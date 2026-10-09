@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
-<body>
+<body class="routes-page">
   <div class="signin" id="signin" hidden>
     <h1>Route Editor</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -67,7 +67,7 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, fitToWindow, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
     import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canReorder } from './js/edit.js';
     forScreen('routes');
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
@@ -140,7 +140,9 @@
       else t.innerHTML = recapView(list);
       t.className = 'routes ' + view;
       document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : list.length + (list.length === 1 ? ' run' : ' runs'));
-      fitToWindow(lines);
+      // Readable rows and print: the grid scrolls inside its box under fixed headings; the page itself does not.
+      const sheet = document.getElementById('sheet'), footer = document.querySelector('.footer');
+      sheet.style.height = Math.max(160, window.innerHeight - sheet.getBoundingClientRect().top - (footer ? footer.offsetHeight : 0) - 8) + 'px';
       if (focus) { const again = t.querySelector('input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]'); if (again) again.focus(); }
     }
 

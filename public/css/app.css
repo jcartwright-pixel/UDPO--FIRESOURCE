@@ -467,3 +467,13 @@ body.weekly-page { background: #eef3f7; }
 .cal-key { font-size: 14px; }
 .drivers-page .panel input[type="text"], .drivers-page .panel input[type="date"] { font-size: 16px; height: 40px; }
 .drivers-page .panel label, .drivers-page .panel-check { font-size: 14px; }
+
+/* Route Editor: readable rows and print; the grid scrolls inside its box with the headings fixed on top. */
+.routes-page { --row: 40px; --font: 16px; }
+.routes-page .sheet#sheet { overflow: auto; }
+.routes-page table.routes thead th { position: sticky; top: 0; z-index: 2; }
+.routes-page table.routes.days td:has(> button[data-runday]) { padding: 3px 4px; }
+.routes-page table.routes.days button[data-runday] { width: 100%; height: 32px; border-radius: 7px; font-size: 14px; font-weight: 800; }
+.routes-page table.routes.days td:has(> button[data-runday]:not(.on)) { background: #171c20; }
+.routes-page table.routes.days button[data-runday]:not(.on) { background: #171c20; color: #9aa7b3; border-color: #171c20; }
+.routes-page table.routes.days button[data-runday].on { background: #f4f8fb; color: #0e3a62; border: 1px solid #bfd1e0; }
