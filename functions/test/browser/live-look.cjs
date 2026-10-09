@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
 (async () => {
   const url = process.argv[2];
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1920, height: 950 } });
+  const page = await browser.newPage({ viewport: { width: 1920, height: 950 }, deviceScaleFactor: 0.5 });
   const problems = [];
   page.on('pageerror', e => problems.push('page error: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
@@ -30,13 +30,13 @@ const { chromium } = require('playwright');
       pageHeight: document.scrollingElement.scrollHeight
     };
   });
-  console.log('LIVE-LOOK ' + JSON.stringify(look, null, 1));
-  console.log('LIVE-PROBLEMS ' + JSON.stringify(problems));
-  const jpg = await page.screenshot({ type: 'jpeg', quality: 55 });
+  const jpg = await page.screenshot({ type: 'jpeg', quality: 50 });
   console.log('LIVE-PICTURE-START');
   const b64 = jpg.toString('base64');
   for (let i = 0; i < b64.length; i += 4000) console.log(b64.slice(i, i + 4000));
   console.log('LIVE-PICTURE-END');
+  console.log('LIVE-LOOK ' + JSON.stringify(look, null, 1));
+  console.log('LIVE-PROBLEMS ' + JSON.stringify(problems));
   await browser.close();
   const ok = look.titleIcon !== 'missing' && parseInt(look.titleIcon, 10) <= 40 && (look.logo === 'missing' || parseInt(look.logo.split('x')[1], 10) <= 60) && look.cards === 8;
   if (!ok) { console.log('::error::The live home page styles did not apply: ' + JSON.stringify(look)); process.exit(1); }
