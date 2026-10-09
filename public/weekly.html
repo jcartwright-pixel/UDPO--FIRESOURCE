@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
-<body>
+<body class="fill weekly-page">
   <div class="signin" id="signin" hidden>
     <h1>Weekly Dispatch</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -25,14 +25,6 @@
     </div>
     <div class="head">
       <div class="title"><h1>Weekly Dispatch</h1><small id="published">New app, side by side with the current one</small></div>
-      <div class="field">
-        <label for="week-date">Week starting</label>
-        <div class="stepper">
-          <button type="button" id="prev" aria-label="Previous week">&#9664;</button>
-          <input type="date" id="week-date">
-          <button type="button" id="next" aria-label="Next week">&#9654;</button>
-        </div>
-      </div>
       <div class="tabs" role="tablist">
         <button type="button" role="tab" id="tab-routes" aria-selected="true">Route / Run Assignments</button>
         <button type="button" role="tab" id="tab-board" aria-selected="false">Driver Assignment Board</button>
@@ -40,7 +32,6 @@
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
     <div class="actions">
-      <button type="button" class="override" id="override" aria-pressed="false">Override</button>
       <span class="spacer"></span>
       <button type="button" id="prev-week">&lt; Previous Week</button>
       <button type="button" id="next-week">Next Week &gt;</button>
@@ -50,27 +41,43 @@
       <button type="button" id="print-week">Print Weekly Dispatch</button>
       <button type="button" class="publish" id="publish">Publish to Daily Dispatch</button>
     </div>
-    <div class="notice error" id="error" hidden></div>
-    <div class="sheet week" id="routes-sheet">
-      <table>
-        <colgroup><col style="width:5%"><col style="width:12%"><col span="7" style="width:11.857%"></colgroup>
-        <thead><tr id="heads"></tr></thead>
-        <tbody id="rows"></tbody>
-      </table>
-    </div>
-    <div class="sheet week board" id="board-sheet" hidden>
-      <table>
-        <colgroup><col style="width:17%"><col span="7" style="width:11.857%"></colgroup>
-        <thead><tr id="board-heads"></tr></thead>
-        <tbody id="board-rows"></tbody>
-      </table>
-    </div>
-    <div class="footer"><span id="count"></span>
+    <section class="wk-summary">
+      <div class="field wk-date">
+        <label for="week-date">Week starting</label>
+        <div class="stepper">
+          <button type="button" id="prev" aria-label="Previous week">&#9664;</button>
+          <input type="date" id="week-date">
+          <button type="button" id="next" aria-label="Next week">&#9654;</button>
+        </div>
+      </div>
       <div class="legend" id="legend">
         <span><i class="assigned"></i>Assigned</span><span><i class="relief"></i>Relief Driver</span><span><i class="needs"></i>Needs Driver</span>
         <span><i class="vacation-needs"></i>Vacation &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span>
       </div>
+      <button type="button" class="override" id="override" aria-pressed="false">Override</button>
+    </section>
+    <div class="notice error" id="error" hidden></div>
+    <div class="wk-scroll" id="wk-scroll">
+      <section class="wk-panel" id="routes-panel">
+        <h2>Route / Run Assignments</h2>
+        <div class="sheet week" id="routes-sheet">
+          <table>
+            <colgroup><col style="width:5%"><col style="width:14%"><col span="7" style="width:11.57%"></colgroup>
+            <thead><tr id="heads"></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="wk-divider" id="board-panel">Driver Assignment Board</div>
+        <div class="sheet week board" id="board-sheet">
+          <table>
+            <colgroup><col style="width:19%"><col span="7" style="width:11.57%"></colgroup>
+            <thead><tr id="board-heads"></tr></thead>
+            <tbody id="board-rows"></tbody>
+          </table>
+        </div>
+      </section>
     </div>
+    <div class="footer"><span id="count"></span></div>
   </div>
 
   <div class="modal-back" id="modal-back" hidden></div>
@@ -107,9 +114,17 @@
     function headCells(first) {
       return first + L.DAYS.map((p, i) => {
         const date = L.addDays(week, i);
-        return '<th class="' + (date === today ? 'today' : '') + '">' + L.DAY_NAMES[i].slice(0, 3) + ' ' + escapeHtml(shortDate(date).replace(/\/\d+$/, '')) + '</th>';
+        return '<th class="' + (date === today ? 'today' : '') + '">' + L.DAY_NAMES[i].slice(0, 3) + '<small>' + escapeHtml(longDate(date)) + '</small></th>';
       }).join('');
     }
+
+    // The day under each column head, as on the current Weekly screen ("OCTOBER 4").
+    function longDate(key) {
+      const [y, m, d] = key.split('-').map(Number);
+      return ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'][m - 1] + ' ' + d;
+    }
+    // A split route's second load (6301_2) shows as 6301, as on the current screen.
+    function routeNumber(v) { const s = String(v || ''), i = s.lastIndexOf('_'); return i > 0 && /^\d+$/.test(s.slice(i + 1)) ? s.slice(0, i) : s; }
 
     function render() {
       if (popover) return; // the editor is open; the grid redraws when it closes
@@ -126,15 +141,16 @@
       plantCtx = ctx;
       document.getElementById('heads').innerHTML = headCells('<th>Route</th><th>Run / Destination</th>');
       document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '">' +
-        '<td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td>' +
+        '<td class="strong" title="' + escapeHtml(r.route) + '">' + escapeHtml(routeNumber(r.route)) + '</td><td class="strong">' + escapeHtml(r.run) + '</td>' +
         L.DAYS.map(p => {
           const d = r.days[p], cls = L.weeklyCellClass(r, p, ctx), locked = cls === 'coverage' && !override;
           const can = edit && !locked;
           if (cls === 'off') return '<td class="day off' + (can ? ' editable' : '') + '" data-day="' + p + '" title="Does not run' + (can ? ': click to assign a driver or carrier' : '') + '"></td>';
+          if (cls === 'coverage' && !override) return '<td class="day off c-coverage" data-day="' + p + '" title="' + escapeHtml(String(r.coverageType || 'Covered') + ' covers this run') + '"></td>';
           const units = [d.truck, d.trailer].filter(Boolean).join(' / '), plant = L.plantFor(ctx, r, p);
-          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? 'VACATION: ' + d.intendedDriver : cls === 'plant' ? 'PLANT LOAD' : 'NEEDS DRIVER');
+          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? 'VACATION: ' + d.intendedDriver : cls === 'plant' ? 'PLANT LOAD' : '\u2014 NEEDS DRIVER \u2014');
           const full = name + (units ? ', ' + units : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
-          return '<td class="day c-' + cls + (plant ? ' plant-load' : '') + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(full) + '">' + escapeHtml(name) +
+          return '<td class="day c-' + cls + (plant ? ' plant-load' : '') + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(full) + '"><b class="nm">' + escapeHtml(name) + '</b>' +
             (units ? '<span class="unit">' + escapeHtml(units) + '</span>' : '') + '</td>';
         }).join('') + '</tr>').join('') || '<tr><td colspan="9" class="empty">This week is not one of the copied Live weeks.</td></tr>';
 
@@ -151,10 +167,7 @@
       }).join('') || '<tr><td colspan="8" class="empty">No active drivers in the Driver Master copy.</td></tr>';
 
       const open = rows.reduce((n, r) => n + L.DAYS.filter(p => ['needs', 'vacation-needs', 'plant'].indexOf(L.weeklyCellClass(r, p, ctx)) >= 0).length, 0);
-      document.getElementById('count').textContent = tab === 'routes' ? rows.length + ' runs' + (open ? ', ' + open + ' days need a driver' : '') : board.length + ' active drivers';
-      document.getElementById('routes-sheet').hidden = tab !== 'routes';
-      document.getElementById('board-sheet').hidden = tab !== 'board';
-      fitToWindow(tab === 'routes' ? rows.length : board.length + (board.some(b => b.relief) ? 2 : 1));
+      document.getElementById('count').textContent = rows.length + ' runs' + (open ? ', ' + open + ' days need a driver' : '') + ' \u00b7 ' + board.length + ' active drivers';
       if (!document.getElementById('days-modal').hidden) paintRunDays();
     }
 
@@ -321,9 +334,12 @@
       window.print();
     };
     function setTab(t) {
+      // Both tables sit on one page, as on the current screen; the buttons jump to them.
       tab = t;
       document.getElementById('tab-routes').setAttribute('aria-selected', String(t === 'routes'));
       document.getElementById('tab-board').setAttribute('aria-selected', String(t === 'board'));
+      const box = document.getElementById('wk-scroll'), target = document.getElementById(t === 'routes' ? 'routes-panel' : 'board-panel');
+      box.scrollTop = t === 'routes' ? 0 : target.offsetTop - box.offsetTop;
       render();
     }
     document.getElementById('tab-routes').onclick = () => setTab('routes');

@@ -117,7 +117,8 @@
     // Session-only screen state, like the current screen: rows switched to NO RUN stay in view, and OVR ticks per row.
     const keptOff = {}, ovr = {};
 
-    // Weeks on this screen begin on Saturday, the same as the current Daily Dispatch.
+    // Like the current Daily Dispatch: the Loadout Day list runs Saturday to Friday (the Saturday loadout delivers into the next week),
+    // and Week Beginning shows that week's Sunday.
     const weekBegin = (key) => L.addDays(key, -((L.DAYS.indexOf(L.dayPrefix(key)) + 1) % 7));
     const show = (v) => v === null || v === undefined ? '' : String(v);
     const departText = (r) => L.timeText(r.dispatchTime !== null && r.dispatchTime !== undefined ? r.dispatchTime : r.startTime);
@@ -381,7 +382,7 @@
     /* ---------- Print: straight to the printer, the same columns as the current dispatch sheet ---------- */
     function printSheet(only) {
       const list = (only || rows).filter(r => !r.off);
-      let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(shortDate(weekBegin(loadDate))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
+      let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(shortDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
         ' &middot; Delivery Day ' + escapeHtml(document.getElementById('delivery-day').value) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
         '<th>C/O</th><th>P/O</th><th>T/O</th><th>L/D</th><th>DR</th><th>CHECKED BY</th><th>JACK</th><th>DRIVER NOTES</th></tr></thead><tbody>';
       let group = '';
@@ -400,7 +401,7 @@
       const { db } = await start();
       if (unsubscribeRuns) unsubscribeRuns();
       const begin = weekBegin(loadDate);
-      document.getElementById('week-begin').value = shortDate(begin);
+      document.getElementById('week-begin').value = shortDate(L.addDays(begin, 1));
       document.getElementById('load-day').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
         const key = L.addDays(begin, i);
         return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key) + ' ' + shortDate(key)) + '</option>';

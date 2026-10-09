@@ -370,3 +370,65 @@ body.phone .notice { margin: 12px 16px 0; }
   .brand small { margin-top: 2px; font-size: 10px; }
   .split-side { height: calc(100vh - 138px); }
 }
+
+/* Weekly Dispatch, laid out like the current app's Weekly screen (WeeklyDispatch.html): the buttons on the right,
+   the week and the colour key in one bar, Route / Run Assignments with the Driver Assignment Board under it.
+   Rows keep the current screen's height; the two tables scroll inside the page, under their column heads. */
+body.weekly-page { background: #eef3f7; }
+.weekly-page .head { padding: 8px 16px 2px; align-items: center; }
+.weekly-page .actions { padding: 0 16px 8px; }
+.weekly-page .actions button { min-height: 42px; border-radius: 10px; }
+.wk-summary { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 16px 8px; padding: 6px 14px; background: #fff; border: 1px solid #d2dde6; border-radius: 14px; }
+.wk-summary .field { flex-direction: row; align-items: center; gap: 10px; }
+.wk-summary .field label { font-size: 14px; font-weight: 800; color: #536b81; }
+.wk-summary .stepper input { font-size: 19px; }
+.wk-summary .legend { margin-left: 0; flex: 1; flex-wrap: wrap; gap: 10px; font-size: 13px; font-weight: 800; color: #294a69; }
+.wk-summary .legend i { width: 26px; height: 16px; border-radius: 5px; border: 2px solid #bfd1e0; box-sizing: border-box; }
+.wk-summary .legend i.assigned { background: #f4f8fb; } .wk-summary .legend i.relief { background: #dff4f1; }
+.wk-summary .legend i.needs { background: #ffd32e; border-color: #e1ae00; } .wk-summary .legend i.vacation-needs { background: #ffd32e; border-color: #ef4545; }
+.wk-summary .legend i.plant { background: #ffd32e; border: 2px dashed #c2410c; } .wk-summary .legend i.conflict { background: #f4f8fb; border-color: #ef4545; }
+.wk-summary .legend i.off { background: #171c20; border-color: #171c20; }
+.wk-summary .override { min-height: 32px; padding: 0 14px; border-radius: 16px; }
+.wk-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0 16px; background: #fff; border: 1px solid #d0dce5; border-radius: 14px; }
+.wk-panel h2 { margin: 0; padding: 8px 24px 10px; color: #123f70; font-size: 19px; font-weight: 500; }
+.weekly-page .sheet.week { margin: 0; border: 0; border-radius: 0; overflow: visible; }
+.weekly-page .week table { min-width: 1120px; }
+.weekly-page .week th { position: sticky; top: 0; z-index: 2; height: auto; padding: 8px 6px; background: #194a7e; color: #fff; font-size: 15px; line-height: 1.08; text-transform: uppercase; border-right: 1px solid #d6e1e9; }
+.weekly-page .week th small { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; }
+.weekly-page .week th.today { background: #0f3a66; box-shadow: inset 0 -4px 0 var(--ud-gold); }
+.weekly-page .week td { height: 44px; padding: 0; border: 1px solid #bfd0df; color: #0d365d; font-size: 15px; white-space: nowrap; }
+.weekly-page .week tbody td.strong { padding: 0 8px; background: #fff; text-align: center; font-size: 16px; font-weight: 900; }
+.weekly-page .week td.day { background: #171c20 !important; box-shadow: none; outline: 0; }
+.weekly-page .week td.day:not(.off) { position: relative; padding: 0 9px; text-align: center; color: #0e3a62; font-size: 14px; font-weight: 850; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
+.weekly-page .week td.day:not(.off)::before { content: ""; position: absolute; inset: 3px; border: 1px solid #bfd1e0; border-radius: 7px; background: #f4f8fb; }
+.weekly-page .week td.day:not(.off) > * { position: relative; }
+.weekly-page .week td.day .nm { display: block; }
+.weekly-page .week td.day .unit { display: block; margin: 1px 0 0; color: #5d7286; font-size: 11px; font-weight: 700; }
+.weekly-page .week td.c-relief::before { background: #dff4f1 !important; }
+.weekly-page .week td.c-needs::before { background: #ffd32e !important; border: 2px solid #e1ae00 !important; }
+.weekly-page .week td.c-plant::before { background: #ffd32e !important; border: 2px dashed #c2410c !important; }
+.weekly-page .week td.c-vacation-needs::before { background: #ffd32e !important; border: 2px solid #ef4545 !important; }
+.weekly-page .week td.c-conflict::before { border: 2px solid #ef4545 !important; }
+.weekly-page .week td.c-booked::before { background: #ffdbe6 !important; border: 2px solid #f0a5bd !important; }
+.weekly-page .week td.c-carrier::before { background: #bcd9ff !important; border: 2px solid #4a8fe0 !important; }
+.weekly-page .week td.c-open::before { background: #e6defa !important; border: 2px solid #9b86d6 !important; }
+.weekly-page .week td.c-coverage::before { background: #e7edf3 !important; }
+.weekly-page .week td.c-coverage { color: #536b81 !important; }
+.weekly-page .week td.editable { cursor: pointer; }
+.weekly-page .week td.editable:not(.off):hover::before { outline: 2px solid var(--ud-gold); outline-offset: -1px; }
+.weekly-page .week td.off.editable:hover { box-shadow: inset 0 0 0 2px var(--ud-gold); }
+.wk-divider { padding: 9px 14px; background: #f4f7fa; color: #0e3a62; text-align: center; font-size: 17px; font-weight: 900; border-top: 3px solid #1d5b91; }
+.weekly-page .board th { background: #e6eef5; color: #0e3a62; border-bottom: 2px solid #1d5b91; }
+.weekly-page .board td { height: 34px; font-size: 12px; font-weight: 850; text-align: center; }
+.weekly-page .board td.strong { font-size: 14px; }
+.weekly-page .board tr.group td { height: 30px; background: #f3f6f9 !important; color: #0e3a62; font-size: 15px; font-weight: 900; border-top: 2px solid #1d5b91; }
+.weekly-page .board td.day { background: #fff !important; }
+.weekly-page .board td.b-available { background: #e7f6e5 !important; }
+.weekly-page .board td.b-assigned { background: #282d33 !important; color: #8fc6ff; }
+.weekly-page .board td.b-booked { background: #d9ebfb !important; color: #000; }
+.weekly-page .board td.b-vacation { background: #f5c6c8 !important; color: #7d2bd0; box-shadow: inset 0 0 0 2px #ee3e3e; }
+.weekly-page .board td.b-conflict { background: #f5bfc1 !important; box-shadow: inset 0 0 0 2px #ee3e3e; }
+.weekly-page .board td.b-unavailable { background: #ffe1b5 !important; color: #914600; }
+.weekly-page .board button.avail { height: 32px; font-size: 12px; font-weight: 850; }
+.weekly-page .footer { padding: 4px 16px 6px; }
+@media (max-height: 720px) { .weekly-page .actions button { min-height: 34px; } .wk-summary { padding: 3px 12px; margin-bottom: 6px; } .wk-panel h2 { padding: 4px 20px 6px; font-size: 17px; } }
