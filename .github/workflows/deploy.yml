@@ -6,7 +6,11 @@ name: Deploy distribution app (Firebase)
 # Needs, per target, the repository secret FIREBASE_SERVICE_ACCOUNT_SANDBOX / FIREBASE_SERVICE_ACCOUNT_PRODUCTION
 # (a deploy key for that Firebase project) and the variable FIREBASE_PROJECT_SANDBOX / FIREBASE_PROJECT_PRODUCTION.
 # Without them it stops with a notice and deploys nothing. It never changes the current Apps Script app.
+# Until this file is on main (where GitHub lists it for "Run workflow"), a push to the work branch whose commit
+# message contains [deploy sandbox] also deploys, to the SANDBOX only.
 on:
+  push:
+    branches: [claude/project-thread-ell22c]
   workflow_dispatch:
     inputs:
       target:
@@ -20,13 +24,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-distribution-app-${{ inputs.target }}
+  group: deploy-distribution-app-${{ inputs.target || 'sandbox' }}
   cancel-in-progress: false
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy sandbox]')
     runs-on: ubuntu-latest
-    environment: distribution-${{ inputs.target }}
+    environment: distribution-${{ inputs.target || 'sandbox' }}
     defaults:
       run:
         working-directory: functions
@@ -46,7 +51,7 @@ jobs:
           SA_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
           PROJECT_SANDBOX: ${{ vars.FIREBASE_PROJECT_SANDBOX }}
           PROJECT_PRODUCTION: ${{ vars.FIREBASE_PROJECT_PRODUCTION }}
-          TARGET: ${{ inputs.target }}
+          TARGET: ${{ inputs.target || 'sandbox' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -69,7 +74,7 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
           PROJECT: ${{ steps.settings.outputs.project }}
-          TARGET: ${{ inputs.target }}
+          TARGET: ${{ inputs.target || 'sandbox' }}
           SANDBOX_SOURCES_JSON: ${{ vars.SANDBOX_SOURCES_JSON }}
           SANDBOX_WRITEBACK_JSON: ${{ vars.SANDBOX_WRITEBACK_JSON }}
           SANDBOX_ADMINS: ${{ vars.SANDBOX_ADMINS || 'jcartwright@uniteddairy.com' }}
@@ -91,7 +96,7 @@ jobs:
           fi
           cd .. && npx --prefix functions firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
           {
-            echo "## Distribution app (${{ inputs.target }})"
+            echo "## Distribution app ($TARGET)"
             echo "Screens: https://$PROJECT.web.app"
             echo "Commit: $GITHUB_SHA"
           } >> "$GITHUB_STEP_SUMMARY"
