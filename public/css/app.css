@@ -477,3 +477,17 @@ body.weekly-page { background: #eef3f7; }
 .routes-page table.routes.days td:has(> button[data-runday]:not(.on)) { background: #171c20; }
 .routes-page table.routes.days button[data-runday]:not(.on) { background: #171c20; color: #9aa7b3; border-color: #171c20; }
 .routes-page table.routes.days button[data-runday].on { background: #f4f8fb; color: #0e3a62; border: 1px solid #bfd1e0; }
+
+/* Route Distribution home: four cards, each a doorway with its screens listed inside. */
+.cards.cards4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); max-width: 1500px; }
+.card.home4 .dc-text strong { font-size: clamp(20px, 2.8vh, 26px); }
+.card.home4 .dc-text em { font-size: 14px; }
+.dc-links { display: grid; grid-auto-rows: minmax(44px, 54px); gap: 8px; padding: 6px 14px 10px; }
+.dc-link { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0 16px; border: 1px solid #cfdeec; border-radius: 11px; background: #fff; color: #0a3866; text-decoration: none; font-weight: 800; font-size: 17px; }
+.dc-link span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-link .dc-arrow { font-size: 22px; }
+.dc-link:hover { border-color: var(--accent); background: #f5f9fd; }
+.card.home4:hover { box-shadow: 0 7px 18px rgba(13,52,87,.075); }
+.card.home4 .dc-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.card .owner.ext { background: #fff4d9; color: #8a5a00; border-color: #f0d48a; }
+@media (max-width: 900px) { .cards.cards4 { grid-template-columns: 1fr; grid-template-rows: none; } }

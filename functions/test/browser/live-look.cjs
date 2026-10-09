@@ -38,7 +38,7 @@ const { chromium } = require('playwright');
   console.log('LIVE-LOOK ' + JSON.stringify(look, null, 1));
   console.log('LIVE-PROBLEMS ' + JSON.stringify(problems));
   await browser.close();
-  const ok = look.titleIcon !== 'missing' && parseInt(look.titleIcon, 10) <= 40 && (look.logo === 'missing' || parseInt(look.logo.split('x')[1], 10) <= 60) && look.cards === 8;
+  const ok = look.titleIcon !== 'missing' && parseInt(look.titleIcon, 10) <= 40 && (look.logo === 'missing' || parseInt(look.logo.split('x')[1], 10) <= 60) && look.cards === 4; // Joe 10/9: the home is four cards (Dispatch, Drivers & Vacations, Equipment, Check-ins & Overall)
   if (!ok) { console.log('::error::The live home page styles did not apply: ' + JSON.stringify(look)); process.exit(1); }
   console.log('Live home page styles applied');
 })().catch(e => { console.error(e); process.exit(1); });
