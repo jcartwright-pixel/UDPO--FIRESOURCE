@@ -24,7 +24,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Daily Dispatch</h1><small>New app, side by side with the current one</small></div>
+      <div class="title"><h1>Daily Dispatch</h1></div>
       <div class="field">
         <label>Week beginning</label>
         <div class="stepper">
@@ -42,14 +42,14 @@
         </div>
       </div>
       <div class="field"><label>Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
+      <div class="actions in-head">
+        <button type="button" class="primary" id="print-sheet">&#9635; Print Dispatch Sheet</button>
+        <button type="button" class="warn" id="open-down">&#128667; Down Trucks / Trailers</button>
+        <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
+        <button type="button" class="primary" id="open-calloff">Driver Call-Off</button>
+        <button type="button" class="primary" id="open-add">+ Add Route / Run</button>
+      </div>
       <div class="badge-test" id="mode"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
-    </div>
-    <div class="actions">
-      <button type="button" class="primary" id="print-sheet">&#9635; Print Dispatch Sheet</button>
-      <button type="button" class="warn" id="open-down">&#128667; Down Trucks / Trailers</button>
-      <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
-      <button type="button" class="primary" id="open-calloff">Driver Call-Off</button>
-      <button type="button" class="primary" id="open-add">+ Add Route / Run</button>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="sheet">
