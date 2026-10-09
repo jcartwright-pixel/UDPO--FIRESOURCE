@@ -521,7 +521,20 @@
     return plan;
   }
 
+  // A check-in or write-up answer that says nothing is wrong ("none", "ok", "no issues", "Y"): no write-up (udpoMaintenanceNoWriteUp_).
+  function noWriteUp(value) {
+    var t = String(value === null || value === undefined ? '' : value).toLowerCase().replace(/[^a-z0-9/+ ]+/g, ' ').replace(/\s+/g, ' ').replace(/^[/+ ]+|[/+ ]+$/g, '');
+    if (!t) return true;
+    if (/^(?:x+|n|no|nope|none|nil|na|n a|n\/a|negative|nothing|ok|okay|good|fine|working|working fine|all good|all ok|all okay|all clear)$/.test(t)) return true;
+    if (/^(?:no|nothing|none)(?: (?:new|known|major|minor|other))? (?:write ?ups?|issues?|defects?|problems?|concerns?|repairs?|damages?|complaints?|comments?|reports?|notes?)(?: (?:to report|reported|noted|found|today|at this time|this trip))?$/.test(t)) return true;
+    if (/^(?:nothing|none) (?:to report|wrong|noted|today|needed|at this time)$/.test(t)) return true;
+    if (/^(?:n0|it ?s (?:fine|good|ok|okay)|it is (?:fine|good|ok|okay)|its (?:fine|good|ok|okay))$/.test(t)) return true;
+    t = t.replace(/[^a-z0-9 ]+/g, ' ').trim();
+    return /^(?:y|ye|yes|yep|yeah|ytes|ye s)$/.test(t);
+  }
+
   return {
+    noWriteUp: noWriteUp,
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, notRunningRows: notRunningRows,
