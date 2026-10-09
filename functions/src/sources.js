@@ -14,7 +14,9 @@ const UNIONTOWN = Object.freeze({
     equipment: { spreadsheetId: '1eqZxqZNQs5gwuaRmQgPRbNvSmy7gOnwwwyoqFS3Djb4', tab: 'EQUIPMENT_MASTER' },
     users: { spreadsheetId: '1hmzHhGAX6NkF2qVDsYFhC_k7V3Ubfbi1WZjkvWKQA20', tab: 'USERS_MASTER' },
     exceptions: { spreadsheetId: '1Iczex1skLAFBX9atk0kRvEQimBTnhCRauKWH6SL4KoM', tab: 'DRIVER_EXCEPTIONS' },
-    vacations: { spreadsheetId: '14gP6bChKZABMglED78OZLmy0LcJF91-tQWVo5bXtGW4', tab: 'DRIVER_VACATIONS' }
+    vacations: { spreadsheetId: '14gP6bChKZABMglED78OZLmy0LcJF91-tQWVo5bXtGW4', tab: 'DRIVER_VACATIONS' },
+    // The Plant Operations Scheduler's journal, in the Live workbook (Weekly's PLANT LOAD marks).
+    plantLoads: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' }
   }
 });
 

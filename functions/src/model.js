@@ -24,7 +24,8 @@ const L = require('./logic');
 const COLLECTIONS = Object.freeze({
   config: 'config', weeks: 'weeks', runs: 'runs', drivers: 'drivers', equipment: 'equipment',
   routes: 'routes', users: 'users', actions: 'actions', transfers: 'transfers',
-  outbox: 'outbox', conflicts: 'conflicts', exceptions: 'exceptions', vacations: 'vacations'
+  outbox: 'outbox', conflicts: 'conflicts', exceptions: 'exceptions', vacations: 'vacations',
+  plantLoads: 'plantLoads'
 });
 
 const LIVE_TABS = Object.freeze({ previous: 'LIVE PREVIOUS WEEK', current: 'LIVE CURRENT WEEK', next: 'LIVE NEXT WEEK' });

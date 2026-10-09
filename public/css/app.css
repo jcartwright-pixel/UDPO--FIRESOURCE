@@ -210,6 +210,8 @@ button.override.on { background: #fff4e5; color: #9a4b00; border-color: #f0b46a;
 .week td.c-assigned { background: var(--c-assigned) !important; }
 .week td.c-relief { background: var(--c-relief) !important; }
 .week td.c-needs { background: var(--c-needs) !important; color: #9a4b00; font-weight: 700; box-shadow: inset 3px 0 0 var(--missing-edge); }
+.week td.c-plant { background: var(--c-plant) !important; color: #5b21b6; font-weight: 700; box-shadow: inset 3px 0 0 #7c3aed; }
+.week td.plant-load { outline: 2px dashed #7c3aed; outline-offset: -3px; }
 .week td.c-vacation-needs { background: var(--c-vacation) !important; color: #9b1c3a; font-weight: 700; }
 .week td.c-conflict, .week td.c-booked { background: var(--c-conflict) !important; color: #9b1c1c; }
 .week td.c-carrier, .week td.c-open { background: #f4f6f8 !important; color: var(--ud-blue); font-weight: 700; }

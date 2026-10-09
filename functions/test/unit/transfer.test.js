@@ -118,3 +118,11 @@ test('SOURCES_JSON can point the copy at a Live workbook copy and keeps the real
   assert.equal(s.live.spreadsheetId, 'sandbox-copy');
   assert.deepEqual(s.masters, UNIONTOWN.masters);
 });
+
+test('plant loads: only Plant Route loads (not Carrier, deleted or other journal rows), the last row of a changed record', () => {
+  const p = T.parseMaster('plantLoads', F.fakeSheets()["'PLANT_OPERATIONS'"]);
+  assert.deepEqual(Object.keys(p.docs), ['pls_1']);
+  const d = p.docs.pls_1;
+  assert.deepEqual([d.runId, d.date, d.pickupTime, d.trailer, d.poNumber], ['run_t801', '2026-10-08', '7:00 AM', 'T-902', '4411']);
+  assert.deepEqual(p.warnings, []);
+});

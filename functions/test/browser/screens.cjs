@@ -214,6 +214,15 @@ async function noScroll(page) {
     await wkEdit.selectOption('.popover select[data-kind="driver"]', '__CARRIER__');
     await wkEdit.click('.popover .close');
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[4].firstChild.textContent === 'CARRIER' && tr.children[4].classList.contains('c-carrier')), null, { timeout: 5000 });
+    // Plant Load: 801 does not run Thursdays, but the plant scheduler has a load for it on 10/8, so the day needs a driver.
+    const thu801 = 'xpath=//tr[td[1][text()="801"]]/td[@data-day="thu"]';
+    assert.deepEqual(await wkEdit.$eval(thu801, td => [td.classList.contains('c-plant'), td.classList.contains('plant-load'), td.textContent, /pickup 7:00 AM, T-902, PO 4411/.test(td.title)]), [true, true, 'PLANT LOAD', true]);
+    await wkEdit.click(thu801);
+    assert.match(await wkEdit.$eval('.popover select[data-kind="driver"] option', o => o.textContent), /PLANT LOAD/);
+    await wkEdit.selectOption('.popover select[data-kind="driver"]', 'drv_test_adams');
+    await wkEdit.click('.popover .close');
+    await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6]; return /ADAMS/.test(td.textContent) && td.classList.contains('plant-load') && !td.classList.contains('c-plant'); }, null, { timeout: 5000 });
+    if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-plant-load-1920.png') });
     await wkEdit.click('#run-days');
     await wkEdit.click('xpath=//tbody[@id="days-rows"]/tr[td[1]/b[text()="802"]]/td[2+5]/button');
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 5000 });
@@ -244,7 +253,7 @@ async function noScroll(page) {
     assert.ok(rsFit.scroll <= rsFit.inner, 'Weekly still fits after Reset Week');
     if (SHOTS) await wkMgr.screenshot({ path: path.join(SHOTS, 'weekly-after-reset-1366.png') });
     results.push('Reset Week: a dispatcher cannot; a manager clicked twice: 802 Tuesday CARRIER went back to its standard driver CASEY, who is called off that day, so it needs a driver; Thursday off again; Monday still Vacation - Needs Driver');
-    results.push('Weekly: CARRIER picked for 802 Tuesday, Route Run Days turned 802 Thursday on (Needs Driver), CASEY on vacation Monday from the Driver Assignment Board left 802 Monday as Vacation - Needs Driver, Publish recorded');
+    results.push('Weekly: 801 Thursday showed PLANT LOAD from the plant scheduler and took ADAMS (the run turned on, the mark stayed); CARRIER picked for 802 Tuesday, Route Run Days turned 802 Thursday on (Needs Driver), CASEY on vacation Monday from the Driver Assignment Board left 802 Monday as Vacation - Needs Driver, Publish recorded');
 
     // Someone with no dispatch role sees no edit controls.
     const viewer = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=viewer.test@uniteddairy.com');

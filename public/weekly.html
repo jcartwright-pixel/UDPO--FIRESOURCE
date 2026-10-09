@@ -99,7 +99,7 @@
     const params = new URLSearchParams(location.search);
     const today = L.operatingDay(new Date());
     let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(today);
-    let unsubscribe = null, unsubscribeWeek = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
+    let unsubscribe = null, unsubscribeWeek = null, unsubscribePlant = null, plantLoads = [], plantCtx = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
     const getRuns = () => runs;
     const SPECIAL = { __CARRIER__: 'CARRIER', __OPEN__: 'OPEN' };
 
@@ -121,7 +121,8 @@
       ob.classList.toggle('on', override);
       ob.setAttribute('aria-pressed', String(override));
       rows = L.weeklyRows(runs, week);
-      const ctx = L.weeklyContext(rows, lists.allDrivers, lists.exceptions);
+      const ctx = L.weeklyContext(rows, lists.allDrivers, lists.exceptions, plantLoads);
+      plantCtx = ctx;
       document.getElementById('heads').innerHTML = headCells('<th>Route</th><th>Run / Destination</th>');
       document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '">' +
         '<td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td>' +
@@ -129,10 +130,10 @@
           const d = r.days[p], cls = L.weeklyCellClass(r, p, ctx), locked = cls === 'coverage' && !override;
           const can = edit && !locked;
           if (cls === 'off') return '<td class="day off' + (can ? ' editable' : '') + '" data-day="' + p + '" title="Does not run' + (can ? ': click to assign a driver or carrier' : '') + '"></td>';
-          const units = [d.truck, d.trailer].filter(Boolean).join(' / ');
-          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? 'VACATION: ' + d.intendedDriver : 'NEEDS DRIVER');
-          const full = name + (units ? ', ' + units : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : '');
-          return '<td class="day c-' + cls + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(full) + '">' + escapeHtml(name) +
+          const units = [d.truck, d.trailer].filter(Boolean).join(' / '), plant = L.plantFor(ctx, r, p);
+          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? 'VACATION: ' + d.intendedDriver : cls === 'plant' ? 'PLANT LOAD' : 'NEEDS DRIVER');
+          const full = name + (units ? ', ' + units : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
+          return '<td class="day c-' + cls + (plant ? ' plant-load' : '') + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(full) + '">' + escapeHtml(name) +
             (units ? '<span class="unit">' + escapeHtml(units) + '</span>' : '') + '</td>';
         }).join('') + '</tr>').join('') || '<tr><td colspan="9" class="empty">This week is not one of the copied Live weeks.</td></tr>';
 
@@ -148,7 +149,7 @@
         }).join('') + '</tr>';
       }).join('') || '<tr><td colspan="8" class="empty">No active drivers in the Driver Master copy.</td></tr>';
 
-      const open = rows.reduce((n, r) => n + L.DAYS.filter(p => ['needs', 'vacation-needs'].indexOf(L.weeklyCellClass(r, p, ctx)) >= 0).length, 0);
+      const open = rows.reduce((n, r) => n + L.DAYS.filter(p => ['needs', 'vacation-needs', 'plant'].indexOf(L.weeklyCellClass(r, p, ctx)) >= 0).length, 0);
       document.getElementById('count').textContent = tab === 'routes' ? rows.length + ' runs' + (open ? ', ' + open + ' days need a driver' : '') : board.length + ' active drivers';
       document.getElementById('routes-sheet').hidden = tab !== 'routes';
       document.getElementById('board-sheet').hidden = tab !== 'board';
@@ -161,7 +162,8 @@
       const d = row.days[day], date = d.date, busy = {};
       rows.forEach(r => { const x = r.days[day]; if (r !== row && x.runs && x.driverId) busy[x.driverId] = 'on ' + r.route; });
       const who = String(d.driver || '').toUpperCase();
-      let html = '<option value="">' + (d.runs ? '&mdash; NEEDS DRIVER &mdash;' : '&mdash; DOES NOT RUN &mdash;') + '</option>' +
+      const plantOpen = !d.runs && L.plantFor(plantCtx, row, day);
+      let html = '<option value="">' + (d.runs ? '&mdash; NEEDS DRIVER &mdash;' : plantOpen ? '&mdash; PLANT LOAD &mdash; NEEDS DRIVER &mdash;' : '&mdash; DOES NOT RUN &mdash;') + '</option>' +
         '<option value="__CARRIER__"' + (who === 'CARRIER' ? ' selected' : '') + '>CARRIER</option><option value="__OPEN__"' + (who === 'OPEN' ? ' selected' : '') + '>OPEN</option>' +
         (d.runs ? '<option value="__OFF__">NOT RUNNING</option>' : '');
       const relief = [], regular = [], blocked = [];
@@ -338,6 +340,11 @@
         render();
       }, e => showError('Could not read the week: ' + e.message));
       unsubscribeWeek = onSnapshot(doc(db, 'weeks', week), snap => { weekDoc = snap.exists() ? snap.data() : null; showPublished(); });
+      // Plant Route loads on the Plant Operations Scheduler for this week (copied from PLANT_OPERATIONS).
+      if (unsubscribePlant) unsubscribePlant();
+      unsubscribePlant = onSnapshot(query(collection(db, 'plantLoads'), where('date', '>=', week), where('date', '<=', L.addDays(week, 6))), snap => {
+        plantLoads = snap.docs.map(d => d.data()); render();
+      }, e => showError('Could not read the plant scheduler loads: ' + e.message));
     }
     function move(days) { week = L.addDays(week, days); watch(); }
 

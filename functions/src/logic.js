@@ -390,7 +390,8 @@
   // The legend colour of one Weekly cell: off, coverage, vacation-needs, conflict, needs, carrier, open, booked, relief, assigned.
   function weeklyCellClass(row, prefix, ctx) {
     var d = row.days[prefix], who = String(d.driver || '').trim().toUpperCase();
-    if (!d.runs) return 'off';
+    // A plant load on the Plant Operations Scheduler for a day the run does not run: it needs a driver (current Weekly).
+    if (!d.runs) return plantFor(ctx, row, prefix) && !coveredRoute(row) ? 'plant' : 'off';
     if (coveredRoute(row)) return 'coverage';
     if (!who) return /VACATION/i.test(d.driverExceptionStatus) ? 'vacation-needs' : 'needs';
     if (who === 'CARRIER') return 'carrier';
@@ -400,7 +401,18 @@
     return ctx.relief[d.driverId] ? 'relief' : 'assigned';
   }
 
-  function weeklyContext(rows, drivers, exceptions) {
+  // The Plant Route loads for one run on one day (plant scheduler copy), or null.
+  function plantFor(ctx, row, prefix) {
+    var list = ctx && ctx.plant ? ctx.plant[row.runId + '|' + row.days[prefix].date] : null;
+    return list && list.length ? list : null;
+  }
+  function plantTitle(list) {
+    return 'Plant scheduler: ' + list.map(function (e) {
+      return [e.pickupTime ? 'pickup ' + e.pickupTime : '', e.loadDate ? 'load ' + e.loadDate : '', e.trailer || '', e.poNumber ? 'PO ' + e.poNumber : ''].filter(Boolean).join(', ');
+    }).join(' / ');
+  }
+
+  function weeklyContext(rows, drivers, exceptions, plantLoads) {
     var dup = {}, relief = {};
     (drivers || []).forEach(function (d) { if (d.reliefDriver) relief[d.id] = true; });
     (rows || []).forEach(function (r) {
@@ -412,7 +424,9 @@
         dup[k] = (dup[k] || 0) + 1;
       });
     });
-    return { dup: dup, relief: relief, exceptions: exceptions || [] };
+    var plant = {};
+    (plantLoads || []).forEach(function (e) { if (e.runId && e.date) (plant[e.runId + '|' + e.date] = plant[e.runId + '|' + e.date] || []).push(e); });
+    return { dup: dup, relief: relief, exceptions: exceptions || [], plant: plant };
   }
 
   // One line per active driver (relief drivers first, then seniority): each day shows the routes they have, else why
@@ -470,7 +484,7 @@
   }
 
   return {
-    standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
+    plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,

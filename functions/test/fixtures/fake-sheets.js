@@ -125,6 +125,17 @@ const VACATIONS = [
   { id: 'vac_test_1', driver_id: 'drv_test_adams', start_date: '2026-10-12', end_date: '2026-10-16', status: 'APPROVED', vacation_type: 'VACATION', facility_id: 'fac_uniontown' }
 ];
 
+// The Plant Operations Scheduler journal (PLANT_OPERATIONS, in the Live workbook): 801 on Thursday 10/8 is a plant
+// load (801 does not run Thursdays), 802 Saturday 10/10 is a Carrier pickup, a changed record keeps its last row.
+const PLANT_HEADERS = ['record_id', 'record_type', 'business_date', 'facility_id', 'route_id', 'run_id', 'route', 'run', 'status', 'notes', 'payload_json', 'recorded_at', 'recorded_by'];
+const PLANT = [
+  { record_id: 'pls_1', record_type: 'PLANT_SCHEDULE', business_date: '2026-10-08', run_id: 'run_t801', route: '801', run: 'UT DSD MILK', status: 'SCHEDULED', payload_json: '{"pickupTime":"6:00 AM","trailer":"T-901","scheduleType":"ROUTE"}', recorded_at: '2026-10-01T10:00:00Z' },
+  { record_id: 'pls_1', record_type: 'PLANT_SCHEDULE', business_date: '2026-10-08', run_id: 'run_t801', route: '801', run: 'UT DSD MILK', status: 'SCHEDULED', payload_json: '{"pickupTime":"7:00 AM","trailer":"T-902","scheduleType":"ROUTE","poNumber":"4411"}', recorded_at: '2026-10-02T10:00:00Z' },
+  { record_id: 'pls_2', record_type: 'PLANT_SCHEDULE', business_date: '2026-10-10', run_id: 'run_t802', route: '802', run: 'UT DSD MILK', status: 'SCHEDULED', payload_json: '{"scheduleType":"CARRIER","poNumber":"88"}' },
+  { record_id: 'pls_3', record_type: 'PLANT_SCHEDULE', business_date: '2026-10-09', run_id: 'run_t802', route: '802', run: 'UT DSD MILK', status: 'DELETED', payload_json: '{}' },
+  { record_id: 'wash_1', record_type: 'WASH', business_date: '2026-10-08', run_id: 'run_t801', status: 'DONE' }
+];
+
 // Weeks: previous 2026-09-27, current 2026-10-04, next 2026-10-11.
 function weekRoutes(week) {
   return [
@@ -153,7 +164,8 @@ function fakeSheets(overrides) {
     "'ROUTES_MASTER'": table(ROUTE_HEADERS, ROUTES),
     "'USERS_MASTER'": table(USER_HEADERS, USERS),
     "'DRIVER_EXCEPTIONS'": table(EXCEPTION_HEADERS, EXCEPTIONS),
-    "'DRIVER_VACATIONS'": table(VACATION_HEADERS, VACATIONS)
+    "'DRIVER_VACATIONS'": table(VACATION_HEADERS, VACATIONS),
+    "'PLANT_OPERATIONS'": table(PLANT_HEADERS, PLANT)
   };
   Object.assign(tabs, overrides);
   return tabs;
@@ -167,7 +179,8 @@ const SOURCES = {
     equipment: { spreadsheetId: 'fake-equipment', tab: 'EQUIPMENT_MASTER' },
     users: { spreadsheetId: 'fake-users', tab: 'USERS_MASTER' },
     exceptions: { spreadsheetId: 'fake-exceptions', tab: 'DRIVER_EXCEPTIONS' },
-    vacations: { spreadsheetId: 'fake-vacations', tab: 'DRIVER_VACATIONS' }
+    vacations: { spreadsheetId: 'fake-vacations', tab: 'DRIVER_VACATIONS' },
+    plantLoads: { spreadsheetId: 'fake-live', tab: 'PLANT_OPERATIONS' }
   }
 };
 

@@ -96,6 +96,27 @@ const MASTER_KINDS = Object.freeze({
       status: get('status').toUpperCase() || 'APPROVED', vacationType: L.vacationType(get('vacation_type')), notes: get('notes'), facilityId: get('facility_id')
     })
   },
+  /*
+   * Plant Route loads on the Plant Operations Scheduler (udpoV7277PlantRouteLoads_): record_type PLANT_SCHEDULE, not
+   * deleted, with a run and a date. Carrier loads (picked up by the customer) need no driver and are left out, as are
+   * the journal's other rows.
+   */
+  plantLoads: {
+    collection: C.plantLoads, idColumn: 'record_id', journal: true,
+    keep: (get) => {
+      if (get('record_type').toUpperCase() !== 'PLANT_SCHEDULE' || get('status').toUpperCase() === 'DELETED' || !get('run_id') || !L.dateKey(get('business_date'))) return false;
+      let d = {};
+      try { d = JSON.parse(get('payload_json') || '{}') || {}; } catch (e) { d = {}; }
+      return String(d.scheduleType || 'ROUTE').trim().toUpperCase() !== 'CARRIER' && d.carrier !== true;
+    },
+    build: (get) => {
+      let d = {};
+      try { d = JSON.parse(get('payload_json') || '{}') || {}; } catch (e) { d = {}; }
+      return { runId: get('run_id'), route: get('route'), run: get('run'), date: L.dateKey(get('business_date')), status: get('status').toUpperCase() || 'SCHEDULED',
+        pickupTime: String(d.pickupTime || ''), loadDate: L.dateKey(d.loadDate) || '', trailer: String(d.trailer || ''), poNumber: String(d.poNumber || ''),
+        cases: String(d.cases || ''), product: String(d.product || ''), notes: String(d.notes || get('notes') || ''), facilityId: get('facility_id') };
+    }
+  },
   users: {
     collection: C.users, idColumn: 'email',
     build: (get, warn) => {
@@ -124,8 +145,11 @@ function parseMaster(kind, values) {
     if (!id) return;
     if (kind === 'users') id = id.toLowerCase();
     const docId = M.safeIdPart(id);
-    if (docs[docId]) { warnings.push({ list: kind, row: rowNumber, id, problem: 'same ID appears twice; the first row is used' }); return; }
     const get = (col) => (index[col] === undefined ? '' : cellText(row[index[col]]));
+    // A journal (the plant scheduler) adds a row for each change of a record: the last one is the record now.
+    if (spec.journal) { delete docs[docId]; if (spec.keep && !spec.keep(get)) return; }
+    if (docs[docId]) { warnings.push({ list: kind, row: rowNumber, id, problem: 'same ID appears twice; the first row is used' }); return; }
+    if (spec.keep && !spec.keep(get)) return;
     const doc = spec.build(get, (problem) => warnings.push({ list: kind, row: rowNumber, id, problem }));
     doc.id = id;
     doc.sheetRow = rowNumber;
