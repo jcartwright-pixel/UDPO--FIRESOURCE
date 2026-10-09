@@ -175,6 +175,34 @@ function lookupsFrom(masters) {
   return { driversById, driversByName, equipmentById, routesByRunId };
 }
 
+/* ---------- maintenance queues ---------- */
+
+/*
+ * The write-ups the Equipment Issues screen lists: TRUCK LIVE, TRAILER LIVE and FORK TRUCK LIVE of the Live workbook
+ * (the sandbox copy in the sandbox), row for row into `maintenance`, keyed by record_id the same way a check-in's own
+ * records are (maintenance.js). The sheet's columns are kept under their own names; `cells` is what the write-back
+ * compares against before it writes a status or note back.
+ */
+const QUEUE_KINDS = Object.freeze({ maintTruck: { tab: 'TRUCK LIVE', kind: 'TRUCK' }, maintTrailer: { tab: 'TRAILER LIVE', kind: 'TRAILER' }, maintFork: { tab: 'FORK TRUCK LIVE', kind: 'FORK_TRUCK' } });
+const queueDocId = (recordId) => String(recordId).replace(/[^A-Za-z0-9_-]+/g, '_');
+
+function parseQueue(list, values) {
+  const spec = QUEUE_KINDS[list], rows = values || [], docs = {}, warnings = [];
+  let h = -1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) if ((rows[i] || []).map(M.normalizeHeader).indexOf('record_id') >= 0) { h = i; break; }
+  if (h < 0) return { docs, warnings: rows.length ? [{ list, problem: spec.tab + ' has no record_id column' }] : [] };
+  const index = headerIndex(rows[h]);
+  rows.slice(h + 1).forEach((row, i) => {
+    const id = cellText(row[index.record_id]);
+    if (!id) return;
+    const docId = queueDocId(id);
+    if (docs[docId]) { warnings.push({ list, row: h + 2 + i, id, problem: 'same record_id appears twice; the first row is used' }); return; }
+    const cells = cellsOf(row, index);
+    docs[docId] = Object.assign({}, cells, { record_id: id, kind: spec.kind, status: (cells.status || 'OPEN').toUpperCase(), sheetRow: h + 2 + i, cells });
+  });
+  return { docs, warnings };
+}
+
 /* ---------- Live week tabs ---------- */
 
 function majority(list) {
@@ -335,6 +363,12 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   kinds.forEach((kind, i) => { masters[kind] = parseMaster(kind, reads[i][0]); });
   const lookups = lookupsFrom(masters);
 
+  // 1b. Maintenance queues. A tab that cannot be read is left as it was (older copies of the Live workbook may lack one).
+  const queues = {};
+  for (const list of sources.live.maintenanceQueues ? Object.keys(QUEUE_KINDS) : []) {
+    try { queues[list] = parseQueue(list, (await reader.batchGet(sources.live.spreadsheetId, ["'" + QUEUE_KINDS[list].tab + "'"]))[0]); } catch (e) { /* not there */ }
+  }
+
   // 2. Live week tabs, one read for all three.
   const tabKeys = Object.keys(M.LIVE_TABS);
   const tabValues = await reader.batchGet(sources.live.spreadsheetId, tabKeys.map(k => "'" + M.LIVE_TABS[k] + "'"));
@@ -362,6 +396,14 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
     ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
     summary.masters[kind] = { rows: Object.keys(masters[kind].docs).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
   }
+  summary.queues = {};
+  for (const list of Object.keys(queues)) {
+    const metaRef = db.collection(META).doc(list);
+    const prev = (await metaRef.get()).data() || {};
+    const d = diffOps(db, C.maintenance, queues[list].docs, prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
+    ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
+    summary.queues[list] = { rows: Object.keys(queues[list].docs).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
+  }
   const waiting = await db.collection(C.outbox).where('status', '==', 'pending').get();
   const hold = {};
   const justWritten = await db.collection(C.outbox).where('doneAt', '>=', readFrom).get();
@@ -376,7 +418,7 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
       publishedAt: prev.publishedAt || '', publishedBy: prev.publishedBy || '' } });
     summary.weeks[tab.weekStart] = { tab: tab.tab, rows: Object.keys(tab.runs).length, written: d.written, unchanged: d.unchanged, removed: d.removed, waitingForWriteBack: d.held };
   }
-  const warnings = [].concat(...Object.keys(masters).map(k => masters[k].warnings), ...tabKeys.map(k => live[k].warnings));
+  const warnings = [].concat(...Object.keys(masters).map(k => masters[k].warnings), ...Object.keys(queues).map(k => queues[k].warnings), ...tabKeys.map(k => live[k].warnings));
   const liveWeeks = {};
   tabKeys.forEach(k => { liveWeeks[k] = live[k].weekStart; });
   const transferRef = db.collection(C.transfers).doc(stamp.replace(/[:.]/g, '-'));
@@ -387,4 +429,4 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   return { at: stamp, liveWeeks, summary, warnings };
 }
 
-module.exports = { parseMaster, parseLiveTab, lookupsFrom, runTransfer, fingerprint, nameKey, MASTER_KINDS, META };
+module.exports = { parseQueue, QUEUE_KINDS, parseMaster, parseLiveTab, lookupsFrom, runTransfer, fingerprint, nameKey, MASTER_KINDS, META };

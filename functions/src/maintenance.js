@@ -12,22 +12,14 @@
 'use strict';
 
 const C = require('./model').COLLECTIONS;
+const L = require('./logic');
 
 const FACILITY = 'fac_uniontown';
 const TABS = Object.freeze({ TRUCK: 'TRUCK LIVE', TRAILER: 'TRAILER LIVE', FORK_TRUCK: 'FORK TRUCK LIVE', WASH: 'WASH / CLEANING LIVE', RETURN: 'REFUSALS / RETURNS LIVE' });
 // The write-back's list name for each queue (masterwrite.js).
 const LISTS = Object.freeze({ TRUCK: 'maintTruck', TRAILER: 'maintTrailer', FORK_TRUCK: 'maintFork', WASH: 'maintWash', RETURN: 'maintReturns' });
 
-function noWriteUp(value) {
-  let t = String(value === null || value === undefined ? '' : value).toLowerCase().replace(/[^a-z0-9/+ ]+/g, ' ').replace(/\s+/g, ' ').replace(/^[/+ ]+|[/+ ]+$/g, '');
-  if (!t) return true;
-  if (/^(?:x+|n|no|nope|none|nil|na|n a|n\/a|negative|nothing|ok|okay|good|fine|working|working fine|all good|all ok|all okay|all clear)$/.test(t)) return true;
-  if (/^(?:no|nothing|none)(?: (?:new|known|major|minor|other))? (?:write ?ups?|issues?|defects?|problems?|concerns?|repairs?|damages?|complaints?|comments?|reports?|notes?)(?: (?:to report|reported|noted|found|today|at this time|this trip))?$/.test(t)) return true;
-  if (/^(?:nothing|none) (?:to report|wrong|noted|today|needed|at this time)$/.test(t)) return true;
-  if (/^(?:n0|it ?s (?:fine|good|ok|okay)|it is (?:fine|good|ok|okay)|its (?:fine|good|ok|okay))$/.test(t)) return true;
-  t = t.replace(/[^a-z0-9 ]+/g, ' ').trim();
-  return /^(?:y|ye|yes|yep|yeah|ytes|ye s)$/.test(t);
-}
+const noWriteUp = L.noWriteUp;
 
 // A typed unit ("T-901", "901", "01") to its Equipment Master entry, as udpoInboundResolveUnit_ does.
 function resolveUnit(raw, kind, equipment) {

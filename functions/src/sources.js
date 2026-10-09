@@ -7,7 +7,7 @@
 'use strict';
 
 const UNIONTOWN = Object.freeze({
-  live: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg' },
+  live: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', maintenanceQueues: true }, // queues: TRUCK / TRAILER / FORK TRUCK LIVE tabs
   masters: {
     routes: { spreadsheetId: '19neEpXEPFbon6-8DeZSG5BCTj2s2PfrCVRibWhUuFKc', tab: 'ROUTES_MASTER' },
     drivers: { spreadsheetId: '1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU', tab: 'DRIVERS_MASTER' },
