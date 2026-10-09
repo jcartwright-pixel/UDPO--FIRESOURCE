@@ -156,7 +156,7 @@
       else if (view === 'details') { t.innerHTML = detailsView(list, edit); lines = 12; }
       else if (view === 'rules') t.innerHTML = rulesView(onlyHidden ? list.filter(r => !weeklyRule(r).shown) : list, edit);
       else t.innerHTML = recapView(list);
-      t.className = 'routes cards-look ' + view;
+      t.className = 'routes ' + view;
       document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : list.length + (list.length === 1 ? ' run' : ' runs')) +
         (view === 'rules' ? ' · ' + list.filter(r => !weeklyRule(r).shown).length + ' hidden on Weekly for the week of ' + shortDate(liveWeek) : '');
       // Readable rows and print: the grid scrolls inside its box under fixed headings; the page itself does not.

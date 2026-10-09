@@ -494,7 +494,6 @@ body.weekly-page { background: #eef3f7; }
 
 /* Look C (Joe picked 10/9): run cards. Each row is a rounded white strip with a little space between,
    the first column (route, unit, driver #) is a blue badge; headings sit quietly on the page colour. */
-body { background: #eef3f7; }
 .sheet:has(> table.cards-look), .sheet.scroll-list:has(table.cards-look) { background: transparent; border: 0; box-shadow: none; }
 table.cards-look { border-collapse: separate; border-spacing: 0 6px; }
 table.cards-look.daily { border-spacing: 0 3px; }
@@ -514,7 +513,6 @@ table.cards-look td.empty { border-radius: 10px; }
 /* Route Days: Runs light, Does Not Run black; the black cells keep their colour inside the strips. */
 .routes-page table.routes.days.cards-look td:has(> button[data-runday]:not(.on)) { background: #171c20; }
 /* Weekly keeps its black / yellow grid (the current app's colours); look C gives the route column the blue badge. */
-.weekly-page #routes-sheet tbody tr td:first-child { background: #1d5b91; color: #fff; font-weight: 900; }
 @media (max-height: 800px) { table.cards-look, table.cards-look.daily { border-spacing: 0 1px; } }
 /* Home header menu (Joe 10/9): the current app's extra screens as buttons, the new app's screens in one drop-down. */
 .home-menu a.ext::after { content: " \2197"; font-size: 12px; opacity: .7; }
