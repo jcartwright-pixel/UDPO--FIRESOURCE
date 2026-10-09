@@ -531,7 +531,7 @@ table.cards-look td.empty { border-radius: 10px; }
 .routes-page table.routes.rules.cards-look tr.hidden-run > td:not(:first-child) { background: #fdf1ef; }
 
 /* Left menu (Joe, 10/9): the same on every screen; the header keeps the logo, the user and Sign out. */
-body.has-side .topbar > a:not(.brand):not([id]) { display: none; }
+body.has-side .topbar > a:not(.brand):not(#to-conflicts) { display: none; }
 body.has-side #screen:not([hidden]) { display: flex; flex-direction: column; height: 100vh; }
 .side-wrap { flex: 1; min-height: 0; display: flex; position: relative; }
 .side-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
