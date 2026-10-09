@@ -138,7 +138,7 @@
       else if (view === 'seq') { const seq = seqList(); t.innerHTML = seqView(seq, edit); lines = seq.length; }
       else if (view === 'details') { t.innerHTML = detailsView(list, edit); lines = 12; }
       else t.innerHTML = recapView(list);
-      t.className = 'routes ' + view;
+      t.className = 'routes cards-look ' + view;
       document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : list.length + (list.length === 1 ? ' run' : ' runs'));
       // Readable rows and print: the grid scrolls inside its box under fixed headings; the page itself does not.
       const sheet = document.getElementById('sheet'), footer = document.querySelector('.footer');

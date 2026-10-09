@@ -491,3 +491,28 @@ body.weekly-page { background: #eef3f7; }
 .card.home4 .dc-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .card .owner.ext { background: #fff4d9; color: #8a5a00; border-color: #f0d48a; }
 @media (max-width: 900px) { .cards.cards4 { grid-template-columns: 1fr; grid-template-rows: none; } }
+
+/* Look C (Joe picked 10/9): run cards. Each row is a rounded white strip with a little space between,
+   the first column (route, unit, driver #) is a blue badge; headings sit quietly on the page colour. */
+body { background: #eef3f7; }
+.sheet:has(> table.cards-look), .sheet.scroll-list:has(table.cards-look) { background: transparent; border: 0; box-shadow: none; }
+table.cards-look { border-collapse: separate; border-spacing: 0 6px; }
+table.cards-look.daily { border-spacing: 0 3px; }
+table.cards-look th, table.cards-look td { border: 0; }
+table.cards-look thead th { background: #eef3f7; color: #43607c; font-size: 13px; letter-spacing: .06em; }
+table.cards-look tbody tr td { background: #fff; box-shadow: 0 1px 0 #dbe4ec, 0 -1px 0 #dbe4ec; }
+table.cards-look tbody tr td:first-child { border-radius: 10px 0 0 10px; box-shadow: 0 1px 0 #dbe4ec, 0 -1px 0 #dbe4ec, -1px 0 0 #dbe4ec; }
+table.cards-look tbody tr td:last-child { border-radius: 0 10px 10px 0; box-shadow: 0 1px 0 #dbe4ec, 0 -1px 0 #dbe4ec, 1px 0 0 #dbe4ec; }
+table.cards-look tbody tr td:only-child { border-radius: 10px; }
+table.cards-look.daily tbody tr:not(.group):not(.off) td:first-child, table.cards-look.routes tbody tr td:first-child { font-weight: 900; color: #fff; background: #1d5b91; }
+table.cards-look.routes tbody tr td:first-child small { color: #cfe0f1; }
+table.cards-look.routes tbody tr td:first-child button.edit { background: #fff; }
+table.cards-look tbody tr.group td { background: transparent !important; box-shadow: none; color: #0e3a62; text-align: left; font-size: 15px; padding: 8px 6px 0; border-radius: 0; }
+table.cards-look tbody tr:hover td:not(:first-child):not(.missing) { background: #f5f9fd; }
+table.cards-look tbody tr.off td { background: #fff8e6; }
+table.cards-look td.empty { border-radius: 10px; }
+/* Route Days: Runs light, Does Not Run black; the black cells keep their colour inside the strips. */
+.routes-page table.routes.days.cards-look td:has(> button[data-runday]:not(.on)) { background: #171c20; }
+/* Weekly keeps its black / yellow grid (the current app's colours); look C gives the route column the blue badge. */
+.weekly-page #routes-sheet tbody tr td:first-child { background: #1d5b91; color: #fff; font-weight: 900; }
+@media (max-height: 800px) { table.cards-look, table.cards-look.daily { border-spacing: 0 1px; } }
