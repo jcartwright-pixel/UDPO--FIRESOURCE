@@ -449,7 +449,7 @@ body.weekly-page { background: #eef3f7; }
 .head .actions.in-head { margin-left: auto; padding: 0; align-self: flex-end; justify-content: flex-end; }
 
 /* Driver Roster: taller rows and larger print; the list scrolls inside its box under a fixed header. */
-.drivers-page { --row: 44px; --font: 17px; }
+.drivers-page { --row: 40px; --font: 17px; }
 .drivers-page .split .sheet { overflow: auto; }
 .drivers-page .sheet thead th { position: sticky; top: 0; z-index: 1; height: 46px; font-size: 15px; }
 .drivers-page .sheet tbody td { font-size: 17px; }
@@ -577,4 +577,19 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
   .card.home4 .dc-metrics { grid-auto-rows: minmax(52px, 90px); }
   .card.home4 .dc-metric b { font-size: 24px; margin: 1px 0; }
   .card.home4 .dc-text strong { font-size: 20px; margin: 1px 0 2px; }
+}
+
+/* Weekly (Joe, 10/9): every action button on one row (Save Draft is gone: each pick saves itself), rows a little
+   shorter, and long names fit their day box. */
+.weekly-page .head { flex-wrap: nowrap; gap: 12px; }
+.weekly-page .head .title { flex: none; }
+.weekly-page .head .actions.in-head { flex-wrap: nowrap; gap: 6px; align-self: center; }
+.weekly-page .head .actions.in-head button { white-space: nowrap; min-height: 38px; padding: 0 11px; font-size: 14px; }
+.weekly-page .head .tabs button { white-space: nowrap; }
+.weekly-page .week td { height: 40px; }
+.weekly-page #routes-sheet td.day:not(.off) { padding: 0 17px 0 6px; font-size: clamp(11px, .72vw, 14px); letter-spacing: -.02em; }
+.weekly-page #routes-sheet td.day.editable:not(.off)::after { right: 7px; font-size: 11px; }
+@media (max-width: 1500px) {
+  .weekly-page .head { flex-wrap: wrap; }
+  .weekly-page .head .actions.in-head { margin-left: 0; width: 100%; justify-content: flex-start; }
 }

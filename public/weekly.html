@@ -34,7 +34,6 @@
         <button type="button" id="next-week">Next Week &gt;</button>
         <button type="button" id="run-days">Route Run Days</button>
         <button type="button" id="reset" title="Rebuild this whole week from Route Master and Driver Master (managers). Trucks, trailers and notes stay.">Reset Week</button>
-        <button type="button" id="save-draft" title="Weekly edits are stored as you make them.">Save Draft</button>
         <button type="button" id="print-week">Print Weekly Dispatch</button>
         <button type="button" class="publish" id="publish">Publish to Daily Dispatch</button>
       </div>
@@ -129,7 +128,7 @@
       if (popover) return; // the editor is open; the grid redraws when it closes
       const edit = canSave();
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
-      ['run-days', 'publish', 'save-draft', 'override'].forEach(id => { document.getElementById(id).disabled = !edit; });
+      ['run-days', 'publish', 'override'].forEach(id => { document.getElementById(id).disabled = !edit; });
       document.getElementById('reset').disabled = !canReorder();
       const ob = document.getElementById('override');
       ob.textContent = override ? 'Override On' : 'Override';
@@ -314,7 +313,6 @@
       // The server works out the week; the grid changes when the saved runs arrive.
       saveOptimistic('resetWeek', { weekStart: week }, () => {}, () => {}, render);
     };
-    document.getElementById('save-draft').onclick = () => {}; // every pick is already saved, the same as the current app says
     document.getElementById('publish').onclick = () => {
       const before = weekDoc ? Object.assign({}, weekDoc) : null;
       saveOptimistic('publishWeek', { weekStart: week }, () => { weekDoc = Object.assign({}, weekDoc, { publishedAt: new Date().toISOString(), publishedBy: lists.person && lists.person.email || '' }); showPublished(); },
