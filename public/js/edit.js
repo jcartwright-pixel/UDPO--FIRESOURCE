@@ -9,7 +9,7 @@ import { start, save, showError, escapeHtml } from './app.js';
 import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const L = window.UDLogic;
-export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], exceptions: [], person: null, app: {} };
+export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], fleetTrucks: [], fleetTrailers: [], exceptions: [], person: null, app: {} };
 
 // The screen's key in the per-screen switch (L.SCREENS); each page sets it once.
 let screenKey = 'dailyDispatch';
@@ -28,8 +28,13 @@ export async function watchLists(user, onChange) {
     // Only Uniontown's units (Equipment Master facility_id), like the current app's pickers; Charleston and Martins Ferry units are left out.
     const all = snap.docs.map(d => d.data()).filter(e => !e.facilityId || e.facilityId === HOME_FACILITY);
     const byUnit = (a, b) => String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
-    lists.allTrucks = all.filter(e => e.type === 'TRUCK').sort(byUnit);
-    lists.allTrailers = all.filter(e => e.type === 'TRAILER').sort(byUnit);
+    lists.fleetTrucks = all.filter(e => e.type === 'TRUCK').sort(byUnit);
+    lists.fleetTrailers = all.filter(e => e.type === 'TRAILER').sort(byUnit);
+    // Joe, 10/9: "This should only show the Uniontown fleet." The Equipment screen, its counts and the pickers show only units
+    // whose Equipment Master location is Uniontown; units kept at the branches (Marietta, Beckley, Fairmont...) are left out.
+    const home = (e) => !e.location || /UNIONTOWN/i.test(e.location);
+    lists.allTrucks = lists.fleetTrucks.filter(home);
+    lists.allTrailers = lists.fleetTrailers.filter(home);
     // Down, inactive or out-of-service units are left out of the choices unless OVR is ticked.
     lists.trucks = lists.allTrucks.filter(e => !L.unitOff(e));
     lists.trailers = lists.allTrailers.filter(e => !L.unitOff(e));
@@ -75,12 +80,15 @@ const KINDS = {
 };
 
 export function optionsHtml(kind, current, busy, opts) {
-  return '<option value="">(none)</option>' + KINDS[kind].list(opts).map(o =>
+  const list = KINDS[kind].list(opts);
+  // A unit already on the run stays shown even when it is kept at another branch.
+  if (current && kind !== 'driver' && !list.some(o => o.id === current) && pickText(kind, current)) list.unshift({ id: current, text: pickText(kind, current) });
+  return '<option value="">(none)</option>' + list.map(o =>
     '<option value="' + escapeHtml(o.id) + '"' + (o.id === current ? ' selected' : '') + '>' + escapeHtml(o.text + (busy && busy[o.id] && o.id !== current ? '  (' + busy[o.id] + ')' : '')) + '</option>').join('');
 }
 
 export function pickText(kind, id) {
-  const pool = kind === 'driver' ? lists.allDrivers : kind === 'truck' ? lists.allTrucks : lists.allTrailers;
+  const pool = kind === 'driver' ? lists.allDrivers : kind === 'truck' ? lists.fleetTrucks : lists.fleetTrailers;
   const item = pool.find(o => o.id === id);
   return item ? (kind === 'driver' ? item.name : item.unit) : '';
 }

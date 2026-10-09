@@ -351,7 +351,7 @@
     };
 
     /* ---------- Down Trucks / Trailers ---------- */
-    const allUnits = () => lists.allTrucks.concat(lists.allTrailers);
+    const allUnits = () => lists.fleetTrucks.concat(lists.fleetTrailers);
     const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:\s*/i, '');
     function paintDown() {
       const down = allUnits().filter(e => L.unitOff(e));

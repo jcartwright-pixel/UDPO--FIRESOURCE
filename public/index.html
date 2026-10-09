@@ -111,7 +111,7 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', L.weeksForLoadDate(today))), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the dispatch'));
       onSnapshot(collection(db, 'drivers'), s => { data.drivers = s.docs.map(d => d.data()); render(); }, fail('the drivers'));
-      onSnapshot(collection(db, 'equipment'), s => { data.equipment = s.docs.map(d => d.data()).filter(e => !e.facilityId || e.facilityId === 'fac_uniontown'); render(); }, fail('the units'));
+      onSnapshot(collection(db, 'equipment'), s => { data.equipment = s.docs.map(d => d.data()).filter(e => (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location))); render(); }, fail('the units'));
       onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => d.data()); render(); }, fail('Route Master'));
       onSnapshot(collection(db, 'vacations'), s => { data.vacations = s.docs.map(d => d.data()); render(); }, fail('the vacation schedule'));
       onSnapshot(query(collection(db, 'conflicts'), where('open', '==', true), limit(100)), s => { data.conflicts = s.size; render(); }, fail('the conflict list'));
