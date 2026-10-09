@@ -1,0 +1,551 @@
+'use strict';
+/*
+ * Browser check of the new screens against the local test database (npm run test:browser):
+ * made-up sheets are transferred, then Daily and Weekly Dispatch are opened at 1920x950 and 1366x650.
+ * It checks the loads shown, that nothing scrolls, that a save is one call, and that an open screen shows
+ * the save without reloading. Pictures go to SHOTS_DIR when it is set.
+ */
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const { chromium } = require('playwright');
+const { db, clear } = require('../emulator/helpers');
+const { runTransfer } = require('../../src/transfer');
+const F = require('../fixtures/fake-sheets');
+
+const HOSTING = 'http://127.0.0.1:5000';
+const SDK = path.dirname(require.resolve('firebase/package.json'));
+const SHOTS = process.env.SHOTS_DIR || '';
+
+async function openPage(browser, width, height, url) {
+  const page = await browser.newPage({ viewport: { width, height } });
+  // The screens load Google's Firebase files from www.gstatic.com; here they come from the installed package.
+  await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
+    const file = route.request().url().split('/').pop();
+    route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, file)) });
+  });
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(HOSTING + url);
+  page.errors = errors;
+  return page;
+}
+
+async function noScroll(page) {
+  return page.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight, width: document.scrollingElement.scrollWidth, innerWidth: window.innerWidth }));
+}
+
+(async () => {
+  await clear();
+  await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
+  const browser = await chromium.launch();
+  const results = [];
+  try {
+    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+      const page = await openPage(browser, w, h, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+      await page.waitForSelector('#rows tr[data-id]');
+      const routes = await page.$$eval('#rows tr[data-id] td:first-child', tds => tds.map(td => td.textContent));
+      assert.deepEqual(routes, ['801', '802'], 'Monday 10/5 loads Tuesday 801 then 802');
+      const group = await page.textContent('#rows tr.group td');
+      assert.equal(group, 'TUESDAY DELIVERIES, 10/6/2026');
+      const size = await noScroll(page);
+      assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Daily fits ' + w + 'x' + h + ' with no scrolling: ' + JSON.stringify(size));
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'daily-' + w + '.png') });
+      assert.deepEqual(page.errors, []);
+      await page.close();
+
+      const weekly = await openPage(browser, w, h, '/weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com');
+      await weekly.waitForSelector('#rows tr td.day');
+      const first = await weekly.$$eval('#rows tr td:first-child', tds => tds.map(td => td.textContent));
+      assert.deepEqual(first, ['802', '801', '810', '810', '899'], 'Route Master week order; 899 is hidden on Daily only');
+      const wsize = await noScroll(weekly);
+      assert.ok(wsize.scroll <= wsize.inner && wsize.width <= wsize.innerWidth, 'Weekly fits ' + w + 'x' + h + ': ' + JSON.stringify(wsize));
+      if (SHOTS) await weekly.screenshot({ path: path.join(SHOTS, 'weekly-' + w + '.png') });
+      await weekly.close();
+    }
+
+    // A save from one screen shows on another open screen without a reload.
+    const watcher = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=manager.test@uniteddairy.com');
+    const saver = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await watcher.waitForSelector('#rows tr[data-id]');
+    await saver.waitForSelector('#rows tr[data-id]');
+    const timing = await saver.evaluate(async () => {
+      const { save } = await import('./js/app.js');
+      const t0 = performance.now();
+      const out = await save('assignDriver', { runDocId: '2026-10-04__run_t802', day: 'tue', driverId: 'drv_test_adams' });
+      const ms = Math.round(performance.now() - t0);
+      const t1 = performance.now();
+      await save('assignTruck', { runDocId: '2026-10-04__run_t802', day: 'tue', equipmentId: 'veh_truck_900002' });
+      return { ms, warm: Math.round(performance.now() - t1), out };
+    });
+    assert.equal(timing.out.ok, true);
+    await watcher.waitForFunction(() => {
+      const row = document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]');
+      return row && row.children[3].textContent === 'ADAMS, PAT';
+    }, null, { timeout: 5000 });
+    results.push('save from the screen: one call, ' + timing.ms + ' ms first (server starting), ' + timing.warm + ' ms next, on the local test database; the other open screen showed it without reloading');
+
+    // Editing on the screens: pick a trailer on Daily, the change shows at once and on the other open screen.
+    const editor = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await editor.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    const t0 = Date.now();
+    await editor.selectOption('tr[data-id="2026-10-04__run_t802|tue"] select.picker', 'veh_trailer_t_901');
+    await editor.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[6].textContent === 'T-901');
+    const shownMs = Date.now() - t0;
+    await watcher.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[6].textContent === 'T-901', null, { timeout: 5000 });
+    const seenMs = Date.now() - t0;
+    // The picker marks units already used that day.
+    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    const labels = await editor.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker option', os => os.map(o => o.textContent));
+    assert.ok(labels.some(t => /T-902\s+\(on 801\)/.test(t)), 'T-902 is shown as on 801: ' + labels.join(' | '));
+    await editor.keyboard.press('Escape');
+    results.push('picking a trailer on Daily: on screen in ' + shownMs + ' ms, on another open screen in ' + seenMs + ' ms (local test database)');
+
+    // A driver note.
+    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="note"]');
+    await editor.fill('tr[data-id="2026-10-04__run_t802|tue"] input.picker', 'Call store on arrival');
+    await editor.keyboard.press('Enter');
+    await watcher.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[9].textContent === 'Call store on arrival', null, { timeout: 5000 });
+
+    // A dispatcher cannot drag; a manager drags 802 above 801 and the order saves as one call.
+    assert.equal(await editor.getAttribute('tr[data-id="2026-10-04__run_t801|tue"]', 'draggable'), null);
+    await watcher.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"][draggable="true"]');
+    await watcher.dragAndDrop('tr[data-id="2026-10-04__run_t802|tue"] td:first-child', 'tr[data-id="2026-10-04__run_t801|tue"] td:first-child');
+    await editor.waitForFunction(() => [...document.querySelectorAll('#rows tr[data-id] td:first-child')].map(td => td.textContent).join(',') === '802,801', null, { timeout: 5000 });
+    results.push('a manager dragged 802 above 801 and the dispatcher\'s screen showed the new order without reloading');
+
+    // The current Daily Dispatch buttons: RUNS / NO RUN, Edit box (depart time, jack), Add Route / Run, Down Trucks / Trailers, Driver Call-Off, OVR.
+    const r801 = 'tr[data-id="2026-10-04__run_t801|tue"]', r802 = 'tr[data-id="2026-10-04__run_t802|tue"]';
+    await editor.click(r801 + ' button[data-runs]');
+    await editor.waitForSelector(r801 + '.off');
+    assert.equal(await editor.textContent(r801 + ' button[data-runs]'), 'NO RUN', 'a run switched to NO RUN stays on screen');
+    await watcher.waitForFunction(() => !document.querySelector('tr[data-id="2026-10-04__run_t801|tue"]'), null, { timeout: 5000 });
+    await editor.click('#open-add');
+    const addable = await editor.$$eval('#add-pick option', os => os.map(o => o.textContent));
+    assert.ok(addable.some(t => /^801 /.test(t)), 'Add Route / Run offers 801: ' + addable.join(' | '));
+    await editor.selectOption('#add-pick', { label: addable.find(t => /^801 .*Tuesday/.test(t)) });
+    await editor.click('#add-save');
+    await watcher.waitForSelector(r801, { timeout: 5000 });
+    assert.equal(await editor.textContent(r801 + ' button[data-runs]'), 'RUNS');
+    results.push('Daily: 801 switched to NO RUN stayed on the screen greyed, then Add Route / Run put it back');
+
+    await editor.click(r802 + ' button[data-open]');
+    await editor.fill('#edit-modal input[data-field="time"]', '4:15 AM');
+    await editor.press('#edit-modal input[data-field="time"]', 'Tab');
+    await editor.fill('#edit-modal input[data-field="jack"]', 'pj-7');
+    await editor.press('#edit-modal input[data-field="jack"]', 'Tab');
+    if (SHOTS) await editor.screenshot({ path: path.join(SHOTS, 'daily-edit-1920.png') });
+    await editor.click('#edit-modal [data-close]');
+    await watcher.waitForFunction(() => { const tr = document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]'); return tr.children[7].textContent === '4:15 AM' && tr.children[8].textContent === 'PJ-7'; }, null, { timeout: 5000 });
+    results.push('Daily Edit box: depart time 4:15 AM and jack PJ-7 saved and showed on the other open screen');
+
+    await editor.click('#open-down');
+    await editor.fill('#down-unit', '900001');
+    await editor.fill('#down-reason', 'Brakes');
+    await editor.click('#down-add');
+    await editor.waitForFunction(() => /900001.*Brakes/.test(document.getElementById('down-rows').textContent));
+    if (SHOTS) await editor.screenshot({ path: path.join(SHOTS, 'daily-down-trucks-1920.png') });
+    await editor.click('#down-panel [data-close]');
+    const downDoc = await editor.evaluate(async () => {
+      const { start } = await import('./js/app.js');
+      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { db } = await start();
+      for (let i = 0; i < 20; i++) { const d = (await getDoc(doc(db, 'equipment', 'veh_truck_900001'))).data(); if (d.status === 'DOWN') return d; await new Promise(r => setTimeout(r, 250)); }
+      return null;
+    });
+    assert.ok(downDoc && downDoc.notes === 'DOWN: Brakes', 'Down saved to Equipment Master copy: ' + JSON.stringify(downDoc));
+    await editor.click(r802 + ' td[data-edit="truck"]');
+    let trucks = await editor.$$eval(r802 + ' select.picker option', os => os.map(o => o.textContent));
+    assert.ok(!trucks.some(t => /900001/.test(t)), 'a down truck is not offered: ' + trucks.join(' | '));
+    await editor.keyboard.press('Escape');
+    await editor.check(r802 + ' input[data-ovr]');
+    await editor.click(r802 + ' td[data-edit="truck"]');
+    trucks = await editor.$$eval(r802 + ' select.picker option', os => os.map(o => o.textContent));
+    assert.ok(trucks.some(t => /900001\s+\[DOWN\]/.test(t)), 'with OVR the down truck is offered and marked: ' + trucks.join(' | '));
+    await editor.keyboard.press('Escape');
+    await editor.uncheck(r802 + ' input[data-ovr]');
+    await editor.click('#open-down');
+    await editor.click('#down-rows button[data-up]');
+    await editor.waitForFunction(() => !/900001/.test(document.getElementById('down-rows').textContent) && /T-903.*INACTIVE/.test(document.getElementById('down-rows').textContent), null, { timeout: 5000 });
+    await editor.click('#down-panel [data-close]');
+    results.push('Down Trucks / Trailers: 900001 down for Brakes left the truck list (shown as [DOWN] with OVR), then Back in service');
+
+    await editor.click('#open-calloff');
+    await editor.selectOption('#off-driver', 'drv_test_casey');
+    await editor.selectOption('#off-reason', 'CALLED OFF');
+    await editor.fill('#off-start', '2026-10-06');
+    await editor.fill('#off-end', '2026-10-06');
+    await editor.click('#off-save');
+    await editor.waitForTimeout(300);
+    await editor.click(r802 + ' td[data-edit="driver"]');
+    const drivers = await editor.$$eval(r802 + ' select.picker option', os => os.map(o => o.textContent));
+    assert.ok(!drivers.some(t => /CASEY/.test(t)), 'a called-off driver is not offered: ' + drivers.join(' | '));
+    await editor.keyboard.press('Escape');
+    const callOff = await editor.evaluate(async () => {
+      const { start } = await import('./js/app.js');
+      const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { db } = await start();
+      for (let i = 0; i < 20; i++) {
+        const s = await getDocs(query(collection(db, 'exceptions'), where('driverId', '==', 'drv_test_casey')));
+        const hit = s.docs.map(d => d.data()).find(e => e.startDate === '2026-10-06');
+        if (hit) return hit;
+        await new Promise(r => setTimeout(r, 250));
+      }
+      return null;
+    });
+    assert.ok(callOff && callOff.reasonCode === 'CALLED OFF', 'Driver Call-Off saved: ' + JSON.stringify(callOff));
+    results.push('Driver Call-Off: CASEY called off 10/6 is saved to Driver Exceptions and left out of the 10/6 driver list');
+
+    // Weekly: click a day, pick a truck in the editor.
+    const wkEdit = await openPage(browser, 1920, 950, '/weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com');
+    await wkEdit.waitForSelector('tr td.day.editable[data-day="mon"]');
+    const monCell = 'xpath=//tr[td[1][text()="802"]]/td[@data-day="mon"]';
+    await wkEdit.click(monCell);
+    await wkEdit.selectOption('.popover select[data-kind="truck"]', 'veh_truck_900002');
+    await wkEdit.click('.popover .close');
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && /900002/.test(tr.children[3].textContent)), null, { timeout: 5000 });
+    results.push('Weekly: a truck picked for 802 Monday saved and shows in the grid');
+    if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-after-edit-1920.png') });
+
+    // Weekly like the current screen: CARRIER, Route Run Days, the Driver Assignment Board's availability box, Publish.
+    const tueCell = 'xpath=//tr[td[1][text()="802"]]/td[@data-day="tue"]';
+    await wkEdit.click(tueCell);
+    await wkEdit.selectOption('.popover select[data-kind="driver"]', '__CARRIER__');
+    await wkEdit.click('.popover .close');
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[4].firstChild.textContent === 'CARRIER' && tr.children[4].classList.contains('c-carrier')), null, { timeout: 5000 });
+    await wkEdit.click('#run-days');
+    await wkEdit.click('xpath=//tbody[@id="days-rows"]/tr[td[1]/b[text()="802"]]/td[2+5]/button');
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 5000 });
+    if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-run-days-1920.png') });
+    await wkEdit.click('#days-modal [data-close]');
+    await wkEdit.click('#tab-board');
+    await wkEdit.waitForSelector('#board-rows tr[data-driver="drv_test_casey"]');
+    const boardNames = await wkEdit.$$eval('#board-rows tr[data-driver] td:first-child', tds => tds.map(td => td.textContent));
+    assert.deepEqual(boardNames, ['BROOK, SAM', 'ADAMS, PAT', 'CASEY, LEE'], 'relief first, then seniority');
+    await wkEdit.click('#board-rows tr[data-driver="drv_test_casey"] td:nth-child(3) button');
+    await wkEdit.selectOption('#avail-reason', 'VACATION');
+    await wkEdit.click('#avail-save');
+    await wkEdit.waitForFunction(() => /VACATION/.test(document.querySelector('#board-rows tr[data-driver="drv_test_casey"] td:nth-child(3)').textContent), null, { timeout: 5000 });
+    if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-board-1920.png') });
+    await wkEdit.click('#tab-routes');
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[3].classList.contains('c-vacation-needs') && /CASEY/.test(tr.children[3].textContent)), null, { timeout: 5000 });
+    await wkEdit.click('#publish');
+    await wkEdit.waitForFunction(() => /Published .* by dispatch\.test$/.test(document.getElementById('published').textContent), null, { timeout: 5000 });
+    // Reset Week (managers): the dispatcher's button is off; a manager's second click rebuilds the week from the masters.
+    assert.equal(await wkEdit.$eval('#reset', b => b.disabled), true, 'a dispatcher cannot Reset Week');
+    const wkMgr = await openPage(browser, 1366, 650, '/weekly.html?week=2026-10-04&testEmail=manager.test@uniteddairy.com');
+    await wkMgr.waitForSelector('tr td.day.editable[data-day="mon"]');
+    await wkMgr.click('#reset');
+    assert.equal(await wkMgr.$eval('#reset', b => b.textContent), 'Click again', 'the first click only asks to confirm');
+    await wkMgr.click('#reset');
+    await wkMgr.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && !/CARRIER/.test(tr.children[4].textContent) && tr.children[4].classList.contains('c-needs') && tr.children[6].classList.contains('off') && tr.children[3].classList.contains('c-vacation-needs')), null, { timeout: 8000 });
+    const rsFit = await wkMgr.evaluate(() => ({ scroll: document.documentElement.scrollHeight, inner: window.innerHeight }));
+    assert.ok(rsFit.scroll <= rsFit.inner, 'Weekly still fits after Reset Week');
+    if (SHOTS) await wkMgr.screenshot({ path: path.join(SHOTS, 'weekly-after-reset-1366.png') });
+    results.push('Reset Week: a dispatcher cannot; a manager clicked twice: 802 Tuesday CARRIER went back to its standard driver CASEY, who is called off that day, so it needs a driver; Thursday off again; Monday still Vacation - Needs Driver');
+    results.push('Weekly: CARRIER picked for 802 Tuesday, Route Run Days turned 802 Thursday on (Needs Driver), CASEY on vacation Monday from the Driver Assignment Board left 802 Monday as Vacation - Needs Driver, Publish recorded');
+
+    // Someone with no dispatch role sees no edit controls.
+    const viewer = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=viewer.test@uniteddairy.com');
+    await viewer.waitForSelector('#rows tr[data-id]');
+    await viewer.waitForTimeout(500);
+    assert.equal(await viewer.$$eval('td[data-edit]', tds => tds.length), 0);
+    assert.equal(await viewer.textContent('#mode-text'), 'TEST COPY, READ ONLY');
+    results.push('a person without a dispatch role sees the screen read only');
+    await Promise.all([editor.close(), wkEdit.close(), viewer.close()]);
+
+    // Vacation Schedule: Time Off, Calendar and Eligibility each fit one page; a manager adds and edits time off; the holiday limit holds.
+    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+      const vac = await openPage(browser, w, h, '/vacations.html?testEmail=manager.test@uniteddairy.com');
+      await vac.waitForSelector('#filters button[data-filter="all"]');
+      await vac.click('#filters button[data-filter="all"]');
+      await vac.waitForSelector('#rows tr[data-id="vac_test_1"]');
+      for (const v of ['time', 'calendar', 'eligibility']) {
+        await vac.click('.tabs [data-view="' + v + '"]');
+        const size = await noScroll(vac);
+        assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Vacation ' + v + ' fits ' + w + 'x' + h + ': ' + JSON.stringify(size));
+        if (SHOTS) await vac.screenshot({ path: path.join(SHOTS, 'vacation-' + v + '-' + w + '.png') });
+      }
+      assert.deepEqual(vac.errors, []);
+      await vac.close();
+    }
+    const vac = await openPage(browser, 1920, 950, '/vacations.html?testEmail=manager.test@uniteddairy.com');
+    await vac.waitForSelector('#filters button[data-filter="all"]');
+    await vac.click('#filters button[data-filter="all"]');
+    await vac.waitForSelector('#rows tr[data-id="vac_test_1"]');
+    assert.match(await vac.textContent('#rows tr[data-id="vac_test_1"]'), /ADAMS, PAT.*Vacation Day.*10\/12\/2026.*10\/16\/2026.*5.*APPROVED/);
+    await vac.click('#add');
+    await vac.selectOption('#form select[name="driverId"]', 'drv_test_brook');
+    await vac.fill('#form input[name="startDate"]', '2026-11-23');
+    await vac.fill('#form input[name="endDate"]', '2026-11-24');
+    await vac.selectOption('#form select[name="type"]', 'PERSONAL');
+    await vac.fill('#form input[name="notes"]', 'Family');
+    await vac.click('#save');
+    await vac.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => /BROOK, SAM.*Personal Day.*11\/23\/2026.*11\/24\/2026.*2.*APPROVED.*Family/.test(tr.textContent) && !/^new-/.test(tr.dataset.id)), null, { timeout: 5000 });
+    // Thanksgiving week allows 2 off: ADAMS makes 2, CASEY on the same day is refused and taken back off the screen.
+    await vac.click('.tabs [data-view="calendar"]');
+    await vac.fill('#cal-month', '2026-11');
+    await vac.dispatchEvent('#cal-month', 'change');
+    await vac.click('#calendar [data-day="2026-11-24"]');
+    await vac.selectOption('#day-form select[name="driverId"]', 'drv_test_adams');
+    await vac.click('#day-save');
+    await vac.waitForFunction(() => /2 of 2 drivers off \(Thanksgiving week/.test(document.getElementById('day-sub').textContent), null, { timeout: 5000 });
+    await vac.selectOption('#day-form select[name="driverId"]', 'drv_test_casey');
+    await vac.click('#day-save');
+    await vac.waitForFunction(() => /FULL during Thanksgiving week/.test(document.getElementById('error').textContent), null, { timeout: 5000 });
+    await vac.waitForFunction(() => !/CASEY/.test(document.getElementById('day-list').textContent));
+    if (SHOTS) await vac.screenshot({ path: path.join(SHOTS, 'vacation-day-full-1920.png') });
+    await vac.keyboard.press('Escape');
+    // Edit: the Personal Day entry becomes Cancelled.
+    await vac.click('.tabs [data-view="time"]');
+    const brookRow = 'xpath=//tbody[@id="rows"]/tr[td[1]/b[text()="BROOK, SAM"]]';
+    await vac.click(brookRow + '//button[@data-edit-id]');
+    await vac.selectOption('#form select[name="status"]', 'CANCELLED');
+    await vac.click('#save');
+    await vac.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => /BROOK, SAM.*CANCELLED/.test(tr.textContent)), null, { timeout: 5000 });
+    const dispatcherVac = await openPage(browser, 1366, 650, '/vacations.html?testEmail=dispatch.test@uniteddairy.com');
+    await dispatcherVac.waitForSelector('#filters button');
+    await dispatcherVac.waitForTimeout(300);
+    assert.equal(await dispatcherVac.isDisabled('#add'), true, 'a dispatcher sees the schedule read only, as on the current screen');
+    await Promise.all([vac.close(), dispatcherVac.close()]);
+    results.push('Vacation Schedule: Time Off, Calendar and Eligibility fit at both sizes; a manager added a Personal Day, the Thanksgiving-week limit of 2 refused a third driver, and an entry was edited to Cancelled');
+
+    // Route Editor: every view fits at both sizes; a manager changes a start time, turns a day on, edits a detail, adds a run and drags the load order.
+    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+      const rt = await openPage(browser, w, h, '/routes.html?testEmail=manager.test@uniteddairy.com');
+      await rt.waitForSelector('table.routes tr[data-id="run_t801"]');
+      for (const v of ['times', 'days', 'seq', 'details', 'recap']) {
+        await rt.selectOption('#view-select', v);
+        const size = await noScroll(rt);
+        assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Route Editor ' + v + ' fits ' + w + 'x' + h + ': ' + JSON.stringify(size));
+        if (SHOTS && (v === 'times' || v === 'days' || w === 1920)) await rt.screenshot({ path: path.join(SHOTS, 'routes-' + v + '-' + w + '.png') });
+      }
+      assert.deepEqual(rt.errors, []);
+      await rt.close();
+    }
+    const rt = await openPage(browser, 1920, 950, '/routes.html?testEmail=manager.test@uniteddairy.com');
+    await rt.waitForSelector('table.routes tr[data-id="run_t801"]');
+    await rt.selectOption('#view-select', 'times');
+    await rt.fill('tr[data-id="run_t801"] input.cell[data-day="mon"]', '5 AM');
+    await rt.press('tr[data-id="run_t801"] input.cell[data-day="mon"]', 'Tab');
+    await rt.waitForFunction(() => document.querySelector('tr[data-id="run_t801"] input.cell[data-day="mon"]').value === '5:00 AM', null, { timeout: 5000 });
+    assert.equal(await rt.evaluate(() => document.activeElement.dataset.day), 'tue', 'Tab moved on to Tuesday while Monday saved');
+    await rt.selectOption('#view-select', 'days');
+    await rt.click('tr[data-id="run_t802"] button[data-runday="wed"]');
+    await rt.waitForFunction(() => document.querySelector('tr[data-id="run_t802"] button[data-runday="wed"]').textContent === 'RUNS');
+    await rt.click('tr[data-id="run_t802"] [data-edit-route]');
+    await rt.selectOption('form.details select[data-f="loadType"]', 'Tote');
+    if (SHOTS) await rt.screenshot({ path: path.join(SHOTS, 'routes-details-802-1920.png') });
+    await rt.selectOption('#view-select', 'recap');
+    await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => tr.children[0].textContent === '802' && tr.children[3].textContent === 'Tote' && /Wed/.test(tr.children[4].textContent)), null, { timeout: 5000 });
+    await rt.click('#add-run');
+    await rt.fill('#add-form input[name="run"]', 'WHEELING');
+    await rt.click('#add-save');
+    await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => /WHEELING/.test(tr.textContent)), null, { timeout: 5000 });
+    await rt.selectOption('#route-select', '');
+    await rt.selectOption('#view-select', 'seq');
+    await rt.waitForSelector('table.routes tr[data-i="1"]');
+    await rt.dragAndDrop('table.routes tr[data-i="1"] td:nth-child(2)', 'table.routes tr[data-i="0"] td:nth-child(2)');
+    await rt.waitForFunction(() => document.querySelector('table.routes tr[data-i="0"] td:nth-child(2)').textContent === '801', null, { timeout: 5000 });
+    const saved801 = await rt.evaluate(async () => {
+      const { start } = await import('./js/app.js');
+      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { db } = await start();
+      for (let i = 0; i < 20; i++) { const d = (await getDoc(doc(db, 'routes', 'run_t801'))).data(); if (d.days.mon.loadOrder === 10 && d.days.mon.dispatchTime === 300) return d.days.mon; await new Promise(r => setTimeout(r, 250)); }
+      return null;
+    });
+    assert.ok(saved801, 'Monday start time 5:00 AM and load order 10 saved for 801');
+    const dispRt = await openPage(browser, 1366, 650, '/routes.html?testEmail=dispatch.test@uniteddairy.com');
+    await dispRt.waitForSelector('table.routes tr[data-id="run_t801"]');
+    await dispRt.waitForTimeout(300);
+    assert.equal(await dispRt.isDisabled('#add-route'), true, 'a dispatcher sees Route Master read only');
+    await Promise.all([rt.close(), dispRt.close()]);
+    results.push('Route Editor: Start Times, Route Days, Load Order, Route Details and Recap fit at both sizes; a manager set 801 Monday to 5 AM (Tab kept moving), turned 802 Wednesday on, set 802 to Tote, added a run to 802 and dragged 801 first on Monday');
+
+    // Equipment: fits at both sizes; a dispatcher puts a truck down with a reason and back in service.
+    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+      const eq = await openPage(browser, w, h, '/equipment.html?testEmail=dispatch.test@uniteddairy.com');
+      await eq.waitForSelector('#rows tr[data-id="veh_truck_900001"]');
+      const size = await noScroll(eq);
+      assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Equipment fits ' + w + 'x' + h + ': ' + JSON.stringify(size));
+      assert.deepEqual(eq.errors, []);
+      if (w === 1366) {
+        await eq.click('#rows tr[data-id="veh_truck_900002"] [data-down]');
+        await eq.fill('#rows tr[data-id="veh_truck_900002"] [data-reason]', 'Flat tire');
+        await eq.click('#rows tr[data-id="veh_truck_900002"] [data-down-save]');
+        await eq.waitForFunction(() => /DOWN.*Flat tire/.test(document.querySelector('#rows tr[data-id="veh_truck_900002"]').textContent));
+        if (SHOTS) await eq.screenshot({ path: path.join(SHOTS, 'equipment-' + w + '.png') });
+        await eq.click('#rows tr[data-id="veh_truck_900002"] [data-up]');
+        await eq.waitForFunction(() => /ACTIVE/.test(document.querySelector('#rows tr[data-id="veh_truck_900002"]').textContent), null, { timeout: 5000 });
+      } else if (SHOTS) await eq.screenshot({ path: path.join(SHOTS, 'equipment-' + w + '.png') });
+      await eq.close();
+    }
+    results.push('Equipment: fits at both sizes; a dispatcher put 900002 down for a flat tire and back in service');
+
+    // A busy day: 32 loads (more than the 27 routes a day today) still fit with no scrolling, at both sizes.
+    const busy = F.fakeSheets();
+    const extra = [];
+    for (let i = 0; i < 30; i++) {
+      extra.push({ route: String(700 + i), routeId: 'rte_b' + i, runId: 'run_b' + i, days: { tue: { seq: 100 + i, driverId: 'drv_test_adams', driver: 'ADAMS, PAT', truckId: 'veh_truck_900001', truck: '900001', trailerId: 'veh_trailer_t_901', trailer: 'T-901' } } });
+    }
+    busy["'LIVE CURRENT WEEK'"] = F.liveTab('2026-10-04', '2026-10-04', F.weekRoutes('2026-10-04').concat(extra));
+    await runTransfer({ db: db(), reader: F.fakeReader(busy), sources: F.SOURCES, now: () => new Date('2026-10-09T12:05:00Z') });
+    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+      const page = await openPage(browser, w, h, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+      await page.waitForFunction(() => document.querySelectorAll('#rows tr[data-id]').length === 32);
+      const size = await noScroll(page);
+      assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'busy Daily fits ' + w + 'x' + h + ': ' + JSON.stringify(size));
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'daily-busy-' + w + '.png') });
+      const wk = await openPage(browser, w, h, '/weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com');
+      await wk.waitForFunction(() => document.querySelectorAll('#rows tr').length === 35);
+      const ws = await noScroll(wk);
+      if (SHOTS) await wk.screenshot({ path: path.join(SHOTS, 'weekly-busy-' + w + '.png') });
+      assert.ok(ws.scroll <= ws.inner && ws.width <= ws.innerWidth, 'busy Weekly fits ' + w + 'x' + h + ': ' + JSON.stringify(ws));
+      await page.close(); await wk.close();
+    }
+    results.push('a 32-load day and a 35-run week fit on one page at 1920x950 and 1366x650');
+
+    // Route Distribution home, Drivers and Driver Check-ins fit one page at both sizes.
+    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+      for (const [url, ready] of [['/index.html?testEmail=dispatch.test@uniteddairy.com', '[data-n="drivers.active"]:not(:empty)'],
+        ['/drivers.html?testEmail=manager.test@uniteddairy.com', '#rows tr[data-id]'],
+        ['/checkins.html?date=2026-10-06&testEmail=dispatch.test@uniteddairy.com', '#rows tr[data-index]']]) {
+        const page = await openPage(browser, w, h, url);
+        await page.waitForSelector(ready);
+        await page.waitForTimeout(300);
+        const size = await noScroll(page);
+        assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, url + ' fits ' + w + 'x' + h + ': ' + JSON.stringify(size));
+        if (SHOTS) await page.screenshot({ path: path.join(SHOTS, url.slice(1).split('.')[0] + '-' + w + '.png') });
+        assert.deepEqual(page.errors, []);
+        await page.close();
+      }
+    }
+    const home = await openPage(browser, 1366, 650, '/index.html?testEmail=dispatch.test@uniteddairy.com');
+    await home.waitForFunction(() => document.querySelector('[data-n="drivers.active"]').textContent === '3');
+    await home.close();
+    results.push('Route Distribution home, Drivers and Driver Check-ins fit on one page at 1920x950 and 1366x650');
+
+    const roster = await openPage(browser, 1366, 650, '/drivers.html?testEmail=manager.test@uniteddairy.com');
+    await roster.waitForSelector('#rows tr[data-id]');
+    const firstNames = await roster.$$eval('#rows tr td.name', tds => tds.map(td => td.textContent.replace('RELIEF', '')));
+    assert.deepEqual(firstNames.slice(0, 3), ['ADAMS, PAT', 'BROOK, SAM', 'CASEY, LEE'], 'seniority order');
+    // Edit: rename, relief, new seniority date.
+    await roster.click('#rows tr[data-id="drv_test_casey"] [data-edit]');
+    await roster.fill('#d-name', 'Casey, Leigh');
+    await roster.check('#d-relief');
+    await roster.fill('#d-seniority', '2025-11-15');
+    await roster.click('#d-save');
+    assert.match(await roster.textContent('#rows tr[data-id="drv_test_casey"] td.name'), /CASEY, LEIGH\s*RELIEF/, 'shown at once');
+    const casey = async () => (await db().collection('drivers').doc('drv_test_casey').get()).data();
+    for (let i = 0; i < 50 && (await casey()).name !== 'CASEY, LEIGH'; i++) await roster.waitForTimeout(100);
+    assert.equal((await casey()).name, 'CASEY, LEIGH');
+    assert.equal((await casey()).reliefDriver, true);
+    assert.equal((await casey()).seniorityDate, '2025-11-15');
+    // Add a driver, then remove two with Remove Selected (they stay as Inactive).
+    await roster.click('#add');
+    await roster.fill('#d-name', 'Evans, Kim');
+    await roster.fill('#d-hire', '2019-04-01');
+    await roster.fill('#d-seniority', '2019-04-01');
+    await roster.fill('#d-truck', '900002');
+    await roster.click('#d-save');
+    await roster.waitForFunction(() => [...document.querySelectorAll('#rows td.name')].some(td => td.textContent === 'EVANS, KIM'));
+    const kim = async () => (await db().collection('drivers').where('name', '==', 'EVANS, KIM').get()).docs.map(d => d.data())[0];
+    for (let i = 0; i < 50 && !(await kim()); i++) await roster.waitForTimeout(100);
+    assert.equal((await kim()).defaultTruckId, 'veh_truck_900002');
+    await roster.waitForSelector('#rows tr[data-id="' + (await kim()).id + '"]');
+    await roster.check('#rows tr[data-id="' + (await kim()).id + '"] [data-select]');
+    await roster.check('#rows tr[data-id="drv_test_brook"] [data-select]');
+    await roster.click('#remove');
+    for (let i = 0; i < 50 && (await kim()).status !== 'INACTIVE'; i++) await roster.waitForTimeout(100);
+    assert.equal((await kim()).status, 'INACTIVE');
+    assert.equal((await db().collection('drivers').doc('drv_test_brook').get()).data().unavailableReason, 'Removed from operational roster');
+    if (SHOTS) await roster.screenshot({ path: path.join(SHOTS, 'drivers-after-edits-1366.png') });
+    // Typing a truck in the list saves it.
+    await roster.fill('#rows tr[data-id="drv_test_adams"] [data-truck]', '900001');
+    await roster.press('#rows tr[data-id="drv_test_adams"] [data-truck]', 'Enter');
+    const adams = async () => (await db().collection('drivers').doc('drv_test_adams').get()).data();
+    for (let i = 0; i < 50 && (await adams()).defaultTruckId !== 'veh_truck_900001'; i++) await roster.waitForTimeout(100);
+    assert.equal((await adams()).defaultTruckId, 'veh_truck_900001');
+    // Panel open while editing: still one page.
+    await roster.click('#rows tr[data-id="drv_test_adams"] [data-edit]');
+    const rs = await noScroll(roster);
+    assert.ok(rs.scroll <= rs.inner && rs.width <= rs.innerWidth, 'Driver Roster with the edit panel fits 1366x650: ' + JSON.stringify(rs));
+    if (SHOTS) await roster.screenshot({ path: path.join(SHOTS, 'drivers-edit-panel-1366.png') });
+    await roster.close();
+    const rosterView = await openPage(browser, 1366, 650, '/drivers.html?testEmail=dispatch.test@uniteddairy.com');
+    await rosterView.waitForSelector('#rows tr[data-id]');
+    await rosterView.waitForTimeout(500);
+    assert.equal(await rosterView.$$eval('button[data-toggle]:not([disabled])', b => b.length), 0, 'a dispatcher sees the driver list read only');
+    await rosterView.close();
+    results.push('Driver Roster: a manager renamed a driver, set relief and seniority, added a driver, removed two (kept as Inactive), typed a truck; each shows at once and saves as one call; a dispatcher sees it read only');
+
+    const ci = await openPage(browser, 1366, 650, '/checkins.html?date=2026-10-06&testEmail=dispatch.test@uniteddairy.com');
+    await ci.waitForSelector('#rows tr[data-index]');
+    const route = await ci.textContent('#rows tr[data-index="0"] td:first-child');
+    await ci.click('#rows tr[data-index="0"]');
+    await ci.fill('#ci-casesDelivered', '412');
+    await ci.fill('#ci-driverCaseReturn', '3');
+    await ci.fill('#ci-trailerIssues', 'Door seal torn');
+    await ci.click('.popover [data-save]');
+    await ci.waitForFunction(() => /412/.test(document.querySelector('#rows tr[data-index="0"]').textContent));
+    const saved = async () => (await db().collection('runs').get()).docs.map(d => d.data()).find(r => r.route === route).days.tue;
+    for (let i = 0; i < 50 && (await saved()).casesDelivered !== 412; i++) await ci.waitForTimeout(100);
+    assert.equal((await saved()).casesDelivered, 412, 'check-in saved');
+    assert.equal(await ci.textContent('#n-issues'), '1');
+    if (SHOTS) await ci.screenshot({ path: path.join(SHOTS, 'checkins-after-entry-1366.png') });
+    await ci.close();
+    results.push('Driver Check-ins: a dispatcher entered a check-in for route ' + route + '; it shows at once and saved as one call');
+
+    // With the write-back on: the badge says saves go to the sandbox sheet, and the conflict list is one click away.
+    await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+    const batch = db().batch();
+    for (let i = 0; i < 40; i++) {
+      batch.set(db().collection('conflicts').doc('test-conflict-' + String(i).padStart(2, '0')), { open: true, at: new Date(Date.parse('2026-10-09T12:00:00Z') + i * 60000).toISOString(),
+        by: 'dispatch.test@uniteddairy.com', tab: 'LIVE CURRENT WEEK', route: '802', run: 'TEST 802', column: 'tue_trailer', sheetValue: 'T-902', newValue: 'T-901',
+        problem: 'changed in the sheet since the app last saw it; the sheet value was kept' });
+    }
+    await batch.commit();
+    const withWb = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await withWb.waitForSelector('#to-conflicts:not([hidden])');
+    assert.equal(await withWb.textContent('#mode-text'), 'TEST COPY: SAVES GO TO THE SANDBOX SHEET');
+    await withWb.close();
+    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+      const page = await openPage(browser, w, h, '/conflicts.html?testEmail=dispatch.test@uniteddairy.com');
+      await page.waitForFunction(() => document.querySelectorAll('#rows button.check').length === 40);
+      const size = await noScroll(page);
+      assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Sheet Conflicts with 40 lines fits ' + w + 'x' + h + ': ' + JSON.stringify(size));
+      assert.equal(await page.textContent('#rows tr:first-child td:nth-child(4)'), 'Tue trailer');
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'conflicts-' + w + '.png') });
+      assert.deepEqual(page.errors, []);
+      await page.close();
+    }
+    const checker = await openPage(browser, 1366, 650, '/conflicts.html?testEmail=dispatch.test@uniteddairy.com');
+    await checker.waitForSelector('#rows button.check');
+    const firstId = await checker.getAttribute('#rows button.check', 'data-id');
+    await checker.click('#rows button.check');
+    for (let i = 0; i < 50 && (await db().collection('conflicts').doc(firstId).get()).data().open !== false; i++) await checker.waitForTimeout(100);
+    assert.equal((await db().collection('conflicts').doc(firstId).get()).data().open, false, 'Checked is saved');
+    await checker.close();
+    results.push('Sheet Conflicts: 40 open lines fit on one page at both sizes; Checked takes a line off the list and saves it');
+
+    // Someone outside United Dairy is signed straight back out.
+    const outsider = await openPage(browser, 1366, 650, '/daily.html?testEmail=someone@gmail.com');
+    await outsider.waitForSelector('#signin-error:not([hidden])');
+    assert.match(await outsider.textContent('#signin-error'), /Only United Dairy Google accounts/);
+    assert.equal(await outsider.isHidden('#screen'), true);
+    results.push('a gmail.com account is signed out and sees no dispatch data');
+
+    // A United Dairy account that is not in the Users list is told so and signed out.
+    const newHire = await openPage(browser, 1366, 650, '/daily.html?testEmail=new.hire@uniteddairy.com');
+    await newHire.waitForSelector('#signin-error:not([hidden])');
+    assert.match(await newHire.textContent('#signin-error'), /not an active user in the Users list/);
+    assert.equal(await newHire.isHidden('#screen'), true);
+    results.push('a United Dairy account not in the Users list is told to ask an administrator and sees no data');
+  } finally {
+    await browser.close();
+  }
+  console.log('BROWSER CHECKS PASSED');
+  results.forEach(r => console.log(' - ' + r));
+  process.exit(0);
+})().catch(e => { console.error(e); process.exit(1); });

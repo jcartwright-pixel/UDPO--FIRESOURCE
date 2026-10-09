@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Driver Check-ins (new app)</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body>
+  <div class="signin" id="signin" hidden>
+    <h1>Driver Check-ins</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="daily.html">Daily Dispatch</a>
+      <a href="weekly.html">Weekly Dispatch</a>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Driver Check-ins</h1><small>What each driver reported after the route</small></div>
+      <div class="field">
+        <label for="date">Delivery date</label>
+        <div class="stepper">
+          <button type="button" id="prev" aria-label="Previous day">&#9664;</button>
+          <input type="date" id="date">
+          <button type="button" id="next" aria-label="Next day">&#9654;</button>
+        </div>
+      </div>
+      <div class="counts"><div><b id="n-in">-</b>Checked in</div><div><b id="n-out">-</b>Not yet</div><div><b id="n-issues">-</b>With issues</div></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Driver phones still check in on the current app</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="sheet">
+      <table>
+        <colgroup>
+          <col style="width:5%"><col style="width:13%"><col style="width:13%"><col style="width:6%"><col style="width:6%">
+          <col style="width:6%"><col style="width:6%"><col style="width:6%"><col style="width:13%"><col style="width:18%"><col style="width:8%">
+        </colgroup>
+        <thead><tr>
+          <th>Route</th><th>Run</th><th>Driver</th><th>Truck</th><th>Trailer</th><th>Cases out</th><th>Delivered</th><th>Returned</th>
+          <th>Refused / returned</th><th>Problems</th><th>Checked in</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="footer"><span id="count"></span><span>Click a line to enter or fix a check-in for a driver.</span></div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
+    import { watchLists, canSave, saveOptimistic } from './js/edit.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    const params = new URLSearchParams(location.search);
+    let date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
+    let unsubscribe = null, runs = [], rows = [], popover = null, writeBack = false;
+
+    const show = (v) => v === null || v === undefined ? '' : String(v);
+    function render() {
+      if (popover) return;
+      rows = L.checkinRows(runs, date);
+      const edit = canSave();
+      document.getElementById('mode-text').textContent = !edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP';
+      document.getElementById('rows').innerHTML = rows.map((r, i) => {
+        const driver = r.driver || (r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '');
+        const refused = [r.refusedReturned, r.refusedReturnedSource].filter(Boolean).join(', ');
+        const at = r.checkinCompletedAt ? new Date(r.checkinCompletedAt) : null;
+        return '<tr data-index="' + i + '"' + (edit ? ' class="editable"' : '') + '>' +
+          '<td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td>' +
+          '<td class="' + (driver ? '' : 'empty') + '">' + escapeHtml(driver) + '</td>' +
+          '<td>' + escapeHtml(r.truck) + '</td><td>' + escapeHtml(r.trailer) + '</td>' +
+          '<td>' + escapeHtml(show(r.casesOut)) + '</td><td>' + escapeHtml(show(r.casesDelivered)) + '</td><td>' + escapeHtml(show(r.driverCaseReturn)) + '</td>' +
+          '<td class="' + (refused ? 'issue' : 'empty') + '" title="' + escapeHtml(refused) + '">' + escapeHtml(refused) + '</td>' +
+          '<td class="' + (r.issues.length ? 'issue' : 'empty') + '" title="' + escapeHtml(r.issues.join('; ')) + '">' + escapeHtml(r.issues.join('; ')) + '</td>' +
+          '<td class="' + (r.checkedIn ? 'ok' : 'empty') + '">' + escapeHtml(at && !isNaN(at) ? at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : r.checkedIn ? 'Yes' : 'Not yet') + '</td></tr>';
+      }).join('') || '<tr><td colspan="11" class="empty">No deliveries on this day in the copied Live weeks.</td></tr>';
+      const done = rows.filter(r => r.checkedIn).length;
+      document.getElementById('n-in').textContent = done;
+      document.getElementById('n-out').textContent = rows.length - done;
+      document.getElementById('n-issues').textContent = rows.filter(r => r.issues.length).length;
+      document.getElementById('count').textContent = rows.length + ' deliveries';
+      fitToWindow(rows.length);
+    }
+
+    function closePopover() { if (popover) { popover.remove(); popover = null; render(); } }
+
+    // The check-in form: the same things the driver's phone asks for. Saved as one call.
+    document.getElementById('rows').addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-index]');
+      if (!tr || popover || !canSave()) return;
+      const row = rows[Number(tr.dataset.index)];
+      const run = runs.find(x => x.id === row.runDocId), d = run.days[row.day];
+      popover = document.createElement('div');
+      popover.className = 'popover';
+      const input = (name, label, value, type) => '<label for="ci-' + name + '">' + label + '</label><input id="ci-' + name + '" name="' + name + '"' + (type ? ' type="' + type + '" min="0" step="1"' : ' maxlength="300"') + ' value="' + escapeHtml(show(value)) + '">';
+      popover.innerHTML = '<b style="grid-column:1/3">' + escapeHtml(row.route + ' ' + row.run + ', ' + L.dayName(date) + ' ' + shortDate(date)) + '</b>' +
+        input('casesDelivered', 'Cases delivered', d.casesDelivered, 'number') +
+        input('driverCaseReturn', 'Cases returned', d.driverCaseReturn, 'number') +
+        input('refusedReturned', 'Refused / returned', d.refusedReturned) +
+        input('refusedReturnedSource', 'Which store', d.refusedReturnedSource) +
+        input('tractorIssues', 'Truck problem', d.tractorIssues) +
+        input('trailerIssues', 'Trailer problem', d.trailerIssues) +
+        input('palletJackIssues', 'Jack problem', d.palletJackIssues) +
+        '<label for="ci-clean">Trailer needs cleaned</label><span class="check-row"><input type="checkbox" id="ci-clean"' + (L.yes(d.trailerNeedsCleaned) ? ' checked' : '') + '></span>' +
+        '<label for="ci-notes">Notes</label><textarea id="ci-notes" maxlength="500">' + escapeHtml(d.checkinNotes || '') + '</textarea>' +
+        '<button type="button" class="close" data-save>Save check-in</button>';
+      document.body.appendChild(popover);
+      const box = tr.getBoundingClientRect(), w = popover.offsetWidth, h = popover.offsetHeight;
+      popover.style.left = Math.max(8, (window.innerWidth - w) / 2) + 'px';
+      popover.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, box.bottom + 4)) + 'px';
+      popover.addEventListener('keydown', ev => { if (ev.key === 'Escape') closePopover(); });
+      popover.querySelector('input').focus();
+      popover.querySelector('[data-save]').addEventListener('click', () => {
+        const get = (name) => popover.querySelector('[name="' + name + '"]').value.trim();
+        const num = (name) => get(name) === '' ? null : Number(get(name));
+        const fields = {
+          casesDelivered: num('casesDelivered'), driverCaseReturn: num('driverCaseReturn'), refusedReturned: get('refusedReturned'),
+          refusedReturnedSource: get('refusedReturnedSource'), tractorIssues: get('tractorIssues'), trailerIssues: get('trailerIssues'),
+          palletJackIssues: get('palletJackIssues'), trailerNeedsCleaned: popover.querySelector('#ci-clean').checked,
+          checkinNotes: popover.querySelector('#ci-notes').value.trim()
+        };
+        const before = Object.assign({}, d);
+        closePopover();
+        saveOptimistic('saveCheckIn', Object.assign({ runDocId: row.runDocId, day: row.day, expectedRev: run.rev }, fields),
+          () => Object.assign(d, fields, { trailerNeedsCleaned: fields.trailerNeedsCleaned ? 'TRUE' : '', checkinCompletedAt: new Date().toISOString() }),
+          () => { run.days[row.day] = before; }, render);
+      });
+    });
+
+    function move(days) { date = L.addDays(date, days); watch(); }
+
+    async function watch() {
+      const { db } = await start();
+      if (unsubscribe) unsubscribe();
+      document.getElementById('date').value = date;
+      history.replaceState(null, '', '?date=' + date + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
+      unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', L.weekStart(date))), snap => {
+        runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        render();
+      }, e => showError('Could not read the check-ins: ' + e.message));
+    }
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      onSnapshot(doc(db, 'config', 'app'), snap => { const c = snap.data() || {}; writeBack = !!(c.writeBack && c.writeBack.enabled === true); render(); });
+      watchLists(user, render);
+      document.getElementById('prev').onclick = () => move(-1);
+      document.getElementById('next').onclick = () => move(1);
+      document.getElementById('date').onchange = e => { if (L.isDateKey(e.target.value)) { date = e.target.value; watch(); } };
+      window.addEventListener('resize', render);
+      watch();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Route Editor (new app)</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body>
+  <div class="signin" id="signin" hidden>
+    <h1>Route Editor</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="weekly.html">Weekly Dispatch</a>
+      <a href="equipment.html">Equipment</a>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1 id="work-title">Route Days</h1><small>Route Editor &middot; Route Master</small></div>
+      <div class="selectors">
+        <label>Route<select id="route-select"></select></label>
+        <label>Run / Destination<select id="run-select"></select></label>
+        <label>View / Edit<select id="view-select">
+          <option value="times">Start Times</option><option value="miles">Mileage</option><option value="hours">Hours and Return</option><option value="offset">Load Day</option>
+          <option value="truck">Default Truck</option><option value="trailer">Default Trailer</option><option value="jack">Default Pallet Jack</option>
+          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="details">Route Details</option><option value="recap">Recap</option>
+        </select></label>
+      </div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Route Master is not changed yet</span></div>
+    </div>
+    <div class="actions">
+      <select id="active-filter" aria-label="Which routes"><option value="ACTIVE">Active routes</option><option value="ALL">All routes</option><option value="INACTIVE">Inactive routes</option></select>
+      <button type="button" id="refresh" title="The list is live; this only redraws it">Refresh</button>
+      <button type="button" class="primary" id="add-route">+ Add Route</button>
+      <button type="button" class="primary" id="add-run">+ Add Run / Destination</button>
+      <span class="seq-day" id="seq-day-box" hidden><label for="seq-day">Day</label><select id="seq-day"></select></span>
+      <span class="spacer"></span>
+      <button type="button" disabled title="Dispatch Administration stays in the current app for now">Dispatch Administration</button>
+      <button type="button" disabled title="Driver Weekly Template stays in the current app for now">Driver Weekly Template</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="sheet" id="sheet"><table id="table"></table></div>
+    <div class="footer"><span id="count"></span><span id="work-sub"></span></div>
+  </div>
+
+  <div class="modal-back" id="modal-back" hidden></div>
+  <section class="modal" id="add-modal" role="dialog" aria-labelledby="add-title" hidden>
+    <h2 id="add-title">Add Route</h2>
+    <form id="add-form" class="modal-grid">
+      <label>Route<input name="route" required maxlength="20"></label>
+      <label>Route Name<input name="routeName" maxlength="80"></label>
+      <label class="wide">Run / Destination<input name="run" required maxlength="80"></label>
+      <label>Loadout Type<select name="loadType"></select></label>
+      <label>Run By<select name="coverageOwner"></select></label>
+      <label>Departure Day<input name="departureDay" value="Delivery Day" maxlength="40"></label>
+      <label>Order<input name="weekOrder" type="number" step="1"></label>
+    </form>
+    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="add-save">Save Changes</button></div>
+  </section>
+
+  <script type="module">
+    import { start, requireSignIn, fitToWindow, escapeHtml, showError } from './js/app.js';
+    import { lists, watchLists, saveOptimistic } from './js/edit.js';
+    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // the Route Master's own order
+    const NAME = (p) => L.DAY_NAMES[L.DAYS.indexOf(p)];
+    const LOADOUT = ['None', 'Case Loadout', 'Tote', 'Boxing', 'Tanker'];
+    const RUN_BY = ['Uniontown', 'Fairmont', 'Marietta', 'Charleston', 'Carrier', 'Anyone'];
+    const GRID = {
+      times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time like 5 AM or 5:30 PM and press Enter or Tab. Ctrl+D fills down from the run above.', ph: 'h:mm AM' },
+      miles: { field: 'miles', title: 'Mileage', sub: 'Miles per run per day (round trip). Ctrl+D fills down.', ph: 'miles' },
+      hours: { field: 'hours', title: 'Hours and Return', sub: 'Expected route hours (hours:minutes or decimal). Ctrl+D fills down.', ph: 'h:mm' },
+      offset: { field: 'loadDayOffset', title: 'Load Day', sub: 'Days before the departure day that the load is built (0 same day, -1 the day before).', ph: '0' },
+      truck: { field: 'tractor', title: 'Default Truck', sub: 'Type a truck number. Blank clears the default.', ph: 'truck' },
+      trailer: { field: 'trailer', title: 'Default Trailer', sub: 'Type a trailer number (T- is added). Blank clears the default.', ph: 'trailer' },
+      jack: { field: 'forklift', title: 'Default Pallet Jack / Forklift', sub: 'Type the unit number. Blank clears the default.', ph: 'unit' }
+    };
+    const OTHER = {
+      seq: ['Load Order', 'Pick a day, then drag a run by its route number to its place in the loadout.'],
+      days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the permanent normal schedule. Special-week changes stay in Weekly Dispatch.'],
+      details: ['Route Details', 'Run settings. Each box and list saves the moment you change it.'],
+      recap: ['Route Recap', 'Current route and run summary.']
+    };
+    let routes = [], view = 'days', pickRoute = '', pickRun = '', filter = 'ACTIVE', seqDay = 'mon', dragging = null, addMode = 'route';
+    const canEdit = () => L.hasRole(lists.person, L.REORDER_ROLES);
+    const isActive = (r) => r.active !== false && String(r.routeStatus || 'ACTIVE').toUpperCase() === 'ACTIVE';
+    const day = (r, p) => (r.days && r.days[p]) || {};
+    const byOrder = (a, b) => (a.weekOrder == null ? 999999 : a.weekOrder) - (b.weekOrder == null ? 999999 : b.weekOrder) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run));
+
+    function shownRuns() {
+      return routes.filter(r => filter === 'ALL' || (filter === 'ACTIVE') === isActive(r)).filter(r => !pickRoute || r.route === pickRoute).filter(r => !pickRun || r.id === pickRun).sort(byOrder);
+    }
+    function cellValue(r, p, field) {
+      const v = day(r, p)[field];
+      if (field === 'dispatchTime') return L.timeText(v);
+      return v === null || v === undefined ? '' : String(v);
+    }
+
+    function refreshSelectors() {
+      const rs = document.getElementById('route-select'), ns = document.getElementById('run-select');
+      const names = [...new Set(routes.filter(r => filter === 'ALL' || (filter === 'ACTIVE') === isActive(r)).sort(byOrder).map(r => r.route))];
+      if (pickRoute && names.indexOf(pickRoute) < 0) pickRoute = '';
+      rs.innerHTML = '<option value="">All routes</option>' + names.map(n => '<option' + (n === pickRoute ? ' selected' : '') + '>' + escapeHtml(n) + '</option>').join('');
+      const runs = routes.filter(r => r.route === pickRoute).sort(byOrder);
+      if (pickRun && !runs.some(r => r.id === pickRun)) pickRun = '';
+      ns.innerHTML = '<option value="">' + (pickRoute ? 'All runs of ' + escapeHtml(pickRoute) : 'All runs') + '</option>' + runs.map(r => '<option value="' + escapeHtml(r.id) + '"' + (r.id === pickRun ? ' selected' : '') + '>' + escapeHtml(r.run) + '</option>').join('');
+      ns.disabled = !pickRoute;
+      document.getElementById('view-select').value = view;
+    }
+
+    function render() {
+      const edit = canEdit();
+      document.getElementById('mode-text').textContent = edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY';
+      ['add-route', 'add-run'].forEach(id => { document.getElementById(id).disabled = !edit; });
+      document.getElementById('add-run').disabled = !edit || !pickRoute;
+      refreshSelectors();
+      const g = GRID[view], o = OTHER[view];
+      document.getElementById('work-title').textContent = g ? g.title : o[0];
+      document.getElementById('work-sub').textContent = g ? g.sub : o[1];
+      document.getElementById('seq-day-box').hidden = view !== 'seq';
+      const list = shownRuns(), t = document.getElementById('table');
+      // Tab or Enter moves to the next box while the last one saves: keep the focus there when the grid redraws.
+      const focus = document.activeElement && document.activeElement.matches && document.activeElement.matches('input.cell') ? [document.activeElement.dataset.r, document.activeElement.dataset.c] : null;
+      let lines = list.length;
+      if (g) t.innerHTML = gridView(g, list, edit);
+      else if (view === 'days') t.innerHTML = daysView(list, edit);
+      else if (view === 'seq') { const seq = seqList(); t.innerHTML = seqView(seq, edit); lines = seq.length; }
+      else if (view === 'details') { t.innerHTML = detailsView(list, edit); lines = 12; }
+      else t.innerHTML = recapView(list);
+      t.className = 'routes ' + view;
+      document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : list.length + (list.length === 1 ? ' run' : ' runs'));
+      fitToWindow(lines);
+      if (focus) { const again = t.querySelector('input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]'); if (again) again.focus(); }
+    }
+
+    const head = (first) => '<thead><tr>' + first + DAYS.map(p => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '</th>').join('') + '</tr></thead>';
+    const routeCells = (r) => '<td class="strong">' + escapeHtml(r.route) + '<small>' + escapeHtml(r.routeName || '') + '</small></td><td class="strong">' + escapeHtml(r.run || '') + '</td>';
+    function gridView(g, list, edit) {
+      return '<colgroup><col style="width:8%"><col style="width:15%"><col span="7" style="width:11%"></colgroup>' + head('<th>Route</th><th>Run / Destination</th>') + '<tbody>' +
+        list.map((r, ri) => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r) + DAYS.map((p, di) => {
+          const on = !!day(r, p).active;
+          return '<td class="' + (on ? '' : 'norun') + '"><input class="cell" data-day="' + p + '" data-r="' + ri + '" data-c="' + di + '" value="' + escapeHtml(cellValue(r, p, g.field)) + '" placeholder="' + (on ? g.ph : '') + '" autocomplete="off"' + (edit ? '' : ' readonly') + '></td>';
+        }).join('') + '</tr>').join('') + '</tbody>' + (list.length ? '' : '<tbody><tr><td colspan="9" class="empty">No runs to show.</td></tr></tbody>');
+    }
+    function daysView(list, edit) {
+      let prior = '';
+      return '<colgroup><col style="width:4%"><col style="width:9%"><col style="width:15%"><col span="7" style="width:10.29%"></colgroup>' + head('<th></th><th>Route</th><th>Run / Destination</th>') + '<tbody>' +
+        list.map(r => {
+          const same = prior === r.route; prior = r.route;
+          return '<tr data-id="' + escapeHtml(r.id) + '"><td>' + (same || !edit ? '' : '<button type="button" class="edit" data-edit-route="' + escapeHtml(r.id) + '" title="Route Details">&#9998;</button>') + '</td>' +
+            '<td class="strong">' + (same ? '<small>&#8627; same route</small>' : escapeHtml(r.route) + '<small>' + escapeHtml(r.routeName || '') + '</small>') + '</td><td class="strong">' + escapeHtml(r.run || '') + '</td>' +
+            DAYS.map(p => { const on = !!day(r, p).active; return '<td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>'; }).join('') + '</tr>';
+        }).join('') + '</tbody>';
+    }
+    function seqList() {
+      return routes.filter(r => isActive(r) && day(r, seqDay).active && (!pickRoute || r.route === pickRoute))
+        .sort((a, b) => (day(a, seqDay).loadOrder == null ? 999999 : day(a, seqDay).loadOrder) - (day(b, seqDay).loadOrder == null ? 999999 : day(b, seqDay).loadOrder) || byOrder(a, b));
+    }
+    function seqView(list, edit) {
+      return '<colgroup><col style="width:8%"><col style="width:12%"><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:22%"></colgroup>' +
+        '<thead><tr><th>Order</th><th>Route</th><th>Run / Destination</th><th>Start time</th><th>Load day</th><th>Run by</th></tr></thead><tbody>' +
+        list.map((r, i) => '<tr data-id="' + escapeHtml(r.id) + '" data-i="' + i + '"' + (edit ? ' draggable="true"' : '') + '><td>' + escapeHtml(cellValue(r, seqDay, 'loadOrder') || '-') + '</td>' +
+          '<td class="strong' + (edit ? ' grab' : '') + '">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(cellValue(r, seqDay, 'dispatchTime')) + '</td>' +
+          '<td>' + escapeHtml(cellValue(r, seqDay, 'loadDayOffset')) + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td></tr>').join('') +
+        (list.length ? '' : '<tr><td colspan="6" class="empty">No runs on ' + NAME(seqDay) + '.</td></tr>') + '</tbody>';
+    }
+    const yesNo = (name, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '><option value="true"' + (v ? ' selected' : '') + '>YES</option><option value="false"' + (v ? '' : ' selected') + '>NO</option></select>';
+    const choice = (name, list, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '>' + (list.indexOf(v) < 0 && v ? '<option selected>' + escapeHtml(v) + '</option>' : '') + list.map(x => '<option' + (x === v ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select>';
+    const textIn = (name, v, edit, type) => '<input data-f="' + name + '" value="' + escapeHtml(v == null ? '' : v) + '"' + (type ? ' type="' + type + '"' : '') + (edit ? '' : ' readonly') + '>';
+    function detailsView(list, edit) {
+      const r = pickRun ? list[0] : list.length === 1 ? list[0] : null;
+      if (!r) return '<tbody><tr><td class="empty pick-one">Pick a route and a run / destination at the top (or click &#9998; on Route Days) to see its details.</td></tr></tbody>';
+      return '<tbody><tr><td class="details-cell"><form class="details" data-id="' + escapeHtml(r.id) + '" onsubmit="return false">' +
+        '<label>Route' + textIn('route', r.route, edit) + '</label><label>Route Name' + textIn('routeName', r.routeName, edit) + '</label><label>Order' + textIn('weekOrder', r.weekOrder, edit, 'number') + '</label>' +
+        '<label>Run / Destination' + textIn('run', r.run, edit) + '</label><label>Movement Type' + textIn('movementType', r.movementType, edit) + '</label>' +
+        '<label>Route ID<input readonly value="' + escapeHtml(r.routeId || '') + '"></label><label>Run ID<input readonly value="' + escapeHtml(r.id) + '"></label><label>Facility ID<input readonly value="' + escapeHtml(r.facilityId || '') + '"></label>' +
+        '<label>Departure Day' + textIn('departureDay', r.departureDay, edit) + '</label><label>Run Active' + yesNo('active', isActive(r), edit) + '</label><label>Sleeper' + yesNo('sleeper', !!r.sleeper, edit) + '</label>' +
+        '<label>Loadout Type' + choice('loadType', LOADOUT, r.loadType || 'None', edit) + '</label><label>Run By' + choice('coverageOwner', RUN_BY, r.coverageOwner || 'Uniontown', edit) + '</label>' +
+        '<label>Show in Plant' + yesNo('displayPlant', r.displayPlant !== false, edit) + '</label><label>Show Daily' + yesNo('displayDaily', r.displayDaily !== false, edit) + '</label>' +
+        '<label>Show Weekly' + yesNo('displayWeekly', r.displayWeekly !== false, edit) + '</label><label>Mobile route' + yesNo('displayMobile', r.displayMobile !== false, edit) + '</label>' +
+        '<label>Drop &amp; Hook' + yesNo('dropAndHook', !!r.dropAndHook, edit) + '</label><label class="wide">Day Notes / Route notes' + textIn('routeNotes', r.routeNotes, edit) + '</label>' +
+        '</form></td></tr></tbody>';
+    }
+    function recapView(list) {
+      const yes = (v) => v ? '&#10003;' : '';
+      return '<colgroup><col style="width:6%"><col style="width:14%"><col style="width:9%"><col style="width:9%"><col style="width:20%"><col span="7" style="width:6%"></colgroup>' +
+        '<thead><tr><th>Route</th><th>Run / Destination</th><th>Run by</th><th>Loadout</th><th>Days</th><th>Active</th><th>Daily</th><th>Weekly</th><th>Plant</th><th>Mobile route</th><th>Sleeper</th><th>Drop &amp; hook</th></tr></thead><tbody>' +
+        list.map(r => '<tr><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td><td>' + escapeHtml(r.loadType || 'None') + '</td>' +
+          '<td>' + escapeHtml(DAYS.filter(p => day(r, p).active).map(p => NAME(p).slice(0, 3)).join(' ')) + '</td><td>' + yes(isActive(r)) + '</td><td>' + yes(r.displayDaily !== false) + '</td><td>' + yes(r.displayWeekly !== false) + '</td>' +
+          '<td>' + yes(r.displayPlant !== false) + '</td><td>' + yes(r.displayMobile !== false) + '</td><td>' + yes(r.sleeper) + '</td><td>' + yes(r.dropAndHook) + '</td></tr>').join('') + '</tbody>';
+    }
+
+    /* ---------- Saves: shown at once, one call each ---------- */
+    // The redraw waits a moment so Tab / Enter has already moved to the next box (render keeps the focus there).
+    const renderSoon = () => setTimeout(render, 0);
+    function saveRun(r, fields, days, apply) {
+      const before = JSON.parse(JSON.stringify(r));
+      return saveOptimistic('saveRoute', { runId: r.id, fields: fields || {}, days: days || {} }, () => apply(r), () => { Object.keys(r).forEach(k => delete r[k]); Object.assign(r, before); }, renderSoon);
+    }
+    function saveCell(input) {
+      const r = routes.find(x => x.id === input.closest('tr').dataset.id), p = input.dataset.day, field = GRID[view].field;
+      if (input.value.trim() === cellValue(r, p, field)) return;
+      const value = input.value.trim();
+      saveRun(r, null, { [p]: { [field]: value } }, x => {
+        const d = x.days[p] = Object.assign({}, x.days[p]);
+        d[field] = field === 'dispatchTime' ? L.minutesOfDay(/^\d{1,2}\s*[AaPp][Mm]$/.test(value) ? value.replace(/\s*([AaPp][Mm])$/, ':00 $1') : value)
+          : ['miles', 'loadOrder', 'loadDayOffset'].indexOf(field) >= 0 ? (value === '' ? null : Number(value))
+          : field === 'trailer' ? (value && !/^T-/i.test(value) ? 'T-' + value.toUpperCase() : value.toUpperCase()) : ['tractor', 'forklift'].indexOf(field) >= 0 ? value.toUpperCase() : value;
+      });
+    }
+    const table = document.getElementById('table');
+    table.addEventListener('change', e => {
+      if (e.target.matches('input.cell')) return saveCell(e.target);
+      const f = e.target.dataset.f;
+      if (!f) return;
+      const r = routes.find(x => x.id === e.target.closest('form').dataset.id);
+      let v = e.target.value;
+      if (e.target.tagName === 'SELECT' && (v === 'true' || v === 'false')) v = v === 'true';
+      if (f === 'weekOrder') v = v === '' ? null : Number(v);
+      saveRun(r, { [f]: v }, null, x => { x[f] = v; if (f === 'active') x.routeStatus = v ? 'ACTIVE' : x.routeStatus; });
+    });
+    table.addEventListener('keydown', e => {
+      const input = e.target.closest('input.cell');
+      if (!input) return;
+      if (e.key === 'Enter') { e.preventDefault(); const below = table.querySelector('input.cell[data-r="' + (Number(input.dataset.r) + 1) + '"][data-c="' + input.dataset.c + '"]'); (below || input).focus(); if (!below) input.blur(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        const above = table.querySelector('input.cell[data-r="' + (Number(input.dataset.r) - 1) + '"][data-c="' + input.dataset.c + '"]');
+        if (above) { input.value = above.value; saveCell(input); }
+      }
+    });
+    table.addEventListener('click', e => {
+      const t = e.target.closest('[data-runday]');
+      if (t) {
+        const r = routes.find(x => x.id === t.closest('tr').dataset.id), p = t.dataset.runday, on = !day(r, p).active;
+        saveRun(r, null, { [p]: { active: on } }, x => { x.days[p] = Object.assign({}, x.days[p], { active: on }); });
+        return;
+      }
+      const ed = e.target.closest('[data-edit-route]');
+      if (ed) { const r = routes.find(x => x.id === ed.dataset.editRoute); pickRoute = r.route; pickRun = r.id; view = 'details'; render(); }
+    });
+    // Load Order: drag a run by its route number; the day's whole order saves as one call.
+    table.addEventListener('dragstart', e => { const tr = e.target.closest('tr[data-i]'); if (tr) { dragging = Number(tr.dataset.i); e.dataTransfer.effectAllowed = 'move'; } });
+    table.addEventListener('dragover', e => { if (dragging !== null && e.target.closest('tr[data-i]')) e.preventDefault(); });
+    table.addEventListener('drop', e => {
+      const tr = e.target.closest('tr[data-i]');
+      if (!tr || dragging === null) return;
+      e.preventDefault();
+      const list = seqList(), from = dragging, to = Number(tr.dataset.i);
+      dragging = null;
+      if (from === to) return;
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      const before = list.map(r => day(r, seqDay).loadOrder), p = seqDay;
+      saveOptimistic('reorderRouteDay', { day: p, runIds: list.map(r => r.id) },
+        () => list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: (i + 1) * 10 }); }),
+        () => list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: before[i] }); }), render);
+    });
+    table.addEventListener('dragend', () => { dragging = null; });
+
+    /* ---------- Add Route / Add Run / Destination ---------- */
+    function openAdd(mode) {
+      addMode = mode;
+      const f = document.getElementById('add-form'), base = mode === 'run' ? routes.find(r => r.route === pickRoute) : null;
+      document.getElementById('add-title').textContent = mode === 'run' ? 'Add Run / Destination to ' + pickRoute : 'Add Route';
+      f.reset();
+      f.loadType.innerHTML = LOADOUT.map(x => '<option>' + x + '</option>').join('');
+      f.coverageOwner.innerHTML = RUN_BY.map(x => '<option>' + x + '</option>').join('');
+      f.route.value = base ? base.route : '';
+      f.route.readOnly = !!base;
+      f.routeName.value = base ? base.routeName || '' : '';
+      if (base) { f.loadType.value = base.loadType || 'None'; f.coverageOwner.value = base.coverageOwner || 'Uniontown'; f.weekOrder.value = base.weekOrder == null ? '' : base.weekOrder; }
+      document.getElementById('modal-back').hidden = false;
+      document.getElementById('add-modal').hidden = false;
+      (base ? f.run : f.route).focus();
+    }
+    function closeAdd() { document.getElementById('modal-back').hidden = true; document.getElementById('add-modal').hidden = true; }
+    document.getElementById('add-route').onclick = () => openAdd('route');
+    document.getElementById('add-run').onclick = () => openAdd('run');
+    document.querySelectorAll('[data-close]').forEach(b => { b.onclick = closeAdd; });
+    document.getElementById('modal-back').onclick = closeAdd;
+    document.getElementById('add-save').onclick = () => {
+      const f = document.getElementById('add-form');
+      const fields = { route: f.route.value.trim(), routeName: f.routeName.value.trim(), run: f.run.value.trim(), loadType: f.loadType.value, coverageOwner: f.coverageOwner.value, departureDay: f.departureDay.value.trim() };
+      if (f.weekOrder.value !== '') fields.weekOrder = Number(f.weekOrder.value);
+      if (!fields.route || !fields.run) { showError('Route and Run / Destination are required.'); return; }
+      closeAdd();
+      const temp = Object.assign({ id: 'new-' + Date.now(), active: true, routeStatus: 'ACTIVE', days: {} }, fields);
+      saveOptimistic('saveRoute', { fields, days: {} }, () => { routes.push(temp); pickRoute = fields.route; pickRun = ''; view = 'days'; },
+        () => { routes.splice(routes.indexOf(temp), 1); }, render);
+    };
+
+    /* ---------- Top controls ---------- */
+    document.getElementById('route-select').onchange = e => { pickRoute = e.target.value; pickRun = ''; render(); };
+    document.getElementById('run-select').onchange = e => { pickRun = e.target.value; render(); };
+    document.getElementById('view-select').onchange = e => { view = e.target.value; render(); };
+    document.getElementById('active-filter').onchange = e => { filter = e.target.value; render(); };
+    document.getElementById('refresh').onclick = render;
+    document.getElementById('seq-day').innerHTML = DAYS.map(p => '<option value="' + p + '">' + NAME(p) + '</option>').join('');
+    document.getElementById('seq-day').onchange = e => { seqDay = e.target.value; render(); };
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      onSnapshot(collection(db, 'routes'), snap => {
+        routes = snap.docs.map(d => Object.assign({ days: {} }, d.data(), { id: d.id }));
+        // A box being typed in keeps its text: the grid redraws when it loses focus.
+        if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#table') && document.activeElement.matches('input')) return;
+        render();
+      }, e => showError('Could not read Route Master: ' + e.message));
+      window.addEventListener('resize', render);
+    });
+  </script>
+</body>
+</html>

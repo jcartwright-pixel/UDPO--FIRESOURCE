@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Driver Roster (new app)</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body>
+  <div class="signin" id="signin" hidden>
+    <h1>Driver Roster</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="daily.html">Daily Dispatch</a>
+      <a href="weekly.html">Weekly Dispatch</a>
+      <button id="refresh" type="button">&#8635; Refresh</button>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Driver Roster</h1><small>Employee information from Driver Master</small></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Driver Master is not changed yet</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="split">
+      <div class="split-main">
+        <div class="filters">
+          <input id="search" type="search" placeholder="Search drivers or trucks...">
+          <select id="status"><option value="ALL">Status: All</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>
+          <select id="relief-filter"><option value="ALL">Relief: All</option><option value="YES">Relief</option><option value="NO">Regular</option></select>
+          <span class="sort">Sorted by seniority, most senior first</span>
+          <button id="remove" class="danger" type="button" disabled>Remove Selected</button>
+        </div>
+        <div class="sheet">
+          <table>
+            <colgroup>
+              <col style="width:4%"><col style="width:5%"><col style="width:24%"><col style="width:18%"><col style="width:14%">
+              <col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:9%">
+            </colgroup>
+            <thead><tr>
+              <th><input id="all" type="checkbox" aria-label="Select all drivers"></th><th>#</th><th>Driver</th><th>Seniority</th><th>Assigned truck</th>
+              <th>Vacation wks</th><th>Status</th><th>Available</th><th>Edit</th>
+            </tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="footer"><span id="count"></span><span>Vacation weeks follow the hire date. Removed drivers stay on the list as Inactive.</span></div>
+      </div>
+      <div class="split-side">
+        <div class="summary">
+          <div class="m-active"><b id="n-active">-</b>Active drivers</div>
+          <div class="m-relief"><b id="n-relief">-</b>Relief drivers</div>
+          <div class="m-inactive"><b id="n-inactive">-</b>Inactive / not available</div>
+        </div>
+        <button id="add" class="primary" type="button">+ Add Driver</button>
+        <div class="panel" id="panel"></div>
+      </div>
+    </div>
+    <datalist id="truck-list"></datalist>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, fitToWindow, escapeHtml } from './js/app.js';
+    import { watchLists, lists, saveOptimistic } from './js/edit.js';
+    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    const today = L.operatingDay(new Date());
+    let drivers = [], rows = [], editingId = null, panelOpen = false, typing = null;
+    const canEdit = () => L.hasRole(lists.person, L.DRIVER_ROLES);
+    const truckUnit = (id) => { const t = lists.trucks.find(e => e.id === id); return t ? t.unit : ''; };
+    const us = (key) => { if (!key) return ''; const [y, m, d] = key.split('-'); return m + '/' + d + '/' + y; };
+    function years(key) {
+      if (!key) return '-';
+      const [y, m, d] = key.split('-').map(Number), [ty, tm, td] = today.split('-').map(Number);
+      return Math.max(0, ty - y - (tm < m || (tm === m && td < d) ? 1 : 0)) + ' yr';
+    }
+
+    function visible() {
+      const q = document.getElementById('search').value.trim().toLowerCase();
+      const st = document.getElementById('status').value, rf = document.getElementById('relief-filter').value;
+      return rows.filter(r => (!q || (r.name + ' ' + truckUnit(r.defaultTruckId)).toLowerCase().includes(q)) &&
+        (st === 'ALL' || (st === 'ACTIVE') === r.active) && (rf === 'ALL' || (rf === 'YES') === r.reliefDriver));
+    }
+
+    function render() {
+      if (typing) return; // someone is typing a truck; the list redraws when they leave the box
+      rows = L.driverRosterRows(drivers, today);
+      const edit = canEdit();
+      document.getElementById('mode-text').textContent = edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY';
+      document.getElementById('truck-list').innerHTML = lists.trucks.map(t => '<option value="' + escapeHtml(t.unit) + '">').join('');
+      const shown = visible(), checked = new Set([...document.querySelectorAll('[data-select]:checked')].map(x => x.dataset.select));
+      const dis = edit ? '' : ' disabled';
+      document.getElementById('rows').innerHTML = shown.map(r => {
+        const id = escapeHtml(r.id);
+        return '<tr data-id="' + id + '" class="' + (r.active ? '' : 'off') + (editingId === r.id ? ' editing' : '') + '">' +
+          '<td><input type="checkbox" data-select="' + id + '"' + (checked.has(r.id) ? ' checked' : '') + dis + ' aria-label="Select ' + escapeHtml(r.name) + '"></td>' +
+          '<td>' + r.position + '</td>' +
+          '<td class="name">' + escapeHtml(r.name) + (r.reliefDriver ? '<span class="chip">RELIEF</span>' : '') + '</td>' +
+          '<td><b>' + years(r.seniorityDate) + '</b> <small>' + (r.seniorityDate ? 'since ' + us(r.seniorityDate) : '') + '</small></td>' +
+          '<td><input class="truck" list="truck-list" data-truck="' + id + '" value="' + escapeHtml(truckUnit(r.defaultTruckId)) + '" placeholder="No truck" maxlength="40" autocomplete="off"' + dis + '></td>' +
+          '<td>' + r.vacationWeeks + '</td>' +
+          '<td><span class="status' + (r.active ? '' : ' off') + '" title="' + escapeHtml(r.unavailableReason) + '">' + (r.active ? 'Active' : 'Inactive') + '</span></td>' +
+          '<td><button type="button" class="switch' + (r.active ? ' on' : '') + '" data-toggle="' + id + '" aria-label="' + (r.active ? 'Mark not available' : 'Mark available') + '"' + dis + '></button></td>' +
+          '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>&#9998; Edit</button></td></tr>';
+      }).join('') || '<tr><td colspan="9" class="empty">No drivers match.</td></tr>';
+      const active = rows.filter(r => r.active);
+      document.getElementById('n-active').textContent = active.length;
+      document.getElementById('n-relief').textContent = active.filter(r => r.reliefDriver).length;
+      document.getElementById('n-inactive').textContent = rows.length - active.length;
+      document.getElementById('count').textContent = shown.length + ' of ' + rows.length + ' drivers';
+      document.getElementById('add').disabled = !edit;
+      syncRemove();
+      if (!panelOpen) document.getElementById('panel').innerHTML = '<div class="panel-empty">Press Edit on a driver to change it here,<br>or + Add Driver for a new one.</div>';
+      fitToWindow(Math.max(shown.length, 1));
+    }
+
+    function syncRemove() { document.getElementById('remove').disabled = !canEdit() || !document.querySelector('[data-select]:checked'); }
+
+    // Every change shows at once and saves in the background as one call; a refused save puts the row back.
+    function change(id, action, fields, values) {
+      const d = drivers.find(x => x.id === id);
+      if (!d) return;
+      const before = {};
+      Object.keys(values).forEach(k => { before[k] = d[k]; });
+      return saveOptimistic(action, fields, () => Object.assign(d, values), () => Object.assign(d, before), render);
+    }
+
+    function openPanel(r) {
+      panelOpen = true;
+      editingId = r ? r.id : null;
+      const v = r || { name: '', hireDate: '', seniorityDate: '', defaultTruckId: '', reliefDriver: false };
+      document.getElementById('panel').innerHTML =
+        '<div class="panel-head"><h2>' + (r ? 'Edit Driver' : 'Add Driver') + '</h2>' + (r ? '<span>Seniority #' + r.position + '</span>' : '') + '</div>' +
+        '<label>Driver name<input id="d-name" type="text" maxlength="120" value="' + escapeHtml(v.name) + '"></label>' +
+        '<div class="panel-row"><label>Hire date<input id="d-hire" type="date" value="' + escapeHtml(v.hireDate || '') + '"></label>' +
+        '<label>Seniority date<input id="d-seniority" type="date" value="' + escapeHtml(v.seniorityDate || '') + '"></label></div>' +
+        '<label>Assigned truck<input id="d-truck" type="text" list="truck-list" maxlength="40" autocomplete="off" value="' + escapeHtml(truckUnit(v.defaultTruckId)) + '" placeholder="No truck"></label>' +
+        (r ? '<div class="panel-facts"><span>Seniority: <b>' + years(r.seniorityDate) + '</b></span><span>Vacation: <b>' + r.vacationWeeks + ' wks</b></span></div>' : '') +
+        '<label class="panel-check"><input id="d-relief" type="checkbox"' + (v.reliefDriver ? ' checked' : '') + '> Relief driver</label>' +
+        (r ? '<div class="panel-state"><span>Available</span><span class="status' + (r.active ? '' : ' off') + '">' + (r.active ? 'Active' : 'Inactive') + '</span></div>' : '') +
+        '<div class="panel-actions"><button id="d-cancel" type="button">Cancel</button><button id="d-save" class="primary" type="button">Save Driver</button></div>';
+      render();
+      document.getElementById('d-name').focus();
+      document.getElementById('d-cancel').onclick = closePanel;
+      document.getElementById('d-save').onclick = () => {
+        const fields = {
+          name: document.getElementById('d-name').value.trim(), hireDate: document.getElementById('d-hire').value,
+          seniorityDate: document.getElementById('d-seniority').value, truck: document.getElementById('d-truck').value.trim().toUpperCase(),
+          relief: document.getElementById('d-relief').checked
+        };
+        const truck = lists.trucks.find(t => t.unit.toUpperCase() === fields.truck);
+        const values = { name: fields.name.toUpperCase(), hireDate: fields.hireDate, seniorityDate: fields.seniorityDate, defaultTruckId: truck ? truck.id : '', reliefDriver: fields.relief };
+        closePanel();
+        if (r) return change(r.id, 'saveDriver', Object.assign({ driverId: r.id }, fields), values);
+        // A new driver shows at once; the live list replaces it with the saved one.
+        const temp = Object.assign({ id: 'new-' + Date.now(), status: 'ACTIVE' }, values);
+        saveOptimistic('saveDriver', fields, () => drivers.push(temp), () => { drivers = drivers.filter(x => x !== temp); }, render)
+          .then(() => { drivers = drivers.filter(x => x !== temp); render(); });
+      };
+    }
+    function closePanel() { panelOpen = false; editingId = null; render(); }
+
+    const table = document.getElementById('rows');
+    table.addEventListener('click', e => {
+      if (!canEdit()) return;
+      const toggle = e.target.closest('[data-toggle]'), edit = e.target.closest('[data-edit]');
+      if (toggle) {
+        const r = rows.find(x => x.id === toggle.dataset.toggle);
+        change(r.id, 'setDriverAvailable', { driverId: r.id, available: !r.active, reason: 'Manager status change' },
+          r.active ? { status: 'INACTIVE', unavailableReason: 'Manager status change' } : { status: 'ACTIVE', unavailableReason: '' });
+      }
+      if (edit) openPanel(rows.find(x => x.id === edit.dataset.edit));
+    });
+    table.addEventListener('change', e => {
+      if (e.target.matches('[data-select]')) return syncRemove();
+      const input = e.target.closest('[data-truck]');
+      if (!input) return;
+      typing = null;
+      const r = rows.find(x => x.id === input.dataset.truck), unit = input.value.trim().toUpperCase();
+      if (unit === truckUnit(r.defaultTruckId).toUpperCase()) return;
+      const truck = lists.trucks.find(t => t.unit.toUpperCase() === unit);
+      change(r.id, 'setDriverTruck', { driverId: r.id, equipmentId: truck ? truck.id : (unit ? unit : '') }, { defaultTruckId: truck ? truck.id : '' });
+    });
+    // Enter saves the truck and moves to the next driver's truck; Up and Down move between the truck boxes.
+    table.addEventListener('focusin', e => { if (e.target.matches('[data-truck]')) typing = e.target.dataset.truck; });
+    table.addEventListener('focusout', e => { if (e.target.matches('[data-truck]')) { typing = null; setTimeout(render, 0); } });
+    table.addEventListener('keydown', e => {
+      const input = e.target.closest('[data-truck]');
+      if (!input || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const step = e.key === 'Enter' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      const boxes = [...document.querySelectorAll('[data-truck]')], next = boxes[boxes.indexOf(input) + step];
+      if (next) { next.focus(); next.select(); } else input.blur();
+    });
+    document.getElementById('all').onchange = e => { document.querySelectorAll('[data-select]:not(:disabled)').forEach(x => { x.checked = e.target.checked; }); syncRemove(); };
+    document.getElementById('remove').onclick = () => {
+      const ids = [...document.querySelectorAll('[data-select]:checked')].map(x => x.dataset.select);
+      if (!ids.length) return;
+      const before = ids.map(id => { const d = drivers.find(x => x.id === id); return { d, status: d.status, reason: d.unavailableReason }; });
+      document.getElementById('all').checked = false;
+      document.querySelectorAll('[data-select]:checked').forEach(x => { x.checked = false; });
+      saveOptimistic('removeDrivers', { driverIds: ids },
+        () => before.forEach(b => Object.assign(b.d, { status: 'INACTIVE', unavailableReason: 'Removed from operational roster' })),
+        () => before.forEach(b => Object.assign(b.d, { status: b.status, unavailableReason: b.reason })), render);
+    };
+    ['search', 'status', 'relief-filter'].forEach(id => { document.getElementById(id).oninput = render; });
+    document.getElementById('add').onclick = () => openPanel(null);
+    document.getElementById('refresh').onclick = render;
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      onSnapshot(collection(db, 'drivers'), snap => { drivers = snap.docs.map(d => d.data()); render(); });
+      window.addEventListener('resize', render);
+    });
+  </script>
+</body>
+</html>

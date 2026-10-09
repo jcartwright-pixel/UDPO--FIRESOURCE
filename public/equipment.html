@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Equipment (new app)</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill">
+  <div class="signin" id="signin" hidden>
+    <h1>Equipment</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="daily.html">Daily Dispatch</a>
+      <a href="routes.html">Route Editor</a>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Equipment</h1><small>Trucks and trailers the dispatch lists offer (Equipment Master)</small></div>
+      <div class="counts"><div><b id="n-trucks">-</b>Trucks</div><div><b id="n-trailers">-</b>Trailers</div><div><b id="n-down">-</b>Down / out</div></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Equipment Master is not changed yet. Fleet service and work orders stay in the current app.</span></div>
+    </div>
+    <div class="view">
+      <div class="actions">
+        <div class="chips" id="filters"></div>
+        <input type="search" id="search" placeholder="Find a unit, location or reason" aria-label="Find">
+      </div>
+      <div class="notice error" id="error" hidden></div>
+      <div class="sheet scroll-list">
+        <table>
+          <colgroup><col style="width:9%"><col style="width:8%"><col style="width:11%"><col style="width:13%"><col style="width:9%"><col style="width:13%"><col style="width:23%"><col style="width:14%"></colgroup>
+          <thead><tr><th>Unit</th><th>Type</th><th>Status</th><th>Location</th><th>Class</th><th>On today</th><th>Reason / notes</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
+    import { lists, watchLists, canSave, saveOptimistic } from './js/edit.js';
+    import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    const today = L.operatingDay(new Date());
+    const FILTERS = [['all', 'All'], ['TRUCK', 'Trucks'], ['TRAILER', 'Trailers'], ['down', 'Down / out']];
+    let filter = 'all', search = '', runs = [], downFor = null;
+
+    // Which run each unit is on today (from the copied Live week).
+    function onToday() {
+      const map = {}, p = L.dayPrefix(today);
+      runs.forEach(r => { const d = r.days && r.days[p]; if (!d || !d.runs) return; [d.truckId, d.trailerId].forEach(id => { if (id) (map[id] = map[id] || []).push(r.route); }); });
+      return map;
+    }
+    const units = () => lists.allTrucks.concat(lists.allTrailers);
+    const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:\s*/i, '');
+
+    function render() {
+      const edit = canSave(), all = units(), on = onToday();
+      document.getElementById('mode-text').textContent = edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY';
+      document.getElementById('n-trucks').textContent = lists.allTrucks.length;
+      document.getElementById('n-trailers').textContent = lists.allTrailers.length;
+      document.getElementById('n-down').textContent = all.filter(e => L.unitOff(e)).length;
+      const match = (e, k) => k === 'all' || (k === 'down' ? L.unitOff(e) : e.type === k);
+      document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + all.filter(e => match(e, k)).length + '</b></button>').join('');
+      const typed = document.querySelector('[data-reason]') ? document.querySelector('[data-reason]').value : '';
+      const q = search.toUpperCase();
+      const list = all.filter(e => match(e, filter) && (!q || [e.unit, e.location, e.notes, e.status, e.assignmentClass].join(' ').toUpperCase().indexOf(q) >= 0));
+      document.getElementById('rows').innerHTML = list.map(e => {
+        const off = L.unitOff(e), down = String(e.status).toUpperCase() === 'DOWN', routes = on[e.id] || [];
+        const action = !edit ? '' : downFor === e.id
+          ? '<span class="down-box"><input data-reason maxlength="120" placeholder="Why is it down?"><button type="button" class="warn" data-down-save>Down</button><button type="button" data-down-cancel>Cancel</button></span>'
+          : down ? '<button type="button" data-up>Back in service</button>' : off ? '' : '<button type="button" class="warn" data-down>Put down</button>';
+        return '<tr data-id="' + escapeHtml(e.id) + '"' + (off ? ' class="off"' : '') + '><td class="strong">' + escapeHtml(e.unit) + '</td><td><span class="tag">' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</span></td>' +
+          '<td><span class="status' + (off ? ' off' : '') + '">' + escapeHtml(String(e.status || '').replace(/_/g, ' ') || 'ACTIVE') + '</span></td><td>' + escapeHtml(e.location || '') + '</td><td>' + escapeHtml(e.assignmentClass || '') + '</td>' +
+          '<td class="' + (off && routes.length ? 'issue' : '') + '">' + escapeHtml(routes.join(', ')) + '</td>' +
+          '<td class="left" title="' + escapeHtml(e.notes || '') + '">' + escapeHtml(down ? reasonOf(e) + (e.downSince ? ' (since ' + shortDate(String(e.downSince).slice(0, 10)) + ')' : '') : e.notes || '') + '</td><td>' + action + '</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="empty">No units match.</td></tr>';
+      const box = document.querySelector('[data-reason]');
+      if (box) { box.value = typed; if (document.activeElement !== box) box.focus(); }
+    }
+
+    document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
+    document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
+    document.getElementById('rows').addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-id]');
+      if (!tr) return;
+      const unit = units().find(x => x.id === tr.dataset.id);
+      if (e.target.closest('[data-down]')) { downFor = unit.id; render(); return; }
+      if (e.target.closest('[data-down-cancel]')) { downFor = null; render(); return; }
+      if (e.target.closest('[data-down-save]')) {
+        const reason = tr.querySelector('[data-reason]').value.trim();
+        if (!reason) { showError('Say why ' + unit.unit + ' is down.'); return; }
+        downFor = null;
+        const before = { status: unit.status, notes: unit.notes, downSince: unit.downSince };
+        // Down takes the unit off today's and later loads (the server does it in the same call); Daily shows it at once.
+        saveOptimistic('setUnitDown', { equipmentId: unit.id, reason, today }, () => Object.assign(unit, { status: 'DOWN', notes: 'DOWN: ' + reason, downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
+        return;
+      }
+      if (e.target.closest('[data-up]')) {
+        const before = { status: unit.status, notes: unit.notes };
+        saveOptimistic('setUnitUp', { equipmentId: unit.id }, () => Object.assign(unit, { status: 'ACTIVE', notes: '' }), () => Object.assign(unit, before), render);
+      }
+    });
+    document.getElementById('rows').addEventListener('keydown', e => { if (e.target.matches('[data-reason]')) { if (e.key === 'Enter') e.target.closest('tr').querySelector('[data-down-save]').click(); if (e.key === 'Escape') { downFor = null; render(); } } });
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', L.weekStart(today))), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read today\'s loads: ' + e.message));
+    });
+  </script>
+</body>
+</html>

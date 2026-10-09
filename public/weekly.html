@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weekly Dispatch (new app)</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body>
+  <div class="signin" id="signin" hidden>
+    <h1>Weekly Dispatch</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="daily.html">Daily Dispatch</a>
+      <a href="conflicts.html" id="to-conflicts" hidden>Sheet conflicts</a>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Weekly Dispatch</h1><small id="published">New app, side by side with the current one</small></div>
+      <div class="field">
+        <label for="week-date">Week starting</label>
+        <div class="stepper">
+          <button type="button" id="prev" aria-label="Previous week">&#9664;</button>
+          <input type="date" id="week-date">
+          <button type="button" id="next" aria-label="Next week">&#9654;</button>
+        </div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-routes" aria-selected="true">Route / Run Assignments</button>
+        <button type="button" role="tab" id="tab-board" aria-selected="false">Driver Assignment Board</button>
+      </div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
+    </div>
+    <div class="actions">
+      <button type="button" class="override" id="override" aria-pressed="false">Override</button>
+      <span class="spacer"></span>
+      <button type="button" id="prev-week">&lt; Previous Week</button>
+      <button type="button" id="next-week">Next Week &gt;</button>
+      <button type="button" id="run-days">Route Run Days</button>
+      <button type="button" id="reset" title="Rebuild this whole week from Route Master and Driver Master (managers). Trucks, trailers and notes stay.">Reset Week</button>
+      <button type="button" id="save-draft" title="Weekly edits are stored as you make them.">Save Draft</button>
+      <button type="button" id="print-week">Print Weekly Dispatch</button>
+      <button type="button" class="publish" id="publish">Publish to Daily Dispatch</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="sheet week" id="routes-sheet">
+      <table>
+        <colgroup><col style="width:5%"><col style="width:12%"><col span="7" style="width:11.857%"></colgroup>
+        <thead><tr id="heads"></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="sheet week board" id="board-sheet" hidden>
+      <table>
+        <colgroup><col style="width:17%"><col span="7" style="width:11.857%"></colgroup>
+        <thead><tr id="board-heads"></tr></thead>
+        <tbody id="board-rows"></tbody>
+      </table>
+    </div>
+    <div class="footer"><span id="count"></span>
+      <div class="legend" id="legend">
+        <span><i class="assigned"></i>Assigned</span><span><i class="relief"></i>Relief Driver</span><span><i class="needs"></i>Needs Driver</span>
+        <span><i class="vacation-needs"></i>Vacation &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-back" id="modal-back" hidden></div>
+  <section class="modal" id="avail-modal" role="dialog" aria-labelledby="avail-title" hidden>
+    <h2 id="avail-title">Driver availability</h2>
+    <p id="avail-context" class="modal-context"></p>
+    <div class="modal-grid">
+      <label class="wide">Availability<select id="avail-reason"><option value="AVAILABLE">Available</option><option value="VACATION">Vacation</option><option value="SICK DAY">Sick Day</option><option value="PERSONAL DAY">Personal Day</option><option value="BEREAVEMENT">Bereavement Day</option><option value="UNPAID DAY">Unpaid Day</option><option value="OFF">Off</option></select></label>
+      <label class="wide">Note<input id="avail-note" maxlength="300" placeholder="Optional"></label>
+    </div>
+    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="avail-save">Save availability</button></div>
+  </section>
+  <section class="modal wide-modal" id="days-modal" role="dialog" aria-labelledby="days-title" hidden>
+    <h2 id="days-title">Route Run Days <small id="days-week"></small></h2>
+    <div class="down-list"><table><thead><tr id="days-heads"></tr></thead><tbody id="days-rows"></tbody></table></div>
+    <div class="modal-actions"><button type="button" class="primary" data-close>Close</button></div>
+  </section>
+  <div id="print" aria-hidden="true"></div>
+
+  <script type="module">
+    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
+    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, saveAssignment, saveRunChange, saveOptimistic } from './js/edit.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    const params = new URLSearchParams(location.search);
+    const today = L.operatingDay(new Date());
+    let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(today);
+    let unsubscribe = null, unsubscribeWeek = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
+    const getRuns = () => runs;
+    const SPECIAL = { __CARRIER__: 'CARRIER', __OPEN__: 'OPEN' };
+
+    function headCells(first) {
+      return first + L.DAYS.map((p, i) => {
+        const date = L.addDays(week, i);
+        return '<th class="' + (date === today ? 'today' : '') + '">' + L.DAY_NAMES[i].slice(0, 3) + ' ' + escapeHtml(shortDate(date).replace(/\/\d+$/, '')) + '</th>';
+      }).join('');
+    }
+
+    function render() {
+      if (popover) return; // the editor is open; the grid redraws when it closes
+      const edit = canSave();
+      document.getElementById('mode-text').textContent = !edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP';
+      ['run-days', 'publish', 'save-draft', 'override'].forEach(id => { document.getElementById(id).disabled = !edit; });
+      document.getElementById('reset').disabled = !canReorder();
+      const ob = document.getElementById('override');
+      ob.textContent = override ? 'Override On' : 'Override';
+      ob.classList.toggle('on', override);
+      ob.setAttribute('aria-pressed', String(override));
+      rows = L.weeklyRows(runs, week);
+      const ctx = L.weeklyContext(rows, lists.allDrivers, lists.exceptions);
+      document.getElementById('heads').innerHTML = headCells('<th>Route</th><th>Run / Destination</th>');
+      document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '">' +
+        '<td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td>' +
+        L.DAYS.map(p => {
+          const d = r.days[p], cls = L.weeklyCellClass(r, p, ctx), locked = cls === 'coverage' && !override;
+          const can = edit && !locked;
+          if (cls === 'off') return '<td class="day off' + (can ? ' editable' : '') + '" data-day="' + p + '" title="Does not run' + (can ? ': click to assign a driver or carrier' : '') + '"></td>';
+          const units = [d.truck, d.trailer].filter(Boolean).join(' / ');
+          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? 'VACATION: ' + d.intendedDriver : 'NEEDS DRIVER');
+          const full = name + (units ? ', ' + units : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : '');
+          return '<td class="day c-' + cls + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(full) + '">' + escapeHtml(name) +
+            (units ? '<span class="unit">' + escapeHtml(units) + '</span>' : '') + '</td>';
+        }).join('') + '</tr>').join('') || '<tr><td colspan="9" class="empty">This week is not one of the copied Live weeks.</td></tr>';
+
+      const board = L.driverBoardRows(lists.allDrivers, rows, lists.exceptions, week);
+      document.getElementById('board-heads').innerHTML = headCells('<th>Driver</th>');
+      let role = '';
+      document.getElementById('board-rows').innerHTML = board.map(b => {
+        let head = '';
+        if ((b.relief ? 'R' : 'D') !== role) { role = b.relief ? 'R' : 'D'; head = '<tr class="group"><td colspan="8">' + (b.relief ? 'RELIEF DRIVERS' : 'DRIVERS &mdash; SENIORITY ORDER') + '</td></tr>'; }
+        return head + '<tr data-driver="' + escapeHtml(b.id) + '"><td class="strong left">' + escapeHtml(b.name) + '</td>' + L.DAYS.map(p => {
+          const c = b.days[p];
+          return '<td class="day b-' + c.kind + '">' + (edit ? '<button type="button" class="avail" data-date="' + c.date + '">' + escapeHtml(c.text) + '</button>' : escapeHtml(c.text)) + '</td>';
+        }).join('') + '</tr>';
+      }).join('') || '<tr><td colspan="8" class="empty">No active drivers in the Driver Master copy.</td></tr>';
+
+      const open = rows.reduce((n, r) => n + L.DAYS.filter(p => ['needs', 'vacation-needs'].indexOf(L.weeklyCellClass(r, p, ctx)) >= 0).length, 0);
+      document.getElementById('count').textContent = tab === 'routes' ? rows.length + ' runs' + (open ? ', ' + open + ' days need a driver' : '') : board.length + ' active drivers';
+      document.getElementById('routes-sheet').hidden = tab !== 'routes';
+      document.getElementById('board-sheet').hidden = tab !== 'board';
+      fitToWindow(tab === 'routes' ? rows.length : board.length + (board.some(b => b.relief) ? 2 : 1));
+      if (!document.getElementById('days-modal').hidden) paintRunDays();
+    }
+
+    /* ---------- One day of one run: driver (with NEEDS DRIVER, CARRIER, OPEN, NOT RUNNING), truck and trailer ---------- */
+    function driverOptions(row, day) {
+      const d = row.days[day], date = d.date, busy = {};
+      rows.forEach(r => { const x = r.days[day]; if (r !== row && x.runs && x.driverId) busy[x.driverId] = 'on ' + r.route; });
+      const who = String(d.driver || '').toUpperCase();
+      let html = '<option value="">' + (d.runs ? '&mdash; NEEDS DRIVER &mdash;' : '&mdash; DOES NOT RUN &mdash;') + '</option>' +
+        '<option value="__CARRIER__"' + (who === 'CARRIER' ? ' selected' : '') + '>CARRIER</option><option value="__OPEN__"' + (who === 'OPEN' ? ' selected' : '') + '>OPEN</option>' +
+        (d.runs ? '<option value="__OFF__">NOT RUNNING</option>' : '');
+      const relief = [], regular = [], blocked = [];
+      L.driverRosterRows(lists.allDrivers, today).forEach(x => {
+        const off = L.exceptionOn(lists.exceptions, x.id, date), why = !x.active ? x.status : off ? L.exceptionLabel(off) : busy[x.id] ? busy[x.id] : '';
+        const item = { id: x.id, label: x.name, why };
+        if (why && x.id !== d.driverId) blocked.push(item); else (x.reliefDriver ? relief : regular).push(item);
+      });
+      const group = (name, items) => items.length ? '<optgroup label="' + escapeHtml(name) + '">' + items.map(x => '<option value="' + escapeHtml(x.id) + '"' + (x.id === d.driverId ? ' selected' : '') + '>' +
+        escapeHtml(x.label + (x.why && x.id !== d.driverId ? ' — ' + x.why.toUpperCase() : '')) + '</option>').join('') + '</optgroup>' : '';
+      return html + group('Relief Drivers — Seniority Order', relief) + group('Drivers — Seniority Order', regular) + (override ? group('Override — Unavailable / Assigned', blocked) : '');
+    }
+
+    function busyOn(day, key, self) {
+      const busy = {};
+      rows.forEach(r => { const d = r.days[day]; if (r !== self && d.runs && d[key]) busy[d[key]] = 'on ' + r.route; });
+      return busy;
+    }
+
+    function saveDriver(row, day, value) {
+      const d = row.days[day];
+      if (value === '__OFF__') return saveRunChange(getRuns, row.runDocId, day, 'setRuns', { runs: false }, x => { x.runs = false; }, render);
+      // A day that does not run is turned on first, then the driver is saved (both wait in line for the same run).
+      if (!d.runs && value) saveRunChange(getRuns, row.runDocId, day, 'setRuns', { runs: true }, x => { x.runs = true; }, render);
+      if (SPECIAL[value]) return saveRunChange(getRuns, row.runDocId, day, 'assignDriver', { driverId: value }, x => { x.driverId = ''; x.driver = SPECIAL[value]; x.driverExceptionStatus = ''; }, render);
+      return saveAssignment(getRuns, row.runDocId, day, 'driver', { id: value, text: pickText('driver', value) }, render, override);
+    }
+
+    function closePopover() { if (popover) { popover.remove(); popover = null; render(); } }
+    document.getElementById('rows').addEventListener('click', e => {
+      const td = e.target.closest('td.editable[data-day]');
+      if (!td || popover) return;
+      const row = rows[Number(td.parentElement.dataset.index)], day = td.dataset.day, d = row.days[day];
+      const opts = { override, date: d.date };
+      popover = document.createElement('div');
+      popover.className = 'popover';
+      popover.innerHTML = '<b style="grid-column:1/3">' + escapeHtml(row.route + ' ' + row.run + ', ' + L.DAY_NAMES[L.DAYS.indexOf(day)] + ' ' + shortDate(d.date)) + '</b>' +
+        '<label>Driver</label><select data-kind="driver">' + driverOptions(row, day) + '</select>' +
+        '<label>Truck</label><select data-kind="truck"' + (d.runs ? '' : ' disabled') + '>' + optionsHtml('truck', d.truckId, busyOn(day, 'truckId', row), opts) + '</select>' +
+        '<label>Trailer</label><select data-kind="trailer"' + (d.runs ? '' : ' disabled') + '>' + optionsHtml('trailer', d.trailerId, busyOn(day, 'trailerId', row), opts) + '</select>' +
+        '<button type="button" class="close">Done</button>';
+      document.body.appendChild(popover);
+      const box = td.getBoundingClientRect(), w = popover.offsetWidth, h = popover.offsetHeight;
+      popover.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, box.left)) + 'px';
+      popover.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, box.bottom + 4)) + 'px';
+      popover.querySelectorAll('select').forEach(sel => sel.addEventListener('change', () => {
+        const kind = sel.dataset.kind;
+        // Apply on screen behind the editor; the grid shows it when the editor closes.
+        const keep = popover; popover = null;
+        if (kind === 'driver') {
+          saveDriver(row, day, sel.value);
+          const running = sel.value !== '__OFF__' && (d.runs || !!sel.value);
+          keep.querySelectorAll('select[data-kind="truck"], select[data-kind="trailer"]').forEach(s => { s.disabled = !running; });
+        } else saveAssignment(getRuns, row.runDocId, day, kind, { id: sel.value, text: pickText(kind, sel.value) }, render, override);
+        popover = keep;
+      }));
+      popover.querySelector('.close').addEventListener('click', closePopover);
+      popover.addEventListener('keydown', ev => { if (ev.key === 'Escape') closePopover(); });
+      popover.querySelector('select').focus();
+    });
+
+    /* ---------- Driver Assignment Board: availability for one driver and day ---------- */
+    const modals = ['avail-modal', 'days-modal'];
+    function openModal(id) { modals.forEach(m => { document.getElementById(m).hidden = m !== id; }); document.getElementById('modal-back').hidden = false; }
+    function closeModals() { modals.forEach(m => { document.getElementById(m).hidden = true; }); document.getElementById('modal-back').hidden = true; avail = null; }
+    document.getElementById('modal-back').onclick = closeModals;
+    document.querySelectorAll('[data-close]').forEach(b => { b.onclick = closeModals; });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('modal-back').hidden) closeModals(); });
+
+    document.getElementById('board-rows').addEventListener('click', e => {
+      const b = e.target.closest('button.avail');
+      if (!b) return;
+      const driver = lists.allDrivers.find(x => x.id === b.closest('tr').dataset.driver);
+      avail = { driverId: driver.id, date: b.dataset.date };
+      const off = L.exceptionOn(lists.exceptions, driver.id, avail.date);
+      document.getElementById('avail-context').textContent = driver.name + ', ' + L.dayName(avail.date) + ' ' + shortDate(avail.date) + ': ' + b.textContent;
+      const reason = off ? (off.type === 'UNAVAILABLE' ? off.reasonCode : off.type) : 'AVAILABLE';
+      const sel = document.getElementById('avail-reason');
+      sel.value = [...sel.options].some(o => o.value === reason) ? reason : 'OFF';
+      if (!off) sel.value = 'AVAILABLE';
+      document.getElementById('avail-note').value = '';
+      openModal('avail-modal');
+      sel.focus();
+    });
+    document.getElementById('avail-save').onclick = () => {
+      if (!avail) return;
+      const choice = document.getElementById('avail-reason').value, a = avail;
+      const fields = { driverId: a.driverId, startDate: a.date, endDate: a.date, reason: choice === 'AVAILABLE' ? '' : choice, status: choice === 'AVAILABLE' ? 'AVAILABLE' : 'UNAVAILABLE', note: document.getElementById('avail-note').value.trim() };
+      closeModals();
+      // Shown at once: the day off on the board, and the driver's runs that day turn to Needs Driver (the server does the same).
+      const temp = { driverId: a.driverId, startDate: a.date, endDate: a.date, type: choice === 'VACATION' ? 'VACATION' : 'UNAVAILABLE', status: 'UNAVAILABLE', reasonCode: choice };
+      const removed = [], hidden = [];
+      saveOptimistic('saveDriverException', fields, () => {
+        if (choice === 'AVAILABLE') {
+          lists.exceptions.forEach(x => { if (x.driverId === a.driverId && x.startDate <= a.date && (x.endDate || x.startDate) >= a.date && !x.hiddenByScreen) { x.hiddenByScreen = true; x.status = 'CANCELLED'; hidden.push(x); } });
+          return;
+        }
+        lists.exceptions.push(temp);
+        runs.forEach(r => { if (r.weekStart !== L.weekStart(a.date)) return; const d = r.days && r.days[L.dayPrefix(a.date)];
+          if (d && d.runs && d.driverId === a.driverId) { removed.push([d, Object.assign({}, d)]); Object.assign(d, { driverId: '', driver: '', intendedDriver: lists.allDrivers.find(x => x.id === a.driverId).name, driverExceptionStatus: choice }); } });
+      }, () => {
+        const i = lists.exceptions.indexOf(temp); if (i >= 0) lists.exceptions.splice(i, 1);
+        removed.forEach(([d, before]) => Object.assign(d, before));
+        hidden.forEach(x => { delete x.hiddenByScreen; x.status = 'UNAVAILABLE'; });
+      }, render);
+    };
+
+    /* ---------- Route Run Days: which days each run runs this week ---------- */
+    function paintRunDays() {
+      document.getElementById('days-week').textContent = 'Week of ' + shortDate(week);
+      document.getElementById('days-heads').innerHTML = headCells('<th>Route</th><th>Run</th>');
+      document.getElementById('days-rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"><td><b>' + escapeHtml(r.route) + '</b></td><td>' + escapeHtml(r.run) + '</td>' +
+        L.DAYS.map(p => '<td><button type="button" class="toggle' + (r.days[p].runs ? ' on' : '') + '" data-runday="' + p + '">' + (r.days[p].runs ? 'RUNS' : 'NO RUN') + '</button></td>').join('') + '</tr>').join('');
+    }
+    document.getElementById('run-days').onclick = () => { openModal('days-modal'); paintRunDays(); };
+    document.getElementById('days-rows').addEventListener('click', e => {
+      const b = e.target.closest('button[data-runday]');
+      if (!b) return;
+      const row = rows[Number(b.closest('tr').dataset.index)], p = b.dataset.runday, on = !row.days[p].runs;
+      saveRunChange(getRuns, row.runDocId, p, 'setRuns', { runs: on }, x => { x.runs = on; }, render);
+    });
+
+    /* ---------- Buttons ---------- */
+    document.getElementById('override').onclick = () => { override = !override; render(); };
+    // Reset Week: a second click within 7 seconds confirms, as on the current screen (the button says so, nothing pops up).
+    let resetArmed = null;
+    document.getElementById('reset').onclick = (e) => {
+      const b = e.currentTarget;
+      if (resetArmed !== week) {
+        resetArmed = week; b.textContent = 'Click again'; b.classList.add('armed');
+        setTimeout(() => { if (resetArmed) { resetArmed = null; b.textContent = 'Reset Week'; b.classList.remove('armed'); } }, 7000);
+        return;
+      }
+      resetArmed = null; b.textContent = 'Reset Week'; b.classList.remove('armed');
+      // The server works out the week; the grid changes when the saved runs arrive.
+      saveOptimistic('resetWeek', { weekStart: week }, () => {}, () => {}, render);
+    };
+    document.getElementById('save-draft').onclick = () => {}; // every pick is already saved, the same as the current app says
+    document.getElementById('publish').onclick = () => {
+      const before = weekDoc ? Object.assign({}, weekDoc) : null;
+      saveOptimistic('publishWeek', { weekStart: week }, () => { weekDoc = Object.assign({}, weekDoc, { publishedAt: new Date().toISOString(), publishedBy: lists.person && lists.person.email || '' }); showPublished(); },
+        () => { weekDoc = before; showPublished(); }, render);
+    };
+    function showPublished() {
+      const at = weekDoc && weekDoc.publishedAt ? new Date(weekDoc.publishedAt) : null;
+      const el = document.getElementById('published');
+      el.textContent = at && !isNaN(at) ? 'Published ' + at.toLocaleDateString([], { month: 'numeric', day: 'numeric' }) + ' ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + (weekDoc.publishedBy ? ' by ' + weekDoc.publishedBy.split('@')[0] : '') : 'Not published yet this week';
+      el.title = weekDoc && weekDoc.publishedBy ? 'Published to Daily Dispatch by ' + weekDoc.publishedBy : '';
+    }
+    document.getElementById('print-week').onclick = () => {
+      let html = '<h2>UNITED DAIRY &mdash; WEEKLY DISPATCH</h2><p>Week starting ' + escapeHtml(shortDate(week)) + '</p><table><thead><tr>' + headCells('<th>Route</th><th>Run</th>') + '</tr></thead><tbody>';
+      rows.forEach(r => { html += '<tr><td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td>' + L.DAYS.map(p => { const d = r.days[p]; return '<td>' + (d.runs ? escapeHtml(d.driver || 'NEEDS DRIVER') + (d.truck || d.trailer ? '<br>' + escapeHtml([d.truck, d.trailer].filter(Boolean).join(' / ')) : '') : '&mdash;') + '</td>'; }).join('') + '</tr>'; });
+      document.getElementById('print').innerHTML = html + '</tbody></table>';
+      window.print();
+    };
+    function setTab(t) {
+      tab = t;
+      document.getElementById('tab-routes').setAttribute('aria-selected', String(t === 'routes'));
+      document.getElementById('tab-board').setAttribute('aria-selected', String(t === 'board'));
+      render();
+    }
+    document.getElementById('tab-routes').onclick = () => setTab('routes');
+    document.getElementById('tab-board').onclick = () => setTab('board');
+
+    async function watch() {
+      const { db } = await start();
+      if (unsubscribe) unsubscribe();
+      if (unsubscribeWeek) unsubscribeWeek();
+      closeModals();
+      document.getElementById('week-date').value = week;
+      history.replaceState(null, '', '?week=' + week + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
+      unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), snap => {
+        runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        render();
+      }, e => showError('Could not read the week: ' + e.message));
+      unsubscribeWeek = onSnapshot(doc(db, 'weeks', week), snap => { weekDoc = snap.exists() ? snap.data() : null; showPublished(); });
+    }
+    function move(days) { week = L.addDays(week, days); watch(); }
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      onSnapshot(doc(db, 'config', 'app'), snap => {
+        const c = snap.data() || {};
+        writeBack = !!(c.writeBack && c.writeBack.enabled === true);
+        // The conflict link shows only while the write-back is on (it is the only thing that makes conflicts).
+        document.getElementById('to-conflicts').hidden = !writeBack;
+        render();
+        const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
+        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy from the sheets';
+      });
+      document.getElementById('prev').onclick = () => move(-7);
+      document.getElementById('next').onclick = () => move(7);
+      document.getElementById('prev-week').onclick = () => move(-7);
+      document.getElementById('next-week').onclick = () => move(7);
+      document.getElementById('week-date').onchange = e => { if (L.isDateKey(e.target.value)) { week = L.weekStart(e.target.value); watch(); } };
+      window.addEventListener('resize', render);
+      watch();
+    });
+  </script>
+</body>
+</html>

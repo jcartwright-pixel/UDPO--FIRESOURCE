@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sheet Conflicts (new app)</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body>
+  <div class="signin" id="signin" hidden>
+    <h1>Sheet Conflicts</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="daily.html">Daily Dispatch</a>
+      <a href="weekly.html">Weekly Dispatch</a>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Sheet Conflicts</h1><small>Saves the new app did not write because someone changed the same cell in the sheet</small></div>
+      <div class="badge-test"><b>TEST COPY</b><span>Sandbox sheet only</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="sheet">
+      <table>
+        <colgroup>
+          <col style="width:9%"><col style="width:15%"><col style="width:7%"><col style="width:12%"><col style="width:11%">
+          <col style="width:11%"><col style="width:26%"><col style="width:9%">
+        </colgroup>
+        <thead><tr>
+          <th>When</th><th>Saved by</th><th>Route</th><th>Cell</th><th>Sheet has</th><th>App saved</th><th>What happened</th><th>Checked</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="footer"><span id="count"></span><span>The sheet value was kept. Fix the sheet or the app by hand, then mark the line checked.</span></div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, fitToWindow, escapeHtml, save, showError } from './js/app.js';
+    import { watchLists, canSave } from './js/edit.js';
+    import { collection, query, where, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    let items = [];
+    const hidden = new Set(); // checked on this screen, waiting for the database to agree
+
+    // "tue_trailer" reads as "Tue trailer".
+    function cellName(column) {
+      if (!column) return '';
+      const [day, ...rest] = String(column).split('_');
+      const i = L.DAYS.indexOf(day);
+      return (i >= 0 ? L.DAY_NAMES[i].slice(0, 3) + ' ' : day + ' ') + rest.join(' ');
+    }
+
+    function render() {
+      const shown = items.filter(c => !hidden.has(c.id)), edit = canSave();
+      const rows = shown.map(c => '<tr>' +
+        '<td>' + escapeHtml(new Date(c.at).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })) + '</td>' +
+        '<td>' + escapeHtml(c.by) + '</td>' +
+        '<td>' + escapeHtml(c.route) + '</td>' +
+        '<td>' + escapeHtml(c.column ? cellName(c.column) : 'whole row') + '</td>' +
+        '<td>' + escapeHtml(c.sheetValue) + '</td>' +
+        '<td>' + escapeHtml(c.newValue) + '</td>' +
+        '<td title="' + escapeHtml(c.problem) + '">' + escapeHtml(c.problem) + '</td>' +
+        '<td>' + (edit ? '<button type="button" class="check" data-id="' + escapeHtml(c.id) + '">Checked</button>' : '') + '</td></tr>');
+      document.getElementById('rows').innerHTML = rows.join('') || '<tr><td colspan="8" class="empty">No conflicts. Every save reached the sheet.</td></tr>';
+      document.getElementById('count').textContent = shown.length + ' open';
+      fitToWindow(Math.max(shown.length, 1));
+    }
+
+    // Checked: off the list at once, saved in the background; back on the list if the save is refused.
+    document.getElementById('rows').addEventListener('click', async e => {
+      const button = e.target.closest('button.check');
+      if (!button) return;
+      const id = button.dataset.id;
+      hidden.add(id);
+      render();
+      try { await save('clearConflict', { conflictId: id }); }
+      catch (err) { hidden.delete(id); render(); showError(err.message || String(err)); }
+    });
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      const q = query(collection(db, 'conflicts'), where('open', '==', true), orderBy('at', 'desc'), limit(40));
+      onSnapshot(q, snap => {
+        items = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        render();
+      }, e => showError('Could not read the conflict list: ' + e.message));
+      window.addEventListener('resize', render);
+    });
+  </script>
+</body>
+</html>
