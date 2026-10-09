@@ -100,3 +100,23 @@ jobs:
             echo "Screens: https://$PROJECT.web.app"
             echo "Commit: $GITHUB_SHA"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Check the deployed app answers
+        if: steps.settings.outputs.ready == 'true'
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          set -uo pipefail
+          ok=true
+          init=$(curl -fsS "https://$PROJECT.web.app/__/firebase/init.json") || init=''
+          if echo "$init" | grep -q '"apiKey"'; then echo "Firebase web settings: found"; else echo "::error::https://$PROJECT.web.app/__/firebase/init.json has no web app settings. In the Firebase console: Project settings > General > Your apps > Add app > Web (</>), any nickname, no Hosting tick, Register app. Then deploy again."; ok=false; fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://$PROJECT.web.app/index.html"); echo "Home page: HTTP $code"; [ "$code" = 200 ] || ok=false
+          # A save with no sign-in must be refused by the server (proves the function is up and checks sign-in).
+          reply=$(curl -s -X POST -H 'Content-Type: application/json' -d '{"data":{}}' "https://us-east4-$PROJECT.cloudfunctions.net/save")
+          echo "Save without sign-in: $reply"
+          echo "$reply" | grep -q 'PERMISSION_DENIED' || ok=false
+          {
+            echo "Web settings: $( [ -n "$init" ] && echo found || echo missing )"
+            echo "Home page: HTTP $code"
+            echo "Save without sign-in: $reply"
+          } >> "$GITHUB_STEP_SUMMARY"
+          $ok
