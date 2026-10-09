@@ -1,0 +1,25 @@
+{
+  "_about": "The sandbox's own copies of the Uniontown sheets (Drive folder 'SANDBOX NEW APP - Distribution sheet copies', made 10/9/2026). Never the real sheets. Exceptions and vacations are copies of the current app's SANDBOX REBUILD copies, because the real ones are not visible to Joe's Drive.",
+  "sources": {
+    "live": { "spreadsheetId": "1yMnC8aFLhhDziHNqu1DyUQsCE7uZ_Ed0keaJ3zSDFAU" },
+    "masters": {
+      "routes": { "spreadsheetId": "1VY6Jfr1xyuwh7Sf8BHcGIiaiax4qkYu897faleHa3_M", "tab": "ROUTES_MASTER" },
+      "drivers": { "spreadsheetId": "1VIGHkWdjSDkYVEu-wh3EMTjTg_vgJgD8Lqyapy1Pprw", "tab": "DRIVERS_MASTER" },
+      "equipment": { "spreadsheetId": "1hkq9BOyqDjeSpP_LFhmuO4LXf23mh26pvgUKa_JznOM", "tab": "EQUIPMENT_MASTER" },
+      "users": { "spreadsheetId": "1kfk1iMBf_nBmWqGmFHh_e98mefmbolzZQzAj3Xr7Pcc", "tab": "USERS_MASTER" },
+      "exceptions": { "spreadsheetId": "1ihDrBpGfMgdB27zmn0TF3UZNBKPrHAayh1qGxKV0YV0", "tab": "DRIVER_EXCEPTIONS" },
+      "vacations": { "spreadsheetId": "1uv5lTlvP20EF8Z9_r2ejU5YSd84OmHddoDkPNgoex2A", "tab": "DRIVER_VACATIONS" },
+      "plantLoads": { "spreadsheetId": "1yMnC8aFLhhDziHNqu1DyUQsCE7uZ_Ed0keaJ3zSDFAU", "tab": "PLANT_OPERATIONS" }
+    }
+  },
+  "writeBack": {
+    "spreadsheetId": "1yMnC8aFLhhDziHNqu1DyUQsCE7uZ_Ed0keaJ3zSDFAU",
+    "masters": {
+      "routes": { "spreadsheetId": "1VY6Jfr1xyuwh7Sf8BHcGIiaiax4qkYu897faleHa3_M", "tab": "ROUTES_MASTER" },
+      "drivers": { "spreadsheetId": "1VIGHkWdjSDkYVEu-wh3EMTjTg_vgJgD8Lqyapy1Pprw", "tab": "DRIVERS_MASTER" },
+      "equipment": { "spreadsheetId": "1hkq9BOyqDjeSpP_LFhmuO4LXf23mh26pvgUKa_JznOM", "tab": "EQUIPMENT_MASTER" },
+      "exceptions": { "spreadsheetId": "1ihDrBpGfMgdB27zmn0TF3UZNBKPrHAayh1qGxKV0YV0", "tab": "DRIVER_EXCEPTIONS" },
+      "vacations": { "spreadsheetId": "1uv5lTlvP20EF8Z9_r2ejU5YSd84OmHddoDkPNgoex2A", "tab": "DRIVER_VACATIONS" }
+    }
+  }
+}
