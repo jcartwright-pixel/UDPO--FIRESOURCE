@@ -109,6 +109,7 @@
   <div id="print" aria-hidden="true"></div>
 
   <script type="module">
+    import { vacationYearHtml, printVacationYear } from './js/vacation-print.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
     import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
     forScreen('vacations');
@@ -209,7 +210,7 @@
       document.getElementById('cal-month').value = month;
       document.getElementById('print-year-label').textContent = y;
       const who = document.getElementById('print-who'), keep = who.value;
-      who.innerHTML = '<option value="">Everyone</option>' + L.driverRosterRows(lists.allDrivers, today).filter(d => d.active).map(d => '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(d.name) + '</option>').join('');
+      who.innerHTML = '<option value="">Every driver &middot; one page each</option>' + L.driverRosterRows(lists.allDrivers, today).filter(d => d.active).map(d => '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(d.name) + '</option>').join('');
       who.value = keep;
       let html = L.DAY_NAMES.map(n => '<div class="dow">' + n.slice(0, 3) + '</div>').join('');
       for (let i = 0; i < lead; i++) html += '<div class="pad"></div>';
@@ -257,19 +258,12 @@
       if (saveEntry({ vacationId: '', driverId: f.driverId.value, startDate: f.startDate.value, endDate: f.endDate.value, type: f.type.value, status: f.status.value, email: '', notes: f.notes.value.trim() })) { f.driverId.value = ''; f.notes.value = ''; }
     });
 
-    // One page per month for the year, the chosen driver's (or everyone's) days marked.
+    // The driver's copy: one page per driver with the whole year, their days, the limits and the memo to sign and turn in.
     document.getElementById('print-year').onclick = () => {
       const y = Number(month.slice(0, 4)), who = document.getElementById('print-who').value;
-      const list = vacations.filter(v => approved(v) && (!who || v.driverId === who));
-      let html = '<h2>UNITED DAIRY &middot; VACATION CALENDAR ' + y + '</h2><p>' + escapeHtml(who ? nameOf(who) : 'Everyone') + (who ? ' &middot; ' + (L.vacationWeeks((lists.allDrivers.find(d => d.id === who) || {}).hireDate, today) || 0) + ' vacation weeks' : '') + '</p><table><thead><tr><th>Month</th><th>Days off</th></tr></thead><tbody>';
-      for (let m = 1; m <= 12; m++) {
-        const mk = y + '-' + String(m).padStart(2, '0');
-        const items = list.filter(v => v.startDate.slice(0, 7) <= mk && (v.endDate || v.startDate).slice(0, 7) >= mk)
-          .map(v => (who ? '' : nameOf(v.driverId) + ': ') + shortDate(v.startDate) + (v.endDate && v.endDate !== v.startDate ? ' – ' + shortDate(v.endDate) : '') + ' (' + (L.VACATION_TYPE_NAMES[v.vacationType] || 'Vacation Day') + ')');
-        html += '<tr><td>' + new Date(Date.UTC(y, m - 1, 15)).toLocaleString(undefined, { month: 'long', timeZone: 'UTC' }) + '</td><td>' + escapeHtml(items.join('; ')) + '</td></tr>';
-      }
-      document.getElementById('print').innerHTML = html + '</tbody></table>';
-      window.print();
+      const drivers = L.driverRosterRows(lists.allDrivers, today).filter(d => who ? d.id === who : d.active);
+      if (!drivers.length) return showError('No drivers to print.');
+      printVacationYear(vacationYearHtml(y, drivers, vacations, today));
     };
 
     /* ---------- Eligibility: weeks of vacation by years of service ---------- */
