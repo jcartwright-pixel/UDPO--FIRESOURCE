@@ -28,6 +28,7 @@ document.querySelectorAll('.topbar').forEach(bar => {
 const CURRENT_APP = 'https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=';
 const ICON = {
   home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+  back: '<path d="M15 5l-7 7 7 7"/><path d="M8 12h12"/>',
   day: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h3v3H8z"/>',
   week: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M7 14h10M7 17h10"/>',
   map: '<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
@@ -74,6 +75,35 @@ function addSideMenu() {
   main.addEventListener('click', () => document.body.classList.remove('side-open'));
 }
 addSideMenu();
+
+/* Back goes one step: it first closes what is open on this screen (a pop-up, an opened driver,
+   a second tab or view); with nothing open, a main screen goes Home and any other page goes to
+   the page it was opened from. A screen can add its own step with window.udBack = () => true/false. */
+export function goBack() {
+  if (typeof window.udBack === 'function' && window.udBack()) return;
+  const back = document.getElementById('modal-back');
+  if (back && !back.hidden) { back.click(); return; }
+  const view = document.getElementById('view-select');
+  if (view && view.selectedIndex > 0) { view.selectedIndex = 0; view.dispatchEvent(new Event('change', { bubbles: true })); return; }
+  const tabs = [...document.querySelectorAll('#screen [role="tab"]')];
+  if (tabs.length && tabs[0].getAttribute('aria-selected') !== 'true') { tabs[0].click(); return; }
+  const here = location.pathname.split('/').pop() || 'index.html';
+  const main = MENU.some(([, items]) => items.some(([, href]) => href === here));
+  let fromHere = false;
+  try { fromHere = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (e) { /* no referrer */ }
+  if (!main && fromHere && history.length > 1) history.back();
+  else location.href = 'index.html';
+}
+(function addBack() {
+  const here = location.pathname.split('/').pop() || 'index.html';
+  const home = document.querySelector('.sidemenu a[href="index.html"]');
+  if (!home || here === 'index.html') return;
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'side-back'; b.id = 'go-back'; b.title = 'Back one screen';
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.back + '</svg><span>Back</span>';
+  b.onclick = goBack;
+  home.replaceWith(b);
+})();
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
 async function firebaseConfig() {

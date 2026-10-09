@@ -175,6 +175,7 @@
       };
     }
     function closePanel() { panelOpen = false; editingId = null; render(); }
+    window.udBack = () => { if (!panelOpen) return false; closePanel(); return true; };
 
     const table = document.getElementById('rows');
     table.addEventListener('click', e => {

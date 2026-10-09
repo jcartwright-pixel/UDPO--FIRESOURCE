@@ -606,3 +606,11 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
   .drivers-page .sheet td .status, .drivers-page .sheet td .pill { font-size: 12px; padding: 2px 6px; }
   .drivers-page button.edit, .drivers-page input.truck { font-size: 14px; height: 30px; }
 }
+/* Back button: top of the left menu on every screen except Home. */
+.sidemenu .side-back { display: flex; align-items: center; gap: 12px; margin: 0 8px 4px; width: calc(100% - 16px); padding: 9px 10px; border-radius: 9px; border: 1px solid #ffffff59; background: #ffffff14; color: #fff; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; text-align: left; }
+.sidemenu .side-back svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.sidemenu .side-back:hover { background: #ffffff2b; }
+@media (max-width: 1500px) {
+  body:not(.side-open) .sidemenu .side-back span { display: none; }
+  body:not(.side-open) .sidemenu .side-back { justify-content: center; padding: 10px 0; }
+}

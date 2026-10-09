@@ -602,6 +602,21 @@ async function noScroll(page) {
     await checker.close();
     results.push('Sheet Conflicts: 40 open lines fit on one page at both sizes; Checked takes a line off the list and saves it');
 
+    // Back: closes what is open first (an opened driver), then a main screen goes Home. Home has no Back.
+    const backPage = await openPage(browser, 1366, 768, '/drivers.html?testEmail=manager.test@uniteddairy.com');
+    await backPage.waitForSelector('#rows tr td.name');
+    assert.equal(await backPage.$('.sidemenu a[href="index.html"]'), null, 'Back takes the place of Home');
+    await backPage.click('#rows tr td.name');
+    await backPage.waitForSelector('#d-cancel');
+    await backPage.click('#go-back');
+    await backPage.waitForSelector('.panel-empty');
+    assert.match(backPage.url(), /drivers\.html/, 'first Back only closes the driver');
+    await Promise.all([backPage.waitForURL(/index\.html/), backPage.click('#go-back')]);
+    await backPage.waitForSelector('.cards');
+    assert.equal(await backPage.$('#go-back'), null, 'Home has no Back');
+    await backPage.close();
+    results.push('Back: closes an opened driver first, then goes Home; Home has no Back');
+
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).
     const adminHome = await openPage(browser, 1366, 650, '/index.html?testEmail=admin.test@uniteddairy.com');
     await adminHome.waitForSelector('[data-owner="dailyDispatch"].can');
