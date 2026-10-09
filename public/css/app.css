@@ -593,3 +593,16 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
   .weekly-page .head { flex-wrap: wrap; }
   .weekly-page .head .actions.in-head { margin-left: 0; width: 100%; justify-content: flex-start; }
 }
+
+/* Header shows only the user's initials; the full email is on hover. */
+.topbar .who.initials { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.45); color: #fff; font-size: 14px; font-weight: 800; letter-spacing: .02em; }
+/* Relief has its own column on the Driver Roster, so the small tag beside the name is not shown. */
+.drivers-page td.name .chip { display: none; }
+/* Driver Roster on laptops: smaller type so every heading and name fits. */
+@media (max-width: 1500px) {
+  .drivers-page .sheet thead th { font-size: 12px; padding: 0 4px; letter-spacing: 0; white-space: normal; line-height: 1.1; }
+  .drivers-page .sheet tbody td { font-size: 14px; padding: 0 5px; }
+  .drivers-page .sheet td.name { font-size: 15px; }
+  .drivers-page .sheet td .status, .drivers-page .sheet td .pill { font-size: 12px; padding: 2px 6px; }
+  .drivers-page button.edit, .drivers-page input.truck { font-size: 14px; height: 30px; }
+}

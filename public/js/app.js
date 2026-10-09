@@ -123,7 +123,12 @@ export async function requireSignIn(ready) {
     gate.hidden = true;
     document.getElementById('screen').hidden = false;
     const who = document.getElementById('who');
-    if (who) who.textContent = user.email;
+    if (who) {
+      const parts = String(user.displayName || '').trim().split(/\s+/).filter(Boolean);
+      who.textContent = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || user.email || '?').slice(0, 2)).toUpperCase();
+      who.title = user.email || '';
+      who.classList.add('initials');
+    }
     ready(user);
   });
   document.getElementById('signin-button').addEventListener('click', async () => {
