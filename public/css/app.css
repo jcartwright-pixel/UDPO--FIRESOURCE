@@ -447,3 +447,22 @@ body.weekly-page { background: #eef3f7; }
 .badge-test { position: absolute !important; width: 1px; height: 1px; padding: 0 !important; margin: 0 !important; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0 !important; }
 .dlive #mode-text { display: none; }
 .head .actions.in-head { margin-left: auto; padding: 0; align-self: flex-end; justify-content: flex-end; }
+
+/* Driver Roster: taller rows and larger print; the list scrolls inside its box under a fixed header. */
+.drivers-page { --row: 44px; --font: 17px; }
+.drivers-page .split .sheet { overflow: auto; }
+.drivers-page .sheet thead th { position: sticky; top: 0; z-index: 1; height: 46px; font-size: 15px; }
+.drivers-page .sheet tbody td { font-size: 17px; }
+.drivers-page .sheet td.name { cursor: pointer; }
+.drivers-page .sheet td.name:hover { text-decoration: underline; }
+.drivers-page button.edit, .drivers-page input.truck { font-size: 16px; height: 34px; max-height: none; }
+.relief-yes { display: inline-block; padding: 2px 12px; border-radius: 10px; background: #dff4f1; color: #0b6b5e; font-size: 14px; font-weight: 800; text-transform: uppercase; }
+.drivers-page .panel-empty { font-size: 16px; }
+
+/* Vacation calendar: larger names and day numbers. */
+.calendar .cday b { font-size: clamp(13px, 1.6vh, 17px); }
+.calendar .cday span { font-size: clamp(11px, 1.45vh, 15px); padding: 1px 6px; }
+.calendar .dow { font-size: 14px; }
+.cal-key { font-size: 14px; }
+.drivers-page .panel input[type="text"], .drivers-page .panel input[type="date"] { font-size: 16px; height: 40px; }
+.drivers-page .panel label, .drivers-page .panel-check { font-size: 14px; }

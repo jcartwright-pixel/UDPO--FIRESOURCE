@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
-<body>
+<body class="drivers-page">
   <div class="signin" id="signin" hidden>
     <h1>Driver Roster</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -41,11 +41,11 @@
         <div class="sheet">
           <table>
             <colgroup>
-              <col style="width:4%"><col style="width:5%"><col style="width:24%"><col style="width:18%"><col style="width:14%">
-              <col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:9%">
+              <col style="width:4%"><col style="width:5%"><col style="width:22%"><col style="width:7%"><col style="width:16%"><col style="width:13%">
+              <col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:9%">
             </colgroup>
             <thead><tr>
-              <th><input id="all" type="checkbox" aria-label="Select all drivers"></th><th>#</th><th>Driver</th><th>Seniority</th><th>Assigned truck</th>
+              <th><input id="all" type="checkbox" aria-label="Select all drivers"></th><th>#</th><th>Driver</th><th>Relief</th><th>Seniority</th><th>Assigned truck</th>
               <th>Vacation wks</th><th>Status</th><th>Available</th><th>Edit</th>
             </tr></thead>
             <tbody id="rows"></tbody>
@@ -67,7 +67,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, fitToWindow, escapeHtml } from './js/app.js';
+    import { start, requireSignIn, escapeHtml } from './js/app.js';
     import { watchLists, lists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
     forScreen('drivers');
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
@@ -105,13 +105,14 @@
           '<td><input type="checkbox" data-select="' + id + '"' + (checked.has(r.id) ? ' checked' : '') + dis + ' aria-label="Select ' + escapeHtml(r.name) + '"></td>' +
           '<td>' + r.position + '</td>' +
           '<td class="name">' + escapeHtml(r.name) + (r.reliefDriver ? '<span class="chip">RELIEF</span>' : '') + '</td>' +
+          '<td class="relief-col">' + (r.reliefDriver ? '<span class="relief-yes">Relief</span>' : '') + '</td>' +
           '<td><b>' + years(r.seniorityDate) + '</b> <small>' + (r.seniorityDate ? 'since ' + us(r.seniorityDate) : '') + '</small></td>' +
           '<td><input class="truck" list="truck-list" data-truck="' + id + '" value="' + escapeHtml(truckUnit(r.defaultTruckId)) + '" placeholder="No truck" maxlength="40" autocomplete="off"' + dis + '></td>' +
           '<td>' + r.vacationWeeks + '</td>' +
           '<td><span class="status' + (r.active ? '' : ' off') + '" title="' + escapeHtml(r.unavailableReason) + '">' + (r.active ? 'Active' : 'Inactive') + '</span></td>' +
           '<td><button type="button" class="switch' + (r.active ? ' on' : '') + '" data-toggle="' + id + '" aria-label="' + (r.active ? 'Mark not available' : 'Mark available') + '"' + dis + '></button></td>' +
           '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>&#9998; Edit</button></td></tr>';
-      }).join('') || '<tr><td colspan="9" class="empty">No drivers match.</td></tr>';
+      }).join('') || '<tr><td colspan="10" class="empty">No drivers match.</td></tr>';
       const active = rows.filter(r => r.active);
       document.getElementById('n-active').textContent = active.length;
       document.getElementById('n-relief').textContent = active.filter(r => r.reliefDriver).length;
@@ -119,8 +120,14 @@
       document.getElementById('count').textContent = shown.length + ' of ' + rows.length + ' drivers';
       document.getElementById('add').disabled = !edit;
       syncRemove();
-      if (!panelOpen) document.getElementById('panel').innerHTML = '<div class="panel-empty">Press Edit on a driver to change it here,<br>or + Add Driver for a new one.</div>';
-      fitToWindow(Math.max(shown.length, 1));
+      if (!panelOpen) document.getElementById('panel').innerHTML = '<div class="panel-empty">Press <b>&#9998; Edit</b> on a driver\'s row (or click the name)<br>and the driver opens here to change.<br><br>Press <b>+ Add Driver</b> above for a new driver.</div>';
+      fitRoster();
+    }
+
+    // Bigger rows and print than the fit-everything screens: the list scrolls inside its box, the page itself does not.
+    function fitRoster() {
+      const sheet = document.querySelector('.sheet'), footer = document.querySelector('.footer');
+      sheet.style.height = Math.max(160, window.innerHeight - sheet.getBoundingClientRect().top - footer.offsetHeight - 8) + 'px';
     }
 
     function syncRemove() { document.getElementById('remove').disabled = !canEdit() || !document.querySelector('[data-select]:checked'); }
@@ -172,13 +179,13 @@
     const table = document.getElementById('rows');
     table.addEventListener('click', e => {
       if (!canEdit()) return;
-      const toggle = e.target.closest('[data-toggle]'), edit = e.target.closest('[data-edit]');
+      const toggle = e.target.closest('[data-toggle]'), edit = e.target.closest('[data-edit]') || (e.target.closest('td.name') && e.target.closest('tr[data-id]'));
       if (toggle) {
         const r = rows.find(x => x.id === toggle.dataset.toggle);
         change(r.id, 'setDriverAvailable', { driverId: r.id, available: !r.active, reason: 'Manager status change' },
           r.active ? { status: 'INACTIVE', unavailableReason: 'Manager status change' } : { status: 'ACTIVE', unavailableReason: '' });
       }
-      if (edit) openPanel(rows.find(x => x.id === edit.dataset.edit));
+      if (edit) openPanel(rows.find(x => x.id === (edit.dataset.edit || edit.dataset.id)));
     });
     table.addEventListener('change', e => {
       if (e.target.matches('[data-select]')) return syncRemove();
