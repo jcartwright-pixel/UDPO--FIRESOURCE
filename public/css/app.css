@@ -460,8 +460,9 @@ body.weekly-page { background: #eef3f7; }
 .drivers-page .panel-empty { font-size: 16px; }
 
 /* Vacation calendar: larger names and day numbers. */
-.calendar .cday b { font-size: clamp(13px, 1.6vh, 17px); }
-.calendar .cday span { font-size: clamp(11px, 1.45vh, 15px); padding: 1px 6px; }
+.calendar .cday { gap: 3px; }
+.calendar .cday b { font-size: clamp(14px, 1.8vh, 19px); }
+.calendar .cday span { font-size: clamp(12px, 1.6vh, 17px); line-height: 1.35; padding: 1px 8px; }
 .calendar .dow { font-size: 14px; }
 .cal-key { font-size: 14px; }
 .drivers-page .panel input[type="text"], .drivers-page .panel input[type="date"] { font-size: 16px; height: 40px; }
