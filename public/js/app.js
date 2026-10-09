@@ -21,6 +21,31 @@ document.querySelectorAll('.topbar').forEach(bar => {
   brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>United Dairy Operations</strong><small>ROUTE DISTRIBUTION &middot; NEW APP</small></span>';
   bar.prepend(brand);
 });
+// The left-hand menu on every desktop screen: every screen by name, the one you are on lit in gold.
+const RAIL = [
+  ['index.html', 'Home', '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>'],
+  ['daily.html', 'Daily Dispatch', '<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>'],
+  ['weekly.html', 'Weekly Dispatch', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
+  ['drivers.html', 'Drivers', '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.6c2.6.2 4.4 1.9 5 5"/>'],
+  ['checkins.html', 'Driver Check-ins', '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 12l3 3 5-6"/>'],
+  ['vacations.html', 'Vacation Schedule', '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'],
+  ['equipment.html', 'Equipment', '<path d="M2 6h11v10H2zM13 9h5l3 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>'],
+  ['routes.html', 'Route Editor', '<path d="M6 19a2 2 0 1 0 0-.01M18 5a2 2 0 1 0 0-.01"/><path d="M6 17V9a4 4 0 0 1 4-4h6M18 7v8a4 4 0 0 1-4 4H8"/>'],
+  ['conflicts.html', 'Sheet Conflicts', '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>']
+];
+const here = (location.pathname.split('/').pop() || 'index.html');
+const screenBox = document.getElementById('screen');
+if (screenBox && here !== 'index.html' && !document.body.classList.contains('phone') && !screenBox.querySelector('.rail')) {
+  const rail = document.createElement('nav');
+  rail.className = 'rail';
+  rail.setAttribute('aria-label', 'Screens');
+  rail.innerHTML = RAIL.map(([href, name, icon]) => '<a href="' + href + '"' + (href === here ? ' class="here" aria-current="page"' : '') + ' title="' + name + '"><svg viewBox="0 0 24 24" aria-hidden="true">' + icon + '</svg><span>' + name + '</span></a>').join('');
+  const bar = screenBox.querySelector('.topbar');
+  if (bar) bar.after(rail); else screenBox.prepend(rail);
+  document.body.classList.add('with-rail');
+  const place = () => document.documentElement.style.setProperty('--bar-h', (bar ? bar.offsetHeight : 0) + 'px');
+  new ResizeObserver(place).observe(bar || document.body);
+}
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
 async function firebaseConfig() {
