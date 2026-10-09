@@ -531,3 +531,52 @@ table.cards-look td.empty { border-radius: 10px; }
 .routes-page table.routes.rules b.off { color: #b3261e; }
 .routes-page table.routes.rules td.why { text-align: left; white-space: normal; font-size: calc(var(--font) - 2px); }
 .routes-page table.routes.rules.cards-look tr.hidden-run > td:not(:first-child) { background: #fdf1ef; }
+
+/* Left menu (Joe, 10/9): the same on every screen; the header keeps the logo, the user and Sign out. */
+body.has-side .topbar > a:not(.brand):not([id]) { display: none; }
+body.has-side #screen:not([hidden]) { display: flex; flex-direction: column; height: 100vh; }
+.side-wrap { flex: 1; min-height: 0; display: flex; position: relative; }
+.side-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+body.fill .side-main, body.weekly-page .side-main, body.drivers-page .side-main, body.routes-page .side-main { overflow: hidden; }
+.sidemenu { --side: 246px; flex: none; width: var(--side); background: #0b3d6b; color: #dbe8f5; overflow-y: auto; overflow-x: hidden; padding: 8px 0 16px; display: flex; flex-direction: column; gap: 1px; transition: width .12s ease; }
+.sidemenu .side-toggle { display: none; align-self: flex-start; margin: 2px 12px 6px; width: 40px; height: 36px; border: 1px solid #ffffff44; border-radius: 8px; background: transparent; color: #fff; font-size: 20px; line-height: 1; cursor: pointer; padding: 0; }
+.sidemenu .side-toggle:hover { background: #ffffff1c; }
+.side-group { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #9fbcd8; padding: 14px 18px 5px; white-space: nowrap; }
+.sidemenu a { display: flex; align-items: center; gap: 12px; margin: 0 8px; padding: 9px 10px; border-radius: 9px; color: #fff; text-decoration: none; font-size: 15px; font-weight: 700; white-space: nowrap; }
+.sidemenu a svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sidemenu a span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sidemenu a i { font-style: normal; font-size: 14px; color: #f2c14e; }
+.sidemenu a:hover { background: #ffffff1c; }
+.sidemenu a.on { background: #fff; color: #0b3d6b; }
+@media (max-width: 1500px) {
+  body:not(.side-open) .sidemenu { --side: 64px; }
+  body:not(.side-open) .side-group, body:not(.side-open) .sidemenu a span, body:not(.side-open) .sidemenu a i { display: none; }
+  body:not(.side-open) .sidemenu a { justify-content: center; padding: 10px 0; }
+  body:not(.side-open) .side-group + a, body:not(.side-open) .sidemenu a:first-of-type { margin-top: 6px; }
+  .sidemenu .side-toggle { display: block; }
+  /* Opened on a laptop, the menu lies over the screen instead of squeezing it. */
+  body.side-open .sidemenu { position: absolute; left: 0; top: 0; bottom: 0; z-index: 50; box-shadow: 6px 0 24px rgba(0,0,0,.25); }
+  body.side-open .side-main { margin-left: 64px; }
+}
+@media print { .sidemenu { display: none !important; } .side-main { overflow: visible !important; } }
+
+/* Home on any screen (Joe, 10/9, smaller laptop): cards take the room there is and never cut off. */
+body.has-side #screen.home-screen .side-main { overflow: auto; }
+.cards.cards4 { grid-template-rows: repeat(2, auto); align-content: stretch; }
+.card.home4 { overflow: visible; min-height: min-content; }
+@media (max-height: 1000px) {
+  .card.home4 .dc-text em { display: none; }
+  .card.home4 .dc-head { padding: 10px 12px 4px; }
+  .card.home4 .dc-icon { width: 40px; height: 40px; }
+  .card.home4 .dc-links { grid-auto-rows: 40px; gap: 6px; padding: 4px 12px 8px; }
+  .card.home4 .dc-link { font-size: 16px; }
+  .card.home4 .dc-metrics { grid-auto-rows: minmax(58px, 96px); gap: 7px; padding: 2px 12px 10px; }
+  .home-screen .dtitle { padding-top: 8px; padding-bottom: 8px; }
+  .cards.cards4 { gap: 10px; }
+}
+@media (max-height: 800px) {
+  .card.home4 .dc-links { grid-auto-rows: 36px; }
+  .card.home4 .dc-metrics { grid-auto-rows: minmax(52px, 90px); }
+  .card.home4 .dc-metric b { font-size: 24px; margin: 1px 0; }
+  .card.home4 .dc-text strong { font-size: 20px; margin: 1px 0 2px; }
+}

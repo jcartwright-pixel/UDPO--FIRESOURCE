@@ -21,6 +21,59 @@ document.querySelectorAll('.topbar').forEach(bar => {
   brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>New Plant Operations</strong><small>UNITED DAIRY &middot; ROUTE DISTRIBUTION</small></span>';
   bar.prepend(brand);
 });
+
+// The menu on the left (Joe, 10/9: "the action buttons ... supposed to be a menu option to the left"), the same on every
+// screen. A link marked with the small arrow still opens the current app in a new tab. On a laptop it folds to icons;
+// the button at its top opens it.
+const CURRENT_APP = 'https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=';
+const ICON = {
+  home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+  day: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h3v3H8z"/>',
+  week: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M7 14h10M7 17h10"/>',
+  map: '<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
+  people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.6c2.6.2 4.4 1.9 5 5"/>',
+  vacation: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 15l3 3 5-6"/>',
+  truck: '<path d="M2 6h11v10H2zM13 9h5l3 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  wrench: '<path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  road: '<path d="M8 3L4 21M16 3l4 18M12 4v3M12 10v3M12 16v3"/>',
+  check: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 12l3 3 5-6"/>',
+  alert: '<path d="M12 3l9 17H3z"/><path d="M12 10v4M12 17v.5"/>'
+};
+export const MENU = [
+  ['', [['Home', 'index.html', 'home']]],
+  ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Route Editor', 'routes.html', 'map']]],
+  ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
+  ['Equipment', [['Equipment', 'equipment.html', 'truck'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin'], ['Garage Work Orders', CURRENT_APP + 'garage-station', 'wrench'], ['Fleet Service', CURRENT_APP + 'fleet-service', 'gear']]],
+  ['Reports', [['Driver Scorecard', CURRENT_APP + 'driver-scorecard', 'star'], ['Over the Road', CURRENT_APP + 'over-the-road', 'road']]],
+  ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Sheet Conflicts', 'conflicts.html', 'alert']]]
+];
+function addSideMenu() {
+  const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
+  if (!bar || document.body.classList.contains('phone') || screen.querySelector('.sidemenu')) return;
+  const here = (location.pathname.split('/').pop() || 'index.html');
+  const svg = (k) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[k] + '</svg>';
+  const nav = document.createElement('nav');
+  nav.className = 'sidemenu';
+  nav.setAttribute('aria-label', 'Screens');
+  nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Open the menu" title="Menu">&#9776;</button>' +
+    MENU.map(([group, items]) => (group ? '<div class="side-group">' + group + '</div>' : '') + items.map(([label, href, icon]) => {
+      const ext = /^https:/.test(href);
+      return '<a href="' + href + '"' + (ext ? ' target="_blank" rel="noopener" class="ext" title="' + label + ' (opens the current app)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
+        '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
+    }).join('')).join('');
+  const wrap = document.createElement('div'), main = document.createElement('div');
+  wrap.className = 'side-wrap'; main.className = 'side-main';
+  [...screen.children].filter(c => c !== bar).forEach(c => main.appendChild(c));
+  wrap.append(nav, main);
+  screen.appendChild(wrap);
+  document.body.classList.add('has-side');
+  nav.querySelector('.side-toggle').onclick = () => document.body.classList.toggle('side-open');
+  main.addEventListener('click', () => document.body.classList.remove('side-open'));
+}
+addSideMenu();
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
 async function firebaseConfig() {

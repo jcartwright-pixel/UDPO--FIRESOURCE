@@ -15,7 +15,7 @@
     <div class="notice error" id="signin-error" hidden></div>
   </div>
   <div id="screen" class="home-screen" hidden>
-    <div class="topbar home-menu"><a class="ext" href="https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=trucks-today" target="_blank" rel="noopener" title="Opens in the current app">Trucks Today</a><a class="ext" href="https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=driver-scorecard" target="_blank" rel="noopener" title="Opens in the current app">Driver Scorecard</a><a class="ext" href="https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=over-the-road" target="_blank" rel="noopener" title="Opens in the current app">Over the Road</a><a class="ext" href="https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=fleet-service" target="_blank" rel="noopener" title="Opens in the current app">Fleet Service</a><a class="ext" href="https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=garage-station" target="_blank" rel="noopener" title="Opens in the current app">Garage Work Orders</a><select id="go-screen" aria-label="Go to a screen"><option value="">Screens &#9662;</option><option value="daily.html">Daily Dispatch</option><option value="weekly.html">Weekly Dispatch</option><option value="routes.html">Route Editor</option><option value="drivers.html">Drivers</option><option value="vacations.html">Vacation Schedule</option><option value="equipment.html">Equipment</option><option value="checkins.html">Driver Check-ins</option><option value="conflicts.html">Sheet Conflicts</option></select><span class="who" id="who"></span><button id="signout" type="button">Sign out</button></div>
+    <div class="topbar"><span class="who" id="who"></span><button id="signout" type="button">Sign out</button></div>
     <div class="dtitle">
       <div class="dtitle-wrap"><span class="dtitle-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg></span>
         <div><h1>Route Distribution</h1><div class="dtitle-sub">Distribution operations command center</div></div></div>
@@ -100,7 +100,6 @@
       render();
     });
 
-    document.getElementById('go-screen').onchange = (e) => { if (e.target.value) location.href = e.target.value; };
 
     requireSignIn(async (user) => {
       const { db } = await start();
