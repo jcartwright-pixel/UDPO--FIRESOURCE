@@ -160,7 +160,7 @@
       document.getElementById('board-rows').innerHTML = board.map(b => {
         let head = '';
         if ((b.relief ? 'R' : 'D') !== role) { role = b.relief ? 'R' : 'D'; head = '<tr class="group"><td colspan="8">' + (b.relief ? 'RELIEF DRIVERS' : 'DRIVERS &mdash; SENIORITY ORDER') + '</td></tr>'; }
-        return head + '<tr data-driver="' + escapeHtml(b.id) + '"><td class="strong left">' + escapeHtml(b.name) + '</td>' + L.DAYS.map(p => {
+        return head + '<tr data-driver="' + escapeHtml(b.id) + '"' + (b.relief ? ' class="relief"' : '') + '><td class="strong left">' + escapeHtml(b.name) + '</td>' + L.DAYS.map(p => {
           const c = b.days[p];
           return '<td class="day b-' + c.kind + '">' + (edit ? '<button type="button" class="avail" data-date="' + c.date + '">' + escapeHtml(c.text) + '</button>' : escapeHtml(c.text)) + '</td>';
         }).join('') + '</tr>';

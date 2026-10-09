@@ -441,3 +441,5 @@ body.weekly-page { background: #eef3f7; }
 .weekly-page #routes-sheet td.day:not(.off) { padding-right: 22px; font-size: 15px; }
 .weekly-page .board td { white-space: normal; }
 .weekly-page .wk-scroll { scrollbar-gutter: stable; }
+/* Current board: a working day is blacked out, except on relief drivers, whose working days stay light. */
+.weekly-page .board tr.relief td.b-assigned, .weekly-page .board tr.relief td.b-booked { background: #dff4f1 !important; color: #0e3a62; }
