@@ -12,6 +12,7 @@
 const L = require('./logic');
 const M = require('./model');
 const { queueMaster } = require('./masterwrite');
+const MAINT = require('./maintenance');
 
 const C = M.COLLECTIONS;
 
@@ -359,6 +360,9 @@ async function applyAction(db, user, input, now) {
       throw new SaveError('CHANGED', run.route + ' ' + run.run + ' was changed by someone else; the screen now shows the latest', { rev: run.rev });
     }
     const after = await resolveAssignment(tx, db, req, stamp, run);
+    // A check-in's problems also go to the maintenance queues (read now; written below with the check-in).
+    const writeMaint = req.action === 'saveCheckIn'
+      ? await MAINT.prepareMaintenance(tx, db, run, req.runDocId, req.day, L.addDays(run.weekStart, L.DAYS.indexOf(req.day)), Object.assign({}, day, after), { by: email, driver: day.driver || '' }, stamp) : null;
     const before = {};
     Object.keys(after).forEach(k => { before[k] = day[k] === undefined ? null : day[k]; });
     const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp };
@@ -368,9 +372,15 @@ async function applyAction(db, user, input, now) {
     tx.update(runRef, update);
     if (mode.writeBack) queueSheetCells(tx, db, req.requestId, '', run, req.runDocId, req.day, after, stamp, email);
     const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }] };
+    if (writeMaint) result.maintenance = writeMaint(maintQueue(tx, db, mode, req.requestId, stamp, email));
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });
     return result;
   });
+}
+
+// Each new maintenance record also goes to its tab of the sandbox Live workbook when the write-back is on.
+function maintQueue(tx, db, mode, requestId, stamp, email) {
+  return (ref, r) => queueMaster(tx, db, mode, requestId, 'm' + r.kind, ref, r.record_id, r, true, stamp, email, MAINT.LISTS[r.kind]);
 }
 
 /*
@@ -863,4 +873,4 @@ async function clearConflict(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { applyAction, validate, requireTestMode, queueSheetCells, SaveError, ACTIONS, SAVE_ROLES, REORDER_ROLES, DRIVER_ROLES };
+module.exports = { applyAction, validate, requireTestMode, queueSheetCells, maintQueue, SaveError, ACTIONS, SAVE_ROLES, REORDER_ROLES, DRIVER_ROLES };

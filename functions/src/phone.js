@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const L = require('./logic');
 const M = require('./model');
 const A = require('./actions');
+const MAINT = require('./maintenance');
 
 const C = M.COLLECTIONS;
 const { SaveError } = A;
@@ -98,14 +99,16 @@ async function phoneCall(db, input, now) {
     // Only a load Dispatch gave this driver, for today or yesterday.
     if (!d || !d.runs || d.driverId !== driverId || dates.indexOf(date) < 0) throw new SaveError('NOT_ALLOWED', 'That load is not yours today; ask Dispatch');
     const after = Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });
+    const by = 'phone:' + driverId;
+    const writeMaint = await MAINT.prepareMaintenance(tx, db, run, req.runDocId, req.day, date, Object.assign({}, d, after), { by: 'PUBLIC ROUTE · ' + driver.data().name, driver: driver.data().name }, stamp);
     const before = {}, update = { rev: run.rev + 1, testEdited: true, editedAt: stamp };
     Object.keys(after).forEach(k => { before[k] = d[k] === undefined ? null : d[k]; update['days.' + req.day + '.' + k] = after[k]; });
-    const by = 'phone:' + driverId;
     update['days.' + req.day + '.updatedAt'] = stamp;
     update['days.' + req.day + '.updatedBy'] = by;
     tx.update(runRef, update);
     if (mode.writeBack) A.queueSheetCells(tx, db, req.requestId, '', run, req.runDocId, req.day, after, stamp, by);
     const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }] };
+    result.maintenance = writeMaint(A.maintQueue(tx, db, mode, req.requestId, stamp, by));
     tx.set(logRef, { action: 'phoneCheckIn', by, driver: driver.data().name, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });
     return result;
   });

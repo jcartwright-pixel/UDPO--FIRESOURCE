@@ -136,6 +136,9 @@ const PLANT = [
   { record_id: 'wash_1', record_type: 'WASH', business_date: '2026-10-08', run_id: 'run_t801', status: 'DONE' }
 ];
 
+const MAINT_HEADERS = ['record_id', 'facility_id', 'service_date', 'source_type', 'source_id', 'status', 'priority', 'opened_at', 'opened_by', 'updated_at', 'updated_by',
+  'driver', 'issue_type', 'issue_details', 'route_id', 'run_id', 'notes'];
+
 // Weeks: previous 2026-09-27, current 2026-10-04, next 2026-10-11.
 function weekRoutes(week) {
   return [
@@ -165,7 +168,13 @@ function fakeSheets(overrides) {
     "'USERS_MASTER'": table(USER_HEADERS, USERS),
     "'DRIVER_EXCEPTIONS'": table(EXCEPTION_HEADERS, EXCEPTIONS),
     "'DRIVER_VACATIONS'": table(VACATION_HEADERS, VACATIONS),
-    "'PLANT_OPERATIONS'": table(PLANT_HEADERS, PLANT)
+    "'PLANT_OPERATIONS'": table(PLANT_HEADERS, PLANT),
+    // The maintenance queues (the garage's tabs in the Live workbook), empty; the Trailer tab has no wash columns.
+    "'TRUCK LIVE'": table(MAINT_HEADERS.concat(['truck_number', 'truck_id']), []),
+    "'TRAILER LIVE'": table(MAINT_HEADERS.concat(['trailer_number', 'trailer_id']), []),
+    "'FORK TRUCK LIVE'": table(MAINT_HEADERS.concat(['unit_number', 'equipment_id', 'equipment_type']), []),
+    "'WASH / CLEANING LIVE'": table(MAINT_HEADERS.concat(['unit_number', 'equipment_id', 'equipment_type', 'wash_reason', 'wash_status', 'wash_type', 'completed_at']), []),
+    "'REFUSALS / RETURNS LIVE'": table(MAINT_HEADERS.concat(['reason_details', 'return_source', 'disposition']), [])
   };
   Object.assign(tabs, overrides);
   return tabs;

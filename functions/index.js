@@ -89,12 +89,15 @@ async function writeBackIfOn(part) {
   const live = part === 'master' ? null : await runWriteBack({ db, sheets, target });
   // Master lists: only those WRITEBACK_JSON.masters names ({"drivers": {"spreadsheetId", "tab"}, ...}), each the same copy the
   // transfer reads (SOURCES_JSON), for the same reason as above.
-  const masters = target.masters || {}, sources = transferSources(process.env).masters;
+  const masters = Object.assign({}, target.masters || {}), sources = transferSources(process.env).masters;
   Object.keys(masters).forEach(k => {
     if (!sources[k] || sources[k].spreadsheetId !== masters[k].spreadsheetId || sources[k].tab !== masters[k].tab) {
       throw new Error('Write-back stopped: WRITEBACK_JSON.masters.' + k + ' and SOURCES_JSON must name the same sandbox copy');
     }
   });
+  // The maintenance queues are tabs of the same sandbox Live workbook.
+  const { TABS, LISTS } = require('./src/maintenance');
+  Object.keys(LISTS).forEach(k => { masters[LISTS[k]] = { spreadsheetId: target.spreadsheetId, tab: TABS[k] }; });
   const master = part !== 'live' && Object.keys(masters).length ? await runMasterWriteBack({ db, sheets, targets: masters }) : null;
   return { live, master };
 }

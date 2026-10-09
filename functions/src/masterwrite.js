@@ -21,7 +21,7 @@ const C = M.COLLECTIONS;
 const BATCH = 50;
 
 // App field -> [sheet column, value kind], per list (the reverse of transfer.js MASTER_KINDS).
-const COLUMNS = Object.freeze({
+const COLUMNS = ({
   drivers: { idColumn: 'driver_id', fields: {
     name: ['name', 'text'], employeeId: ['employee_id', 'text'], status: ['status', 'text'], employmentStatus: ['employment_status', 'text'],
     reliefDriver: ['relief_driver', 'bool'], positionOrder: ['position_order', 'number'], defaultTruckId: ['default_tractor_id', 'text'],
@@ -48,6 +48,8 @@ const COLUMNS = Object.freeze({
     driverId: ['driver_id', 'text'], startDate: ['start_date', 'date'], endDate: ['end_date', 'date'], status: ['status', 'text'],
     vacationType: ['vacation_type', 'text'], notes: ['notes', 'text'], facilityId: ['facility_id', 'text'] } }
 });
+// The maintenance queues (maintenance.js): new records only, written column for column; a column the tab lacks is skipped.
+['maintTruck', 'maintTrailer', 'maintFork', 'maintWash', 'maintReturns'].forEach(k => { COLUMNS[k] = { idColumn: 'record_id', passThrough: true, collection: C.maintenance }; });
 const KIND_OF = { [C.drivers]: 'drivers', [C.equipment]: 'equipment', [C.routes]: 'routes', [C.exceptions]: 'exceptions', [C.vacations]: 'vacations' };
 
 function cellValue(kind, v) {
@@ -61,6 +63,7 @@ function cellValue(kind, v) {
 // The sheet cells for one save's changed fields (flat fields, and Route Master days as "days.mon.miles" or {days:{mon:{...}}}).
 function masterCells(list, fields) {
   const spec = COLUMNS[list], cells = {};
+  if (spec.passThrough) { Object.keys(fields || {}).forEach(k => { if (/^[a-z_]+$/.test(k) && k !== 'kind' && k !== spec.idColumn) cells[k] = fields[k] === null || fields[k] === undefined ? '' : String(fields[k]); }); return cells; }
   Object.keys(fields || {}).forEach(k => {
     const m = /^days\.([a-z]{3})\.(\w+)$/.exec(k);
     if (m && spec.days && spec.days[m[2]]) { cells[m[1] + '_' + spec.days[m[2]][0]] = cellValue(spec.days[m[2]][1], fields[k]); return; }
@@ -77,16 +80,15 @@ function masterCells(list, fields) {
  * Called inside a save's transaction next to the master write. ref = the master doc, rowId = the sheet ID cell,
  * fields = what changed (app field names), create = an entry made in the new app (a new row in the sheet).
  */
-function queueMaster(tx, db, mode, requestId, part, ref, rowId, fields, create, stamp, email) {
+function queueMaster(tx, db, mode, requestId, part, ref, rowId, fields, create, stamp, email, listName) {
   if (!mode.writeBack) return;
-  const list = KIND_OF[ref.parent.id];
+  const list = listName || KIND_OF[ref.parent.id];
   if (!list) throw new Error('No master list for ' + ref.parent.id);
   const cells = masterCells(list, fields);
   if (!Object.keys(cells).length) return;
-  cells.updated_at = stamp;
-  cells.updated_by = email;
+  if (!COLUMNS[list].passThrough) { cells.updated_at = stamp; cells.updated_by = email; }
   tx.set(db.collection(C.masterOutbox).doc(requestId + (part ? '-' + part : '')), {
-    status: 'pending', at: stamp, by: email, requestId, list, docId: ref.id, rowId: String(rowId), idColumn: COLUMNS[list].idColumn, create: !!create, cells
+    status: 'pending', at: stamp, by: email, requestId, list, collection: ref.parent.id, docId: ref.id, rowId: String(rowId), idColumn: COLUMNS[list].idColumn, create: !!create, cells
   });
 }
 
@@ -116,7 +118,7 @@ async function runMasterWriteBack({ db, sheets, targets, now }) {
     header[list] = (sheet[list][M.MASTER_HEADER_ROW - 1] || []).map(M.normalizeHeader);
   }
   // What the new app last read for each row (the copy's cells), kept up to date as cells are written.
-  const docRefs = items.map(i => db.collection(C[i.list]).doc(i.docId));
+  const docRefs = items.map(i => db.collection(i.collection || C[i.list]).doc(i.docId));
   const docSnaps = await db.getAll(...docRefs);
   const known = {};
   items.forEach((i, n) => { known[i.list + '/' + i.docId] = Object.assign({}, docSnaps[n].exists ? docSnaps[n].data().cells || {} : {}); });
@@ -148,7 +150,7 @@ async function runMasterWriteBack({ db, sheets, targets, now }) {
     const row = values[r];
     Object.keys(item.cells).forEach(column => {
       const c = head.indexOf(column), want = item.cells[column], stampColumn = column === 'updated_at' || column === 'updated_by';
-      if (c < 0) { if (!stampColumn) { itemConflicts++; conflict(item, column, { newValue: want, problem: 'the sheet has no column ' + column }); } return; }
+      if (c < 0) { if (!stampColumn && !COLUMNS[item.list].passThrough) { itemConflicts++; conflict(item, column, { newValue: want, problem: 'the sheet has no column ' + column }); } return; }
       const inSheet = String(row[c] === undefined || row[c] === null ? '' : row[c]).trim(), expected = String(k[column] || '').trim();
       if (!stampColumn && rows.length && inSheet !== expected && inSheet !== String(want).trim()) {
         itemConflicts++;
