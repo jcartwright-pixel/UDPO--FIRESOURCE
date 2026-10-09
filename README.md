@@ -141,3 +141,20 @@ After changing `functions/src/logic.js` run `npm run sync-logic`; a test fails i
 
 Deploy: `.github/workflows/deploy.yml`, run by hand, sandbox first. Production only after Joe's
 release words for the new app.
+
+**Deploy keys.** `FIREBASE_SERVICE_ACCOUNT_SANDBOX` is the key of the `github-deploy` service account in the
+**ud-distribution-sandbox** project only, and must never be reused for production. Production gets its own account in
+its own project, ideally keyless (Workload Identity Federation). The sandbox account has only the roles a deploy of
+this app needs, not Owner:
+
+| Role | Why |
+|---|---|
+| Firebase Hosting Admin | the screens |
+| Cloud Functions Admin, Cloud Run Admin | the server (functions v2 run on Cloud Run) |
+| Service Account User | functions run as the project's runtime account |
+| Artifact Registry Administrator | the server's build images and their clean-up rule |
+| Cloud Scheduler Admin | the every-minute copy and write-back |
+| Eventarc Admin | the write-back that runs on each save |
+| Firebase Rules Admin, Cloud Datastore Index Admin | database rules and indexes |
+| Service Usage Admin | turns on the Google services the app uses, on the first deploy |
+| API Keys Viewer | the screens' Firebase settings |
