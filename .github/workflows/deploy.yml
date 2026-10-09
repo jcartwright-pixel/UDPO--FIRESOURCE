@@ -149,4 +149,10 @@ jobs:
         env:
           PROJECT: ${{ steps.settings.outputs.project }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
-        run: node test/browser/last-transfer.cjs "$PROJECT" "$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%S)"
+        run: |
+          since=$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%S)
+          node test/browser/last-transfer.cjs "$PROJECT" "$since" && exit 0
+          # The deploy key may not read the database; the copy's own log says whether it ran and what went wrong.
+          sleep 150
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet
+          gcloud logging read "resource.labels.service_name=\"transfereveryminute\" AND timestamp>=\"${since}Z\"" --project "$PROJECT" --limit 40 --format='value(timestamp,severity,httpRequest.status,textPayload,jsonPayload.message)'
