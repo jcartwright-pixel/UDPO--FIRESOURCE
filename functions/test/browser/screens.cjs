@@ -331,6 +331,22 @@ async function noScroll(page) {
     await rt.press('tr[data-id="run_t801"] input.cell[data-day="mon"]', 'Tab');
     await rt.waitForFunction(() => document.querySelector('tr[data-id="run_t801"] input.cell[data-day="mon"]').value === '5:00 AM', null, { timeout: 5000 });
     assert.equal(await rt.evaluate(() => document.activeElement.dataset.day), 'tue', 'Tab moved on to Tuesday while Monday saved');
+    // Block paste (from Excel / Sheets or this grid): two runs by two days, one save per run; Shift+click and copy give the block back.
+    await rt.focus('tr[data-id="run_t802"] input.cell[data-day="wed"]');
+    await rt.evaluate(() => {
+      const dt = new DataTransfer(); dt.setData('text/plain', '6 AM\t6:15 AM\r\n7 AM\t7:15 AM\r\n');
+      document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    await rt.waitForFunction(() => document.querySelector('tr[data-id="run_t802"] input.cell[data-day="thu"]').value === '6:15 AM' && document.querySelector('tr[data-id="run_t801"] input.cell[data-day="wed"]').value === '7:00 AM', null, { timeout: 5000 });
+    await rt.click('tr[data-id="run_t802"] input.cell[data-day="wed"]');
+    await rt.click('tr[data-id="run_t801"] input.cell[data-day="thu"]', { modifiers: ['Shift'] });
+    const copied = await rt.evaluate(() => {
+      const dt = new DataTransfer();
+      document.querySelector('tr[data-id="run_t801"] input.cell[data-day="thu"]').dispatchEvent(new ClipboardEvent('copy', { clipboardData: dt, bubbles: true, cancelable: true }));
+      return dt.getData('text/plain');
+    });
+    assert.equal(copied, '6:00 AM\t6:15 AM\n7:00 AM\t7:15 AM', 'the marked block copies as rows and columns');
+    if (SHOTS) await rt.screenshot({ path: path.join(SHOTS, 'routes-block-paste-1920.png') });
     await rt.selectOption('#view-select', 'days');
     await rt.click('tr[data-id="run_t802"] button[data-runday="wed"]');
     await rt.waitForFunction(() => document.querySelector('tr[data-id="run_t802"] button[data-runday="wed"]').textContent === 'RUNS');
@@ -361,7 +377,7 @@ async function noScroll(page) {
     await dispRt.waitForTimeout(300);
     assert.equal(await dispRt.isDisabled('#add-route'), true, 'a dispatcher sees Route Master read only');
     await Promise.all([rt.close(), dispRt.close()]);
-    results.push('Route Editor: Start Times, Route Days, Load Order, Route Details and Recap fit at both sizes; a manager set 801 Monday to 5 AM (Tab kept moving), turned 802 Wednesday on, set 802 to Tote, added a run to 802 and dragged 801 first on Monday');
+    results.push('Route Editor: Start Times, Route Days, Load Order, Route Details and Recap fit at both sizes; a manager set 801 Monday to 5 AM (Tab kept moving), pasted a two-by-two block of start times and copied it back, turned 802 Wednesday on, set 802 to Tote, added a run to 802 and dragged 801 first on Monday');
 
     // Equipment: fits at both sizes; a dispatcher puts a truck down with a reason and back in service.
     for (const [w, h] of [[1920, 950], [1366, 650]]) {

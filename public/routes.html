@@ -77,7 +77,7 @@
     const LOADOUT = ['None', 'Case Loadout', 'Tote', 'Boxing', 'Tanker'];
     const RUN_BY = ['Uniontown', 'Fairmont', 'Marietta', 'Charleston', 'Carrier', 'Anyone'];
     const GRID = {
-      times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time like 5 AM or 5:30 PM and press Enter or Tab. Ctrl+D fills down from the run above.', ph: 'h:mm AM' },
+      times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time like 5 AM or 5:30 PM, Enter or Tab. Ctrl+D fills down; Shift+click marks a block to copy; paste fills a block.', ph: 'h:mm AM' },
       miles: { field: 'miles', title: 'Mileage', sub: 'Miles per run per day (round trip). Ctrl+D fills down.', ph: 'miles' },
       hours: { field: 'hours', title: 'Hours and Return', sub: 'Expected route hours (hours:minutes or decimal). Ctrl+D fills down.', ph: 'h:mm' },
       offset: { field: 'loadDayOffset', title: 'Load Day', sub: 'Days before the departure day that the load is built (0 same day, -1 the day before).', ph: '0' },
@@ -211,12 +211,13 @@
       const r = routes.find(x => x.id === input.closest('tr').dataset.id), p = input.dataset.day, field = GRID[view].field;
       if (input.value.trim() === cellValue(r, p, field)) return;
       const value = input.value.trim();
-      saveRun(r, null, { [p]: { [field]: value } }, x => {
-        const d = x.days[p] = Object.assign({}, x.days[p]);
-        d[field] = field === 'dispatchTime' ? L.minutesOfDay(/^\d{1,2}\s*[AaPp][Mm]$/.test(value) ? value.replace(/\s*([AaPp][Mm])$/, ':00 $1') : value)
-          : ['miles', 'loadOrder', 'loadDayOffset'].indexOf(field) >= 0 ? (value === '' ? null : Number(value))
-          : field === 'trailer' ? (value && !/^T-/i.test(value) ? 'T-' + value.toUpperCase() : value.toUpperCase()) : ['tractor', 'forklift'].indexOf(field) >= 0 ? value.toUpperCase() : value;
-      });
+      saveRun(r, null, { [p]: { [field]: value } }, x => { x.days[p] = Object.assign({}, x.days[p], { [field]: shown(field, value) }); });
+    }
+    // What the screen shows at once for a typed value (the server stores the same).
+    function shown(field, value) {
+      return field === 'dispatchTime' ? L.minutesOfDay(/^\d{1,2}\s*[AaPp][Mm]$/.test(value) ? value.replace(/\s*([AaPp][Mm])$/, ':00 $1') : value)
+        : ['miles', 'loadOrder', 'loadDayOffset'].indexOf(field) >= 0 ? (value === '' ? null : Number(value))
+        : field === 'trailer' ? (value && !/^T-/i.test(value) ? 'T-' + value.toUpperCase() : value.toUpperCase()) : ['tractor', 'forklift'].indexOf(field) >= 0 ? value.toUpperCase() : value;
     }
     const table = document.getElementById('table');
     table.addEventListener('change', e => {
@@ -238,6 +239,53 @@
         const above = table.querySelector('input.cell[data-r="' + (Number(input.dataset.r) - 1) + '"][data-c="' + input.dataset.c + '"]');
         if (above) { input.value = above.value; saveCell(input); }
       }
+    });
+    /*
+     * Block copy and paste, as in the sheet: Shift+click marks a block from the box you are in; Ctrl+C copies it
+     * (tab and line separated, so it pastes into Excel or Sheets too); Ctrl+V of several cells fills from the box you
+     * are in, right and down. Each run changed saves as one call with all its days.
+     */
+    let anchor = null, block = null;
+    const cellAt = (r, c) => table.querySelector('input.cell[data-r="' + r + '"][data-c="' + c + '"]');
+    function markBlock() {
+      table.querySelectorAll('input.cell.picked').forEach(x => x.classList.remove('picked'));
+      if (!block) return;
+      for (let r = block.r1; r <= block.r2; r++) for (let c = block.c1; c <= block.c2; c++) { const x = cellAt(r, c); if (x) x.classList.add('picked'); }
+    }
+    table.addEventListener('mousedown', e => {
+      const input = e.target.closest('input.cell');
+      if (!input) return;
+      const r = Number(input.dataset.r), c = Number(input.dataset.c);
+      if (e.shiftKey && anchor) { e.preventDefault(); block = { r1: Math.min(anchor.r, r), r2: Math.max(anchor.r, r), c1: Math.min(anchor.c, c), c2: Math.max(anchor.c, c) }; }
+      else { anchor = { r, c }; block = null; }
+      markBlock();
+    });
+    table.addEventListener('copy', e => {
+      if (!block || !e.target.closest('input.cell')) return;
+      const lines = [];
+      for (let r = block.r1; r <= block.r2; r++) { const row = []; for (let c = block.c1; c <= block.c2; c++) { const x = cellAt(r, c); row.push(x ? x.value : ''); } lines.push(row.join('\t')); }
+      e.clipboardData.setData('text/plain', lines.join('\n'));
+      e.preventDefault();
+    });
+    table.addEventListener('paste', e => {
+      const input = e.target.closest('input.cell');
+      if (!input || input.readOnly) return;
+      const text = (e.clipboardData && e.clipboardData.getData('text/plain') || '').replace(/\r/g, '').replace(/\n$/, '');
+      if (!/[\t\n]/.test(text)) return; // one value: the box takes it as typed
+      e.preventDefault();
+      const r0 = Number(input.dataset.r), c0 = Number(input.dataset.c), field = GRID[view].field, perRun = {};
+      text.split('\n').forEach((line, dr) => line.split('\t').forEach((v, dc) => {
+        const x = cellAt(r0 + dr, c0 + dc);
+        if (!x || x.readOnly || v.trim() === x.value) return;
+        x.value = v.trim();
+        const id = x.closest('tr').dataset.id;
+        (perRun[id] = perRun[id] || []).push(x);
+      }));
+      Object.keys(perRun).forEach(id => {
+        const r = routes.find(x => x.id === id), days = {};
+        perRun[id].forEach(x => { days[x.dataset.day] = { [field]: x.value }; });
+        saveRun(r, null, days, run => Object.keys(days).forEach(p => { run.days[p] = Object.assign({}, run.days[p], { [field]: shown(field, days[p][field]) }); }));
+      });
     });
     table.addEventListener('click', e => {
       const t = e.target.closest('[data-runday]');

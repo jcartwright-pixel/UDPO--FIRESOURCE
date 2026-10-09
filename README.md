@@ -14,9 +14,9 @@ project yet, so nobody can open it until the steps under "What Joe provides" are
 | Database layout (Firestore) | Built |
 | One-way copy from the sheets (every minute) | Built, tested with made-up sheets in the real column layout |
 | Daily Dispatch screen | Built, test copy: the current columns and buttons (RUNS?, OVR, depart time, jack, Edit box, move to another day, Print, Down Trucks / Trailers, Driver Call-Off, Add Route / Run); managers drag the load order |
-| Weekly Dispatch screen | Built, test copy: pick driver, truck, trailer per day, CARRIER / OPEN / NOT RUNNING, Override, legend colours, Route Run Days, Driver Assignment Board, Publish record. Reset Week still in the current app; Save Draft not needed (every pick saves) |
+| Weekly Dispatch screen | Built, test copy: pick driver, truck, trailer per day, CARRIER / OPEN / NOT RUNNING, Override, legend colours, Route Run Days, Driver Assignment Board, Publish record. Reset Week (managers); Save Draft not needed (every pick saves) |
 | Vacation Schedule | Built, test copy: Time Off list, Calendar with the day-off box, Eligibility by years of service, Print Year; a day off takes the driver off that day's runs |
-| Route Editor | Built, test copy (managers): start times, miles, hours, load day, default truck / trailer / jack, Route Days, Load Order drag, Route Details, Recap, Add Route / Run. Block paste not built (Ctrl+D fill-down is) |
+| Route Editor | Built, test copy (managers): start times, miles, hours, load day, default truck / trailer / jack, Route Days, Load Order drag, Route Details, Recap, Add Route / Run. Ctrl+D fill-down, Shift+click block copy, block paste from Excel or Sheets |
 | Equipment | Built, test copy: trucks and trailers, put down / back in service, the run each unit is on today. Fleet service and work orders stay in the current app |
 | Sign-in | Built: United Dairy Google accounts only |
 | Saves (driver, truck, trailer, driver note, load order) | Built, one call each; shown on screen at once, saved in the background |

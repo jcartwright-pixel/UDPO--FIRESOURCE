@@ -280,6 +280,7 @@ table.routes td.norun { background: #eef2f6 !important; }
 table.routes input.cell { width: 100%; height: calc(var(--row) - 6px); max-height: 34px; border: 1px solid transparent; border-radius: 6px; background: transparent; font: inherit; text-align: center; color: var(--ink); }
 table.routes input.cell:focus { border-color: var(--ud-blue); background: #fff; outline: none; }
 table.routes input.cell:not([readonly]):hover { border-color: #bcd0e3; }
+table.routes input.cell.picked { background: #e8f0fb; border-color: #9fbbe0; }
 table.routes button.toggle { font-size: calc(var(--font) - 3px); }
 table.routes td.details-cell { height: auto; padding: 16px; white-space: normal; text-align: left; }
 table.routes td.pick-one { height: 120px; }
