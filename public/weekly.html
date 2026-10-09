@@ -92,7 +92,8 @@
 
   <script type="module">
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, saveAssignment, saveRunChange, saveOptimistic } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, saveAssignment, saveRunChange, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    forScreen('weeklyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
@@ -113,7 +114,7 @@
     function render() {
       if (popover) return; // the editor is open; the grid redraws when it closes
       const edit = canSave();
-      document.getElementById('mode-text').textContent = !edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP';
+      document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
       ['run-days', 'publish', 'save-draft', 'override'].forEach(id => { document.getElementById(id).disabled = !edit; });
       document.getElementById('reset').disabled = !canReorder();
       const ob = document.getElementById('override');

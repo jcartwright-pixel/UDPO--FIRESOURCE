@@ -80,10 +80,14 @@ export async function requireSignIn(ready) {
 
 // Every save is one call. A fresh requestId makes a retry safe: the server saves it once.
 export async function save(action, fields) {
+  return callServer('save', Object.assign({ action }, fields));
+}
+
+// Any other server call that changes something (the per-screen switch): also one call with its own requestId.
+export async function callServer(name, fields) {
   const { functions } = await start();
   const requestId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
-  const call = httpsCallable(functions, 'save');
-  const result = await call(Object.assign({ action, requestId }, fields));
+  const result = await httpsCallable(functions, name)(Object.assign({ requestId }, fields));
   return result.data;
 }
 

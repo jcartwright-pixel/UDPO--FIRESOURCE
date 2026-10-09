@@ -79,7 +79,12 @@ button.check { background: var(--ud-blue); color: #fff; border: 0; border-radius
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 14px; padding: 0 16px 16px; height: calc(100vh - 138px); }
 .card { background: var(--card); border: 1px solid var(--line); border-top: 6px solid var(--ud-blue); border-radius: 12px; padding: 1.6vh 18px; display: flex; flex-direction: column; text-decoration: none; color: var(--ink); min-height: 0; }
 .card:hover { border-top-color: var(--ud-gold); box-shadow: 0 6px 18px rgba(11,79,138,.15); }
-.card .kicker { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.card .kicker { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.card .owner { font-size: 11px; letter-spacing: 0; text-transform: none; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #eef2f6; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.card .owner.new { background: #e3f4e8; color: #1d6b35; border-color: #9fd3ae; }
+.card .owner.can { cursor: pointer; }
+.card .owner.can:hover { border-color: var(--ud-blue); }
+.card .owner.armed { background: var(--ud-gold); color: #3b2a00; border-color: var(--ud-gold); }
 .card h2 { margin: .4vh 0 .6vh; font-size: clamp(18px, 2.6vh, 26px); color: var(--ud-blue-dark); }
 .card p { margin: 0; color: var(--muted); font-weight: 500; font-size: clamp(12px, 1.6vh, 15px); }
 .card .nums { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }

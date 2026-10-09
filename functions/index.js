@@ -6,6 +6,7 @@
  *   save                  every save from the screens, one call each
  *   phone                 the drivers' phone Check-In (Route Distribution code, no United Dairy account)
  *   newRouteCode          a manager makes a new Route Distribution code for the phones
+ *   setSwitch             an administrator moves a screen between the current app and the new one, or turns the write-back on / off
  *   writeBackOnSave       writes each save into the SANDBOX Live workbook (phase 2; production is refused)
  *   writeBackEveryMinute  retries anything the write-back could not finish
  *   masterWriteBackOnSave writes Driver / Route / Equipment Master, day off and vacation saves into SANDBOX copies
@@ -20,6 +21,7 @@ const { setGlobalOptions } = require('firebase-functions/v2');
 const { runTransfer } = require('./src/transfer');
 const { applyAction, SaveError } = require('./src/actions');
 const { phoneCall, newRouteCode } = require('./src/phone');
+const { setSwitch, SwitchError } = require('./src/switch');
 const { unitedDairyUser } = require('./src/auth');
 const { makeSheetsReader, makeSheetsWriter } = require('./src/sheets');
 const { runWriteBack } = require('./src/writeback');
@@ -53,7 +55,7 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
 });
 
-const asHttps = (error) => (error instanceof SaveError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
@@ -63,6 +65,12 @@ exports.phone = onCall({ maxInstances: 3 }, async (request) => {
 exports.newRouteCode = onCall(async (request) => {
   const user = signedIn(request);
   try { return await newRouteCode(db, user); } catch (error) { throw asHttps(error); }
+});
+
+exports.setSwitch = onCall(async (request) => {
+  const user = signedIn(request);
+  // The write-back can go on only where the server names a sandbox Live workbook to write.
+  try { return await setSwitch(db, user, request.data, !!process.env.WRITEBACK_JSON); } catch (error) { throw asHttps(error); }
 });
 
 exports.save = onCall(async (request) => {

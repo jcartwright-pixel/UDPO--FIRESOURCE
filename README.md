@@ -26,7 +26,8 @@ project yet, so nobody can open it until the steps under "What Joe provides" are
 | Drivers screen | Built, test copy: seniority order, vacation weeks, assigned truck, relief, available; add, edit (name, dates, truck, relief) and Remove Selected (managers) |
 | Master tabs (Driver, Route, Equipment Master, day offs, vacations) | Built: with the write-back on, saves go to **sandbox copies** of the lists, found by their ID column; new entries become new rows; production sheets refused in code |
 | Driver Check-ins screen | Built, test copy: what drivers reported per delivery day; a dispatcher can enter or fix one (same Live columns as the phone check-in). The drivers' phone Check-In is `route.html` (plant code once, name once, today's or yesterday's loads); DVIR, plant journal and maintenance queue still on the current app |
-| Writing to the production sheet, per-screen switch | Not built (only after Joe says go) |
+| Per-screen switch | Built: each home card says which app runs that screen (Current app / New app). An administrator clicks the tag twice to move a screen; a screen can move only while the write-back is on, and the write-back cannot go off while any screen is on the new app. Once one screen moves, the others are view only in the new app and the copy keeps reading the sheet (saves not yet in the sheet are held) |
+| Writing to the production sheet | Not built (only after Joe says go); the write-back refuses any sheet but the sandbox copies |
 
 **Why Firestore and not SQL.** Joe asked for "the SQL package". Google's SQL database (Cloud SQL) is an
 always-on server: about $30 to $50 a month for us against about $10 to $20 for Firestore, and at our size it

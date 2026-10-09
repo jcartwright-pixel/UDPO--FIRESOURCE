@@ -46,7 +46,8 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, saveOptimistic } from './js/edit.js';
+    import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    forScreen('dailyDispatch');
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
@@ -65,7 +66,7 @@
 
     function render() {
       const edit = canSave(), all = units(), on = onToday();
-      document.getElementById('mode-text').textContent = edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY';
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
       document.getElementById('n-trucks').textContent = lists.allTrucks.length;
       document.getElementById('n-trailers').textContent = lists.allTrailers.length;
       document.getElementById('n-down').textContent = all.filter(e => L.unitOff(e)).length;

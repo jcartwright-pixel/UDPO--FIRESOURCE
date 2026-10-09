@@ -68,7 +68,8 @@
 
   <script type="module">
     import { start, requireSignIn, fitToWindow, escapeHtml, showError } from './js/app.js';
-    import { lists, watchLists, saveOptimistic } from './js/edit.js';
+    import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canReorder } from './js/edit.js';
+    forScreen('routes');
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
@@ -92,7 +93,7 @@
       recap: ['Route Recap', 'Current route and run summary.']
     };
     let routes = [], view = 'days', pickRoute = '', pickRun = '', filter = 'ACTIVE', seqDay = 'mon', dragging = null, addMode = 'route';
-    const canEdit = () => L.hasRole(lists.person, L.REORDER_ROLES);
+    const canEdit = () => canReorder();
     const isActive = (r) => r.active !== false && String(r.routeStatus || 'ACTIVE').toUpperCase() === 'ACTIVE';
     const day = (r, p) => (r.days && r.days[p]) || {};
     const byOrder = (a, b) => (a.weekOrder == null ? 999999 : a.weekOrder) - (b.weekOrder == null ? 999999 : b.weekOrder) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run));
@@ -120,7 +121,7 @@
 
     function render() {
       const edit = canEdit();
-      document.getElementById('mode-text').textContent = edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY';
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
       ['add-route', 'add-run'].forEach(id => { document.getElementById(id).disabled = !edit; });
       document.getElementById('add-run').disabled = !edit || !pickRoute;
       refreshSelectors();

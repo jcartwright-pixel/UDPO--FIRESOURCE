@@ -9,7 +9,11 @@ import { start, save, showError, escapeHtml } from './app.js';
 import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const L = window.UDLogic;
-export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], exceptions: [], person: null };
+export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], exceptions: [], person: null, app: {} };
+
+// The screen's key in the per-screen switch (L.SCREENS); each page sets it once.
+let screenKey = 'dailyDispatch';
+export function forScreen(key) { screenKey = key; }
 
 // Drivers, units and the signed-in person's roles, kept current.
 export async function watchLists(user, onChange) {
@@ -31,11 +35,23 @@ export async function watchLists(user, onChange) {
   });
   // Days off (Driver Call-Off, Weekly availability, Vacation Schedule): those drivers are left out unless OVR is ticked.
   onSnapshot(collection(db, 'exceptions'), snap => { lists.exceptions = snap.docs.map(d => d.data()); onChange(); });
+  // Which app runs each screen: a screen still run from the current app is view only here once any screen has moved.
+  onSnapshot(doc(db, 'config', 'app'), snap => { lists.app = snap.data() || {}; onChange(); });
   onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), snap => { lists.person = snap.exists() ? snap.data() : null; onChange(); });
 }
 
-export function canSave() { return L.hasRole(lists.person, L.SAVE_ROLES); }
-export function canReorder() { return L.hasRole(lists.person, L.REORDER_ROLES); }
+export function screenOpen() { return L.screenState(lists.app, screenKey).open; }
+export function canSave() { return L.hasRole(lists.person, L.SAVE_ROLES) && screenOpen(); }
+export function canReorder() { return L.hasRole(lists.person, L.REORDER_ROLES) && screenOpen(); }
+export function canManage() { return L.hasRole(lists.person, L.DRIVER_ROLES) && screenOpen(); }
+
+// The badge at the top right: the test copy's own words, or which app runs this screen once one has moved.
+export function modeLabel(testText) {
+  const s = L.screenState(lists.app, screenKey);
+  if (!s.live) return testText;
+  if (s.owner === 'new') return s.open ? 'NEW APP: SAVES GO TO THE SHEET' : 'NEW APP: WRITE-BACK OFF, VIEW ONLY';
+  return 'RUN FROM THE CURRENT APP: VIEW ONLY';
+}
 
 // Checked when the list opens, so a unit put down a moment ago on this screen is already left out.
 const units = (all, opts) => (opts && opts.override) ? all : all.filter(e => !L.unitOff(e));

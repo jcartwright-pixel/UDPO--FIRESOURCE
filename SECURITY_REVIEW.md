@@ -57,6 +57,15 @@ workflow in this repository. Tested on the local emulators with made-up data. No
 - **Master-list write-back.** Driver, Route and Equipment Master, day offs and vacations are written only to sandbox
   copies named in `WRITEBACK_JSON.masters`, each the same copy the transfer reads; every production list is refused in
   code (tested). Two passes at once cannot add the same new row twice (each claims its saves first).
+- **Per-screen switch.** Only an ADMINISTRATOR can move a screen or turn the write-back on or off (`setSwitch`,
+  checked on the server; tested). Every flip is logged in `actions` with before and after. A screen cannot move to the
+  new app with the write-back off, the write-back cannot go off while a screen is on the new app, and the server
+  refuses saves from any screen still run from the current app (tested), so a save is never kept in the new app alone.
+  The copy from the sheets holds any run or master entry whose save is waiting or was written after the copy began
+  reading, so it cannot undo a save (tested).
+- **Maintenance queues.** Check-in problems become one record per run, day and kind in `maintenance`, written only to
+  the sandbox Live workbook's TRUCK / TRAILER / FORK TRUCK / WASH / RETURNS LIVE tabs; fixing a check-in updates its
+  record instead of adding another.
 
 ## Recommended before going live (not built; each needs a setting or a decision)
 

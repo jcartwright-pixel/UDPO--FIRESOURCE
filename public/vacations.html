@@ -110,7 +110,8 @@
 
   <script type="module">
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, saveOptimistic } from './js/edit.js';
+    import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
+    forScreen('vacations');
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
@@ -119,7 +120,7 @@
     const TYPE_CLASS = { VACATION: 't-vacation', PERSONAL: 't-personal', SICK: 't-sick', BEREAVEMENT: 't-bereavement', UNPAID: 't-unpaid' };
     let vacations = [], view = 'time', filter = 'week', month = today.slice(0, 7), dayOpen = null;
 
-    const canEdit = () => L.hasRole(lists.person, L.DRIVER_ROLES);
+    const canEdit = () => canManage();
     const nameOf = (id) => { const d = lists.allDrivers.find(x => x.id === id); return d ? d.name : id; };
     const days = (a, b) => L.daysBetween(a, b || a) + 1;
     const approved = (v) => v.status === 'APPROVED';
@@ -142,7 +143,7 @@
 
     function render() {
       const edit = canEdit();
-      document.getElementById('mode-text').textContent = edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY';
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
       document.getElementById('add').disabled = !edit;
       document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
       ['time', 'calendar', 'eligibility'].forEach(v => { document.getElementById('view-' + v).hidden = v !== view; });

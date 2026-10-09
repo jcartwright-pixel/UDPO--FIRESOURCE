@@ -18,35 +18,35 @@
     <div class="topbar"><span class="who" id="who"></span><button id="signout" type="button">Sign out</button></div>
     <div class="head">
       <div class="title"><h1>Route Distribution</h1><small id="today">New app, side by side with the current one</small></div>
-      <div class="badge-test"><b>TEST COPY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="cards">
-      <a class="card" href="daily.html" id="card-daily"><span class="kicker">Today's loadout</span><h2>Daily Dispatch</h2><p>Drivers, trucks and trailers for every load, in load order.</p>
+      <a class="card" href="daily.html" id="card-daily"><span class="kicker">Today's loadout<span class="owner" data-owner="dailyDispatch">Current app</span></span><h2>Daily Dispatch</h2><p>Drivers, trucks and trailers for every load, in load order.</p>
         <div class="nums"><div><b data-n="daily.loads">-</b><span>Loads</span></div><div><b data-n="daily.needsDriver" data-alert>-</b><span>Needs driver</span></div><div><b data-n="daily.covered" data-suffix="%">-</b><span>Covered</span></div></div></a>
-      <a class="card" href="weekly.html"><span class="kicker">This week</span><h2>Weekly Dispatch</h2><p>The whole week, one line per run.</p>
+      <a class="card" href="weekly.html"><span class="kicker">This week<span class="owner" data-owner="weeklyDispatch">Current app</span></span><h2>Weekly Dispatch</h2><p>The whole week, one line per run.</p>
         <div class="nums"><div><b data-n="weekly.runs">-</b><span>Runs</span></div><div><b data-n="weekly.open" data-alert>-</b><span>Days with no driver</span></div><div><b data-n="drivers.relief">-</b><span>Relief drivers</span></div></div></a>
-      <a class="card" href="drivers.html"><span class="kicker">Employee information</span><h2>Drivers</h2><p>Seniority, assigned truck, vacation weeks, available.</p>
+      <a class="card" href="drivers.html"><span class="kicker">Employee information<span class="owner" data-owner="drivers">Current app</span></span><h2>Drivers</h2><p>Seniority, assigned truck, vacation weeks, available.</p>
         <div class="nums"><div><b data-n="drivers.active">-</b><span>Active</span></div><div><b data-n="drivers.relief">-</b><span>Relief</span></div><div><b data-n="drivers.inactive">-</b><span>Not available</span></div></div></a>
-      <a class="card" href="checkins.html"><span class="kicker">Today's deliveries</span><h2>Driver Check-ins</h2><p>Cases delivered and returned, refused product, truck and trailer problems.</p>
+      <a class="card" href="checkins.html"><span class="kicker">Today's deliveries<span class="owner" data-owner="checkIns">Current app</span></span><h2>Driver Check-ins</h2><p>Cases delivered and returned, refused product, truck and trailer problems.</p>
         <div class="nums"><div><b data-n="checkins.deliveries">-</b><span>Deliveries</span></div><div><b data-n="checkins.checkedIn">-</b><span>Checked in</span></div><div><b data-n="checkins.issues" data-alert>-</b><span>With issues</span></div></div></a>
-      <a class="card" href="vacations.html"><span class="kicker">Time off</span><h2>Vacation Schedule</h2><p>Who is off, the calendar and vacation weeks by years of service.</p>
+      <a class="card" href="vacations.html"><span class="kicker">Time off<span class="owner" data-owner="vacations">Current app</span></span><h2>Vacation Schedule</h2><p>Who is off, the calendar and vacation weeks by years of service.</p>
         <div class="nums"><div><b data-n="vacation.today" data-alert>-</b><span>Off today</span></div><div><b data-n="vacation.week">-</b><span>Off this week</span></div><div><b data-n="vacation.pending">-</b><span>Pending</span></div></div></a>
       <a class="card" href="equipment.html"><span class="kicker">Equipment Master</span><h2>Equipment</h2><p>Trucks and trailers, down and back in service. Fleet service stays in the current app.</p>
         <div class="nums"><div><b data-n="fleet.trucks">-</b><span>Trucks</span></div><div><b data-n="fleet.trailers">-</b><span>Trailers</span></div><div><b data-n="fleet.inactive" data-alert>-</b><span>Down / out</span></div></div></a>
-      <a class="card" href="routes.html"><span class="kicker">Route Master</span><h2>Route Editor</h2><p>Run days, start times, miles, load order and route details.</p>
+      <a class="card" href="routes.html"><span class="kicker">Route Master<span class="owner" data-owner="routes">Current app</span></span><h2>Route Editor</h2><p>Run days, start times, miles, load order and route details.</p>
         <div class="nums"><div><b data-n="routes.active">-</b><span>Active runs</span></div><div><b data-n="routes.routes">-</b><span>Routes</span></div></div></a>
-      <a class="card" href="conflicts.html"><span class="kicker">Sandbox write-back</span><h2>Sheet Conflicts</h2><p>Saves the new app did not write because the same cell changed in the sheet.</p>
+      <a class="card" href="conflicts.html"><span class="kicker">Sandbox write-back<span class="owner" data-owner="writeBack">Write-back off</span></span><h2>Sheet Conflicts</h2><p>Saves the new app did not write because the same cell changed in the sheet.</p>
         <div class="nums"><div><b data-n="conflicts.open" data-alert>-</b><span>Open</span></div><div><b data-n="writeBack.on">-</b><span>Write-back</span></div></div></a>
     </div>
   </div>
   <script type="module">
-    import { start, requireSignIn, showError, shortDate } from './js/app.js';
+    import { start, requireSignIn, showError, shortDate, callServer } from './js/app.js';
     import { collection, doc, query, where, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
-    const data = { runs: [], drivers: [], equipment: [], routes: [], vacations: [], conflicts: 0, writeBack: false };
+    const data = { runs: [], drivers: [], equipment: [], routes: [], vacations: [], conflicts: 0, writeBack: false, app: {}, admin: false };
 
     // Numbers update the moment anything changes in the database (no reload, no 30-second checks).
     function render() {
@@ -57,6 +57,16 @@
       const live = data.routes.filter(r => r.active !== false && String(r.routeStatus || 'ACTIVE').toUpperCase() === 'ACTIVE');
       n.routes = { active: live.length, routes: new Set(live.map(r => r.route)).size };
       n.writeBack = { on: data.writeBack ? 'ON' : 'OFF' };
+      // Which app runs each screen. An administrator clicks a tag twice to move that screen (or turn the write-back on / off).
+      const owners = L.screenOwners(data.app);
+      document.getElementById('mode-text').textContent = Object.keys(owners).some(k => owners[k] === 'new') ? 'NEW APP RUNS THE GREEN SCREENS' : 'TEST COPY';
+      document.querySelectorAll('[data-owner]').forEach(el => {
+        const key = el.dataset.owner, isNew = key === 'writeBack' ? data.writeBack : owners[key] === 'new';
+        el.classList.toggle('new', isNew);
+        el.classList.toggle('can', data.admin);
+        if (!el.classList.contains('armed')) el.textContent = key === 'writeBack' ? (isNew ? 'Write-back on' : 'Write-back off') : (isNew ? 'New app' : 'Current app');
+        el.title = data.admin ? 'Click twice to ' + (key === 'writeBack' ? (isNew ? 'turn the write-back off' : 'turn the write-back on') : (isNew ? 'move this screen back to the current app' : 'run this screen from the new app')) : '';
+      });
       document.querySelectorAll('[data-n]').forEach(el => {
         const [a, b] = el.dataset.n.split('.');
         const v = n[a][b];
@@ -65,8 +75,28 @@
       });
     }
 
-    requireSignIn(async () => {
+    document.querySelector('.cards').addEventListener('click', async (e) => {
+      const tag = e.target.closest('[data-owner]');
+      if (!tag) return;
+      e.preventDefault();
+      if (!data.admin) return;
+      if (!tag.classList.contains('armed')) {
+        tag.classList.add('armed');
+        tag.textContent = 'Click again';
+        setTimeout(() => { tag.classList.remove('armed'); render(); }, 7000);
+        return;
+      }
+      tag.classList.remove('armed');
+      const key = tag.dataset.owner;
+      const fields = key === 'writeBack' ? { writeBack: !data.writeBack } : { screen: key, owner: L.screenOwners(data.app)[key] === 'new' ? 'old' : 'new' };
+      tag.textContent = '...';
+      try { showError(''); await callServer('setSwitch', fields); } catch (err) { showError(err.message || String(err)); }
+      render();
+    });
+
+    requireSignIn(async (user) => {
       const { db } = await start();
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), snap => { data.admin = L.hasRole(snap.exists() ? snap.data() : null, ['ADMINISTRATOR']); render(); });
       document.getElementById('today').textContent = 'Operating day ' + L.dayName(today) + ' ' + shortDate(today) + ' (rolls at 6 AM)';
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', L.weeksForLoadDate(today))), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the dispatch'));
@@ -77,6 +107,7 @@
       onSnapshot(query(collection(db, 'conflicts'), where('open', '==', true), limit(100)), s => { data.conflicts = s.size; render(); }, fail('the conflict list'));
       onSnapshot(doc(db, 'config', 'app'), snap => {
         const c = snap.data() || {};
+        data.app = c;
         data.writeBack = !!(c.writeBack && c.writeBack.enabled === true);
         const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
         document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy from the sheets';

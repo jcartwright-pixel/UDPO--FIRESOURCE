@@ -5,7 +5,8 @@
  * same run since the screen last showed it, writes the change, and records it in `actions` with before and
  * after. Sending the same request twice (a retry after a dropped connection) saves once.
  *
- * Phase 1: saves go only to the new app's test copy. Nothing here writes to Google Sheets.
+ * Saves never write Google Sheets directly: with the write-back on, each one queues its sheet cells (writeback.js,
+ * masterwrite.js). Which screens may save is the per-screen switch (switch.js).
  */
 'use strict';
 
@@ -13,6 +14,7 @@ const L = require('./logic');
 const M = require('./model');
 const { queueMaster } = require('./masterwrite');
 const MAINT = require('./maintenance');
+const SWITCH = require('./switch');
 
 const C = M.COLLECTIONS;
 
@@ -235,16 +237,11 @@ async function requireSaver(tx, db, user, roles) {
   return person;
 }
 
+// Whether this screen may save in the new app (switch.js): every screen while it is a test copy, then only
+// the screens an administrator moved to the new app.
 async function requireTestMode(tx, db, screen) {
   const snap = await tx.get(db.collection(C.config).doc('app'));
-  const config = snap.exists ? snap.data() : {};
-  const mode = config.mode || 'test';
-  // Phase 1 only has the test copy. Saving for real needs the screen switch and the sheet write-back, not built yet.
-  if (mode !== 'test') throw new SaveError('NOT_ALLOWED', 'Saving for real is not built yet; the new app is in test mode only');
-  const owner = (config.screenOwners || {})[screen] || 'old';
-  // With the write-back off, saves stay in the new app only (phase 1); with it on, each save queues its sheet cells.
-  const writeBack = !!(config.writeBack && config.writeBack.enabled === true);
-  return { mode, owner, writeBack };
+  return SWITCH.screenMode(snap.exists ? snap.data() : {}, screen, (code, message) => new SaveError(code, message));
 }
 
 async function resolveAssignment(tx, db, req, stamp, run) {

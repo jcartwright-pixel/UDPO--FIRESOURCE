@@ -219,6 +219,28 @@
   // Editing the driver list is a manager's job, as on the current Employee Information screen.
   var DRIVER_ROLES = REORDER_ROLES;
 
+  // The per-screen switch (switch.js): which app runs each screen. "old" = the current app (the new app shows a copy),
+  // "new" = the new app saves and the write-back puts each save in the sheet. While every screen is "old" the new
+  // app is a test copy and every screen may save; once one is "new", only "new" screens save in the new app.
+  var SCREENS = { dailyDispatch: 'Daily Dispatch', weeklyDispatch: 'Weekly Dispatch', checkIns: 'Driver Check-ins',
+    drivers: 'Drivers', vacations: 'Vacation Schedule', routes: 'Route Editor' };
+  function screenOwners(config) {
+    var out = {}, set = (config && config.screenOwners) || {};
+    Object.keys(SCREENS).forEach(function (k) { out[k] = 'old'; });
+    Object.keys(set).forEach(function (k) { out[k] = set[k]; });
+    return out;
+  }
+  // {owner, open, live, why}: open = this screen may save in the new app; why = the reason when it may not.
+  function screenState(config, screen) {
+    var owners = screenOwners(config), owner = owners[screen] || 'old', name = SCREENS[screen] || screen;
+    var writeBack = !!(config && config.writeBack && config.writeBack.enabled === true);
+    var anyNew = Object.keys(owners).some(function (k) { return owners[k] === 'new'; });
+    if (owner === 'new') return { owner: owner, live: true, open: writeBack, why: writeBack ? '' : name + ' belongs to the new app but the write-back is off; ask an administrator' };
+    if (config && config.mode === 'live' && !anyNew) return { owner: owner, live: false, open: false, why: 'The app is marked live but no screen belongs to the new app; saves stay in test mode only' };
+    if (anyNew) return { owner: owner, live: true, open: false, why: name + ' is still run from the current app; save it there' };
+    return { owner: owner, live: false, open: true, why: '' };
+  }
+
   // Same rule as desktopVacationWeeksV0310_: completed years since hire -> 0, 1, 2, 3, 4 or 5 weeks.
   function vacationWeeks(hireDate, asOf) {
     var h = dateKey(hireDate), a = dateKey(asOf);
@@ -489,6 +511,7 @@
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
+    SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,

@@ -68,13 +68,14 @@
 
   <script type="module">
     import { start, requireSignIn, fitToWindow, escapeHtml } from './js/app.js';
-    import { watchLists, lists, saveOptimistic } from './js/edit.js';
+    import { watchLists, lists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
+    forScreen('drivers');
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
     let drivers = [], rows = [], editingId = null, panelOpen = false, typing = null;
-    const canEdit = () => L.hasRole(lists.person, L.DRIVER_ROLES);
+    const canEdit = () => canManage();
     const truckUnit = (id) => { const t = lists.trucks.find(e => e.id === id); return t ? t.unit : ''; };
     const us = (key) => { if (!key) return ''; const [y, m, d] = key.split('-'); return m + '/' + d + '/' + y; };
     function years(key) {
@@ -94,7 +95,7 @@
       if (typing) return; // someone is typing a truck; the list redraws when they leave the box
       rows = L.driverRosterRows(drivers, today);
       const edit = canEdit();
-      document.getElementById('mode-text').textContent = edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY';
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
       document.getElementById('truck-list').innerHTML = lists.trucks.map(t => '<option value="' + escapeHtml(t.unit) + '">').join('');
       const shown = visible(), checked = new Set([...document.querySelectorAll('[data-select]:checked')].map(x => x.dataset.select));
       const dis = edit ? '' : ' disabled';

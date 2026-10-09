@@ -602,6 +602,45 @@ async function noScroll(page) {
     await checker.close();
     results.push('Sheet Conflicts: 40 open lines fit on one page at both sizes; Checked takes a line off the list and saves it');
 
+    // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).
+    const adminHome = await openPage(browser, 1366, 650, '/index.html?testEmail=admin.test@uniteddairy.com');
+    await adminHome.waitForSelector('[data-owner="dailyDispatch"].can');
+    await adminHome.waitForSelector('[data-owner="writeBack"].new');
+    await adminHome.click('[data-owner="dailyDispatch"]');
+    assert.equal(await adminHome.textContent('[data-owner="dailyDispatch"]'), 'Click again');
+    assert.match(adminHome.url(), /index\.html/, 'the tag does not open the screen');
+    await adminHome.click('[data-owner="dailyDispatch"]');
+    await adminHome.waitForSelector('[data-owner="dailyDispatch"].new');
+    assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'new');
+    const homeSize = await noScroll(adminHome);
+    assert.ok(homeSize.scroll <= homeSize.inner && homeSize.width <= homeSize.innerWidth, 'home with the switch fits 1366x650');
+    if (SHOTS) await adminHome.screenshot({ path: path.join(SHOTS, 'home-switch-1366.png') });
+    const onNew = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await onNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'NEW APP: SAVES GO TO THE SHEET');
+    await onNew.close();
+    const onOld = await openPage(browser, 1366, 650, '/weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com');
+    await onOld.waitForFunction(() => document.getElementById('mode-text').textContent === 'RUN FROM THE CURRENT APP: VIEW ONLY');
+    assert.equal(await onOld.isDisabled('#publish'), true, 'Weekly is view only while it is run from the current app');
+    if (SHOTS) await onOld.screenshot({ path: path.join(SHOTS, 'weekly-view-only-1366.png') });
+    await onOld.close();
+    // A manager sees which app runs each screen but cannot move one.
+    const mgrHome = await openPage(browser, 1366, 650, '/index.html?testEmail=manager.test@uniteddairy.com');
+    await mgrHome.waitForSelector('[data-owner="dailyDispatch"].new');
+    assert.equal(await mgrHome.$('[data-owner].can'), null);
+    await mgrHome.close();
+    // The write-back cannot go off while a screen is on the new app; moving Daily back makes every screen a test copy again.
+    await adminHome.click('[data-owner="writeBack"]');
+    await adminHome.click('[data-owner="writeBack"]');
+    await adminHome.waitForSelector('#error:not([hidden])');
+    assert.match(await adminHome.textContent('#error'), /back to the current app/);
+    await adminHome.click('[data-owner="dailyDispatch"]');
+    await adminHome.click('[data-owner="dailyDispatch"]');
+    await adminHome.waitForSelector('[data-owner="dailyDispatch"]:not(.new):not(.armed)');
+    assert.equal((await db().collection('config').doc('app').get()).data().mode, 'test');
+    assert.deepEqual(adminHome.errors, []);
+    await adminHome.close();
+    results.push('per-screen switch: an administrator moves Daily Dispatch to the new app and back from the home page; other screens turn view only; a manager cannot switch');
+
     // Someone outside United Dairy is signed straight back out.
     const outsider = await openPage(browser, 1366, 650, '/daily.html?testEmail=someone@gmail.com');
     await outsider.waitForSelector('#signin-error:not([hidden])');

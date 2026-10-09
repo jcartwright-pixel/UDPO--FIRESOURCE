@@ -105,7 +105,8 @@
 
   <script type="module">
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, canReorder, openPicker, openNote, optionsHtml, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, openPicker, openNote, optionsHtml, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    forScreen('dailyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
@@ -146,7 +147,7 @@
       if (editing) return; // a picker is open; the next render happens when it closes
       rows = buildRows();
       const edit = canSave(), order = canReorder();
-      document.getElementById('mode-text').textContent = !edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP';
+      document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
       ['open-down', 'open-calloff', 'open-add'].forEach(id => { document.getElementById(id).disabled = !edit; });
       const body = [];
       let group = '';

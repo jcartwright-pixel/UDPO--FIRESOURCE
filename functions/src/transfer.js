@@ -317,10 +317,12 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   const configSnap = await configRef.get();
   const config = configSnap.exists ? configSnap.data() : {};
   const owners = config.screenOwners || {};
-  // Phase 1 safety: the transfer overwrites the new app's copy. Once any screen belongs to the new app the
-  // new app's saves are the real record, and this copy must not run (cutover is a later, separate step).
+  // Once a screen belongs to the new app its saves are the real record. The copy then keeps running only with
+  // the write-back on (those saves reach the sheet, so reading the sheet back brings them in, and anything not
+  // yet written is held below); with the write-back off it would overwrite them, so it stops.
   const moved = Object.keys(owners).filter(k => owners[k] === 'new');
-  if (moved.length) throw new Error('Transfer stopped: ' + moved.join(', ') + ' already belongs to the new app');
+  if (moved.length && !(config.writeBack && config.writeBack.enabled === true)) throw new Error('Transfer stopped: ' + moved.join(', ') + ' already belongs to the new app and the write-back is off');
+  const readFrom = started.toISOString();
 
   // 1. Master lists.
   // Read side by side: each master list is its own spreadsheet.
@@ -347,7 +349,9 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   // A master entry with a save still waiting for the sheet keeps the app's value until it is written (masterwrite.js).
   const masterWaiting = await db.collection(C.masterOutbox).where('status', 'in', ['pending', 'writing']).get();
   const masterHold = {};
-  masterWaiting.docs.forEach(d => { (masterHold[d.data().list] = masterHold[d.data().list] || {})[d.data().docId] = true; });
+  // A save written to the sheet after this copy began reading it is not in what was read: hold it too.
+  const masterJustWritten = await db.collection(C.masterOutbox).where('doneAt', '>=', readFrom).get();
+  masterWaiting.docs.concat(masterJustWritten.docs).forEach(d => { (masterHold[d.data().list] = masterHold[d.data().list] || {})[d.data().docId] = true; });
   for (const kind of Object.keys(masters)) {
     const metaRef = db.collection(META).doc(kind);
     const prev = (await metaRef.get()).data() || {};
@@ -357,7 +361,8 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   }
   const waiting = await db.collection(C.outbox).where('status', '==', 'pending').get();
   const hold = {};
-  waiting.docs.forEach(d => { hold[d.data().runDocId] = true; });
+  const justWritten = await db.collection(C.outbox).where('doneAt', '>=', readFrom).get();
+  waiting.docs.concat(justWritten.docs).forEach(d => { hold[d.data().runDocId] = true; });
   for (const k of tabKeys) {
     const tab = live[k];
     const weekRef = db.collection(C.weeks).doc(tab.weekStart);
@@ -375,7 +380,7 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   ops.push({ ref: transferRef, data: { at: stamp, force: !!force, summary, warningCount: warnings.length, warnings: warnings.slice(0, 200) } });
   await commitInBatches(db, ops);
   const lastTransfer = { at: stamp, id: transferRef.id, warningCount: warnings.length };
-  await configRef.set({ mode: config.mode || 'test', screenOwners: Object.assign({ dailyDispatch: 'old', weeklyDispatch: 'old' }, owners), liveWeeks, lastTransfer }, { merge: true });
+  await configRef.set({ mode: moved.length ? 'live' : 'test', screenOwners: Object.assign({ dailyDispatch: 'old', weeklyDispatch: 'old' }, owners), liveWeeks, lastTransfer }, { merge: true });
   return { at: stamp, liveWeeks, summary, warnings };
 }
 
