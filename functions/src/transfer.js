@@ -230,6 +230,8 @@ function parseLiveTab(tabName, values, lookups) {
     M.RUN_FIELDS.forEach(([field, col, kind]) => { run[field] = M.convert(kind, get(r.row, col)); });
     const routeMaster = lookups.routesByRunId[run.runId];
     run.weekOrder = routeMaster && routeMaster.weekOrder !== undefined ? routeMaster.weekOrder : null;
+    // Route Master's display_weekly_dispatch decides whether Weekly shows the run, as in the current app; blank falls back to the Live row.
+    run.weeklyShowMaster = routeMaster && (routeMaster.displayWeekly === true || routeMaster.displayWeekly === false) ? routeMaster.displayWeekly : null;
     run.days = {};
     L.DAYS.forEach(prefix => {
       const day = {};
@@ -244,7 +246,8 @@ function parseLiveTab(tabName, values, lookups) {
       run.days[prefix] = day;
     });
     run.cells = cellsOf(r.row, index);
-    run.fingerprint = fingerprint(r.row.map(cellText));
+    // Route Master's order and Weekly setting are part of the fingerprint, so a Route Master change rewrites the run.
+    run.fingerprint = fingerprint(r.row.map(cellText).concat(['weekOrder=' + run.weekOrder, 'weeklyShow=' + run.weeklyShowMaster]));
     runs[M.runDocId(weekStart, key)] = run;
   });
   return { tab: tabName, weekStart, runs, warnings };

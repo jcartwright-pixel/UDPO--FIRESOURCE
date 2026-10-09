@@ -186,10 +186,18 @@
     return own === last ? [own] : [own, last];
   }
 
+  // Which runs Weekly shows, like the current app (udpoV780LiveWeeklyView_): Route Master's display_weekly_dispatch when it is set,
+  // else the Live row's. A blank is missing setup, never a yes, so a run with both blank is left off (a flag never read stays shown).
+  function weeklyShown(run) {
+    if (!routeIsShown(run, 'displayWeekly')) return false;
+    if (run.weeklyShowMaster === true || run.weeklyShowMaster === false) return run.weeklyShowMaster;
+    return run.displayWeekly !== null;
+  }
+
   // The Weekly Dispatch grid for one week: one line per run, seven day cells.
   function weeklyRows(runs, week) {
     return (runs || []).filter(function (run) {
-      return run.weekStart === week && routeIsShown(run, 'displayWeekly');
+      return run.weekStart === week && weeklyShown(run);
     }).map(function (run) {
       var days = {};
       DAYS.forEach(function (prefix, i) {
