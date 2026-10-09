@@ -25,7 +25,7 @@ project yet, so nobody can open it until the steps under "What Joe provides" are
 | Route Distribution home | Built: eight cards with live numbers (loads, needs driver, covered, week, drivers, check-ins, time off, units, routes, conflicts) |
 | Drivers screen | Built, test copy: seniority order, vacation weeks, assigned truck, relief, available; add, edit (name, dates, truck, relief) and Remove Selected (managers) |
 | Master tabs (Driver, Route, Equipment Master, day offs, vacations) | Built: with the write-back on, saves go to **sandbox copies** of the lists, found by their ID column; new entries become new rows; production sheets refused in code |
-| Driver Check-ins screen | Built, test copy: what drivers reported per delivery day; a dispatcher can enter or fix one (same Live columns as the phone check-in). Driver phone form, plant journal and maintenance queue still on the current app |
+| Driver Check-ins screen | Built, test copy: what drivers reported per delivery day; a dispatcher can enter or fix one (same Live columns as the phone check-in). The drivers' phone Check-In is `route.html` (plant code once, name once, today's or yesterday's loads); DVIR, plant journal and maintenance queue still on the current app |
 | Writing to the production sheet, per-screen switch | Not built (only after Joe says go) |
 
 **Why Firestore and not SQL.** Joe asked for "the SQL package". Google's SQL database (Cloud SQL) is an

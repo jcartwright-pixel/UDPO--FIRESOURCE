@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b4f8a">
+  <title>Route Check-In</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="phone">
+  <header class="phone-top"><b>United Dairy</b><span id="who"></span><button type="button" id="change" hidden>Change</button></header>
+  <div class="notice error" id="error" hidden></div>
+
+  <!-- 1. The plant's Route Distribution code, asked once and kept on the phone. -->
+  <form class="phone-card" id="step-code" hidden>
+    <h1>Route Check-In</h1>
+    <label for="code">Route Distribution code</label>
+    <input id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="Ask Dispatch">
+    <button type="submit" class="primary">Continue</button>
+  </form>
+
+  <!-- 2. The driver picks their name once. -->
+  <form class="phone-card" id="step-name" hidden>
+    <h1>Who are you?</h1>
+    <label for="name">Your name</label>
+    <select id="name"></select>
+    <button type="submit" class="primary">That's me</button>
+  </form>
+
+  <!-- 3. Today's loads (or yesterday's) and the Check-In for one. -->
+  <section class="phone-card" id="step-loads" hidden>
+    <div class="phone-days" id="days"></div>
+    <div id="loads"></div>
+  </section>
+
+  <form class="phone-card" id="step-form" hidden>
+    <h1 id="form-title"></h1>
+    <div class="phone-grid">
+      <label>Cases delivered<input name="casesDelivered" inputmode="numeric" pattern="[0-9]*"></label>
+      <label>Cases returned<input name="driverCaseReturn" inputmode="numeric" pattern="[0-9]*"></label>
+      <label class="wide">Refused / returned product<input name="refusedReturned" maxlength="200" placeholder="e.g. 2 cs 2% gal"></label>
+      <label class="wide">Which store<input name="refusedReturnedSource" maxlength="200"></label>
+      <label class="wide">Truck problems<input name="tractorIssues" maxlength="300"></label>
+      <label class="wide">Trailer problems<input name="trailerIssues" maxlength="300"></label>
+      <label class="wide">Pallet jack problems<input name="palletJackIssues" maxlength="300"></label>
+      <label class="check wide"><input type="checkbox" name="trailerNeedsCleaned"> Trailer needs cleaned</label>
+      <label class="wide">Notes<input name="checkinNotes" maxlength="500"></label>
+    </div>
+    <div class="phone-buttons"><button type="button" id="back">Back</button><button type="submit" class="primary" id="send">Check In</button></div>
+  </form>
+
+  <script type="module">
+    import { start, escapeHtml, shortDate, showError } from './js/app.js';
+    import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+
+    // Kept on the phone (the code and the name); the page works without it, it just asks again.
+    const store = {
+      get(k) { try { return localStorage.getItem('udRoute.' + k) || ''; } catch (e) { return ''; } },
+      set(k, v) { try { if (v) localStorage.setItem('udRoute.' + k, v); else localStorage.removeItem('udRoute.' + k); } catch (e) {} }
+    };
+    let code = store.get('code'), driverId = store.get('driverId'), driverName = store.get('driverName'), date = '', dates = [], loads = [], open = null;
+
+    async function call(op, fields) {
+      const { functions } = await start();
+      try { return (await httpsCallable(functions, 'phone')(Object.assign({ code, op }, fields || {}))).data; }
+      catch (e) {
+        if (/code is not right|not turned on/.test(e.message)) { code = ''; store.set('code', ''); show(); }
+        if (/Pick your name/.test(e.message)) { driverId = ''; store.set('driverId', ''); show(); }
+        throw e;
+      }
+    }
+    const steps = ['step-code', 'step-name', 'step-loads', 'step-form'];
+    function step(id) { steps.forEach(s => { document.getElementById(s).hidden = s !== id; }); }
+
+    async function show() {
+      document.getElementById('who').textContent = driverId ? driverName : '';
+      document.getElementById('change').hidden = !driverId;
+      if (!code) return step('step-code');
+      if (!driverId) {
+        const r = await call('roster');
+        document.getElementById('name').innerHTML = '<option value="">Pick your name</option>' + r.drivers.map(d => '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(d.name) + '</option>').join('');
+        return step('step-name');
+      }
+      const r = await call('loads', { driverId, date });
+      date = r.date; dates = r.dates; loads = r.loads; driverName = r.driver; store.set('driverName', driverName);
+      document.getElementById('who').textContent = driverName;
+      document.getElementById('days').innerHTML = dates.map((d, i) => '<button type="button" data-date="' + d + '" class="' + (d === date ? 'on' : '') + '">' + (i ? 'Yesterday ' : 'Today ') + escapeHtml(shortDate(d)) + '</button>').join('');
+      document.getElementById('loads').innerHTML = loads.map((l, i) => '<button type="button" class="phone-load' + (l.checkinCompletedAt ? ' done' : '') + '" data-i="' + i + '"><b>' + escapeHtml(l.route) + '</b> ' + escapeHtml(l.run) +
+        '<small>' + escapeHtml([l.truck && 'Truck ' + l.truck, l.trailer && 'Trailer ' + l.trailer].filter(Boolean).join(' · ')) + '</small><span>' + (l.checkinCompletedAt ? 'Checked in' : 'Check In') + '</span></button>').join('') ||
+        '<p class="phone-empty">Dispatch has no load for you on this day.</p>';
+      step(open === null ? 'step-loads' : 'step-form');
+    }
+
+    function fillForm(l) {
+      const f = document.getElementById('step-form');
+      document.getElementById('form-title').textContent = l.route + ' ' + l.run;
+      ['casesDelivered', 'driverCaseReturn', 'refusedReturned', 'refusedReturnedSource', 'tractorIssues', 'trailerIssues', 'palletJackIssues', 'checkinNotes'].forEach(k => { f.elements[k].value = l[k] === null || l[k] === undefined ? '' : l[k]; });
+      f.elements.trailerNeedsCleaned.checked = !!l.trailerNeedsCleaned;
+    }
+
+    const run = (fn) => async (e) => { if (e) e.preventDefault(); showError(''); try { await fn(e); } catch (err) { showError(err.message); } };
+    document.getElementById('step-code').addEventListener('submit', run(async () => {
+      code = document.getElementById('code').value.trim().toUpperCase();
+      await call('roster');
+      store.set('code', code);
+      await show();
+    }));
+    document.getElementById('step-name').addEventListener('submit', run(async () => {
+      const sel = document.getElementById('name');
+      if (!sel.value) throw new Error('Pick your name');
+      driverId = sel.value; driverName = sel.options[sel.selectedIndex].text;
+      store.set('driverId', driverId); store.set('driverName', driverName);
+      await show();
+    }));
+    document.getElementById('change').addEventListener('click', run(async () => { driverId = ''; store.set('driverId', ''); open = null; await show(); }));
+    document.getElementById('days').addEventListener('click', run(async (e) => { const b = e.target.closest('[data-date]'); if (b) { date = b.dataset.date; await show(); } }));
+    document.getElementById('loads').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; open = Number(b.dataset.i); fillForm(loads[open]); step('step-form'); });
+    document.getElementById('back').addEventListener('click', () => { open = null; step('step-loads'); });
+    document.getElementById('step-form').addEventListener('submit', run(async () => {
+      const f = document.getElementById('step-form'), l = loads[open], fields = {};
+      ['casesDelivered', 'driverCaseReturn', 'refusedReturned', 'refusedReturnedSource', 'tractorIssues', 'trailerIssues', 'palletJackIssues', 'checkinNotes'].forEach(k => { fields[k] = f.elements[k].value.trim(); });
+      fields.trailerNeedsCleaned = f.elements.trailerNeedsCleaned.checked;
+      const requestId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
+      const btn = document.getElementById('send');
+      btn.disabled = true;
+      try { await call('checkIn', { driverId, runDocId: l.runDocId, day: l.day, requestId, fields }); } finally { btn.disabled = false; }
+      open = null;
+      await show();
+    }));
+    show().catch(err => showError(err.message));
+  </script>
+</body>
+</html>

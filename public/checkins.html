@@ -34,7 +34,7 @@
         </div>
       </div>
       <div class="counts"><div><b id="n-in">-</b>Checked in</div><div><b id="n-out">-</b>Not yet</div><div><b id="n-issues">-</b>With issues</div></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Driver phones still check in on the current app</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Drivers check in on their phones at route.html</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="sheet">
@@ -50,12 +50,13 @@
         <tbody id="rows"></tbody>
       </table>
     </div>
-    <div class="footer"><span id="count"></span><span>Click a line to enter or fix a check-in for a driver.</span></div>
+    <div class="footer"><span id="count"></span><span id="foot-note">Click a line to enter or fix a check-in for a driver.</span><span class="spacer"></span><button type="button" id="new-code" hidden title="Make a new Route Distribution code; every driver phone asks for it again">New phone code</button></div>
   </div>
 
   <script type="module">
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { watchLists, canSave, saveOptimistic } from './js/edit.js';
+    import { watchLists, canSave, canReorder, saveOptimistic, lists } from './js/edit.js';
+    import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
@@ -64,7 +65,21 @@
     let unsubscribe = null, runs = [], rows = [], popover = null, writeBack = false;
 
     const show = (v) => v === null || v === undefined ? '' : String(v);
+    // New phone code (managers): shown once in the footer, in place of the hint; never stored in the page.
+    let codeArmed = false;
+    document.getElementById('new-code').addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      if (!codeArmed) { codeArmed = true; b.textContent = 'Click again'; setTimeout(() => { codeArmed = false; b.textContent = 'New phone code'; }, 7000); return; }
+      codeArmed = false; b.textContent = 'New phone code'; b.disabled = true;
+      try {
+        const { functions } = await start();
+        const r = (await httpsCallable(functions, 'newRouteCode')({})).data;
+        document.getElementById('foot-note').innerHTML = 'Route Distribution code for the phones: <b id="phone-code">' + escapeHtml(r.code) + '</b> (the old code stops working)';
+      } catch (err) { showError(err.message); } finally { b.disabled = false; }
+    });
+
     function render() {
+      document.getElementById('new-code').hidden = !canReorder();
       if (popover) return;
       rows = L.checkinRows(runs, date);
       const edit = canSave();

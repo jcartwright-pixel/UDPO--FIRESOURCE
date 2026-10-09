@@ -47,6 +47,17 @@ workflow in this repository. Tested on the local emulators with made-up data. No
 - **Deploy workflow.** It is run by hand only and has read-only repository permissions. Deploy keys are
   repository secrets that are never printed, and it deploys nothing until the projects exist.
 
+- **Drivers' phone Check-In (`route.html`, no United Dairy account).** The same model as the current public Route
+  page: the phone sends the plant's Route Distribution code with every call. The server keeps only a salted hash of
+  the code, compares it in constant time and allows 30 wrong codes a minute in total (tested). A phone can read only
+  the active drivers' names and the loads Dispatch gave the chosen driver for today or yesterday, and can save only a
+  check-in on one of those loads (tested: another driver's load and an older load are refused). It cannot read the
+  database directly; the database rules stay closed to it. A manager makes a new code on Driver Check-ins; the old
+  code stops working at once. Picking another driver's name is possible for anyone holding the code, as today.
+- **Master-list write-back.** Driver, Route and Equipment Master, day offs and vacations are written only to sandbox
+  copies named in `WRITEBACK_JSON.masters`, each the same copy the transfer reads; every production list is refused in
+  code (tested). Two passes at once cannot add the same new row twice (each claims its saves first).
+
 ## Recommended before going live (not built; each needs a setting or a decision)
 
 1. **Deploy keys without a stored password.** Today the workflow expects a service-account key file saved as
@@ -58,5 +69,7 @@ workflow in this repository. Tested on the local emulators with made-up data. No
    anonymous sign-in off, and turn on email enumeration protection.
 4. **Driver phone numbers.** The copy keeps every DRIVERS_MASTER cell, including phone and email, because
    dispatch uses them. If dispatchers do not need them in the new app, the copy can drop those columns.
-5. **Separate server accounts.** Use one account that can only read the sheets for the copy, and a separate
+5. **App Check on the phone page too.** Once the app has its real address, App Check also limits the phone calls to
+   the real page.
+6. **Separate server accounts.** Use one account that can only read the sheets for the copy, and a separate
    one, with edit rights on the sandbox workbook only, for the write-back.

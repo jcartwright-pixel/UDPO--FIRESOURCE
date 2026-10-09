@@ -863,4 +863,4 @@ async function clearConflict(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { applyAction, validate, SaveError, ACTIONS, SAVE_ROLES, REORDER_ROLES, DRIVER_ROLES };
+module.exports = { applyAction, validate, requireTestMode, queueSheetCells, SaveError, ACTIONS, SAVE_ROLES, REORDER_ROLES, DRIVER_ROLES };

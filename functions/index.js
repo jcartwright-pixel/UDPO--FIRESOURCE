@@ -4,6 +4,8 @@
  *   transferEveryMinute   copies the Live tabs and master lists into the database (read-only on the sheets)
  *   transferNow           the same on request, for an administrator ("Reset test copy" rewrites every row)
  *   save                  every save from the screens, one call each
+ *   phone                 the drivers' phone Check-In (Route Distribution code, no United Dairy account)
+ *   newRouteCode          a manager makes a new Route Distribution code for the phones
  *   writeBackOnSave       writes each save into the SANDBOX Live workbook (phase 2; production is refused)
  *   writeBackEveryMinute  retries anything the write-back could not finish
  *   masterWriteBackOnSave writes Driver / Route / Equipment Master, day off and vacation saves into SANDBOX copies
@@ -17,6 +19,7 @@ const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { runTransfer } = require('./src/transfer');
 const { applyAction, SaveError } = require('./src/actions');
+const { phoneCall, newRouteCode } = require('./src/phone');
 const { unitedDairyUser } = require('./src/auth');
 const { makeSheetsReader, makeSheetsWriter } = require('./src/sheets');
 const { runWriteBack } = require('./src/writeback');
@@ -48,6 +51,18 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   }
   const result = await runTransfer({ db, reader: makeSheetsReader(), sources: transferSources(process.env), force: !!(request.data && request.data.resetTestCopy) });
   return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
+});
+
+const asHttps = (error) => (error instanceof SaveError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+
+// Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
+exports.phone = onCall({ maxInstances: 3 }, async (request) => {
+  try { return await phoneCall(db, request.data); } catch (error) { throw asHttps(error); }
+});
+
+exports.newRouteCode = onCall(async (request) => {
+  const user = signedIn(request);
+  try { return await newRouteCode(db, user); } catch (error) { throw asHttps(error); }
 });
 
 exports.save = onCall(async (request) => {

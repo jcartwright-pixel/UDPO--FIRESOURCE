@@ -388,6 +388,54 @@ async function noScroll(page) {
     await Promise.all([rt.close(), dispRt.close()]);
     results.push('Route Editor: Start Times, Route Days, Load Order, Route Details and Recap fit at both sizes; a manager set 801 Monday to 5 AM (Tab kept moving), pasted a two-by-two block of start times and copied it back, turned 802 Wednesday on, set 802 to Tote, added a run to 802 and dragged 801 first on Monday');
 
+    // Phone Check-In: a manager makes the code on Driver Check-ins (second click); a driver's phone asks for it once, then the name.
+    const ciMgr = await openPage(browser, 1366, 650, '/checkins.html?testEmail=manager.test@uniteddairy.com');
+    await ciMgr.waitForSelector('#new-code:not([hidden])');
+    await ciMgr.click('#new-code');
+    await ciMgr.click('#new-code');
+    await ciMgr.waitForSelector('#phone-code', { timeout: 8000 });
+    const phoneCode = await ciMgr.$eval('#phone-code', b => b.textContent);
+    const ciFit = await noScroll(ciMgr);
+    assert.ok(ciFit.scroll <= ciFit.inner, 'Driver Check-ins still fits with the code shown');
+    // Give CASEY a load today (the made-up weeks cover 9/27 - 10/17; another day only checks the screens).
+    const phoneLoad = await ciMgr.evaluate(async () => {
+      const L = window.UDLogic, { save } = await import('./js/app.js');
+      const today = L.operatingDay(new Date()), week = L.weekStart(today), p = L.dayPrefix(today);
+      if (['2026-09-27', '2026-10-04', '2026-10-11'].indexOf(week) < 0) return null;
+      const runDocId = week + '__run_t802';
+      await save('setRuns', { runDocId, day: p, runs: true });
+      await save('assignDriver', { runDocId, day: p, driverId: 'drv_test_casey', override: true });
+      return today;
+    });
+    const phone = await openPage(browser, 390, 844, '/route.html');
+    await phone.fill('#code', phoneCode.toLowerCase());
+    await phone.click('#step-code button[type=submit]');
+    await phone.waitForSelector('#step-name:not([hidden])', { timeout: 8000 });
+    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'phone-name-390.png') });
+    await phone.selectOption('#name', 'drv_test_casey');
+    await phone.click('#step-name button[type=submit]');
+    await phone.waitForSelector('#step-loads:not([hidden])', { timeout: 8000 });
+    assert.equal(await phone.$eval('#who', e => e.textContent), 'CASEY, LEE');
+    if (phoneLoad) {
+      await phone.click('.phone-load');
+      await phone.fill('#step-form input[name=casesDelivered]', '400');
+      await phone.fill('#step-form input[name=tractorIssues]', 'Check engine light');
+      if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'phone-checkin-390.png') });
+      const pf = await noScroll(phone);
+      assert.ok(pf.scroll <= pf.inner && pf.width <= pf.innerWidth, 'the phone Check-In fits a 390x844 phone: ' + JSON.stringify(pf));
+      await phone.click('#send');
+      await phone.waitForSelector('.phone-load.done', { timeout: 8000 });
+      if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'phone-loads-390.png') });
+      await ciMgr.goto(HOSTING + '/checkins.html?date=' + phoneLoad + '&testEmail=manager.test@uniteddairy.com');
+      await ciMgr.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && /400/.test(tr.textContent) && /Check engine light/.test(tr.textContent)), null, { timeout: 8000 });
+    }
+    // The name and the code stay on the phone.
+    await phone.reload();
+    await phone.waitForSelector('#step-loads:not([hidden])', { timeout: 8000 });
+    assert.deepEqual([...ciMgr.errors, ...phone.errors], []);
+    await Promise.all([ciMgr.close(), phone.close()]);
+    results.push('Phone Check-In: a manager made the code; the phone took it once and the driver name once' + (phoneLoad ? ', CASEY checked in 802 (400 delivered, a truck problem) and Driver Check-ins showed it' : ' (today is outside the made-up weeks, so no load to check in)'));
+
     // Equipment: fits at both sizes; a dispatcher puts a truck down with a reason and back in service.
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       const eq = await openPage(browser, w, h, '/equipment.html?testEmail=dispatch.test@uniteddairy.com');
