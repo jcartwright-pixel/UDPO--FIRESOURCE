@@ -24,7 +24,7 @@ project yet, so nobody can open it until the steps under "What Joe provides" are
 | Sheet Conflicts screen | Built: saves the write-back did not write, with both values |
 | Route Distribution home | Built: eight cards with live numbers (loads, needs driver, covered, week, drivers, check-ins, time off, units, routes, conflicts) |
 | Drivers screen | Built, test copy: seniority order, vacation weeks, assigned truck, relief, available; add, edit (name, dates, truck, relief) and Remove Selected (managers) |
-| Master tabs (Driver, Route, Equipment Master) | Saves stay in the new app; not written back to the sheets yet |
+| Master tabs (Driver, Route, Equipment Master, day offs, vacations) | Built: with the write-back on, saves go to **sandbox copies** of the lists, found by their ID column; new entries become new rows; production sheets refused in code |
 | Driver Check-ins screen | Built, test copy: what drivers reported per delivery day; a dispatcher can enter or fix one (same Live columns as the phone check-in). Driver phone form, plant journal and maintenance queue still on the current app |
 | Writing to the production sheet, per-screen switch | Not built (only after Joe says go) |
 
@@ -104,6 +104,7 @@ do on its own. If true SQL is wanted later, the data layout here moves over tabl
     src/actions.js         one-transaction saves, revisions, idempotent request IDs, save log
     src/auth.js            United Dairy account check
     src/writeback.js       database -> sandbox Live sheet, conflict rule, production IDs refused
+    src/masterwrite.js     master-list saves -> sandbox copies of Driver / Route / Equipment Master, day offs, vacations
     src/sheets.js          Sheets API reader (read only) and writer (write-back)
     src/sources.js         Uniontown spreadsheet IDs (the same as the current app)
     test/unit, test/emulator, test/browser, test/fixtures/fake-sheets.js
@@ -128,6 +129,9 @@ Settings on the sandbox server (environment variables of the functions):
   `{"live":{"spreadsheetId":"<sandbox copy ID>"}}` (masters can stay the real ones, read only).
 - `WRITEBACK_JSON` turns on writing to it: `{"spreadsheetId":"<sandbox copy ID>"}`. The write-back runs only
   when this is set **and** `config/app` has `writeBack.enabled: true` in the database.
+- The master lists are written only when `WRITEBACK_JSON` also names their sandbox copies, each the same copy
+  `SOURCES_JSON` points the transfer at: `"masters": {"drivers": {"spreadsheetId": "...", "tab": "DRIVERS_MASTER"}, ...}`
+  (drivers, routes, equipment, exceptions, vacations). Production list IDs are refused in code.
 
 On a workstation whose web proxy blocks the emulator's set-up of database triggers, put
 `UD_LOCAL_NO_TRIGGERS=1` in `functions/.env.local` (ignored by git) before `npm run test:browser`; GitHub's test

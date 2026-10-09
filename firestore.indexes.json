@@ -31,6 +31,24 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "masterOutbox",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestId",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -91,6 +109,16 @@
     },
     {
       "collectionGroup": "outbox",
+      "fieldPath": "cells",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "masterOutbox",
+      "fieldPath": "cells",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "plantLoads",
       "fieldPath": "cells",
       "indexes": []
     }

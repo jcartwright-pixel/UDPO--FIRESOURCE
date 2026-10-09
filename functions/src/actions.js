@@ -11,6 +11,7 @@
 
 const L = require('./logic');
 const M = require('./model');
+const { queueMaster } = require('./masterwrite');
 
 const C = M.COLLECTIONS;
 
@@ -427,6 +428,7 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
   const result = { ok: true, requestId: req.requestId, runs: [] };
   if (req.action === 'setUnitUp') {
     tx.update(ref, { status: 'ACTIVE', notes: '', downSince: '', testEdited: true, editedAt: stamp, editedBy: email });
+    queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'ACTIVE', notes: '' }, false, stamp, email);
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' }, after: { status: 'ACTIVE' }, result });
     return result;
   }
@@ -450,6 +452,7 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
     if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id.slice(-6) + p + i, run, r.id, p, { [idKey]: '', [textKey]: '' }, stamp, email));
   });
   tx.update(ref, { status: 'DOWN', notes: 'DOWN: ' + req.reason, downSince: stamp, testEdited: true, editedAt: stamp, editedBy: email });
+  queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'DOWN', notes: 'DOWN: ' + req.reason }, false, stamp, email);
   result.removedFrom = removed;
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' }, after: { status: 'DOWN', reason: req.reason, removedFrom: removed }, result });
   return result;
@@ -497,9 +500,9 @@ async function reorder(tx, db, req, email, stamp, logRef, mode) {
 }
 
 /*
- * Driver list edits (the Employee Information screen): assigned truck, available, relief. In this phase they
- * change the new app's copy only; DRIVERS_MASTER is not written back. As with runs, the sheet wins again the next
- * time that driver's row changes in DRIVERS_MASTER.
+ * Driver list edits (the Employee Information screen): assigned truck, available, relief. With the write-back on they
+ * also go to the sandbox copy of DRIVERS_MASTER (masterwrite.js); as with runs, the sheet wins again the next time
+ * that driver's row changes in DRIVERS_MASTER.
  */
 async function editDriver(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection(C.drivers).doc(M.safeIdPart(req.driverId));
@@ -525,6 +528,7 @@ async function editDriver(tx, db, req, email, stamp, logRef, mode) {
   const before = {};
   Object.keys(after).forEach(k => { before[k] = d[k] === undefined ? null : d[k]; });
   tx.update(ref, Object.assign({}, after, { testEdited: true, editedAt: stamp, editedBy: email }));
+  queueMaster(tx, db, mode, req.requestId, '', ref, d.id, after, false, stamp, email);
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: d.id, before, after, result });
   return result;
@@ -557,6 +561,7 @@ async function saveDriver(tx, db, req, email, stamp, logRef, mode) {
     const before = {};
     Object.keys(after).forEach(k => { before[k] = existing[k] === undefined ? null : existing[k]; });
     tx.update(ref, Object.assign({}, after, { testEdited: true, editedAt: stamp, editedBy: email }));
+    queueMaster(tx, db, mode, req.requestId, '', ref, existing.id, after, false, stamp, email);
     result.driverId = existing.id;
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: existing.id, before, after, result });
     return result;
@@ -565,6 +570,7 @@ async function saveDriver(tx, db, req, email, stamp, logRef, mode) {
   ref = db.collection(C.drivers).doc(M.safeIdPart(id));
   const created = Object.assign({ id, status: 'ACTIVE', employmentStatus: 'ACTIVE', unavailableReason: '', createdInApp: true, testEdited: true, createdAt: stamp, createdBy: email }, after);
   tx.set(ref, created);
+  queueMaster(tx, db, mode, req.requestId, '', ref, id, Object.assign({ status: 'ACTIVE', employmentStatus: 'ACTIVE' }, after), true, stamp, email);
   result.driverId = id;
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: id, before: null, after: created, result });
   return result;
@@ -579,7 +585,10 @@ async function removeDrivers(tx, db, req, email, stamp, logRef, mode) {
     if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverIds[i] + ' is not in Driver Master');
     before.push({ driverId: req.driverIds[i], status: snap.data().status || '' });
   });
-  refs.forEach(ref => tx.update(ref, { status: 'INACTIVE', unavailableReason: 'Removed from operational roster', testEdited: true, editedAt: stamp, editedBy: email }));
+  refs.forEach((ref, i) => {
+    tx.update(ref, { status: 'INACTIVE', unavailableReason: 'Removed from operational roster', testEdited: true, editedAt: stamp, editedBy: email });
+    queueMaster(tx, db, mode, req.requestId, String(i), ref, snaps[i].data().id || req.driverIds[i], { status: 'INACTIVE', unavailableReason: 'Removed from operational roster' }, false, stamp, email);
+  });
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: { status: 'INACTIVE' }, result });
   return result;
@@ -621,12 +630,17 @@ async function saveRoute(tx, db, req, email, stamp, logRef, mode) {
   const before = snap.exists ? snap.data() : null;
   const update = Object.assign({}, req.fields, { testEdited: true, editedAt: stamp, editedBy: email });
   Object.keys(req.days).forEach(p => Object.keys(req.days[p]).forEach(k => { update['days.' + p + '.' + k] = req.days[p][k]; }));
-  if (snap.exists) tx.update(ref, update);
-  else {
+  if (snap.exists) {
+    tx.update(ref, update);
+    queueMaster(tx, db, mode, req.requestId, '', ref, before.id || id, Object.assign({}, req.fields, { days: req.days }), false, stamp, email);
+  } else {
     const days = {};
     L.DAYS.forEach(p => { days[p] = Object.assign({ active: false, dispatchTime: null, loadOrder: null, miles: null, hours: '', loadDayOffset: null, forklift: '', tractor: '', trailer: '', notes: '' }, req.days[p] || {}); });
-    tx.set(ref, Object.assign({ id, routeId: 'rte_app_' + M.safeIdPart(String(req.fields.route)).toLowerCase(), routeStatus: 'ACTIVE', active: true, displayDaily: true, displayWeekly: true,
-      displayPlant: true, displayMobile: true, createdInApp: true, createdAt: stamp, createdBy: email }, req.fields, { days, testEdited: true, editedAt: stamp, editedBy: email }));
+    const made = Object.assign({ id, routeId: 'rte_app_' + M.safeIdPart(String(req.fields.route)).toLowerCase(), routeStatus: 'ACTIVE', active: true, displayDaily: true, displayWeekly: true,
+      displayPlant: true, displayMobile: true, createdInApp: true, createdAt: stamp, createdBy: email }, req.fields, { days, testEdited: true, editedAt: stamp, editedBy: email });
+    tx.set(ref, made);
+    const { createdInApp, createdAt, createdBy, testEdited, editedAt, editedBy, id: madeId, ...sheetFields } = made;
+    queueMaster(tx, db, mode, req.requestId, '', ref, id, sheetFields, true, stamp, email);
   }
   const result = { ok: true, requestId: req.requestId, runs: [], runId: id };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runId: id, before: before ? { fields: Object.keys(req.fields).reduce((o, k) => Object.assign(o, { [k]: before[k] === undefined ? null : before[k] }), {}) } : null, after: { fields: req.fields, days: req.days }, result });
@@ -639,7 +653,10 @@ async function reorderRouteDay(tx, db, req, email, stamp, logRef, mode) {
   const snaps = await Promise.all(refs.map(r => tx.get(r)));
   snaps.forEach((s, i) => { if (!s.exists) throw new SaveError('NOT_FOUND', req.runIds[i] + ' is no longer in the Route Master copy'); });
   const before = snaps.map(s => ({ runId: s.id, loadOrder: ((s.data().days || {})[req.day] || {}).loadOrder === undefined ? null : s.data().days[req.day].loadOrder }));
-  refs.forEach((r, i) => tx.update(r, { ['days.' + req.day + '.loadOrder']: (i + 1) * 10, testEdited: true, editedAt: stamp, editedBy: email }));
+  refs.forEach((r, i) => {
+    tx.update(r, { ['days.' + req.day + '.loadOrder']: (i + 1) * 10, testEdited: true, editedAt: stamp, editedBy: email });
+    queueMaster(tx, db, mode, req.requestId, String(i), r, snaps[i].data().id || req.runIds[i], { ['days.' + req.day + '.loadOrder']: (i + 1) * 10 }, false, stamp, email);
+  });
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, day: req.day, before, after: req.runIds.map((id, i) => ({ runId: id, loadOrder: (i + 1) * 10 })), result });
   return result;
@@ -760,24 +777,32 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
     const v = exceptionValues(req.reason);
     const doc = { id, driverId: driver.id, startDate: req.startDate, endDate: req.endDate, type: v.type, status: v.status, reasonCode: v.reasonCode,
       notes: req.note, createdInApp: true, createdAt: stamp, createdBy: email, updatedAt: stamp, updatedBy: email };
-    tx.set(db.collection(C.exceptions).doc(id), doc);
+    const exRef = db.collection(C.exceptions).doc(id);
+    tx.set(exRef, doc);
+    queueMaster(tx, db, mode, req.requestId, 'ex', exRef, id, { driverId: doc.driverId, startDate: doc.startDate, endDate: doc.endDate, type: doc.type, status: doc.status, reasonCode: doc.reasonCode, notes: doc.notes }, true, stamp, email);
     result.exceptionId = id;
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before: null, after: doc, result });
     return result;
   }
   const changed = [];
   const note = 'Available ' + req.startDate + (req.endDate !== req.startDate ? ' - ' + req.endDate : '') + ' from Dispatch';
-  mine.docs.forEach(snap => {
+  mine.docs.forEach((snap, n) => {
     const e = snap.data(), a = e.startDate, z = e.endDate || e.startDate;
     if (!a || z < req.startDate || a > req.endDate || ['CANCELLED', 'CLEARED', 'DENIED'].indexOf(String(e.status).toUpperCase()) >= 0) return;
     const base = { updatedAt: stamp, updatedBy: email, testEdited: true };
     if (a >= req.startDate && z <= req.endDate) {
       tx.update(snap.ref, Object.assign(base, { status: 'CANCELLED', decisionNotes: 'Returned available from Dispatch' }));
+      queueMaster(tx, db, mode, req.requestId, 'ex' + n, snap.ref, e.id || snap.id, { status: 'CANCELLED', decisionNotes: 'Returned available from Dispatch' }, false, stamp, email);
     } else {
-      tx.update(snap.ref, Object.assign(base, { decisionNotes: note }, a < req.startDate ? { endDate: L.addDays(req.startDate, -1) } : { startDate: L.addDays(req.endDate, 1) }));
+      const kept = Object.assign({ decisionNotes: note }, a < req.startDate ? { endDate: L.addDays(req.startDate, -1) } : { startDate: L.addDays(req.endDate, 1) });
+      tx.update(snap.ref, Object.assign(base, kept));
+      queueMaster(tx, db, mode, req.requestId, 'ex' + n, snap.ref, e.id || snap.id, kept, false, stamp, email);
       if (a < req.startDate && z > req.endDate) {
-        const id = String(snap.id) + '_' + req.requestId.slice(-8).toLowerCase();
-        tx.set(db.collection(C.exceptions).doc(id), Object.assign({}, e, base, { id, startDate: L.addDays(req.endDate, 1), endDate: z, decisionNotes: note, createdInApp: true }));
+        const id = String(snap.id) + '_' + req.requestId.slice(-8).toLowerCase(), later = db.collection(C.exceptions).doc(id);
+        const split = Object.assign({}, e, base, { id, startDate: L.addDays(req.endDate, 1), endDate: z, decisionNotes: note, createdInApp: true });
+        tx.set(later, split);
+        queueMaster(tx, db, mode, req.requestId, 'exs' + n, later, id, { driverId: split.driverId, startDate: split.startDate, endDate: split.endDate, type: split.type, status: split.status,
+          reasonCode: split.reasonCode, notes: split.notes, decisionNotes: note, facilityId: split.facilityId }, true, stamp, email);
       }
     }
     changed.push({ id: snap.id, startDate: a, endDate: z, status: e.status });
@@ -798,6 +823,8 @@ async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection(C.vacations).doc(M.safeIdPart(id));
   const existing = await tx.get(ref);
   if (req.vacationId && !existing.exists) throw new SaveError('NOT_FOUND', 'That vacation entry no longer exists');
+  const vsRef = db.collection(C.exceptions).doc(M.safeIdPart('vsched_' + id));
+  const vsSnap = await tx.get(vsRef);
   if (req.status === 'APPROVED') {
     const approved = await tx.get(db.collection(C.vacations).where('status', '==', 'APPROVED'));
     const others = approved.docs.map(d => Object.assign({ docId: d.id }, d.data())).filter(v => v.docId !== ref.id && v.driverId !== driver.id && v.startDate && (v.endDate || v.startDate) >= req.startDate && v.startDate <= req.endDate);
@@ -812,12 +839,13 @@ async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
   const doc = { id, driverId: driver.id, startDate: req.startDate, endDate: req.endDate, status: req.status, vacationType: req.type, notes: req.notes, notificationEmail: req.email, updatedAt: stamp, updatedBy: email, testEdited: true };
   if (!existing.exists) Object.assign(doc, { createdInApp: true, createdAt: stamp, createdBy: email });
   tx.set(ref, doc, { merge: true });
+  queueMaster(tx, db, mode, req.requestId, 'vac', ref, id, { driverId: doc.driverId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status, vacationType: doc.vacationType, notes: doc.notes }, !existing.exists, stamp, email);
   const pair = VACATION_EXCEPTION[req.type], approved = req.status === 'APPROVED';
-  tx.set(db.collection(C.exceptions).doc(M.safeIdPart('vsched_' + id)), {
-    id: 'vsched_' + id, driverId: driver.id, startDate: req.startDate, endDate: req.endDate, type: pair[0], reasonCode: pair[1],
-    status: !approved ? 'CANCELLED' : pair[0] === 'VACATION' ? 'APPROVED' : 'UNAVAILABLE', notes: 'Vacation Schedule' + (req.notes ? ': ' + req.notes : ''),
-    updatedAt: stamp, updatedBy: email, testEdited: true
-  }, { merge: true });
+  const mirror = { id: 'vsched_' + id, driverId: driver.id, startDate: req.startDate, endDate: req.endDate, type: pair[0], reasonCode: pair[1],
+    status: !approved ? 'CANCELLED' : pair[0] === 'VACATION' ? 'APPROVED' : 'UNAVAILABLE', notes: 'Vacation Schedule' + (req.notes ? ': ' + req.notes : '') };
+  tx.set(vsRef, Object.assign({}, mirror, { updatedAt: stamp, updatedBy: email, testEdited: true }), { merge: true });
+  const { id: mirrorId, ...mirrorFields } = mirror;
+  queueMaster(tx, db, mode, req.requestId, 'vsched', vsRef, mirrorId, mirrorFields, !vsSnap.exists, stamp, email);
   const result = { ok: true, requestId: req.requestId, runs: [], vacationId: id };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before, after: doc, result });
   return result;

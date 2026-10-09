@@ -25,7 +25,7 @@ const COLLECTIONS = Object.freeze({
   config: 'config', weeks: 'weeks', runs: 'runs', drivers: 'drivers', equipment: 'equipment',
   routes: 'routes', users: 'users', actions: 'actions', transfers: 'transfers',
   outbox: 'outbox', conflicts: 'conflicts', exceptions: 'exceptions', vacations: 'vacations',
-  plantLoads: 'plantLoads'
+  plantLoads: 'plantLoads', masterOutbox: 'masterOutbox'
 });
 
 const LIVE_TABS = Object.freeze({ previous: 'LIVE PREVIOUS WEEK', current: 'LIVE CURRENT WEEK', next: 'LIVE NEXT WEEK' });

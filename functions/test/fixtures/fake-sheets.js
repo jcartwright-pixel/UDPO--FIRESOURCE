@@ -210,6 +210,7 @@ function fakeWritableSheets(tabs) {
         const m = range.match(/^('.*')!([A-Z]+)(\d+)$/);
         if (!m) throw new Error('bad range ' + range);
         const rows = tabs[m[1]], r = Number(m[3]) - 1, c = colIndex(m[2]);
+        while (rows.length <= r) rows.push([]);
         while (rows[r].length <= c) rows[r].push('');
         rows[r][c] = values[0][0];
       });

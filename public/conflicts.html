@@ -65,7 +65,7 @@
       const rows = shown.map(c => '<tr>' +
         '<td>' + escapeHtml(new Date(c.at).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })) + '</td>' +
         '<td>' + escapeHtml(c.by) + '</td>' +
-        '<td>' + escapeHtml(c.route) + '</td>' +
+        '<td>' + escapeHtml(c.route || (c.tab ? c.tab + ' ' + (c.rowId || '') : '')) + '</td>' +
         '<td>' + escapeHtml(c.column ? cellName(c.column) : 'whole row') + '</td>' +
         '<td>' + escapeHtml(c.sheetValue) + '</td>' +
         '<td>' + escapeHtml(c.newValue) + '</td>' +

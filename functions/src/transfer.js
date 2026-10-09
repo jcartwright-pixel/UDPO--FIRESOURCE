@@ -344,10 +344,14 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   const revBase = started.getTime();
   const ops = [];
   const summary = { masters: {}, weeks: {} };
+  // A master entry with a save still waiting for the sheet keeps the app's value until it is written (masterwrite.js).
+  const masterWaiting = await db.collection(C.masterOutbox).where('status', 'in', ['pending', 'writing']).get();
+  const masterHold = {};
+  masterWaiting.docs.forEach(d => { (masterHold[d.data().list] = masterHold[d.data().list] || {})[d.data().docId] = true; });
   for (const kind of Object.keys(masters)) {
     const metaRef = db.collection(META).doc(kind);
     const prev = (await metaRef.get()).data() || {};
-    const d = diffOps(db, masters[kind].collection, masters[kind].docs, prev.hashes || {}, force, { transferredAt: stamp }, revBase);
+    const d = diffOps(db, masters[kind].collection, masters[kind].docs, prev.hashes || {}, force, { transferredAt: stamp }, revBase, masterHold[kind]);
     ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
     summary.masters[kind] = { rows: Object.keys(masters[kind].docs).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
   }

@@ -6,6 +6,7 @@
  *   save                  every save from the screens, one call each
  *   writeBackOnSave       writes each save into the SANDBOX Live workbook (phase 2; production is refused)
  *   writeBackEveryMinute  retries anything the write-back could not finish
+ *   masterWriteBackOnSave writes Driver / Route / Equipment Master, day off and vacation saves into SANDBOX copies
  */
 'use strict';
 
@@ -19,6 +20,7 @@ const { applyAction, SaveError } = require('./src/actions');
 const { unitedDairyUser } = require('./src/auth');
 const { makeSheetsReader, makeSheetsWriter } = require('./src/sheets');
 const { runWriteBack } = require('./src/writeback');
+const { runMasterWriteBack } = require('./src/masterwrite');
 const { transferSources } = require('./src/sources');
 const { safeIdPart } = require('./src/model');
 
@@ -60,7 +62,7 @@ exports.save = onCall(async (request) => {
 
 // The write-back runs only when config/app.writeBack.enabled is true and WRITEBACK_JSON names the sandbox Live
 // workbook ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
-async function writeBackIfOn() {
+async function writeBackIfOn(part) {
   const config = (await db.collection('config').doc('app').get()).data() || {};
   if (!config.writeBack || config.writeBack.enabled !== true || !process.env.WRITEBACK_JSON) return null;
   const target = JSON.parse(process.env.WRITEBACK_JSON);
@@ -68,12 +70,24 @@ async function writeBackIfOn() {
   if (target.spreadsheetId !== transferSources(process.env).live.spreadsheetId) {
     throw new Error('Write-back stopped: WRITEBACK_JSON and SOURCES_JSON must name the same sandbox Live workbook');
   }
-  return runWriteBack({ db, sheets: makeSheetsWriter(), target });
+  const sheets = makeSheetsWriter();
+  const live = part === 'master' ? null : await runWriteBack({ db, sheets, target });
+  // Master lists: only those WRITEBACK_JSON.masters names ({"drivers": {"spreadsheetId", "tab"}, ...}), each the same copy the
+  // transfer reads (SOURCES_JSON), for the same reason as above.
+  const masters = target.masters || {}, sources = transferSources(process.env).masters;
+  Object.keys(masters).forEach(k => {
+    if (!sources[k] || sources[k].spreadsheetId !== masters[k].spreadsheetId || sources[k].tab !== masters[k].tab) {
+      throw new Error('Write-back stopped: WRITEBACK_JSON.masters.' + k + ' and SOURCES_JSON must name the same sandbox copy');
+    }
+  });
+  const master = part !== 'live' && Object.keys(masters).length ? await runMasterWriteBack({ db, sheets, targets: masters }) : null;
+  return { live, master };
 }
 
 // UD_LOCAL_NO_TRIGGERS=1 leaves this out on a workstation whose proxy blocks the emulator's trigger setup;
 // the minute pass below still writes back, and CI runs with the trigger.
 if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
-  exports.writeBackOnSave = onDocumentCreated({ document: 'outbox/{id}', maxInstances: 1, concurrency: 1 }, writeBackIfOn);
+  exports.writeBackOnSave = onDocumentCreated({ document: 'outbox/{id}', maxInstances: 1, concurrency: 1 }, () => writeBackIfOn('live'));
+  exports.masterWriteBackOnSave = onDocumentCreated({ document: 'masterOutbox/{id}', maxInstances: 1, concurrency: 1 }, () => writeBackIfOn('master'));
 }
-exports.writeBackEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 120, maxInstances: 1 }, writeBackIfOn);
+exports.writeBackEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 120, maxInstances: 1 }, () => writeBackIfOn('both'));
