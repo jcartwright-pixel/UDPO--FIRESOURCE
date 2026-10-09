@@ -103,7 +103,9 @@ jobs:
           else
             printf '%s\n' "$PRODUCTION_ENV" > .env
           fi
-          cd .. && npx --prefix functions firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
+          # A new address for the styles on every deploy, so no browser or cache can pair a new page with old styles.
+          cd .. && sed -i "s|css/app.css\"|css/app.css?v=${GITHUB_SHA::12}\"|" public/*.html
+          npx --prefix functions firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
           {
             echo "## Distribution app ($TARGET)"
             echo "Screens: https://$PROJECT.web.app"
@@ -119,6 +121,11 @@ jobs:
           init=$(curl -fsS "https://$PROJECT.web.app/__/firebase/init.json") || init=''
           if echo "$init" | grep -q '"apiKey"'; then echo "Firebase web settings: found"; else echo "::error::https://$PROJECT.web.app/__/firebase/init.json has no web app settings. In the Firebase console: Project settings > General > Your apps > Add app > Web (</>), any nickname, no Hosting tick, Register app. Then deploy again."; ok=false; fi
           code=$(curl -s -o /dev/null -w '%{http_code}' "https://$PROJECT.web.app/index.html"); echo "Home page: HTTP $code"; [ "$code" = 200 ] || ok=false
+          # The live home page must ask for this deploy's styles, and those styles must be the current ones.
+          page=$(curl -fsS "https://$PROJECT.web.app/index.html?check=$GITHUB_SHA") || page=''
+          if echo "$page" | grep -q "css/app.css?v=${GITHUB_SHA::12}"; then echo "Home page asks for this deploy's styles: yes"; else echo "::error::The live home page does not ask for this deploy's styles"; ok=false; fi
+          css=$(curl -fsS "https://$PROJECT.web.app/css/app.css?v=${GITHUB_SHA::12}") || css=''
+          if echo "$css" | grep -q '\.dc-head'; then echo "Styles are current: yes"; else echo "::error::The live styles are not the current ones"; ok=false; fi
           # A save with no sign-in must be refused by the server (proves the function is up and checks sign-in).
           reply=$(curl -s -X POST -H 'Content-Type: application/json' -d '{"data":{}}' "https://us-east4-$PROJECT.cloudfunctions.net/save")
           echo "Save without sign-in: $reply"
