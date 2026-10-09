@@ -31,7 +31,7 @@
         <label>View / Edit<select id="view-select">
           <option value="times">Start Times</option><option value="miles">Mileage</option><option value="hours">Hours and Return</option><option value="offset">Load Day</option>
           <option value="truck">Default Truck</option><option value="trailer">Default Trailer</option><option value="jack">Default Pallet Jack</option>
-          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="details">Route Details</option><option value="recap">Recap</option>
+          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="rules">Show / Hide Rules</option><option value="details">Route Details</option><option value="recap">Recap</option>
         </select></label>
       </div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Route Master is not changed yet</span></div>
@@ -41,6 +41,7 @@
       <button type="button" id="refresh" title="The list is live; this only redraws it">Refresh</button>
       <button type="button" class="primary" id="add-route">+ Add Route</button>
       <button type="button" class="primary" id="add-run">+ Add Run / Destination</button>
+      <label class="seq-day" id="hidden-box" hidden><input type="checkbox" id="only-hidden"> Only runs hidden on Weekly</label>
       <span class="seq-day" id="seq-day-box" hidden><label for="seq-day">Day</label><select id="seq-day"></select></span>
       <span class="spacer"></span>
       <button type="button" disabled title="Dispatch Administration stays in the current app for now">Dispatch Administration</button>
@@ -67,10 +68,10 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
     import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canReorder } from './js/edit.js';
     forScreen('routes');
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
     const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // the Route Master's own order
@@ -90,9 +91,10 @@
       seq: ['Load Order', 'Pick a day, then drag a run by its route number to its place in the loadout.'],
       days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the permanent normal schedule. Special-week changes stay in Weekly Dispatch.'],
       details: ['Route Details', 'Run settings. Each box and list saves the moment you change it.'],
-      recap: ['Route Recap', 'Current route and run summary.']
+      recap: ['Route Recap', 'Current route and run summary.'],
+      rules: ['Show / Hide Rules', 'Each YES / NO is the Route Master setting; click to flip it. Weekly shows a run when Route Master says YES, or, when Route Master is blank, when this week\'s Live row says YES.']
     };
-    let routes = [], view = 'days', pickRoute = '', pickRun = '', filter = 'ACTIVE', seqDay = 'mon', dragging = null, addMode = 'route';
+    let onlyHidden = false, routes = [], liveRows = {}, liveWeek = '', liveStop = null, liveDb = null, view = 'days', pickRoute = '', pickRun = '', filter = 'ACTIVE', seqDay = 'mon', dragging = null, addMode = 'route';
     const canEdit = () => canReorder();
     const isActive = (r) => r.active !== false && String(r.routeStatus || 'ACTIVE').toUpperCase() === 'ACTIVE';
     const day = (r, p) => (r.days && r.days[p]) || {};
@@ -119,7 +121,21 @@
       document.getElementById('view-select').value = view;
     }
 
+    // The Live week the rules are checked against: the copied LIVE CURRENT WEEK tab (config/app liveWeeks), else this calendar week.
+    function watchLiveWeek() {
+      const w = (lists.app.liveWeeks && lists.app.liveWeeks.current) || L.weekStart(L.operatingDay(new Date()));
+      if (!liveDb || w === liveWeek) return;
+      liveWeek = w; liveRows = {};
+      if (liveStop) liveStop();
+      liveStop = onSnapshot(query(collection(liveDb, 'runs'), where('weekStart', '==', w)), snap => {
+        liveRows = {};
+        snap.docs.forEach(d => { const x = d.data(); const k = String(x.runId || '').trim().replace(/[\/\s]+/g, '_').replace(/[^A-Za-z0-9_.@\-|]/g, ''); if (k && !liveRows[k]) liveRows[k] = x; });
+        if (view === 'rules') render();
+      }, e => showError('Could not read the Live week: ' + e.message));
+    }
+
     function render() {
+      watchLiveWeek();
       const edit = canEdit();
       document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
       ['add-route', 'add-run'].forEach(id => { document.getElementById(id).disabled = !edit; });
@@ -129,6 +145,7 @@
       document.getElementById('work-title').textContent = g ? g.title : o[0];
       document.getElementById('work-sub').textContent = g ? g.sub : o[1];
       document.getElementById('seq-day-box').hidden = view !== 'seq';
+      document.getElementById('hidden-box').hidden = view !== 'rules';
       const list = shownRuns(), t = document.getElementById('table');
       // Tab or Enter moves to the next box while the last one saves: keep the focus there when the grid redraws.
       const focus = document.activeElement && document.activeElement.matches && document.activeElement.matches('input.cell') ? [document.activeElement.dataset.r, document.activeElement.dataset.c] : null;
@@ -137,9 +154,11 @@
       else if (view === 'days') t.innerHTML = daysView(list, edit);
       else if (view === 'seq') { const seq = seqList(); t.innerHTML = seqView(seq, edit); lines = seq.length; }
       else if (view === 'details') { t.innerHTML = detailsView(list, edit); lines = 12; }
+      else if (view === 'rules') t.innerHTML = rulesView(onlyHidden ? list.filter(r => !weeklyRule(r).shown) : list, edit);
       else t.innerHTML = recapView(list);
       t.className = 'routes cards-look ' + view;
-      document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : list.length + (list.length === 1 ? ' run' : ' runs'));
+      document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : list.length + (list.length === 1 ? ' run' : ' runs')) +
+        (view === 'rules' ? ' · ' + list.filter(r => !weeklyRule(r).shown).length + ' hidden on Weekly for the week of ' + shortDate(liveWeek) : '');
       // Readable rows and print: the grid scrolls inside its box under fixed headings; the page itself does not.
       const sheet = document.getElementById('sheet'), footer = document.querySelector('.footer');
       sheet.style.height = Math.max(160, window.innerHeight - sheet.getBoundingClientRect().top - (footer ? footer.offsetHeight : 0) - 8) + 'px';
@@ -193,6 +212,33 @@
         '<label>Show Weekly' + yesNo('displayWeekly', r.displayWeekly !== false, edit) + '</label><label>Mobile route' + yesNo('displayMobile', r.displayMobile !== false, edit) + '</label>' +
         '<label>Drop &amp; Hook' + yesNo('dropAndHook', !!r.dropAndHook, edit) + '</label><label class="wide">Day Notes / Route notes' + textIn('routeNotes', r.routeNotes, edit) + '</label>' +
         '</form></td></tr></tbody>';
+    }
+    // Show / Hide Rules: every true/false the screens read, where it comes from, and what Weekly does with it this week.
+    // Same rule as Weekly (logic.js weeklyShown): the Live row can hide a run; then Route Master YES / NO decides; a blank
+    // Route Master falls back to the Live row, and blank in both is missing setup, so the run stays off.
+    function weeklyRule(r) {
+      const live = liveRows[r.id], m = r.displayWeekly;
+      if (!live) return { shown: false, why: 'Not on the Live sheet for the week of ' + shortDate(liveWeek) };
+      if (String(live.routeStatus || 'ACTIVE').trim().toUpperCase() !== 'ACTIVE' || live.active === false) return { shown: false, why: 'Live row says the run is not active' };
+      if (live.displayWeekly === false) return { shown: false, why: 'Live row says NO' };
+      if (m === true) return { shown: true, why: 'Route Master says YES' };
+      if (m === false) return { shown: false, why: 'Route Master says NO' };
+      if (live.displayWeekly === true) return { shown: true, why: 'Route Master blank, Live row says YES' };
+      return { shown: false, why: 'Blank in Route Master and the Live row (missing setup)' };
+    }
+    const flag = (r, f, edit) => {
+      const v = f === 'active' ? isActive(r) : r[f];
+      const cls = v === true ? 'yes' : v === false ? 'no' : 'blank';
+      return '<td><button type="button" class="rule ' + cls + '" data-rule="' + f + '"' + (edit ? '' : ' disabled') + '>' + (v === true ? 'YES' : v === false ? 'NO' : 'BLANK') + '</button></td>';
+    };
+    const liveText = (v) => v === true ? 'YES' : v === false ? 'NO' : 'blank';
+    function rulesView(list, edit) {
+      return '<colgroup><col style="width:7%"><col style="width:17%"><col span="5" style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:19%"></colgroup>' +
+        '<thead><tr><th>Route</th><th>Run / Destination</th><th>Run Active</th><th>Show Daily</th><th>Show Weekly</th><th>Show in Plant</th><th>Mobile route</th><th>Live row Weekly</th><th>On Weekly now</th><th>Why</th></tr></thead><tbody>' +
+        list.map(r => { const w = weeklyRule(r), live = liveRows[r.id];
+          return '<tr data-id="' + escapeHtml(r.id) + '"' + (w.shown ? '' : ' class="hidden-run"') + '>' + routeCells(r) + flag(r, 'active', edit) + flag(r, 'displayDaily', edit) + flag(r, 'displayWeekly', edit) + flag(r, 'displayPlant', edit) + flag(r, 'displayMobile', edit) +
+            '<td>' + (live ? liveText(live.displayWeekly) : '-') + '</td><td><b class="' + (w.shown ? 'shown' : 'off') + '">' + (w.shown ? 'SHOWN' : 'HIDDEN') + '</b></td><td class="why">' + escapeHtml(w.why) + '</td></tr>'; }).join('') +
+        (list.length ? '' : '<tr><td colspan="10" class="empty">No runs to show.</td></tr>') + '</tbody>';
     }
     function recapView(list) {
       const yes = (v) => v ? '&#10003;' : '';
@@ -297,6 +343,13 @@
         saveRun(r, null, { [p]: { active: on } }, x => { x.days[p] = Object.assign({}, x.days[p], { active: on }); });
         return;
       }
+      const rb = e.target.closest('button[data-rule]');
+      if (rb) {
+        const r = routes.find(x => x.id === rb.closest('tr').dataset.id), f = rb.dataset.rule, v = f === 'active' ? !isActive(r) : r[f] !== true;
+        const fields = f === 'active' ? { active: v, routeStatus: v ? 'ACTIVE' : 'INACTIVE' } : { [f]: v };
+        saveRun(r, fields, null, x => Object.assign(x, fields));
+        return;
+      }
       const ed = e.target.closest('[data-edit-route]');
       if (ed) { const r = routes.find(x => x.id === ed.dataset.editRoute); pickRoute = r.route; pickRun = r.id; view = 'details'; render(); }
     });
@@ -358,10 +411,12 @@
     document.getElementById('active-filter').onchange = e => { filter = e.target.value; render(); };
     document.getElementById('refresh').onclick = render;
     document.getElementById('seq-day').innerHTML = DAYS.map(p => '<option value="' + p + '">' + NAME(p) + '</option>').join('');
+    document.getElementById('only-hidden').onchange = e => { onlyHidden = e.target.checked; render(); };
     document.getElementById('seq-day').onchange = e => { seqDay = e.target.value; render(); };
 
     requireSignIn(async (user) => {
       const { db } = await start();
+      liveDb = db;
       watchLists(user, render);
       onSnapshot(collection(db, 'routes'), snap => {
         routes = snap.docs.map(d => Object.assign({ days: {} }, d.data(), { id: d.id }));

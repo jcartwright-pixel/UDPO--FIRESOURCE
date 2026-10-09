@@ -55,3 +55,14 @@ test("a manager edits a run's standards, adds a run and drags the load order; a 
   assert.equal((await route('run_t801')).days.mon.loadOrder, 10);
   assert.equal((await route('run_t802')).days.mon.loadOrder, 20);
 });
+
+test('Show / Hide Rules: flipping Show Weekly in the Route Editor moves the run on Weekly at once', async () => {
+  const L = require('../../src/logic');
+  const runs = async () => (await db().collection('runs').where('runId', '==', 'run_t801').get()).docs.map(d => d.data());
+  assert.ok((await runs()).length > 0, 'the fixture has Live rows for run_t801');
+  await applyAction(db(), MANAGER, { action: 'saveRoute', requestId: rid(), runId: 'run_t801', fields: { displayWeekly: false }, days: {} });
+  assert.equal((await route('run_t801')).displayWeekly, false);
+  (await runs()).forEach(r => { assert.equal(r.weeklyShowMaster, false); assert.equal(L.weeklyRows([r], r.weekStart).length, 0); });
+  await applyAction(db(), MANAGER, { action: 'saveRoute', requestId: rid(), runId: 'run_t801', fields: { displayWeekly: true }, days: {} });
+  (await runs()).forEach(r => assert.equal(L.weeklyRows([r], r.weekStart).length, 1));
+});

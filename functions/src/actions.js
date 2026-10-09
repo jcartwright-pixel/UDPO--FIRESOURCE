@@ -635,10 +635,15 @@ async function saveRoute(tx, db, req, email, stamp, logRef, mode) {
   const snap = await tx.get(ref);
   if (req.runId && !snap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer in the Route Master copy');
   const before = snap.exists ? snap.data() : null;
+  // Show Weekly flipped in the Route Editor: the copied Live runs of this run carry Route Master's answer (weeklyShowMaster,
+  // transfer.js), so Weekly follows at once instead of after the next copy. Reads come before any write in a transaction.
+  const weeklyRuns = snap.exists && typeof req.fields.displayWeekly === 'boolean'
+    ? (await tx.get(db.collection(C.runs).where('runId', '==', before.id || id))).docs : [];
   const update = Object.assign({}, req.fields, { testEdited: true, editedAt: stamp, editedBy: email });
   Object.keys(req.days).forEach(p => Object.keys(req.days[p]).forEach(k => { update['days.' + p + '.' + k] = req.days[p][k]; }));
   if (snap.exists) {
     tx.update(ref, update);
+    weeklyRuns.forEach(d => tx.update(d.ref, { weeklyShowMaster: req.fields.displayWeekly }));
     queueMaster(tx, db, mode, req.requestId, '', ref, before.id || id, Object.assign({}, req.fields, { days: req.days }), false, stamp, email);
   } else {
     const days = {};
