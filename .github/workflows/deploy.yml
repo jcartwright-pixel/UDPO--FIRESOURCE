@@ -84,7 +84,16 @@ jobs:
           node ../tools/sync-logic.cjs
           # What the copy reads (index.js transferSetup). The sandbox shows the made-up sheets until SANDBOX_SOURCES_JSON
           # names its sheet copies; production reads nothing until PRODUCTION_ENV is set after Joe says go.
+          # The sandbox sheet copies can also be named in sandbox-sources.json at the repository root
+          # ({"sources": SOURCES_JSON, "writeBack": WRITEBACK_JSON}); spreadsheet IDs of copies are not secrets.
+          if [ "$TARGET" = sandbox ] && [ -z "$SANDBOX_SOURCES_JSON" ] && [ -f ../sandbox-sources.json ]; then
+            SANDBOX_SOURCES_JSON=$(node -e "console.log(JSON.stringify(require('../sandbox-sources.json').sources))")
+            SANDBOX_WRITEBACK_JSON=$(node -e "const w=require('../sandbox-sources.json').writeBack; console.log(w ? JSON.stringify(w) : '')")
+          fi
           if [ "$TARGET" = sandbox ]; then
+            # The copy reads the sheets through the Google Sheets API.
+            gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet
+            gcloud services enable sheets.googleapis.com --project "$PROJECT" --quiet
             if [ -n "$SANDBOX_SOURCES_JSON" ]; then
               printf 'SOURCES_JSON=%s\n' "$SANDBOX_SOURCES_JSON" > .env
               if [ -n "$SANDBOX_WRITEBACK_JSON" ]; then printf 'WRITEBACK_JSON=%s\n' "$SANDBOX_WRITEBACK_JSON" >> .env; fi
