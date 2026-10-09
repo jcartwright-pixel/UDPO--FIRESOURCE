@@ -46,12 +46,14 @@ jobs:
       - name: Install the test browser
         run: npx playwright install --with-deps chromium
       - name: Screen tests on the local emulator (Daily, Weekly, fit to one page, live update)
-        run: mkdir -p shots && SHOTS_DIR="$PWD/shots" npm run test:browser
+        # Pictures go outside functions/: the emulator reloads the server when a file appears there, which slowed
+        # saves mid-test and made the Route Editor checks time out.
+        run: mkdir -p "$RUNNER_TEMP/shots" && SHOTS_DIR="$RUNNER_TEMP/shots" npm run test:browser
       - name: Keep the screen pictures
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: distribution-app-screens
-          path: functions/shots/
+          path: ${{ runner.temp }}/shots/
           if-no-files-found: ignore
           retention-days: 14
