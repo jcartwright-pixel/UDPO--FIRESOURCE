@@ -18,7 +18,7 @@ document.querySelectorAll('.topbar').forEach(bar => {
   const brand = document.createElement('a');
   brand.className = 'brand';
   brand.href = 'index.html';
-  brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>United Dairy Operations</strong><small>ROUTE DISTRIBUTION &middot; NEW APP</small></span>';
+  brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>New Plant Operations</strong><small>UNITED DAIRY &middot; ROUTE DISTRIBUTION</small></span>';
   bar.prepend(brand);
 });
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
