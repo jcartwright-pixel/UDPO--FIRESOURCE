@@ -13,6 +13,7 @@ export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], al
 
 // The screen's key in the per-screen switch (L.SCREENS); each page sets it once.
 let screenKey = 'dailyDispatch';
+const HOME_FACILITY = 'fac_uniontown';
 export function forScreen(key) { screenKey = key; }
 
 // Drivers, units and the signed-in person's roles, kept current.
@@ -24,7 +25,8 @@ export async function watchLists(user, onChange) {
     onChange();
   });
   onSnapshot(collection(db, 'equipment'), snap => {
-    const all = snap.docs.map(d => d.data());
+    // Only Uniontown's units (Equipment Master facility_id), like the current app's pickers; Charleston and Martins Ferry units are left out.
+    const all = snap.docs.map(d => d.data()).filter(e => !e.facilityId || e.facilityId === HOME_FACILITY);
     const byUnit = (a, b) => String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
     lists.allTrucks = all.filter(e => e.type === 'TRUCK').sort(byUnit);
     lists.allTrailers = all.filter(e => e.type === 'TRAILER').sort(byUnit);
