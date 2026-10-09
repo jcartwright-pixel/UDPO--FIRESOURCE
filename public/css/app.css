@@ -369,10 +369,6 @@ body.phone .notice { margin: 12px 16px 0; }
   .brand strong { font-size: 18px; }
   .brand small { margin-top: 2px; font-size: 10px; }
   .split-side { height: calc(100vh - 138px); }
-  .head { padding: 6px 16px 4px; gap: 10px; }
-  .title h1 { font-size: 23px; }
-  .badge-test { padding: 4px 10px; font-size: 12px; }
-  .badge-test b { font-size: 13px; }
 }
 
 /* The left-hand menu: every screen by name, the one you are on lit in gold. Desktop only; phones keep their own page. */
@@ -385,7 +381,7 @@ body.phone .notice { margin: 12px 16px 0; }
 body.with-rail #screen > :not(.topbar):not(.rail) { margin-left: var(--rail-w); }
 body.with-rail #screen > .sheet { margin-left: calc(var(--rail-w) + 16px); }
 @media (max-width: 1599px) {
-  :root { --rail-w: 70px; }
+  :root { --rail-w: 76px; }
   .rail { padding: 8px 5px; }
   .rail a { white-space: normal; flex-direction: column; gap: 3px; padding: 7px 2px; font-size: 10px; line-height: 1.15; text-align: center; border-left: 0; border-bottom: 3px solid transparent; }
   .rail a.here { border-bottom-color: var(--ud-gold); }
@@ -394,9 +390,4 @@ body.with-rail #screen > .sheet { margin-left: calc(var(--rail-w) + 16px); }
   .rail { display: none; }
   body.with-rail #screen > :not(.topbar):not(.rail) { margin-left: 0; }
   body.with-rail #screen > .sheet { margin-left: 16px; }
-}
-/* Laptop widths: the test-copy note stays on the title line instead of taking a line of its own. */
-@media (max-width: 1500px) {
-  .badge-test { max-width: 270px; padding: 3px 8px; font-size: 11px; line-height: 1.2; }
-  .badge-test b { font-size: 12px; }
 }
