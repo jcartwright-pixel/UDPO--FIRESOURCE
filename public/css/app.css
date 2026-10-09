@@ -398,37 +398,46 @@ body.weekly-page { background: #eef3f7; }
 .weekly-page .week th.today { background: #0f3a66; box-shadow: inset 0 -4px 0 var(--ud-gold); }
 .weekly-page .week td { height: 44px; padding: 0; border: 1px solid #bfd0df; color: #0d365d; font-size: 15px; white-space: nowrap; }
 .weekly-page .week tbody td.strong { padding: 0 8px; background: #fff; text-align: center; font-size: 16px; font-weight: 900; }
-.weekly-page .week td.day { background: #171c20 !important; box-shadow: none; outline: 0; }
-.weekly-page .week td.day:not(.off) { position: relative; padding: 0 9px; text-align: center; color: #0e3a62; font-size: 14px; font-weight: 850; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
-.weekly-page .week td.day:not(.off)::before { content: ""; position: absolute; inset: 3px; border: 1px solid #bfd1e0; border-radius: 7px; background: #f4f8fb; }
-.weekly-page .week td.day:not(.off) > * { position: relative; }
-.weekly-page .week td.day .nm { display: block; }
-.weekly-page .week td.day .unit { display: block; margin: 1px 0 0; color: #5d7286; font-size: 11px; font-weight: 700; }
-.weekly-page .week td.c-relief::before { background: #dff4f1 !important; }
-.weekly-page .week td.c-needs::before { background: #ffd32e !important; border: 2px solid #e1ae00 !important; }
-.weekly-page .week td.c-plant::before { background: #ffd32e !important; border: 2px dashed #c2410c !important; }
-.weekly-page .week td.c-vacation-needs::before { background: #ffd32e !important; border: 2px solid #ef4545 !important; }
-.weekly-page .week td.c-conflict::before { border: 2px solid #ef4545 !important; }
-.weekly-page .week td.c-booked::before { background: #ffdbe6 !important; border: 2px solid #f0a5bd !important; }
-.weekly-page .week td.c-carrier::before { background: #bcd9ff !important; border: 2px solid #4a8fe0 !important; }
-.weekly-page .week td.c-open::before { background: #e6defa !important; border: 2px solid #9b86d6 !important; }
-.weekly-page .week td.c-coverage::before { background: #e7edf3 !important; }
-.weekly-page .week td.c-coverage { color: #536b81 !important; }
-.weekly-page .week td.editable { cursor: pointer; }
-.weekly-page .week td.editable:not(.off):hover::before { outline: 2px solid var(--ud-gold); outline-offset: -1px; }
-.weekly-page .week td.off.editable:hover { box-shadow: inset 0 0 0 2px var(--ud-gold); }
+.weekly-page #routes-sheet td.day { background: #171c20 !important; box-shadow: none; outline: 0; }
+.weekly-page #routes-sheet td.day:not(.off) { position: relative; padding: 0 9px; text-align: center; color: #0e3a62; font-size: 14px; font-weight: 850; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
+.weekly-page #routes-sheet td.day:not(.off)::before { content: ""; position: absolute; inset: 3px; border: 1px solid #bfd1e0; border-radius: 7px; background: #f4f8fb; }
+.weekly-page #routes-sheet td.day:not(.off) > * { position: relative; }
+.weekly-page #routes-sheet td.day .nm { display: block; }
+.weekly-page #routes-sheet td.day .unit { display: block; margin: 1px 0 0; color: #5d7286; font-size: 11px; font-weight: 700; }
+.weekly-page #routes-sheet td.c-relief::before { background: #dff4f1 !important; }
+.weekly-page #routes-sheet td.c-needs::before { background: #ffd32e !important; border: 2px solid #e1ae00 !important; }
+.weekly-page #routes-sheet td.c-plant::before { background: #ffd32e !important; border: 2px dashed #c2410c !important; }
+.weekly-page #routes-sheet td.c-vacation-needs::before { background: #ffd32e !important; border: 2px solid #ef4545 !important; }
+.weekly-page #routes-sheet td.c-conflict::before { border: 2px solid #ef4545 !important; }
+.weekly-page #routes-sheet td.c-booked::before { background: #ffdbe6 !important; border: 2px solid #f0a5bd !important; }
+.weekly-page #routes-sheet td.c-carrier::before { background: #bcd9ff !important; border: 2px solid #4a8fe0 !important; }
+.weekly-page #routes-sheet td.c-open::before { background: #e6defa !important; border: 2px solid #9b86d6 !important; }
+.weekly-page #routes-sheet td.c-coverage::before { background: #e7edf3 !important; }
+.weekly-page #routes-sheet td.c-coverage { color: #536b81 !important; }
+.weekly-page #routes-sheet td.editable { cursor: pointer; }
+.weekly-page #routes-sheet td.editable:not(.off):hover::before { outline: 2px solid var(--ud-gold); outline-offset: -1px; }
+.weekly-page #routes-sheet td.off.editable:hover { box-shadow: inset 0 0 0 2px var(--ud-gold); }
 .wk-divider { padding: 9px 14px; background: #f4f7fa; color: #0e3a62; text-align: center; font-size: 17px; font-weight: 900; border-top: 3px solid #1d5b91; }
 .weekly-page .board th { background: #e6eef5; color: #0e3a62; border-bottom: 2px solid #1d5b91; }
 .weekly-page .board td { height: 34px; font-size: 12px; font-weight: 850; text-align: center; }
 .weekly-page .board td.strong { font-size: 14px; }
 .weekly-page .board tr.group td { height: 30px; background: #f3f6f9 !important; color: #0e3a62; font-size: 15px; font-weight: 900; border-top: 2px solid #1d5b91; }
-.weekly-page .board td.day { background: #fff !important; }
-.weekly-page .board td.b-available { background: #e7f6e5 !important; }
-.weekly-page .board td.b-assigned { background: #282d33 !important; color: #8fc6ff; }
-.weekly-page .board td.b-booked { background: #d9ebfb !important; color: #000; }
+.weekly-page .board td.day { padding: 0; background: #fff !important; color: #0e3a62; text-transform: uppercase; }
+.weekly-page .board td.b-available { background: #e7f6e5 !important; color: #0e3a62; }
+.weekly-page .board td.b-assigned, .weekly-page .board td.b-booked { background: #282d33 !important; color: #8fc6ff; }
 .weekly-page .board td.b-vacation { background: #f5c6c8 !important; color: #7d2bd0; box-shadow: inset 0 0 0 2px #ee3e3e; }
-.weekly-page .board td.b-conflict { background: #f5bfc1 !important; box-shadow: inset 0 0 0 2px #ee3e3e; }
-.weekly-page .board td.b-unavailable { background: #ffe1b5 !important; color: #914600; }
-.weekly-page .board button.avail { height: 32px; font-size: 12px; font-weight: 850; }
+.weekly-page .board td.b-conflict { background: #f5bfc1 !important; color: #0e3a62; box-shadow: inset 0 0 0 2px #ee3e3e; }
+.weekly-page .board td.b-off { background: #ffe1b5 !important; color: #914600; }
+.weekly-page .board td.b-unavailable { background: #dfe5e9 !important; color: #0e3a62; }
+.weekly-page .board th.today { background: #d3e2ef; color: #0e3a62; box-shadow: inset 0 -4px 0 var(--ud-gold); }
+.weekly-page .board button.avail { display: block; width: 100%; min-height: 32px; margin: 0; padding: 3px 6px; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; white-space: normal; line-height: 1.15; box-shadow: none; }
+.weekly-page .board button.avail:hover, .weekly-page .board button.avail:focus-visible { background: #dceaf5; color: #0e3a62; outline: 2px solid #3978aa; outline-offset: -2px; }
 .weekly-page .footer { padding: 4px 16px 6px; }
 @media (max-height: 720px) { .weekly-page .actions button { min-height: 34px; } .wk-summary { padding: 3px 12px; margin-bottom: 6px; } .wk-panel h2 { padding: 4px 20px 6px; font-size: 17px; } }
+/* Like the current Weekly grid: the cell shows the driver only (truck and trailer are in the cell's tooltip and the editor),
+   with a drop-down arrow, and the Driver Assignment Board wraps long run names. */
+.weekly-page #routes-sheet td.day .unit { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.weekly-page #routes-sheet td.day.editable:not(.off)::after { content: "\25BE"; position: absolute; top: 50%; right: 11px; transform: translateY(-50%); color: #0e3a62; font-size: 13px; }
+.weekly-page #routes-sheet td.day:not(.off) { padding-right: 22px; font-size: 15px; }
+.weekly-page .board td { white-space: normal; }
+.weekly-page .wk-scroll { scrollbar-gutter: stable; }

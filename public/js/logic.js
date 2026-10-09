@@ -200,7 +200,7 @@
           intendedDriver: d.intendedDriver || '', driverExceptionStatus: d.driverExceptionStatus || ''
         };
       });
-      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run, coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
+      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
     }).sort(function (a, b) {
       var x = a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder;
       var y = b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder;
@@ -453,18 +453,25 @@
 
   // One line per active driver (relief drivers first, then seniority): each day shows the routes they have, else why
   // they are off, else AVAILABLE. kind = assigned, booked (two or more), vacation, unavailable, available.
+  function boardLabel(r) {
+    var stream = String(r.streamId || '').trim(), route = String(r.route || '').trim(), run = String(r.run || '').trim();
+    return stream || (!run || run.toUpperCase() === route.toUpperCase() ? route : route + ' ' + run);
+  }
   function driverBoardRows(drivers, rows, exceptions, week) {
     var list = (drivers || []).filter(function (d) { return String(d.status || '').toUpperCase() === 'ACTIVE'; }).map(function (d) {
-      return { id: d.id, name: d.name || '', relief: !!d.reliefDriver, seniorityDate: dateKey(d.seniorityDate) || dateKey(d.hireDate) || '9999-12-31', days: {} };
+      return { id: d.id, name: d.name || '', relief: !!d.reliefDriver, cells: d.cells && Object.keys(d.cells).length ? d.cells : null, seniorityDate: dateKey(d.seniorityDate) || dateKey(d.hireDate) || '9999-12-31', days: {} };
     });
     list.sort(function (a, b) { return (a.relief === b.relief ? 0 : a.relief ? -1 : 1) || a.seniorityDate.localeCompare(b.seniorityDate) || a.name.localeCompare(b.name); });
     list.forEach(function (driver) {
       DAYS.forEach(function (p, i) {
         var date = addDays(week, i), routes = [];
-        (rows || []).forEach(function (r) { var d = r.days[p]; if (d.runs && d.driverId === driver.id) routes.push(r.route); });
+        // Like the current board: the run's stream (SAVE-A-LOT 1, 825), else the route, plus the run when it differs.
+        (rows || []).forEach(function (r) { var d = r.days[p]; if (d.runs && d.driverId === driver.id) routes.push(boardLabel(r)); });
         var off = exceptionOn(exceptions, driver.id, date);
-        var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (/VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : 'available';
-        driver.days[p] = { date: date, routes: routes, kind: kind, text: routes.length ? routes.join(' / ') : off ? exceptionLabel(off) : 'AVAILABLE' };
+        // OFF: Driver Master does not have the driver available that day (<day>_available), as on the current board.
+        var dayOff = !!driver.cells && !yes(driver.cells[p + '_available']);
+        var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (/VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : dayOff ? 'off' : 'available';
+        driver.days[p] = { date: date, routes: routes, kind: kind, text: routes.length ? routes.join(' / ') : off ? exceptionLabel(off) : dayOff ? 'OFF' : 'AVAILABLE' };
       });
     });
     return list;
