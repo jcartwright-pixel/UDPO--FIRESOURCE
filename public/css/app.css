@@ -516,3 +516,7 @@ table.cards-look td.empty { border-radius: 10px; }
 /* Weekly keeps its black / yellow grid (the current app's colours); look C gives the route column the blue badge. */
 .weekly-page #routes-sheet tbody tr td:first-child { background: #1d5b91; color: #fff; font-weight: 900; }
 @media (max-height: 800px) { table.cards-look, table.cards-look.daily { border-spacing: 0 1px; } }
+/* Home header menu (Joe 10/9): the current app's extra screens as buttons, the new app's screens in one drop-down. */
+.home-menu a.ext::after { content: " \2197"; font-size: 12px; opacity: .7; }
+.home-menu select { height: 38px; border: 1px solid #b9c7d3; border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 700; color: var(--ud-blue); background: #fff; cursor: pointer; }
+@media (max-width: 1500px) { .home-menu a.ext, .home-menu select { padding: 6px 9px; font-size: 13px; } .home-menu .who { display: none; } }
