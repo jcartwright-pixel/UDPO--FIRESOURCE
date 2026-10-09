@@ -3,3 +3,4 @@ node_modules/
 .firebase/
 functions/.env.local
 functions/shots/
+functions/.env

@@ -69,9 +69,26 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
           PROJECT: ${{ steps.settings.outputs.project }}
+          TARGET: ${{ inputs.target }}
+          SANDBOX_SOURCES_JSON: ${{ vars.SANDBOX_SOURCES_JSON }}
+          SANDBOX_WRITEBACK_JSON: ${{ vars.SANDBOX_WRITEBACK_JSON }}
+          SANDBOX_ADMINS: ${{ vars.SANDBOX_ADMINS || 'jcartwright@uniteddairy.com' }}
+          PRODUCTION_ENV: ${{ vars.PRODUCTION_ENV }}
         run: |
           set -euo pipefail
           node ../tools/sync-logic.cjs
+          # What the copy reads (index.js transferSetup). The sandbox shows the made-up sheets until SANDBOX_SOURCES_JSON
+          # names its sheet copies; production reads nothing until PRODUCTION_ENV is set after Joe says go.
+          if [ "$TARGET" = sandbox ]; then
+            if [ -n "$SANDBOX_SOURCES_JSON" ]; then
+              printf 'SOURCES_JSON=%s\n' "$SANDBOX_SOURCES_JSON" > .env
+              if [ -n "$SANDBOX_WRITEBACK_JSON" ]; then printf 'WRITEBACK_JSON=%s\n' "$SANDBOX_WRITEBACK_JSON" >> .env; fi
+            else
+              printf 'DEMO_DATA=1\nDEMO_ADMINS=%s\n' "$SANDBOX_ADMINS" > .env
+            fi
+          else
+            printf '%s\n' "$PRODUCTION_ENV" > .env
+          fi
           cd .. && npx --prefix functions firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
           {
             echo "## Distribution app (${{ inputs.target }})"

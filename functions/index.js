@@ -41,8 +41,27 @@ function signedIn(request) {
   return user;
 }
 
+/*
+ * Where the copy reads from. Nothing is read until one of these is set on the deployed project:
+ *   DEMO_DATA=1               the made-up sheets in src/demo-sheets.js (the sandbox before its sheet copies exist);
+ *                             DEMO_ADMINS (comma-separated emails) are added to the made-up Users list as administrators
+ *   SOURCES_JSON              copies of the sheets (sources.js)
+ *   READ_UNIONTOWN_SHEETS=1   the Uniontown sheets themselves, read only (production, only after Joe says go)
+ */
+function transferSetup() {
+  if (process.env.DEMO_DATA === '1') {
+    const D = require('./src/demo-sheets');
+    const admins = String(process.env.DEMO_ADMINS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+    return { reader: D.fakeReader(D.demoSheets(admins)), sources: D.SOURCES };
+  }
+  if (!process.env.SOURCES_JSON && process.env.READ_UNIONTOWN_SHEETS !== '1') return null;
+  return { reader: makeSheetsReader(), sources: transferSources(process.env) };
+}
+
 exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone: 'America/New_York', timeoutSeconds: 120 }, async () => {
-  await runTransfer({ db, reader: makeSheetsReader(), sources: transferSources(process.env) });
+  const setup = transferSetup();
+  if (!setup) return;
+  await runTransfer({ db, reader: setup.reader, sources: setup.sources });
 });
 
 exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
@@ -51,7 +70,9 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   if (!person || person.status !== 'ACTIVE' || (person.roles || []).indexOf('ADMINISTRATOR') < 0) {
     throw new HttpsError('permission-denied', 'Only an administrator can run the transfer by hand');
   }
-  const result = await runTransfer({ db, reader: makeSheetsReader(), sources: transferSources(process.env), force: !!(request.data && request.data.resetTestCopy) });
+  const setup = transferSetup();
+  if (!setup) throw new HttpsError('failed-precondition', 'No sheets are set up for this project yet (DEMO_DATA, SOURCES_JSON or READ_UNIONTOWN_SHEETS)');
+  const result = await runTransfer({ db, reader: setup.reader, sources: setup.sources, force: !!(request.data && request.data.resetTestCopy) });
   return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
 });
 
@@ -70,7 +91,7 @@ exports.newRouteCode = onCall(async (request) => {
 exports.setSwitch = onCall(async (request) => {
   const user = signedIn(request);
   // The write-back can go on only where the server names a sandbox Live workbook to write.
-  try { return await setSwitch(db, user, request.data, !!process.env.WRITEBACK_JSON); } catch (error) { throw asHttps(error); }
+  try { return await setSwitch(db, user, request.data, !!process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1'); } catch (error) { throw asHttps(error); }
 });
 
 exports.save = onCall(async (request) => {
@@ -87,7 +108,7 @@ exports.save = onCall(async (request) => {
 // workbook ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
 async function writeBackIfOn(part) {
   const config = (await db.collection('config').doc('app').get()).data() || {};
-  if (!config.writeBack || config.writeBack.enabled !== true || !process.env.WRITEBACK_JSON) return null;
+  if (!config.writeBack || config.writeBack.enabled !== true || !process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
   const target = JSON.parse(process.env.WRITEBACK_JSON);
   // The conflict check compares with what the copy last read, so the write-back must write the workbook the copy reads.
   if (target.spreadsheetId !== transferSources(process.env).live.spreadsheetId) {
