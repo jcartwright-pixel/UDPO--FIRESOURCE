@@ -174,7 +174,8 @@
     rows.sort(function (a, b) {
       var x = a.loadSequence === null || a.loadSequence === undefined ? 999999 : a.loadSequence;
       var y = b.loadSequence === null || b.loadSequence === undefined ? 999999 : b.loadSequence;
-      return x - y || compareRoute(a, b);
+      // Like the current Daily Dispatch: one block per delivery day (a Saturday loadout shows Sunday, then Monday), load order inside it.
+      return String(a.deliveryDate || '').localeCompare(String(b.deliveryDate || '')) || x - y || compareRoute(a, b);
     });
     return rows;
   }
