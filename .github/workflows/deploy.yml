@@ -136,3 +136,10 @@ jobs:
             echo "Save without sign-in: $reply"
           } >> "$GITHUB_STEP_SUMMARY"
           $ok
+      - name: Open the live home page in a browser and check its styles applied
+        if: steps.settings.outputs.ready == 'true'
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          npx playwright install --with-deps chromium
+          node test/browser/live-look.cjs "https://$PROJECT.web.app"
