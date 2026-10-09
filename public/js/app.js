@@ -11,6 +11,16 @@ import { getFirestore, connectFirestoreEmulator, doc, getDoc } from 'https://www
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 
 export const DOMAIN = 'uniteddairy.com';
+
+// The approved header of the current app: logo and name on the left, the screen's buttons on the right.
+document.querySelectorAll('.topbar').forEach(bar => {
+  if (bar.querySelector('.brand')) return;
+  const brand = document.createElement('a');
+  brand.className = 'brand';
+  brand.href = 'index.html';
+  brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>United Dairy Operations</strong><small>ROUTE DISTRIBUTION &middot; NEW APP</small></span>';
+  bar.prepend(brand);
+});
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
 async function firebaseConfig() {
