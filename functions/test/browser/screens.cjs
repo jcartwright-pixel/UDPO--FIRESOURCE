@@ -651,6 +651,35 @@ async function noScroll(page) {
     assert.deepEqual(fs2.errors, []);
     await fs2.close();
     results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
+    // Over the Road: a manager ticks route 801 for Jersey in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
+    const otr = await openPage(browser, 1920, 950, '/otr.html?view=routes&testEmail=manager.test@uniteddairy.com');
+    await otr.waitForSelector('[data-dest="run_t801"]');
+    await otr.selectOption('[data-dest="run_t801"]', 'Jersey');
+    await otr.waitForFunction(() => !document.querySelector('[data-inc="run_t801"]').disabled);
+    await otr.check('[data-inc="run_t801"]');
+    await otr.waitForSelector('tr.otr-on [data-inc="run_t801"]');
+    await otr.click('.tabs [data-view="figures"]');
+    await otr.fill('.otr-in[data-m="9"][data-k="gallons_sold"]', '1000000');
+    await otr.press('.otr-in[data-m="9"][data-k="gallons_sold"]', 'Tab');
+    await otr.fill('.otr-in[data-m="9"][data-k="distribution_cost"]', '400000');
+    await otr.press('.otr-in[data-m="9"][data-k="distribution_cost"]', 'Tab');
+    await otr.waitForFunction(() => /\$0\.400/.test(document.querySelector('.otr-in[data-m="9"]').closest('tr').textContent), null, { timeout: 5000 });
+    const otrSaved = await otr.evaluate(async () => {
+      const { start } = await import('./js/app.js');
+      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { db } = await start();
+      for (let i = 0; i < 20; i++) { const a = (await getDoc(doc(db, 'otrRoutes', 'run_t801'))).data(), b = (await getDoc(doc(db, 'otrMonthly', new Date().getFullYear() + '-09'))).data(); if (a && b && b.distribution_cost === 400000) return [a, b]; await new Promise(r => setTimeout(r, 250)); }
+      return null;
+    });
+    assert.ok(otrSaved, 'the tick and both figures saved');
+    assert.equal(otrSaved[0].destination, 'Jersey');
+    await otr.click('.tabs [data-view="dash"]');
+    await otr.waitForSelector('.otr-week');
+    await otr.click('.tabs [data-view="report"]');
+    await otr.waitForSelector('#otr-report table');
+    assert.deepEqual(otr.errors, []);
+    await otr.close();
+    results.push('Over the Road: a manager ticked 801 for Jersey and typed September figures (cost per gallon $0.400); Dashboard and Report open');
     // Dispatch Administration: the current app's cards; a built screen opens in this window, from the Route Editor too.
     const adm = await openPage(browser, 1920, 950, '/routes.html?testEmail=manager.test@uniteddairy.com');
     await adm.waitForSelector('#to-admin');

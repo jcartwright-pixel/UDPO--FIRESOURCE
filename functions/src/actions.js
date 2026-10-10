@@ -15,6 +15,7 @@ const M = require('./model');
 const { queueMaster } = require('./masterwrite');
 const MAINT = require('./maintenance');
 const SWITCH = require('./switch');
+const OTR = require('./otr-core');
 
 const C = M.COLLECTIONS;
 
@@ -53,7 +54,8 @@ const ACTIONS = Object.freeze({
   reorderRouteDay: { roles: REORDER_ROLES, screen: 'routes' },
   updateIssue: { roles: SAVE_ROLES, screen: 'checkIns' },
   setWeekReason: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
-  saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' }
+  saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
+  saveOtr: { roles: DRIVER_ROLES, screen: 'otr' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -190,6 +192,30 @@ function validate(input) {
     out.runIds = [...new Set((Array.isArray(input.runIds) ? input.runIds : []).map(id => text(id, 120)).filter(Boolean))].slice(0, 6);
     if (out.status === 'ASSIGNMENT' && !out.runIds.length) throw new SaveError('BAD_REQUEST', 'Pick a run');
     if (out.status !== 'ASSIGNMENT') out.runIds = [];
+    return out;
+  }
+  // Over the Road (the current app's OTR saves, 222_V7276): tick a run for the report, type a month figure, or fix a day's count.
+  if (action === 'saveOtr') {
+    out.op = text(input.op, 10);
+    if (out.op === 'route') {
+      out.runId = text(input.runId, 120);
+      if (!out.runId) throw new SaveError('BAD_REQUEST', 'Pick the run');
+      out.include = input.include === true;
+      out.destination = OTR.otrNormDest_(input.destination);
+      if (out.destination && OTR.OTR_CORE.DESTINATIONS.indexOf(out.destination) < 0) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
+      if (out.include && !out.destination) throw new SaveError('BAD_REQUEST', 'Pick where this route goes before including it');
+    } else if (out.op === 'figure') {
+      out.year = Number(input.year); out.month = Number(input.month); out.key = text(input.key, 40);
+      if (!Number.isInteger(out.year) || out.year < 2000 || out.year > 2100 || !Number.isInteger(out.month) || out.month < 1 || out.month > 12) throw new SaveError('BAD_REQUEST', 'Pick a month');
+      if (!OTR.OTR_CORE.FIGURES.some(f => f.key === out.key)) throw new SaveError('BAD_REQUEST', 'Unknown figure ' + out.key);
+      out.value = input.value === '' || input.value === null || input.value === undefined ? null : OTR.otrNum_(input.value);
+      if (out.value === null && !(input.value === '' || input.value === null || input.value === undefined)) throw new SaveError('BAD_REQUEST', input.value + ' is not a number');
+    } else if (out.op === 'day') {
+      out.date = text(input.date, 10); out.destination = OTR.otrNormDest_(input.destination); out.runs = count(input.runs, 'Runs');
+      if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+      if (OTR.OTR_CORE.DESTINATIONS.indexOf(out.destination) < 0) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
+      if (out.runs === null) throw new SaveError('BAD_REQUEST', 'Type the number of runs');
+    } else throw new SaveError('BAD_REQUEST', 'op must be route, figure or day');
     return out;
   }
   if (action === 'setWeekReason') {
@@ -373,6 +399,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveVacation') return saveVacation(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriverTemplate') return saveDriverTemplate(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'publishWeek') return publishWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveRoute') return saveRoute(tx, db, req, email, stamp, logRef, mode);
@@ -805,6 +832,23 @@ async function saveDriverTemplate(tx, db, req, email, stamp, logRef, mode) {
   });
   result.liveDays = live;
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: d.id, day: p, before, after: cells, liveDays: live, result });
+  return result;
+}
+
+/*
+ * Over the Road: the module's own records (the current app keeps them in its "UDPO OTR Report" workbook, never in Route Master):
+ * otrRoutes (which runs count and where they go), otrMonthly (a month's figures), otrDaily (a day's count typed by hand, which wins
+ * over the count from the dispatch sheet).
+ */
+async function saveOtr(tx, db, req, email, stamp, logRef, mode) {
+  let ref, data;
+  if (req.op === 'route') { ref = db.collection('otrRoutes').doc(M.safeIdPart(req.runId)); data = { runId: req.runId, include: req.include, destination: req.destination }; }
+  else if (req.op === 'figure') { ref = db.collection('otrMonthly').doc(req.year + '-' + String(req.month).padStart(2, '0')); data = { year: req.year, month: req.month, [req.key]: req.value, source: 'TYPED' }; }
+  else { ref = db.collection('otrDaily').doc(req.date + '__' + M.safeIdPart(req.destination)); data = { date: req.date, destination: req.destination, runs: req.runs, source: 'MANUAL' }; }
+  const snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+  tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email, testEdited: mode.mode === 'test' }), { merge: true });
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, op: req.op, doc: ref.path, before, after: data, result });
   return result;
 }
 

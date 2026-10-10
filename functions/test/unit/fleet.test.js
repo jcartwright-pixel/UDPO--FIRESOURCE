@@ -37,3 +37,12 @@ test('Fleet Service setup and garage technicians copy read only; a PIN is never 
   const setup = parseQueue('fleetSetup', [['unit', 'unit_type', 'dot_due'], ['T-2893', 'TRAILER', '2027-03-01']]);
   assert.equal(setup.docs['T-2893'].dot_due, '2027-03-01');
 });
+
+test('Over the Road logic: the screen and the server load the same file', () => {
+  const fs = require('fs'), path = require('path');
+  assert.equal(fs.readFileSync(path.join(__dirname, '../../src/otr-core.js'), 'utf8'), fs.readFileSync(path.join(__dirname, '../../../public/js/otr-core.js'), 'utf8'));
+  const O = require('../../src/otr-core');
+  const routes = O.otrRouteList_([{ runId: 'r1', route: '855', run: 'SAL 1', include: 'TRUE', destination: 'save a lot' }]);
+  const day = O.otrCountDay_('2026-10-04', [{ runId: 'r1', route: '855', run: 'SAL 1', runs: 'TRUE' }, { runId: 'r1', route: '855', run: 'SAL 1', runs: 'TRUE' }], routes);
+  assert.equal(day.byDestination.SAL, 2, 'two runs on one day count 2');
+});

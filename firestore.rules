@@ -32,6 +32,10 @@ service cloud.firestore {
     match /fleetSetup/{id} { allow read: if activeUser(); }
     match /garageTechs/{id} { allow read: if activeUser(); }
     match /odometers/{id} { allow read: if activeUser(); }
+    match /otrRoutes/{id} { allow read: if activeUser(); }
+    match /otrDaily/{id} { allow read: if activeUser(); }
+    match /otrMonthly/{id} { allow read: if activeUser(); }
+    match /otrMonthRuns/{id} { allow read: if activeUser(); }
     // Sheet cells the write-back did not write, so a dispatcher can check them.
     match /conflicts/{id} { allow read: if activeUser(); }
     match /{other=**} { allow read, write: if false; }

@@ -822,3 +822,24 @@ html { background: var(--page); }
 .fleet-split.wide-left { grid-template-columns: 3fr 1fr; }
 .fleet-split h2 { margin: 6px 4px 8px; font-size: 17px; color: var(--ud-blue); }
 @media (max-width: 1200px) { .fleet-split, .fleet-split.wide-left { grid-template-columns: 1fr; } }
+
+/* Over the Road */
+.otr-dash { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; padding: 4px; }
+.otr-card { background: #fff; border: 1px solid #d5e1eb; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.otr-card.wide { grid-column: 1 / -1; }
+.otr-card h2 { margin: 0; font-size: 18px; color: var(--ud-blue); }
+.otr-card p { margin: 0; color: var(--muted); }
+.otr-card > button { align-self: flex-start; }
+.otr-big { font-size: 56px; font-weight: 800; color: #123f70; line-height: 1; }
+.otr-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+.otr-week div { display: flex; flex-direction: column; align-items: center; padding: 10px; border: 1px solid #d5e1eb; border-radius: 10px; }
+.otr-week div.today { background: #e3f3e8; border-color: #a9d8b8; }
+.otr-week span { font-size: 28px; font-weight: 800; color: #123f70; }
+.otr-rep td, .otr-rep th { padding: 4px 6px; font-size: 14px; }
+.otr-rep td.neg { color: #c62828; font-weight: 700; }
+.otr-fig input.otr-in { width: 100%; height: 32px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: right; padding: 0 6px; font: inherit; font-size: 14px; }
+.otr-fig small, .otr-fig td small { display: block; color: #8a99a8; font-size: 11px; }
+tr.otr-on td { background: #e3f3e8; }
+#otr-report h2 { margin: 4px; font-size: 18px; color: var(--ud-blue); }
+.otr-card > button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.otr-page .actions select { min-height: 38px; padding: 0 10px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-weight: 700; }
