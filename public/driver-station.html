@@ -41,7 +41,7 @@
           <div class="ds-row ds-headrow"><span>ROUTE</span><span>RUN</span><span>DRIVER</span><span>TRAILER</span><span>CASES</span><span>LOAD STATUS</span><span>PICKUP</span></div>
           <div class="ds-scroll" id="board-scroll"><div id="board"></div></div>
         </section>
-        <aside class="ds-weather" id="weather" hidden><b>&#9728; LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p>Weather is not connected yet.</p></aside>
+        <aside class="ds-weather" id="weather" hidden><span class="sym" aria-hidden="true">&#9728;</span><b>LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p>Weather is not connected yet.</p></aside>
         <section class="ds-week" aria-label="Driver weekly schedule">
           <div class="ds-week-title"><b>DRIVER WEEKLY SCHEDULE</b><span id="week-of"></span></div>
           <div class="ds-scroll" id="week-scroll"><table class="ds-week-table"><thead id="week-head"></thead><tbody id="week-rows"></tbody></table></div>
@@ -59,11 +59,14 @@
     // United Dairy sign-in (no branch code); "Driver Room TV" is the old DISPLAY mode: dark, no menu, notes shown, both lists roll.
     const L = window.UDLogic, B = window.UDBoard;
     const params = new URLSearchParams(location.search);
-    const tv = params.get('tv') === '1';
+    // Joe 10/10: the Driver Room board opens as the old Driver Room display: both lists roll and the weather window sits on the
+    // right. ?tv=1 is the TV itself (no header); ?view=desk is the plain list for the office.
+    const full = params.get('tv') === '1', tv = full || params.get('view') !== 'desk';
     document.body.classList.toggle('ds-tv', tv);
+    document.body.classList.toggle('ds-full', full);
     document.getElementById('go-back').addEventListener('click', goBack);
     document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
-    document.getElementById('tv').textContent = tv ? 'Leave TV mode' : 'Driver Room TV';
+    document.getElementById('tv').textContent = tv ? 'Desk view' : 'Driver Room display';
     document.getElementById('eyebrow').textContent = tv ? 'Driver Room Display' : 'Driver Loadout & Pickup';
     document.getElementById('weather').hidden = !tv;
     let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = B.calendarDay(new Date()), updated = null;
@@ -114,9 +117,9 @@
     }
     roll('board-scroll', 45); roll('week-scroll', 50);
 
-    document.getElementById('tv').addEventListener('click', () => { location.search = tv ? '' : '?tv=1'; });
+    document.getElementById('tv').addEventListener('click', () => { location.search = tv ? '?view=desk' : ''; });
     document.getElementById('refresh').addEventListener('click', () => { sig = ''; weekSig = ''; render(); });
-    window.udBack = () => { if (tv) { location.search = ''; return true; } return false; };
+    window.udBack = () => { if (full) { location.search = ''; return true; } return false; };
 
     requireSignIn(async () => {
       const { db } = await start();
