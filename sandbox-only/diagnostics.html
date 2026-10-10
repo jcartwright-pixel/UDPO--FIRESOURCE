@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diagnostics · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+  <!-- SANDBOX ONLY: this page is copied in by the sandbox deploy (tools/sandbox-diagnostics.cjs) and never ships to production. -->
+  <style>
+    .diag-page td, .diag-page th { padding: 0 8px; }
+    .diag-page tbody td { height: 34px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
+    .diag-page tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .diag-page tbody tr.bad td { background: var(--error-bg); }
+    .diag-page tbody tr.slow td { background: var(--missing); }
+    .diag-page td.issue { color: var(--error-ink); font-weight: 600; white-space: normal; line-height: 1.25; padding: 4px 8px; }
+    .diag-page .muted-row td { color: var(--muted); font-weight: 500; text-align: center; height: 80px; }
+    .diag-page .rec-state { font-size: 13px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+    .diag-page .kpis { grid-template-columns: repeat(6, 1fr); margin-bottom: 10px; }
+    .diag-page .kpis .bad b { color: var(--error-ink); }
+    .diag-page .sheet { margin: 0 16px; }
+    .diag-page #controls .tabs button { white-space: nowrap; }
+    @media (min-width: 1501px) { .diag-page #controls > button { white-space: nowrap; width: auto; max-width: none; padding: 0 16px; } }
+  </style>
+</head>
+<body class="fill issues-page diag-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Diagnostics</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1><span class="title-pic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span>Diagnostics</h1><small>Checks every screen and times loads and saves. Sandbox only: the real app has none of this.</small></div>
+      <div class="actions in-head top-row" id="controls" hidden>
+        <button type="button" class="primary" id="run">Run check</button>
+        <button type="button" id="record">Record while I work</button>
+        <button type="button" id="copy">Copy summary</button>
+        <button type="button" id="clear">Clear</button>
+        <span class="rec-state" id="rec-state"></span>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" data-view="check" aria-selected="true">Last check</button>
+          <button type="button" role="tab" data-view="work" aria-selected="false">While I work</button>
+        </div>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="kpis" id="kpis"></div>
+      <div class="sheet scroll-list" id="sheet"></div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireSignIn, start, callServer, escapeHtml, showError } from './js/app.js';
+    import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    // The screens the check opens, in menu order: every page the sandbox deploy fitted with the diagnostics probe.
+    const PAGES = __DIAG_PAGES__;
+    const SLOW_SCREEN = 5000, SLOW_CALL = 3000, RUN_HOURS = 1, RECORD_HOURS = 8;
+    const KEY_RUN = 'udDiagRun', KEY_LAST = 'udDiagLastRun', KEY_REC = 'udDiagRecord', KEY_LOG = 'udDiagLog';
+    const read = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
+    const write = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* no storage */ } };
+    const sec = (ms) => ms == null ? '' : (ms / 1000).toFixed(1) + ' s';
+    const clock = (iso) => iso ? new Date(iso).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+    let view = 'check';
+
+    const issues = (r) => [
+      ...(r.signedOut ? ['Did not open: the sign-in card stayed up'] : []),
+      ...(r.shownMs == null && !r.signedOut ? ['The screen never showed'] : []),
+      ...(r.errors || []).map(e => e.kind + ': ' + e.text),
+      ...(r.calls || []).filter(c => c.ok === false && !c.expected).map(c => 'server ' + c.name + (c.action ? ' ' + c.action : '') + ' failed: ' + (c.error || '?'))
+    ];
+    const slowCalls = (list) => list.flatMap(r => (r.calls || []).filter(c => c.ms != null && c.ms > SLOW_CALL).map(c => Object.assign({ page: r.page, title: r.title }, c)));
+
+    function rowsFor(list, withWhen) {
+      if (!list.length) return '<tr class="muted-row"><td colspan="' + (withWhen ? 8 : 7) + '">' + (view === 'check' ? 'No check yet. Press Run check: it opens every screen in this window, one after another, and comes back here with the results.' : 'Nothing recorded. Press Record while I work, then use the screens as usual; each screen you open and each save is timed here. It switches itself off after 8 hours.') + '</td></tr>';
+      return list.map(r => {
+        const bad = issues(r), calls = (r.calls || []).filter(c => c.ms != null), slow = r.loadedMs > SLOW_SCREEN || calls.some(c => c.ms > SLOW_CALL);
+        return '<tr class="' + (bad.length ? 'bad' : slow ? 'slow' : '') + '">' + (withWhen ? '<td>' + escapeHtml(clock(r.when)) + '</td>' : '') +
+          '<td>' + escapeHtml(r.title) + '</td><td>' + escapeHtml(r.page) + '</td><td class="num">' + sec(r.shownMs) + '</td><td class="num">' + sec(r.loadedMs) + (r.stillChanging && !r.signedOut ? ' +' : '') + '</td>' +
+          '<td class="num">' + (calls.length ? calls.length + ' · ' + sec(Math.max(...calls.map(c => c.ms))) : '') + '</td><td class="num">' + (bad.length || '') + '</td>' +
+          '<td class="issue">' + escapeHtml(bad.join(' · ')) + '</td></tr>';
+      }).join('');
+    }
+
+    function render() {
+      const run = read(KEY_LAST), log = read(KEY_LOG) || [], rec = read(KEY_REC);
+      const recOn = !!(rec && Date.now() < rec.until);
+      document.getElementById('record').textContent = recOn ? 'Stop recording' : 'Record while I work';
+      document.getElementById('rec-state').textContent = recOn ? 'Recording until ' + clock(new Date(rec.until).toISOString()) : '';
+      document.querySelectorAll('.tabs [data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
+      const list = view === 'check' ? (run ? run.results : []) : log.slice().reverse();
+      const failed = list.filter(r => issues(r).length), slow = list.filter(r => r.loadedMs > SLOW_SCREEN), loads = list.map(r => r.loadedMs).filter(x => x != null);
+      const trips = (run && run.server || []).filter(t => t.ms != null);
+      const k = (label, value, cls) => '<div class="' + (cls || '') + '"><b>' + value + '</b><span>' + label + '</span></div>';
+      document.getElementById('kpis').innerHTML = k(view === 'check' ? 'Screens checked' : 'Screens recorded', list.length) + k('With errors', failed.length, failed.length ? 'bad' : 'good') +
+        k('Slow (over 5 s)', slow.length, slow.length ? 'warn' : 'good') + k('Average load', loads.length ? sec(loads.reduce((a, b) => a + b, 0) / loads.length) : '–') +
+        k('Slowest load', loads.length ? sec(Math.max(...loads)) : '–') + (view === 'check' ? k('Server round trip', trips.length ? Math.min(...trips.map(t => t.ms)) + ' ms' : '–', trips.some(t => !t.answered) ? 'bad' : '') : k('Slow saves (over 3 s)', slowCalls(list).length, slowCalls(list).length ? 'warn' : 'good'));
+      document.getElementById('sheet').innerHTML = '<table><colgroup>' + (view === 'work' ? '<col style="width:9%">' : '') + '<col style="width:16%"><col style="width:12%"><col style="width:7%"><col style="width:8%"><col style="width:9%"><col style="width:6%"><col></colgroup>' +
+        '<thead><tr>' + (view === 'work' ? '<th>When</th>' : '') + '<th>Screen</th><th>Page</th><th>Shown</th><th>Loaded</th><th>Calls · slowest</th><th>Errors</th><th>What went wrong</th></tr></thead><tbody>' + rowsFor(list, view === 'work') + '</tbody></table>';
+      document.getElementById('foot').textContent = view === 'check'
+        ? (run ? 'Check ' + run.id + ', ' + clock(run.started) + (run.stopped ? ', stopped before the end' : '') + '. Shown = sign-in passed; Loaded = the last rows arrived (+ = still changing after 20 s). Only the last check is kept.' : '')
+        : 'The last ' + log.length + ' screens opened while recording (up to 400 kept). Saves are timed from the press to the server\'s answer.';
+    }
+
+    function summary() {
+      const run = read(KEY_LAST), log = read(KEY_LOG) || [], out = [];
+      const list = run ? run.results : [];
+      out.push('SUMMARY  Diagnostics ' + (run ? run.id + '  ' + run.started : '(no check yet)') + '  ' + location.host);
+      out.push('Screens checked: ' + list.length + '   With errors: ' + list.filter(r => issues(r).length).length + '   Slow (over 5 s): ' + list.filter(r => r.loadedMs > SLOW_SCREEN).length);
+      if (run && run.server) out.push('Server round trip: ' + run.server.map(t => t.answered ? t.ms + ' ms' : 'FAILED ' + (t.error || '')).join(' / '));
+      const failed = list.filter(r => issues(r).length), slow = list.filter(r => r.loadedMs > SLOW_SCREEN);
+      out.push('', 'FAILED'); out.push(...(failed.length ? failed.map(r => '  ' + r.page + '  ' + r.title + ': ' + issues(r).join(' | ')) : ['  none']));
+      out.push('', 'SLOW_SCREENS (over 5 s)'); out.push(...(slow.length ? slow.map(r => '  ' + r.page + '  ' + r.title + ': loaded ' + sec(r.loadedMs) + (r.stillChanging ? ' (still changing)' : '')) : ['  none']));
+      const calls = slowCalls(list.concat(log));
+      out.push('', 'SLOW_CALLS (over 3 s)'); out.push(...(calls.length ? calls.map(c => '  ' + c.page + '  ' + c.name + (c.action ? ' ' + c.action : '') + ': ' + sec(c.ms) + (c.ok === false ? ' FAILED ' + c.error : '')) : ['  none']));
+      out.push('', 'ALL SCREENS (shown / loaded)'); out.push(...list.map(r => '  ' + r.page + '  ' + sec(r.shownMs) + ' / ' + sec(r.loadedMs)));
+      if (log.length) {
+        const bad = log.filter(r => issues(r).length);
+        out.push('', 'WHILE I WORK: ' + log.length + ' screens, ' + bad.length + ' with errors');
+        out.push(...bad.slice(-20).map(r => '  ' + r.when + '  ' + r.page + ': ' + issues(r).join(' | ')));
+      }
+      return out.join('\n');
+    }
+
+    // The server's answer time with nothing saved: a save the server does not know is refused before it touches anything.
+    async function roundTrips() {
+      const out = [];
+      for (let i = 0; i < 3; i++) {
+        const t = performance.now();
+        try { await callServer('save', { action: 'diagnosticsRoundTrip' }); out.push({ ms: Math.round(performance.now() - t), answered: false, error: 'the server accepted an unknown save' }); }
+        catch (e) { const ms = Math.round(performance.now() - t), answered = /Unknown save/.test(e && e.message || ''); out.push({ ms, answered, error: answered ? '' : String(e && (e.code + ': ' + e.message) || e).slice(0, 200) }); }
+      }
+      return out;
+    }
+
+    async function finishRun() {
+      const run = read(KEY_RUN);
+      if (!run) return;
+      write(KEY_RUN, null);
+      run.finished = new Date().toISOString();
+      if (!run.stopped) run.server = await roundTrips();
+      // The probe's own calls on this page are not part of any screen.
+      write(KEY_LAST, run);
+      view = 'check';
+      render();
+    }
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      const me = await getDoc(doc(db, 'users', String(user.email).toLowerCase())).catch(() => null);
+      if (!L.hasRole(me && me.exists() ? me.data() : null, ['ADMINISTRATOR'])) {
+        write(KEY_RUN, null);
+        showError('Diagnostics is for administrators only.');
+        return;
+      }
+      document.getElementById('controls').hidden = false;
+      document.getElementById('run').onclick = () => {
+        const now = new Date(), id = 'DIAG-' + now.toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-');
+        write(KEY_RUN, { id, started: now.toISOString(), until: now.getTime() + RUN_HOURS * 3600e3, queue: PAGES.slice(), total: PAGES.length, results: [], navAt: Date.now() });
+        location.replace(PAGES[0]);
+      };
+      document.getElementById('record').onclick = () => {
+        const rec = read(KEY_REC);
+        write(KEY_REC, rec && Date.now() < rec.until ? null : { since: Date.now(), until: Date.now() + RECORD_HOURS * 3600e3 });
+        render();
+      };
+      document.getElementById('copy').onclick = async () => {
+        const text = summary();
+        try { await navigator.clipboard.writeText(text); document.getElementById('copy').textContent = 'Copied'; setTimeout(() => { document.getElementById('copy').textContent = 'Copy summary'; }, 2000); }
+        catch (e) { showError('Could not copy. ' + text.slice(0, 400)); }
+      };
+      document.getElementById('clear').onclick = () => { if (view === 'check') write(KEY_LAST, null); else write(KEY_LOG, []); render(); };
+      document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; render(); } });
+      window.udDiagSummary = summary;
+      render();
+      await finishRun();
+    });
+  </script>
+</body>
+</html>
