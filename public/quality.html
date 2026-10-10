@@ -82,6 +82,13 @@
     // The form of one line, as the current app's desktop form. The check of this round (entered since the last report was sent)
     // fills it and is filled in further as each box is left; with none yet the boxes are empty, with the last check small and grey.
     function roundCheck(line) { const l = line.last || {}; return l.docId && inRound(l.recordedAt, roundStart) && Date.now() - Date.parse(l.recordedAt) < 12 * 3600000 ? l : null; }
+    // Size, as the current app: Totes are always Tote and Raypak the 5-gallon dispenser; other lines pick the package size.
+    const SIZES = ['Pint', 'Quart', 'Half gallon', 'Gallon', 'Dispenser'];
+    function sizeBox(name, last, old, dis, note, was) {
+      const n = String(name || '').trim().toUpperCase(), fixed = /^TOTES?$/.test(n) ? 'Tote' : n === 'RAYPAK' ? '5-gallon dispenser' : '';
+      if (fixed) return '<label>Size<input class="prod-size" value="' + fixed + '" readonly aria-readonly="true"></label>';
+      return '<label>Size<select class="prod-size"' + dis + '>' + opt('', last.productSize, '') + SIZES.map(z => opt(z, last.productSize, z)).join('') + '</select>' + note('prod-size') + was(old.productSize) + '</label>';
+    }
     function drawForm(line) {
       const ck = canSave(), cur = roundCheck(line), old = line.last || {}, last = cur || {}, w = last.weights || {}, ow = old.weights || {}, skip = U.qualitySkip(line.name), blow = U.isBlowMold(line.name), dis = ck ? '' : ' disabled';
       const by = old.recordedAt ? ' · ' + clockOf(old.recordedAt) + (old.recordedBy ? ' · ' + initials(old.recordedBy) : '') : '';
@@ -93,7 +100,7 @@
       const fields = blow
         ? '<label>Jug size<select class="prod-product"' + dis + '><option value="Gallon">Gallon</option></select></label><label>Annealer temperature<input class="prod-temperature" inputmode="decimal" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' +
           '<label>Annealer speed<input class="prod-annealer-speed" inputmode="decimal" placeholder="Machine setting" value="' + escapeHtml(last.annealerSpeed || '') + '"' + dis + '>' + note('prod-annealer-speed') + was(old.annealerSpeed) + '</label><div class="qc-field wide"><span>Jug weight</span>' + weight + '</div><label>Cycle time<input class="prod-cycle" inputmode="decimal" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>'
-        : '<label>Product being run<input class="prod-product" value="' + escapeHtml(last.product || '') + '"' + dis + '>' + note('prod-product') + was(old.product) + '</label>' + (skip.weight ? '' : '<div class="qc-field"><span>Package weight</span>' + weight + '</div>') +
+        : '<label>Product being run<input class="prod-product" value="' + escapeHtml(last.product || '') + '"' + dis + '>' + note('prod-product') + was(old.product) + '</label>' + sizeBox(line.name, last, old, dis, note, was) + (skip.weight ? '' : '<div class="qc-field"><span>Package weight</span>' + weight + '</div>') +
           '<label>Temperature<input class="prod-temperature" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' + (skip.tip ? '' : '<label>Tip test' + pick3('prod-tip', last.tipTest).replace('<select', '<select' + dis) + note('prod-tip') + was(word(old.tipTest)) + '</label>') +
           '<label>Label / date code' + pick3('prod-quality', last.qualityCheck).replace('<select', '<select' + dis) + note('prod-quality') + was(word(old.qualityCheck)) + '</label>' + (skip.cycle ? '' : '<label>Cycle time<input class="prod-cycle" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>');
       document.getElementById('form-title').textContent = line.name + ' Quality Check';
@@ -142,7 +149,7 @@
       const heads = f.querySelectorAll('.prod-head'), weights = {};
       if (heads.length) heads.forEach(x => { weights['head' + x.dataset.head] = x.value; }); else if (f.querySelector('.prod-weights')) weights.result = v('prod-weights');
       return { operationId: line.operationId, product: v('prod-product'), status: v('prod-status'), remainingOutput: (line.last && line.last.remainingOutput) || '', qualityCheck: v('prod-quality'),
-        tipTest: v('prod-tip'), temperature: v('prod-temperature'), cycleTime: v('prod-cycle'), productSize: '', annealerSpeed: v('prod-annealer-speed'), weights, notes: v('prod-notes') };
+        tipTest: v('prod-tip'), temperature: v('prod-temperature'), cycleTime: v('prod-cycle'), productSize: v('prod-size'), annealerSpeed: v('prod-annealer-speed'), weights, notes: v('prod-notes') };
     }
     // Each box saves as it is left (a drop-down as soon as it is picked): the first box makes the check, the rest fill it in.
     document.getElementById('fields').addEventListener('change', async e => {

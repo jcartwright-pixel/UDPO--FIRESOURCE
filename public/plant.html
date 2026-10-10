@@ -63,13 +63,15 @@
     const L = window.UDLogic;
     const params = new URLSearchParams(location.search);
     const date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
-    const data = { runs: [], journal: [], wash: [], appWash: [] };
+    const data = { runs: [], journal: [], wash: [], appWash: [], pickups: [] };
     const link = (href, label, side, alert) => '<a class="dc-link" href="' + href + '"><span>' + escapeHtml(label) + '</span>' + (side !== undefined ? '<b class="dc-side' + (alert ? ' alert' : '') + '">' + escapeHtml(side) + '</b>' : '') + '<i class="dc-arrow">&rarr;</i></a>';
 
     function render() {
       // Loads Today / Waiting / Loading / Complete count today's loads; yesterday's unfinished ones are added below the bar.
       const rows = P.loadoutRows(data.runs, date), all = P.counts(rows), c = P.counts(rows.filter(r => !r.prior));
-      const load = { total: c.total, waiting: c.waiting, loading: c.loading, done: c.done };
+      // As the current app: a driver pickup counts as a load of its own (open = waiting, complete = done).
+      const pu = rows.filter(r => !r.prior).flatMap(r => P.pickupsFor(r, data.pickups)), puOpen = pu.filter(P.pickupOpen).length;
+      const load = { total: c.total + pu.length, waiting: c.waiting + puOpen, loading: c.loading, done: c.done + pu.length - puOpen };
       // Unloading, washing and returns: the same lists their screens show (plant-core.js).
       const returns = P.returnsFor(data.runs, date, data.journal), urows = P.unloadRows(data.runs, date, data.journal, returns, rows), uc = P.unloadCounts(urows);
       const unload = { total: uc.total, waiting: uc.waiting, unloading: uc.unloading, done: uc.complete };
@@ -100,6 +102,7 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
       onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the loads'));
+      onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); render(); }, fail('the pickups'));
       onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { data.journal = s.docs.map(d => d.data()); render(); }, fail('the plant journal'));
       onSnapshot(collection(db, 'plantWash'), s => { data.wash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); render(); }, fail('the wash list'));
       onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { data.appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); render(); }, fail('the wash requests'));

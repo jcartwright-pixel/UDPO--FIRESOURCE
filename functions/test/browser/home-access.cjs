@@ -50,7 +50,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await sup.waitForSelector('.co-plant');
     assert.deepEqual(await sup.$$eval('.co-plant', c => c.map(x => x.dataset.plant)), ['fac_uniontown'], 'the overview shows a one-plant user their plant only');
     await sup.goto(HOSTING + '/administration.html?testEmail=super.test@uniteddairy.com');
-    await sup.waitForFunction(() => /Administrators only/.test(document.getElementById('body').textContent));
+    await sup.waitForFunction(() => /Administrators only/.test(document.getElementById('shell').textContent));
     assert.deepEqual(sup.errors, []);
     await sup.close();
     results.push('A one-plant supervisor sees only Uniontown\'s home (three cards, no Administration); the overview shows them Uniontown only; Administration says Administrators only');
@@ -82,43 +82,68 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
     await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"]')]);
     await Promise.all([adm.waitForURL(/administration\.html/), adm.click('.launch-card[data-side="admin"]')]);
-    await adm.waitForSelector('.adm-tile');
-    const groups = await adm.$$eval('.adm-group h2', h => h.map(x => x.textContent));
+    // Joe 10/10: Administration like the current app's tab: every item in a menu on the left; the item opens on the right.
+    await adm.waitForSelector('.adm-item.on[data-key="people"]');
+    const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
     assert.deepEqual(groups, ['People & Access', 'App Links & Codes', 'Email & Schedules', 'Dispatch Administration', 'Fleet & GPS Setup', 'System Tools', 'Diagnostics']);
-    const all = await adm.$$eval('.adm-tile', t => t.length);
-    const tops = await adm.$$eval('.adm-tile', t => [...new Set(t.map(x => Math.round(x.getBoundingClientRect().height)))]);
-    assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, 'tiles are the same size: ' + tops.join(' '));
+    const all = await adm.$$eval('.adm-item', t => t.length);
+    assert.equal(all, 28, 'every item from the current app\'s Administration is in the menu');
+    // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
+    await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
+    assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
+    assert.deepEqual(await adm.$$eval('.adm-table th', t => t.map(x => x.textContent)), ['Name', 'Email', 'Role', 'Plants', 'Status']);
     assert.ok(await noSideScroll(adm), 'Administration fits the width');
-    assert.equal(await adm.$$eval('a[href*="script.google.com"]', a => a.length), 0);
-    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-1920.png'), fullPage: true });
-    await adm.click('#show [data-show="soon"]');
-    assert.equal(await adm.$$eval('.adm-tile:not(.soon)', t => t.length), 0, 'Being built shows only screens still to build');
-    await adm.click('#show [data-show="ready"]');
-    assert.equal(await adm.$$eval('.adm-tile.soon', t => t.length), 0);
-    await adm.click('#show [data-show="all"]');
-    assert.equal(await adm.$$eval('.adm-tile', t => t.length), all);
+    assert.equal(await adm.$$eval('a[href*="script.google.com"], a[target="_blank"]', a => a.length), 0);
+    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-people-1920.png') });
+    // A screen already in the new app opens inside the panel, without its own header and menu; the page stays put.
+    await adm.click('.adm-item[data-key="print"]');
+    const frame = await (await adm.waitForSelector('#frame')).contentFrame();
+    await frame.waitForSelector('#screen:not([hidden])');
+    assert.equal(await frame.evaluate(() => document.body.classList.contains('embed') && !document.querySelector('.topbar').getClientRects().length), true, 'no second header inside the panel');
+    assert.match(adm.url(), /administration\.html/);
+    assert.equal(await adm.getAttribute('#full', 'href').then(h => /^print\.html/.test(h)), true);
+    await adm.waitForTimeout(800);
+    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-print-1920.png') });
+    // One still being built says so right there.
+    await adm.click('.adm-item[data-key="repair-email"]');
+    await adm.waitForSelector('.adm-soon');
+    assert.match(await adm.textContent('.adm-panel-head'), /Repair Email[\s\S]*Being built/);
+    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-soon-1920.png') });
     await adm.fill('#find', 'QR');
-    assert.deepEqual(await adm.$$eval('.adm-tile strong', s => s.map(x => x.textContent)), ['Access & QR Codes', 'App Links & Codes']);
+    assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'App Links & Codes']);
     await adm.fill('#find', '');
-    await Promise.all([adm.waitForURL(/soon\.html\?what=admin-people/), adm.click('.adm-tile[data-key="people"]')]);
-    await adm.waitForFunction(() => document.getElementById('what').textContent === 'People & Roles is being built in the new app');
-    await Promise.all([adm.waitForURL(/administration\.html/), adm.click('#go')]);
-    await adm.waitForSelector('.adm-tile');
-    await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-tile[data-key="print"]')]);
+    await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has a fourth same-size Administration card; Administration lists every item in seven groups, filters by built / being built and by a word, and opens each inside the new app');
+    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has a fourth same-size Administration card; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, built screens open inside the right panel and the rest say Being built there');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');
     await small.waitForSelector('.co-plant .co-grid');
     assert.ok(await noSideScroll(small));
     await small.goto(HOSTING + '/administration.html?testEmail=admin.test@uniteddairy.com');
-    await small.waitForSelector('.adm-tile');
+    await small.waitForSelector('.adm-item');
     assert.ok(await noSideScroll(small));
     assert.deepEqual(small.errors, []);
     await small.close();
     results.push('The overview and Administration fit a 1366 window');
+
+    // Phones 360 and 390 wide: the header title wraps beside the logo and never runs under the initials or Sign out.
+    for (const w of [360, 390]) {
+      for (const pg of ['index.html', 'daily.html', 'yard.html']) {
+        const ph = await openPage(browser, w, 780, '/' + pg + '?testEmail=manager.test@uniteddairy.com');
+        await ph.waitForSelector('#screen:not([hidden]) .topbar .brand strong');
+        await ph.waitForFunction(() => document.getElementById('who').textContent.length > 0);
+        const r = await ph.evaluate(() => {
+          const t = document.querySelector('.brand strong').getBoundingClientRect(), who = document.getElementById('who').getBoundingClientRect(), out = document.getElementById('signout').getBoundingClientRect();
+          return { clear: t.right <= Math.min(who.width ? who.left : out.left, out.left) + 1, inside: out.right <= innerWidth + 1 };
+        });
+        assert.deepEqual(r, { clear: true, inside: true }, pg + ' at ' + w + ': the title clears the initials and Sign out');
+        if (SHOTS && pg === 'index.html') await ph.screenshot({ path: path.join(SHOTS, 'phone-header-' + w + '.png'), clip: { x: 0, y: 0, width: w, height: 200 } });
+        await ph.close();
+      }
+    }
+    results.push('Phone header at 360 and 390: the title wraps beside the logo, clear of the initials and Sign out');
   } finally {
     await browser.close();
   }

@@ -130,6 +130,7 @@
         return '<button type="button" class="area' + (a === area ? ' on' : '') + '" data-area="' + a + '" style="--area:' + P.AREA[a].color + '">' +
           '<span class="ring" style="--p:' + pct + '"><b>' + ac.done + '/' + ac.total + '</b></span><span><strong>' + P.AREA[a].tile + '</strong><small>' + ac.done + ' loaded · ' + (ac.total - ac.done) + ' to load</small></span></button>';
       }).join('');
+      drawTrailers(rows);
       const pu = rows.flatMap(r => P.pickupsFor(r, pickups)), puOpen = pu.filter(P.pickupOpen).length;
       const behind = rows.filter(r => P.isBehind(r, today())).length, pct = c.total ? Math.round(c.done * 100 / c.total) : 0;
       document.getElementById('strip').innerHTML =
@@ -153,7 +154,7 @@
         const st = r.state, items = P.pickupsFor(r, pickups), open = items.filter(P.pickupOpen).length;
         const puBtn = '<button type="button" class="pu ' + (open ? 'open' : items.length ? 'done' : '') + '" data-pu="' + r.id + '">' + (open ? 'P/U<i>' + open + '</i>' : items.length ? 'Completed' : 'P/U') + '</button>';
         const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
-        const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '" value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
+        const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
         const mins = P.minutesTaken(r);
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' : '';
         const total = mins === null ? '' : '<span class="' + (st === 'LOADING' ? 'running' : '') + '">' + P.minutesText(mins) + '</span>';
@@ -346,6 +347,10 @@
       date = d;
       history.replaceState(null, '', '?date=' + date + '&area=' + area);
       watchRuns();
+      onSnapshot(query(collection(db, 'equipment'), where('type', '==', 'TRAILER')), s => {
+        trailerUnits = s.docs.map(d => d.data()).filter(e => e.unit).map(e => ({ unit: e.unit, down: !!e.status && String(e.status).toUpperCase() !== 'ACTIVE' }));
+        render();
+      }, () => {});
       render();
     }
     document.getElementById('prev').onclick = () => setDate(L.addDays(date, -1));
@@ -361,6 +366,17 @@
       unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', days)), s => { pickups = s.docs.map(d => d.data()); render(); if (puRow && !document.getElementById('pu-modal').hidden) drawPickups(); }, e => showError('Could not read the pickups: ' + e.message)));
     }
 
+    // The trailer box offers the fleet's trailers as the current app's picker did: open ones first, then those on a route today,
+    // then those marked down. Any trailer can still be typed.
+    let trailerUnits = [], trailersShown = '';
+    const unitKey = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    function drawTrailers(rows) {
+      const busy = new Set(rows.filter(r => !r.prior && r.trailer).map(r => unitKey(r.trailer)));
+      const word = (t) => t.down ? 'DOWN' : busy.has(unitKey(t.unit)) ? 'ON A ROUTE' : 'OPEN', rank = { OPEN: 0, 'ON A ROUTE': 1, DOWN: 2 };
+      const html = trailerUnits.map(t => ({ unit: t.unit, word: word(t) })).sort((a, b) => rank[a.word] - rank[b.word] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }))
+        .map(t => '<option value="' + escapeHtml(t.unit) + '" label="' + t.word + '">' + t.word + '</option>').join('');
+      if (html !== trailersShown) { document.getElementById('lo-trailers').innerHTML = html; trailersShown = html; }
+    }
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
@@ -372,5 +388,6 @@
       render();
     });
   </script>
+  <datalist id="lo-trailers"></datalist>
 </body>
 </html>
