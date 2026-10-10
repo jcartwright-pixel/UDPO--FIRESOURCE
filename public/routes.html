@@ -31,7 +31,7 @@
         <label>View / Edit<select id="view-select">
           <option value="times">Start Times</option><option value="miles">Mileage</option><option value="hours">Hours and Return</option><option value="offset">Load Day</option>
           <option value="truck">Default Truck</option><option value="trailer">Default Trailer</option><option value="jack">Default Pallet Jack</option>
-          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="rules">Show / Hide Rules</option><option value="details">Route Details</option><option value="recap">Recap</option>
+          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="rules">Show / Hide Rules</option><option value="details">Route Editor (one run)</option><option value="recap">Recap</option>
         </select></label>
       </div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Route Master is not changed yet</span></div>
@@ -44,6 +44,7 @@
       <label class="seq-day" id="hidden-box" hidden><input type="checkbox" id="only-hidden"> Only runs hidden on Weekly</label>
       <span class="seq-day" id="seq-day-box" hidden><label for="seq-day">Day</label><select id="seq-day"></select></span>
       <span class="spacer"></span>
+      <a class="button" href="routeweek.html" id="to-holiday" title="Change which days routes run for one week only (holidays)">Holiday Week Editor</a>
       <button type="button" disabled title="Dispatch Administration stays in the current app for now">Dispatch Administration</button>
       <button type="button" disabled title="Driver Weekly Template stays in the current app for now">Driver Weekly Template</button>
     </div>
@@ -89,8 +90,8 @@
     };
     const OTHER = {
       seq: ['Load Order', 'Pick a day, then drag a run by its route number to its place in the loadout.'],
-      days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the permanent normal schedule. Special-week changes stay in Weekly Dispatch.'],
-      details: ['Route Details', 'Run settings. Each box and list saves the moment you change it.'],
+      days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the normal week. Edit Route opens every setting for a run. Holidays and one-week changes: Holiday Week Editor.'],
+      details: ['Route Editor', 'Every setting for one run, and its normal week day by day. Each box and list saves the moment you change it.'],
       recap: ['Route Recap', 'Current route and run summary.'],
       rules: ['Show / Hide Rules', 'The same rules as the current app. Each YES / NO is the Route Master setting; click to flip it. A blank cell counts as NO (a run with a blank Active is inactive). Only Weekly looks further: when Route Master\'s Show Weekly is blank, this week\'s Live row decides.']
     };
@@ -169,7 +170,7 @@
       if (focus) { const again = t.querySelector('input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]'); if (again) again.focus(); }
     }
 
-    const head = (first) => '<thead><tr>' + first + DAYS.map(p => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '</th>').join('') + '</tr></thead>';
+    const head = (first, last) => '<thead><tr>' + first + DAYS.map(p => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '</th>').join('') + (last || '') + '</tr></thead>';
     const routeCells = (r) => '<td class="strong">' + escapeHtml(r.route) + '<small>' + escapeHtml(r.routeName || '') + '</small></td><td class="strong">' + escapeHtml(r.run || '') + '</td>';
     function gridView(g, list, edit) {
       return '<colgroup><col style="width:8%"><col style="width:15%"><col span="7" style="width:11%"></colgroup>' + head('<th>Route</th><th>Run / Destination</th>') + '<tbody>' +
@@ -180,12 +181,14 @@
     }
     function daysView(list, edit) {
       let prior = '';
-      return '<colgroup><col style="width:4%"><col style="width:9%"><col style="width:15%"><col span="7" style="width:10.29%"></colgroup>' + head('<th></th><th>Route</th><th>Run / Destination</th>') + '<tbody>' +
+      // Joe 10/9: Route Days is the quick "runs or not" screen; Edit Route on each run opens the full Route Editor form.
+      return '<colgroup><col style="width:8%"><col style="width:15%"><col span="7" style="width:9.57%"><col style="width:10%"></colgroup>' + head('<th>Route</th><th>Run / Destination</th>', '<th>Action</th>') + '<tbody>' +
         list.map(r => {
           const same = prior === r.route; prior = r.route;
-          return '<tr data-id="' + escapeHtml(r.id) + '"><td>' + (same || !edit ? '' : '<button type="button" class="edit" data-edit-route="' + escapeHtml(r.id) + '" title="Route Details">&#9998;</button>') + '</td>' +
+          return '<tr data-id="' + escapeHtml(r.id) + '">' +
             '<td class="strong">' + (same ? '<small>&#8627; same route</small>' : escapeHtml(r.route) + '<small>' + escapeHtml(r.routeName || '') + '</small>') + '</td><td class="strong">' + escapeHtml(r.run || '') + '</td>' +
-            DAYS.map(p => { const on = !!day(r, p).active; return '<td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>'; }).join('') + '</tr>';
+            DAYS.map(p => { const on = !!day(r, p).active; return '<td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>'; }).join('') +
+            '<td><button type="button" class="edit edit-route" data-edit-route="' + escapeHtml(r.id) + '" title="Open the Route Editor for this run">Edit Route</button></td></tr>';
         }).join('') + '</tbody>';
     }
     function seqList() {
@@ -205,7 +208,7 @@
     const textIn = (name, v, edit, type) => '<input data-f="' + name + '" value="' + escapeHtml(v == null ? '' : v) + '"' + (type ? ' type="' + type + '"' : '') + (edit ? '' : ' readonly') + '>';
     function detailsView(list, edit) {
       const r = pickRun ? list[0] : list.length === 1 ? list[0] : null;
-      if (!r) return '<tbody><tr><td class="empty pick-one">Pick a route and a run / destination at the top (or click &#9998; on Route Days) to see its details.</td></tr></tbody>';
+      if (!r) return '<tbody><tr><td class="empty pick-one">Pick a route and a run / destination at the top (or click Edit Route on Route Days) to see its details.</td></tr></tbody>';
       return '<tbody><tr><td class="details-cell"><form class="details" data-id="' + escapeHtml(r.id) + '" onsubmit="return false">' +
         '<label>Route' + textIn('route', r.route, edit) + '</label><label>Route Name' + textIn('routeName', r.routeName, edit) + '</label><label>Order' + textIn('weekOrder', r.weekOrder, edit, 'number') + '</label>' +
         '<label>Run / Destination' + textIn('run', r.run, edit) + '</label><label>Movement Type' + textIn('movementType', r.movementType, edit) + '</label>' +
@@ -215,7 +218,17 @@
         '<label>Show in Plant' + yesNo('displayPlant', shows(r, 'displayPlant'), edit) + '</label><label>Show Daily' + yesNo('displayDaily', shows(r, 'displayDaily'), edit) + '</label>' +
         '<label>Show Weekly' + yesNo('displayWeekly', shows(r, 'displayWeekly'), edit) + '</label><label>Mobile route' + yesNo('displayMobile', shows(r, 'displayMobile'), edit) + '</label><label>Route list' + yesNo('displayRouteMaster', shows(r, 'displayRouteMaster'), edit) + '</label>' +
         '<label>Drop &amp; Hook' + yesNo('dropAndHook', !!r.dropAndHook, edit) + '</label><label class="wide">Day Notes / Route notes' + textIn('routeNotes', r.routeNotes, edit) + '</label>' +
-        '</form></td></tr></tbody>';
+        '</form>' + dayTable(r, edit) + '</td></tr></tbody>';
+    }
+    // Route Editor (Joe 10/9): the run's whole normal week on one page: runs or not, start time, load day, miles, hours
+    // and the default truck, trailer and jack for each day. Each box saves when it changes, like the grids.
+    const DAY_FIELDS = [['dispatchTime', 'Start Time'], ['loadDayOffset', 'Load Day'], ['miles', 'Miles'], ['hours', 'Hours'], ['tractor', 'Truck'], ['trailer', 'Trailer'], ['forklift', 'Jack']];
+    function dayTable(r, edit) {
+      return '<h3 class="day-title">Each day of the normal week</h3><table class="day-table"><thead><tr><th>Day</th><th>Runs?</th>' + DAY_FIELDS.map(f => '<th>' + f[1] + '</th>').join('') + '</tr></thead><tbody>' +
+        DAYS.map(p => { const on = !!day(r, p).active;
+          return '<tr data-id="' + escapeHtml(r.id) + '"' + (on ? '' : ' class="off"') + '><td class="strong">' + NAME(p) + '</td><td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>' +
+            DAY_FIELDS.map(f => '<td><input class="dcell" data-day="' + p + '" data-field="' + f[0] + '" value="' + escapeHtml(cellValue(r, p, f[0])) + '" autocomplete="off"' + (edit ? '' : ' readonly') + '></td>').join('') + '</tr>';
+        }).join('') + '</tbody></table>';
     }
     // Show / Hide Rules: every true/false the screens read, where it comes from, and what Weekly does with it this week.
     // Same rule as Weekly (logic.js weeklyShown): the Live row can hide a run; then Route Master YES / NO decides; a blank
@@ -275,6 +288,11 @@
     const table = document.getElementById('table');
     table.addEventListener('change', e => {
       if (e.target.matches('input.cell')) return saveCell(e.target);
+      if (e.target.matches('input.dcell')) {
+        const r = routes.find(x => x.id === e.target.closest('tr').dataset.id), p = e.target.dataset.day, field = e.target.dataset.field, value = e.target.value.trim();
+        if (value === cellValue(r, p, field)) return;
+        return saveRun(r, null, { [p]: { [field]: value } }, x => { x.days[p] = Object.assign({}, x.days[p], { [field]: shown(field, value) }); });
+      }
       const f = e.target.dataset.f;
       if (!f) return;
       const r = routes.find(x => x.id === e.target.closest('form').dataset.id);

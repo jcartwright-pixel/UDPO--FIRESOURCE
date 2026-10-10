@@ -712,3 +712,19 @@ table.cards-look tbody tr td:last-child { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 
 .weekly-page .board td.strong { font-size: 15px; }
 .issues-page table.issues td { font-size: 16px; }
 @media (max-width: 1500px) { .issues-page table.issues td { font-size: 14px; } }
+
+/* Route Days (Joe 10/9): RUNS is green like the current app; Edit Route opens the Route Editor form; the Holiday Week
+   Editor is one click away. */
+.routes-page table.routes.days button[data-runday].on { background: #e3f3e8; color: #1c6b3a; border: 1px solid #a9d8b8; }
+.routes-page table.routes.days button.edit-route { width: 100%; max-width: 130px; font-weight: 800; background: #fff; color: var(--ud-blue); border: 1px solid #1d5b91; }
+.routes-page table.routes.days button.edit-route:hover { background: #1d5b91; color: #fff; }
+.actions a.button { display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.actions a.button:hover { background: #e8f0fb; }
+h3.day-title { margin: 18px 0 8px; font-size: 15px; color: var(--ud-blue); text-transform: uppercase; letter-spacing: .05em; }
+table.day-table { table-layout: fixed; }
+table.day-table td { height: 42px; padding: 3px 5px; }
+table.day-table tr.off td:not(:nth-child(2)) { background: #f1f3f5 !important; color: #7a8794; }
+table.day-table input.dcell { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 7px; text-align: center; font: inherit; color: var(--ink); background: #fff; }
+table.day-table input.dcell:focus { border-color: var(--ud-blue); outline: none; }
+table.day-table button[data-runday] { width: 100%; height: 34px; border-radius: 7px; font-weight: 800; font-size: 14px; border: 1px solid #171c20; background: #171c20; color: #e8edf2; cursor: pointer; }
+table.day-table button[data-runday].on { background: #e3f3e8; color: #1c6b3a; border-color: #a9d8b8; }
