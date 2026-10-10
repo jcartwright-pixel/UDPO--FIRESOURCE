@@ -68,7 +68,7 @@ async function shots(page, name, w) {
       await shots(page, 'quality-blowmold', w);
       await page.click('[data-line="ut_prod_htst_1"]');
       await page.waitForFunction(() => document.getElementById('form-title').textContent === 'HTST #1 Quality Check');
-      assert.deepEqual(await page.$$eval('#fields label, #fields .qc-field > span', l => l.map(x => x.childNodes[0].textContent.trim())), ['Product being run', 'Temperature', 'Label / date code', 'Overall result', 'Corrective action / notes']);
+      assert.deepEqual(await page.$$eval('#fields label, #fields .qc-field > span', l => l.map(x => x.childNodes[0].textContent.trim())), ['Product being run', 'Size', 'Temperature', 'Label / date code', 'Overall result', 'Corrective action / notes']);
       await shots(page, 'quality-htst', w);
       await page.click('[data-pane="history"]');
       await page.waitForSelector('#pane-history:not([hidden])');
