@@ -130,14 +130,14 @@
       const was = weekDoc && weekDoc.overrideReason || '', now = box.value.trim();
       if (now === was) return;
       if (weekDoc) weekDoc.overrideReason = now;
-      try { await save('setWeekReason', { weekStart: week, reason: now }); } catch (e) { if (weekDoc) weekDoc.overrideReason = was; render(); showError(e.message || String(e)); }
+      try { await save('setWeekReason', { weekStart: week, reason: now }); } catch (e) { if (weekDoc) weekDoc.overrideReason = was; render(); showError('The week reason was not saved (' + (e.message || String(e)) + '). Type it again and click outside the box to retry.'); }
     });
     function setWeek(w) {
       week = w;
       if (stopRuns) stopRuns();
       if (stopWeek) stopWeek();
-      stopRuns = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read the week: ' + e.message));
-      stopWeek = onSnapshot(doc(db, 'weeks', week), s => { weekDoc = s.exists() ? s.data() : null; render(); });
+      stopRuns = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read the week (' + e.message + '). Check the network and reload the page.'));
+      stopWeek = onSnapshot(doc(db, 'weeks', week), s => { weekDoc = s.exists() ? s.data() : null; render(); }, e => showError('Could not read the week reason (' + e.message + '). Reload the page.'));
       render();
     }
     document.getElementById('prev').onclick = () => { const i = weeks.indexOf(week); if (i > 0) setWeek(weeks[i - 1]); };
