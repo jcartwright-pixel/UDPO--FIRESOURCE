@@ -154,7 +154,7 @@
         const st = r.state, items = P.pickupsFor(r, pickups), open = items.filter(P.pickupOpen).length;
         const puBtn = '<button type="button" class="pu ' + (open ? 'open' : items.length ? 'done' : '') + '" data-pu="' + r.id + '">' + (open ? 'P/U<i>' + open + '</i>' : items.length ? 'Completed' : 'P/U') + '</button>';
         const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
-        const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
+        const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : k === 'truck' ? ' list="lo-trucks" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
         const mins = P.minutesTaken(r);
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' : '';
         const total = mins === null ? '' : '<span class="' + (st === 'LOADING' ? 'running' : '') + '">' + P.minutesText(mins) + '</span>';
@@ -347,10 +347,6 @@
       date = d;
       history.replaceState(null, '', '?date=' + date + '&area=' + area);
       watchRuns();
-      onSnapshot(query(collection(db, 'equipment'), where('type', '==', 'TRAILER')), s => {
-        trailerUnits = s.docs.map(d => d.data()).filter(e => e.unit).map(e => ({ unit: e.unit, down: !!e.status && String(e.status).toUpperCase() !== 'ACTIVE' }));
-        render();
-      }, () => {});
       render();
     }
     document.getElementById('prev').onclick = () => setDate(L.addDays(date, -1));
@@ -366,21 +362,35 @@
       unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', days)), s => { pickups = s.docs.map(d => d.data()); render(); if (puRow && !document.getElementById('pu-modal').hidden) drawPickups(); }, e => showError('Could not read the pickups: ' + e.message)));
     }
 
-    // The trailer box offers the fleet's trailers as the current app's picker did: open ones first, then those on a route today,
-    // then those marked down. Any trailer can still be typed.
-    let trailerUnits = [], trailersShown = '';
+    // The truck and trailer boxes offer the fleet's units, as Daily Dispatch does (Joe 10/10): open ones first, then those on a
+    // route today, then those marked down. Any number can still be typed. The trailer list starts with TBA: the trailer is not
+    // known yet (saved as plain TBA, never T-TBA).
+    let units = { TRUCK: [], TRAILER: [] }, unitsShown = { TRUCK: '', TRAILER: '' };
     const unitKey = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     function drawTrailers(rows) {
-      const busy = new Set(rows.filter(r => !r.prior && r.trailer).map(r => unitKey(r.trailer)));
-      const word = (t) => t.down ? 'DOWN' : busy.has(unitKey(t.unit)) ? 'ON A ROUTE' : 'OPEN', rank = { OPEN: 0, 'ON A ROUTE': 1, DOWN: 2 };
-      const html = trailerUnits.map(t => ({ unit: t.unit, word: word(t) })).sort((a, b) => rank[a.word] - rank[b.word] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }))
-        .map(t => '<option value="' + escapeHtml(t.unit) + '" label="' + t.word + '">' + t.word + '</option>').join('');
-      if (html !== trailersShown) { document.getElementById('lo-trailers').innerHTML = html; trailersShown = html; }
+      [['TRUCK', 'truck', 'lo-trucks'], ['TRAILER', 'trailer', 'lo-trailers']].forEach(([type, k, id]) => {
+        const busy = new Set(rows.filter(r => !r.prior && r[k]).map(r => unitKey(r[k])));
+        const word = (t) => t.down ? 'DOWN' : busy.has(unitKey(t.unit)) ? 'ON A ROUTE' : 'OPEN', rank = { OPEN: 0, 'ON A ROUTE': 1, DOWN: 2 };
+        const html = (type === 'TRAILER' ? '<option value="TBA" label="Trailer not known yet">Trailer not known yet</option>' : '') +
+          units[type].map(t => ({ unit: t.unit, word: word(t) })).sort((a, b) => rank[a.word] - rank[b.word] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }))
+            .map(t => '<option value="' + escapeHtml(t.unit) + '" label="' + t.word + '">' + t.word + '</option>').join('');
+        if (html !== unitsShown[type]) { document.getElementById(id).innerHTML = html; unitsShown[type] = html; }
+      });
     }
+    // The list opens when the box is clicked, not only after typing.
+    document.addEventListener('click', e => {
+      const box = e.target.closest && e.target.closest('input[list^="lo-"]');
+      if (box && !box.disabled && box.showPicker) { try { box.showPicker(); } catch (err) { /* not allowed here */ } }
+    });
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
+        const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));
+        ['TRUCK', 'TRAILER'].forEach(t => { units[t] = all.filter(e => e.type === t).map(e => ({ unit: e.unit, down: !!e.status && String(e.status).toUpperCase() !== 'ACTIVE' })); });
+        render();
+      }, () => {});
       watchRuns();
       // The day rolls at 6 AM: the screen moves to the new day by itself when it was showing today.
       let shown = today();
@@ -389,5 +399,6 @@
     });
   </script>
   <datalist id="lo-trailers"></datalist>
+  <datalist id="lo-trucks"></datalist>
 </body>
 </html>

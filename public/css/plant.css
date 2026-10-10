@@ -681,4 +681,4 @@
 .products-page .pm-check small { display: block; margin-top: 2px; font-size: 12px; font-weight: 800; color: #9a5b00; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 1100px) { .sched-page .sc-titleline { flex-wrap: wrap; row-gap: 8px; } .sched-page .head .sc-lane { margin-left: 0; } }
 /* Joe 10/10: the whole card opens its screen. */
-.plant-page [data-href], .manager-page .mc-card[data-href] { cursor: pointer; }
+.plant-page .card[data-card], .manager-page .mc-card[data-href] { cursor: pointer; }
