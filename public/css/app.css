@@ -1270,3 +1270,11 @@ body.embed .head > .title { display: none; }
   .brand small { display: none; }
   .topbar .who, .topbar #signout { flex: none; }
 }
+
+/* Joe 10/10: a whole card opens its screen; a line or number inside opens that screen. */
+[data-card], [data-open] { cursor: pointer; }
+[data-open]:hover { background-color: rgba(31, 111, 235, .08); border-radius: 8px; }
+.co-plant header a { color: #fff; text-decoration: none; text-align: center; }
+.co-plant footer > a { margin-left: auto; color: #1f6feb; text-decoration: none; }
+.co-plant footer > a:hover { text-decoration: underline; }
+.co-plant footer > span { padding: 2px 6px; }

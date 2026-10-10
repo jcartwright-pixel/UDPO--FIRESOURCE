@@ -70,7 +70,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.waitForFunction(() => /Charleston is not connected/.test(document.getElementById('why').textContent));
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
-    await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"]')]);
+    await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
     await adm.waitForSelector('.launch-card[data-side="admin"]');
     assert.deepEqual(await adm.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['distribution', 'plant', 'fleet', 'admin']);
     const sizes = await adm.$$eval('.launch-card', c => c.map(x => Math.round(x.getBoundingClientRect().width) + 'x' + Math.round(x.getBoundingClientRect().height)));
@@ -80,7 +80,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-admin-uniontown-1920.png') });
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go-back')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
-    await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"]')]);
+    await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
     await Promise.all([adm.waitForURL(/administration\.html/), adm.click('.launch-card[data-side="admin"]')]);
     // Joe 10/10: Administration like the current app's tab: every item in a menu on the left; the item opens on the right.
     await adm.waitForSelector('.adm-item.on[data-key="people"]');
@@ -127,6 +127,29 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.deepEqual(small.errors, []);
     await small.close();
     results.push('The overview and Administration fit a 1366 window');
+
+    // Joe 10/10: anywhere on a card opens its screen's first view; one line or number inside opens that screen.
+    const cards = await openPage(browser, 1920, 1080, '/company.html?testEmail=admin.test@uniteddairy.com');
+    await cards.waitForSelector('.co-plant[data-plant="fac_uniontown"] .co-grid');
+    await Promise.all([cards.waitForURL(/unloading\.html/), cards.click('.co-plant[data-plant="fac_uniontown"] .co-cell[data-open="unloading.html"] span')]);
+    await cards.goto(HOSTING + '/company.html?testEmail=admin.test@uniteddairy.com');
+    await cards.waitForSelector('.co-plant[data-plant="fac_uniontown"] .co-grid');
+    await Promise.all([cards.waitForURL(/maint\.html/), cards.click('.co-plant[data-plant="fac_uniontown"] .co-cell[data-open="maint.html"]')]);
+    await cards.waitForSelector('.hub-card[data-kind="TRAILER"] .hub-tiles4');
+    // Fleet & Maintenance cards are links edge to edge: the top opens the card's screen, each box its own.
+    await Promise.all([cards.waitForURL(/issues\.html\?kind=TRAILER$/), cards.click('.hub-card[data-kind="TRAILER"] .hub-card-head strong')]);
+    await cards.goto(HOSTING + '/maint.html?testEmail=admin.test@uniteddairy.com');
+    await cards.waitForSelector('.hub-kpis [data-open]');
+    await Promise.all([cards.waitForURL(/filter=review/), cards.click('.hub-kpis [data-open*="filter=review"]')]);
+    await cards.goto(HOSTING + '/distribution.html?testEmail=admin.test@uniteddairy.com');
+    await cards.waitForSelector('.card[data-card="drivers.html"] .dc-metric');
+    await Promise.all([cards.waitForURL(/vacations\.html/), cards.click('.card[data-card="drivers.html"] [data-open="vacations.html"] b')]);
+    await cards.goto(HOSTING + '/distribution.html?testEmail=admin.test@uniteddairy.com');
+    await cards.waitForSelector('.card[data-card="drivers.html"] .dc-head');
+    await Promise.all([cards.waitForURL(/drivers\.html/), cards.click('.card[data-card="drivers.html"] .dc-head')]);
+    assert.deepEqual(cards.errors, []);
+    await cards.close();
+    results.push('Cards: a card opens its screen (Route Distribution, Fleet & Maintenance, all-plants overview) and a number or line inside opens its own screen');
 
     // Phones 360 and 390 wide: the header title wraps beside the logo and never runs under the initials or Sign out.
     for (const w of [360, 390]) {

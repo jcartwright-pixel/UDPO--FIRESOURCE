@@ -314,6 +314,15 @@ try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add
   h.onclick = () => { location.href = 'index.html'; };
   home.replaceWith(b, h);
 })();
+// Joe 10/10: on every screen with cards, clicking anywhere on a card opens that card's screen in its first view, and clicking
+// one line or number inside it opens that particular screen. A card carries data-card="page"; a line or number data-open="page"
+// (real links and buttons inside keep their own job). Always this window.
+document.addEventListener('click', (e) => {
+  if (e.defaultPrevented || e.button || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (e.target.closest('a[href], button, input, select, textarea, label')) return;
+  const t = e.target.closest('[data-open], [data-card]');
+  if (t) location.href = t.dataset.open || t.dataset.card;
+});
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
 async function firebaseConfig() {
