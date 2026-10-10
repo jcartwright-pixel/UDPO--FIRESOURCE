@@ -870,7 +870,9 @@ async function noScroll(page) {
     const sec = (name) => (menu.find(m => m[0] === name) || [name, []])[1];
     assert.deepEqual(sec('Administration'), ['Dispatch Administration', 'Operational Assignments', 'Print Layouts', 'Dispatch Settings']);
     assert.equal(sec('Dispatch').indexOf('Dispatch Administration'), -1, 'not under Dispatch');
-    assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template') >= 0).map(m => m[0]), ['Drivers']);
+    assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template (assign routes)') >= 0).map(m => m[0]), ['Drivers']);
+    assert.deepEqual(sec('Drivers'), ['Drivers', 'Driver Weekly Template (assign routes)', 'Driver Assignment Board', 'Vacation Schedule'], 'Joe 10/10: route assignment has a link under Drivers');
+    assert.ok(sec('Dispatch').indexOf('Driver Assignment Board') >= 0, 'the board stays under Dispatch too');
     assert.equal(sec('Equipment')[0], 'Fleet & Maintenance', 'the maintenance side starts on the hub');
     await mp.close();
     // Joe 10/10 (old hub picture): Fleet & Maintenance shows the six counts, four cards with the icon library pictures and the

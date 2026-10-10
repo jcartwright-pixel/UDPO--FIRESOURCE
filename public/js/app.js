@@ -52,7 +52,8 @@ const ICON = {
 export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
   ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
-  ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Driver Weekly Template', 'template.html', 'week'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
+  // Joe 10/10: assigning drivers their routes has a plain link here (it came off the Route Editor); the board is under Dispatch too.
+  ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Driver Weekly Template (assign routes)', 'template.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
   // Joe 10/10: the maintenance side starts on the Fleet & Maintenance hub and branches out from there, as in the current app.
   // An icon name ending .webp is a picture from the United Dairy icon library (img/library).
   ['Equipment', [['Fleet & Maintenance', 'maint.html', 'maintenance-tractor-v1-560.webp'], ['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'],
