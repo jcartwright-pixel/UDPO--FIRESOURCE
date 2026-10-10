@@ -184,7 +184,7 @@ body.ds-tv .foot { color: #cfe3f6; }
 .ta-page .ta-yard h3 { margin: 12px 0 6px; font-size: 14px; text-transform: uppercase; color: #33475b; }
 .ta-page .ta-help { margin: 0; color: #0b4d83; font-weight: 700; }
 .ta-page .ta-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.ta-page .ta-chip { border-radius: 6px; padding: 6px 4px; font-weight: 700; font-size: 14px; border: 1px solid; min-height: 0; }
+.ta-page .ta-chip { border-radius: 6px; padding: 6px 4px; font-weight: 700; font-size: 14px; border: 1px solid; min-height: 40px; }
 .ta-page .ta-chip small { display: block; font-weight: 400; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ta-page .ta-chip.open { background: #eef8f0; border-color: #6bb07c; color: #1f5f30; cursor: pointer; }
 .ta-page .ta-chip.busy { background: #fff6df; border-color: #d4a121; color: #6e4800; }

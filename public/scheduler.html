@@ -67,7 +67,7 @@
     const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     let lane = R.lane(params.get('lane')), view = ['day', 'week', 'month'].indexOf(params.get('view')) >= 0 ? params.get('view') : (window.matchMedia('(max-width: 760px)').matches ? 'day' : 'month'); // a phone opens on the day: a month of boxes is too small to read
     let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
-    let loads = { SHIPPING: [], RECEIVING: [] }, supplierDocs = [], routeDocs = [], person = null, app = {}, db = null, search = '';
+    let loads = { SHIPPING: [], RECEIVING: [] }, seen = { SHIPPING: false, RECEIVING: false }, supplierDocs = [], routeDocs = [], person = null, app = {}, db = null, search = '';
     const pending = {};           // load id -> the load as saved (or {deleted: true}) while its save is on its way
     const pendingSuppliers = [];  // suppliers added while their save is on its way
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
@@ -134,6 +134,9 @@
       document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
       document.getElementById('range').lastChild.textContent = rangeTitle();
       document.getElementById('today').textContent = view === 'month' ? 'This month' : view === 'week' ? 'This week' : 'Today';
+      // The arrows say what they step through.
+      const unit = view === 'month' ? 'month' : view === 'week' ? 'week' : 'day';
+      [['prev', 'Previous '], ['next', 'Next ']].forEach(([id, w]) => { const b = document.getElementById(id); b.title = w + unit; b.setAttribute('aria-label', w + unit); });
       document.getElementById('print').textContent = 'Print ' + (view === 'week' ? 'Weekly' : view === 'day' ? 'Daily' : 'Monthly');
       document.getElementById('pick').value = date;
       document.getElementById('add').hidden = !ck;
@@ -194,7 +197,7 @@
         '<thead><tr><th>' + (lane === 'RECEIVING' ? 'Code' : 'Route') + '</th><th>' + (lane === 'RECEIVING' ? 'Supplier' : 'Run') + '</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th><th></th></tr></thead><tbody>' +
         (rows.map(x => '<tr>' + cell(x.route) + cell(runName(x), 'run') + cell(clock(x.pickupTime)) + cell(x.scheduleType === 'CARRIER' ? 'Carrier' : 'Route') + cell(x.loadDate ? md(x.loadDate) : '') + cell(x.trailer) + cell(x.poNumber) + cell(x.cases) +
           cell(x.product, 'txt') + cell(x.notes, 'txt') + '<td><button type="button" class="sc-btn small" data-edit="' + escapeHtml(x.id) + '">' + (ck ? 'Edit' : 'View') + '</button></td></tr>').join('') ||
-          '<tr><td colspan="11" class="empty">No plant schedule entries for this date.</td></tr>') + '</tbody></table></div>' +
+          (seen[lane] ? '<tr><td colspan="11" class="empty">No plant schedule entries for this date.</td></tr>' : '<tr><td colspan="11" class="empty">Loading the schedule&hellip;</td></tr>')) + '</tbody></table></div>' +
         (ck ? '<div class="sc-dayadd"><button type="button" class="sc-btn primary" data-new="' + date + '">＋ Add ' + (lane === 'RECEIVING' ? 'Load' : 'Route') + '</button></div>' : '');
     }
 
@@ -245,6 +248,9 @@
       trailers(loadIn.value || key);
       if (!ck) return;
       document.getElementById('f-save').onclick = () => saveLoad(x, options);
+      // The cursor starts in the first box of a new load; Enter in any box but Notes saves.
+      if (!x) document.getElementById('f-route').focus();
+      modal.querySelector('.sc-form').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName !== 'TEXTAREA' && ev.target.tagName !== 'BUTTON') { ev.preventDefault(); document.getElementById('f-save').click(); } });
       const del = document.getElementById('f-delete');
       if (del) del.onclick = () => confirmDelete(x);
     }
@@ -262,7 +268,8 @@
         const busy = new Set(P.loadoutRows(runs.docs.map(d => Object.assign({ id: d.id }, d.data())), loadDate).filter(r => !r.prior && r.trailer).map(r => R.unitKey(r.trailer)));
         const units = eq.docs.map(d => d.data()).filter(e => !e.status || String(e.status).toUpperCase() === 'ACTIVE').map(e => ({ unit: e.unit, available: !busy.has(R.unitKey(e.unit)) }))
           .sort((a, b) => (b.available - a.available) || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }));
-        list.innerHTML = units.map(t => '<option value="' + escapeHtml(t.unit) + '"' + (t.available ? ' label="AVAILABLE"' : '') + '>' + (t.available ? 'AVAILABLE' : '') + '</option>').join('');
+        // Standing rule: the trailer list offers TBA (trailer not known yet), saved as plain TBA.
+        list.innerHTML = '<option value="TBA">Trailer not known yet</option>' + units.map(t => '<option value="' + escapeHtml(t.unit) + '"' + (t.available ? ' label="AVAILABLE"' : '') + '>' + (t.available ? 'AVAILABLE' : '') + '</option>').join('');
         note.textContent = 'Pick from the list or type one · ' + units.filter(t => t.available).length + ' available';
       } catch (e) { if (note && trailerAsk === loadDate) note.textContent = 'Trailer list unavailable. Type the trailer number.'; }
     }
@@ -290,7 +297,14 @@
         await save('savePlantSchedule', { lane, op: 'save', id: x ? x.id : '', date: key, fields: f });
         showError('');
         setTimeout(() => { delete pending[tmp]; render(); }, 1500);
-      } catch (e) { delete pending[tmp]; showError('Save Load: ' + (e.message || e)); render(); }
+      } catch (e) {
+        // Nothing typed is lost: the box opens again with the same entries and says why.
+        delete pending[tmp]; render();
+        openLoad(key, x ? x.id : '', r ? { routeId: r.routeId, runId: r.runId } : null);
+        const put = (id, v) => { const el = document.getElementById(id); if (el && !el.disabled) el.value = v; };
+        put('f-type', f.scheduleType); put('f-date', key); put('f-load', f.loadDate); put('f-time', f.pickupTime); put('f-trailer', f.trailer); put('f-po', f.poNumber); put('f-cases', f.cases); put('f-product', f.product); put('f-notes', f.notes);
+        formError('Not saved (' + (e.message || e) + '). Check the entries and press Save Load again.');
+      }
     }
     function confirmDelete(x) {
       openModal('<h2 id="modal-title">Delete this load?</h2><dl class="sc-dl"><dt>' + who() + '</dt><dd>' + escapeHtml(entryName(x)) + '</dd><dt>Run</dt><dd>' + escapeHtml([x.route, x.run].filter(Boolean).join(' · ') || '—') + '</dd>' +
@@ -399,10 +413,10 @@
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
-      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       // Every load of each lane (the journal keeps scheduler records), so a load moved to another day is never shown twice.
-      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING)), s => { loads.SHIPPING = s.docs.map(d => d.data()); render(); }, fail('the Shipping schedule'));
-      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.RECEIVING)), s => { loads.RECEIVING = s.docs.map(d => d.data()); render(); }, fail('the Receiving schedule'));
+      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING)), s => { loads.SHIPPING = s.docs.map(d => d.data()); seen.SHIPPING = true; render(); }, fail('the Shipping schedule'));
+      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.RECEIVING)), s => { loads.RECEIVING = s.docs.map(d => d.data()); seen.RECEIVING = true; render(); }, fail('the Receiving schedule'));
       onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.SUPPLIER_TYPE)), s => { supplierDocs = s.docs.map(d => d.data()); render(); }, fail('the suppliers'));
       onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, fail('Route Master'));
       render();

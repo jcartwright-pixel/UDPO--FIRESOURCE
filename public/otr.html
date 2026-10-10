@@ -106,7 +106,9 @@
         document.getElementById('copy').onclick = async () => { const t = O.otrDailyCountText_(todayCount); try { await navigator.clipboard.writeText(t); copied = 'Copied: ' + t; } catch (e) { copied = t; } render(); };
       } else if (view === 'report') {
         const r = O.otrYearReport_(year, today, merged, monthRuns, monthly), M = CORE.MONTHS;
-        bar.innerHTML = '<select id="year">' + [0, 1, 2].map(i => year - 1 + 1 - i).concat([]).map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select><button type="button" class="primary" id="print-report">Print</button><span class="hint">One page, letter size, landscape.</span>';
+        // The year list always runs from this year back (picking last year keeps this year on the list); buttons first, the year on the right.
+        const thisYear = Number(today.slice(0, 4)), years = [thisYear, thisYear - 1, thisYear - 2].concat([thisYear, thisYear - 1, thisYear - 2].indexOf(year) < 0 ? [year] : []);
+        bar.innerHTML = '<button type="button" class="primary" id="print-report">Print</button><span class="hint">One page, letter size, landscape.</span><span class="spacer"></span><select id="year" aria-label="Report year">' + years.map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
         const rowsFor = (d) => '<tr><td class="strong" rowspan="2">' + escapeHtml(d.name) + '</td><td>' + r.prior + '</td>' + d.prior.map(v => '<td>' + (v || '') + '</td>').join('') + '<td class="strong">' + (d.priorYear || '') + '</td><td rowspan="2" class="' + (d.change < 0 ? 'neg' : '') + '">' + (d.change ? (d.change > 0 ? '+' : '') + d.change : '') + '</td></tr>' +
           '<tr><td>' + r.year + '</td>' + d.current.map(v => '<td>' + (v == null ? '' : v || '') + '</td>').join('') + '<td class="strong">' + (d.currentYear || '') + '</td></tr>';
         const shown = r.destinations.filter(d => d.priorYear || d.currentYear);
@@ -123,11 +125,12 @@
         };
       } else if (view === 'figures') {
         const fm = O.otrFigureMap_(monthly), dis = edit ? '' : ' disabled';
-        bar.innerHTML = '<select id="year">' + [year + 1, year, year - 1, year - 2].map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select><span class="hint">Type a month\'s total; it saves by itself. Gray = last year. Cost per gallon = delivery cost ÷ gallons sold.</span><span class="spacer"></span><button type="button" disabled title="Importing the accounting package is in the current app for now">Import From Accounting</button>';
+        const thisYear = Number(today.slice(0, 4)), years = [thisYear + 1, thisYear, thisYear - 1, thisYear - 2].concat([thisYear + 1, thisYear, thisYear - 1, thisYear - 2].indexOf(year) < 0 ? [year] : []);
+        bar.innerHTML = '<button type="button" disabled title="Importing the accounting package is in the current app for now">Import From Accounting</button><span class="hint">Type a month\'s total; it saves by itself. Gray = last year. Cost per gallon = delivery cost ÷ gallons sold.</span><span class="spacer"></span><select id="year" aria-label="Figures year">' + years.map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
         sheet.innerHTML = '<table class="issues otr-fig"><thead><tr><th>Month</th>' + CORE.FIGURES.map(f => '<th>' + escapeHtml(f.label) + '</th>').join('') + '<th>Cost per gallon</th></tr></thead><tbody>' +
           CORE.MONTHS.map((m, i) => {
             const cur = fm[year + '-' + (i + 1)] || {}, ly = fm[(year - 1) + '-' + (i + 1)] || {};
-            return '<tr><td class="strong">' + m + ' ' + year + '</td>' + CORE.FIGURES.map(f => '<td><input class="otr-in" data-m="' + (i + 1) + '" data-k="' + f.key + '" value="' + (cur[f.key] == null ? '' : cur[f.key]) + '"' + dis + '><small>' + (ly[f.key] == null ? '' : (f.money ? money(ly[f.key]) : n0(ly[f.key]))) + '</small></td>').join('') +
+            return '<tr><td class="strong">' + m + ' ' + year + '</td>' + CORE.FIGURES.map(f => '<td><input class="otr-in" inputmode="decimal" aria-label="' + escapeHtml(m + ' ' + year + ' ' + f.label) + '" data-m="' + (i + 1) + '" data-k="' + f.key + '" value="' + escapeHtml(cur[f.key] == null ? '' : cur[f.key]) + '"' + dis + '><small>' + (ly[f.key] == null ? '' : (f.money ? money(ly[f.key]) : n0(ly[f.key]))) + '</small></td>').join('') +
               '<td class="strong">' + (O.otrCostPerGallon_(cur) == null ? '' : cents(O.otrCostPerGallon_(cur))) + '<small>' + (O.otrCostPerGallon_(ly) == null ? '' : cents(O.otrCostPerGallon_(ly))) + '</small></td></tr>';
           }).join('') + '</tbody></table>';
         foot.textContent = 'Gallons sold and delivery cost make the cost per gallon. Employee cost and fuel cost come from P&L Expenses by Dept.';
@@ -147,7 +150,7 @@
         const dis = edit ? '' : ' disabled';
         bar.innerHTML = '<span class="hint">Tick a route once and every run of it counts on the OTR report, every day. Miles come from Route Master; DRAFT miles are not confirmed and not saved.</span>';
         sheet.innerHTML = '<table class="issues"><colgroup><col style="width:8%"><col style="width:12%"><col style="width:28%"><col style="width:26%"><col style="width:26%"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Run</th><th>Destination</th><th>Round-trip miles</th></tr></thead><tbody>' +
-          list.map(r => '<tr' + (r.include ? ' class="otr-on"' : '') + '><td><input type="checkbox" data-inc="' + escapeHtml(r.runId) + '"' + (r.include ? ' checked' : '') + dis + '></td><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td><select data-dest="' + escapeHtml(r.runId) + '"' + dis + '><option value="">Pick…</option>' +
+          list.map(r => '<tr' + (r.include ? ' class="otr-on"' : '') + '><td><input type="checkbox" aria-label="' + escapeHtml('Include ' + r.route + ' ' + r.run) + '" data-inc="' + escapeHtml(r.runId) + '"' + (r.include ? ' checked' : '') + dis + '></td><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td><select aria-label="' + escapeHtml('Destination for ' + r.route + ' ' + r.run) + '" data-dest="' + escapeHtml(r.runId) + '"' + dis + '><option value="">Pick…</option>' +
             CORE.DESTINATIONS.map(d => '<option' + (d === r.destination ? ' selected' : '') + '>' + escapeHtml(d) + '</option>').join('') + '</select></td><td>' + (r.miles ? n0(r.miles) : r.draftMiles ? n0(r.draftMiles) + ' <span class="pill warn">DRAFT</span>' : '') + '</td></tr>').join('') + '</tbody></table>';
         foot.textContent = list.filter(r => r.include).length + ' of ' + list.length + ' active runs are on the OTR report.';
         const saveRoute = (runId, include, destination) => {

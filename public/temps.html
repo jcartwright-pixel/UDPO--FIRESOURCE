@@ -72,7 +72,7 @@
     const phoneQuery = window.matchMedia('(max-width: 760px)');
     // Manager Center's Status and 24-Hour History cards open this screen on Alerts or on the history.
     let pane = params.get('view') === 'history' ? 'history' : 'current', filter = params.get('view') === 'alerts' ? 'ALERTS' : 'ALL';
-    let setup = [], journal = [], person = null, app = {}, roundStart = '', sensors = [], mocreo = {}, appLocs = [];
+    let setupSeen = false, setup = [], journal = [], person = null, app = {}, roundStart = '', sensors = [], mocreo = {}, appLocs = [];
     // drafts: what is typed and not saved yet; pending: a reading shown at once, over its saved copy, until the database has it;
     // fills: each location's reading of this round, filled in box by box; notes: the "Saved" time of each location.
     const drafts = {}, pending = {}, fills = {}, notes = {};
@@ -127,17 +127,17 @@
         const limits = r.lowLimit !== '' || r.highLimit !== '' ? '<small>' + escapeHtml([r.lowLimit !== '' ? r.lowLimit + '°' : '', r.highLimit !== '' ? r.highLimit + '°F' : ''].filter(Boolean).join(' – ')) + '</small>' : '';
         return '<tr data-location="' + escapeHtml(r.locationId) + '"><td class="tp-name"><b>' + escapeHtml(r.location) + '</b>' + limits + '</td>' +
           '<td class="tp-reading">' + (r.sensorTemp === '' ? '—' : escapeHtml(r.sensorTemp) + '°F') + '</td>' +
-          '<td><input class="tp-manual" inputmode="decimal" placeholder="' + (phone ? '°F' : 'Manual °F') + '" value="' + escapeHtml(d.manualTemperature || '') + '"' + dis + '>' + last + '</td>' +
+          '<td><input class="tp-manual" inputmode="' + (Number(r.lowLimit) < 0 ? 'text' : 'decimal') + '" aria-label="Manual °F for ' + escapeHtml(r.location) + '" placeholder="' + (phone ? '°F' : 'Manual °F') + '" value="' + escapeHtml(d.manualTemperature || '') + '"' + dis + '>' + last + '</td>' +
           '<td class="tp-trend">—</td>' +
           '<td><span class="tp-status ' + statusClass(r.status) + '">' + escapeHtml(r.status) + '</span>' + detail + '</td>' +
           '<td>' + (r.batteryLevel === '' ? '—' : escapeHtml(r.batteryLevel) + '%') + '</td>' +
           '<td>' + escapeHtml(clock(r.sensorLastReadingAt)) + '</td>' +
-          '<td><input class="tp-notes" placeholder="' + (phone ? 'Notes' : 'Add notes (optional)…') + '" maxlength="800" value="' + escapeHtml(d.notes || '') + '"' + dis + '></td>' +
+          '<td><input class="tp-notes" aria-label="Notes for ' + escapeHtml(r.location) + '" placeholder="' + (phone ? 'Notes' : 'Add notes (optional)…') + '" maxlength="800" value="' + escapeHtml(d.notes || '') + '"' + dis + '></td>' +
           '<td class="tp-last">' + (r.lastCheckedAt ? escapeHtml(clock(r.lastCheckedAt)) + (r.lastManualTemperature !== '' ? '<small>' + escapeHtml(r.lastManualTemperature) + '°F</small>' : '') : '—') + '</td>' +
           '<td>' + escapeHtml(initials(r.lastCheckedBy) || '—') + '</td>' +
           // Joe 10/10: no Save button; the column shows when the reading saved, or how long the location is locked.
           '<td class="tp-act">' + (!ck ? '<span class="pill">View only</span>' : note ? '<small class="as-note' + (/^Not|^Enter/.test(note) ? ' bad' : '') + '">' + escapeHtml(note) + '</small>' : r.locked && !cur ? '<small class="as-last" title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked ' + r.minutesUntilDue + ' min</small>' : cur ? '<small class="as-note">Saved ' + escapeHtml(clockOf(r.lastCheckedAt)) + '</small>' : '<small class="as-last">Due</small>') + '</td></tr>';
-      }).join('') || '<tr><td colspan="11" class="empty">' + (rows.length ? 'No locations match the ' + escapeHtml(FILTERS.find(f => f[0] === filter)[1]) + ' filter.' : 'No temperature locations are set up for this plant.') + '</td></tr>';
+      }).join('') || '<tr><td colspan="11" class="empty">' + (rows.length ? 'No locations match the ' + escapeHtml(FILTERS.find(f => f[0] === filter)[1]) + ' filter.' : (setupSeen ? 'No temperature locations are set up for this plant.' : 'Loading the temperature locations&hellip;')) + '</td></tr>';
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="tp-name"><b>' + escapeHtml(h.location) + '</b></td>' +
         '<td>' + escapeHtml(h.manualTemperature !== '' ? h.manualTemperature : h.sensorTemperature !== '' ? h.sensorTemperature : '—') + '</td>' +
         '<td><span class="tp-status ' + statusClass(h.status) + '">' + escapeHtml(h.status || 'Recorded') + '</span></td><td>' + (h.batteryLevel === '' ? '—' : escapeHtml(h.batteryLevel) + '%') + '</td>' +
@@ -169,7 +169,9 @@
       const id = tr.dataset.location, loc = U.tempLocations(U.withTempLocations(setup, appLocs)).find(l => l.locationId === id), row = U.tempRows(U.withTempLocations(setup, appLocs), all(), Date.now(), sensors).find(r => r.locationId === id);
       const fields = { locationId: id, manualTemperature: tr.querySelector('.tp-manual').value.trim(), notes: tr.querySelector('.tp-notes').value.trim() };
       if (fields.manualTemperature === '') { notes[id] = fields.notes ? 'Enter the temperature to save' : ''; drafts[id] = fields; render(); tick(id); return; }
-      if (!isFinite(Number(fields.manualTemperature))) { notes[id] = 'Not saved: not a number'; drafts[id] = fields; render(); tick(id); return; }
+      if (!/^-?\d+(\.\d+)?$/.test(fields.manualTemperature)) { notes[id] = 'Not saved: not a number'; drafts[id] = fields; render(); tick(id); return; }
+      // A reading whose 2-hour lock has run out is finished: the next one starts a fresh check (the old one cannot be filled in).
+      if (fills[id] && fills[id].id && !(row && roundReading(row))) { delete fills[id]; delete pending[id]; }
       if (!fills[id]) fills[id] = fillIn('saveTemperatureCheck', save, row && roundReading(row) ? row.lastDocId : '');
       const status = U.tempStatus(loc, fields.manualTemperature);
       const mine = pending[id] || { type: U.TEMP_TYPE, recordedAt: row && roundReading(row) ? row.lastCheckedAt : new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, _id: fills[id].id };
@@ -187,10 +189,10 @@
         tick(id);
         showError('');
       } catch (err) {
-        notes[id] = 'Not saved';
+        notes[id] = 'Not saved: type it again to retry';
         tick(id);
         if (!mine.saved && !fills[id].id) delete pending[id];
-        showError(loc.location + ': ' + (err.message || err));
+        showError(loc.location + ' not saved (' + (err.message || err) + '). Type it again to retry.');
       }
       render();
     });
@@ -207,10 +209,10 @@
 
     requireSignIn(async (user) => {
       const { db } = await start();
-      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
-      onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(); }, fail('the temperature locations'));
+      onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupSeen = true; render(); }, fail('the temperature locations'));
       // MOCREO sensors, read by the server every 5 minutes once its key is set (functions/src/mocreo.js).
       onSnapshot(collection(db, 'tempLocations'), s => { appLocs = s.docs.map(d => d.data()); render(); }, () => {});
       onSnapshot(collection(db, 'sensors'), s => { sensors = s.docs.map(d => d.data()); render(); }, () => {});

@@ -79,8 +79,8 @@
     function cellHtml(d, p, edit) {
       const c = cell(d, p), dirty = !!edits[key(d.id, p)], dis = edit ? '' : ' disabled';
       return '<td class="tcell ' + (c.status === 'OFF' ? 'off' : c.status === 'ASSIGNMENT' ? 'on' : '') + (dirty ? ' changed' : '') + '" data-driver="' + escapeHtml(d.id) + '" data-day="' + p + '">' +
-        '<select data-status' + dis + '><option value="AVAILABLE"' + (c.status === 'AVAILABLE' ? ' selected' : '') + '>Available</option><option value="OFF"' + (c.status === 'OFF' ? ' selected' : '') + '>Off</option><option value="ASSIGNMENT"' + (c.status === 'ASSIGNMENT' ? ' selected' : '') + '>Assigned</option></select>' +
-        c.runs.map((id, i) => '<div class="run-line" data-i="' + i + '">' + runSelect(p, id).replace('<select data-run>', '<select data-run' + dis + '>') + '<button type="button" class="mini" data-remove' + dis + ' aria-label="Remove run">×</button></div>').join('') +
+        '<select data-status aria-label="' + escapeHtml(d.name + ' ' + L.DAY_NAMES[DAYS.indexOf(p)] + ' status') + '"' + dis + '><option value="AVAILABLE"' + (c.status === 'AVAILABLE' ? ' selected' : '') + '>Available</option><option value="OFF"' + (c.status === 'OFF' ? ' selected' : '') + '>Off</option><option value="ASSIGNMENT"' + (c.status === 'ASSIGNMENT' ? ' selected' : '') + '>Assigned</option></select>' +
+        c.runs.map((id, i) => '<div class="run-line" data-i="' + i + '">' + runSelect(p, id).replace('<select data-run>', '<select data-run aria-label="' + escapeHtml(d.name + ' ' + L.DAY_NAMES[DAYS.indexOf(p)] + ' run ' + (i + 1)) + '"' + dis + '>') + '<button type="button" class="mini" data-remove' + dis + ' aria-label="Remove run">×</button></div>').join('') +
         '<button type="button" class="tpl-add" data-add' + dis + '>+ Add Run</button>' +
         '<div class="tpl-tools"><button type="button" class="mini" data-copy' + dis + '>Copy</button><button type="button" class="mini" data-paste' + (copied && edit ? '' : ' disabled') + '>Paste</button><button type="button" class="mini" data-pasteadd' + (copied && edit ? '' : ' disabled') + '>Paste + Add</button></div></td>';
     }
@@ -163,16 +163,31 @@
           const d = drivers.find(x => x.id === driverId);
           if (d) { d.cells = Object.assign({}, d.cells, { [day + '_available']: c.status === 'OFF' ? 'FALSE' : 'TRUE', [day + '_assignments_json']: JSON.stringify(c.runs.map(runId => ({ runId }))) }); }
           delete edits[k];
-        } catch (e) { problems.push((drivers.find(x => x.id === driverId) || {}).name + ' ' + L.DAY_NAMES[DAYS.indexOf(day)] + ': ' + (e.message || e)); }
+        } catch (e) { problems.push(((drivers.find(x => x.id === driverId) || {}).name || driverId) + ' ' + L.DAY_NAMES[DAYS.indexOf(day)] + ': ' + (e.message || e)); }
         render();
       }
       saving = false;
-      if (problems.length) showError('Not saved: ' + problems.join('; '));
+      if (problems.length) showError('Not saved: ' + problems.join('; ') + '. Those cells stay marked; press Save Template to try again.');
       note = problems.length ? '' : 'Template saved. ' + (liveDays ? liveDays + ' day' + (liveDays === 1 ? '' : 's') + ' in the Live weeks now follow it.' : 'No Live week days needed to change.');
       render();
     };
     // Refresh drops unsaved changes and shows the saved template again.
-    document.getElementById('refresh').onclick = () => { edits = {}; copied = null; document.getElementById('copy-state').textContent = 'No copied cell'; note = ''; showError(''); render(); };
+    // With unsaved changes it asks once more first ("Drop 3? Press again").
+    let refreshArmed = null;
+    document.getElementById('refresh').onclick = (ev) => {
+      const b = ev.currentTarget, n = Object.keys(edits).length;
+      if (n && !refreshArmed) {
+        const label = b.textContent;
+        b.textContent = 'Drop ' + n + '? Press again';
+        refreshArmed = setTimeout(() => { refreshArmed = null; b.textContent = label; }, 6000);
+        b.dataset.label = label;
+        return;
+      }
+      if (refreshArmed) { clearTimeout(refreshArmed); refreshArmed = null; b.textContent = b.dataset.label; }
+      edits = {}; copied = null; document.getElementById('copy-state').textContent = 'No copied cell'; note = ''; showError(''); render();
+    };
+    // Leaving the screen with changes not saved asks first.
+    window.addEventListener('beforeunload', e => { if (Object.keys(edits).length) { e.preventDefault(); e.returnValue = ''; } });
     window.udBack = () => { if (copied) { copied = null; document.getElementById('copy-state').textContent = 'No copied cell'; render(); return true; } return false; };
 
     requireSignIn(async (user) => {

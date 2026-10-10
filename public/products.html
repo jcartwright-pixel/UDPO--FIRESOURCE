@@ -96,7 +96,7 @@
       // Not drawn again while someone types in the list.
       if (force === 'keep' || (!force && document.getElementById('rows').contains(document.activeElement))) return;
       const dis = ck ? '' : ' disabled', q = find.trim().toUpperCase();
-      const cell = (i, k, v, ph, also) => '<td' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><input data-i="' + i + '" data-k="' + k + '" value="' + escapeHtml(v || '') + '" placeholder="' + ph + '" maxlength="120"' + dis + '>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
+      const cell = (i, k, v, ph, also) => '<td' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><input data-i="' + i + '" data-k="' + k + '" aria-label="' + escapeHtml(ph + (k === 'name' ? '' : ' for ' + (listOf(line.operationId)[i] || {}).name)) + '" value="' + escapeHtml(v || '') + '" placeholder="' + ph + '" maxlength="120"' + dis + '>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
       const rows = listOf(line.operationId).map((p, i) => [p, i]).filter(([p]) => !q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0);
       document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr>' + cell(i, 'name', p.name, 'Product name') + cell(i, 'sku', p.sku, 'SKU', shared(p)) + cell(i, 'mfgType', p.mfgType, 'Type') + cell(i, 'productGroup', p.productGroup, 'Group') +
         '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + i + '">' + (armed === line.operationId + '|' + i ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
@@ -111,7 +111,7 @@
       render(what ? true : 'keep');
       const run = busy.then(() => save('saveMachineProducts', { operationId: line.operationId, products: list.filter(p => String(p.name || '').trim()) }));
       busy = run.catch(() => {});
-      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); }, err => { note = 'Not saved.'; showError(line.name + ': ' + (err.message || err)); delete mine[line.operationId]; }).then(() => render());
+      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.operationId]; }).then(() => render());
     }
     document.getElementById('rows').addEventListener('change', e => {
       const box = e.target.closest('[data-k]'), line = current();
@@ -145,7 +145,9 @@
       if (armed !== chosen) { armed = chosen; render(true); setTimeout(() => { if (armed === chosen) { armed = null; render(true); } }, 7000); return; }
       armed = null;
       const base = (await startingList()).lines.find(l => l.operationId === line.operationId);
-      send(line, base ? base.products.map(p => Object.assign({}, p)) : [], 'Back on the RedZone list');
+      // Never save an empty list because the RedZone file did not load.
+      if (!base) { showError('Could not load the RedZone list for ' + line.name + '; nothing was changed. Reload the page and try again.'); render(true); return; }
+      send(line, base.products.map(p => Object.assign({}, p)), 'Back on the RedZone list');
     });
     document.getElementById('find').addEventListener('input', e => { find = e.target.value; render(true); });
     document.getElementById('lines').addEventListener('click', e => {
@@ -158,14 +160,15 @@
 
     requireSignIn(async (user) => {
       const { db } = await start();
-      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(true); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(true); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(true); }, fail('the machines'));
       watchProducts(db, (p, c) => {
         products = p; changed = c;
         // A saved list has caught up with what was typed here.
-        Object.keys(mine).forEach(id => { if (c[id] && JSON.stringify(c[id].products) === JSON.stringify(mine[id].filter(x => String(x.name || '').trim()))) delete mine[id]; });
+        // A new line still without its product name stays on screen as typed (it is not saved until it has one).
+        Object.keys(mine).forEach(id => { if (mine[id].some(x => !String(x.name || '').trim())) return; if (c[id] && JSON.stringify(c[id].products) === JSON.stringify(mine[id].filter(x => String(x.name || '').trim()))) delete mine[id]; });
         render();
       }, fail('the machine products'));
     });

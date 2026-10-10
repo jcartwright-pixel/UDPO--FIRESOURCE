@@ -66,7 +66,8 @@
     let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
     let mode = 'check';
     let runs = [], journal = [], person = null, app = {};
-    const returned = {};       // return id -> true while its RTA is saving
+    const returned = {};       // return id -> true while its RTA is saving, and a moment after (until the database shows it)
+    const got = { runs: false, journal: false };
     const unsubs = [];
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
 
@@ -80,14 +81,14 @@
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + (date === today() ? '' : '  ·  ' + shortDate(date));
       document.getElementById('hstats').innerHTML = [['Returns', rows.length, ''], ['Cases', cases.toLocaleString(), ''], ['Refused', refused, refused ? 'warn' : ''], ['Pending', pend, pend ? 'bad' : '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
+      document.querySelectorAll('[data-mode]').forEach(b => { b.setAttribute('aria-selected', String(b.dataset.mode === mode)); b.setAttribute('aria-pressed', String(b.dataset.mode === mode)); });
       document.getElementById('rows').innerHTML = rows.map(x => '<tr class="' + (x.pending ? 'needs-return' : 'done') + '"><td class="rr"><b>' + escapeHtml(x.route || 'Route') + '</b><span>' + escapeHtml(x.run) + '</span></td>' +
         '<td>' + (x.trailer ? '<span class="trl">' + escapeHtml(x.trailer) + '</span>' : '<span class="na">—</span>') + '</td><td>' + (x.source === 'RETURN' ? 'Unloading' : 'Driver check-in') + '</td>' +
         '<td>' + (x.cases ? escapeHtml(x.cases) : '—') + '</td><td class="detail">' + escapeHtml((x.refused ? 'Refused / returned · ' : '') + x.detail) + '</td><td>' + escapeHtml(P.shortStamp(x.recordedAt) || '—') + '</td>' +
         '<td>' + (x.pending ? '<span class="pill pend">Pending</span>' : '<span class="chk ok">&#10003; Returned</span>') + '</td>' +
         '<td>' + (ck && x.pending ? '<button type="button" class="rta" data-rta="' + escapeHtml(x.id) + '" title="Return to the cooler (RTA)">RTA</button>' : '') + '</td></tr>').join('') ||
-        '<tr><td colspan="8" class="empty">No product returns reported for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>';
-      document.getElementById('foot').textContent = rows.length + ' returns. ' + (ck ? 'RTA = put back in the cooler.' : canSave() ? 'View Only: press Check Off to mark returns.' : 'View only.') + ' Returns come from the drivers\' check-ins and the dock.';
+        (got.runs && got.journal ? '<tr><td colspan="8" class="empty">No product returns reported for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>' : '<tr><td colspan="8" class="empty">Loading the returns&hellip;</td></tr>');
+      document.getElementById('foot').textContent = rows.length + (rows.length === 1 ? ' return. ' : ' returns. ') + (ck ? 'RTA = put back in the cooler.' : canSave() ? 'View Only: press Check Off to mark returns.' : 'View only.') + ' Returns come from the drivers\' check-ins and the dock.';
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
@@ -102,10 +103,12 @@
       try {
         await save('saveUnloading', { date, route: x.route, run: x.run, runDocId: x.runDocId || '', day: x.day || '', fields: { returnIds: [x.id] } });
         showError('');
+        // Stays Returned (no RTA button to press twice) while the database catches up.
+        setTimeout(() => { delete returned[x.id]; render(); }, 1500);
       } catch (err) {
-        showError(x.route + ' ' + x.run + ': ' + (err.message || err));
+        delete returned[x.id];
+        showError('RTA for ' + x.route + ' ' + x.run + ' not saved (' + (err.message || err) + '). Press RTA again.');
       }
-      delete returned[x.id];
       render();
     });
     document.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => { mode = b.dataset.mode; render(); }; });
@@ -123,8 +126,8 @@
     let db = null;
     function watch() {
       while (unsubs.length) unsubs.pop()();
-      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', L.weekStart(date))), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the check-ins: ' + e.message)));
-      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { journal = s.docs.map(d => d.data()); render(); }, e => showError('Could not read the returns: ' + e.message)));
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', L.weekStart(date))), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); got.runs = true; render(); }, e => showError('Could not read the check-ins (' + e.message + '). Check the network and reload the page.')));
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { journal = s.docs.map(d => d.data()); got.journal = true; render(); }, e => showError('Could not read the returns (' + e.message + '). Check the network and reload the page.')));
     }
 
     requireSignIn(async (user) => {
