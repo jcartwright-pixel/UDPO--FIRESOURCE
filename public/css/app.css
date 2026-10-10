@@ -1343,3 +1343,8 @@ body.embed .head > .title { display: none; }
 body:not(.is-admin) .topbar .hdr-admin { display: none; }
 .sidemenu .side-plant[hidden], .side-flyouts a[data-plant][hidden] { display: none !important; }
 @media (max-width: 1100px) { .topbar .hdr-btn span { display: none; } .topbar .hdr-btn { padding: 0 11px; } }
+/* Joe 10/10 evening: no icons in the menu on any page, so folded it is just the menu button; the mouse over it (or a tap)
+   opens the menu over the screen, and the menu button pins it open. */
+.sidemenu a, .sidemenu .side-sec-btn { padding-left: 14px; }
+body.side-folded .sidemenu > :not(.side-toggle) { opacity: 0; }
+body.side-folded .sidemenu .side-toggle { align-self: center; margin: 2px 0 6px; }
