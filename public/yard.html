@@ -25,6 +25,7 @@
     <div class="head">
       <div class="title"><span class="eyebrow">Live Trailer Monitoring · Timestamped Checks</span><h1>Yard Checks</h1></div>
       <div class="tabs" id="panes" role="tablist" aria-label="Yard view"><button type="button" role="tab" data-pane="current">Active Yard Queue</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
+      <button type="button" class="yd-refresh" id="refresh">&#8635; Refresh</button><button type="button" class="yd-refresh" id="refresh-history" hidden>&#8635; Refresh History</button>
       <div class="dayname" id="dayname"></div>
       <div class="hstats" id="hstats"></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
@@ -35,13 +36,11 @@
         <img class="yd-icon" src="img/library/yard-checks.webp" alt="">
         <div><h2>Active Yard Queue</h2><p>Trailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.</p></div>
         <span class="yd-cycle"><b>2-hour recheck cycle</b> · Trailers past dispatch time will not reappear.</span>
-        <button type="button" class="yd-refresh" id="refresh">&#8635; Refresh</button>
       </div>
       <div class="yd-bar" id="bar-history" hidden>
         <img class="yd-icon" src="img/library/yard-checks.webp" alt="">
         <div><h2>24-Hour History</h2><p>All recorded yard checks with timestamps.</p></div>
         <span class="yd-grow"></span>
-        <button type="button" class="yd-refresh" id="refresh-history">&#8635; Refresh History</button>
       </div>
       <div class="yd-cards" id="cards" aria-label="Trailers to check"></div>
       <div class="sheet scroll-list" id="pane-current">
@@ -101,7 +100,7 @@
       document.getElementById('hstats').innerHTML = [['Active', q.rows.length + q.locked.length, ''], ['Due', q.rows.length, q.rows.length ? 'warn' : ''], ['Checked', q.locked.length, q.locked.length ? 'good' : ''],
         ['Latest', latest ? clock(latest.recordedAt) : 'None', '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + l + '</span></div>').join('');
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
-      ['current', 'history'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; });
+      ['current', 'history'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; }); document.getElementById('refresh').hidden = pane !== 'current'; document.getElementById('refresh-history').hidden = pane !== 'history';
       document.getElementById('rows').innerHTML = q.rows.map(x => {
         const d = drafts[x.trailer] || {}, v = (k) => d[k] !== undefined ? d[k] : x[k];
         const next = x.minutesUntilDue > 0 ? 'Due in ' + x.minutesUntilDue + ' min' : 'Due now';

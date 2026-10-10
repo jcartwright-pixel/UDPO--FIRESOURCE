@@ -95,7 +95,7 @@
 .plant-page .area small b.r { color: #b42332; } .plant-page .area small b.o { color: #0080a0; }
 .plant-page .hstats .bad b { color: #b42332; }
 .plant-page .hstats .wash b { color: #0080a0; }
-.plant-page .head .tabs.mode button { white-space: nowrap; }
+.plant-page .tabs.mode button { white-space: nowrap; }
 .plant-page .uw-tabrow { display: flex; align-items: center; gap: 12px; margin: 0 16px; }
 .plant-page .uw-scope { font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .plant-page .uw-banner { display: flex; align-items: center; gap: 14px; margin: 0 16px; padding: 8px 14px; border-radius: 10px; background: #fde5e3; border: 1px solid #f2b8b2; color: #8f1d1d; }
@@ -168,7 +168,7 @@
 .sched-page .eyebrow b { color: var(--ud-blue); }
 .sched-page.sc-recv .eyebrow b { color: var(--runs-ink); }
 .sched-page.sc-recv .tabs.lane button[aria-selected="true"] { background: var(--runs-ink); }
-.sched-page .sc-ctrl { display: flex; align-items: center; gap: 10px; margin: 0 16px 8px; flex-wrap: wrap; }
+.sched-page .sc-ctrl { display: flex; align-items: center; gap: 10px; margin: 0 16px 8px; flex-wrap: nowrap; }
 .sched-page .sc-ctrl .stepper input { width: 150px; }
 .sched-page .sc-today { font-weight: 800 !important; font-size: 14px !important; min-width: 96px; border-left: 1px solid var(--line) !important; border-right: 1px solid var(--line) !important; }
 .sched-page .sc-grow { flex: 1; }
@@ -176,6 +176,7 @@
 .sched-page .sc-key i { width: 14px; height: 14px; border-radius: 4px; background: #fff1d6; border: 1px solid #f0c987; }
 .sched-page .sc-btn { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .sched-page .sc-btn.primary { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.sched-page .sc-ctrl > .sc-btn { min-width: 150px; }
 .sched-page.sc-recv .sc-btn.primary { background: var(--runs-ink); border-color: var(--runs-ink); }
 .sched-page .sc-btn.small { min-height: 30px; padding: 0 12px; font-size: 13px; }
 .sched-page .sc-body { flex: 1 1 auto; min-height: 0; margin: 0 16px; display: flex; flex-direction: column; }
@@ -265,6 +266,8 @@
 .yard-page .yd-cycle { margin-left: auto; background: #edf6ff; border-radius: 9px; padding: 9px 13px; font-size: 13px; color: var(--ud-blue); }
 .yard-page .yd-grow { margin-left: auto; }
 .yard-page .yd-refresh { min-height: 38px; border: 0; border-radius: 9px; background: #e6f1ff; color: var(--ud-blue); font: inherit; font-weight: 800; padding: 0 15px; cursor: pointer; }
+.yard-page .head .yd-refresh { align-self: center; min-height: 40px; }
+.yard-page .head .yd-refresh[hidden] { display: none; }
 .yard-page table.yd-table { width: 100%; table-layout: fixed; }
 .yard-page table.yd-table td { height: 52px; }
 .yard-page table.yd-table td input, .yard-page table.yd-table td select { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 7px; font: inherit; color: var(--ink); background: #fff; padding: 0 8px; box-sizing: border-box; }
@@ -290,7 +293,7 @@
 /* Phone (the yard hands): one card per trailer, each box saves as it is left, one big Left Yard button; no history. */
 .yard-page .yd-cards { display: none; }
 @media (max-width: 760px) {
-  .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .head .tabs, .yard-page .head .badge-test span, .yard-page .yd-bar, .yard-page #pane-current, .yard-page #pane-history, .yard-page .foot { display: none !important; }
+  .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .head .tabs, .yard-page .head .yd-refresh, .yard-page .head .badge-test span, .yard-page .yd-bar, .yard-page #pane-current, .yard-page #pane-history, .yard-page .foot { display: none !important; }
   .yard-page .yd-cards { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 10px 16px; }
   .yard-page .yd-card { background: #fff; border: 1px solid var(--line); border-left: 6px solid #bf2020; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
   .yard-page .yd-card.done { border-left-color: var(--runs-ink); background: #f6fcf8; }
