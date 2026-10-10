@@ -100,7 +100,7 @@ export async function renderRefreshRates(box) {
   let data = null;
   box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn" id="rr2-reload">Reload schedules</button><button type="button" class="ap-btn" id="rr2-archive">Archive now</button>', '<span class="ap-help" id="rr2-tz"></span>') +
     '<p class="ap-note">Change one job at a time. Saving changes its schedule; it does not run the job now. Each screen also updates by itself the moment the data changes.</p>' +
-    '<div class="ap-scroll"><table class="ap-t"><thead><tr><th>Job</th><th>What it does</th><th>How often</th><th>Last run</th><th></th></tr></thead><tbody id="rr2-rows"></tbody></table></div></div>';
+    '<div class="ap-scroll"><table class="ap-t"><thead><tr><th style="width:20%">Job</th><th style="width:40%">What it does</th><th>How often</th><th>Last run</th><th></th></tr></thead><tbody id="rr2-rows"></tbody></table></div></div>';
   const $ = (s) => box.querySelector(s);
   function control(j) {
     if (j.kind === 'interval') return '<select data-minutes="' + j.key + '">' + data.minutes.filter(m => m >= j.base).map(m => '<option value="' + m + '"' + (m === j.minutes ? ' selected' : '') + '>Every ' + minutesText(m) + '</option>').join('') + '</select>' + (j.warnOver && j.minutes > j.warnOver ? '<small class="ap-chip warn">Readings older than ' + j.warnOver + ' minutes</small>' : '');
