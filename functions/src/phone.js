@@ -83,7 +83,7 @@ async function phoneCall(db, input, now) {
   if (op === 'loads') {
     const date = dates.indexOf(input.date) >= 0 ? input.date : dates[0], p = L.dayPrefix(date);
     const snap = await db.collection(C.runs).where('weekStart', '==', L.weekStart(date)).get();
-    const loads = snap.docs.filter(s => { const d = s.data().days && s.data().days[p]; return d && d.runs && d.driverId === driverId; }).map(s => loadOf(s.data(), s.id, p));
+    const loads = snap.docs.filter(s => { const d = s.data().days && s.data().days[p]; return d && d.runs && d.driverId === driverId && L.liveFlagShown(s.data(), 'displayMobileRoute', 'mobile'); }).map(s => loadOf(s.data(), s.id, p));
     return { date, dates, driver: driver.data().name, loads };
   }
   if (op !== 'checkIn') throw new SaveError('BAD_REQUEST', 'Unknown request');

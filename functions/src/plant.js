@@ -17,6 +17,7 @@ const L = require('./logic');
 const MAINT = require('./maintenance');
 const R = require('./plant-rules');
 const { queueMaster } = require('./masterwrite');
+const M = require('./model');
 
 // Everyone who may save on Daily Dispatch, plus the plant floor.
 const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
@@ -383,5 +384,113 @@ async function saveWash(tx, db, req, email, stamp, logRef, mode, SaveError) {
   return result;
 }
 
+/* ---------- the Plant Operations Scheduler ---------- */
+
+// savePlantSchedule: Save Load (add or edit), Delete Load, and New Supplier on Receiving, as the current app's
+// desktopUiSavePlantScheduleV778. The loads stay in the new app (plantJournal); Shipping's Plant Route loads also go on
+// plantLoads, which Weekly Dispatch reads to show a load that needs a driver.
+const appScheduleId = (type, id) => docId(type + '_app_' + id);
+function validateSchedule(input, SaveError) {
+  const out = { lane: R.lane(input.lane), op: text(input.op) || 'save' };
+  if (['save', 'remove', 'addSupplier'].indexOf(out.op) < 0) throw new SaveError('BAD_REQUEST', 'op must be save, remove or addSupplier');
+  if (out.op === 'addSupplier') {
+    if (out.lane !== 'RECEIVING') throw new SaveError('BAD_REQUEST', 'Suppliers are on Receiving');
+    out.name = text(input.name).replace(/\s+/g, ' ').toUpperCase();
+    out.label = text(input.label).replace(/\s+/g, ' ').slice(0, 40);
+    out.code = text(input.code).toUpperCase();
+    if (!out.name) throw new SaveError('BAD_REQUEST', 'Type the supplier name.');
+    if (out.name.length > 60) throw new SaveError('BAD_REQUEST', 'The supplier name can be up to 60 letters.');
+    if (out.code && !/^[A-Z0-9_-]{1,8}$/.test(out.code)) throw new SaveError('BAD_REQUEST', 'The code can be up to 8 letters or numbers.');
+    return out;
+  }
+  out.id = text(input.id).slice(0, 120);
+  out.date = text(input.date);
+  if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'Pick the delivery date.');
+  if (out.op === 'remove') {
+    if (!out.id) throw new SaveError('BAD_REQUEST', 'Pick the load to delete');
+    return out;
+  }
+  const f = input.fields || {};
+  out.routeId = text(f.routeId).slice(0, 120); out.runId = text(f.runId).slice(0, 120);
+  out.route = text(f.route).slice(0, 60); out.run = text(f.run).slice(0, 120);
+  if (!out.route || !out.routeId || !out.runId) throw new SaveError('BAD_REQUEST', out.lane === 'RECEIVING' ? 'Pick the supplier.' : 'Pick the route / run.');
+  out.pickupTime = R.time24(f.pickupTime);
+  if (!out.pickupTime) throw new SaveError('BAD_REQUEST', 'Enter the pickup time.');
+  out.scheduleType = text(f.scheduleType || 'ROUTE').toUpperCase();
+  if (['ROUTE', 'CARRIER'].indexOf(out.scheduleType) < 0) throw new SaveError('BAD_REQUEST', 'Schedule Type must be Plant Route or Carrier');
+  out.poNumber = text(f.poNumber).slice(0, 40);
+  if (out.scheduleType === 'CARRIER' && !out.poNumber) throw new SaveError('BAD_REQUEST', 'A carrier load needs its PO number.');
+  out.cases = text(f.cases);
+  if (out.cases && !/^[0-9]{1,6}$/.test(out.cases)) throw new SaveError('BAD_REQUEST', 'Cases must be a whole number.');
+  out.product = text(f.product).slice(0, 80);
+  out.notes = text(f.notes).slice(0, 1200);
+  out.loadDate = text(f.loadDate);
+  if (out.loadDate && !L.isDateKey(out.loadDate)) throw new SaveError('BAD_REQUEST', 'The load date must be a date.');
+  if (out.loadDate && out.loadDate > out.date) throw new SaveError('BAD_REQUEST', 'The load date cannot be after the delivery date.');
+  out.trailer = text(f.trailer).toUpperCase();
+  if (out.trailer.length > 24 || /[^A-Z0-9 _\-/.#]/.test(out.trailer)) throw new SaveError('BAD_REQUEST', 'Check the trailer number.');
+  return out;
+}
+
+async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const type = R.LOAD_TYPE[req.lane], journal = db.collection('plantJournal');
+  if (req.op === 'addSupplier') {
+    const docs = (await tx.get(journal.where('type', '==', R.SUPPLIER_TYPE))).docs.map(d => d.data());
+    const list = R.scheduleSuppliers(docs);
+    if (list.some(x => x.run.toUpperCase() === req.name)) throw new SaveError('CONFLICT', req.name + ' is already on the list.');
+    let code = req.code;
+    if (!code) { let n = list.length + 1; do { code = 'S' + String(n).padStart(2, '0'); n++; } while (list.some(x => x.route === code)); }
+    else if (list.some(x => x.route === code)) throw new SaveError('CONFLICT', 'Code ' + code + ' is already used.');
+    const id = 'SUP-' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+    const sup = { recordId: id, type: R.SUPPLIER_TYPE, date: L.operatingDay(new Date(stamp)), status: 'ACTIVE', routeId: id, runId: id, route: code, run: req.name, notes: req.label || req.name,
+      area: 'RECEIVING', payload: {}, createdAt: stamp, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp };
+    tx.set(journal.doc(appScheduleId(R.SUPPLIER_TYPE, id)), sup);
+    const result = { ok: true, requestId: req.requestId, supplier: { routeId: id, runId: id, route: code, run: req.name, name: sup.notes } };
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, lane: req.lane, after: result.supplier, result });
+    return result;
+  }
+  // Reads: the record now (an edit or delete), the customer or supplier list, and the trailers when one was typed.
+  const had = req.id ? R.newestRecords((await tx.get(journal.where('recordId', '==', req.id))).docs.map(d => d.data()), [type])[req.id] : null;
+  if (req.id && (!had || (had.type !== type))) throw new SaveError('NOT_FOUND', 'That load is no longer on the ' + (req.lane === 'RECEIVING' ? 'Receiving' : 'Shipping') + ' schedule.');
+  let choices = [], equipment = [];
+  if (req.op === 'save') {
+    if (req.lane === 'RECEIVING') choices = R.scheduleSuppliers((await tx.get(journal.where('type', '==', R.SUPPLIER_TYPE))).docs.map(d => d.data()));
+    else choices = R.scheduleCustomers((await tx.get(db.collection('routes'))).docs.map(d => Object.assign({ runId: d.id }, d.data())));
+    if (req.trailer) equipment = (await tx.get(db.collection('equipment'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
+  }
+  // All reads are done.
+  const id = req.id || ('SCHED-' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24));
+  const before = had ? R.scheduleEntries([had], req.lane)[0] || null : null;
+  let rec;
+  if (req.op === 'remove') {
+    rec = Object.assign({}, had, { status: 'DELETED', date: had.date || req.date });
+  } else {
+    const pick = choices.filter(r => r.routeId === req.routeId && r.runId === req.runId);
+    if (pick.length !== 1) throw new SaveError('CONFLICT', (req.lane === 'RECEIVING' ? 'That supplier' : 'That route / run') + ' is no longer on the list. The list was refreshed; pick again.');
+    if (pick[0].route !== req.route || pick[0].run !== req.run) throw new SaveError('CONFLICT', 'Route Master changed that run. The list was refreshed; pick again.');
+    let trailer = req.trailer;
+    if (trailer) { const u = MAINT.resolveUnit(trailer, 'TRAILER', equipment); trailer = !u.resolved && /^\d+$/.test(u.unit) ? 'T-' + u.unit : u.unit; }
+    const payload = { pickupTime: req.pickupTime, loadDate: req.loadDate, trailer, scheduleType: req.scheduleType, carrier: req.scheduleType === 'CARRIER', poNumber: req.poNumber,
+      cases: req.cases, product: req.product, notes: req.notes };
+    rec = { recordId: id, type, date: req.date, status: 'SCHEDULED', routeId: req.routeId, runId: req.runId, route: req.route, run: req.run, trailer, notes: req.notes,
+      area: req.lane === 'RECEIVING' ? 'RECEIVING' : 'SCHEDULER', payload, facilityId: (had && had.facilityId) || 'fac_uniontown' };
+  }
+  delete rec.sheetRow; delete rec.cells;
+  Object.assign(rec, { recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  tx.set(journal.doc(appScheduleId(type, id)), rec);
+  // Weekly Dispatch shows a Shipping Plant Route load (not a carrier's) as needing a driver (transfer.js plantLoads).
+  if (req.lane === 'SHIPPING') {
+    const ref = db.collection(M.COLLECTIONS.plantLoads).doc(M.safeIdPart(id)), p = rec.payload || {};
+    if (rec.status === 'DELETED' || p.scheduleType === 'CARRIER' || p.carrier === true || !rec.runId) tx.delete(ref);
+    else tx.set(ref, { runId: rec.runId, route: rec.route, run: rec.run, date: rec.date, status: 'SCHEDULED', pickupTime: p.pickupTime || '', loadDate: p.loadDate || '', trailer: p.trailer || '',
+      poNumber: p.poNumber || '', cases: p.cases || '', product: p.product || '', notes: p.notes || '', facilityId: rec.facilityId || '', createdInApp: true, testEdited: true, editedAt: stamp });
+  }
+  const after = req.op === 'remove' ? null : R.scheduleEntries([rec], req.lane)[0];
+  const result = { ok: true, requestId: req.requestId, id, status: rec.status, date: rec.date };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, lane: req.lane, op: req.op, scheduleId: id, before, after, result });
+  return result;
+}
+
 module.exports = { PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
-  validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId };
+  validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
+  validateSchedule, saveSchedule, appScheduleId };

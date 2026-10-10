@@ -66,7 +66,7 @@ export const MENU = [
   // Joe 10/10: Dispatch Administration has its own Administration section (out of the Dispatch menu).
   ['Administration', [['Dispatch Administration', 'admin.html', 'gear']]],
   // The plant side (the current app's Plant Menu): the departments page and each department's screen.
-  ['Plant', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash']]]
+  ['Plant', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Plant Operations Scheduler', 'scheduler.html', 'week']]]
 ];
 function addSideMenu() {
   const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
@@ -149,7 +149,7 @@ const PAGE_ICON = {
   'gps.html': 'distribution-truck-v1-560.webp', 'scorecard.html': 'distribution-truck-v1-560.webp',
   'equipment.html': 'maintenance-tractor-v1-560.webp', 'maint.html': 'maintenance-tractor-v1-560.webp', 'issues.html': 'maintenance-tractor-v1-560.webp',
   'garage.html': 'maintenance-tractor-v1-560.webp', 'fleet.html': 'maintenance-trailer-v1-560.webp',
-  'plant.html': 'plant-building-v1-560.webp', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash',
+  'plant.html': 'plant-building-v1-560.webp', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'distribution-truck-v1-560.webp',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {

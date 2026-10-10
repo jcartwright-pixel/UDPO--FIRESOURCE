@@ -109,6 +109,16 @@
     return ((h % 12) || 12) + ':' + pad(m) + ' ' + ampm;
   }
 
+  // Daily Dispatch and the drivers' phone, as the current app reads a Live row (udpoV780VisibleBase_): the run must be ACTIVE, the
+  // Live row's flag decides, a blank flag takes Route Master's, and blank in both is hidden. A run copied before Route Master's
+  // flags were kept on it (no masterShow) keeps the old reading: only a FALSE hides it.
+  function liveFlagShown(run, field, masterField) {
+    if (!routeIsShown(run, field)) return false;
+    if (run[field] === true) return true;
+    if (!run.masterShow) return true;
+    return run.masterShow[masterField] === true;
+  }
+
   function routeIsShown(run, flag) {
     var status = String(run.routeStatus || 'ACTIVE').trim().toUpperCase();
     if (status && status !== 'ACTIVE') return false;
@@ -224,7 +234,7 @@
   function dailyRows(runs, loadDate) {
     var rows = [];
     (runs || []).forEach(function (run) {
-      if (!routeIsShown(run, 'displayDaily')) return;
+      if (!liveFlagShown(run, 'displayDaily', 'daily')) return;
       loadBlocksFor(run, loadDate).forEach(function (block) {
         var day = run.days[block.prefix];
         rows.push({
@@ -523,7 +533,7 @@
   function checkinRows(runs, deliveryDate) {
     var prefix = dayPrefix(deliveryDate), week = weekStart(deliveryDate), rows = [];
     (runs || []).forEach(function (run) {
-      if (run.weekStart !== week || !routeIsShown(run, 'displayDaily')) return;
+      if (run.weekStart !== week || !liveFlagShown(run, 'displayDaily', 'daily')) return;
       var d = run.days && run.days[prefix];
       if (!d || !d.runs) return;
       var issues = [];
@@ -572,7 +582,7 @@
   function notRunningRows(runs, loadDate) {
     var rows = [];
     (runs || []).forEach(function (run) {
-      if (!routeIsShown(run, 'displayDaily')) return;
+      if (!liveFlagShown(run, 'displayDaily', 'daily')) return;
       DAYS.forEach(function (prefix) {
         var day = run.days && run.days[prefix];
         if (!day || day.runs) return;
@@ -784,7 +794,7 @@
     fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
-    weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
+    liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
