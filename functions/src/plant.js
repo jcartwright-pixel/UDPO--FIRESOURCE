@@ -646,6 +646,56 @@ async function saveShiftNote(tx, db, req, email, stamp, logRef, mode, SaveError)
   return result;
 }
 
-module.exports = { validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+/* ---------- Cooler Temperatures ---------- */
+
+// saveTemperatureCheck: a manual reading for one location, as desktopUiSavePlantTemperatureCheckCurrentRoutedV787_.
+function validateTemperature(input, SaveError) {
+  const out = { locationId: text(input.locationId).slice(0, 120), notes: text(input.notes).slice(0, 800) };
+  if (!out.locationId) throw new SaveError('BAD_REQUEST', 'Temperature location is not configured for this plant.');
+  const manual = text(input.manualTemperature);
+  if (manual === '' || !isFinite(Number(manual))) throw new SaveError('BAD_REQUEST', 'Enter a valid manual temperature before saving.');
+  out.manualTemperature = Number(manual);
+  return out;
+}
+
+async function saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const got = await tx.get(db.collection('plantSetup').doc(docId(req.locationId)));
+  const d = got.exists ? got.data() : null;
+  if (!d || d.type !== 'TEMPERATURE_CHECK_LOCATION' || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Temperature location is not configured for this plant.');
+  const loc = R.tempLocations([d])[0], now = new Date(stamp), day = L.operatingDay(now);
+  const recent = (await tx.get(db.collection('plantJournal').where('date', 'in', [L.addDays(day, -1), day]))).docs.map(x => x.data());
+  const left = R.tempLockLeft(recent, loc, now.getTime());
+  if (left) throw new SaveError('CONFLICT', loc.location + ' was already checked. It can be checked again in ' + left + ' minutes.');
+  const status = R.tempStatus(loc, req.manualTemperature);
+  const payload = { locationId: loc.locationId, location: loc.location, manualTemperature: req.manualTemperature, notes: req.notes, status, sensorId: loc.sensorId, sensorTemperature: '', batteryLevel: '', source: 'PLANT TEMPERATURE MANUAL CHECK' };
+  const id = R.TEMP_TYPE + '_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+  tx.set(db.collection('plantJournal').doc(id), { recordId: 'TEMP-' + req.requestId.slice(0, 40), type: R.TEMP_TYPE, date: day, status, area: loc.location, temperature: String(req.manualTemperature),
+    notes: req.notes, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  const result = { ok: true, requestId: req.requestId, recordId: 'TEMP-' + req.requestId.slice(0, 40), locationId: loc.locationId, status, recordedAt: stamp, message: loc.location + ' temperature recorded. This location is locked for 2 hours.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, locationId: loc.locationId, after: payload, result });
+  return result;
+}
+
+/* ---------- Send Current Report ---------- */
+
+// sendPlantReport: keeps the report as it was sent (subject, text, note). Email is not set up in the new app yet, so it is held,
+// not emailed; the current app's Send Current Report emails the Plant Managers group through its outbound email policy.
+function validateReport(input, SaveError) {
+  const out = { subject: text(input.subject).slice(0, 200), body: text(input.text).slice(0, 20000), note: text(input.note).slice(0, 1500), groupName: text(input.groupName).slice(0, 100) || 'Plant Managers' };
+  if (!out.subject || !out.body) throw new SaveError('BAD_REQUEST', 'The report is still loading. Try again in a moment.');
+  return out;
+}
+
+async function sendReport(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const id = 'REPORT_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 30);
+  const record = { subject: req.subject, text: req.body, note: req.note, groupName: req.groupName, status: 'HELD', emailed: false, date: L.operatingDay(new Date(stamp)), at: stamp, by: email, mode: mode.mode };
+  tx.set(db.collection('plantReports').doc(id), record);
+  const result = { ok: true, requestId: req.requestId, reportId: id, sent: false, subject: req.subject,
+    message: 'Report saved. Email is not set up in the new app yet, so it was not emailed to ' + req.groupName + '.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, reportId: id, result });
+  return result;
+}
+
+module.exports = { validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

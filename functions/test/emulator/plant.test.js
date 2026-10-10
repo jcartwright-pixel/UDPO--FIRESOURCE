@@ -168,3 +168,29 @@ test('Shift Notes: an entry and a review note under it are saved, kept by the ne
   const entry = R.shiftLog(all, Date.now()).find(r => r.entryId === first.entryId);
   assert.deepEqual([entry.type, entry.equipment, entry.notes, entry.status, entry.reviews.map(r => r.entry)], ['Breakdown', 'Palletizer', 'Maintenance to look at the infeed', 'RESOLVED', ['Infeed sensor cleaned']]);
 });
+
+/* ---------- Plant Temperatures & Coolers ---------- */
+test('Temperatures: a manual reading is saved with HIGH / LOW from the limits and locks its location for 2 hours', async () => {
+  const t = (fields) => applyAction(db(), DISPATCHER, Object.assign({ action: 'saveTemperatureCheck', requestId: rid() }, fields));
+  await assert.rejects(t({ locationId: 'ut_prod_boxing', manualTemperature: '38' }), /Temperature location is not configured/);
+  await assert.rejects(t({ locationId: 'ut_temp_cooler_north', manualTemperature: '' }), /Enter a valid manual temperature/);
+  const res = await t({ locationId: 'ut_temp_cooler_north', manualTemperature: '44.5', notes: 'Door left open' });
+  assert.equal(res.status, 'HIGH');
+  assert.match(res.message, /Cooler North temperature recorded\. This location is locked for 2 hours/);
+  await assert.rejects(t({ locationId: 'ut_temp_cooler_north', manualTemperature: '38' }), /Cooler North was already checked\. It can be checked again in 120 minutes/);
+  const middle = await t({ locationId: 'ut_temp_cooler_middle', manualTemperature: '36' });
+  assert.equal(middle.status, 'RECORDED');
+  await copy();
+  const all = (await db().collection('plantJournal').where('type', '==', 'PLANT_TEMPERATURE_CHECK').get()).docs.map(d => d.data());
+  const rows = R.tempRows((await db().collection('plantSetup').get()).docs.map(d => d.data()), all, Date.now());
+  assert.deepEqual(rows.map(r => [r.location, r.lastManualTemperature, r.lastStatus, r.locked]), [['Cooler North', 44.5, 'HIGH', true], ['Cooler Middle', 36, 'RECORDED', true]]);
+});
+
+/* ---------- Send Current Report ---------- */
+test('Send Current Report: the report is kept as sent and not emailed (email is not set up in the new app)', async () => {
+  const res = await applyAction(db(), DISPATCHER, { action: 'sendPlantReport', requestId: rid(), subject: 'Plant Update 10/8 10:00 AM: All routes on time', text: 'ROUTES BEHIND (0)', note: 'Short staffed on second shift' });
+  assert.equal(res.sent, false);
+  assert.match(res.message, /Report saved\. Email is not set up in the new app yet, so it was not emailed to Plant Managers/);
+  const kept = (await db().collection('plantReports').doc(res.reportId).get()).data();
+  assert.deepEqual([kept.subject, kept.note, kept.status, kept.emailed], ['Plant Update 10/8 10:00 AM: All routes on time', 'Short staffed on second shift', 'HELD', false]);
+});

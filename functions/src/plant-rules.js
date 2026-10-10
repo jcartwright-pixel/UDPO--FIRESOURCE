@@ -32,6 +32,21 @@
  *   - an entry has a type, equipment / area, shift, reading time, what happened, next steps and a follow-up status;
  *   - a review note hangs under its entry and the entry's status is its newest review's; the log shows the last 24 hours;
  *   - the shift by the hour: 6 AM to 2:59 PM first, 3 PM to 11:59 PM second, midnight to 5:59 AM third.
+ *
+ * And Cooler Temperatures' (Plant Temperatures & Coolers, 025_V730_PlantTemperatureChecks.gs):
+ *   - the locations are the active TEMPERATURE_CHECK_LOCATION rows of PLANT_OPERATIONS_MASTER, in view order, with the
+ *     sensor id and low / high limits from days_json;
+ *   - a manual reading is HIGH above the high limit, LOW below the low limit, else RECORDED; a location is locked for
+ *     2 hours after its last manual reading; a location with no sensor reading shows MANUAL ONLY;
+ *   - the 24-hour history lists every reading, newest first.
+ *
+ * And Manager Center's (218_V7275_ManagerCenterCounts.gs) and Send Current Report's (217_V7271_PlantCurrentReport.gs):
+ *   - every mini-card number comes from the same rules as the screen it opens;
+ *   - Scheduler: this month, this week (Sunday to Saturday), today, and loads from today to Saturday with no trailer (carriers bring their own);
+ *   - Quality: lines, lines down (DOWN or a FAIL label check), tip tests and fails in 24 hours, the last weight, checks in 24 hours;
+ *   - Shift Notes: handoff entries, other issues, entries not resolved, all entries in 24 hours;
+ *   - the report: a load not done whose depart time is 30 minutes away or past is behind; breakdowns are Breakdown entries of the
+ *     Incident & Breakdown Log not resolved; the subject is "Plant Update <time>: N routes behind" or "All routes on time".
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -390,6 +405,153 @@
     });
   }
 
+  /* ---------- Cooler Temperatures ---------- */
+  var TEMP_TYPE = 'PLANT_TEMPERATURE_CHECK', TEMP_LOCK_MINUTES = 120;
+  function limit(v) { return v === '' || v === null || v === undefined || !isFinite(Number(v)) ? '' : Number(v); }
+  function tempLocations(setup) {
+    return (setup || []).filter(function (r) { return r.type === 'TEMPERATURE_CHECK_LOCATION' && (r.status || 'ACTIVE') === 'ACTIVE'; }).map(function (r) {
+      var s = r.settings || {};
+      return { locationId: r.operationId, location: text(r.name), viewSequence: Number(r.viewSequence) || 999999, sensorId: text(s.sensorId || s.mocreoSensorId), sensorName: text(s.sensorName),
+        lowLimit: limit(s.lowLimit), highLimit: limit(s.highLimit), staleMinutes: Number(s.staleMinutes) || 30 };
+    }).sort(function (a, b) { return a.viewSequence - b.viewSequence || a.location.localeCompare(b.location); });
+  }
+  function tempStatus(loc, reading) {
+    var t = Number(reading);
+    if (!isFinite(t)) return '';
+    return loc.highLimit !== '' && t > loc.highLimit ? 'HIGH' : loc.lowLimit !== '' && t < loc.lowLimit ? 'LOW' : 'RECORDED';
+  }
+  function tempReadings(journal) {
+    return (journal || []).filter(function (d) { return text(d.type).toUpperCase() === TEMP_TYPE; }).map(function (d) {
+      var p = payloadOf(d);
+      return { recordId: text(d.recordId), locationId: text(p.locationId), location: text(p.location), manualTemperature: p.manualTemperature === undefined || p.manualTemperature === null ? '' : p.manualTemperature,
+        sensorTemperature: p.sensorTemperature === undefined || p.sensorTemperature === null ? '' : p.sensorTemperature, batteryLevel: p.batteryLevel === undefined || p.batteryLevel === null ? '' : p.batteryLevel,
+        status: text(p.status || d.status).toUpperCase(), notes: text(p.notes !== undefined ? p.notes : d.notes), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy) };
+    }).sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
+  }
+  function tempKey(v) { return text(v).toUpperCase(); }
+  // Minutes left on a location's 2-hour lock (0 = it can be read again).
+  function tempLockLeft(journal, loc, nowMs) {
+    var last = tempReadings(journal).filter(function (r) { return r.manualTemperature !== '' && (tempKey(r.locationId) === tempKey(loc.locationId) || (!r.locationId && tempKey(r.location) === tempKey(loc.location))); })[0];
+    if (!last) return 0;
+    var age = (nowMs - when(last.recordedAt)) / 60000;
+    return age < TEMP_LOCK_MINUTES ? Math.ceil(TEMP_LOCK_MINUTES - age) : 0;
+  }
+  // The Current table: one row per location with its last manual reading and lock.
+  function tempRows(setup, journal, nowMs) {
+    var readings = tempReadings(journal);
+    return tempLocations(setup).map(function (loc) {
+      var last = readings.filter(function (r) { return r.manualTemperature !== '' && (tempKey(r.locationId) === tempKey(loc.locationId) || (!r.locationId && tempKey(r.location) === tempKey(loc.location))); })[0] || null;
+      var left = tempLockLeft(journal, loc, nowMs);
+      return Object.assign({}, loc, { sensorTemp: '', batteryLevel: '', sensorLastReadingAt: '', status: 'MANUAL ONLY', lastCheckedAt: last ? last.recordedAt : '', lastCheckedBy: last ? last.recordedBy : '',
+        lastManualTemperature: last ? last.manualTemperature : '', lastStatus: last ? last.status : '', locked: left > 0, minutesUntilDue: left });
+    });
+  }
+  function tempHistory(journal, nowMs) {
+    return tempReadings(journal).filter(function (r) { var t = when(r.recordedAt); return !t || t >= nowMs - 86400000; });
+  }
+
+  /* ---------- Manager Center ---------- */
+  function weekOf(key) { var n = dayNum(key); if (n === null) return null; var start = n - ((n + 4) % 7); return { start: dayKey(start), end: dayKey(start + 6) }; }
+  function managerSchedule(entries, date) {
+    var wk = weekOf(date), month = String(date).slice(0, 7), list = (entries || []).filter(function (e) { return e.status !== 'DELETED'; });
+    var today = list.filter(function (e) { return e.date === date; }), times = today.map(function (e) { return e.pickupTime; }).filter(Boolean).sort();
+    return { month: list.filter(function (e) { return String(e.date).slice(0, 7) === month; }).length, monthKey: month,
+      week: wk ? list.filter(function (e) { return e.date >= wk.start && e.date <= wk.end; }).length : 0, today: today.length, next: times[0] || '',
+      needTrailer: wk ? list.filter(function (e) { return e.date >= date && e.date <= wk.end && e.scheduleType !== 'CARRIER' && !text(e.trailer); }).length : 0 };
+  }
+  function managerQuality(lines, history) {
+    var tips = (history || []).filter(function (h) { return text(h.tipTest) !== ''; });
+    var weighed = (history || []).filter(function (h) { var w = h.weights || {}; return Object.keys(w).some(function (k) { return text(w[k]) !== ''; }); })[0];
+    return { lines: (lines || []).length, down: (lines || []).filter(function (l) { var x = l.last || {}; return text(x.status).toUpperCase() === 'DOWN' || text(x.qualityCheck).toUpperCase() === 'FAIL'; }).length,
+      tipTests: tips.length, tipFails: tips.filter(function (h) { return /^(FAIL|REVIEW)$/i.test(text(h.tipTest)); }).length, lastWeight: weighed ? weighed.recordedAt : '', history: (history || []).length };
+  }
+  function tempAlert(r) { return ['HIGH', 'LOW', 'STALE', 'SENSOR ERROR'].indexOf(r.status) >= 0 || r.lastStatus === 'HIGH' || r.lastStatus === 'LOW'; }
+  function managerTemps(rows, history) {
+    var last = (rows || []).map(function (r) { return r.lastCheckedAt; }).filter(Boolean).sort().pop() || '';
+    return { sensors: (rows || []).filter(function (r) { return r.sensorId; }).length, offline: (rows || []).filter(function (r) { return r.status === 'OFFLINE'; }).length,
+      alerts: (rows || []).filter(tempAlert).length, lastManual: last, history: (history || []).length };
+  }
+  function managerNotes(log) {
+    var type = function (r) { return text(r.type).toUpperCase(); };
+    return { handoff: (log || []).filter(function (r) { return type(r) === 'HANDOFF'; }).length, issues: (log || []).filter(function (r) { return type(r) !== 'HANDOFF'; }).length,
+      open: (log || []).filter(function (r) { return r.status !== 'RESOLVED'; }).length, history: (log || []).length };
+  }
+
+  /* ---------- Send Current Report ---------- */
+  var REPORT_BEHIND = 30, REPORT_AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
+  function zoned(ms, opts) { return new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: YARD_ZONE }, opts)).format(new Date(ms)); }
+  function clockOf(v) { var t = typeof v === 'number' ? v : Date.parse(v || ''); return isFinite(t) && t ? zoned(t, { hour: 'numeric', minute: '2-digit' }) : text(v); }
+  function minutesText12(m) { if (m === null || m === undefined || m === '') return ''; var h = Math.floor(m / 60) % 24, mm = m % 60; return (h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm + ' ' + (h < 12 ? 'AM' : 'PM'); }
+  function lateText(minutes) { var m = Math.abs(minutes), h = Math.floor(m / 60), t = h ? h + ' h ' + (m % 60) + ' min' : m + ' min'; return minutes <= 0 ? t + ' late' : 'departs in ' + t; }
+  function statusWord(s) { return s === 'WAITING' ? 'NOT LOADED' : s === 'DONE' ? 'COMPLETE' : s; }
+  // Every part of the report from what the screens already show: loads (the Loadout Center's rows), open pickups, the shift log,
+  // the production lines with their last checks, the temperature rows.
+  function plantReport(input, nowMs) {
+    var now = wallClock(nowMs), out = { behind: [], nextUp: [], loaded: [], leftToLoad: 0, total: 0 }, areas = {};
+    REPORT_AREAS.forEach(function (a) { areas[a] = { area: a, left: 0, total: 0 }; });
+    (input.loads || []).forEach(function (r) {
+      if (!areas[r.area]) return;
+      var depart = dayNum(r.loadDate), until = depart === null || r.dispatchTime === null || r.dispatchTime === undefined ? null : depart * 1440 + clockMinutes(r.dispatchTime) - now;
+      var item = { route: text(r.route), run: text(r.run), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
+        startedAt: r.startedAt ? clockOf(r.startedAt) : '', priorDay: !!r.prior, loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
+      areas[r.area].total++; out.total++;
+      if (r.state === 'DONE') { out.loaded.push(item); return; }
+      areas[r.area].left++; out.leftToLoad++;
+      if (until !== null && until <= REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); } else out.nextUp.push(item);
+    });
+    var byDepart = function (a, b) { var x = a.minutesUntil === null ? 1e9 : a.minutesUntil, y = b.minutesUntil === null ? 1e9 : b.minutesUntil; return x - y || a.route.localeCompare(b.route, undefined, { numeric: true }); };
+    out.behind.sort(byDepart);
+    out.nextUp.sort(function (a, b) { return Number(a.priorDay) - Number(b.priorDay) || a.loadSequence - b.loadSequence || byDepart(a, b); });
+    out.loaded.sort(function (a, b) { return byDepart(b, a); });
+    var down = (input.shiftLog || []).filter(function (r) { return text(r.type).toUpperCase() === 'BREAKDOWN' && r.status !== 'RESOLVED'; })
+      .map(function (r) { return { equipment: r.equipment, entry: r.entry, shift: r.shift, status: r.status || 'OPEN', at: r.recordedAt ? clockOf(r.recordedAt) : '' }; });
+    var pickups = (input.pickups || []).filter(function (p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(text(p.status).toUpperCase()) < 0; })
+      .map(function (p) { return { route: text(p.route), run: text(p.run), product: text(p.item || p.product), quantity: text(p.quantity) }; });
+    var lines = (input.lines || []).map(function (l) {
+      var x = l.last || {}, status = text(x.status).toUpperCase(), check = text(x.qualityCheck).toUpperCase();
+      return { line: l.name, status: status, product: text(x.product), qualityCheck: check, lastCheckedAt: x.recordedAt ? clockOf(x.recordedAt) : '', notes: text(x.notes), flag: status === 'DOWN' || check === 'FAIL' };
+    });
+    var temps = (input.temps || []).map(function (t) {
+      var status = t.status === 'MANUAL ONLY' ? (t.lastManualTemperature === '' ? 'NO CHECK' : t.lastStatus === 'RECORDED' ? 'OK' : t.lastStatus) : t.status === 'IN RANGE' ? 'OK' : t.status;
+      var lim = t.lowLimit !== '' && t.highLimit !== '' ? t.lowLimit + '–' + t.highLimit : t.highLimit !== '' ? '≤ ' + t.highLimit : t.lowLimit !== '' ? '≥ ' + t.lowLimit : '';
+      return { location: t.location, reading: t.sensorTemp !== '' ? String(t.sensorTemp) : String(t.lastManualTemperature), status: status, limit: lim, lastCheckedAt: t.lastCheckedAt ? clockOf(t.lastCheckedAt) : '',
+        due: t.status === 'MANUAL ONLY' && !t.locked, flag: ['HIGH', 'LOW', 'OFFLINE', 'STALE', 'SENSOR ERROR'].indexOf(status) >= 0 };
+    });
+    var r = { timeLabel: zoned(nowMs, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ''),
+      dayLabel: zoned(nowMs, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + zoned(nowMs, { hour: 'numeric', minute: '2-digit' }),
+      behindMinutes: REPORT_BEHIND, behind: out.behind, nextUp: out.nextUp, loaded: out.loaded, leftToLoad: out.leftToLoad, totalLoads: out.total,
+      areas: REPORT_AREAS.map(function (a) { return areas[a]; }).filter(function (a) { return a.total > 0; }), down: down, pickups: pickups, lines: lines, temperatures: temps };
+    r.counts = { behind: r.behind.length, leftToLoad: r.leftToLoad, pickups: pickups.length, down: down.length, linesDown: lines.filter(function (l) { return l.flag; }).length, tempsOut: temps.filter(function (t) { return t.flag; }).length };
+    r.subject = 'Plant Update ' + r.timeLabel + ': ' + (r.behind.length ? r.behind.length + ' route' + (r.behind.length === 1 ? '' : 's') + ' behind' : 'All routes on time');
+    r.smooth = !r.counts.behind && !r.counts.down && !r.counts.linesDown && !r.counts.tempsOut;
+    r.text = reportText(r);
+    return r;
+  }
+  function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
+  function reportText(r) {
+    var L = [];
+    L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': every route due within ' + r.behindMinutes + ' minutes is COMPLETE'));
+    r.behind.forEach(function (x) { L.push('  ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.startedAt ? ' since ' + x.startedAt : '') + '  ' + x.late + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '')); });
+    L.push('');
+    L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in the Incident & Breakdown Log'));
+    r.down.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + (d.at ? '  logged ' + d.at : '') + (d.shift ? ' ' + d.shift.toLowerCase() : '') + '  ' + d.status); });
+    L.push('');
+    L.push('PICKUPS OPEN (' + r.pickups.length + ')');
+    r.pickups.forEach(function (p) { L.push('  ' + [p.route, p.run].filter(Boolean).join(' ') + '  ' + [p.quantity, p.product].filter(Boolean).join(' ')); });
+    L.push('');
+    L.push('STILL TO LOAD: ' + r.leftToLoad + ' of ' + r.totalLoads + (r.areas.length ? '   ' + r.areas.map(function (a) { return a.area.charAt(0) + a.area.slice(1).toLowerCase() + ' ' + a.left + ' of ' + a.total; }).join(' · ') : ''));
+    r.behind.concat(r.nextUp).forEach(function (x, i) { L.push('  ' + (i + 1) + '. ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.late ? '  ' + x.late : '') + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '') + (x.priorDay ? '  (from yesterday)' : '')); });
+    L.push('');
+    L.push('PRODUCTION');
+    if (!r.lines.length) L.push('  No production lines set up');
+    r.lines.forEach(function (l) { L.push('  ' + l.line + '  ' + (l.status || 'no status') + (l.product ? '  ' + l.product : '') + (l.lastCheckedAt ? '  quality check ' + l.lastCheckedAt + (l.qualityCheck ? ' ' + l.qualityCheck : '') : '') + (l.flag && l.notes ? '  (' + l.notes + ')' : '')); });
+    L.push('');
+    L.push('TEMPERATURES');
+    if (!r.temperatures.length) L.push('  No temperature locations set up');
+    r.temperatures.forEach(function (t) { L.push('  ' + t.location + '  ' + (t.reading !== '' ? t.reading + '°F' : '-') + '  ' + t.status + (t.limit ? ' (limit ' + t.limit + ')' : '') + (t.due ? '  check due' : '')); });
+    return L.join('\n');
+  }
+
   return { unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
@@ -397,5 +559,8 @@
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
-    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog };
+    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
+    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
+    weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
+    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName };
 });
