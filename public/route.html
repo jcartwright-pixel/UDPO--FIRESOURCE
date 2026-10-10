@@ -107,6 +107,8 @@
       const { functions } = await start();
       try { return (await httpsCallable(functions, 'phone')(Object.assign({ code, op }, fields || {}))).data; }
       catch (e) {
+        // A plain sentence for the driver, without the server's status number on the end.
+        e.message = String(e.message || e).replace(/\s*\[\d{3}\]\s*$/, '');
         if (/code is not right|not turned on/.test(e.message)) { code = ''; store.set('code', ''); show(); }
         if (/Pick your name/.test(e.message)) { driverId = ''; store.set('driverId', ''); show(); }
         throw e;
