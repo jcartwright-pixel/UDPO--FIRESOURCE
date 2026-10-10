@@ -121,6 +121,14 @@ jobs:
               echo "Scope: https://www.googleapis.com/auth/gmail.send"
             } >> "$GITHUB_STEP_SUMMARY"
             echo "Report email client ID: ${client:-could not read}"
+            # MOCREO sensors (src/mocreo.js): the server reads MOCREO_API_KEY and MOCREO_ASSET_ID from Secret Manager each run.
+            # Joe adds the two secrets himself; nothing here sees them.
+            gcloud services enable secretmanager.googleapis.com --project "$PROJECT" --quiet \
+              || echo "::warning::Could not turn on Secret Manager for $PROJECT; MOCREO sensors stay off until it is on."
+            gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$runtime" \
+              --role=roles/secretmanager.secretAccessor --condition=None --quiet >/dev/null \
+              && echo "Server account may read the MOCREO secrets: yes" \
+              || echo "::warning::Could not let $runtime read secrets (Secret Manager Secret Accessor); MOCREO sensors stay off until it can."
           else
             printf '%s\n' "$PRODUCTION_ENV" > .env
           fi

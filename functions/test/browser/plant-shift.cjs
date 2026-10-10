@@ -1,7 +1,8 @@
 'use strict';
 /*
- * Browser check of Shift Notes (Incident & Breakdown Log) on the made-up plant: the desktop form as the current app, a saved
- * entry on another open screen's 24-hour log at once, a review note under it that changes its status, and the phone form.
+ * Browser check of Shift Notes (Incident & Breakdown Log) on the made-up plant: the desktop form as the current app, an entry
+ * saved box by box (no Save button, the shift from the time) on another open screen's 24-hour log at once, a review note and
+ * status that save as they are changed, and the phone form.
  * One entry from earlier in the day is seeded with the real clock, since the log keeps the last 24 hours. Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -54,8 +55,10 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       const page = await openPage(browser, w, h, '/shiftnotes.html' + MANAGER);
       await page.waitForSelector('#fields .sn-entry');
-      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'Shift', 'Reading Time', 'Entry / Measurements', 'Notes / Follow-up', 'Follow-up']);
-      assert.equal(await page.textContent('#record'), 'Save Timestamped Entry');
+      // Joe 10/10: no shift picker (the shift comes from the time) and no Save button (each box saves as it is left).
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'Reading Time', 'Entry / Measurements', 'Notes / Follow-up', 'Follow-up']);
+      assert.equal(await page.$('#record'), null, 'Shift Notes has no Save button');
+      assert.match(await page.textContent('#shift-now'), /^(First|Second|Third) shift$/);
       await fits(page, 'Shift Notes ' + w + 'x' + h);
       await shots(page, 'shiftnotes-current', w);
       await page.click('[data-pane="history"]');
@@ -70,35 +73,40 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     const desk = await openPage(browser, 1920, 950, '/shiftnotes.html' + MANAGER);
     await watcher.waitForFunction(() => document.querySelectorAll('#history .sn-card').length === 1);
     await desk.waitForSelector('#fields .sn-entry');
-    await desk.click('#record');
-    await desk.waitForFunction(() => /Enter report information before saving/.test(document.getElementById('error').textContent));
     await desk.selectOption('.sn-type', 'Safety');
     await desk.fill('.sn-equip', 'Cooler 2 floor');
+    await desk.press('.sn-equip', 'Tab');
     await desk.fill('.sn-entry', 'Water on the floor by the north door');
-    await desk.fill('.sn-notes', 'Maintenance to check the drain');
     const t0 = Date.now();
-    await desk.click('#record');
-    await desk.waitForFunction(() => document.querySelector('.sn-entry').value === '' && !document.getElementById('saved').hidden);
-    const shown = Date.now() - t0;
+    await desk.press('.sn-entry', 'Tab');
     await watcher.waitForFunction(() => document.querySelectorAll('#history .sn-card').length === 2 && /Safety · Cooler 2 floor[\s\S]*Water on the floor/.test(document.querySelector('#history .sn-card').textContent), null, { timeout: 8000 });
-    results.push('Save Timestamped Entry: form cleared in ' + shown + ' ms, top of the other screen\'s log in ' + (Date.now() - t0) + ' ms');
+    const shown = Date.now() - t0;
+    await desk.fill('.sn-notes', 'Maintenance to check the drain');
+    await desk.press('.sn-notes', 'Tab');
+    await watcher.waitForFunction(() => /Water on the floor[\s\S]*Maintenance to check the drain/.test(document.querySelector('#history .sn-card').textContent), null, { timeout: 8000 });
+    await desk.waitForSelector('#another:not([hidden])');
+    await desk.click('#another');
+    assert.equal(await desk.inputValue('.sn-entry'), '', 'Start Another Entry empties the form');
+    results.push('Entry saved on leaving the box: top of the other screen\'s log in ' + shown + ' ms, notes added to the same entry; Start Another Entry empties the form');
     // A review note on the seeded entry marks it resolved on both screens.
-    await watcher.waitForSelector('[data-review-text="SHIFT-seed1"]');
-    await watcher.fill('[data-review-text="SHIFT-seed1"]', 'Seal replaced, door closes');
-    await watcher.selectOption('[data-review-status="SHIFT-seed1"]', 'RESOLVED');
+    // The review note and the status each save as they are changed.
+    await watcher.waitForSelector('#history [data-review="SHIFT-seed1"]');
+    await watcher.fill('#history [data-review="SHIFT-seed1"]', 'Seal replaced, door closes');
+    await watcher.press('#history [data-review="SHIFT-seed1"]', 'Tab');
+    await watcher.waitForFunction(() => [...document.querySelectorAll('#history .sn-card')].some(c => /Dock 3 door[\s\S]*Seal replaced/.test(c.textContent)), null, { timeout: 8000 });
     const t1 = Date.now();
-    await watcher.click('[data-review-save="SHIFT-seed1"]');
-    await watcher.waitForFunction(() => [...document.querySelectorAll('#history .sn-card')].some(c => /Dock 3 door[\s\S]*Resolved[\s\S]*Review ·[\s\S]*Seal replaced/.test(c.textContent)));
+    await watcher.selectOption('#history [data-status="SHIFT-seed1"]', 'RESOLVED');
+    await watcher.waitForFunction(() => document.querySelector('#history [data-status="SHIFT-seed1"]').value === 'RESOLVED' && /Marked Resolved/.test(document.getElementById('history').textContent), null, { timeout: 8000 });
     const reviewShown = Date.now() - t1;
     await desk.click('[data-pane="history"]');
-    await desk.waitForFunction(() => [...document.querySelectorAll('#history .sn-card')].some(c => /Seal replaced/.test(c.textContent) && !/saving/.test(c.textContent)), null, { timeout: 8000 });
+    await desk.waitForFunction(() => [...document.querySelectorAll('#history .sn-card')].some(c => /Seal replaced/.test(c.textContent)) && document.querySelector('#history [data-status="SHIFT-seed1"]').value === 'RESOLVED', null, { timeout: 8000 });
     results.push('Review note (Resolved): on screen in ' + reviewShown + ' ms, on the other screen in ' + (Date.now() - t1) + ' ms');
     assert.equal(await cards(desk), 2);
     if (SHOTS) await watcher.screenshot({ path: path.join(SHOTS, 'shiftnotes-reviewed-1920.png'), scale: 'css' });
     const phone = await openPage(browser, 412, 860, '/shiftnotes.html' + MANAGER);
     await phone.waitForSelector('#fields .sn-entry');
-    assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'Equipment / area', 'What happened?', 'Next steps Optional', 'Status']);
-    assert.equal(await phone.textContent('#record'), 'Save Entry');
+    assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'What happened?', 'Next steps Optional', 'Status']);
+    assert.equal(await phone.$('#record'), null, 'no Save button on the phone');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'shiftnotes-phone-412.png'), scale: 'css' });
     await phone.click('[data-pane="history"]');
     await phone.waitForFunction(() => document.querySelectorAll('#history .sn-card').length === 2);

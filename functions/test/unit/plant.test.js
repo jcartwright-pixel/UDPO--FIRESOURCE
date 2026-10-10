@@ -224,8 +224,9 @@ test('quality: the active lines in view order with their last check; each line r
   assert.deepEqual([lines[0].last.product, lines[0].last.status, lines[0].today], ['Skim', 'DOWN', 2]);
   assert.deepEqual([lines[4].last.status, lines[4].last.cycleTime, lines[1].last.status], ['REVIEW', '7.8', undefined]);
   assert.deepEqual(R.qualityHistory([app], status, Date.parse('2026-10-08T20:00:00Z')).map(h => h.area), ['BOXING', 'BLOW MOLD', 'BOXING']);
-  assert.deepEqual([R.qualitySkip('Boxing'), R.qualitySkip('TOTES'), R.qualitySkip('HTST #2'), R.qualitySkip('GALLON FILLER')],
-    [{ cycle: true }, { cycle: true, weight: true }, { cycle: true, weight: true, tip: true }, {}]);
+  // Joe 10/10 (typed): Totes have no tip test; Raypak keeps it.
+  assert.deepEqual([R.qualitySkip('Boxing'), R.qualitySkip('TOTES'), R.qualitySkip('RAYPAK'), R.qualitySkip('HTST #2'), R.qualitySkip('GALLON FILLER')],
+    [{ cycle: true }, { cycle: true, weight: true, tip: true }, { cycle: true, weight: true }, { cycle: true, weight: true, tip: true }, {}]);
   assert.equal(R.weightText({ head1: '55.3', head2: '58.5' }), 'H1 55.3 · H2 58.5 · H3 — · H4 — · H5 — · H6 —');
   assert.throws(() => P.validateQuality({ operationId: 'ut_prod_boxing', status: 'BROKEN' }, SaveError), /Status must be Running, Review, Changeover, Down, or Finished/);
   assert.deepEqual(P.validateQuality({ operationId: 'ut_prod_boxing', weights: { result: '3990', evil: 'x' } }, SaveError).weights, { result: '3990' });

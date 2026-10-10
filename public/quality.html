@@ -104,7 +104,7 @@
     function drawForm(line) {
       const ck = canSave(), cur = roundCheck(line), old = line.last || {}, last = cur || {}, w = last.weights || {}, ow = old.weights || {}, skip = U.qualitySkip(line.name), blow = U.isBlowMold(line.name), dis = ck ? '' : ' disabled';
       const by = old.recordedAt ? ' · ' + clockOf(old.recordedAt) + (old.recordedBy ? ' · ' + initials(old.recordedBy) : '') : '';
-      const was = (v) => !cur && old.recordedAt && String(v || '') !== '' ? '<small class="as-last">Last: ' + escapeHtml(String(v)) + by + '</small>' : '';
+      const was = (v) => !cur && (old.recordedAt || old.fromSheet) && String(v || '') !== '' ? '<small class="as-last">Last: ' + escapeHtml(String(v)) + by + '</small>' : '';
       const note = (cls) => '<small class="as-note" data-note="' + cls + '"></small>';
       const word = (v) => CHECK[v] || v;
       const weight = blow ? '<div class="qc-heads">' + [1, 2, 3, 4, 5, 6].map(n => '<label>H' + n + '<input class="prod-head" data-head="' + n + '" inputmode="decimal" value="' + escapeHtml(w['head' + n] || '') + '"' + dis + '>' + was(ow['head' + n]) + '</label>').join('') + '</div>' + note('prod-head')
@@ -222,10 +222,13 @@
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(); }, fail('the production lines'));
       watchProducts(db, p => { products = p; shownFor = ''; render(); }, fail('the machine products'));
       watchRound(db, at => { roundStart = at; Object.keys(pending).forEach(k => delete pending[k]); render(); });
-      onSnapshot(collection(db, 'plantLineStatus'), s => { lineStatus = s.docs.map(d => d.data()); render(); }, fail('the line status'));
-      let unsub = null, day = '';
+      // The first copy of the lines' last checks draws the form again (its grey "Last:" values), unless someone is typing.
+      let firstStatus = true;
+      onSnapshot(collection(db, 'plantLineStatus'), s => { lineStatus = s.docs.map(d => d.data()); if (firstStatus) { firstStatus = false; shownFor = ''; } render(); }, fail('the line status'));
+      let unsub = null, day = '', firstJournal = true;
       const watch = () => { const t = today(); if (t === day) return; day = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(t, -1), t])), s => {
         journal = s.docs.map(d => Object.assign({ _id: d.id }, d.data()));
+        if (firstJournal) { firstJournal = false; shownFor = ''; }
         // A check the database now has replaces the one shown while saving.
         Object.keys(pending).forEach(k => { const p = pending[k]; if (p.saved && journal.some(d => d._id === p._id)) delete pending[k]; });
         render();

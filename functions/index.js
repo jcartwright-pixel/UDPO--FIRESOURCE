@@ -14,6 +14,7 @@
  *   fleetSyncNightly      brings Equipment Master in step with the United Dairy fleet list every night (SANDBOX copy only)
  *   fleetSyncNow          the same from Equipment's "Sync fleet list" button, for a manager or administrator
  *   mailPlantReport       emails a plant report straight after Send Current Report saves it (reportmail.js; MAIL_FROM)
+ *   mocreoEvery5Minutes   reads the MOCREO cooler sensors (read only) once the MOCREO_API_KEY and MOCREO_ASSET_ID secrets exist
  */
 'use strict';
 
@@ -35,6 +36,7 @@ const { transferSources } = require('./src/sources');
 const { safeIdPart } = require('./src/model');
 const { runFleetSync } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
+const { runMocreoSync, readSecrets } = require('./src/mocreo');
 const L = require('./src/logic');
 
 admin.initializeApp();
@@ -184,6 +186,18 @@ exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'Americ
   if (!target) return;
   const sheets = makeSheetsWriter();
   await runFleetSync({ db, reader: sheets, sheets, target, by: 'nightly' });
+});
+
+// MOCREO sensors (src/mocreo.js): the secrets are read from Secret Manager each run, so the sync starts by itself once they
+// are added, and nothing here holds the key.
+exports.mocreoEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
+  const getSecrets = async () => {
+    const { GoogleAuth } = require('google-auth-library');
+    const token = await new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] }).getAccessToken();
+    return readSecrets({ project, token, fetchFn: fetch });
+  };
+  await runMocreoSync({ db, getSecrets, fetchFn: fetch });
 });
 
 exports.fleetSyncNow = onCall({ timeoutSeconds: 120, maxInstances: 1 }, async (request) => {
