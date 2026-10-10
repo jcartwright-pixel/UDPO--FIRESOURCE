@@ -70,7 +70,7 @@ const SCREENS = [
     assert.ok(Math.abs(boxes[0][2] - Math.max(...boxes.map(b => b[2]))) <= 2 && Math.abs(boxes[0][1] - boxes[1][1]) <= 2, 'the report card is as tall as the three rows ' + JSON.stringify(boxes));
     await side.hover('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]');
     await side.waitForSelector('.side-flyouts .flyout.open');
-    assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Plant Departments', 'Loadout Center', 'Unloading & Washing', 'Product Returns', 'Truck Washing']);
+    assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Plant Departments', 'Loadout Center', 'Unloading & Washing', 'Product Returns', 'Truck Washing', 'Trailer Assignments', 'Plant Station']);
     await side.mouse.move(1500, 900);
     await Promise.all([side.waitForURL(/report=1/), side.click('.sidemenu a[href="manager.html?report=1"]')]);
     await side.waitForSelector('#modal:not([hidden])');
