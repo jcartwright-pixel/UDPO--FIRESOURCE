@@ -589,3 +589,11 @@
 .manager-page .mc-acts .mc-btn { white-space: normal; height: auto; min-height: 42px; line-height: 1.15; padding: 6px 12px; }
 .manager-page .mc-acts .mc-btn[data-open-report] { flex: 0 0 auto; min-width: 110px; }
 .manager-page .mc-acts .mc-btn.send { flex: 1 1 0; min-width: 0; }
+/* Scheduler head (Joe 10/10, "you got things separated too much"): the date right beside the month, Shipping / Receiving by
+   itself just under it and a little larger, and the action buttons as far up and to the right as they go. */
+.sched-page .head, .sched-page .head:has(.top-row) { align-items: flex-start; flex-wrap: nowrap; }
+.sched-page .sc-titleline { display: flex; align-items: center; gap: 12px; }
+.sched-page .sc-titleline #pick { height: 38px; width: 160px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 15px; font-weight: 700; color: var(--ud-blue-dark); background: #fff; }
+.sched-page .head .sc-lane { display: inline-flex; margin: 10px 0 2px; }
+.sched-page .head .sc-lane button { height: 42px; min-height: 42px; padding: 0 22px; font-size: 16px; font-weight: 800; white-space: nowrap; }
+.sched-page .head .actions.in-head.top-row { align-self: flex-start; margin-top: 4px; }

@@ -23,7 +23,10 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Plant Operations Scheduler · <b id="lane-name">Shipping</b></span><h1 id="range">Plant Operations Scheduler</h1></div>
+      <!-- Joe 10/10: the date right beside the month, and Shipping / Receiving by itself just under it so it stands out. -->
+      <div class="title"><span class="eyebrow">Plant Operations Scheduler · <b id="lane-name">Shipping</b></span>
+        <div class="sc-titleline"><h1 id="range">Plant Operations Scheduler</h1><input id="pick" type="date" aria-label="Schedule date"></div>
+        <div class="tabs lane seg sc-lane" role="group" aria-label="Shipping or Receiving"><button type="button" data-lane="SHIPPING">Shipping</button><button type="button" data-lane="RECEIVING">Receiving</button></div></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -32,14 +35,12 @@
         <!-- Joe 10/10: the buttons first, the same size, then the filters, all in the top line (data-top). -->
         <button type="button" class="sc-btn primary" id="add">＋ Add Load</button>
         <button type="button" class="sc-btn" id="print">Print Monthly</button>
-        <div class="tabs lane seg" role="group" aria-label="Shipping or Receiving"><button type="button" data-lane="SHIPPING">Shipping</button><button type="button" data-lane="RECEIVING">Receiving</button></div>
         <div class="tabs seg" id="views" role="tablist" aria-label="Schedule view"><button type="button" data-view="day">Day</button><button type="button" data-view="week">Week</button><button type="button" data-view="month">Month</button></div>
         <div class="stepper">
           <button type="button" id="prev" aria-label="Previous" title="Previous">&#9664;</button>
           <button type="button" id="today" class="sc-today">This month</button>
           <button type="button" id="next" aria-label="Next" title="Next">&#9654;</button>
         </div>
-        <div class="stepper"><input id="pick" type="date" aria-label="Schedule date"></div>
       </div>
       <!-- Joe 10/10: the counts and the holiday colour key sit in a slim strip under the top line, so the month title and the
            buttons keep their room. -->
