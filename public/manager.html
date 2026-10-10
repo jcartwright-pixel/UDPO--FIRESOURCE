@@ -71,6 +71,8 @@
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import { watchRound } from './js/autosave.js';
+    import { cardClicks } from './js/cards.js';
+    cardClicks(document.getElementById('grid'));
 
     const L = window.UDLogic, U = window.UDPlant;
     const today = () => L.operatingDay(new Date());
@@ -114,7 +116,7 @@
     function render() {
       const x = build(), r = report;
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase();
-      const grid = document.getElementById('grid'), put = (k, html) => { grid.querySelector('[data-card="' + k + '"]').innerHTML = html; };
+      const grid = document.getElementById('grid'), put = (k, html) => { const el = grid.querySelector('[data-card="' + k + '"]'); el.innerHTML = html; const bar = el.querySelector('a.mc-bar'); if (bar) el.dataset.href = bar.getAttribute('href'); };
       put('yard', card('&#10003;', 'Yard Checks', 'Loaded trailers remaining on yard · temperature · fuel · timestamped checks', 'yard.html', [
         tile('yard.html', 'Active', x.yard.rows.length + x.yard.locked.length, '', 'on the yard'), tile('yard.html', 'Due', x.yard.rows.length, '', 'need a check', null, x.yard.rows.length ? 'warn' : ''),
         tile('yard.html', 'Checked', x.yard.locked.length, '', 'in the last 2 hours', null, 'good'), tile('yard.html?view=history', 'Latest', x.latestYard ? clock(x.latestYard.recordedAt) : 'None', '', 'last check')]));
