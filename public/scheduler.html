@@ -29,19 +29,19 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="sc-ctrl">
-        <!-- Joe 10/10: the buttons first, the same size, then the filters, all on one line. -->
+      <div class="sc-ctrl" data-top>
+        <!-- Joe 10/10: the buttons first, the same size, then the filters, all in the top line (data-top). -->
         <button type="button" class="sc-btn primary" id="add">＋ Add Load</button>
         <button type="button" class="sc-btn" id="print">Print Monthly</button>
-        <div class="tabs lane" role="group" aria-label="Shipping or Receiving"><button type="button" data-lane="SHIPPING">Shipping</button><button type="button" data-lane="RECEIVING">Receiving</button></div>
-        <div class="tabs" id="views" role="tablist" aria-label="Schedule view"><button type="button" data-view="day">Day</button><button type="button" data-view="week">Week</button><button type="button" data-view="month">Month</button></div>
+        <div class="tabs lane seg" role="group" aria-label="Shipping or Receiving"><button type="button" data-lane="SHIPPING">Shipping</button><button type="button" data-lane="RECEIVING">Receiving</button></div>
+        <div class="tabs seg" id="views" role="tablist" aria-label="Schedule view"><button type="button" data-view="day">Day</button><button type="button" data-view="week">Week</button><button type="button" data-view="month">Month</button></div>
         <div class="stepper">
           <button type="button" id="prev" aria-label="Previous" title="Previous">&#9664;</button>
           <button type="button" id="today" class="sc-today">This month</button>
           <button type="button" id="next" aria-label="Next" title="Next">&#9654;</button>
         </div>
         <div class="stepper"><input id="pick" type="date" aria-label="Schedule date"></div>
-        <span class="sc-grow"></span>
+        <span class="sc-grow spacer"></span>
         <span class="sc-key"><i></i>Holiday</span>
       </div>
       <div class="sc-body" id="body"></div>

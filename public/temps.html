@@ -34,10 +34,10 @@
         <img class="tp-icon" src="img/library/temperatures.webp" alt="">
         <div class="tp-copy"><h2 id="bar-title">Current Temperature Readings</h2><p id="bar-text">Live sensor readings and manual entries for each plant location.</p></div>
         <!-- Joe 10/10: one line of controls, the buttons first and the filters after them. -->
-        <div class="tabs" id="panes" role="tablist" aria-label="Temperature view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
-        <button type="button" class="tp-btn" id="refresh">&#8635; Refresh Now</button>
-        <div class="tp-actions" id="filters"></div>
-        <span class="tp-sensor" id="sensor-at">Last Sensor Update: —</span>
+        <div class="tabs seg" id="panes" data-top role="tablist" aria-label="Temperature view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
+        <button type="button" class="tp-btn" id="refresh" data-top>&#8635; Refresh Now</button>
+        <div class="tp-actions chips" id="filters" data-top></div>
+        <span class="tp-sensor hint" id="sensor-at" data-top>Last Sensor Update: —</span>
       </div>
       <div class="sheet scroll-list" id="pane-current">
         <table class="loadout tp-table">
