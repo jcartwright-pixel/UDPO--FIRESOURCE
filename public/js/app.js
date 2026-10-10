@@ -61,8 +61,11 @@ function addSideMenu() {
   const nav = document.createElement('nav');
   nav.className = 'sidemenu';
   nav.setAttribute('aria-label', 'Screens');
+  // Joe 10/9: Home shows every section; a screen shows only its own section's screens (Back returns Home).
+  const section = MENU.find(([group, items]) => group && items.some(([, href]) => href === here));
+  const groups = here === 'index.html' || !section ? MENU : [MENU[0], section];
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' +
-    MENU.map(([group, items]) => (group ? '<div class="side-group">' + group + '</div>' : '') + items.map(([label, href, icon]) => {
+    groups.map(([group, items]) => (group ? '<div class="side-group">' + group + '</div>' : '') + items.map(([label, href, icon]) => {
       const ext = /^https:/.test(href);
       return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
         '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
