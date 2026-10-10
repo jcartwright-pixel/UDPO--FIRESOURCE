@@ -163,3 +163,15 @@ test('truck and trailer lists: a unit on the road on another run at the same tim
   assert.equal(late.r9, 'ON ROAD UNTIL 2:00 AM (806)', 'past midnight');
   assert.equal(L.hoursMinutes('9.5'), 570);
 });
+
+test('unitLessor: the lease company from the fleet text, a short number when one unit ends that way, owned trucks go to our garage', () => {
+  const units = [{ unit: '223876', notes: 'External Fleet: 2023 | FREIGHTLINER | x | Lease: Idealease' }, { unit: '493', notes: 'External Fleet: 2015 | INTERNATIONAL | DuraStar 4300' },
+    { unit: '123876', notes: 'External Fleet: Lease: PENSKE' }, { unit: '224981', notes: 'External Fleet: Lease: Idealease' }];
+  assert.equal(L.unitLessor(units, '223876').lessor, 'Idealease');
+  assert.equal(L.unitLessor(units, '4981').lessor, 'Idealease');
+  assert.equal(L.unitLessor(units, '4981').unit, '224981');
+  assert.equal(L.unitLessor(units, '493').lessor, '');
+  assert.match(L.unitLessor(units, '493').why, /Owned/);
+  assert.match(L.unitLessor(units, '876').why, /matches 223876, 123876/);
+  assert.match(L.unitLessor(units, '999').why, /not on the fleet list/);
+});

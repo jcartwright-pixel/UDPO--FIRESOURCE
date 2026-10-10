@@ -49,7 +49,12 @@ export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
   ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
   ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Driver Weekly Template', 'template.html', 'week'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
-  ['Equipment', [['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'], ['Garage Work Orders', 'garage.html', 'wrench'], ['Fleet Service', 'fleet.html', 'gear']]],
+  // Joe 10/10: the maintenance side starts on the Fleet & Maintenance hub and branches out from there, as in the current app.
+  // An icon name ending .webp is a picture from the United Dairy icon library (img/library).
+  ['Equipment', [['Fleet & Maintenance', 'maint.html', 'maintenance-tractor-v1-560.webp'], ['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'],
+    ['Truck Issues', 'issues.html?kind=TRUCK', 'maintenance-tractor-v1-560.webp'], ['Trailer Issues', 'issues.html?kind=TRAILER', 'maintenance-trailer-v1-560.webp'],
+    ['Fork Truck / Pallet Jack Issues', 'issues.html?kind=FORK_TRUCK', 'forklift-truck-v1-560.webp'], ['Garage Work Orders', 'garage.html', 'wrench'], ['Fleet Service', 'fleet.html', 'gear'],
+    ['Garage Station', CURRENT_APP + 'garage-station', 'wrench'], ['Over the Road', 'otr.html', 'distribution-truck-v1-560.webp'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin']]],
   ['GPS / Fleet', [['GPS Setup', 'gps.html', 'gear'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin'], ['Driver Scorecard', 'scorecard.html', 'star']]],
   ['Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road']]],
   ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Sheet Conflicts', 'conflicts.html', 'alert']]],
@@ -60,7 +65,7 @@ function addSideMenu() {
   const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
   if (!bar || document.body.classList.contains('phone') || screen.querySelector('.sidemenu')) return;
   const here = (location.pathname.split('/').pop() || 'index.html');
-  const svg = (k) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[k] + '</svg>';
+  const svg = (k) => /\.webp$/.test(k) ? '<img class="lib-icon" src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[k] + '</svg>';
   const nav = document.createElement('nav');
   nav.className = 'sidemenu';
   nav.setAttribute('aria-label', 'Screens');

@@ -243,7 +243,7 @@ function validate(input) {
     out.recordId = text(input.recordId, 300);
     if (!out.recordId) throw new SaveError('BAD_REQUEST', 'Pick the write-up');
     out.step = text(input.step);
-    if (['repaired', 'reviewed', 'remove', 'garage'].indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'step must be repaired, reviewed, remove or garage');
+    if (['repaired', 'reviewed', 'remove', 'garage', 'lessor'].indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'step must be repaired, reviewed, remove, garage or lessor');
     out.note = text(input.note, 500);
     return out;
   }
@@ -560,6 +560,14 @@ async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
   else if (req.step === 'garage') {
     if (notes.indexOf('Sent to garage') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the garage.' };
     change = { notes: add('Sent to garage ' + stamp + ' by ' + email) };
+  } else if (req.step === 'lessor') {
+    // Joe 10/10: a truck write-up goes to our garage or to the company that leases the truck. Email stays off in the new
+    // app, so this marks it sent to the lessor (named in the note) once; the Lessor email itself is still sent from the current app.
+    if (String(r.kind || '').toUpperCase() !== 'TRUCK') throw new SaveError('NOT_ALLOWED', 'Only a truck write-up goes to a lessor');
+    const lessor = String(req.note || '').replace(/[\n|]+/g, ' ').trim().slice(0, 40);
+    if (!lessor) throw new SaveError('BAD_REQUEST', 'Say which lessor');
+    if (notes.indexOf('Sent to lessor') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the lessor.' };
+    change = { notes: add('Sent to lessor ' + lessor + ' ' + stamp + ' by ' + email) };
   } else {
     if (String(r.status || '').toUpperCase() !== 'NEEDS_REVIEW') throw new SaveError('NOT_ALLOWED', 'Only a write-up that needs review can be marked reviewed');
     if (L.noWriteUp(r.issue_details)) throw new SaveError('NOT_ALLOWED', 'Add what is wrong before marking it reviewed');

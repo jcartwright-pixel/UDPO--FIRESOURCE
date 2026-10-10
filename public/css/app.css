@@ -950,3 +950,89 @@ td.eq-day span { display: block; white-space: nowrap; }
 .template-page .tcell .tpl-add:disabled { color: #9aa9b7; cursor: default; }
 .template-page .tpl-tools, .template-page .tcell:hover .tpl-tools { visibility: visible; display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 4px; margin-top: 4px; }
 .template-page .tpl-tools .mini { font-size: 12px; padding: 6px 2px; white-space: normal; line-height: 1.1; color: #175b92; }
+
+/* Fleet & Maintenance hub (Joe 10/10, the current app's hub picture): count strip, four cards with pictures from the
+   United Dairy icon library and their counts, the latest write-ups on the right. Every number opens its list in this window. */
+.hub-page .head .hub-tiles { margin-left: auto; }
+.hub-tiles > a.button { gap: 6px; max-width: 150px !important; min-width: 120px !important; }
+.hub-tiles > a.button img { width: 34px; height: 30px; object-fit: contain; flex: none; }
+.hub-view { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; padding-bottom: 14px; }
+.hub-page .kpis div { align-items: center; text-align: center; padding: 12px 10px; }
+.hub-page .kpis b { font-size: 34px; }
+.hub-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin: 0 16px; align-items: start; }
+.hub-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.hub-card { background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.hub-card.garage { border-top-color: #1d7a3e; }
+.hub-card-head { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; }
+.hub-card-head img { width: 96px; height: 76px; object-fit: contain; }
+.hub-card-head strong { font-size: 21px; line-height: 1.15; color: var(--ud-blue-dark); }
+.hub-card-head:hover strong { text-decoration: underline; }
+.hub-big { display: flex; flex-direction: column; align-items: flex-end; }
+.hub-big b { font-size: 44px; line-height: 1; color: var(--ud-blue-dark); }
+.hub-big small { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.hub-wrench { width: 96px; height: 76px; border-radius: 12px; background: #e3f4e8; display: grid; place-items: center; }
+.hub-wrench svg { width: 46px; height: 46px; fill: none; stroke: #1d7a3e; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hub-tiles4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.hub-tile { background: var(--band); border-radius: 9px; padding: 8px 4px; text-align: center; text-decoration: none; color: var(--ink); display: flex; flex-direction: column; gap: 2px; min-height: 64px; justify-content: center; }
+.hub-tile:hover { background: #d8e6f3; }
+.hub-tile b { font-size: 24px; color: var(--ud-blue-dark); line-height: 1.05; }
+.hub-tile span { font-size: 12.5px; font-weight: 700; color: var(--muted); line-height: 1.15; }
+.hub-tile.warn b { color: #b45f00; }
+.hub-tile.good b { color: #1d7a3e; }
+.hub-latest { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.hub-latest h2 { margin: 0; padding: 12px 16px; font-size: 18px; color: var(--ud-blue-dark); background: var(--band); }
+.hub-latest table { width: 100%; table-layout: fixed; }
+.hub-latest tbody tr { cursor: pointer; }
+.hub-latest td.wrong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1500px) {
+  .hub-body { grid-template-columns: 1fr; }
+  .hub-card-head { grid-template-columns: 72px 1fr auto; }
+  .hub-card-head img, .hub-wrench { width: 72px; height: 58px; }
+}
+/* Pictures from the United Dairy icon library in the menu sit on a small white tile so they read on the blue menu too. */
+img.lib-icon { flex: none; width: 26px; height: 22px; object-fit: contain; background: #fff; border-radius: 5px; padding: 1px; }
+.dc-icon.pic { background: #fff; border: 1px solid var(--line); }
+.dc-icon.pic img { width: 88%; height: 88%; object-fit: contain; }
+
+/* Truck / Trailer / Fork Truck Issues laid out like the current app's lists (Joe 10/10 pictures): three list buttons with
+   counts on the left, search on the right; Reviewed is a tick box, Emailed and Garage a tick or a dash; the work buttons are
+   the envelope, Lessor | Garage (trucks) or To garage, Repaired and the red X. */
+.issues-page .head .title small a { color: var(--ud-blue); text-decoration: none; }
+.issues-page .head .title small a:hover { text-decoration: underline; }
+.issue-bar { margin: 0 16px; display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
+.issue-bar #search { margin-left: auto; width: 420px; max-width: 32vw; min-height: 44px; font-size: 16px; }
+.kind-tabs { display: flex; gap: 10px; }
+.kind-tabs button { min-height: 46px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.kind-tabs button b { margin-left: 8px; display: inline-block; min-width: 26px; padding: 1px 7px; border-radius: 13px; background: #e1ebf5; color: var(--ud-blue-dark); font-size: 14px; text-align: center; }
+.kind-tabs button[aria-selected="true"] { background: #0f2e52; color: #fff; border-color: #0f2e52; }
+.kind-tabs button[aria-selected="true"] b { background: var(--ud-gold); color: #0f2e52; }
+.issue-bar .chips button { min-height: 34px; font-size: 13px; }
+table.old-issues thead th { background: #0f2e52; color: #fff; text-align: center; }
+table.old-issues td { text-align: center; }
+table.old-issues td.wrong { text-align: left; }
+table.old-issues .tick { color: #1d7a3e; font-size: 24px; font-weight: 900; line-height: 1; }
+table.old-issues .dash { color: #8a97a5; font-size: 20px; }
+table.old-issues input[data-review] { width: 26px; height: 26px; cursor: pointer; accent-color: #1d7a3e; }
+table.old-issues .count { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #eef2f6; font-weight: 800; }
+table.old-issues .count.repeat { background: #fdebd3; color: #b45f00; }
+.work-acts { display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.work-acts button { min-height: 40px; padding: 0 12px; border-radius: 9px; font: inherit; font-weight: 800; cursor: pointer; border: 1px solid var(--line); background: #fff; white-space: nowrap; }
+.work-acts button:disabled { opacity: .45; cursor: default; }
+.work-acts .ic { width: 44px; padding: 0; font-size: 18px; color: var(--ud-blue-dark); }
+.work-acts .seg { display: inline-flex; }
+.work-acts .seg button { border-radius: 0; }
+.work-acts .seg .seg-l { background: #1f5f9e; color: #fff; border-color: #1f5f9e; border-radius: 9px 0 0 9px; }
+.work-acts .seg .seg-g { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; border-radius: 0 9px 9px 0; }
+.work-acts .to-garage { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; }
+.work-acts .done { background: #eaf7ee; color: #1d7a3e; border-color: #a9d8b8; }
+.work-acts .remove { color: #c62828; border-color: #f0b8b8; font-size: 20px; }
+tr.issue-more > td { background: #f6f9fc; text-align: left; padding: 10px 16px; font-weight: 600; }
+tr.issue-more p { margin: 6px 0; font-size: 16px; white-space: pre-wrap; }
+@media (max-width: 1500px) {
+  .kind-tabs button { font-size: 14px; padding: 0 12px; min-height: 40px; }
+  .issue-bar #search { width: 260px; }
+  .work-acts { gap: 5px; } .work-acts button { padding: 0 8px; min-height: 34px; font-size: 13px; } .work-acts .ic { width: 34px; }
+}
+.issue-bar .chips { flex-wrap: nowrap; }
+.issue-bar .chips button { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; padding: 0 12px; white-space: nowrap; }
+.issue-bar .chips button b { font-size: 13px; }

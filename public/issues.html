@@ -21,20 +21,18 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Equipment Issues</h1><small>Truck, trailer and fork truck / pallet jack write-ups</small></div>
-      <div class="tabs" role="tablist" id="kinds"></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Email to the garage stays off in the new app</span></div>
+      <div class="title"><h1 id="title">Truck Issues</h1><small><a href="maint.html">Fleet &amp; Maintenance</a> › <span id="crumb">Truck Issues</span></small></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Email stays off in the new app</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="kpis" id="kpis"></div>
-      <div class="kind-line" id="kind-line"></div>
-      <div class="actions">
+      <div class="actions issue-bar">
+        <div class="kind-tabs" role="tablist" id="kinds"></div>
         <div class="chips" id="filters"></div>
-        <input type="search" id="search" placeholder="Find a unit, driver or problem" aria-label="Find">
+        <input type="search" id="search" placeholder="Search this view" aria-label="Search this view">
       </div>
       <div class="sheet scroll-list">
-        <table class="issues">
+        <table class="issues old-issues">
           <colgroup id="cols"></colgroup>
           <thead id="head"></thead>
           <tbody id="rows"></tbody>
@@ -51,53 +49,56 @@
     forScreen('checkIns');
 
     const L = window.UDLogic;
-    // Same three lists and columns as the current app's Maintenance screen.
-    const KINDS = [['TRUCK', 'Trucks', 'Truck #'], ['TRAILER', 'Trailers', 'Trailer #'], ['FORK_TRUCK', 'Fork Truck / Pallet Jack', 'Unit']];
+    // The current app's Truck / Trailer / Fork Truck Issues lists (Maintenance.html): the drivers' check-in write-ups, opened from
+    // the Fleet & Maintenance hub. Joe 10/10: a truck write-up goes to our garage or to the company that leases the truck.
+    const KINDS = [['TRUCK', 'Trucks', 'Truck #', 'Truck Issues'], ['TRAILER', 'Trailers', 'Trailer #', 'Trailer Issues'], ['FORK_TRUCK', 'Fork Truck / Pallet Jack', 'Unit', 'Fork Truck / Pallet Jack Issues']];
     const FILTERS = [['all', 'All open'], ['review', 'Need review'], ['repeat', 'Repeat'], ['garage', 'At garage'], ['new', 'New · 7 days']];
-    let kind = 'TRUCK', filter = 'all', search = '', records = [], removeFor = null;
+    const params = new URLSearchParams(location.search);
+    let kind = KINDS.some(k => k[0] === params.get('kind')) ? params.get('kind') : 'TRUCK', filter = FILTERS.some(f => f[0] === params.get('filter')) ? params.get('filter') : 'all';
+    let search = '', records = [], removeFor = null, openFor = null;
     const now = () => Date.now();
     const daysAgo = (ms) => ms ? Math.floor((now() - ms) / 86400000) : '';
     const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
     const open = (k) => L.issueRows(records, k, now());
+    const tick = (title) => '<span class="tick" title="' + escapeHtml(title || '') + '">&#10003;</span>';
+    const dash = '<span class="dash">&mdash;</span>';
 
     function render() {
-      const edit = canSave(), lists3 = KINDS.map(([k]) => open(k)), nums = lists3.map(o => L.issueNumbers(o, now()));
+      const edit = canSave(), lists3 = KINDS.map(([k]) => open(k));
       document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
-      const all = [].concat(...lists3), t = nums[0];
-      const oldest = Math.max(0, ...nums.map(n => n.oldestDays));
-      const kpi = (n, label, cls) => '<div class="' + (cls || '') + '"><b>' + n + '</b><span>' + label + '</span></div>';
-      document.getElementById('kpis').innerHTML = kpi(all.length, 'Open issues') + kpi(nums.reduce((a, n) => a + n.needReview, 0), 'Need review', 'warn') +
-        kpi(nums.reduce((a, n) => a + n.repeat, 0), 'Repeat units · 90 days') + kpi(t.notEmailed, 'Trucks not emailed') +
-        kpi(oldest + (oldest === 1 ? ' day' : ' days'), 'Oldest open') + kpi(nums.reduce((a, n) => a + n.repaired30, 0), 'Repaired · last 30 days', 'good');
-      document.getElementById('kinds').innerHTML = KINDS.map(([k, label], i) => '<button type="button" role="tab" data-kind="' + k + '" aria-selected="' + (k === kind) + '">' + label + ' <b>' + lists3[i].length + '</b></button>').join('');
-      const i = KINDS.findIndex(x => x[0] === kind), n = nums[i], rows = lists3[i];
-      document.getElementById('kind-line').innerHTML = [['Need review', n.needReview], ['Repeat', n.repeat], ['At garage', n.atGarage], ['New · 7 days', n.newWeek], ['Oldest', n.oldestDays + ' d'], ['Average age', n.averageDays + ' d']]
-        .concat(kind === 'TRUCK' ? [['Emailed', n.emailed], ['Not emailed', n.notEmailed]] : []).map(([a, b]) => '<span>' + a + ' <b>' + b + '</b></span>').join('');
-      const match = (r, f) => f === 'all' || (f === 'review' ? r.needsReview : f === 'repeat' ? r.occurrences > 1 : f === 'garage' ? r.atGarage : r.openedMs && now() - r.openedMs <= 7 * 86400000);
+      const i = KINDS.findIndex(x => x[0] === kind), rows = lists3[i], truck = kind === 'TRUCK';
+      document.getElementById('title').textContent = KINDS[i][3];
+      document.getElementById('crumb').textContent = KINDS[i][3];
+      document.title = KINDS[i][3] + ' · New Plant Operations';
+      document.getElementById('kinds').innerHTML = KINDS.map(([k, label], n) => '<button type="button" role="tab" data-kind="' + k + '" aria-selected="' + (k === kind) + '">' + label + ' <b>' + lists3[n].length + '</b></button>').join('');
+      const match = (r, f) => f === 'all' || (f === 'review' ? r.needsReview : f === 'repeat' ? r.occurrences > 1 : f === 'garage' ? r.atGarage || r.toLessor : r.openedMs && now() - r.openedMs <= 7 * 86400000);
       document.getElementById('filters').innerHTML = FILTERS.map(([f, label]) => '<button type="button" data-filter="' + f + '" class="' + (filter === f ? 'on' : '') + '">' + label + '<b>' + rows.filter(r => match(r, f)).length + '</b></button>').join('');
-      const truck = kind === 'TRUCK', q = search.toUpperCase();
+      const q = search.toUpperCase();
       const shown = rows.filter(r => match(r, filter) && (!q || [r.unit, r.driver, r.text, r.route].join(' ').toUpperCase().indexOf(q) >= 0));
-      const narrow = window.innerWidth < 1500;
-      document.getElementById('cols').innerHTML = truck && narrow
-        ? '<col style="width:7%"><col style="width:10%"><col style="width:8%"><col style="width:19%"><col style="width:6%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:28%">'
-        : truck
-        ? '<col style="width:7%"><col style="width:11%"><col style="width:8%"><col style="width:24%"><col style="width:6%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:22%">'
-        : '<col style="width:8%"><col style="width:10%"><col style="width:36%"><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:21%">';
+      document.getElementById('cols').innerHTML = truck
+        ? '<col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:26%"><col style="width:6%"><col style="width:7%"><col style="width:6%"><col style="width:7%"><col style="width:24%">'
+        : '<col style="width:8%"><col style="width:9%"><col style="width:39%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:21%">';
       document.getElementById('head').innerHTML = '<tr><th>' + KINDS[i][2] + '</th>' + (truck ? '<th>Driver</th>' : '') + '<th>Date Reported</th><th>What\'s Wrong</th><th>Report Count</th><th>Reviewed</th>' + (truck ? '<th>Emailed</th>' : '') + '<th>Garage</th><th>Work Actions</th></tr>';
-      const typed = document.querySelector('[data-why]') ? document.querySelector('[data-why]').value : '';
+      const typed = document.querySelector('[data-why]') ? document.querySelector('[data-why]').value : '', cols = truck ? 9 : 7, d = edit ? '' : ' disabled';
       document.getElementById('rows').innerHTML = shown.map(r => {
-        const actions = !edit ? '' : removeFor === r.id
+        const sent = r.atGarage || r.toLessor, who = truck ? L.unitLessor(lists.fleetTrucks, r.unit) : null;
+        const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || sent || !who.lessor ? ' disabled' : '') + ' title="' + escapeHtml(who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor). Email stays off in the new app, so this marks it sent.' : who ? who.why : '') + '">Lessor</button>';
+        const garageBtn = '<button type="button" class="' + (truck ? 'seg-g' : 'to-garage') + '" data-step="garage"' + (!edit || sent ? ' disabled' : '') + ' title="Send to the garage">' + (truck ? 'Garage' : 'To garage') + '</button>';
+        const actions = removeFor === r.id
           ? '<span class="down-box"><input data-why maxlength="200" placeholder="Why remove it?"><button type="button" class="warn" data-remove-save>Remove</button><button type="button" data-remove-cancel>Cancel</button></span>'
-          : '<span class="work"><button type="button" class="good" data-step="repaired">Repaired</button>' + (r.needsReview && r.text ? '<button type="button" data-step="reviewed">Reviewed</button>' : '') +
-            (r.atGarage ? '' : '<button type="button" data-step="garage">To garage</button>') + (truck ? '<button type="button" disabled title="Email to the garage is off in the new app">Email</button>' : '') +
-            '<button type="button" class="link" data-remove>Remove</button></span>';
-        const tag = (on, text, cls) => on ? '<span class="pill ' + (cls || 'yes') + '">' + text + '</span>' : '<span class="pill no">No</span>';
+          : '<span class="work-acts"><button type="button" class="ic" data-open title="See the whole write-up" aria-label="See the whole write-up">&#9993;</button>' +
+            (truck ? '<span class="seg">' + lessorBtn + garageBtn + '</span>' : garageBtn) +
+            '<button type="button" class="done" data-step="repaired" title="Mark Repaired"' + d + '>&#10003; Repaired</button>' +
+            '<button type="button" class="ic remove" data-remove title="Remove: not a real unit, or not a write-up. The sheet keeps the row marked Removed." aria-label="Remove"' + d + '>&#10005;</button></span>';
+        const reviewed = r.needsReview ? '<input type="checkbox" data-review aria-label="Mark reviewed"' + (!edit || !r.text ? ' disabled' : '') + (r.text ? '' : ' title="Add what is wrong first"') + '>' : tick(r.reviewedBy ? 'Reviewed by ' + r.reviewedBy : 'Reviewed');
+        const garage = r.atGarage ? tick('Sent to the garage ' + r.garageAt.slice(0, 10) + ' by ' + r.garageBy) : r.toLessor ? '<span class="pill yes" title="Sent ' + escapeHtml(r.lessorAt.slice(0, 10) + ' by ' + r.lessorBy) + '">' + escapeHtml(r.lessor) + '</span>' : dash;
+        const more = openFor === r.id ? '<tr class="issue-more"><td colspan="' + cols + '"><b>' + escapeHtml(KINDS[i][2].replace(' #', '') + ' ' + (r.unit || '?')) + '</b>' + (r.driver ? ' · ' + escapeHtml(r.driver) : '') + (r.route ? ' · route ' + escapeHtml(r.route) : '') +
+          ' · reported ' + dateText(r.reported) + ' (' + daysAgo(r.openedMs) + ' days ago)<p>' + escapeHtml(r.text) + '</p>' + (truck && who ? '<small>' + escapeHtml(who.lessor ? 'Leased from ' + who.lessor : who.why) + '</small>' : '') + '</td></tr>' : '';
         return '<tr data-id="' + escapeHtml(r.id) + '"' + (r.needsReview ? ' class="review"' : '') + '><td class="strong">' + escapeHtml(r.unit || '?') + '</td>' + (truck ? '<td>' + escapeHtml(r.driver) + '</td>' : '') +
-          '<td>' + dateText(r.reported) + '<small>' + daysAgo(r.openedMs) + ' d</small></td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + (r.text ? escapeHtml(r.text) : '<i>No detail: needs review</i>') + '</td>' +
-          '<td><span class="count' + (r.occurrences > 1 ? ' repeat' : '') + '">' + r.occurrences + '</span></td>' +
-          '<td>' + (r.needsReview ? '<span class="pill warn">Needs review</span>' : tag(r.reviewed, 'Yes')) + '</td>' + (truck ? '<td>' + (r.emailed ? '<span class="pill yes" title="' + escapeHtml(r.emailedAt) + '">' + dateText(r.emailedAt) + '</span>' : '<span class="pill no">No</span>') + '</td>' : '') +
-          '<td>' + (r.atGarage ? '<span class="pill yes" title="' + escapeHtml(r.garageBy) + '">' + dateText(r.garageAt) + '</span>' : '<span class="pill no">No</span>') + '</td><td>' + actions + '</td></tr>';
-      }).join('') || '<tr><td colspan="9" class="empty">No open write-ups' + (filter === 'all' && !q ? '' : ' match') + '.</td></tr>';
+          '<td>' + dateText(r.reported) + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + (r.text ? escapeHtml(r.text) : '<i>No detail: needs review</i>') + '</td>' +
+          '<td><span class="count' + (r.occurrences > 1 ? ' repeat' : '') + '">' + r.occurrences + '</span></td><td>' + reviewed + '</td>' +
+          (truck ? '<td>' + (r.emailed ? tick('Emailed ' + r.emailedAt) : dash) + '</td>' : '') + '<td>' + garage + '</td><td>' + actions + '</td></tr>' + more;
+      }).join('') || '<tr><td colspan="' + cols + '" class="empty">No open write-ups' + (filter === 'all' && !q ? '' : ' match') + '.</td></tr>';
       document.getElementById('foot').textContent = shown.length + ' of ' + rows.length + ' open · repaired write-ups stay in the sheet until the weekly archive';
       const box = document.querySelector('[data-why]');
       if (box) { box.value = typed; if (document.activeElement !== box) box.focus(); }
@@ -110,12 +111,13 @@
         if (name === 'repaired') Object.assign(doc, { status: 'COMPLETE', completed_at: at });
         if (name === 'remove') Object.assign(doc, { status: 'REMOVED' });
         if (name === 'garage') doc.notes = (doc.notes ? doc.notes + '\n' : '') + 'Sent to garage ' + at + ' by ' + me;
+        if (name === 'lessor') doc.notes = (doc.notes ? doc.notes + '\n' : '') + 'Sent to lessor ' + note + ' ' + at + ' by ' + me;
         if (name === 'reviewed') Object.assign(doc, { status: 'OPEN', notes: (doc.notes ? doc.notes + '\n' : '') + 'Reviewed by ' + me + ' at ' + at });
       };
       saveOptimistic('updateIssue', { recordId: r.recordId, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render);
     }
 
-    document.getElementById('kinds').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) { kind = b.dataset.kind; filter = 'all'; removeFor = null; render(); } });
+    document.getElementById('kinds').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) { kind = b.dataset.kind; filter = 'all'; removeFor = openFor = null; render(); } });
     document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
     document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
     document.getElementById('rows').addEventListener('click', e => {
@@ -123,15 +125,23 @@
       if (!tr) return;
       const r = open(kind).find(x => x.id === tr.dataset.id);
       if (!r) return;
+      if (e.target.closest('[data-review]')) { step(r, 'reviewed'); return; }
       const b = e.target.closest('[data-step]');
-      if (b) { step(r, b.dataset.step); return; }
+      if (b) { step(r, b.dataset.step, b.dataset.step === 'lessor' ? L.unitLessor(lists.fleetTrucks, r.unit).lessor : ''); return; }
+      if (e.target.closest('[data-open]')) { openFor = openFor === r.id ? null : r.id; render(); return; }
       if (e.target.closest('[data-remove]')) { removeFor = r.id; render(); return; }
       if (e.target.closest('[data-remove-cancel]')) { removeFor = null; render(); return; }
       if (e.target.closest('[data-remove-save]')) { const why = tr.querySelector('[data-why]').value.trim(); removeFor = null; step(r, 'remove', why); }
     });
     document.getElementById('rows').addEventListener('keydown', e => { if (e.target.matches('[data-why]')) { if (e.key === 'Enter') e.target.closest('tr').querySelector('[data-remove-save]').click(); if (e.key === 'Escape') { removeFor = null; render(); } } });
-    // Back on this screen: a remove box first, then a second list back to Trucks (app.js goBack reads window.udBack).
-    window.udBack = () => { if (removeFor) { removeFor = null; render(); return true; } if (kind !== 'TRUCK') { kind = 'TRUCK'; filter = 'all'; render(); return true; } return false; };
+    // Back: a remove box or an open write-up first; then the Fleet & Maintenance hub when the list was opened from it, else Trucks.
+    const fromHub = /\/maint\.html/.test(document.referrer || '');
+    window.udBack = () => {
+      if (removeFor || openFor) { removeFor = openFor = null; render(); return true; }
+      if (fromHub) { location.href = 'maint.html'; return true; }
+      if (kind !== 'TRUCK') { kind = 'TRUCK'; filter = 'all'; render(); return true; }
+      return false;
+    };
 
     window.addEventListener('resize', () => render());
     requireSignIn(async (user) => {
