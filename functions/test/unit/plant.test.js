@@ -271,3 +271,35 @@ test('Temperatures: locations in view order with their limits, HIGH / LOW / RECO
   assert.throws(() => P.validateTemperature({ manualTemperature: '38' }, SaveError), /not configured/);
   assert.equal(P.validateTemperature({ locationId: 'ut_temp_cooler_north', manualTemperature: ' 38.5 ' }, SaveError).manualTemperature, 38.5);
 });
+
+test('Manager Center: scheduler, quality, temperature and shift-note numbers, and the Send Current Report text', () => {
+  const e = (date, extra) => Object.assign({ date, pickupTime: '', scheduleType: 'ROUTE', trailer: '', status: 'SCHEDULED' }, extra);
+  // Thursday 10/8: the week runs Sunday 10/4 to Saturday 10/10.
+  const s = R.managerSchedule([e('2026-10-08', { pickupTime: '09:00' }), e('2026-10-08', { pickupTime: '06:30', trailer: 'T-5' }), e('2026-10-10', { scheduleType: 'CARRIER' }), e('2026-10-04'), e('2026-10-11'), e('2026-09-30')], '2026-10-08');
+  assert.deepEqual(s, { month: 5, monthKey: '2026-10', week: 4, today: 2, next: '06:30', needTrailer: 1 });
+  const q = R.managerQuality([{ last: { status: 'DOWN' } }, { last: { status: 'RUNNING', qualityCheck: 'FAIL' } }, { last: {} }],
+    [{ tipTest: 'PASS', recordedAt: '2026-10-08T12:00:00Z' }, { tipTest: 'Fail', weights: { result: '3990' }, recordedAt: '2026-10-08T11:00:00Z' }, { weights: { head1: '' } }]);
+  assert.deepEqual(q, { lines: 3, down: 2, tipTests: 2, tipFails: 1, lastWeight: '2026-10-08T11:00:00Z', history: 3 });
+  assert.deepEqual(R.managerTemps([{ status: 'MANUAL ONLY', lastStatus: 'HIGH', lastCheckedAt: '2026-10-08T10:00:00Z', sensorId: 'x' }, { status: 'MANUAL ONLY', lastStatus: 'RECORDED', lastCheckedAt: '2026-10-08T12:00:00Z' }], [1, 2]),
+    { sensors: 1, offline: 0, alerts: 1, lastManual: '2026-10-08T12:00:00Z', history: 2 });
+  assert.deepEqual(R.managerNotes([{ type: 'Handoff', status: 'RESOLVED' }, { type: 'Breakdown', status: 'OPEN' }, { type: 'Safety', status: 'MONITOR' }]), { handoff: 1, issues: 2, open: 2, history: 3 });
+  // 10:00 AM in New York: 801 (depart 10:15, not loaded) is behind; 803 (depart noon) is next; 802 is loaded.
+  const now = Date.parse('2026-10-08T14:00:00Z');
+  const load = (route, state, dispatchTime, seq, extra) => Object.assign({ route, run: route, area: 'CASE', state, dispatchTime, loadDate: '2026-10-08', loadSequence: seq, truck: '', trailer: '' }, extra);
+  const r = R.plantReport({
+    loads: [load('801', 'WAITING', 615, 2, { trailer: 'T-12' }), load('802', 'DONE', 300, 1), load('803', 'LOADING', 720, 3, { area: 'TOTES' }), load('799', 'WAITING', 600, 0, { prior: true, loadDate: '2026-10-07' })],
+    pickups: [{ route: '801', run: '801', item: 'Chocolate milk', quantity: '3', status: 'PENDING' }, { route: '802', status: 'COMPLETE' }],
+    shiftLog: [{ type: 'Breakdown', equipment: 'Palletizer', entry: 'Jammed', status: 'OPEN', recordedAt: '2026-10-08T13:00:00Z', shift: 'FIRST SHIFT' }, { type: 'Breakdown', status: 'RESOLVED' }],
+    lines: [{ name: 'BOXING', last: { status: 'DOWN', product: 'Skim', notes: 'Belt' } }],
+    temps: [{ location: 'Cooler North', status: 'MANUAL ONLY', lastManualTemperature: 44.5, lastStatus: 'HIGH', lowLimit: 33, highLimit: 41, sensorTemp: '', locked: true }, { location: 'Cooler Middle', status: 'MANUAL ONLY', lastManualTemperature: '', lastStatus: '', lowLimit: '', highLimit: '', sensorTemp: '', locked: false }]
+  }, now);
+  assert.equal(r.subject, 'Plant Update 10/8 10:00 AM: 2 routes behind');
+  assert.deepEqual(r.behind.map(x => [x.route, x.late]), [['799', '24 h 0 min late'], ['801', 'departs in 15 min']]);
+  assert.deepEqual([r.nextUp.map(x => x.route), r.loaded.map(x => x.route), r.leftToLoad, r.totalLoads], [['803'], ['802'], 3, 4]);
+  assert.deepEqual(r.counts, { behind: 2, leftToLoad: 3, pickups: 1, down: 1, linesDown: 1, tempsOut: 1 });
+  assert.match(r.text, /ROUTES BEHIND \(2\)\n {2}799 {2}depart 10:00 AM {2}NOT LOADED {2}24 h 0 min late/);
+  assert.match(r.text, /PLANT BREAKDOWNS \(1\)\n {2}Palletizer {2}Jammed {2}logged 9:00 AM first shift {2}OPEN/);
+  assert.match(r.text, /STILL TO LOAD: 3 of 4 {3}Case 2 of 3 · Totes 1 of 1/);
+  assert.match(r.text, /TEMPERATURES\n {2}Cooler North {2}44\.5°F {2}HIGH \(limit 33–41\)\n {2}Cooler Middle {2}- {2}NO CHECK {2}check due/);
+  assert.throws(() => P.validateReport({ subject: '', text: 'x' }, SaveError), /still loading/);
+});
