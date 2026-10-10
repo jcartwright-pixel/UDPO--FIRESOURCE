@@ -129,6 +129,7 @@
     const busy = (box) => box.contains(document.activeElement) && document.activeElement.matches('input') && document.activeElement.value;
 
     function render() {
+      if (phone.matches) pane = 'current'; // phones: the entry only, no history tab
       const all = week(), rows = day(), ck = canSave(), mineId = entry && entry.mine && entry.mine.payload.entryId;
       document.getElementById('hstats').innerHTML = [['Entries 24 h', rows.length, ''], ['Needs attention', all.filter(r => r.status === 'OPEN' && !isKind(r, 'Handoff')).length, 'warn'], ['Monitor', all.filter(r => r.status === 'MONITOR' && !isKind(r, 'Handoff')).length, ''], ['Resolved', rows.filter(r => r.status === 'RESOLVED').length, 'good']]
         .map(([l, n, k]) => '<div class="' + (n ? k : '') + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
