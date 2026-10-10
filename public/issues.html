@@ -159,6 +159,7 @@
 
     document.getElementById('kinds').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) { kind = b.dataset.kind; filter = 'all'; removeFor = openFor = null; render(); } });
     document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
+    document.getElementById('search').value = search;
     document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
     document.getElementById('rows').addEventListener('click', e => {
       const tr = e.target.closest('tr[data-id]');

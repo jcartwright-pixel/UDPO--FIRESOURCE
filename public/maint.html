@@ -51,7 +51,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // Joe 10/10: the current app's Fleet & Maintenance hub, where the maintenance side starts. Each list is read once
     // (write-ups, work orders, units, service setup, odometers) and every card is counted from that one copy.
@@ -59,6 +59,7 @@
     const KINDS = [['TRUCK', 'Truck Issues', 'maintenance-tractor-v1-560.webp', 'Truck'], ['TRAILER', 'Trailer Issues', 'maintenance-trailer-v1-560.webp', 'Trailer'],
       ['FORK_TRUCK', 'Fork Truck / Pallet Jack Issues', 'forklift-truck-v1-560.webp', 'Fork truck']];
     const data = { maintenance: [], workOrders: [], equipment: [], fleetSetup: [], odometers: [] };
+    let rules = null; // Fleet Service Setup's rules (config/fleetRules), over the defaults
     const now = () => Date.now();
     const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
 
@@ -93,7 +94,7 @@
       const t = L.operatingDay(new Date()), month = t.slice(0, 7), weekAgo = L.addDays(t, -7);
       const open = data.workOrders.filter(o => String(o.status || 'NEW').toUpperCase() !== 'DONE');
       const week = data.workOrders.filter(o => String(o.status).toUpperCase() === 'DONE' && String(o.completed_at || '').slice(0, 10) >= weekAgo);
-      const due = L.fleetDue(units(), data.fleetSetup, miles(), open, null, t);
+      const due = L.fleetDue(units(), data.fleetSetup, miles(), open, rules, t);
       const hours = Math.round(week.reduce((s, x) => s + (Number(x.minutes) || 0), 0) / 6) / 10;
       const garage = '<div class="hub-card garage" data-kind="GARAGE" data-card="fleet.html?view=work"><a class="hub-card-head" href="fleet.html?view=work"><span class="hub-wrench"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></span><strong>Garage</strong><span class="hub-big"><b>' + open.length + '</b><small>Work orders</small></span></a>' +
         '<div class="hub-tiles4">' + tile(open.filter(x => String(x.status).toUpperCase() === 'WORKING').length, 'Working now', 'fleet.html?view=work') + tile(open.filter(x => String(x.status).toUpperCase() === 'PARTS').length, 'Waiting on parts', 'fleet.html?view=work', 'warn') +
@@ -110,6 +111,7 @@
 
     requireSignIn(async () => {
       const { db } = await start();
+      onSnapshot(doc(db, 'config', 'fleetRules'), s => { rules = s.exists() ? s.data() : null; render(); }, () => {});
       Object.keys(data).forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read ' + name + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
       render();
     });
