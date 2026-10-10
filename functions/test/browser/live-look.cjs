@@ -15,7 +15,7 @@ const { chromium } = require('playwright');
   page.on('pageerror', e => problems.push('page error: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
   page.on('response', r => { if (r.status() >= 400) problems.push('HTTP ' + r.status() + ' ' + r.url()); });
-  await page.goto(url + '/index.html', { waitUntil: 'networkidle' });
+  await page.goto(url + '/distribution.html', { waitUntil: 'networkidle' });
   await page.evaluate(() => { document.querySelectorAll('[hidden]').forEach(el => { if (el.id === 'screen') el.hidden = false; }); const s = document.getElementById('signin'); if (s) s.hidden = true; });
   await page.waitForTimeout(500);
   const look = await page.evaluate(() => {

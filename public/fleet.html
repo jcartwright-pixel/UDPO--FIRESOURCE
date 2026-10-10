@@ -71,7 +71,8 @@
     const table = (cols, head, rows, empty) => '<table class="issues"><colgroup>' + cols.map(w => '<col style="width:' + w + '%">').join('') + '</colgroup><thead><tr>' +
       head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (rows || '<tr><td colspan="' + head.length + '" class="empty">' + empty + '</td></tr>') + '</tbody></table>';
 
-    // Joe 10/10 picked mock-up B: one row per unit, PM / Reefer, DOT and Plates side by side, each box colored by its state;
+    // Joe 10/10 picked mock-up A: one row per unit, PM / Reefer, DOT and Plates side by side in colored words with a thin colored edge,
+    // then Miles / hours now and Status;
     // units that need something first. Every figure the old list showed (due at, now, left, last done) is in the box or its tip.
     const RANK = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
     const md = (k) => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(k || '')); return m ? Number(m[2]) + '/' + Number(m[3]) + '/' + m[1].slice(2) : ''; };
@@ -93,12 +94,12 @@
       const need = rows.filter(r => r.worst !== 'OK').length;
       const now = (r) => { const i = r.c.PM; return i && i.now !== '' && i.now !== undefined && i.now !== null ? num(i.now) + (r.type === 'TRUCK' ? ' mi' : ' hrs') : ''; };
       const tip = (i) => !i ? '' : [i.what, 'Due ' + (i.key === 'PM' ? num(i.dueAt) + (i.dueAt !== '' ? ' mi' : '') : when(i.dueAt)), i.now !== '' && i.now !== undefined ? 'Now ' + num(i.now) : '', 'Left ' + (typeof i.left === 'number' ? num(i.left) + ' mi' : i.left), 'Last done ' + when(i.last), (STATUS[i.status] || [''])[0]].filter(Boolean).join(' · ');
-      const box = (i) => { const x = boxText(i); return '<td class="gc ' + x.s + '" title="' + escapeHtml(tip(i)) + '"><b>' + escapeHtml(x.big) + '</b> <small>' + escapeHtml(x.small) + '</small></td>'; };
+      const box = (i) => { const x = boxText(i); return '<td class="gc ' + x.s + '" title="' + escapeHtml(tip(i)) + '"><b>' + escapeHtml(x.big) + '</b><small>' + escapeHtml(x.small) + '</small></td>'; };
       const send = (r) => r.worst === 'AT_GARAGE' ? '<small>at garage</small>' : r.worst === 'OK' ? '' : '<button type="button" class="edit" disabled title="Send to Garage comes with the Garage Station">Send to Garage</button>';
-      return '<div class="fs-legend"><span class="OVERDUE">Overdue</span><span class="DUE_SOON">Due soon</span><span class="AT_GARAGE">At garage</span><span class="SET_UP">Needs start date</span><span class="OK">OK</span><em>' + need + ' of ' + rows.length + ' units need something</em></div>' +
-        table([9, 9, 22, 22, 22, 16], ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', ''],
-          rows.map(r => '<tr data-unit="' + escapeHtml(r.unit) + '" data-worst="' + r.worst + '"><td class="strong">' + escapeHtml(r.unit) + '</td><td>' + (r.type === 'TRAILER' ? 'Trailer' : 'Truck') + (now(r) ? '<small class="fs-now">' + now(r) + '</small>' : '') + '</td>' +
-            box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td>' + send(r) + '</td></tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
+      return '<div class="fs-legend"><em>' + need + ' of ' + rows.length + ' units need something</em></div>' +
+        table([9, 7, 17, 17, 17, 10, 10, 13], ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status', ''],
+          rows.map(r => '<tr data-unit="' + escapeHtml(r.unit) + '" data-worst="' + r.worst + '"><td class="strong">' + escapeHtml(r.unit) + '</td><td>' + (r.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td>' +
+            box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td>' + now(r) + '</td><td>' + pill(STATUS[r.worst]) + '</td><td>' + send(r) + '</td></tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
     }
 
     function render() {

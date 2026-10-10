@@ -52,7 +52,8 @@ const ICON = {
 export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
   ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
-  ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Driver Weekly Template', 'template.html', 'week'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
+  // Joe 10/10: assigning drivers their routes has a plain link here (it came off the Route Editor); the board is under Dispatch too.
+  ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Driver Weekly Template (assign routes)', 'template.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
   // Joe 10/10: the maintenance side starts on the Fleet & Maintenance hub and branches out from there, as in the current app.
   // An icon name ending .webp is a picture from the United Dairy icon library (img/library).
   ['Equipment', [['Fleet & Maintenance', 'maint.html', 'maintenance-tractor-v1-560.webp'], ['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'],
@@ -67,6 +68,24 @@ export const MENU = [
   // The plant side (the current app's Plant Menu): the departments page and each department's screen.
   ['Plant', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Plant Operations Scheduler', 'scheduler.html', 'week'], ['Yard Checks', 'yard.html', 'yard-checks.webp'], ['Production Line Status & Quality', 'quality.html', 'production.webp'], ['Shift Notes', 'shiftnotes.html', 'alert'], ['Temperatures & Coolers', 'temps.html', 'temperatures.webp'], ['Manager Center', 'manager.html', 'star']]]
 ];
+// Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
+// lists only that side's screens. A screen listed on two sides stays on the side it was opened from.
+export const SIDES = [
+  { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Reports', 'Overall', 'Administration'] },
+  { key: 'plant', name: 'Plant Operations', home: 'plant.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks, shift notes and reports', sections: ['Plant'] },
+  { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders, fleet service and GPS', sections: ['Equipment', 'GPS / Fleet'] }
+];
+const pageOf = (href) => String(href).split(/[?#]/)[0];
+const sideHas = (side, page) => page === side.home || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
+export function sideFor(page) {
+  if (!page || page === 'index.html') return null;
+  let last = '';
+  try { last = sessionStorage.getItem('udSide') || ''; } catch (e) { /* no storage */ }
+  const kept = SIDES.find(s => s.key === last);
+  const side = (kept && sideHas(kept, page)) ? kept : SIDES.find(s => sideHas(s, page)) || kept || SIDES[0];
+  try { sessionStorage.setItem('udSide', side.key); } catch (e) { /* no storage */ }
+  return side;
+}
 function addSideMenu() {
   const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
   if (!bar || document.body.classList.contains('phone') || screen.querySelector('.sidemenu')) return;
@@ -83,11 +102,17 @@ function addSideMenu() {
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
       '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
   };
-  nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' +
-    MENU.map(([group, items]) => !group ? items.map(link).join('') :
+  const side = sideFor(here), groups = side ? MENU.filter(([g]) => side.sections.indexOf(g) >= 0) : [];
+  // Home lists the three sides; a side shows its name (back to its first page), then only its own sections. A side with one
+  // section lists its screens straight in the menu.
+  const top = link(MENU[0][1][0]) + (!side ? SIDES.map(s => link([s.name, s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ')).join('') :
+    link([side.name, side.home, side.pic]).replace('<a ', '<a data-side="' + side.key + '" ').replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (here === side.home ? ' on' : '') + '" '));
+  nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
+    (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? items.map(link).join('') :
       '<div class="side-sec' + (items.some(([, href]) => href === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
       svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span><i aria-hidden="true">&#9656;</i></button>' +
-      '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join('');
+      '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join(''));
+  nav.addEventListener('click', e => { const a = e.target.closest('a[data-side]'); if (a) try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ } });
   // Joe 10/10: the fly-outs live in their own layer on the page, not inside the menu, so no screen, table or pop-up can draw over them.
   const layer = document.createElement('nav');
   layer.className = 'side-flyouts';
@@ -194,18 +219,27 @@ export function goBack() {
   const main = MENU.some(([, items]) => items.some(([, href]) => href === here));
   let fromHere = false;
   try { fromHere = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (e) { /* no referrer */ }
-  if (!main && fromHere && history.length > 1) history.back();
-  else location.href = 'index.html';
+  // Up one level: a side's screen goes to that side's first page, and the side's first page goes Home.
+  const side = sideFor(here), up = side && here !== side.home ? side.home : 'index.html';
+  if (!main && side && here !== side.home && fromHere && history.length > 1) history.back();
+  else location.href = up;
 }
+// Joe 10/10: every screen has a Back button and a Home button, in the same place at the top of the menu (built here, once).
 (function addBack() {
   const here = location.pathname.split('/').pop() || 'index.html';
   const home = document.querySelector('.sidemenu a[href="index.html"]');
-  if (!home || here === 'index.html') return;
+  if (!home) return;
+  home.id = 'go-home';
+  if (here === 'index.html') return;
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'side-back'; b.id = 'go-back'; b.title = 'Back one screen';
   b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.back + '</svg><span>Back</span>';
   b.onclick = goBack;
-  home.replaceWith(b);
+  const h = document.createElement('button');
+  h.type = 'button'; h.className = 'side-back side-home'; h.id = 'go-home'; h.title = 'Home';
+  h.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.home + '</svg><span>Home</span>';
+  h.onclick = () => { location.href = 'index.html'; };
+  home.replaceWith(b, h);
 })();
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
@@ -319,12 +353,13 @@ export function showError(text) {
 }
 
 // Sizes rows and type to the window so the whole list fits on one page with no scrolling.
-export function fitToWindow(lineCount) {
+export function fitToWindow(lineCount, gap) {
   const sheet = document.querySelector('.sheet');
   if (!sheet) return;
   const top = sheet.getBoundingClientRect().top;
   const footer = document.querySelector('.footer');
-  const room = window.innerHeight - top - (footer ? footer.offsetHeight : 0) - 8;
+  // gap: space between rows (Daily's card rows), taken from the room first.
+  const room = window.innerHeight - top - (footer ? footer.offsetHeight : 0) - 8 - (gap || 0) * (Math.max(lineCount, 1) + 2);
   const lines = Math.max(lineCount, 1) + 1.25; // the header row is a little taller than a line
   const apply = (row) => {
     document.documentElement.style.setProperty('--row', row + 'px');

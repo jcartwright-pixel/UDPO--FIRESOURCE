@@ -370,9 +370,14 @@ async function noScroll(page) {
     await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => /WHEELING/.test(tr.textContent)), null, { timeout: 5000 });
     await rt.selectOption('#route-select', '');
     await rt.selectOption('#view-select', 'seq');
-    await rt.waitForSelector('table.routes tr[data-i="1"]');
+    // The Load Order list is drawn and the saves above have settled, so no copy redraws the rows in the middle of the drag.
+    await rt.waitForFunction(() => document.querySelector('table.routes thead th') && document.querySelector('table.routes thead th').textContent === 'Order' && document.querySelector('table.routes tr[data-i="1"]'), null, { timeout: 5000 });
+    await rt.waitForTimeout(600);
+    const orderShown = () => rt.evaluate(() => [...document.querySelectorAll('table.routes tbody tr[data-i]')].map(tr => tr.children[1].textContent).join(','));
+    const beforeDrag = await orderShown();
     await rt.dragAndDrop('table.routes tr[data-i="1"] td:nth-child(2)', 'table.routes tr[data-i="0"] td:nth-child(2)');
-    await rt.waitForFunction(() => document.querySelector('table.routes tr[data-i="0"] td:nth-child(2)').textContent === '801', null, { timeout: 5000 });
+    await rt.waitForFunction(() => document.querySelector('table.routes tr[data-i="0"] td:nth-child(2)').textContent === '801', null, { timeout: 5000 })
+      .catch(async e => { throw new Error('Load order drag: before ' + beforeDrag + ', after ' + await orderShown() + ' (' + e.message + ')'); });
     const saved801 = await rt.evaluate(async () => {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
@@ -481,7 +486,7 @@ async function noScroll(page) {
 
     // Route Distribution home, Drivers and Driver Check-ins fit one page at both sizes.
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
-      for (const [url, ready] of [['/index.html?testEmail=dispatch.test@uniteddairy.com', '[data-n="drivers.active"]:not(:empty)'],
+      for (const [url, ready] of [['/distribution.html?testEmail=dispatch.test@uniteddairy.com', '[data-n="drivers.active"]:not(:empty)'],
         ['/drivers.html?testEmail=manager.test@uniteddairy.com', '#rows tr[data-id]'],
         ['/checkins.html?date=2026-10-06&testEmail=dispatch.test@uniteddairy.com', '#rows tr[data-index]']]) {
         const page = await openPage(browser, w, h, url);
@@ -494,7 +499,7 @@ async function noScroll(page) {
         await page.close();
       }
     }
-    const home = await openPage(browser, 1366, 650, '/index.html?testEmail=dispatch.test@uniteddairy.com');
+    const home = await openPage(browser, 1366, 650, '/distribution.html?testEmail=dispatch.test@uniteddairy.com');
     await home.waitForFunction(() => document.querySelector('[data-n="drivers.active"]').textContent === '3');
     await home.close();
     results.push('Route Distribution home, Drivers and Driver Check-ins fit on one page at 1920x950 and 1366x650');
@@ -611,11 +616,14 @@ async function noScroll(page) {
     await backPage.click('#go-back');
     await backPage.waitForSelector('.panel-empty');
     assert.match(backPage.url(), /drivers\.html/, 'first Back only closes the driver');
-    await Promise.all([backPage.waitForURL(/index\.html/), backPage.click('#go-back')]);
+    // Joe 10/10: Back goes up one level: a Route Distribution screen goes to the Route Distribution page, and that page goes Home.
+    await Promise.all([backPage.waitForURL(/distribution\.html/), backPage.click('#go-back')]);
     await backPage.waitForSelector('.cards');
+    await Promise.all([backPage.waitForURL(/index\.html/), backPage.click('#go-back')]);
+    await backPage.waitForSelector('.launch-card');
     assert.equal(await backPage.$('#go-back'), null, 'Home has no Back');
     await backPage.close();
-    results.push('Back: closes an opened driver first, then goes Home; Home has no Back');
+    results.push('Back: closes an opened driver first, then goes up to Route Distribution, then Home; Home has no Back');
 
     // Driver Weekly Template: a manager turns ADAMS Off on Tuesday, copies it to Wednesday, and Save Template saves both cells.
     const tpl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
@@ -651,10 +659,25 @@ async function noScroll(page) {
     assert.deepEqual(fs2.errors, []);
     await fs2.close();
     results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
-    // Joe 10/10 picked mock-up B: one row per unit with PM / Reefer, DOT and Plates side by side, units that need something first.
+    // Joe 10/10: every screen, plant screens included, shows Back and Home together at the top of the menu.
+    const fsMod = require('fs'), pathMod = require('path');
+    const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html');
+    const bh = await openPage(browser, 1366, 768, '/index.html?testEmail=manager.test@uniteddairy.com');
+    const missing = [];
+    for (const pg of pages) {
+      await bh.goto(bh.url().replace(/\/[a-z-]+\.html.*/, '/' + pg + '?testEmail=manager.test@uniteddairy.com'));
+      await bh.waitForSelector('#go-home', { timeout: 8000 }).catch(() => {});
+      const seen = await bh.evaluate(() => ['go-back', 'go-home'].filter(id => { const e = document.getElementById(id); return e && e.getBoundingClientRect().width > 0; }));
+      const want = pg === 'index.html' ? ['go-home'] : ['go-back', 'go-home'];
+      if (want.some(id => seen.indexOf(id) < 0)) missing.push(pg + ': ' + seen.join(','));
+    }
+    assert.deepEqual(missing, [], 'every screen has Back and Home');
+    await bh.close();
+    results.push('Back and Home: all ' + pages.length + ' screens show both at the top of the menu (Home shows Home)');
+    // Joe 10/10 picked mock-up A: one row per unit with PM / Reefer, DOT and Plates side by side, Miles / hours now and Status, units that need something first.
     const fsB = await openPage(browser, 1920, 950, '/fleet.html?testEmail=manager.test@uniteddairy.com');
     await fsB.waitForSelector('table.fs-grid tbody tr');
-    assert.deepEqual(await fsB.$$eval('table.fs-grid thead th', t => t.map(x => x.textContent)), ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', '']);
+    assert.deepEqual(await fsB.$$eval('table.fs-grid thead th', t => t.map(x => x.textContent)), ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status', '']);
     const fsRows = await fsB.$$eval('table.fs-grid tbody tr[data-unit]', r => r.map(x => [x.dataset.unit, x.dataset.worst]));
     assert.equal(new Set(fsRows.map(r => r[0])).size, fsRows.length, 'one row per unit');
     const rank = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
@@ -662,7 +685,7 @@ async function noScroll(page) {
     assert.match(await fsB.textContent('.fs-legend em'), /of \d+ units need something/);
     assert.deepEqual(fsB.errors, []);
     await fsB.close();
-    results.push('Fleet Service (mock-up B): one row per unit, PM / Reefer, DOT and Plates side by side, units that need something first');
+    results.push('Fleet Service (mock-up A): one row per unit, PM / Reefer, DOT, Plates, Miles / hours now and Status, units that need something first');
     // Over the Road: a manager ticks route 801 for Jersey in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
     const otr = await openPage(browser, 1920, 950, '/otr.html?view=routes&testEmail=manager.test@uniteddairy.com');
     await otr.waitForSelector('[data-dest="run_t801"]');
@@ -863,16 +886,49 @@ async function noScroll(page) {
       await rd.close();
     }
     results.push('Route Days: Refresh, Add Route, Add Run, Holiday Week Editor and Dispatch Administration sit together in one even row at both sizes');
+    // Joe 10/10: Home is the old app's launcher, one big picture per side; each side's menu lists only its own screens.
+    const lp = await openPage(browser, 1920, 950, '/index.html?testEmail=manager.test@uniteddairy.com');
+    await lp.waitForSelector('.launch-card');
+    assert.deepEqual(await lp.$$eval('.launch-card strong', s => s.map(x => x.textContent)), ['Route Distribution', 'Plant Operations', 'Fleet & Maintenance']);
+    await lp.waitForFunction(() => [...document.querySelectorAll('.launch-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 3, null, { timeout: 10000 });
+    assert.equal(await lp.$('.sidemenu .side-sec'), null, 'Home lists the sides, not every screen');
+    assert.deepEqual(await lp.$$eval('.sidemenu a[data-side]', a => a.map(x => x.textContent.trim())), ['Route Distribution', 'Plant Operations', 'Fleet & Maintenance']);
+    if (SHOTS) await lp.screenshot({ path: path.join(SHOTS, 'home-launcher-1920.png') });
+    await Promise.all([lp.waitForURL(/plant\.html/), lp.click('.launch-card[data-side="plant"]')]);
+    await lp.waitForSelector('.sidemenu a.side-name');
+    const plantMenu = await lp.$$eval('.sidemenu > a', a => a.map(x => x.textContent.trim()));
+    assert.deepEqual(plantMenu, ['Plant Operations', 'Loadout Center', 'Unloading & Washing', 'Product Returns', 'Truck Washing', 'Plant Operations Scheduler', 'Yard Checks', 'Production Line Status & Quality', 'Shift Notes', 'Temperatures & Coolers', 'Manager Center'], 'the Plant side lists only plant screens');
+    assert.equal(await lp.$('.sidemenu .side-sec'), null, 'no Dispatch, Drivers or Equipment sections on the Plant side');
+    await Promise.all([lp.waitForURL(/scheduler\.html/), lp.click('.sidemenu a[href="scheduler.html"]')]);
+    await lp.waitForSelector('.sidemenu a[href="scheduler.html"].on');
+    await Promise.all([lp.waitForURL(/plant\.html/), lp.click('#go-back')]);
+    await Promise.all([lp.waitForURL(/index\.html/), lp.click('#go-home')]);
+    await Promise.all([lp.waitForURL(/maint\.html/), lp.click('.launch-card[data-side="fleet"]')]);
+    await lp.waitForSelector('.sidemenu .side-sec');
+    assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)), ['Equipment', 'GPS / Fleet'], 'the Fleet & Maintenance side lists only its own sections');
+    // Over the Road is on two sides: opened from Fleet & Maintenance, its menu stays on that side.
+    await lp.goto(lp.url().replace(/maint\.html.*/, 'otr.html?testEmail=manager.test@uniteddairy.com'));
+    await lp.waitForSelector('.sidemenu a.side-name');
+    assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'fleet');
+    assert.deepEqual(lp.errors, []);
+    await lp.close();
+    results.push('Home: three big pictures (Route Distribution, Plant Operations, Fleet & Maintenance); each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
     // Joe 10/10: an Administration section holds Dispatch Administration; Driver Weekly Template is under Drivers only.
-    const mp = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
+    const mp = await openPage(browser, 1920, 950, '/daily.html?testEmail=manager.test@uniteddairy.com');
     await mp.waitForSelector('.side-flyouts .flyout', { state: 'attached' });
     const menu = await mp.$$eval('.side-flyouts .flyout', fs => fs.map(f => [f.querySelector('.flyout-title').textContent, [...f.querySelectorAll('a')].map(a => a.textContent.trim())]));
     const sec = (name) => (menu.find(m => m[0] === name) || [name, []])[1];
     assert.deepEqual(sec('Administration'), ['Dispatch Administration', 'Operational Assignments', 'Print Layouts', 'Dispatch Settings']);
     assert.equal(sec('Dispatch').indexOf('Dispatch Administration'), -1, 'not under Dispatch');
-    assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template') >= 0).map(m => m[0]), ['Drivers']);
-    assert.equal(sec('Equipment')[0], 'Fleet & Maintenance', 'the maintenance side starts on the hub');
+    assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template (assign routes)') >= 0).map(m => m[0]), ['Drivers']);
+    assert.deepEqual(sec('Drivers'), ['Drivers', 'Driver Weekly Template (assign routes)', 'Driver Assignment Board', 'Vacation Schedule'], 'Joe 10/10: route assignment has a link under Drivers');
+    assert.ok(sec('Dispatch').indexOf('Driver Assignment Board') >= 0, 'the board stays under Dispatch too');
+    assert.deepEqual(menu.map(m => m[0]), ['Dispatch', 'Drivers', 'Reports', 'Overall', 'Administration'], 'the Route Distribution side lists only its own sections');
     await mp.close();
+    const mq = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
+    await mq.waitForSelector('.side-flyouts .flyout', { state: 'attached' });
+    assert.equal(await mq.$eval('.side-flyouts .flyout a', a => a.textContent.trim()), 'Fleet & Maintenance', 'the maintenance side starts on the hub');
+    await mq.close();
     // Joe 10/10 (old hub picture): Fleet & Maintenance shows the six counts, four cards with the icon library pictures and the
     // latest write-ups; a card opens its list in this window, with the old columns and Lessor | Garage on trucks.
     const hub = await openPage(browser, 1920, 950, '/maint.html?testEmail=manager.test@uniteddairy.com');
@@ -908,12 +964,12 @@ async function noScroll(page) {
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).
-    const adminHome = await openPage(browser, 1366, 650, '/index.html?testEmail=admin.test@uniteddairy.com');
+    const adminHome = await openPage(browser, 1366, 650, '/distribution.html?testEmail=admin.test@uniteddairy.com');
     await adminHome.waitForSelector('[data-owner="dailyDispatch"].can');
     await adminHome.waitForSelector('[data-owner="writeBack"].new');
     await adminHome.click('[data-owner="dailyDispatch"]');
     assert.equal(await adminHome.textContent('[data-owner="dailyDispatch"]'), 'Click again');
-    assert.match(adminHome.url(), /index\.html/, 'the tag does not open the screen');
+    assert.match(adminHome.url(), /distribution\.html/, 'the tag does not open the screen');
     await adminHome.click('[data-owner="dailyDispatch"]');
     await adminHome.waitForSelector('[data-owner="dailyDispatch"].new');
     assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'new');
@@ -929,7 +985,7 @@ async function noScroll(page) {
     if (SHOTS) await onOld.screenshot({ path: path.join(SHOTS, 'weekly-view-only-1366.png') });
     await onOld.close();
     // A manager sees which app runs each screen but cannot move one.
-    const mgrHome = await openPage(browser, 1366, 650, '/index.html?testEmail=manager.test@uniteddairy.com');
+    const mgrHome = await openPage(browser, 1366, 650, '/distribution.html?testEmail=manager.test@uniteddairy.com');
     await mgrHome.waitForSelector('[data-owner="dailyDispatch"].new');
     assert.equal(await mgrHome.$('[data-owner].can'), null);
     await mgrHome.close();

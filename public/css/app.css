@@ -1069,18 +1069,56 @@ table.set thead th { background: var(--ud-blue); color: #fff; }
 .soon-card p { font-size: 16px; line-height: 1.45; }
 @media (max-width: 1100px) { .set-grid { grid-template-columns: 1fr; } }
 
-/* Fleet Service, mock-up B (Joe 10/10): one row per unit, each service box colored by its state. */
-table.fs-grid td.gc { text-align: left; padding: 6px 10px; white-space: normal; }
-table.fs-grid td.gc b { font-size: 15px; }
-table.fs-grid td.gc small { font-size: 12px; color: #5a6b7d; }
-table.fs-grid td.gc.OVERDUE { background: #fde2e2; } table.fs-grid td.gc.OVERDUE b { color: #b3261e; }
-table.fs-grid td.gc.DUE_SOON { background: #fff1dc; } table.fs-grid td.gc.DUE_SOON b { color: #8a4b00; }
-table.fs-grid td.gc.OK { background: #e7f6ec; } table.fs-grid td.gc.OK b { color: #1d7a3e; }
-table.fs-grid td.gc.SET_UP, table.fs-grid td.gc.NO_MILES { background: #eef2f6; }
-table.fs-grid td.gc.AT_GARAGE { background: #e1ebf5; }
-table.fs-grid small.fs-now { display: block; font-size: 12px; color: #5a6b7d; }
-.fs-legend { display: flex; gap: 10px; align-items: center; margin: 0 0 8px; font-size: 13px; font-weight: 700; }
-.fs-legend span { padding: 4px 10px; border-radius: 6px; }
-.fs-legend .OVERDUE { background: #fde2e2; } .fs-legend .DUE_SOON { background: #fff1dc; } .fs-legend .AT_GARAGE { background: #e1ebf5; }
-.fs-legend .SET_UP { background: #eef2f6; } .fs-legend .OK { background: #e7f6ec; }
+/* Fleet Service, mock-up A (Joe 10/10): one row per unit, colored words with a thin colored edge on each service cell. */
+table.fs-grid td.gc { text-align: left; padding: 6px 10px; white-space: normal; border-left: 5px solid transparent; }
+table.fs-grid td.gc b { display: block; font-size: 16px; }
+table.fs-grid td.gc small { display: block; font-size: 12px; color: #5a6b7d; }
+table.fs-grid td.gc.OVERDUE { border-left-color: #c62828; } table.fs-grid td.gc.OVERDUE b { color: #c62828; }
+table.fs-grid td.gc.DUE_SOON { border-left-color: #e5891a; } table.fs-grid td.gc.DUE_SOON b { color: #b45f00; }
+table.fs-grid td.gc.OK b { color: #1d7a3e; }
+table.fs-grid td.gc.SET_UP b, table.fs-grid td.gc.NO_MILES b { color: #5a6b7d; font-style: italic; }
+table.fs-grid td.gc.AT_GARAGE { border-left-color: #1f5f9e; } table.fs-grid td.gc.AT_GARAGE b { color: #1f5f9e; }
+.fs-legend { display: flex; align-items: center; margin: 0 0 8px; font-size: 13px; font-weight: 700; }
 .fs-legend em { margin-left: auto; font-style: normal; color: #5a6b7d; }
+
+/* Back and Home sit together at the top of the menu on every screen (Joe 10/10); Home looks like Back. */
+.sidemenu .side-home { margin-bottom: 6px; }
+
+/* Daily Dispatch, Joe's pick 10/10 (mock-up A): every row a white card with a blue edge, route numbers in blue,
+   delivery-day lines as blue banners, RUNS and Edit as round buttons. Rows still size to fit the window. */
+body.daily-look .sheet { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+body.daily-look table.daily { border-collapse: separate; border-spacing: 0 5px; background: transparent; margin-top: -5px; }
+body.daily-look table.daily thead th { background: #0f2747; color: #fff; letter-spacing: .08em; border: 0; }
+body.daily-look table.daily thead th:first-child { border-radius: 10px 0 0 10px; }
+body.daily-look table.daily thead th:last-child { border-radius: 0 10px 10px 0; }
+body.daily-look table.daily tbody tr:not(.group) td { background: #fff; border: 0; border-top: 1px solid #dfe6ee; border-bottom: 1px solid #dfe6ee; }
+body.daily-look table.daily tbody tr:not(.group) td:first-child { border-left: 5px solid #1f6feb; border-radius: 10px 0 0 10px; }
+body.daily-look table.daily tbody tr:not(.group) td:last-child { border-right: 1px solid #dfe6ee; border-radius: 0 10px 10px 0; }
+body.daily-look table.daily tbody tr:not(.group):hover td { background: #f3f8ff; }
+body.daily-look table.daily td.route { font-weight: 900; color: #0b4fb3; font-size: calc(var(--font) + 2px); }
+body.daily-look table.daily tbody tr.group td { background: linear-gradient(90deg, #1f6feb, #6aa8ff) !important; color: #fff !important; font-weight: 900; letter-spacing: .1em; border-radius: 10px; text-align: left; padding-left: 14px; }
+body.daily-look table.daily td.missing { background: #fff1f0; color: #b3261e; box-shadow: inset 0 0 0 2px #f3b8b3; border-radius: 6px; }
+body.daily-look table.daily button.toggle.on { background: #16a34a; color: #fff; border-radius: 999px; border: 0; font-weight: 900; }
+body.daily-look table.daily button.edit { border-radius: 999px; background: #0f2747; color: #fff; border: 0; }
+body.daily-look table.daily td.pickup { color: #b3261e; font-weight: 900; }
+
+/* Joe 10/10: Home is the old app's launcher: one big picture card per side (Route Distribution, Plant Operations, Fleet & Maintenance). */
+.launch-title { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 4px 16px; margin: 18px 24px; }
+.launch-title h1 { margin: 0; font-size: 30px; font-weight: 900; color: #0b3d6b; }
+.launch-title p { margin: 0; grid-column: 1; color: #4a6b8d; font-size: 16px; }
+.launch-title #today { grid-column: 2; grid-row: 1 / span 2; align-self: center; padding: 8px 16px; border-radius: 10px; background: #eef5fc; color: #0b3d6b; font-weight: 800; }
+.launch-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin: 0 24px 24px; }
+.launch-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 22px 22px; border-radius: 18px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 8px 24px rgba(11, 61, 107, .10); color: #0b3d6b; text-decoration: none; text-align: center; transition: transform .12s, box-shadow .12s; }
+.launch-card:hover, .launch-card:focus-visible { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(11, 61, 107, .20); border-color: #1f6feb; }
+.launch-art { display: flex; align-items: center; justify-content: center; width: 100%; height: clamp(150px, 26vh, 260px); border-radius: 14px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
+.launch-art img { max-width: 78%; max-height: 88%; object-fit: contain; }
+.launch-card strong { font-size: 24px; font-weight: 900; margin-top: 6px; }
+.launch-card small { color: #4a6b8d; font-size: 15px; min-height: 2.6em; }
+.launch-card b { margin-top: 4px; padding: 10px 22px; border-radius: 999px; background: #0f2747; color: #fff; font-size: 15px; }
+@media (max-width: 900px) { .launch-grid { grid-template-columns: 1fr; } .launch-art { height: 140px; } }
+/* A side's name sits under Back and Home, so it is plain which side the menu belongs to. */
+.sidemenu a.side-name { margin-bottom: 6px; border-bottom: 1px solid #ffffff33; border-radius: 9px 9px 0 0; font-size: 15px; font-weight: 900; }
+/* Long screen names wrap onto a second line instead of being cut off. */
+body:not(.side-folded) .sidemenu a { white-space: normal; line-height: 1.15; }
+body:not(.side-folded) .sidemenu a span { overflow: visible; text-overflow: clip; }
+.sidemenu a.side-name.on { border-radius: 9px; }
