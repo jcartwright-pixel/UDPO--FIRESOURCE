@@ -748,3 +748,26 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
   body:not(.side-open) .sidemenu .side-sec-btn span, body:not(.side-open) .sidemenu .side-sec-btn i { display: none; }
   body:not(.side-open) .sidemenu .side-sec-btn { justify-content: center; padding: 11px 0; }
 }
+
+/* GPS Setup (Joe 10/9): the Verizon Connect login and a plain pass / fail test. */
+.gps-page .gps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 16px 16px; }
+.gps-page .gps-card { background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.gps-page .gps-card.wide { grid-column: 1 / 3; }
+.gps-page h2 { margin: 0; font-size: 19px; color: var(--ud-blue); display: flex; align-items: center; gap: 10px; }
+.gps-page .hint { margin: 0; color: var(--muted); font-size: 14px; }
+.gps-page label { display: grid; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.gps-page input { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.gps-page form { display: grid; gap: 10px; }
+.gps-page .gps-buttons { display: flex; gap: 10px; }
+.gps-page .gps-buttons button { min-height: 40px; padding: 0 18px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 800; cursor: pointer; }
+.gps-page .gps-buttons button.primary { background: var(--ud-blue); color: #fff; }
+.gps-page .gps-buttons button.big { min-height: 48px; font-size: 17px; padding: 0 28px; }
+.gps-page .gps-buttons button.armed { background: #b45309; border-color: #b45309; color: #fff; }
+.gps-page .pill { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 800; }
+.gps-page .pill.yes { background: #e3f4e8; color: #1d6b37; }
+.gps-page .pill.warn { background: #fdecc4; color: #8a5a00; }
+.gps-page .pill.no { background: #eef2f5; color: #6b7c8c; }
+.gps-page .gps-result { padding: 14px 16px; border-radius: 10px; font-size: 17px; background: #eef2f6; color: var(--ink); }
+.gps-page .gps-result.ok { background: #e3f4e8; color: #1d6b37; border: 1px solid #a9d8b8; }
+.gps-page .gps-result.bad { background: #fde3df; color: #a8321f; border: 1px solid #f0b4aa; }
+.gps-page .gps-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 15px; }

@@ -6,6 +6,7 @@
  *   save                  every save from the screens, one call each
  *   phone                 the drivers' phone Check-In (Route Distribution code, no United Dairy account)
  *   newRouteCode          a manager makes a new Route Distribution code for the phones
+ *   gps                   a manager or administrator saves, removes or tests the Verizon Connect (Fleetmatics) API login
  *   setSwitch             an administrator moves a screen between the current app and the new one, or turns the write-back on / off
  *   writeBackOnSave       writes each save into the SANDBOX Live workbook (phase 2; production is refused)
  *   writeBackEveryMinute  retries anything the write-back could not finish
@@ -22,6 +23,7 @@ const { runTransfer } = require('./src/transfer');
 const { applyAction, SaveError } = require('./src/actions');
 const { phoneCall, newRouteCode } = require('./src/phone');
 const { setSwitch, SwitchError } = require('./src/switch');
+const { gpsCall, GpsError } = require('./src/gps');
 const { unitedDairyUser } = require('./src/auth');
 const { makeSheetsReader, makeSheetsWriter } = require('./src/sheets');
 const { runWriteBack } = require('./src/writeback');
@@ -76,7 +78,7 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
 });
 
-const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
@@ -92,6 +94,11 @@ exports.setSwitch = onCall(async (request) => {
   const user = signedIn(request);
   // The write-back can go on only where the server names a sandbox Live workbook to write.
   try { return await setSwitch(db, user, request.data, !!process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1'); } catch (error) { throw asHttps(error); }
+});
+
+exports.gps = onCall({ timeoutSeconds: 30 }, async (request) => {
+  const user = signedIn(request);
+  try { return await gpsCall(db, user, request.data, { local: process.env.FUNCTIONS_EMULATOR === 'true' }); } catch (error) { throw asHttps(error); }
 });
 
 exports.save = onCall(async (request) => {
