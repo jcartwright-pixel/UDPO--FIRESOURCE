@@ -800,7 +800,7 @@ async function noScroll(page) {
     const ops = await openPage(browser, 1920, 950, '/admin.html?testEmail=manager.test@uniteddairy.com');
     await ops.waitForSelector('.admin-card');
     assert.deepEqual(await ops.$$eval('.admin-card', a => a.filter(x => !/^[a-z]+\.html/.test(x.getAttribute('href')) || x.textContent.includes('current app')).map(x => x.textContent)), [], 'no card leaves the new app');
-    for (const [name, page, sel] of [['Print Layouts', 'print', '#grid .admin-card'], ['Dispatch Settings', 'settings', '#owners tr'], ['Operational Assignments', 'ops', '#rows tr[data-name]']]) {
+    for (const [name, page, sel] of [['Print Layouts', 'print', '#sheets .pl-item'], ['Dispatch Settings', 'settings', '#owners tr'], ['Operational Assignments', 'ops', '#rows tr[data-name]']]) {
       await ops.goto(ops.url().replace(/\/[a-z]+\.html.*/, '/admin.html?testEmail=manager.test@uniteddairy.com'));
       await ops.waitForSelector('.admin-card');
       await Promise.all([ops.waitForURL(new RegExp('/' + page + '\\.html')), ops.click('.admin-card:has-text("' + name + '")')]);
