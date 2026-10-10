@@ -771,3 +771,13 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
 .gps-page .gps-result.ok { background: #e3f4e8; color: #1d6b37; border: 1px solid #a9d8b8; }
 .gps-page .gps-result.bad { background: #fde3df; color: #a8321f; border: 1px solid #f0b4aa; }
 .gps-page .gps-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 15px; }
+
+/* One app, not page after page (Joe 10/9): the page colour shows while a screen loads (no white flash), and Chrome
+   cross-fades from one screen to the next with the header and the menu held in place. */
+html { background: var(--page); }
+@view-transition { navigation: auto; }
+.topbar { view-transition-name: ud-topbar; }
+.sidemenu { view-transition-name: ud-menu; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 120ms; }
+::view-transition-group(ud-topbar), ::view-transition-group(ud-menu) { animation-duration: 0s; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }

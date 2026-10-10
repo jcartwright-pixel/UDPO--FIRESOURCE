@@ -114,6 +114,18 @@ function addSideMenu() {
 }
 addSideMenu();
 
+// Moving between screens feels like one app (Joe 10/9): Chrome gets each screen ready while the pointer rests on its menu
+// link, so a click shows it at once. Pages of the current app and the drivers' phone page are left out.
+(function prerenderOnHover() {
+  try {
+    if (!(HTMLScriptElement.supports && HTMLScriptElement.supports('speculationrules'))) return;
+    const rules = document.createElement('script');
+    rules.type = 'speculationrules';
+    rules.textContent = JSON.stringify({ prerender: [{ source: 'document', where: { and: [{ href_matches: '/*.html' }, { not: { href_matches: '/route.html' } }] }, eagerness: 'moderate' }] });
+    document.head.appendChild(rules);
+  } catch (e) { /* not supported */ }
+})();
+
 /* Back goes one step: it first closes what is open on this screen (a pop-up, an opened driver,
    a second tab or view); with nothing open, a main screen goes Home and any other page goes to
    the page it was opened from. A screen can add its own step with window.udBack = () => true/false. */
@@ -171,32 +183,48 @@ export function isUnitedDairy(user) {
 
 // Shows the sign-in card until a United Dairy account is signed in, then calls ready(user).
 export async function requireSignIn(ready) {
+  // Moving between screens (Joe 10/9): someone already checked in this tab sees the screen at once, not a blank page while
+  // the sign-in and the Users list are checked again; the check still runs and signs out anyone no longer active.
+  const gate = document.getElementById('signin'), screen = document.getElementById('screen');
+  let known = '';
+  try { known = sessionStorage.getItem('udActive') || ''; } catch (e) { /* no storage */ }
+  if (known) { gate.hidden = true; screen.hidden = false; }
   const { auth } = await start();
-  const gate = document.getElementById('signin');
+  const showWho = (user) => {
+    const who = document.getElementById('who');
+    if (!who) return;
+    const parts = String(user.displayName || '').trim().split(/\s+/).filter(Boolean);
+    who.textContent = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || user.email || '?').slice(0, 2)).toUpperCase();
+    who.title = user.email || '';
+    who.classList.add('initials');
+  };
+  const remember = (email) => { try { if (email) sessionStorage.setItem('udActive', email); else sessionStorage.removeItem('udActive'); } catch (e) { /* no storage */ } };
   onAuthStateChanged(auth, async (user) => {
     if (user && !isUnitedDairy(user)) {
+      remember('');
       await signOut(auth);
       showError('Only United Dairy Google accounts can use this app. You were signed out.');
       return;
     }
-    if (!user) { gate.hidden = false; document.getElementById('screen').hidden = true; return; }
+    if (!user) { remember(''); gate.hidden = false; screen.hidden = true; return; }
+    const email = String(user.email).toLowerCase();
+    const early = known === email;
+    if (early) { gate.hidden = true; screen.hidden = false; showWho(user); ready(user); }
     // The database shows dispatch data only to people ACTIVE in USERS_MASTER; say so plainly instead of a blank screen.
     const { db } = await start();
-    const entry = await getDoc(doc(db, 'users', String(user.email).toLowerCase())).catch(() => null);
+    const entry = await getDoc(doc(db, 'users', email)).catch(() => null);
     if (!entry || !entry.exists() || entry.data().status !== 'ACTIVE') {
+      remember('');
+      screen.hidden = true;
       await signOut(auth);
       showError(user.email + ' is not an active user in the Users list. Ask an administrator to add you.');
       return;
     }
+    remember(email);
+    if (early) return;
     gate.hidden = true;
-    document.getElementById('screen').hidden = false;
-    const who = document.getElementById('who');
-    if (who) {
-      const parts = String(user.displayName || '').trim().split(/\s+/).filter(Boolean);
-      who.textContent = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || user.email || '?').slice(0, 2)).toUpperCase();
-      who.title = user.email || '';
-      who.classList.add('initials');
-    }
+    screen.hidden = false;
+    showWho(user);
     ready(user);
   });
   document.getElementById('signin-button').addEventListener('click', async () => {
