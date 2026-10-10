@@ -651,10 +651,10 @@ async function noScroll(page) {
     assert.deepEqual(fs2.errors, []);
     await fs2.close();
     results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
-    // Joe 10/10 picked mock-up B: one row per unit with PM / Reefer, DOT and Plates side by side, units that need something first.
+    // Joe 10/10 picked mock-up A: one row per unit with PM / Reefer, DOT and Plates side by side, Miles / hours now and Status, units that need something first.
     const fsB = await openPage(browser, 1920, 950, '/fleet.html?testEmail=manager.test@uniteddairy.com');
     await fsB.waitForSelector('table.fs-grid tbody tr');
-    assert.deepEqual(await fsB.$$eval('table.fs-grid thead th', t => t.map(x => x.textContent)), ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', '']);
+    assert.deepEqual(await fsB.$$eval('table.fs-grid thead th', t => t.map(x => x.textContent)), ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status', '']);
     const fsRows = await fsB.$$eval('table.fs-grid tbody tr[data-unit]', r => r.map(x => [x.dataset.unit, x.dataset.worst]));
     assert.equal(new Set(fsRows.map(r => r[0])).size, fsRows.length, 'one row per unit');
     const rank = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
@@ -662,7 +662,7 @@ async function noScroll(page) {
     assert.match(await fsB.textContent('.fs-legend em'), /of \d+ units need something/);
     assert.deepEqual(fsB.errors, []);
     await fsB.close();
-    results.push('Fleet Service (mock-up B): one row per unit, PM / Reefer, DOT and Plates side by side, units that need something first');
+    results.push('Fleet Service (mock-up A): one row per unit, PM / Reefer, DOT, Plates, Miles / hours now and Status, units that need something first');
     // Over the Road: a manager ticks route 801 for Jersey in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
     const otr = await openPage(browser, 1920, 950, '/otr.html?view=routes&testEmail=manager.test@uniteddairy.com');
     await otr.waitForSelector('[data-dest="run_t801"]');
