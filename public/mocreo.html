@@ -61,7 +61,7 @@
         <p class="hint">Each box saves as you leave it. A sensor picked here is that cooler's MOCREO sensor; "Manual only" means the cooler is read by hand. Off leaves it off Cooler Temperatures; Remove (press twice) takes it off the list.</p>
         <div class="mc-scroll">
           <table class="loadout mc-table">
-            <colgroup><col style="width:19%"><col style="width:18%"><col style="width:23%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:11%"></colgroup>
+            <colgroup><col style="width:20%"><col style="width:19%"><col style="width:22%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:11%"></colgroup>
             <thead><tr><th>Location</th><th>Cooler / Area</th><th>MOCREO Sensor</th><th>Now</th><th>Low °F</th><th>High °F</th><th>On</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
@@ -120,7 +120,11 @@
         : (sync.lastError || 'Test passed; the first reading comes within 5 minutes.');
       $('foot').textContent = all.length + ' thermometer' + (all.length === 1 ? '' : 's') + '. ' + (note || '');
       if (typing()) return;
-      const sensorOpts = (cur) => '<option value="">Manual only</option>' + sensors.map(x => '<option value="' + escapeHtml(x.sensorId) + '"' + (x.sensorId === cur ? ' selected' : '') + '>' + escapeHtml(x.name + (x.returned === false ? ' (not sending)' : '')) + '</option>').join('') +
+      // MOCREO names most sensors alike ("Temperature Humidity Sensor"), so a shared name leads with the end of the sensor's ID.
+      const named = {}; sensors.forEach(x => { named[x.name] = (named[x.name] || 0) + 1; });
+      const short = (n) => String(n).replace(/Temperature/i, 'Temp').replace(/\s+Humidity/i, '/Humidity').replace(/\s*Sensor$/i, '');
+      const label = (x) => (named[x.name] > 1 ? '…' + String(x.sensorId).slice(-4) + ' ' : '') + short(x.name) + (x.returned === false ? ' (not sending)' : '');
+      const sensorOpts = (cur) => '<option value="">Manual only</option>' + sensors.map(x => '<option value="' + escapeHtml(x.sensorId) + '"' + (x.sensorId === cur ? ' selected' : '') + ' title="' + escapeHtml(x.name + ' · ' + x.sensorId) + '">' + escapeHtml(label(x)) + '</option>').join('') +
         // A sensor named on the thermometer but not read from MOCREO yet shows by the end of its ID (the full ID stays saved).
         (cur && !sensors.some(x => x.sensorId === cur) ? '<option value="' + escapeHtml(cur) + '" selected title="' + escapeHtml(cur) + '">' + escapeHtml('Sensor …' + cur.slice(-4)) + '</option>' : '');
       const live = (l) => { const x = sensors.find(y => y.sensorId === l.sensorId); return x && x.temperatureF !== null && x.temperatureF !== undefined ? x.temperatureF + '°F' : '—'; };
