@@ -36,7 +36,7 @@
       <div class="mc-left">
         <section class="gps-card">
           <h2>1. MOCREO key <span class="pill" id="state">-</span></h2>
-          <p class="hint">Paste the key here only, never in a chat or email. Once saved it is locked away on the server and never shown again; only its last 4 characters show. Leave a box blank to keep what is saved.</p>
+          <p class="hint">Paste the key here only, never in a chat or email. Once saved it is locked away and never shown again; only its last 4 characters show. A box left blank keeps what is saved.</p>
           <form id="form" autocomplete="off" onsubmit="return false">
             <label>API key<input id="f-key" type="password" autocomplete="new-password" spellcheck="false"></label>
             <label>Asset ID<input id="f-asset" type="password" autocomplete="new-password" spellcheck="false"></label>
@@ -49,7 +49,7 @@
         </section>
         <section class="gps-card">
           <h2>2. Test connection</h2>
-          <p class="hint">Test reads the sensor list from MOCREO with the saved key. When it passes, the cooler readings start (every 5 minutes); until then Cooler Temperatures is entered by hand.</p>
+          <p class="hint">Reads the sensor list from MOCREO with the saved key. When it passes, the cooler readings start every 5 minutes; until then Cooler Temperatures is entered by hand.</p>
           <div class="gps-buttons"><button type="button" class="primary big" id="test">Test Connection</button></div>
           <div class="gps-result" id="result" hidden></div>
           <p class="hint" id="last"></p>
@@ -61,7 +61,7 @@
         <p class="hint">Each box saves as you leave it. A sensor picked here is that cooler's MOCREO sensor; "Manual only" means the cooler is read by hand. Off leaves it off Cooler Temperatures; Remove (press twice) takes it off the list.</p>
         <div class="mc-scroll">
           <table class="loadout mc-table">
-            <colgroup><col style="width:20%"><col style="width:16%"><col style="width:22%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:6%"><col style="width:8%"></colgroup>
+            <colgroup><col style="width:19%"><col style="width:18%"><col style="width:23%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:11%"></colgroup>
             <thead><tr><th>Location</th><th>Cooler / Area</th><th>MOCREO Sensor</th><th>Now</th><th>Low °F</th><th>High °F</th><th>On</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
@@ -107,13 +107,22 @@
     function render() {
       keyBox();
       const all = list(), on = all.filter(l => l.active), linked = on.filter(l => l.sensorId).length;
-      $('hstats').innerHTML = [['Thermometers', on.length, ''], ['On a sensor', linked, linked ? 'good' : ''], ['Sensors', sensors.filter(x => x.returned !== false).length, '']]
+      // Sensors read = what MOCREO sent at the last read; a dash until the first read (no key yet, or not tested).
+      const read = sync.lastSuccess ? sensors.filter(x => x.returned !== false).length : '—';
+      $('hstats').innerHTML = [['Thermometers', on.length, ''], ['On a sensor', linked, linked ? 'good' : ''], ['Sensors read', read, '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      $('sync').textContent = sync.lastSuccess && sync.configured ? 'Sensors last read ' + stamp(sync.lastSuccess) + ' (' + (sync.sensors || 0) + ' sensors).' + (sync.lastError ? ' Last try failed: ' + sync.lastError + '. Press Test Connection, or replace the key.' : '') : (sync.lastError || 'Sensors not read yet; readings are manual.');
+      // Plain words for where things stand (Joe 10/10): no key yet and a key not yet tested say what to press next.
+      const t = s && s.lastTest;
+      $('sync').textContent = !s ? '' : !(s.hasKey && s.hasAsset) ? 'No key saved yet, so Cooler Temperatures is entered by hand. Paste the API key and asset ID in box 1, press Replace Key, then press Test Connection.'
+        : !t ? 'Key saved. Press Test Connection; when it passes, the readings start.'
+        : !t.ok ? 'The last test failed, so readings are still by hand. Check the key and asset ID (paste them again with Replace Key if needed), then press Test Connection.'
+        : sync.lastSuccess && sync.configured ? 'Sensors last read ' + stamp(sync.lastSuccess) + ' (' + (sync.sensors || 0) + ' sensors).' + (sync.lastError ? ' Last try failed: ' + sync.lastError + '. Press Test Connection, or replace the key.' : '')
+        : (sync.lastError || 'Test passed; the first reading comes within 5 minutes.');
       $('foot').textContent = all.length + ' thermometer' + (all.length === 1 ? '' : 's') + '. ' + (note || '');
       if (typing()) return;
       const sensorOpts = (cur) => '<option value="">Manual only</option>' + sensors.map(x => '<option value="' + escapeHtml(x.sensorId) + '"' + (x.sensorId === cur ? ' selected' : '') + '>' + escapeHtml(x.name + (x.returned === false ? ' (not sending)' : '')) + '</option>').join('') +
-        (cur && !sensors.some(x => x.sensorId === cur) ? '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>' : '');
+        // A sensor named on the thermometer but not read from MOCREO yet shows by the end of its ID (the full ID stays saved).
+        (cur && !sensors.some(x => x.sensorId === cur) ? '<option value="' + escapeHtml(cur) + '" selected title="' + escapeHtml(cur) + '">' + escapeHtml('Sensor …' + cur.slice(-4)) + '</option>' : '');
       const live = (l) => { const x = sensors.find(y => y.sensorId === l.sensorId); return x && x.temperatureF !== null && x.temperatureF !== undefined ? x.temperatureF + '°F' : '—'; };
       const rows = (draft ? [draft] : []).concat(all);
       $('rows').innerHTML = rows.map(l => '<tr data-id="' + escapeHtml(l.locationId || '') + '"' + (l.active ? '' : ' class="off"') + '>' +
