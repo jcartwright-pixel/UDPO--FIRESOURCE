@@ -853,6 +853,12 @@ tr.otr-on td { background: #e3f3e8; }
 .otr-setup select:disabled { background-color: #eef2f6; color: #7a8797; cursor: not-allowed; }
 .otr-setup input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; vertical-align: middle; }
 .otr-setup input[type=checkbox]:disabled { cursor: not-allowed; }
+.otr-import { margin: 6px 6px 10px; padding: 10px 14px; border: 1px solid #a9c4dc; border-radius: 10px; background: #eef5fb; }
+.otr-import b { color: var(--ud-blue); font-size: 15px; }
+.otr-import table { width: auto; margin-top: 6px; border-collapse: collapse; }
+.otr-import td { padding: 3px 14px 3px 0; font-size: 14px; text-align: left; border: 0; height: auto; }
+.otr-import p { margin: 6px 0 0; color: var(--muted); }
+.otr-rep small.otr-by { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
 
 /* Driver Scorecard */
 .sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
@@ -1321,3 +1327,8 @@ body.embed .head > .title { display: none; }
 .vac-view select { height: 38px; min-width: 190px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 15px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--ud-blue); background: #fff; cursor: pointer; }
 #day-modal .notice.error { margin: 0 0 10px; }
 @media print { body:has(#print .vac-print) { background: #fff !important; } #print .vac-print-sub { margin: 0 0 8px; font-size: 12px; } #print table.vac-print { width: 100%; font-size: 12px; } #print table.vac-print :is(td, th):is(:first-child, :last-child) { text-align: left; } }
+
+/* Readable tables (Joe 10/10): Daily, Driver Check-ins and Sheet Conflicts keep 16px rows; a busy day scrolls inside the table. */
+.sheet.fit-scroll { overflow-y: auto !important; overflow-x: hidden; }
+.sheet.fit-scroll thead th { position: sticky; top: 0; z-index: 2; }
+@media print { .sheet.fit-scroll { max-height: none !important; overflow: visible !important; } }
