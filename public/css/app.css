@@ -853,6 +853,11 @@ tr.otr-on td { background: #e3f3e8; }
 .otr-setup select:disabled { background-color: #eef2f6; color: #7a8797; cursor: not-allowed; }
 .otr-setup input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; vertical-align: middle; }
 .otr-setup input[type=checkbox]:disabled { cursor: not-allowed; }
+.otr-import { margin: 6px 6px 10px; padding: 10px 14px; border: 1px solid #a9c4dc; border-radius: 10px; background: #eef5fb; }
+.otr-import b { color: var(--ud-blue); font-size: 15px; }
+.otr-import table { width: auto; margin-top: 6px; border-collapse: collapse; }
+.otr-import td { padding: 3px 14px 3px 0; font-size: 14px; text-align: left; border: 0; height: auto; }
+.otr-import p { margin: 6px 0 0; color: var(--muted); }
 .otr-rep small.otr-by { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
 
 /* Driver Scorecard */

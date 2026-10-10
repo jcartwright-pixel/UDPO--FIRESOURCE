@@ -241,7 +241,32 @@ function validate(input) {
       if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
       if (OTR.OTR_CORE.DESTINATIONS.indexOf(out.destination) < 0) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
       if (out.runs === null) throw new SaveError('BAD_REQUEST', 'Type the number of runs');
-    } else throw new SaveError('BAD_REQUEST', 'op must be route, figure or day');
+    } else if (out.op === 'import') {
+      // Import From Accounting (the current app's otrImportApply_): the screen reads the Excel files and sends what it found.
+      const figs = Array.isArray(input.figures) ? input.figures : [], days = Array.isArray(input.daily) ? input.daily : [];
+      if (figs.length > 1000 || days.length > 300) throw new SaveError('BAD_REQUEST', 'Too many numbers in one save');
+      const months = {};
+      figs.forEach(f => {
+        const y = Number(f && f.year), m = Number(f && f.month), key = text(f && f.key, 40), v = OTR.otrNum_(f && f.value);
+        if (!Number.isInteger(y) || y < 2000 || y > 2100 || !Number.isInteger(m) || m < 1 || m > 12) throw new SaveError('BAD_REQUEST', 'Pick a month');
+        if (!OTR.OTR_CORE.FIGURES.some(x => x.key === key)) throw new SaveError('BAD_REQUEST', 'Unknown figure ' + key);
+        if (v === null) throw new SaveError('BAD_REQUEST', 'A figure is not a number');
+        (months[y + '-' + m] = months[y + '-' + m] || { year: y, month: m })[key] = v;
+      });
+      out.months = Object.values(months);
+      if (out.months.length > 60) throw new SaveError('BAD_REQUEST', 'Too many months in one save');
+      const seen = {};
+      out.daily = [];
+      days.forEach(d => {
+        const date = text(d && d.date, 10), dest = text(OTR.otrNormDest_(d && d.destination), 60), runs = count(d && d.runs, 'Runs');
+        if (!L.isDateKey(date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+        if (!dest) throw new SaveError('BAD_REQUEST', 'Pick a destination');
+        if (runs === null) throw new SaveError('BAD_REQUEST', 'Type the number of runs');
+        seen[date + '|' + dest] = { date, destination: dest, runs };
+      });
+      out.daily = Object.values(seen);
+      if (!out.months.length && !out.daily.length) throw new SaveError('BAD_REQUEST', 'Nothing to import');
+    } else throw new SaveError('BAD_REQUEST', 'op must be route, figure, day or import');
     return out;
   }
   // Driver Scorecard Settings (the current app's scSaveSettings_): one points or grade number, or the call-off reasons.
@@ -932,6 +957,23 @@ async function saveDriverTemplate(tx, db, req, email, stamp, logRef, mode) {
  * over the count from the dispatch sheet).
  */
 async function saveOtr(tx, db, req, email, stamp, logRef, mode) {
+  if (req.op === 'import') {
+    // Imported numbers fill their months (typed figures for other keys stay); imported day counts never replace a typed one.
+    const monthRefs = req.months.map(m => db.collection('otrMonthly').doc(m.year + '-' + String(m.month).padStart(2, '0')));
+    const dayRefs = req.daily.map(d => db.collection('otrDaily').doc(d.date + '__' + M.safeIdPart(d.destination)));
+    const daySnaps = dayRefs.length ? await tx.getAll(...dayRefs) : [];
+    const meta = { updatedAt: stamp, updatedBy: email, testEdited: mode.mode === 'test' };
+    req.months.forEach((m, i) => tx.set(monthRefs[i], Object.assign({}, m, { source: 'IMPORT' }, meta), { merge: true }));
+    let kept = 0;
+    req.daily.forEach((d, i) => {
+      const old = daySnaps[i].exists ? daySnaps[i].data() : null;
+      if (old && String(old.source || '').toUpperCase() === 'MANUAL') { kept++; return; }
+      tx.set(dayRefs[i], Object.assign({}, d, { source: 'IMPORT' }, meta), { merge: true });
+    });
+    const result = { ok: true, requestId: req.requestId, runs: [], months: req.months.length, days: req.daily.length - kept, keptTyped: kept };
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, op: 'import', months: req.months.length, days: req.daily.length, result });
+    return result;
+  }
   let ref, data;
   if (req.op === 'route') { ref = db.collection('otrRoutes').doc(M.safeIdPart(req.runId)); data = { runId: req.runId, include: req.include, destination: req.destination, deliveredBy: req.deliveredBy || '' }; }
   else if (req.op === 'figure') { ref = db.collection('otrMonthly').doc(req.year + '-' + String(req.month).padStart(2, '0')); data = { year: req.year, month: req.month, [req.key]: req.value, source: 'TYPED' }; }
