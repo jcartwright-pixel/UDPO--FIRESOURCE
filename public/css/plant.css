@@ -633,8 +633,10 @@
 .sched-page .head, .sched-page .head:has(.top-row) { align-items: flex-start; flex-wrap: nowrap; }
 .sched-page .sc-titleline { display: flex; align-items: center; gap: 12px; }
 .sched-page .sc-titleline #pick { height: 38px; width: 160px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 15px; font-weight: 700; color: var(--ud-blue-dark); background: #fff; }
-.sched-page .head .sc-lane { display: inline-flex; margin: 10px 0 2px; }
-.sched-page .head .sc-lane button { height: 42px; min-height: 42px; padding: 0 22px; font-size: 16px; font-weight: 800; white-space: nowrap; }
+.sched-page .head .sc-lane { display: inline-flex; gap: 8px; margin: 0 0 0 6px; border: 0; background: none; padding: 0; box-shadow: none; }
+.sched-page .head .sc-lane button { height: 40px; min-height: 40px; padding: 0 20px; font-size: 16px; font-weight: 800; white-space: nowrap; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+.sched-page .head .sc-lane button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.sched-page.sc-recv .head .sc-lane button[aria-selected="true"] { background: var(--runs-ink); border-color: var(--runs-ink); color: #fff; }
 .sched-page .head .actions.in-head.top-row { align-self: flex-start; margin-top: 4px; }
 /* Joe 10/10: one line at the top. On a wide screen the Check Off / View Only and Needs Unloading / All Loads switches sit on
    the title line; the day is in the date box, so the big day name gives way to them. */
@@ -677,3 +679,4 @@
 .products-page .pm-table td:first-child input { text-align: left; }
 .products-page .pm-check input { border-color: #d99a1e; background: #fff8e6; }
 .products-page .pm-check small { display: block; margin-top: 2px; font-size: 12px; font-weight: 800; color: #9a5b00; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1100px) { .sched-page .sc-titleline { flex-wrap: wrap; row-gap: 8px; } .sched-page .head .sc-lane { margin-left: 0; } }
