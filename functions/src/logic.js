@@ -150,6 +150,49 @@
     return true;
   }
 
+  // Equipment Issues (the current app's Maintenance screen, udpoV740MaintenanceRowsFromTable_): the write-ups on TRUCK LIVE,
+  // TRAILER LIVE and FORK TRUCK LIVE. Removed rows and text that says nothing is wrong are left out; Occurrences counts the reports
+  // on that unit in the 90 days up to and including this one (repaired ones too); the open list leaves out repaired rows.
+  var ISSUE_DONE = /^(COMPLETE|COMPLETED|CLOSED|RESOLVED|REPAIRED)$/i;
+  function issueUnitKey(unit) { return String(unit || '').trim().toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/^0+(?=\d)/, ''); }
+  function issueRows(records, kind, nowMs) {
+    var DAY = 86400000;
+    var written = (records || []).filter(function (r) { return r && String(r.kind || '').toUpperCase() === kind; }).map(function (r) {
+      var notes = String(r.notes || ''), status = String(r.status || 'OPEN').trim().toUpperCase();
+      var unit = String(r.truck_number || r.trailer_number || r.unit_number || '').trim(), text = String(r.issue_details || '').trim();
+      var sent = /Repair email sent (\S+) to ([^\n(]*)/.exec(notes), garageAt = notes.lastIndexOf('Sent to garage');
+      var garage = garageAt >= 0 ? /^ (\S+) by ([^\n]*)/.exec(notes.slice(garageAt + 'Sent to garage'.length)) : null;
+      var reviewed = /Reviewed by (\S+) at (\S+)/.exec(notes);
+      var opened = Date.parse(r.opened_at || r.service_date || ''), done = Date.parse(r.completed_at || '');
+      return { id: r.id || r.record_id, recordId: r.record_id, unit: unit, unitKey: issueUnitKey(unit), driver: r.driver || '', route: r.route_id || '',
+        reported: String(r.opened_at || r.service_date || ''), openedMs: isFinite(opened) ? opened : 0, completedMs: isFinite(done) ? done : 0,
+        text: text, status: status, needsReview: status === 'NEEDS_REVIEW' || !text, reviewed: !!reviewed, reviewedBy: reviewed ? reviewed[1] : '',
+        emailed: !!sent, emailedAt: sent ? sent[1] : '', atGarage: !!garage, garageAt: garage ? garage[1] : '', garageBy: garage ? garage[2].trim() : '',
+        done: ISSUE_DONE.test(status), occurrences: 1 };
+    }).filter(function (r) { return r.recordId && r.status !== 'REMOVED' && !noWriteUp(r.text); });
+    var seen = {};
+    written.slice().sort(function (a, b) { return a.openedMs - b.openedMs; }).forEach(function (r) {
+      if (!r.unitKey) return;
+      var list = seen[r.unitKey] = seen[r.unitKey] || [];
+      r.occurrences = list.filter(function (t) { return t && (!r.openedMs || r.openedMs - t <= 90 * DAY); }).length + 1;
+      list.push(r.openedMs);
+    });
+    var open = written.filter(function (r) { return !r.done; }).sort(function (a, b) { return b.openedMs - a.openedMs; });
+    var now = nowMs || Date.now();
+    open.repairedLast30 = written.filter(function (r) { return r.done && r.completedMs && now - r.completedMs <= 30 * DAY; }).length;
+    return open;
+  }
+  // The hub numbers for one kind's open list.
+  function issueNumbers(open, nowMs) {
+    var DAY = 86400000, now = nowMs || Date.now(), ages = open.filter(function (r) { return r.openedMs; }).map(function (r) { return (now - r.openedMs) / DAY; });
+    return { open: open.length, needReview: open.filter(function (r) { return r.needsReview; }).length,
+      repeat: open.filter(function (r) { return r.occurrences > 1; }).length, atGarage: open.filter(function (r) { return r.atGarage; }).length,
+      newWeek: open.filter(function (r) { return r.openedMs && now - r.openedMs <= 7 * DAY; }).length,
+      oldestDays: ages.length ? Math.floor(Math.max.apply(null, ages)) : 0, averageDays: ages.length ? Math.round(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length) : 0,
+      emailed: open.filter(function (r) { return r.emailed; }).length, notEmailed: open.filter(function (r) { return !r.emailed; }).length,
+      repaired30: open.repairedLast30 || 0 };
+  }
+
   // Which day blocks of a Live row load on loadDate. Day blocks are DELIVERY days; a load goes out
   // loadDayOffset days before (offset -1 = loaded the day before delivery). A blank offset is -1, as today.
   function loadBlocksFor(run, loadDate) {
@@ -581,7 +624,7 @@
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
-    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
+    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
   };

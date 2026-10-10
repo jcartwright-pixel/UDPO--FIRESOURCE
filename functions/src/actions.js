@@ -50,7 +50,8 @@ const ACTIONS = Object.freeze({
   publishWeek: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   resetWeek: { roles: REORDER_ROLES, screen: 'weeklyDispatch' },
   saveRoute: { roles: REORDER_ROLES, screen: 'routes' },
-  reorderRouteDay: { roles: REORDER_ROLES, screen: 'routes' }
+  reorderRouteDay: { roles: REORDER_ROLES, screen: 'routes' },
+  updateIssue: { roles: SAVE_ROLES, screen: 'checkIns' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -175,6 +176,14 @@ function validate(input) {
   if (action === 'removeDrivers') {
     if (!Array.isArray(input.driverIds) || !input.driverIds.length || input.driverIds.length > 100) throw new SaveError('BAD_REQUEST', 'Pick the drivers to remove');
     out.driverIds = [...new Set(input.driverIds.map(id => text(id)).filter(Boolean))];
+    return out;
+  }
+  if (action === 'updateIssue') {
+    out.recordId = text(input.recordId, 300);
+    if (!out.recordId) throw new SaveError('BAD_REQUEST', 'Pick the write-up');
+    out.step = text(input.step);
+    if (['repaired', 'reviewed', 'remove', 'garage'].indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'step must be repaired, reviewed, remove or garage');
+    out.note = text(input.note, 500);
     return out;
   }
   if (action === 'setUnitDown' || action === 'setUnitUp') {
@@ -335,6 +344,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'moveRun') return moveRun(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setUnitDown' || req.action === 'setUnitUp') return setUnitDown(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'updateIssue') return updateIssue(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'clearConflict') return clearConflict(tx, db, req, email, stamp, logRef, mode);
     if (DRIVER_ACTIONS.indexOf(req.action) >= 0) return editDriver(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriver') return saveDriver(tx, db, req, email, stamp, logRef, mode);
@@ -462,6 +472,37 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
   queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'DOWN', notes: 'DOWN: ' + req.reason }, false, stamp, email);
   result.removedFrom = removed;
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' }, after: { status: 'DOWN', reason: req.reason, removedFrom: removed }, result });
+  return result;
+}
+
+/*
+ * Equipment Issues buttons (036_V740_MaintenanceRepositoryService.gs): Repaired, Reviewed, Remove and To garage, each one save on
+ * the write-up. Repaired: COMPLETE, available, not out of service, completed at / by. Remove keeps the row as REMOVED with who and
+ * when (never deleted). To garage adds one note, once. Reviewed only moves a NEEDS_REVIEW write-up that has text to OPEN.
+ */
+async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection(C.maintenance).doc(MAINT.docId(req.recordId));
+  const snap = await tx.get(ref);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'That write-up is no longer on the list');
+  const r = snap.data(), notes = String(r.notes || '').trim(), add = (line) => (notes ? notes + '\n' : '') + line;
+  let change;
+  if (req.step === 'repaired') change = { status: 'COMPLETE', available: 'TRUE', out_of_service: 'FALSE', completed_at: stamp, completed_by: email, resolution: 'COMPLETED', resolution_notes: req.note || '' };
+  else if (req.step === 'remove') change = { status: 'REMOVED', resolution: 'REMOVED', resolution_notes: req.note || 'Removed: not a real unit or not a write-up', notes: add('Removed by ' + email + ' at ' + stamp) };
+  else if (req.step === 'garage') {
+    if (notes.indexOf('Sent to garage') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the garage.' };
+    change = { notes: add('Sent to garage ' + stamp + ' by ' + email) };
+  } else {
+    if (String(r.status || '').toUpperCase() !== 'NEEDS_REVIEW') throw new SaveError('NOT_ALLOWED', 'Only a write-up that needs review can be marked reviewed');
+    if (L.noWriteUp(r.issue_details)) throw new SaveError('NOT_ALLOWED', 'Add what is wrong before marking it reviewed');
+    change = { status: 'OPEN', notes: add('Reviewed by ' + email + ' at ' + stamp) };
+  }
+  Object.assign(change, { updated_at: stamp, updated_by: email });
+  tx.update(ref, Object.assign({}, change, { testEdited: true, editedAt: stamp, editedBy: email }));
+  const list = MAINT.LISTS[String(r.kind || '').toUpperCase()];
+  if (list) queueMaster(tx, db, mode, req.requestId, 'issue', ref, r.record_id, r.createdInApp ? Object.assign({}, r, change) : change, !!r.createdInApp, stamp, email, list);
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  const before = {}; Object.keys(change).forEach(k => { before[k] = r[k] === undefined ? null : r[k]; });
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, recordId: r.record_id, before, after: change, result });
   return result;
 }
 

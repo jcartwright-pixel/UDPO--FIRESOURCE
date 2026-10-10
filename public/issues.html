@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Equipment Issues · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill issues-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Equipment Issues</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Equipment Issues</h1><small>Truck, trailer and fork truck / pallet jack write-ups</small></div>
+      <div class="tabs" role="tablist" id="kinds"></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Email to the garage stays off in the new app</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="kpis" id="kpis"></div>
+      <div class="kind-line" id="kind-line"></div>
+      <div class="actions">
+        <div class="chips" id="filters"></div>
+        <input type="search" id="search" placeholder="Find a unit, driver or problem" aria-label="Find">
+      </div>
+      <div class="sheet scroll-list">
+        <table class="issues">
+          <colgroup id="cols"></colgroup>
+          <thead id="head"></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
+    import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    forScreen('checkIns');
+
+    const L = window.UDLogic;
+    // Same three lists and columns as the current app's Maintenance screen.
+    const KINDS = [['TRUCK', 'Trucks', 'Truck #'], ['TRAILER', 'Trailers', 'Trailer #'], ['FORK_TRUCK', 'Fork Truck / Pallet Jack', 'Unit']];
+    const FILTERS = [['all', 'All open'], ['review', 'Need review'], ['repeat', 'Repeat'], ['garage', 'At garage'], ['new', 'New · 7 days']];
+    let kind = 'TRUCK', filter = 'all', search = '', records = [], removeFor = null;
+    const now = () => Date.now();
+    const daysAgo = (ms) => ms ? Math.floor((now() - ms) / 86400000) : '';
+    const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
+    const open = (k) => L.issueRows(records, k, now());
+
+    function render() {
+      const edit = canSave(), lists3 = KINDS.map(([k]) => open(k)), nums = lists3.map(o => L.issueNumbers(o, now()));
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      const all = [].concat(...lists3), t = nums[0];
+      const oldest = Math.max(0, ...nums.map(n => n.oldestDays));
+      const kpi = (n, label, cls) => '<div class="' + (cls || '') + '"><b>' + n + '</b><span>' + label + '</span></div>';
+      document.getElementById('kpis').innerHTML = kpi(all.length, 'Open issues') + kpi(nums.reduce((a, n) => a + n.needReview, 0), 'Need review', 'warn') +
+        kpi(nums.reduce((a, n) => a + n.repeat, 0), 'Repeat units · 90 days') + kpi(t.notEmailed, 'Trucks not emailed') +
+        kpi(oldest + (oldest === 1 ? ' day' : ' days'), 'Oldest open') + kpi(nums.reduce((a, n) => a + n.repaired30, 0), 'Repaired · last 30 days', 'good');
+      document.getElementById('kinds').innerHTML = KINDS.map(([k, label], i) => '<button type="button" role="tab" data-kind="' + k + '" aria-selected="' + (k === kind) + '">' + label + ' <b>' + lists3[i].length + '</b></button>').join('');
+      const i = KINDS.findIndex(x => x[0] === kind), n = nums[i], rows = lists3[i];
+      document.getElementById('kind-line').innerHTML = [['Need review', n.needReview], ['Repeat', n.repeat], ['At garage', n.atGarage], ['New · 7 days', n.newWeek], ['Oldest', n.oldestDays + ' d'], ['Average age', n.averageDays + ' d']]
+        .concat(kind === 'TRUCK' ? [['Emailed', n.emailed], ['Not emailed', n.notEmailed]] : []).map(([a, b]) => '<span>' + a + ' <b>' + b + '</b></span>').join('');
+      const match = (r, f) => f === 'all' || (f === 'review' ? r.needsReview : f === 'repeat' ? r.occurrences > 1 : f === 'garage' ? r.atGarage : r.openedMs && now() - r.openedMs <= 7 * 86400000);
+      document.getElementById('filters').innerHTML = FILTERS.map(([f, label]) => '<button type="button" data-filter="' + f + '" class="' + (filter === f ? 'on' : '') + '">' + label + '<b>' + rows.filter(r => match(r, f)).length + '</b></button>').join('');
+      const truck = kind === 'TRUCK', q = search.toUpperCase();
+      const shown = rows.filter(r => match(r, filter) && (!q || [r.unit, r.driver, r.text, r.route].join(' ').toUpperCase().indexOf(q) >= 0));
+      const narrow = window.innerWidth < 1500;
+      document.getElementById('cols').innerHTML = truck && narrow
+        ? '<col style="width:7%"><col style="width:10%"><col style="width:8%"><col style="width:19%"><col style="width:6%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:28%">'
+        : truck
+        ? '<col style="width:7%"><col style="width:11%"><col style="width:8%"><col style="width:24%"><col style="width:6%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:22%">'
+        : '<col style="width:8%"><col style="width:10%"><col style="width:36%"><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:21%">';
+      document.getElementById('head').innerHTML = '<tr><th>' + KINDS[i][2] + '</th>' + (truck ? '<th>Driver</th>' : '') + '<th>Date Reported</th><th>What\'s Wrong</th><th>Report Count</th><th>Reviewed</th>' + (truck ? '<th>Emailed</th>' : '') + '<th>Garage</th><th>Work Actions</th></tr>';
+      const typed = document.querySelector('[data-why]') ? document.querySelector('[data-why]').value : '';
+      document.getElementById('rows').innerHTML = shown.map(r => {
+        const actions = !edit ? '' : removeFor === r.id
+          ? '<span class="down-box"><input data-why maxlength="200" placeholder="Why remove it?"><button type="button" class="warn" data-remove-save>Remove</button><button type="button" data-remove-cancel>Cancel</button></span>'
+          : '<span class="work"><button type="button" class="good" data-step="repaired">Repaired</button>' + (r.needsReview && r.text ? '<button type="button" data-step="reviewed">Reviewed</button>' : '') +
+            (r.atGarage ? '' : '<button type="button" data-step="garage">To garage</button>') + (truck ? '<button type="button" disabled title="Email to the garage is off in the new app">Email</button>' : '') +
+            '<button type="button" class="link" data-remove>Remove</button></span>';
+        const tag = (on, text, cls) => on ? '<span class="pill ' + (cls || 'yes') + '">' + text + '</span>' : '<span class="pill no">No</span>';
+        return '<tr data-id="' + escapeHtml(r.id) + '"' + (r.needsReview ? ' class="review"' : '') + '><td class="strong">' + escapeHtml(r.unit || '?') + '</td>' + (truck ? '<td>' + escapeHtml(r.driver) + '</td>' : '') +
+          '<td>' + dateText(r.reported) + '<small>' + daysAgo(r.openedMs) + ' d</small></td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + (r.text ? escapeHtml(r.text) : '<i>No detail: needs review</i>') + '</td>' +
+          '<td><span class="count' + (r.occurrences > 1 ? ' repeat' : '') + '">' + r.occurrences + '</span></td>' +
+          '<td>' + (r.needsReview ? '<span class="pill warn">Needs review</span>' : tag(r.reviewed, 'Yes')) + '</td>' + (truck ? '<td>' + (r.emailed ? '<span class="pill yes" title="' + escapeHtml(r.emailedAt) + '">' + dateText(r.emailedAt) + '</span>' : '<span class="pill no">No</span>') + '</td>' : '') +
+          '<td>' + (r.atGarage ? '<span class="pill yes" title="' + escapeHtml(r.garageBy) + '">' + dateText(r.garageAt) + '</span>' : '<span class="pill no">No</span>') + '</td><td>' + actions + '</td></tr>';
+      }).join('') || '<tr><td colspan="9" class="empty">No open write-ups' + (filter === 'all' && !q ? '' : ' match') + '.</td></tr>';
+      document.getElementById('foot').textContent = shown.length + ' of ' + rows.length + ' open · repaired write-ups stay in the sheet until the weekly archive';
+      const box = document.querySelector('[data-why]');
+      if (box) { box.value = typed; if (document.activeElement !== box) box.focus(); }
+    }
+
+    // Each button is one save; the row changes at once and goes back if the server refuses.
+    function step(r, name, note) {
+      const doc = records.find(x => x.id === r.id), before = JSON.parse(JSON.stringify(doc)), at = new Date().toISOString(), me = lists.person && lists.person.email || 'you';
+      const apply = () => {
+        if (name === 'repaired') Object.assign(doc, { status: 'COMPLETE', completed_at: at });
+        if (name === 'remove') Object.assign(doc, { status: 'REMOVED' });
+        if (name === 'garage') doc.notes = (doc.notes ? doc.notes + '\n' : '') + 'Sent to garage ' + at + ' by ' + me;
+        if (name === 'reviewed') Object.assign(doc, { status: 'OPEN', notes: (doc.notes ? doc.notes + '\n' : '') + 'Reviewed by ' + me + ' at ' + at });
+      };
+      saveOptimistic('updateIssue', { recordId: r.recordId, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render);
+    }
+
+    document.getElementById('kinds').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) { kind = b.dataset.kind; filter = 'all'; removeFor = null; render(); } });
+    document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
+    document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
+    document.getElementById('rows').addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-id]');
+      if (!tr) return;
+      const r = open(kind).find(x => x.id === tr.dataset.id);
+      if (!r) return;
+      const b = e.target.closest('[data-step]');
+      if (b) { step(r, b.dataset.step); return; }
+      if (e.target.closest('[data-remove]')) { removeFor = r.id; render(); return; }
+      if (e.target.closest('[data-remove-cancel]')) { removeFor = null; render(); return; }
+      if (e.target.closest('[data-remove-save]')) { const why = tr.querySelector('[data-why]').value.trim(); removeFor = null; step(r, 'remove', why); }
+    });
+    document.getElementById('rows').addEventListener('keydown', e => { if (e.target.matches('[data-why]')) { if (e.key === 'Enter') e.target.closest('tr').querySelector('[data-remove-save]').click(); if (e.key === 'Escape') { removeFor = null; render(); } } });
+    // Back on this screen: a remove box first, then a second list back to Trucks (app.js goBack reads window.udBack).
+    window.udBack = () => { if (removeFor) { removeFor = null; render(); return true; } if (kind !== 'TRUCK') { kind = 'TRUCK'; filter = 'all'; render(); return true; } return false; };
+
+    window.addEventListener('resize', () => render());
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      onSnapshot(collection(db, 'maintenance'), s => { records = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the write-ups: ' + e.message));
+    });
+  </script>
+</body>
+</html>
