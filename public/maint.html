@@ -110,7 +110,7 @@
 
     requireSignIn(async () => {
       const { db } = await start();
-      Object.keys(data).forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read ' + name + ': ' + e.message)));
+      Object.keys(data).forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read ' + name + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
       render();
     });
   </script>

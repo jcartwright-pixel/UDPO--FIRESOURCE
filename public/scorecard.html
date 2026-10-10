@@ -162,13 +162,14 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
-      const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + name + ': ' + e.message));
+      const NAMES = { runs: 'the dispatch runs', plantEvents: 'the plant check-ins', drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master' };
+      const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + (NAMES[name] || name) + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.'));
       watch('runs', v => { runs = v; });
       watch('plantEvents', v => { events = v; });
       watch('drivers', v => { drivers = v; });
       watch('exceptions', v => { exceptions = v; });
       watch('routes', v => { routeMiles = {}; L.DAYS.forEach(p => { routeMiles[p] = {}; }); v.forEach(r => L.DAYS.forEach(p => { if (r.days && r.days[p] && r.days[p].miles) routeMiles[p][r.id] = r.days[p].miles; })); });
-      onSnapshot(doc(db, 'scorecard', 'settings'), s => { saved = s.exists() ? s.data() : {}; render(); }, e => showError('Could not read the scorecard settings: ' + e.message));
+      onSnapshot(doc(db, 'scorecard', 'settings'), s => { saved = s.exists() ? s.data() : {}; render(); }, e => showError('Could not read the scorecard settings (' + e.message + '). The scores use the standard settings until it loads; reload the page.'));
     });
   </script>
 </body>
