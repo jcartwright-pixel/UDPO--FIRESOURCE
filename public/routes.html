@@ -400,10 +400,13 @@
       const at = list.findIndex(r => r.id === tr.dataset.id);
       if (at < 0) return;
       list.splice(up ? at : at + 1, 0, moved);
-      const before = list.map(r => day(r, seqDay).loadOrder), p = seqDay;
-      saveOptimistic('reorderRouteDay', { day: p, runIds: list.map(r => r.id) },
-        () => list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: (i + 1) * 10 }); }),
-        () => list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: before[i] }); }), render);
+      const before = list.map(r => day(r, seqDay).loadOrder), p = seqDay, ids = list.map(r => r.id);
+      // Kept on top of any Route Master update that lands before this save, like the run saves above.
+      const mine = { all: true, apply: () => ids.forEach((id, i) => { const r = routes.find(x => x.id === id); if (r) r.days[p] = Object.assign({}, r.days[p], { loadOrder: (i + 1) * 10 }); }) };
+      pending.push(mine);
+      const done = () => { const k = pending.indexOf(mine); if (k >= 0) pending.splice(k, 1); };
+      saveOptimistic('reorderRouteDay', { day: p, runIds: ids }, mine.apply,
+        () => { done(); list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: before[i] }); }); }, render).then(done);
     });
     table.addEventListener('dragend', () => { dragging = null; pressing = false; if (redrawLater) render(); });
     // A row pressed to drag is not redrawn under the pointer (a copy arriving then would cancel the drag); the redraw waits for the release.
@@ -458,7 +461,7 @@
       watchLists(user, render);
       onSnapshot(collection(db, 'routes'), snap => {
         routes = snap.docs.map(d => Object.assign({ days: {} }, d.data(), { id: d.id }));
-        pending.forEach(c => { const r = routes.find(x => x.id === c.id); if (r) c.apply(r); });
+        pending.forEach(c => { if (c.all) return c.apply(); const r = routes.find(x => x.id === c.id); if (r) c.apply(r); });
         // A box being typed in keeps its text: the grid redraws when it is left. A grid box that only has the focus (Tab moved
         // there, or a paste filled it) redraws at once, so a save that lands meanwhile is never hidden behind an older copy.
         const a = document.activeElement;
