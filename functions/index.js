@@ -77,6 +77,13 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
   await runTransfer({ db, reader: setup.reader, sources: setup.sources });
 });
 
+// Sandbox only: Joe's Over the Road history (OTR Trips 2026 + the August accounting package), filled in once (src/otr-seed.js).
+exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
+  const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
+  if (project !== 'ud-distribution-sandbox') return;
+  await require('./src/otr-seed').seedOtrOnce(db);
+});
+
 exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   const user = signedIn(request);
   const person = (await db.collection('users').doc(safeIdPart(user.email)).get()).data();
