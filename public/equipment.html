@@ -36,7 +36,7 @@
       <div class="notice error" id="error" hidden></div>
       <div class="sheet scroll-list">
         <table>
-          <colgroup><col style="width:8%"><col style="width:6%"><col style="width:8%"><col style="width:12%"><col span="7" style="width:5.4%"><col style="width:17%"><col style="width:11%"></colgroup>
+          <colgroup><col style="width:7%"><col style="width:5%"><col style="width:7%"><col style="width:11%"><col span="7" style="width:7.6%"><col style="width:9.8%"><col style="width:7%"></colgroup>
           <thead><tr><th>Unit</th><th>Type</th><th>Status</th><th>Location</th><th class="eq-day">Sun</th><th class="eq-day">Mon</th><th class="eq-day">Tue</th><th class="eq-day">Wed</th><th class="eq-day">Thu</th><th class="eq-day">Fri</th><th class="eq-day">Sat</th><th>Down reason</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
@@ -82,7 +82,7 @@
           : down ? '<button type="button" data-up>Back in service</button>' : off ? '' : '<button type="button" class="warn" data-down>Put down</button>';
         return '<tr data-id="' + escapeHtml(e.id) + '"' + (off ? ' class="off"' : '') + '><td class="strong">' + escapeHtml(e.unit) + '</td><td><span class="tag">' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</span></td>' +
           '<td><span class="status' + (off ? ' off' : '') + '">' + escapeHtml(String(e.status || '').replace(/_/g, ' ') || 'ACTIVE') + '</span></td><td>' + escapeHtml(e.location || '') + '</td>' +
-          L.DAYS.map(p => { const r = days[p] || []; return '<td class="eq-day' + (p === todayP ? ' today' : '') + (off && r.length ? ' issue' : '') + (r.length > 1 ? ' busy' : '') + '"' + (r.length > 1 ? ' title="Set for ' + r.length + ' runs that day"' : '') + '>' + escapeHtml(r.join(', ')) + '</td>'; }).join('') +
+          L.DAYS.map(p => { const r = days[p] || []; return '<td class="eq-day' + (p === todayP ? ' today' : '') + (off && r.length ? ' issue' : '') + (r.length > 1 ? ' busy' : '') + '"' + (r.length > 1 ? ' title="Set for ' + r.length + ' runs that day"' : '') + '>' + r.map(n => '<span>' + escapeHtml(n) + '</span>').join('') + '</td>'; }).join('') +
           '<td class="left">' + escapeHtml(downReason(e) + (down && e.downSince ? ' (since ' + shortDate(String(e.downSince).slice(0, 10)) + ')' : '')) + '</td><td>' + action + '</td></tr>';
       }).join('') || '<tr><td colspan="13" class="empty">No units match.</td></tr>';
       const box = document.querySelector('[data-reason]');
