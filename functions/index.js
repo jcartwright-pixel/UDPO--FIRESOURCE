@@ -15,6 +15,8 @@
  *   fleetSyncNightly      brings Equipment Master in step with the United Dairy fleet list every night (SANDBOX copy only)
  *   fleetSyncNow          the same from Equipment's "Sync fleet list" button, for a manager or administrator
  *   mailPlantReport       emails a plant report straight after Send Current Report saves it (reportmail.js; MAIL_FROM)
+ *   mocreoEvery5Minutes   reads the MOCREO cooler sensors (read only) once a key is saved in Administration and tested
+ *   mocreo                Administration > MOCREO & Sensors: save or replace the key (never shown again), test it, thermometer locations
  */
 'use strict';
 
@@ -37,6 +39,7 @@ const { transferSources } = require('./src/sources');
 const { safeIdPart } = require('./src/model');
 const { runFleetSync } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
+const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
 const L = require('./src/logic');
 
 admin.initializeApp();
@@ -86,7 +89,7 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
 });
 
-const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
@@ -122,6 +125,12 @@ exports.people = onCall(async (request) => {
 exports.gps = onCall({ timeoutSeconds: 30 }, async (request) => {
   const user = signedIn(request);
   try { return await gpsCall(db, user, request.data, { local: process.env.FUNCTIONS_EMULATOR === 'true' }); } catch (error) { throw asHttps(error); }
+});
+
+// Administration > MOCREO & Sensors: the API key (write-only), Test Connection, and the thermometer locations.
+exports.mocreo = onCall({ timeoutSeconds: 60 }, async (request) => {
+  const user = signedIn(request);
+  try { return await mocreoCall(db, user, request.data); } catch (error) { throw asHttps(error); }
 });
 
 exports.save = onCall(async (request) => {
@@ -191,6 +200,18 @@ exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'Americ
   if (!target) return;
   const sheets = makeSheetsWriter();
   await runFleetSync({ db, reader: sheets, sheets, target, by: 'nightly' });
+});
+
+// MOCREO sensors (src/mocreo.js): the key is read each run, so the sync starts by itself once a key is saved and tested.
+exports.mocreoEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
+  // The key saved in Administration > MOCREO & Sensors; else the Secret Manager secrets.
+  const getSecrets = () => appSecrets(db, async () => {
+    const { GoogleAuth } = require('google-auth-library');
+    const token = await new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] }).getAccessToken();
+    return readSecrets({ project, token, fetchFn: fetch });
+  });
+  await runMocreoSync({ db, getSecrets, fetchFn: fetch });
 });
 
 exports.fleetSyncNow = onCall({ timeoutSeconds: 120, maxInstances: 1 }, async (request) => {

@@ -77,7 +77,7 @@
     const L = window.UDLogic, U = window.UDPlant;
     const today = () => L.operatingDay(new Date());
     let date = today();
-    const data = { runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
+    const data = { sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
     let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null;
     let askReport = new URLSearchParams(location.search).get('report') === '1';
     const canSend = () => L.hasRole(person, L.SAVE_ROLES) && L.screenState(app, 'plant').open;
@@ -103,7 +103,7 @@
       wash.forEach(w => { const k = String(w.trailer || '').toUpperCase(); seen[k] = (seen[k] || 0) + 1; if (seen[k] === 2) repeat++; });
       const ship = U.managerSchedule(U.scheduleEntries(data.ship, 'SHIPPING'), date), recv = U.managerSchedule(U.scheduleEntries(data.recv, 'RECEIVING'), date);
       const lines = U.qualityLines(data.setup, journal, data.lineStatus, now), qhist = U.qualityHistory(journal, data.lineStatus, now), Q = U.managerQuality(lines, qhist);
-      const temps = U.tempRows(data.setup, journal, now), T = U.managerTemps(temps, U.tempHistory(journal, now));
+      const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors), T = U.managerTemps(temps, U.tempHistory(journal, now));
       // The report carries open breakdowns over from earlier shifts (a week of the log); the tile counts the last 24 hours.
       const log = U.shiftLog(journal, now), N = U.managerNotes(log), week = U.shiftLog(data.shift, now, 168);
       const openPickups = data.pickups.filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
@@ -256,6 +256,8 @@
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; later(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; later(); });
       onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
+      onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});
+      onSnapshot(collection(db, 'sensors'), s => { data.sensors = s.docs.map(d => d.data()); later(); }, () => {});
       onSnapshot(collection(db, 'plantLineStatus'), s => { data.lineStatus = s.docs.map(d => d.data()); later(); }, fail('the line status'));
       watchRound(db, at => { data.roundStart = at; later(); });
       onSnapshot(collection(db, 'plantWash'), s => { data.wash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); later(); }, fail('the wash list'));

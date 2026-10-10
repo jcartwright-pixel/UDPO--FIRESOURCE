@@ -29,14 +29,17 @@ export const ADMIN_GROUPS = [
   ['Plant Setup', 'Set-up for the plant side', [
     ['machine-products', 'Machine Products', 'The products each machine runs (RedZone, Uniontown): the Product drop-down on Quality Checks. Add, change or remove a product and its SKU.', 'products.html', 'production.webp']
   ]],
+  // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.
+  ['Connections & Keys', 'The API keys the app uses: paste, replace and test them here', [
+    ['mocreo', 'MOCREO & Sensors', 'The MOCREO API key (never shown again once saved) and asset ID, Test Connection, and the thermometers: location, cooler, sensor, low and high limits, on or off.', 'mocreo.html', 'temperatures.webp']
+  ]],
   ['Fleet & GPS Setup', 'Set-up for the maintenance side', [
     ['gps', 'GPS Setup', 'The Verizon Connect sign-in and a plain pass or fail test.', 'gps.html', 'pin'],
     ['fleet-setup', 'Fleet Service Setup', 'Service rules: PM miles, reefer months, DOT and plate warnings.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp']
   ]],
-  ['System Tools', 'Stations and sensors', [
+  ['System Tools', 'Stations and checks', [
     ['window-test', 'Window Test Center', 'Opens every screen at each window size to check nothing is cut off.', '', 'check'],
-    ['driver-station', 'Driver Station', 'The driver board and check-in station.', 'driver-station.html', 'distribution-truck-v1-560.webp'],
-    ['mocreo', 'MOCREO & Sensors', 'The cooler sensors: which sensor is which cooler, and the MOCREO connection. Coolers are entered by hand until the key is set.', '', 'temperatures.webp']
+    ['driver-station', 'Driver Station', 'The driver board and check-in station.', 'driver-station.html', 'distribution-truck-v1-560.webp']
   ]],
   ['Diagnostics', 'Checks and repairs for the data behind the app', [
     ['preflight', 'Run Runtime Pre-Flight', 'Checks every sheet, column and setting the app needs and lists anything missing.', '', 'check'],

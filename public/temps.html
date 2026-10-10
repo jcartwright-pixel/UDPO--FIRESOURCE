@@ -72,7 +72,7 @@
     const phoneQuery = window.matchMedia('(max-width: 760px)');
     // Manager Center's Status and 24-Hour History cards open this screen on Alerts or on the history.
     let pane = params.get('view') === 'history' ? 'history' : 'current', filter = params.get('view') === 'alerts' ? 'ALERTS' : 'ALL';
-    let setup = [], journal = [], person = null, app = {}, roundStart = '';
+    let setup = [], journal = [], person = null, app = {}, roundStart = '', sensors = [], mocreo = {}, appLocs = [];
     // drafts: what is typed and not saved yet; pending: a reading shown at once, over its saved copy, until the database has it;
     // fills: each location's reading of this round, filled in box by box; notes: the "Saved" time of each location.
     const drafts = {}, pending = {}, fills = {}, notes = {};
@@ -98,10 +98,15 @@
     const roundReading = (r) => r.lastDocId && inRound(r.lastCheckedAt, roundStart) && r.locked;
     function typing() { const a = document.activeElement; return !!(a && a.closest && a.closest('#rows') && a.tagName === 'INPUT'); }
     let waiting = false;
+    function sensorWords() {
+      if (!mocreo.configured) return 'MOCREO sensors are not connected yet (Administration > MOCREO & Sensors); readings are manual.';
+      if (mocreo.lastError) return 'MOCREO sensors: last read failed (' + mocreo.lastError + ').';
+      return 'MOCREO sensors read ' + (mocreo.lastSuccess ? clock(mocreo.lastSuccess) : '') + ' (' + (mocreo.sensors || 0) + ' sensors).';
+    }
     function render() {
       if (typing()) { waiting = true; return; }
       waiting = false;
-      const phone = phoneQuery.matches, ck = canSave(), now = Date.now(), rows = U.tempRows(setup, all(), now), hist = U.tempHistory(all(), now), list = rows.filter(shown);
+      const phone = phoneQuery.matches, ck = canSave(), now = Date.now(), rows = U.tempRows(U.withTempLocations(setup, appLocs), all(), now, sensors), hist = U.tempHistory(all(), now), list = rows.filter(shown);
       if (phone) pane = 'current';
       const alerts = rows.filter(alertOf).length;
       document.getElementById('hstats').innerHTML = [['Locations', rows.length, ''], ['Checked 2 h', rows.filter(r => r.locked).length, 'good'], ['Due', rows.filter(r => !r.locked).length, ''], ['Alerts', alerts, alerts ? 'warn' : '']]
@@ -139,7 +144,7 @@
         '<td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + '</td></tr>').join('') ||
         '<tr><td colspan="7" class="empty">No temperature checks recorded in the last 24 hours.</td></tr>';
       document.getElementById('foot').textContent = pane === 'current'
-        ? list.length + ' shown. ' + (ck ? 'Each reading saves as you leave its box, with the time and who entered it, and locks the location for 2 hours. After Send Current Report the boxes start empty for the next round. Sensors are not connected in the new app yet.' : 'View only.')
+        ? list.length + ' shown. ' + (ck ? 'Each reading saves as you leave its box, with the time and who entered it, and locks the location for 2 hours. After Send Current Report the boxes start empty for the next round. ' + sensorWords() : 'View only.')
         : hist.length + ' reading' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
@@ -161,7 +166,7 @@
     rowsEl.addEventListener('change', async e => {
       const tr = e.target.closest('[data-location]');
       if (!tr || !canSave()) return;
-      const id = tr.dataset.location, loc = U.tempLocations(setup).find(l => l.locationId === id), row = U.tempRows(setup, all(), Date.now()).find(r => r.locationId === id);
+      const id = tr.dataset.location, loc = U.tempLocations(U.withTempLocations(setup, appLocs)).find(l => l.locationId === id), row = U.tempRows(U.withTempLocations(setup, appLocs), all(), Date.now(), sensors).find(r => r.locationId === id);
       const fields = { locationId: id, manualTemperature: tr.querySelector('.tp-manual').value.trim(), notes: tr.querySelector('.tp-notes').value.trim() };
       if (fields.manualTemperature === '') { notes[id] = fields.notes ? 'Enter the temperature to save' : ''; drafts[id] = fields; render(); tick(id); return; }
       if (!isFinite(Number(fields.manualTemperature))) { notes[id] = 'Not saved: not a number'; drafts[id] = fields; render(); tick(id); return; }
@@ -206,6 +211,10 @@
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(); }, fail('the temperature locations'));
+      // MOCREO sensors, read by the server every 5 minutes once its key is set (functions/src/mocreo.js).
+      onSnapshot(collection(db, 'tempLocations'), s => { appLocs = s.docs.map(d => d.data()); render(); }, () => {});
+      onSnapshot(collection(db, 'sensors'), s => { sensors = s.docs.map(d => d.data()); render(); }, () => {});
+      onSnapshot(doc(db, 'config', 'mocreo'), s => { mocreo = s.data() || {}; render(); }, () => {});
       watchRound(db, at => { if (at !== roundStart) { roundStart = at; [pending, fills, notes, drafts].forEach(o => Object.keys(o).forEach(k => delete o[k])); } render(); });
       let unsub = null, day = '';
       const watch = () => { const t = today(); if (t === day) return; day = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(t, -1), t])), s => {

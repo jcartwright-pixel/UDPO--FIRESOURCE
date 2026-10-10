@@ -69,16 +69,18 @@ async function shots(page, name, w) {
     await watcher.waitForFunction(() => document.querySelectorAll('#rows [data-location]').length === 2);
     await desk.waitForFunction(() => document.querySelectorAll('#rows [data-location]').length === 2);
     const row = '[data-location="ut_temp_cooler_north"]';
-    await desk.click(row + ' [data-save]');
-    await desk.waitForFunction(() => /Enter a valid manual temperature/.test(document.getElementById('error').textContent));
-    await desk.fill(row + ' .tp-manual', '44.5');
+    // Joe 10/10: no Save button; each box saves as it is left. Notes alone do not make a reading.
+    assert.equal(await desk.$('[data-save]'), null, 'Temperatures has no Save button');
     await desk.fill(row + ' .tp-notes', 'Door left open');
+    await desk.press(row + ' .tp-notes', 'Tab');
+    await desk.waitForFunction((r) => /Enter the temperature to save/.test(document.querySelector(r + ' .tp-act').textContent), row);
+    await desk.fill(row + ' .tp-manual', '44.5');
     const t0 = Date.now();
-    await desk.click(row + ' [data-save]');
-    await desk.waitForFunction((r) => /Locked/.test(document.querySelector(r + ' [data-save]').textContent) && /HIGH/.test(document.querySelector(r).textContent), row);
+    await desk.press(row + ' .tp-manual', 'Tab');
+    await desk.waitForFunction((r) => /Saved \d[\s\S]*HIGH/.test(document.querySelector(r + ' .tp-act').textContent), row);
     const shown = Date.now() - t0;
-    await watcher.waitForFunction((r) => { const x = document.querySelector(r); return x && /Last manual 44\.5°F HIGH/.test(x.textContent) && x.querySelector('[data-save]').disabled; }, row, { timeout: 8000 });
-    results.push('Save (Cooler North 44.5°F): locked and HIGH on screen in ' + shown + ' ms, on the other screen in ' + (Date.now() - t0) + ' ms');
+    await watcher.waitForFunction((r) => { const x = document.querySelector(r); return x && /Last manual 44\.5°F HIGH/.test(x.textContent); }, row, { timeout: 8000 });
+    results.push('Cooler North 44.5°F saved on leaving the box: HIGH on screen in ' + shown + ' ms, on the other screen in ' + (Date.now() - t0) + ' ms');
     await watcher.click('[data-filter="ALERTS"]');
     await watcher.waitForFunction(() => document.querySelectorAll('#rows [data-location]').length === 1);
     assert.match(await watcher.textContent('[data-filter="ALERTS"]'), /Alerts \(1\)/);

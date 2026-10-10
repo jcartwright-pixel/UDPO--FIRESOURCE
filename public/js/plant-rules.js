@@ -25,7 +25,7 @@
  * And Production Line Status & Quality's (027_V734_ProductionQuality.gs, Plant.html desktopQualityMarkupV780):
  *   - the lines are the active PRODUCTION_AREA rows of PLANT_OPERATIONS_MASTER, in view order;
  *   - a line's form starts from its last check (product, tip test, label / date code, overall result, notes, weights);
- *   - Boxing records no cycle time; Totes and Raypak no cycle time or weight; HTST #1 and #2 no cycle time, weight or tip test;
+ *   - Boxing records no cycle time; Raypak no cycle time or weight; Totes and HTST #1 and #2 no cycle time, weight or tip test;
  *   - the overall result is Pass (RUNNING), Review, Fail (DOWN) or Finished; the 24-hour history lists every line's checks.
  *
  * And Shift Notes' (the Incident & Breakdown Log, desktopUiSavePlantShiftReportV5008 / handoffLogHtmlV7250):
@@ -37,7 +37,8 @@
  *   - the locations are the active TEMPERATURE_CHECK_LOCATION rows of PLANT_OPERATIONS_MASTER, in view order, with the
  *     sensor id and low / high limits from days_json;
  *   - a manual reading is HIGH above the high limit, LOW below the low limit, else RECORDED; a location is locked for
- *     2 hours after its last manual reading; a location with no sensor reading shows MANUAL ONLY;
+ *     2 hours after its last manual reading; a location with no sensor reading shows MANUAL ONLY; a MOCREO sensor (sensors/*)
+ *     shows its °F, battery and IN RANGE / HIGH / LOW / STALE / OFFLINE / SENSOR ERROR;
  *   - the 24-hour history lists every reading, newest first.
  *
  * And Manager Center's (218_V7275_ManagerCenterCounts.gs) and Send Current Report's (217_V7271_PlantCurrentReport.gs):
@@ -333,7 +334,9 @@
   function qualitySkip(line) {
     var k = lineKey(line);
     if (k === 'BOXING') return { cycle: true };
-    if (k === 'TOTES' || k === 'RAYPAK') return { cycle: true, weight: true };
+    // Joe 10/10: Totes have no tip test.
+    if (k === 'TOTES') return { cycle: true, weight: true, tip: true };
+    if (k === 'RAYPAK') return { cycle: true, weight: true };
     if (k === 'HTST1' || k === 'HTST2') return { cycle: true, weight: true, tip: true };
     return {};
   }
@@ -431,9 +434,30 @@
   function tempLocations(setup) {
     return (setup || []).filter(function (r) { return r.type === 'TEMPERATURE_CHECK_LOCATION' && (r.status || 'ACTIVE') === 'ACTIVE'; }).map(function (r) {
       var s = r.settings || {};
-      return { locationId: r.operationId, location: text(r.name), viewSequence: Number(r.viewSequence) || 999999, sensorId: text(s.sensorId || s.mocreoSensorId), sensorName: text(s.sensorName),
+      return { locationId: r.operationId, location: text(r.name), area: text(s.area), viewSequence: Number(r.viewSequence) || 999999, sensorId: text(s.sensorId || s.mocreoSensorId), sensorName: text(s.sensorName),
         lowLimit: limit(s.lowLimit), highLimit: limit(s.highLimit), staleMinutes: Number(s.staleMinutes) || 30 };
     }).sort(function (a, b) { return a.viewSequence - b.viewSequence || a.location.localeCompare(b.location); });
+  }
+  // Joe 10/10: the thermometer locations are changed in Administration > MOCREO & Sensors (tempLocations/*). A change there
+  // replaces the sheet's row for that location; a location added there is added; one removed or turned off is left out.
+  function withTempLocations(setup, appLocs) {
+    var mine = {};
+    (appLocs || []).forEach(function (a) { if (a && a.locationId) mine[tempKey(a.locationId)] = a; });
+    var row = function (a, base) {
+      var b = base || { type: 'TEMPERATURE_CHECK_LOCATION', operationId: a.locationId, settings: {} }, s = Object.assign({}, b.settings || {});
+      ['sensorId', 'sensorName', 'area', 'lowLimit', 'highLimit'].forEach(function (k) { if (a[k] !== undefined) s[k] = a[k]; });
+      return Object.assign({}, b, { type: 'TEMPERATURE_CHECK_LOCATION', operationId: b.operationId || a.locationId, name: a.location !== undefined ? a.location : b.name,
+        viewSequence: a.viewSequence !== undefined ? a.viewSequence : b.viewSequence, removed: !!a.removed, status: a.removed || a.active === false ? 'INACTIVE' : a.active === true ? 'ACTIVE' : (b.status || 'ACTIVE'), settings: s });
+    };
+    var seen = {}, out = (setup || []).map(function (r) {
+      if (r.type !== 'TEMPERATURE_CHECK_LOCATION') return r;
+      var a = mine[tempKey(r.operationId)];
+      if (!a) return r;
+      seen[tempKey(r.operationId)] = true;
+      return row(a, r);
+    });
+    Object.keys(mine).forEach(function (k) { if (!seen[k]) out.push(row(mine[k], null)); });
+    return out;
   }
   function tempStatus(loc, reading) {
     var t = Number(reading);
@@ -456,13 +480,32 @@
     var age = (nowMs - when(last.recordedAt)) / 60000;
     return age < TEMP_LOCK_MINUTES ? Math.ceil(TEMP_LOCK_MINUTES - age) : 0;
   }
-  // The Current table: one row per location with its last manual reading and lock.
-  function tempRows(setup, journal, nowMs) {
+  // A location's MOCREO sensor (sensors/*, read by the server): its sensor ID, else a sensor with exactly the location's name,
+  // as the current app; never a guess.
+  function nameKey(v) { return text(v).toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim(); }
+  function sensorFor(loc, sensors) {
+    var list = sensors || [], id = tempKey(loc.sensorId);
+    return (id && list.filter(function (s) { return tempKey(s.sensorId) === id; })[0]) || list.filter(function (s) { return nameKey(s.name) && nameKey(s.name) === nameKey(loc.location); })[0] || null;
+  }
+  function sensorStatus(s, loc, nowMs) {
+    if (s.error) return 'SENSOR ERROR';
+    if (s.returned === false || s.online === false) return 'OFFLINE';
+    var t = s.lastReadingAt ? when(s.lastReadingAt) : 0;
+    if (t && (nowMs - t) / 60000 > (loc.staleMinutes || 30)) return 'STALE';
+    var f = s.temperatureF;
+    if (f === null || f === undefined || !isFinite(Number(f))) return 'SENSOR ERROR';
+    return loc.highLimit !== '' && Number(f) > loc.highLimit ? 'HIGH' : loc.lowLimit !== '' && Number(f) < loc.lowLimit ? 'LOW' : 'IN RANGE';
+  }
+  // The Current table: one row per location with its sensor (when MOCREO is connected), its last manual reading and lock.
+  function tempRows(setup, journal, nowMs, sensors) {
     var readings = tempReadings(journal);
     return tempLocations(setup).map(function (loc) {
       var last = readings.filter(function (r) { return r.manualTemperature !== '' && (tempKey(r.locationId) === tempKey(loc.locationId) || (!r.locationId && tempKey(r.location) === tempKey(loc.location))); })[0] || null;
-      var left = tempLockLeft(journal, loc, nowMs);
-      return Object.assign({}, loc, { sensorTemp: '', batteryLevel: '', sensorLastReadingAt: '', status: 'MANUAL ONLY', lastCheckedAt: last ? last.recordedAt : '', lastCheckedBy: last ? last.recordedBy : '',
+      var left = tempLockLeft(journal, loc, nowMs), s = sensorFor(loc, sensors);
+      var sensor = s ? { sensorId: loc.sensorId || text(s.sensorId), sensorName: loc.sensorName || text(s.name), sensorTemp: s.temperatureF === null || s.temperatureF === undefined ? '' : s.temperatureF,
+        batteryLevel: s.batteryLevel === null || s.batteryLevel === undefined ? '' : s.batteryLevel, sensorLastReadingAt: text(s.lastReadingAt), status: sensorStatus(s, loc, nowMs) }
+        : { sensorTemp: '', batteryLevel: '', sensorLastReadingAt: '', status: 'MANUAL ONLY' };
+      return Object.assign({}, loc, sensor, { lastCheckedAt: last ? last.recordedAt : '', lastCheckedBy: last ? last.recordedBy : '',
         lastManualTemperature: last ? last.manualTemperature : '', lastStatus: last ? last.status : '', lastNotes: last ? last.notes : '', lastDocId: last ? last.docId : '', locked: left > 0, minutesUntilDue: left });
     });
   }
@@ -639,7 +682,7 @@
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
-    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
+    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
     REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, reportText: reportText, reportHtml: reportHtml };
 });

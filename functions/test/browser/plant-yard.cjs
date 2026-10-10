@@ -71,7 +71,9 @@ async function seed() {
       assert.deepEqual(await trailers(page), ['T-701', 'T-702', 'T-704']);
       assert.match(await page.textContent('#hstats'), /^4Active3Due1Checked/);
       assert.match(await page.textContent('#rows tr[data-trailer="T-702"]'), /Due now[\s\S]*JERSEY 1/);
-      assert.equal(await page.inputValue('#rows tr[data-trailer="T-702"] .yd-temp'), '36', 'the last check\'s values show');
+      // Joe 10/10: a trailer due again starts with empty boxes; its last check is in Last Check.
+      assert.equal(await page.inputValue('#rows tr[data-trailer="T-702"] .yd-temp'), '', 'the boxes start empty');
+      assert.notEqual((await page.textContent('#rows tr[data-trailer="T-702"] .yd-last')).trim(), '—', 'the last check shows in Last Check');
       await fits(page, 'Yard Checks ' + w + 'x' + h);
       await shots(page, 'yard-queue', w);
       await page.click('[data-pane="history"]');
@@ -89,15 +91,23 @@ async function seed() {
     await watcher.waitForFunction(() => document.querySelectorAll('#rows tr[data-trailer]').length === 3);
     await desk.waitForFunction(() => document.querySelectorAll('#rows tr[data-trailer]').length === 3);
     const row = (t) => '#rows tr[data-trailer="' + t + '"]';
+    // No Record button: each box saves as it is left, and T-701 stays on this screen while it is filled in.
+    assert.equal(await desk.$('[data-record]'), null, 'Yard Checks has no Record button');
     await desk.fill(row('T-701') + ' .yd-temp', '35');
-    await desk.selectOption(row('T-701') + ' select', '1/2');
-    await desk.fill(row('T-701') + ' .yd-notes', 'Reefer on, doors sealed');
     const t0 = Date.now();
-    await desk.click(row('T-701') + ' [data-record]');
-    await desk.waitForFunction(() => !document.querySelector('#rows tr[data-trailer="T-701"]'));
+    await desk.press(row('T-701') + ' .yd-temp', 'Tab');
+    await desk.waitForFunction(() => /Saved|\d/.test((document.querySelector('#rows tr[data-trailer="T-701"] .yd-tick') || {}).textContent || ''));
     const shown = Date.now() - t0;
     await watcher.waitForFunction(() => !document.querySelector('#rows tr[data-trailer="T-701"]') && /^4Active2Due2Checked/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
-    results.push('Record T-701 (35°F, 1/2, notes): off the list in ' + shown + ' ms, on the other screen in ' + (Date.now() - t0) + ' ms; locked for 2 hours');
+    await desk.selectOption(row('T-701') + ' select', '1/2');
+    await desk.fill(row('T-701') + ' .yd-notes', 'Reefer on, doors sealed');
+    await desk.press(row('T-701') + ' .yd-notes', 'Tab');
+    for (let i = 0; i < 40; i++) {
+      const c = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).find(x => x.createdInApp && x.payload.trailer === 'T-701');
+      if (c && c.payload.fuelLevel === '1/2' && c.payload.notes === 'Reefer on, doors sealed') break;
+      await desk.waitForTimeout(250);
+    }
+    results.push('T-701 (35°F, 1/2, notes) saved box by box: saved on screen in ' + shown + ' ms, off the other screen in ' + (Date.now() - t0) + ' ms; locked for 2 hours');
     // Left Yard asks once more.
     await desk.click(row('T-704') + ' [data-left]');
     assert.equal(await desk.textContent(row('T-704') + ' [data-left]'), 'Confirm Left');

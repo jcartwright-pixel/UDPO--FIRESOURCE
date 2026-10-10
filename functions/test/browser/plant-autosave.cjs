@@ -56,7 +56,10 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     assert.ok((await desk.$$eval('#fields select', s => s.map(x => x.value))).every(v => v === ''), 'the drop-downs start blank: nothing passes without a real check');
     const before = await rows(watcher, '#history tr:not(:has(td.empty))');
     const t0 = Date.now();
-    await leave(desk, '.prod-product', 'Orange drink');
+    // Joe 10/10 (typed): the product is picked from the machine's own drop-down; one not on it goes under Other (type it).
+    await desk.focus('.prod-product');
+    await desk.selectOption('.prod-product', '__other__');
+    await leave(desk, '.prod-other', 'Orange drink');
     await desk.waitForFunction(() => /^Saved \d/.test(document.querySelector('[data-note="prod-product"]').textContent));
     const shown = Date.now() - t0;
     await watcher.waitForFunction((n) => document.querySelectorAll('#history tr:not(:has(td.empty))').length === n + 1 && /TOTES[\s\S]*Orange drink/.test(document.querySelector('#history tr').textContent), before, { timeout: 8000 });
