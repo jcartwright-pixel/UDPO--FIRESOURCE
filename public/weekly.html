@@ -30,6 +30,7 @@
         <button type="button" role="tab" id="tab-board" aria-selected="false">Driver Assignment Board</button>
       </div>
       <div class="actions in-head">
+        <a class="button" id="go-daily" href="daily.html">Daily Dispatch</a>
         <button type="button" id="prev-week">&lt; Previous Week</button>
         <button type="button" id="next-week">Next Week &gt;</button>
         <button type="button" id="run-days">Route Run Days</button>
@@ -49,7 +50,7 @@
         </div>
       </div>
       <div class="legend" id="legend">
-        <span><i class="assigned"></i>Assigned</span><span><i class="relief"></i>Relief Driver</span><span><i class="needs"></i>Needs Driver</span>
+        <span><i class="relief"></i>Relief Driver</span><span><i class="needs"></i>Needs Driver</span>
         <span><i class="vacation-needs"></i>Vacation &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span>
       </div>
       <button type="button" class="override" id="override" aria-pressed="false">Override</button>
@@ -343,6 +344,9 @@
     }
     document.getElementById('tab-routes').onclick = () => setTab('routes');
     document.getElementById('tab-board').onclick = () => setTab('board');
+    // Menu > Driver Assignment Board opens this page at the board (weekly.html#board).
+    let jumpBoard = location.hash === '#board';
+    window.addEventListener('hashchange', () => { if (location.hash === '#board') setTab('board'); });
 
     async function watch() {
       const { db } = await start();
@@ -350,10 +354,14 @@
       if (unsubscribeWeek) unsubscribeWeek();
       closeModals();
       document.getElementById('week-date').value = week;
-      history.replaceState(null, '', '?week=' + week + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
+      // Daily Dispatch for this week: today's loadout when today is in it, else the Saturday loadout that delivers its Sunday.
+      const opDay = L.operatingDay(new Date());
+      document.getElementById("go-daily").href = 'daily.html?date=' + (opDay >= L.addDays(week, -1) && opDay <= L.addDays(week, 5) ? opDay : L.addDays(week, -1)) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
+      history.replaceState(null, '', '?week=' + week + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '') + location.hash);
       unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), snap => {
         runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
         render();
+        if (jumpBoard) { jumpBoard = false; setTab('board'); }
       }, e => showError('Could not read the week: ' + e.message));
       unsubscribeWeek = onSnapshot(doc(db, 'weeks', week), snap => { weekDoc = snap.exists() ? snap.data() : null; showPublished(); });
       // Plant Route loads on the Plant Operations Scheduler for this week (copied from PLANT_OPERATIONS).

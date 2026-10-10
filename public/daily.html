@@ -43,6 +43,7 @@
       </div>
       <div class="field"><label>Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
       <div class="actions in-head">
+        <a class="button" id="go-weekly" href="weekly.html">Weekly Dispatch</a>
         <button type="button" class="primary" id="print-sheet">&#9635; Print Dispatch Sheet</button>
         <button type="button" class="warn" id="open-down">&#128667; Down Trucks / Trailers</button>
         <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
@@ -406,6 +407,7 @@
         const key = L.addDays(begin, i);
         return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key) + ' ' + shortDate(key)) + '</option>';
       }).join('');
+      document.getElementById('go-weekly').href = 'weekly.html?week=' + L.addDays(loadDate, 1) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
       history.replaceState(null, '', '?date=' + loadDate + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
       // One live query: every open screen gets each change the moment it is saved, without checking every 30 seconds.
       const q = query(collection(db, 'runs'), where('weekStart', 'in', L.weeksForLoadDate(loadDate)));

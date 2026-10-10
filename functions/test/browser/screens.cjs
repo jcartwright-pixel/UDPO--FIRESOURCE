@@ -712,6 +712,20 @@ async function noScroll(page) {
     assert.deepEqual(adm.errors, []);
     await adm.close();
     results.push('Dispatch Administration: 15 cards from the Route Editor button; Driver Weekly Template opens in the same window');
+    // Joe 10/10: Daily and Weekly each have a tile to the other (same window, same week); the menu's Driver Assignment Board opens Weekly at the board.
+    const hop = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await hop.waitForSelector('#go-weekly[href*="week=2026-10-06"]');
+    await Promise.all([hop.waitForURL(/weekly\.html\?week=2026-10-04/), hop.click('#go-weekly')]);
+    await hop.waitForSelector('#rows tr');
+    assert.equal(await hop.$$eval('#legend i.assigned', a => a.length), 0, 'no Assigned key');
+    await hop.waitForSelector('#go-daily[href*="daily.html?date="]');
+    await Promise.all([hop.waitForURL(/daily\.html\?date=2026-10-0[3-9]/), hop.click('#go-daily')]);
+    await hop.waitForSelector('#go-weekly');
+    await hop.goto(hop.url().replace(/daily\.html\?[^#]*/, 'weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com') + '#board');
+    await hop.waitForFunction(() => document.getElementById('tab-board').getAttribute('aria-selected') === 'true' && document.getElementById('board-panel').getBoundingClientRect().top < innerHeight, null, { timeout: 8000 });
+    assert.deepEqual(hop.errors, []);
+    await hop.close();
+    results.push('Daily and Weekly: a tile on each opens the other for the same week in this window; Weekly has no Assigned key; Menu > Driver Assignment Board opens Weekly at the board');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).

@@ -893,3 +893,6 @@ tr.otr-on td { background: #e3f3e8; }
   .head:has(#print-sheet) h1 { font-size: 26px; }
   .head:has(#print-sheet) .coverage { width: 82px; }
 }
+/* Link tiles match the button tiles. */
+.head .actions.in-head a.button { display: inline-flex; align-items: center; justify-content: center; width: 92px; min-width: 92px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px; white-space: normal; line-height: 1.12; font-size: 13px; font-weight: 800; text-align: center; }
+@media (max-width: 1500px) { .head .actions.in-head a.button { width: 82px; min-width: 82px; font-size: 12px; } }
