@@ -887,7 +887,7 @@ async function noScroll(page) {
     await tab.close();
     results.push('Menu: a slim icon strip that opens over the screen on hover (screen does not move), fly-outs beside it, folds when the mouse leaves; the menu button pins it open and is remembered; a tablet tap opens it before picking');
     // Joe 10/10: a menu click always opens the screen's own first view (first tab, this week), never the last one used.
-    const dv = await openPage(browser, 1920, 950, '/weekly.html?testEmail=dispatch.test@uniteddairy.com');
+    let dv = await openPage(browser, 1920, 950, '/weekly.html?testEmail=dispatch.test@uniteddairy.com');
     await dv.waitForSelector('#rows tr');
     const thisWeek = new URL(dv.url()).searchParams.get('week');
     await dv.click('#tab-board');
@@ -904,17 +904,19 @@ async function noScroll(page) {
     await dv.waitForSelector('#rows tr');
     assert.equal(await dv.getAttribute('#tab-routes', 'aria-selected'), 'true', 'Weekly opens on Route / Run Assignments');
     assert.equal(new URL(dv.url()).searchParams.get('week'), thisWeek, 'Weekly opens on this week');
-    for (const [pg, menuHref, pick] of [['fleet.html', 'fleet.html', '[role="tab"][data-view="history"]'], ['vacations.html', 'vacations.html', '[role="tab"][data-view="calendar"]'], ['otr.html', 'otr.html', '[role="tab"][data-view="figures"]']]) {
-      await dv.goto(HOSTING + '/' + pg + '?testEmail=manager.test@uniteddairy.com');
-      await dv.waitForSelector(pick);
-      await dv.click(pick);
-      await viaMenu(menuHref, 'manager.test@uniteddairy.com');
-      await dv.waitForSelector('[role="tab"][aria-selected="true"]');
-      assert.equal(await dv.$eval('[role="tab"][aria-selected="true"]', t => t === t.parentElement.querySelector('[role="tab"]')), true, pg + ' opens on its first tab');
-    }
-    assert.deepEqual(await dv.evaluate(() => Object.keys(localStorage).filter(k => k !== 'udSidePinned')), [], 'distribution and fleet screens keep no last-used view');
     assert.deepEqual(dv.errors, []);
     await dv.close();
+    for (const [pg, pick] of [['fleet.html', '[role="tab"][data-view="history"]'], ['vacations.html', '[role="tab"][data-view="calendar"]'], ['otr.html', '[role="tab"][data-view="figures"]']]) {
+      dv = await openPage(browser, 1920, 950, '/' + pg + '?testEmail=manager.test@uniteddairy.com');
+      await dv.waitForSelector('#screen:not([hidden]) ' + pick, { state: 'visible' });
+      await dv.click(pick);
+      await viaMenu(pg, 'manager.test@uniteddairy.com');
+      await dv.waitForSelector('#screen:not([hidden]) [role="tab"][aria-selected="true"]', { state: 'visible' });
+      assert.equal(await dv.$eval('[role="tab"][aria-selected="true"]', t => t === t.parentElement.querySelector('[role="tab"]')), true, pg + ' opens on its first tab');
+      assert.deepEqual(await dv.evaluate(() => Object.keys(localStorage).filter(k => k !== 'udSidePinned')), [], pg + ' keeps no last-used view');
+      assert.deepEqual(dv.errors, []);
+      await dv.close();
+    }
     results.push('Menu clicks open each screen\'s first view: Weekly on Route / Run Assignments and this week, Fleet Service, Vacations and Over the Road on their first tab');
     // Joe 10/10: Equipment leaves off inactive units that are not down, and shows each unit's default runs Sun to Sat (Route Master).
     await db().collection('equipment').doc('veh_trailer_t_904').set({ id: 'veh_trailer_t_904', type: 'TRAILER', unit: 'T-904', status: 'INACTIVE', location: 'UNIONTOWN', notes: 'External Fleet: 2001 | GREAT DANE' });
