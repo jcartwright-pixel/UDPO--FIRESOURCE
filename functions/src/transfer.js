@@ -449,12 +449,17 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   // 2b. The plant side (plant.js): journal, pickups, wash and returns lists. A list that cannot be read is left as it was.
   const plant = await PLANT.readPlant(reader, sources);
   summary.plant = { skipped: plant.skipped };
-  for (const list of Object.keys(plant.lists)) {
-    const metaRef = db.collection(META).doc(list);
-    const prev = (await metaRef.get()).data() || {};
-    const d = diffOps(db, PLANT.PLANT_LISTS[list].collection, plant.lists[list], prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
-    ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
-    summary.plant[list] = { rows: Object.keys(plant.lists[list]).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
+  // The production lines, temperature locations and the lines' last checks (Production Line Status & Quality, Cooler Temperatures).
+  const setup = await PLANT.readPlant(reader, sources, PLANT.SETUP_LISTS);
+  summary.plantSetup = { skipped: setup.skipped };
+  for (const [specs, read, sum] of [[PLANT.PLANT_LISTS, plant, summary.plant], [PLANT.SETUP_LISTS, setup, summary.plantSetup]]) {
+    for (const list of Object.keys(read.lists)) {
+      const metaRef = db.collection(META).doc(list);
+      const prev = (await metaRef.get()).data() || {};
+      const d = diffOps(db, specs[list].collection, read.lists[list], prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
+      ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
+      sum[list] = { rows: Object.keys(read.lists[list]).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
+    }
   }
   const waiting = await db.collection(C.outbox).where('status', '==', 'pending').get();
   const hold = {};

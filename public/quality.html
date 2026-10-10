@@ -102,14 +102,14 @@
       document.getElementById('pane-current').hidden = pane !== 'current';
       document.getElementById('pane-history').hidden = pane !== 'history';
       document.getElementById('lines').innerHTML = all.map(l => '<button type="button" data-line="' + escapeHtml(l.operationId) + '" class="' + (line && l.operationId === line.operationId ? 'active' : '') + '">' +
-        '<i class="qc-dot ' + String(l.last.status || 'NONE').toLowerCase() + '" title="' + escapeHtml(RESULT[l.last.status] || 'No check yet') + '"></i><span>' + escapeHtml(l.name) + '</span><b title="Checks in the last 24 hours">' + l.today + '</b></button>').join('') ||
+        '<i class="qc-dot st-' + String(l.last.status || 'NONE').toLowerCase() + '" title="' + escapeHtml(RESULT[l.last.status] || 'No check yet') + '"></i><span>' + escapeHtml(l.name) + '</span><b title="Checks in the last 24 hours">' + l.today + '</b></button>').join('') ||
         '<p class="empty">No production lines are set up for this plant.</p>';
       // The form is redrawn when another line is picked or a newer check of this line arrives, not while someone types.
       if (line) { const key = line.operationId + '|' + (line.last.recordedAt || ''); if (key !== shownFor) drawForm(line); }
       document.getElementById('form').hidden = !line;
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td><b>' + escapeHtml(h.area) + '</b></td><td>' + escapeHtml(h.product || '') + '</td>' +
         '<td class="detail">' + escapeHtml([h.temperature ? 'Temp ' + h.temperature : '', h.cycleTime ? 'Cycle ' + h.cycleTime : '', h.annealerSpeed ? 'Speed ' + h.annealerSpeed : '', U.weightText(h.weights), h.remainingOutput].filter(Boolean).join(' · ')) + '</td>' +
-        '<td><span class="qc-res ' + String(h.status || '').toLowerCase() + '">' + escapeHtml(RESULT[h.status] || h.status || '') + '</span>' + (h.qualityCheck ? '<small>Label ' + escapeHtml(CHECK[h.qualityCheck] || h.qualityCheck) + '</small>' : '') + '</td>' +
+        '<td><span class="qc-res st-' + String(h.status || '').toLowerCase() + '">' + escapeHtml(RESULT[h.status] || h.status || '') + '</span>' + (h.qualityCheck ? '<small>Label ' + escapeHtml(CHECK[h.qualityCheck] || h.qualityCheck) + '</small>' : '') + '</td>' +
         '<td class="detail">' + escapeHtml(h.notes || '') + '</td><td>' + escapeHtml(initials(h.recordedBy)) + '</td></tr>').join('') ||
         '<tr><td colspan="7" class="empty">No quality checks have been recorded during this operational day.</td></tr>';
       document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Record Quality Check saves the check with the time; it becomes the line\'s status now.' : 'View only.') : hist.length + ' check' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours, all production lines.';

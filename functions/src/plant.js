@@ -143,8 +143,11 @@ const PLANT_LISTS = Object.freeze({
   plantJournal: { collection: 'plantJournal', where: 'live', tab: 'PLANT_OPERATIONS', parse: parseJournal },
   plantWash: { collection: 'plantWash', where: 'live', tab: 'WASH / CLEANING LIVE', parse: (v) => parseQueueTab(v, 'WASH') },
   plantReturns: { collection: 'plantReturns', where: 'live', tab: 'REFUSALS / RETURNS LIVE', parse: (v) => parseQueueTab(v, 'RETURN') },
-  pickups: { collection: 'pickups', where: 'pickups', tab: 'LIVE PLANT OPERATIONS', parse: parsePickups },
-  // The production lines and temperature locations (the Plant Operations workbook, beside the pickups) and the lines' last checks.
+  pickups: { collection: 'pickups', where: 'pickups', tab: 'LIVE PLANT OPERATIONS', parse: parsePickups }
+});
+// The production lines and temperature locations (the Plant Operations workbook, beside the pickups) and the lines' last
+// checks (the Live workbook), read the same way as the lists above.
+const SETUP_LISTS = Object.freeze({
   plantSetup: { collection: 'plantSetup', where: 'pickups', ownTab: true, tab: 'PLANT_OPERATIONS_MASTER', parse: parseSetup },
   plantLineStatus: { collection: 'plantLineStatus', where: 'live', tab: 'PLANT LINE STATUS', parse: parseLineStatus }
 });
@@ -154,10 +157,10 @@ const PLANT_LISTS = Object.freeze({
  * sources.live.plant is set; sources.plant.pickups =
  * {spreadsheetId, tab} of the Plant Operations workbook (or its copy). Returns {lists: {name: docs}, skipped: [why]}.
  */
-async function readPlant(reader, sources) {
-  const lists = {}, skipped = [];
-  for (const name of Object.keys(PLANT_LISTS)) {
-    const spec = PLANT_LISTS[name];
+async function readPlant(reader, sources, specs) {
+  const lists = {}, skipped = [], all = specs || PLANT_LISTS;
+  for (const name of Object.keys(all)) {
+    const spec = all[name];
     // The Live workbook's plant tabs are read where the setup says so (live.plant, like live.maintenanceQueues).
     const named = spec.where === 'live' ? (sources.live && sources.live.plant ? sources.live : null) : sources.plant && sources.plant[spec.where];
     const at = named && named.spreadsheetId, tab = spec.where === 'live' || spec.ownTab ? spec.tab : (named && named.tab) || spec.tab;
@@ -607,6 +610,6 @@ async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
   return result;
 }
 
-module.exports = { validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+module.exports = { validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };
