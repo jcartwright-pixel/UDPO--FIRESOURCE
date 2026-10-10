@@ -396,6 +396,10 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   const moved = Object.keys(owners).filter(k => owners[k] === 'new');
   if (moved.length && !(config.writeBack && config.writeBack.enabled === true)) throw new Error('Transfer stopped: ' + moved.join(', ') + ' already belongs to the new app and the write-back is off');
   const readFrom = started.toISOString();
+  // A new copy of the sheets (another Live workbook than last time) replaces every row, including rows the app changed
+  // without writing them to the sheet (sandbox test saves with the write-back off), so nothing from the old copy lingers.
+  const liveSourceId = String(sources.live.spreadsheetId || '');
+  if (config.liveSourceId !== liveSourceId) force = true;
 
   // 1. Master lists.
   // Read side by side: each master list is its own spreadsheet.
@@ -482,7 +486,7 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   ops.push({ ref: transferRef, data: { at: stamp, force: !!force, summary, warningCount: warnings.length, warnings: warnings.slice(0, 200) } });
   await commitInBatches(db, ops);
   const lastTransfer = { at: stamp, id: transferRef.id, warningCount: warnings.length };
-  await configRef.set({ mode: moved.length ? 'live' : 'test', screenOwners: Object.assign({ dailyDispatch: 'old', weeklyDispatch: 'old' }, owners), liveWeeks, lastTransfer }, { merge: true });
+  await configRef.set({ mode: moved.length ? 'live' : 'test', screenOwners: Object.assign({ dailyDispatch: 'old', weeklyDispatch: 'old' }, owners), liveWeeks, lastTransfer, liveSourceId }, { merge: true });
   return { at: stamp, liveWeeks, summary, warnings };
 }
 

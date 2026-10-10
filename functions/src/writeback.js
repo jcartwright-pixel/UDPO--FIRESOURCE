@@ -22,7 +22,7 @@ const C = M.COLLECTIONS;
 const BATCH = 50;
 
 // Every production spreadsheet the current app uses. The write-back never writes to any of them.
-const PRODUCTION_IDS = Object.freeze([UNIONTOWN.live.spreadsheetId].concat(Object.keys(UNIONTOWN.masters).map(k => UNIONTOWN.masters[k].spreadsheetId)).concat([
+const PRODUCTION_IDS = Object.freeze([UNIONTOWN.live.spreadsheetId, UNIONTOWN.plant.pickups.spreadsheetId].concat(Object.keys(UNIONTOWN.masters).map(k => UNIONTOWN.masters[k].spreadsheetId)).concat([
   '1UrAzrPIe4x6jcNBCjCJUIE8mjvJAniZMoONRGK8GJmw', '1ac78al6_HhYA3_89kwYU93KbIzOv0vqExYhFsG1i4Rk', // Charleston, Martins Ferry Live
   '16_uzQQ22XhYwOacPqPYV0rIFePRHC34AZDlEt_VFz5k', '1eJGQWiddOb_-y46dFMZtePIUc9cAhQXFnDH5MN9IBTg', '17slbLYbNeCLQUgYDN8uWv5mLOmNV0JJqhhUZ1qplllo', // pallet jacks, vacation periods, facilities
   '1fASsuj4EYl38yJJb-XlLi0D5nxcmGwE6MBWtRTTP3xc', '1srmlHGCRkfObi2q_M5BDV6Qmz7AKMaMnOuMJ88LLnPo' // the United Dairy fleet list (read only)
