@@ -672,8 +672,29 @@ async function noScroll(page) {
       if (want.some(id => seen.indexOf(id) < 0)) missing.push(pg + ': ' + seen.join(','));
     }
     assert.deepEqual(missing, [], 'every screen has Back and Home');
-    await bh.close();
     results.push('Back and Home: all ' + pages.length + ' screens show both at the top of the menu (Home shows Home)');
+    // Joe 10/10: "move the action buttons all in a line up above": on every screen the action buttons sit in one row in the top
+    // line, all the same size, above the tables; no action row is left down in the screen.
+    const topBad = [];
+    for (const pg of ['daily.html?date=2026-10-05', 'weekly.html?week=2026-10-04', 'routes.html?x=1', 'routeweek.html?x=1', 'drivers.html?x=1', 'vacations.html?x=1', 'template.html?x=1', 'equipment.html?x=1', 'fleet.html?x=1', 'otr.html?x=1', 'scorecard.html?x=1', 'ops.html?x=1', 'print.html?x=1', 'settings.html?x=1', 'maint.html?x=1']) {
+      await bh.goto(bh.url().replace(/\/[a-z-]+\.html.*/, '/' + pg + '&testEmail=manager.test@uniteddairy.com'));
+      await bh.waitForSelector('#screen:not([hidden]) .head', { timeout: 8000 });
+      await bh.waitForTimeout(700);
+      const r = await bh.evaluate(() => {
+        const vis = e => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+        const head = document.querySelector('#screen .head'), hb = head.getBoundingClientRect();
+        const stray = [...document.querySelectorAll('#screen .actions')].filter(a => vis(a) && !head.contains(a) && !a.closest('.modal, form, .soon-card, #view-calendar') && a.querySelector('button, a.button'));
+        const tiles = [...head.querySelectorAll('.actions button, .actions a.button')].filter(b => vis(b) && !b.closest('.chips, .seg, .stepper') && !/^(prev|next)$/.test(b.id)).map(b => b.getBoundingClientRect());
+        const table = [...document.querySelectorAll('#screen table')].find(vis);
+        return { stray: stray.map(a => a.textContent.trim().slice(0, 40)), tiles: tiles.map(t => [Math.round(t.top), Math.round(t.width), Math.round(t.height)]), headBottom: Math.round(hb.bottom), tableTop: table ? Math.round(table.getBoundingClientRect().top) : null };
+      });
+      if (r.stray.length) topBad.push(pg + ': action row left in the screen: ' + r.stray.join(' / '));
+      if (r.tiles.some(t => Math.abs(t[0] - r.tiles[0][0]) > 4 || t[1] !== r.tiles[0][1] || t[2] !== r.tiles[0][2])) topBad.push(pg + ': buttons not one even row: ' + JSON.stringify(r.tiles));
+      if (r.tableTop !== null && r.tableTop < r.headBottom - 8) topBad.push(pg + ': a table above the buttons');
+    }
+    assert.deepEqual(topBad, [], 'action buttons in one even row at the top');
+    results.push('Action buttons: on 15 screens they sit in one even row in the top line, above the tables');
+    await bh.close();
     // Joe 10/10 picked mock-up A: one row per unit with PM / Reefer, DOT and Plates side by side, Miles / hours now and Status, units that need something first.
     const fsB = await openPage(browser, 1920, 950, '/fleet.html?testEmail=manager.test@uniteddairy.com');
     await fsB.waitForSelector('table.fs-grid tbody tr');

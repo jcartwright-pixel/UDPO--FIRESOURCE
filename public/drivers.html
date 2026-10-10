@@ -31,7 +31,7 @@
     <div class="notice error" id="error" hidden></div>
     <div class="split">
       <div class="split-main">
-        <div class="filters">
+        <div class="filters" data-top>
           <input id="search" type="search" placeholder="Search drivers or trucks...">
           <select id="status"><option value="ALL">Status: All</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>
           <select id="relief-filter"><option value="ALL">Relief: All</option><option value="YES">Relief</option><option value="NO">Regular</option></select>
@@ -59,7 +59,7 @@
           <div class="m-relief"><b id="n-relief">-</b>Relief drivers</div>
           <div class="m-inactive"><b id="n-inactive">-</b>Inactive / not available</div>
         </div>
-        <button id="add" class="primary" type="button">+ Add Driver</button>
+        <button id="add" class="primary" type="button" data-top>+ Add Driver</button>
         <div class="panel" id="panel"></div>
       </div>
     </div>

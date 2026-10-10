@@ -164,6 +164,22 @@ function addSideMenu() {
   main.addEventListener('click', () => document.body.classList.remove('side-open'));
 }
 addSideMenu();
+/* Joe 10/10: "move the action buttons all in a line up above". Anything a screen marks data-top (a button, or a whole action or
+   filter row, even one the screen fills later) joins one row in the screen's top line: buttons first, all the same size, and
+   filters (pickers, chips, search boxes) to their right. A row that belongs to one view shows only while that view does. */
+export function buttonsToTop() {
+  const head = document.querySelector('#screen .head'), marked = [...document.querySelectorAll('#screen [data-top]')].filter(e => !head || !head.contains(e) || !e.closest('.actions.in-head.top-row'));
+  if (!head || !marked.length) return;
+  let row = head.querySelector('.actions.in-head.top-row');
+  if (!row) { row = document.createElement('div'); row.className = 'actions in-head top-row'; head.appendChild(row); }
+  marked.forEach(e => {
+    const view = e.parentElement && e.parentElement.closest('.view[id], section[id]');
+    if (e.classList.contains('actions') || e.id === 'bar' || e.children.length && e.tagName === 'DIV' && !e.classList.contains('chips')) e.classList.add('top-part');
+    row.appendChild(e);
+    if (view) { const sync = () => { e.hidden = view.hidden; }; sync(); new MutationObserver(sync).observe(view, { attributes: true, attributeFilter: ['hidden'] }); }
+  });
+}
+buttonsToTop();
 
 // One look on every screen (Joe 10/10): each screen title starts with its picture from the United Dairy icon library
 // (img/library), or with its line icon in the same tile where no picture fits.

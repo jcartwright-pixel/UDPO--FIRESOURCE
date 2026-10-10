@@ -240,7 +240,7 @@ button.override.on { background: #fff4e5; color: #9a4b00; border-color: #f0b46a;
 .actions > button:not(.primary):not(.warn):not(.publish) { background: #fff; color: var(--ud-blue); border: 1px solid var(--line); }
 .actions button.publish { background: #277b43; color: #fff; border: 0; }
 .actions button.armed { background: #b45309; color: #fff; border-color: #b45309; }
-#reset { min-width: 112px; }
+:not(.in-head) > #reset { min-width: 112px; }
 .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
 .tabs button { border: 0; border-radius: 0; background: #fff; color: var(--muted); min-height: 40px; padding: 0 16px; font: inherit; font-weight: 700; cursor: pointer; }
 .tabs button[aria-selected="true"] { background: var(--ud-blue); color: #fff; }
@@ -1122,3 +1122,22 @@ body.daily-look table.daily td.pickup { color: #b3261e; font-weight: 900; }
 body:not(.side-folded) .sidemenu a { white-space: normal; line-height: 1.15; }
 body:not(.side-folded) .sidemenu a span { overflow: visible; text-overflow: clip; }
 .sidemenu a.side-name.on { border-radius: 9px; }
+
+/* Joe 10/10: every screen's action buttons sit in one row in the top line, all the same size; filters sit to their right. */
+.head .actions.in-head.top-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-left: auto; }
+.head .actions.in-head.top-row .top-part { display: contents; }
+.head .actions.in-head.top-row :is(select, input, label, .chips, .seg, .hint, .spacer, .tpl-dirty, .tpl-copy, .stepper, .seq-day, .sort) { order: 2; }
+.head .actions.in-head.top-row :is(.chips, .seg) button, .head .actions.in-head.top-row .stepper button { width: auto; min-width: 0; height: 38px; min-height: 38px; white-space: nowrap; font-size: 14px; }
+.head .actions.in-head.top-row .spacer { display: none; }
+.head .actions.in-head.top-row input[type="search"] { width: 220px; }
+/* The top line stays one line: the title gives way first; long hints wrap in their own small box; month arrows count as filters. */
+.head:has(.top-row) { flex-wrap: nowrap; }
+.head:has(.top-row) .title { min-width: 0; flex: 0 1 auto; }
+.head:has(.top-row) .title small { white-space: normal; }
+.head .actions.in-head.top-row .hint { max-width: 380px; white-space: normal; font-size: 13px; line-height: 1.25; }
+.head .actions.in-head.top-row :is(#prev, #next, .sc-period) { order: 2; }
+.head .actions.in-head.top-row :is(#prev, #next) { width: 40px; min-width: 40px; height: 38px; min-height: 38px; }
+@media (max-width: 1500px) { .head:has(.top-row) { flex-wrap: wrap; } }
+@media (max-width: 1500px) { .head .actions.in-head.top-row > :is(button, a.button), .head .actions.in-head.top-row .top-part > :is(button, a.button) { width: 92px; min-width: 92px; font-size: 12px; } }
+/* A tile row moved up keeps its wider tiles, so long names like Dispatch Administration fit. */
+.head .actions.in-head.top-row .actions.tiles > :is(button, a.button) { width: 116px; min-width: 116px; max-width: 116px; }
