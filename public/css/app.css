@@ -1141,3 +1141,11 @@ body:not(.side-folded) .sidemenu a span { overflow: visible; text-overflow: clip
 @media (max-width: 1500px) { .head .actions.in-head.top-row > :is(button, a.button), .head .actions.in-head.top-row .top-part > :is(button, a.button) { width: 92px; min-width: 92px; font-size: 12px; } }
 /* A tile row moved up keeps its wider tiles, so long names like Dispatch Administration fit. */
 .head .actions.in-head.top-row .actions.tiles > :is(button, a.button) { width: 116px; min-width: 116px; max-width: 116px; }
+
+/* Joe 10/10: the menu is a slim strip of icons until the mouse is over it (or a tablet taps it); then it opens over the screen,
+   so nothing on the screen moves. The menu button pins it open beside the screen. */
+body.side-rail .sidemenu { position: absolute; left: 0; top: 0; bottom: 0; z-index: 300; transition: none; }
+body.side-rail .side-main { margin-left: 64px; }
+body.side-rail.side-open .sidemenu { box-shadow: 6px 0 24px rgba(0, 0, 0, .25); }
+body.side-pinned.side-open .sidemenu { position: relative; box-shadow: none; }
+body.side-pinned.side-open .side-main { margin-left: 0; }

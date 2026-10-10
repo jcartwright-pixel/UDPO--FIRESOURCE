@@ -843,6 +843,81 @@ async function noScroll(page) {
       }
     }
     results.push('Menu fly-outs draw above the screen on Daily Dispatch and Equipment, with the menu open and folded');
+    // Joe 10/10: the menu is a slim icon strip until the mouse is over it; then it opens over the screen (nothing moves), a
+    // section's screens open beside it, and leaving folds it again. The menu button pins it open; a tablet tap opens it first.
+    const rail = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await rail.waitForSelector('.sidemenu .side-sec');
+    const box = () => rail.evaluate(() => ({ menu: Math.round(document.querySelector('.sidemenu').getBoundingClientRect().width), main: Math.round(document.querySelector('.side-main').getBoundingClientRect().left) }));
+    const folded = await box();
+    assert.ok(folded.menu <= 70, 'folded to icons: ' + JSON.stringify(folded));
+    await rail.hover('.sidemenu .side-sec-btn[title="Drivers"]');
+    await rail.waitForSelector('.side-flyouts .flyout.open', { state: 'visible' });
+    const peeked = await box();
+    assert.ok(peeked.menu >= 190, 'opens on hover: ' + JSON.stringify(peeked));
+    assert.equal(peeked.main, folded.main, 'the screen does not move when the menu opens');
+    assert.equal(await rail.evaluate(() => getComputedStyle(document.querySelector('.sidemenu .side-sec-btn span')).display !== 'none'), true, 'names show when open');
+    const flyLeft = await rail.$eval('.side-flyouts .flyout.open', f => f.getBoundingClientRect().left);
+    assert.ok(flyLeft >= peeked.menu - 2, 'the fly-out sits beside the open menu: ' + flyLeft);
+    await rail.hover('.side-flyouts .flyout.open a[href="drivers.html"]');
+    assert.ok((await box()).menu >= 190, 'stays open while the mouse is on the fly-out');
+    await rail.mouse.move(1400, 600);
+    await rail.waitForFunction(() => document.querySelector('.sidemenu').getBoundingClientRect().width <= 70 && !document.querySelector('.side-flyouts .flyout.open'));
+    await rail.click('.sidemenu .side-toggle');
+    await rail.mouse.move(1400, 600);
+    await rail.waitForTimeout(400);
+    const pinned = await box();
+    assert.ok(pinned.menu >= 190 && pinned.main >= pinned.menu, 'pinned open beside the screen: ' + JSON.stringify(pinned));
+    await rail.reload();
+    await rail.waitForSelector('.sidemenu .side-sec');
+    assert.ok((await box()).menu >= 190, 'the pin is remembered');
+    await rail.click('.sidemenu .side-toggle');
+    await rail.mouse.move(1400, 600);
+    await rail.waitForFunction(() => document.querySelector('.sidemenu').getBoundingClientRect().width <= 70);
+    assert.deepEqual(rail.errors, []);
+    await rail.close();
+    const tab = await browser.newContext({ viewport: { width: 1280, height: 800 }, hasTouch: true });
+    const tp = await tab.newPage();
+    await tp.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
+    await tp.goto(HOSTING + '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await tp.waitForSelector('.sidemenu a.side-name');
+    await tp.tap('.sidemenu a.side-name');
+    await tp.waitForFunction(() => document.querySelector('.sidemenu').getBoundingClientRect().width >= 190);
+    assert.match(tp.url(), /daily\.html/, 'the first tap only opens the menu');
+    await Promise.all([tp.waitForURL(/distribution\.html/), tp.tap('.sidemenu a.side-name')]);
+    await tab.close();
+    results.push('Menu: a slim icon strip that opens over the screen on hover (screen does not move), fly-outs beside it, folds when the mouse leaves; the menu button pins it open and is remembered; a tablet tap opens it before picking');
+    // Joe 10/10: a menu click always opens the screen's own first view (first tab, this week), never the last one used.
+    let dv = await openPage(browser, 1920, 950, '/weekly.html?testEmail=dispatch.test@uniteddairy.com');
+    await dv.waitForSelector('#rows tr');
+    const thisWeek = new URL(dv.url()).searchParams.get('week');
+    await dv.click('#tab-board');
+    await dv.click('#next');
+    await dv.waitForFunction((w) => new URL(location.href).searchParams.get('week') !== w, thisWeek);
+    // (The test sign-in rides on the address, so the menu link carries it here.)
+    const viaMenu = async (href, who) => {
+      const moved = dv.waitForEvent('framenavigated', f => f === dv.mainFrame());
+      await dv.$eval('.sidemenu a[href="' + href + '"], .side-flyouts a[href="' + href + '"]', (a, who) => { a.href = a.getAttribute('href') + '?testEmail=' + who; a.click(); }, who);
+      await moved;
+      await dv.waitForLoadState('load');
+    };
+    await viaMenu('weekly.html', 'dispatch.test@uniteddairy.com');
+    await dv.waitForSelector('#rows tr');
+    assert.equal(await dv.getAttribute('#tab-routes', 'aria-selected'), 'true', 'Weekly opens on Route / Run Assignments');
+    assert.equal(new URL(dv.url()).searchParams.get('week'), thisWeek, 'Weekly opens on this week');
+    assert.deepEqual(dv.errors, []);
+    await dv.close();
+    for (const [pg, pick] of [['fleet.html', '[role="tab"][data-view="history"]'], ['vacations.html', '[role="tab"][data-view="calendar"]'], ['otr.html', '[role="tab"][data-view="figures"]']]) {
+      dv = await openPage(browser, 1920, 950, '/' + pg + '?testEmail=manager.test@uniteddairy.com');
+      await dv.waitForSelector('#screen:not([hidden]) ' + pick, { state: 'visible' });
+      await dv.click(pick);
+      await viaMenu(pg, 'manager.test@uniteddairy.com');
+      await dv.waitForSelector('#screen:not([hidden]) [role="tab"][aria-selected="true"]', { state: 'visible' });
+      assert.equal(await dv.$eval('[role="tab"][aria-selected="true"]', t => t === t.parentElement.querySelector('[role="tab"]')), true, pg + ' opens on its first tab');
+      assert.deepEqual(await dv.evaluate(() => Object.keys(localStorage).filter(k => k !== 'udSidePinned')), [], pg + ' keeps no last-used view');
+      assert.deepEqual(dv.errors, []);
+      await dv.close();
+    }
+    results.push('Menu clicks open each screen\'s first view: Weekly on Route / Run Assignments and this week, Fleet Service, Vacations and Over the Road on their first tab');
     // Joe 10/10: Equipment leaves off inactive units that are not down, and shows each unit's default runs Sun to Sat (Route Master).
     await db().collection('equipment').doc('veh_trailer_t_904').set({ id: 'veh_trailer_t_904', type: 'TRAILER', unit: 'T-904', status: 'INACTIVE', location: 'UNIONTOWN', notes: 'External Fleet: 2001 | GREAT DANE' });
     const eqd = await openPage(browser, 1920, 950, '/equipment.html?testEmail=dispatch.test@uniteddairy.com');
