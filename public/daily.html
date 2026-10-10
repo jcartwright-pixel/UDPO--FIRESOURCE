@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
-<body>
+<body class="daily-look">
   <div class="signin" id="signin" hidden>
     <h1>Daily Dispatch</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -179,7 +179,7 @@
       document.getElementById('delivery-day').value = days.join(' / ') || '-';
       const groups = new Set(rows.map(r => r.deliveryDate)).size;
       document.getElementById('count').textContent = running.length + ' loads' + (running.length - covered ? ', ' + (running.length - covered) + ' need a driver' : '');
-      fitToWindow(rows.length + groups);
+      fitToWindow(rows.length + groups, 5);
       if (editRow) paintEdit();
       if (!document.getElementById('down-panel').hidden) paintDown();
     }

@@ -198,15 +198,22 @@ export function goBack() {
   if (!main && fromHere && history.length > 1) history.back();
   else location.href = 'index.html';
 }
+// Joe 10/10: every screen has a Back button and a Home button, in the same place at the top of the menu (built here, once).
 (function addBack() {
   const here = location.pathname.split('/').pop() || 'index.html';
   const home = document.querySelector('.sidemenu a[href="index.html"]');
-  if (!home || here === 'index.html') return;
+  if (!home) return;
+  home.id = 'go-home';
+  if (here === 'index.html') return;
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'side-back'; b.id = 'go-back'; b.title = 'Back one screen';
   b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.back + '</svg><span>Back</span>';
   b.onclick = goBack;
-  home.replaceWith(b);
+  const h = document.createElement('button');
+  h.type = 'button'; h.className = 'side-back side-home'; h.id = 'go-home'; h.title = 'Home';
+  h.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.home + '</svg><span>Home</span>';
+  h.onclick = () => { location.href = 'index.html'; };
+  home.replaceWith(b, h);
 })();
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
@@ -320,12 +327,13 @@ export function showError(text) {
 }
 
 // Sizes rows and type to the window so the whole list fits on one page with no scrolling.
-export function fitToWindow(lineCount) {
+export function fitToWindow(lineCount, gap) {
   const sheet = document.querySelector('.sheet');
   if (!sheet) return;
   const top = sheet.getBoundingClientRect().top;
   const footer = document.querySelector('.footer');
-  const room = window.innerHeight - top - (footer ? footer.offsetHeight : 0) - 8;
+  // gap: space between rows (Daily's card rows), taken from the room first.
+  const room = window.innerHeight - top - (footer ? footer.offsetHeight : 0) - 8 - (gap || 0) * (Math.max(lineCount, 1) + 2);
   const lines = Math.max(lineCount, 1) + 1.25; // the header row is a little taller than a line
   const apply = (row) => {
     document.documentElement.style.setProperty('--row', row + 'px');

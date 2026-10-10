@@ -36,3 +36,13 @@ test('Operational Assignments start with the current app\'s four, in order, and 
   assert.equal(rows[4].active, false);
   assert.equal(L.opsKey('  martins   ferry '), 'MARTINS FERRY');
 });
+
+// Joe 10/10: "My window should have a back button or a return to home button." Every screen (the drivers' public phone page
+// aside) loads the shared shell, which puts Back and Home at the top of the menu.
+test('every screen loads the shared shell that gives it Back and Home', () => {
+  const bad = fs.readdirSync(PUB).filter(f => f.endsWith('.html') && f !== 'route.html').filter(f => {
+    const text = fs.readFileSync(path.join(PUB, f), 'utf8');
+    return !/js\/app\.js/.test(text) || !/id="screen"/.test(text) || !/class="topbar"/.test(text);
+  });
+  assert.deepEqual(bad, []);
+});
