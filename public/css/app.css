@@ -1221,3 +1221,13 @@ body:not(.is-admin) .sidemenu a[href="administration.html"] { display: none; }
 .co-soon b { font-size: 20px; color: #0b3d6b; }
 .co-plant.planned { opacity: .92; }
 @media (max-width: 1200px) { .co-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .co-plants { grid-template-columns: 1fr; } }
+
+/* Phones (Joe 10/10, standing rule): a slim header with the logo, initials and Sign out; the app name stays on the icon. */
+@media (max-width: 600px) {
+  .topbar { min-height: 50px; padding: 4px 10px; gap: 8px; }
+  .brand { gap: 0; }
+  .brand img { width: 120px; height: 38px; }
+  .brand > span { display: none; }
+  .topbar .who.initials { width: 32px; height: 32px; font-size: 12px; }
+  .topbar a, .topbar button { padding: 6px 10px; }
+}
