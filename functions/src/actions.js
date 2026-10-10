@@ -65,7 +65,9 @@ const ACTIONS = Object.freeze({
   completePickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   // Unloading & Washing, Product Returns and Truck Washing.
   saveUnloading: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
-  completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plant' }
+  completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  // Plant Operations Scheduler (Shipping and Receiving).
+  savePlantSchedule: { roles: PLANT.PLANT_ROLES, screen: 'plant' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -267,6 +269,7 @@ function validate(input) {
   if (action === 'addPickup' || action === 'completePickup') return Object.assign(out, PLANT.validatePickup(action, input, SaveError));
   if (action === 'saveUnloading') return Object.assign(out, PLANT.validateUnload(input, SaveError));
   if (action === 'completeWash') return Object.assign(out, PLANT.validateWash(input, SaveError));
+  if (action === 'savePlantSchedule') return Object.assign(out, PLANT.validateSchedule(input, SaveError));
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
     if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
@@ -436,6 +439,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'addPickup' || req.action === 'completePickup') return PLANT.savePickup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveUnloading') return PLANT.saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, queueSheetCells);
     if (req.action === 'completeWash') return PLANT.saveWash(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'savePlantSchedule') return PLANT.saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);

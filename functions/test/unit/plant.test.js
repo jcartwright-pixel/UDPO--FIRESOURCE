@@ -121,3 +121,48 @@ test('unloading saves: whole quantities, T- trailers, one press at a time', () =
   assert.throws(() => P.validateWash({ date: '2026-10-08', trailer: '951', close: [{ list: 'runs', id: 'x' }] }, SaveError), /wash request/);
   assert.throws(() => P.validateWash({ date: '2026-10-08', trailer: '' }, SaveError), /trailer number/);
 });
+
+/* ---------- the Plant Operations Scheduler ---------- */
+
+test('scheduler: pickup times, the newest copy of a load, deleted loads off, Sunday-first holidays', () => {
+  assert.equal(R.time24('6:00 AM'), '06:00');
+  assert.equal(R.time24('12:15 am'), '00:15');
+  assert.equal(R.time24('13:05'), '13:05');
+  assert.equal(R.time24('25:00'), '');
+  const sheet = { recordId: 'S1', type: 'PLANT_SCHEDULE', date: '2026-10-08', status: 'SCHEDULED', route: '892', run: 'GARBER', payload: { pickupTime: '7:00 AM', scheduleType: 'ROUTE' }, recordedAt: '2026-10-08T10:00:00Z' };
+  const app = Object.assign({}, sheet, { date: '2026-10-09', payload: { pickupTime: '08:00', scheduleType: 'CARRIER', poNumber: '9' }, recordedAt: '2026-10-01T00:00:00Z', createdInApp: true });
+  assert.deepEqual(R.scheduleEntries([sheet], 'SHIPPING').map(x => [x.date, x.pickupTime, x.scheduleType]), [['2026-10-08', '07:00', 'ROUTE']]);
+  // The app's copy wins even with an older clock, and a load moved to another day shows once.
+  assert.deepEqual(R.scheduleEntries([app, sheet], 'SHIPPING').map(x => [x.date, x.pickupTime, x.scheduleType]), [['2026-10-09', '08:00', 'CARRIER']]);
+  assert.deepEqual(R.scheduleEntries([sheet, Object.assign({}, app, { status: 'DELETED' })], 'SHIPPING'), []);
+  assert.deepEqual(R.scheduleEntries([sheet], 'RECEIVING'), [], 'Receiving never sees Shipping loads');
+  assert.equal(R.holidayName('2026-11-26'), 'Thanksgiving');
+  assert.equal(R.holidayName('2026-05-25'), 'Memorial Day');
+  assert.equal(R.holidayName('2026-10-12'), '');
+});
+
+test('scheduler: customers are Route Master\'s plant runs, an as-needed customer listed once; suppliers start with five', () => {
+  const PD = require('../fixtures/plant-demo');
+  const routes = PD.CUSTOMERS.map(r => ({ runId: r.run_id, routeId: r.route_id, route: r.route, run: r.run, routeName: r.route_name, routeStatus: r.route_status, active: r.active === 'TRUE', displayPlant: r.display_plant_distribution === 'TRUE' }));
+  const list = R.scheduleCustomers(routes);
+  assert.deepEqual(list.map(r => r.route + ' ' + r.run), ['849 SUN VALLEY', '892 GARBER', '905 ALDI - CHARLESTON', '907_1 FAIRMONT TRANSFER', '6302 UT WALMART']);
+  assert.equal(list.find(r => r.route === '905').slots, 2);
+  assert.equal(list.find(r => r.route === '905').runId, 'run_c905_1');
+  const sup = R.scheduleSuppliers([{ recordId: 'SUP-m1', type: 'PLANT_SUPPLIER', routeId: 'SUP-m1', route: 'S06', run: 'MOUNTAIN STATE SUGAR', notes: 'Mountain Sugar', status: 'ACTIVE' }]);
+  assert.deepEqual(sup.map(s => s.route), ['S01', 'S02', 'S03', 'S04', 'S05', 'S06']);
+  assert.equal(sup[5].name, 'Mountain Sugar');
+});
+
+test('scheduler: Save Load checks what the current app checks', () => {
+  const ok = { lane: 'shipping', date: '2026-10-08', fields: { routeId: 'r', runId: 'n', route: '892', run: 'GARBER', pickupTime: '07:00' } };
+  const bad = (change, re) => assert.throws(() => P.validateSchedule(Object.assign({}, ok, { fields: Object.assign({}, ok.fields, change) }), SaveError), re);
+  assert.equal(P.validateSchedule(ok, SaveError).lane, 'SHIPPING');
+  bad({ pickupTime: '' }, /pickup time/);
+  bad({ routeId: '' }, /route \/ run/);
+  bad({ scheduleType: 'CARRIER' }, /PO number/);
+  bad({ cases: '12.5' }, /whole number/);
+  bad({ loadDate: '2026-10-09' }, /after the delivery date/);
+  bad({ trailer: 'T-9<1' }, /trailer/);
+  assert.throws(() => P.validateSchedule({ lane: 'SHIPPING', op: 'addSupplier', name: 'X' }, SaveError), /Suppliers are on Receiving/);
+  assert.throws(() => P.validateSchedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'X', code: 'TOO-LONG-1' }, SaveError), /up to 8/);
+});
