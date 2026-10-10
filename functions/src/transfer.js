@@ -184,22 +184,24 @@ function lookupsFrom(masters) {
  * records are (maintenance.js). The sheet's columns are kept under their own names; `cells` is what the write-back
  * compares against before it writes a status or note back.
  */
-const QUEUE_KINDS = Object.freeze({ maintTruck: { tab: 'TRUCK LIVE', kind: 'TRUCK' }, maintTrailer: { tab: 'TRAILER LIVE', kind: 'TRAILER' }, maintFork: { tab: 'FORK TRUCK LIVE', kind: 'FORK_TRUCK' } });
+const QUEUE_KINDS = Object.freeze({ maintTruck: { tab: 'TRUCK LIVE', kind: 'TRUCK' }, maintTrailer: { tab: 'TRAILER LIVE', kind: 'TRAILER' }, maintFork: { tab: 'FORK TRUCK LIVE', kind: 'FORK_TRUCK' },
+  // The garage's work orders (the current app's Garage Station writes them, 220_V7276): read only here, into `workOrders`.
+  workOrders: { tab: 'GARAGE WORK ORDERS', kind: 'WORK_ORDER', idColumn: 'work_order_id', collection: 'workOrders' } });
 const queueDocId = (recordId) => String(recordId).replace(/[^A-Za-z0-9_-]+/g, '_');
 
 function parseQueue(list, values) {
-  const spec = QUEUE_KINDS[list], rows = values || [], docs = {}, warnings = [];
+  const spec = QUEUE_KINDS[list], rows = values || [], docs = {}, warnings = [], idCol = spec.idColumn || 'record_id';
   let h = -1;
-  for (let i = 0; i < Math.min(rows.length, 10); i++) if ((rows[i] || []).map(M.normalizeHeader).indexOf('record_id') >= 0) { h = i; break; }
-  if (h < 0) return { docs, warnings: rows.length ? [{ list, problem: spec.tab + ' has no record_id column' }] : [] };
+  for (let i = 0; i < Math.min(rows.length, 10); i++) if ((rows[i] || []).map(M.normalizeHeader).indexOf(idCol) >= 0) { h = i; break; }
+  if (h < 0) return { docs, warnings: rows.length ? [{ list, problem: spec.tab + ' has no ' + idCol + ' column' }] : [] };
   const index = headerIndex(rows[h]);
   rows.slice(h + 1).forEach((row, i) => {
-    const id = cellText(row[index.record_id]);
+    const id = cellText(row[index[idCol]]);
     if (!id) return;
     const docId = queueDocId(id);
-    if (docs[docId]) { warnings.push({ list, row: h + 2 + i, id, problem: 'same record_id appears twice; the first row is used' }); return; }
+    if (docs[docId]) { warnings.push({ list, row: h + 2 + i, id, problem: 'same ' + idCol + ' appears twice; the first row is used' }); return; }
     const cells = cellsOf(row, index);
-    docs[docId] = Object.assign({}, cells, { record_id: id, kind: spec.kind, status: (cells.status || 'OPEN').toUpperCase(), sheetRow: h + 2 + i, cells });
+    docs[docId] = Object.assign({}, cells, { [idCol]: id, kind: spec.kind, status: (cells.status || (spec.idColumn ? 'NEW' : 'OPEN')).toUpperCase(), sheetRow: h + 2 + i, cells });
   });
   return { docs, warnings };
 }
@@ -401,7 +403,7 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   for (const list of Object.keys(queues)) {
     const metaRef = db.collection(META).doc(list);
     const prev = (await metaRef.get()).data() || {};
-    const d = diffOps(db, C.maintenance, queues[list].docs, prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
+    const d = diffOps(db, QUEUE_KINDS[list].collection || C.maintenance, queues[list].docs, prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
     ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
     summary.queues[list] = { rows: Object.keys(queues[list].docs).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
   }

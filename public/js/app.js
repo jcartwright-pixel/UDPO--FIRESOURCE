@@ -49,7 +49,7 @@ export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
   ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
   ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
-  ['Equipment', [['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin'], ['Garage Work Orders', CURRENT_APP + 'garage-station', 'wrench'], ['Fleet Service', CURRENT_APP + 'fleet-service', 'gear']]],
+  ['Equipment', [['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin'], ['Garage Work Orders', 'garage.html', 'wrench'], ['Fleet Service', CURRENT_APP + 'fleet-service', 'gear']]],
   ['Reports', [['Driver Scorecard', CURRENT_APP + 'driver-scorecard', 'star'], ['Over the Road', CURRENT_APP + 'over-the-road', 'road']]],
   ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Sheet Conflicts', 'conflicts.html', 'alert']]]
 ];
@@ -64,7 +64,7 @@ function addSideMenu() {
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' +
     MENU.map(([group, items]) => (group ? '<div class="side-group">' + group + '</div>' : '') + items.map(([label, href, icon]) => {
       const ext = /^https:/.test(href);
-      return '<a href="' + href + '"' + (ext ? ' target="_blank" rel="noopener" class="ext" title="' + label + ' (opens the current app)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
+      return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
         '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
     }).join('')).join('');
   const wrap = document.createElement('div'), main = document.createElement('div');

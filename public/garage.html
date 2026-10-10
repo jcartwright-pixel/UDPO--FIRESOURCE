@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Garage Work Orders · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill issues-page garage-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Garage Work Orders</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Garage Work Orders</h1><small>What the garage has open and what it finished. Technicians sign in with their PIN only on the garage tablet, to start or finish a job.</small></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Read only: work orders are made on the garage tablet</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="kpis" id="kpis"></div>
+      <div class="actions">
+        <div class="chips" id="filters"></div>
+        <input type="search" id="search" placeholder="Find a unit, problem or technician" aria-label="Find">
+      </div>
+      <div class="sheet scroll-list">
+        <table class="issues">
+          <colgroup><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:20%"><col style="width:8%"><col style="width:6%"><col style="width:10%"><col style="width:9%"><col style="width:8%"><col style="width:16%"></colgroup>
+          <thead><tr><th>Work Order</th><th>Unit</th><th>Type</th><th>Problem</th><th>Category</th><th>Can Run</th><th>From</th><th>Status</th><th>Techs</th><th>Fixed / Completed</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
+    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    // The current app's GARAGE WORK ORDERS tab (220_V7276_GarageFleetService.gs), read only. NEW, WORKING and PARTS are open.
+    const STATUS = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
+    const FILTERS = [['open', 'Open'], ['parts', 'Waiting on parts'], ['done', 'Done'], ['all', 'All']];
+    let filter = 'open', search = '', orders = [];
+    const isOpen = (o) => o.status !== 'DONE';
+    const when = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
+    const yes = (v) => /^(Y|YES|TRUE)$/i.test(String(v || '').trim());
+    const weekAgo = () => new Date(Date.now() - 7 * 86400000).toISOString();
+
+    function render() {
+      const open = orders.filter(isOpen), done7 = orders.filter(o => o.status === 'DONE' && String(o.completed_at || '') >= weekAgo());
+      document.getElementById('kpis').innerHTML = [
+        [open.length, 'Open', ''], [orders.filter(o => o.status === 'NEW').length, 'Not started', 'warn'], [orders.filter(o => o.status === 'WORKING').length, 'Being worked', ''],
+        [orders.filter(o => o.status === 'PARTS').length, 'Waiting on parts', 'warn'], [open.filter(o => !yes(o.can_run)).length, 'Cannot run', 'warn'], [done7.length, 'Done last 7 days', 'good']
+      ].map(([n, label, c]) => '<div class="' + c + '"><b>' + n + '</b><span>' + label + '</span></div>').join('');
+      const match = (o, k) => k === 'all' || (k === 'open' ? isOpen(o) : k === 'parts' ? o.status === 'PARTS' : o.status === 'DONE');
+      document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + orders.filter(o => match(o, k)).length + '</b></button>').join('');
+      const q = search.toUpperCase();
+      const list = orders.filter(o => match(o, filter) && (!q || [o.work_order_id, o.unit, o.problem, o.category, o.techs, o.fixed_note].join(' ').toUpperCase().indexOf(q) >= 0))
+        .sort((a, b) => (isOpen(b) - isOpen(a)) || String(b.completed_at || b.created_at || '').localeCompare(String(a.completed_at || a.created_at || '')));
+      document.getElementById('rows').innerHTML = list.map(o => {
+        const s = STATUS[o.status] || [o.status, 'no'], cantRun = isOpen(o) && !yes(o.can_run);
+        const fix = o.status === 'DONE' ? escapeHtml(o.fixed_note || o.fixed || '') + '<small>' + when(o.completed_at) + (o.minutes ? ' · ' + escapeHtml(o.minutes) + ' min' : '') + (o.signed_by ? ' · signed ' + escapeHtml(o.signed_by) : '') + '</small>' : '';
+        return '<tr' + (cantRun ? ' class="review"' : '') + '><td class="strong">' + escapeHtml(o.work_order_id) + '<small>' + when(o.created_at) + '</small></td><td class="strong">' + escapeHtml(o.unit || '') + '</td>' +
+          '<td>' + (String(o.unit_type).toUpperCase() === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td class="wrong">' + escapeHtml(o.problem || '') + '</td><td>' + escapeHtml(o.category || '') + '</td>' +
+          '<td><span class="pill ' + (yes(o.can_run) ? 'yes">YES' : 'warn">NO') + '</span></td><td>' + escapeHtml(o.source || '') + '</td>' +
+          '<td><span class="pill ' + s[1] + '">' + escapeHtml(s[0]) + '</span></td><td>' + escapeHtml(o.techs || '') + '</td><td class="wrong">' + fix + '</td></tr>';
+      }).join('') || '<tr><td colspan="10" class="empty">' + (orders.length ? 'No work orders match.' : 'No work orders yet. They show here once the garage tablet makes them.') + '</td></tr>';
+      document.getElementById('foot').textContent = orders.length + ' work orders from the garage list. Shaded rows: the unit cannot run until it is fixed.';
+    }
+
+    document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
+    document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
+    window.udBack = () => { if (filter !== 'open' || search) { filter = 'open'; search = ''; document.getElementById('search').value = ''; render(); return true; } return false; };
+
+    requireSignIn(async () => {
+      const { db } = await start();
+      onSnapshot(collection(db, 'workOrders'), s => { orders = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the work orders: ' + e.message));
+      render();
+    });
+  </script>
+</body>
+</html>
