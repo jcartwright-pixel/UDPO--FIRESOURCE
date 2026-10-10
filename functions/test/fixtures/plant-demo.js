@@ -120,7 +120,7 @@ const LINES = [['ut_prod_boxing', 'BOXING', 10], ['ut_prod_totes', 'TOTES', 20],
 const SETUP = LINES.map(([id, name, seq]) => ({ operation_id: id, operation_type: 'PRODUCTION_AREA', display_name: name, status: 'ACTIVE', production_area: name, days_json: '{}', view_sequence: String(seq), facility_id: 'fac_uniontown' }))
   .concat([{ operation_id: 'ut_prod_retired', operation_type: 'PRODUCTION_AREA', display_name: 'OLD FILLER', status: 'INACTIVE', production_area: 'OLD FILLER', view_sequence: '5', facility_id: 'fac_uniontown' },
     { operation_id: 'ut_temp_cooler_north', operation_type: 'TEMPERATURE_CHECK_LOCATION', display_name: 'Cooler North', status: 'ACTIVE', production_area: 'Cooler North', view_sequence: '140', facility_id: 'fac_uniontown',
-      days_json: JSON.stringify({ sensorId: '69834842f8b4d991033d30d1', sensorName: 'Temperature Humidity Sensor' }) },
+      days_json: JSON.stringify({ sensorId: '69834842f8b4d991033d30d1', sensorName: 'Temperature Humidity Sensor', lowLimit: 33, highLimit: 41 }) },
     { operation_id: 'ut_temp_cooler_middle', operation_type: 'TEMPERATURE_CHECK_LOCATION', display_name: 'Cooler Middle', status: 'ACTIVE', production_area: 'Cooler Middle', view_sequence: '180', facility_id: 'fac_uniontown', days_json: '{"sensorId":""}' }]);
 // PLANT LINE STATUS (the Live workbook): each line's last check.
 const LINE_STATUS_HEADERS = ['Record Key', 'Area', 'Status', 'Temperature', 'Notes', 'Payload JSON', 'Updated At', 'Updated By'];
