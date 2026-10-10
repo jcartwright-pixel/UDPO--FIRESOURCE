@@ -102,6 +102,16 @@ exports.setSwitch = onCall(async (request) => {
   try { return await setSwitch(db, user, request.data, !!process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1'); } catch (error) { throw asHttps(error); }
 });
 
+// Joe 10/10: Administration's People & Roles lists everyone on the Users list, for Administrators only. Each person may
+// still read only their own entry from the screens; the whole list comes through here.
+exports.people = onCall(async (request) => {
+  const user = signedIn(request);
+  const person = (await db.collection('users').doc(safeIdPart(user.email)).get()).data();
+  if (!person || person.status !== 'ACTIVE' || !L.isAdmin(person)) throw new HttpsError('permission-denied', 'Only an administrator can see the Users list');
+  const snap = await db.collection('users').get();
+  return { people: snap.docs.map(d => { const p = d.data(); return { email: d.id, name: p.name || '', status: p.status || '', roles: p.roles || [], facilities: p.facilities || [] }; }) };
+});
+
 exports.gps = onCall({ timeoutSeconds: 30 }, async (request) => {
   const user = signedIn(request);
   try { return await gpsCall(db, user, request.data, { local: process.env.FUNCTIONS_EMULATOR === 'true' }); } catch (error) { throw asHttps(error); }
