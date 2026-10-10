@@ -87,7 +87,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
     assert.deepEqual(groups, ['People & Access', 'App Links & Codes', 'Email & Schedules', 'Dispatch Administration', 'Plant Setup', 'Connections & Keys', 'Fleet & GPS Setup', 'System Tools', 'Diagnostics']);
     const all = await adm.$$eval('.adm-item', t => t.length);
-    assert.equal(all, 29, 'every item from the current app\'s Administration is in the menu');
+    assert.equal(all, 31, 'every item from the current app\'s Administration is in the menu');
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
@@ -104,18 +104,18 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await adm.getAttribute('#full', 'href').then(h => /^print\.html/.test(h)), true);
     await adm.waitForTimeout(800);
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-print-1920.png') });
-    // One still being built says so right there.
+    // Joe 10/10: every Administration item is built; none says Being built. Repair Email opens right there.
     await adm.click('.adm-item[data-key="repair-email"]');
-    await adm.waitForSelector('.adm-soon');
-    assert.match(await adm.textContent('.adm-panel-head'), /Repair Email[\s\S]*Being built/);
-    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-soon-1920.png') });
+    await adm.waitForSelector('#re-where input');
+    assert.equal(/Being built/.test(await adm.textContent('#shell')), false);
+    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-repair-email-1920.png') });
     await adm.fill('#find', 'QR');
     assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'App Links & Codes']);
     await adm.fill('#find', '');
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has a fourth same-size Administration card; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, built screens open inside the right panel and the rest say Being built there');
+    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has a fourth same-size Administration card; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');
