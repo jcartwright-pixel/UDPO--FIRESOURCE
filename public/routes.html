@@ -198,7 +198,7 @@
     function seqView(list, edit) {
       return '<colgroup><col style="width:8%"><col style="width:12%"><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:22%"></colgroup>' +
         '<thead><tr><th>Order</th><th>Route</th><th>Run / Destination</th><th>Start time</th><th>Load day</th><th>Run by</th></tr></thead><tbody>' +
-        list.map((r, i) => '<tr data-id="' + escapeHtml(r.id) + '" data-i="' + i + '"' + (edit ? ' draggable="true"' : '') + '><td>' + escapeHtml(cellValue(r, seqDay, 'loadOrder') || '-') + '</td>' +
+        list.map((r, i) => '<tr data-id="' + escapeHtml(r.id) + '" data-i="' + i + '" draggable="true"' + (edit ? '' : ' class="no-drag"') + '><td>' + escapeHtml(cellValue(r, seqDay, 'loadOrder') || '-') + '</td>' +
           '<td class="strong' + (edit ? ' grab' : '') + '">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(cellValue(r, seqDay, 'dispatchTime')) + '</td>' +
           '<td>' + escapeHtml(cellValue(r, seqDay, 'loadDayOffset')) + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td></tr>').join('') +
         (list.length ? '' : '<tr><td colspan="6" class="empty">No runs on ' + NAME(seqDay) + '.</td></tr>') + '</tbody>';
@@ -376,7 +376,8 @@
       if (ed) { const r = routes.find(x => x.id === ed.dataset.editRoute); pickRoute = r.route; pickRun = r.id; view = 'details'; render(); }
     });
     // Load Order: drag a run by its route number; the day's whole order saves as one call.
-    table.addEventListener('dragstart', e => { const tr = e.target.closest('tr[data-i]'); if (tr) { dragging = Number(tr.dataset.i); e.dataTransfer.effectAllowed = 'move'; } });
+    // Rows are always draggable (a redraw that only turns editing on cannot then miss a drag that already began); who may move them is checked here.
+    table.addEventListener('dragstart', e => { const tr = e.target.closest('tr[data-i]'); if (!tr) return; if (!canEdit()) { e.preventDefault(); return; } dragging = Number(tr.dataset.i); e.dataTransfer.effectAllowed = 'move'; });
     table.addEventListener('dragover', e => { if (dragging !== null && e.target.closest('tr[data-i]')) e.preventDefault(); });
     table.addEventListener('drop', e => {
       const tr = e.target.closest('tr[data-i]');
