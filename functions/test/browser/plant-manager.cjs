@@ -98,7 +98,7 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
     await page.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 4/.test(document.querySelector('[data-card="dept"]').textContent));
     // The Plant menu with a section open beside it (Joe 10/10: sections like the Distribution side, no Manager Menu on the screen).
     if (SHOTS) {
-      for (const sec of ['Plant Distribution Departments', 'Cooler Temperature']) {
+      for (const sec of ['Plant Distribution Departments']) {
         await page.hover('.sidemenu .side-sec-btn[title="' + sec + '"]');
         await page.waitForSelector('.side-flyouts .flyout.open');
         await page.screenshot({ path: path.join(SHOTS, 'plant-menu-' + sec.toLowerCase().replace(/ /g, '-') + '-open-1920.png'), scale: 'css' });
