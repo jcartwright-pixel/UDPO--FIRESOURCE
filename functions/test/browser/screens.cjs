@@ -593,9 +593,11 @@ async function noScroll(page) {
     // With the write-back on: the badge says saves go to the sandbox sheet, and the conflict list is one click away.
     await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
     const batch = db().batch();
-    for (let i = 0; i < 40; i++) {
+    // 40 different cells, plus the newest one refused 4 more times: the repeats are one line with one Checked button.
+    for (let i = 0; i < 44; i++) {
+      const route = String(802 + (i < 40 ? i : 39));
       batch.set(db().collection('conflicts').doc('test-conflict-' + String(i).padStart(2, '0')), { open: true, at: new Date(Date.parse('2026-10-09T12:00:00Z') + i * 60000).toISOString(),
-        by: 'dispatch.test@uniteddairy.com', tab: 'LIVE CURRENT WEEK', route: '802', run: 'TEST 802', column: 'tue_trailer', sheetValue: 'T-902', newValue: 'T-901',
+        by: 'dispatch.test@uniteddairy.com', tab: 'LIVE CURRENT WEEK', route, run: 'TEST ' + route, column: 'tue_trailer', sheetValue: 'T-902', newValue: 'T-901',
         problem: 'changed in the sheet since the app last saw it; the sheet value was kept' });
     }
     await batch.commit();
@@ -609,18 +611,24 @@ async function noScroll(page) {
       const size = await noScroll(page);
       assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Sheet Conflicts with 40 lines fits ' + w + 'x' + h + ': ' + JSON.stringify(size));
       assert.equal(await page.textContent('#rows tr:first-child td:nth-child(4)'), 'Tue trailer');
+      assert.equal(await page.textContent('#rows tr:first-child button.check'), 'Checked (5)', 'the cell refused 5 times is one line');
+      assert.match(await page.textContent('#rows tr:first-child td:first-child'), /5 times since/);
+      assert.match(await page.textContent('#count'), /^44 open on 40 lines/);
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'conflicts-' + w + '.png') });
       assert.deepEqual(page.errors, []);
       await page.close();
     }
     const checker = await openPage(browser, 1366, 650, '/conflicts.html?testEmail=dispatch.test@uniteddairy.com');
     await checker.waitForSelector('#rows button.check');
-    const firstId = await checker.getAttribute('#rows button.check', 'data-id');
+    const firstIds = (await checker.getAttribute('#rows button.check', 'data-ids')).split(' ');
+    assert.equal(firstIds.length, 5);
     await checker.click('#rows button.check');
-    for (let i = 0; i < 50 && (await db().collection('conflicts').doc(firstId).get()).data().open !== false; i++) await checker.waitForTimeout(100);
-    assert.equal((await db().collection('conflicts').doc(firstId).get()).data().open, false, 'Checked is saved');
+    const allChecked = async () => (await Promise.all(firstIds.map(id => db().collection('conflicts').doc(id).get()))).every(d => d.data().open === false);
+    for (let i = 0; i < 80 && !(await allChecked()); i++) await checker.waitForTimeout(100);
+    assert.ok(await allChecked(), 'one Checked saves every repeat of that cell');
+    await checker.waitForFunction(() => document.querySelectorAll('#rows button.check').length === 39);
     await checker.close();
-    results.push('Sheet Conflicts: 40 open lines fit on one page at both sizes; Checked takes a line off the list and saves it');
+    results.push('Sheet Conflicts: 40 open lines fit on one page at both sizes; a cell refused 5 times is one line, and its one Checked saves all 5');
 
     // Back: closes what is open first (an opened driver), then a main screen goes Home. Home has no Back.
     const backPage = await openPage(browser, 1366, 768, '/drivers.html?testEmail=manager.test@uniteddairy.com');
