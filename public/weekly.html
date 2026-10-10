@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
-<body class="fill weekly-page">
+<body data-view="routes" class="fill weekly-page">
   <div class="signin" id="signin" hidden>
     <h1>Weekly Dispatch</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -29,10 +29,6 @@
     </div>
     <div class="head">
       <div class="title"><h1>Weekly Dispatch</h1><small id="published"></small></div>
-      <div class="tabs" role="tablist">
-        <button type="button" role="tab" id="tab-routes" aria-selected="true">Route / Run Assignments</button>
-        <button type="button" role="tab" id="tab-board" aria-selected="false">Driver Assignment Board</button>
-      </div>
       <div class="actions in-head">
         <a class="button" id="go-daily" href="daily.html">Daily Dispatch</a>
         <button type="button" id="prev-week">&lt; Previous Week</button>
@@ -223,36 +219,22 @@
       const td = e.target.closest('td.editable[data-day]');
       if (!td || popover) return;
       const row = rows[Number(td.parentElement.dataset.index)], day = td.dataset.day, d = row.days[day];
-      const opts = { override, date: d.date };
+      // Joe 10/10, like the current Weekly screen: the click opens the driver drop-down right on the box; picking a driver saves
+      // and closes it (a day that was off turns on). Trucks and trailers are picked on Daily Dispatch (they show when you hover a box).
       popover = document.createElement('div');
-      popover.className = 'popover';
-      popover.innerHTML = '<b style="grid-column:1/3">' + escapeHtml(row.route + ' ' + row.run + ', ' + L.DAY_NAMES[L.DAYS.indexOf(day)] + ' ' + shortDate(d.date)) + '</b>' +
-        (d.runs ? '' : '<small class="pop-note">' + (d.driver ? 'Marked as not running this day. ' : 'Does not run this day. ') + 'Pick a driver to turn it on; then the truck and trailer can be picked.</small>') +
-        '<label>Driver</label><select data-kind="driver">' + driverOptions(row, day) + '</select>' +
-        '<label>Truck</label><select data-kind="truck"' + (d.runs ? '' : ' disabled') + '>' + optionsHtml('truck', d.truckId, busyOn(day, 'truckId', row), opts) + '</select>' +
-        '<label>Trailer</label><select data-kind="trailer"' + (d.runs ? '' : ' disabled') + '>' + optionsHtml('trailer', d.trailerId, busyOn(day, 'trailerId', row), opts) + '</select>' +
-        '<button type="button" class="close">Done</button>';
+      popover.className = 'popover cell-pick';
+      popover.innerHTML = '<select data-kind="driver" aria-label="' + escapeHtml('Driver for ' + row.route + ' ' + row.run + ', ' + L.DAY_NAMES[L.DAYS.indexOf(day)] + ' ' + shortDate(d.date)) + '">' + driverOptions(row, day) + '</select>';
       document.body.appendChild(popover);
-      const box = td.getBoundingClientRect(), w = popover.offsetWidth, h = popover.offsetHeight;
-      popover.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, box.left)) + 'px';
-      popover.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, box.bottom + 4)) + 'px';
-      popover.querySelectorAll('select').forEach(sel => sel.addEventListener('change', () => {
-        const kind = sel.dataset.kind;
-        // Apply on screen behind the editor; the grid shows it when the editor closes.
-        const keep = popover; popover = null;
-        if (kind === 'driver') {
-          saveDriver(row, day, sel.value);
-          const running = sel.value !== '__OFF__' && (d.runs || !!sel.value);
-          keep.querySelectorAll('select[data-kind="truck"], select[data-kind="trailer"]').forEach(s => { s.disabled = !running; });
-        } else saveAssignment(getRuns, row.runDocId, day, kind, { id: sel.value, text: pickText(kind, sel.value) }, render, override);
-        popover = keep;
-      }));
-      popover.querySelector('.close').addEventListener('click', closePopover);
-      popover.addEventListener('keydown', ev => { if (ev.key === 'Escape') closePopover(); });
-      // Joe 10/10: one click opens the driver drop-down, like the current app.
-      const pick = popover.querySelector('select[data-kind="driver"]');
-      pick.focus();
-      try { if (pick.showPicker) pick.showPicker(); } catch (x) { /* the list opens on the next click */ }
+      const box = td.getBoundingClientRect();
+      Object.assign(popover.style, { left: (box.left + 3) + 'px', top: (box.top + 3) + 'px', width: Math.max(box.width - 6, 180) + 'px', height: (box.height - 6) + 'px' });
+      const sel = popover.querySelector('select');
+      let done = false;
+      const finish = () => { if (done) return; done = true; closePopover(); };
+      sel.addEventListener('change', () => { const keep = popover; popover = null; saveDriver(row, day, sel.value); popover = keep; finish(); });
+      sel.addEventListener('blur', () => setTimeout(finish, 150));
+      popover.addEventListener('keydown', ev => { if (ev.key === 'Escape') finish(); });
+      sel.focus();
+      try { if (sel.showPicker) sel.showPicker(); } catch (x) { /* the focused list opens with a click or the arrow keys */ }
     });
     // A click anywhere outside the editor closes it (and a click on another day opens that day).
     document.addEventListener('mousedown', e => { if (popover && !popover.contains(e.target)) closePopover(); }, true);
@@ -353,16 +335,13 @@
       window.print();
     };
     function setTab(t) {
-      // Both tables sit on one page, as on the current screen; the buttons jump to them.
+      // Both tables sit on one page, as on the current screen. Joe 10/10: no tab buttons; Menu > Driver Assignment Board jumps to the board.
       tab = t;
-      document.getElementById('tab-routes').setAttribute('aria-selected', String(t === 'routes'));
-      document.getElementById('tab-board').setAttribute('aria-selected', String(t === 'board'));
+      document.body.dataset.view = t;
       const box = document.getElementById('wk-scroll'), target = document.getElementById(t === 'routes' ? 'routes-panel' : 'board-panel');
       box.scrollTop = t === 'routes' ? 0 : target.offsetTop - box.offsetTop;
       render();
     }
-    document.getElementById('tab-routes').onclick = () => setTab('routes');
-    document.getElementById('tab-board').onclick = () => setTab('board');
     // Menu > Driver Assignment Board opens this page at the board (weekly.html#board).
     let jumpBoard = location.hash === '#board';
     window.addEventListener('hashchange', () => { if (location.hash === '#board') setTab('board'); });

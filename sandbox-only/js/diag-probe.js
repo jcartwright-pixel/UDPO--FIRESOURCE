@@ -174,6 +174,20 @@
             fly.appendChild(a);
           });
           // The Administration page (its tiles are drawn again on every filter): a Sandbox tools group at the end.
+          // Joe 10/10: Administration became a menu on the left (#nav, drawn again on every search); the group goes at its end.
+          var nav = page === 'administration.html' && document.getElementById('nav');
+          if (nav) {
+            var addNavGroup = function () {
+              if (nav.querySelector('.diag-group')) return;
+              var g = document.createElement('div');
+              g.className = 'adm-nav-group diag-group';
+              g.innerHTML = '<h2>Sandbox tools</h2><a class="adm-item adm-tile ready" style="text-decoration:none" href="diagnostics.html" title="Check every screen, time loads and saves, list slow and failed items (sandbox only)">' +
+                '<span class="adm-ic">' + icon + '</span><span class="adm-name">Diagnostics</span><em>Sandbox</em></a>';
+              nav.appendChild(g);
+            };
+            addNavGroup();
+            new MutationObserver(addNavGroup).observe(nav, { childList: true });
+          }
           var body = page === 'administration.html' && document.getElementById('body');
           if (body) {
             var addGroup = function () {
