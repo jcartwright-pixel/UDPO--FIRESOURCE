@@ -114,6 +114,24 @@ const WASH = [
 const RETURN_HEADERS = ['record_id', 'facility_id', 'service_date', 'status', 'route_id', 'run_id', 'reason_details', 'return_source', 'disposition'];
 const RETURNS = [{ record_id: 'ret_d1', service_date: PLANT_DATE, status: 'OPEN', run_id: 'run_p802', reason_details: '3 cases chocolate refused', return_source: 'DRIVER_CHECKIN', disposition: 'PENDING_REVIEW' }];
 
+// PLANT_OPERATIONS_MASTER (the Plant Operations workbook): the production lines and temperature locations, as on the real sheet.
+const SETUP_HEADERS = ['operation_id', 'operation_type', 'display_name', 'status', 'production_area', 'days_json', 'view_sequence', 'facility_id'];
+const LINES = [['ut_prod_boxing', 'BOXING', 10], ['ut_prod_totes', 'TOTES', 20], ['ut_prod_htst_1', 'HTST #1', 40], ['ut_prod_gallon_filler', 'GALLON FILLER', 80], ['ut_prod_blow_mold', 'BLOW MOLD', 90]];
+const SETUP = LINES.map(([id, name, seq]) => ({ operation_id: id, operation_type: 'PRODUCTION_AREA', display_name: name, status: 'ACTIVE', production_area: name, days_json: '{}', view_sequence: String(seq), facility_id: 'fac_uniontown' }))
+  .concat([{ operation_id: 'ut_prod_retired', operation_type: 'PRODUCTION_AREA', display_name: 'OLD FILLER', status: 'INACTIVE', production_area: 'OLD FILLER', view_sequence: '5', facility_id: 'fac_uniontown' },
+    { operation_id: 'ut_temp_cooler_north', operation_type: 'TEMPERATURE_CHECK_LOCATION', display_name: 'Cooler North', status: 'ACTIVE', production_area: 'Cooler North', view_sequence: '140', facility_id: 'fac_uniontown',
+      days_json: JSON.stringify({ sensorId: '69834842f8b4d991033d30d1', sensorName: 'Temperature Humidity Sensor' }) },
+    { operation_id: 'ut_temp_cooler_middle', operation_type: 'TEMPERATURE_CHECK_LOCATION', display_name: 'Cooler Middle', status: 'ACTIVE', production_area: 'Cooler Middle', view_sequence: '180', facility_id: 'fac_uniontown', days_json: '{"sensorId":""}' }]);
+// PLANT LINE STATUS (the Live workbook): each line's last check.
+const LINE_STATUS_HEADERS = ['Record Key', 'Area', 'Status', 'Temperature', 'Notes', 'Payload JSON', 'Updated At', 'Updated By'];
+const LINE_STATUS = [
+  { 'Record Key': 'ut_prod_boxing', Area: 'BOXING', Status: 'RUNNING', 'Updated At': '2026-10-08T14:03:33-04:00', 'Updated By': 'bbircher@uniteddairy.com',
+    'Payload JSON': JSON.stringify({ operationId: 'ut_prod_boxing', area: 'BOXING', product: '1% Chocolate milk', status: 'RUNNING', qualityCheck: 'PASS', tipTest: 'PASS', weights: { result: '' }, notes: '' }) },
+  { 'Record Key': 'ut_prod_blow_mold', Area: 'BLOW MOLD', Status: 'REVIEW', Temperature: '1130', 'Updated At': '2026-10-08T14:16:55-04:00', 'Updated By': 'bbircher@uniteddairy.com',
+    'Payload JSON': JSON.stringify({ operationId: 'ut_prod_blow_mold', area: 'BLOW MOLD', product: 'Gallon', status: 'REVIEW', temperature: '1130', cycleTime: '7.8', annealerSpeed: '70',
+      weights: { head1: '55.3', head2: '58.5', head3: '57.2', head4: '55.7', head5: '57.1', head6: '55.9' }, notes: 'Head 2 heavy' }) }
+];
+
 function plantSheets() {
   return D.fakeSheets({
     "'LIVE CURRENT WEEK'": plantWeek(),
@@ -122,7 +140,9 @@ function plantSheets() {
     "'PLANT_OPERATIONS'": D.table(JOURNAL_HEADERS, JOURNAL.concat(SCHEDULE)),
     "'ROUTES_MASTER'": D.table([...new Set(D.ROUTES.concat(CUSTOMERS).flatMap(r => Object.keys(r)).concat(CUSTOMER_HEADERS))], D.ROUTES.concat(CUSTOMERS)),
     "'WASH / CLEANING LIVE'": D.table(WASH_HEADERS, WASH),
-    "'REFUSALS / RETURNS LIVE'": D.table(RETURN_HEADERS, RETURNS)
+    "'REFUSALS / RETURNS LIVE'": D.table(RETURN_HEADERS, RETURNS),
+    "'PLANT_OPERATIONS_MASTER'": D.table(SETUP_HEADERS, SETUP),
+    "'PLANT LINE STATUS'": D.table(LINE_STATUS_HEADERS, LINE_STATUS)
   });
 }
 const PLANT_SOURCES = Object.assign({}, D.SOURCES, { live: Object.assign({}, D.SOURCES.live, { plant: true }), plant: { pickups: { spreadsheetId: 'fake-plant', tab: 'LIVE PLANT OPERATIONS' } } });
