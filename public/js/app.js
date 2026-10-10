@@ -68,12 +68,12 @@ export const MENU = [
   // The plant side (Joe 10/10): Plant Operations opens the Manager Center cards; the menu lists the cards in the same order,
   // and a card with more than one area opens its screens beside it. A section with one screen is a plain link.
   ['Send Report', [['Send Current Report', 'manager.html?report=1', 'star']]],
-  ['Yard Checks', [['Active Yard Queue', 'yard.html', 'yard-checks.webp'], ['24-Hour History', 'yard.html?view=history', 'yard-checks.webp']]],
-  ['Plant Operations Scheduler', [['Shipping', 'scheduler.html?lane=SHIPPING', 'week'], ['Receiving', 'scheduler.html?lane=RECEIVING', 'week']]],
+  ['Yard Checks', [['Yard Checks', 'yard.html', 'yard-checks.webp']]],
+  ['Plant Operations Scheduler', [['Plant Operations Scheduler', 'scheduler.html', 'week']]],
   ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash']]],
-  ['Quality Checks', [['Production Line Status & Quality', 'quality.html', 'production.webp'], ['Quality History', 'quality.html?view=history', 'production.webp']]],
-  ['Cooler Temperature', [['Manual Read', 'temps.html', 'temperatures.webp'], ['Status / Alerts', 'temps.html?view=alerts', 'temperatures.webp'], ['24-Hour History', 'temps.html?view=history', 'temperatures.webp']]],
-  ['Shift Notes', [['Shift Handoff', 'shiftnotes.html', 'alert'], ['24-Hour History', 'shiftnotes.html?view=history', 'alert']]]
+  ['Quality Checks', [['Quality Checks', 'quality.html', 'production.webp']]],
+  ['Cooler Temperature', [['Cooler Temperature', 'temps.html', 'temperatures.webp']]],
+  ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]]
 ];
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
 // lists only that side's screens. A screen listed on two sides stays on the side it was opened from.

@@ -61,7 +61,6 @@
     const today = () => L.operatingDay(new Date());
     let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
     let mode = 'check';
-    try { mode = localStorage.getItem('udPlantUnloadMode') === 'view' ? 'view' : 'check'; } catch (e) { /* no storage */ }
     let runs = [], journal = [], person = null, app = {};
     const returned = {};       // return id -> true while its RTA is saving
     const unsubs = [];
@@ -105,7 +104,7 @@
       delete returned[x.id];
       render();
     });
-    document.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => { mode = b.dataset.mode; try { localStorage.setItem('udPlantUnloadMode', mode); } catch (e) { /* no storage */ } render(); }; });
+    document.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => { mode = b.dataset.mode; render(); }; });
     function setDate(d) {
       if (!L.isDateKey(d) || d === date) return;
       date = d;
