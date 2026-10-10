@@ -29,10 +29,11 @@ export function areaOf(loadType) {
   return '';
 }
 
-// The plant shows a run unless Route Master or the Live row turns it off for the plant, or the route is retired.
+// The plant loads every run that runs and has a load type, unless the route is retired. "Show in plant"
+// (display_plant_distribution) only decides the Plant Operations Scheduler's customer list, never the loadout or
+// unloading lists (the current app's rule since 7.0.227, udpoV780DisplayPolicy_ "plant_loadout_all").
 function shownForPlant(run) {
-  if (String(run.routeStatus || '').toUpperCase() === 'INACTIVE' || run.active === false) return false;
-  return run.displayPlant !== false;
+  return !(String(run.routeStatus || '').toUpperCase() === 'INACTIVE' || run.active === false);
 }
 
 // WAITING / LOADING / DONE (a stored READY counts as done, Joe 7.0.272).

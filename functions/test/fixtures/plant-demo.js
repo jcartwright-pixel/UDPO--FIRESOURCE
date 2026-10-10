@@ -38,6 +38,8 @@ function plantWeek() {
   tab.slice(6).forEach((row, i) => {
     const area = i < LOADS.length ? LOADS[i][2] : 'CASE';
     row[col('load_type')] = AREA_TYPE[area];
+    // As on the real Live sheet, the DSD case routes have "show in plant" off; the plant still loads them.
+    if (area === 'CASE') row[col('display_plant_distribution')] = 'FALSE';
     const state = i < LOADS.length ? LOADS[i][5] : 'L';
     const p = i < LOADS.length ? 'fri' : 'thu', base = i < LOADS.length ? PLANT_DATE : '2026-10-07';
     // Start / End times (extension_05 = started, complete_time = done) in UTC, morning at the plant.
@@ -71,6 +73,38 @@ const JOURNAL = [
     payload_json: JSON.stringify({ route: '805', run: 'UT DSD MILK', casesReturned: '3', notes: '3 cases chocolate milk refused at the store' }) },
   { record_id: '2026-10-07|802|UT DSD MILK', business_date: '2026-10-07', record_type: 'UNLOADING', run_id: 'run_p802', route: '802', run: 'UT DSD MILK', status: 'COMPLETE' }
 ];
+// The Plant Operations Scheduler: Route Master's plant customers and a week of Shipping and Receiving loads.
+const CUSTOMER_HEADERS = ['route_id', 'run_id', 'route_code', 'facility_id', 'route', 'route_name', 'run', 'route_status', 'active', 'display_plant_distribution'];
+const CUSTOMERS = [
+  { route_id: 'rte_c892', run_id: 'run_c892', route: '892', route_name: 'Garber Farms', run: 'GARBER', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },
+  { route_id: 'rte_c849', run_id: 'run_c849', route: '849', route_name: 'Sun Valley', run: 'SUN VALLEY', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },
+  { route_id: 'rte_c6302', run_id: 'run_c6302', route: '6302', route_name: 'Walmart DC', run: 'UT WALMART', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },
+  { route_id: 'rte_c905', run_id: 'run_c905_1', route: '905_1', route_name: 'Aldi Charleston', run: 'ALDI - CHARLESTON LOAD 1', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },
+  { route_id: 'rte_c905', run_id: 'run_c905_2', route: '905_2', route_name: 'Aldi Charleston', run: 'ALDI - CHARLESTON LOAD 2', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },
+  { route_id: 'rte_c907', run_id: 'run_c907_1', route: '907_1', route_name: 'Fairmont', run: 'FAIRMONT TRANSFER', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },
+  { route_id: 'rte_c950', run_id: 'run_c950', route: '950', route_name: 'Retired Customer', run: 'RETIRED', route_status: 'INACTIVE', active: 'FALSE', display_plant_distribution: 'TRUE' },
+  { route_id: 'rte_c951', run_id: 'run_c951', route: '951', route_name: 'Not For Plant', run: 'NOT PLANT', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'FALSE' }
+];
+const sched = (id, type, date, c, p, extra) => Object.assign({ record_id: id, facility_id: 'fac_uniontown', business_date: date, record_type: type, route_id: c[0], run_id: c[1], route: c[2], run: c[3],
+  status: 'SCHEDULED', area: type === 'PLANT_RECEIVING' ? 'RECEIVING' : 'SCHEDULER', notes: p.notes || '', payload_json: JSON.stringify(p), recorded_at: '2026-10-05T14:00:00Z', recorded_by: 'manager@uniteddairy.com' }, extra || {});
+const GARBER = ['rte_c892', 'run_c892', '892', 'GARBER'], SUNV = ['rte_c849', 'run_c849', '849', 'SUN VALLEY'], WALMART = ['rte_c6302', 'run_c6302', '6302', 'UT WALMART'], ALDI = ['rte_c905', 'run_c905_1', '905', 'ALDI - CHARLESTON'];
+const VALLEY = ['SUP-START-1', 'SUP-START-1', 'S01', 'VALLEY FARMS MILK CO-OP'], KEYSTONE = ['SUP-START-3', 'SUP-START-3', 'S03', 'KEYSTONE CARTON SUPPLY'];
+const SCHEDULE = [
+  sched('SCHED-g1', 'PLANT_SCHEDULE', '2026-10-08', GARBER, { pickupTime: '07:00', loadDate: '2026-10-07', trailer: 'T-955', scheduleType: 'ROUTE', cases: '', product: 'Raw milk' }),
+  sched('SCHED-s1', 'PLANT_SCHEDULE', '2026-10-08', SUNV, { pickupTime: '13:00', loadDate: '2026-10-08', scheduleType: 'CARRIER', carrier: true, poNumber: '4471', cases: '860', product: 'Half gallons' }),
+  // Edited once: the second row is the load now (6:30 AM).
+  sched('SCHED-w1', 'PLANT_SCHEDULE', '2026-10-08', WALMART, { pickupTime: '06:00', loadDate: '2026-10-07', scheduleType: 'ROUTE' }),
+  sched('SCHED-w1', 'PLANT_SCHEDULE', '2026-10-08', WALMART, { pickupTime: '06:30', loadDate: '2026-10-07', trailer: 'T-960', scheduleType: 'ROUTE', notes: 'Dock 3' }, { recorded_at: '2026-10-06T09:00:00Z' }),
+  sched('SCHED-a1', 'PLANT_SCHEDULE', '2026-10-09', ALDI, { pickupTime: '05:30', loadDate: '2026-10-08', trailer: 'T-961', scheduleType: 'ROUTE', cases: '1200', product: 'Gallons 2%' }),
+  sched('SCHED-w2', 'PLANT_SCHEDULE', '2026-10-06', WALMART, { pickupTime: '04:00', loadDate: '2026-10-05', scheduleType: 'ROUTE' }),
+  sched('SCHED-g2', 'PLANT_SCHEDULE', '2026-10-13', GARBER, { pickupTime: '07:00', loadDate: '2026-10-12', scheduleType: 'ROUTE' }),
+  sched('SCHED-x1', 'PLANT_SCHEDULE', '2026-10-08', GARBER, { pickupTime: '09:00', scheduleType: 'ROUTE' }, { status: 'DELETED' }),
+  sched('RECV-v1', 'PLANT_RECEIVING', '2026-10-08', VALLEY, { pickupTime: '08:00', scheduleType: 'ROUTE', cases: '', product: 'Raw milk, 2 tankers' }),
+  sched('RECV-k1', 'PLANT_RECEIVING', '2026-10-09', KEYSTONE, { pickupTime: '10:00', scheduleType: 'CARRIER', carrier: true, poNumber: 'K-2290', cases: '40', product: 'Gallon cartons' }),
+  { record_id: 'SUP-m1', facility_id: 'fac_uniontown', business_date: '2026-10-02', record_type: 'PLANT_SUPPLIER', route_id: 'SUP-m1', run_id: 'SUP-m1', route: 'S06', run: 'MOUNTAIN STATE SUGAR', status: 'ACTIVE',
+    area: 'RECEIVING', notes: 'Mountain Sugar', payload_json: '{}', recorded_at: '2026-10-02T12:00:00Z' }
+];
+
 const WASH_HEADERS = ['record_id', 'facility_id', 'service_date', 'source_type', 'status', 'unit_number', 'equipment_type', 'wash_reason', 'notes', 'opened_at', 'completed_at'];
 const WASH = [
   { record_id: 'wash_d1', service_date: PLANT_DATE, status: 'OPEN', unit_number: 'T-951', equipment_type: 'TRAILER', wash_reason: 'Trailer cleaning requested' },
@@ -85,11 +119,12 @@ function plantSheets() {
     "'LIVE CURRENT WEEK'": plantWeek(),
     "'LIVE PLANT OPERATIONS'": D.table(['pickup_id', 'facility_id', 'service_date', 'route_id', 'run_id', 'route', 'run', 'operation_type', 'item', 'quantity', 'pickup_location', 'notes', 'status',
       'manager_acknowledged', 'created_at', 'created_by', 'updated_at', 'updated_by', 'completed_at', 'completed_by'], PICKUPS),
-    "'PLANT_OPERATIONS'": D.table(JOURNAL_HEADERS, JOURNAL),
+    "'PLANT_OPERATIONS'": D.table(JOURNAL_HEADERS, JOURNAL.concat(SCHEDULE)),
+    "'ROUTES_MASTER'": D.table([...new Set(D.ROUTES.concat(CUSTOMERS).flatMap(r => Object.keys(r)).concat(CUSTOMER_HEADERS))], D.ROUTES.concat(CUSTOMERS)),
     "'WASH / CLEANING LIVE'": D.table(WASH_HEADERS, WASH),
     "'REFUSALS / RETURNS LIVE'": D.table(RETURN_HEADERS, RETURNS)
   });
 }
 const PLANT_SOURCES = Object.assign({}, D.SOURCES, { live: Object.assign({}, D.SOURCES.live, { plant: true }), plant: { pickups: { spreadsheetId: 'fake-plant', tab: 'LIVE PLANT OPERATIONS' } } });
 
-module.exports = { PLANT_DATE, LOADS, plantSheets, PLANT_SOURCES };
+module.exports = { PLANT_DATE, LOADS, plantSheets, PLANT_SOURCES, CUSTOMERS, SCHEDULE };
