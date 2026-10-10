@@ -74,7 +74,7 @@
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
-    const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // the Route Master's own order
+    const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']; // Joe 10/10: every week runs Sunday to Saturday
     const NAME = (p) => L.DAY_NAMES[L.DAYS.indexOf(p)];
     const LOADOUT = ['None', 'Case Loadout', 'Tote', 'Boxing', 'Tanker'];
     const RUN_BY = ['Uniontown', 'Fairmont', 'Marietta', 'Charleston', 'Carrier', 'Anyone'];
