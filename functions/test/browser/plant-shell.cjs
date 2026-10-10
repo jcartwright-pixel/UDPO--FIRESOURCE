@@ -50,24 +50,30 @@ const SCREENS = [
   const browser = await chromium.launch();
   const results = [];
   try {
-    // The Plant Operations side (Joe 10/10): only section names in the menu, like Dispatch and Drivers on the Distribution
-    // side; each section's screens open beside it, and together they reach all 11 plant screens. No screen keeps a menu of its own.
+    // The Plant Operations side (Joe 10/10): its name opens the Manager Center cards; the menu lists the cards in the same
+    // order, a card with more than one area opens its screens beside it, and together they reach all 11 plant screens.
     const side = await openPage(browser, 1920, 950, '/manager.html' + MANAGER);
     await side.waitForSelector('#screen:not([hidden])');
-    assert.deepEqual(await side.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)),
-      ['Departments', 'Scheduler', 'Yard Checks', 'Quality', 'Coolers', 'Shift Notes', 'Manager Center']);
+    assert.equal(await side.getAttribute('.sidemenu a.side-name', 'href'), 'manager.html', 'Plant Operations opens Manager Center');
+    assert.ok(await side.$('.sidemenu a.side-name.on'), 'Manager Center is the Plant Operations screen');
+    assert.deepEqual(await side.$$eval('.sidemenu > a:not(.side-name):not(#go-home), .sidemenu > .side-sec > .side-sec-btn', x => x.map(e => e.textContent.replace(/[\u25b8]/g, '').trim())),
+      ['Send Report', 'Yard Checks', 'Plant Operations Scheduler', 'Plant Distribution Departments', 'Quality Checks', 'Cooler Temperature', 'Shift Notes']);
     const hrefs = await side.$$eval('.sidemenu a[href], .side-flyouts a[href]', a => a.map(x => x.getAttribute('href').split(/[?#]/)[0]));
     for (const [page] of SCREENS) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Operations side menu: ' + JSON.stringify(hrefs));
     assert.equal(await side.$('.mc-menu, aside'), null, 'Manager Center has no menu of its own');
     const grid = await side.$eval('#grid', g => g.getBoundingClientRect().left - document.querySelector('.sidemenu').getBoundingClientRect().right);
     assert.ok(grid < 40, 'the Manager Center cards start right beside the side menu: ' + grid);
-    await side.hover('.sidemenu .side-sec.on .side-sec-btn');
+    // The report card runs the full height of the left column; the other six cards share the two columns on the right.
+    const boxes = await side.$$eval('#grid > .mc-card', c => c.map(x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.bottom)]; }));
+    assert.ok(boxes.slice(1).every(b => b[0] > boxes[0][0]), 'every other card is right of the report card ' + JSON.stringify(boxes));
+    assert.ok(Math.abs(boxes[0][2] - Math.max(...boxes.map(b => b[2]))) <= 2 && Math.abs(boxes[0][1] - boxes[1][1]) <= 2, 'the report card is as tall as the three rows ' + JSON.stringify(boxes));
+    await side.hover('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]');
     await side.waitForSelector('.side-flyouts .flyout.open');
-    assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Manager Center', 'Send Current Report']);
-    if (process.env.SHOTS_DIR) await side.screenshot({ path: path.join(process.env.SHOTS_DIR, 'plant-menu-shell-check-1920.png') });
-    await Promise.all([side.waitForURL(/report=1/), side.click('.side-flyouts .flyout.open a[href="manager.html?report=1"]')]);
+    assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Plant Departments', 'Loadout Center', 'Unloading & Washing', 'Product Returns', 'Truck Washing']);
+    await side.mouse.move(1500, 900);
+    await Promise.all([side.waitForURL(/report=1/), side.click('.sidemenu a[href="manager.html?report=1"]')]);
     await side.waitForSelector('#modal:not([hidden])');
-    assert.ok(await side.isVisible('#rp-subject'), 'Send Current Report in the menu opens the full report');
+    assert.ok(await side.isVisible('#rp-subject'), 'Send Report in the menu opens the full report');
     await side.close();
     results.push('Plant Operations side reaches all 11 plant screens, Manager Center included');
 

@@ -136,8 +136,16 @@
         ['Breakdowns', r.counts.down, r.counts.down ? 'bad' : ''], ['Lines down', r.counts.linesDown, r.counts.linesDown ? 'bad' : ''], ['Temps out', r.counts.tempsOut, r.counts.tempsOut ? 'bad' : '']]
         .map(([l, n, k]) => '<span class="' + k + '"><b>' + escapeHtml(String(n)) + '</b> ' + l + '</span>').join('');
       const next = r.behind.concat(r.nextUp);
-      document.getElementById('pv-list').innerHTML = next.slice(0, 6).map(z => '<span class="' + (z.late ? 'bad' : '') + '"><b>' + escapeHtml(U.reportName(z)) + '</b> ' + escapeHtml((z.depart ? 'depart ' + z.depart + ' · ' : '') + U.statusWord(z.status) + (z.late ? ' · ' + z.late : '')) + '</span>').join('') +
-        (next.length > 6 ? '<span class="more">+ ' + (next.length - 6) + ' more still to load</span>' : '') + (next.length ? '' : '<span class="good">Every load is done.</span>');
+      // Joe 10/10: the tall report card previews the email: every route in brief, then the rest of the email body.
+      const rt = (z, k, word) => '<span class="mc-rt ' + k + '"><b>' + escapeHtml(U.reportName(z)) + '</b><em>' + escapeHtml(z.depart ? 'depart ' + z.depart : '') + '</em><i>' + escapeHtml(word) + '</i></span>';
+      const part = (title, n, items, empty, bad) => '<span class="mc-pvh' + (bad && n ? ' bad' : '') + '">' + escapeHtml(title) + '<em>' + escapeHtml(String(n)) + '</em></span>' + (items.length ? items.join('') : '<span class="mc-pvnone">' + escapeHtml(empty) + '</span>');
+      const line = (a, b, k) => '<span class="mc-pvrow ' + (k || '') + '"><b>' + escapeHtml(a) + '</b> ' + escapeHtml(b) + '</span>';
+      document.getElementById('pv-list').innerHTML =
+        part('Routes', (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded', r.behind.map(z => rt(z, 'bad', 'BEHIND' + (z.late ? ' · ' + z.late : ''))).concat(r.nextUp.map(z => rt(z, 'no', U.statusWord(z.status)))).concat(r.loaded.map(z => rt(z, 'ok', 'LOADED'))), 'No loads on the dispatch sheet for this day.') +
+        part('Pickups open', r.pickups.length, r.pickups.map(p => line('PICKUP ' + [p.route, p.run].filter(Boolean).join(' '), [p.quantity, p.product].filter(Boolean).join(' '), 'bad')), 'None open.', true) +
+        part('Plant breakdowns', r.down.length, r.down.map(d => line(d.equipment || 'Plant equipment', [d.entry, d.at ? 'logged ' + d.at : ''].filter(Boolean).join(' · '), 'bad')), 'None open.', true) +
+        part('Production lines', r.counts.linesDown ? r.counts.linesDown + ' down' : 'all running', r.lines.map(l => line(l.line, [l.product, l.status || 'no status'].filter(Boolean).join(' · '), l.flag ? 'bad' : '')), 'No production lines set up.', true) +
+        part('Temperatures', r.counts.tempsOut ? r.counts.tempsOut + ' out' : 'all in range', r.temperatures.map(t => line(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status), t.flag ? 'bad' : t.due ? 'warn' : '')), 'No temperature locations set up.', true);
       ['send-card', 'send'].forEach(id => { document.getElementById(id).hidden = !canSend(); });
       if (!document.getElementById('modal').hidden) drawReport();
       const st = L.screenState(app, 'plant');
