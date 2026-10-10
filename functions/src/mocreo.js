@@ -137,7 +137,9 @@ async function runMocreoSync({ db, getSecrets, fetchFn, now = () => new Date() }
   let s;
   try { s = await getSecrets(); } catch (e) { await statusRef.set({ configured: false, lastAttempt: at, lastError: 'Could not read the MOCREO settings: ' + e.message }, { merge: true }); return { ok: false }; }
   if (s.missing || s.denied || s.untested) {
-    const why = s.untested ? 'The saved MOCREO key has not passed Test Connection yet; readings are manual.' : s.missing ? 'No MOCREO key saved yet; readings are manual.' : 'The server may not read ' + s.denied + ' (needs Secret Manager Secret Accessor).';
+    // Secret Manager is only a fallback (Joe pastes the key in Administration), so a secret the server may not read means
+    // the same to him as no key: nothing to fix on his side.
+    const why = s.untested ? 'The saved MOCREO key has not passed Test Connection yet; readings are manual.' : 'No MOCREO key saved yet; readings are manual.';
     await statusRef.set({ configured: false, lastAttempt: at, lastError: why }, { merge: true });
     return { ok: false, waiting: true };
   }
