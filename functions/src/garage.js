@@ -15,6 +15,13 @@
  * once the office sent it to the garage (its notes say "Sent to garage"): the lessor repairs the others. Work orders made
  * here stay in the new app (ids WO-...); a safe Done marks the write-up repaired the same way Equipment Issues' Mark
  * Repaired does (queued for the sandbox sheet when the write-back is on) and moves Fleet Service's due dates.
+ *
+ * Joe 10/10 evening: the tablet opens straight to the open work orders (`board`, no sign-in), fork truck / pallet jack
+ * write-ups included (FORK TRUCK LIVE, the check-in's pallet jack line). A mechanic taps a work order, then their name and
+ * login ID, and Starts: each mechanic has their own clock on the job (`labor` on the work order, `garageClocks` per
+ * mechanic), a second mechanic joins with Add another mechanic. One mechanic, one job: starting another job stops their
+ * clock on the first, which stays open. Need Parts and Complete stop every clock; only Complete (name + login ID, what
+ * was fixed, safe to drive, signature) closes the work order and records who completed it and the labour per mechanic.
  */
 'use strict';
 
@@ -37,7 +44,10 @@ const G = Object.freeze({
   MAX_TECHS: 2, SESSION_MS: 30 * 60000, SIGNATURE_MAX: 30000, TECH_FAILS: 5, TECH_LOCK_MS: 5 * 60000, STATION_FAILS_PER_MINUTE: 30,
   GARAGE_MARK: 'Sent to garage'
 });
-const WORK_ORDERS = 'workOrders', TECHS = 'garageTechs', LOGINS = 'garageLogins', SESSIONS = 'garageSessions', LOCKS = 'garageLocks';
+const WORK_ORDERS = 'workOrders', TECHS = 'garageTechs', LOGINS = 'garageLogins', SESSIONS = 'garageSessions', LOCKS = 'garageLocks', CLOCKS = 'garageClocks';
+// The write-up queues the garage works from, as the job key's first part (Equipment Issues' TRUCK / TRAILER / FORK_TRUCK).
+const KIND_KEYS = Object.freeze({ TRUCK: 'trucks', TRAILER: 'trailers', FORK_TRUCK: 'forks' });
+const KEY_KINDS = Object.freeze({ trucks: 'TRUCK', trailers: 'TRAILER', forks: 'FORK_TRUCK' });
 const SIGN_IN_REQUIRED = 'Tap your name and enter your login ID.';
 
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
@@ -82,7 +92,7 @@ function matchUnit(units, typed) {
 // A write-up the garage can work on (desktopUiValidMaintenanceCurrent_): a real unit, a real problem, not already fixed.
 const DONE_STATUS = /^(COMPLETE|COMPLETED|CLOSED|RESOLVED|REPAIRED|REMOVED)$/i;
 function realWriteUp(r) {
-  const unit = text(r.truck_number || r.truck_id || r.trailer_number || r.trailer_id).toUpperCase(), problem = text(r.issue_details || r.notes, 4000), status = text(r.status || 'OPEN').toUpperCase();
+  const unit = text(rawUnit(r)).toUpperCase(), problem = text(r.issue_details || r.notes, 4000), status = text(r.status || 'OPEN').toUpperCase();
   if (!r.record_id || DONE_STATUS.test(status) || /REPAIRED|RESOLVED|COMPLETE|CLOSED|ADDRESSED/.test(status) || yes(r.addressed)) return false;
   if (!unit || /^(REVIEW|UNKNOWN|N\/A|NONE|-+)$/.test(unit)) return false;
   if (!problem || L.noWriteUp(problem) || /^(ISSUE REPORTED|NEEDS DETAIL|NEEDS REVIEW)/i.test(problem) || /^(NO ISSUES?|NONE|N\/A)$/i.test(problem)) return false;
@@ -90,15 +100,31 @@ function realWriteUp(r) {
   if (/\b(reported working|now working|is working|works now)\b/i.test(problem) && !/\b(not working|stops working)\b/i.test(problem)) return false;
   return true;
 }
+function rawUnit(r) { return r.truck_number || r.truck_id || r.trailer_number || r.trailer_id || r.unit_number || r.equipment_id || ''; }
+// Where a write-up came from, for the tablet: the driver's DVIR, the driver's check-in, or Equipment Issues (the sheet).
+function writeUpFrom(r) {
+  const notes = String(r.notes || '');
+  if (/source: DVIR/i.test(notes)) return 'DVIR';
+  if (/check-in/i.test(notes) || r.source_type === 'ROUTE_APP') return 'Driver check-in';
+  return 'Equipment Issues';
+}
 const canRunGuess = (s) => !/OUT OF SERVICE|\bOOS\b|CAN.?T RUN|DOWN/i.test(String(s || ''));
-const writeUpKey = (r) => (String(r.kind).toUpperCase() === 'TRAILER' ? 'trailers' : 'trucks') + '|' + r.record_id;
+const writeUpKey = (r) => (KIND_KEYS[String(r.kind).toUpperCase()] || 'trucks') + '|' + r.record_id;
+const unitType = (v) => { const t = String(v || '').toUpperCase(); return t === 'TRAILER' || t === 'FORK_TRUCK' ? t : 'TRUCK'; };
+const FROM = { OFFICE: 'Office (Fleet Service)', TECH: 'Garage', WRITE_UP: 'Equipment Issues' };
+// A work order's labour: one entry per mechanic per clock (start, end, minutes); an open one has no end yet.
+const laborOf = (o) => (Array.isArray(o.labor) ? o.labor : []).filter(s => s && s.tech_id).map(s => ({ tech_id: String(s.tech_id), name: String(s.name || ''), start: String(s.start || ''), end: String(s.end || ''), minutes: Number(s.minutes) || 0 }));
 
 // One job as the tablet shows it (udpoV7276Job_).
 function jobOf(o) {
-  return { id: o.work_order_id, unit: o.unit || '', type: String(o.unit_type || '').toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK', problem: o.problem || '', category: o.category || '',
+  const labor = laborOf(o);
+  return { id: o.work_order_id, unit: o.unit || '', type: unitType(o.unit_type), problem: o.problem || '', category: o.category || '',
     canRun: o.can_run === undefined || o.can_run === '' ? true : yes(o.can_run), source: String(o.source || '').toUpperCase(), serviceKey: o.service_key || '', status: String(o.status || 'NEW').toUpperCase(),
     techs: String(o.techs || '').split(/\s*,\s*/).filter(Boolean), startedAt: o.started_at || '', partsAt: o.parts_at || '', completedAt: o.completed_at || '', createdAt: o.created_at || '', createdBy: o.created_by || '',
-    fixed: o.fixed || '', fixedNote: o.fixed_note || '', safe: o.safe || '', signedBy: o.signed_by || '', minutes: o.minutes || '' };
+    fixed: o.fixed || '', fixedNote: o.fixed_note || '', safe: o.safe || '', signedBy: o.signed_by || '', minutes: o.minutes || '',
+    from: o.source_from || FROM[String(o.source || '').toUpperCase()] || '', completedBy: o.completed_by || '',
+    onNow: labor.filter(s => !s.end).map(s => ({ id: s.tech_id, name: s.name, since: s.start })), labor: labor.filter(s => s.end).map(s => ({ id: s.tech_id, name: s.name, minutes: s.minutes })),
+    laborMinutes: labor.reduce((n, s) => n + (s.end ? s.minutes : 0), 0) };
 }
 
 // The hub list (udpoV7276GarageList_ + udpoV7276OrderJobs_): open work orders, then write-ups with no work order yet.
@@ -111,13 +137,14 @@ function garageJobs(orders, records, units) {
   const jobs = mine.filter(o => String(o.status || '').toUpperCase() !== 'DONE').map(jobOf);
   (records || []).forEach(r => {
     const kind = String(r.kind || '').toUpperCase();
-    if ((kind !== 'TRUCK' && kind !== 'TRAILER') || !realWriteUp(r) || linked[writeUpKey(r)]) return;
-    const raw = text(r.truck_number || r.truck_id || r.trailer_number || r.trailer_id), unit = byUnit[alnum(raw)] || byUnit[alnum(raw).replace(/^T/, '')];
+    if (!KIND_KEYS[kind] || !realWriteUp(r) || linked[writeUpKey(r)]) return;
+    const raw = text(rawUnit(r)), unit = kind === 'FORK_TRUCK' ? null : byUnit[alnum(raw)] || byUnit[alnum(raw).replace(/^T/, '')];
     // A leased unit's write-up goes to the lessor unless the office sent it to our garage.
     if (unit && unit.leased && String(r.notes || '').indexOf(G.GARAGE_MARK) < 0) return;
     const problem = text(r.issue_details || r.notes, 300);
     jobs.push({ id: '', writeUp: writeUpKey(r), unit: unit ? unit.unit : unitText(raw, kind), type: kind, problem, category: '', canRun: canRunGuess(problem + ' ' + (r.priority || '')),
-      source: 'WRITE_UP', serviceKey: '', status: 'NEW', techs: [], startedAt: '', createdAt: String(r.opened_at || r.service_date || ''), driver: r.driver || '' });
+      source: 'WRITE_UP', serviceKey: '', status: 'NEW', techs: [], startedAt: '', createdAt: String(r.opened_at || r.service_date || ''), driver: r.driver || '',
+      from: writeUpFrom(r), onNow: [], labor: [], laborMinutes: 0, completedBy: '' });
   });
   const rank = (j) => j.status === 'PARTS' ? 4 : !j.canRun ? 0 : j.status === 'WORKING' ? 1 : j.source === 'OFFICE' ? 3 : 2;
   return jobs.sort((a, b) => rank(a) - rank(b) || String(a.createdAt).localeCompare(String(b.createdAt)));
@@ -187,15 +214,32 @@ async function read(db, input, nowMs) {
     renew((ref, data) => batch.update(ref, data), people, nowMs);
     await batch.commit();
     const orders = (await db.collection(WORK_ORDERS).get()).docs.map(d => d.data());
-    const records = (await db.collection(C.maintenance).where('kind', 'in', ['TRUCK', 'TRAILER']).get()).docs.map(d => d.data());
+    const records = (await db.collection(C.maintenance).where('kind', 'in', Object.keys(KIND_KEYS)).get()).docs.map(d => d.data());
     jobs = garageJobs(orders, records, units);
   }
   return { techs, signedIn: people.map(p => ({ token: p.token, id: p.id, name: p.name })), jobs, units: units.map(u => u.unit), categories: G.CATEGORIES, fixes: G.FIXES };
 }
 
+/*
+ * The tablet's first screen (Joe 10/10): every open work order and write-up, with no sign-in, and each mechanic with the
+ * job their clock is on. The drivers' names stay off it (anyone can open the page); the steps still need a login ID.
+ */
+async function board(db, nowMs) {
+  const techs = activeTechs((await db.collection(TECHS).get()).docs.map(d => d.data()));
+  const units = garageUnits((await db.collection(C.equipment).get()).docs.map(d => d.data()));
+  const orders = (await db.collection(WORK_ORDERS).get()).docs.map(d => d.data());
+  const records = (await db.collection(C.maintenance).where('kind', 'in', Object.keys(KIND_KEYS)).get()).docs.map(d => d.data());
+  const clocks = {};
+  (await db.collection(CLOCKS).get()).docs.forEach(d => { const c = d.data(); if (c.techId) clocks[c.techId] = c; });
+  const jobs = garageJobs(orders, records, units).map(j => { const c = Object.assign({}, j); delete c.driver; return c; });
+  const open = {}; jobs.forEach(j => { if (j.id) open[j.id] = j; });
+  return { techs: techs.map(t => { const c = clocks[t.id], j = c && open[c.workOrderId]; return Object.assign({}, t, { on: j ? { id: j.id, unit: j.unit, since: c.since } : null }); }),
+    jobs, units: units.map(u => u.unit), categories: G.CATEGORIES, fixes: G.FIXES, now: new Date(nowMs).toISOString() };
+}
+
 /* ---------- the job steps ---------- */
 
-const OPS = ['START', 'HELPER', 'PARTS', 'RESUME', 'DONE', 'REPORT'];
+const OPS = ['START', 'HELPER', 'PARTS', 'RESUME', 'STOP', 'DONE', 'REPORT'];
 function validateStep(input) {
   const op = text(input.step, 10).toUpperCase();
   if (OPS.indexOf(op) < 0) throw SaveErr('BAD_REQUEST', 'Garage: unknown step ' + (op || '(none)') + '.');
@@ -211,7 +255,7 @@ function validateStep(input) {
     out.problem = text(input.problem, 300);
     return out;
   }
-  if (!out.id && !(op === 'START' && /^(trucks|trailers)\|.+/.test(out.writeUp))) throw SaveErr('BAD_REQUEST', 'That job is not on the list any more. Go back to Jobs.');
+  if (!out.id && !(op === 'START' && /^(trucks|trailers|forks)\|.+/.test(out.writeUp))) throw SaveErr('BAD_REQUEST', 'That job is not on the list any more. Go back to Jobs.');
   if (op === 'DONE') {
     out.fixed = text(input.fixed, 40);
     if (G.FIXES.indexOf(out.fixed) < 0) throw SaveErr('BAD_REQUEST', 'Tap what you fixed.');
@@ -270,9 +314,9 @@ async function step(db, input, nowMs) {
       if (hit) { ref = hit.ref; order = hit.data(); }
       else {
         if (!w.exists || !realWriteUp(w.data())) throw SaveErr('NOT_FOUND', 'That write-up was already fixed or removed.');
-        const r = w.data(), id = newOrderId(), kind = kindName === 'trailers' ? 'TRAILER' : 'TRUCK', problem = text(r.issue_details || r.notes, 300);
+        const r = w.data(), id = newOrderId(), kind = KEY_KINDS[kindName] || 'TRUCK', problem = text(r.issue_details || r.notes, 300);
         ref = db.collection(WORK_ORDERS).doc(docId(id));
-        order = { work_order_id: id, facility_id: FACILITY, unit: unitText(r.truck_number || r.truck_id || r.trailer_number || r.trailer_id, kind), unit_type: kind, problem, category: '',
+        order = { work_order_id: id, facility_id: FACILITY, unit: kind === 'FORK_TRUCK' ? text(rawUnit(r), 20).toUpperCase() : unitText(rawUnit(r), kind), unit_type: kind, problem, category: '', source_from: writeUpFrom(r),
           can_run: canRunGuess(problem + ' ' + (r.priority || '')) ? 'YES' : 'NO', source: 'WRITE_UP', source_kind: kindName, source_id: recordId, service_key: '', status: 'NEW',
           created_at: String(r.opened_at || r.service_date || stamp), created_by: text(r.driver, 60) || 'Write-up', started_at: '', techs: '', parts_at: '', fixed: '', fixed_note: '', safe: '',
           signed_by: '', signature: '', completed_at: '', minutes: '', odometer: '', updated_at: stamp, updated_by: by, version: 0, createdInApp: true, isNew: true };
@@ -285,7 +329,7 @@ async function step(db, input, nowMs) {
     let odometer = null, setupRef = null, setup = null;
     if (req.op === 'DONE' && req.safe) {
       if (order.source_id && !writeUp) { writeUpRef = db.collection(C.maintenance).doc(MAINT.docId(order.source_id)); const w = await tx.get(writeUpRef); writeUp = w.exists ? w.data() : null; }
-      if (String(order.unit_type).toUpperCase() !== 'TRAILER') {
+      if (unitType(order.unit_type) === 'TRUCK') {
         const odo = (await tx.get(db.collection('odometers').where('unit', '==', String(order.unit).toUpperCase().replace(/\s+/g, '')))).docs.map(d => d.data());
         odo.sort((a, b) => String(b.at || b.date).localeCompare(String(a.at || a.date)));
         odometer = odo.length ? odo[0].miles : null;
@@ -293,8 +337,48 @@ async function step(db, input, nowMs) {
       if (G.SERVICES[order.service_key]) { setupRef = db.collection('fleetSetup').doc(docId(order.unit)); const s = await tx.get(setupRef); setup = s.exists ? s.data() : null; }
     }
 
+    // The clocks: each signed-in mechanic's own (one job at a time), and every clock still running on this job.
+    const thisId = order.work_order_id, labor = laborOf(order);
+    const clockIds = people.map(p => p.id).concat(labor.filter(s => !s.end).map(s => s.tech_id)).filter((v, i, a) => a.indexOf(v) === i);
+    const clockRefs = clockIds.map(id => db.collection(CLOCKS).doc(docId(id)));
+    const clockSnaps = clockRefs.length ? await tx.getAll(...clockRefs) : [];
+    const clocks = {}; clockSnaps.forEach((s, i) => { clocks[clockIds[i]] = { ref: clockRefs[i], data: s.exists ? s.data() : null }; });
+    const starting = ['START', 'HELPER', 'RESUME'].indexOf(req.op) >= 0;
+    const elsewhere = starting ? people.map(p => clocks[p.id].data).filter(c => c && c.workOrderId && c.workOrderId !== thisId) : [];
+    const otherIds = elsewhere.map(c => c.workOrderId).filter((v, i, a) => a.indexOf(v) === i);
+    const otherRefs = otherIds.map(id => db.collection(WORK_ORDERS).doc(docId(id)));
+    const otherSnaps = otherRefs.length ? await tx.getAll(...otherRefs) : [];
+
+    const minutesFrom = (iso) => Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000)) || 0;
+    const closeClock = (list, techId) => list.forEach(s => { if (s.tech_id === techId && !s.end) { s.end = stamp; s.minutes = minutesFrom(s.start); } });
+    const laborFields = (list) => ({ labor: list, on_now: joinNames(list.filter(s => !s.end).map(s => s.name)), labor_minutes: list.reduce((n, s) => n + (s.end ? s.minutes : 0), 0) });
+    const clockWrites = [];
+    if (starting) {
+      people.forEach(p => {
+        if (labor.some(s => s.tech_id === p.id && !s.end)) return;
+        labor.push({ tech_id: p.id, name: p.name, start: stamp, end: '', minutes: 0 });
+        clockWrites.push(['set', clocks[p.id].ref, { techId: p.id, name: p.name, workOrderId: thisId, unit: order.unit || '', since: stamp }]);
+      });
+      // One mechanic, one job: their clock on another job stops; that job stays open.
+      otherSnaps.forEach((s, i) => {
+        if (!s.exists) return;
+        const list = laborOf(s.data()), moving = people.filter(p => clocks[p.id].data && clocks[p.id].data.workOrderId === otherIds[i]);
+        moving.forEach(p => closeClock(list, p.id));
+        clockWrites.push(['update', otherRefs[i], Object.assign(laborFields(list), { updated_at: stamp, updated_by: by, testEdited: true, editedAt: stamp })]);
+        result.stoppedOn = (result.stoppedOn || []).concat(String(s.data().unit || otherIds[i]));
+      });
+    } else if (req.op === 'STOP' || req.op === 'PARTS' || (req.op === 'DONE' && req.safe)) {
+      const who = req.op === 'STOP' ? people.map(p => p.id) : labor.filter(s => !s.end).map(s => s.tech_id);
+      who.forEach(id => {
+        closeClock(labor, id);
+        const c = clocks[id] && clocks[id].data;
+        if (c && c.workOrderId === thisId) clockWrites.push(['delete', clocks[id].ref]);
+      });
+    }
+
     const was = String(order.status || 'NEW').toUpperCase(), techs = String(order.techs || '').split(/\s*,\s*/).filter(Boolean);
-    const change = { techs: joinNames(techs.concat(names)), started_at: order.started_at || stamp, updated_at: stamp, updated_by: by, version: (Number(order.version) || 0) + 1 };
+    const change = Object.assign({ techs: joinNames(techs.concat(names)), started_at: order.started_at || stamp, updated_at: stamp, updated_by: by, version: (Number(order.version) || 0) + 1 }, laborFields(labor));
+    if (req.op === 'STOP' && was === 'NEW') change.status = 'WORKING';
     if (req.op === 'START' || req.op === 'HELPER') change.status = was === 'PARTS' ? 'PARTS' : 'WORKING';
     if (req.op === 'PARTS') Object.assign(change, { status: 'PARTS', parts_at: stamp });
     if (req.op === 'RESUME') change.status = 'WORKING';
@@ -302,7 +386,7 @@ async function step(db, input, nowMs) {
       Object.assign(change, { fixed: req.fixed, fixed_note: req.note, safe: req.safe ? 'YES' : 'NO', signed_by: names[0], signature: req.signature });
       if (!req.safe) Object.assign(change, { status: 'WORKING', can_run: 'NO' });
       else {
-        Object.assign(change, { status: 'DONE', completed_at: stamp, can_run: 'YES', minutes: Math.max(0, Math.round((nowMs - Date.parse(change.started_at)) / 60000)) || 0 });
+        Object.assign(change, { status: 'DONE', completed_at: stamp, completed_by: names[0], can_run: 'YES', minutes: Math.max(0, Math.round((nowMs - Date.parse(change.started_at)) / 60000)) || 0 });
         if (odometer) change.odometer = odometer;
       }
     }
@@ -310,6 +394,7 @@ async function step(db, input, nowMs) {
     delete after.isNew;
     if (order.isNew) tx.set(ref, after); else tx.update(ref, Object.assign({}, change, { testEdited: true, editedAt: stamp }));
     renew((r, d) => tx.update(r, d), people, nowMs);
+    clockWrites.forEach(([kind, r, d]) => { if (kind === 'delete') tx.delete(r); else if (kind === 'set') tx.set(r, d); else tx.update(r, d); });
 
     if (req.op === 'DONE' && req.safe) {
       // The write-up is repaired (Equipment Issues' Mark Repaired), and Fleet Service's dates move on.
@@ -370,6 +455,7 @@ async function garageCall(db, input, now) {
   input = input || {};
   const nowMs = (now ? now() : new Date()).getTime(), op = String(input.op || '');
   if (op === 'read') return read(db, input, nowMs);
+  if (op === 'board') return board(db, nowMs);
   if (op === 'signIn') return signIn(db, input, nowMs);
   if (op === 'signOut') {
     // Sign Out ends the sign-in on the server too (the current app left it alive until it ran out).
