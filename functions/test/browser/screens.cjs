@@ -801,6 +801,20 @@ async function noScroll(page) {
       await one.close();
     }
     results.push('Route Editor (one run): Order and Day Notes per day, "none set" for a blank unit default, square tiles in one row at both sizes');
+    // Joe 10/10: the Route Days action buttons sit together in one neat row, all the same size, not split left and right.
+    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+      const rd = await openPage(browser, w, h, '/routes.html?testEmail=manager.test@uniteddairy.com');
+      await rd.waitForSelector('table.routes tr[data-id="run_t801"]');
+      for (const v of ['days', 'seq', 'rules']) {
+        await rd.selectOption('#view-select', v);
+        const row = await rd.$$eval('.actions.tiles > button, .actions.tiles > a.button', b => b.map(x => { const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right) }; }));
+        assert.equal(row.length, 5);
+        assert.ok(row.every((t, i) => t.w === row[0].w && t.h === row[0].h && t.top === row[0].top && (i === 0 || t.left - row[i - 1].right <= 12)), 'Route Days ' + v + ' buttons in one even row at ' + w + ': ' + JSON.stringify(row));
+      }
+      assert.deepEqual(rd.errors, []);
+      await rd.close();
+    }
+    results.push('Route Days: Refresh, Add Route, Add Run, Holiday Week Editor and Dispatch Administration sit together in one even row at both sizes');
     // Joe 10/10: an Administration section holds Dispatch Administration; Driver Weekly Template is under Drivers only.
     const mp = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
     await mp.waitForSelector('.side-flyouts .flyout', { state: 'attached' });

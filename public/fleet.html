@@ -96,7 +96,7 @@
         const o = open(), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
           [o.filter(x => String(x.source).toUpperCase() === 'OFFICE').length, 'Sent from office'], [week.length, 'Finished · last 7 days', 'good'], [Math.round(mins / 6) / 10, 'Mechanic hours · 7 days']]);
-        bar.innerHTML = '<a class="button" href="garage.html">Garage Work Orders</a><span class="spacer"></span><a class="button" href="' + CURRENT_APP + 'garage-station">Garage Station</a>';
+        bar.innerHTML = '<span class="spacer"></span><a class="button" href="garage.html">Garage Work Orders</a><a class="button" href="' + CURRENT_APP + 'garage-station">Garage Station</a>';
         sheet.innerHTML = '<div class="fleet-split"><div><h2>Open Work Orders</h2>' + table([14, 12, 34, 14, 12, 14], ['#', 'Unit', "What's wrong", 'Came from', 'Tech', 'Status'],
           o.map(x => '<tr><td class="strong">' + escapeHtml(x.work_order_id) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(x.source || '') +
             '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + pill(JOB[String(x.status).toUpperCase()] || [x.status, 'no']) + '</td></tr>').join(''), 'No open work orders.') +

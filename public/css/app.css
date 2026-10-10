@@ -929,10 +929,10 @@ td.eq-day span { display: block; white-space: nowrap; }
 .actions.tiles { flex-wrap: nowrap; align-items: center; gap: 6px; }
 .actions.tiles > button, .actions.tiles > a.button {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
-  width: auto; min-width: 92px; max-width: 116px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px;
+  width: 116px; min-width: 116px; max-width: 116px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px;
   white-space: normal; line-height: 1.12; font-size: 13px; font-weight: 800; text-align: center; overflow-wrap: normal; hyphens: none;
 }
-@media (max-width: 1500px) { .actions.tiles > button, .actions.tiles > a.button { min-width: 82px; font-size: 12px; } }
+@media (max-width: 1500px) { .actions.tiles > button, .actions.tiles > a.button { font-size: 12px; } }
 .day-table input.dcell::placeholder { color: #9aa7b4; font-style: italic; font-weight: 400; }
 .day-table td.day-notes { min-width: 160px; }
 
