@@ -438,7 +438,7 @@
 @media (max-width: 1400px) { .temp-page .tp-copy p { display: none; } .temp-page .tp-btn { min-width: 0; } }
 /* Phone: manual checks only, as the current app's phone screen (name, manual read, notes, save); no history. */
 @media (max-width: 760px) {
-  .temp-page .head .hstats, .temp-page .head .tabs, .temp-page .head .badge-test span, .temp-page .tp-bar, .temp-page .foot { display: none !important; }
+  .temp-page .head .hstats, .temp-page .head .tabs, .temp-page .head .top-row, .temp-page .head .badge-test span, .temp-page .tp-bar, .temp-page .foot { display: none !important; }
   .temp-page #pane-current { margin: 0 6px; }
   .temp-page table.tp-table { min-width: 0 !important; width: 100% !important; }
   .temp-page table.tp-table colgroup { display: none; }
@@ -549,3 +549,12 @@
   .manager-page .mc-dhead { flex-direction: column; }
   .manager-page .mc-dacts { width: 100%; }
 }
+
+/* Shared top line (data-top) on the plant screens: Unloading has six counts beside its title, so its controls take the line
+   just under them, still one line at the top; tab groups in the top line never cut their words. */
+.unload-page .head:has(.top-row) { flex-wrap: wrap; }
+.unload-page .head .actions.in-head.top-row { flex-basis: 100%; justify-content: flex-end; }
+.plant-page .head .actions.in-head.top-row .tabs { flex: none; }
+.plant-page .head .actions.in-head.top-row .tabs button { flex: none; }
+.plant-page .head .actions.in-head.top-row .seg > button { width: auto; min-width: 0; max-width: none; height: 38px; min-height: 38px; padding: 0 12px; white-space: nowrap; font-size: 14px; }
+.sched-page .head .actions.in-head.top-row .sc-key { order: 3; }

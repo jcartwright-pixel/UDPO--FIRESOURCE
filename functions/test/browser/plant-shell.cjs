@@ -33,14 +33,14 @@ async function openPage(browser, width, height, url) {
 const SCREENS = [
   ['plant.html', null],
   ['loadout.html', null],
-  ['unloading.html', '.uw-tabrow', ['[data-mode="check"]', '[data-mode="view"]', '#tabs']],
+  ['unloading.html', '.head', ['[data-mode="check"]', '[data-mode="view"]', '#tabs']],
   ['returns.html', '.head', ['[data-mode="check"]', '[data-mode="view"]']],
   ['washing.html', null],
-  ['scheduler.html', '.sc-ctrl', ['#add', '[data-lane="SHIPPING"]', '[data-view="week"]', '#pick']],
+  ['scheduler.html', '.head', ['#add', '[data-lane="SHIPPING"]', '[data-view="week"]', '#pick']],
   ['yard.html', '.head', ['[data-pane="current"]', '#refresh']],
   ['quality.html', null],
   ['shiftnotes.html', null],
-  ['temps.html', '#bar', ['[data-pane="current"]', '#refresh', '[data-filter="ALL"]']],
+  ['temps.html', '.head', ['[data-pane="current"]', '#refresh', '[data-filter="ALL"]']],
   ['manager.html', null]
 ];
 
@@ -71,6 +71,17 @@ const SCREENS = [
           const mids = boxes.map(b => b[1]);
           assert.ok(Math.max(...mids) - Math.min(...mids) <= 6, page + ' ' + w + ': the buttons and filters are on one line ' + JSON.stringify(boxes));
         }
+        // The shared top line (data-top): the action buttons are one even row and none is left down in the screen.
+        const tiles = await p.evaluate(() => {
+          const vis = e => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+          const head = document.querySelector('#screen .head');
+          if (!head) return { stray: [], tiles: [] };
+          const stray = [...document.querySelectorAll('#screen [data-top]')].filter(e => vis(e) && !head.contains(e)).map(e => e.id || e.className);
+          const t = [...head.querySelectorAll('.actions button, .actions a.button')].filter(b => vis(b) && !b.closest('.chips, .seg, .stepper') && !/^(prev|next)$/.test(b.id)).map(b => b.getBoundingClientRect());
+          return { stray, tiles: t.map(r => [Math.round(r.top), Math.round(r.width), Math.round(r.height)]) };
+        });
+        assert.deepEqual(tiles.stray, [], page + ': nothing marked for the top line is left in the screen');
+        assert.ok(tiles.tiles.every(t => Math.abs(t[0] - tiles.tiles[0][0]) <= 4 && t[1] === tiles.tiles[0][1] && t[2] === tiles.tiles[0][2]), page + ' ' + w + ': the action buttons are one even row ' + JSON.stringify(tiles.tiles));
         assert.deepEqual(p.errors, [], page + ' has no page errors');
         await p.close();
       }

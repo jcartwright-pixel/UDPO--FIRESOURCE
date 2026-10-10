@@ -85,8 +85,15 @@ async function shots(page, name, w) {
       throw e;
     });
     results.push('805: 25 cases typed, End pressed; it left the other screen\'s Needs Unloading list in ' + (Date.now() - t0) + ' ms');
+    // The End is two saves (the count, then the end); Start 811 only once this screen too has 805 off its list, or the
+    // one-at-a-time rule rightly refuses it. Then this screen shows 811 unloading at once and the other screen follows.
+    await dock.waitForFunction(k => !document.querySelector('tr[data-key="' + k + '"]'), DATE + '|805|UT DSD MILK', { timeout: 8000 });
     await dock.click(row('811') + ' button.clock');
-    await watcher.waitForSelector(row('811') + '.loading', { timeout: 8000 });
+    await dock.waitForSelector(row('811') + '.loading', { timeout: 8000 });
+    await watcher.waitForSelector(row('811') + '.loading', { timeout: 8000 }).catch(async e => {
+      console.error('DEBUG3', await dock.textContent('#error'), await dock.innerHTML(row('811')).catch(() => 'gone'), await watcher.innerHTML(row('811')).catch(() => 'gone'));
+      throw e;
+    });
 
     // Edit: trailer back typed as 977 is stored as T-977.
     await dock.click(row('811') + ' button.edit-row');
