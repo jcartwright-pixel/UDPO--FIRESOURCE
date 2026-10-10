@@ -3,124 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Route Distribution · New Plant Operations</title>
+  <title>Home · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
-<body>
+<body class="launch-page">
   <div class="signin" id="signin" hidden>
-    <h1>United Dairy Distribution</h1>
+    <h1>New Plant Operations</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
   </div>
-  <div id="screen" class="home-screen" hidden>
+  <div id="screen" hidden>
     <div class="topbar"><span class="who" id="who"></span><button id="signout" type="button">Sign out</button></div>
-    <div class="dtitle">
-      <div class="dtitle-wrap"><span class="dtitle-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg></span>
-        <div><h1>Route Distribution</h1><div class="dtitle-sub">Distribution operations command center</div></div></div>
-      <div class="dlive"><span id="mode-text">TEST COPY</span><span id="copied">Waiting for the first copy</span><span id="today">-</span></div>
-    </div>
+    <div class="launch-title"><h1>Uniontown Operations</h1><p>Select the department you want to open.</p><span id="today">-</span></div>
     <div class="notice error" id="error" hidden></div>
-    <div class="cards cards4">
-      <div class="card dc home4" style="--accent:#1976d2">
-        <div class="dc-head"><span class="dc-icon pic"><img src="img/library/distribution-truck-v1-560.webp" alt=""></span><span class="dc-text"><small>Daily, weekly and routes</small><strong>Dispatch</strong><em>Who drives what today and this week, and the routes behind it.</em></span></div>
-        <div class="dc-links"><a class="dc-link" href="daily.html" id="card-daily"><span>Daily Dispatch</span><span class="owner" data-owner="dailyDispatch">Current app</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="weekly.html"><span>Weekly Dispatch</span><span class="owner" data-owner="weeklyDispatch">Current app</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="routes.html"><span>Route Editor</span><span class="owner" data-owner="routes">Current app</span><i class="dc-arrow">&rarr;</i></a></div>
-        <div class="dc-metrics n4"><span class="dc-metric"><em>Today</em><b data-n="daily.loads">-</b><small>Loads</small></span><span class="dc-metric"><em>Drivers</em><b data-n="daily.needsDriver" data-alert>-</b><small>Needs driver</small></span><span class="dc-metric"><em>This Week</em><b data-n="weekly.open" data-alert>-</b><small>Open days</small></span><span class="dc-metric"><em>Routes</em><b data-n="routes.active">-</b><small>Active runs</small></span></div></div>
-      <div class="card dc home4" style="--accent:#2e7d5b">
-        <div class="dc-head"><span class="dc-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.6c2.6.2 4.4 1.9 5 5"/></svg></span><span class="dc-text"><small>Drivers and time off</small><strong>Drivers &amp; Vacations</strong><em>Roster, seniority, relief drivers and the vacation calendar.</em></span></div>
-        <div class="dc-links"><a class="dc-link" href="drivers.html"><span>Drivers</span><span class="owner" data-owner="drivers">Current app</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="vacations.html"><span>Vacation Schedule</span><span class="owner" data-owner="vacations">Current app</span><i class="dc-arrow">&rarr;</i></a></div>
-        <div class="dc-metrics n4"><span class="dc-metric"><em>Roster</em><b data-n="drivers.active">-</b><small>Active</small></span><span class="dc-metric"><em>Relief</em><b data-n="drivers.relief">-</b><small>Relief</small></span><span class="dc-metric"><em>Off Today</em><b data-n="vacation.today" data-alert>-</b><small>Vacation</small></span><span class="dc-metric"><em>Requests</em><b data-n="vacation.pending">-</b><small>Pending</small></span></div></div>
-      <div class="card dc home4" style="--accent:#526d82">
-        <div class="dc-head"><span class="dc-icon pic"><img src="img/library/maintenance-tractor-v1-560.webp" alt=""></span><span class="dc-text"><small>Trucks, trailers and fork trucks</small><strong>Equipment</strong><em>Problems drivers report at check-in, down units, and the garage work orders.</em></span></div>
-        <div class="dc-links"><a class="dc-link" href="maint.html"><span>Fleet &amp; Maintenance</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="equipment.html"><span>Equipment</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="issues.html"><span>Equipment Issues</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="garage.html"><span>Garage Work Orders</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="fleet.html"><span>Fleet Service</span><i class="dc-arrow">&rarr;</i></a></div>
-        <div class="dc-metrics n4"><span class="dc-metric"><em>Truck</em><b data-n="issues.truck" data-alert>-</b><small>Issues today</small></span><span class="dc-metric"><em>Trailer</em><b data-n="issues.trailer" data-alert>-</b><small>Issues today</small></span><span class="dc-metric"><em>Fork Truck</em><b data-n="issues.jack" data-alert>-</b><small>Issues today</small></span><span class="dc-metric"><em>Down / Out</em><b data-n="fleet.inactive" data-alert>-</b><small>Units</small></span></div></div>
-      <div class="card dc home4" style="--accent:#0b4f8a">
-        <div class="dc-head"><span class="dc-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 12l3 3 5-6"/></svg></span><span class="dc-text"><small>Overall</small><strong>Check-ins &amp; Overall</strong><em>Today's deliveries checked in, and anything that needs a look.</em></span></div>
-        <div class="dc-links"><a class="dc-link" href="checkins.html"><span>Driver Check-ins</span><span class="owner" data-owner="checkIns">Current app</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="conflicts.html"><span>Sheet Conflicts</span><span class="owner" data-owner="writeBack">Current app</span><i class="dc-arrow">&rarr;</i></a></div>
-        <div class="dc-metrics n4"><span class="dc-metric"><em>Deliveries</em><b data-n="checkins.deliveries">-</b><small>Today</small></span><span class="dc-metric"><em>Checked In</em><b data-n="checkins.checkedIn">-</b><small>Done</small></span><span class="dc-metric"><em>Issues</em><b data-n="checkins.issues" data-alert>-</b><small>With issues</small></span><span class="dc-metric"><em>Conflicts</em><b data-n="conflicts.open" data-alert>-</b><small>Open</small></span></div></div>
-    </div>
+    <!-- Joe 10/10: like the old app's home, one big picture per side; each opens its side, whose menu lists only its own screens. -->
+    <section class="launch-grid" id="sides"></section>
   </div>
   <script type="module">
-    import { start, requireSignIn, showError, shortDate, callServer } from './js/app.js';
-    import { collection, doc, query, where, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-
+    import { requireSignIn, shortDate, SIDES, escapeHtml } from './js/app.js';
     const L = window.UDLogic;
-    const today = L.operatingDay(new Date());
-    const data = { runs: [], drivers: [], equipment: [], routes: [], vacations: [], conflicts: 0, writeBack: false, app: {}, admin: false };
-
-    // Numbers update the moment anything changes in the database (no reload, no 30-second checks).
-    function render() {
-      const n = L.homeNumbers(data.runs, data.drivers, data.equipment, today);
-      n.conflicts = { open: data.conflicts };
-      const off = (a, z) => new Set(data.vacations.filter(v => v.status === 'APPROVED' && v.startDate <= z && (v.endDate || v.startDate) >= a).map(v => v.driverId)).size;
-      n.vacation = { today: off(today, today), week: off(L.weekStart(today), L.addDays(L.weekStart(today), 6)), pending: data.vacations.filter(v => v.status === 'PENDING').length };
-      const live = data.routes.filter(r => L.masterActive(r));
-      n.routes = { active: live.length, routes: new Set(live.map(r => r.route)).size };
-      n.writeBack = { on: data.writeBack ? 'ON' : 'OFF' };
-      // Same count as the Equipment screen's Down / out: trucks and trailers that are down, out of service or inactive.
-      n.fleet.inactive = data.equipment.filter(e => (e.type === 'TRUCK' || e.type === 'TRAILER') && L.unitOff(e)).length;
-      // Problems drivers reported at check-in today, by unit kind.
-      const said = L.checkinRows(data.runs, today).reduce((a, r) => a.concat(r.issues), []);
-      n.issues = { truck: said.filter(x => /^Truck:/.test(x)).length, trailer: said.filter(x => /^Trailer/.test(x)).length, jack: said.filter(x => /^Jack:/.test(x)).length };
-      // Which app runs each screen. An administrator clicks a tag twice to move that screen (or turn the write-back on / off).
-      const owners = L.screenOwners(data.app);
-      document.getElementById('mode-text').textContent = Object.keys(owners).some(k => owners[k] === 'new') ? 'New app runs the green screens' : 'Test copy';
-      document.querySelectorAll('[data-owner]').forEach(el => {
-        const key = el.dataset.owner, isNew = key === 'writeBack' ? data.writeBack : owners[key] === 'new';
-        el.classList.toggle('new', isNew);
-        el.classList.toggle('can', data.admin);
-        if (!el.classList.contains('armed')) el.textContent = key === 'writeBack' ? (isNew ? 'Write-back on' : 'Write-back off') : (isNew ? 'New app' : 'Current app');
-        el.title = data.admin ? 'Click twice to ' + (key === 'writeBack' ? (isNew ? 'turn the write-back off' : 'turn the write-back on') : (isNew ? 'move this screen back to the current app' : 'run this screen from the new app')) : '';
-      });
-      document.querySelectorAll('[data-n]').forEach(el => {
-        const [a, b] = el.dataset.n.split('.');
-        const v = n[a][b];
-        el.textContent = v + (el.dataset.suffix || '');
-        if (el.hasAttribute('data-alert')) el.classList.toggle('alert', Number(v) > 0);
-      });
-    }
-
-    document.querySelector('.cards').addEventListener('click', async (e) => {
-      const tag = e.target.closest('[data-owner]');
-      if (!tag) return;
-      e.preventDefault();
-      if (!data.admin) return;
-      if (!tag.classList.contains('armed')) {
-        tag.classList.add('armed');
-        tag.textContent = 'Click again';
-        setTimeout(() => { tag.classList.remove('armed'); render(); }, 7000);
-        return;
-      }
-      tag.classList.remove('armed');
-      const key = tag.dataset.owner;
-      const fields = key === 'writeBack' ? { writeBack: !data.writeBack } : { screen: key, owner: L.screenOwners(data.app)[key] === 'new' ? 'old' : 'new' };
-      tag.textContent = '...';
-      try { showError(''); await callServer('setSwitch', fields); } catch (err) { showError(err.message || String(err)); }
-      render();
-    });
-
-
-    requireSignIn(async (user) => {
-      const { db } = await start();
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), snap => { data.admin = L.hasRole(snap.exists() ? snap.data() : null, ['ADMINISTRATOR']); render(); });
+    document.getElementById('sides').innerHTML = SIDES.map(s => '<a class="launch-card" data-side="' + s.key + '" href="' + s.home + '">' +
+      '<span class="launch-art"><img src="img/library/' + s.pic + '" alt=""></span><strong>' + escapeHtml(s.name) + '</strong><small>' + escapeHtml(s.note) + '</small>' +
+      '<b>Open ' + escapeHtml(s.name.replace(/^Route /, '').replace(/ Operations$/, '')) + ' &rarr;</b></a>').join('');
+    // The side picked here is the side its screens' menu shows.
+    document.getElementById('sides').addEventListener('click', e => { const a = e.target.closest('[data-side]'); if (a) try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ } });
+    requireSignIn(async () => {
+      const today = L.operatingDay(new Date());
       document.getElementById('today').textContent = L.dayName(today) + ' ' + shortDate(today);
-      document.getElementById('today').title = 'Operating day (rolls at 6 AM)';
-      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
-      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', L.weeksForLoadDate(today))), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the dispatch'));
-      onSnapshot(collection(db, 'drivers'), s => { data.drivers = s.docs.map(d => d.data()); render(); }, fail('the drivers'));
-      onSnapshot(collection(db, 'equipment'), s => { data.equipment = s.docs.map(d => d.data()).filter(e => (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location))); render(); }, fail('the units'));
-      onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => d.data()); render(); }, fail('Route Master'));
-      onSnapshot(collection(db, 'vacations'), s => { data.vacations = s.docs.map(d => d.data()); render(); }, fail('the vacation schedule'));
-      onSnapshot(query(collection(db, 'conflicts'), where('open', '==', true), limit(100)), s => { data.conflicts = s.size; render(); }, fail('the conflict list'));
-      onSnapshot(doc(db, 'config', 'app'), snap => {
-        const c = snap.data() || {};
-        data.app = c;
-        data.writeBack = !!(c.writeBack && c.writeBack.enabled === true);
-        const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
-        document.getElementById('copied').textContent = at ? 'Last Sync: ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy';
-        render();
-      });
     });
   </script>
 </body>

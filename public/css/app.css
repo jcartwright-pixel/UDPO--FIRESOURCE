@@ -1101,3 +1101,24 @@ body.daily-look table.daily td.missing { background: #fff1f0; color: #b3261e; bo
 body.daily-look table.daily button.toggle.on { background: #16a34a; color: #fff; border-radius: 999px; border: 0; font-weight: 900; }
 body.daily-look table.daily button.edit { border-radius: 999px; background: #0f2747; color: #fff; border: 0; }
 body.daily-look table.daily td.pickup { color: #b3261e; font-weight: 900; }
+
+/* Joe 10/10: Home is the old app's launcher: one big picture card per side (Route Distribution, Plant Operations, Fleet & Maintenance). */
+.launch-title { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 4px 16px; margin: 18px 24px; }
+.launch-title h1 { margin: 0; font-size: 30px; font-weight: 900; color: #0b3d6b; }
+.launch-title p { margin: 0; grid-column: 1; color: #4a6b8d; font-size: 16px; }
+.launch-title #today { grid-column: 2; grid-row: 1 / span 2; align-self: center; padding: 8px 16px; border-radius: 10px; background: #eef5fc; color: #0b3d6b; font-weight: 800; }
+.launch-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin: 0 24px 24px; }
+.launch-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 22px 22px; border-radius: 18px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 8px 24px rgba(11, 61, 107, .10); color: #0b3d6b; text-decoration: none; text-align: center; transition: transform .12s, box-shadow .12s; }
+.launch-card:hover, .launch-card:focus-visible { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(11, 61, 107, .20); border-color: #1f6feb; }
+.launch-art { display: flex; align-items: center; justify-content: center; width: 100%; height: clamp(150px, 26vh, 260px); border-radius: 14px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
+.launch-art img { max-width: 78%; max-height: 88%; object-fit: contain; }
+.launch-card strong { font-size: 24px; font-weight: 900; margin-top: 6px; }
+.launch-card small { color: #4a6b8d; font-size: 15px; min-height: 2.6em; }
+.launch-card b { margin-top: 4px; padding: 10px 22px; border-radius: 999px; background: #0f2747; color: #fff; font-size: 15px; }
+@media (max-width: 900px) { .launch-grid { grid-template-columns: 1fr; } .launch-art { height: 140px; } }
+/* A side's name sits under Back and Home, so it is plain which side the menu belongs to. */
+.sidemenu a.side-name { margin-bottom: 6px; border-bottom: 1px solid #ffffff33; border-radius: 9px 9px 0 0; font-size: 15px; font-weight: 900; }
+/* Long screen names wrap onto a second line instead of being cut off. */
+body:not(.side-folded) .sidemenu a { white-space: normal; line-height: 1.15; }
+body:not(.side-folded) .sidemenu a span { overflow: visible; text-overflow: clip; }
+.sidemenu a.side-name.on { border-radius: 9px; }
