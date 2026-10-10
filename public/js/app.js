@@ -239,3 +239,29 @@ export function shortDate(key) {
   const [y, m, d] = key.split('-').map(Number);
   return m + '/' + d + '/' + y;
 }
+
+// Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets smaller print until it fits (down to 11px),
+// so names and values are never cut off. Headers keep their size. Runs after every redraw and on resize.
+const FIT_MIN = 11;
+let fitQueued = false;
+function tooWide(td) {
+  // The text's laid-out width against the room inside the padding (a day cell keeps its padding for the arrow).
+  const cs = getComputedStyle(td), room = td.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const r = document.createRange();
+  r.selectNodeContents(td);
+  return r.getBoundingClientRect().width > room + 0.5 || td.scrollWidth > td.clientWidth + 1;
+}
+function fitCells() {
+  fitQueued = false;
+  const cells = [...document.querySelectorAll('tbody td')].filter(td => td.offsetParent && td.textContent.trim() && !td.querySelector('input, textarea, select, table') && !td.classList.contains('details-cell') && td.colSpan === 1);
+  cells.forEach(td => { if (td.dataset.fit) { td.style.fontSize = ''; delete td.dataset.fit; } });
+  let over = cells.filter(tooWide);
+  for (let pass = 0; over.length && pass < 8; pass++) {
+    const sizes = over.map(td => parseFloat(getComputedStyle(td).fontSize));
+    over = over.filter((td, i) => { if (sizes[i] <= FIT_MIN) return false; td.style.fontSize = Math.max(FIT_MIN, sizes[i] - 1) + 'px'; td.dataset.fit = '1'; return true; });
+    over = over.filter(tooWide);
+  }
+}
+function queueFit() { if (!fitQueued) { fitQueued = true; requestAnimationFrame(fitCells); } }
+new MutationObserver(queueFit).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+window.addEventListener('resize', queueFit);
