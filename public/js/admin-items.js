@@ -35,7 +35,7 @@ export const ADMIN_GROUPS = [
   ]],
   ['System Tools', 'Stations and sensors', [
     ['window-test', 'Window Test Center', 'Opens every screen at each window size to check nothing is cut off.', '', 'check'],
-    ['driver-station', 'Driver Station', 'The driver board and check-in station.', '', 'distribution-truck-v1-560.webp'],
+    ['driver-station', 'Driver Station', 'The driver board and check-in station.', 'driver-station.html', 'distribution-truck-v1-560.webp'],
     ['mocreo', 'MOCREO & Sensors', 'The cooler sensors: which sensor is which cooler, and the MOCREO connection. Coolers are entered by hand until the key is set.', '', 'temperatures.webp']
   ]],
   ['Diagnostics', 'Checks and repairs for the data behind the app', [

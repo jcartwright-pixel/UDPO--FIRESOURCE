@@ -38,6 +38,8 @@ service cloud.firestore {
     match /otrMonthly/{id} { allow read: if activeUser(); }
     match /otrMonthRuns/{id} { allow read: if activeUser(); }
     match /plantEvents/{id} { allow read: if activeUser(); }
+    // The drivers' DVIR inspections (phone.js), one per trailer.
+    match /dvirs/{id} { allow read: if activeUser(); }
     match /scorecard/{id} { allow read: if activeUser(); }
     match /opsAssignments/{id} { allow read: if activeUser(); }
     // The plant side: the plant journal, pickups, and the wash and returns lists.

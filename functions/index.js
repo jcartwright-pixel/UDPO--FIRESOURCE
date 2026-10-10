@@ -5,6 +5,7 @@
  *   transferNow           the same on request, for an administrator ("Reset test copy" rewrites every row)
  *   save                  every save from the screens, one call each
  *   phone                 the drivers' phone Check-In (Route Distribution code, no United Dairy account)
+ *   garage                the Garage Station tablet (technician name + login ID, no United Dairy account)
  *   newRouteCode          a manager makes a new Route Distribution code for the phones
  *   gps                   a manager or administrator saves, removes or tests the Verizon Connect (Fleetmatics) API login
  *   setSwitch             an administrator moves a screen between the current app and the new one, or turns the write-back on / off
@@ -25,6 +26,7 @@ const { setGlobalOptions } = require('firebase-functions/v2');
 const { runTransfer } = require('./src/transfer');
 const { applyAction, SaveError } = require('./src/actions');
 const { phoneCall, newRouteCode } = require('./src/phone');
+const { garageCall } = require('./src/garage');
 const { setSwitch, SwitchError } = require('./src/switch');
 const { gpsCall, GpsError } = require('./src/gps');
 const { unitedDairyUser } = require('./src/auth');
@@ -89,6 +91,11 @@ const asHttps = (error) => (error instanceof SaveError || error instanceof Switc
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
   try { return await phoneCall(db, request.data); } catch (error) { throw asHttps(error); }
+});
+
+// Open to the garage tablet without a United Dairy account: every step is checked against a technician's sign-in.
+exports.garage = onCall({ maxInstances: 3 }, async (request) => {
+  try { return await garageCall(db, request.data); } catch (error) { throw asHttps(error); }
 });
 
 exports.newRouteCode = onCall(async (request) => {

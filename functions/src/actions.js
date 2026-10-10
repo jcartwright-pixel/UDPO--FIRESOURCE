@@ -18,6 +18,7 @@ const SWITCH = require('./switch');
 const OTR = require('./otr-core');
 const SC = require('./sc-core');
 const PLANT = require('./plant');
+const GARAGE = require('./garage');
 
 const C = M.COLLECTIONS;
 
@@ -75,7 +76,9 @@ const ACTIONS = Object.freeze({
   saveTemperatureCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   sendPlantReport: { roles: L.SAVE_ROLES, screen: 'plant' },
   // Administration > Machine Products: the products each machine runs.
-  saveMachineProducts: { roles: REORDER_ROLES, screen: 'plant' }
+  saveMachineProducts: { roles: REORDER_ROLES, screen: 'plant' },
+  // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
+  sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -294,6 +297,7 @@ function validate(input) {
   if (action === 'saveTemperatureCheck') return Object.assign(out, PLANT.validateTemperature(input, SaveError));
   if (action === 'sendPlantReport') return Object.assign(out, PLANT.validateReport(input, SaveError));
   if (action === 'saveMachineProducts') return Object.assign(out, PLANT.validateMachineProducts(input, SaveError));
+  if (action === 'sendToGarage') return GARAGE.validateSend(input, out);
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
     if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
@@ -396,7 +400,7 @@ async function resolveAssignment(tx, db, req, stamp, run) {
   if (req.action === 'setDispatchTime') return { dispatchTime: req.time };
   if (req.action === 'setJack') return { palletJack: req.jack };
   if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });
-  if (req.action === 'savePlantLoad') return PLANT.loadValues(tx, db, req, (run.days && run.days[req.day]) || {}, stamp, SaveError);
+  if (req.action === 'savePlantLoad') return PLANT.loadValues(tx, db, req, (run.days && run.days[req.day]) || {}, stamp, SaveError, run);
   return { driverNotes: req.note };
 }
 
@@ -454,6 +458,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'moveRun') return moveRun(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setUnitDown' || req.action === 'setUnitUp') return setUnitDown(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'updateIssue') return updateIssue(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'sendToGarage') return GARAGE.sendToGarage(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'clearConflict') return clearConflict(tx, db, req, email, stamp, logRef, mode);
     if (DRIVER_ACTIONS.indexOf(req.action) >= 0) return editDriver(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriver') return saveDriver(tx, db, req, email, stamp, logRef, mode);

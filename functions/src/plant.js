@@ -205,11 +205,17 @@ function validateLoad(input, SaveError) {
   if (f.trailer !== undefined) out.trailer = text(f.trailer).toUpperCase().slice(0, 60);
   if (f.runs !== undefined) { if (f.runs !== false) throw new SaveError('BAD_REQUEST', 'A load can only be marked as not running here'); out.runs = false; }
   if (!Object.keys(out).length) throw new SaveError('BAD_REQUEST', 'Nothing to save');
+  // Trailer Assignments (the current app's Mobile Plant "trailers" view): only the trailer, one unit, never a down one.
+  if (input.assign === true) {
+    if (Object.keys(out).join() !== 'trailer') throw new SaveError('BAD_REQUEST', 'A trailer assignment changes only the trailer');
+    if (out.trailer && !/^[A-Z0-9-]{1,20}$/.test(out.trailer)) throw new SaveError('BAD_REQUEST', 'Enter one trailer number: letters, numbers and dashes only.');
+    out.assign = true;
+  }
   return out;
 }
 
 // The day fields one savePlantLoad changes. day = the run's day block now; equipment is read only when a unit was typed.
-async function loadValues(tx, db, req, day, stamp, SaveError) {
+async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   const f = req.plant, after = {};
   if (f.runs === false) return { runs: false };
   if (f.quantity !== undefined) after.casesOut = f.quantity;
@@ -242,12 +248,32 @@ async function loadValues(tx, db, req, day, stamp, SaveError) {
       // TBA: the trailer is not known yet. Kept as plain TBA, never T-TBA.
       if (/^T\.?B\.?A\.?$/i.test(String(f[k]).trim())) { after[k] = 'TBA'; after[idField] = ''; return; }
       const u = MAINT.resolveUnit(f[k], type, equipment);
+      if (f.assign) assignCheck(f[k], u, equipment, run, req.day, stamp, SaveError);
       // A number no unit matches is kept as typed, the same as the current app.
       after[k] = type === 'TRAILER' && !u.resolved && /^\d+$/.test(u.unit) ? 'T-' + u.unit : u.unit;
       after[idField] = u.id;
     });
   }
   return after;
+}
+
+// Trailer Assignments' checks (udpoV7176ResolveUnitInput_, 220_V7276_DownUnitsOffSchedule.gs): a short number that matches
+// more than one trailer must be typed in full, and a down trailer cannot go on a load for today or later.
+const DOWN_STATUSES = ['DOWN', 'OUT OF SERVICE', 'OOS', 'REPAIR'];
+function assignCheck(typed, u, equipment, run, prefix, stamp, SaveError) {
+  const key = text(typed).toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/^0+(?=\d)/, '');
+  if (!u.resolved && /^\d{1,4}$/.test(key)) {
+    const suffix = key.length < 3 ? key.padStart(3, '0') : key;
+    const many = (equipment || []).filter(e => e.type === 'TRAILER' && /^\d+$/.test(text(e.unit).replace(/^T-?/i, '')) && text(e.unit).replace(/^T-?/i, '').replace(/^0+(?=\d)/, '').slice(-suffix.length) === suffix);
+    if (many.length > 1) throw new SaveError('BAD_REQUEST', 'Trailer ' + text(typed) + ' matches ' + many.slice(0, 6).map(e => e.unit).join(', ') + '. Type the full number.');
+  }
+  const e = u.resolved ? (equipment || []).find(x => x.id === u.id) : null;
+  if (!e || DOWN_STATUSES.indexOf(text(e.status).toUpperCase()) < 0 || !run) return;
+  const block = L.DAYS.indexOf(prefix), delivery = L.addDays(run.weekStart, block);
+  const offset = run.days && run.days[prefix] && run.days[prefix].loadDayOffset != null ? run.days[prefix].loadDayOffset : -1;
+  if (L.addDays(delivery, offset) < L.operatingDay(new Date(stamp))) return;
+  const reason = (/DOWN:\s*([^|]+)/i.exec(text(e.notes)) || [])[1];
+  throw new SaveError('NOT_ALLOWED', 'Trailer ' + e.unit + ' is down' + (reason ? ' (' + reason.trim() + ')' : '') + '. Pick another trailer, or put it back in service on Down Trucks / Trailers.');
 }
 
 // Pickups: "Add Pickup" (Product / Item, Quantity / Cases, Optional Note) and "Pickup Complete".
