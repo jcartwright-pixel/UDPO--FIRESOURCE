@@ -782,6 +782,24 @@ async function noScroll(page) {
     await eqv.close();
     await db().collection('config').doc('fleetSync').delete();
     results.push('Equipment: a manager sees Sync fleet list with when it last synced; the button answers on the line; a dispatcher has no button');
+    // Joe 10/10 (route 855): the one-run editor has every day field of the old one (Order, Day Notes), a blank unit default on a
+    // running day says "none set", and the action buttons are square tiles in one row.
+    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+      const one = await openPage(browser, w, h, '/routes.html?testEmail=manager.test@uniteddairy.com');
+      await one.waitForFunction(() => [...document.querySelectorAll('#route-select option')].some(o => o.textContent === '802'));
+      await one.selectOption('#route-select', '802');
+      await one.selectOption('#run-select', 'run_t802');
+      await one.selectOption('#view-select', 'details');
+      await one.waitForSelector('table.day-table');
+      assert.deepEqual(await one.$$eval('table.day-table thead th', t => t.map(x => x.textContent.trim().toUpperCase())), ['DAY', 'RUNS?', 'START TIME', 'LOAD DAY', 'MILES', 'HOURS', 'ORDER', 'TRUCK', 'TRAILER', 'JACK', 'DAY NOTES']);
+      assert.equal(await one.$eval('table.day-table tr:nth-child(2) input[data-field="tractor"]', i => i.placeholder), 'none set', '802 runs Monday with no default truck');
+      const tiles = await one.$$eval('.actions.tiles > button, .actions.tiles > a.button', b => b.map(x => { const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) }; }));
+      assert.equal(tiles.length, 6);
+      assert.ok(tiles.every(t => t.w <= 92 && t.h >= 56 && t.top === tiles[0].top), 'square tiles in one row at ' + w + ': ' + JSON.stringify(tiles));
+      assert.deepEqual(one.errors, []);
+      await one.close();
+    }
+    results.push('Route Editor (one run): Order and Day Notes per day, "none set" for a blank unit default, square tiles in one row at both sizes');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).
