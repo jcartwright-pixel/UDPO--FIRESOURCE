@@ -74,7 +74,15 @@
       return out;
     }
 
+    // Replacing the page can blur a typed box, whose save asks for a redraw while this one is still running: that one waits its turn.
+    let painting = false, again = false;
     function render() {
+      if (painting) { again = true; return; }
+      painting = true;
+      try { paint(); } finally { painting = false; }
+      if (again) { again = false; render(); }
+    }
+    function paint() {
       const list = otrRoutes(), live = liveCounts(list), merged = O.otrMergeDaily_(daily, live), today = L.operatingDay(new Date());
       const todayCount = live[today] || { date: today, total: 0, byDestination: {}, runs: [] };
       const edit = canManage();

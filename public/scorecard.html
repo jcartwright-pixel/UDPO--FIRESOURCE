@@ -89,7 +89,15 @@
       return { rows, summary: S.scSummary_(rows, s, minDays), through: yesterday, days: Object.keys(days).sort() };
     }
 
+    // Replacing the page can blur a typed box, whose save asks for a redraw while this one is still running: that one waits its turn.
+    let painting = false, again = false;
     function render() {
+      if (painting) { again = true; return; }
+      painting = true;
+      try { paint(); } finally { painting = false; }
+      if (again) { again = false; render(); }
+    }
+    function paint() {
       const s = S.scSettings_(saved), edit = canManage();
       document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
       document.getElementById('sub').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY') + ' · every driver starts at 100';

@@ -95,7 +95,7 @@
       recap: ['Route Recap', 'Current route and run summary.'],
       rules: ['Show / Hide Rules', 'The same rules as the current app. Each YES / NO is the Route Master setting; click to flip it. A blank cell counts as NO (a run with a blank Active is inactive). Only Weekly looks further: when Route Master\'s Show Weekly is blank, this week\'s Live row decides.']
     };
-    let onlyHidden = false, routes = [], liveRows = {}, liveWeek = '', liveStop = null, liveDb = null, view = 'days', pickRoute = '', pickRun = '', filter = 'ACTIVE', seqDay = 'mon', dragging = null, redrawLater = false, addMode = 'route';
+    let onlyHidden = false, routes = [], liveRows = {}, liveWeek = '', liveStop = null, liveDb = null, view = 'days', pickRoute = '', pickRun = '', filter = 'ACTIVE', seqDay = 'mon', dragging = null, pressing = false, redrawLater = false, addMode = 'route';
     const canEdit = () => canReorder();
     const isActive = (r) => L.masterActive(r);
     const shows = (r, f) => L.masterFlag(r, f);
@@ -138,7 +138,7 @@
 
     function render() {
       // A redraw in the middle of a drag would cancel it: wait until the drag ends.
-      if (dragging !== null) { redrawLater = true; return; }
+      if (dragging !== null || pressing) { redrawLater = true; return; }
       redrawLater = false;
       watchLiveWeek();
       const edit = canEdit();
@@ -393,7 +393,10 @@
         () => list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: (i + 1) * 10 }); }),
         () => list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: before[i] }); }), render);
     });
-    table.addEventListener('dragend', () => { dragging = null; if (redrawLater) render(); });
+    table.addEventListener('dragend', () => { dragging = null; pressing = false; if (redrawLater) render(); });
+    // A row pressed to drag is not redrawn under the pointer (a copy arriving then would cancel the drag); the redraw waits for the release.
+    table.addEventListener('mousedown', e => { if (e.button === 0 && view === 'seq' && e.target.closest('tr[data-i]') && !e.target.closest('input, select, button, a')) pressing = true; });
+    document.addEventListener('mouseup', () => { if (!pressing) return; pressing = false; if (dragging === null && redrawLater) render(); });
 
     /* ---------- Add Route / Add Run / Destination ---------- */
     function openAdd(mode) {
