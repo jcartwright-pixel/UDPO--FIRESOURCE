@@ -30,21 +30,6 @@
     <div class="notice error" id="error" hidden></div>
     <div class="notice ok" id="saved" hidden></div>
     <div class="view mc-shell">
-      <aside class="mc-menu" aria-label="Manager Menu">
-        <strong>Manager Menu</strong>
-        <button type="button" class="mc-direct report" data-open-report>&#9993; Send Current Report</button>
-        <a class="mc-direct" href="yard.html">Yard Checks</a>
-        <span class="mc-group">Plant Operations Scheduler</span>
-        <a href="scheduler.html?lane=SHIPPING">Shipping</a><a href="scheduler.html?lane=RECEIVING">Receiving</a>
-        <span class="mc-group">Plant Distribution Departments</span>
-        <a href="loadout.html">Loadout Center</a><a href="unloading.html">Unloading</a><a href="returns.html">Returns</a><a href="washing.html">Washing</a>
-        <span class="mc-group">Quality Checks Report</span>
-        <a href="quality.html">Quality Checks</a><a href="quality.html?view=history">History</a>
-        <span class="mc-group">Cooler Temperature Reports</span>
-        <a href="temps.html">Manual Read</a><a href="temps.html?view=alerts">Status</a><a href="temps.html?view=history">24-Hour History</a>
-        <span class="mc-group">Shift Notes</span>
-        <a href="shiftnotes.html">Handoff</a><a href="shiftnotes.html?view=history">24-Hour History</a>
-      </aside>
       <section class="mc-grid" id="grid">
         <div class="mc-card mc-report" style="--accent:#c62828">
           <div class="mc-bar"><span class="mc-ic">&#9993;</span><strong>Send Current Report</strong></div>
@@ -87,6 +72,7 @@
     let date = today();
     const data = { runs: [], journal: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [] };
     let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null;
+    let askReport = new URLSearchParams(location.search).get('report') === '1';
     const canSend = () => L.hasRole(person, L.SAVE_ROLES) && L.screenState(app, 'plant').open;
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : 'None'; };
     const pct = (a, b) => b ? Math.min(100, Math.round(a / b * 100)) : 0;
@@ -156,6 +142,8 @@
       if (!document.getElementById('modal').hidden) drawReport();
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      // Send Current Report from the Plant menu (manager.html?report=1): open the full report once it is ready.
+      if (askReport) { askReport = false; openReport(); }
     }
 
     // The full report as the email reads, one section after another.

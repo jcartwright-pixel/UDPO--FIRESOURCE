@@ -50,11 +50,24 @@ const SCREENS = [
   const browser = await chromium.launch();
   const results = [];
   try {
-    // The Plant Operations side: its name opens Plant Departments, and its menu lists the other ten plant screens.
-    const side = await openPage(browser, 1920, 950, '/plant.html' + MANAGER);
+    // The Plant Operations side (Joe 10/10): only section names in the menu, like Dispatch and Drivers on the Distribution
+    // side; each section's screens open beside it, and together they reach all 11 plant screens. No screen keeps a menu of its own.
+    const side = await openPage(browser, 1920, 950, '/manager.html' + MANAGER);
     await side.waitForSelector('#screen:not([hidden])');
-    const hrefs = await side.$$eval('.sidemenu a[href]', a => a.map(x => x.getAttribute('href')));
+    assert.deepEqual(await side.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)),
+      ['Departments', 'Scheduler', 'Yard Checks', 'Quality', 'Coolers', 'Shift Notes', 'Manager Center']);
+    const hrefs = await side.$$eval('.sidemenu a[href], .side-flyouts a[href]', a => a.map(x => x.getAttribute('href').split(/[?#]/)[0]));
     for (const [page] of SCREENS) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Operations side menu: ' + JSON.stringify(hrefs));
+    assert.equal(await side.$('.mc-menu, aside'), null, 'Manager Center has no menu of its own');
+    const grid = await side.$eval('#grid', g => g.getBoundingClientRect().left - document.querySelector('.sidemenu').getBoundingClientRect().right);
+    assert.ok(grid < 40, 'the Manager Center cards start right beside the side menu: ' + grid);
+    await side.hover('.sidemenu .side-sec.on .side-sec-btn');
+    await side.waitForSelector('.side-flyouts .flyout.open');
+    assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Manager Center', 'Send Current Report']);
+    if (process.env.SHOTS_DIR) await side.screenshot({ path: path.join(process.env.SHOTS_DIR, 'plant-menu-shell-check-1920.png') });
+    await Promise.all([side.waitForURL(/report=1/), side.click('.side-flyouts .flyout.open a[href="manager.html?report=1"]')]);
+    await side.waitForSelector('#modal:not([hidden])');
+    assert.ok(await side.isVisible('#rp-subject'), 'Send Current Report in the menu opens the full report');
     await side.close();
     results.push('Plant Operations side reaches all 11 plant screens, Manager Center included');
 
