@@ -99,6 +99,14 @@ export function sideFor(page) {
   try { sessionStorage.setItem('udSide', side.key); } catch (e) { /* no storage */ }
   return side;
 }
+// The plants, as on the Operations Overview; someone sees only the plants they may (known once the Users list is read).
+const PLANT_LIST = () => (window.UDLogic && window.UDLogic.PLANTS) || [{ id: 'fac_uniontown', name: 'Uniontown', status: 'ACTIVE' }, { id: 'fac_charleston', name: 'Charleston', status: 'PLANNED' }, { id: 'fac_martins_ferry', name: 'Martins Ferry', status: 'PLANNED' }];
+function limitPlants() {
+  let allowed = null;
+  try { allowed = JSON.parse(sessionStorage.getItem('udPlants') || 'null'); } catch (e) { /* no storage */ }
+  if (!Array.isArray(allowed)) return;
+  document.querySelectorAll('.side-plant[data-plant], .side-flyouts a[data-plant]').forEach(el => { el.hidden = allowed.indexOf(el.dataset.plant) < 0; });
+}
 function addSideMenu() {
   const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
   if (!bar || document.body.classList.contains('phone') || screen.querySelector('.sidemenu')) return;
@@ -116,21 +124,37 @@ function addSideMenu() {
       '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
   };
   const side = sideFor(here), groups = side ? MENU.filter(([g]) => side.sections.indexOf(g) >= 0) : [];
-  // Home lists the three sides; a side shows its name (back to its first page), then only its own sections. A side with one
-  // section lists its screens straight in the menu.
-  const top = link(MENU[0][1][0]) + (!side ? SIDES.map(s => link([s.name, s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ')).join('') + link(['Administration', 'administration.html', 'gear']) :
-    link([side.name, side.home, side.pic]).replace('<a ', '<a data-side="' + side.key + '" ').replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (here === side.home ? ' on' : '') + '" '));
+  // Joe 10/10 evening: Back and Home sit in the header, not in the menu. The main screen (the all-plants Operations Overview)
+  // lists only the plants; each plant opens its Plant Operations, Route Distribution and Fleet & Maintenance beside it.
+  // A plant's home lists its three sides; a side shows its name (back to its first page), then only its own sections.
+  // A side with one section lists its screens straight in the menu. Administration is a header button, not a menu item.
+  const sideLink = (s, href) => link([s.name, href || s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ');
+  const plantSec = (p) => {
+    const live = p.status === 'ACTIVE', soon = 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
+    const order = ['plant', 'distribution', 'fleet'].map(k => SIDES.find(s => s.key === k));
+    return '<div class="side-sec side-plant" data-plant="' + p.id + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + p.name + '">' +
+      svg('plant-building-v1-560.webp') + '<span>' + p.name + '</span><i aria-hidden="true">&#9656;</i></button>' +
+      '<div class="flyout" role="menu"><div class="flyout-title">' + p.name + '</div>' +
+      order.map(s => sideLink(s, live ? s.home : soon).replace('<a ', '<a data-plant="' + p.id + '" ')).join('') + '</div></div>';
+  };
+  const top = here === 'company.html' ? PLANT_LIST().map(plantSec).join('') : !side ? SIDES.map(s => sideLink(s)).join('') :
+    sideLink(side).replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (here === side.home ? ' on' : '') + '" ');
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
-    (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? items.map(link).join('') : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
+    (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
       '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
       svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span><i aria-hidden="true">&#9656;</i></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join(''));
-  nav.addEventListener('click', e => { const a = e.target.closest('a[data-side]'); if (a) try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ } });
   // Joe 10/10: the fly-outs live in their own layer on the page, not inside the menu, so no screen, table or pop-up can draw over them.
   const layer = document.createElement('nav');
   layer.className = 'side-flyouts';
   layer.setAttribute('aria-label', 'Screens in this section');
   document.body.appendChild(layer);
+  [nav, layer].forEach(el => el.addEventListener('click', e => {
+    const a = e.target.closest('a[data-side]');
+    if (!a) return;
+    try { sessionStorage.setItem('udSide', a.dataset.side); if (a.dataset.plant) sessionStorage.setItem('udPlant', a.dataset.plant); } catch (x) { /* no storage */ }
+  }));
+  limitPlants();
   const flyOf = (sec) => sec._fly;
   nav.querySelectorAll('.side-sec').forEach(sec => { sec._fly = sec.querySelector('.flyout'); sec._fly._sec = sec; layer.appendChild(sec._fly); });
   const shut = (x) => { x.classList.remove('open'); flyOf(x).classList.remove('open'); x.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'false'); };
@@ -179,7 +203,7 @@ function addSideMenu() {
   // (A tap's pointerdown comes before the mouse events a tablet makes up, so the strip is still folded here.)
   nav.addEventListener('pointerdown', e => { tapped = e.pointerType !== 'mouse' && !pinned && !document.body.classList.contains('side-open'); }, true);
   nav.addEventListener('click', e => {
-    if (tapped && e.target.closest('a, .side-back')) { e.preventDefault(); e.stopPropagation(); peek(true); }
+    if (tapped && e.target.closest('a')) { e.preventDefault(); e.stopPropagation(); peek(true); }
     tapped = false;
   }, true);
   nav.querySelector('.side-toggle').onclick = () => {
@@ -276,14 +300,19 @@ export function goBack() {
   if ((here === 'company.html' || (!main && side && here !== side.home)) && fromHere && history.length > 1) history.back();
   else location.href = up;
 }
-// Joe 10/10: every screen has a Back button and a Home button, in the same place at the top of the menu (built here, once).
+// Joe 10/10: every screen has a Back button and a Home button. Joe 10/10 evening: they sit in the header beside the logo,
+// never in the menu (built here, once). The main screens' header also has the Administration button (Administrators only).
 // Joe 10/10: someone who may see more than one plant (an Administrator, or a plant list of "*") starts on the all-plants
 // overview and picks a plant; a plant's home then has Back to the overview. Known once the Users list is read.
 function multiPlant() { try { return sessionStorage.getItem('udMulti') === '1'; } catch (e) { return false; } }
-function backButton() {
+function headerButton(id, icon, label, title) {
   const b = document.createElement('button');
-  b.type = 'button'; b.className = 'side-back'; b.id = 'go-back'; b.title = 'Back one screen';
-  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.back + '</svg><span>Back</span>';
+  b.type = 'button'; b.className = 'hdr-btn'; b.id = id; b.title = title;
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[icon] + '</svg><span>' + label + '</span>';
+  return b;
+}
+function backButton() {
+  const b = headerButton('go-back', 'back', 'Back', 'Back one screen');
   b.onclick = goBack;
   return b;
 }
@@ -297,24 +326,34 @@ function noteAccess(person) {
   try {
     sessionStorage.setItem('udMulti', L.plantsFor(person).length > 1 ? '1' : '0');
     sessionStorage.setItem('udAdmin', L.isAdmin(person) ? '1' : '0');
+    sessionStorage.setItem('udPlants', JSON.stringify(L.plantsFor(person)));
   } catch (e) { /* no storage */ }
   document.body.classList.toggle('is-admin', L.isAdmin(person));
   plantHomeBack();
+  limitPlants();
 }
-// The Administration links show only to Administrators (the screens check again).
+// The Administration button shows only to Administrators (the screens check again).
 try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add('is-admin'); } catch (e) { /* no storage */ }
 (function addBack() {
   const here = location.pathname.split('/').pop() || 'index.html';
-  const home = document.querySelector('.sidemenu a[href="index.html"]');
-  if (!home) return;
-  home.id = 'go-home';
-  if (here === 'index.html') { plantHomeBack(); return; }
-  const b = backButton();
-  const h = document.createElement('button');
-  h.type = 'button'; h.className = 'side-back side-home'; h.id = 'go-home'; h.title = 'Home';
-  h.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.home + '</svg><span>Home</span>';
+  const bar = document.querySelector('#screen > .topbar'), brand = bar && bar.querySelector('.brand');
+  if (!brand || !document.body.classList.contains('has-side') || document.getElementById('go-home')) return;
+  const nav = document.createElement('div');
+  nav.className = 'hdr-nav';
+  const h = headerButton('go-home', 'home', 'Home', 'Home');
   h.onclick = () => { location.href = 'index.html'; };
-  home.replaceWith(b, h);
+  // The main screen (all plants) and a plant's home are the top: no Back there (a plant's home gets Back to the overview below).
+  if (['index.html', 'company.html'].indexOf(here) < 0) nav.append(backButton());
+  nav.append(h);
+  brand.after(nav);
+  if (here === 'index.html') plantHomeBack();
+  if (['company.html', 'index.html'].indexOf(here) >= 0) {
+    const adm = headerButton('go-admin', 'gear', 'Administration', 'Administration');
+    adm.classList.add('hdr-admin');
+    adm.onclick = () => { location.href = 'administration.html'; };
+    const who = bar.querySelector('.who, #signout');
+    if (who) who.before(adm); else bar.append(adm);
+  }
 })();
 // Joe 10/10: on every screen with cards, clicking anywhere on a card opens that card's screen in its first view, and clicking
 // one line or number inside it opens that particular screen. A card carries data-card="page"; a line or number data-open="page"
