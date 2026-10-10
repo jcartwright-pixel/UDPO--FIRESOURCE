@@ -317,6 +317,7 @@ function parseLiveTab(tabName, values, lookups) {
     run.masterShow = routeMaster ? { daily: routeMaster.displayDaily === undefined ? null : routeMaster.displayDaily, mobile: routeMaster.displayMobile === undefined ? null : routeMaster.displayMobile,
       loadType: routeMaster.loadType || '' } : { daily: null, mobile: null, loadType: '' };
     run.days = {};
+    const ranByDriver = [];
     L.DAYS.forEach(prefix => {
       const day = {};
       M.DAY_FIELDS.forEach(([field, suffix, kind]) => {
@@ -327,11 +328,14 @@ function parseLiveTab(tabName, values, lookups) {
       });
       fixDriver(day, prefix, r.rowNumber, run, lookups, warn);
       fixEquipment(day, prefix, r.rowNumber, run, lookups, warn);
+      // Joe 10/10: a day with a driver runs. A Live row marked not running that still holds a driver (852 JERSEY LOAD 2,
+      // Wednesday 10/7) is read as running, so it shows on every screen and Route Run Days agrees; only a day with no driver stays off.
+      if (!day.runs && day.driver) { day.runs = true; ranByDriver.push(prefix); }
       run.days[prefix] = day;
     });
     run.cells = cellsOf(r.row, index);
     // Route Master's order and Weekly setting are part of the fingerprint, so a Route Master change rewrites the run.
-    run.fingerprint = fingerprint(r.row.map(cellText).concat(['weekOrder=' + run.weekOrder, 'weeklyShow=' + run.weeklyShowMaster]));
+    run.fingerprint = fingerprint(r.row.map(cellText).concat(['weekOrder=' + run.weekOrder, 'weeklyShow=' + run.weeklyShowMaster].concat(ranByDriver.length ? ['ranByDriver=' + ranByDriver.join('-')] : [])));
     runs[M.runDocId(weekStart, key)] = run;
   });
   return { tab: tabName, weekStart, runs, warnings };
