@@ -745,6 +745,39 @@ async function sendReport(tx, db, req, email, stamp, logRef, mode, SaveError) {
   return result;
 }
 
-module.exports = { validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+/* ---------- Machine Products ---------- */
+
+// saveMachineProducts (Joe 10/10): the products one machine runs, the drop-down on the Quality check. It replaces that
+// machine's starting list (RedZone, public/data/plant-products.json), so a new SKU goes in without a code change.
+const PRODUCT_LIMIT = 400;
+function validateMachineProducts(input, SaveError) {
+  const operationId = text(input.operationId).slice(0, 120);
+  if (!/^[A-Za-z0-9_-]+$/.test(operationId)) throw new SaveError('BAD_REQUEST', 'Pick a machine.');
+  if (!Array.isArray(input.products) || input.products.length > PRODUCT_LIMIT) throw new SaveError('BAD_REQUEST', 'A machine holds up to ' + PRODUCT_LIMIT + ' products.');
+  const seen = {}, products = [];
+  input.products.forEach(p => {
+    const x = p && typeof p === 'object' ? p : {};
+    const row = { name: text(x.name).slice(0, 120), sku: text(x.sku).slice(0, 40), mfgType: text(x.mfgType).slice(0, 40), productGroup: text(x.productGroup).slice(0, 60) };
+    if (!row.name) return;
+    const key = row.name.toUpperCase();
+    if (seen[key]) throw new SaveError('BAD_REQUEST', row.name + ' is on the list twice. Each product needs its own name.');
+    seen[key] = true;
+    products.push(row);
+  });
+  return { operationId, products };
+}
+async function saveMachineProducts(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const line = await tx.get(db.collection('plantSetup').doc(docId(req.operationId)));
+  const d = line.exists ? line.data() : null;
+  if (!d || d.type !== 'PRODUCTION_AREA') throw new SaveError('NOT_FOUND', 'That machine is not set up for this plant.');
+  const ref = db.collection('plantProducts').doc(docId(req.operationId)), had = await tx.get(ref);
+  const after = { operationId: req.operationId, line: d.name, facilityId: d.facilityId || 'fac_uniontown', products: req.products, updatedAt: stamp, updatedBy: email, testEdited: true };
+  tx.set(ref, after);
+  const result = { ok: true, requestId: req.requestId, operationId: req.operationId, count: req.products.length, message: d.name + ': ' + req.products.length + ' product' + (req.products.length === 1 ? '' : 's') + ' saved.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, before: had.exists ? had.data().products || [] : null, after: req.products, result });
+  return result;
+}
+
+module.exports = { validateMachineProducts, saveMachineProducts, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

@@ -223,7 +223,7 @@ const PAGE_ICON = {
   'gps.html': 'distribution-truck-v1-560.webp', 'scorecard.html': 'distribution-truck-v1-560.webp',
   'equipment.html': 'maintenance-tractor-v1-560.webp', 'maint.html': 'maintenance-tractor-v1-560.webp', 'issues.html': 'maintenance-tractor-v1-560.webp',
   'garage.html': 'maintenance-tractor-v1-560.webp', 'fleet.html': 'maintenance-trailer-v1-560.webp',
-  'plant.html': 'plant-building-v1-560.webp', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'distribution-truck-v1-560.webp', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'shiftnotes.html': 'alert', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
+  'plant.html': 'plant-building-v1-560.webp', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'distribution-truck-v1-560.webp', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'shiftnotes.html': 'alert', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {
