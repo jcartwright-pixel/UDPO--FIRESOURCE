@@ -95,11 +95,18 @@ async function noScroll(page) {
     const shownMs = Date.now() - t0;
     await watcher.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[6].textContent === 'T-901', null, { timeout: 5000 });
     const seenMs = Date.now() - t0;
-    // The picker marks units already used that day.
+    // Joe 10/10: a trailer on the road on another run at the same time (T-902 on 801) is left out of the list unless OVR is ticked;
+    // with OVR it is offered and says why.
     await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
     const labels = await editor.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker option', os => os.map(o => o.textContent));
-    assert.ok(labels.some(t => /T-902\s+\(on 801\)/.test(t)), 'T-902 is shown as on 801: ' + labels.join(' | '));
+    assert.ok(!labels.some(t => /T-902/.test(t)), 'T-902 (on the road on 801) is left out: ' + labels.join(' | '));
     await editor.keyboard.press('Escape');
+    await editor.check('tr[data-id="2026-10-04__run_t802|tue"] input[data-ovr]');
+    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    const ovrLabels = await editor.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker option', os => os.map(o => o.textContent));
+    assert.ok(ovrLabels.some(t => /T-902\s+\[ON ROAD.*\(801\)\]/.test(t)), 'with OVR, T-902 is offered as on the road on 801: ' + ovrLabels.join(' | '));
+    await editor.keyboard.press('Escape');
+    await editor.uncheck('tr[data-id="2026-10-04__run_t802|tue"] input[data-ovr]');
     results.push('picking a trailer on Daily: on screen in ' + shownMs + ' ms, on another open screen in ' + seenMs + ' ms (local test database)');
 
     // A driver note.
@@ -197,22 +204,27 @@ async function noScroll(page) {
     assert.ok(callOff && callOff.reasonCode === 'CALLED OFF', 'Driver Call-Off saved: ' + JSON.stringify(callOff));
     results.push('Driver Call-Off: CASEY called off 10/6 is saved to Driver Exceptions and left out of the 10/6 driver list');
 
-    // Weekly: click a day, pick a truck in the editor.
+    // Weekly (Joe 10/10): clicking a run box opens the driver drop-down right on the box; trucks and trailers are picked on Daily Dispatch.
     const wkEdit = await openPage(browser, 1920, 950, '/weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com');
     await wkEdit.waitForSelector('tr td.day.editable[data-day="mon"]');
-    const monCell = 'xpath=//tr[td[1][text()="802"]]/td[@data-day="mon"]';
+    const monCell = 'xpath=//tr[td[1][text()="899"]]/td[@data-day="mon"]';
     await wkEdit.click(monCell);
-    await wkEdit.selectOption('.popover select[data-kind="truck"]', 'veh_truck_900002');
-    await wkEdit.click('.popover .close');
-    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && /900002/.test(tr.children[3].textContent)), null, { timeout: 5000 });
-    results.push('Weekly: a truck picked for 802 Monday saved and shows in the grid');
+    await wkEdit.waitForSelector('.popover.cell-pick select[data-kind="driver"]');
+    assert.deepEqual(await wkEdit.$$eval('.popover select', s => s.map(x => x.dataset.kind)), ['driver'], 'only the driver is picked on Weekly');
+    const monBox = await wkEdit.$eval(monCell, td => { const r = td.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; });
+    const pickBox = await wkEdit.$eval('.popover.cell-pick', p => { const r = p.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; });
+    assert.ok(Math.abs(pickBox[0] - monBox[0]) <= 4 && Math.abs(pickBox[1] - monBox[1]) <= 4, 'the drop-down sits on the box: ' + JSON.stringify([monBox, pickBox]));
+    await wkEdit.selectOption('.popover select[data-kind="driver"]', 'drv_test_brook');
+    await wkEdit.waitForSelector('.popover', { state: 'detached' });
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '899' && /BROOK/.test(tr.children[3].textContent)), null, { timeout: 5000 });
+    results.push('Weekly: clicking 899 Monday opened the driver drop-down on the box; BROOK picked saved, closed it and shows in the grid');
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-after-edit-1920.png') });
 
     // Weekly like the current screen: CARRIER, Route Run Days, the Driver Assignment Board's availability box, Publish.
     const tueCell = 'xpath=//tr[td[1][text()="802"]]/td[@data-day="tue"]';
     await wkEdit.click(tueCell);
     await wkEdit.selectOption('.popover select[data-kind="driver"]', '__CARRIER__');
-    await wkEdit.click('.popover .close');
+    await wkEdit.waitForSelector('.popover', { state: 'detached' });
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[4].firstChild.textContent === 'CARRIER' && tr.children[4].classList.contains('c-carrier')), null, { timeout: 5000 });
     // Plant Load: 801 does not run Thursdays, but the plant scheduler has a load for it on 10/8, so the day needs a driver.
     const thu801 = 'xpath=//tr[td[1][text()="801"]]/td[@data-day="thu"]';
@@ -220,7 +232,7 @@ async function noScroll(page) {
     await wkEdit.click(thu801);
     assert.match(await wkEdit.$eval('.popover select[data-kind="driver"] option', o => o.textContent), /PLANT LOAD/);
     await wkEdit.selectOption('.popover select[data-kind="driver"]', 'drv_test_adams');
-    await wkEdit.click('.popover .close');
+    await wkEdit.waitForSelector('.popover', { state: 'detached' });
     await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6]; return /ADAMS/.test(td.textContent) && td.classList.contains('plant-load') && !td.classList.contains('c-plant'); }, null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-plant-load-1920.png') });
     await wkEdit.click('#run-days');
@@ -228,7 +240,10 @@ async function noScroll(page) {
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-run-days-1920.png') });
     await wkEdit.click('#days-modal [data-close]');
-    await wkEdit.click('#tab-board');
+    // Joe 10/10: no tab buttons; the menu's Driver Assignment Board opens Weekly at the board (the test sign-in rides on the address).
+    assert.equal(await wkEdit.$('#tab-board'), null, 'no tab buttons');
+    await wkEdit.$eval('.side-flyouts a[href="weekly.html#board"]', a => { a.href = 'weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com#board'; a.click(); });
+    await wkEdit.waitForFunction(() => document.body.dataset.view === 'board' && document.getElementById('board-panel').getBoundingClientRect().top < innerHeight, null, { timeout: 8000 });
     await wkEdit.waitForSelector('#board-rows tr[data-driver="drv_test_casey"]');
     const boardNames = await wkEdit.$$eval('#board-rows tr[data-driver] td:first-child', tds => tds.map(td => td.textContent));
     assert.deepEqual(boardNames, ['BROOK, SAM', 'ADAMS, PAT', 'CASEY, LEE'], 'relief first, then seniority');
@@ -237,7 +252,7 @@ async function noScroll(page) {
     await wkEdit.click('#avail-save');
     await wkEdit.waitForFunction(() => /VACATION/.test(document.querySelector('#board-rows tr[data-driver="drv_test_casey"] td:nth-child(3)').textContent), null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-board-1920.png') });
-    await wkEdit.click('#tab-routes');
+    await wkEdit.evaluate(() => { document.getElementById('wk-scroll').scrollTop = 0; });
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[3].classList.contains('c-vacation-needs') && /CASEY/.test(tr.children[3].textContent)), null, { timeout: 5000 });
     await wkEdit.click('#publish');
     await wkEdit.waitForFunction(() => /Published .* by dispatch\.test$/.test(document.getElementById('published').textContent), null, { timeout: 5000 });
@@ -756,10 +771,14 @@ async function noScroll(page) {
     assert.deepEqual(sc.errors, []);
     await sc.close();
     results.push('Driver Scorecard: Month, Year and Settings open; a manager set call-offs to 5 points and it saved');
-    // Dispatch Administration: the current app's cards; a built screen opens in this window, from the Route Editor too.
+    // Dispatch Administration: the current app's cards; a built screen opens in this window. Joe 10/10: it opens from the menu
+    // (Administration section); the Route Editor has no Dispatch Administration button.
     const adm = await openPage(browser, 1920, 950, '/routes.html?testEmail=manager.test@uniteddairy.com');
-    await adm.waitForSelector('#to-admin');
-    await Promise.all([adm.waitForURL(/admin\.html/), adm.click('#to-admin')]);
+    await adm.waitForSelector('.sidemenu .side-sec-btn[title="Administration"]');
+    assert.equal(await adm.$('#to-admin'), null, 'no Dispatch Administration button on the Route Editor');
+    await adm.hover('.sidemenu .side-sec-btn[title="Administration"]');
+    await adm.waitForSelector('.side-flyouts .flyout.open a[href="admin.html"]', { state: 'visible' });
+    await Promise.all([adm.waitForURL(/admin\.html/), adm.click('.side-flyouts .flyout.open a[href="admin.html"]')]);
     await adm.waitForSelector('.admin-card');
     assert.equal(await adm.$$eval('.admin-card', a => a.length), 15);
     assert.equal(await adm.$$eval('.admin-card[target]', a => a.length), 0, 'no card opens a new window');
@@ -767,7 +786,7 @@ async function noScroll(page) {
     await adm.waitForSelector('.tcell');
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('Dispatch Administration: 15 cards from the Route Editor button; Driver Weekly Template opens in the same window');
+    results.push('Dispatch Administration: 15 cards, opened from the menu; Driver Weekly Template opens in the same window');
     // Joe 10/10: Print Layouts took him into the old program. Every Dispatch Administration card opens a new-app screen; Operational
     // Assignments, Print Layouts and Dispatch Settings are built here, and an active assignment is a driver choice on Daily.
     const ops = await openPage(browser, 1920, 950, '/admin.html?testEmail=manager.test@uniteddairy.com');
@@ -814,7 +833,7 @@ async function noScroll(page) {
     await Promise.all([hop.waitForURL(/daily\.html\?date=2026-10-0[3-9]/), hop.click('#go-daily')]);
     await hop.waitForSelector('#go-weekly');
     await hop.goto(hop.url().replace(/daily\.html\?[^#]*/, 'weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com') + '#board');
-    await hop.waitForFunction(() => document.getElementById('tab-board').getAttribute('aria-selected') === 'true' && document.getElementById('board-panel').getBoundingClientRect().top < innerHeight, null, { timeout: 8000 });
+    await hop.waitForFunction(() => document.body.dataset.view === 'board' && document.getElementById('board-panel').getBoundingClientRect().top < innerHeight, null, { timeout: 8000 });
     assert.deepEqual(hop.errors, []);
     await hop.close();
     results.push('Daily and Weekly: a tile on each opens the other for the same week in this window; Weekly has no Assigned key; Menu > Driver Assignment Board opens Weekly at the board');
@@ -890,7 +909,8 @@ async function noScroll(page) {
     let dv = await openPage(browser, 1920, 950, '/weekly.html?testEmail=dispatch.test@uniteddairy.com');
     await dv.waitForSelector('#rows tr');
     const thisWeek = new URL(dv.url()).searchParams.get('week');
-    await dv.click('#tab-board');
+    await dv.evaluate(() => { location.hash = 'board'; });
+    await dv.waitForFunction(() => document.body.dataset.view === 'board');
     await dv.click('#next');
     await dv.waitForFunction((w) => new URL(location.href).searchParams.get('week') !== w, thisWeek);
     // (The test sign-in rides on the address, so the menu link carries it here.)
@@ -902,7 +922,7 @@ async function noScroll(page) {
     };
     await viaMenu('weekly.html', 'dispatch.test@uniteddairy.com');
     await dv.waitForSelector('#rows tr');
-    assert.equal(await dv.getAttribute('#tab-routes', 'aria-selected'), 'true', 'Weekly opens on Route / Run Assignments');
+    assert.equal(await dv.evaluate(() => document.body.dataset.view), 'routes', 'Weekly opens on Route / Run Assignments');
     assert.equal(new URL(dv.url()).searchParams.get('week'), thisWeek, 'Weekly opens on this week');
     assert.deepEqual(dv.errors, []);
     await dv.close();
@@ -961,7 +981,7 @@ async function noScroll(page) {
       assert.deepEqual(await one.$$eval('table.day-table thead th', t => t.map(x => x.textContent.trim().toUpperCase())), ['DAY', 'RUNS?', 'START TIME', 'LOAD DAY', 'MILES', 'HOURS', 'ORDER', 'TRUCK', 'TRAILER', 'JACK', 'DAY NOTES']);
       assert.equal(await one.$eval('table.day-table tr:nth-child(2) input[data-field="tractor"]', i => i.placeholder), 'none set', '802 runs Monday with no default truck');
       const tiles = await one.$$eval('.actions.tiles > button, .actions.tiles > a.button', b => b.map(x => { const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), fits: x.scrollWidth <= x.clientWidth }; }));
-      assert.equal(tiles.length, 5);
+      assert.equal(tiles.length, 4);
       assert.equal(await one.$('#to-template'), null, 'Joe 10/10: Driver Weekly Template is on the Drivers menu, not the Route Editor');
       assert.ok(tiles.every(t => t.w <= 116 && t.h >= 56 && t.fits && t.top === tiles[0].top), 'square tiles in one row at ' + w + ': ' + JSON.stringify(tiles));
       assert.deepEqual(one.errors, []);
@@ -975,13 +995,13 @@ async function noScroll(page) {
       for (const v of ['days', 'seq', 'rules']) {
         await rd.selectOption('#view-select', v);
         const row = await rd.$$eval('.actions.tiles > button, .actions.tiles > a.button', b => b.map(x => { const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right) }; }));
-        assert.equal(row.length, 5);
+        assert.equal(row.length, 4);
         assert.ok(row.every((t, i) => t.w === row[0].w && t.h === row[0].h && t.top === row[0].top && (i === 0 || t.left - row[i - 1].right <= 12)), 'Route Days ' + v + ' buttons in one even row at ' + w + ': ' + JSON.stringify(row));
       }
       assert.deepEqual(rd.errors, []);
       await rd.close();
     }
-    results.push('Route Days: Refresh, Add Route, Add Run, Holiday Week Editor and Dispatch Administration sit together in one even row at both sizes');
+    results.push('Route Days: Refresh, Add Route, Add Run and Holiday Week Editor sit together in one even row at both sizes');
     // Joe 10/10: Home is the old app's launcher, one big picture per side; each side's menu lists only its own screens.
     const lp = await openPage(browser, 1920, 950, '/index.html?testEmail=manager.test@uniteddairy.com');
     await lp.waitForSelector('.launch-card');
@@ -990,14 +1010,20 @@ async function noScroll(page) {
     assert.equal(await lp.$('.sidemenu .side-sec'), null, 'Home lists the sides, not every screen');
     assert.deepEqual(await lp.$$eval('.sidemenu a[data-side]', a => a.map(x => x.textContent.trim())), ['Route Distribution', 'Plant Operations', 'Fleet & Maintenance']);
     if (SHOTS) await lp.screenshot({ path: path.join(SHOTS, 'home-launcher-1920.png') });
-    await Promise.all([lp.waitForURL(/plant\.html/), lp.click('.launch-card[data-side="plant"]')]);
+    // Joe 10/10: the Plant Operations picture opens Manager Center; the Plant side shows its sections (Manager Center's cards)
+    // with fly-outs, and Back from a plant screen goes up to Manager Center.
+    await Promise.all([lp.waitForURL(/manager\.html/), lp.click('.launch-card[data-side="plant"]')]);
     await lp.waitForSelector('.sidemenu a.side-name');
-    const plantMenu = await lp.$$eval('.sidemenu > a', a => a.map(x => x.textContent.trim()));
-    assert.deepEqual(plantMenu, ['Plant Operations', 'Loadout Center', 'Unloading & Washing', 'Product Returns', 'Truck Washing', 'Plant Operations Scheduler', 'Yard Checks', 'Production Line Status & Quality', 'Shift Notes', 'Temperatures & Coolers', 'Manager Center'], 'the Plant side lists only plant screens');
-    assert.equal(await lp.$('.sidemenu .side-sec'), null, 'no Dispatch, Drivers or Equipment sections on the Plant side');
-    await Promise.all([lp.waitForURL(/scheduler\.html/), lp.click('.sidemenu a[href="scheduler.html"]')]);
-    await lp.waitForSelector('.sidemenu a[href="scheduler.html"].on');
-    await Promise.all([lp.waitForURL(/plant\.html/), lp.click('#go-back')]);
+    assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'plant');
+    const plantMenu = await lp.$$eval('.sidemenu > a:not(.side-name), .sidemenu > .side-sec', e => e.map(x => x.matches('a') ? x.textContent.trim() : x.querySelector('.side-sec-btn').getAttribute('title')));
+    assert.deepEqual(plantMenu.filter(x => x !== 'Home'), ['Send Report', 'Yard Checks', 'Plant Operations Scheduler', 'Plant Distribution Departments', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'], 'the Plant side lists its own sections');
+    assert.equal(await lp.$$eval('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]', b => b.length), 1, 'a section with several screens has a fly-out');
+    assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)).then(t => t.filter(x => ['Dispatch', 'Drivers', 'Equipment', 'GPS / Fleet'].indexOf(x) >= 0)), [], 'no Dispatch, Drivers or Equipment sections on the Plant side');
+    await lp.hover('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]');
+    await lp.waitForSelector('.side-flyouts .flyout.open a[href="loadout.html"]', { state: 'visible' });
+    await Promise.all([lp.waitForURL(/loadout\.html/), lp.click('.side-flyouts .flyout.open a[href="loadout.html"]')]);
+    await lp.waitForSelector('.sidemenu a.side-name[data-side="plant"]');
+    await Promise.all([lp.waitForURL(/manager\.html/), lp.click('#go-back')]);
     await Promise.all([lp.waitForURL(/index\.html/), lp.click('#go-home')]);
     await Promise.all([lp.waitForURL(/maint\.html/), lp.click('.launch-card[data-side="fleet"]')]);
     await lp.waitForSelector('.sidemenu .side-sec');

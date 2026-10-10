@@ -63,9 +63,11 @@ export function modeLabel(testText) {
 }
 
 // Checked when the list opens, so a unit put down a moment ago on this screen is already left out.
-const units = (all, opts) => (opts && opts.override) ? all : all.filter(e => !L.unitOff(e));
+const units = (all, opts) => (opts && opts.override) ? all : all.filter(e => !L.unitOff(e) && !(opts && opts.conflicts && opts.conflicts[e.id]));
+// Why a unit is normally left out: down / out first, then on the road on another run (opts.conflicts, L.unitConflicts).
+const unitWhy = (e, opts) => L.unitOff(e) ? e.status : (opts && opts.conflicts && opts.conflicts[e.id]) || '';
 
-// opts = {override, date}: with OVR every driver and unit is offered, marked with why it is normally left out.
+// opts = {override, date, conflicts}: with OVR every driver and unit is offered, marked with why it is normally left out.
 const KINDS = {
   driver: { action: 'assignDriver', field: 'driverId', idKey: 'driverId', textKey: 'driver', list: (opts) => {
     opts = opts || {};
@@ -77,15 +79,15 @@ const KINDS = {
       return { id: d.id, text: d.name + (why && opts.override ? '  [' + why + ']' : '') };
     }).filter(Boolean);
   } },
-  truck: { action: 'assignTruck', field: 'equipmentId', idKey: 'truckId', textKey: 'truck', list: (opts) => units(lists.allTrucks, opts).map(e => ({ id: e.id, text: e.unit + (L.unitOff(e) ? '  [' + e.status + ']' : '') })) },
-  trailer: { action: 'assignTrailer', field: 'equipmentId', idKey: 'trailerId', textKey: 'trailer', list: (opts) => units(lists.allTrailers, opts).map(e => ({ id: e.id, text: e.unit + (L.unitOff(e) ? '  [' + e.status + ']' : '') })) }
+  truck: { action: 'assignTruck', field: 'equipmentId', idKey: 'truckId', textKey: 'truck', list: (opts) => units(lists.allTrucks, opts).map(e => ({ id: e.id, text: e.unit + (unitWhy(e, opts) ? '  [' + unitWhy(e, opts) + ']' : ''), why: !!unitWhy(e, opts) })) },
+  trailer: { action: 'assignTrailer', field: 'equipmentId', idKey: 'trailerId', textKey: 'trailer', list: (opts) => units(lists.allTrailers, opts).map(e => ({ id: e.id, text: e.unit + (unitWhy(e, opts) ? '  [' + unitWhy(e, opts) + ']' : ''), why: !!unitWhy(e, opts) })) }
 };
 
 export function optionsHtml(kind, current, busy, opts) {
   const list = KINDS[kind].list(opts);
   // A unit already on the run stays shown even when it is kept at another branch.
   if (current && kind !== 'driver' && !list.some(o => o.id === current) && pickText(kind, current)) list.unshift({ id: current, text: pickText(kind, current) });
-  const opt = (o) => '<option value="' + escapeHtml(o.id) + '"' + (o.id === current ? ' selected' : '') + '>' + escapeHtml(o.text + (busy && busy[o.id] && o.id !== current ? '  (' + busy[o.id] + ')' : '')) + '</option>';
+  const opt = (o) => '<option value="' + escapeHtml(o.id) + '"' + (o.id === current ? ' selected' : '') + '>' + escapeHtml(o.text + (busy && busy[o.id] && o.id !== current && !o.why ? '  (' + busy[o.id] + ')' : '')) + '</option>';
   const cvg = kind === 'driver' ? cvgOptions() : [];
   return '<option value="">(none)</option>' + list.map(opt).join('') + (cvg.length ? '<optgroup label="Other CVG / Carriers">' + cvg.map(opt).join('') + '</optgroup>' : '');
 }
