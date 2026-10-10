@@ -1002,10 +1002,11 @@ async function noScroll(page) {
     await Promise.all([lp.waitForURL(/maint\.html/), lp.click('.launch-card[data-side="fleet"]')]);
     await lp.waitForSelector('.sidemenu .side-sec');
     assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)), ['Equipment', 'GPS / Fleet'], 'the Fleet & Maintenance side lists only its own sections');
-    // Over the Road is on two sides: opened from Fleet & Maintenance, its menu stays on that side.
+    // Joe 10/10: Over the Road and Trucks Today are manager reports, only under Route Distribution's Reports; opened
+    // after Fleet & Maintenance, Over the Road shows the Route Distribution side.
     await lp.goto(lp.url().replace(/maint\.html.*/, 'otr.html?testEmail=manager.test@uniteddairy.com'));
     await lp.waitForSelector('.sidemenu a.side-name');
-    assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'fleet');
+    assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'distribution');
     assert.deepEqual(lp.errors, []);
     await lp.close();
     results.push('Home: three big pictures (Route Distribution, Plant Operations, Fleet & Maintenance); each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
@@ -1020,6 +1021,7 @@ async function noScroll(page) {
     assert.deepEqual(sec('Drivers'), ['Drivers', 'Driver Weekly Template (assign routes)', 'Driver Assignment Board', 'Vacation Schedule'], 'Joe 10/10: route assignment has a link under Drivers');
     assert.ok(sec('Dispatch').indexOf('Driver Assignment Board') >= 0, 'the board stays under Dispatch too');
     assert.deepEqual(menu.map(m => m[0]), ['Dispatch', 'Drivers', 'Reports', 'Overall', 'Administration'], 'the Route Distribution side lists only its own sections');
+    assert.deepEqual(sec('Reports'), ['Driver Scorecard', 'Over the Road', 'Trucks Today'], 'Joe 10/10: the manager reports');
     await mp.close();
     const mq = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
     await mq.waitForSelector('.side-flyouts .flyout', { state: 'attached' });
@@ -1031,6 +1033,10 @@ async function noScroll(page) {
     await hub.waitForSelector('.hub-card[data-kind="GARAGE"] .hub-tile');
     assert.equal(await hub.$$eval('.hub-kpis div', d => d.length), 6);
     assert.deepEqual(await hub.$$eval('.hub-card strong', d => d.map(x => x.textContent)), ['Truck Issues', 'Trailer Issues', 'Fork Truck / Pallet Jack Issues', 'Garage']);
+    // Joe 10/10: Over the Road and Trucks Today are off the hub (they are under Reports); eleven write-ups at most; no scrolling.
+    assert.deepEqual(await hub.$$eval('.hub-tiles > a', a => a.map(x => x.textContent.trim())), ['Garage Station', 'Fleet Service', 'Equipment']);
+    assert.ok(await hub.$$eval('#latest tr', r => r.length) <= 11);
+    assert.ok(await hub.evaluate(() => document.scrollingElement.scrollHeight <= innerHeight && document.querySelector('.hub-view').scrollHeight <= document.querySelector('.hub-view').clientHeight), 'the hub fits 1920x950');
     await hub.waitForFunction(() => [...document.querySelectorAll('.hub-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 3, null, { timeout: 10000 });
     await Promise.all([hub.waitForNavigation(), hub.click('.hub-card[data-kind="TRUCK"] .hub-card-head')]);
     assert.match(hub.url(), /issues\.html\?kind=TRUCK$/);

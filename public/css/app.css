@@ -984,6 +984,9 @@ td.eq-day span { display: block; white-space: nowrap; }
 .hub-latest table { width: 100%; table-layout: fixed; }
 .hub-latest tbody tr { cursor: pointer; }
 .hub-latest td.wrong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Joe 10/10: the hub fits his screen with no scrolling: eleven write-ups, each a little shorter, ending in line with the cards. */
+.issues-page .hub-latest table.issues td { height: 40px; padding-top: 3px; padding-bottom: 3px; line-height: 1.15; }
+.issues-page .hub-latest table.issues th { height: 40px; }
 @media (max-width: 1500px) {
   .hub-body { grid-template-columns: 1fr; }
   .hub-card-head { grid-template-columns: 72px 1fr auto; }
