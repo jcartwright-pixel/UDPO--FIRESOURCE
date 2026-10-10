@@ -75,7 +75,7 @@ export const MENU = [
   ['Send Report', [['Send Current Report', 'manager.html?report=1', 'star']]],
   ['Yard Checks', [['Yard Checks', 'yard.html', 'yard-checks.webp']]],
   ['Plant Operations Scheduler', [['Plant Operations Scheduler', 'scheduler.html', 'week']]],
-  ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash']]],
+  ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Trailer Assignments', 'trailers.html', 'load'], ['Plant Station', 'plant-station.html', 'factory']]],
   ['Quality Checks', [['Quality Checks', 'quality.html', 'production.webp']]],
   ['Cooler Temperature', [['Cooler Temperature', 'temps.html', 'temperatures.webp']]],
   ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]]

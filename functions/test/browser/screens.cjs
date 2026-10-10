@@ -818,11 +818,11 @@ async function noScroll(page) {
     await cvgDaily.close();
     await ops.goto(ops.url().replace(/\/[a-z]+\.html.*/, '/maint.html?testEmail=manager.test@uniteddairy.com'));
     await ops.waitForSelector('#to-garage-station');
-    await Promise.all([ops.waitForURL(/soon\.html\?what=garage-station/), ops.click('#to-garage-station')]);
+    await Promise.all([ops.waitForURL(/garage-station\.html/), ops.click('#to-garage-station')]);
     await ops.waitForFunction(() => document.getElementById('title').textContent === 'Garage Station');
     assert.deepEqual(ops.errors, []);
     await ops.close();
-    results.push('Dispatch Administration: no card leaves the new app; Print Layouts, Dispatch Settings and Operational Assignments open here; a manager added Beckley and turned Marietta off, and Daily offers the active ones under Other CVG / Carriers; Garage Station opens a being-built page inside the new app');
+    results.push('Dispatch Administration: no card leaves the new app; Print Layouts, Dispatch Settings and Operational Assignments open here; a manager added Beckley and turned Marietta off, and Daily offers the active ones under Other CVG / Carriers; Garage Station opens the new Garage Station screen (Joe 10/10)');
     // Joe 10/10: Daily and Weekly each have a tile to the other (same window, same week); the menu's Driver Assignment Board opens Weekly at the board.
     const hop = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await hop.waitForSelector('#go-weekly[href*="week=2026-10-06"]');
