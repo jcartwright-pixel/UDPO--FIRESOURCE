@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Incident &amp; Breakdown Log · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page quality-page shift-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Incident &amp; Breakdown Log</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Timestamped Shift Entry</span><h1>Incident &amp; Breakdown Log</h1></div>
+      <div class="tabs" id="panes" role="tablist" aria-label="Log view"><button type="button" data-pane="current">Current</button><button type="button" data-pane="history">24-Hour History</button></div>
+      <div class="hstats" id="hstats"></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="notice ok" id="saved" hidden></div>
+    <div class="view">
+      <section class="qc-form sn-form" id="pane-current">
+        <div class="qc-top"><h2>New Entry</h2><span class="qc-last" id="form-last"></span>
+          <div class="qc-actions"><button type="button" class="qc-btn" id="clear">Clear</button><button type="button" class="qc-btn primary" id="record">Save Timestamped Entry</button></div></div>
+        <div class="qc-fields" id="fields"></div>
+      </section>
+      <section class="sn-history" id="pane-history" hidden>
+        <h2>Last 24 Hours</h2>
+        <div id="history"></div>
+      </section>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic, U = window.UDPlant;
+    const params = new URLSearchParams(location.search);
+    const today = () => L.operatingDay(new Date());
+    const phone = window.matchMedia('(max-width: 760px)');
+    let pane = params.get('view') === 'history' ? 'history' : 'current';
+    let journal = [], person = null, app = {}, drawnFor = '';
+    const pending = [];
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const FOLLOW = { OPEN: 'Needs attention', MONITOR: 'Monitor', RESOLVED: 'Resolved' };
+    const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
+    const clockNow = () => new Date().toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
+    const opt = (value, current, label) => '<option value="' + value + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + escapeHtml(label || value) + '</option>';
+    const followSelect = (cls, current, words) => '<select class="' + cls + '">' + U.FOLLOW_UPS.map(f => opt(f, current, words ? FOLLOW[f] : f)).join('') + '</select>';
+
+    // A saved entry stays on screen as sent until its own record comes back from the database, then only that one shows.
+    function log() { const have = new Set(journal.map(d => d.recordId)); return U.shiftLog(journal.concat(pending.filter(p => !have.has(p.payload.entryId))), Date.now()); }
+
+    // The entry form, as the current app: the desktop form, or the phone's shorter one (time recorded automatically).
+    function drawForm() {
+      const ck = canSave(), m = phone.matches, shift = U.shiftAt(Date.now());
+      const types = '<label>Type<select class="sn-type">' + U.ENTRY_TYPES.map(t => opt(t, 'Breakdown')).join('') + '</select></label>';
+      const shifts = '<label>Shift<select class="sn-shift">' + U.SHIFTS.map(s => opt(s, shift)).join('') + '</select></label>';
+      const equip = '<label' + (m ? ' class="wide"' : '') + '>Equipment / area<input class="sn-equip" maxlength="80" placeholder="Dock 3 door, Palletizer, Truck 214…"></label>';
+      document.getElementById('fields').innerHTML = m
+        ? types + shifts + equip + '<label class="wide">What happened?<textarea class="sn-entry" maxlength="4000" placeholder="What happened, and what has been done."></textarea></label>' +
+          '<label class="wide"><span>Next steps <i class="sn-opt">Optional</i></span><textarea class="sn-notes" maxlength="1500" placeholder="What needs attention or follow-up from the next shift?"></textarea></label>' +
+          '<label>Status' + followSelect('sn-follow', 'OPEN', true) + '</label>'
+        : types + equip + shifts + '<label>Reading Time<input class="sn-time" type="time" value="' + clockNow() + '"></label>' +
+          '<label class="wide">Entry / Measurements<textarea class="sn-entry" maxlength="4000" placeholder="Enter readings, production status, outage details, quality results, or handoff information."></textarea></label>' +
+          '<label class="wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500"></textarea></label>' +
+          '<label>Follow-up' + followSelect('sn-follow', 'OPEN', false) + '</label>';
+      document.getElementById('fields').querySelectorAll('input,select,textarea').forEach(x => { x.disabled = !ck; });
+      document.getElementById('record').textContent = m ? 'Save Entry' : 'Save Timestamped Entry';
+      document.getElementById('form-last').textContent = m ? 'Time recorded automatically' : '';
+      document.getElementById('clear').hidden = !ck;
+      document.getElementById('record').hidden = !ck;
+      drawnFor = (m ? 'phone' : 'desk') + '|' + ck;
+    }
+
+    function card(x, ck) {
+      const status = String(x.status || 'OPEN').toLowerCase(), id = escapeHtml(x.entryId);
+      return '<article class="sn-card"><div class="sn-card-head"><strong>' + escapeHtml([stamp(x.recordedAt) || x.readingTime, x.type || 'Note', x.equipment, x.shift].filter(Boolean).join(' · ')) + '</strong>' +
+        '<span class="sn-status s-' + status + '">' + escapeHtml(U.followLabel(x.status)) + '</span></div>' +
+        (x.entry ? '<p>' + escapeHtml(x.entry) + '</p>' : '') + (x.notes ? '<p class="sn-next"><b>Next steps:</b> ' + escapeHtml(x.notes) + '</p>' : '') +
+        x.reviews.map(r => '<div class="sn-review"><b>Review · ' + escapeHtml(stamp(r.recordedAt)) + ' · ' + escapeHtml(U.followLabel(r.followUpStatus)) + '</b> ' + escapeHtml(r.entry) + '<small>' + escapeHtml(r.recordedBy) + '</small></div>').join('') +
+        (ck && x.entryId && !/^pending-/.test(x.entryId) ? '<div class="sn-addreview"><input data-review-text="' + id + '" maxlength="500" placeholder="Add a review note">' +
+          '<select data-review-status="' + id + '">' + U.FOLLOW_UPS.map(f => opt(f, x.status, FOLLOW[f])).join('') + '</select><button type="button" class="qc-btn primary" data-review-save="' + id + '">Add</button></div>' : '') +
+        '<small class="sn-by">' + escapeHtml(x.recordedBy) + (/^pending-/.test(x.entryId) ? ' · saving…' : '') + '</small></article>';
+    }
+
+    function render() {
+      const rows = log(), ck = canSave(), open = rows.filter(r => r.status !== 'RESOLVED').length;
+      document.getElementById('hstats').innerHTML = [['Entries 24 h', rows.length, ''], ['Needs attention', rows.filter(r => r.status === 'OPEN').length, open ? 'warn' : ''], ['Monitor', rows.filter(r => r.status === 'MONITOR').length, ''], ['Resolved', rows.filter(r => r.status === 'RESOLVED').length, 'good']]
+        .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
+      document.getElementById('pane-current').hidden = pane !== 'current';
+      document.getElementById('pane-history').hidden = pane !== 'history';
+      document.getElementById('eyebrow').textContent = phone.matches ? 'Same log as the desktop' : 'Timestamped Shift Entry';
+      if (drawnFor !== (phone.matches ? 'phone' : 'desk') + '|' + ck) drawForm();
+      // The log is not redrawn while someone is typing a review note in it.
+      const box = document.getElementById('history'), typing = box.contains(document.activeElement) && document.activeElement.value;
+      if (!typing) box.innerHTML = rows.map(r => card(r, ck)).join('') || '<div class="empty">No entries in the last 24 hours.</div>';
+      document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Save keeps the entry with the time on the 24-hour log; anyone can add a review note to it there.' : 'View only.') : rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' in the last 24 hours.';
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+    }
+
+    // Shown at once on the log; taken off again if the save fails.
+    async function send(fields, mine, okText, onFail) {
+      pending.push(mine);
+      render();
+      const ok = document.getElementById('saved');
+      ok.textContent = okText; ok.hidden = false;
+      try {
+        const done = await save('saveShiftNote', fields);
+        if (done && done.entryId) mine.payload.entryId = done.entryId;
+        showError('');
+        render();
+        setTimeout(() => { ok.hidden = true; }, 2500);
+        setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); render(); }, 20000);
+      } catch (e) {
+        const i = pending.indexOf(mine);
+        if (i >= 0) pending.splice(i, 1);
+        ok.hidden = true;
+        onFail();
+        render();
+        showError(e.message || String(e));
+      }
+    }
+    const record = (values, extra) => ({ type: U.SHIFT_TYPE, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, area: 'HANDOFF', payload: Object.assign({ section: 'HANDOFF', values }, extra) });
+
+    document.getElementById('record').onclick = () => {
+      const f = document.getElementById('fields'), v = (c) => { const n = f.querySelector('.' + c); return n ? n.value.trim() : ''; };
+      const entry = v('sn-entry'), notes = v('sn-notes');
+      if (!entry && !notes) { showError('Enter report information before saving.'); return; }
+      const values = { Entry: entry, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') };
+      const fields = { values, notes, shift: v('sn-shift'), readingTime: v('sn-time') || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
+      const kept = Array.from(f.querySelectorAll('input,textarea,select')).map(x => x.value);
+      const mine = record(values, { entryId: 'pending-' + Date.now(), shift: fields.shift, readingTime: fields.readingTime, notes, followUpStatus: fields.followUpStatus });
+      drawForm();
+      send(fields, mine, 'Entry saved to the log.', () => { Array.from(f.querySelectorAll('input,textarea,select')).forEach((x, i) => { if (kept[i] !== undefined) x.value = kept[i]; }); });
+    };
+    document.getElementById('clear').onclick = () => drawForm();
+    document.getElementById('history').addEventListener('click', e => {
+      const b = e.target.closest('[data-review-save]');
+      if (!b) return;
+      const id = b.dataset.reviewSave, box = document.getElementById('history');
+      const input = box.querySelector('[data-review-text="' + CSS.escape(id) + '"]'), status = box.querySelector('[data-review-status="' + CSS.escape(id) + '"]');
+      const note = input.value.trim();
+      if (!note) { showError('Enter the review note before adding it.'); return; }
+      const values = { Entry: note, Type: 'REVIEW', ParentId: id };
+      input.value = '';
+      input.blur();
+      send({ values, notes: '', readingTime: clockNow(), followUpStatus: status.value }, record(values, { followUpStatus: status.value }), 'Review note added.', () => {});
+    });
+    document.getElementById('history').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-review-text]')) { const b = e.target.parentElement.querySelector('[data-review-save]'); if (b) b.click(); } });
+    document.getElementById('panes').addEventListener('click', e => {
+      const b = e.target.closest('[data-pane]');
+      if (!b) return;
+      pane = b.dataset.pane;
+      history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
+      render();
+    });
+    phone.addEventListener('change', render);
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      let unsub = null, day = '';
+      const watch = () => { const t = today(); if (t === day) return; day = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(t, -1), t])), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the log')); };
+      watch();
+      setInterval(() => { watch(); render(); }, 60000);
+      render();
+    });
+  </script>
+</body>
+</html>
