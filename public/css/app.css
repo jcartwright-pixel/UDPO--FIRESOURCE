@@ -1269,5 +1269,4 @@ body.embed .head > .title { display: none; }
   .brand strong { font-size: 15px; line-height: 1.15; white-space: normal; overflow-wrap: anywhere; }
   .brand small { display: none; }
   .topbar .who, .topbar #signout { flex: none; }
-
 }
