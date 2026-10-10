@@ -21,7 +21,7 @@ export async function watchLists(user, onChange) {
   const { db } = await start();
   onSnapshot(collection(db, 'drivers'), snap => {
     lists.allDrivers = snap.docs.map(d => d.data()).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-    lists.drivers = lists.allDrivers.filter(d => d.status === 'ACTIVE');
+    lists.drivers = lists.allDrivers.filter(d => L.driverActive(d));
     onChange();
   });
   onSnapshot(collection(db, 'equipment'), snap => {
@@ -71,7 +71,7 @@ const KINDS = {
     return pool.map(d => {
       const off = opts.date ? L.exceptionOn(lists.exceptions, d.id, opts.date) : null;
       if (off && !opts.override) return null;
-      const why = d.status !== 'ACTIVE' ? d.status : off ? L.exceptionLabel(off) : '';
+      const why = !L.driverActive(d) ? d.status : off ? L.exceptionLabel(off) : '';
       return { id: d.id, text: d.name + (why && opts.override ? '  [' + why + ']' : '') };
     }).filter(Boolean);
   } },

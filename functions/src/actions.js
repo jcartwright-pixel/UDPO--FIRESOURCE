@@ -256,7 +256,7 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
     const d = snap.data();
     if (!req.override) {
-      if (d.status && d.status !== 'ACTIVE') throw new SaveError('NOT_ALLOWED', d.name + ' is ' + d.status + ' in Driver Master (tick OVR to use them anyway)');
+      if (!L.driverActive(d)) throw new SaveError('NOT_ALLOWED', d.name + ' is ' + d.status + ' in Driver Master (tick OVR to use them anyway)');
       const date = L.addDays(run.weekStart, L.DAYS.indexOf(req.day));
       const off = await tx.get(db.collection(C.exceptions).where('driverId', '==', d.id));
       const e = L.exceptionOn(off.docs.map(x => x.data()), d.id, date);
@@ -610,7 +610,7 @@ async function requireDriver(tx, db, driverId) {
 /* ---------- Route Editor (Route Master copy; ROUTES_MASTER itself is not written yet) ---------- */
 const ROUTE_FIELDS = { route: 'text', routeName: 'text', run: 'text', loadType: 'text', movementType: 'text', coverageOwner: 'text', coverageType: 'text',
   departureDay: 'text', routeNotes: 'text', weekOrder: 'number', active: 'bool', sleeper: 'bool', dropAndHook: 'bool', displayDaily: 'bool',
-  displayWeekly: 'bool', displayPlant: 'bool', displayMobile: 'bool', routeStatus: 'text' };
+  displayWeekly: 'bool', displayPlant: 'bool', displayMobile: 'bool', displayRouteMaster: 'bool', routeStatus: 'text' };
 const ROUTE_DAY_FIELDS = { active: 'bool', dispatchTime: 'time', loadOrder: 'number', miles: 'number', hours: 'hours', loadDayOffset: 'offset',
   forklift: 'unit', tractor: 'unit', trailer: 'trailer', notes: 'text' };
 function routeValue(kind, v, label) {
@@ -649,7 +649,7 @@ async function saveRoute(tx, db, req, email, stamp, logRef, mode) {
     const days = {};
     L.DAYS.forEach(p => { days[p] = Object.assign({ active: false, dispatchTime: null, loadOrder: null, miles: null, hours: '', loadDayOffset: null, forklift: '', tractor: '', trailer: '', notes: '' }, req.days[p] || {}); });
     const made = Object.assign({ id, routeId: 'rte_app_' + M.safeIdPart(String(req.fields.route)).toLowerCase(), routeStatus: 'ACTIVE', active: true, displayDaily: true, displayWeekly: true,
-      displayPlant: true, displayMobile: true, createdInApp: true, createdAt: stamp, createdBy: email }, req.fields, { days, testEdited: true, editedAt: stamp, editedBy: email });
+      displayPlant: true, displayMobile: true, displayRouteMaster: true, createdInApp: true, createdAt: stamp, createdBy: email }, req.fields, { days, testEdited: true, editedAt: stamp, editedBy: email });
     tx.set(ref, made);
     const { createdInApp, createdAt, createdBy, testEdited, editedAt, editedBy, id: madeId, ...sheetFields } = made;
     queueMaster(tx, db, mode, req.requestId, '', ref, id, sheetFields, true, stamp, email);

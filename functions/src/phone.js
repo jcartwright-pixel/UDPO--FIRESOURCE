@@ -73,7 +73,7 @@ async function phoneCall(db, input, now) {
   if (!(await checkCode(db, String(input.code || '').slice(0, 40), stamp))) throw new SaveError('NOT_ALLOWED', 'That code is not right. Ask Dispatch for the Route Distribution code.');
   const op = String(input.op || '');
   if (op === 'roster') {
-    const drivers = (await db.collection(C.drivers).get()).docs.map(d => d.data()).filter(d => d.name && (d.status || 'ACTIVE') === 'ACTIVE');
+    const drivers = (await db.collection(C.drivers).get()).docs.map(d => d.data()).filter(d => d.name && L.driverActive(d));
     return { drivers: drivers.map(d => ({ id: d.id, name: d.name })).sort((a, b) => a.name.localeCompare(b.name)), dates: allowedDates(stamp) };
   }
   const driverId = String(input.driverId || '').slice(0, 120);

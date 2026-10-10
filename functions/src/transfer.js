@@ -52,7 +52,8 @@ const MASTER_KINDS = Object.freeze({
     collection: C.equipment, idColumn: 'equipment_id',
     build: (get) => ({
       type: get('equipment_type').toUpperCase(), unit: get('unit_id'), status: get('status').toUpperCase(),
-      location: get('location'), facilityId: get('facility_id'), notes: get('notes'), assignmentClass: get('assignment_class')
+      location: get('location'), facilityId: get('facility_id'), notes: get('notes'), assignmentClass: get('assignment_class'),
+      sourcePresent: L.optionalYes(get('source_present'))
     })
   },
   routes: {

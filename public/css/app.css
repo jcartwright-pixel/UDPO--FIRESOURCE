@@ -614,3 +614,4 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
   body:not(.side-open) .sidemenu .side-back span { display: none; }
   body:not(.side-open) .sidemenu .side-back { justify-content: center; padding: 10px 0; }
 }
+.routes-page button.rule small { display: block; font-size: 10px; font-weight: 700; color: #c7d3de; text-transform: lowercase; line-height: 1; }

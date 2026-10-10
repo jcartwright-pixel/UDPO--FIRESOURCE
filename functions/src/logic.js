@@ -117,6 +117,39 @@
     return true;
   }
 
+  // Route Master's own yes / no rules, exactly as the current app's Route Editor reads a row (desktopRouteConfigParseCanonicalRowV5054_):
+  // a run is active only when route_status is ACTIVE (a blank status is ACTIVE) AND its active cell says yes; a blank active cell
+  // is NOT active (Rhino 834). Each show flag is yes only when its cell says yes; a blank show cell is NO. A field the record does
+  // not carry at all (an older copy without that column) stays yes, as the current app does when the column is missing.
+  function masterActive(r) {
+    if (!r) return false;
+    var status = String(r.routeStatus || 'ACTIVE').trim().toUpperCase();
+    if (status !== 'ACTIVE') return false;
+    return r.active === undefined ? true : r.active === true;
+  }
+  function masterFlag(r, field) {
+    if (!r) return false;
+    if (r[field] === undefined) return field === 'displayDaily' ? String(r.movementType || '').toUpperCase() !== 'CUSTOMER_PICKUP' : true;
+    return r[field] === true;
+  }
+
+  // A driver is active unless Driver Master says INACTIVE, TERMINATED or DISABLED (udpoV7000DriverIsActive_; a blank status is active).
+  function driverActive(d) {
+    if (!d) return false;
+    if (['INACTIVE', 'TERMINATED', 'DISABLED'].indexOf(String(d.status || '').trim().toUpperCase()) >= 0) return false;
+    return d.active === undefined || d.active === null || d.active === '' ? true : d.active === true;
+  }
+  // A truck, trailer or pallet jack can be put on a run only when its status is AVAILABLE, ACTIVE, IN SERVICE or READY and,
+  // for trucks and trailers, it is still on the United Dairy fleet list import (source_present), as udpoV7000EquipmentIsActive_.
+  var UNIT_ON_STATUSES = ['AVAILABLE', 'ACTIVE', 'IN SERVICE', 'READY'];
+  function unitUsable(unit) {
+    if (!unit) return false;
+    if (UNIT_ON_STATUSES.indexOf(String(unit.status || '').trim().toUpperCase()) < 0) return false;
+    var type = String(unit.type || '').toUpperCase();
+    if ((type === 'TRUCK' || type === 'TRACTOR' || type === 'TRAILER') && unit.sourcePresent === false) return false;
+    return true;
+  }
+
   // Which day blocks of a Live row load on loadDate. Day blocks are DELIVERY days; a load goes out
   // loadDayOffset days before (offset -1 = loaded the day before delivery). A blank offset is -1, as today.
   function loadBlocksFor(run, loadDate) {
@@ -272,7 +305,7 @@
       return {
         id: d.id, name: d.name || '', status: d.status || '', reliefDriver: !!d.reliefDriver, seniorityDate: seniority,
         hireDate: dateKey(d.hireDate), vacationWeeks: vacationWeeks(d.hireDate, asOf), defaultTruckId: d.defaultTruckId || '',
-        unavailableReason: d.unavailableReason || '', active: String(d.status || '').toUpperCase() === 'ACTIVE'
+        unavailableReason: d.unavailableReason || '', active: driverActive(d)
       };
     });
     rows.sort(function (a, b) {
@@ -321,7 +354,7 @@
     var covered = daily.filter(function (r) { return !needsDriver(r); }).length;
     var week = weeklyRows(runs, weekStart(today));
     var checkins = checkinRows(runs, today);
-    var active = (drivers || []).filter(function (d) { return String(d.status).toUpperCase() === 'ACTIVE'; });
+    var active = (drivers || []).filter(driverActive);
     var units = (equipment || []).filter(function (e) { return e.status !== 'INACTIVE'; });
     return {
       daily: { loads: daily.length, needsDriver: daily.length - covered, covered: daily.length ? Math.round(covered * 100 / daily.length) : 100 },
@@ -334,7 +367,9 @@
 
   // Truck and trailer choices skip these, as the current app does (unless OVR is ticked).
   var UNIT_OFF_STATUSES = ['DOWN', 'INACTIVE', 'OUT', 'OUT OF SERVICE', 'OOS', 'REPAIR', 'DISABLED', 'UNAVAILABLE'];
-  function unitOff(unit) { return UNIT_OFF_STATUSES.indexOf(String(unit && unit.status || '').trim().toUpperCase()) >= 0; }
+  // Off = not usable by the current app's rule (unitUsable below): a status outside AVAILABLE / ACTIVE / IN SERVICE / READY, or a truck
+  // or trailer no longer on the fleet list import.
+  function unitOff(unit) { return !unitUsable(unit); }
 
   // Runs that do not run on a load date's delivery day, for + Add Route / Run (blank load-day offset = -1).
   function notRunningRows(runs, loadDate) {
@@ -467,7 +502,7 @@
     return stream || (!run || run.toUpperCase() === route.toUpperCase() ? route : route + ' ' + run);
   }
   function driverBoardRows(drivers, rows, exceptions, week) {
-    var list = (drivers || []).filter(function (d) { return String(d.status || '').toUpperCase() === 'ACTIVE'; }).map(function (d) {
+    var list = (drivers || []).filter(driverActive).map(function (d) {
       return { id: d.id, name: d.name || '', relief: !!d.reliefDriver, cells: d.cells && Object.keys(d.cells).length ? d.cells : null, seniorityDate: dateKey(d.seniorityDate) || dateKey(d.hireDate) || '9999-12-31', days: {} };
     });
     list.sort(function (a, b) { return (a.relief === b.relief ? 0 : a.relief ? -1 : 1) || a.seniorityDate.localeCompare(b.seniorityDate) || a.name.localeCompare(b.name); });
@@ -510,7 +545,7 @@
     return slot;
   }
   function resetWeekPlan(run, route, slots, exceptions) {
-    if (!route || ROUTE_OFF.indexOf(String(route.routeStatus || 'ACTIVE').toUpperCase()) >= 0 || route.active === false) return null;
+    if (!route || ROUTE_OFF.indexOf(String(route.routeStatus || 'ACTIVE').toUpperCase()) >= 0 || !masterActive(route)) return null;
     var plan = {};
     DAYS.forEach(function (p, i) {
       var rd = route.days && route.days[p] || {}, runs = !!rd.active, d = runs ? slots[run.runId + '|' + p] : null;
@@ -537,7 +572,7 @@
     noWriteUp: noWriteUp,
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
-    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, notRunningRows: notRunningRows,
+    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
@@ -546,7 +581,7 @@
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
-    yes: yes, optionalYes: optionalYes, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
+    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
   };

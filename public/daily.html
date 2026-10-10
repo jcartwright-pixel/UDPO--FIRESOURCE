@@ -314,7 +314,7 @@
     /* ---------- Driver Call-Off: a day off (or back to available) for a driver, saved to Driver Exceptions ---------- */
     document.getElementById('open-calloff').onclick = () => {
       const first = rows.find(r => !r.off), day = first ? first.deliveryDate : loadDate;
-      document.getElementById('off-driver').innerHTML = '<option value="">Pick a driver</option>' + lists.allDrivers.filter(d => d.status === 'ACTIVE')
+      document.getElementById('off-driver').innerHTML = '<option value="">Pick a driver</option>' + lists.allDrivers.filter(d => L.driverActive(d))
         .map(d => '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(d.name) + '</option>').join('');
       document.getElementById('off-start').value = day;
       document.getElementById('off-end').value = day;

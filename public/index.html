@@ -55,7 +55,7 @@
       n.conflicts = { open: data.conflicts };
       const off = (a, z) => new Set(data.vacations.filter(v => v.status === 'APPROVED' && v.startDate <= z && (v.endDate || v.startDate) >= a).map(v => v.driverId)).size;
       n.vacation = { today: off(today, today), week: off(L.weekStart(today), L.addDays(L.weekStart(today), 6)), pending: data.vacations.filter(v => v.status === 'PENDING').length };
-      const live = data.routes.filter(r => r.active !== false && String(r.routeStatus || 'ACTIVE').toUpperCase() === 'ACTIVE');
+      const live = data.routes.filter(r => L.masterActive(r));
       n.routes = { active: live.length, routes: new Set(live.map(r => r.route)).size };
       n.writeBack = { on: data.writeBack ? 'ON' : 'OFF' };
       // Same count as the Equipment screen's Down / out: trucks and trailers that are down, out of service or inactive.
