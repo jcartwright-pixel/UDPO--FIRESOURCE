@@ -912,3 +912,8 @@ tr.otr-on td { background: #e3f3e8; }
 .side-flyouts a:hover { background: #ffffff1c; }
 .side-flyouts a.on { background: #fff; color: #0b3d6b; }
 @media print { .side-flyouts { display: none !important; } }
+/* Equipment (Joe 10/10): Sun to Sat show each unit's default runs; today's column is marked. */
+th.eq-day, td.eq-day { padding-left: 2px !important; padding-right: 2px !important; font-size: 14px; text-align: center; white-space: normal; line-height: 1.1; }
+th.eq-day { text-transform: uppercase; }
+td.eq-day.today { background: #fff8e1; }
+td.eq-day.busy { color: #b3261e; font-weight: 800; }

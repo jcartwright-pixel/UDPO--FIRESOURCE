@@ -751,6 +751,19 @@ async function noScroll(page) {
       }
     }
     results.push('Menu fly-outs draw above the screen on Daily Dispatch and Equipment, with the menu open and folded');
+    // Joe 10/10: Equipment leaves off inactive units that are not down, and shows each unit's default runs Sun to Sat (Route Master).
+    await db().collection('equipment').doc('veh_trailer_t_904').set({ id: 'veh_trailer_t_904', type: 'TRAILER', unit: 'T-904', status: 'INACTIVE', location: 'UNIONTOWN', notes: 'External Fleet: 2001 | GREAT DANE' });
+    const eqd = await openPage(browser, 1920, 950, '/equipment.html?testEmail=dispatch.test@uniteddairy.com');
+    await eqd.waitForSelector('#rows tr[data-id="veh_truck_900001"]');
+    assert.deepEqual(await eqd.$$eval('thead th.eq-day', t => t.map(x => x.textContent)), ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    assert.equal(await eqd.$eval('#rows tr[data-id="veh_truck_900001"] td:nth-child(6)', td => td.textContent), '801', '900001 runs 801 on Monday by default');
+    assert.equal(await eqd.$eval('#rows tr[data-id="veh_trailer_t_901"] td:nth-child(6)', td => td.textContent), '801');
+    assert.equal(await eqd.$('#rows tr[data-id="veh_trailer_t_904"]'), null, 'an inactive unit that is not down is left off');
+    assert.equal(/External Fleet/.test(await eqd.$eval('#rows', t => t.textContent)), false);
+    assert.deepEqual(eqd.errors, []);
+    await eqd.close();
+    await db().collection('equipment').doc('veh_trailer_t_904').delete();
+    results.push('Equipment: Sun to Sat show each unit\'s default runs from Route Master; an inactive unit that is not down is left off');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).

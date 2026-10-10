@@ -126,3 +126,18 @@ test('Driver Assignment Board names a repeated run once with its count, one line
   assert.equal(board[0].days.mon.text, '8303 ×2 / FERRY PRODUCT');
   assert.equal(board[0].days.mon.kind, 'booked');
 });
+
+test('Equipment: each unit\'s default runs by weekday from Route Master, and the fleet sync text left out of notes', () => {
+  const days = (o) => Object.fromEntries(L.DAYS.map(p => [p, Object.assign({ active: false }, o[p] || {})]));
+  const routes = [
+    { route: '808', streamId: '808', routeStatus: 'ACTIVE', days: days({ mon: { active: true, tractor: '223880', trailer: 'T-946' }, tue: { active: false, tractor: '223880' } }) },
+    { route: '901', streamId: 'FERRY JUG', routeStatus: 'ACTIVE', days: days({ mon: { active: true, trailer: 'veh_trailer_t_946' } }) },
+    { route: '999', streamId: '999', routeStatus: 'INACTIVE', days: days({ mon: { active: true, tractor: '223880' } }) }
+  ];
+  const units = [{ id: 'veh_truck_223880', unit: '223880' }, { id: 'veh_trailer_t_946', unit: 'T-946' }];
+  const map = L.unitDefaultDays(routes, units);
+  assert.deepEqual(map.veh_truck_223880, { mon: ['808'] });
+  assert.deepEqual(map.veh_trailer_t_946, { mon: ['808', 'FERRY JUG'] });
+  assert.equal(L.cleanUnitNote('Down (10/8/2026 jc@uniteddairy.com) | External Fleet: 2017 | INTL'), 'Down (10/8/2026 jc@uniteddairy.com)');
+  assert.equal(L.cleanUnitNote('External Fleet: 2017 | INTERNATIONAL | Prostar'), '');
+});

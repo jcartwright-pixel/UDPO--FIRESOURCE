@@ -356,6 +356,40 @@
     out.setUTCDate(Math.min(day, last));
     return out.toISOString().slice(0, 10);
   }
+  /*
+   * Equipment screen (Joe 10/10): what each truck and trailer is set to run by default on each weekday, from Route Master's
+   * <day>_tractor_default / <day>_trailer_default on active runs (a value may be the unit number or the equipment id).
+   * Returns {equipmentId: {sun: ['808', ...], ...}}.
+   */
+  function unitDefaultDays(routes, units) {
+    var byKey = {}, out = {};
+    (units || []).forEach(function (e) {
+      [e.id, e.unit].forEach(function (k) { k = String(k || '').trim().toUpperCase(); if (k) byKey[k] = e.id; });
+    });
+    (routes || []).forEach(function (r) {
+      if (!r || (r.routeStatus && r.routeStatus !== 'ACTIVE') || r.active === false) return;
+      var label = String(r.streamId || '').trim() || String(r.route || '').trim();
+      DAYS.forEach(function (p) {
+        var d = r.days && r.days[p];
+        if (!d || !d.active) return;
+        [d.tractor, d.trailer].forEach(function (v) {
+          var id = byKey[String(v || '').trim().toUpperCase()];
+          if (!id) return;
+          var days = out[id] = out[id] || {};
+          var list = days[p] = days[p] || [];
+          if (list.indexOf(label) < 0) list.push(label);
+        });
+      });
+    });
+    return out;
+  }
+  // The Equipment Master notes without the fleet sync's text (" | External Fleet: ...", "Route Day ...").
+  function cleanUnitNote(text) {
+    // Everything from "External Fleet:" on is the fleet list's own text (year | make | model | VIN | yard | state).
+    return String(text || '').replace(/\|?\s*External Fleet:[\s\S]*$/i, '').split('|').map(function (s) { return s.trim(); })
+      .filter(function (s) { return s && !/^Route Day\b/i.test(s); }).join(' | ');
+  }
+
   function fleetKind(type) {
     var t = String(type || '').trim().toUpperCase().replace(/_/g, ' ');
     if (['TRUCK', 'TRACTOR', 'POWER UNIT', 'TRACTOR TRUCK', 'STRAIGHT TRUCK', 'BOX TRUCK'].indexOf(t) >= 0) return 'TRUCK';
@@ -688,6 +722,7 @@
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers,
+    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote,
     fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
