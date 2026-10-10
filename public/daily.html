@@ -396,6 +396,8 @@
       window.print();
     }
     document.getElementById('print-sheet').onclick = () => printSheet();
+    // Print Layouts opens Daily with #print: the sheet prints once the day's runs are on screen.
+    if (location.hash === '#print') { const t = setInterval(() => { if (!rows.length) return; clearInterval(t); history.replaceState(null, '', location.pathname + location.search); printSheet(); }, 300); }
 
     /* ---------- Week and day ---------- */
     async function watchRuns() {

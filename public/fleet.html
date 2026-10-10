@@ -39,7 +39,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, CURRENT_APP } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Fleet Service (FleetService.html, 220_V7276_GarageFleetService.gs), read only for now: Send to Garage,
@@ -83,7 +83,7 @@
         k.innerHTML = kpis([[late, 'Overdue', late ? 'warn' : ''], [soon, 'Due soon', soon ? 'warn' : ''], [due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'DOT this month'],
           [due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates expiring · 30 days'], [open().length, 'At the garage'], [done().filter(o => String(o.completed_at || '').slice(0, 7) === month).length, 'Done this month', 'good']]);
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
-          '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="' + CURRENT_APP + 'garage-station">Garage Station</a>';
+          '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="soon.html?what=garage-station">Garage Station</a>';
         const shown = due.items.filter(i => i.status !== 'OK' && hit(i.unit));
         sheet.innerHTML = table([10, 8, 20, 11, 11, 10, 10, 10, 10], ['Unit', 'Type', "What's due", 'Due at', 'Now', 'Left', 'Last done', 'Status', ''],
           shown.map(i => '<tr' + (i.status === 'OVERDUE' ? ' class="review"' : '') + '><td class="strong">' + escapeHtml(i.unit) + '</td><td>' + (i.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + escapeHtml(i.what) +
@@ -96,7 +96,7 @@
         const o = open(), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
           [o.filter(x => String(x.source).toUpperCase() === 'OFFICE').length, 'Sent from office'], [week.length, 'Finished · last 7 days', 'good'], [Math.round(mins / 6) / 10, 'Mechanic hours · 7 days']]);
-        bar.innerHTML = '<span class="spacer"></span><a class="button" href="garage.html">Garage Work Orders</a><a class="button" href="' + CURRENT_APP + 'garage-station">Garage Station</a>';
+        bar.innerHTML = '<span class="spacer"></span><a class="button" href="garage.html">Garage Work Orders</a><a class="button" href="soon.html?what=garage-station">Garage Station</a>';
         sheet.innerHTML = '<div class="fleet-split"><div><h2>Open Work Orders</h2>' + table([14, 12, 34, 14, 12, 14], ['#', 'Unit', "What's wrong", 'Came from', 'Tech', 'Status'],
           o.map(x => '<tr><td class="strong">' + escapeHtml(x.work_order_id) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(x.source || '') +
             '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + pill(JOB[String(x.status).toUpperCase()] || [x.status, 'no']) + '</td></tr>').join(''), 'No open work orders.') +
@@ -122,7 +122,7 @@
         k.innerHTML = '';
         const R = L.FLEET_RULES;
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span><span class="hint">Rules: PM every ' + num(R.truckMiles) + ' mi (warn ' + num(R.truckWarnMiles) + ' ahead) · Reefer every ' + R.trailerMonths + ' months or ' + num(R.trailerHours) + ' hrs · DOT every ' + R.dotMonths + ' months (warn ' + R.dotWarnDays + ' days) · Plates warn ' + R.plateWarnDays + ' days</span>' +
-          '<a class="button" href="' + CURRENT_APP + 'fleet-service">Change in the current app</a>';
+          '<a class="button" href="soon.html?what=fleet-service-setup">Change the rules</a>';
         sheet.innerHTML = '<div class="fleet-split wide-left"><div><h2>Units</h2>' + table([12, 9, 10, 13, 16, 13, 13, 14], ['Unit', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'DOT due', 'Plate expires', 'Notes'],
           due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.tracked ? 'Yes' : 'No') + '</td><td>' + when(u.lastServiceDate) +
             (u.lastServiceMiles != null ? '<small>' + num(u.lastServiceMiles) + ' mi</small>' : u.lastServiceHours != null ? '<small>' + num(u.lastServiceHours) + ' hrs</small>' : '') + '</td><td>' +

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Operational Assignments · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="ops-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Operational Assignments</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Operational Assignments</h1><small>Dispatch Administration &rsaquo; Carrier, Fairmont, Marietta, Martins Ferry and other non-driver coverage</small></div>
+      <div class="actions tiles">
+        <button type="button" class="primary" id="add">+ Add Assignment</button>
+        <a class="button" href="admin.html">Dispatch Administration</a>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <p class="ops-note">Active names are offered under <b>Other CVG / Carriers</b> in the driver lists on Daily and Weekly Dispatch. Order sets their place in that list.</p>
+    <div class="sheet ops-sheet">
+      <table class="ops">
+        <colgroup><col style="width:34%"><col style="width:14%"><col style="width:14%"><col style="width:38%"></colgroup>
+        <thead><tr><th>Assignment</th><th>Active</th><th>Order</th><th>Last change</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, save, showError } from './js/app.js';
+    import { lists, watchLists, canManage, forScreen } from './js/edit.js';
+    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    // The current app's Operational Assignments (93_DispatchAdminV037: Assignment, Active, Sequence). Each change saves at once.
+    const L = window.UDLogic;
+    forScreen('drivers');
+    let docs = [], adding = false;
+    const when = (x) => x.updatedAt ? new Date(x.updatedAt).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' · ' + String(x.updatedBy || '').split('@')[0] : (x.builtIn ? 'Built in (the current app\'s list)' : '');
+    function render() {
+      const edit = canManage(), rows = L.opsAssignments(docs), dis = edit ? '' : ' disabled';
+      document.getElementById('add').disabled = !edit;
+      document.getElementById('rows').innerHTML = rows.map(x => '<tr data-name="' + escapeHtml(x.assignment) + '" class="' + (x.active === false ? 'off' : '') + '"><td class="strong">' + escapeHtml(x.assignment) + '</td>' +
+        '<td><button type="button" class="toggle' + (x.active === false ? '' : ' on') + '" data-active' + dis + '>' + (x.active === false ? 'NO' : 'YES') + '</button></td>' +
+        '<td><input class="ops-seq" type="number" min="1" max="999" value="' + escapeHtml(x.sequence) + '"' + dis + '></td><td class="muted">' + escapeHtml(when(x)) + '</td></tr>').join('') +
+        (adding ? '<tr class="adding"><td><input id="new-name" maxlength="60" placeholder="Name, for example Beckley"></td><td colspan="2"><button type="button" class="primary" id="new-save">Save</button> <button type="button" id="new-cancel">Cancel</button></td><td></td></tr>' : '');
+      if (adding) document.getElementById('new-name').focus();
+    }
+    function put(x, change) {
+      const next = Object.assign({ assignment: x.assignment, active: x.active !== false, sequence: Number(x.sequence) || 1 }, change);
+      const i = docs.findIndex(d => L.opsKey(d.assignment) === L.opsKey(next.assignment)), before = i >= 0 ? docs[i] : null;
+      docs = docs.filter(d => d !== before).concat([Object.assign({}, before || {}, next, { updatedAt: new Date().toISOString(), updatedBy: lists.person && lists.person.email || '' })]);
+      render();
+      save('saveOpsAssignment', next).catch(e => { docs = docs.filter(d => L.opsKey(d.assignment) !== L.opsKey(next.assignment)).concat(before ? [before] : []); render(); showError(e.message || String(e)); });
+    }
+    const find = (el) => L.opsAssignments(docs).find(x => x.assignment === el.closest('tr').dataset.name);
+    document.getElementById('rows').addEventListener('click', e => {
+      if (e.target.matches('[data-active]')) { const x = find(e.target); put(x, { active: x.active === false }); }
+      if (e.target.id === 'new-cancel') { adding = false; render(); }
+      if (e.target.id === 'new-save') addNew();
+    });
+    document.getElementById('rows').addEventListener('change', e => {
+      if (!e.target.matches('.ops-seq')) return;
+      const n = Number(e.target.value), x = find(e.target);
+      if (!Number.isInteger(n) || n < 1 || n > 999) { showError('Order must be a whole number from 1 to 999'); render(); return; }
+      put(x, { sequence: n });
+    });
+    document.getElementById('rows').addEventListener('keydown', e => { if (e.target.id === 'new-name' && e.key === 'Enter') addNew(); if (e.key === 'Escape' && adding) { adding = false; render(); } });
+    function addNew() {
+      const name = document.getElementById('new-name').value.trim().replace(/\s+/g, ' ');
+      if (!name) return showError('Type the assignment name');
+      if (L.opsAssignments(docs).some(x => L.opsKey(x.assignment) === L.opsKey(name))) return showError(name + ' is already on the list');
+      adding = false;
+      put({ assignment: name, sequence: Math.max(0, ...L.opsAssignments(docs).map(x => Number(x.sequence) || 0)) + 1 }, {});
+    }
+    document.getElementById('add').onclick = () => { adding = true; render(); };
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      onSnapshot(collection(db, 'opsAssignments'), s => { docs = s.docs.map(d => d.data()); render(); }, e => showError('Could not read Operational Assignments: ' + e.message));
+      render();
+    });
+  </script>
+</body>
+</html>

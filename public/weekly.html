@@ -98,7 +98,7 @@
 
   <script type="module">
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, saveAssignment, saveRunChange, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
@@ -189,7 +189,10 @@
       });
       const group = (name, items) => items.length ? '<optgroup label="' + escapeHtml(name) + '">' + items.map(x => '<option value="' + escapeHtml(x.id) + '"' + (x.id === d.driverId ? ' selected' : '') + '>' +
         escapeHtml(x.label + (x.why && x.id !== d.driverId ? ' — ' + x.why.toUpperCase() : '')) + '</option>').join('') + '</optgroup>' : '';
-      return html + group('Relief Drivers — Seniority Order', relief) + group('Drivers — Seniority Order', regular) + (override ? group('Override — Unavailable / Assigned', blocked) : '');
+      // Operational Assignments (Carrier, Fairmont, Marietta, Martins Ferry...), as the current app's "Other CVG / Carriers".
+      const cvg = cvgOptions().filter(o => o.text.toUpperCase() !== 'CARRIER').map(o => '<option value="' + escapeHtml(o.id) + '"' + (!d.driverId && who === o.text.toUpperCase() ? ' selected' : '') + '>' + escapeHtml(o.text) + '</option>').join('');
+      return html + group('Relief Drivers — Seniority Order', relief) + group('Drivers — Seniority Order', regular) + (override ? group('Override — Unavailable / Assigned', blocked) : '') +
+        (cvg ? '<optgroup label="Other CVG / Carriers">' + cvg + '</optgroup>' : '');
     }
 
     function busyOn(day, key, self) {
@@ -204,6 +207,7 @@
       // A day that does not run is turned on first, then the driver is saved (both wait in line for the same run).
       if (!d.runs && value) saveRunChange(getRuns, row.runDocId, day, 'setRuns', { runs: true }, x => { x.runs = true; }, render);
       if (SPECIAL[value]) return saveRunChange(getRuns, row.runDocId, day, 'assignDriver', { driverId: value }, x => { x.driverId = ''; x.driver = SPECIAL[value]; x.driverExceptionStatus = ''; }, render);
+      if (/^__CVG__:/.test(value)) return saveRunChange(getRuns, row.runDocId, day, 'assignDriver', { driverId: value }, x => { x.driverId = ''; x.driver = value.slice(8); x.driverExceptionStatus = ''; }, render);
       return saveAssignment(getRuns, row.runDocId, day, 'driver', { id: value, text: pickText('driver', value) }, render, override);
     }
 
@@ -327,6 +331,8 @@
       el.textContent = at && !isNaN(at) ? 'Published ' + at.toLocaleDateString([], { month: 'numeric', day: 'numeric' }) + ' ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + (weekDoc.publishedBy ? ' by ' + weekDoc.publishedBy.split('@')[0] : '') : 'Not published yet this week';
       el.title = weekDoc && weekDoc.publishedBy ? 'Published to Daily Dispatch by ' + weekDoc.publishedBy : '';
     }
+    // Print Layouts opens Weekly with #print: the week prints once its runs are on screen.
+    if (location.hash === '#print') { const t = setInterval(() => { if (!rows.length) return; clearInterval(t); history.replaceState(null, '', location.pathname + location.search); document.getElementById('print-week').click(); }, 300); }
     document.getElementById('print-week').onclick = () => {
       let html = '<h2>UNITED DAIRY &mdash; WEEKLY DISPATCH</h2><p>Week starting ' + escapeHtml(shortDate(week)) + '</p><table><thead><tr>' + headCells('<th>Route</th><th>Run</th>') + '</tr></thead><tbody>';
       rows.forEach(r => { html += '<tr><td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td>' + L.DAYS.map(p => { const d = r.days[p]; return '<td>' + (d.runs ? escapeHtml(d.driver || 'NEEDS DRIVER') + (d.truck || d.trailer ? '<br>' + escapeHtml([d.truck, d.trailer].filter(Boolean).join(' / ')) : '') : '&mdash;') + '</td>'; }).join('') + '</tr>'; });

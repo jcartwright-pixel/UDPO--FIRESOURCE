@@ -25,7 +25,6 @@ document.querySelectorAll('.topbar').forEach(bar => {
 // The menu on the left (Joe, 10/9: "the action buttons ... supposed to be a menu option to the left"), the same on every
 // screen. A link marked with the small arrow still opens the current app in a new tab. On a laptop it folds to icons;
 // the button at its top opens it.
-export const CURRENT_APP = 'https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=';
 const ICON = {
   home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
   back: '<path d="M15 5l-7 7 7 7"/><path d="M8 12h12"/>',
@@ -59,12 +58,12 @@ export const MENU = [
   ['Equipment', [['Fleet & Maintenance', 'maint.html', 'maintenance-tractor-v1-560.webp'], ['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'],
     ['Truck Issues', 'issues.html?kind=TRUCK', 'maintenance-tractor-v1-560.webp'], ['Trailer Issues', 'issues.html?kind=TRAILER', 'maintenance-trailer-v1-560.webp'],
     ['Fork Truck / Pallet Jack Issues', 'issues.html?kind=FORK_TRUCK', 'forklift-truck-v1-560.webp'], ['Garage Work Orders', 'garage.html', 'wrench'], ['Fleet Service', 'fleet.html', 'gear'],
-    ['Garage Station', CURRENT_APP + 'garage-station', 'wrench'], ['Over the Road', 'otr.html', 'distribution-truck-v1-560.webp'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin']]],
-  ['GPS / Fleet', [['GPS Setup', 'gps.html', 'gear'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin'], ['Driver Scorecard', 'scorecard.html', 'star']]],
+    ['Garage Station', 'soon.html?what=garage-station', 'wrench'], ['Over the Road', 'otr.html', 'distribution-truck-v1-560.webp'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
+  ['GPS / Fleet', [['GPS Setup', 'gps.html', 'gear'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin'], ['Driver Scorecard', 'scorecard.html', 'star']]],
   ['Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road']]],
   ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Sheet Conflicts', 'conflicts.html', 'alert']]],
   // Joe 10/10: Dispatch Administration has its own Administration section (out of the Dispatch menu).
-  ['Administration', [['Dispatch Administration', 'admin.html', 'gear']]],
+  ['Administration', [['Dispatch Administration', 'admin.html', 'gear'], ['Operational Assignments', 'ops.html', 'people'], ['Print Layouts', 'print.html', 'day'], ['Dispatch Settings', 'settings.html', 'gear']]],
   // The plant side (the current app's Plant Menu): the departments page and each department's screen.
   ['Plant', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Plant Operations Scheduler', 'scheduler.html', 'week'], ['Yard Checks', 'yard.html', 'yard-checks.webp']]]
 ];
@@ -145,7 +144,7 @@ addSideMenu();
 // (img/library), or with its line icon in the same tile where no picture fits.
 const PAGE_ICON = {
   'daily.html': 'distribution-truck-v1-560.webp', 'weekly.html': 'distribution-truck-v1-560.webp', 'routes.html': 'distribution-truck-v1-560.webp',
-  'routeweek.html': 'distribution-truck-v1-560.webp', 'admin.html': 'distribution-truck-v1-560.webp', 'otr.html': 'distribution-truck-v1-560.webp',
+  'routeweek.html': 'distribution-truck-v1-560.webp', 'admin.html': 'distribution-truck-v1-560.webp', 'ops.html': 'distribution-truck-v1-560.webp', 'print.html': 'distribution-truck-v1-560.webp', 'settings.html': 'distribution-truck-v1-560.webp', 'soon.html': 'plant-building-v1-560.webp', 'otr.html': 'distribution-truck-v1-560.webp',
   'gps.html': 'distribution-truck-v1-560.webp', 'scorecard.html': 'distribution-truck-v1-560.webp',
   'equipment.html': 'maintenance-tractor-v1-560.webp', 'maint.html': 'maintenance-tractor-v1-560.webp', 'issues.html': 'maintenance-tractor-v1-560.webp',
   'garage.html': 'maintenance-tractor-v1-560.webp', 'fleet.html': 'maintenance-trailer-v1-560.webp',

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Being built · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="soon-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Being built</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1 id="title">Being built</h1><small id="sub">This screen is being built in the new app</small></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <section class="soon-card"><h2 id="what"></h2><p id="why"></p><p class="muted">It opens here, in the new app, as soon as it is ready. Nothing in the new app opens the old program.</p>
+      <div class="actions tiles"><a class="button" id="go" href="index.html">Home</a></div></section>
+  </div>
+
+  <script type="module">
+    import { requireSignIn } from './js/app.js';
+
+    // Joe 10/10: a screen not built yet opens this page inside the new app, never the old program.
+    const SCREENS = {
+      'garage-station': ['Garage Station', 'The garage tablet where technicians sign in with their PIN to start and finish jobs. Meanwhile Garage Work Orders shows what is open and finished.', 'garage.html', 'Garage Work Orders'],
+      'trucks-today': ['Trucks Today', 'Where every truck is today, from Verizon Connect. It is finished once Verizon turns on Fleet API access (see GPS Setup).', 'gps.html', 'GPS Setup'],
+      'fleet-service-setup': ['Fleet Service Setup', 'Changing the service rules (PM miles, reefer months, DOT and plate warnings).', 'fleet.html', 'Fleet Service']
+    };
+    const key = new URLSearchParams(location.search).get('what') || '', s = SCREENS[key] || ['This screen', 'It is next on the build list.', 'index.html', 'Home'];
+    document.title = s[0] + ' · New Plant Operations';
+    document.getElementById('title').textContent = s[0];
+    document.getElementById('what').textContent = s[0] + ' is being built in the new app';
+    document.getElementById('why').textContent = s[1];
+    const go = document.getElementById('go'); go.href = s[2]; go.textContent = s[3];
+    requireSignIn(async () => {});
+  </script>
+</body>
+</html>

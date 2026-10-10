@@ -59,6 +59,7 @@ const ACTIONS = Object.freeze({
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
   saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'drivers' },
   // The plant side (plant.js): Loadout Center loads and pickups.
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   addPickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
@@ -232,6 +233,16 @@ function validate(input) {
     return out;
   }
   // Driver Scorecard Settings (the current app's scSaveSettings_): one points or grade number, or the call-off reasons.
+  // Operational Assignments (the current app's desktopUiSaveOperationalAssignmentV037): a name, Active and its place in the list.
+  if (action === 'saveOpsAssignment') {
+    out.assignment = text(input.assignment, 60).replace(/\s+/g, ' ');
+    if (!out.assignment) throw new SaveError('BAD_REQUEST', 'Type the assignment name');
+    if (out.assignment.startsWith('__')) throw new SaveError('BAD_REQUEST', 'That name cannot be used');
+    out.active = input.active !== false;
+    out.sequence = Number(input.sequence);
+    if (!Number.isInteger(out.sequence) || out.sequence < 1 || out.sequence > 999) throw new SaveError('BAD_REQUEST', 'Order must be a whole number from 1 to 999');
+    return out;
+  }
   if (action === 'saveScorecard') {
     if (Array.isArray(input.callOffReasons)) {
       out.callOffReasons = [...new Set(input.callOffReasons.map(r => text(r, 40).toUpperCase()))];
@@ -339,6 +350,14 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     if (!req.driverId) return Object.assign({ driverId: '', driver: '' }, clearOff);
     // Weekly's CARRIER and OPEN choices: a word in the driver column, no Driver Master entry.
     if (req.driverId === '__CARRIER__' || req.driverId === '__OPEN__') return Object.assign({ driverId: '', driver: req.driverId.slice(2, -2) }, clearOff);
+    // Other CVG / Carriers (Operational Assignments): the name in the driver column, as the current app writes it.
+    if (req.driverId.startsWith('__CVG__:')) {
+      const name = req.driverId.slice(8).trim(), key = L.opsKey(name);
+      const op = key ? await tx.get(db.collection('opsAssignments').doc(M.safeIdPart(key))) : null;
+      const row = op && op.exists ? op.data() : L.OPS_DEFAULTS.map(n => ({ assignment: n, active: true })).find(x => L.opsKey(x.assignment) === key);
+      if (!row || row.active === false) throw new SaveError('NOT_ALLOWED', (name || 'That name') + ' is not an active Operational Assignment');
+      return Object.assign({ driverId: '', driver: row.assignment }, clearOff);
+    }
     const snap = await tx.get(db.collection(C.drivers).doc(M.safeIdPart(req.driverId)));
     if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
     const d = snap.data();
@@ -434,6 +453,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveScorecard') return saveScorecard(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'saveOpsAssignment') return saveOpsAssignment(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'publishWeek') return publishWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveRoute') return saveRoute(tx, db, req, email, stamp, logRef, mode);
@@ -904,6 +924,16 @@ async function saveScorecard(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection('scorecard').doc('settings'), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
   const data = req.callOffReasons ? { callOffReasons: req.callOffReasons } : { [req.key]: req.value };
   tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email }), { merge: true });
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
+  return result;
+}
+
+// Operational Assignments: opsAssignments/{NAME}, read by the screen and the driver lists with the current app's four under it.
+async function saveOpsAssignment(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('opsAssignments').doc(M.safeIdPart(L.opsKey(req.assignment))), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+  const data = { assignment: req.assignment, active: req.active, sequence: req.sequence };
+  tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email, testEdited: mode.mode === 'test' }));
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
   return result;
