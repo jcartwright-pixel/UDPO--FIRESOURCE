@@ -809,7 +809,29 @@ async function noScroll(page) {
     assert.deepEqual(sec('Administration'), ['Dispatch Administration']);
     assert.equal(sec('Dispatch').indexOf('Dispatch Administration'), -1, 'not under Dispatch');
     assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template') >= 0).map(m => m[0]), ['Drivers']);
+    assert.equal(sec('Equipment')[0], 'Fleet & Maintenance', 'the maintenance side starts on the hub');
     await mp.close();
+    // Joe 10/10 (old hub picture): Fleet & Maintenance shows the six counts, four cards with the icon library pictures and the
+    // latest write-ups; a card opens its list in this window, with the old columns and Lessor | Garage on trucks.
+    const hub = await openPage(browser, 1920, 950, '/maint.html?testEmail=manager.test@uniteddairy.com');
+    await hub.waitForSelector('.hub-card[data-kind="GARAGE"] .hub-tile');
+    assert.equal(await hub.$$eval('.hub-kpis div', d => d.length), 6);
+    assert.deepEqual(await hub.$$eval('.hub-card strong', d => d.map(x => x.textContent)), ['Truck Issues', 'Trailer Issues', 'Fork Truck / Pallet Jack Issues', 'Garage']);
+    assert.equal(await hub.$$eval('.hub-card img', d => d.filter(i => i.complete && i.naturalWidth > 0).length), 3, 'the three library pictures load');
+    await Promise.all([hub.waitForNavigation(), hub.click('.hub-card[data-kind="TRUCK"] .hub-card-head')]);
+    assert.match(hub.url(), /issues\.html\?kind=TRUCK$/);
+    await hub.waitForSelector('#head th');
+    assert.equal(await hub.textContent('#title'), 'Truck Issues');
+    assert.deepEqual(await hub.$$eval('#head th', t => t.map(x => x.textContent)), ['Truck #', 'Driver', 'Date Reported', "What's Wrong", 'Report Count', 'Reviewed', 'Emailed', 'Garage', 'Work Actions']);
+    if (await hub.$('#rows tr[data-id]')) assert.deepEqual(await hub.$$eval('#rows tr[data-id]:first-child .seg button', b => b.map(x => x.textContent)), ['Lessor', 'Garage']);
+    await hub.click('#kinds [data-kind="FORK_TRUCK"]');
+    assert.equal(await hub.textContent('#title'), 'Fork Truck / Pallet Jack Issues');
+    assert.deepEqual(await hub.$$eval('#head th', t => t.map(x => x.textContent)), ['Unit', 'Date Reported', "What's Wrong", 'Report Count', 'Reviewed', 'Garage', 'Work Actions']);
+    await Promise.all([hub.waitForNavigation(), hub.click('#go-back')]);
+    assert.match(hub.url(), /\/maint\.html$/, 'Back returns to the hub');
+    assert.deepEqual(hub.errors, []);
+    await hub.close();
+    results.push('Fleet & Maintenance: six counts, four cards with the library pictures; Truck Issues opens with the old columns and Lessor | Garage; Fork Truck has the trailer columns');
     // Joe 10/10 (old-screen picture): the template lists relief drivers first; every day shows + Add Run, Copy, Paste and Paste + Add.
     const tl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
     await tl.waitForSelector('.tcell [data-copy]');

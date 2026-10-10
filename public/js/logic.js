@@ -162,12 +162,13 @@
       var unit = String(r.truck_number || r.trailer_number || r.unit_number || '').trim(), text = String(r.issue_details || '').trim();
       var sent = /Repair email sent (\S+) to ([^\n(]*)/.exec(notes), garageAt = notes.lastIndexOf('Sent to garage');
       var garage = garageAt >= 0 ? /^ (\S+) by ([^\n]*)/.exec(notes.slice(garageAt + 'Sent to garage'.length)) : null;
-      var reviewed = /Reviewed by (\S+) at (\S+)/.exec(notes);
+      var reviewed = /Reviewed by (\S+) at (\S+)/.exec(notes), lessor = /Sent to lessor (.*?) ?(\d{4}-\d\d-\d\dT\S+) by ([^\n]*)/.exec(notes);
       var opened = Date.parse(r.opened_at || r.service_date || ''), done = Date.parse(r.completed_at || '');
       return { id: r.id || r.record_id, recordId: r.record_id, unit: unit, unitKey: issueUnitKey(unit), driver: r.driver || '', route: r.route_id || '',
         reported: String(r.opened_at || r.service_date || ''), openedMs: isFinite(opened) ? opened : 0, completedMs: isFinite(done) ? done : 0,
         text: text, status: status, needsReview: status === 'NEEDS_REVIEW' || !text, reviewed: !!reviewed, reviewedBy: reviewed ? reviewed[1] : '',
         emailed: !!sent, emailedAt: sent ? sent[1] : '', atGarage: !!garage, garageAt: garage ? garage[1] : '', garageBy: garage ? garage[2].trim() : '',
+        toLessor: !!lessor, lessor: lessor ? lessor[1].trim() : '', lessorAt: lessor ? lessor[2] : '', lessorBy: lessor ? lessor[3].trim() : '',
         done: ISSUE_DONE.test(status), occurrences: 1 };
     }).filter(function (r) { return r.recordId && r.status !== 'REMOVED' && !noWriteUp(r.text); });
     var seen = {};
@@ -432,6 +433,19 @@
   // A leased unit (the fleet sync writes "Lease: Idealease" into the External Fleet text): not on Fleet Service (Joe 10/10).
   function unitLeased(unit) {
     return /External Fleet:[\s\S]*\bLease:\s*\S/i.test(String(unit && unit.notes || ''));
+  }
+  // Who leases a truck (the fleet list's LEASE column, kept in the unit's notes), or '' for one we own. A driver's short
+  // number is the end of one unit's number (876 = 223876) when exactly one unit ends that way, as the current app's lessor routing.
+  function unitLessor(units, unitText) {
+    var key = issueUnitKey(unitText), list = units || [];
+    var hit = list.filter(function (u) { return issueUnitKey(u.unit) === key; });
+    if (!hit.length && /^\d{2,5}$/.test(key)) {
+      hit = list.filter(function (u) { var d = String(u.unit || '').replace(/\D/g, ''); return d.length > key.length && d.slice(-key.length) === key; });
+      if (hit.length > 1) return { unit: '', lessor: '', why: 'Truck ' + unitText + ' matches ' + hit.map(function (u) { return u.unit; }).join(', ') };
+    }
+    if (!hit.length) return { unit: '', lessor: '', why: 'Truck ' + unitText + ' is not on the fleet list' };
+    var m = /\bLease:\s*([^|\n]+)/i.exec(String(hit[0].notes || ''));
+    return { unit: hit[0].unit, lessor: m ? m[1].trim() : '', why: m ? '' : 'Owned truck: our garage fixes it' };
   }
 
   function fleetKind(type) {
@@ -766,7 +780,7 @@
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers,
-    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, runWindow: runWindow, unitConflicts: unitConflicts,
+    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
