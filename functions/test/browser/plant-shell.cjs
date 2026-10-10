@@ -36,7 +36,8 @@ const SCREENS = [
   ['unloading.html', '.head', ['[data-mode="check"]', '[data-mode="view"]', '#tabs']],
   ['returns.html', '.head', ['[data-mode="check"]', '[data-mode="view"]']],
   ['washing.html', null],
-  ['scheduler.html', '.head', ['#add', '[data-lane="SHIPPING"]', '[data-view="week"]', '#pick']],
+  // Joe 10/10 (typed): Shipping and Receiving sit beside the date on the title line; the buttons stay on the button line.
+  ['scheduler.html', '.head', ['#add', '[data-view="week"]']],
   ['yard.html', '.head', ['[data-pane="current"]', '#refresh']],
   ['quality.html', null],
   ['shiftnotes.html', null],
@@ -113,6 +114,11 @@ const SCREENS = [
           const mids = boxes.map(b => b[1]);
           assert.ok(Math.max(...mids) - Math.min(...mids) <= 6, page + ' ' + w + ': the buttons and filters are on one line ' + JSON.stringify(boxes));
         }
+        if (page === 'scheduler.html') {
+          const t = await p.evaluate(() => { const r = (s) => document.querySelector('.sc-titleline ' + s).getBoundingClientRect(); const d = r('#pick'), sh = r('[data-lane="SHIPPING"]'), rc = r('[data-lane="RECEIVING"]');
+            return { mids: [d, sh, rc].map(x => Math.round(x.top + x.height / 2)), gap: Math.round(rc.left - sh.right), beside: Math.round(sh.left - d.right) }; });
+          assert.ok(Math.max(...t.mids) - Math.min(...t.mids) <= 6 && t.beside >= 0 && t.beside < 60 && t.gap > 0, 'scheduler.html ' + w + ': Shipping and Receiving sit beside the date with a little space between them ' + JSON.stringify(t));
+        }
         // The shared top line (data-top): the action buttons are one even row and none is left down in the screen.
         const tiles = await p.evaluate(() => {
           const vis = e => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
@@ -127,7 +133,7 @@ const SCREENS = [
         assert.deepEqual(p.errors, [], page + ' has no page errors');
         await p.close();
       }
-      results.push(w + ' wide: every plant screen has Back and Home; Unloading, Returns, Scheduler, Yard Checks and Temperatures keep their buttons and filters on one line');
+      results.push(w + ' wide: every plant screen has Back and Home; Unloading, Returns, Scheduler, Yard Checks and Temperatures keep their buttons and filters on one line; the Scheduler\'s Shipping and Receiving sit beside the date');
     }
     console.log(results.map(r => 'SHELL ' + r).join('\n'));
   } finally {

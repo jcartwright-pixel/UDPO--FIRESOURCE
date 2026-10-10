@@ -82,8 +82,11 @@ async function shots(page, name, w) {
     await watcher.waitForSelector('#pane-history:not([hidden])');
     const before = await watcher.$$eval('#history tr:not(:has(td.empty))', r => r.length);
     assert.equal(await desk.$('.prod-weights'), null, 'Totes records no weight');
-    await desk.fill('.prod-product', 'Orange drink');
-    await desk.press('.prod-product', 'Tab');
+    // Joe 10/10 (typed): the product is picked from the machine's own drop-down; one not on it goes under Other (type it).
+    await desk.focus('.prod-product');
+    await desk.selectOption('.prod-product', '__other__');
+    await desk.fill('.prod-other', 'Orange drink');
+    await desk.press('.prod-other', 'Tab');
     const t0 = Date.now();
     await desk.fill('.prod-temperature', '38');
     await desk.press('.prod-temperature', 'Tab');
