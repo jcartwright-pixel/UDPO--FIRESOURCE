@@ -843,6 +843,16 @@ tr.otr-on td { background: #e3f3e8; }
 #otr-report h2 { margin: 4px; font-size: 18px; color: var(--ud-blue); }
 .otr-card > button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 .otr-page .actions select { min-height: 38px; padding: 0 10px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-weight: 700; }
+/* OTR Routes Setup: destination drop-downs and Include boxes sized to the row, like the other table pickers. */
+.otr-setup select { box-sizing: border-box; width: 88%; max-width: 380px; height: 40px; padding: 0 36px 0 12px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-size: 16px; font-weight: 700; color: var(--ud-blue); text-align: left; cursor: pointer;
+  appearance: none; -webkit-appearance: none; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%230b4f8a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.otr-setup select:hover { border-color: var(--ud-blue); }
+.otr-setup select:focus { border-color: var(--ud-blue); outline: 2px solid #3978aa55; outline-offset: 1px; }
+.otr-setup select:has(option[value=""]:checked) { color: #6b7d8f; font-weight: 600; }
+.otr-setup select option { color: var(--ink); font-weight: 600; }
+.otr-setup select:disabled { background-color: #eef2f6; color: #7a8797; cursor: not-allowed; }
+.otr-setup input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; vertical-align: middle; }
+.otr-setup input[type=checkbox]:disabled { cursor: not-allowed; }
 
 /* Driver Scorecard */
 .sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
