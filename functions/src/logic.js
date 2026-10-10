@@ -312,6 +312,25 @@
     return !!(person && person.status === 'ACTIVE' && (person.roles || []).some(function (r) { return roles.indexOf(r) >= 0; }));
   }
 
+  // Joe 10/10: the plants (the current app's facility list) and who sees which. A person's plant list (USERS_MASTER
+  // facility_ids_json) decides: ["*"] is every plant, otherwise the plants named. With no list, an Administrator sees
+  // every plant and anyone else sees Uniontown. Someone who sees more than one plant lands on the all-plants overview.
+  var PLANTS = [
+    { id: 'fac_uniontown', name: 'Uniontown', status: 'ACTIVE' },
+    { id: 'fac_charleston', name: 'Charleston', status: 'PLANNED' },
+    { id: 'fac_martins_ferry', name: 'Martins Ferry', status: 'PLANNED' }
+  ];
+  var PRIMARY_ADMINS = ['jcartwright@uniteddairy.com'];
+  var ADMIN_ROLES = ['ADMINISTRATOR', 'ADMIN'];
+  function isAdmin(person) { return hasRole(person, ADMIN_ROLES); }
+  function plantsFor(person) {
+    if (!person || person.status !== 'ACTIVE') return [];
+    var list = (person.facilities || []).map(String);
+    if (list.indexOf('*') >= 0 || (!list.length && isAdmin(person))) return PLANTS.map(function (p) { return p.id; });
+    var known = PLANTS.map(function (p) { return p.id; }).filter(function (id) { return list.indexOf(id) >= 0; });
+    return known.length ? known : ['fac_uniontown'];
+  }
+
   // Editing the driver list is a manager's job, as on the current Employee Information screen.
   var DRIVER_ROLES = REORDER_ROLES;
 
@@ -802,6 +821,7 @@
     exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
+    PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
