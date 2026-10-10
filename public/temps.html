@@ -37,11 +37,11 @@
       <div class="tp-bar" id="bar">
         <img class="tp-icon" src="img/library/temperatures.webp" alt="">
         <div class="tp-copy"><h2 id="bar-title">Current Temperature Readings</h2><p id="bar-text">Live sensor readings and manual entries for each plant location.</p></div>
+        <span class="tp-sensor" id="sensor-at">Last Sensor Update: —</span>
         <!-- Joe 10/10: one line of controls, the buttons first and the filters after them. -->
         <div class="tabs seg" id="panes" data-top role="tablist" aria-label="Temperature view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
         <button type="button" class="tp-btn" id="refresh" data-top>&#8635; Refresh Now</button>
         <div class="tp-actions chips" id="filters" data-top></div>
-        <span class="tp-sensor hint" id="sensor-at" data-top>Last Sensor Update: —</span>
       </div>
       <div class="sheet scroll-list" id="pane-current">
         <table class="loadout tp-table">
@@ -136,7 +136,7 @@
           '<td class="tp-last">' + (r.lastCheckedAt ? escapeHtml(clock(r.lastCheckedAt)) + (r.lastManualTemperature !== '' ? '<small>' + escapeHtml(r.lastManualTemperature) + '°F</small>' : '') : '—') + '</td>' +
           '<td>' + escapeHtml(initials(r.lastCheckedBy) || '—') + '</td>' +
           // Joe 10/10: no Save button; the column shows when the reading saved, or how long the location is locked.
-          '<td class="tp-act">' + (!ck ? '<span class="pill">View only</span>' : note ? '<small class="as-note' + (/^Not|^Enter/.test(note) ? ' bad' : '') + '">' + escapeHtml(note) + '</small>' : r.locked && !cur ? '<small class="as-last" title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked ' + r.minutesUntilDue + ' min</small>' : cur ? '<small class="as-note">Saved ' + escapeHtml(clockOf(r.lastCheckedAt)) + '</small>' : '<small class="as-last">Due</small>') + '</td></tr>';
+          '<td class="tp-act">' + (!ck ? '<span class="pill">View only</span>' : note ? '<small class="as-note' + (/^Not|^Enter/.test(note) ? ' bad' : '') + '">' + escapeHtml(note) + '</small>' : r.locked && !cur ? '<small class="as-last tp-pill locked" title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked ' + r.minutesUntilDue + ' min</small>' : cur ? '<small class="as-note tp-pill saved">Saved ' + escapeHtml(clockOf(r.lastCheckedAt)) + '</small>' : '<small class="as-last tp-pill due" title="Type the reading in Manual °F; it saves as you leave the box">Due</small>') + '</td></tr>';
       }).join('') || '<tr><td colspan="11" class="empty">' + (rows.length ? 'No locations match the ' + escapeHtml(FILTERS.find(f => f[0] === filter)[1]) + ' filter.' : (setupSeen ? 'No temperature locations are set up for this plant.' : 'Loading the temperature locations&hellip;')) + '</td></tr>';
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="tp-name"><b>' + escapeHtml(h.location) + '</b></td>' +
         '<td>' + escapeHtml(h.manualTemperature !== '' ? h.manualTemperature : h.sensorTemperature !== '' ? h.sensorTemperature : '—') + '</td>' +
@@ -146,6 +146,8 @@
       document.getElementById('foot').textContent = pane === 'current'
         ? list.length + ' shown. ' + (ck ? 'Each reading saves as you leave its box, with the time and who entered it, and locks the location for 2 hours. After Send Current Report the boxes start empty for the next round. ' + sensorWords() : 'View only.')
         : hist.length + ' reading' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
+      // Joe 10/10: when MOCREO was last read (the footer has the details).
+      document.getElementById('sensor-at').textContent = 'Last Sensor Update: ' + (mocreo.configured && mocreo.lastSuccess ? clock(mocreo.lastSuccess) : '—');
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
