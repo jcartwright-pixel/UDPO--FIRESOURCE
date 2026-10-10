@@ -70,13 +70,13 @@
     document.getElementById('tv').textContent = tv ? 'Desk view' : 'Driver Room display';
     document.getElementById('eyebrow').textContent = tv ? 'Driver Room Display' : 'Driver Loadout & Pickup';
     document.getElementById('weather').hidden = !tv;
-    let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = B.calendarDay(new Date()), updated = null;
+    let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = L.operatingDay(new Date()), updated = null;
 
     const overflows = (id) => { const el = document.getElementById(id); return el.scrollHeight > el.clientHeight + 2; };
     const fmt = (k) => { const [y, m, d] = k.split('-'); return m + '/' + d + '/' + y; };
     function render() {
-      date = B.calendarDay(new Date());
-      const rows = B.boardRows(runs, pickups, date), dayName = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(date))];
+      date = L.operatingDay(new Date());
+      const rows = B.loadoutBoardRows(runs, pickups, date), dayName = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(date))];
       document.getElementById('weekday').textContent = dayName.charAt(0) + dayName.slice(1).toLowerCase();
       if (tv) {
         const h = new Date().getHours(), w = document.getElementById('welcome');
