@@ -617,6 +617,34 @@ async function noScroll(page) {
     await backPage.close();
     results.push('Back: closes an opened driver first, then goes Home; Home has no Back');
 
+    // Driver Weekly Template: a manager turns ADAMS Off on Tuesday, copies it to Wednesday, and Save Template saves both cells.
+    const tpl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
+    await tpl.waitForSelector('.tcell[data-driver="drv_test_adams"][data-day="tue"] select[data-status]');
+    assert.equal(await tpl.isDisabled('#save'), true, 'nothing to save yet');
+    await tpl.selectOption('.tcell[data-driver="drv_test_adams"][data-day="tue"] select[data-status]', 'OFF');
+    await tpl.hover('.tcell[data-driver="drv_test_adams"][data-day="tue"]');
+    await tpl.click('.tcell[data-driver="drv_test_adams"][data-day="tue"] [data-copy]');
+    await tpl.hover('.tcell[data-driver="drv_test_adams"][data-day="wed"]');
+    await tpl.click('.tcell[data-driver="drv_test_adams"][data-day="wed"] [data-paste]');
+    assert.equal(await tpl.textContent('#dirty'), '2 unsaved changes');
+    if (SHOTS) await tpl.screenshot({ path: path.join(SHOTS, 'template-1920.png') });
+    await tpl.click('#save');
+    await tpl.waitForFunction(() => /^Template saved/.test(document.getElementById('dirty').textContent), null, { timeout: 10000 });
+    const adamsTpl = await tpl.evaluate(async () => {
+      const { start } = await import('./js/app.js');
+      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { db } = await start();
+      return (await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells;
+    });
+    assert.equal(adamsTpl.tue_available, 'FALSE');
+    assert.equal(adamsTpl.wed_available, 'FALSE');
+    assert.deepEqual(tpl.errors, []);
+    const dispatcherTpl = await openPage(browser, 1366, 650, '/template.html?testEmail=dispatch.test@uniteddairy.com');
+    await dispatcherTpl.waitForSelector('.tcell select[data-status]');
+    assert.equal(await dispatcherTpl.isDisabled('.tcell select[data-status]'), true, 'a dispatcher sees the template read only');
+    await Promise.all([tpl.close(), dispatcherTpl.close()]);
+    results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
+
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).
     const adminHome = await openPage(browser, 1366, 650, '/index.html?testEmail=admin.test@uniteddairy.com');
     await adminHome.waitForSelector('[data-owner="dailyDispatch"].can');

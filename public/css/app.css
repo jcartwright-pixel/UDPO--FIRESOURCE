@@ -781,3 +781,24 @@ html { background: var(--page); }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 120ms; }
 ::view-transition-group(ud-topbar), ::view-transition-group(ud-menu) { animation-duration: 0s; }
 @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+
+/* Driver Weekly Template */
+.template-page table.tpl { table-layout: fixed; }
+.template-page .tpl td { vertical-align: top; padding: 6px; }
+.template-page .tpl tr.tpl-group td { background: #dfeaf3; color: #123f70; font-weight: 800; font-size: 14px; padding: 7px 10px; }
+.template-page .tcell select { width: 100%; height: 32px; border: 1px solid #b7c9d8; border-radius: 7px; background: #fff; font-weight: 700; font-size: 14px; }
+.template-page .tcell.on { background: #e3f3e8; }
+.template-page .tcell.off { background: #fff1e2; }
+.template-page .tcell.changed { box-shadow: inset 0 0 0 2px #7fb2e5; background-color: #e8f2fd; }
+.template-page .run-line { display: flex; gap: 4px; margin-top: 5px; }
+.template-page .run-line select { flex: 1; min-width: 0; }
+.template-page .mini { border: 1px solid #b9c9d7; background: #fff; border-radius: 6px; padding: 3px 6px; font-size: 11px; font-weight: 700; color: #175b92; cursor: pointer; }
+.template-page .mini:disabled { opacity: .45; cursor: default; }
+.template-page .tpl-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.template-page .tpl-copy { padding: 6px 12px; border: 1px solid #b9d8c3; border-radius: 999px; background: #edf9f0; color: #17683a; font-weight: 800; font-size: 13px; }
+.template-page .tpl-dirty { color: #175b92; font-weight: 800; }
+/* One quiet line of cell tools; they show on hover or while the cell has focus (always on touch screens). */
+.template-page .tpl-tools { flex-wrap: nowrap; gap: 3px; margin-top: 5px; visibility: hidden; }
+.template-page .tpl-tools .mini { font-size: 10px; padding: 2px 4px; white-space: nowrap; }
+.template-page .tcell:hover .tpl-tools, .template-page .tcell:focus-within .tpl-tools { visibility: visible; }
+@media (hover: none) { .template-page .tpl-tools { visibility: visible; } }
