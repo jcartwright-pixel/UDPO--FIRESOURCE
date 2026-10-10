@@ -123,6 +123,11 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     await yard.click('[data-pane="history"]');
     await yard.waitForFunction(() => { const r = [...document.querySelectorAll('#history tr')].filter(x => /T-701/.test(x.textContent)); return r.length === 1 && /35[\s\S]*Reefer on, doors sealed/.test(r[0].textContent); }, null, { timeout: 8000 });
     results.push('Yard Checks: T-701 saved on leaving the box and stayed on the list for its notes; one check in the history');
+    await yard.click('[data-pane="current"]');
+    await yard.waitForSelector('#rows tr[data-trailer="T-701"]');
+    await mgr.click('#send-card');
+    await yard.waitForFunction(() => !document.querySelector('#rows tr[data-trailer="T-701"]'), null, { timeout: 8000 });
+    results.push('Yard Checks: the next Send Current Report clears the screen; T-701 (checked) leaves the list until it is due again');
 
     for (const p of [watcher, desk, mgr, temps, tWatch, notes, nWatch, yard]) assert.deepEqual(p.errors, []);
     console.log(results.map(r => 'AUTOSAVE ' + r).join('\n'));

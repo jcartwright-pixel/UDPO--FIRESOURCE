@@ -64,7 +64,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { savedText } from './js/autosave.js';
+    import { savedText, watchRound } from './js/autosave.js';
 
     const L = window.UDLogic, U = window.UDPlant;
     const FUEL = [['', ''], ['FULL', 'FULL'], ['3/4', '3/4'], ['1/2', '1/2'], ['EMPTY', 'EMPTY']];
@@ -276,6 +276,9 @@
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      // Joe 10/10: after each Send Current Report the yard starts empty too: trailers finished here leave the screen, typed boxes clear.
+      let round = null;
+      watchRound(db, at => { if (round !== null && at !== round) { [mine, drafts].forEach(o => Object.keys(o).forEach(k => delete o[k])); render(); } round = at; });
       watch();
       // Due times count down and trailers leave at their dispatch time, so the list is redrawn every 30 seconds.
       setInterval(() => { const t = today(); if (t !== date) { date = t; watch(); } render(); }, 30000);
