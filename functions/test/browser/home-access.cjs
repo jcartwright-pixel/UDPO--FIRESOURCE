@@ -127,6 +127,23 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.deepEqual(small.errors, []);
     await small.close();
     results.push('The overview and Administration fit a 1366 window');
+
+    // Phones 360 and 390 wide: the header title wraps beside the logo and never runs under the initials or Sign out.
+    for (const w of [360, 390]) {
+      for (const pg of ['index.html', 'daily.html', 'yard.html']) {
+        const ph = await openPage(browser, w, 780, '/' + pg + '?testEmail=manager.test@uniteddairy.com');
+        await ph.waitForSelector('#screen:not([hidden]) .topbar .brand strong');
+        await ph.waitForFunction(() => document.getElementById('who').textContent.length > 0);
+        const r = await ph.evaluate(() => {
+          const t = document.querySelector('.brand strong').getBoundingClientRect(), who = document.getElementById('who').getBoundingClientRect(), out = document.getElementById('signout').getBoundingClientRect();
+          return { clear: t.right <= Math.min(who.width ? who.left : out.left, out.left) + 1, inside: out.right <= innerWidth + 1 };
+        });
+        assert.deepEqual(r, { clear: true, inside: true }, pg + ' at ' + w + ': the title clears the initials and Sign out');
+        if (SHOTS && pg === 'index.html') await ph.screenshot({ path: path.join(SHOTS, 'phone-header-' + w + '.png'), clip: { x: 0, y: 0, width: w, height: 200 } });
+        await ph.close();
+      }
+    }
+    results.push('Phone header at 360 and 390: the title wraps beside the logo, clear of the initials and Sign out');
   } finally {
     await browser.close();
   }

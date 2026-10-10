@@ -1259,3 +1259,14 @@ body.embed .head > .title { display: none; }
 .adm-soon h3 { margin: 0 0 8px; font-size: 20px; color: #0b3d6b; }
 .adm-soon p { margin: 6px 0; color: #34495e; }
 @media (max-width: 900px) { .adm-shell { grid-template-columns: 1fr; } .adm-nav { max-height: 40vh; } }
+
+/* Phones (360-480 wide): the header title wraps beside a smaller logo and never runs under the initials or Sign out. */
+@media (max-width: 480px) {
+  .topbar { gap: 8px; padding: 4px 10px; }
+  .brand { gap: 8px; flex: 1 1 auto; }
+  .brand img { width: 92px; height: 32px; padding: 2px; }
+  .brand > span { min-width: 0; }
+  .brand strong { font-size: 15px; line-height: 1.15; white-space: normal; overflow-wrap: anywhere; }
+  .brand small { display: none; }
+  .topbar .who, .topbar #signout { flex: none; }
+}
