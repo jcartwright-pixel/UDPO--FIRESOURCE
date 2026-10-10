@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Phone Screens · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/stations.css">
+  <script src="js/logic.js"></script>
+</head>
+<body>
+  <div class="signin" id="signin" hidden>
+    <h1>Phone Screens</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Phone Screens</h1><small>Every phone and tablet screen, to try from this computer. Each one looks the same here as on the phone or tablet.</small></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="pss" id="list"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireSignIn, escapeHtml } from './js/app.js';
+    // Joe 10/10: the phone and tablet screens, in one place, so they can be tried from a laptop.
+    const SCREENS = [
+      ['Phones', 'Driver Check-In', 'The drivers\' phone: Route Distribution code, then their name, then the loads to check in.', 'route.html'],
+      ['Phones', 'Driver View Loadout', 'The drivers\' phone: the read-only route list and loadout status.', 'route.html?view=loadout'],
+      ['Phones', 'Driver DVIR', 'The drivers\' phone: the driver vehicle inspection report.', 'route.html?view=dvir'],
+      ['Tablets', 'Garage Station', 'The garage tablet: technicians tap their name and login ID, then work their jobs.', 'garage-station.html'],
+      ['Tablets', 'Plant Station', 'The plant floor tablet: pick its station once, then Loading, Unloading, Washing and Returns.', 'plant-station.html'],
+      ['Tablets', 'Trailer Assignments', 'Trailer numbers for each load; also works on a phone.', 'trailers.html'],
+      ['Screens on the wall', 'Driver Room TV', 'The driver board on the Driver Room TV.', 'driver-station.html?tv=1']
+    ];
+    // Opened from Administration's panel, a screen still opens in the whole window, like on the phone.
+    document.getElementById('list').addEventListener('click', e => {
+      const a = e.target.closest('a[data-page]');
+      if (!a) return;
+      e.preventDefault();
+      (window.top || window).location.href = new URL(a.dataset.page, location.href).href;
+    });
+    requireSignIn(() => {
+      const groups = [...new Set(SCREENS.map(s => s[0]))];
+      document.getElementById('list').innerHTML = groups.map(g => '<h2>' + escapeHtml(g) + '</h2><div class="pss-grid">' +
+        SCREENS.filter(s => s[0] === g).map(([, name, what, page]) =>
+          '<a class="pss-card" href="' + page + '" data-page="' + page + '"><b>' + escapeHtml(name) + '</b><span>' + escapeHtml(what) + '</span><small>' + escapeHtml(location.origin + '/' + page) + '</small></a>').join('') + '</div>').join('');
+    });
+  </script>
+</body>
+</html>

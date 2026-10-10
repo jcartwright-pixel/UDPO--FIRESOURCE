@@ -11,9 +11,12 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
 </head>
-<body class="fill gs-page">
+<body class="fill phone gs-page">
   <div id="screen">
+    <!-- Joe 10/10: a tablet screen on every screen size: a slim header with Back and Home, no desktop side menu. -->
     <div class="topbar">
+      <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
+      <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
       <span class="gs-people" id="people"></span>
       <button id="gs-signout" type="button" hidden>Sign Out</button>
     </div>
@@ -99,7 +102,7 @@
   </div>
 
   <script type="module">
-    import { start, escapeHtml } from './js/app.js';
+    import { start, escapeHtml, goBack } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 
     // The current app's Garage Station (GarageStation.html, 7.0.276), with the login ID in place of the PIN (Joe 10/10).
@@ -193,6 +196,8 @@
       if (!quiet) message('');
     }
     $('gs-signout').addEventListener('click', () => signOutAll());
+    $('go-back').addEventListener('click', goBack);
+    $('go-home').addEventListener('click', () => { location.href = 'index.html'; });
 
     /* ---------- jobs ---------- */
     function rowClass(j) { return j.status === 'PARTS' ? 'parts' : j.status === 'WORKING' ? 'working' : !j.canRun ? 'down' : j.source === 'OFFICE' ? 'office' : ''; }

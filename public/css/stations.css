@@ -3,6 +3,11 @@
 
 /* ---------- Garage Station ---------- */
 .gs-page .view { padding: 0 16px 12px; }
+.gs-page .topbar { min-height: 56px; padding: 4px 14px; }
+.gs-page .topbar .brand img { width: auto; height: 40px; }
+.gs-page .topbar .brand small { display: none; }
+.gs-page .topbar .gs-nav { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.gs-page .topbar .brand { order: 0; } .gs-page .topbar .gs-nav { order: -1; }
 .gs { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; font-size: 22px; color: #1b2a3a; }
 .gs [hidden] { display: none !important; }
 .gs h2 { margin: 0; font-size: 34px; color: #123f70; }
@@ -241,4 +246,17 @@ body.ds-tv .foot { color: #cfe3f6; }
   .ps-page .ps-pill { order: 9; flex-basis: 100%; text-align: center; }
   .ps-page .ps-stations, .ps-page .ps-tabs { grid-template-columns: 1fr; }
   .ps-page .ps-title h1 { font-size: 24px; }
+}
+
+/* ---------- Phone Screens (Administration > System Tools): every phone and tablet screen in one list ---------- */
+.pss h2 { margin: 14px 0 8px; font-size: 20px; color: #123f70; }
+.pss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.pss-card { display: grid; gap: 6px; padding: 16px; background: #fff; border: 1px solid #c9d6e4; border-top: 5px solid #0b6eaa; border-radius: 12px; text-decoration: none; color: #0b2f55; }
+.pss-card b { font-size: 19px; } .pss-card span { color: #4a5b6c; font-size: 15px; } .pss-card small { color: #6b7b8c; font-size: 13px; word-break: break-all; }
+.pss-card:hover { box-shadow: 0 2px 10px rgba(7, 60, 106, .18); }
+
+/* Joe 10/10: the drivers' phone page looks like a phone on a laptop too: one phone-width column in the middle. */
+@media (min-width: 600px) {
+  html:has(body.phone:not(.gs-page):not(.ps-page)) { background: #dfe6ee; }
+  body.phone:not(.gs-page):not(.ps-page) { max-width: 460px; margin: 0 auto; box-shadow: 0 0 24px rgba(7, 60, 106, .18); }
 }
