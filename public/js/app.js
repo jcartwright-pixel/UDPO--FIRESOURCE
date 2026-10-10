@@ -25,7 +25,7 @@ document.querySelectorAll('.topbar').forEach(bar => {
 // The menu on the left (Joe, 10/9: "the action buttons ... supposed to be a menu option to the left"), the same on every
 // screen. A link marked with the small arrow still opens the current app in a new tab. On a laptop it folds to icons;
 // the button at its top opens it.
-const CURRENT_APP = 'https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=';
+export const CURRENT_APP = 'https://script.google.com/a/macros/uniteddairy.com/s/AKfycbxgii-Lcrmg072I1gRBrRWrLmBipFGH8pKzg9kRjWRLWphUpV0ESS-3mpn01X6TBBJNSw/exec?workspace=';
 const ICON = {
   home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
   back: '<path d="M15 5l-7 7 7 7"/><path d="M8 12h12"/>',
@@ -47,7 +47,7 @@ const ICON = {
 };
 export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
-  ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
+  ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap'], ['Dispatch Administration', 'admin.html', 'gear']]],
   ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Driver Weekly Template', 'template.html', 'week'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
   ['Equipment', [['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'], ['Garage Work Orders', 'garage.html', 'wrench'], ['Fleet Service', CURRENT_APP + 'fleet-service', 'gear']]],
   ['GPS / Fleet', [['GPS Setup', 'gps.html', 'gear'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin'], ['Driver Scorecard', CURRENT_APP + 'driver-scorecard', 'star']]],

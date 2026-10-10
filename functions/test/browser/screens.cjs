@@ -643,6 +643,18 @@ async function noScroll(page) {
     await dispatcherTpl.waitForSelector('.tcell select[data-status]');
     assert.equal(await dispatcherTpl.isDisabled('.tcell select[data-status]'), true, 'a dispatcher sees the template read only');
     await Promise.all([tpl.close(), dispatcherTpl.close()]);
+    // Dispatch Administration: the current app's cards; a built screen opens in this window, from the Route Editor too.
+    const adm = await openPage(browser, 1920, 950, '/routes.html?testEmail=manager.test@uniteddairy.com');
+    await adm.waitForSelector('#to-admin');
+    await Promise.all([adm.waitForURL(/admin\.html/), adm.click('#to-admin')]);
+    await adm.waitForSelector('.admin-card');
+    assert.equal(await adm.$$eval('.admin-card', a => a.length), 15);
+    assert.equal(await adm.$$eval('.admin-card[target]', a => a.length), 0, 'no card opens a new window');
+    await Promise.all([adm.waitForURL(/template\.html/), adm.click('.admin-card[href="template.html"]')]);
+    await adm.waitForSelector('.tcell');
+    assert.deepEqual(adm.errors, []);
+    await adm.close();
+    results.push('Dispatch Administration: 15 cards from the Route Editor button; Driver Weekly Template opens in the same window');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).
