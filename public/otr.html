@@ -43,7 +43,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, save } from './js/app.js';
     import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
@@ -130,8 +130,10 @@
       } else if (view === 'figures') {
         const fm = O.otrFigureMap_(monthly), dis = edit ? '' : ' disabled';
         const thisYear = Number(today.slice(0, 4)), years = [thisYear + 1, thisYear, thisYear - 1, thisYear - 2].concat([thisYear + 1, thisYear, thisYear - 1, thisYear - 2].indexOf(year) < 0 ? [year] : []);
-        bar.innerHTML = '<button type="button" disabled title="Importing the accounting package is in the current app for now">Import From Accounting</button><span class="hint">Type a month\'s total; it saves by itself. Gray = last year. Cost per gallon = delivery cost ÷ gallons sold.</span><span class="spacer"></span><select id="year" aria-label="Figures year">' + years.map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
-        sheet.innerHTML = '<table class="issues otr-fig"><thead><tr><th>Month</th>' + CORE.FIGURES.map(f => '<th>' + escapeHtml(f.label) + '</th>').join('') + '<th>Cost per gallon</th></tr></thead><tbody>' +
+        bar.innerHTML = (imp && imp.merged ? '<button type="button" class="primary" id="imp-use"' + (imp.busy || !edit ? ' disabled' : '') + '>' + (imp.busy || 'Use These Numbers') + '</button><button type="button" id="imp-cancel"' + (imp.busy ? ' disabled' : '') + '>Cancel</button><span class="hint">Check the numbers found in ' + escapeHtml(imp.file) + ', then press Use These Numbers.</span>'
+          : '<button type="button" id="imp-pick"' + (edit && !(imp && imp.busy) ? '' : ' disabled') + '>' + (imp && imp.busy ? escapeHtml(imp.busy) : 'Import From Accounting') + '</button><input type="file" id="imp-file" accept=".zip,.xlsx,.xls" hidden><span class="hint">Type a month\'s total; it saves by itself. Gray = last year. Cost per gallon = delivery cost ÷ gallons sold.</span>') + '<span class="spacer"></span><select id="year" aria-label="Figures year">' + years.map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
+        const prev = imp && imp.merged ? '<div class="otr-import"><b>Found in ' + escapeHtml(imp.file) + '</b>' + (imp.merged.summary.length ? '<table><tbody>' + imp.merged.summary.map(l => '<tr><td class="strong">' + escapeHtml(l.what) + '</td><td>' + escapeHtml(l.count) + '</td><td>' + escapeHtml(l.from) + ' – ' + escapeHtml(l.to) + '</td><td>' + (l.changed ? l.changed + ' differ from what is saved' : l.total != null ? n0(l.total) + ' runs' : '') + '</td></tr>').join('') + '</tbody></table>' : '<p>No figures were found in this file. Use the accounting package zip (P&amp;L Expenses by Dept, Gallon Comparison) or the OTR Trips workbook (By Date, Recap).</p>') + '</div>' : '';
+        sheet.innerHTML = prev + '<table class="issues otr-fig"><thead><tr><th>Month</th>' + CORE.FIGURES.map(f => '<th>' + escapeHtml(f.label) + '</th>').join('') + '<th>Cost per gallon</th></tr></thead><tbody>' +
           CORE.MONTHS.map((m, i) => {
             const cur = fm[year + '-' + (i + 1)] || {}, ly = fm[(year - 1) + '-' + (i + 1)] || {};
             return '<tr><td class="strong">' + m + ' ' + year + '</td>' + CORE.FIGURES.map(f => '<td><input class="otr-in" inputmode="decimal" aria-label="' + escapeHtml(m + ' ' + year + ' ' + f.label) + '" data-m="' + (i + 1) + '" data-k="' + f.key + '" value="' + escapeHtml(cur[f.key] == null ? '' : cur[f.key]) + '"' + dis + '><small>' + (ly[f.key] == null ? '' : (f.money ? money(ly[f.key]) : n0(ly[f.key]))) + '</small></td>').join('') +
@@ -139,6 +141,15 @@
           }).join('') + '</tbody></table>';
         foot.textContent = 'Gallons sold and delivery cost make the cost per gallon. Employee cost and fuel cost come from P&L Expenses by Dept.';
         document.getElementById('year').onchange = (e) => { year = Number(e.target.value); render(); };
+        const pick = document.getElementById('imp-pick'), fileIn = document.getElementById('imp-file');
+        if (pick) pick.onclick = () => fileIn.click();
+        if (fileIn) fileIn.onchange = async () => {
+          const f = fileIn.files[0]; if (!f) return;
+          imp = { file: f.name, busy: 'Reading ' + f.name + '…' }; showError(''); render();
+          try { imp = { file: f.name, merged: await readImport(f), busy: '' }; } catch (e) { imp = null; showError('Could not read ' + f.name + ': ' + (e.message || e)); }
+          render();
+        };
+        if (document.getElementById('imp-use')) { document.getElementById('imp-use').onclick = applyImport; document.getElementById('imp-cancel').onclick = () => { imp = null; render(); }; if (imp.merged.summary.length === 0) document.getElementById('imp-use').disabled = true; }
         sheet.querySelectorAll('.otr-in').forEach(inp => { inp.onchange = () => {
           const m = Number(inp.dataset.m), key = inp.dataset.k, value = inp.value.trim(), id = year + '-' + m;
           let rec = monthly.find(x => Number(x.year) === year && Number(x.month) === m), made = false, before = rec ? rec[key] : undefined;
@@ -169,6 +180,49 @@
     }
 
     const pendingFigures = [];
+    // Import From Accounting (the current app's OverTheRoad.html import card): drop the accounting package zip or an Excel workbook
+    // (P&L Expenses by Dept, Gallon Comparison, OTR Trips By Date / Recap). The files are read here, checked, then saved together.
+    let imp = null;
+    const loadScript = (src) => new Promise((ok, bad) => { if ([...document.scripts].some(x => x.src === src)) return ok(); const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => bad(new Error('Could not load the Excel reader')); document.head.appendChild(el); });
+    async function readImport(file) {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+      let books = [{ name: file.name, data: await file.arrayBuffer() }];
+      if (/\.zip$/i.test(file.name)) {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+        const zip = await window.JSZip.loadAsync(books[0].data);
+        books = await Promise.all(Object.keys(zip.files).filter(n => /\.xlsx?$/i.test(n) && !/^__MACOSX\//.test(n) && !zip.files[n].dir).map(async n => ({ name: n, data: await zip.files[n].async('arraybuffer') })));
+      }
+      const parts = [];
+      books.forEach(b => {
+        const wb = window.XLSX.read(b.data, { type: 'array', cellDates: true });
+        wb.SheetNames.forEach(tab => {
+          // Dates as local midnight, the way the current app's Sheets read gives them.
+          const values = window.XLSX.utils.sheet_to_json(wb.Sheets[tab], { header: 1, raw: true, defval: '', blankrows: true })
+            .map(row => row.map(v => v instanceof Date ? new Date(v.getFullYear(), v.getMonth(), v.getDate() + (v.getHours() >= 12 ? 1 : 0)) : v));
+          const m = (tab + ' ' + b.name).match(/(20\d{2})/);
+          const parsed = O.otrParseImport_(values, m ? Number(m[1]) : year, tab);
+          parsed.tab = b.name.replace(/^.*\//, '') + ' · ' + String(tab).trim();
+          parts.push(parsed);
+        });
+      });
+      const merged = O.otrMergeImport_(parts);
+      merged.summary = O.otrImportSummary_(merged, monthly);
+      return merged;
+    }
+    async function applyImport() {
+      const merged = imp.merged;
+      imp = Object.assign({}, imp, { busy: 'Saving…' }); render();
+      try {
+        const chunks = [];
+        for (let i = 0; i < merged.daily.length; i += 300) chunks.push(merged.daily.slice(i, i + 300));
+        await save('saveOtr', { op: 'import', figures: merged.figures, daily: chunks.shift() || [] });
+        for (const c of chunks) await save('saveOtr', { op: 'import', figures: [], daily: c });
+        const yrs = merged.figures.map(f => f.year);
+        if (yrs.length) year = Math.max(...yrs);
+        imp = null; showError('');
+      } catch (e) { imp = Object.assign({}, imp, { busy: '' }); showError(e.message || String(e)); }
+      render();
+    }
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; render(); } });
     window.udBack = () => { if (view !== 'dash') { view = 'dash'; render(); return true; } return false; };
 
