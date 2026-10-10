@@ -27,6 +27,11 @@
  *   - a line's form starts from its last check (product, tip test, label / date code, overall result, notes, weights);
  *   - Boxing records no cycle time; Totes and Raypak no cycle time or weight; HTST #1 and #2 no cycle time, weight or tip test;
  *   - the overall result is Pass (RUNNING), Review, Fail (DOWN) or Finished; the 24-hour history lists every line's checks.
+ *
+ * And Shift Notes' (the Incident & Breakdown Log, desktopUiSavePlantShiftReportV5008 / handoffLogHtmlV7250):
+ *   - an entry has a type, equipment / area, shift, reading time, what happened, next steps and a follow-up status;
+ *   - a review note hangs under its entry and the entry's status is its newest review's; the log shows the last 24 hours;
+ *   - the shift by the hour: 6 AM to 2:59 PM first, 3 PM to 11:59 PM second, midnight to 5:59 AM third.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -357,11 +362,40 @@
     return [1, 2, 3, 4, 5, 6].map(function (n) { return text(w['head' + n]); }).some(Boolean) ? [1, 2, 3, 4, 5, 6].map(function (n) { return 'H' + n + ' ' + (text(w['head' + n]) || '—'); }).join(' · ') : '';
   }
 
+
+  /* ---------- Shift Notes (Incident & Breakdown Log) ---------- */
+  var SHIFT_TYPE = 'SHIFT_REPORT', SHIFTS = ['FIRST SHIFT', 'SECOND SHIFT', 'THIRD SHIFT'], ENTRY_TYPES = ['Breakdown', 'Incident', 'Safety', 'Quality', 'Handoff', 'Other'],
+    FOLLOW_UPS = ['OPEN', 'MONITOR', 'RESOLVED'];
+  function shiftAt(ms) { var h = Math.floor(((wallClock(ms) % 1440) + 1440) % 1440 / 60); return h >= 6 && h <= 14 ? 'FIRST SHIFT' : h >= 15 ? 'SECOND SHIFT' : 'THIRD SHIFT'; }
+  function followLabel(v) { v = text(v).toUpperCase() || 'OPEN'; return v === 'RESOLVED' ? 'Resolved' : v === 'MONITOR' ? 'Monitor' : 'Needs attention'; }
+  // One shift report record, whether the sheet's journal wrote it or the app did.
+  function shiftRecord(d) {
+    var p = payloadOf(d), v = p.values || {};
+    return { entryId: text(p.entryId || d.recordId), section: text(p.section || d.area).toUpperCase(), shift: text(p.shift || d.shift).toUpperCase(), readingTime: text(p.readingTime),
+      type: text(v.Type), equipment: text(v.Equipment), entry: text(v.Entry), parentId: text(v.ParentId), notes: text(p.notes !== undefined ? p.notes : d.notes),
+      followUpStatus: text(p.followUpStatus || 'OPEN').toUpperCase(), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), inApp: !!d.createdInApp };
+  }
+  // The log of the last 24 hours, newest first; each entry with its reviews (oldest first) and its status now.
+  function shiftLog(journal, nowMs) {
+    var all = (journal || []).filter(function (d) { return text(d.type).toUpperCase() === SHIFT_TYPE; }).map(shiftRecord)
+      .filter(function (r) { return !r.section || r.section === 'HANDOFF'; })
+      .filter(function (r) { var t = when(r.recordedAt); return !t || t >= nowMs - 86400000; })
+      .sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
+    var ids = {}, kids = {}, parents = [];
+    all.forEach(function (r) { if (r.entryId) ids[r.entryId] = true; });
+    all.forEach(function (r) { if (r.parentId && ids[r.parentId]) (kids[r.parentId] = kids[r.parentId] || []).push(r); else parents.push(r); });
+    return parents.map(function (r) {
+      var reviews = (kids[r.entryId] || []).slice().reverse();
+      return Object.assign({}, r, { reviews: reviews, status: (reviews.length ? reviews[reviews.length - 1] : r).followUpStatus });
+    });
+  }
+
   return { unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, productionLines: productionLines, qualityLines: qualityLines,
-    qualityHistory: qualityHistory, weightText: weightText };
+    qualityHistory: qualityHistory, weightText: weightText,
+    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog };
 });

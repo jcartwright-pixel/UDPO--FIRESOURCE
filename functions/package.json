@@ -10,7 +10,7 @@
     "test": "node --test test/unit/*.test.js",
     "test:emulator": "firebase emulators:exec --only firestore,auth --project demo-ud-distribution \"node --test --test-concurrency=1 test/emulator/*.test.js\"",
     "sync-logic": "node ../tools/sync-logic.cjs",
-    "test:browser": "firebase emulators:exec --only firestore,auth,functions,hosting --project demo-ud-distribution \"node test/browser/screens.cjs && node test/browser/plant.cjs && node test/browser/plant-unload.cjs && node test/browser/plant-sched.cjs && node test/browser/plant-yard.cjs && node test/browser/plant-quality.cjs\""
+    "test:browser": "firebase emulators:exec --only firestore,auth,functions,hosting --project demo-ud-distribution \"node test/browser/screens.cjs && node test/browser/plant.cjs && node test/browser/plant-unload.cjs && node test/browser/plant-sched.cjs && node test/browser/plant-yard.cjs && node test/browser/plant-quality.cjs && node test/browser/plant-shift.cjs\""
   },
   "dependencies": {
     "firebase-admin": "13.10.0",
