@@ -46,7 +46,6 @@
       <span class="spacer"></span>
       <a class="button" href="routeweek.html" id="to-holiday" title="Change which days routes run for one week only (holidays)">Holiday Week Editor</a>
       <a class="button" href="admin.html" id="to-admin">Dispatch Administration</a>
-      <a class="button" href="template.html" id="to-template">Driver Weekly Template</a>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="sheet" id="sheet"><table id="table"></table></div>
@@ -380,17 +379,21 @@
     });
     // Load Order: drag a run by its route number; the day's whole order saves as one call.
     // Rows are always draggable (a redraw that only turns editing on cannot then miss a drag that already began); who may move them is checked here.
-    table.addEventListener('dragstart', e => { const tr = e.target.closest('tr[data-i]'); if (!tr) return; if (!canEdit()) { e.preventDefault(); return; } dragging = Number(tr.dataset.i); e.dataTransfer.effectAllowed = 'move'; });
+    table.addEventListener('dragstart', e => { const tr = e.target.closest('tr[data-i]'); if (!tr) return; if (!canEdit()) { e.preventDefault(); return; } dragging = { id: tr.dataset.id, i: Number(tr.dataset.i) }; e.dataTransfer.effectAllowed = 'move'; });
     table.addEventListener('dragover', e => { if (dragging !== null && e.target.closest('tr[data-i]')) e.preventDefault(); });
     table.addEventListener('drop', e => {
       const tr = e.target.closest('tr[data-i]');
       if (!tr || dragging === null) return;
       e.preventDefault();
-      const list = seqList(), from = dragging, to = Number(tr.dataset.i);
+      // By run, not by row number: a copy that arrived during the drag may have changed the order behind the drawn rows.
+      // Dropped above the row it started on: it goes just before the target run; dropped below: just after it.
+      const list = seqList(), up = Number(tr.dataset.i) < dragging.i, from = list.findIndex(r => r.id === dragging.id);
       dragging = null;
-      if (from === to) return;
+      if (from < 0 || tr.dataset.id === list[from].id) return;
       const [moved] = list.splice(from, 1);
-      list.splice(to, 0, moved);
+      const at = list.findIndex(r => r.id === tr.dataset.id);
+      if (at < 0) return;
+      list.splice(up ? at : at + 1, 0, moved);
       const before = list.map(r => day(r, seqDay).loadOrder), p = seqDay;
       saveOptimistic('reorderRouteDay', { day: p, runIds: list.map(r => r.id) },
         () => list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: (i + 1) * 10 }); }),

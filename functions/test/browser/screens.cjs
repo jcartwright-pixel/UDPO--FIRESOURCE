@@ -793,13 +793,34 @@ async function noScroll(page) {
       await one.waitForSelector('table.day-table');
       assert.deepEqual(await one.$$eval('table.day-table thead th', t => t.map(x => x.textContent.trim().toUpperCase())), ['DAY', 'RUNS?', 'START TIME', 'LOAD DAY', 'MILES', 'HOURS', 'ORDER', 'TRUCK', 'TRAILER', 'JACK', 'DAY NOTES']);
       assert.equal(await one.$eval('table.day-table tr:nth-child(2) input[data-field="tractor"]', i => i.placeholder), 'none set', '802 runs Monday with no default truck');
-      const tiles = await one.$$eval('.actions.tiles > button, .actions.tiles > a.button', b => b.map(x => { const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) }; }));
-      assert.equal(tiles.length, 6);
-      assert.ok(tiles.every(t => t.w <= 92 && t.h >= 56 && t.top === tiles[0].top), 'square tiles in one row at ' + w + ': ' + JSON.stringify(tiles));
+      const tiles = await one.$$eval('.actions.tiles > button, .actions.tiles > a.button', b => b.map(x => { const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), fits: x.scrollWidth <= x.clientWidth }; }));
+      assert.equal(tiles.length, 5);
+      assert.equal(await one.$('#to-template'), null, 'Joe 10/10: Driver Weekly Template is on the Drivers menu, not the Route Editor');
+      assert.ok(tiles.every(t => t.w <= 116 && t.h >= 56 && t.fits && t.top === tiles[0].top), 'square tiles in one row at ' + w + ': ' + JSON.stringify(tiles));
       assert.deepEqual(one.errors, []);
       await one.close();
     }
     results.push('Route Editor (one run): Order and Day Notes per day, "none set" for a blank unit default, square tiles in one row at both sizes');
+    // Joe 10/10: an Administration section holds Dispatch Administration; Driver Weekly Template is under Drivers only.
+    const mp = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
+    await mp.waitForSelector('.side-flyouts .flyout', { state: 'attached' });
+    const menu = await mp.$$eval('.side-flyouts .flyout', fs => fs.map(f => [f.querySelector('.flyout-title').textContent, [...f.querySelectorAll('a')].map(a => a.textContent.trim())]));
+    const sec = (name) => (menu.find(m => m[0] === name) || [name, []])[1];
+    assert.deepEqual(sec('Administration'), ['Dispatch Administration']);
+    assert.equal(sec('Dispatch').indexOf('Dispatch Administration'), -1, 'not under Dispatch');
+    assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template') >= 0).map(m => m[0]), ['Drivers']);
+    await mp.close();
+    // Joe 10/10 (old-screen picture): the template lists relief drivers first; every day shows + Add Run, Copy, Paste and Paste + Add.
+    const tl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
+    await tl.waitForSelector('.tcell [data-copy]');
+    const groups = await tl.$$eval('tr.tpl-group td', t => t.map(x => x.textContent));
+    assert.match(groups[0], /Relief/i, 'relief drivers first: ' + groups.join(' | '));
+    assert.equal(await tl.$eval('.tcell [data-copy]', b => getComputedStyle(b.parentElement).visibility), 'visible', 'Copy shows without pointing at the cell');
+    assert.equal(await tl.$eval('.tcell [data-add]', b => b.textContent), '+ Add Run');
+    assert.equal(await tl.$eval('td.tpl-name', t => getComputedStyle(t).textAlign), 'left');
+    assert.deepEqual(tl.errors, []);
+    await tl.close();
+    results.push('Menu: Administration holds Dispatch Administration; Driver Weekly Template is under Drivers only. Template: relief first, + Add Run and Copy / Paste / Paste + Add on every day');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).

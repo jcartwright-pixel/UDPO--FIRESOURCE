@@ -21,16 +21,17 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Driver Weekly Template</h1><small>Each driver's normal week. It is the default for every schedule week; Weekly Dispatch changes override it. A driver can have more than one run a day.</small></div>
+      <div class="title"><h1>Driver Weekly Template</h1></div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Driver Master is not changed yet</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="actions">
-        <span class="tpl-copy" id="copy-state">No copied cell</span>
+      <div class="actions tpl-bar">
+        <span class="tpl-about">Maintain the normal weekly pattern once; it becomes the standard default for every schedule week. Weekly changes override it. A driver can have more than one run on the same day.</span>
         <span class="tpl-dirty" id="dirty"></span>
         <button type="button" id="refresh">Refresh</button>
-        <button type="button" class="primary" id="save">Save Template</button>
+        <span class="tpl-copy" id="copy-state">No copied cell</span>
+        <button type="button" class="go" id="save">Save Template</button>
       </div>
       <div class="sheet scroll-list">
         <table class="tpl">
@@ -76,7 +77,8 @@
       return '<td class="tcell ' + (c.status === 'OFF' ? 'off' : c.status === 'ASSIGNMENT' ? 'on' : '') + (dirty ? ' changed' : '') + '" data-driver="' + escapeHtml(d.id) + '" data-day="' + p + '">' +
         '<select data-status' + dis + '><option value="AVAILABLE"' + (c.status === 'AVAILABLE' ? ' selected' : '') + '>Available</option><option value="OFF"' + (c.status === 'OFF' ? ' selected' : '') + '>Off</option><option value="ASSIGNMENT"' + (c.status === 'ASSIGNMENT' ? ' selected' : '') + '>Assigned</option></select>' +
         c.runs.map((id, i) => '<div class="run-line" data-i="' + i + '">' + runSelect(p, id).replace('<select data-run>', '<select data-run' + dis + '>') + '<button type="button" class="mini" data-remove' + dis + ' aria-label="Remove run">×</button></div>').join('') +
-        (edit ? '<div class="tpl-tools"><button type="button" class="mini" data-add>+ Add Run</button><button type="button" class="mini" data-copy>Copy</button><button type="button" class="mini" data-paste' + (copied ? '' : ' disabled') + '>Paste</button><button type="button" class="mini" data-pasteadd' + (copied ? '' : ' disabled') + '>Paste + Add</button></div>' : '') + '</td>';
+        '<button type="button" class="tpl-add" data-add' + dis + '>+ Add Run</button>' +
+        '<div class="tpl-tools"><button type="button" class="mini" data-copy' + dis + '>Copy</button><button type="button" class="mini" data-paste' + (copied && edit ? '' : ' disabled') + '>Paste</button><button type="button" class="mini" data-pasteadd' + (copied && edit ? '' : ' disabled') + '>Paste + Add</button></div></td>';
     }
     function render() {
       const edit = canManage();
@@ -84,11 +86,12 @@
       const rows = L.driverRosterRows(drivers, L.operatingDay(new Date())).filter(r => r.active), byId = {};
       drivers.forEach(d => { byId[d.id] = d; });
       let html = '';
-      [[false, 'Regular / set schedule drivers'], [true, 'Relief drivers · default Available']].forEach(([relief, label]) => {
+      // As in the current app: relief drivers first, then the regular / set schedule drivers.
+      [[true, 'Relief drivers · default available'], [false, 'Regular / set schedule drivers']].forEach(([relief, label]) => {
         const group = rows.filter(r => r.reliefDriver === relief);
         if (!group.length) return;
         html += '<tr class="tpl-group"><td colspan="8">' + label + '</td></tr>';
-        group.forEach(r => { const d = byId[r.id]; html += '<tr><td class="strong">' + escapeHtml(d.name) + '</td>' + DAYS.map(p => cellHtml(d, p, edit)).join('') + '</tr>'; });
+        group.forEach(r => { const d = byId[r.id]; html += '<tr><td class="tpl-name">' + escapeHtml(d.name) + '</td>' + DAYS.map(p => cellHtml(d, p, edit)).join('') + '</tr>'; });
       });
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="8" class="empty">No active drivers.</td></tr>';
       const n = Object.keys(edits).length;

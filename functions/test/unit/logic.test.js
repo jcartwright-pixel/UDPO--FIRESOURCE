@@ -141,3 +141,25 @@ test('Equipment: each unit\'s default runs by weekday from Route Master, and the
   assert.equal(L.cleanUnitNote('Down (10/8/2026 jc@uniteddairy.com) | External Fleet: 2017 | INTL'), 'Down (10/8/2026 jc@uniteddairy.com)');
   assert.equal(L.cleanUnitNote('External Fleet: 2017 | INTERNATIONAL | Prostar'), '');
 });
+
+test('truck and trailer lists: a unit on the road on another run at the same time is out, as in the current app', () => {
+  const rows = [
+    { id: 'a', route: '801', deliveryDate: '2026-10-12', dispatchTime: 240, routeHours: '9:30', truckId: 't1', trailerId: 'r1' },
+    { id: 'b', route: '802', deliveryDate: '2026-10-12', dispatchTime: 600, routeHours: 4, truckId: 't2', trailerId: '' },
+    { id: 'c', route: '803', deliveryDate: '2026-10-12', dispatchTime: 950, routeHours: '', truckId: 't3' },
+    { id: 'd', route: '804', deliveryDate: '2026-10-13', dispatchTime: 600, routeHours: 4, truckId: 't4' },
+    { id: 'e', route: '805', deliveryDate: '2026-10-12', dispatchTime: 1260, routeHours: 6, truckId: 't5' },
+    { id: 't', route: '900', deliveryDate: '2026-10-12', dispatchTime: 780, routeHours: 3 }
+  ];
+  const c = L.unitConflicts(rows, rows[5], 'truck', (r) => (r.id === 'c' ? '2' : null));
+  assert.equal(c.t1, 'ON ROAD UNTIL 1:30 PM (801)', '4 AM + 9:30 overlaps 1 PM, by more than the 15 minutes leeway');
+  assert.equal(c.t2, 'ON ROAD UNTIL 2:00 PM (802)');
+  assert.equal(c.t3, undefined, '803 leaves at 3:50 PM (Route Master 2 hours), within the 15 minutes leeway of this one being back at 4 PM');
+  assert.equal(c.t4, undefined, 'another delivery day');
+  assert.equal(c.t5, undefined, 'leaves after this one is back');
+  const c2 = L.unitConflicts(rows, rows[5], 'truck', () => null);
+  assert.equal(c2.t3, 'ON ROAD — RETURN UNKNOWN (803)', 'a run with no hours anywhere counts as busy, as in the current app');
+  const late = L.unitConflicts([{ id: 'x', route: '806', deliveryDate: 'd', dispatchTime: 1320, routeHours: 4, trailerId: 'r9' }, { id: 'y', route: '807', deliveryDate: 'd', dispatchTime: 1380, routeHours: 1 }], { id: 'y', route: '807', deliveryDate: 'd', dispatchTime: 1380, routeHours: 1 }, 'trailer');
+  assert.equal(late.r9, 'ON ROAD UNTIL 2:00 AM (806)', 'past midnight');
+  assert.equal(L.hoursMinutes('9.5'), 570);
+});

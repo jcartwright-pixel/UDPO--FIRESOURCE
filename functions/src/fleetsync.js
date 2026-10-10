@@ -37,7 +37,9 @@ function fleetUnits(values) {
     if (['BODY TYPE', 'ASSET TYPE', 'MODEL', 'USE'].some(k => up(g(k)).indexOf('YARD') >= 0)) { yard.push(unit); return; }
     const type = typeOf(g('ASSET TYPE')), facilityId = facilityOf(g('LOCATION'));
     if (!type || !facilityId) return;
-    const about = [g('YEAR'), g('MAKE'), g('MODEL'), g('VIN'), g('PLATE'), g('STATE')].filter(Boolean).join(' | ');
+    // Joe 10/10: leased units (LEASE other than OWN) are not on Fleet Service; the lessor is kept with the fleet text.
+    const lease = /^(OWN|OWNED)?$/i.test(g('LEASE')) ? '' : 'Lease: ' + g('LEASE');
+    const about = [g('YEAR'), g('MAKE'), g('MODEL'), g('VIN'), g('PLATE'), g('STATE'), lease].filter(Boolean).join(' | ');
     units.push({ unit, type, facilityId, location: g('LOCATION'), outOfService: /OOS|OUT OF SERVICE|REMOVE/i.test(g('LOCATION') + ' ' + g('IN SERVICE')), notes: about ? 'External Fleet: ' + about : '' });
   });
   return { units, yard };

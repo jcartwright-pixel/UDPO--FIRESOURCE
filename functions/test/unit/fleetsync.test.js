@@ -63,3 +63,15 @@ test('fleet sync: adds new units, brings back listed ones, keeps DOWN units and 
   // A second pass over the result changes nothing.
   assert.equal(planFleetSync(FLEET, v, AT).cells.length, 0);
 });
+
+test('fleet sync keeps the lessor with the fleet text, so Fleet Service can leave leased units out', () => {
+  const L = require('../../src/logic');
+  const fleet = [['UD UNIT', 'ASSET TYPE', 'LOCATION', 'MAKE', 'LEASE'], ['123885', 'Tractor', 'Uniontown PA Branch', 'Freightliner', 'Idealease'], ['493', 'Straight Truck', 'Uniontown PA Branch', 'Isuzu', 'OWN']];
+  const { units } = fleetUnits(fleet);
+  assert.equal(units[0].notes, 'External Fleet: Freightliner | Lease: Idealease');
+  assert.equal(units[1].notes, 'External Fleet: Isuzu');
+  assert.equal(L.unitLeased({ notes: units[0].notes }), true);
+  assert.equal(L.unitLeased({ notes: units[1].notes }), false);
+  assert.equal(L.unitLeased({ notes: 'DOWN: Lease: return' }), false, 'only the fleet text counts');
+  assert.equal(L.cleanUnitNote(units[0].notes), '', 'the screens never show it');
+});
