@@ -695,3 +695,15 @@
 .mocreo-page .mc-now { font-weight: 800; color: var(--ud-blue); }
 @media (max-width: 1100px) { .mocreo-page .mc-grid { grid-template-columns: 1fr; } .mocreo-page .mc-scroll { max-height: none; } }
 .mocreo-page #add { white-space: nowrap; }
+/* Narrow screens (1366 laptops) and wider system fonts: the buttons keep their size and one line; the eyebrow, day name and
+   header counts give way first. */
+.plant-page .head .actions.in-head.top-row { flex-shrink: 0; }
+.plant-page .head .actions.in-head.top-row button { white-space: nowrap; }
+.plant-page .head .tabs button { white-space: nowrap; }
+.plant-page .head .title .eyebrow { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1500px) {
+  .plant-page .head .dayname { font-size: 20px; }
+  .plant-page .head .hstats { min-width: 0; flex-shrink: 1; gap: 6px; }
+  .plant-page .head .hstats div { min-width: 0; padding: 4px 8px; }
+  .plant-page .head .hstats b { font-size: 20px; }
+}
