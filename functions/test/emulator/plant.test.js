@@ -67,3 +67,49 @@ test('Wash: closes the trailer\'s requests and records the wash; another trailer
   await copy();
   assert.equal((await db().collection('plantWash').doc('wash_d1').get()).data().status, 'COMPLETE');
 });
+
+/* ---------- the Plant Operations Scheduler ---------- */
+const schedule = (fields) => applyAction(db(), DISPATCHER, Object.assign({ action: 'savePlantSchedule', requestId: rid() }, fields));
+const lanes = async (lane) => R.scheduleEntries((await db().collection('plantJournal').where('type', '==', R.LOAD_TYPE[lane]).get()).docs.map(d => d.data()), lane);
+const GARBER = { routeId: 'rte_c892', runId: 'run_c892', route: '892', run: 'GARBER' };
+
+test('Scheduler: the copy brings the loads; Add, Edit and Delete Load; Plant Route loads reach Weekly Dispatch', async () => {
+  const ship = await lanes('SHIPPING');
+  assert.deepEqual(ship.map(x => x.id).sort(), ['SCHED-a1', 'SCHED-g1', 'SCHED-g2', 'SCHED-s1', 'SCHED-w1', 'SCHED-w2']);
+  assert.equal(ship.find(x => x.id === 'SCHED-w1').pickupTime, '06:30', 'the journal\'s last row is the load now');
+  assert.deepEqual((await lanes('RECEIVING')).map(x => x.id).sort(), ['RECV-k1', 'RECV-v1']);
+  // Add.
+  const added = await schedule({ lane: 'SHIPPING', op: 'save', date: '2026-10-10', fields: Object.assign({ pickupTime: '6:15 AM', loadDate: '2026-10-09', trailer: '961', cases: '40', product: 'Cream' }, GARBER) });
+  let x = (await lanes('SHIPPING')).find(e => e.id === added.id);
+  assert.deepEqual([x.date, x.pickupTime, x.trailer, x.cases], ['2026-10-10', '06:15', 'T-961', '40']);
+  assert.equal((await db().collection('plantLoads').doc(added.id).get()).data().date, '2026-10-10', 'Weekly Dispatch sees the load as needing a driver');
+  // Edit a load the sheet has: moved to Friday as a carrier load; it leaves Weekly Dispatch.
+  await schedule({ lane: 'SHIPPING', op: 'save', id: 'SCHED-g1', date: '2026-10-09', fields: Object.assign({ pickupTime: '07:30', scheduleType: 'CARRIER', poNumber: 'P-1' }, GARBER) });
+  x = (await lanes('SHIPPING')).filter(e => e.id === 'SCHED-g1');
+  assert.equal(x.length, 1, 'shown once, on its new day');
+  assert.deepEqual([x[0].date, x[0].scheduleType, x[0].poNumber], ['2026-10-09', 'CARRIER', 'P-1']);
+  assert.equal((await db().collection('plantLoads').doc('SCHED-g1').get()).exists, false);
+  // The next copy from the sheets keeps the app's edit.
+  await copy();
+  assert.equal((await lanes('SHIPPING')).find(e => e.id === 'SCHED-g1').date, '2026-10-09');
+  // Delete.
+  await schedule({ lane: 'SHIPPING', op: 'remove', id: 'SCHED-w2', date: '2026-10-06' });
+  assert.equal((await lanes('SHIPPING')).some(e => e.id === 'SCHED-w2'), false);
+  assert.equal((await db().collection('plantLoads').doc('SCHED-w2').get()).exists, false);
+  // A Receiving load is not on Shipping, and a Shipping one cannot be deleted from Receiving.
+  await assert.rejects(schedule({ lane: 'RECEIVING', op: 'remove', id: 'SCHED-a1', date: '2026-10-09' }), /no longer on the Receiving schedule/);
+  // A run not shown to the plant is refused.
+  await assert.rejects(schedule({ lane: 'SHIPPING', op: 'save', date: '2026-10-10', fields: { routeId: 'rte_c951', runId: 'run_c951', route: '951', run: 'NOT PLANT', pickupTime: '07:00' } }), /no longer on the list/);
+});
+
+test('Scheduler: Receiving adds a supplier (next S code), refuses a repeat, and books its load', async () => {
+  const out = await schedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'Ohio Valley Fruit', label: 'Ohio Fruit' });
+  assert.equal(out.supplier.route, 'S07');
+  await assert.rejects(schedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'ohio valley fruit' }), /already on the list/);
+  await assert.rejects(schedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'Another', code: 'S06' }), /S06 is already used/);
+  const load = await schedule({ lane: 'RECEIVING', op: 'save', date: '2026-10-09', fields: { routeId: out.supplier.routeId, runId: out.supplier.runId, route: 'S07', run: 'OHIO VALLEY FRUIT', pickupTime: '11:00', product: 'Strawberries' } });
+  const recv = await lanes('RECEIVING');
+  assert.equal(recv.find(e => e.id === load.id).product, 'Strawberries');
+  assert.equal((await db().collection('plantLoads').doc(load.id).get()).exists, false, 'Receiving loads are not driver loads');
+  assert.equal((await lanes('SHIPPING')).some(e => e.id === load.id), false);
+});
