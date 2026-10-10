@@ -40,6 +40,8 @@ Writing back to the real sheets is a later step: it needs a code change and Joe'
 | 12 | Optional: plant managers' email addresses for reports, as the GitHub variable `PRODUCTION_ENV` = `REPORT_TO=a@uniteddairy.com,b@uniteddairy.com` (United Dairy addresses only) | Joe | GitHub > Settings > Variables |
 | 13 | Release: merge the work into `main`, run the deploy for production, check the run's summary and the live checks | Claude, on Joe's release words | GitHub Actions |
 
+| 14 | Last, only after Joe says in words that the new app is running the plant and types *"Turn off the old app: show the moved page, stop its timed jobs and emails, keep the sheets."*: release the old app with its off switch (united-dairy-desktop-operations PR #237), then run `udpoRetireOldApp` in its Apps Script editor. Every old page shows "This app has moved" with a link here; its timed jobs and outbound email stop; the sheets are not touched. Move the tablets and phones to this app's links | Claude (release), Joe (runs it or asks Claude) | Old app's Apps Script editor |
+
 Steps 1 to 10 can be done any time; nothing runs until step 13. The deploy turns on the Google services it needs
 (Sheets, IAM Credentials, Gmail, Secret Manager) by itself.
 
@@ -56,6 +58,7 @@ Steps 1 to 10 can be done any time; nothing runs until step 13. The deploy turns
 
 ## Going back
 
-The current Apps Script app is never changed by any of this and keeps running. To go back, use the current app as
-today. To undo a bad production deploy of the screens: Firebase > Hosting > Release history > the previous release >
+Until step 14 the current Apps Script app is never changed by any of this and keeps running. To go back, use the
+current app as today. After step 14, run `udpoRestoreOldApp` in the old app's Apps Script editor: its pages open again,
+its timed jobs return with their saved schedules and outbound email goes back to its earlier setting. To undo a bad production deploy of the screens: Firebase > Hosting > Release history > the previous release >
 Roll back. To stop the new app reading the sheets, remove the server account's Viewer share on the sheets.
