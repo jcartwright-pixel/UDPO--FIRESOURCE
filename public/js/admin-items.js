@@ -40,7 +40,8 @@ export const ADMIN_GROUPS = [
   ['System Tools', 'Stations and checks', [
     ['window-test', 'Window Test Center', 'Opens every screen at each window size to check nothing is cut off.', '', 'check'],
     ['driver-station', 'Driver Station', 'The driver board and check-in station.', 'driver-station.html', 'distribution-truck-v1-560.webp'],
-    ['plant-station', 'Plant Station', 'The plant floor tablet: pick its station, then Loading, Unloading, Washing and Returns.', 'plant-station.html', 'plant-building-v1-560.webp']
+    ['plant-station', 'Plant Station', 'The plant floor tablet: pick its station, then Loading, Unloading, Washing and Returns.', 'plant-station.html', 'plant-building-v1-560.webp'],
+    ['phone-screens', 'Phone Screens', 'Every phone and tablet screen with its link, to try from this computer.', 'phone-screens.html', 'people']
   ]],
   ['Diagnostics', 'Checks and repairs for the data behind the app', [
     ['preflight', 'Run Runtime Pre-Flight', 'Checks every sheet, column and setting the app needs and lists anything missing.', '', 'check'],
