@@ -212,3 +212,21 @@ test('yard checks save: trailer required, fuel Full, 3/4, 1/2 or Empty', () => {
   const ok = P.validateYard({ date: '2026-10-07', trailer: '955', fuelLevel: 'full', temperature: '34', notes: 'x'.repeat(900) }, SaveError);
   assert.deepEqual([ok.trailer, ok.fuelLevel, ok.notes.length, ok.departed], ['T-955', 'FULL', 800, false]);
 });
+
+test('quality: the active lines in view order with their last check; each line records only its own fields', () => {
+  const PDX = require('../fixtures/plant-demo');
+  const sheets = PDX.plantSheets(), setup = Object.values(P.parseSetup(sheets["'PLANT_OPERATIONS_MASTER'"]));
+  assert.ok(setup.length >= 7, 'the setup tab is read');
+  const status = Object.values(P.parseLineStatus(sheets["'PLANT LINE STATUS'"]));
+  const app = { type: 'PRODUCTION_QUALITY', recordedAt: '2026-10-08T19:00:00Z', recordedBy: 'qa@uniteddairy.com', payload: { operationId: 'ut_prod_boxing', area: 'BOXING', product: 'Skim', status: 'DOWN', qualityCheck: 'FAIL' } };
+  const lines = R.qualityLines(setup, [app], status, Date.parse('2026-10-08T20:00:00Z'));
+  assert.deepEqual(lines.map(l => l.name), ['BOXING', 'TOTES', 'HTST #1', 'GALLON FILLER', 'BLOW MOLD']);
+  assert.deepEqual([lines[0].last.product, lines[0].last.status, lines[0].today], ['Skim', 'DOWN', 2]);
+  assert.deepEqual([lines[4].last.status, lines[4].last.cycleTime, lines[1].last.status], ['REVIEW', '7.8', undefined]);
+  assert.deepEqual(R.qualityHistory([app], status, Date.parse('2026-10-08T20:00:00Z')).map(h => h.area), ['BOXING', 'BLOW MOLD', 'BOXING']);
+  assert.deepEqual([R.qualitySkip('Boxing'), R.qualitySkip('TOTES'), R.qualitySkip('HTST #2'), R.qualitySkip('GALLON FILLER')],
+    [{ cycle: true }, { cycle: true, weight: true }, { cycle: true, weight: true, tip: true }, {}]);
+  assert.equal(R.weightText({ head1: '55.3', head2: '58.5' }), 'H1 55.3 · H2 58.5 · H3 — · H4 — · H5 — · H6 —');
+  assert.throws(() => P.validateQuality({ operationId: 'ut_prod_boxing', status: 'BROKEN' }, SaveError), /Status must be Running, Review, Changeover, Down, or Finished/);
+  assert.deepEqual(P.validateQuality({ operationId: 'ut_prod_boxing', weights: { result: '3990', evil: 'x' } }, SaveError).weights, { result: '3990' });
+});

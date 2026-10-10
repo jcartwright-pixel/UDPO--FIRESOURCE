@@ -135,3 +135,20 @@ test('Yard Checks: Record locks the trailer for 2 hours that day, Left Yard take
   assert.equal(mine.find(d => d.payload.status === 'COMPLETE').payload.fuelLevel, '1/2');
   assert.ok(!R.yardQueue(loaded, j, DATE, now).rows.concat(R.yardQueue(loaded, j, DATE, now).locked).some(r => r.trailer === first.trailer && r.routeRun === first.routeRun), 'Left Yard takes the load off');
 });
+
+/* ---------- Production Line Status & Quality ---------- */
+test('Quality: the copy brings the lines and their last checks; Record Quality Check needs a set-up line and a known status', async () => {
+  const setup = (await db().collection('plantSetup').get()).docs.map(d => d.data());
+  assert.deepEqual(R.productionLines(setup).map(l => l.name), ['BOXING', 'TOTES', 'HTST #1', 'GALLON FILLER', 'BLOW MOLD']);
+  assert.equal((await db().collection('plantLineStatus').doc('ut_prod_blow_mold').get()).data().payload.cycleTime, '7.8');
+  const q = (fields) => applyAction(db(), DISPATCHER, Object.assign({ action: 'saveQualityCheck', requestId: rid() }, fields));
+  await assert.rejects(q({ operationId: 'ut_prod_retired', status: 'RUNNING' }), /Production area is not configured/);
+  await assert.rejects(q({ operationId: 'ut_prod_totes', status: 'BROKEN' }), /Status must be/);
+  const res = await q({ operationId: 'ut_prod_totes', product: 'Orange drink', status: 'REVIEW', qualityCheck: 'pass', temperature: '38', notes: 'Cap torque low' });
+  assert.match(res.message, /TOTES production status updated/);
+  await copy();
+  const all = (await db().collection('plantJournal').where('type', '==', 'PRODUCTION_QUALITY').get()).docs.map(d => d.data());
+  const lines = R.qualityLines(setup, all, (await db().collection('plantLineStatus').get()).docs.map(d => d.data()), Date.now());
+  const totes = lines.find(l => l.name === 'TOTES').last;
+  assert.deepEqual([totes.product, totes.status, totes.qualityCheck, totes.notes], ['Orange drink', 'REVIEW', 'PASS', 'Cap torque low']);
+});

@@ -69,7 +69,8 @@ const ACTIONS = Object.freeze({
   completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   // Plant Operations Scheduler (Shipping and Receiving).
   savePlantSchedule: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
-  saveYardCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' }
+  saveYardCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  saveQualityCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -283,6 +284,7 @@ function validate(input) {
   if (action === 'completeWash') return Object.assign(out, PLANT.validateWash(input, SaveError));
   if (action === 'savePlantSchedule') return Object.assign(out, PLANT.validateSchedule(input, SaveError));
   if (action === 'saveYardCheck') return Object.assign(out, PLANT.validateYard(input, SaveError));
+  if (action === 'saveQualityCheck') return Object.assign(out, PLANT.validateQuality(input, SaveError));
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
     if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
@@ -463,6 +465,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'completeWash') return PLANT.saveWash(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePlantSchedule') return PLANT.saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveYardCheck') return PLANT.saveYard(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveQualityCheck') return PLANT.saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);

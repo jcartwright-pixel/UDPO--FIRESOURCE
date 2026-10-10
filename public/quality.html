@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Production Line Status &amp; Quality · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page quality-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Production Line Status &amp; Quality Control</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Timestamped Shift Entry</span><h1>Production Line Status &amp; Quality Control</h1></div>
+      <div class="tabs" id="panes" role="tablist" aria-label="Quality view"><button type="button" data-pane="current">Current</button><button type="button" data-pane="history">24-Hour History</button></div>
+      <div class="hstats" id="hstats"></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="notice ok" id="saved" hidden></div>
+    <div class="view">
+      <div class="qc-split" id="pane-current">
+        <aside class="qc-lines" aria-label="Production lines"><h2>Lines</h2><div id="lines"></div></aside>
+        <section class="qc-form" id="form">
+          <div class="qc-top"><h2 id="form-title">Quality Check</h2><span class="qc-last" id="form-last"></span>
+            <div class="qc-actions"><button type="button" class="qc-btn" id="clear">Clear</button><button type="button" class="qc-btn primary" id="record">Record Quality Check</button></div></div>
+          <div class="qc-fields" id="fields"></div>
+        </section>
+      </div>
+      <section class="sheet scroll-list qc-history" id="pane-history" hidden>
+        <table class="loadout qc-table">
+          <colgroup><col style="width:14%"><col style="width:13%"><col style="width:16%"><col style="width:19%"><col style="width:10%"><col style="width:20%"><col style="width:8%"></colgroup>
+          <thead><tr><th>Time</th><th>Production Line</th><th>Product</th><th>Measurements</th><th>Result</th><th>Notes</th><th>Entered By</th></tr></thead>
+          <tbody id="history"></tbody>
+        </table>
+      </section>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic, U = window.UDPlant;
+    const params = new URLSearchParams(location.search);
+    const today = () => L.operatingDay(new Date());
+    let pane = params.get('view') === 'history' ? 'history' : 'current', chosen = params.get('line') || '';
+    let setup = [], lineStatus = [], journal = [], person = null, app = {}, shownFor = '';
+    const pending = [];
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const RESULT = { RUNNING: 'Pass', REVIEW: 'Review', DOWN: 'Fail', FINISHED: 'Finished', CHANGEOVER: 'Changeover' };
+    const CHECK = { PASS: 'Pass', REVIEW: 'Review', FAIL: 'Fail' };
+    const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
+    const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
+    const opt = (value, current, label) => '<option value="' + value + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + label + '</option>';
+    const pick3 = (cls, current) => '<select class="' + cls + '">' + opt('PASS', current, 'Pass') + opt('REVIEW', current, 'Review') + opt('FAIL', current, 'Fail') + '</select>';
+
+    function journalAll() { return journal.concat(pending); }
+    function lines() { return U.qualityLines(setup, journalAll(), lineStatus, Date.now()); }
+    function current() { const all = lines(); return all.find(l => l.operationId === chosen) || all[0] || null; }
+
+    // The form of one line, as the current app's desktop form; it starts from the line's last check.
+    function drawForm(line) {
+      const ck = canSave(), last = line.last || {}, w = last.weights || {}, skip = U.qualitySkip(line.name), blow = U.isBlowMold(line.name), dis = ck ? '' : ' disabled';
+      const weight = blow ? '<div class="qc-heads">' + [1, 2, 3, 4, 5, 6].map(n => '<label>H' + n + '<input class="prod-head" data-head="' + n + '" inputmode="decimal" value="' + escapeHtml(w['head' + n] || '') + '"' + dis + '></label>').join('') + '</div>'
+        : '<input class="prod-weights" value="' + escapeHtml(w.result || '') + '"' + dis + '>';
+      const fields = blow
+        ? '<label>Jug size<select class="prod-product"' + dis + '><option value="Gallon">Gallon</option></select></label><label>Annealer temperature<input class="prod-temperature" inputmode="decimal"' + dis + '></label>' +
+          '<label>Annealer speed<input class="prod-annealer-speed" inputmode="decimal" placeholder="Machine setting"' + dis + '></label><div class="qc-field wide"><span>Jug weight</span>' + weight + '</div><label>Cycle time<input class="prod-cycle" inputmode="decimal"' + dis + '></label>'
+        : '<label>Product being run<input class="prod-product" value="' + escapeHtml(last.product || '') + '"' + dis + '></label>' + (skip.weight ? '' : '<div class="qc-field"><span>Package weight</span>' + weight + '</div>') +
+          '<label>Temperature<input class="prod-temperature"' + dis + '></label>' + (skip.tip ? '' : '<label>Tip test' + pick3('prod-tip', last.tipTest).replace('<select', '<select' + dis) + '</label>') +
+          '<label>Label / date code' + pick3('prod-quality', last.qualityCheck).replace('<select', '<select' + dis) + '</label>' + (skip.cycle ? '' : '<label>Cycle time<input class="prod-cycle"' + dis + '></label>');
+      document.getElementById('form-title').textContent = line.name + ' Quality Check';
+      document.getElementById('form-last').textContent = last.recordedAt ? 'Last check ' + dateTime(last.recordedAt) + (last.recordedBy ? ' · ' + initials(last.recordedBy) : '') + ' · ' + (RESULT[last.status] || last.status || '') : 'No check recorded yet';
+      document.getElementById('fields').innerHTML = fields + '<label>Overall result<select class="prod-status"' + dis + '>' + opt('RUNNING', last.status, 'Pass') + opt('REVIEW', last.status, 'Review') + opt('DOWN', last.status, 'Fail') + opt('FINISHED', last.status, 'Finished') + '</select></label>' +
+        '<label class="wide">Corrective action / notes<input class="prod-notes" maxlength="1000" value="' + escapeHtml(last.notes || '') + '"' + dis + '></label>';
+      document.getElementById('clear').hidden = !ck;
+      document.getElementById('record').hidden = !ck;
+      shownFor = line.operationId + '|' + (last.recordedAt || '');
+    }
+
+    function render() {
+      const all = lines(), line = current(), hist = U.qualityHistory(journalAll(), lineStatus, Date.now()), ck = canSave();
+      if (line) chosen = line.operationId;
+      const fails = all.filter(l => l.last && (l.last.status === 'DOWN' || l.last.status === 'REVIEW')).length;
+      document.getElementById('hstats').innerHTML = [['Lines', all.length, ''], ['Checks 24 h', hist.length, 'good'], ['Review / Fail', fails, fails ? 'warn' : '']]
+        .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
+      document.getElementById('pane-current').hidden = pane !== 'current';
+      document.getElementById('pane-history').hidden = pane !== 'history';
+      document.getElementById('lines').innerHTML = all.map(l => '<button type="button" data-line="' + escapeHtml(l.operationId) + '" class="' + (line && l.operationId === line.operationId ? 'active' : '') + '">' +
+        '<i class="qc-dot st-' + String(l.last.status || 'NONE').toLowerCase() + '" title="' + escapeHtml(RESULT[l.last.status] || 'No check yet') + '"></i><span>' + escapeHtml(l.name) + '</span><b title="Checks in the last 24 hours">' + l.today + '</b></button>').join('') ||
+        '<p class="empty">No production lines are set up for this plant.</p>';
+      // The form is redrawn when another line is picked or a newer check of this line arrives, not while someone types.
+      if (line) { const key = line.operationId + '|' + (line.last.recordedAt || ''); if (key !== shownFor) drawForm(line); }
+      document.getElementById('form').hidden = !line;
+      document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td><b>' + escapeHtml(h.area) + '</b></td><td>' + escapeHtml(h.product || '') + '</td>' +
+        '<td class="detail">' + escapeHtml([h.temperature ? 'Temp ' + h.temperature : '', h.cycleTime ? 'Cycle ' + h.cycleTime : '', h.annealerSpeed ? 'Speed ' + h.annealerSpeed : '', U.weightText(h.weights), h.remainingOutput].filter(Boolean).join(' · ')) + '</td>' +
+        '<td><span class="qc-res st-' + String(h.status || '').toLowerCase() + '">' + escapeHtml(RESULT[h.status] || h.status || '') + '</span>' + (h.qualityCheck ? '<small>Label ' + escapeHtml(CHECK[h.qualityCheck] || h.qualityCheck) + '</small>' : '') + '</td>' +
+        '<td class="detail">' + escapeHtml(h.notes || '') + '</td><td>' + escapeHtml(initials(h.recordedBy)) + '</td></tr>').join('') ||
+        '<tr><td colspan="7" class="empty">No quality checks have been recorded during this operational day.</td></tr>';
+      document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Record Quality Check saves the check with the time; it becomes the line\'s status now.' : 'View only.') : hist.length + ' check' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours, all production lines.';
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+    }
+
+    function readForm(line) {
+      const f = document.getElementById('fields'), v = (c) => { const n = f.querySelector('.' + c); return n ? n.value : ''; };
+      const heads = f.querySelectorAll('.prod-head'), weights = {};
+      if (heads.length) heads.forEach(x => { weights['head' + x.dataset.head] = x.value; }); else if (f.querySelector('.prod-weights')) weights.result = v('prod-weights');
+      return { operationId: line.operationId, product: v('prod-product'), status: v('prod-status'), remainingOutput: (line.last && line.last.remainingOutput) || '', qualityCheck: v('prod-quality'),
+        tipTest: v('prod-tip'), temperature: v('prod-temperature'), cycleTime: v('prod-cycle'), productSize: '', annealerSpeed: v('prod-annealer-speed'), weights, notes: v('prod-notes') };
+    }
+    document.getElementById('record').onclick = async () => {
+      const line = current();
+      if (!line) return;
+      const fields = readForm(line);
+      // Shown at once: the check is the line's last check and is on the history.
+      const mine = { type: U.QUALITY_TYPE, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, payload: Object.assign({ area: line.name }, fields) };
+      pending.push(mine);
+      shownFor = '';
+      render();
+      const ok = document.getElementById('saved');
+      ok.textContent = line.name + ' quality check recorded.'; ok.hidden = false;
+      try {
+        await save('saveQualityCheck', fields);
+        showError('');
+        setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); ok.hidden = true; render(); }, 2500);
+      } catch (e) {
+        const i = pending.indexOf(mine);
+        if (i >= 0) pending.splice(i, 1);
+        ok.hidden = true;
+        render();
+        showError(line.name + ': ' + (e.message || e));
+      }
+    };
+    document.getElementById('clear').onclick = () => document.querySelectorAll('#fields input').forEach(x => { if (!x.readOnly) x.value = ''; });
+    document.getElementById('lines').addEventListener('click', e => {
+      const b = e.target.closest('[data-line]');
+      if (!b) return;
+      chosen = b.dataset.line;
+      shownFor = '';
+      history.replaceState(null, '', '?line=' + encodeURIComponent(chosen));
+      render();
+    });
+    document.getElementById('panes').addEventListener('click', e => {
+      const b = e.target.closest('[data-pane]');
+      if (!b) return;
+      pane = b.dataset.pane;
+      history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
+      render();
+    });
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; shownFor = ''; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; shownFor = ''; render(); });
+      onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(); }, fail('the production lines'));
+      onSnapshot(collection(db, 'plantLineStatus'), s => { lineStatus = s.docs.map(d => d.data()); render(); }, fail('the line status'));
+      let unsub = null, day = '';
+      const watch = () => { const t = today(); if (t === day) return; day = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(t, -1), t])), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the quality checks')); };
+      watch();
+      setInterval(() => { watch(); render(); }, 60000);
+      render();
+    });
+  </script>
+</body>
+</html>

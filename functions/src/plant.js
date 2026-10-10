@@ -109,11 +109,47 @@ function parseQueueTab(values, kind) {
   return docs;
 }
 
+// PLANT_OPERATIONS_MASTER (the Plant Operations workbook): the production lines (PRODUCTION_AREA) and the temperature
+// check locations (TEMPERATURE_CHECK_LOCATION), with their settings (days_json), as udpoV734ProductionAreas_ reads them.
+function parseSetup(values) {
+  const t = table(values, 'operation_id'), docs = {};
+  if (!t.index) return docs;
+  t.rows.forEach((row, i) => {
+    const c = cellsOf(row, t.index), id = c.operation_id;
+    if (!id) return;
+    let settings = {};
+    try { settings = JSON.parse(c.days_json || '{}') || {}; } catch (e) { settings = {}; }
+    docs[docId(id)] = { operationId: id, type: text(c.operation_type).toUpperCase(), name: c.display_name || c.production_area || id, status: text(c.status).toUpperCase(),
+      area: c.production_area || '', facilityId: c.facility_id || '', viewSequence: Number(c.view_sequence) || 0, settings, sheetRow: t.start + i, cells: c };
+  });
+  return docs;
+}
+// PLANT LINE STATUS (the Live workbook): each production line's last recorded check (udpoProductionLineRecords_).
+function parseLineStatus(values) {
+  const t = table(values, 'record_key'), docs = {};
+  if (!t.index) return docs;
+  t.rows.forEach((row, i) => {
+    const c = cellsOf(row, t.index), id = c.record_key;
+    if (!id) return;
+    let payload = {};
+    try { payload = JSON.parse(c.payload_json || '{}') || {}; } catch (e) { payload = {}; }
+    docs[docId(id)] = { operationId: id, area: c.area || '', status: text(c.status).toUpperCase(), temperature: c.temperature || '', notes: c.notes || '', payload,
+      updatedAt: c.updated_at || '', updatedBy: c.updated_by || '', sheetRow: t.start + i, cells: c };
+  });
+  return docs;
+}
+
 const PLANT_LISTS = Object.freeze({
   plantJournal: { collection: 'plantJournal', where: 'live', tab: 'PLANT_OPERATIONS', parse: parseJournal },
   plantWash: { collection: 'plantWash', where: 'live', tab: 'WASH / CLEANING LIVE', parse: (v) => parseQueueTab(v, 'WASH') },
   plantReturns: { collection: 'plantReturns', where: 'live', tab: 'REFUSALS / RETURNS LIVE', parse: (v) => parseQueueTab(v, 'RETURN') },
   pickups: { collection: 'pickups', where: 'pickups', tab: 'LIVE PLANT OPERATIONS', parse: parsePickups }
+});
+// The production lines and temperature locations (the Plant Operations workbook, beside the pickups) and the lines' last
+// checks (the Live workbook), read the same way as the lists above.
+const SETUP_LISTS = Object.freeze({
+  plantSetup: { collection: 'plantSetup', where: 'pickups', ownTab: true, tab: 'PLANT_OPERATIONS_MASTER', parse: parseSetup },
+  plantLineStatus: { collection: 'plantLineStatus', where: 'live', tab: 'PLANT LINE STATUS', parse: parseLineStatus }
 });
 
 /*
@@ -121,13 +157,13 @@ const PLANT_LISTS = Object.freeze({
  * sources.live.plant is set; sources.plant.pickups =
  * {spreadsheetId, tab} of the Plant Operations workbook (or its copy). Returns {lists: {name: docs}, skipped: [why]}.
  */
-async function readPlant(reader, sources) {
-  const lists = {}, skipped = [];
-  for (const name of Object.keys(PLANT_LISTS)) {
-    const spec = PLANT_LISTS[name];
+async function readPlant(reader, sources, specs) {
+  const lists = {}, skipped = [], all = specs || PLANT_LISTS;
+  for (const name of Object.keys(all)) {
+    const spec = all[name];
     // The Live workbook's plant tabs are read where the setup says so (live.plant, like live.maintenanceQueues).
     const named = spec.where === 'live' ? (sources.live && sources.live.plant ? sources.live : null) : sources.plant && sources.plant[spec.where];
-    const at = named && named.spreadsheetId, tab = spec.where === 'live' ? spec.tab : (named && named.tab) || spec.tab;
+    const at = named && named.spreadsheetId, tab = spec.where === 'live' || spec.ownTab ? spec.tab : (named && named.tab) || spec.tab;
     if (!at) { skipped.push(name + ': no sheet named'); continue; }
     try { lists[name] = spec.parse((await reader.batchGet(at, ["'" + tab + "'"]))[0]); } catch (e) { skipped.push(name + ': ' + String(e && e.message || e).slice(0, 120)); }
   }
@@ -504,11 +540,24 @@ function validateYard(input, SaveError) {
   out.fuelLevel = text(input.fuelLevel).toUpperCase();
   if (out.fuelLevel && R.FUEL_LEVELS.indexOf(out.fuelLevel) < 0) throw new SaveError('BAD_REQUEST', 'Fuel level must be Full, 3/4, 1/2, or Empty.');
   out.notes = text(input.notes).slice(0, 800);
+  // The phone saves each box as it is left: the first save is the check, later ones fill in the same check.
+  out.checkId = text(input.checkId).slice(0, 150);
+  if (out.checkId && !/^YARD_CHECK_app_[A-Za-z0-9]+$/.test(out.checkId)) throw new SaveError('BAD_REQUEST', 'checkId is not a yard check');
   return out;
 }
 
 async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const journal = db.collection('plantJournal');
+  if (req.checkId && !req.departed) {
+    const ref = journal.doc(req.checkId), had = await tx.get(ref), d = had.exists ? had.data() : null, p = (d && d.payload) || {};
+    if (!d || d.type !== 'YARD_CHECK' || p.status !== 'COMPLETE' || R.yardTrailer(p.trailer) !== req.trailer) throw new SaveError('NOT_FOUND', 'That yard check is no longer open. Record the trailer again.');
+    if (Date.parse(stamp) - R.when(d.recordedAt) >= R.YARD_LOCK_MINUTES * 60000) throw new SaveError('CONFLICT', 'That yard check is more than 2 hours old. Record the trailer again.');
+    const payload = Object.assign({}, p, { temperature: req.temperature, setPoint: req.setPoint || p.setPoint || '', fuelLevel: req.fuelLevel, notes: req.notes });
+    tx.update(ref, { payload, temperature: req.temperature, notes: req.notes, editedAt: stamp, editedBy: email, testEdited: true });
+    const result = { ok: true, requestId: req.requestId, trailer: req.trailer, status: 'COMPLETE', checkId: req.checkId, recordedAt: d.recordedAt, message: 'Yard check updated.' };
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, trailer: req.trailer, checkId: req.checkId, before: p, after: payload, result });
+    return result;
+  }
   if (!req.departed) {
     const same = (await tx.get(journal.where('date', '==', req.date))).docs.map(d => d.data());
     const left = R.yardLockLeft(same, req.date, req.trailer, Date.parse(stamp));
@@ -519,12 +568,48 @@ async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
     : { route: req.routeRun, run: req.routeRun, trailer: req.trailer, temperature: req.temperature, setPoint: req.setPoint, fuelLevel: req.fuelLevel, notes: req.notes, status: 'COMPLETE' };
   tx.set(journal.doc(id), { recordId: 'YARD-' + req.requestId.slice(0, 40), type: 'YARD_CHECK', date: req.date, status: payload.status, route: req.routeRun, run: req.routeRun, trailer: req.trailer,
     temperature: payload.temperature || '', notes: payload.notes, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
-  const result = { ok: true, requestId: req.requestId, trailer: req.trailer, status: payload.status, recordedAt: stamp,
+  const result = { ok: true, requestId: req.requestId, trailer: req.trailer, status: payload.status, recordedAt: stamp, checkId: id,
     message: req.departed ? 'Trailer ' + req.trailer + ' marked as left the yard.' : 'Yard check recorded. Trailer is locked for 2 hours.' };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, trailer: req.trailer, after: payload, result });
   return result;
 }
 
-module.exports = { validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+/* ---------- Production Line Status & Quality ---------- */
+
+// saveQualityCheck: Record Quality Check for one production line, as desktopUiSavePlantProductionQualityGuardedV748_.
+// The check stays in the new app (plantJournal PRODUCTION_QUALITY); it is the line's status now and goes on the history.
+function validateQuality(input, SaveError) {
+  const out = { operationId: text(input.operationId).slice(0, 120) };
+  if (!out.operationId) throw new SaveError('BAD_REQUEST', 'Production area is not configured for this plant.');
+  out.status = text(input.status).toUpperCase();
+  if (out.status && R.LINE_STATUSES.indexOf(out.status) < 0) throw new SaveError('BAD_REQUEST', 'Status must be Running, Review, Changeover, Down, or Finished.');
+  out.product = text(input.product).slice(0, 120);
+  out.remainingOutput = text(input.remainingOutput).slice(0, 80);
+  out.qualityCheck = text(input.qualityCheck).toUpperCase().slice(0, 40);
+  out.tipTest = text(input.tipTest).toUpperCase().slice(0, 40);
+  ['temperature', 'cycleTime', 'productSize', 'annealerSpeed'].forEach(k => { out[k] = text(input[k]).slice(0, 80); });
+  out.notes = text(input.notes).slice(0, 1000);
+  const w = input.weights && typeof input.weights === 'object' && !Array.isArray(input.weights) ? input.weights : {};
+  out.weights = {};
+  Object.keys(w).forEach(k => { if (/^(result|head[1-6])$/.test(k)) out.weights[k] = text(w[k]).slice(0, 80); });
+  return out;
+}
+
+async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const line = await tx.get(db.collection('plantSetup').doc(docId(req.operationId)));
+  const d = line.exists ? line.data() : null;
+  if (!d || d.type !== 'PRODUCTION_AREA' || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Production area is not configured for this plant.');
+  const record = { operationId: req.operationId, area: d.name, product: req.product, status: req.status, remainingOutput: req.remainingOutput, qualityCheck: req.qualityCheck,
+    tipTest: req.tipTest, temperature: req.temperature, cycleTime: req.cycleTime, productSize: req.productSize, annealerSpeed: req.annealerSpeed, weights: req.weights, notes: req.notes,
+    facilityId: d.facilityId || 'fac_uniontown' };
+  const id = 'PRODUCTION_QUALITY_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+  tx.set(db.collection('plantJournal').doc(id), { recordId: 'PQ-' + req.requestId.slice(0, 40), type: R.QUALITY_TYPE, date: L.operatingDay(new Date(stamp)), status: req.status, area: d.name,
+    temperature: req.temperature, notes: req.notes, payload: record, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  const result = { ok: true, requestId: req.requestId, operationId: req.operationId, recordedAt: stamp, message: d.name + ' production status updated; quality observation recorded.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, after: record, result });
+  return result;
+}
+
+module.exports = { validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };
