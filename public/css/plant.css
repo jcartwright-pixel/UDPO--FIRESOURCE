@@ -584,3 +584,8 @@
 .plant-page .as-last { display: block; margin-top: 3px; font-size: 12px; font-weight: 600; color: #8796a2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quality-page .qc-round { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--muted); }
 .temp-page .tp-act .as-note { white-space: normal; line-height: 1.25; }
+/* Manager Center (Joe 10/10, "SEND button runs over"): Edit / Add takes only its width, Send Current Report the rest, and a
+   long label wraps inside its button instead of running past the card. */
+.manager-page .mc-acts .mc-btn { white-space: normal; height: auto; min-height: 42px; line-height: 1.15; padding: 6px 12px; }
+.manager-page .mc-acts .mc-btn[data-open-report] { flex: 0 0 auto; min-width: 110px; }
+.manager-page .mc-acts .mc-btn.send { flex: 1 1 0; min-width: 0; }
