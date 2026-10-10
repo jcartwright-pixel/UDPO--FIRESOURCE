@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Being built · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
@@ -36,7 +40,12 @@
     const SCREENS = {
       'garage-station': ['Garage Station', 'The garage tablet where technicians sign in with their PIN to start and finish jobs. Meanwhile Garage Work Orders shows what is open and finished.', 'garage.html', 'Garage Work Orders'],
       'trucks-today': ['Trucks Today', 'Where every truck is today, from Verizon Connect. It is finished once Verizon turns on Fleet API access (see GPS Setup).', 'gps.html', 'GPS Setup'],
-      'fleet-service-setup': ['Fleet Service Setup', 'Changing the service rules (PM miles, reefer months, DOT and plate warnings).', 'fleet.html', 'Fleet Service']
+      'fleet-service-setup': ['Fleet Service Setup', 'Changing the service rules (PM miles, reefer months, DOT and plate warnings).', 'fleet.html', 'Fleet Service'],
+      // Phone and tablet screens of the old app not built yet (Joe 10/10; list in PHONE_LINKS.md).
+      'driver-dvir': ['Driver DVIR', 'The drivers\' pre-trip and post-trip inspection on the phone: odometer, truck and trailer checks, extra trailers, notes and signature. Meanwhile drivers report truck and trailer problems on the phone Check-In.', 'checkins.html', 'Driver Check-ins'],
+      'driver-loadout': ['View Loadout (drivers)', 'The drivers\' phone board of which loads are loaded and ready. Meanwhile the Loadout Center shows the same loads.', 'loadout.html', 'Loadout Center'],
+      'plant-station': ['Plant Station tablet', 'The plant floor tablet opened with a station code: Loading, Unloading, Washing and Returns for that station only. Meanwhile the same work is done on the Loadout, Unloading, Washing and Returns screens.', 'plant.html', 'Plant Departments'],
+      'trailer-assignments': ['Trailer Assignments', 'The phone picker for which trailer goes on which load. Meanwhile trailers are set on Daily Dispatch.', 'daily.html', 'Daily Dispatch']
     };
     // Administration items not built yet come back to the Administration Center.
     const key = new URLSearchParams(location.search).get('what') || '', a = /^admin-/.test(key) && adminItem(key.slice(6));

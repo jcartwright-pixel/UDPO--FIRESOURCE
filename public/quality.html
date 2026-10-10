@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Production Line Status &amp; Quality · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
@@ -54,12 +58,13 @@
     import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
+    import { watchProducts, sizeFor, OTHER } from './js/products.js';
 
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
     let pane = params.get('view') === 'history' ? 'history' : 'current', chosen = params.get('line') || '';
-    let setup = [], lineStatus = [], journal = [], person = null, app = {}, shownFor = '', roundStart = '', form = null;
+    let setup = [], lineStatus = [], journal = [], products = {}, person = null, app = {}, shownFor = '', roundStart = '', form = null;
     // A check being filled in box by box shows at once, over its saved copy, until the database has caught up.
     const pending = {};
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
@@ -85,6 +90,17 @@
       if (fixed) return '<label>Size<input class="prod-size" value="' + fixed + '" readonly aria-readonly="true"></label>';
       return '<label>Size<select class="prod-size"' + dis + '>' + opt('', last.productSize, '') + SIZES.map(z => opt(z, last.productSize, z)).join('') + '</select>' + note('prod-size') + was(old.productSize) + '</label>';
     }
+    // Joe 10/10: the product is picked from the machine's own products (RedZone, Uniontown), blank to start. "Other (type it)"
+    // keeps a product that is not on the list yet; a product saved earlier that is not on the list stays as its own choice.
+    function productBox(line, last, old, dis, note, was) {
+      const list = products[line.operationId] || [], cur = String(last.product || '');
+      if (!list.length) return '<label>Product being run<input class="prod-product" value="' + escapeHtml(cur) + '"' + dis + '>' + note('prod-product') + was(old.product) + '</label>';
+      const known = list.some(p => p.name === cur);
+      return '<label class="qc-product">Product being run<select class="prod-product"' + dis + '>' + opt('', cur, '') +
+        list.map(p => '<option value="' + escapeHtml(p.name) + '"' + (p.name === cur ? ' selected' : '') + '>' + escapeHtml(p.name + (p.sku && p.sku !== p.name ? ' · ' + p.sku : '')) + '</option>').join('') +
+        (cur && !known ? '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>' : '') + '<option value="' + OTHER + '">Other (type it)</option></select>' +
+        '<input class="prod-other" placeholder="Type the product" maxlength="120" hidden' + dis + '>' + note('prod-product') + was(old.product) + '</label>';
+    }
     function drawForm(line) {
       const ck = canSave(), cur = roundCheck(line), old = line.last || {}, last = cur || {}, w = last.weights || {}, ow = old.weights || {}, skip = U.qualitySkip(line.name), blow = U.isBlowMold(line.name), dis = ck ? '' : ' disabled';
       const by = old.recordedAt ? ' · ' + clockOf(old.recordedAt) + (old.recordedBy ? ' · ' + initials(old.recordedBy) : '') : '';
@@ -96,7 +112,7 @@
       const fields = blow
         ? '<label>Jug size<select class="prod-product"' + dis + '><option value="Gallon">Gallon</option></select></label><label>Annealer temperature<input class="prod-temperature" inputmode="decimal" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' +
           '<label>Annealer speed<input class="prod-annealer-speed" inputmode="decimal" placeholder="Machine setting" value="' + escapeHtml(last.annealerSpeed || '') + '"' + dis + '>' + note('prod-annealer-speed') + was(old.annealerSpeed) + '</label><div class="qc-field wide"><span>Jug weight</span>' + weight + '</div><label>Cycle time<input class="prod-cycle" inputmode="decimal" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>'
-        : '<label>Product being run<input class="prod-product" value="' + escapeHtml(last.product || '') + '"' + dis + '>' + note('prod-product') + was(old.product) + '</label>' + sizeBox(line.name, last, old, dis, note, was) + (skip.weight ? '' : '<div class="qc-field"><span>Package weight</span>' + weight + '</div>') +
+        : productBox(line, last, old, dis, note, was) + sizeBox(line.name, last, old, dis, note, was) + (skip.weight ? '' : '<div class="qc-field"><span>Package weight</span>' + weight + '</div>') +
           '<label>Temperature<input class="prod-temperature" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' + (skip.tip ? '' : '<label>Tip test' + pick3('prod-tip', last.tipTest).replace('<select', '<select' + dis) + note('prod-tip') + was(word(old.tipTest)) + '</label>') +
           '<label>Label / date code' + pick3('prod-quality', last.qualityCheck).replace('<select', '<select' + dis) + note('prod-quality') + was(word(old.qualityCheck)) + '</label>' + (skip.cycle ? '' : '<label>Cycle time<input class="prod-cycle" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>');
       document.getElementById('form-title').textContent = line.name + ' Quality Check';
@@ -144,14 +160,26 @@
       const f = document.getElementById('fields'), v = (c) => { const n = f.querySelector('.' + c); return n ? n.value : ''; };
       const heads = f.querySelectorAll('.prod-head'), weights = {};
       if (heads.length) heads.forEach(x => { weights['head' + x.dataset.head] = x.value; }); else if (f.querySelector('.prod-weights')) weights.result = v('prod-weights');
-      return { operationId: line.operationId, product: v('prod-product'), status: v('prod-status'), remainingOutput: (line.last && line.last.remainingOutput) || '', qualityCheck: v('prod-quality'),
+      const product = v('prod-product') === OTHER ? v('prod-other').trim() : v('prod-product');
+      return { operationId: line.operationId, product, status: v('prod-status'), remainingOutput: (line.last && line.last.remainingOutput) || '', qualityCheck: v('prod-quality'),
         tipTest: v('prod-tip'), temperature: v('prod-temperature'), cycleTime: v('prod-cycle'), productSize: v('prod-size'), annealerSpeed: v('prod-annealer-speed'), weights, notes: v('prod-notes') };
     }
     // Each box saves as it is left (a drop-down as soon as it is picked): the first box makes the check, the rest fill it in.
     document.getElementById('fields').addEventListener('change', async e => {
       const line = current(), box = e.target;
       if (!line || !form || form.operationId !== line.operationId || !canSave()) return;
-      const fields = readForm(line), noteEl = document.querySelector('[data-note="' + (box.classList.contains('prod-head') ? 'prod-head' : box.className.split(' ')[0]) + '"]');
+      // Other (type it): the typing box opens and saves when it is left.
+      if (box.matches('select.prod-product')) {
+        const other = box.parentNode.querySelector('.prod-other');
+        if (other) other.hidden = box.value !== OTHER;
+        if (box.value === OTHER) { other.focus(); return; }
+        // The package size follows the product's RedZone type when it is still blank.
+        const p = (products[line.operationId] || []).find(x => x.name === box.value), size = document.querySelector('#fields select.prod-size');
+        if (p && size && !size.value && sizeFor(p.mfgType)) size.value = sizeFor(p.mfgType);
+      }
+      if (box.matches('.prod-other') && !box.value.trim()) return;
+      const key = box.classList.contains('prod-head') ? 'prod-head' : box.classList.contains('prod-other') ? 'prod-product' : box.className.split(' ')[0];
+      const fields = readForm(line), noteEl = document.querySelector('[data-note="' + key + '"]');
       const mine = pending[line.operationId] || { type: U.QUALITY_TYPE, recordedAt: form.started || new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, _id: form.fill.id };
       mine.payload = Object.assign({ area: line.name }, fields);
       if (!form.started) form.started = mine.recordedAt;
@@ -192,6 +220,7 @@
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; shownFor = ''; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; shownFor = ''; render(); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(); }, fail('the production lines'));
+      watchProducts(db, p => { products = p; shownFor = ''; render(); }, fail('the machine products'));
       watchRound(db, at => { roundStart = at; Object.keys(pending).forEach(k => delete pending[k]); render(); });
       onSnapshot(collection(db, 'plantLineStatus'), s => { lineStatus = s.docs.map(d => d.data()); render(); }, fail('the line status'));
       let unsub = null, day = '';

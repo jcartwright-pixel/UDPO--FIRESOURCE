@@ -167,6 +167,14 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           node test/browser/live-look.cjs "https://$PROJECT.web.app"
+      - name: Time the phone pages and server calls
+        if: steps.settings.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          node test/browser/phone-speed.cjs "https://$PROJECT.web.app" "$PROJECT" | tee speed.txt
+          { echo "### Phone speed"; sed 's/^/- /' speed.txt; } >> "$GITHUB_STEP_SUMMARY"
       - name: Show what the sandbox copy read from the sheets
         if: steps.settings.outputs.ready == 'true'
         continue-on-error: true

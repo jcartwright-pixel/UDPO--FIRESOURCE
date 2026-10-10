@@ -26,6 +26,9 @@ export const ADMIN_GROUPS = [
     ['routes', 'Route Editor', 'Routes, runs, times and which days each run goes.', 'routes.html', 'map'],
     ['switch', 'Which App Runs Each Screen', 'On the Route Distribution page, an administrator clicks a screen\'s tag twice to run it from the new app, and turns the write-back on or off.', 'distribution.html', 'swap']
   ]],
+  ['Plant Setup', 'Set-up for the plant side', [
+    ['machine-products', 'Machine Products', 'The products each machine runs (RedZone, Uniontown): the Product drop-down on Quality Checks. Add, change or remove a product and its SKU.', 'products.html', 'production.webp']
+  ]],
   ['Fleet & GPS Setup', 'Set-up for the maintenance side', [
     ['gps', 'GPS Setup', 'The Verizon Connect sign-in and a plain pass or fail test.', 'gps.html', 'pin'],
     ['fleet-setup', 'Fleet Service Setup', 'Service rules: PM miles, reefer months, DOT and plate warnings.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp']
