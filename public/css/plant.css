@@ -698,7 +698,7 @@
 .mocreo-page .mc-table .pm-remove { padding: 0 2px; font-size: 13px; }
 .mocreo-page .mc-table input[type="checkbox"] { width: 22px; height: 22px; }
 .mocreo-page .mc-table tr.off td { opacity: .55; }
-.mocreo-page .mc-now { font-weight: 800; color: var(--ud-blue); }
+.mocreo-page .mc-now { font-weight: 800; color: var(--ud-blue); white-space: nowrap; text-align: center; }
 @media (max-width: 1100px) { .mocreo-page .mc-grid { grid-template-columns: 1fr; } .mocreo-page .mc-scroll { max-height: none; } }
 /* MOCREO in Administration (Joe 10/10 picture): Add Thermometer keeps its whole name in the top line. */
 .mocreo-page .head .actions.in-head.top-row #add { width: auto; min-width: 92px; padding: 4px 14px; white-space: nowrap; flex: none; }
