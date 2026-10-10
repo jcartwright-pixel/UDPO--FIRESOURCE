@@ -131,9 +131,13 @@
         sheet.querySelectorAll('.otr-in').forEach(inp => { inp.onchange = () => {
           const m = Number(inp.dataset.m), key = inp.dataset.k, value = inp.value.trim(), id = year + '-' + m;
           let rec = monthly.find(x => Number(x.year) === year && Number(x.month) === m), made = false, before = rec ? rec[key] : undefined;
+          // Kept on top of the figures until saved: a copy of an earlier figure's save can land first and must not wipe this one.
+          const y = year, put = () => { let r = monthly.find(x => Number(x.year) === y && Number(x.month) === m); if (!r) { r = { year: y, month: m }; monthly.push(r); } r[key] = value === '' ? null : O.otrNum_(value); return r; };
+          pendingFigures.push(put);
+          const done = () => { const k = pendingFigures.indexOf(put); if (k >= 0) pendingFigures.splice(k, 1); };
           saveOptimistic('saveOtr', { op: 'figure', year, month: m, key, value },
-            () => { if (!rec) { rec = { year, month: m }; monthly.push(rec); made = true; } rec[key] = value === '' ? null : O.otrNum_(value); },
-            () => { if (made) monthly.splice(monthly.indexOf(rec), 1); else rec[key] = before; }, render);
+            () => { made = !rec; rec = put(); },
+            () => { done(); if (made) monthly.splice(monthly.indexOf(rec), 1); else rec[key] = before; }, render).then(done);
         }; });
       } else {
         const dis = edit ? '' : ' disabled';
@@ -153,6 +157,7 @@
       sheet.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { view = b.dataset.go; render(); }; });
     }
 
+    const pendingFigures = [];
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; render(); } });
     window.udBack = () => { if (view !== 'dash') { view = 'dash'; render(); return true; } return false; };
 
@@ -164,7 +169,7 @@
       watch('runs', v => { runs = v; });
       watch('otrRoutes', v => { picks = {}; v.forEach(p => { picks[p.runId] = { include: p.include === true, destination: p.destination || '' }; }); });
       watch('otrDaily', v => { daily = v; });
-      watch('otrMonthly', v => { monthly = v; });
+      watch('otrMonthly', v => { monthly = v; pendingFigures.forEach(put => put()); });
       watch('otrMonthRuns', v => { monthRuns = v; });
     });
   </script>
