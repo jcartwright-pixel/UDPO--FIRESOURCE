@@ -181,6 +181,8 @@
     document.getElementById('close').onclick = () => { note = document.getElementById('note').value; document.getElementById('modal').hidden = true; };
     document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') document.getElementById('close').click(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('modal').hidden) document.getElementById('close').click(); });
+    // Back closes the report first.
+    window.udBack = () => { if (document.getElementById('modal').hidden) return false; document.getElementById('close').click(); return true; };
     document.getElementById('note').addEventListener('input', e => { note = e.target.value; });
     async function send(btn) {
       if (!report || btn.disabled) return;
