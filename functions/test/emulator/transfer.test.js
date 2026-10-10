@@ -45,6 +45,22 @@ test('an unchanged sheet writes nothing; one changed cell rewrites one run', asy
   assert.equal((await db().collection('runs').doc('2026-10-04__run_t801').get()).data().days.mon.trailer, 'T-902');
 });
 
+test('a new copy of the Live workbook replaces every row, even one the app changed without writing it to the sheet', async () => {
+  const tabs = F.fakeSheets();
+  await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
+  // A sandbox test save with the write-back off: the run changes in the app, the sheet never hears of it.
+  const ref = db().collection('runs').doc('2026-10-04__run_t801');
+  await ref.update({ 'days.mon.driver': 'TEST, SAVE' });
+  const same = await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
+  assert.equal(same.summary.weeks['2026-10-04'].written, 0);
+  assert.equal((await ref.get()).data().days.mon.driver, 'TEST, SAVE', 'the same copy keeps the app value');
+  const fresh = Object.assign({}, F.SOURCES, { live: Object.assign({}, F.SOURCES.live, { spreadsheetId: 'fresh-copy' }) });
+  const out = await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: fresh, now: tick });
+  assert.equal(out.summary.weeks['2026-10-04'].written, 6);
+  assert.equal((await ref.get()).data().days.mon.driver, 'ADAMS, PAT', 'a fresh copy brings the sheet value back');
+  assert.equal((await db().collection('config').doc('app').get()).data().liveSourceId, 'fresh-copy');
+});
+
 test('sorting the Live tab moves nothing', async () => {
   const tabs = F.fakeSheets();
   await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
