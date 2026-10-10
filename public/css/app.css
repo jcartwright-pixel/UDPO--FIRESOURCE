@@ -1332,3 +1332,14 @@ body.embed .head > .title { display: none; }
 .sheet.fit-scroll { overflow-y: auto !important; overflow-x: hidden; }
 .sheet.fit-scroll thead th { position: sticky; top: 0; z-index: 2; }
 @media print { .sheet.fit-scroll { max-height: none !important; overflow: visible !important; } }
+
+/* Joe 10/10 evening: Back and Home sit in the header beside the logo, not in the menu; the main screens' header has the
+   Administration button (Administrators only). The main screen's menu lists only the plants. */
+.topbar .brand:has(+ .hdr-nav) { margin-right: 0; }
+.topbar .hdr-nav { display: flex; align-items: center; gap: 8px; margin: 0 auto 0 12px; }
+.topbar .hdr-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 16px; font-size: 16px; font-weight: 800; white-space: nowrap; }
+.topbar .hdr-btn svg { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.topbar .hdr-btn:hover { background: #e8f1fb; }
+body:not(.is-admin) .topbar .hdr-admin { display: none; }
+.sidemenu .side-plant[hidden], .side-flyouts a[data-plant][hidden] { display: none !important; }
+@media (max-width: 1100px) { .topbar .hdr-btn span { display: none; } .topbar .hdr-btn { padding: 0 11px; } }
