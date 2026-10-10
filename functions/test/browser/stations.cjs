@@ -36,6 +36,10 @@ async function openPage(browser, width, height, url, clock) {
       }
     });
   }
+  // The Driver Room weather window reads Open-Meteo; the check answers with a fixed forecast.
+  await page.route(/api\.open-meteo\.com/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+    current: { temperature_2m: 54.4, weather_code: 2, wind_speed_10m: 7.6 },
+    daily: { weather_code: [2, 61], temperature_2m_max: [61.2, 58], temperature_2m_min: [43.8, 47.1], precipitation_probability_max: [20, 70] } }) }));
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
@@ -100,8 +104,12 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await tv.waitForTimeout(1500);
     assert.equal(await tv.$eval('body', b => b.classList.contains('ds-tv')), true);
     await shot(tv, 'driver-room-tv-1920.png');
+    await tv.waitForFunction(() => /°F/.test(document.getElementById('weather-now').textContent));
+    assert.equal(await tv.textContent('#weather-now'), '54°F · Partly cloudy');
+    assert.equal(await tv.textContent('#weather-today'), 'High 61° · Low 44° · Rain 20% · Wind 8 mph');
+    assert.equal(await tv.textContent('#weather-next'), 'Tomorrow: Rain, 58° / 47°');
     assert.deepEqual(ds.errors.concat(tv.errors), []);
-    results.push('Driver Station: the board and the Driver Room TV open');
+    results.push('Driver Station: the board and the Driver Room TV open, with the weather window filled in');
 
     // Trailer Assignments and Plant Station on the made-up plant day.
     await clear();
