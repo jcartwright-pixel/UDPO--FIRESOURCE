@@ -71,9 +71,8 @@
     const table = (cols, head, rows, empty) => '<table class="issues"><colgroup>' + cols.map(w => '<col style="width:' + w + '%">').join('') + '</colgroup><thead><tr>' +
       head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (rows || '<tr><td colspan="' + head.length + '" class="empty">' + empty + '</td></tr>') + '</tbody></table>';
 
-    // Joe 10/10 03:56 picked mock-up A: one row per unit with PM / Reefer, DOT and Plates side by side (a red or amber bar on the
-    // side of what is due), the miles or hours now, and the unit's status; units that need something first. Every figure the old
-    // list showed (due at, now, left, last done) is in the cell or its tip.
+    // Joe 10/10 picked mock-up B: one row per unit, PM / Reefer, DOT and Plates side by side, each box colored by its state;
+    // units that need something first. Every figure the old list showed (due at, now, left, last done) is in the box or its tip.
     const RANK = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
     const md = (k) => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(k || '')); return m ? Number(m[2]) + '/' + Number(m[3]) + '/' + m[1].slice(2) : ''; };
     function boxText(i) {
@@ -91,17 +90,15 @@
       due.items.forEach(i => { const r = by[i.unit]; if (r) r.c[i.key === 'REEFER' ? 'PM' : i.key] = i; });
       const rows = Object.values(by).filter(r => hit(r.unit)).map(r => { r.worst = Object.values(r.c).reduce((w, i) => RANK[i.status] < RANK[w] ? i.status : w, 'OK'); return r; })
         .sort((a, b) => RANK[a.worst] - RANK[b.worst] || (a.type === b.type ? 0 : a.type === 'TRUCK' ? -1 : 1) || a.unit.localeCompare(b.unit, undefined, { numeric: true }));
+      const need = rows.filter(r => r.worst !== 'OK').length;
       const now = (r) => { const i = r.c.PM; return i && i.now !== '' && i.now !== undefined && i.now !== null ? num(i.now) + (r.type === 'TRUCK' ? ' mi' : ' hrs') : ''; };
       const tip = (i) => !i ? '' : [i.what, 'Due ' + (i.key === 'PM' ? num(i.dueAt) + (i.dueAt !== '' ? ' mi' : '') : when(i.dueAt)), i.now !== '' && i.now !== undefined ? 'Now ' + num(i.now) : '', 'Left ' + (typeof i.left === 'number' ? num(i.left) + ' mi' : i.left), 'Last done ' + when(i.last), (STATUS[i.status] || [''])[0]].filter(Boolean).join(' · ');
-      const box = (i) => { const x = boxText(i); return '<td class="gc ' + x.s + '" title="' + escapeHtml(tip(i)) + '"><b>' + escapeHtml(x.big) + '</b><small>' + escapeHtml(x.small) + '</small></td>'; };
+      const box = (i) => { const x = boxText(i); return '<td class="gc ' + x.s + '" title="' + escapeHtml(tip(i)) + '"><b>' + escapeHtml(x.big) + '</b> <small>' + escapeHtml(x.small) + '</small></td>'; };
       const send = (r) => r.worst === 'AT_GARAGE' ? '<small>at garage</small>' : r.worst === 'OK' ? '' : '<button type="button" class="edit" disabled title="Send to Garage comes with the Garage Station">Send to Garage</button>';
-      return {
-        need: rows.filter(r => r.worst !== 'OK').length, count: rows.length,
-        html: table([8, 7, 18, 18, 18, 11, 9, 11], ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / Hours Now', 'Status', ''],
-          rows.map(r => '<tr data-unit="' + escapeHtml(r.unit) + '" data-worst="' + r.worst + '"><td class="strong">' + escapeHtml(r.unit) + '</td><td>' + (r.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td>' +
-            box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td class="fs-now">' + now(r) + '</td><td>' + pill(STATUS[r.worst]) + '</td><td>' + send(r) + '</td></tr>').join(''),
-          due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid fs-a">')
-      };
+      return '<div class="fs-legend"><span class="OVERDUE">Overdue</span><span class="DUE_SOON">Due soon</span><span class="AT_GARAGE">At garage</span><span class="SET_UP">Needs start date</span><span class="OK">OK</span><em>' + need + ' of ' + rows.length + ' units need something</em></div>' +
+        table([9, 9, 22, 22, 22, 16], ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', ''],
+          rows.map(r => '<tr data-unit="' + escapeHtml(r.unit) + '" data-worst="' + r.worst + '"><td class="strong">' + escapeHtml(r.unit) + '</td><td>' + (r.type === 'TRAILER' ? 'Trailer' : 'Truck') + (now(r) ? '<small class="fs-now">' + now(r) + '</small>' : '') + '</td>' +
+            box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td>' + send(r) + '</td></tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
     }
 
     function render() {
@@ -115,12 +112,10 @@
       if (view === 'due') {
         k.innerHTML = kpis([[late, 'Overdue', late ? 'warn' : ''], [soon, 'Due soon', soon ? 'warn' : ''], [due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'DOT this month'],
           [due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates expiring · 30 days'], [open().length, 'At the garage'], [done().filter(o => String(o.completed_at || '').slice(0, 7) === month).length, 'Done this month', 'good']]);
-        // Joe 10/10: buttons first, the same size, then the filter, all on one line.
-        bar.innerHTML = '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="soon.html?what=garage-station">Garage Station</a>' +
-          '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '">';
-        const grid = unitGrid(due, hit);
-        sheet.innerHTML = grid.html;
-        foot.textContent = due.units.length + ' trucks and trailers at Uniontown · ' + grid.need + ' of ' + grid.count + ' units need something · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(L.FLEET_RULES.truckMiles) + ' miles, reefer every ' + L.FLEET_RULES.trailerMonths + ' months or ' + num(L.FLEET_RULES.trailerHours) + ' hours, DOT every ' + L.FLEET_RULES.dotMonths + ' months.';
+        bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
+          '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="soon.html?what=garage-station">Garage Station</a>';
+        sheet.innerHTML = unitGrid(due, hit);
+        foot.textContent = due.units.length + ' trucks and trailers at Uniontown · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(L.FLEET_RULES.truckMiles) + ' miles, reefer every ' + L.FLEET_RULES.trailerMonths + ' months or ' + num(L.FLEET_RULES.trailerHours) + ' hours, DOT every ' + L.FLEET_RULES.dotMonths + ' months.';
       } else if (view === 'work') {
         const o = open(), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],

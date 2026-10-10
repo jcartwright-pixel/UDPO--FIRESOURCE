@@ -1069,15 +1069,18 @@ table.set thead th { background: var(--ud-blue); color: #fff; }
 .soon-card p { font-size: 16px; line-height: 1.45; }
 @media (max-width: 1100px) { .set-grid { grid-template-columns: 1fr; } }
 
-/* Fleet Service, mock-up A (Joe 10/10 03:56): one row per unit; white cells, a red or amber bar on the side of what is due. */
-table.fs-grid td.gc { text-align: left; padding: 6px 10px; white-space: normal; border-left: 4px solid transparent; }
-table.fs-grid td.gc b { display: block; font-size: 16px; line-height: 1.2; }
-table.fs-grid td.gc small { display: block; font-size: 12px; color: #5a6b7d; }
-table.fs-grid td.gc.OVERDUE { border-left-color: #c62828; } table.fs-grid td.gc.OVERDUE b { color: #b3261e; }
-table.fs-grid td.gc.DUE_SOON { border-left-color: #e08a00; } table.fs-grid td.gc.DUE_SOON b { color: #a85a00; }
-table.fs-grid td.gc.OK b { color: #1d7a3e; }
-table.fs-grid td.gc.AT_GARAGE { border-left-color: #1d5b91; } table.fs-grid td.gc.AT_GARAGE b { color: #1d5b91; }
-table.fs-grid td.gc.SET_UP b, table.fs-grid td.gc.NO_MILES b { color: #5a6b7d; }
-table.fs-grid td.fs-now { color: #123f70; font-weight: 700; }
-.fleet-page #bar > button, .fleet-page #bar > a.button { min-width: 230px; justify-content: center; text-align: center; }
-.fleet-page #bar > input[type="search"] { width: 300px; }
+/* Fleet Service, mock-up B (Joe 10/10): one row per unit, each service box colored by its state. */
+table.fs-grid td.gc { text-align: left; padding: 6px 10px; white-space: normal; }
+table.fs-grid td.gc b { font-size: 15px; }
+table.fs-grid td.gc small { font-size: 12px; color: #5a6b7d; }
+table.fs-grid td.gc.OVERDUE { background: #fde2e2; } table.fs-grid td.gc.OVERDUE b { color: #b3261e; }
+table.fs-grid td.gc.DUE_SOON { background: #fff1dc; } table.fs-grid td.gc.DUE_SOON b { color: #8a4b00; }
+table.fs-grid td.gc.OK { background: #e7f6ec; } table.fs-grid td.gc.OK b { color: #1d7a3e; }
+table.fs-grid td.gc.SET_UP, table.fs-grid td.gc.NO_MILES { background: #eef2f6; }
+table.fs-grid td.gc.AT_GARAGE { background: #e1ebf5; }
+table.fs-grid small.fs-now { display: block; font-size: 12px; color: #5a6b7d; }
+.fs-legend { display: flex; gap: 10px; align-items: center; margin: 0 0 8px; font-size: 13px; font-weight: 700; }
+.fs-legend span { padding: 4px 10px; border-radius: 6px; }
+.fs-legend .OVERDUE { background: #fde2e2; } .fs-legend .DUE_SOON { background: #fff1dc; } .fs-legend .AT_GARAGE { background: #e1ebf5; }
+.fs-legend .SET_UP { background: #eef2f6; } .fs-legend .OK { background: #e7f6ec; }
+.fs-legend em { margin-left: auto; font-style: normal; color: #5a6b7d; }
