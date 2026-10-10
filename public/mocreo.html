@@ -80,7 +80,8 @@
     const U = window.UDPlant;
     let s = null, setup = [], mine = [], sensors = [], sync = {}, armed = null, note = '', draft = null;
     const $ = (id) => document.getElementById(id);
-    const stamp = (t) => t ? shortDate(String(t).slice(0, 10)) + ' ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    // Date and time both in New York time (the stored time is UTC, so its first 10 characters are tomorrow after 8 p.m.).
+    const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '') : ''; };
     const typing = () => $('rows').contains(document.activeElement) && document.activeElement.matches('input');
 
     // Every thermometer, off ones too (removed ones are gone), in view order.
@@ -99,16 +100,16 @@
       $('state').className = 'pill ' + (s.hasKey && s.hasAsset ? 'yes' : s.hasKey ? 'warn' : 'no');
       $('f-key').placeholder = s.hasKey ? 'saved, ends ' + s.keyEnds + ' (paste to replace)' : 'paste the MOCREO API key';
       $('f-asset').placeholder = s.hasAsset ? 'saved, ends ' + s.assetEnds + ' (paste to replace)' : 'paste the MOCREO asset ID';
-      $('saved').textContent = s.savedAt ? 'Updated ' + stamp(s.savedAt) + ' by ' + s.savedBy : '';
+      $('saved').textContent = s.savedAt ? 'Updated ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
       const t = s.lastTest;
-      $('last').textContent = t ? 'Last test ' + stamp(t.at) + ' by ' + t.by + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
+      $('last').textContent = t ? 'Last test ' + stamp(t.at) + (t.by ? ' by ' + t.by : '') + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
     }
     function render() {
       keyBox();
       const all = list(), on = all.filter(l => l.active), linked = on.filter(l => l.sensorId).length;
       $('hstats').innerHTML = [['Thermometers', on.length, ''], ['On a sensor', linked, linked ? 'good' : ''], ['Sensors', sensors.filter(x => x.returned !== false).length, '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      $('sync').textContent = sync.lastSuccess && sync.configured ? 'Sensors last read ' + stamp(sync.lastSuccess) + ' (' + (sync.sensors || 0) + ' sensors).' + (sync.lastError ? ' Last try: ' + sync.lastError : '') : (sync.lastError || 'Sensors not read yet; readings are manual.');
+      $('sync').textContent = sync.lastSuccess && sync.configured ? 'Sensors last read ' + stamp(sync.lastSuccess) + ' (' + (sync.sensors || 0) + ' sensors).' + (sync.lastError ? ' Last try failed: ' + sync.lastError + '. Press Test Connection, or replace the key.' : '') : (sync.lastError || 'Sensors not read yet; readings are manual.');
       $('foot').textContent = all.length + ' thermometer' + (all.length === 1 ? '' : 's') + '. ' + (note || '');
       if (typing()) return;
       const sensorOpts = (cur) => '<option value="">Manual only</option>' + sensors.map(x => '<option value="' + escapeHtml(x.sensorId) + '"' + (x.sensorId === cur ? ' selected' : '') + '>' + escapeHtml(x.name + (x.returned === false ? ' (not sending)' : '')) + '</option>').join('') +

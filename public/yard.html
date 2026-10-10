@@ -99,6 +99,7 @@
     function render() {
       if (typing()) { waiting = true; return; }
       waiting = false;
+      forgetOld();
       const q = queue(), ck = canSave(), hist = U.yardHistory(all(), date, Date.now());
       const latest = hist.find(h => h.status !== 'DEPARTED');
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase();
@@ -114,13 +115,13 @@
         const last = x.recordedAt ? escapeHtml(clock(x.recordedAt)) + ' · ' + escapeHtml(initials(x.recordedBy)) : '—';
         const dis = ck ? '' : ' disabled';
         return '<tr data-trailer="' + escapeHtml(x.trailer) + '" data-route="' + escapeHtml(x.routeRun) + '"><td class="yd-trailer"><b>' + escapeHtml(x.trailer) + '</b><small>' + escapeHtml(next) + '</small></td>' +
-          '<td><input class="yd-temp" data-k="temperature" inputmode="decimal" placeholder="Temp" value="' + escapeHtml(v('temperature')) + '"' + dis + '></td>' +
+          '<td><input class="yd-temp" data-k="temperature" inputmode="decimal" aria-label="Temperature for trailer ' + escapeHtml(x.trailer) + '" placeholder="Temp" value="' + escapeHtml(v('temperature')) + '"' + dis + '></td>' +
           '<td><input class="yd-set" value="' + escapeHtml(x.setPoint) + '" readonly tabindex="-1"></td>' +
           '<td><select data-k="fuelLevel"' + dis + '>' + FUEL.map(([val, label]) => '<option value="' + val + '"' + (v('fuelLevel') === val ? ' selected' : '') + '>' + label + '</option>').join('') + '</select></td>' +
           '<td><input class="yd-notes" data-k="notes" placeholder="Add notes (optional)…" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></td>' +
           '<td class="yd-last">' + last + '</td><td class="yd-next' + (x.minutesUntilDue === 0 ? ' overdue' : '') + '">' + escapeHtml(next) + '<small>' + escapeHtml(x.routeRun) + '</small></td>' +
           '<td class="yd-act">' + (ck ? (m ? (m.saved === 'saving' ? '<span class="yd-tick saving">Saving…</span>' : m.saved === 'error' ? '<span class="yd-tick error">Not saved</span>' : '<span class="yd-tick">&#10003; ' + escapeHtml(m.at || 'Saved') + '</span>') : '') + '<button type="button" class="yd-left" data-left' + (armed[x.trailer] ? ' data-armed="true">Confirm Left' : ' title="Trailer has left the yard">Left Yard') + '</button>' : '<span class="pill">View only</span>') + '</td></tr>';
-      }).join('') || '<tr><td colspan="8" class="empty">No loaded trailers are currently due for a yard check.</td></tr>';
+      }).join('') || (got.runs && got.journal ? '<tr><td colspan="8" class="empty">No loaded trailers are currently due for a yard check.</td></tr>' : '<tr><td colspan="8" class="empty">Loading the trailers&hellip;</td></tr>');
       drawCards(q, ck);
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="yd-trailer"><b>' + escapeHtml(h.trailer) + '</b></td><td>' + escapeHtml(h.temperature) + '</td><td>' + escapeHtml(h.setPoint) + '</td>' +
         '<td>' + escapeHtml(h.fuelLevel) + '</td><td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + ' <span class="yd-status' + (h.status === 'DEPARTED' ? ' left' : '') + '">' + escapeHtml(STATUS[h.status] || h.status) + '</span></td></tr>').join('') ||
@@ -134,7 +135,14 @@
 
 
     // Phone cards: the trailers due, plus the ones checked on this phone in this visit (kept on screen so the rest can be filled in).
-    const mine = {};            // trailer -> { checkId, saved: 'saving' | 'saved' | 'error', at }
+    const got = { runs: false, journal: false }; // the first loads and checks have arrived
+    const mine = {};            // trailer -> { checkId, saved: 'saving' | 'saved' | 'error', at, first }
+    // A check made here is finished once its 2-hour lock runs out: the trailer is due again with empty boxes, and its next
+    // save starts a new check (the old one can no longer be filled in).
+    const LOCK_MS = (U.YARD_LOCK_MINUTES || 120) * 60000;
+    function forgetOld() {
+      Object.keys(mine).forEach(t => { const m = mine[t]; if (m.first && m.saved !== 'saving' && Date.now() - m.first >= LOCK_MS) { delete mine[t]; delete drafts[t]; } });
+    }
     const queues = {};          // trailer -> the saves of that trailer, one after the other
     function drawCards(q, ck) {
       const box = document.getElementById('cards');
@@ -151,7 +159,7 @@
           '<div class="yd-f"><span>Fuel</span><div class="yd-fuel">' + ['FULL', '3/4', '1/2', 'EMPTY'].map(f => '<button type="button" data-fuel="' + f + '" aria-pressed="' + (fuel === f) + '"' + dis + '>' + (f === 'FULL' ? 'Full' : f === 'EMPTY' ? 'Empty' : f) + '</button>').join('') + '</div></div>' +
           '<label class="yd-f"><span>Notes</span><input data-k="notes" enterkeyhint="done" placeholder="Optional" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></label>' +
           (ck ? '<button type="button" class="yd-leave" data-left' + (armed[x.trailer] ? ' data-armed="true">Tap again to confirm: left the yard' : '>Left Yard') + '</button>' : '') + '</article>';
-      }).join('') || '<p class="yd-none">No loaded trailers are due for a yard check.</p>';
+      }).join('') || (got.runs && got.journal ? '<p class="yd-none">No loaded trailers are due for a yard check.</p>' : '<p class="yd-none">Loading the trailers&hellip;</p>');
     }
     // One box was left (or a fuel button tapped): save that trailer's check. The first save is the check (locked for 2 hours);
     // the next ones fill in the same check.
@@ -167,6 +175,13 @@
     }
     function autoSave(card) {
       const trailer = card.dataset.trailer, routeRun = card.dataset.route, d = drafts[trailer] || {};
+      // The temperature must be a number (or left empty); anything else is not sent and the box says why.
+      if (d.temperature !== undefined && String(d.temperature).trim() !== '' && !/^-?\d+(\.\d+)?$/.test(String(d.temperature).trim())) {
+        if (mine[trailer]) { mine[trailer].saved = 'error'; tick(trailer); }
+        showError('Yard check ' + trailer + ' not saved: the temperature must be a number, like 35.');
+        return;
+      }
+      forgetOld();
       const x = queue().rows.concat(queue().locked).find(r => r.trailer === trailer) || {};
       const m = mine[trailer] = mine[trailer] || { saved: 'saving' };
       m.saved = 'saving';
@@ -184,6 +199,7 @@
         try {
           const res = await save('saveYardCheck', fields);
           m.checkId = res && res.checkId || m.checkId;
+          if (!m.first) m.first = Date.now();
           m.saved = 'saved';
           m.at = savedText();
           tick(trailer);
@@ -191,7 +207,7 @@
         } catch (e) {
           m.saved = 'error';
           tick(trailer);
-          showError('Yard check ' + trailer + ': ' + (e.message || e));
+          showError('Yard check ' + trailer + ' not saved (' + (e.message || e) + '). Type it again to retry.');
         }
         if (mineRec) setTimeout(() => { const i = pending.indexOf(mineRec); if (i >= 0) pending.splice(i, 1); render(); }, 1500);
         render();
@@ -272,8 +288,8 @@
       while (unsubs.length) unsubs.pop()();
       // The loads of the week before, this week and the week after (the current app's three Live weeks), and two days of checks.
       const weeks = [...new Set([L.addDays(date, -6), date, L.addDays(date, 6)].map(L.weekStart))];
-      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read the loads: ' + e.message)));
-      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { journal = s.docs.map(d => d.data()); render(); }, e => showError('Could not read the yard checks: ' + e.message)));
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); got.runs = true; render(); }, e => showError('Could not read the loads (' + e.message + '). Check the network and reload the page.')));
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { journal = s.docs.map(d => d.data()); got.journal = true; render(); }, e => showError('Could not read the yard checks (' + e.message + '). Check the network and reload the page.')));
     }
 
     requireSignIn(async (user) => {

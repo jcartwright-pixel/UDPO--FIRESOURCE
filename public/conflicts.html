@@ -9,6 +9,10 @@
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Sheet Conflicts · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* A line refused more than once says how often under its time. */
+    .cf-times { display: block; font-size: 11px; color: #a3471a; font-weight: 600; line-height: 1.1; }
+  </style>
   <script src="js/logic.js"></script>
 </head>
 <body>
@@ -54,7 +58,8 @@
     import { collection, query, where, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
-    let items = [];
+    const MAX = 200;
+    let items = [], loaded = false;
     const hidden = new Set(); // checked on this screen, waiting for the database to agree
 
     // "tue_trailer" reads as "Tue trailer".
@@ -64,42 +69,53 @@
       const i = L.DAYS.indexOf(day);
       return (i >= 0 ? L.DAY_NAMES[i].slice(0, 3) + ' ' : day + ' ') + rest.join(' ');
     }
+    const when = (at) => { const d = new Date(at); return isNaN(d) ? '' : d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+    const whereOf = (c) => c.route || (c.tab ? c.tab + ' ' + (c.rowId || '') : '');
 
     function render() {
-      const shown = items.filter(c => !hidden.has(c.id)), edit = canSave();
-      const rows = shown.map(c => '<tr>' +
-        '<td>' + escapeHtml(new Date(c.at).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })) + '</td>' +
+      const shown = items.filter(c => !hidden.has(c.id)), edit = canSave(), lines = shown.map(c => Object.assign({}, c, { ids: [c.id], first: c.at, last: c.at }));
+      const rows = lines.map(c => '<tr>' +
+        '<td>' + escapeHtml(when(c.last)) + (c.ids.length > 1 ? '<small class="cf-times" title="First ' + escapeHtml(when(c.first)) + '">' + c.ids.length + ' times since ' + escapeHtml(when(c.first)) + '</small>' : '') + '</td>' +
         '<td>' + escapeHtml(c.by) + '</td>' +
-        '<td>' + escapeHtml(c.route || (c.tab ? c.tab + ' ' + (c.rowId || '') : '')) + '</td>' +
+        '<td>' + escapeHtml(whereOf(c)) + '</td>' +
         '<td>' + escapeHtml(c.column ? cellName(c.column) : 'whole row') + '</td>' +
         '<td>' + escapeHtml(c.sheetValue) + '</td>' +
         '<td>' + escapeHtml(c.newValue) + '</td>' +
         '<td title="' + escapeHtml(c.problem) + '">' + escapeHtml(c.problem) + '</td>' +
-        '<td>' + (edit ? '<button type="button" class="check" data-id="' + escapeHtml(c.id) + '">Checked</button>' : '') + '</td></tr>');
-      document.getElementById('rows').innerHTML = rows.join('') || '<tr><td colspan="8" class="empty">No conflicts. Every save reached the sheet.</td></tr>';
-      document.getElementById('count').textContent = shown.length + ' open';
-      fitToWindow(Math.max(shown.length, 1));
+        '<td>' + (edit ? '<button type="button" class="check" data-id="' + escapeHtml(c.id) + '" data-ids="' + escapeHtml(c.ids.join(' ')) + '" aria-label="Mark ' + escapeHtml(whereOf(c) + ' ' + (c.column ? cellName(c.column) : 'whole row')) + ' checked">Checked' + (c.ids.length > 1 ? ' (' + c.ids.length + ')' : '') + '</button>' : '') + '</td></tr>');
+      document.getElementById('rows').innerHTML = !loaded ? '<tr><td colspan="8" class="empty">Loading the conflict list&hellip;</td></tr>' :
+        rows.join('') || '<tr><td colspan="8" class="empty">No conflicts. Every save reached the sheet.</td></tr>';
+      // The list reads the newest MAX: say so when there may be more.
+      document.getElementById('count').textContent = !loaded ? '' : (items.length >= MAX ? MAX + '+ open (newest ' + MAX + ' shown)' : shown.length + ' open') +
+        '';
+      fitToWindow(Math.max(lines.length, 1));
     }
 
     // Checked: off the list at once, saved in the background; back on the list if the save is refused.
     document.getElementById('rows').addEventListener('click', async e => {
       const button = e.target.closest('button.check');
       if (!button) return;
-      const id = button.dataset.id;
-      hidden.add(id);
+      const ids = button.dataset.ids.split(' ').filter(Boolean);
+      ids.forEach(id => hidden.add(id));
       render();
-      try { await save('clearConflict', { conflictId: id }); }
-      catch (err) { hidden.delete(id); render(); showError(err.message || String(err)); }
+      const failed = [];
+      for (const id of ids) {
+        try { await save('clearConflict', { conflictId: id }); }
+        catch (err) { hidden.delete(id); failed.push(err.message || String(err)); }
+      }
+      if (failed.length) { render(); showError('Could not mark ' + failed.length + ' of them checked (' + failed[0] + '). They are back on the list; press Checked again.'); }
+      else showError('');
     });
 
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
-      const q = query(collection(db, 'conflicts'), where('open', '==', true), orderBy('at', 'desc'), limit(40));
+      const q = query(collection(db, 'conflicts'), where('open', '==', true), orderBy('at', 'desc'), limit(MAX));
       onSnapshot(q, snap => {
         items = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        loaded = true;
         render();
-      }, e => showError('Could not read the conflict list: ' + e.message));
+      }, e => showError('Could not read the conflict list (' + e.message + '). Check the network and reload the page.'));
       window.addEventListener('resize', render);
     });
   </script>

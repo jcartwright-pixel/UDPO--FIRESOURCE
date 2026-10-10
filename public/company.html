@@ -66,7 +66,7 @@
       const u = plants.indexOf('fac_uniontown') >= 0 ? uniontown() : null;
       const kpi = (label, value, sub, color) => '<div class="co-kpi" style="--accent:' + color + '"><span>' + label + '</span><b>' + value + '</b><small>' + sub + '</small></div>';
       document.getElementById('kpis').innerHTML = kpi('Scheduled Loads', u ? u.total : 0, 'Today', '#0d6efd') + kpi('Loaded', u ? u.done + ' / ' + u.total : '0 / 0', 'Loadout complete today', '#0c9a4b') +
-        kpi('Loads Completed', u ? u.done : 0, 'Across all facilities', '#5b7fa6') + kpi('Currently Loading', u ? u.loading : 0, 'Active work', '#7a3ff2') +
+        kpi('Loads Completed', u ? u.done : 0, 'Connected plants (Uniontown)', '#5b7fa6') + kpi('Currently Loading', u ? u.loading : 0, 'Active work', '#7a3ff2') +
         kpi('Unloaded', u ? u.unloaded : 0, 'Completed returns', '#f38a00') + kpi('Waiting to Unload', u ? u.waiting : 0, 'Open arrivals', '#0b8fae');
       document.getElementById('plants').innerHTML = L.PLANTS.filter(p => plants.indexOf(p.id) >= 0).map(p => {
         const live = p.id === 'fac_uniontown' && u, href = live ? 'index.html' : 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
@@ -90,12 +90,14 @@
     requireSignIn(async (user) => {
       document.getElementById('today').textContent = L.dayName(date) + ' ' + shortDate(date);
       const { db } = await start();
-      const fail = (what) => e => showError('Could not read ' + what + ': ' + e.message);
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; ready = true; render(); });
+      const fail = (what) => e => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; ready = true; render(); }, fail('your user record'));
       onSnapshot(collection(db, 'maintenance'), s => { data.maintenance = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, fail('the maintenance list'));
       const unsubs = [];
       const watch = () => {
         date = today();
+        // The header rolls with the operating day (6 a.m.), with the numbers.
+        document.getElementById('today').textContent = L.dayName(date) + ' ' + shortDate(date);
         unsubs.splice(0).forEach(u => u());
         const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
         unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the loads')));

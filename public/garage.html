@@ -53,9 +53,10 @@
     // The current app's GARAGE WORK ORDERS tab (220_V7276_GarageFleetService.gs), read only. NEW, WORKING and PARTS are open.
     const STATUS = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
     const FILTERS = [['open', 'Open'], ['parts', 'Waiting on parts'], ['done', 'Done'], ['all', 'All']];
-    let filter = 'open', search = '', orders = [];
+    let filter = 'open', search = '', orders = [], loaded = false;
     const isOpen = (o) => o.status !== 'DONE';
-    const when = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
+    // A stored time (UTC) shows its New York date, so a job finished after 8 p.m. is not dated tomorrow; a plain date shows as it is.
+    const when = (s) => { const v = String(s || ''); if (/T\d/.test(v) && !isNaN(new Date(v))) return new Date(v).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric' }); const k = v.slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
     const yes = (v) => /^(Y|YES|TRUE)$/i.test(String(v || '').trim());
     const weekAgo = () => new Date(Date.now() - 7 * 86400000).toISOString();
 
@@ -77,7 +78,7 @@
           '<td>' + (String(o.unit_type).toUpperCase() === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td class="wrong">' + escapeHtml(o.problem || '') + '</td><td>' + escapeHtml(o.category || '') + '</td>' +
           '<td><span class="pill ' + (yes(o.can_run) ? 'yes">YES' : 'warn">NO') + '</span></td><td>' + escapeHtml(o.source || '') + '</td>' +
           '<td><span class="pill ' + s[1] + '">' + escapeHtml(s[0]) + '</span></td><td>' + escapeHtml(o.techs || '') + '</td><td class="wrong">' + fix + '</td></tr>';
-      }).join('') || '<tr><td colspan="10" class="empty">' + (orders.length ? 'No work orders match.' : 'No work orders yet. They show here once the garage tablet makes them.') + '</td></tr>';
+      }).join('') || '<tr><td colspan="10" class="empty">' + (!loaded ? 'Loading the work orders&hellip;' : orders.length ? 'No work orders match.' : 'No work orders yet. They show here once the garage tablet makes them.') + '</td></tr>';
       document.getElementById('foot').textContent = orders.length + ' work orders from the garage list. Shaded rows: the unit cannot run until it is fixed.';
     }
 
@@ -87,7 +88,12 @@
 
     requireSignIn(async () => {
       const { db } = await start();
-      onSnapshot(collection(db, 'workOrders'), s => { orders = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the work orders: ' + e.message));
+      onSnapshot(collection(db, 'workOrders'), s => {
+        // Status read the same way as the Fleet hub: upper case, blank = NEW.
+        orders = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })).map(o => Object.assign(o, { status: String(o.status || 'NEW').trim().toUpperCase() }));
+        loaded = true;
+        render();
+      }, e => showError('Could not read the work orders (' + e.message + '). Check the network and reload the page.'));
       render();
     });
   </script>
