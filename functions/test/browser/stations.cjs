@@ -133,6 +133,18 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.deepEqual(await ps.$$eval('.ps-tab b', b => b.map(x => x.textContent)), ['Unloading', 'Washing', 'Returns']);
     assert.deepEqual(ps.errors, []);
     results.push('Plant Station: a tablet picks its station once; Case Loadout shows Loading only, Case Unloading shows Unloading, Washing and Returns');
+    // Joe 10/10: the Plant Station is a tablet screen: a slim header with Back and Home, no desktop side menu.
+    const tab = await openPage(browser, 1280, 800, '/plant-station.html' + MANAGER, clock);
+    await tab.waitForSelector('[data-station="CASE_UNLOADING"]');
+    assert.equal(await tab.$('.sidemenu'), null, 'no desktop side menu on the Plant Station');
+    assert.ok(await tab.isVisible('#go-back') && await tab.isVisible('#go-home'), 'Back and Home in the slim header');
+    assert.ok(await fits(tab), 'the Plant Station fits a tablet');
+    await shot(tab, 'plant-station-tablet-pick-1280.png');
+    await tab.click('[data-station="CASE_UNLOADING"]');
+    await tab.waitForSelector('.ps-tab');
+    await shot(tab, 'plant-station-tablet-unloading-1280.png');
+    assert.deepEqual(tab.errors, []);
+    results.push('Plant Station: tablet layout with a slim header (Back, Home) and no desktop menu');
   } finally {
     await browser.close();
   }

@@ -202,18 +202,27 @@ body.ds-tv .foot { color: #cfe3f6; }
 }
 
 /* ---------- Plant Station (plant-station.html) ---------- */
-.ps-page .ps-pill { background: #073c6a; color: #fff; border-radius: 999px; padding: 6px 14px; font-weight: 700; white-space: nowrap; }
+/* Plant Station: a tablet screen (Joe 10/10, "basically a mobile"): slim header, no desktop menu, big touch cards. */
+.ps-page #ps-top { min-height: 56px; gap: 8px; padding: 6px 14px; position: sticky; top: 0; z-index: 5; }
+.ps-page #ps-top button { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.ps-page #ps-top .ps-brand img { width: auto; height: 38px; }
+.ps-page #ps-top .ps-brand strong { font-size: 20px; }
+.ps-page .ps-pill { background: #073c6a; color: #fff; border-radius: 999px; padding: 7px 14px; font-weight: 700; white-space: nowrap; }
 .ps-page .ps-pill::before { content: '\25CF  '; color: #f3b613; }
-.ps-page .ps-intro { margin: 0 0 12px; color: #33475b; font-size: 16px; }
-.ps-page .ps-stations { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-.ps-page .ps-station { text-align: left; background: #fff; border: 1px solid #c9d6e4; border-top: 5px solid #0b6eaa; border-radius: 10px; padding: 16px; cursor: pointer; min-height: 120px; }
-.ps-page .ps-station b { display: block; font-size: 20px; color: #0b2f55; }
-.ps-page .ps-station span { display: block; margin-top: 6px; color: #4a5b6c; font-size: 15px; }
-.ps-page .ps-station:hover { box-shadow: 0 2px 10px rgba(7, 60, 106, .18); }
-.ps-page .ps-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-.ps-page .ps-tab { display: flex; gap: 14px; align-items: center; text-decoration: none; background: var(--tone); border: 1px solid #d5dfea; border-top: 5px solid var(--accent); border-radius: 10px; padding: 18px; min-height: 110px; color: #0b2f55; }
-.ps-page .ps-tab img { width: 64px; height: 64px; object-fit: contain; }
-.ps-page .ps-tab b { display: block; font-size: 22px; }
-.ps-page .ps-tab small { display: block; font-size: 15px; color: #4a5b6c; }
-.ps-page .ps-count { display: inline-block; margin-top: 6px; font-weight: 700; color: var(--accent); font-size: 15px; }
+.ps-page .ps-title { padding: 16px 18px 4px; }
+.ps-page .ps-title .eyebrow { display: block; color: #5b6b7c; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.ps-page .ps-title h1 { margin: 2px 0 0; font-size: 28px; color: #0b2f55; }
+.ps-page .view { padding: 8px 18px 24px; }
+.ps-page .ps-intro { margin: 0 0 14px; color: #33475b; font-size: 17px; }
+.ps-page .ps-stations { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.ps-page .ps-station { text-align: left; background: #fff; border: 1px solid #c9d6e4; border-top: 6px solid #0b6eaa; border-radius: 14px; padding: 22px; cursor: pointer; min-height: 150px; font: inherit; }
+.ps-page .ps-station b { display: block; font-size: 25px; color: #0b2f55; }
+.ps-page .ps-station span { display: block; margin-top: 8px; color: #4a5b6c; font-size: 17px; }
+.ps-page .ps-station:active { transform: scale(.99); background: #f2f8ff; }
+.ps-page .ps-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.ps-page .ps-tab { display: flex; gap: 18px; align-items: center; text-decoration: none; background: var(--tone); border: 1px solid #d5dfea; border-top: 6px solid var(--accent); border-radius: 14px; padding: 24px; min-height: 160px; color: #0b2f55; }
+.ps-page .ps-tab img { width: 84px; height: 84px; object-fit: contain; }
+.ps-page .ps-tab b { display: block; font-size: 27px; }
+.ps-page .ps-tab small { display: block; font-size: 17px; color: #4a5b6c; }
+.ps-page .ps-count { display: inline-block; margin-top: 8px; font-weight: 700; color: var(--accent); font-size: 17px; }
 .ps-page .ps-foot { margin-top: 18px; color: #5b6b7c; font-size: 14px; }
