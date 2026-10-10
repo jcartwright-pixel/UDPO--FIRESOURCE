@@ -158,17 +158,39 @@ function addSideMenu() {
   wrap.append(nav, main);
   screen.appendChild(wrap);
   document.body.classList.add('has-side');
-  // Wide screens fold the menu to icons and open it again; the choice is remembered on this computer.
-  // Narrow screens keep it folded and open it over the page.
-  const wide = () => window.matchMedia('(min-width: 1501px)').matches;
-  try { if (localStorage.getItem('udSideFolded') === '1') document.body.classList.add('side-folded'); } catch (e) { /* no storage */ }
+  // Joe 10/10: the menu stays a slim strip of icons until the mouse is over it (or a tablet taps it), then opens over the
+  // screen without moving it; leaving it folds it again. A section's screens still open beside it. The menu button pins it
+  // open (remembered on this computer) and folds it again.
+  let pinned = false, timer = null, tapped = false;
+  try { pinned = localStorage.getItem('udSidePinned') === '1'; } catch (e) { /* no storage */ }
+  const peek = (open) => { document.body.classList.toggle('side-open', open); document.body.classList.toggle('side-folded', !open); };
+  const pin = (p) => { pinned = p; document.body.classList.toggle('side-rail', !p); document.body.classList.toggle('side-pinned', p); peek(p); };
+  pin(pinned);
+  const inside = () => { clearTimeout(timer); if (!pinned) peek(true); };
+  const outside = () => { clearTimeout(timer); if (!pinned) timer = setTimeout(() => { peek(false); close(); }, 250); };
+  [nav, layer].forEach(el => { el.addEventListener('mouseenter', inside); el.addEventListener('mouseleave', outside); });
+  // A tap on the folded strip opens it first; the next tap picks the screen.
+  // (A tap's pointerdown comes before the mouse events a tablet makes up, so the strip is still folded here.)
+  nav.addEventListener('pointerdown', e => { tapped = e.pointerType !== 'mouse' && !pinned && !document.body.classList.contains('side-open'); }, true);
+  nav.addEventListener('click', e => {
+    if (tapped && e.target.closest('a, .side-back')) { e.preventDefault(); e.stopPropagation(); peek(true); }
+    tapped = false;
+  }, true);
   nav.querySelector('.side-toggle').onclick = () => {
-    if (!wide()) { document.body.classList.toggle('side-open'); return; }
-    const folded = document.body.classList.toggle('side-folded');
-    try { localStorage.setItem('udSideFolded', folded ? '1' : '0'); } catch (e) { /* no storage */ }
+    pin(!pinned);
+    try { localStorage.setItem('udSidePinned', pinned ? '1' : '0'); } catch (e) { /* no storage */ }
     window.dispatchEvent(new Event('resize'));
   };
-  main.addEventListener('click', () => document.body.classList.remove('side-open'));
+  main.addEventListener('click', () => { if (!pinned) { peek(false); close(); } });
+  // Joe 10/10: a menu click always opens the screen fresh on its first view (first tab, today, this week), even when only the
+  // part after # differs from the screen already open.
+  [nav, layer].forEach(el => el.addEventListener('click', e => {
+    const a = e.defaultPrevented ? null : e.target.closest('a[href]');
+    if (!a || a.target || a.origin !== location.origin || a.pathname !== location.pathname || a.search !== location.search) return;
+    e.preventDefault();
+    location.href = a.href;
+    location.reload();
+  }));
 }
 addSideMenu();
 /* Joe 10/10: "move the action buttons all in a line up above". Anything a screen marks data-top (a button, or a whole action or
