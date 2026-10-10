@@ -74,6 +74,29 @@
 .gs-typed small { font-size: 20px; font-weight: 700; color: #1c7c4a; } .gs-typed small.bad { color: #b42318; }
 .gs-cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; } .gs-cats .gs-btn { min-height: 64px; font-size: 24px; }
 .gs-matches { display: flex; gap: 8px; flex-wrap: wrap; } .gs-matches .gs-btn { min-height: 48px; font-size: 20px; }
+/* Joe 10/10 evening: work orders first, each mechanic's own clock on a job. */
+.gs-stack { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+.gs-strip { display: flex; align-items: center; gap: 10px; overflow-x: auto; padding-bottom: 2px; }
+.gs-strip .gs-label { flex: none; }
+.gs-chip { flex: none; display: flex; flex-direction: column; align-items: flex-start; border: 3px solid #d7e1ec; background: #fff; border-radius: 14px; padding: 6px 14px; font-size: 20px; font-weight: 800; color: #1b2a3a; min-height: 64px; cursor: pointer; touch-action: manipulation; }
+.gs-chip small { font-size: 16px; font-weight: 700; color: #6b7b8c; }
+.gs-chip.on { border-color: #1c7c4a; background: #e3f5ea; } .gs-chip.on small { color: #145c37; }
+.gs-crew { display: flex; flex-direction: column; gap: 8px; }
+.gs-clock { display: grid; grid-template-columns: 52px 1fr auto auto; align-items: center; gap: 14px; padding: 6px 0; border-top: 1px solid #e5ebf1; }
+.gs-clock:first-child { border-top: 0; }
+.gs-clock i { width: 52px; height: 52px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-style: normal; font-weight: 800; background: #1c7c4a; }
+.gs-clock:nth-child(2) i { background: #6d28d9; } .gs-clock:nth-child(3) i { background: #b45309; }
+.gs-clock b { font-size: 26px; }
+.gs-clock .t { font-size: 34px; font-weight: 800; color: #1c7c4a; font-variant-numeric: tabular-nums; }
+.gs-two .gs-btn[hidden] + .gs-btn { grid-column: 1 / -1; }
+.topbar .gs-people .p { color: #fff; }
+.gs-onclock { font-size: 16px; font-weight: 700; color: rgba(255, 255, 255, .85); }
+.gs-people .p small { font-size: 16px; font-weight: 700; color: rgba(255, 255, 255, .85); }
+#view-job { overflow: auto; }
+#view-job > * { flex: none; }
+#view-job .gs-two .gs-btn { min-height: 84px; font-size: 30px; }
+#view-job .gs-done { min-height: 80px; }
+.gs-now:empty { display: none; }
 @media (max-width: 1100px) {
   .gs-sign, .gs-report { grid-template-columns: 1fr; overflow: auto; }
   .gs-job { grid-template-columns: 120px 1fr 140px; } .gs-job .unit { font-size: 28px; }
@@ -85,6 +108,7 @@
   .gs-btn { font-size: 22px; min-height: 60px; }
   .gs-job { grid-template-columns: 1fr; } .gs-job .gs-btn { width: 100%; }
   .gs-two { grid-template-columns: 1fr; }
+  .gs-clock { grid-template-columns: 40px 1fr auto; } .gs-clock i { width: 40px; height: 40px; } .gs-clock .gs-btn { grid-column: 1 / -1; }
   /* A phone: the names, the dots and the keypad shrink to fit the width instead of running off the right edge. */
   .gs-page .view { padding: 0 8px 10px; }
   .gs-card { padding: 12px; min-width: 0; }

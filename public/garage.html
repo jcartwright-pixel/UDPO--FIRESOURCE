@@ -58,6 +58,7 @@
     // A stored time (UTC) shows its New York date, so a job finished after 8 p.m. is not dated tomorrow; a plain date shows as it is.
     const when = (s) => { const v = String(s || ''); if (/T\d/.test(v) && !isNaN(new Date(v))) return new Date(v).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric' }); const k = v.slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
     const yes = (v) => /^(Y|YES|TRUE)$/i.test(String(v || '').trim());
+    const hm = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' m' : m + ' m';
     const weekAgo = () => new Date(Date.now() - 7 * 86400000).toISOString();
 
     function render() {
@@ -69,15 +70,18 @@
       const match = (o, k) => k === 'all' || (k === 'open' ? isOpen(o) : k === 'parts' ? o.status === 'PARTS' : o.status === 'DONE');
       document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + orders.filter(o => match(o, k)).length + '</b></button>').join('');
       const q = search.toUpperCase();
-      const list = orders.filter(o => match(o, filter) && (!q || [o.work_order_id, o.unit, o.problem, o.category, o.techs, o.fixed_note].join(' ').toUpperCase().indexOf(q) >= 0))
+      const list = orders.filter(o => match(o, filter) && (!q || [o.work_order_id, o.unit, o.problem, o.category, o.techs, o.fixed_note, o.completed_by, o.on_now].join(' ').toUpperCase().indexOf(q) >= 0))
         .sort((a, b) => (isOpen(b) - isOpen(a)) || String(b.completed_at || b.created_at || '').localeCompare(String(a.completed_at || a.created_at || '')));
       document.getElementById('rows').innerHTML = list.map(o => {
         const s = STATUS[o.status] || [o.status, 'no'], cantRun = isOpen(o) && !yes(o.can_run);
-        const fix = o.status === 'DONE' ? escapeHtml(o.fixed_note || o.fixed || '') + '<small>' + when(o.completed_at) + (o.minutes ? ' · ' + escapeHtml(o.minutes) + ' min' : '') + (o.signed_by ? ' · signed ' + escapeHtml(o.signed_by) : '') + '</small>' : '';
+        const fix = o.status === 'DONE' ? escapeHtml(o.fixed_note || o.fixed || '') + '<small>' + when(o.completed_at) + (o.minutes ? ' · ' + escapeHtml(o.minutes) + ' min' : '') + (o.completed_by ? ' · completed by ' + escapeHtml(o.completed_by) : o.signed_by ? ' · signed ' + escapeHtml(o.signed_by) : '') + '</small>' : '';
+        // Joe 10/10: each mechanic's own clock on the Garage Station; their labour and who is on it now.
+        const labor = {}; (Array.isArray(o.labor) ? o.labor : []).forEach(x => { if (x && x.end) labor[x.name] = (labor[x.name] || 0) + (Number(x.minutes) || 0); });
+        const crew = Object.keys(labor).map(n => escapeHtml(n) + ' ' + hm(labor[n])).join(', ') + (o.on_now && isOpen(o) ? (Object.keys(labor).length ? ' · ' : '') + 'on now: ' + escapeHtml(o.on_now) : '');
         return '<tr' + (cantRun ? ' class="review"' : '') + '><td class="strong">' + escapeHtml(o.work_order_id) + '<small>' + when(o.created_at) + '</small></td><td class="strong">' + escapeHtml(o.unit || '') + '</td>' +
-          '<td>' + (String(o.unit_type).toUpperCase() === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td class="wrong">' + escapeHtml(o.problem || '') + '</td><td>' + escapeHtml(o.category || '') + '</td>' +
+          '<td>' + ({ TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' }[String(o.unit_type).toUpperCase()] || 'Truck') + '</td><td class="wrong">' + escapeHtml(o.problem || '') + '</td><td>' + escapeHtml(o.category || '') + '</td>' +
           '<td><span class="pill ' + (yes(o.can_run) ? 'yes">YES' : 'warn">NO') + '</span></td><td>' + escapeHtml(o.source || '') + '</td>' +
-          '<td><span class="pill ' + s[1] + '">' + escapeHtml(s[0]) + '</span></td><td>' + escapeHtml(o.techs || '') + '</td><td class="wrong">' + fix + '</td></tr>';
+          '<td><span class="pill ' + s[1] + '">' + escapeHtml(s[0]) + '</span></td><td>' + escapeHtml(o.techs || '') + (crew ? '<small>' + crew + '</small>' : '') + '</td><td class="wrong">' + fix + '</td></tr>';
       }).join('') || '<tr><td colspan="10" class="empty">' + (!loaded ? 'Loading the work orders&hellip;' : orders.length ? 'No work orders match.' : 'No work orders yet. They show here once the garage tablet makes them.') + '</td></tr>';
       document.getElementById('foot').textContent = orders.length + ' work orders from the garage list. Shaded rows: the unit cannot run until it is fixed.';
     }
