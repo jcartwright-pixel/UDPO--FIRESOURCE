@@ -3,11 +3,10 @@
 
 /* ---------- Garage Station ---------- */
 .gs-page .view { padding: 0 16px 12px; }
-.gs-page .topbar { min-height: 56px; padding: 4px 14px; }
-.gs-page .topbar .brand img { width: auto; height: 40px; }
-.gs-page .topbar .brand small { display: none; }
-.gs-page .topbar .gs-nav { min-height: 40px; padding: 0 14px; font-size: 15px; }
-.gs-page .topbar .brand { order: 0; } .gs-page .topbar .gs-nav { order: -1; }
+:is(.gs-page, .ds-page) .topbar { min-height: 56px; padding: 4px 14px; }
+:is(.gs-page, .ds-page) .topbar .brand img { width: auto; height: 40px; }
+:is(.gs-page, .ds-page) .topbar .brand small { display: none; }
+:is(.gs-page, .ds-page) .topbar .gs-nav { min-height: 40px; padding: 0 14px; font-size: 15px; order: -1; }
 .gs { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; font-size: 22px; color: #1b2a3a; }
 .gs [hidden] { display: none !important; }
 .gs h2 { margin: 0; font-size: 34px; color: #123f70; }
@@ -257,6 +256,6 @@ body.ds-tv .foot { color: #cfe3f6; }
 
 /* Joe 10/10: the drivers' phone page looks like a phone on a laptop too: one phone-width column in the middle. */
 @media (min-width: 600px) {
-  html:has(body.phone:not(.gs-page):not(.ps-page)) { background: #dfe6ee; }
-  body.phone:not(.gs-page):not(.ps-page) { max-width: 460px; margin: 0 auto; box-shadow: 0 0 24px rgba(7, 60, 106, .18); }
+  html:has(body.phone:not(.gs-page):not(.ps-page):not(.ds-page)) { background: #dfe6ee; }
+  body.phone:not(.gs-page):not(.ps-page):not(.ds-page) { max-width: 460px; margin: 0 auto; box-shadow: 0 0 24px rgba(7, 60, 106, .18); }
 }

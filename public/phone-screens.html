@@ -26,7 +26,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Phone Screens</h1><small>Every phone and tablet screen, to try from this computer. Each one looks the same here as on the phone or tablet.</small></div>
+      <div class="title"><h1>Phone Screens</h1><small>Every phone, tablet and kiosk screen, to try from this computer. Each one looks the same here as on the phone, tablet or kiosk.</small></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -44,7 +44,8 @@
       ['Tablets', 'Garage Station', 'The garage tablet: technicians tap their name and login ID, then work their jobs.', 'garage-station.html'],
       ['Tablets', 'Plant Station', 'The plant floor tablet: pick its station once, then Loading, Unloading, Washing and Returns.', 'plant-station.html'],
       ['Tablets', 'Trailer Assignments', 'Trailer numbers for each load; also works on a phone.', 'trailers.html'],
-      ['Screens on the wall', 'Driver Room TV', 'The driver board on the Driver Room TV.', 'driver-station.html?tv=1']
+      ['Driver Room kiosk and TV', 'Driver Room Kiosk', 'The driver board and weekly schedule on the Driver Room kiosk.', 'driver-station.html'],
+      ['Driver Room kiosk and TV', 'Driver Room TV', 'The same board on the Driver Room TV: dark, full screen, both lists roll.', 'driver-station.html?tv=1']
     ];
     // Opened from Administration's panel, a screen still opens in the whole window, like on the phone.
     document.getElementById('list').addEventListener('click', e => {
