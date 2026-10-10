@@ -135,6 +135,20 @@ const MASTER_KINDS = Object.freeze({
       return { unit: String(d.truck).trim().toUpperCase().replace(/\s+/g, ''), miles: Number(String(d.odometer).replace(/,/g, '')), date: L.dateKey(get('business_date')) || '', at: get('recorded_at') };
     }
   },
+  /*
+   * Driver Scorecard (scBuildDay_): the journal's route check-ins (ROUTE_CHECKIN) and daily inspections (DVIR), with the route and
+   * run they were for and whether the inspection found a defect.
+   */
+  plantEvents: {
+    collection: 'plantEvents', idColumn: 'record_id', journal: true,
+    keep: (get) => ['DVIR', 'ROUTE_CHECKIN'].indexOf(get('record_type').toUpperCase()) >= 0 && !!L.dateKey(get('business_date')),
+    build: (get) => {
+      let p = {};
+      try { p = JSON.parse(get('payload_json') || '{}') || {}; } catch (e) { p = {}; }
+      const defect = (Array.isArray(p.checks) && p.checks.indexOf('Defect found') >= 0) || !!String(p.tractorIssues || '').trim() || !!String(p.trailerIssues || '').trim();
+      return { type: get('record_type').toUpperCase(), date: L.dateKey(get('business_date')), route: String(p.route || get('route') || '').trim(), run: String(p.run || get('run') || '').trim(), defect };
+    }
+  },
   users: {
     collection: C.users, idColumn: 'email',
     build: (get, warn) => {

@@ -16,6 +16,7 @@ const { queueMaster } = require('./masterwrite');
 const MAINT = require('./maintenance');
 const SWITCH = require('./switch');
 const OTR = require('./otr-core');
+const SC = require('./sc-core');
 
 const C = M.COLLECTIONS;
 
@@ -55,7 +56,8 @@ const ACTIONS = Object.freeze({
   updateIssue: { roles: SAVE_ROLES, screen: 'checkIns' },
   setWeekReason: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
-  saveOtr: { roles: DRIVER_ROLES, screen: 'otr' }
+  saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
+  saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -216,6 +218,19 @@ function validate(input) {
       if (OTR.OTR_CORE.DESTINATIONS.indexOf(out.destination) < 0) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
       if (out.runs === null) throw new SaveError('BAD_REQUEST', 'Type the number of runs');
     } else throw new SaveError('BAD_REQUEST', 'op must be route, figure or day');
+    return out;
+  }
+  // Driver Scorecard Settings (the current app's scSaveSettings_): one points or grade number, or the call-off reasons.
+  if (action === 'saveScorecard') {
+    if (Array.isArray(input.callOffReasons)) {
+      out.callOffReasons = [...new Set(input.callOffReasons.map(r => text(r, 40).toUpperCase()))];
+      if (out.callOffReasons.some(r => SC.SC_CORE.REASONS.indexOf(r) < 0)) throw new SaveError('BAD_REQUEST', 'Unknown call-off reason');
+      return out;
+    }
+    out.key = text(input.key, 40);
+    if (SC.SC_CORE.NUMBER_SETTINGS.indexOf(out.key) < 0) throw new SaveError('BAD_REQUEST', 'Unknown setting ' + out.key);
+    out.value = Number(String(input.value).trim());
+    if (String(input.value).trim() === '' || !isFinite(out.value) || out.value < 0 || out.value > 100) throw new SaveError('BAD_REQUEST', 'Type a number from 0 to 100');
     return out;
   }
   if (action === 'setWeekReason') {
@@ -400,6 +415,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveDriverTemplate') return saveDriverTemplate(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'saveScorecard') return saveScorecard(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'publishWeek') return publishWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveRoute') return saveRoute(tx, db, req, email, stamp, logRef, mode);
@@ -849,6 +865,16 @@ async function saveOtr(tx, db, req, email, stamp, logRef, mode) {
   tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email, testEdited: mode.mode === 'test' }), { merge: true });
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, op: req.op, doc: ref.path, before, after: data, result });
+  return result;
+}
+
+// Driver Scorecard settings: scorecard/settings, read by the screen with the current app's defaults under it (scSettings_).
+async function saveScorecard(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('scorecard').doc('settings'), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+  const data = req.callOffReasons ? { callOffReasons: req.callOffReasons } : { [req.key]: req.value };
+  tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email }), { merge: true });
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
   return result;
 }
 

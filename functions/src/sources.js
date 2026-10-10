@@ -18,7 +18,9 @@ const UNIONTOWN = Object.freeze({
     // The Plant Operations Scheduler's journal, in the Live workbook (Weekly's PLANT LOAD marks).
     plantLoads: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' },
     // The same journal's daily inspections (DVIR): each truck's newest odometer, for Fleet Service's PM due miles.
-    odometers: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' }
+    odometers: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' },
+    // And its route check-ins and inspections, for the Driver Scorecard.
+    plantEvents: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' }
   }
 });
 
@@ -30,8 +32,8 @@ function transferSources(env) {
   const given = JSON.parse(raw);
   const masters = {};
   const named = given.masters || {};
-  // The odometers come from the plant journal, so a copy named for plantLoads is read for them too.
-  Object.keys(UNIONTOWN.masters).forEach(k => { masters[k] = Object.assign({}, UNIONTOWN.masters[k], k === 'odometers' && !named.odometers ? named.plantLoads : named[k]); });
+  // The odometers and plant events come from the plant journal, so a copy named for plantLoads is read for them too.
+  Object.keys(UNIONTOWN.masters).forEach(k => { masters[k] = Object.assign({}, UNIONTOWN.masters[k], (k === 'odometers' || k === 'plantEvents') && !named[k] ? named.plantLoads : named[k]); });
   return { live: Object.assign({}, UNIONTOWN.live, given.live), masters };
 }
 

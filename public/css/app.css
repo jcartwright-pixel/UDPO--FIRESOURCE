@@ -843,3 +843,23 @@ tr.otr-on td { background: #e3f3e8; }
 #otr-report h2 { margin: 4px; font-size: 18px; color: var(--ud-blue); }
 .otr-card > button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 .otr-page .actions select { min-height: 38px; padding: 0 10px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-weight: 700; }
+
+/* Driver Scorecard */
+.sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
+.sc.g-A { background: #e3f3e8; color: #1c6b3a; } .sc.g-B { background: #e6f0fb; color: #1d5b91; }
+.sc.g-C { background: #fff4d6; color: #8a5a00; } .sc.g-D { background: #fde8e8; color: #b42318; }
+.sc-board td.sc-ok { color: #1c6b3a; } .sc-board td.sc-bad { color: #b42318; font-weight: 700; }
+.sc-board td small, .sc-board th small { display: block; font-size: 11px; font-weight: 600; }
+.sc-board th.later, .sc-board td.later { color: #9aa9b8; }
+.sc-board tr[data-key] { cursor: pointer; }
+.sc-board tr.sc-open td { background: #e8f2fd; }
+.sc-board tr.sc-misses td { text-align: left; background: #f7fbfe; font-size: 14px; }
+.sc-board tr.sc-misses div { padding: 2px 0; }
+.sc-pts { color: #b42318; font-weight: 800; }
+.sc-period { font-size: 18px; color: var(--ud-blue); min-width: 170px; text-align: center; }
+.sc-set { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; padding: 4px; }
+.sc-set p { color: inherit; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sc-set p.later { color: #9aa9b8; }
+.sc-n { width: 64px; height: 34px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: center; font: inherit; font-weight: 700; }
+.sc-reasons { display: flex; flex-wrap: wrap; gap: 14px; }
+.sc-set .otr-card > button { align-self: flex-end; }

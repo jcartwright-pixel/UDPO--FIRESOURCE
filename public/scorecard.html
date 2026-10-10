@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Driver Scorecard · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+  <script src="js/sc-core.js"></script>
+</head>
+<body class="fill issues-page score-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Driver Scorecard</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Driver Scorecard</h1><small id="sub">Every driver starts the month at 100</small></div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-mode="month" aria-selected="true">Month</button>
+        <button type="button" role="tab" data-mode="year" aria-selected="false">Year</button>
+        <button type="button" role="tab" data-mode="settings" aria-selected="false">Settings</button>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="kpis" id="kpis"></div>
+      <div class="actions" id="bar"></div>
+      <div class="sheet scroll-list" id="sheet"></div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
+    import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
+    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    // The current app's Driver Scorecard (screen A, 224/225_V7279): one table of every driver for the month or the year.
+    // Days come from the copied Live weeks (check-ins, cases out vs in) and the plant journal (inspections, route check-ins).
+    forScreen('scorecard');
+    const L = window.UDLogic, S = window.UDScore, CORE = S.SC_CORE;
+    let mode = 'month', runs = [], events = [], drivers = [], exceptions = [], saved = {}, open = '';
+    const today = () => L.operatingDay(new Date());
+    let year = Number(today().slice(0, 4)), month = Number(today().slice(5, 7));
+
+    function names() { const out = {}; drivers.forEach(d => { if (!d.name) return; if (d.id) out[S.scPersonKey_(d.id)] = d.name; out[S.scPersonKey_(d.name)] = d.name; }); return out; }
+    // Every day in the copied Live weeks, built the current app's way (scBuildDay_).
+    function allDays(routeMiles) {
+      const byDate = {}, ev = {};
+      events.forEach(e => { (ev[e.date] = ev[e.date] || []).push({ eventType: e.type, payload: { route: e.route, run: e.run, checks: e.defect ? ['Defect found'] : [] } }); });
+      runs.forEach(run => L.DAYS.forEach((p, i) => {
+        const d = run.days && run.days[p]; if (!d) return;
+        const date = L.addDays(run.weekStart, i);
+        (byDate[date] = byDate[date] || []).push({ runId: run.runId, route: run.route, run: run.run, runs: d.runs ? 'TRUE' : '', driver: d.driver || '', driverId: d.driverId || '',
+          casesOut: d.casesOut, plantCaseReturn: d.plantCaseReturn, driverCaseReturn: d.driverCaseReturn, checkedIn: !!d.checkinCompletedAt });
+      }));
+      const out = {};
+      Object.keys(byDate).forEach(date => {
+        const p = L.DAYS[S.scWeekday_(date)], rows = byDate[date];
+        // A check-in typed on Driver Check-ins counts like the phone's ROUTE_CHECKIN event.
+        const dayEv = (ev[date] || []).concat(rows.filter(r => r.checkedIn).map(r => ({ eventType: 'ROUTE_CHECKIN', payload: { route: r.route, run: r.run } })));
+        out[date] = S.scBuildDay_(date, rows, dayEv, routeMiles[p] || {});
+      });
+      return out;
+    }
+    let routeMiles = {};
+
+    function board(s) {
+      const t = today(), yesterday = S.scAddDays_(t, -1), days = allDays(routeMiles), ex = exceptions.map(e => Object.assign({}, e.cells || {}, { driver_id: (e.cells || {}).driver_id || e.driverId || '' }));
+      const first = mode === 'year' ? 1 : month, last = mode === 'year' ? 12 : month, months = [];
+      for (let m = first; m <= last; m++) {
+        const range = S.scMonthRange_(year, m);
+        if (range.start > yesterday) break;
+        const end = range.end < yesterday ? range.end : yesterday;
+        let list = [];
+        for (let d = range.start; d <= end; d = S.scAddDays_(d, 1)) list = list.concat(days[d] || []);
+        months.push({ month: m, rows: S.scScoreMonth_(list, S.scCallOffDays_(ex, range.start, end, s), s, names()) });
+      }
+      const rows = mode === 'year' ? S.scScoreYear_(months, s) : (months[0] ? months[0].rows : []);
+      const minDays = mode === 'year' ? Math.round(s.monthMinDays * months.length / 2) : s.monthMinDays;
+      return { rows, summary: S.scSummary_(rows, s, minDays), through: yesterday, days: Object.keys(days).sort() };
+    }
+
+    function render() {
+      const s = S.scSettings_(saved), edit = canManage();
+      document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
+      document.getElementById('sub').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY') + ' · every driver starts at 100';
+      const k = document.getElementById('kpis'), bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
+      if (mode === 'settings') {
+        k.innerHTML = '';
+        bar.innerHTML = '<span class="hint">Change any number and it saves. Personal Day, vacation and Off never count.</span>';
+        const n = (key) => '<input class="sc-n" data-k="' + key + '" value="' + s[key] + '"' + (edit ? '' : ' disabled') + '>';
+        sheet.innerHTML = '<div class="sc-set"><section class="otr-card"><h2>What costs points</h2>' +
+          '<p><b>Daily check-in</b> ' + n('checkinMiss') + ' points for each run without a check-in</p>' +
+          '<p><b>Cases out vs in</b> ' + n('lostCase') + ' point per lost case, at most ' + n('lostCaseDayCap') + ' a day</p>' +
+          '<p><b>Clean inspections</b> ' + n('inspectionDefect') + ' points per inspection with a defect, ' + n('inspectionMissing') + ' if none done</p>' +
+          '<p><b>Attendance</b> ' + n('callOff') + ' points per call-off day</p>' +
+          '<p class="later"><b>Route cuts</b> later: needs a cut mark on Daily Dispatch</p><p class="later"><b>Driving habits</b> later: speeding, hard braking, idling from GPS</p>' +
+          '<h2>Counts as a call-off</h2><div class="sc-reasons">' + CORE.REASONS.map(r => '<label><input type="checkbox" data-reason="' + r + '"' + (s.callOffReasons.indexOf(r) >= 0 ? ' checked' : '') + (edit ? '' : ' disabled') + '> ' + r.charAt(0) + r.slice(1).toLowerCase() + '</label>').join('') + '</div></section>' +
+          '<section class="otr-card"><h2>Grades</h2><p><span class="sc g-A">A</span> ' + n('gradeA') + ' and up</p><p><span class="sc g-B">B</span> ' + n('gradeB') + ' and up</p><p><span class="sc g-C">C</span> ' + n('gradeC') + ' and up</p><p><span class="sc g-D">D</span> below</p>' +
+          '<h2>Driver of the Month</h2><p>Highest score, worked at least ' + n('monthMinDays') + ' days</p><button type="button" data-mode-go="month">Back to the scorecard</button></section></div>';
+        foot.textContent = '';
+        sheet.querySelectorAll('.sc-n').forEach(inp => { inp.onchange = () => {
+          const key = inp.dataset.k, before = saved[key];
+          saveOptimistic('saveScorecard', { key, value: inp.value }, () => { saved = Object.assign({}, saved, { [key]: Number(inp.value) }); }, () => { saved = Object.assign({}, saved, { [key]: before }); }, render);
+        }; });
+        sheet.querySelectorAll('[data-reason]').forEach(c => { c.onchange = () => {
+          const list = [...sheet.querySelectorAll('[data-reason]:checked')].map(x => x.dataset.reason), before = saved.callOffReasons;
+          saveOptimistic('saveScorecard', { callOffReasons: list }, () => { saved = Object.assign({}, saved, { callOffReasons: list }); }, () => { saved = Object.assign({}, saved, { callOffReasons: before }); }, render);
+        }; });
+        sheet.querySelector('[data-mode-go]').onclick = () => { mode = 'month'; render(); };
+        return;
+      }
+      const b = board(s), sm = b.summary, label = mode === 'year' ? String(year) : CORE.MONTHS[month - 1] + ' ' + year;
+      k.innerHTML = [[sm.drivers, 'Drivers graded'], [sm.average == null ? '–' : sm.average, 'Plant average score'], [sm.missedCheckins, 'Missed check-ins', sm.missedCheckins ? 'warn' : ''],
+        [sm.lostCases, 'Cases lost on routes', sm.lostCases ? 'warn' : ''], [sm.leader || '–', mode === 'year' ? 'Leading for Driver of the Year' : 'Leading for Driver of the Month', 'good']]
+        .map(([v, l, c]) => '<div class="' + (c || '') + '"><b>' + escapeHtml(String(v)) + '</b><span>' + l + '</span></div>').join('');
+      bar.innerHTML = '<button type="button" id="prev" aria-label="Earlier">◀</button><b class="sc-period">' + escapeHtml(label) + '</b><button type="button" id="next" aria-label="Later">▶</button><span class="spacer"></span><button type="button" class="primary" id="sc-print">Print</button>';
+      const cell = (bad, good, text) => '<td class="' + (bad ? 'sc-bad' : good ? 'sc-ok' : '') + '">' + text + '</td>';
+      sheet.innerHTML = '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:15%"><col style="width:6%"><col style="width:8%"><col style="width:11%"><col style="width:12%"><col style="width:7%"><col style="width:11%"><col style="width:10%"><col style="width:7%"><col style="width:9%"></colgroup>' +
+        '<thead><tr><th>#</th><th>Driver</th><th>Route</th><th>Score</th><th>Daily Check-in</th><th>Cases Out vs In</th><th class="later">Route Cuts<small>(later)</small></th><th>Clean Inspections</th><th>Attendance</th><th>Miles</th><th class="later">Driving Habits<small>(GPS, later)</small></th></tr></thead><tbody>' +
+        (b.rows.filter(r => r.runDays || r.callOffs).map(r => '<tr data-key="' + escapeHtml(r.driverKey) + '" class="' + (open === r.driverKey ? 'sc-open' : '') + '"><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td><td>' + escapeHtml(r.route) + '</td>' +
+          '<td><span class="sc g-' + r.grade + '">' + r.score + '</span></td>' + cell(r.missedCheckins, !r.missedCheckins, (r.runDays - r.missedCheckins) + ' of ' + r.runDays + (r.missedCheckins ? '<small>' + r.missedCheckins + ' missed</small>' : '')) +
+          cell(r.lostCases, !r.lostCases && r.casesOut, r.casesOut ? r.casesOut.toLocaleString() + ' / ' + r.casesIn.toLocaleString() + (r.lostCases ? '<small>' + r.lostCases + ' lost</small>' : '') : '<small>not recorded</small>') +
+          '<td class="later">–</td>' + cell(r.defects, !r.defects && r.inspected, r.inspected + ' clean' + (r.defects ? '<small>' + r.defects + ' with a defect</small>' : '') + (r.notInspected ? '<small>' + r.notInspected + ' not done</small>' : '')) +
+          cell(r.callOffs, !r.callOffs, r.callOffs ? r.callOffs + ' call-off' + (r.callOffs === 1 ? '' : 's') : 'Perfect') + '<td>' + (r.miles ? r.miles.toLocaleString() : '') + '</td><td class="later">–</td></tr>' +
+          (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="10">' + (r.misses && r.misses.length ? r.misses.map(m => '<div><b>' + shortDate(m.date) + '</b> ' + escapeHtml(m.what) + ' <span class="sc-pts">−' + m.points + '</span></div>').join('') : 'No misses.') + '</td></tr>' : '')).join('') ||
+          '<tr><td colspan="11" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>') + '</tbody></table>';
+      foot.textContent = 'Through ' + shortDate(b.through) + ' · green = no misses, red = cost points · days counted: ' + (b.days.length ? shortDate(b.days[0]) + ' to ' + shortDate(b.days[b.days.length - 1]) + ' (the copied Live weeks)' : 'none') + ' · click a driver for the misses.';
+      document.getElementById('prev').onclick = () => { if (mode === 'year') year--; else if (--month < 1) { month = 12; year--; } open = ''; render(); };
+      document.getElementById('next').onclick = () => { if (mode === 'year') year++; else if (++month > 12) { month = 1; year++; } open = ''; render(); };
+      document.getElementById('sc-print').onclick = () => {
+        let box = document.getElementById('print'); if (!box) { box = document.createElement('div'); box.id = 'print'; document.body.appendChild(box); }
+        box.innerHTML = '<h2>Driver Scorecard · ' + escapeHtml(label) + '</h2>' + sheet.innerHTML; window.print();
+      };
+    }
+
+    document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b) { mode = b.dataset.mode; open = ''; render(); } });
+    document.getElementById('sheet').addEventListener('click', e => { const tr = e.target.closest('tr[data-key]'); if (tr) { open = open === tr.dataset.key ? '' : tr.dataset.key; render(); } });
+    window.udBack = () => { if (open) { open = ''; render(); return true; } if (mode !== 'month') { mode = 'month'; render(); return true; } return false; };
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + name + ': ' + e.message));
+      watch('runs', v => { runs = v; });
+      watch('plantEvents', v => { events = v; });
+      watch('drivers', v => { drivers = v; });
+      watch('exceptions', v => { exceptions = v; });
+      watch('routes', v => { routeMiles = {}; L.DAYS.forEach(p => { routeMiles[p] = {}; }); v.forEach(r => L.DAYS.forEach(p => { if (r.days && r.days[p] && r.days[p].miles) routeMiles[p][r.id] = r.days[p].miles; })); });
+      onSnapshot(doc(db, 'scorecard', 'settings'), s => { saved = s.exists() ? s.data() : {}; render(); }, e => showError('Could not read the scorecard settings: ' + e.message));
+    });
+  </script>
+</body>
+</html>

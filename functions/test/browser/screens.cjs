@@ -680,6 +680,26 @@ async function noScroll(page) {
     assert.deepEqual(otr.errors, []);
     await otr.close();
     results.push('Over the Road: a manager ticked 801 for Jersey and typed September figures (cost per gallon $0.400); Dashboard and Report open');
+    // Driver Scorecard: the month board, a driver's misses, the year and Settings open with no errors; a manager changes a point value.
+    const sc = await openPage(browser, 1920, 950, '/scorecard.html?testEmail=manager.test@uniteddairy.com');
+    await sc.waitForSelector('.sc-board');
+    await sc.click('.tabs [data-mode="year"]');
+    await sc.waitForSelector('.sc-board');
+    await sc.click('.tabs [data-mode="settings"]');
+    await sc.waitForFunction(() => document.querySelector('.sc-n[data-k="callOff"]') && !document.querySelector('.sc-n[data-k="callOff"]').disabled);
+    await sc.fill('.sc-n[data-k="callOff"]', '5');
+    await sc.press('.sc-n[data-k="callOff"]', 'Tab');
+    const scSaved = await sc.evaluate(async () => {
+      const { start } = await import('./js/app.js');
+      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { db } = await start();
+      for (let i = 0; i < 20; i++) { const d = (await getDoc(doc(db, 'scorecard', 'settings'))).data(); if (d && d.callOff === 5) return d; await new Promise(r => setTimeout(r, 250)); }
+      return null;
+    });
+    assert.ok(scSaved, 'the call-off points saved');
+    assert.deepEqual(sc.errors, []);
+    await sc.close();
+    results.push('Driver Scorecard: Month, Year and Settings open; a manager set call-offs to 5 points and it saved');
     // Dispatch Administration: the current app's cards; a built screen opens in this window, from the Route Editor too.
     const adm = await openPage(browser, 1920, 950, '/routes.html?testEmail=manager.test@uniteddairy.com');
     await adm.waitForSelector('#to-admin');

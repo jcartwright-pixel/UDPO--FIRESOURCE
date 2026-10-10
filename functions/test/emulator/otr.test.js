@@ -37,3 +37,14 @@ test('Over the Road: a manager ticks a run, types a month figure and fixes a day
   assert.equal(day.runs, 2);
   assert.equal(day.source, 'MANUAL');
 });
+
+test('Driver Scorecard settings: a manager changes a point value and the call-off reasons; a bad number is refused', async () => {
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'saveScorecard', requestId: rid(), key: 'callOff', value: 5 }, now), /role/);
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveScorecard', requestId: rid(), key: 'callOff', value: 'x' }, now), /number/);
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveScorecard', requestId: rid(), key: 'nope', value: 1 }, now), /Unknown setting/);
+  await applyAction(db(), MANAGER, { action: 'saveScorecard', requestId: rid(), key: 'callOff', value: '5' }, now);
+  await applyAction(db(), MANAGER, { action: 'saveScorecard', requestId: rid(), callOffReasons: ['CALLED OFF', 'SICK DAY'] }, now);
+  const s = (await db().collection('scorecard').doc('settings').get()).data();
+  assert.equal(s.callOff, 5);
+  assert.deepEqual(s.callOffReasons, ['CALLED OFF', 'SICK DAY']);
+});

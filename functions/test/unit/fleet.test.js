@@ -46,3 +46,14 @@ test('Over the Road logic: the screen and the server load the same file', () => 
   const day = O.otrCountDay_('2026-10-04', [{ runId: 'r1', route: '855', run: 'SAL 1', runs: 'TRUE' }, { runId: 'r1', route: '855', run: 'SAL 1', runs: 'TRUE' }], routes);
   assert.equal(day.byDestination.SAL, 2, 'two runs on one day count 2');
 });
+
+test('Driver Scorecard logic: the screen and the server load the same file; a missed check-in and lost cases cost points', () => {
+  const fs = require('fs'), path = require('path');
+  assert.equal(fs.readFileSync(path.join(__dirname, '../../src/sc-core.js'), 'utf8'), fs.readFileSync(path.join(__dirname, '../../../public/js/sc-core.js'), 'utf8'));
+  const S = require('../../src/sc-core');
+  const s = S.scSettings_({});
+  const days = S.scBuildDay_('2026-10-05', [{ runId: 'r1', route: '855', run: 'SAL', runs: 'TRUE', driver: 'ADAMS, PAT', driverId: 'd1', casesOut: 500, plantCaseReturn: 497 }], [], {});
+  const rows = S.scScoreMonth_(days, [], s, { D1: 'ADAMS, PAT' });
+  assert.equal(rows[0].score, 100 - 4 - 3, 'check-in 4 points, 3 lost cases 3 points');
+  assert.equal(rows[0].driver, 'ADAMS, PAT');
+});
