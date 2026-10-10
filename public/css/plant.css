@@ -460,9 +460,9 @@
 /* ---------- Manager Center (manager.html) ---------- */
 .manager-page .notice.ok { margin: 0 16px 8px; background: #e6f6ec; border: 1px solid #a8dcb8; color: var(--runs-ink); border-radius: 10px; padding: 8px 14px; font-weight: 800; }
 .manager-page .mc-shell { flex-direction: row !important; gap: 12px; padding: 0 16px 12px; min-height: 0; flex: 1 1 auto; }
-.manager-page .mc-grid { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 12px; overflow: auto; }
+.manager-page .mc-grid { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 12px; overflow: auto; }
 .manager-page .mc-card { background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--accent); border-radius: 12px; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
-.manager-page .mc-report { grid-row: span 2; }
+.manager-page .mc-report { grid-row: 1 / span 3; grid-column: 1; }
 .manager-page .mc-bar { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ud-blue-dark); }
 .manager-page .mc-bar strong { font-size: 18px; flex: 1; }
 .manager-page .mc-bar em { font-style: normal; font-size: 13px; font-weight: 800; color: var(--accent); }
@@ -491,6 +491,25 @@
 .manager-page .mc-pvlist span { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .manager-page .mc-pvlist span.bad { color: #c62828; } .manager-page .mc-pvlist span.good { color: #1f7a4d; font-weight: 800; }
 .manager-page .mc-pvlist .more { color: var(--muted); font-weight: 700; }
+.manager-page .mc-report .mc-pvlist { flex: 1 1 auto; min-height: 0; overflow: auto; gap: 3px; }
+.manager-page .mc-pvlist .mc-pvh { display: flex; margin-top: 6px; padding-bottom: 2px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: #5b6775; }
+.manager-page .mc-pvlist .mc-pvh:first-child { margin-top: 0; }
+.manager-page .mc-pvlist .mc-pvh em { margin-left: auto; font-style: normal; letter-spacing: 0; text-transform: none; }
+.manager-page .mc-pvlist .mc-pvh.bad { color: #b42318; }
+.manager-page .mc-pvlist .mc-rt { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 8px; padding: 2px 0; }
+.manager-page .mc-pvlist .mc-rt em, .manager-page .mc-pvlist .mc-rt i { font-style: normal; overflow: hidden; text-overflow: ellipsis; }
+.manager-page .mc-pvlist .mc-rt em { color: var(--muted); }
+.manager-page .mc-pvlist .mc-rt b { overflow: hidden; text-overflow: ellipsis; }
+.manager-page .mc-pvlist .mc-rt.bad, .manager-page .mc-pvlist .mc-rt.no i, .manager-page .mc-pvlist .mc-pvrow.bad { color: #c62828; }
+.manager-page .mc-pvlist .mc-rt.ok i { color: #1f7a4d; font-weight: 800; }
+.manager-page .mc-pvlist .mc-pvrow.warn { color: #9a5b00; }
+.manager-page .mc-pvlist .mc-pvnone { color: var(--muted); }
+/* Long card and tile names wrap instead of being cut off (Joe 10/10 at his window width). */
+.manager-page .mc-tile span, .manager-page .mc-tile i { white-space: normal; overflow-wrap: anywhere; }
+.manager-page .mc-acts { flex-wrap: wrap; }
+.manager-page .mc-btn { min-width: 0; }
+/* The Plant menu's section names are long: they wrap onto a second line. */
+.plant-page .sidemenu .side-sec-btn { white-space: normal; line-height: 1.2; }
 .manager-page .mc-pvnote { margin-top: auto; color: var(--muted); font-size: 14px; border-top: 1px dashed var(--line); padding-top: 8px; }
 .manager-page .mc-to { font-size: 13px; color: var(--muted); font-weight: 700; }
 .manager-page .mc-acts, .manager-page .mc-dacts { display: flex; gap: 8px; }
@@ -526,7 +545,7 @@
 .manager-page .mc-routes span { display: flex; justify-content: space-between; border-radius: 6px; padding: 7px 9px; font-weight: 800; font-size: 15px; }
 .manager-page .mc-routes span i { font-style: normal; font-size: 11px; align-self: center; }
 .manager-page .mc-routes .ok { background: #e2f4ea; color: #1f7a4d; } .manager-page .mc-routes .behind { background: #b42318; color: #fff; } .manager-page .mc-routes .no { background: #fde8e6; color: #b42318; }
-@media (max-width: 1500px) { .manager-page .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; align-content: start; } .manager-page .mc-card, .manager-page .mc-tiles { min-height: auto; } .manager-page .mc-report { grid-row: span 1; min-height: 360px; } .manager-page .mc-tile { min-height: 92px; } }
+@media (max-width: 1500px) { .manager-page .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; align-content: start; } .manager-page .mc-card, .manager-page .mc-tiles { min-height: auto; } .manager-page .mc-report { grid-row: 1 / span 3; min-height: 360px; } .manager-page .mc-tile { min-height: 92px; } }
 @media (max-width: 1100px) { @media (max-width: 760px) {
   .manager-page .head .badge-test span { display: none; }
   .manager-page .mc-shell { padding: 0 8px 8px; overflow: auto; }
