@@ -72,8 +72,21 @@
     const when = (at) => { const d = new Date(at); return isNaN(d) ? '' : d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
     const whereOf = (c) => c.route || (c.tab ? c.tab + ' ' + (c.rowId || '') : '');
 
+    // The same cell refused again and again (each retry of one save) is one line: how many times, first and last time.
+    // Checked marks every one of them.
+    function groups(list) {
+      const out = new Map();
+      list.forEach(c => {
+        const key = [whereOf(c), c.column || '', c.sheetValue, c.newValue, c.problem, c.by].map(String).join('\u0001');
+        const g = out.get(key);
+        if (g) { g.ids.push(c.id); g.first = c.at < g.first ? c.at : g.first; g.last = c.at > g.last ? c.at : g.last; }
+        else out.set(key, Object.assign({}, c, { ids: [c.id], first: c.at, last: c.at }));
+      });
+      return [...out.values()];
+    }
+
     function render() {
-      const shown = items.filter(c => !hidden.has(c.id)), edit = canSave(), lines = shown.map(c => Object.assign({}, c, { ids: [c.id], first: c.at, last: c.at }));
+      const shown = items.filter(c => !hidden.has(c.id)), edit = canSave(), lines = groups(shown);
       const rows = lines.map(c => '<tr>' +
         '<td>' + escapeHtml(when(c.last)) + (c.ids.length > 1 ? '<small class="cf-times" title="First ' + escapeHtml(when(c.first)) + '">' + c.ids.length + ' times since ' + escapeHtml(when(c.first)) + '</small>' : '') + '</td>' +
         '<td>' + escapeHtml(c.by) + '</td>' +
@@ -87,7 +100,7 @@
         rows.join('') || '<tr><td colspan="8" class="empty">No conflicts. Every save reached the sheet.</td></tr>';
       // The list reads the newest MAX: say so when there may be more.
       document.getElementById('count').textContent = !loaded ? '' : (items.length >= MAX ? MAX + '+ open (newest ' + MAX + ' shown)' : shown.length + ' open') +
-        '';
+        (lines.length < shown.length ? ' on ' + lines.length + (lines.length === 1 ? ' line' : ' lines') : '');
       fitToWindow(Math.max(lines.length, 1));
     }
 
