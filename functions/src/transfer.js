@@ -299,6 +299,9 @@ function parseLiveTab(tabName, values, lookups) {
     run.weekOrder = routeMaster && routeMaster.weekOrder !== undefined ? routeMaster.weekOrder : null;
     // Route Master's display_weekly_dispatch decides whether Weekly shows the run, as in the current app; blank falls back to the Live row.
     run.weeklyShowMaster = routeMaster && (routeMaster.displayWeekly === true || routeMaster.displayWeekly === false) ? routeMaster.displayWeekly : null;
+    // Where the Live row leaves a show flag or the load type blank, the current app reads Route Master's (udpoV780ResolveDisplayBase_).
+    run.masterShow = routeMaster ? { daily: routeMaster.displayDaily === undefined ? null : routeMaster.displayDaily, mobile: routeMaster.displayMobile === undefined ? null : routeMaster.displayMobile,
+      loadType: routeMaster.loadType || '' } : { daily: null, mobile: null, loadType: '' };
     run.days = {};
     L.DAYS.forEach(prefix => {
       const day = {};

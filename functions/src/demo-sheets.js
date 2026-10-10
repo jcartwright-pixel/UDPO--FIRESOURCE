@@ -39,6 +39,7 @@ function liveTab(weekStart, label, routes, options) {
     set('load_type', 'Case Loadout'); set('movement_type', 'COMPANY_ROUTE'); set('coverage_type', 'UNITED DAIRY');
     set('route_status', r.status || 'ACTIVE'); set('active', r.active === undefined ? 'TRUE' : r.active);
     set('display_daily_dispatch', r.showDaily === undefined ? 'TRUE' : r.showDaily); set('display_weekly_dispatch', 'TRUE');
+    set('display_mobile_route', r.showMobile === undefined ? 'TRUE' : r.showMobile);
     PREFIXES.forEach((p, i) => {
       const d = (r.days || {})[p];
       const delivery = addDays(weekStart, i);

@@ -175,3 +175,15 @@ test('unitLessor: the lease company from the fleet text, a short number when one
   assert.match(L.unitLessor(units, '876').why, /matches 223876, 123876/);
   assert.match(L.unitLessor(units, '999').why, /not on the fleet list/);
 });
+
+test('Daily and the phone follow the Live flag, and a blank Live flag falls back to Route Master like the current app', () => {
+  const show = (run) => L.liveFlagShown(run, 'displayDaily', 'daily');
+  assert.equal(show({ displayDaily: true, masterShow: { daily: false } }), true);
+  assert.equal(show({ displayDaily: false, masterShow: { daily: true } }), false);
+  assert.equal(show({ masterShow: { daily: true } }), true);
+  assert.equal(show({ masterShow: { daily: false } }), false);
+  assert.equal(show({ masterShow: { daily: null } }), false);
+  assert.equal(show({ displayDaily: true, routeStatus: 'INACTIVE' }), false);
+  assert.equal(show({ displayDaily: true, active: false }), false);
+  assert.equal(show({}), true);
+});
