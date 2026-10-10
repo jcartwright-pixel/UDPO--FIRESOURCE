@@ -41,12 +41,13 @@ const ICON = {
   star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
   road: '<path d="M8 3L4 21M16 3l4 18M12 4v3M12 10v3M12 16v3"/>',
   check: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 12l3 3 5-6"/>',
+  swap: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
   issue: '<path d="M4 20h16"/><path d="M6 20V9l6-5 6 5v11"/><path d="M12 10v4M12 16.5v.5"/>',
   alert: '<path d="M12 3l9 17H3z"/><path d="M12 10v4M12 17v.5"/>'
 };
 export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
-  ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Route Editor', 'routes.html', 'map']]],
+  ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
   ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
   ['Equipment', [['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin'], ['Garage Work Orders', CURRENT_APP + 'garage-station', 'wrench'], ['Fleet Service', CURRENT_APP + 'fleet-service', 'gear']]],
   ['Reports', [['Driver Scorecard', CURRENT_APP + 'driver-scorecard', 'star'], ['Over the Road', CURRENT_APP + 'over-the-road', 'road']]],

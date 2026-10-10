@@ -65,6 +65,9 @@ function masterCells(list, fields) {
   const spec = COLUMNS[list], cells = {};
   if (spec.passThrough) { Object.keys(fields || {}).forEach(k => { if (/^[a-z_]+$/.test(k) && k !== 'kind' && k !== spec.idColumn) cells[k] = fields[k] === null || fields[k] === undefined ? '' : String(fields[k]); }); return cells; }
   Object.keys(fields || {}).forEach(k => {
+    // A raw sheet column the app keeps as it is (drivers' <day>_available / <day>_assignments_json): 'cells.<column>'.
+    const raw = /^cells\.([a-z0-9_]+)$/.exec(k);
+    if (raw) { cells[raw[1]] = fields[k] === null || fields[k] === undefined ? '' : String(fields[k]); return; }
     const m = /^days\.([a-z]{3})\.(\w+)$/.exec(k);
     if (m && spec.days && spec.days[m[2]]) { cells[m[1] + '_' + spec.days[m[2]][0]] = cellValue(spec.days[m[2]][1], fields[k]); return; }
     if (k === 'days' && spec.days && fields.days && typeof fields.days === 'object') {

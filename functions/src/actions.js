@@ -51,7 +51,9 @@ const ACTIONS = Object.freeze({
   resetWeek: { roles: REORDER_ROLES, screen: 'weeklyDispatch' },
   saveRoute: { roles: REORDER_ROLES, screen: 'routes' },
   reorderRouteDay: { roles: REORDER_ROLES, screen: 'routes' },
-  updateIssue: { roles: SAVE_ROLES, screen: 'checkIns' }
+  updateIssue: { roles: SAVE_ROLES, screen: 'checkIns' },
+  setWeekReason: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
+  saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -176,6 +178,24 @@ function validate(input) {
   if (action === 'removeDrivers') {
     if (!Array.isArray(input.driverIds) || !input.driverIds.length || input.driverIds.length > 100) throw new SaveError('BAD_REQUEST', 'Pick the drivers to remove');
     out.driverIds = [...new Set(input.driverIds.map(id => text(id)).filter(Boolean))];
+    return out;
+  }
+  if (action === 'saveDriverTemplate') {
+    out.driverId = text(input.driverId);
+    if (!out.driverId) throw new SaveError('BAD_REQUEST', 'Pick the driver');
+    if (L.DAYS.indexOf(input.day) < 0) throw new SaveError('BAD_REQUEST', 'day must be sun..sat');
+    out.day = input.day;
+    out.status = text(input.status).toUpperCase();
+    if (['AVAILABLE', 'OFF', 'ASSIGNMENT'].indexOf(out.status) < 0) throw new SaveError('BAD_REQUEST', 'status must be AVAILABLE, OFF or ASSIGNMENT');
+    out.runIds = [...new Set((Array.isArray(input.runIds) ? input.runIds : []).map(id => text(id, 120)).filter(Boolean))].slice(0, 6);
+    if (out.status === 'ASSIGNMENT' && !out.runIds.length) throw new SaveError('BAD_REQUEST', 'Pick a run');
+    if (out.status !== 'ASSIGNMENT') out.runIds = [];
+    return out;
+  }
+  if (action === 'setWeekReason') {
+    out.weekStart = text(input.weekStart);
+    if (!L.isDateKey(out.weekStart)) throw new SaveError('BAD_REQUEST', 'weekStart must be yyyy-mm-dd');
+    out.reason = text(input.reason, 300);
     return out;
   }
   if (action === 'updateIssue') {
@@ -351,6 +371,8 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'removeDrivers') return removeDrivers(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriverException') return saveDriverException(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveVacation') return saveVacation(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'saveDriverTemplate') return saveDriverTemplate(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'publishWeek') return publishWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveRoute') return saveRoute(tx, db, req, email, stamp, logRef, mode);
@@ -376,7 +398,7 @@ async function applyAction(db, user, input, now) {
     Object.keys(after).forEach(k => { update['days.' + req.day + '.' + k] = after[k]; });
     // Any driver change marks the day as changed by hand (<day>_route_override), as the current app's driver saves do;
     // the Driver Assignment Board shows those days light blue.
-    const marks = req.action === 'assignDriver' ? { routeOverride: 'TRUE' } : {};
+    const marks = req.action === 'assignDriver' || req.action === 'setRuns' ? { routeOverride: 'TRUE' } : {};
     Object.keys(marks).forEach(k => { update['days.' + req.day + '.' + k] = marks[k]; });
     update['days.' + req.day + '.updatedAt'] = stamp;
     update['days.' + req.day + '.updatedBy'] = email;
@@ -731,6 +753,70 @@ async function publishWeek(tx, db, req, email, stamp, logRef, mode) {
   tx.update(ref, { publishedAt: stamp, publishedBy: email });
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before, after: { publishedAt: stamp, publishedBy: email }, result });
+  return result;
+}
+
+/*
+ * Driver Weekly Template (udpoV780DriverWeeklyTemplateSave_): one driver's normal day in Driver Master: Available, Off, or the
+ * runs they drive (more than one allowed). A run must be active in Route Master and run that day, and belongs to one driver a day.
+ * Then, like the current save (udpoV7267DriverMasterToLive_), the copied Live weeks from this week on take the new driver on
+ * those days, except days someone changed by hand (route_override).
+ */
+async function saveDriverTemplate(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection(C.drivers).doc(M.safeIdPart(req.driverId));
+  const snap = await tx.get(ref);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
+  const d = snap.data(), p = req.day, today = L.operatingDay(new Date(stamp));
+  const [routeSnap, driverSnap, runSnap] = await Promise.all([tx.get(db.collection(C.routes)), tx.get(db.collection(C.drivers)),
+    tx.get(db.collection(C.runs).where('weekStart', '>=', L.weekStart(today)))]);
+  const routes = {};
+  routeSnap.docs.forEach(s => { const r = s.data(); routes[r.id || s.id] = r; });
+  const assignments = req.runIds.map((runId, i) => {
+    const r = routes[runId];
+    if (!r || !L.masterActive(r)) throw new SaveError('NOT_FOUND', 'Run ' + runId + ' is not an active run in Route Master');
+    if (!(r.days && r.days[p] && r.days[p].active)) throw new SaveError('NOT_ALLOWED', r.route + ' ' + (r.run || '') + ' does not run on ' + L.DAY_NAMES[L.DAYS.indexOf(p)]);
+    driverSnap.docs.forEach(o => {
+      const other = o.data();
+      if (other.id === d.id) return;
+      let list = [];
+      try { list = JSON.parse((other.cells && other.cells[p + '_assignments_json']) || '[]'); } catch (e) { list = []; }
+      if ((Array.isArray(list) ? list : [list]).some(a => (typeof a === 'string' ? a : a && (a.runId || a.run_id)) === runId)) throw new SaveError('CHANGED', r.route + ' on ' + L.DAY_NAMES[L.DAYS.indexOf(p)] + ' is already ' + other.name + "'s run");
+    });
+    return { slot: i + 1, runId, routeId: r.routeId || '', status: 'ASSIGNMENT' };
+  });
+  const cells = { [p + '_available']: req.status === 'OFF' ? 'FALSE' : 'TRUE', [p + '_assignments_json']: JSON.stringify(assignments), [p + '_default_route_id']: assignments.length ? assignments[0].routeId : '' };
+  const before = {}, update = { testEdited: true, editedAt: stamp, editedBy: email }, fields = {};
+  Object.keys(cells).forEach(k => { before[k] = d.cells && d.cells[k] !== undefined ? d.cells[k] : null; update['cells.' + k] = cells[k]; fields['cells.' + k] = cells[k]; });
+  tx.update(ref, update);
+  queueMaster(tx, db, mode, req.requestId, '', ref, d.id, fields, false, stamp, email);
+  // The copied Live weeks from today on take the template on that day, unless the day was changed by hand.
+  const result = { ok: true, requestId: req.requestId, runs: [] }, mine = new Set(req.runIds), live = [];
+  runSnap.docs.forEach(s => {
+    const run = s.data(), day = run.days && run.days[p], date = L.addDays(run.weekStart, L.DAYS.indexOf(p));
+    if (!day || date < today || L.yes(day.routeOverride)) return;
+    let after = null;
+    if (mine.has(run.runId) && day.runs && day.driverId !== d.id) after = { driverId: d.id, driver: d.name };
+    else if (!mine.has(run.runId) && day.driverId === d.id) after = { driverId: '', driver: '' };
+    if (!after) return;
+    tx.update(s.ref, { ['days.' + p + '.driverId']: after.driverId, ['days.' + p + '.driver']: after.driver, rev: run.rev + 1, testEdited: true, editedAt: stamp });
+    if (mode.writeBack) queueSheetCells(tx, db, req.requestId, 't' + result.runs.length, run, s.id, p, after, stamp, email);
+    result.runs.push({ runDocId: s.id, rev: run.rev + 1 });
+    live.push(run.route + ' ' + date);
+  });
+  result.liveDays = live;
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: d.id, day: p, before, after: cells, liveDays: live, result });
+  return result;
+}
+
+// Route Week Override's reason for the week's changes (the current app keeps it with the week's overrides).
+async function setWeekReason(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection(C.weeks).doc(req.weekStart);
+  const snap = await tx.get(ref);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'The week of ' + req.weekStart + ' is not one of the copied Live weeks');
+  const before = { overrideReason: snap.data().overrideReason || '' }, after = { overrideReason: req.reason, overrideReasonBy: email, overrideReasonAt: stamp };
+  tx.update(ref, after);
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before, after, result });
   return result;
 }
 

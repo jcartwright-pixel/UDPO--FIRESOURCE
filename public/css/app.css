@@ -659,3 +659,32 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 /* Driver Assignment Board: a day changed by hand this week (route_override) is light blue, as in the current app. */
 .weekly-page .board td.b-extra, .weekly-page .board tr.relief td.b-extra { background: #d9ebfb !important; color: #000 !important; }
 .legend i.extra { background: #d9ebfb; border: 1px solid #9cc4ea; }
+/* Route Week Override (the current app's screen, look B): grid on the left, the week's changes on the right. */
+.routeweek-page .rw-shell { display: grid !important; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; padding: 0 16px 12px; }
+.routeweek-page .rw-grid { margin: 0; min-height: 0; overflow: auto; }
+.routeweek-page table.rw th small { display: block; font-size: 11px; font-weight: 600; opacity: .8; }
+.routeweek-page table.rw td { height: 38px; padding: 2px 4px; font-size: 14px; }
+.routeweek-page table.rw tr.first > td { border-top: 2px solid #c9d8e7; }
+.routeweek-page .rw-day { width: 94%; min-height: 28px; border: 0; border-radius: 13px; background: #e3f5ee; color: #0f7b5f; font: inherit; font-size: 12px; font-weight: 900; white-space: nowrap; cursor: pointer; }
+.routeweek-page .rw-day.off { background: #fde8e6; color: #c0392b; }
+.routeweek-page .rw-day.over { background: repeating-linear-gradient(135deg, #fff3dc 0 6px, #ffe6b3 6px 12px); color: #8a5a00; box-shadow: inset 0 0 0 2px #f2b632; }
+.routeweek-page .rw-day:disabled { cursor: default; }
+.routeweek-page .rw-side { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.routeweek-page .rw-week { display: flex; align-items: center; gap: 10px; }
+.routeweek-page .rw-week > div { flex: 1; text-align: center; }
+.routeweek-page .rw-week b { display: block; font-size: 20px; color: var(--ud-blue); }
+.routeweek-page .rw-week small { color: var(--muted); font-weight: 700; }
+.routeweek-page .rw-week button { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ud-blue); cursor: pointer; }
+.routeweek-page .rw-reason { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+.routeweek-page .rw-reason textarea { font: inherit; font-size: 15px; text-transform: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; resize: vertical; color: #12324f; }
+.routeweek-page .rw-counts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.routeweek-page .rw-counts div { background: #f4f8fb; border-radius: 10px; padding: 8px; text-align: center; }
+.routeweek-page .rw-counts b { display: block; font-size: 28px; color: #8a5a00; }
+.routeweek-page .rw-counts span { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+.routeweek-page .rw-filter { display: grid; grid-template-columns: 1fr 1fr; }
+.routeweek-page .rw-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.routeweek-page .rw-list > div { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 6px 8px; border-radius: 8px; background: #fbfcfd; border: 1px solid #edf1f5; }
+.routeweek-page .rw-list em { font-style: normal; font-weight: 900; }
+.routeweek-page .rw-list em.on { color: #0f7b5f; } .routeweek-page .rw-list em.off { color: #c0392b; }
+.routeweek-page .rw-list .empty { color: var(--muted); text-align: center; padding: 18px 0; border: 0; background: none; }
+@media (max-width: 1500px) { .routeweek-page .rw-shell { grid-template-columns: minmax(0, 1fr) 290px; } .routeweek-page .rw-day { font-size: 10px; } }

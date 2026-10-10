@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Route Week Override · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill routeweek-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Route Week Override</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Route Week Override</h1><small>Which days each route runs this one week; the normal week stays in Route Master</small></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Each click saves at once</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view rw-shell">
+      <div class="sheet rw-grid scroll-list">
+        <table class="rw">
+          <colgroup><col style="width:8%"><col style="width:20%"><col span="7" style="width:10.28%"></colgroup>
+          <thead><tr id="heads"></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <aside class="rw-side">
+        <div class="rw-week">
+          <button type="button" id="prev" aria-label="Previous week">&#9664;</button>
+          <div><b id="week-label">-</b><small id="week-kind"></small></div>
+          <button type="button" id="next" aria-label="Next week">&#9654;</button>
+        </div>
+        <label class="rw-reason">Reason for this week's changes<textarea id="reason" maxlength="300" rows="2" placeholder="Holiday week, plant shutdown, customer closed..."></textarea></label>
+        <div class="rw-counts"><div><b id="n-over">0</b><span>Overrides this week</span></div><div><b id="n-routes">0</b><span>Routes affected</span></div></div>
+        <div class="tabs rw-filter" role="tablist">
+          <button type="button" role="tab" data-show="all" aria-selected="true">All Routes</button>
+          <button type="button" role="tab" data-show="changed" aria-selected="false">Changed Only</button>
+        </div>
+        <div class="rw-list" id="change-list"></div>
+        <button type="button" class="warn" id="reset">Reset Week to Normal</button>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError, save } from './js/app.js';
+    import { lists, watchLists, canSave, saveRunChange, forScreen, modeLabel } from './js/edit.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    forScreen('weeklyDispatch');
+
+    const L = window.UDLogic;
+    const NAME = (p) => L.DAY_NAMES[L.DAYS.indexOf(p)];
+    let db = null, week = '', weeks = [], runs = [], routes = {}, weekDoc = null, show = 'all', stopRuns = null, stopWeek = null, typing = false;
+    const getRuns = () => runs;
+    // The normal week: Route Master's day switches for the run (routes/{runId}).
+    const normal = (r) => { const m = routes[r.runId]; return m && m.days ? m.days : null; };
+    const normalOn = (r, p) => { const n = normal(r); return n ? !!(n[p] && n[p].active) : !!(r.days[p] && r.days[p].runs); };
+    const isOver = (r, p) => !!(r.days[p] && r.days[p].runs) !== normalOn(r, p);
+    const overRow = (r) => L.DAYS.some(p => isOver(r, p));
+
+    function shown() {
+      // Every run Weekly shows for the week, in Weekly's order.
+      const ids = new Set(L.weeklyRows(runs, week).map(x => x.runDocId));
+      return runs.filter(r => ids.has(r.id)).sort((a, b) => (a.weekOrder ?? 999999) - (b.weekOrder ?? 999999) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
+    }
+
+    function render() {
+      const edit = canSave(), list = shown(), over = list.filter(overRow);
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      const live = lists.app.liveWeeks || {};
+      document.getElementById('week-label').textContent = week ? 'Week of ' + shortDate(week) : '-';
+      document.getElementById('week-kind').textContent = week === live.current ? 'This week' : week === live.next ? 'Next week' : week === live.previous ? 'Last week' : '';
+      document.getElementById('prev').disabled = weeks.indexOf(week) <= 0;
+      document.getElementById('next').disabled = weeks.indexOf(week) >= weeks.length - 1;
+      document.getElementById('heads').innerHTML = '<th>Route</th><th>Load / Trip</th>' + L.DAYS.map((p, i) => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '<small>' + shortDate(L.addDays(week, i)).replace(/\/\d{4}$/, '') + ' · ' + list.filter(r => r.days[p] && r.days[p].runs).length + ' run</small></th>').join('');
+      const rows = show === 'changed' ? over : list;
+      let prior = '';
+      document.getElementById('rows').innerHTML = rows.map(r => {
+        const first = r.route !== prior; prior = r.route;
+        return '<tr data-id="' + escapeHtml(r.id) + '"' + (first ? ' class="first"' : '') + '><td class="strong">' + (first ? escapeHtml(r.route) : '') + '</td><td>' + escapeHtml(r.run || r.routeName || '') + '</td>' +
+          L.DAYS.map(p => { const on = !!(r.days[p] && r.days[p].runs), o = isOver(r, p);
+            return '<td><button type="button" class="rw-day' + (on ? '' : ' off') + (o ? ' over' : '') + '" data-day="' + p + '"' + (edit ? '' : ' disabled') + ' title="' + (o ? 'Changed from the normal week (normal: ' + (normalOn(r, p) ? 'runs' : 'does not run') + ')' : 'Normal week') + '">' + (on ? '&#10003; RUNS' : '&#10005; DOES NOT RUN') + '</button></td>'; }).join('') + '</tr>';
+      }).join('') || '<tr><td colspan="9" class="empty">' + (show === 'changed' ? 'Every route runs its normal week.' : 'No routes for this week.') + '</td></tr>';
+      document.getElementById('n-over').textContent = over.reduce((a, r) => a + L.DAYS.filter(p => isOver(r, p)).length, 0);
+      document.getElementById('n-routes').textContent = new Set(over.map(r => r.route)).size;
+      document.getElementById('change-list').innerHTML = over.map(r => L.DAYS.filter(p => isOver(r, p)).map(p => { const on = r.days[p].runs;
+        return '<div><span><b>' + escapeHtml(r.route) + '</b> &middot; ' + escapeHtml(r.run || '') + '</span><span>' + NAME(p).slice(0, 3) + ' <em class="' + (on ? 'on' : 'off') + '">' + (on ? 'RUNS' : 'DOES NOT RUN') + '</em></span></div>'; }).join('')).join('') || '<div class="empty">Every route runs its normal week.</div>';
+      document.querySelectorAll('[data-show]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.show === show)));
+      const box = document.getElementById('reason');
+      box.disabled = !edit;
+      if (!typing) box.value = weekDoc && weekDoc.overrideReason || '';
+      document.getElementById('reset').disabled = !edit || !over.length;
+    }
+
+    function toggle(r, p) {
+      const on = !(r.days[p] && r.days[p].runs);
+      return saveRunChange(getRuns, r.id, p, 'setRuns', { runs: on }, x => { x.runs = on; x.routeOverride = 'TRUE'; }, render);
+    }
+
+    document.getElementById('rows').addEventListener('click', e => {
+      const b = e.target.closest('button[data-day]');
+      if (!b) return;
+      const r = runs.find(x => x.id === b.closest('tr').dataset.id);
+      if (r) toggle(r, b.dataset.day);
+    });
+    document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { show = b.dataset.show; render(); });
+    // Reset Week to Normal: every changed day goes back to Route Master's normal week, one save each.
+    document.getElementById('reset').onclick = async () => {
+      const work = [];
+      shown().forEach(r => L.DAYS.forEach(p => { if (isOver(r, p)) work.push([r, p]); }));
+      for (const [r, p] of work) await toggle(r, p);
+    };
+    const box = document.getElementById('reason');
+    box.addEventListener('focus', () => { typing = true; });
+    box.addEventListener('blur', async () => {
+      typing = false;
+      const was = weekDoc && weekDoc.overrideReason || '', now = box.value.trim();
+      if (now === was) return;
+      if (weekDoc) weekDoc.overrideReason = now;
+      try { await save('setWeekReason', { weekStart: week, reason: now }); } catch (e) { if (weekDoc) weekDoc.overrideReason = was; render(); showError(e.message || String(e)); }
+    });
+    function setWeek(w) {
+      week = w;
+      if (stopRuns) stopRuns();
+      if (stopWeek) stopWeek();
+      stopRuns = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read the week: ' + e.message));
+      stopWeek = onSnapshot(doc(db, 'weeks', week), s => { weekDoc = s.exists() ? s.data() : null; render(); });
+      render();
+    }
+    document.getElementById('prev').onclick = () => { const i = weeks.indexOf(week); if (i > 0) setWeek(weeks[i - 1]); };
+    document.getElementById('next').onclick = () => { const i = weeks.indexOf(week); if (i < weeks.length - 1) setWeek(weeks[i + 1]); };
+
+    requireSignIn(async (user) => {
+      db = (await start()).db;
+      watchLists(user, () => {
+        const live = lists.app.liveWeeks || {}, list = [live.previous, live.current, live.next].filter(Boolean);
+        if (!list.length && !week) setWeek(L.weekStart(L.operatingDay(new Date())));
+        if (list.length && list.join() !== weeks.join()) { weeks = list; if (!week || weeks.indexOf(week) < 0) setWeek(live.next || live.current || L.weekStart(L.operatingDay(new Date()))); }
+        render();
+      });
+      onSnapshot(collection(db, 'routes'), s => { routes = {}; s.docs.forEach(d => { const r = d.data(); routes[r.id || d.id] = r; }); render(); });
+    });
+  </script>
+</body>
+</html>
