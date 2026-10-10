@@ -441,23 +441,35 @@ export function showError(text) {
 export function fitToWindow(lineCount, gap) {
   const sheet = document.querySelector('.sheet');
   if (!sheet) return;
+  // Joe 10/10: rows never shrink below readable print (16px text). A busy day scrolls inside the table instead.
+  sheet.classList.remove('fit-scroll');
+  sheet.style.maxHeight = '';
   const top = sheet.getBoundingClientRect().top;
   const footer = document.querySelector('.footer');
+  const footerH = footer ? footer.offsetHeight : 0;
   // gap: space between rows (Daily's card rows), taken from the room first.
-  const room = window.innerHeight - top - (footer ? footer.offsetHeight : 0) - 8 - (gap || 0) * (Math.max(lineCount, 1) + 2);
+  const room = window.innerHeight - top - footerH - 8 - (gap || 0) * (Math.max(lineCount, 1) + 2);
   const lines = Math.max(lineCount, 1) + 1.25; // the header row is a little taller than a line
   const apply = (row) => {
     document.documentElement.style.setProperty('--row', row + 'px');
-    document.documentElement.style.setProperty('--font', Math.max(9, Math.min(16, Math.round(row * 0.5))) + 'px');
+    document.documentElement.style.setProperty('--font', Math.max(FIT_FONT_MIN, Math.min(16, Math.round(row * 0.5))) + 'px');
     // Tall enough rows show a second line (the Weekly grid puts truck / trailer under the driver).
     document.body.classList.toggle('roomy', row >= 34);
   };
-  let row = Math.max(10, Math.min(44, Math.floor(room / lines)));
+  let row = Math.max(FIT_ROW_MIN, Math.min(44, Math.floor(room / lines)));
   apply(row);
   // Borders and the RUNS tags add a little to each line; step down until the page truly fits.
-  const root = document.scrollingElement;
-  while (row > 10 && root.scrollHeight > window.innerHeight) apply(--row);
+  // The page scrolls in the side-menu shell's content box when there is one, else the window.
+  const box = sheet.closest('.side-main') || document.scrollingElement;
+  const over = () => box.scrollHeight > box.clientHeight + 1 || document.scrollingElement.scrollHeight > window.innerHeight;
+  while (row > FIT_ROW_MIN && over()) apply(--row);
+  if (over()) {
+    // Still too many lines at the smallest readable size: the table scrolls, its header stays put.
+    sheet.classList.add('fit-scroll');
+    sheet.style.maxHeight = Math.max(160, Math.min(window.innerHeight, box.getBoundingClientRect().bottom || window.innerHeight) - top - footerH - 8) + 'px';
+  }
 }
+const FIT_ROW_MIN = 32, FIT_FONT_MIN = 16;
 
 export function escapeHtml(value) {
   return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
