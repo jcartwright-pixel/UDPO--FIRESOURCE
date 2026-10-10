@@ -24,13 +24,16 @@
     </div>
     <div class="head">
       <div class="title"><span class="eyebrow">Plant Operations Scheduler · <b id="lane-name">Shipping</b></span><h1 id="range">Plant Operations Scheduler</h1></div>
-      <div class="tabs lane" role="group" aria-label="Shipping or Receiving"><button type="button" data-lane="SHIPPING">Shipping</button><button type="button" data-lane="RECEIVING">Receiving</button></div>
       <div class="hstats" id="hstats"></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
       <div class="sc-ctrl">
+        <!-- Joe 10/10: the buttons first, the same size, then the filters, all on one line. -->
+        <button type="button" class="sc-btn primary" id="add">＋ Add Load</button>
+        <button type="button" class="sc-btn" id="print">Print Monthly</button>
+        <div class="tabs lane" role="group" aria-label="Shipping or Receiving"><button type="button" data-lane="SHIPPING">Shipping</button><button type="button" data-lane="RECEIVING">Receiving</button></div>
         <div class="tabs" id="views" role="tablist" aria-label="Schedule view"><button type="button" data-view="day">Day</button><button type="button" data-view="week">Week</button><button type="button" data-view="month">Month</button></div>
         <div class="stepper">
           <button type="button" id="prev" aria-label="Previous" title="Previous">&#9664;</button>
@@ -40,8 +43,6 @@
         <div class="stepper"><input id="pick" type="date" aria-label="Schedule date"></div>
         <span class="sc-grow"></span>
         <span class="sc-key"><i></i>Holiday</span>
-        <button type="button" class="sc-btn" id="print">Print Monthly</button>
-        <button type="button" class="sc-btn primary" id="add">＋ Add Load</button>
       </div>
       <div class="sc-body" id="body"></div>
     </div>
