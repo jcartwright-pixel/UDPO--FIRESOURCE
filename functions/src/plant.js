@@ -646,6 +646,36 @@ async function saveShiftNote(tx, db, req, email, stamp, logRef, mode, SaveError)
   return result;
 }
 
-module.exports = { validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+/* ---------- Cooler Temperatures ---------- */
+
+// saveTemperatureCheck: a manual reading for one location, as desktopUiSavePlantTemperatureCheckCurrentRoutedV787_.
+function validateTemperature(input, SaveError) {
+  const out = { locationId: text(input.locationId).slice(0, 120), notes: text(input.notes).slice(0, 800) };
+  if (!out.locationId) throw new SaveError('BAD_REQUEST', 'Temperature location is not configured for this plant.');
+  const manual = text(input.manualTemperature);
+  if (manual === '' || !isFinite(Number(manual))) throw new SaveError('BAD_REQUEST', 'Enter a valid manual temperature before saving.');
+  out.manualTemperature = Number(manual);
+  return out;
+}
+
+async function saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const got = await tx.get(db.collection('plantSetup').doc(docId(req.locationId)));
+  const d = got.exists ? got.data() : null;
+  if (!d || d.type !== 'TEMPERATURE_CHECK_LOCATION' || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Temperature location is not configured for this plant.');
+  const loc = R.tempLocations([d])[0], now = new Date(stamp), day = L.operatingDay(now);
+  const recent = (await tx.get(db.collection('plantJournal').where('date', 'in', [L.addDays(day, -1), day]))).docs.map(x => x.data());
+  const left = R.tempLockLeft(recent, loc, now.getTime());
+  if (left) throw new SaveError('CONFLICT', loc.location + ' was already checked. It can be checked again in ' + left + ' minutes.');
+  const status = R.tempStatus(loc, req.manualTemperature);
+  const payload = { locationId: loc.locationId, location: loc.location, manualTemperature: req.manualTemperature, notes: req.notes, status, sensorId: loc.sensorId, sensorTemperature: '', batteryLevel: '', source: 'PLANT TEMPERATURE MANUAL CHECK' };
+  const id = R.TEMP_TYPE + '_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+  tx.set(db.collection('plantJournal').doc(id), { recordId: 'TEMP-' + req.requestId.slice(0, 40), type: R.TEMP_TYPE, date: day, status, area: loc.location, temperature: String(req.manualTemperature),
+    notes: req.notes, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  const result = { ok: true, requestId: req.requestId, recordId: 'TEMP-' + req.requestId.slice(0, 40), locationId: loc.locationId, status, recordedAt: stamp, message: loc.location + ' temperature recorded. This location is locked for 2 hours.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, locationId: loc.locationId, after: payload, result });
+  return result;
+}
+
+module.exports = { validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

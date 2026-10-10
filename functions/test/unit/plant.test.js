@@ -252,3 +252,22 @@ test('Shift Notes: shift by New York hour, the 24-hour log with reviews under th
   assert.deepEqual([ok.type, ok.equipment, ok.shift, ok.followUpStatus], ['Breakdown', 'Palletizer', 'FIRST SHIFT', 'MONITOR']);
   assert.equal(P.validateShiftNote({ values: { Entry: 'y'.repeat(900), ParentId: 'SHIFT-1' } }, SaveError).entry.length, 500);
 });
+
+test('Temperatures: locations in view order with their limits, HIGH / LOW / RECORDED, the 2-hour lock, and the save checks', () => {
+  const sheets = require('../fixtures/plant-demo').plantSheets();
+  const setup = Object.values(P.parseSetup(sheets["'PLANT_OPERATIONS_MASTER'"]));
+  assert.deepEqual(R.tempLocations(setup).map(l => [l.location, l.lowLimit, l.highLimit]), [['Cooler North', 33, 41], ['Cooler Middle', '', '']]);
+  const north = R.tempLocations(setup)[0];
+  assert.deepEqual(['45', '30', '38', 'x'].map(t => R.tempStatus(north, t)), ['HIGH', 'LOW', 'RECORDED', '']);
+  const reading = (at, temp, status) => ({ type: 'PLANT_TEMPERATURE_CHECK', recordId: 'T' + at, recordedAt: at, recordedBy: 'sup@uniteddairy.com', payload: { locationId: 'ut_temp_cooler_north', location: 'Cooler North', manualTemperature: temp, status } });
+  const journal = [reading('2026-10-08T17:00:00Z', 45, 'HIGH'), reading('2026-10-08T19:30:00Z', 38, 'RECORDED'), reading('2026-10-07T10:00:00Z', 36, 'RECORDED')];
+  const now = Date.parse('2026-10-08T20:00:00Z');
+  const rows = R.tempRows(setup, journal, now);
+  assert.deepEqual([rows[0].status, rows[0].lastManualTemperature, rows[0].lastStatus, rows[0].locked, rows[0].minutesUntilDue], ['MANUAL ONLY', 38, 'RECORDED', true, 90]);
+  assert.deepEqual([rows[1].locked, rows[1].lastCheckedAt], [false, '']);
+  assert.deepEqual(R.tempHistory(journal, now).map(h => h.manualTemperature), [38, 45]);
+  assert.equal(R.tempLockLeft(journal, north, Date.parse('2026-10-08T21:31:00Z')), 0);
+  assert.throws(() => P.validateTemperature({ locationId: 'ut_temp_cooler_north', manualTemperature: 'cold' }, SaveError), /Enter a valid manual temperature/);
+  assert.throws(() => P.validateTemperature({ manualTemperature: '38' }, SaveError), /not configured/);
+  assert.equal(P.validateTemperature({ locationId: 'ut_temp_cooler_north', manualTemperature: ' 38.5 ' }, SaveError).manualTemperature, 38.5);
+});

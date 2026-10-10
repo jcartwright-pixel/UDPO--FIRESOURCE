@@ -32,6 +32,13 @@
  *   - an entry has a type, equipment / area, shift, reading time, what happened, next steps and a follow-up status;
  *   - a review note hangs under its entry and the entry's status is its newest review's; the log shows the last 24 hours;
  *   - the shift by the hour: 6 AM to 2:59 PM first, 3 PM to 11:59 PM second, midnight to 5:59 AM third.
+ *
+ * And Cooler Temperatures' (Plant Temperatures & Coolers, 025_V730_PlantTemperatureChecks.gs):
+ *   - the locations are the active TEMPERATURE_CHECK_LOCATION rows of PLANT_OPERATIONS_MASTER, in view order, with the
+ *     sensor id and low / high limits from days_json;
+ *   - a manual reading is HIGH above the high limit, LOW below the low limit, else RECORDED; a location is locked for
+ *     2 hours after its last manual reading; a location with no sensor reading shows MANUAL ONLY;
+ *   - the 24-hour history lists every reading, newest first.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -390,6 +397,51 @@
     });
   }
 
+  /* ---------- Cooler Temperatures ---------- */
+  var TEMP_TYPE = 'PLANT_TEMPERATURE_CHECK', TEMP_LOCK_MINUTES = 120;
+  function limit(v) { return v === '' || v === null || v === undefined || !isFinite(Number(v)) ? '' : Number(v); }
+  function tempLocations(setup) {
+    return (setup || []).filter(function (r) { return r.type === 'TEMPERATURE_CHECK_LOCATION' && (r.status || 'ACTIVE') === 'ACTIVE'; }).map(function (r) {
+      var s = r.settings || {};
+      return { locationId: r.operationId, location: text(r.name), viewSequence: Number(r.viewSequence) || 999999, sensorId: text(s.sensorId || s.mocreoSensorId), sensorName: text(s.sensorName),
+        lowLimit: limit(s.lowLimit), highLimit: limit(s.highLimit), staleMinutes: Number(s.staleMinutes) || 30 };
+    }).sort(function (a, b) { return a.viewSequence - b.viewSequence || a.location.localeCompare(b.location); });
+  }
+  function tempStatus(loc, reading) {
+    var t = Number(reading);
+    if (!isFinite(t)) return '';
+    return loc.highLimit !== '' && t > loc.highLimit ? 'HIGH' : loc.lowLimit !== '' && t < loc.lowLimit ? 'LOW' : 'RECORDED';
+  }
+  function tempReadings(journal) {
+    return (journal || []).filter(function (d) { return text(d.type).toUpperCase() === TEMP_TYPE; }).map(function (d) {
+      var p = payloadOf(d);
+      return { recordId: text(d.recordId), locationId: text(p.locationId), location: text(p.location), manualTemperature: p.manualTemperature === undefined || p.manualTemperature === null ? '' : p.manualTemperature,
+        sensorTemperature: p.sensorTemperature === undefined || p.sensorTemperature === null ? '' : p.sensorTemperature, batteryLevel: p.batteryLevel === undefined || p.batteryLevel === null ? '' : p.batteryLevel,
+        status: text(p.status || d.status).toUpperCase(), notes: text(p.notes !== undefined ? p.notes : d.notes), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy) };
+    }).sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
+  }
+  function tempKey(v) { return text(v).toUpperCase(); }
+  // Minutes left on a location's 2-hour lock (0 = it can be read again).
+  function tempLockLeft(journal, loc, nowMs) {
+    var last = tempReadings(journal).filter(function (r) { return r.manualTemperature !== '' && (tempKey(r.locationId) === tempKey(loc.locationId) || (!r.locationId && tempKey(r.location) === tempKey(loc.location))); })[0];
+    if (!last) return 0;
+    var age = (nowMs - when(last.recordedAt)) / 60000;
+    return age < TEMP_LOCK_MINUTES ? Math.ceil(TEMP_LOCK_MINUTES - age) : 0;
+  }
+  // The Current table: one row per location with its last manual reading and lock.
+  function tempRows(setup, journal, nowMs) {
+    var readings = tempReadings(journal);
+    return tempLocations(setup).map(function (loc) {
+      var last = readings.filter(function (r) { return r.manualTemperature !== '' && (tempKey(r.locationId) === tempKey(loc.locationId) || (!r.locationId && tempKey(r.location) === tempKey(loc.location))); })[0] || null;
+      var left = tempLockLeft(journal, loc, nowMs);
+      return Object.assign({}, loc, { sensorTemp: '', batteryLevel: '', sensorLastReadingAt: '', status: 'MANUAL ONLY', lastCheckedAt: last ? last.recordedAt : '', lastCheckedBy: last ? last.recordedBy : '',
+        lastManualTemperature: last ? last.manualTemperature : '', lastStatus: last ? last.status : '', locked: left > 0, minutesUntilDue: left });
+    });
+  }
+  function tempHistory(journal, nowMs) {
+    return tempReadings(journal).filter(function (r) { var t = when(r.recordedAt); return !t || t >= nowMs - 86400000; });
+  }
+
   return { unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
@@ -397,5 +449,6 @@
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
-    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog };
+    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
+    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory };
 });
