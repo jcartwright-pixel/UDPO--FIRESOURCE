@@ -102,6 +102,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await admin.waitForFunction(() => document.querySelectorAll('#rows tr').length > 100);
     await admin.fill('#find', 'jersey 2%');
     await admin.waitForFunction(() => document.querySelectorAll('#rows input[data-k="name"]').length >= 2 && [...document.querySelectorAll('#rows input[data-k="name"]')].every(i => /JERSEY 2%/i.test(i.value)));
+    assert.match(await admin.textContent('#rows tr:first-child td.pm-check'), /Check SKU · also GV 2% Gallon/, 'a SKU on two products is marked to check');
     await fits(admin, 'Machine Products 1920');
     await shots(admin, 'machine-products', 1920);
     await admin.fill('#find', '');

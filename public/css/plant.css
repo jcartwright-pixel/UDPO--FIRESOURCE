@@ -675,3 +675,5 @@
 .products-page .pm-remove { height: 38px; width: 100%; border: 1px solid #e3b4b4; border-radius: 8px; background: #fff; color: #a32020; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
 .products-page #find { height: 40px; min-width: 240px; border: 1px solid #b8cadb; border-radius: 9px; padding: 0 12px; font: inherit; font-size: 16px; }
 .products-page .pm-table td:first-child input { text-align: left; }
+.products-page .pm-check input { border-color: #d99a1e; background: #fff8e6; }
+.products-page .pm-check small { display: block; margin-top: 2px; font-size: 12px; font-weight: 800; color: #9a5b00; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

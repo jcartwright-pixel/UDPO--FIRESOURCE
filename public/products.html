@@ -75,14 +75,20 @@
       const all = machines(), line = current(), ck = canSave();
       if (line) chosen = line.operationId;
       const total = all.reduce((n, l) => n + listOf(l.operationId).length, 0);
-      document.getElementById('hstats').innerHTML = [['Machines', all.length], ['Products', total]].map(([l, n]) => '<div><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      // Joe 10/10: the product name is what counts; some RedZone SKUs are wrong. A SKU given to more than one product is marked
+      // to check (GV and Jersey both on 280305, for one), and the name is still what Quality saves.
+      const bySku = {};
+      all.forEach(l => listOf(l.operationId).forEach(p => { const k = String(p.sku || '').trim(); if (k && p.name) (bySku[k] = bySku[k] || new Set()).add(p.name); }));
+      const shared = (p) => { const k = String(p.sku || '').trim(), set = k && bySku[k]; return set && set.size > 1 ? [...set].filter(n => n !== p.name) : null; };
+      const toCheck = Object.values(bySku).filter(x => x.size > 1).length;
+      document.getElementById('hstats').innerHTML = [['Machines', all.length, ''], ['Products', total, ''], ['SKUs to check', toCheck, toCheck ? 'warn' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.getElementById('lines').innerHTML = all.map(l => '<button type="button" data-line="' + escapeHtml(l.operationId) + '" class="' + (line && l.operationId === line.operationId ? 'active' : '') + '"><span>' + escapeHtml(l.name) + '</span><b>' + listOf(l.operationId).length + '</b></button>').join('') ||
         '<p class="empty">No machines are set up for this plant.</p>';
       ['add', 'reset'].forEach(id => { document.getElementById(id).disabled = !ck || !line; });
       document.getElementById('reset').textContent = armed === chosen ? 'Press again' : 'RedZone List';
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
-      document.getElementById('foot').textContent = (ck ? 'Each box saves as you leave it. These are the choices in the Product drop-down on Quality Checks for this machine; Quality Checks also keeps "Other (type it)".' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
+      document.getElementById('foot').textContent = (ck ? 'Each box saves as you leave it. These are the choices in the Product drop-down on Quality Checks for this machine; Quality Checks also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
       if (!line) { document.getElementById('rows').innerHTML = ''; return; }
       const c = changed[line.operationId];
       document.getElementById('form-title').textContent = line.name + ' Products';
@@ -90,9 +96,9 @@
       // Not drawn again while someone types in the list.
       if (force === 'keep' || (!force && document.getElementById('rows').contains(document.activeElement))) return;
       const dis = ck ? '' : ' disabled', q = find.trim().toUpperCase();
-      const cell = (i, k, v, ph) => '<td><input data-i="' + i + '" data-k="' + k + '" value="' + escapeHtml(v || '') + '" placeholder="' + ph + '" maxlength="120"' + dis + '></td>';
+      const cell = (i, k, v, ph, also) => '<td' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><input data-i="' + i + '" data-k="' + k + '" value="' + escapeHtml(v || '') + '" placeholder="' + ph + '" maxlength="120"' + dis + '>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
       const rows = listOf(line.operationId).map((p, i) => [p, i]).filter(([p]) => !q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0);
-      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr>' + cell(i, 'name', p.name, 'Product name') + cell(i, 'sku', p.sku, 'SKU') + cell(i, 'mfgType', p.mfgType, 'Type') + cell(i, 'productGroup', p.productGroup, 'Group') +
+      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr>' + cell(i, 'name', p.name, 'Product name') + cell(i, 'sku', p.sku, 'SKU', shared(p)) + cell(i, 'mfgType', p.mfgType, 'Type') + cell(i, 'productGroup', p.productGroup, 'Group') +
         '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + i + '">' + (armed === line.operationId + '|' + i ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
         '<tr><td colspan="5" class="empty">' + (q ? 'No product matches ' + escapeHtml(find) + '.' : 'No products for this machine. Add Product puts one in.') + '</td></tr>';
     }
