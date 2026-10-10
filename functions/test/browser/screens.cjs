@@ -651,18 +651,50 @@ async function noScroll(page) {
     assert.deepEqual(fs2.errors, []);
     await fs2.close();
     results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
-    // Joe 10/10 picked mock-up B: one row per unit with PM / Reefer, DOT and Plates side by side, units that need something first.
-    const fsB = await openPage(browser, 1920, 950, '/fleet.html?testEmail=manager.test@uniteddairy.com');
-    await fsB.waitForSelector('table.fs-grid tbody tr');
-    assert.deepEqual(await fsB.$$eval('table.fs-grid thead th', t => t.map(x => x.textContent)), ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', '']);
-    const fsRows = await fsB.$$eval('table.fs-grid tbody tr[data-unit]', r => r.map(x => [x.dataset.unit, x.dataset.worst]));
+    // Joe 10/10 03:56 picked mock-up A: one row per unit with PM / Reefer, DOT and Plates side by side, the miles or hours now and
+    // the unit's status, units that need something first; the buttons and the filter on one line.
+    // Five owned units with service dates around today, and one leased trailer that must stay off the list.
+    const dayKey = (n) => { const d = new Date(Date.now() + n * 86400000); return d.toISOString().slice(0, 10); };
+    const fsUnits = [['223801', 'TRUCK'], ['223802', 'TRUCK'], ['T-801', 'TRAILER'], ['T-802', 'TRAILER'], ['T-803', 'TRAILER'], ['T-899', 'TRAILER']];
+    for (const [unit, type] of fsUnits) {
+      await db().collection('equipment').doc('veh_fs_' + unit).set({ id: 'veh_fs_' + unit, unit, type, status: 'ACTIVE', facilityId: 'fac_uniontown', notes: unit === 'T-899' ? 'External Fleet: 2020 | GREAT DANE | Lease: PENSKE' : '' });
+    }
+    const fsSetup = { 223801: { last_service_miles: '100000', dot_due: dayKey(90), plate_expires: dayKey(260) }, 223802: { last_service_miles: '100000', dot_due: dayKey(200), plate_expires: dayKey(260) },
+      'T-801': { last_service_date: dayKey(-160), dot_due: dayKey(125), plate_expires: dayKey(264) }, 'T-802': { last_service_date: dayKey(-20), dot_due: dayKey(-8), plate_expires: dayKey(83) },
+      'T-803': { last_service_date: dayKey(-85), dot_due: dayKey(19), plate_expires: dayKey(22) }, 'T-899': { last_service_date: dayKey(-200), dot_due: dayKey(-30) } };
+    for (const unit of Object.keys(fsSetup)) await db().collection('fleetSetup').doc(unit).set(Object.assign({ unit }, fsSetup[unit]));
+    await db().collection('odometers').doc('fs_223801').set({ unit: '223801', miles: 116250, date: dayKey(-1), at: dayKey(-1) + 'T12:00:00Z' });
+    await db().collection('odometers').doc('fs_223802').set({ unit: '223802', miles: 108400, date: dayKey(-1), at: dayKey(-1) + 'T12:00:00Z' });
+    const fsA = await openPage(browser, 1920, 950, '/fleet.html?testEmail=manager.test@uniteddairy.com');
+    await fsA.waitForSelector('table.fs-grid tbody tr[data-unit="T-803"]');
+    assert.deepEqual(await fsA.$$eval('table.fs-grid thead th', t => t.map(x => x.textContent)), ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / Hours Now', 'Status', '']);
+    const fsRows = await fsA.$$eval('table.fs-grid tbody tr[data-unit]', r => r.map(x => [x.dataset.unit, x.dataset.worst, x.cells[6].textContent]));
     assert.equal(new Set(fsRows.map(r => r[0])).size, fsRows.length, 'one row per unit');
+    assert.equal(fsRows.some(r => r[0] === 'T-899'), false, 'a leased trailer is not on the list');
+    assert.deepEqual(fsRows.filter(r => /^(2238|T-8)/.test(r[0])).map(r => r[0]).sort(), ['223801', '223802', 'T-801', 'T-802', 'T-803']);
     const rank = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
     assert.ok(fsRows.every((r, i) => i === 0 || rank[fsRows[i - 1][1]] <= rank[r[1]]), 'units that need something come first: ' + JSON.stringify(fsRows.slice(0, 8)));
-    assert.match(await fsB.textContent('.fs-legend em'), /of \d+ units need something/);
-    assert.deepEqual(fsB.errors, []);
-    await fsB.close();
-    results.push('Fleet Service (mock-up B): one row per unit, PM / Reefer, DOT and Plates side by side, units that need something first');
+    const word = { OVERDUE: 'Overdue', AT_GARAGE: 'At garage', DUE_SOON: 'Due soon', NO_MILES: 'No miles yet', SET_UP: 'Needs start date', OK: 'OK' };
+    assert.ok(fsRows.every(r => r[2] === word[r[1]]), 'the status column says the unit\'s worst state');
+    assert.match(await fsA.textContent('#foot'), /\d+ of \d+ units need something/);
+    const tops = await fsA.$$eval('#bar > *', x => x.map(e => Math.round(e.getBoundingClientRect().top)));
+    assert.equal(new Set(tops).size, 1, 'the buttons and the filter are on one line');
+    assert.deepEqual(await fsA.$$eval('#bar > *', x => x.map(e => e.tagName === 'INPUT' ? 'filter' : e.textContent)), ['Print Fleet Service Report', 'Garage Station', 'filter']);
+    if (SHOTS) {
+      await fsA.setViewportSize({ width: 1920, height: 1080 });
+      await fsA.screenshot({ path: path.join(SHOTS, 'fleet-service-A-1920.png') });
+      const fs2x = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 });
+      await fs2x.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
+      await fs2x.goto(HOSTING + '/fleet.html?testEmail=manager.test@uniteddairy.com');
+      await fs2x.waitForSelector('table.fs-grid tbody tr[data-unit="T-803"]');
+      await fs2x.screenshot({ path: path.join(SHOTS, 'fleet-service-A-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 540 } });
+      await fs2x.close();
+    }
+    assert.deepEqual(fsA.errors, []);
+    await fsA.close();
+    for (const [unit] of fsUnits) { await db().collection('equipment').doc('veh_fs_' + unit).delete(); await db().collection('fleetSetup').doc(unit).delete(); }
+    for (const id of ['fs_223801', 'fs_223802']) await db().collection('odometers').doc(id).delete();
+    results.push('Fleet Service (mock-up A): one row per unit, PM / Reefer, DOT, Plates, miles now and status, units that need something first, controls on one line');
     // Over the Road: a manager ticks route 801 for Jersey in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
     const otr = await openPage(browser, 1920, 950, '/otr.html?view=routes&testEmail=manager.test@uniteddairy.com');
     await otr.waitForSelector('[data-dest="run_t801"]');
