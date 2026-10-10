@@ -444,7 +444,29 @@
 .temp-page .tp-copy h2 { margin: 0; font-size: 20px; color: var(--ud-blue-dark); }
 .temp-page .tp-copy p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
 .temp-page .tp-actions { margin-left: auto; display: flex; gap: 8px; }
-.temp-page .tp-sensor { font-size: 14px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.temp-page .tp-sensor { margin-left: auto; font-size: 15px; font-weight: 800; color: var(--ud-blue-dark); white-space: nowrap; }
+/* Joe 10/10 picture: the top line fits on one line at 1920 and at 125% zoom: the title on one line, the counts compact,
+   and every button there the same height with its whole word. */
+.temp-page .head { flex-wrap: nowrap; align-items: center; }
+.temp-page .head .title { flex: none; }
+.temp-page .head .title h1 { white-space: nowrap; }
+.temp-page .head .hstats { flex: none; }
+.temp-page .head .hstats span { white-space: nowrap; }
+.temp-page .head .actions.in-head.top-row { flex: none; margin-left: auto; }
+.temp-page .head .actions.in-head.top-row button, .temp-page .head .actions.in-head.top-row .seg > button { width: auto; min-width: 0; max-width: none; height: 40px; min-height: 40px; padding: 0 12px; font-size: 14px; white-space: nowrap; flex: none; }
+.temp-page .head .actions.in-head.top-row .tp-actions { margin-left: 0; gap: 6px; }
+@media (max-width: 1750px) {
+  .temp-page .head { gap: 10px; }
+  .temp-page .head .title h1 { font-size: 24px; }
+  .temp-page .head .hstats div { min-width: 0; padding: 4px 9px; }
+  .temp-page .head .hstats b { font-size: 20px; }
+  .temp-page .head .hstats span { font-size: 10px; letter-spacing: .03em; }
+}
+/* Action column: Due, Locked and Saved read as clear tags (there is no Save button; each box saves as it is left). */
+.temp-page .tp-act .tp-pill { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.temp-page .tp-act .tp-pill.due { background: #fff3df; color: #b45f00; border: 1px solid #f1c98a; }
+.temp-page .tp-act .tp-pill.locked { background: #eef2f6; color: #4c5d6e; }
+.temp-page .tp-act .tp-pill.saved { background: #e6f6ec; color: var(--runs-ink); }
 .temp-page .tp-btn { min-width: 118px; height: 40px; border: 1px solid var(--ud-blue); border-radius: 9px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 15px; font-weight: 800; padding: 0 14px; cursor: pointer; white-space: nowrap; }
 .temp-page .tp-btn.on { background: var(--ud-blue); color: #fff; }
 .temp-page .tp-btn.alert { border-color: #c62828; color: #c62828; }
@@ -468,7 +490,7 @@
 .temp-page .tp-detail.bad { color: #c62828; }
 .temp-page button.tp-save { width: 100%; height: 38px; border: 0; border-radius: 8px; background: var(--ud-blue); color: #fff; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
 .temp-page button.tp-save:disabled { background: #c9d5e0; color: #4c5d6e; cursor: default; }
-@media (max-width: 1500px) { .temp-page .tp-sensor { display: none; } }
+
 @media (max-width: 1400px) { .temp-page .tp-copy p { display: none; } .temp-page .tp-btn { min-width: 0; } }
 /* Phone: manual checks only, as the current app's phone screen (name, manual read, notes, save); no history. */
 @media (max-width: 760px) {

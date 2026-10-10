@@ -69,16 +69,35 @@ function fahrenheit(raw) {
   const n = number(raw);
   return n === null ? null : Math.round(((n / 100) * 9 / 5 + 32) * 10) / 10;
 }
+// MOCREO's device record (api.mocreo.com/v1/public/openapi, "Device"): properties {temperature, battery_percentage,
+// updatedAt in ms} is the latest reading; attributes {online, lastOnline in seconds, labels.displayName}. The record's own
+// top-level updatedAt is when the device was last edited, not when it last reported, so it is only a last resort.
+function readingTime(both) {
+  const times = [];
+  ['list', 'details'].forEach(k => {
+    const d = both[k] || {}, p = d.properties || {}, a = d.attributes || {};
+    [p.updatedAt, a.lastOnline].forEach(v => { const t = isoTime(v); if (t && !isNaN(Date.parse(t))) times.push(t); });
+  });
+  if (times.length) return times.sort().pop();
+  return isoTime(findField(both, ['lastReadingAt', 'lastReportAt', 'lastSeenAt', 'updatedAt', 'timestamp', 'time']));
+}
+function displayName(both) {
+  for (const k of ['details', 'list']) {
+    const l = ((both[k] || {}).attributes || {}).labels || {};
+    if (String(l.displayName || '').trim()) return String(l.displayName).trim();
+  }
+  return '';
+}
 function normalize(item, details) {
   const both = { list: item || {}, details: details || {} };
   const id = String(findField(both, ['id', 'deviceId', 'device_id', 'sn', 'serialNumber', 'serial']) || '').trim();
   return {
     sensorId: id,
-    name: String(findField(both, ['displayName', 'deviceName', 'name', 'alias']) || id).trim(),
+    name: String(displayName(both) || findField(both, ['displayName', 'deviceName', 'name', 'alias']) || id).trim(),
     temperatureF: fahrenheit(measurement(both, ['temperature', 'currentTemperature', 'temp'])),
     batteryLevel: number(measurement(both, ['batteryLevel', 'battery', 'batteryPercent', 'batteryPercentage'])),
     online: bool(findField(both, ['online', 'isOnline', 'found', 'connected'])),
-    lastReadingAt: isoTime(findField(both, ['lastReadingAt', 'lastReportAt', 'lastSeenAt', 'updatedAt', 'timestamp', 'time'])),
+    lastReadingAt: readingTime(both),
     model: String(findField(both, ['model', 'deviceModel', 'productModel']) || ''),
     error: ''
   };
