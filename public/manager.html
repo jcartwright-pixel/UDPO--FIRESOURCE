@@ -56,7 +56,7 @@
   <div class="mc-modal" id="modal" hidden>
     <div class="mc-dialog" role="dialog" aria-modal="true" aria-labelledby="rp-subject">
       <div class="mc-dhead"><div><span class="eyebrow">Send Current Report · To: Plant Managers group</span><h2 id="rp-subject"></h2></div>
-        <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn send" id="send">&#9993; Send Current Report</button></div></div>
+        <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn" id="copy">&#10697; Copy</button><button type="button" class="mc-btn" id="print-report">&#9113; Print</button><button type="button" class="mc-btn send" id="send">&#9993; Send Current Report</button></div></div>
       <label class="mc-note">Note at the top of the email (optional)<textarea id="note" maxlength="1500" placeholder="Add a note to this report…"></textarea></label>
       <div class="mc-report-body" id="rp-body"></div>
     </div>
@@ -103,7 +103,8 @@
       const openPickups = data.pickups.filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       // Joe 10/10: only what was checked since the last report was sent goes in; the rest is "Not checked".
       report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart }, now);
-      return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N };
+      const S = U.shiftReport(week, data.roundStart);
+      return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N, S };
     }
 
     function render() {
@@ -129,9 +130,11 @@
         tile('temps.html', 'Sensor Temp', x.T.sensors, '', x.T.offline ? 'sensors · ' + x.T.offline + ' offline' : 'sensors', null, x.T.offline ? 'warn' : ''),
         tile('temps.html', 'Manual Read', x.T.lastManual ? clock(x.T.lastManual) : 'None', '', 'last manual read'),
         tile('temps.html?view=alerts', 'Status', x.T.alerts, '', x.T.alerts ? 'need attention' : 'all in range', null, x.T.alerts ? 'bad' : 'good'), tile('temps.html?view=history', '24-Hour History', x.T.history, '', 'readings in 24 hours')]));
-      put('notes', card('&#9998;', 'Shift Notes', 'Shift handoff, issues and follow-up', 'shiftnotes.html', [
-        tile('shiftnotes.html', 'Handoff', x.N.handoff, '', 'in 24 hours'), tile('shiftnotes.html?view=history', 'Issues', x.N.issues, '', 'in 24 hours'),
-        tile('shiftnotes.html?view=history', 'Follow-up', x.N.open, '', 'still open', null, x.N.open ? 'warn' : ''), tile('shiftnotes.html?view=history', '24-Hour History', x.N.history, '', 'notes')]));
+      // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.
+      const carried = x.S.down.filter(d => d.carried).length;
+      put('notes', card('&#9998;', 'Shift Notes', 'Breakdowns carried over until resolved, shift handoff', 'shiftnotes.html', [
+        tile('shiftnotes.html', 'Breakdowns', x.S.down.length, '', 'still open', null, x.S.down.length ? 'bad' : ''), tile('shiftnotes.html', 'Carried Over', carried, '', 'from earlier shifts', null, carried ? 'warn' : ''),
+        tile('shiftnotes.html', 'Handoff', x.S.handoff.length, '', 'since the last report'), tile('shiftnotes.html?view=history', '24-Hour History', x.N.history, '', 'notes')]));
       // The report card's preview: subject, the counts and the first loads still to go.
       document.getElementById('pv-subject').textContent = r.subject;
       document.getElementById('pv-subject').className = 'mc-subject' + (r.behind.length ? ' bad' : ' good');
@@ -223,6 +226,20 @@
     }
     document.getElementById('send-card').onclick = (e) => send(e.currentTarget);
     document.getElementById('send').onclick = (e) => send(e.currentTarget);
+    // Copy and Print, as the current app's report: the email's words on the clipboard, or the email itself on paper.
+    const reportNote = () => (document.getElementById('note').value || '').trim();
+    document.getElementById('copy').onclick = async (e) => {
+      const b = e.currentTarget, text = (reportNote() ? 'NOTE: ' + reportNote() + '\n\n' : '') + report.subject + '\n\n' + report.text;
+      try { await navigator.clipboard.writeText(text); b.textContent = '\u2713 Copied'; } catch (err) { showError('Could not copy the report: ' + err.message); }
+      setTimeout(() => { b.innerHTML = '&#10697; Copy'; }, 2000);
+    };
+    document.getElementById('print-report').onclick = () => {
+      const f = document.createElement('iframe');
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+      document.body.appendChild(f);
+      f.contentDocument.open(); f.contentDocument.write('<!doctype html><title>' + escapeHtml(report.subject) + '</title>' + U.reportHtml(report, reportNote())); f.contentDocument.close();
+      setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 1000); }, 300);
+    };
 
     requireSignIn(async (user) => {
       const { db } = await start();

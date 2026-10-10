@@ -126,6 +126,9 @@ jobs:
           fi
           # A new address for the styles on every deploy, so no browser or cache can pair a new page with old styles.
           cd .. && sed -i "s|css/app.css\"|css/app.css?v=${GITHUB_SHA::12}\"|" public/*.html
+          # Diagnostics are sandbox only (Joe 10/10): the sandbox gets the Diagnostics screen and its probe on every screen;
+          # production must have none of it, and the deploy stops if it does.
+          if [ "$TARGET" = sandbox ]; then node tools/sandbox-diagnostics.cjs add public; else node tools/sandbox-diagnostics.cjs check public; fi
           npx --prefix functions firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
           {
             echo "## Distribution app ($TARGET)"

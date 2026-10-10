@@ -34,6 +34,19 @@ always-on server: about $30 to $50 a month for us against about $10 to $20 for F
 is not faster. Firestore also tells every open screen about a change the moment it is saved, which SQL does not
 do on its own. If true SQL is wanted later, the data layout here moves over table for table.
 
+## Diagnostics (sandbox only)
+
+The sandbox has a **Diagnostics** screen for administrators (Administration menu > Diagnostics (sandbox)), the new app's
+version of the old app's Full Diagnostics. **Run check** opens every screen in the same window, one after another, notes
+how long each took to show and to load and any error, times the server's answer, and comes back to a one-page summary
+(slow and failed items marked; **Copy summary** gives SUMMARY / SLOW_SCREENS / SLOW_CALLS text). **Record while I work**
+times every screen opened and every save while you use the app, and switches itself off after 8 hours (log capped at
+400 screens; only the last check is kept).
+
+It lives in `sandbox-only/`, not in `public/`. Only the sandbox deploy adds it (`tools/sandbox-diagnostics.cjs add`);
+the production deploy runs `tools/sandbox-diagnostics.cjs check` and stops if any of it is there, and
+`functions/test/unit/sandbox-only.test.js` fails if `public/` ever holds any of it.
+
 ## How it works, in plain words
 
 1. **The copy.** Every minute the server reads the three Live week tabs (previous, current, next) and Route,
