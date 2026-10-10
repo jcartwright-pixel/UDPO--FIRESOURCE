@@ -111,7 +111,8 @@ function addSideMenu() {
   const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
   if (!bar || document.body.classList.contains('phone') || screen.querySelector('.sidemenu')) return;
   const here = (location.pathname.split('/').pop() || 'index.html');
-  const svg = (k) => /\.webp$/.test(k) ? '<img class="lib-icon" src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[k] + '</svg>';
+  // Joe 10/10 evening: the menu is words only, on every page (no pictures or icons).
+  const svg = () => '';
   const nav = document.createElement('nav');
   nav.className = 'sidemenu';
   nav.setAttribute('aria-label', 'Screens');
