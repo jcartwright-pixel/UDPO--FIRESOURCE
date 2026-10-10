@@ -17,6 +17,7 @@ const MAINT = require('./maintenance');
 const SWITCH = require('./switch');
 const OTR = require('./otr-core');
 const SC = require('./sc-core');
+const PLANT = require('./plant');
 
 const C = M.COLLECTIONS;
 
@@ -57,7 +58,14 @@ const ACTIONS = Object.freeze({
   setWeekReason: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
-  saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' }
+  saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  // The plant side (plant.js): Loadout Center loads and pickups.
+  savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  addPickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  completePickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  // Unloading & Washing, Product Returns and Truck Washing.
+  saveUnloading: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plant' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -256,6 +264,9 @@ function validate(input) {
     out.today = input.today;
     return out;
   }
+  if (action === 'addPickup' || action === 'completePickup') return Object.assign(out, PLANT.validatePickup(action, input, SaveError));
+  if (action === 'saveUnloading') return Object.assign(out, PLANT.validateUnload(input, SaveError));
+  if (action === 'completeWash') return Object.assign(out, PLANT.validateWash(input, SaveError));
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
     if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
@@ -287,6 +298,7 @@ function validate(input) {
     out.toDate = input.toDate;
   }
   if (action === 'setDriverNote') out.note = text(input.note, 500);
+  if (action === 'savePlantLoad') out.plant = PLANT.validateLoad(input, SaveError);
   if (action === 'saveCheckIn') {
     out.checkIn = {
       casesDelivered: count(input.casesDelivered, 'Cases delivered'), driverCaseReturn: count(input.driverCaseReturn, 'Cases returned'),
@@ -349,6 +361,7 @@ async function resolveAssignment(tx, db, req, stamp, run) {
   if (req.action === 'setDispatchTime') return { dispatchTime: req.time };
   if (req.action === 'setJack') return { palletJack: req.jack };
   if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });
+  if (req.action === 'savePlantLoad') return PLANT.loadValues(tx, db, req, (run.days && run.days[req.day]) || {}, stamp, SaveError);
   return { driverNotes: req.note };
 }
 
@@ -420,6 +433,9 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveRoute') return saveRoute(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderRouteDay') return reorderRouteDay(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'addPickup' || req.action === 'completePickup') return PLANT.savePickup(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveUnloading') return PLANT.saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, queueSheetCells);
+    if (req.action === 'completeWash') return PLANT.saveWash(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);

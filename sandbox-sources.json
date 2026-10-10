@@ -10,6 +10,10 @@
       "exceptions": { "spreadsheetId": "1ihDrBpGfMgdB27zmn0TF3UZNBKPrHAayh1qGxKV0YV0", "tab": "DRIVER_EXCEPTIONS" },
       "vacations": { "spreadsheetId": "1uv5lTlvP20EF8Z9_r2ejU5YSd84OmHddoDkPNgoex2A", "tab": "DRIVER_VACATIONS" },
       "plantLoads": { "spreadsheetId": "1ceqB_Aj8PnuVwI_ZIM3BsQh_O_8TDeYk44QdYR1CLqk", "tab": "PLANT_OPERATIONS" }
+    },
+    "plant": {
+      "_about": "The sandbox's copy of the Plant Operations workbook (pickups), made 10/10/2026, shared read only with the sandbox server.",
+      "pickups": { "spreadsheetId": "1jyqEN5xKFbw6f5ykLbpuHr1nourmpHoqnOpwK8pXHYI", "tab": "LIVE PLANT OPERATIONS" }
     }
   },
   "writeBack": {
