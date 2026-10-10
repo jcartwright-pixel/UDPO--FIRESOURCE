@@ -79,10 +79,11 @@ async function phoneCall(db, input, now) {
   }
   // View Loadout (Joe 10/10): the Driver Room board on the phone, read only, today's routes and their pickups.
   if (op === 'board') {
-    const date = B.calendarDay(new Date(stamp));
-    const runs = (await db.collection(C.runs).where('weekStart', '==', L.weekStart(date)).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
-    const pickups = (await db.collection('pickups').where('date', 'in', [date, L.addDays(date, -1), L.addDays(date, -2), L.addDays(date, -3)]).get()).docs.map(d => d.data());
-    const rows = B.boardRows(runs, pickups, date).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText }));
+    // The loads the plant loads on this operating day (Saturday = the Sunday and Monday deliveries), as on the Driver Room board.
+    const date = L.operatingDay(new Date(stamp)), week = L.weekStart(date);
+    const runs = (await db.collection(C.runs).where('weekStart', 'in', [week, L.addDays(week, 7)]).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
+    const pickups = (await db.collection('pickups').where('date', 'in', [date, L.addDays(date, 1), L.addDays(date, 2), L.addDays(date, 3)]).get()).docs.map(d => d.data());
+    const rows = B.loadoutBoardRows(runs, pickups, date).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText }));
     return { date, rows, remaining: rows.filter(r => r.state !== 'LOADED').length, at: stamp };
   }
   const driverId = String(input.driverId || '').slice(0, 120);
