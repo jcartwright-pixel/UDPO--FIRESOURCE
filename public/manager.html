@@ -71,7 +71,7 @@
     const L = window.UDLogic, U = window.UDPlant;
     const today = () => L.operatingDay(new Date());
     let date = today();
-    const data = { runs: [], journal: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
+    const data = { runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
     let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null;
     let askReport = new URLSearchParams(location.search).get('report') === '1';
     const canSend = () => L.hasRole(person, L.SAVE_ROLES) && L.screenState(app, 'plant').open;
@@ -98,10 +98,11 @@
       const ship = U.managerSchedule(U.scheduleEntries(data.ship, 'SHIPPING'), date), recv = U.managerSchedule(U.scheduleEntries(data.recv, 'RECEIVING'), date);
       const lines = U.qualityLines(data.setup, journal, data.lineStatus, now), qhist = U.qualityHistory(journal, data.lineStatus, now), Q = U.managerQuality(lines, qhist);
       const temps = U.tempRows(data.setup, journal, now), T = U.managerTemps(temps, U.tempHistory(journal, now));
-      const log = U.shiftLog(journal, now), N = U.managerNotes(log);
+      // The report carries open breakdowns over from earlier shifts (a week of the log); the tile counts the last 24 hours.
+      const log = U.shiftLog(journal, now), N = U.managerNotes(log), week = U.shiftLog(data.shift, now, 168);
       const openPickups = data.pickups.filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       // Joe 10/10: only what was checked since the last report was sent goes in; the rest is "Not checked".
-      report = U.plantReport({ loads, pickups: openPickups, shiftLog: log, lines, temps, roundStart: data.roundStart }, now);
+      report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart }, now);
       return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N };
     }
 
@@ -145,7 +146,10 @@
       document.getElementById('pv-list').innerHTML =
         part('Routes', (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded', r.behind.map(z => rt(z, 'bad', 'BEHIND' + (z.late ? ' · ' + z.late : ''))).concat(r.nextUp.map(z => rt(z, 'no', U.statusWord(z.status)))).concat(r.loaded.map(z => rt(z, 'ok', 'LOADED'))), 'No loads on the dispatch sheet for this day.') +
         part('Pickups open', r.pickups.length, r.pickups.map(p => line('PICKUP ' + [p.route, p.run].filter(Boolean).join(' '), [p.quantity, p.product].filter(Boolean).join(' '), 'bad')), 'None open.', true) +
-        part('Plant breakdowns', r.down.length, r.down.map(d => line(d.equipment || 'Plant equipment', [d.entry, d.at ? 'logged ' + d.at : ''].filter(Boolean).join(' · '), 'bad')), 'None open.', true) +
+        part('Plant breakdowns', r.down.length, r.down.map(d => line(d.equipment || 'Plant equipment', [d.entry, d.at ? 'logged ' + d.at : '', d.carried ? 'carried over' : '', U.followLabel(d.status)].filter(Boolean).join(' · '), d.status === 'MONITOR' ? 'warn' : 'bad')), 'None open.', true) +
+        (r.fixed.length ? part('Fixed since last report', r.fixed.length, r.fixed.map(d => line(d.equipment || 'Plant equipment', [d.review || d.entry, d.reviewAt].filter(Boolean).join(' · '), 'ok')), '') : '') +
+        (r.handoff.length ? part('Shift handoff', r.handoff.length, r.handoff.map(d => line(d.shift ? d.shift.charAt(0) + d.shift.slice(1).toLowerCase() : 'Handoff', [d.at, d.entry, d.notes].filter(Boolean).join(' · '))), '') : '') +
+        (r.others.length ? part('Incidents · Safety · Quality', r.others.length, r.others.map(d => line(d.equipment || d.type, [d.type, d.entry, U.followLabel(d.status)].filter(Boolean).join(' · '), d.status === 'RESOLVED' ? '' : 'warn')), '') : '') +
         part('Production lines', r.counts.linesDown ? r.counts.linesDown + ' down' : 'all running', r.lines.map(l => line(l.line, [l.product, l.status || 'no status', l.notChecked && l.lastCheckedAt ? 'last ' + l.lastCheckedAt : ''].filter(Boolean).join(' · '), l.flag ? 'bad' : l.notChecked ? 'warn' : '')), 'No production lines set up.', true) +
         part('Temperatures', r.counts.tempsOut ? r.counts.tempsOut + ' out' : 'all in range', r.temperatures.map(t => line(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.', true);
       ['send-card', 'send'].forEach(id => { document.getElementById(id).hidden = !canSend(); });
@@ -168,7 +172,10 @@
         (notLoaded.length ? '<h4 class="bad">Not loaded (' + notLoaded.length + ')</h4><div class="mc-routes">' + notLoaded.join('') + '</div>' : '') + (r.totalLoads ? '' : '<p>No loads on the dispatch sheet for this day.</p>') + '</section>' +
         sect('Routes behind', r.behind.length, r.behind.length ? 'bad' : '', r.behind.map(z => row(U.reportName(z), 'depart ' + (z.depart || '-') + ' · ' + U.statusWord(z.status) + (z.startedAt ? ' since ' + z.startedAt : '') + ' · ' + z.late + ((z.truck || z.trailer) ? ' · ' + [z.truck, z.trailer].filter(Boolean).join(' / ') : ''), 'bad')), 'Every route due within ' + r.behindMinutes + ' minutes is complete.') +
         sect('Pickups open', r.pickups.length, r.pickups.length ? 'bad' : '', r.pickups.map(p => row('PICKUP ' + [p.route, p.run].filter(Boolean).join(' '), [p.quantity, p.product].filter(Boolean).join(' '), 'bad')), 'None open.') +
-        sect('Plant breakdowns', r.down.length, r.down.length ? 'bad' : '', r.down.map(d => row(d.equipment || 'Plant equipment', [d.entry, d.at ? 'logged ' + d.at : '', d.status].filter(Boolean).join(' · '), 'bad')), 'None open.') +
+        sect('Plant breakdowns', r.down.length, r.down.length ? 'bad' : '', r.down.map(d => row(d.equipment || 'Plant equipment', [d.entry, d.at ? 'logged ' + d.at : '', d.carried ? 'carried over' : '', U.followLabel(d.status), d.review ? 'review ' + d.reviewAt + ': ' + d.review : ''].filter(Boolean).join(' · '), d.status === 'MONITOR' ? 'warn' : 'bad')), 'None open.') +
+        (r.fixed.length ? sect('Fixed since last report', r.fixed.length, '', r.fixed.map(d => row(d.equipment || 'Plant equipment', [d.review || d.entry, d.reviewAt, 'Resolved'].filter(Boolean).join(' · '))), '') : '') +
+        (r.handoff.length ? sect('Shift handoff', r.handoff.length, '', r.handoff.map(d => row(d.shift ? d.shift.charAt(0) + d.shift.slice(1).toLowerCase() : 'Handoff', [d.at, d.entry, d.notes].filter(Boolean).join(' · '))), '') : '') +
+        (r.others.length ? sect('Incidents · Safety · Quality', r.others.length, '', r.others.map(d => row(d.equipment || d.type, [d.type, d.entry, U.followLabel(d.status)].filter(Boolean).join(' · '), d.status === 'RESOLVED' ? '' : 'warn')), '') : '') +
         sect('Still to load', r.leftToLoad + ' of ' + r.totalLoads, '', r.behind.concat(r.nextUp).map((z, i) => row((i + 1) + '. ' + U.reportName(z), 'depart ' + (z.depart || '-') + ' · ' + U.statusWord(z.status) + (z.late ? ' · ' + z.late : '') + ((z.truck || z.trailer) ? ' · ' + [z.truck, z.trailer].filter(Boolean).join(' / ') : '') + (z.priorDay ? ' · from yesterday' : ''), z.late ? 'bad' : '')), 'Nothing left to load.') +
         sect('Production', null, '', r.lines.map(l => row(l.line, [l.product, l.lastCheckedAt ? (l.notChecked ? 'last check ' : 'quality check ') + l.lastCheckedAt + (l.qualityCheck ? ' ' + l.qualityCheck : '') : '', l.status || 'no status'].filter(Boolean).join(' · '), l.flag ? 'bad' : '')), 'No production lines set up.') +
         sect('Temperatures', null, '', r.temperatures.map(t => row(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : '') + (t.limit ? ' · limit ' + t.limit : '') + (t.due && t.status !== 'NO CHECK' ? ' · check due' : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.');
@@ -239,6 +246,7 @@
         const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
         unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); later(); }, fail('the loads')));
         unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); later(); }, fail('the plant journal')));
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', [0, 1, 2, 3, 4, 5, 6, 7].map(n => L.addDays(date, -n)))), s => { data.shift = s.docs.map(d => d.data()); later(); }, fail('the shift notes')));
         unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); later(); }, fail('the pickups')));
       };
       watch();

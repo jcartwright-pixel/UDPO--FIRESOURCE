@@ -68,3 +68,23 @@ test('Send Current Report: lines and coolers not checked since the last report r
   // No report sent yet: everything counts, as before.
   assert.equal(R.plantReport({ loads: [], lines, temps }, Date.parse('2026-10-08T16:00:00Z')).lines[0].status, 'RUNNING');
 });
+
+test('Shift Notes option A in the report: open breakdowns carry over until resolved; fixed, handoff and the rest since the last report', () => {
+  const rec = (id, at, type, entry, status, parent) => ({ type: 'SHIFT_REPORT', recordedAt: at, recordedBy: 'm@uniteddairy.com', payload: { entryId: id, section: 'HANDOFF', shift: 'FIRST SHIFT', values: { Entry: entry, Type: type, Equipment: parent ? '' : 'Filler', ParentId: parent || '' }, followUpStatus: status } });
+  const journal = [rec('a', '2026-10-07T20:00:00Z', 'Breakdown', 'Valve leaking', 'OPEN'), rec('ar', '2026-10-08T10:20:00Z', 'REVIEW', 'slow drip only', 'MONITOR', 'a'),
+    rec('b', '2026-10-08T08:00:00Z', 'Breakdown', 'Belt off', 'OPEN'), rec('br', '2026-10-08T15:00:00Z', 'REVIEW', 'Belt replaced', 'RESOLVED', 'b'),
+    rec('c', '2026-10-08T15:10:00Z', 'Handoff', 'Run 2% next', 'OPEN'), rec('d', '2026-10-08T15:20:00Z', 'Safety', 'Wet floor', 'OPEN'), rec('e', '2026-10-08T12:00:00Z', 'Safety', 'Old one', 'OPEN')];
+  const now = Date.parse('2026-10-08T16:00:00Z'), round = '2026-10-08T14:00:00Z';
+  assert.equal(R.shiftLog(journal, now, 168).length, 5, 'five entries, the reviews under them');
+  const s = R.shiftReport(R.shiftLog(journal, now, 168), round);
+  assert.deepEqual(s.down.map(d => [d.entry, d.status, d.carried, d.review]), [['Valve leaking', 'MONITOR', true, 'slow drip only']]);
+  assert.deepEqual(s.fixed.map(d => [d.entry, d.review]), [['Belt off', 'Belt replaced']]);
+  assert.deepEqual(s.handoff.map(d => d.entry), ['Run 2% next']);
+  assert.deepEqual(s.others.map(d => d.entry), ['Wet floor']);
+  const r = R.plantReport({ loads: [], shiftLog: R.shiftLog(journal, now, 168), roundStart: round }, now);
+  assert.match(r.text, /Valve leaking.*MONITOR {2}\(carried over\)/);
+  assert.match(r.text, /FIXED SINCE LAST REPORT \(1\)\n {2}Filler {2}Belt off {2}RESOLVED/);
+  assert.match(r.text, /SHIFT HANDOFF \(1\)/);
+  assert.match(r.text, /INCIDENTS · SAFETY · QUALITY \(1\)/);
+  assert.match(R.reportHtml(r, ''), /CARRIED OVER[\s\S]*MONITOR[\s\S]*Fixed since last report/);
+});

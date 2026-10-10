@@ -105,9 +105,23 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     await leave(notes, '.sn-notes', 'Maintenance to check the drain');
     await nWatch.waitForFunction((n) => document.querySelectorAll('#history .sn-card').length === n + 1 && /Water on the floor[\s\S]*Maintenance to check the drain/.test(document.getElementById('history').textContent), cards, { timeout: 8000 });
     await notes.waitForSelector('#another:not([hidden])');
+    // Option A (Joe 10/10): no shift to pick; the shift comes from the time of the entry and is kept with it.
+    assert.equal(await notes.$('select.sn-shift'), null, 'Shift Notes has no shift picker');
+    assert.match(await notes.textContent('#shift-now'), /^(First|Second|Third) shift$/);
+    assert.deepEqual(await notes.$$eval('#lines [data-kind]', b => b.map(x => x.dataset.kind)), ['Handoff', 'Breakdown', 'Incident', 'Safety', 'Quality', 'Other']);
+    assert.match(await nWatch.textContent('#history'), /Cooler 2 floor · (FIRST|SECOND|THIRD) SHIFT/);
     await notes.click('#another');
     assert.equal(await notes.inputValue('.sn-entry'), '', 'Start Another Entry empties the form');
-    results.push('Shift Notes: the entry went on the other screen\'s log at the first box and the notes filled it in; Start Another Entry empties the form');
+    // The breakdown just made is now on the Still open list at the top, with its status drop-down and review box.
+    const open = '#open-box .sn-card:has-text("Water on the floor")';
+    await notes.waitForSelector(open + ' .tag.new', { timeout: 8000 });
+    await notes.waitForSelector(open + ' select[data-status]');
+    await notes.selectOption(open + ' select[data-status]', 'MONITOR');
+    await nWatch.waitForFunction(() => /Marked Monitor/.test(document.getElementById('history').textContent), null, { timeout: 8000 });
+    await leave(notes, open + ' [data-review]', 'Drain snaked, still slow');
+    await nWatch.waitForFunction(() => /Drain snaked, still slow/.test(document.getElementById('history').textContent), null, { timeout: 8000 });
+    await notes.waitForFunction(() => /1 monitor/.test(document.querySelector('#lines [data-kind="Breakdown"]').textContent), null, { timeout: 8000 });
+    results.push('Shift Notes: the entry went on the other screen\'s log at the first box with the shift from the clock (no shift picker); Start Another Entry empties the form; the breakdown sits under Still open, and its status and review note save as they are changed');
 
     /* ---------- Yard Checks (desktop) ---------- */
     // Trailer T-701, loaded today and never checked (the yard list follows the real clock).
@@ -128,6 +142,16 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     await mgr.click('#send-card');
     await yard.waitForFunction(() => !document.querySelector('#rows tr[data-trailer="T-701"]'), null, { timeout: 8000 });
     results.push('Yard Checks: the next Send Current Report clears the screen; T-701 (checked) leaves the list until it is due again');
+
+    /* ---------- Shift Notes after the report: open breakdowns carry over, a fixed one goes in the next report ---------- */
+    await notes.waitForSelector('#open-box .sn-card:has-text("Water on the floor") .tag.carry', { timeout: 8000 });
+    assert.match(await notes.textContent('#carry'), /1 breakdown from earlier shifts/);
+    await mgr.waitForFunction(() => /Plant breakdowns[\s\S]*Water on the floor[\s\S]*carried over · Monitor/.test(document.getElementById('pv-list').textContent), null, { timeout: 8000 });
+    await shots(notes, 'shift-notes-A');
+    await notes.selectOption('#open-box .sn-card:has-text("Water on the floor") select[data-status]', 'RESOLVED');
+    await notes.waitForFunction(() => !/Water on the floor/.test(document.getElementById('open-box').textContent), null, { timeout: 8000 });
+    await mgr.waitForFunction(() => /Fixed since last report[\s\S]*Cooler 2 floor/.test(document.getElementById('pv-list').textContent) && !/Plant breakdowns[\s\S]*Water on the floor/.test(document.getElementById('pv-list').textContent), null, { timeout: 8000 });
+    results.push('Shift Notes: after Send Current Report the open breakdown stays as CARRIED OVER, and the report lists it every time until it is marked Resolved; then it goes under Fixed since last report');
 
     for (const p of [watcher, desk, mgr, temps, tWatch, notes, nWatch, yard]) assert.deepEqual(p.errors, []);
     console.log(results.map(r => 'AUTOSAVE ' + r).join('\n'));
