@@ -113,3 +113,25 @@ test('Scheduler: Receiving adds a supplier (next S code), refuses a repeat, and 
   assert.equal((await db().collection('plantLoads').doc(load.id).get()).exists, false, 'Receiving loads are not driver loads');
   assert.equal((await lanes('SHIPPING')).some(e => e.id === load.id), false);
 });
+
+/* ---------- Yard Checks ---------- */
+const yard = (fields) => applyAction(db(), DISPATCHER, Object.assign({ action: 'saveYardCheck', requestId: rid() }, fields));
+
+test('Yard Checks: Record locks the trailer for 2 hours that day, Left Yard takes the load off, the copy keeps the app\'s checks', async () => {
+  const loaded = (await db().collection('runs').where('weekStart', '==', '2026-10-04').get()).docs.map(d => Object.assign({ id: d.id }, d.data()));
+  const now = Date.parse('2026-10-08T14:00:00Z');
+  const before = R.yardQueue(loaded, await journal(), DATE, now).rows;
+  assert.ok(before.length > 0, 'loaded trailers wait on the yard');
+  const first = before[0];
+  const res = await yard({ date: DATE, trailer: first.trailer.replace('T-', ''), routeRun: first.routeRun, temperature: '35', fuelLevel: '1/2', notes: 'Reefer running' });
+  assert.equal(res.trailer, first.trailer);
+  await assert.rejects(yard({ date: DATE, trailer: first.trailer, routeRun: first.routeRun, temperature: '36' }), /already checked\. It can be checked again in 1[12][0-9] minutes/);
+  await assert.rejects(yard({ date: DATE, trailer: first.trailer, fuelLevel: '1/4' }), /Fuel level must be/);
+  const left = await yard({ date: DATE, trailer: first.trailer, routeRun: first.routeRun, departed: true });
+  assert.equal(left.status, 'DEPARTED');
+  await copy();
+  const j = await journal(), mine = j.filter(d => d.type === 'YARD_CHECK' && d.createdInApp);
+  assert.deepEqual(mine.map(d => d.payload.status).sort(), ['COMPLETE', 'DEPARTED']);
+  assert.equal(mine.find(d => d.payload.status === 'COMPLETE').payload.fuelLevel, '1/2');
+  assert.ok(!R.yardQueue(loaded, j, DATE, now).rows.concat(R.yardQueue(loaded, j, DATE, now).locked).some(r => r.trailer === first.trailer && r.routeRun === first.routeRun), 'Left Yard takes the load off');
+});
