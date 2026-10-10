@@ -1,7 +1,7 @@
 /* Administration pages built inside the right-hand panel (js/admin-pages.js). Text stays at 16px; long lists scroll. */
 .ap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; font-size: 16px; }
 .ap-bar { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-height: 44px; }
-.ap-bar .ap-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.ap-bar .ap-right { margin-left: auto; display: flex; gap: 8px; align-items: center; min-height: 40px; }
 .ap-bar button, .ap-bar a.ap-btn, .ap-bar select, .ap-bar input { height: 40px; min-height: 40px; }
 .ap button.ap-btn, .ap a.ap-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 120px; padding: 0 14px; border-radius: 8px; border: 1px solid #1d5b91;
   background: #fff; color: #0b3d6b; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; text-decoration: none; white-space: nowrap; }
@@ -30,7 +30,7 @@
 .ap-checks input { width: 18px; height: 18px; }
 .ap-t { width: 100%; border-collapse: collapse; font-size: 16px; }
 .ap-t th { position: sticky; top: 0; z-index: 1; background: #0b3d6b; color: #fff; text-align: left; padding: 8px 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
-.ap-t td { padding: 7px 10px; border-bottom: 1px solid #e6ecf2; vertical-align: middle; }
+.ap-t td { padding: 7px 10px; border-bottom: 1px solid #e6ecf2; vertical-align: middle; height: auto; text-align: left; white-space: normal; overflow: visible; line-height: 1.3; }
 .ap-t td small { display: block; color: #5a6b7d; font-size: 13px; }
 .ap-t tr.ap-group td { background: #eef5fc; font-weight: 900; color: #0b3d6b; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
 .ap-t select { min-height: 34px; }

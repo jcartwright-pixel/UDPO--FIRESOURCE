@@ -66,13 +66,15 @@ const byLoad = (a, b) => (Number(b.prior) - Number(a.prior)) || String(a.loadDat
   (Number(a.loadSequence == null ? 999999 : a.loadSequence) - Number(b.loadSequence == null ? 999999 : b.loadSequence)) ||
   String(a.route).localeCompare(String(b.route), undefined, { numeric: true });
 
-// Every load for the plant on `date` (all areas), plus yesterday's loads that are not done yet.
-export function loadoutRows(runs, date) {
-  const out = [], yesterday = L.addDays(date, -1);
+// Every load for the plant on `date` (all areas), plus yesterday's loads that are not done yet, unless the plant was started
+// fresh after yesterday (Administration > Start Plant Fresh From Today, udpoV780PlantLoadingRows_ UDPO_PLANT_START_DATE).
+export function loadoutRows(runs, date, plantStart) {
+  const out = [], yesterday = L.addDays(date, -1), start = plantStart === undefined ? (typeof window !== 'undefined' && window.UDPlantStart) || '' : plantStart;
+  const carry = !start || yesterday >= start;
   (runs || []).forEach(run => {
     if (!shownForPlant(run) || !runArea(run)) return;
     L.loadBlocksFor(run, date).forEach(b => out.push(rowFor(run, b, date, false)));
-    L.loadBlocksFor(run, yesterday).forEach(b => { const r = rowFor(run, b, yesterday, true); if (r.state !== 'DONE') out.push(r); });
+    if (carry) L.loadBlocksFor(run, yesterday).forEach(b => { const r = rowFor(run, b, yesterday, true); if (r.state !== 'DONE') out.push(r); });
   });
   return out.sort(byLoad);
 }

@@ -45,8 +45,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     const p = await openPage(browser, 1920, 1080, '/administration.html' + ADMIN);
     await p.waitForSelector('.adm-item.on[data-key="people"]');
     await p.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
-    const BUILT = ['people', 'role-templates', 'access-codes', 'app-links', 'station-codes', 'report-recipients', 'sent-log', 'repair-items'];
-    const pills = await p.$$eval('.adm-item', (s, keys) => s.filter(x => keys.indexOf(x.dataset.key) >= 0 && x.querySelector('em')).map(x => x.dataset.key), BUILT);
+    const pills = await p.$$eval('.adm-item', s => s.filter(x => x.querySelector('em')).map(x => x.dataset.key));
     assert.deepEqual(pills, [], 'nothing in Administration says Being built or View only: ' + pills.join(', '));
     assert.equal(await p.$('.adm-state'), null);
     assert.equal(/Users sheet; editing here is being built/.test(await p.textContent('#view')), false);
@@ -161,6 +160,85 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await ps.waitForSelector('[data-station="CASE_UNLOADING"]');
     assert.deepEqual(ps.errors, []);
     results.push('Plant Station: with a release code set, Change Station asks for it; a wrong code is refused, the right one frees the tablet');
+
+    // Batch 2: email, schedules and diagnostics (js/admin-tools.js).
+    await open('repair-email', '#re-where input');
+    await p.fill('[data-emails="PENSKE"]', 'repairs@penske.com');
+    await p.selectOption('[data-mode="PENSKE"]', 'IMMEDIATE');
+    await p.click('#re-save');
+    await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
+    assert.ok(await oneLine(p));
+    await shot(p, 'repair-email-1920.png');
+    await p.click('#re-send');
+    await p.waitForFunction(() => /Sent \d+ repair|Nothing was sent/.test(document.querySelector('#view .ap-msg').textContent));
+
+    await open('checkin-email', '#ce-from');
+    assert.equal(await p.inputValue('#ce-from'), 'callcenter@lauttamus.com');
+    await p.check('#ce-on');
+    await p.click('#ce-save');
+    await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await p.click('#ce-now');
+    // The emulator cannot reach Gmail: the page says why, plainly.
+    await p.waitForFunction(() => /Checked|did not finish/.test(document.querySelector('#view .ap-msg').textContent), null, { timeout: 30000 });
+    await shot(p, 'checkin-email-1920.png');
+
+    await open('refresh-rates', '#rr2-rows tr');
+    await p.selectOption('[data-minutes="checkinMail"]', '30');
+    await p.click('[data-save="checkinMail"]');
+    await p.waitForFunction(() => /Schedule saved/.test(document.querySelector('#view .ap-msg').textContent));
+    assert.ok(await oneLine(p));
+    await shot(p, 'refresh-rates-1920.png');
+
+    await open('preflight', '#pf-run');
+    await p.click('#pf-run');
+    await p.waitForSelector('#pf-rows tr td .ap-chip');
+    assert.match(await p.textContent('#pf-sum'), /checks/);
+    await shot(p, 'preflight-1920.png');
+
+    await open('update-live', '#ul-dry');
+    await p.click('#ul-dry');
+    await p.waitForFunction(() => /Dry run/.test(document.querySelector('#view .ap-msg').textContent));
+    await shot(p, 'update-live-1920.png');
+
+    await open('plant-fresh', '#pfr-go');
+    await p.click('#pfr-go');
+    assert.equal(await p.textContent('#pfr-go'), 'Click Again to Confirm');
+    await p.click('#pfr-go');
+    await p.waitForFunction(() => /Plant starts fresh from/.test(document.querySelector('#view .ap-msg').textContent));
+    await shot(p, 'plant-fresh-1920.png');
+
+    await open('refresh-home', '#rh-go');
+    await shot(p, 'refresh-home-1920.png');
+    await open('date-inventory', '#di-run');
+    await shot(p, 'date-inventory-1920.png');
+    await open('date-convert', '#dc-dry');
+    assert.equal(await p.$eval('#dc-go', b => b.disabled), true, 'Convert waits for a clean dry run');
+    await shot(p, 'date-convert-1920.png');
+
+    await open('window-test', '#wt-run');
+    await p.selectOption('#wt-screen', { label: 'Drivers \u2014 drivers.html' });
+    await p.click('#wt-run');
+    await p.waitForFunction(() => /READ (RESPONSE CONFIRMED|CHECK FAILED)/.test(document.querySelector('#view .ap-msg').textContent), null, { timeout: 40000 });
+    assert.ok(await oneLine(p));
+    await shot(p, 'window-test-1920.png');
+    assert.ok(await noSideScroll(p));
+    assert.deepEqual(p.errors, []);
+    results.push('Repair Email, Driver Check-In Email, Refresh Rates, Pre-Flight, Update Live Sheets (dry run), Start Plant Fresh, Refresh Home, Date Inventory, Date Convert and Window Test Center all open and work inside the panel');
+
+    // Sharp top crops for Joe (2x).
+    if (SHOTS) {
+      const hi = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 });
+      await hi.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
+      await hi.goto(HOSTING + '/administration.html' + ADMIN);
+      for (const [key, ready, name] of [['repair-email', '#re-where input', 'repair-email'], ['refresh-rates', '#rr2-rows tr', 'refresh-rates'], ['checkin-email', '#ce-from', 'checkin-email']]) {
+        await hi.waitForSelector('.adm-item[data-key="' + key + '"]');
+        await hi.click('.adm-item[data-key="' + key + '"]');
+        await hi.waitForSelector(ready);
+        await hi.waitForTimeout(400);
+        await hi.screenshot({ path: path.join(SHOTS, name + '-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 540 } });
+      }
+      await hi.close();
+    }
 
     const small = await openPage(browser, 1366, 768, '/administration.html' + ADMIN);
     await small.waitForSelector('#people tr');

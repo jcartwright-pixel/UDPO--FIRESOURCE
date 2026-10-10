@@ -19,7 +19,7 @@ const prettyRole = (r) => String(r).charAt(0) + String(r).slice(1).toLowerCase()
 const plantName = (id) => id === '*' ? 'All locations' : ((L.PLANTS.find(p => p.id === id) || {}).name || id);
 
 // The message line under the buttons.
-function say(box, text, kind) {
+export function say(box, text, kind) {
   const open = [...box.querySelectorAll('.ap-modal:not([hidden]) .ap-msg')][0];
   const m = open || box.querySelector('.ap-msg');
   if (!m) return;
@@ -27,7 +27,7 @@ function say(box, text, kind) {
   m.className = 'ap-msg' + (kind ? ' ' + kind : '');
   m.hidden = !text;
 }
-const errText = (err) => String(err && err.message || err).replace(/^FirebaseError:\s*/, '');
+export const errText = (err) => String(err && err.message || err).replace(/^FirebaseError:\s*/, '');
 
 // Press twice: the first press arms the button (new label); the second runs it. Any other press disarms.
 export function twice(btn, armedLabel, run) {
@@ -44,7 +44,7 @@ export function twice(btn, armedLabel, run) {
   return null;
 }
 
-async function busy(box, btn, work) {
+export async function busy(box, btn, work) {
   const buttons = [...box.querySelectorAll('button')];
   buttons.forEach(b => { b.dataset.wasDisabled = b.disabled ? '1' : ''; b.disabled = true; });
   try { return await work(); } catch (err) { say(box, errText(err), 'bad'); return null; } finally {

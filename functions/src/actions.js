@@ -659,8 +659,8 @@ async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
     if (notes.indexOf('Sent to garage') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the garage.' };
     change = { notes: add('Sent to garage ' + stamp + ' by ' + email) };
   } else if (req.step === 'lessor') {
-    // Joe 10/10: a truck write-up goes to our garage or to the company that leases the truck. Email stays off in the new
-    // app, so this marks it sent to the lessor (named in the note) once; the Lessor email itself is still sent from the current app.
+    // Joe 10/10: a truck write-up goes to our garage or to the company that leases the truck. This marks it sent to the lessor
+    // (named in the note) once; the email itself goes out after the save (admintools.afterSave, Administration > Repair Email).
     if (String(r.kind || '').toUpperCase() !== 'TRUCK') throw new SaveError('NOT_ALLOWED', 'Only a truck write-up goes to a lessor');
     const lessor = String(req.note || '').replace(/[\n|]+/g, ' ').trim().slice(0, 40);
     if (!lessor) throw new SaveError('BAD_REQUEST', 'Say which lessor');
