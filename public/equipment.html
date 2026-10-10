@@ -36,8 +36,8 @@
       <div class="notice error" id="error" hidden></div>
       <div class="sheet scroll-list">
         <table>
-          <colgroup><col style="width:9%"><col style="width:8%"><col style="width:11%"><col style="width:13%"><col style="width:9%"><col style="width:13%"><col style="width:23%"><col style="width:14%"></colgroup>
-          <thead><tr><th>Unit</th><th>Type</th><th>Status</th><th>Location</th><th>Class</th><th>On today</th><th>Reason / notes</th><th></th></tr></thead>
+          <colgroup><col style="width:10%"><col style="width:9%"><col style="width:12%"><col style="width:16%"><col style="width:14%"><col style="width:25%"><col style="width:14%"></colgroup>
+          <thead><tr><th>Unit</th><th>Type</th><th>Status</th><th>Location</th><th>On today</th><th>Down reason</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -63,6 +63,8 @@
     }
     const units = () => lists.allTrucks.concat(lists.allTrailers);
     const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:\s*/i, '');
+    // Joe 10/9: only a real down reason shows; the sheet's sync notes ("External Fleet: ...", "Route Day ...") stay in the sheet.
+    const downReason = (e) => String(e.status).toUpperCase() === 'DOWN' || /^DOWN:/i.test(String(e.notes || '')) ? reasonOf(e) : '';
 
     function render() {
       const edit = canSave(), all = units(), on = onToday();
@@ -74,17 +76,17 @@
       document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + all.filter(e => match(e, k)).length + '</b></button>').join('');
       const typed = document.querySelector('[data-reason]') ? document.querySelector('[data-reason]').value : '';
       const q = search.toUpperCase();
-      const list = all.filter(e => match(e, filter) && (!q || [e.unit, e.location, e.notes, e.status, e.assignmentClass].join(' ').toUpperCase().indexOf(q) >= 0));
+      const list = all.filter(e => match(e, filter) && (!q || [e.unit, e.location, downReason(e), e.status].join(' ').toUpperCase().indexOf(q) >= 0));
       document.getElementById('rows').innerHTML = list.map(e => {
         const off = L.unitOff(e), down = String(e.status).toUpperCase() === 'DOWN', routes = on[e.id] || [];
         const action = !edit ? '' : downFor === e.id
           ? '<span class="down-box"><input data-reason maxlength="120" placeholder="Why is it down?"><button type="button" class="warn" data-down-save>Down</button><button type="button" data-down-cancel>Cancel</button></span>'
           : down ? '<button type="button" data-up>Back in service</button>' : off ? '' : '<button type="button" class="warn" data-down>Put down</button>';
         return '<tr data-id="' + escapeHtml(e.id) + '"' + (off ? ' class="off"' : '') + '><td class="strong">' + escapeHtml(e.unit) + '</td><td><span class="tag">' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</span></td>' +
-          '<td><span class="status' + (off ? ' off' : '') + '">' + escapeHtml(String(e.status || '').replace(/_/g, ' ') || 'ACTIVE') + '</span></td><td>' + escapeHtml(e.location || '') + '</td><td>' + escapeHtml(e.assignmentClass || '') + '</td>' +
+          '<td><span class="status' + (off ? ' off' : '') + '">' + escapeHtml(String(e.status || '').replace(/_/g, ' ') || 'ACTIVE') + '</span></td><td>' + escapeHtml(e.location || '') + '</td>' +
           '<td class="' + (off && routes.length ? 'issue' : '') + '">' + escapeHtml(routes.join(', ')) + '</td>' +
-          '<td class="left" title="' + escapeHtml(e.notes || '') + '">' + escapeHtml(down ? reasonOf(e) + (e.downSince ? ' (since ' + shortDate(String(e.downSince).slice(0, 10)) + ')' : '') : e.notes || '') + '</td><td>' + action + '</td></tr>';
-      }).join('') || '<tr><td colspan="8" class="empty">No units match.</td></tr>';
+          '<td class="left">' + escapeHtml(downReason(e) + (down && e.downSince ? ' (since ' + shortDate(String(e.downSince).slice(0, 10)) + ')' : '')) + '</td><td>' + action + '</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="empty">No units match.</td></tr>';
       const box = document.querySelector('[data-reason]');
       if (box) { box.value = typed; if (document.activeElement !== box) box.focus(); }
     }
