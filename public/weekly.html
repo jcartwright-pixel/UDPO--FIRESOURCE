@@ -148,6 +148,9 @@
         L.DAYS.map(p => {
           const d = r.days[p], cls = L.weeklyCellClass(r, p, ctx), locked = cls === 'coverage' && !override;
           const can = edit && !locked;
+          // Joe 10/10: a day the Live sheet marks as not running but still holds a driver is never shown black: the driver
+          // shows, marked Not running, so it can be fixed (picking a driver turns the day back on).
+          if (cls === 'off' && d.driver) return '<td class="day c-notrun' + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(d.driver + ([d.truck, d.trailer].filter(Boolean).length ? ', ' + [d.truck, d.trailer].filter(Boolean).join(' / ') : '') + '. Marked as not running this day' + (can ? ': click to pick the driver again and turn the day on' : '')) + '"><b class="nm">' + escapeHtml(d.driver) + '</b><em class="notrun">Not running</em></td>';
           if (cls === 'off') return '<td class="day off' + (can ? ' editable' : '') + '" data-day="' + p + '" title="Does not run' + (can ? ': click to assign a driver or carrier' : '') + '"></td>';
           if (cls === 'coverage' && !override) return '<td class="day off c-coverage" data-day="' + p + '" title="' + escapeHtml(String(r.coverageType || 'Covered') + ' covers this run') + '"></td>';
           const units = [d.truck, d.trailer].filter(Boolean).join(' / '), plant = L.plantFor(ctx, r, p);
@@ -224,6 +227,7 @@
       popover = document.createElement('div');
       popover.className = 'popover';
       popover.innerHTML = '<b style="grid-column:1/3">' + escapeHtml(row.route + ' ' + row.run + ', ' + L.DAY_NAMES[L.DAYS.indexOf(day)] + ' ' + shortDate(d.date)) + '</b>' +
+        (d.runs ? '' : '<small class="pop-note">' + (d.driver ? 'Marked as not running this day. ' : 'Does not run this day. ') + 'Pick a driver to turn it on; then the truck and trailer can be picked.</small>') +
         '<label>Driver</label><select data-kind="driver">' + driverOptions(row, day) + '</select>' +
         '<label>Truck</label><select data-kind="truck"' + (d.runs ? '' : ' disabled') + '>' + optionsHtml('truck', d.truckId, busyOn(day, 'truckId', row), opts) + '</select>' +
         '<label>Trailer</label><select data-kind="trailer"' + (d.runs ? '' : ' disabled') + '>' + optionsHtml('trailer', d.trailerId, busyOn(day, 'trailerId', row), opts) + '</select>' +
@@ -245,8 +249,13 @@
       }));
       popover.querySelector('.close').addEventListener('click', closePopover);
       popover.addEventListener('keydown', ev => { if (ev.key === 'Escape') closePopover(); });
-      popover.querySelector('select').focus();
+      // Joe 10/10: one click opens the driver drop-down, like the current app.
+      const pick = popover.querySelector('select[data-kind="driver"]');
+      pick.focus();
+      try { if (pick.showPicker) pick.showPicker(); } catch (x) { /* the list opens on the next click */ }
     });
+    // A click anywhere outside the editor closes it (and a click on another day opens that day).
+    document.addEventListener('mousedown', e => { if (popover && !popover.contains(e.target)) closePopover(); }, true);
 
     /* ---------- Driver Assignment Board: availability for one driver and day ---------- */
     const modals = ['avail-modal', 'days-modal'];
