@@ -116,6 +116,12 @@ addSideMenu();
 
 // Moving between screens feels like one app (Joe 10/9): Chrome gets each screen ready while the pointer rests on its menu
 // link, so a click shows it at once. Pages of the current app and the drivers' phone page are left out.
+// Standing rule (Joe, 10/9): every link opens in this window; a link that asks for a new tab is opened here instead.
+document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a[target]');
+  if (a && a.target !== '_self') a.removeAttribute('target');
+}, true);
+
 (function prerenderOnHover() {
   try {
     if (!(HTMLScriptElement.supports && HTMLScriptElement.supports('speculationrules'))) return;

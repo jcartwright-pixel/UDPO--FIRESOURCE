@@ -163,3 +163,10 @@ this app needs, not Owner:
 | Firebase Rules Admin, Cloud Datastore Index Admin | database rules and indexes |
 | Service Usage Admin | turns on the Google services the app uses, on the first deploy |
 | API Keys Viewer | the screens' Firebase settings |
+
+## Standing rule: one window (Joe, 10/9)
+
+Every screen and link opens in the same window, never a new tab, for this app and every screen added later, unless Joe
+says otherwise. Moving between screens keeps the header and side menu in place with no blank flash (cross-document view
+transitions in `css/app.css`, prerender on hover and the remembered sign-in in `js/app.js`). `functions/test/unit/same-window.test.js`
+fails if any page or script uses `target="_blank"` or `window.open`.
