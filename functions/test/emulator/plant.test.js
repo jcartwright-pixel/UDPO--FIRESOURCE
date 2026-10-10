@@ -152,3 +152,19 @@ test('Quality: the copy brings the lines and their last checks; Record Quality C
   const totes = lines.find(l => l.name === 'TOTES').last;
   assert.deepEqual([totes.product, totes.status, totes.qualityCheck, totes.notes], ['Orange drink', 'REVIEW', 'PASS', 'Cap torque low']);
 });
+
+/* ---------- Shift Notes (Incident & Breakdown Log) ---------- */
+test('Shift Notes: an entry and a review note under it are saved, kept by the next copy, and show on the 24-hour log', async () => {
+  const s = (fields) => applyAction(db(), DISPATCHER, Object.assign({ action: 'saveShiftNote', requestId: rid() }, fields));
+  await assert.rejects(s({ values: { Type: 'Breakdown' } }), /Enter report information before saving/);
+  await assert.rejects(s({ values: { Entry: 'More', ParentId: 'SHIFT-nothere' } }), /no longer on the log/);
+  const first = await s({ values: { Entry: 'Palletizer jammed twice', Type: 'Breakdown', Equipment: 'Palletizer' }, notes: 'Maintenance to look at the infeed', readingTime: '14:20', followUpStatus: 'OPEN' });
+  assert.match(first.entryId, /^SHIFT-/);
+  assert.ok(R.SHIFTS.indexOf(first.shift) >= 0);
+  const review = await s({ values: { Entry: 'Infeed sensor cleaned', ParentId: first.entryId }, followUpStatus: 'RESOLVED' });
+  assert.equal(review.message, 'Review note added.');
+  await copy();
+  const all = (await db().collection('plantJournal').where('type', '==', 'SHIFT_REPORT').get()).docs.map(d => d.data());
+  const entry = R.shiftLog(all, Date.now()).find(r => r.entryId === first.entryId);
+  assert.deepEqual([entry.type, entry.equipment, entry.notes, entry.status, entry.reviews.map(r => r.entry)], ['Breakdown', 'Palletizer', 'Maintenance to look at the infeed', 'RESOLVED', ['Infeed sensor cleaned']]);
+});

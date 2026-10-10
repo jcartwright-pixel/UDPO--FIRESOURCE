@@ -610,6 +610,42 @@ async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
   return result;
 }
 
-module.exports = { validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+/* ---------- Shift Notes (Incident & Breakdown Log) ---------- */
+
+// saveShiftNote: a timestamped entry or a review note under one, as desktopUiSavePlantShiftReportV5008 (section handoff).
+function validateShiftNote(input, SaveError) {
+  const v = input.values && typeof input.values === 'object' ? input.values : {};
+  const out = { parentId: text(v.ParentId).slice(0, 80), entry: text(v.Entry).slice(0, 4000), notes: text(input.notes).slice(0, 1500), readingTime: text(input.readingTime).slice(0, 20) };
+  out.type = out.parentId ? 'REVIEW' : text(v.Type).slice(0, 40) || 'Handoff';
+  if (!out.parentId && R.ENTRY_TYPES.indexOf(out.type) < 0) throw new SaveError('BAD_REQUEST', 'Type must be Breakdown, Incident, Safety, Quality, Handoff or Other.');
+  out.equipment = out.parentId ? '' : text(v.Equipment).slice(0, 80);
+  out.shift = text(input.shift).toUpperCase();
+  if (out.shift && R.SHIFTS.indexOf(out.shift) < 0) throw new SaveError('BAD_REQUEST', 'Shift could not be determined.');
+  out.followUpStatus = text(input.followUpStatus).toUpperCase() || 'OPEN';
+  if (R.FOLLOW_UPS.indexOf(out.followUpStatus) < 0) throw new SaveError('BAD_REQUEST', 'Follow-up must be Open, Monitor or Resolved.');
+  if (out.parentId && !out.entry) throw new SaveError('BAD_REQUEST', 'Enter the review note before adding it.');
+  if (!out.parentId && !out.entry && !out.notes) throw new SaveError('BAD_REQUEST', 'Enter report information before saving.');
+  if (out.parentId) out.entry = out.entry.slice(0, 500);
+  return out;
+}
+
+async function saveShiftNote(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const journal = db.collection('plantJournal');
+  if (req.parentId) {
+    const parent = (await tx.get(journal.where('recordId', '==', req.parentId))).docs.map(d => d.data()).filter(d => d.type === R.SHIFT_TYPE);
+    if (!parent.length) throw new SaveError('NOT_FOUND', 'That entry is no longer on the log.');
+  }
+  const now = new Date(stamp), entryId = 'SHIFT-' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 30);
+  const shift = req.shift || R.shiftAt(now.getTime());
+  const values = req.parentId ? { Entry: req.entry, Type: 'REVIEW', ParentId: req.parentId } : { Entry: req.entry, Type: req.type, Equipment: req.equipment };
+  const payload = { entryId, date: L.operatingDay(now), shift, section: 'HANDOFF', readingTime: req.readingTime, values, notes: req.notes, followUpStatus: req.followUpStatus };
+  tx.set(journal.doc(R.SHIFT_TYPE + '_app_' + entryId.replace(/[^A-Za-z0-9]/g, '')), { recordId: entryId, type: R.SHIFT_TYPE, date: payload.date, status: req.followUpStatus, shift, area: 'HANDOFF',
+    notes: req.notes, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  const result = { ok: true, requestId: req.requestId, entryId, shift, recordedAt: stamp, message: req.parentId ? 'Review note added.' : 'Shift entry saved.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, entryId, after: payload, result });
+  return result;
+}
+
+module.exports = { validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

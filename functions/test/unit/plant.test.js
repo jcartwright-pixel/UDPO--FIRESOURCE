@@ -230,3 +230,25 @@ test('quality: the active lines in view order with their last check; each line r
   assert.throws(() => P.validateQuality({ operationId: 'ut_prod_boxing', status: 'BROKEN' }, SaveError), /Status must be Running, Review, Changeover, Down, or Finished/);
   assert.deepEqual(P.validateQuality({ operationId: 'ut_prod_boxing', weights: { result: '3990', evil: 'x' } }, SaveError).weights, { result: '3990' });
 });
+
+test('Shift Notes: shift by New York hour, the 24-hour log with reviews under their entry, and the save checks', () => {
+  assert.deepEqual(['2026-10-08T11:00:00Z', '2026-10-08T19:00:00Z', '2026-10-09T05:00:00Z'].map(t => R.shiftAt(Date.parse(t))), ['FIRST SHIFT', 'SECOND SHIFT', 'THIRD SHIFT']);
+  const rec = (id, at, values, follow, extra) => Object.assign({ type: 'SHIFT_REPORT', recordId: id, recordedAt: at, recordedBy: 'sup@uniteddairy.com', area: 'HANDOFF', payload: { entryId: id, section: 'HANDOFF', values, notes: '', followUpStatus: follow } }, extra);
+  const journal = [
+    rec('SHIFT-1', '2026-10-08T12:00:00Z', { Entry: 'Dock 3 door stuck', Type: 'Breakdown', Equipment: 'Dock 3 door' }, 'OPEN'),
+    rec('SHIFT-2', '2026-10-08T13:00:00Z', { Entry: 'Called door company', Type: 'REVIEW', ParentId: 'SHIFT-1' }, 'MONITOR'),
+    rec('SHIFT-3', '2026-10-08T15:00:00Z', { Entry: 'Fixed', Type: 'REVIEW', ParentId: 'SHIFT-1' }, 'RESOLVED'),
+    rec('SHIFT-4', '2026-10-08T16:00:00Z', { Entry: 'Wet floor', Type: 'Safety', Equipment: 'Cooler' }, 'OPEN'),
+    rec('SHIFT-5', '2026-10-06T16:00:00Z', { Entry: 'Too old', Type: 'Other' }, 'OPEN'),
+    rec('SHIFT-6', '2026-10-08T16:00:00Z', { Entry: '40F', Type: '' }, 'OPEN', { area: 'TEMPERATURES', payload: { entryId: 'SHIFT-6', section: 'TEMPERATURES', values: { Entry: '40F' } } })];
+  const log = R.shiftLog(journal, Date.parse('2026-10-08T20:00:00Z'));
+  assert.deepEqual(log.map(r => [r.entryId, r.status, r.reviews.map(x => x.entry)]), [['SHIFT-4', 'OPEN', []], ['SHIFT-1', 'RESOLVED', ['Called door company', 'Fixed']]]);
+  assert.deepEqual(['OPEN', 'MONITOR', 'RESOLVED', ''].map(R.followLabel), ['Needs attention', 'Monitor', 'Resolved', 'Needs attention']);
+  assert.throws(() => P.validateShiftNote({ values: { Type: 'Breakdown' } }, SaveError), /Enter report information before saving/);
+  assert.throws(() => P.validateShiftNote({ values: { ParentId: 'SHIFT-1' } }, SaveError), /Enter the review note before adding it/);
+  assert.throws(() => P.validateShiftNote({ values: { Entry: 'x', Type: 'Party' } }, SaveError), /Type must be/);
+  assert.throws(() => P.validateShiftNote({ values: { Entry: 'x', Type: 'Other' }, followUpStatus: 'LATER' }, SaveError), /Follow-up must be/);
+  const ok = P.validateShiftNote({ values: { Entry: 'Belt slipping', Type: 'Breakdown', Equipment: 'Palletizer' }, notes: 'Watch it', shift: 'first shift', followUpStatus: 'monitor' }, SaveError);
+  assert.deepEqual([ok.type, ok.equipment, ok.shift, ok.followUpStatus], ['Breakdown', 'Palletizer', 'FIRST SHIFT', 'MONITOR']);
+  assert.equal(P.validateShiftNote({ values: { Entry: 'y'.repeat(900), ParentId: 'SHIFT-1' } }, SaveError).entry.length, 500);
+});
