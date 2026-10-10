@@ -81,6 +81,13 @@
   .gs-btn { font-size: 22px; min-height: 60px; }
   .gs-job { grid-template-columns: 1fr; } .gs-job .gs-btn { width: 100%; }
   .gs-two { grid-template-columns: 1fr; }
+  /* A phone: the names, the dots and the keypad shrink to fit the width instead of running off the right edge. */
+  .gs-page .view { padding: 0 8px 10px; }
+  .gs-card { padding: 12px; min-width: 0; }
+  .gs-names { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .gs-name { font-size: 20px; min-height: 70px; padding: 10px 6px; }
+  .gs-dots { gap: 8px; } .gs-dots i { width: 30px; height: 30px; }
+  .gs-keys { gap: 8px; } .gs-keys button { font-size: 28px; min-height: 56px; min-width: 0; } .gs-keys button.go { font-size: 22px; }
 }
 
 /* ---------- The drivers' phone page (route.html): the menu cards, View Loadout and DVIR ---------- */
@@ -226,3 +233,12 @@ body.ds-tv .foot { color: #cfe3f6; }
 .ps-page .ps-tab small { display: block; font-size: 17px; color: #4a5b6c; }
 .ps-page .ps-count { display: inline-block; margin-top: 8px; font-weight: 700; color: var(--accent); font-size: 17px; }
 .ps-page .ps-foot { margin-top: 18px; color: #5b6b7c; font-size: 14px; }
+@media (max-width: 700px) {
+  .ps-page #ps-top { flex-wrap: wrap; padding: 6px 10px; }
+  .ps-page #ps-top .ps-brand img { display: none; }
+  .ps-page #ps-top .ps-brand strong { font-size: 17px; white-space: nowrap; }
+  .ps-page #ps-top button { min-height: 36px; padding: 0 10px; font-size: 14px; }
+  .ps-page .ps-pill { order: 9; flex-basis: 100%; text-align: center; }
+  .ps-page .ps-stations, .ps-page .ps-tabs { grid-template-columns: 1fr; }
+  .ps-page .ps-title h1 { font-size: 24px; }
+}
