@@ -19,6 +19,7 @@ const OTR = require('./otr-core');
 const SC = require('./sc-core');
 const PLANT = require('./plant');
 const GARAGE = require('./garage');
+const RIGHTS = require('./rights');
 
 const C = M.COLLECTIONS;
 
@@ -369,12 +370,17 @@ function validate(input) {
   return out;
 }
 
-async function requireSaver(tx, db, user, roles) {
+async function requireSaver(tx, db, user, roles, action) {
   const email = String(user && user.email || '').toLowerCase();
   const snap = await tx.get(db.collection(C.users).doc(M.safeIdPart(email)));
   const person = snap.exists ? snap.data() : null;
   if (!person || person.status !== 'ACTIVE') throw new SaveError('NOT_ALLOWED', email + ' is not an active user in the Users list');
-  if (!L.hasRole(person, roles)) throw new SaveError('NOT_ALLOWED', email + ' does not have a role that can make this save (' + roles.join(', ') + ')');
+  // Administration's Role Templates and the person's Allow / Deny (rights.js) change the role check only where set.
+  const [tpl, ex] = await Promise.all([tx.get(db.collection('private').doc('roleTemplates')), tx.get(db.collection('personRights').doc(M.safeIdPart(email)))]);
+  const roleOk = L.hasRole(person, roles);
+  if (!RIGHTS.saveAllowed(person, action, roleOk, tpl.exists ? tpl.data().templates : null, ex.exists ? ex.data() : null)) {
+    throw new SaveError('NOT_ALLOWED', roleOk ? email + ' is not allowed this save (Administration > People & Roles)' : email + ' does not have a role that can make this save (' + roles.join(', ') + ')');
+  }
   return person;
 }
 
@@ -480,7 +486,7 @@ async function applyAction(db, user, input, now) {
       return Object.assign({}, prior.result, { repeated: true });
     }
     const mode = await requireTestMode(tx, db, spec.screen);
-    await requireSaver(tx, db, user, spec.roles);
+    await requireSaver(tx, db, user, spec.roles, req.action);
 
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'moveRun') return moveRun(tx, db, req, email, stamp, logRef, mode);

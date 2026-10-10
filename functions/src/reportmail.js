@@ -34,16 +34,39 @@ function reportHtml(report) {
   return '<!doctype html><html><head><meta charset="utf-8"></head><body><pre style="font:14px/1.4 Consolas,Menlo,monospace;white-space:pre-wrap">' + e(report.text) + '</pre></body></html>';
 }
 
+// Administration > Sent Email Log. A log line that cannot be written never stops the report.
+async function logReport(db, report, status, sentTo, reason) {
+  try {
+    await db.collection('sentEmails').add({ at: new Date().toISOString(), kind: 'Plant report', label: report.group || 'Current report', detail: report.mode || '', by: report.by || '',
+      meantFor: [], subject: String(report.subject || '').slice(0, 300), sentTo, status, reason: String(reason || '').slice(0, 200), testCopy: report.mode !== 'live' });
+  } catch (e) { console.error('Sent Email Log', e.message || e); }
+}
+
 // ref: the plantReports document; deps: { env, sendMail } (fakes in the tests).
 async function mailReport(ref, report, deps) {
   const d = deps || {};
-  const env = d.env || process.env;
+  let env = d.env || process.env;
   const send = d.sendMail || sendMail;
   if (!report || report.status !== 'SENDING') return null;
   const from = String(env.MAIL_FROM || '').trim();
   if (!from) {
     await ref.update({ status: 'HELD', emailed: false, reason: 'Email is not set up in the new app yet.' });
     return 'HELD';
+  }
+  // Administration: the Sending switch, and the location's report group the sender picked (live mode only; the sandbox
+  // sends to the sender). Both are read only where the report document comes from the database (not in the unit tests).
+  const db = d.db || (ref && ref.firestore) || null;
+  if (db) {
+    const s = (await db.collection('private').doc('emailSettings').get()).data() || {};
+    if (s.sending === false) {
+      await ref.update({ status: 'HELD', emailed: false, reason: 'Sending is OFF (Administration > Sent Email Log).' });
+      await logReport(db, report, 'BLOCKED', [], 'Outbound email is turned off.');
+      return 'HELD';
+    }
+    if (report.mode === 'live' && report.group) {
+      const g = (await db.collection('reportGroups').where('facilityId', '==', report.facilityId || 'fac_uniontown').where('name', '==', report.group).get()).docs.map(x => x.data()).find(x => x.active !== false);
+      if (g && g.recipients && g.recipients.length) env = Object.assign({}, env, { REPORT_TO: g.recipients.join(',') });
+    }
   }
   const { to, copy } = recipients(report, env);
   if (!to.length) {
@@ -53,11 +76,13 @@ async function mailReport(ref, report, deps) {
   try {
     const sent = await send({ from, fromName: 'United Dairy Plant Operations', to, subject: report.subject, text: report.text, html: reportHtml(report) });
     await ref.update({ status: 'SENT', emailed: true, sentTo: sent.to, testCopy: copy, sentAt: Date.now(), gmailId: sent.id || '', reason: '' });
+    if (db) await logReport(db, report, 'SENT', sent.to, copy ? 'Test copy: sent only to ' + sent.to.join(', ') + '.' : '');
     return 'SENT';
   } catch (e) {
     const reason = REASON[e.code] || ('The email did not go out: ' + (e.message || e));
     console.error('Send Current Report email failed', e.code || '', e.message || e);
     await ref.update({ status: 'FAILED', emailed: false, reason, errorCode: e.code || 'ERROR' });
+    if (db) await logReport(db, report, 'FAILED', [], reason);
     return 'FAILED';
   }
 }
