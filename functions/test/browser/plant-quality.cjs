@@ -1,7 +1,8 @@
 'use strict';
 /*
  * Browser check of Production Line Status & Quality on the made-up plant (test/fixtures/plant-demo.js): the lines in view order
- * with their last checks, each line's own fields, Record Quality Check, the 24-hour history, and a second open screen.
+ * with their last checks, each line's own fields, a check saved box by box as each is left (Joe 10/10: no Record button; the
+ * boxes start empty with the last check small and grey), the 24-hour history, and a second open screen.
  * (Below: the old header of the Yard Checks test this file was made from.)
  * Browser check of Yard Checks against the local test database (npm run test:browser). Four loaded trailers wait on the
  * yard today (dated from the real clock, since the yard list follows the time of day): T-701 never checked, T-702 checked
@@ -55,12 +56,14 @@ async function shots(page, name, w) {
       await page.waitForFunction(() => document.querySelectorAll('#lines [data-line]').length === 5);
       assert.deepEqual(await page.$$eval('#lines [data-line] span', s => s.map(x => x.textContent)), ['BOXING', 'TOTES', 'HTST #1', 'GALLON FILLER', 'BLOW MOLD']);
       assert.equal(await page.textContent('#form-title'), 'BOXING Quality Check');
-      assert.equal(await page.inputValue('.prod-product'), '1% Chocolate milk', 'the form starts from the line\'s last check');
+      assert.equal(await page.inputValue('.prod-product'), '', 'the boxes start empty');
+      assert.match(await page.textContent('#fields'), /Last: 1% Chocolate milk/, 'the line\'s last check shows small and grey');
       assert.equal(await page.$('.prod-cycle'), null, 'Boxing records no cycle time');
       await page.click('[data-line="ut_prod_blow_mold"]');
       await page.waitForFunction(() => document.getElementById('form-title').textContent === 'BLOW MOLD Quality Check');
       assert.equal(await page.$$eval('.prod-head', x => x.length), 6);
-      assert.equal(await page.inputValue('.prod-head[data-head="2"]'), '58.5');
+      assert.equal(await page.inputValue('.prod-head[data-head="2"]'), '');
+      assert.match(await page.textContent('.qc-heads'), /Last: 58\.5/);
       await fits(page, 'Quality ' + w + 'x' + h);
       await shots(page, 'quality-blowmold', w);
       await page.click('[data-line="ut_prod_htst_1"]');
@@ -80,15 +83,17 @@ async function shots(page, name, w) {
     const before = await watcher.$$eval('#history tr:not(:has(td.empty))', r => r.length);
     assert.equal(await desk.$('.prod-weights'), null, 'Totes records no weight');
     await desk.fill('.prod-product', 'Orange drink');
-    await desk.fill('.prod-temperature', '38');
-    await desk.selectOption('.prod-status', 'REVIEW');
-    await desk.fill('.prod-notes', 'Cap torque low');
+    await desk.press('.prod-product', 'Tab');
     const t0 = Date.now();
-    await desk.click('#record');
-    await desk.waitForFunction(() => /Review/.test(document.getElementById('form-last').textContent));
+    await desk.fill('.prod-temperature', '38');
+    await desk.press('.prod-temperature', 'Tab');
+    await desk.selectOption('.prod-status', 'REVIEW');
+    await desk.waitForFunction(() => /^Saved/.test(document.querySelector('[data-note="prod-status"]').textContent));
     const shown = Date.now() - t0;
+    await desk.fill('.prod-notes', 'Cap torque low');
+    await desk.press('.prod-notes', 'Tab');
     await watcher.waitForFunction((n) => document.querySelectorAll('#history tr:not(:has(td.empty))').length === n + 1 && /TOTES[\s\S]*Orange drink[\s\S]*Temp 38[\s\S]*Review[\s\S]*Cap torque low/.test(document.querySelector('#history tr').textContent), before, { timeout: 8000 });
-    results.push('Record Quality Check (TOTES, Review, 38): on screen in ' + shown + ' ms, top of the other screen\'s 24-hour history in ' + (Date.now() - t0) + ' ms');
+    results.push('Quality check saved box by box (TOTES, Review, 38): on screen in ' + shown + ' ms, top of the other screen\'s 24-hour history in ' + (Date.now() - t0) + ' ms');
     if (SHOTS) await watcher.screenshot({ path: path.join(SHOTS, 'quality-history-1920.png'), scale: 'css' });
     const phone = await openPage(browser, 412, 860, '/quality.html?line=ut_prod_gallon_filler&' + MANAGER.slice(1));
     await phone.waitForFunction(() => document.getElementById('form-title').textContent === 'GALLON FILLER Quality Check');
