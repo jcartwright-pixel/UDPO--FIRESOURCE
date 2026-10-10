@@ -3,9 +3,11 @@
  * 040_V740_MocreoNormalizationAssignment.gs): GET https://api.mocreo.com/v1/assets/<asset>/devices with the X-API-Key
  * header, a device's own page when the list has no temperature, and the temperature in hundredths of a degree Celsius.
  *
- * The API key and asset ID are the Secret Manager secrets MOCREO_API_KEY and MOCREO_ASSET_ID of the project the server runs
- * in. They are read when the sync runs, never stored in the database, never logged and never sent to a screen. Until both
- * secrets are there the sync does nothing and Cooler Temperatures stays manual.
+ * Joe 10/10: an administrator pastes the API key and asset ID in Administration > MOCREO & Sensors (mocreo.html, through
+ * mocreoCall below). They are kept in private/mocreo, which no screen can read (firestore.rules); the screen only learns the
+ * key's last 4 characters, who saved it and when. The key is never logged and never sent back. The sync starts once a key is
+ * saved and Test Connection passes; until then Cooler Temperatures stays manual. (The Secret Manager secrets MOCREO_API_KEY
+ * and MOCREO_ASSET_ID are read instead when nothing is saved in the app.)
  *
  * Each sensor goes in sensors/<sensorId> (temperature in °F, battery, online, last reading); config/mocreo holds the last
  * try, the last success and the last error in plain words. Nothing is written to MOCREO or to any sheet.
@@ -134,8 +136,8 @@ async function runMocreoSync({ db, getSecrets, fetchFn, now = () => new Date() }
   const at = now().toISOString(), statusRef = db.collection('config').doc('mocreo');
   let s;
   try { s = await getSecrets(); } catch (e) { await statusRef.set({ configured: false, lastAttempt: at, lastError: 'Could not read the MOCREO settings: ' + e.message }, { merge: true }); return { ok: false }; }
-  if (s.missing || s.denied) {
-    const why = s.missing ? s.missing + ' is not in Secret Manager yet; Cooler Temperatures stays manual.' : 'The server may not read ' + s.denied + ' (needs Secret Manager Secret Accessor).';
+  if (s.missing || s.denied || s.untested) {
+    const why = s.untested ? 'The saved MOCREO key has not passed Test Connection yet; readings are manual.' : s.missing ? 'No MOCREO key saved yet; readings are manual.' : 'The server may not read ' + s.denied + ' (needs Secret Manager Secret Accessor).';
     await statusRef.set({ configured: false, lastAttempt: at, lastError: why }, { merge: true });
     return { ok: false, waiting: true };
   }
@@ -158,4 +160,83 @@ async function runMocreoSync({ db, getSecrets, fetchFn, now = () => new Date() }
   }
 }
 
-module.exports = { runMocreoSync, readSecrets, fetchDevices, normalize, fahrenheit, SECRETS };
+/* ---------- Administration > MOCREO & Sensors (administrators only) ---------- */
+class MocreoError extends Error { constructor(code, message) { super(message); this.code = code; } }
+const L = require('./logic');
+const ends = (v) => { const t = String(v || ''); return t ? t.slice(-4) : ''; };
+const view = (d) => ({ hasKey: !!d.apiKey, keyEnds: ends(d.apiKey), hasAsset: !!d.assetId, assetEnds: ends(d.assetId), savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastTest: d.lastTest || null });
+
+// The key saved in the app once its test has passed (the sync waits until then); else the Secret Manager secrets.
+async function appSecrets(db, fallback) {
+  const d = (await db.collection('private').doc('mocreo').get()).data() || {};
+  if (d.apiKey && d.assetId) return d.lastTest && d.lastTest.ok ? { key: d.apiKey, asset: d.assetId } : { untested: true };
+  return fallback ? fallback() : { missing: SECRETS.key };
+}
+
+const LIMIT = (v) => { const t = String(v === undefined || v === null ? '' : v).trim(); if (t === '') return ''; if (!isFinite(Number(t))) throw new MocreoError('BAD_REQUEST', 'A limit must be a number of °F, or blank.'); return Number(t); };
+const clean = (v, n) => String(v === undefined || v === null ? '' : v).trim().slice(0, n);
+
+/* input.op: status | save {apiKey, assetId} | clear | test | location {locationId?, location, area, sensorId, lowLimit, highLimit, active} | removeLocation {locationId} */
+async function mocreoCall(db, user, input, options) {
+  input = input || {};
+  const o = Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date() }, options || {});
+  const email = String(user && user.email || '').toLowerCase();
+  const person = (await db.collection('users').doc(safeIdPart(email)).get()).data();
+  if (!person || person.status !== 'ACTIVE' || !L.isAdmin(person)) throw new MocreoError('NOT_ALLOWED', 'Only an administrator can change the MOCREO connection and the thermometers');
+  const ref = db.collection('private').doc('mocreo'), d = (await ref.get()).data() || {}, at = o.now().toISOString(), op = String(input.op || 'status');
+  if (op === 'status') return view(d);
+  if (op === 'save') {
+    const next = Object.assign({}, d), key = String(input.apiKey || '').trim(), asset = String(input.assetId || '').trim();
+    if (!key && !asset) throw new MocreoError('BAD_REQUEST', 'Paste the new API key or asset ID first.');
+    if (key) next.apiKey = key.slice(0, 300);
+    if (asset) next.assetId = asset.slice(0, 200);
+    Object.assign(next, { savedAt: at, savedBy: email, lastTest: null });
+    await ref.set(next);
+    await db.collection('config').doc('mocreo').set({ configured: false, lastError: 'New key saved; press Test Connection.' }, { merge: true });
+    return view(next);
+  }
+  if (op === 'clear') {
+    const next = { savedAt: at, savedBy: email, lastTest: null };
+    await ref.set(next);
+    await db.collection('config').doc('mocreo').set({ configured: false, lastError: 'No MOCREO key saved; readings are manual.' }, { merge: true });
+    return view(next);
+  }
+  if (op === 'test') {
+    let result;
+    if (!d.apiKey || !d.assetId) result = { ok: false, message: 'Not tested: save the API key and asset ID first.' };
+    else {
+      try {
+        const devices = await fetchDevices(o.fetch, d.apiKey, d.assetId);
+        result = { ok: true, message: 'Connected. MOCREO sent ' + devices.length + ' sensor' + (devices.length === 1 ? '' : 's') + '.', sensors: devices.length };
+      } catch (e) {
+        result = { ok: false, message: /answered 40[13]/.test(e.message) ? 'MOCREO refused the key (' + e.message.replace(/^MOCREO answered (\d+).*/, '$1') + '). Check the API key and asset ID.' : 'Could not read MOCREO: ' + e.message };
+      }
+    }
+    const lastTest = Object.assign({ at, by: email }, result);
+    await ref.set({ lastTest }, { merge: true });
+    // A passing test reads the sensors at once, so the thermometer list fills in without waiting for the next run.
+    if (result.ok) await runMocreoSync({ db, getSecrets: async () => ({ key: d.apiKey, asset: d.assetId }), fetchFn: o.fetch, now: o.now });
+    return Object.assign(view(Object.assign({}, d, { lastTest })), { result });
+  }
+  if (op === 'location') {
+    const name = clean(input.location, 80);
+    if (!name) throw new MocreoError('BAD_REQUEST', 'Give the thermometer a location name.');
+    const id = clean(input.locationId, 120) || 'ut_temp_app_' + safeIdPart(name.toLowerCase()).replace(/[^a-z0-9]+/g, '_').slice(0, 40) + '_' + Date.parse(at).toString(36);
+    const low = LIMIT(input.lowLimit), high = LIMIT(input.highLimit);
+    if (low !== '' && high !== '' && low > high) throw new MocreoError('BAD_REQUEST', 'The low limit is above the high limit.');
+    const doc = { locationId: id, location: name, area: clean(input.area, 80), sensorId: clean(input.sensorId, 120), sensorName: clean(input.sensorName, 120), lowLimit: low, highLimit: high,
+      active: input.active !== false, removed: false, facilityId: 'fac_uniontown', updatedAt: at, updatedBy: email };
+    if (input.viewSequence !== undefined && isFinite(Number(input.viewSequence))) doc.viewSequence = Number(input.viewSequence);
+    await db.collection('tempLocations').doc(safeIdPart(id)).set(doc, { merge: true });
+    return { ok: true, location: doc };
+  }
+  if (op === 'removeLocation') {
+    const id = clean(input.locationId, 120);
+    if (!id) throw new MocreoError('BAD_REQUEST', 'Which thermometer?');
+    await db.collection('tempLocations').doc(safeIdPart(id)).set({ locationId: id, removed: true, active: false, updatedAt: at, updatedBy: email }, { merge: true });
+    return { ok: true };
+  }
+  throw new MocreoError('BAD_REQUEST', 'Unknown MOCREO step ' + op.slice(0, 30));
+}
+
+module.exports = { runMocreoSync, readSecrets, fetchDevices, normalize, fahrenheit, SECRETS, mocreoCall, MocreoError, appSecrets };

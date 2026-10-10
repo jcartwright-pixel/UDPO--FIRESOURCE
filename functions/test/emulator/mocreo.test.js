@@ -33,7 +33,7 @@ test('no secrets yet: nothing is read and the screen is told it stays manual', a
   assert.deepEqual([out.waiting, calls.length], [true, 0]);
   const s = (await db().collection('config').doc('mocreo').get()).data();
   assert.equal(s.configured, false);
-  assert.match(s.lastError, /MOCREO_API_KEY is not in Secret Manager yet/);
+  assert.match(s.lastError, /No MOCREO key saved yet/);
   assert.equal((await db().collection('sensors').get()).size, 0);
 });
 
@@ -77,4 +77,56 @@ test('Temperatures: a location takes its sensor by ID, else by exactly its name,
   const rows = R.tempRows(setup, [], now, sensors);
   assert.deepEqual(rows.map(r => [r.location, r.sensorTemp, r.status]), [['Cooler Middle', 36, 'STALE'], ['Cooler North', 38.2, 'HIGH'], ['Dock', '', 'MANUAL ONLY']]);
   assert.deepEqual(R.tempRows(setup, [], now).map(r => r.status), ['MANUAL ONLY', 'MANUAL ONLY', 'MANUAL ONLY'], 'no sensors: manual, as before');
+});
+
+/* ---------- Administration > MOCREO & Sensors ---------- */
+const { runTransfer } = require('../../src/transfer');
+const { applyAction } = require('../../src/actions');
+const D = require('../../src/demo-sheets');
+const PD = require('../fixtures/plant-demo');
+const ADMIN = { email: 'admin.test@uniteddairy.com' }, MANAGER = { email: 'manager.test@uniteddairy.com' };
+const plant = () => runTransfer({ db: db(), reader: D.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T16:00:00Z') });
+
+test('only an administrator may set the key; the screen gets the last 4 characters, never the key', async () => {
+  await plant();
+  await assert.rejects(M.mocreoCall(db(), MANAGER, { op: 'status' }), /Only an administrator/);
+  const saved = await M.mocreoCall(db(), ADMIN, { op: 'save', apiKey: KEY, assetId: 'asset-12345' });
+  assert.deepEqual([saved.hasKey, saved.keyEnds, saved.hasAsset, saved.assetEnds, saved.savedBy], [true, KEY.slice(-4), true, '2345', 'admin.test@uniteddairy.com']);
+  assert.ok(!JSON.stringify(saved).includes(KEY) && !JSON.stringify(await M.mocreoCall(db(), ADMIN, { op: 'status' })).includes(KEY));
+  // Saved but not tested: the sync waits, readings stay manual.
+  const calls = [];
+  const waiting = await M.runMocreoSync({ db: db(), getSecrets: () => M.appSecrets(db()), fetchFn: fakeMocreo(calls) });
+  assert.deepEqual([waiting.waiting, calls.length], [true, 0]);
+  // Test Connection reads MOCREO with the saved key and fills the sensors at once.
+  const tested = await M.mocreoCall(db(), ADMIN, { op: 'test' }, { fetch: fakeMocreo(calls) });
+  assert.deepEqual([tested.result.ok, tested.result.sensors, tested.lastTest.ok], [true, 2, true]);
+  assert.ok(!JSON.stringify(tested).includes(KEY));
+  assert.equal((await db().collection('sensors').get()).size, 2);
+  assert.deepEqual(await M.appSecrets(db()), { key: KEY, asset: 'asset-12345' });
+  // Replace Key: a new key waits for its own test.
+  await M.mocreoCall(db(), ADMIN, { op: 'save', apiKey: 'mok_new_key_9876' });
+  assert.deepEqual(await M.appSecrets(db()), { untested: true });
+  const refused = await M.mocreoCall(db(), ADMIN, { op: 'test' }, { fetch: async () => ({ ok: false, status: 401, text: async () => 'no' }) });
+  assert.equal(refused.result.ok, false);
+  assert.match(refused.result.message, /MOCREO refused the key \(401\)/);
+});
+
+test('thermometers: add, rename, limits and off in Administration; Cooler Temperatures and its saves follow', async () => {
+  await plant();
+  const setup = (await db().collection('plantSetup').get()).docs.map(d => d.data());
+  const added = await M.mocreoCall(db(), ADMIN, { op: 'location', location: 'Freezer 2', area: 'Dock freezer', sensorId: 'S9', lowLimit: '-10', highLimit: '5' });
+  await M.mocreoCall(db(), ADMIN, { op: 'location', locationId: 'ut_temp_cooler_north', location: 'Cooler North (milk)', lowLimit: '33', highLimit: '40' });
+  await M.mocreoCall(db(), ADMIN, { op: 'location', locationId: 'ut_temp_cooler_middle', location: 'Cooler Middle', active: false });
+  await assert.rejects(M.mocreoCall(db(), ADMIN, { op: 'location', location: 'Bad', lowLimit: '50', highLimit: '40' }), /low limit is above/);
+  const mine = () => db().collection('tempLocations').get().then(s => s.docs.map(d => d.data()));
+  let locs = R.tempLocations(R.withTempLocations(setup, await mine()));
+  assert.deepEqual(locs.map(l => [l.location, l.lowLimit, l.highLimit]), [['Cooler North (milk)', 33, 40], ['Freezer 2', -10, 5]]);
+  assert.equal(locs[1].area, 'Dock freezer');
+  // A reading on the new thermometer saves like any other.
+  const r = await applyAction(db(), { email: 'dispatch.test@uniteddairy.com' }, { action: 'saveTemperatureCheck', requestId: 'mocreo-t-' + Date.now(), locationId: added.location.locationId, manualTemperature: '9' });
+  assert.equal(r.status, 'HIGH');
+  await M.mocreoCall(db(), ADMIN, { op: 'removeLocation', locationId: added.location.locationId });
+  locs = R.tempLocations(R.withTempLocations(setup, await mine()));
+  assert.deepEqual(locs.map(l => l.location), ['Cooler North (milk)']);
+  await assert.rejects(applyAction(db(), { email: 'dispatch.test@uniteddairy.com' }, { action: 'saveTemperatureCheck', requestId: 'mocreo-t2-' + Date.now(), locationId: 'ut_temp_cooler_middle', manualTemperature: '38' }), /not configured/);
 });

@@ -694,8 +694,10 @@ function validateTemperature(input, SaveError) {
 
 async function saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const got = await tx.get(db.collection('plantSetup').doc(docId(req.locationId)));
-  const d = got.exists ? got.data() : null;
-  if (!d || d.type !== 'TEMPERATURE_CHECK_LOCATION' || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Temperature location is not configured for this plant.');
+  // A location changed or added in Administration > MOCREO & Sensors (tempLocations) counts as set up.
+  const mine = await tx.get(db.collection('tempLocations').doc(docId(req.locationId)));
+  const d = R.withTempLocations(got.exists ? [got.data()] : [], mine.exists ? [mine.data()] : []).find(r => r.type === 'TEMPERATURE_CHECK_LOCATION');
+  if (!d || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Temperature location is not configured for this plant.');
   const loc = R.tempLocations([d])[0], now = new Date(stamp), day = L.operatingDay(now);
   if (req.checkId) {
     const ref = db.collection('plantJournal').doc(req.checkId), had = await tx.get(ref), old = had.exists ? had.data() : null, p = (old && old.payload) || {};

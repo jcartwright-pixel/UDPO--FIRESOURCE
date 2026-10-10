@@ -434,9 +434,30 @@
   function tempLocations(setup) {
     return (setup || []).filter(function (r) { return r.type === 'TEMPERATURE_CHECK_LOCATION' && (r.status || 'ACTIVE') === 'ACTIVE'; }).map(function (r) {
       var s = r.settings || {};
-      return { locationId: r.operationId, location: text(r.name), viewSequence: Number(r.viewSequence) || 999999, sensorId: text(s.sensorId || s.mocreoSensorId), sensorName: text(s.sensorName),
+      return { locationId: r.operationId, location: text(r.name), area: text(s.area), viewSequence: Number(r.viewSequence) || 999999, sensorId: text(s.sensorId || s.mocreoSensorId), sensorName: text(s.sensorName),
         lowLimit: limit(s.lowLimit), highLimit: limit(s.highLimit), staleMinutes: Number(s.staleMinutes) || 30 };
     }).sort(function (a, b) { return a.viewSequence - b.viewSequence || a.location.localeCompare(b.location); });
+  }
+  // Joe 10/10: the thermometer locations are changed in Administration > MOCREO & Sensors (tempLocations/*). A change there
+  // replaces the sheet's row for that location; a location added there is added; one removed or turned off is left out.
+  function withTempLocations(setup, appLocs) {
+    var mine = {};
+    (appLocs || []).forEach(function (a) { if (a && a.locationId) mine[tempKey(a.locationId)] = a; });
+    var row = function (a, base) {
+      var b = base || { type: 'TEMPERATURE_CHECK_LOCATION', operationId: a.locationId, settings: {} }, s = Object.assign({}, b.settings || {});
+      ['sensorId', 'sensorName', 'area', 'lowLimit', 'highLimit'].forEach(function (k) { if (a[k] !== undefined) s[k] = a[k]; });
+      return Object.assign({}, b, { type: 'TEMPERATURE_CHECK_LOCATION', operationId: b.operationId || a.locationId, name: a.location !== undefined ? a.location : b.name,
+        viewSequence: a.viewSequence !== undefined ? a.viewSequence : b.viewSequence, removed: !!a.removed, status: a.removed || a.active === false ? 'INACTIVE' : a.active === true ? 'ACTIVE' : (b.status || 'ACTIVE'), settings: s });
+    };
+    var seen = {}, out = (setup || []).map(function (r) {
+      if (r.type !== 'TEMPERATURE_CHECK_LOCATION') return r;
+      var a = mine[tempKey(r.operationId)];
+      if (!a) return r;
+      seen[tempKey(r.operationId)] = true;
+      return row(a, r);
+    });
+    Object.keys(mine).forEach(function (k) { if (!seen[k]) out.push(row(mine[k], null)); });
+    return out;
   }
   function tempStatus(loc, reading) {
     var t = Number(reading);
@@ -661,7 +682,7 @@
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
-    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
+    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
     REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, reportText: reportText, reportHtml: reportHtml };
 });
