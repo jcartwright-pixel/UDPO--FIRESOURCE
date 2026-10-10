@@ -592,8 +592,13 @@ function validateQuality(input, SaveError) {
   const w = input.weights && typeof input.weights === 'object' && !Array.isArray(input.weights) ? input.weights : {};
   out.weights = {};
   Object.keys(w).forEach(k => { if (/^(result|head[1-6])$/.test(k)) out.weights[k] = text(w[k]).slice(0, 80); });
+  // Joe 10/10: no Record button. Each box saves as it is left: the first save is the check, later ones fill in the same check.
+  out.checkId = text(input.checkId).slice(0, 150);
+  if (out.checkId && !/^PRODUCTION_QUALITY_app_[A-Za-z0-9]+$/.test(out.checkId)) throw new SaveError('BAD_REQUEST', 'checkId is not a quality check');
   return out;
 }
+// A check filled in box by box stays open to its own later boxes for 12 hours.
+const FILL_IN_HOURS = 12;
 
 async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const line = await tx.get(db.collection('plantSetup').doc(docId(req.operationId)));
@@ -602,10 +607,19 @@ async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const record = { operationId: req.operationId, area: d.name, product: req.product, status: req.status, remainingOutput: req.remainingOutput, qualityCheck: req.qualityCheck,
     tipTest: req.tipTest, temperature: req.temperature, cycleTime: req.cycleTime, productSize: req.productSize, annealerSpeed: req.annealerSpeed, weights: req.weights, notes: req.notes,
     facilityId: d.facilityId || 'fac_uniontown' };
+  if (req.checkId) {
+    const ref = db.collection('plantJournal').doc(req.checkId), had = await tx.get(ref), old = had.exists ? had.data() : null;
+    if (!old || old.type !== R.QUALITY_TYPE || (old.payload || {}).operationId !== req.operationId) throw new SaveError('NOT_FOUND', 'That quality check is no longer open. Enter it again.');
+    if (Date.parse(stamp) - R.when(old.recordedAt) >= FILL_IN_HOURS * 3600000) throw new SaveError('CONFLICT', 'That quality check is too old to change. Enter a new one.');
+    tx.update(ref, { status: req.status, temperature: req.temperature, notes: req.notes, payload: record, editedAt: stamp, editedBy: email, testEdited: true });
+    const result = { ok: true, requestId: req.requestId, operationId: req.operationId, checkId: req.checkId, recordedAt: old.recordedAt, message: d.name + ' quality check saved.' };
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, checkId: req.checkId, before: old.payload || {}, after: record, result });
+    return result;
+  }
   const id = 'PRODUCTION_QUALITY_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
   tx.set(db.collection('plantJournal').doc(id), { recordId: 'PQ-' + req.requestId.slice(0, 40), type: R.QUALITY_TYPE, date: L.operatingDay(new Date(stamp)), status: req.status, area: d.name,
     temperature: req.temperature, notes: req.notes, payload: record, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
-  const result = { ok: true, requestId: req.requestId, operationId: req.operationId, recordedAt: stamp, message: d.name + ' production status updated; quality observation recorded.' };
+  const result = { ok: true, requestId: req.requestId, operationId: req.operationId, checkId: id, recordedAt: stamp, message: d.name + ' production status updated; quality observation recorded.' };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, after: record, result });
   return result;
 }
@@ -626,6 +640,9 @@ function validateShiftNote(input, SaveError) {
   if (out.parentId && !out.entry) throw new SaveError('BAD_REQUEST', 'Enter the review note before adding it.');
   if (!out.parentId && !out.entry && !out.notes) throw new SaveError('BAD_REQUEST', 'Enter report information before saving.');
   if (out.parentId) out.entry = out.entry.slice(0, 500);
+  // Joe 10/10: no Save button. The entry saves as each box is left; later boxes fill in the same entry.
+  out.checkId = out.parentId ? '' : text(input.checkId).slice(0, 150);
+  if (out.checkId && !/^SHIFT_REPORT_app_[A-Za-z0-9]+$/.test(out.checkId)) throw new SaveError('BAD_REQUEST', 'checkId is not a shift entry');
   return out;
 }
 
@@ -635,13 +652,24 @@ async function saveShiftNote(tx, db, req, email, stamp, logRef, mode, SaveError)
     const parent = (await tx.get(journal.where('recordId', '==', req.parentId))).docs.map(d => d.data()).filter(d => d.type === R.SHIFT_TYPE);
     if (!parent.length) throw new SaveError('NOT_FOUND', 'That entry is no longer on the log.');
   }
+  if (req.checkId) {
+    const ref = journal.doc(req.checkId), had = await tx.get(ref), old = had.exists ? had.data() : null, p = (old && old.payload) || {};
+    if (!old || old.type !== R.SHIFT_TYPE || (p.values || {}).ParentId) throw new SaveError('NOT_FOUND', 'That entry is no longer on the log.');
+    if (Date.parse(stamp) - R.when(old.recordedAt) >= FILL_IN_HOURS * 3600000) throw new SaveError('CONFLICT', 'That entry is too old to change. Start a new entry.');
+    const shift = req.shift || p.shift, payload = Object.assign({}, p, { shift, readingTime: req.readingTime || p.readingTime, values: { Entry: req.entry, Type: req.type, Equipment: req.equipment }, notes: req.notes, followUpStatus: req.followUpStatus });
+    tx.update(ref, { status: req.followUpStatus, shift, notes: req.notes, payload, editedAt: stamp, editedBy: email, testEdited: true });
+    const result = { ok: true, requestId: req.requestId, entryId: p.entryId || old.recordId, checkId: req.checkId, shift, recordedAt: old.recordedAt, message: 'Shift entry saved.' };
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, entryId: result.entryId, checkId: req.checkId, before: p, after: payload, result });
+    return result;
+  }
   const now = new Date(stamp), entryId = 'SHIFT-' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 30);
   const shift = req.shift || R.shiftAt(now.getTime());
   const values = req.parentId ? { Entry: req.entry, Type: 'REVIEW', ParentId: req.parentId } : { Entry: req.entry, Type: req.type, Equipment: req.equipment };
   const payload = { entryId, date: L.operatingDay(now), shift, section: 'HANDOFF', readingTime: req.readingTime, values, notes: req.notes, followUpStatus: req.followUpStatus };
-  tx.set(journal.doc(R.SHIFT_TYPE + '_app_' + entryId.replace(/[^A-Za-z0-9]/g, '')), { recordId: entryId, type: R.SHIFT_TYPE, date: payload.date, status: req.followUpStatus, shift, area: 'HANDOFF',
+  const docName = R.SHIFT_TYPE + '_app_' + entryId.replace(/[^A-Za-z0-9]/g, '');
+  tx.set(journal.doc(docName), { recordId: entryId, type: R.SHIFT_TYPE, date: payload.date, status: req.followUpStatus, shift, area: 'HANDOFF',
     notes: req.notes, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
-  const result = { ok: true, requestId: req.requestId, entryId, shift, recordedAt: stamp, message: req.parentId ? 'Review note added.' : 'Shift entry saved.' };
+  const result = { ok: true, requestId: req.requestId, entryId, checkId: req.parentId ? '' : docName, shift, recordedAt: stamp, message: req.parentId ? 'Review note added.' : 'Shift entry saved.' };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, entryId, after: payload, result });
   return result;
 }
@@ -655,6 +683,10 @@ function validateTemperature(input, SaveError) {
   const manual = text(input.manualTemperature);
   if (manual === '' || !isFinite(Number(manual))) throw new SaveError('BAD_REQUEST', 'Enter a valid manual temperature before saving.');
   out.manualTemperature = Number(manual);
+  // Joe 10/10: no Save button. The reading saves as its box is left; the notes box, or a corrected reading, fills in the same
+  // reading while the location's 2-hour lock runs.
+  out.checkId = text(input.checkId).slice(0, 150);
+  if (out.checkId && !/^PLANT_TEMPERATURE_CHECK_app_[A-Za-z0-9]+$/.test(out.checkId)) throw new SaveError('BAD_REQUEST', 'checkId is not a temperature reading');
   return out;
 }
 
@@ -663,6 +695,16 @@ async function saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveErro
   const d = got.exists ? got.data() : null;
   if (!d || d.type !== 'TEMPERATURE_CHECK_LOCATION' || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Temperature location is not configured for this plant.');
   const loc = R.tempLocations([d])[0], now = new Date(stamp), day = L.operatingDay(now);
+  if (req.checkId) {
+    const ref = db.collection('plantJournal').doc(req.checkId), had = await tx.get(ref), old = had.exists ? had.data() : null, p = (old && old.payload) || {};
+    if (!old || old.type !== R.TEMP_TYPE || p.locationId !== loc.locationId) throw new SaveError('NOT_FOUND', 'That reading is no longer open. Enter it again.');
+    if (now.getTime() - R.when(old.recordedAt) >= R.TEMP_LOCK_MINUTES * 60000) throw new SaveError('CONFLICT', 'That reading is more than 2 hours old. Enter a new one.');
+    const status = R.tempStatus(loc, req.manualTemperature), payload = Object.assign({}, p, { manualTemperature: req.manualTemperature, notes: req.notes, status });
+    tx.update(ref, { status, temperature: String(req.manualTemperature), notes: req.notes, payload, editedAt: stamp, editedBy: email, testEdited: true });
+    const result = { ok: true, requestId: req.requestId, recordId: old.recordId, checkId: req.checkId, locationId: loc.locationId, status, recordedAt: old.recordedAt, message: loc.location + ' reading saved.' };
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, locationId: loc.locationId, checkId: req.checkId, before: p, after: payload, result });
+    return result;
+  }
   const recent = (await tx.get(db.collection('plantJournal').where('date', 'in', [L.addDays(day, -1), day]))).docs.map(x => x.data());
   const left = R.tempLockLeft(recent, loc, now.getTime());
   if (left) throw new SaveError('CONFLICT', loc.location + ' was already checked. It can be checked again in ' + left + ' minutes.');
@@ -671,7 +713,7 @@ async function saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveErro
   const id = R.TEMP_TYPE + '_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
   tx.set(db.collection('plantJournal').doc(id), { recordId: 'TEMP-' + req.requestId.slice(0, 40), type: R.TEMP_TYPE, date: day, status, area: loc.location, temperature: String(req.manualTemperature),
     notes: req.notes, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
-  const result = { ok: true, requestId: req.requestId, recordId: 'TEMP-' + req.requestId.slice(0, 40), locationId: loc.locationId, status, recordedAt: stamp, message: loc.location + ' temperature recorded. This location is locked for 2 hours.' };
+  const result = { ok: true, requestId: req.requestId, recordId: 'TEMP-' + req.requestId.slice(0, 40), checkId: id, locationId: loc.locationId, status, recordedAt: stamp, message: loc.location + ' temperature recorded. This location is locked for 2 hours.' };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, locationId: loc.locationId, after: payload, result });
   return result;
 }

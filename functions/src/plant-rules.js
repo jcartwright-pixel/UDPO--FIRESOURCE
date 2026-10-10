@@ -355,7 +355,7 @@
     (journal || []).forEach(function (d) {
       if (text(d.type).toUpperCase() !== QUALITY_TYPE) return;
       var p = payloadOf(d);
-      out.push(Object.assign({}, p, { operationId: text(p.operationId), area: text(p.area), status: text(p.status).toUpperCase(), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), inApp: true }));
+      out.push(Object.assign({}, p, { operationId: text(p.operationId), area: text(p.area), status: text(p.status).toUpperCase(), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), inApp: true, docId: text(d._id) }));
     });
     return out.sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
   }
@@ -425,7 +425,7 @@
       var p = payloadOf(d);
       return { recordId: text(d.recordId), locationId: text(p.locationId), location: text(p.location), manualTemperature: p.manualTemperature === undefined || p.manualTemperature === null ? '' : p.manualTemperature,
         sensorTemperature: p.sensorTemperature === undefined || p.sensorTemperature === null ? '' : p.sensorTemperature, batteryLevel: p.batteryLevel === undefined || p.batteryLevel === null ? '' : p.batteryLevel,
-        status: text(p.status || d.status).toUpperCase(), notes: text(p.notes !== undefined ? p.notes : d.notes), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy) };
+        status: text(p.status || d.status).toUpperCase(), notes: text(p.notes !== undefined ? p.notes : d.notes), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), docId: text(d._id) };
     }).sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
   }
   function tempKey(v) { return text(v).toUpperCase(); }
@@ -443,7 +443,7 @@
       var last = readings.filter(function (r) { return r.manualTemperature !== '' && (tempKey(r.locationId) === tempKey(loc.locationId) || (!r.locationId && tempKey(r.location) === tempKey(loc.location))); })[0] || null;
       var left = tempLockLeft(journal, loc, nowMs);
       return Object.assign({}, loc, { sensorTemp: '', batteryLevel: '', sensorLastReadingAt: '', status: 'MANUAL ONLY', lastCheckedAt: last ? last.recordedAt : '', lastCheckedBy: last ? last.recordedBy : '',
-        lastManualTemperature: last ? last.manualTemperature : '', lastStatus: last ? last.status : '', locked: left > 0, minutesUntilDue: left });
+        lastManualTemperature: last ? last.manualTemperature : '', lastStatus: last ? last.status : '', lastNotes: last ? last.notes : '', lastDocId: last ? last.docId : '', locked: left > 0, minutesUntilDue: left });
     });
   }
   function tempHistory(journal, nowMs) {
@@ -507,11 +507,16 @@
       .map(function (r) { return { equipment: r.equipment, entry: r.entry, shift: r.shift, status: r.status || 'OPEN', at: r.recordedAt ? clockOf(r.recordedAt) : '' }; });
     var pickups = (input.pickups || []).filter(function (p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(text(p.status).toUpperCase()) < 0; })
       .map(function (p) { return { route: text(p.route), run: text(p.run), product: text(p.item || p.product), quantity: text(p.quantity) }; });
+    // Joe 10/10: a report takes only what was checked since the last report was sent (input.roundStart); anything older is
+    // "Not checked", with when it was last checked, so no leftover reading goes out as if it were new.
+    var since = when(input.roundStart) || 0, stale = function (at) { return !!since && (!at || when(at) <= since); };
     var lines = (input.lines || []).map(function (l) {
       var x = l.last || {}, status = text(x.status).toUpperCase(), check = text(x.qualityCheck).toUpperCase();
+      if (stale(x.recordedAt)) return { line: l.name, status: 'NOT CHECKED', product: '', qualityCheck: '', lastCheckedAt: x.recordedAt ? clockOf(x.recordedAt) : '', notes: '', flag: false, notChecked: true };
       return { line: l.name, status: status, product: text(x.product), qualityCheck: check, lastCheckedAt: x.recordedAt ? clockOf(x.recordedAt) : '', notes: text(x.notes), flag: status === 'DOWN' || check === 'FAIL' };
     });
     var temps = (input.temps || []).map(function (t) {
+      if (t.status === 'MANUAL ONLY' && stale(t.lastCheckedAt)) return { location: t.location, reading: '', status: 'NOT CHECKED', limit: '', lastCheckedAt: t.lastCheckedAt ? clockOf(t.lastCheckedAt) : '', due: false, flag: false, notChecked: true };
       var status = t.status === 'MANUAL ONLY' ? (t.lastManualTemperature === '' ? 'NO CHECK' : t.lastStatus === 'RECORDED' ? 'OK' : t.lastStatus) : t.status === 'IN RANGE' ? 'OK' : t.status;
       var lim = t.lowLimit !== '' && t.highLimit !== '' ? t.lowLimit + '–' + t.highLimit : t.highLimit !== '' ? '≤ ' + t.highLimit : t.lowLimit !== '' ? '≥ ' + t.lowLimit : '';
       return { location: t.location, reading: t.sensorTemp !== '' ? String(t.sensorTemp) : String(t.lastManualTemperature), status: status, limit: lim, lastCheckedAt: t.lastCheckedAt ? clockOf(t.lastCheckedAt) : '',
@@ -544,11 +549,11 @@
     L.push('');
     L.push('PRODUCTION');
     if (!r.lines.length) L.push('  No production lines set up');
-    r.lines.forEach(function (l) { L.push('  ' + l.line + '  ' + (l.status || 'no status') + (l.product ? '  ' + l.product : '') + (l.lastCheckedAt ? '  quality check ' + l.lastCheckedAt + (l.qualityCheck ? ' ' + l.qualityCheck : '') : '') + (l.flag && l.notes ? '  (' + l.notes + ')' : '')); });
+    r.lines.forEach(function (l) { L.push('  ' + l.line + '  ' + (l.status || 'no status') + (l.product ? '  ' + l.product : '') + (l.lastCheckedAt ? (l.notChecked ? '  last check ' : '  quality check ') + l.lastCheckedAt + (l.qualityCheck ? ' ' + l.qualityCheck : '') : '') + (l.flag && l.notes ? '  (' + l.notes + ')' : '')); });
     L.push('');
     L.push('TEMPERATURES');
     if (!r.temperatures.length) L.push('  No temperature locations set up');
-    r.temperatures.forEach(function (t) { L.push('  ' + t.location + '  ' + (t.reading !== '' ? t.reading + '°F' : '-') + '  ' + t.status + (t.limit ? ' (limit ' + t.limit + ')' : '') + (t.due ? '  check due' : '')); });
+    r.temperatures.forEach(function (t) { L.push('  ' + t.location + '  ' + (t.reading !== '' ? t.reading + '°F' : '-') + '  ' + t.status + (t.notChecked && t.lastCheckedAt ? ' (last ' + t.lastCheckedAt + ')' : '') + (t.limit ? ' (limit ' + t.limit + ')' : '') + (t.due ? '  check due' : '')); });
     return L.join('\n');
   }
 
@@ -590,10 +595,10 @@
     else H.push(rows(down.map(function (d) { return [d.equipment || 'Plant equipment', e([d.entry, d.at ? 'logged ' + d.at : ''].filter(Boolean).join(' · ')) + ' ' + pill(d.status, '#fde8e6', RED)]; })));
     H.push(head('Production'));
     if (!lines.length) H.push(plain('No production lines set up.'));
-    else H.push(rows(lines.map(function (l) { return [l.line, (l.product ? e(l.product) + ' ' : '') + (l.qualityCheck ? pill('QC ' + l.qualityCheck, l.qualityCheck === 'FAIL' ? '#fde8e6' : '#e2f4ea', l.qualityCheck === 'FAIL' ? RED : GREEN) + ' ' : '') + (l.status ? pill(l.status, l.flag ? '#fde8e6' : '#eef1f4', l.flag ? RED : GREY) : 'no status')]; })));
+    else H.push(rows(lines.map(function (l) { return [l.line, (l.product ? e(l.product) + ' ' : '') + (l.qualityCheck ? pill('QC ' + l.qualityCheck, l.qualityCheck === 'FAIL' ? '#fde8e6' : '#e2f4ea', l.qualityCheck === 'FAIL' ? RED : GREEN) + ' ' : '') + (l.notChecked ? pill('NOT CHECKED', '#fff1d6', '#9a5b00') : l.status ? pill(l.status, l.flag ? '#fde8e6' : '#eef1f4', l.flag ? RED : GREY) : 'no status')]; })));
     H.push(head('Temperatures'));
     if (!temps.length) H.push(plain('No temperature locations set up.'));
-    else H.push(rows(temps.map(function (t) { var ok = t.status === 'OK', due = t.due || t.status === 'NO CHECK'; return [t.location, (t.reading !== '' && t.reading !== undefined ? e(t.reading) + '&deg;F ' : '&ndash; ') + (t.flag ? pill(t.status, '#fde8e6', RED) : due ? pill(t.status === 'NO CHECK' ? 'CHECK DUE' : t.status + ' · CHECK DUE', '#fff1d6', '#9a5b00') : pill(t.status || '-', ok ? '#e2f4ea' : '#eef1f4', ok ? GREEN : GREY))]; })));
+    else H.push(rows(temps.map(function (t) { var ok = t.status === 'OK', due = t.due || t.status === 'NO CHECK'; if (t.notChecked) return [t.location, pill('NOT CHECKED', '#fff1d6', '#9a5b00')]; return [t.location, (t.reading !== '' && t.reading !== undefined ? e(t.reading) + '&deg;F ' : '&ndash; ') + (t.flag ? pill(t.status, '#fde8e6', RED) : due ? pill(t.status === 'NO CHECK' ? 'CHECK DUE' : t.status + ' · CHECK DUE', '#fff1d6', '#9a5b00') : pill(t.status || '-', ok ? '#e2f4ea' : '#eef1f4', ok ? GREEN : GREY))]; })));
     H.push('<tr><td style="' + F + 'padding:16px 14px;font-size:12px;color:#8a95a3;text-align:center">United Dairy Plant Operations</td></tr>');
     return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#ffffff">' +
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff">' + H.join('') + '</table></body></html>';

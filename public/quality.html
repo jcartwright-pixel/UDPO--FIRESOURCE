@@ -35,7 +35,7 @@
         <aside class="qc-lines" aria-label="Production lines"><h2>Lines</h2><div id="lines"></div></aside>
         <section class="qc-form" id="form">
           <div class="qc-top"><h2 id="form-title">Quality Check</h2><span class="qc-last" id="form-last"></span>
-            <div class="qc-actions"><button type="button" class="qc-btn" id="clear">Clear</button><button type="button" class="qc-btn primary" id="record">Record Quality Check</button></div></div>
+            <span class="qc-round" id="round"></span></div>
           <div class="qc-fields" id="fields"></div>
         </section>
       </div>
@@ -53,44 +53,57 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
 
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
     let pane = params.get('view') === 'history' ? 'history' : 'current', chosen = params.get('line') || '';
-    let setup = [], lineStatus = [], journal = [], person = null, app = {}, shownFor = '';
-    const pending = [];
+    let setup = [], lineStatus = [], journal = [], person = null, app = {}, shownFor = '', roundStart = '', form = null;
+    // A check being filled in box by box shows at once, over its saved copy, until the database has caught up.
+    const pending = {};
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
     const RESULT = { RUNNING: 'Pass', REVIEW: 'Review', DOWN: 'Fail', FINISHED: 'Finished', CHANGEOVER: 'Changeover' };
     const CHECK = { PASS: 'Pass', REVIEW: 'Review', FAIL: 'Fail' };
     const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
     const opt = (value, current, label) => '<option value="' + value + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + label + '</option>';
-    const pick3 = (cls, current) => '<select class="' + cls + '">' + opt('PASS', current, 'Pass') + opt('REVIEW', current, 'Review') + opt('FAIL', current, 'Fail') + '</select>';
+    // Joe 10/10: the drop-downs start blank, so nothing passes without a real check.
+    const pick3 = (cls, current) => '<select class="' + cls + '">' + opt('', current, '') + opt('PASS', current, 'Pass') + opt('REVIEW', current, 'Review') + opt('FAIL', current, 'Fail') + '</select>';
 
-    function journalAll() { return journal.concat(pending); }
+    function journalAll() { const mine = Object.values(pending), ids = new Set(mine.map(p => p._id).filter(Boolean)); return journal.filter(d => !ids.has(d._id)).concat(mine); }
     function lines() { return U.qualityLines(setup, journalAll(), lineStatus, Date.now()); }
     function current() { const all = lines(); return all.find(l => l.operationId === chosen) || all[0] || null; }
 
-    // The form of one line, as the current app's desktop form; it starts from the line's last check.
+    // The form of one line, as the current app's desktop form. The check of this round (entered since the last report was sent)
+    // fills it and is filled in further as each box is left; with none yet the boxes are empty, with the last check small and grey.
+    function roundCheck(line) { const l = line.last || {}; return l.docId && inRound(l.recordedAt, roundStart) && Date.now() - Date.parse(l.recordedAt) < 12 * 3600000 ? l : null; }
     function drawForm(line) {
-      const ck = canSave(), last = line.last || {}, w = last.weights || {}, skip = U.qualitySkip(line.name), blow = U.isBlowMold(line.name), dis = ck ? '' : ' disabled';
-      const weight = blow ? '<div class="qc-heads">' + [1, 2, 3, 4, 5, 6].map(n => '<label>H' + n + '<input class="prod-head" data-head="' + n + '" inputmode="decimal" value="' + escapeHtml(w['head' + n] || '') + '"' + dis + '></label>').join('') + '</div>'
-        : '<input class="prod-weights" value="' + escapeHtml(w.result || '') + '"' + dis + '>';
+      const ck = canSave(), cur = roundCheck(line), old = line.last || {}, last = cur || {}, w = last.weights || {}, ow = old.weights || {}, skip = U.qualitySkip(line.name), blow = U.isBlowMold(line.name), dis = ck ? '' : ' disabled';
+      const by = old.recordedAt ? ' · ' + clockOf(old.recordedAt) + (old.recordedBy ? ' · ' + initials(old.recordedBy) : '') : '';
+      const was = (v) => !cur && old.recordedAt && String(v || '') !== '' ? '<small class="as-last">Last: ' + escapeHtml(String(v)) + by + '</small>' : '';
+      const note = (cls) => '<small class="as-note" data-note="' + cls + '"></small>';
+      const word = (v) => CHECK[v] || v;
+      const weight = blow ? '<div class="qc-heads">' + [1, 2, 3, 4, 5, 6].map(n => '<label>H' + n + '<input class="prod-head" data-head="' + n + '" inputmode="decimal" value="' + escapeHtml(w['head' + n] || '') + '"' + dis + '>' + was(ow['head' + n]) + '</label>').join('') + '</div>' + note('prod-head')
+        : '<input class="prod-weights" value="' + escapeHtml(w.result || '') + '"' + dis + '>' + note('prod-weights') + was(ow.result);
       const fields = blow
-        ? '<label>Jug size<select class="prod-product"' + dis + '><option value="Gallon">Gallon</option></select></label><label>Annealer temperature<input class="prod-temperature" inputmode="decimal"' + dis + '></label>' +
-          '<label>Annealer speed<input class="prod-annealer-speed" inputmode="decimal" placeholder="Machine setting"' + dis + '></label><div class="qc-field wide"><span>Jug weight</span>' + weight + '</div><label>Cycle time<input class="prod-cycle" inputmode="decimal"' + dis + '></label>'
-        : '<label>Product being run<input class="prod-product" value="' + escapeHtml(last.product || '') + '"' + dis + '></label>' + (skip.weight ? '' : '<div class="qc-field"><span>Package weight</span>' + weight + '</div>') +
-          '<label>Temperature<input class="prod-temperature"' + dis + '></label>' + (skip.tip ? '' : '<label>Tip test' + pick3('prod-tip', last.tipTest).replace('<select', '<select' + dis) + '</label>') +
-          '<label>Label / date code' + pick3('prod-quality', last.qualityCheck).replace('<select', '<select' + dis) + '</label>' + (skip.cycle ? '' : '<label>Cycle time<input class="prod-cycle"' + dis + '></label>');
+        ? '<label>Jug size<select class="prod-product"' + dis + '><option value="Gallon">Gallon</option></select></label><label>Annealer temperature<input class="prod-temperature" inputmode="decimal" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' +
+          '<label>Annealer speed<input class="prod-annealer-speed" inputmode="decimal" placeholder="Machine setting" value="' + escapeHtml(last.annealerSpeed || '') + '"' + dis + '>' + note('prod-annealer-speed') + was(old.annealerSpeed) + '</label><div class="qc-field wide"><span>Jug weight</span>' + weight + '</div><label>Cycle time<input class="prod-cycle" inputmode="decimal" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>'
+        : '<label>Product being run<input class="prod-product" value="' + escapeHtml(last.product || '') + '"' + dis + '>' + note('prod-product') + was(old.product) + '</label>' + (skip.weight ? '' : '<div class="qc-field"><span>Package weight</span>' + weight + '</div>') +
+          '<label>Temperature<input class="prod-temperature" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' + (skip.tip ? '' : '<label>Tip test' + pick3('prod-tip', last.tipTest).replace('<select', '<select' + dis) + note('prod-tip') + was(word(old.tipTest)) + '</label>') +
+          '<label>Label / date code' + pick3('prod-quality', last.qualityCheck).replace('<select', '<select' + dis) + note('prod-quality') + was(word(old.qualityCheck)) + '</label>' + (skip.cycle ? '' : '<label>Cycle time<input class="prod-cycle" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>');
       document.getElementById('form-title').textContent = line.name + ' Quality Check';
-      document.getElementById('form-last').textContent = last.recordedAt ? 'Last check ' + dateTime(last.recordedAt) + (last.recordedBy ? ' · ' + initials(last.recordedBy) : '') + ' · ' + (RESULT[last.status] || last.status || '') : 'No check recorded yet';
-      document.getElementById('fields').innerHTML = fields + '<label>Overall result<select class="prod-status"' + dis + '>' + opt('RUNNING', last.status, 'Pass') + opt('REVIEW', last.status, 'Review') + opt('DOWN', last.status, 'Fail') + opt('FINISHED', last.status, 'Finished') + '</select></label>' +
-        '<label class="wide">Corrective action / notes<input class="prod-notes" maxlength="1000" value="' + escapeHtml(last.notes || '') + '"' + dis + '></label>';
-      document.getElementById('clear').hidden = !ck;
-      document.getElementById('record').hidden = !ck;
-      shownFor = line.operationId + '|' + (last.recordedAt || '');
+      document.getElementById('form-last').textContent = cur ? 'This check ' + dateTime(cur.recordedAt) + (cur.recordedBy ? ' · ' + initials(cur.recordedBy) : '') : old.recordedAt ? 'Last check ' + dateTime(old.recordedAt) + (old.recordedBy ? ' · ' + initials(old.recordedBy) : '') + ' · ' + (RESULT[old.status] || old.status || '—') : 'No check recorded yet';
+      document.getElementById('fields').innerHTML = fields + '<label>Overall result<select class="prod-status"' + dis + '>' + opt('', last.status, '') + opt('RUNNING', last.status, 'Pass') + opt('REVIEW', last.status, 'Review') + opt('DOWN', last.status, 'Fail') + opt('FINISHED', last.status, 'Finished') + '</select>' + note('prod-status') + was(RESULT[old.status] || old.status) + '</label>' +
+        '<label class="wide">Corrective action / notes<input class="prod-notes" maxlength="1000" value="' + escapeHtml(last.notes || '') + '"' + dis + '>' + note('prod-notes') + was(old.notes) + '</label>';
+      // Drawn again for the same check, its "Saved" times stay.
+      const keep = form && form.operationId === line.operationId && cur && form.fill.id === cur.docId ? form.fill : null;
+      document.querySelectorAll('#fields [data-note]').forEach(n => { if (keep && form.notes[n.dataset.note]) n.textContent = form.notes[n.dataset.note]; });
+      form = { operationId: line.operationId, fill: keep || fillIn('saveQualityCheck', save, cur ? cur.docId : ''), started: cur ? cur.recordedAt : '', notes: keep ? form.notes : {} };
+      shownFor = formKey(line);
     }
+    // The form is drawn again only for another line, a new round, or a check someone else entered.
+    function formKey(line) { const cur = roundCheck(line); return line.operationId + '|' + roundStart + '|' + (cur && (!form || form.fill.id !== cur.docId) ? cur.docId : form && form.operationId === line.operationId ? form.fill.id : ''); }
 
     function render() {
       const all = lines(), line = current(), hist = U.qualityHistory(journalAll(), lineStatus, Date.now()), ck = canSave();
@@ -105,14 +118,16 @@
         '<i class="qc-dot st-' + String(l.last.status || 'NONE').toLowerCase() + '" title="' + escapeHtml(RESULT[l.last.status] || 'No check yet') + '"></i><span>' + escapeHtml(l.name) + '</span><b title="Checks in the last 24 hours">' + l.today + '</b></button>').join('') ||
         '<p class="empty">No production lines are set up for this plant.</p>';
       // The form is redrawn when another line is picked or a newer check of this line arrives, not while someone types.
-      if (line) { const key = line.operationId + '|' + (line.last.recordedAt || ''); if (key !== shownFor) drawForm(line); }
+      const typing = document.getElementById('fields').contains(document.activeElement);
+      if (line && (!form || form.operationId !== line.operationId || (!typing && formKey(line) !== shownFor))) drawForm(line);
+      document.getElementById('round').textContent = ck ? 'Saves as you go' + (roundStart ? ' · new round since the report at ' + clockOf(roundStart) : '') : '';
       document.getElementById('form').hidden = !line;
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td><b>' + escapeHtml(h.area) + '</b></td><td>' + escapeHtml(h.product || '') + '</td>' +
         '<td class="detail">' + escapeHtml([h.temperature ? 'Temp ' + h.temperature : '', h.cycleTime ? 'Cycle ' + h.cycleTime : '', h.annealerSpeed ? 'Speed ' + h.annealerSpeed : '', U.weightText(h.weights), h.remainingOutput].filter(Boolean).join(' · ')) + '</td>' +
         '<td><span class="qc-res st-' + String(h.status || '').toLowerCase() + '">' + escapeHtml(RESULT[h.status] || h.status || '') + '</span>' + (h.qualityCheck ? '<small>Label ' + escapeHtml(CHECK[h.qualityCheck] || h.qualityCheck) + '</small>' : '') + '</td>' +
         '<td class="detail">' + escapeHtml(h.notes || '') + '</td><td>' + escapeHtml(initials(h.recordedBy)) + '</td></tr>').join('') ||
         '<tr><td colspan="7" class="empty">No quality checks have been recorded during this operational day.</td></tr>';
-      document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Record Quality Check saves the check with the time; it becomes the line\'s status now.' : 'View only.') : hist.length + ' check' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours, all production lines.';
+      document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Each box saves as you leave it, with the time and who entered it; the check is the line\'s status now. After Send Current Report the boxes start empty for the next round.' : 'View only.') : hist.length + ' check' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours, all production lines.';
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
@@ -124,30 +139,29 @@
       return { operationId: line.operationId, product: v('prod-product'), status: v('prod-status'), remainingOutput: (line.last && line.last.remainingOutput) || '', qualityCheck: v('prod-quality'),
         tipTest: v('prod-tip'), temperature: v('prod-temperature'), cycleTime: v('prod-cycle'), productSize: '', annealerSpeed: v('prod-annealer-speed'), weights, notes: v('prod-notes') };
     }
-    document.getElementById('record').onclick = async () => {
-      const line = current();
-      if (!line) return;
-      const fields = readForm(line);
-      // Shown at once: the check is the line's last check and is on the history.
-      const mine = { type: U.QUALITY_TYPE, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, payload: Object.assign({ area: line.name }, fields) };
-      pending.push(mine);
-      shownFor = '';
+    // Each box saves as it is left (a drop-down as soon as it is picked): the first box makes the check, the rest fill it in.
+    document.getElementById('fields').addEventListener('change', async e => {
+      const line = current(), box = e.target;
+      if (!line || !form || form.operationId !== line.operationId || !canSave()) return;
+      const fields = readForm(line), noteEl = document.querySelector('[data-note="' + (box.classList.contains('prod-head') ? 'prod-head' : box.className.split(' ')[0]) + '"]');
+      const mine = pending[line.operationId] || { type: U.QUALITY_TYPE, recordedAt: form.started || new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, _id: form.fill.id };
+      mine.payload = Object.assign({ area: line.name }, fields);
+      if (!form.started) form.started = mine.recordedAt;
+      pending[line.operationId] = mine;
+      if (noteEl) { noteEl.textContent = 'Saving…'; noteEl.classList.remove('bad'); }
       render();
-      const ok = document.getElementById('saved');
-      ok.textContent = line.name + ' quality check recorded.'; ok.hidden = false;
       try {
-        await save('saveQualityCheck', fields);
+        const done = await form.fill.send(fields);
+        if (done && done.checkId) { mine._id = done.checkId; if (done.recordedAt) mine.recordedAt = done.recordedAt; }
+        mine.saved = true;
         showError('');
-        setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); ok.hidden = true; render(); }, 2500);
-      } catch (e) {
-        const i = pending.indexOf(mine);
-        if (i >= 0) pending.splice(i, 1);
-        ok.hidden = true;
-        render();
-        showError(line.name + ': ' + (e.message || e));
+        if (noteEl) { noteEl.textContent = savedText(); form.notes[noteEl.dataset.note] = noteEl.textContent; }
+      } catch (err) {
+        if (noteEl) { noteEl.textContent = 'Not saved'; noteEl.classList.add('bad'); }
+        showError(line.name + ': ' + (err.message || err));
       }
-    };
-    document.getElementById('clear').onclick = () => document.querySelectorAll('#fields input').forEach(x => { if (!x.readOnly) x.value = ''; });
+      render();
+    });
     document.getElementById('lines').addEventListener('click', e => {
       const b = e.target.closest('[data-line]');
       if (!b) return;
@@ -170,9 +184,15 @@
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; shownFor = ''; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; shownFor = ''; render(); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(); }, fail('the production lines'));
+      watchRound(db, at => { roundStart = at; Object.keys(pending).forEach(k => delete pending[k]); render(); });
       onSnapshot(collection(db, 'plantLineStatus'), s => { lineStatus = s.docs.map(d => d.data()); render(); }, fail('the line status'));
       let unsub = null, day = '';
-      const watch = () => { const t = today(); if (t === day) return; day = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(t, -1), t])), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the quality checks')); };
+      const watch = () => { const t = today(); if (t === day) return; day = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(t, -1), t])), s => {
+        journal = s.docs.map(d => Object.assign({ _id: d.id }, d.data()));
+        // A check the database now has replaces the one shown while saving.
+        Object.keys(pending).forEach(k => { const p = pending[k]; if (p.saved && journal.some(d => d._id === p._id)) delete pending[k]; });
+        render();
+      }, fail('the quality checks')); };
       watch();
       setInterval(() => { watch(); render(); }, 60000);
       render();

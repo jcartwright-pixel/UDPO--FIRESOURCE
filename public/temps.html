@@ -60,6 +60,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
 
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
@@ -67,8 +68,10 @@
     const phoneQuery = window.matchMedia('(max-width: 760px)');
     // Manager Center's Status and 24-Hour History cards open this screen on Alerts or on the history.
     let pane = params.get('view') === 'history' ? 'history' : 'current', filter = params.get('view') === 'alerts' ? 'ALERTS' : 'ALL';
-    let setup = [], journal = [], person = null, app = {};
-    const drafts = {}, pending = [];
+    let setup = [], journal = [], person = null, app = {}, roundStart = '';
+    // drafts: what is typed and not saved yet; pending: a reading shown at once, over its saved copy, until the database has it;
+    // fills: each location's reading of this round, filled in box by box; notes: the "Saved" time of each location.
+    const drafts = {}, pending = {}, fills = {}, notes = {};
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : '—'; };
     const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'; };
@@ -86,7 +89,9 @@
     }
 
     // A saved reading stays on screen as sent until its own record comes back from the database, then only that one shows.
-    function all() { const have = new Set(journal.map(d => d.recordId)); return journal.concat(pending.filter(p => !have.has(p.recordId))); }
+    function all() { const mine = Object.values(pending), ids = new Set(mine.map(p => p._id).filter(Boolean)); return journal.filter(d => !ids.has(d._id)).concat(mine); }
+    // The reading of this round: entered since the last report was sent and still inside its 2 hours, so it can be filled in.
+    const roundReading = (r) => r.lastDocId && inRound(r.lastCheckedAt, roundStart) && r.locked;
     function typing() { const a = document.activeElement; return !!(a && a.closest && a.closest('#rows') && a.tagName === 'INPUT'); }
     let waiting = false;
     function render() {
@@ -106,12 +111,14 @@
       document.getElementById('filters').innerHTML = pane === 'current' ? FILTERS.map(([f, label]) => '<button type="button" class="tp-btn' + (filter === f ? ' on' : '') + (f === 'ALERTS' ? ' alert' : '') + '" data-filter="' + f + '">' + label + (f === 'ALERTS' ? ' (' + alerts + ')' : '') + '</button>').join('') : '';
       document.getElementById('refresh').innerHTML = pane === 'current' ? '&#8635; Refresh Now' : '&#8635; Refresh History';
       document.getElementById('rows').innerHTML = list.map(r => {
-        const d = drafts[r.locationId] || {}, dis = ck && !r.locked ? '' : ' disabled';
+        const cur = roundReading(r), d = drafts[r.locationId] || (cur ? { manualTemperature: String(r.lastManualTemperature), notes: r.lastNotes } : {}), dis = ck && (!r.locked || cur) ? '' : ' disabled';
+        const last = !cur && r.lastCheckedAt ? '<small class="as-last">Last: ' + escapeHtml(r.lastManualTemperature) + '°F · ' + escapeHtml(clockOf(r.lastCheckedAt)) + (r.lastCheckedBy ? ' · ' + escapeHtml(initials(r.lastCheckedBy)) : '') + '</small>' : '';
+        const note = notes[r.locationId] || '';
         const detail = r.lastStatus === 'HIGH' || r.lastStatus === 'LOW' ? '<small class="tp-detail bad">Last manual ' + escapeHtml(r.lastManualTemperature) + '°F ' + r.lastStatus + '</small>' : '';
         const limits = r.lowLimit !== '' || r.highLimit !== '' ? '<small>' + escapeHtml([r.lowLimit !== '' ? r.lowLimit + '°' : '', r.highLimit !== '' ? r.highLimit + '°F' : ''].filter(Boolean).join(' – ')) + '</small>' : '';
         return '<tr data-location="' + escapeHtml(r.locationId) + '"><td class="tp-name"><b>' + escapeHtml(r.location) + '</b>' + limits + '</td>' +
           '<td class="tp-reading">' + (r.sensorTemp === '' ? '—' : escapeHtml(r.sensorTemp) + '°F') + '</td>' +
-          '<td><input class="tp-manual" inputmode="decimal" placeholder="' + (phone ? '°F' : 'Manual °F') + '" value="' + escapeHtml(d.manualTemperature || '') + '"' + dis + '></td>' +
+          '<td><input class="tp-manual" inputmode="decimal" placeholder="' + (phone ? '°F' : 'Manual °F') + '" value="' + escapeHtml(d.manualTemperature || '') + '"' + dis + '>' + last + '</td>' +
           '<td class="tp-trend">—</td>' +
           '<td><span class="tp-status ' + statusClass(r.status) + '">' + escapeHtml(r.status) + '</span>' + detail + '</td>' +
           '<td>' + (r.batteryLevel === '' ? '—' : escapeHtml(r.batteryLevel) + '%') + '</td>' +
@@ -119,7 +126,8 @@
           '<td><input class="tp-notes" placeholder="' + (phone ? 'Notes' : 'Add notes (optional)…') + '" maxlength="800" value="' + escapeHtml(d.notes || '') + '"' + dis + '></td>' +
           '<td class="tp-last">' + (r.lastCheckedAt ? escapeHtml(clock(r.lastCheckedAt)) + (r.lastManualTemperature !== '' ? '<small>' + escapeHtml(r.lastManualTemperature) + '°F</small>' : '') : '—') + '</td>' +
           '<td>' + escapeHtml(initials(r.lastCheckedBy) || '—') + '</td>' +
-          '<td>' + (ck ? '<button type="button" class="tp-save" data-save' + (r.locked ? ' disabled title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked' : '>Save') + '</button>' : '<span class="pill">View only</span>') + '</td></tr>';
+          // Joe 10/10: no Save button; the column shows when the reading saved, or how long the location is locked.
+          '<td class="tp-act">' + (!ck ? '<span class="pill">View only</span>' : note ? '<small class="as-note' + (/^Not|^Enter/.test(note) ? ' bad' : '') + '">' + escapeHtml(note) + '</small>' : r.locked && !cur ? '<small class="as-last" title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked ' + r.minutesUntilDue + ' min</small>' : cur ? '<small class="as-note">Saved ' + escapeHtml(clockOf(r.lastCheckedAt)) + '</small>' : '<small class="as-last">Due</small>') + '</td></tr>';
       }).join('') || '<tr><td colspan="11" class="empty">' + (rows.length ? 'No locations match the ' + escapeHtml(FILTERS.find(f => f[0] === filter)[1]) + ' filter.' : 'No temperature locations are set up for this plant.') + '</td></tr>';
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="tp-name"><b>' + escapeHtml(h.location) + '</b></td>' +
         '<td>' + escapeHtml(h.manualTemperature !== '' ? h.manualTemperature : h.sensorTemperature !== '' ? h.sensorTemperature : '—') + '</td>' +
@@ -127,7 +135,7 @@
         '<td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + '</td></tr>').join('') ||
         '<tr><td colspan="7" class="empty">No temperature checks recorded in the last 24 hours.</td></tr>';
       document.getElementById('foot').textContent = pane === 'current'
-        ? list.length + ' shown. ' + (ck ? 'Save records the manual reading with the time and locks the location for 2 hours. Sensors are not connected in the new app yet.' : 'View only.')
+        ? list.length + ' shown. ' + (ck ? 'Each reading saves as you leave its box, with the time and who entered it, and locks the location for 2 hours. After Send Current Report the boxes start empty for the next round. Sensors are not connected in the new app yet.' : 'View only.')
         : hist.length + ' reading' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
@@ -139,39 +147,43 @@
       if (tr) drafts[tr.dataset.location] = { manualTemperature: tr.querySelector('.tp-manual').value, notes: tr.querySelector('.tp-notes').value };
     });
     rowsEl.addEventListener('focusout', () => setTimeout(() => { if (waiting) render(); }, 0));
-    rowsEl.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) { const b = e.target.closest('tr').querySelector('[data-save]'); if (b) b.click(); } });
-    rowsEl.addEventListener('click', async e => {
-      const b = e.target.closest('[data-save]');
-      if (!b || b.disabled) return;
-      const tr = b.closest('[data-location]'), id = tr.dataset.location, loc = U.tempLocations(setup).find(l => l.locationId === id);
+    rowsEl.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) e.target.blur(); });
+    // The row's "Saving… / Saved" shows at once, even while its notes box is being typed in (the row is not redrawn then).
+    function tick(id) {
+      const tr = [...rowsEl.querySelectorAll('[data-location]')].find(r => r.dataset.location === id), cell = tr && tr.querySelector('.tp-act');
+      if (cell) cell.innerHTML = '<small class="as-note' + (/^Not|^Enter/.test(notes[id] || '') ? ' bad' : '') + '">' + escapeHtml(notes[id] || '') + '</small>';
+    }
+    // Each box saves as it is left: the reading makes the location's check, the notes box fills it in.
+    rowsEl.addEventListener('change', async e => {
+      const tr = e.target.closest('[data-location]');
+      if (!tr || !canSave()) return;
+      const id = tr.dataset.location, loc = U.tempLocations(setup).find(l => l.locationId === id), row = U.tempRows(setup, all(), Date.now()).find(r => r.locationId === id);
       const fields = { locationId: id, manualTemperature: tr.querySelector('.tp-manual').value.trim(), notes: tr.querySelector('.tp-notes').value.trim() };
-      if (fields.manualTemperature === '' || !isFinite(Number(fields.manualTemperature))) { showError('Enter a valid manual temperature before saving.'); return; }
-      // Shown at once: the reading is the location's last check and the location locks.
+      if (fields.manualTemperature === '') { notes[id] = fields.notes ? 'Enter the temperature to save' : ''; drafts[id] = fields; render(); tick(id); return; }
+      if (!isFinite(Number(fields.manualTemperature))) { notes[id] = 'Not saved: not a number'; drafts[id] = fields; render(); tick(id); return; }
+      if (!fills[id]) fills[id] = fillIn('saveTemperatureCheck', save, row && roundReading(row) ? row.lastDocId : '');
       const status = U.tempStatus(loc, fields.manualTemperature);
-      const mine = { type: U.TEMP_TYPE, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true,
-        payload: { locationId: id, location: loc.location, manualTemperature: Number(fields.manualTemperature), notes: fields.notes, status } };
-      pending.push(mine);
-      delete drafts[id];
-      document.activeElement && document.activeElement.blur && document.activeElement.blur();
-      render();
-      const ok = document.getElementById('saved');
-      ok.textContent = loc.location + ' temperature recorded' + (status === 'HIGH' || status === 'LOW' ? ' (' + status + ')' : '') + '. This location is locked for 2 hours.';
-      ok.hidden = false;
+      const mine = pending[id] || { type: U.TEMP_TYPE, recordedAt: row && roundReading(row) ? row.lastCheckedAt : new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, _id: fills[id].id };
+      mine.payload = { locationId: id, location: loc.location, manualTemperature: Number(fields.manualTemperature), notes: fields.notes, status };
+      pending[id] = mine;
+      drafts[id] = fields;
+      notes[id] = 'Saving…';
+      render(); tick(id);
       try {
-        const done = await save('saveTemperatureCheck', fields);
-        if (done && done.recordId) mine.recordId = done.recordId;
+        const done = await fills[id].send(fields);
+        if (done && done.checkId) { mine._id = done.checkId; if (done.recordedAt) mine.recordedAt = done.recordedAt; }
+        mine.saved = true;
+        if (drafts[id] === fields) delete drafts[id];
+        notes[id] = savedText() + (status === 'HIGH' || status === 'LOW' ? ' · ' + status : '');
+        tick(id);
         showError('');
-        render();
-        setTimeout(() => { ok.hidden = true; }, 2500);
-        setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); render(); }, 20000);
       } catch (err) {
-        const i = pending.indexOf(mine);
-        if (i >= 0) pending.splice(i, 1);
-        drafts[id] = { manualTemperature: fields.manualTemperature, notes: fields.notes };
-        ok.hidden = true;
-        render();
+        notes[id] = 'Not saved';
+        tick(id);
+        if (!mine.saved && !fills[id].id) delete pending[id];
         showError(loc.location + ': ' + (err.message || err));
       }
+      render();
     });
     document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
     document.getElementById('refresh').onclick = () => render();
@@ -190,8 +202,13 @@
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(); }, fail('the temperature locations'));
+      watchRound(db, at => { if (at !== roundStart) { roundStart = at; [pending, fills, notes, drafts].forEach(o => Object.keys(o).forEach(k => delete o[k])); } render(); });
       let unsub = null, day = '';
-      const watch = () => { const t = today(); if (t === day) return; day = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(t, -1), t])), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the temperature readings')); };
+      const watch = () => { const t = today(); if (t === day) return; day = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(t, -1), t])), s => {
+        journal = s.docs.map(d => Object.assign({ _id: d.id }, d.data()));
+        Object.keys(pending).forEach(k => { const p = pending[k]; if (p.saved && journal.some(d => d._id === p._id)) delete pending[k]; });
+        render();
+      }, fail('the temperature readings')); };
       watch();
       // Locks run out and the history drops readings past 24 hours with the clock.
       setInterval(() => { watch(); render(); }, 30000);

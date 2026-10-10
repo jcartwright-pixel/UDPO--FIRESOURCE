@@ -575,3 +575,12 @@
 .sched-page .sc-strip .hstats div { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; padding: 3px 12px; border-radius: 999px; }
 .sched-page .sc-strip .hstats b { display: inline; font-size: 16px; }
 .sched-page .sc-strip .hstats span { font-size: 11px; }
+
+/* Auto-save (Joe 10/10): no Record or Save buttons on the plant side. Each box shows when it saved ("Saved 10:42"), and an empty
+   box of a new round shows the last reading small and grey under it. */
+.plant-page .as-note { display: block; margin-top: 3px; font-size: 12px; font-weight: 800; color: var(--runs-ink); min-height: 0; }
+.plant-page .as-note:empty { display: none; }
+.plant-page .as-note.bad { color: #b42332; }
+.plant-page .as-last { display: block; margin-top: 3px; font-size: 12px; font-weight: 600; color: #8796a2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quality-page .qc-round { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--muted); }
+.temp-page .tp-act .as-note { white-space: normal; line-height: 1.25; }

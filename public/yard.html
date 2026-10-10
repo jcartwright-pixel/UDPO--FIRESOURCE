@@ -64,6 +64,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { savedText } from './js/autosave.js';
 
     const L = window.UDLogic, U = window.UDPlant;
     const FUEL = [['', ''], ['FULL', 'FULL'], ['3/4', '3/4'], ['1/2', '1/2'], ['EMPTY', 'EMPTY']];
@@ -101,8 +102,10 @@
         ['Latest', latest ? clock(latest.recordedAt) : 'None', '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + l + '</span></div>').join('');
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
       ['current', 'history'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; }); document.getElementById('refresh').hidden = pane !== 'current'; document.getElementById('refresh-history').hidden = pane !== 'history';
-      document.getElementById('rows').innerHTML = q.rows.map(x => {
-        const d = drafts[x.trailer] || {}, v = (k) => d[k] !== undefined ? d[k] : x[k];
+      // Joe 10/10: no Record button on the desktop either. Each box saves as it is left; a trailer checked here stays on the list
+      // while it is filled in, and a trailer due again starts with empty boxes (its last check is in Last Check).
+      document.getElementById('rows').innerHTML = q.rows.concat(q.locked.filter(x => mine[x.trailer])).map(x => {
+        const m = mine[x.trailer], d = drafts[x.trailer] || {}, v = (k) => d[k] !== undefined ? d[k] : (m || x.locked ? x[k] || '' : '');
         const next = x.minutesUntilDue > 0 ? 'Due in ' + x.minutesUntilDue + ' min' : 'Due now';
         const last = x.recordedAt ? escapeHtml(clock(x.recordedAt)) + ' · ' + escapeHtml(initials(x.recordedBy)) : '—';
         const dis = ck ? '' : ' disabled';
@@ -112,14 +115,14 @@
           '<td><select data-k="fuelLevel"' + dis + '>' + FUEL.map(([val, label]) => '<option value="' + val + '"' + (v('fuelLevel') === val ? ' selected' : '') + '>' + label + '</option>').join('') + '</select></td>' +
           '<td><input class="yd-notes" data-k="notes" placeholder="Add notes (optional)…" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></td>' +
           '<td class="yd-last">' + last + '</td><td class="yd-next' + (x.minutesUntilDue === 0 ? ' overdue' : '') + '">' + escapeHtml(next) + '<small>' + escapeHtml(x.routeRun) + '</small></td>' +
-          '<td class="yd-act">' + (ck ? '<button type="button" class="yd-record" data-record>Record</button><button type="button" class="yd-left" data-left' + (armed[x.trailer] ? ' data-armed="true">Confirm Left' : ' title="Trailer has left the yard">Left Yard') + '</button>' : '<span class="pill">View only</span>') + '</td></tr>';
+          '<td class="yd-act">' + (ck ? (m ? (m.saved === 'saving' ? '<span class="yd-tick saving">Saving…</span>' : m.saved === 'error' ? '<span class="yd-tick error">Not saved</span>' : '<span class="yd-tick">&#10003; ' + escapeHtml(m.at || 'Saved') + '</span>') : '') + '<button type="button" class="yd-left" data-left' + (armed[x.trailer] ? ' data-armed="true">Confirm Left' : ' title="Trailer has left the yard">Left Yard') + '</button>' : '<span class="pill">View only</span>') + '</td></tr>';
       }).join('') || '<tr><td colspan="8" class="empty">No loaded trailers are currently due for a yard check.</td></tr>';
       drawCards(q, ck);
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="yd-trailer"><b>' + escapeHtml(h.trailer) + '</b></td><td>' + escapeHtml(h.temperature) + '</td><td>' + escapeHtml(h.setPoint) + '</td>' +
         '<td>' + escapeHtml(h.fuelLevel) + '</td><td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + ' <span class="yd-status' + (h.status === 'DEPARTED' ? ' left' : '') + '">' + escapeHtml(STATUS[h.status] || h.status) + '</span></td></tr>').join('') ||
         '<tr><td colspan="7" class="empty">No yard checks in the last 24 hours.</td></tr>';
       document.getElementById('foot').textContent = pane === 'current'
-        ? q.rows.length + ' trailer' + (q.rows.length === 1 ? '' : 's') + ' due, ' + q.locked.length + ' checked in the last 2 hours. ' + (ck ? 'Record saves the check and locks the trailer for 2 hours; Left Yard takes it off the list.' : 'View only.')
+        ? q.rows.length + ' trailer' + (q.rows.length === 1 ? '' : 's') + ' due, ' + q.locked.length + ' checked in the last 2 hours. ' + (ck ? 'Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.' : 'View only.')
         : hist.length + ' record' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
@@ -148,11 +151,22 @@
     }
     // One box was left (or a fuel button tapped): save that trailer's check. The first save is the check (locked for 2 hours);
     // the next ones fill in the same check.
+    // The row's "Saving… / Saved" shows at once, even while the next box of the row is being typed in (the row is not redrawn then).
+    function tick(trailer) {
+      const m = mine[trailer], td = [...document.querySelectorAll('#rows tr[data-trailer]')].find(r => r.dataset.trailer === trailer);
+      const cell = td && td.querySelector('.yd-act');
+      if (!m || !cell) return;
+      let t = cell.querySelector('.yd-tick');
+      if (!t) { t = document.createElement('span'); cell.prepend(t); }
+      t.className = 'yd-tick' + (m.saved === 'saving' ? ' saving' : m.saved === 'error' ? ' error' : '');
+      t.textContent = m.saved === 'saving' ? 'Saving…' : m.saved === 'error' ? 'Not saved' : '\u2713 ' + (m.at || 'Saved');
+    }
     function autoSave(card) {
       const trailer = card.dataset.trailer, routeRun = card.dataset.route, d = drafts[trailer] || {};
       const x = queue().rows.concat(queue().locked).find(r => r.trailer === trailer) || {};
       const m = mine[trailer] = mine[trailer] || { saved: 'saving' };
       m.saved = 'saving';
+      tick(trailer);
       const pick = (k) => d[k] !== undefined ? d[k] : (m.checkId ? x[k] || '' : '');
       const run = async () => {
         const fields = { date, trailer, routeRun, temperature: pick('temperature'), setPoint: x.setPoint || '', fuelLevel: pick('fuelLevel'), notes: pick('notes') };
@@ -167,9 +181,12 @@
           const res = await save('saveYardCheck', fields);
           m.checkId = res && res.checkId || m.checkId;
           m.saved = 'saved';
+          m.at = savedText();
+          tick(trailer);
           showError('');
         } catch (e) {
           m.saved = 'error';
+          tick(trailer);
           showError('Yard check ' + trailer + ': ' + (e.message || e));
         }
         if (mineRec) setTimeout(() => { const i = pending.indexOf(mineRec); if (i >= 0) pending.splice(i, 1); render(); }, 1500);
@@ -199,7 +216,8 @@
       if (!tr || !k) return;
       (drafts[tr.dataset.trailer] = drafts[tr.dataset.trailer] || {})[k] = e.target.value;
     });
-    rowsEl.addEventListener('change', e => { const tr = e.target.closest('tr'), k = e.target.dataset.k; if (tr && k) (drafts[tr.dataset.trailer] = drafts[tr.dataset.trailer] || {})[k] = e.target.value; });
+    rowsEl.addEventListener('change', e => { const tr = e.target.closest('tr'), k = e.target.dataset.k; if (tr && k) { (drafts[tr.dataset.trailer] = drafts[tr.dataset.trailer] || {})[k] = e.target.value; if (canSave()) autoSave(tr); } });
+    rowsEl.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.k) e.target.blur(); });
     rowsEl.addEventListener('focusout', () => setTimeout(() => { if (waiting && !typing()) render(); }, 0));
 
     // Record and Left Yard show at once; the database copy replaces them when it arrives.
@@ -229,10 +247,10 @@
       const b = e.target.closest('button'), tr = b && b.closest('tr');
       if (!b || !tr) return;
       const trailer = tr.dataset.trailer, route = tr.dataset.route;
-      if (b.hasAttribute('data-record')) { send(trailer, route, false); return; }
       if (!b.hasAttribute('data-left')) return;
       // Left Yard asks once more ("Confirm Left") for 6 seconds, as on the current app.
       if (!armed[trailer]) { armed[trailer] = true; render(); setTimeout(() => { if (armed[trailer]) { delete armed[trailer]; render(); } }, 6000); return; }
+      delete mine[trailer];
       send(trailer, route, true);
     });
     document.getElementById('panes').addEventListener('click', e => {

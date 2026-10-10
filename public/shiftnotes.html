@@ -33,7 +33,7 @@
     <div class="view">
       <section class="qc-form sn-form" id="pane-current">
         <div class="qc-top"><h2>New Entry</h2><span class="qc-last" id="form-last"></span>
-          <div class="qc-actions"><button type="button" class="qc-btn" id="clear">Clear</button><button type="button" class="qc-btn primary" id="record">Save Timestamped Entry</button></div></div>
+          <div class="qc-actions"><button type="button" class="qc-btn" id="another" hidden>Start Another Entry</button></div></div>
         <div class="qc-fields" id="fields"></div>
       </section>
       <section class="sn-history" id="pane-history" hidden>
@@ -47,13 +47,14 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { fillIn, savedText } from './js/autosave.js';
 
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
     const phone = window.matchMedia('(max-width: 760px)');
     let pane = params.get('view') === 'history' ? 'history' : 'current';
-    let journal = [], person = null, app = {}, drawnFor = '';
+    let journal = [], person = null, app = {}, drawnFor = '', entry = null;
     const pending = [];
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
     const FOLLOW = { OPEN: 'Needs attention', MONITOR: 'Monitor', RESOLVED: 'Resolved' };
@@ -80,10 +81,10 @@
           '<label class="wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500"></textarea></label>' +
           '<label>Follow-up' + followSelect('sn-follow', 'OPEN', false) + '</label>';
       document.getElementById('fields').querySelectorAll('input,select,textarea').forEach(x => { x.disabled = !ck; });
-      document.getElementById('record').textContent = m ? 'Save Entry' : 'Save Timestamped Entry';
-      document.getElementById('form-last').textContent = m ? 'Time recorded automatically' : '';
-      document.getElementById('clear').hidden = !ck;
-      document.getElementById('record').hidden = !ck;
+      // Joe 10/10: no Save button. The entry saves to the log as each box is left; Start Another Entry empties the form for the next one.
+      entry = { fill: fillIn('saveShiftNote', save), mine: null };
+      document.getElementById('form-last').textContent = ck ? (m ? 'Time recorded automatically · saves as you go' : 'Saves as you go') : '';
+      document.getElementById('another').hidden = true;
       drawnFor = (m ? 'phone' : 'desk') + '|' + ck;
     }
 
@@ -110,7 +111,7 @@
       // The log is not redrawn while someone is typing a review note in it.
       const box = document.getElementById('history'), typing = box.contains(document.activeElement) && document.activeElement.value;
       if (!typing) box.innerHTML = rows.map(r => card(r, ck)).join('') || '<div class="empty">No entries in the last 24 hours.</div>';
-      document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Save keeps the entry with the time on the 24-hour log; anyone can add a review note to it there.' : 'View only.') : rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' in the last 24 hours.';
+      document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'The entry saves to the 24-hour log as you leave each box, with the time and who entered it; anyone can add a review note to it there.' : 'View only.') : rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' in the last 24 hours.';
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
@@ -139,18 +140,36 @@
     }
     const record = (values, extra) => ({ type: U.SHIFT_TYPE, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, area: 'HANDOFF', payload: Object.assign({ section: 'HANDOFF', values }, extra) });
 
-    document.getElementById('record').onclick = () => {
+    // Each box saves as it is left, once the entry has some words: the first save puts the entry on the log, later boxes fill it in.
+    document.getElementById('fields').addEventListener('change', async () => {
+      if (!canSave() || !entry) return;
       const f = document.getElementById('fields'), v = (c) => { const n = f.querySelector('.' + c); return n ? n.value.trim() : ''; };
-      const entry = v('sn-entry'), notes = v('sn-notes');
-      if (!entry && !notes) { showError('Enter report information before saving.'); return; }
-      const values = { Entry: entry, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') };
+      const text = v('sn-entry'), notes = v('sn-notes'), mine0 = entry.mine, cur = entry;
+      if (!text && !notes) return;
+      const values = { Entry: text, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') };
       const fields = { values, notes, shift: v('sn-shift'), readingTime: v('sn-time') || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
-      const kept = Array.from(f.querySelectorAll('input,textarea,select')).map(x => x.value);
-      const mine = record(values, { entryId: 'pending-' + Date.now(), shift: fields.shift, readingTime: fields.readingTime, notes, followUpStatus: fields.followUpStatus });
-      drawForm();
-      send(fields, mine, 'Entry saved to the log.', () => { Array.from(f.querySelectorAll('input,textarea,select')).forEach((x, i) => { if (kept[i] !== undefined) x.value = kept[i]; }); });
-    };
-    document.getElementById('clear').onclick = () => drawForm();
+      const mine = mine0 || record(values, { entryId: 'pending-' + Date.now() });
+      Object.assign(mine.payload, { values, shift: fields.shift, readingTime: fields.readingTime, notes, followUpStatus: fields.followUpStatus });
+      mine.status = fields.followUpStatus;
+      if (!mine0) { cur.mine = mine; pending.push(mine); }
+      const last = document.getElementById('form-last');
+      last.textContent = 'Saving…'; last.classList.remove('bad');
+      render();
+      try {
+        const done = await cur.fill.send(fields);
+        if (done && done.entryId) mine.payload.entryId = done.entryId;
+        showError('');
+        if (entry === cur) { last.textContent = savedText() + ' · on the log'; document.getElementById('another').hidden = false; }
+        render();
+        setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0 && journal.some(d => d.recordId === mine.payload.entryId)) { pending.splice(i, 1); render(); } }, 20000);
+      } catch (e) {
+        if (!cur.fill.id) { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); cur.mine = null; }
+        if (entry === cur) { last.textContent = 'Not saved'; last.classList.add('bad'); }
+        render();
+        showError(e.message || String(e));
+      }
+    });
+    document.getElementById('another').onclick = () => { document.getElementById('form-last').classList.remove('bad'); drawForm(); };
     document.getElementById('history').addEventListener('click', e => {
       const b = e.target.closest('[data-review-save]');
       if (!b) return;
