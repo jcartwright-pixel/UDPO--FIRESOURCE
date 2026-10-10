@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>MOCREO &amp; Sensors · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page gps-page mocreo-page">
+  <div class="signin" id="signin" hidden>
+    <h1>MOCREO &amp; Sensors</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Administration · Connections &amp; Keys</span><h1>MOCREO &amp; Sensors</h1></div>
+      <div class="hstats" id="hstats"></div>
+      <button type="button" id="add" data-top>Add Thermometer</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="mc-grid">
+      <div class="mc-left">
+        <section class="gps-card">
+          <h2>1. MOCREO key <span class="pill" id="state">-</span></h2>
+          <p class="hint">Paste the key here only, never in a chat or email. Once saved it is locked away on the server and never shown again; only its last 4 characters show. Leave a box blank to keep what is saved.</p>
+          <form id="form" autocomplete="off" onsubmit="return false">
+            <label>API key<input id="f-key" type="password" autocomplete="new-password" spellcheck="false"></label>
+            <label>Asset ID<input id="f-asset" type="password" autocomplete="new-password" spellcheck="false"></label>
+            <div class="gps-buttons">
+              <button type="button" class="primary" id="save">Replace Key</button>
+              <button type="button" id="clear">Remove Key</button>
+            </div>
+          </form>
+          <p class="hint" id="saved"></p>
+        </section>
+        <section class="gps-card">
+          <h2>2. Test connection</h2>
+          <p class="hint">Test reads the sensor list from MOCREO with the saved key. When it passes, the cooler readings start (every 5 minutes); until then Cooler Temperatures is entered by hand.</p>
+          <div class="gps-buttons"><button type="button" class="primary big" id="test">Test Connection</button></div>
+          <div class="gps-result" id="result" hidden></div>
+          <p class="hint" id="last"></p>
+          <p class="hint" id="sync"></p>
+        </section>
+      </div>
+      <section class="gps-card mc-therm">
+        <h2>3. Thermometers</h2>
+        <p class="hint">Each box saves as you leave it. A sensor picked here is that cooler's MOCREO sensor; "Manual only" means the cooler is read by hand. Off leaves it off Cooler Temperatures; Remove (press twice) takes it off the list.</p>
+        <div class="mc-scroll">
+          <table class="loadout mc-table">
+            <colgroup><col style="width:20%"><col style="width:16%"><col style="width:22%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:6%"><col style="width:8%"></colgroup>
+            <thead><tr><th>Location</th><th>Cooler / Area</th><th>MOCREO Sensor</th><th>Now</th><th>Low °F</th><th>High °F</th><th>On</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <p class="hint" id="foot"></p>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer } from './js/app.js';
+    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    // Joe 10/10: "Any of the API keys that we mess with, it should be in the administration app for updating ... replace the key
+    // and then adjust the locations of the thermometers, add, subtract." Administrators only (functions/src/mocreo.js).
+    const U = window.UDPlant;
+    let s = null, setup = [], mine = [], sensors = [], sync = {}, armed = null, note = '', draft = null;
+    const $ = (id) => document.getElementById(id);
+    const stamp = (t) => t ? shortDate(String(t).slice(0, 10)) + ' ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    const typing = () => $('rows').contains(document.activeElement) && document.activeElement.matches('input');
+
+    // Every thermometer, off ones too (removed ones are gone), in view order.
+    // A row just saved shows as typed until the database has it (a redraw in between must not undo a box).
+    const sent = {};
+    let busy = Promise.resolve();
+    function list() {
+      const now = Date.now(), recent = Object.values(sent).filter(x => now - x.at < 15000).map(x => x.row);
+      const rows = U.withTempLocations(setup, mine.concat(recent)).filter(r => r.type === 'TEMPERATURE_CHECK_LOCATION' && !r.removed);
+      const on = new Set(U.tempLocations(rows).map(l => l.locationId));
+      return U.tempLocations(rows.map(r => Object.assign({}, r, { status: 'ACTIVE' }))).map(l => Object.assign(l, { active: on.has(l.locationId) }));
+    }
+    function keyBox() {
+      if (!s) return;
+      $('state').textContent = s.hasKey && s.hasAsset ? 'Key set · ends ' + s.keyEnds : s.hasKey ? 'Asset ID missing' : 'No key';
+      $('state').className = 'pill ' + (s.hasKey && s.hasAsset ? 'yes' : s.hasKey ? 'warn' : 'no');
+      $('f-key').placeholder = s.hasKey ? 'saved, ends ' + s.keyEnds + ' (paste to replace)' : 'paste the MOCREO API key';
+      $('f-asset').placeholder = s.hasAsset ? 'saved, ends ' + s.assetEnds + ' (paste to replace)' : 'paste the MOCREO asset ID';
+      $('saved').textContent = s.savedAt ? 'Updated ' + stamp(s.savedAt) + ' by ' + s.savedBy : '';
+      const t = s.lastTest;
+      $('last').textContent = t ? 'Last test ' + stamp(t.at) + ' by ' + t.by + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
+    }
+    function render() {
+      keyBox();
+      const all = list(), on = all.filter(l => l.active), linked = on.filter(l => l.sensorId).length;
+      $('hstats').innerHTML = [['Thermometers', on.length, ''], ['On a sensor', linked, linked ? 'good' : ''], ['Sensors', sensors.filter(x => x.returned !== false).length, '']]
+        .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      $('sync').textContent = sync.lastSuccess && sync.configured ? 'Sensors last read ' + stamp(sync.lastSuccess) + ' (' + (sync.sensors || 0) + ' sensors).' + (sync.lastError ? ' Last try: ' + sync.lastError : '') : (sync.lastError || 'Sensors not read yet; readings are manual.');
+      $('foot').textContent = all.length + ' thermometer' + (all.length === 1 ? '' : 's') + '. ' + (note || '');
+      if (typing()) return;
+      const sensorOpts = (cur) => '<option value="">Manual only</option>' + sensors.map(x => '<option value="' + escapeHtml(x.sensorId) + '"' + (x.sensorId === cur ? ' selected' : '') + '>' + escapeHtml(x.name + (x.returned === false ? ' (not sending)' : '')) + '</option>').join('') +
+        (cur && !sensors.some(x => x.sensorId === cur) ? '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>' : '');
+      const live = (l) => { const x = sensors.find(y => y.sensorId === l.sensorId); return x && x.temperatureF !== null && x.temperatureF !== undefined ? x.temperatureF + '°F' : '—'; };
+      const rows = (draft ? [draft] : []).concat(all);
+      $('rows').innerHTML = rows.map(l => '<tr data-id="' + escapeHtml(l.locationId || '') + '"' + (l.active ? '' : ' class="off"') + '>' +
+        '<td><input data-k="location" value="' + escapeHtml(l.location) + '" placeholder="Location name" maxlength="80"></td>' +
+        '<td><input data-k="area" value="' + escapeHtml(l.area || '') + '" placeholder="Cooler / area" maxlength="80"></td>' +
+        '<td><select data-k="sensorId">' + sensorOpts(l.sensorId) + '</select></td>' +
+        '<td class="mc-now">' + escapeHtml(live(l)) + '</td>' +
+        '<td><input data-k="lowLimit" inputmode="decimal" value="' + escapeHtml(l.lowLimit === '' ? '' : String(l.lowLimit)) + '"></td>' +
+        '<td><input data-k="highLimit" inputmode="decimal" value="' + escapeHtml(l.highLimit === '' ? '' : String(l.highLimit)) + '"></td>' +
+        '<td><input type="checkbox" data-k="active"' + (l.active ? ' checked' : '') + ' aria-label="On"></td>' +
+        '<td>' + (l.locationId ? '<button type="button" class="pm-remove" data-remove="' + escapeHtml(l.locationId) + '">' + (armed === l.locationId ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
+        '<tr><td colspan="8" class="empty">No thermometers yet. Add Thermometer puts one in.</td></tr>';
+    }
+    async function call(fields, button) {
+      showError('');
+      if (button) button.disabled = true;
+      try { return await callServer('mocreo', fields); }
+      catch (e) { showError(e.message || String(e)); return null; }
+      finally { if (button) button.disabled = false; }
+    }
+    $('save').onclick = async () => {
+      const r = await call({ op: 'save', apiKey: $('f-key').value, assetId: $('f-asset').value }, $('save'));
+      if (r) { s = r; $('f-key').value = ''; $('f-asset').value = ''; $('result').hidden = true; render(); }
+    };
+    // No pop-up: the first tap arms the button, a second tap within 5 seconds removes the key.
+    $('clear').onclick = async () => {
+      const b = $('clear');
+      if (!b.classList.contains('armed')) { b.textContent = 'Tap again to remove'; b.classList.add('armed'); setTimeout(() => { b.textContent = 'Remove Key'; b.classList.remove('armed'); }, 5000); return; }
+      b.textContent = 'Remove Key'; b.classList.remove('armed');
+      const r = await call({ op: 'clear' }, b);
+      if (r) { s = r; render(); }
+    };
+    $('test').onclick = async () => {
+      $('result').hidden = false; $('result').className = 'gps-result'; $('result').textContent = 'Testing...';
+      const r = await call({ op: 'test' }, $('test'));
+      if (!r) { $('result').hidden = true; return; }
+      s = r;
+      $('result').className = 'gps-result ' + (r.result.ok ? 'ok' : 'bad');
+      $('result').innerHTML = '<b>' + (r.result.ok ? 'PASSED' : 'FAILED') + '</b> ' + escapeHtml(r.result.message);
+      render();
+    };
+    $('add').onclick = () => {
+      draft = { locationId: '', location: '', area: '', sensorId: '', lowLimit: '', highLimit: '', active: true };
+      render();
+      $('rows').querySelector('tr input[data-k="location"]').focus();
+    };
+    // Each box saves as it is left: the whole row goes, so the server keeps one record per thermometer.
+    $('rows').addEventListener('change', async e => {
+      const tr = e.target.closest('tr[data-id]');
+      if (!tr) return;
+      const v = (k) => tr.querySelector('[data-k="' + k + '"]'), sensor = sensors.find(x => x.sensorId === v('sensorId').value);
+      const row = { op: 'location', locationId: tr.dataset.id, location: v('location').value, area: v('area').value, sensorId: v('sensorId').value, sensorName: sensor ? sensor.name : '',
+        lowLimit: v('lowLimit').value, highLimit: v('highLimit').value, active: v('active').checked };
+      if (!row.location.trim()) { note = tr.dataset.id ? 'A thermometer needs a location name; not saved.' : 'Type the location name first.'; render(); return; }
+      if (row.locationId) sent[row.locationId] = { at: Date.now(), row: Object.assign({}, row, { lowLimit: row.lowLimit.trim() === '' ? '' : Number(row.lowLimit), highLimit: row.highLimit.trim() === '' ? '' : Number(row.highLimit), removed: false }) };
+      note = 'Saving…'; render();
+      // Saves go one at a time, so a later box always wins.
+      const run = busy.then(() => call(row));
+      busy = run.catch(() => {});
+      const r = await run;
+      if (r) { if (!tr.dataset.id) { draft = null; tr.dataset.id = r.location.locationId; sent[r.location.locationId] = { at: Date.now(), row: r.location }; } note = (row.location + ' saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })); }
+      else { note = 'Not saved.'; delete sent[row.locationId]; }
+      render();
+    });
+    $('rows').addEventListener('focusout', () => setTimeout(() => { if (!typing()) render(); }, 0));
+    $('rows').addEventListener('click', async e => {
+      const b = e.target.closest('[data-remove]');
+      if (!b) return;
+      const id = b.dataset.remove;
+      if (armed !== id) { armed = id; render(); setTimeout(() => { if (armed === id) { armed = null; render(); } }, 7000); return; }
+      armed = null;
+      const r = await call({ op: 'removeLocation', locationId: id }, b);
+      note = r ? 'Thermometer removed.' : 'Not removed.';
+      render();
+    });
+
+    requireSignIn(async () => {
+      const { db } = await start();
+      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      s = await call({ op: 'status' });
+      onSnapshot(collection(db, 'plantSetup'), x => { setup = x.docs.map(d => d.data()); render(); }, fail('the thermometers'));
+      onSnapshot(collection(db, 'tempLocations'), x => { mine = x.docs.map(d => d.data()); render(); }, fail('the thermometer changes'));
+      onSnapshot(collection(db, 'sensors'), x => { sensors = x.docs.map(d => d.data()).sort((a, b) => String(a.name).localeCompare(String(b.name))); render(); }, () => {});
+      onSnapshot(doc(db, 'config', 'mocreo'), x => { sync = x.data() || {}; render(); }, () => {});
+      render();
+    });
+  </script>
+</body>
+</html>
