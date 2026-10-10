@@ -22,6 +22,10 @@ document.querySelectorAll('.topbar').forEach(bar => {
   bar.prepend(brand);
 });
 
+// Joe 10/10: Administration opens a screen inside its right-hand panel; there the screen shows without its own header and menu.
+export const EMBED = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+if (EMBED) document.body.classList.add('embed');
+
 // The menu on the left (Joe, 10/9: "the action buttons ... supposed to be a menu option to the left"), the same on every
 // screen. A link marked with the small arrow still opens the current app in a new tab. On a laptop it folds to icons;
 // the button at its top opens it.
