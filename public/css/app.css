@@ -1305,3 +1305,9 @@ body.embed .head > .title { display: none; }
 /* Weekly (Joe 10/10): the driver drop-down opens right on the clicked box, like the current screen. */
 .popover.cell-pick { display: block; padding: 0; border: 0; border-radius: 7px; background: transparent; box-shadow: 0 0 0 2px var(--ud-gold), 0 6px 18px rgba(0,0,0,.25); }
 .popover.cell-pick select { width: 100%; height: 100%; border: 1px solid #bfd1e0; border-radius: 7px; background: #fff; color: #0e3a62; text-align: center; text-align-last: center; font-size: 15px; font-weight: 850; }
+
+/* Vacation Schedule (Joe 10/10): one View drop-down in place of the five filter buttons, and Print for the list shown. */
+.vac-view { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.vac-view select { height: 38px; min-width: 190px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 15px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--ud-blue); background: #fff; cursor: pointer; }
+#day-modal .notice.error { margin: 0 0 10px; }
+@media print { body:has(#print .vac-print) { background: #fff !important; } #print .vac-print-sub { margin: 0 0 8px; font-size: 12px; } #print table.vac-print { width: 100%; font-size: 12px; } #print table.vac-print :is(td, th):is(:first-child, :last-child) { text-align: left; } }

@@ -40,10 +40,10 @@
 
     <section class="view" id="view-time">
       <div class="actions" data-top>
-        <div class="chips" id="filters"></div>
-        <span class="hint" id="range-hint"></span>
-        <span class="spacer"></span>
         <button type="button" class="primary" id="add">+ Add Vacation</button>
+        <button type="button" id="print-list">&#128424; Print</button>
+        <label class="vac-view">View<select id="filters" aria-label="Which time off to show"></select></label>
+        <span class="hint" id="range-hint"></span>
       </div>
       <form class="vac-form" id="form" hidden>
         <input type="hidden" name="vacationId">
@@ -60,7 +60,7 @@
         <table>
           <colgroup><col style="width:24%"><col style="width:11%"><col style="width:11%"><col style="width:7%"><col style="width:12%"><col style="width:27%"><col style="width:8%"></colgroup>
           <thead><tr><th>Driver</th><th>First day</th><th>Last day</th><th>Days</th><th>Status</th><th>Notes</th><th></th></tr></thead>
-          <tbody id="rows"></tbody>
+          <tbody id="rows"><tr><td colspan="7" class="empty" id="loading">Loading the vacation schedule&hellip;</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -94,6 +94,7 @@
   <section class="modal wide-modal" id="day-modal" role="dialog" aria-labelledby="day-title" hidden>
     <h2 id="day-title"></h2>
     <p class="modal-context" id="day-sub"></p>
+    <div class="notice error" id="day-error" hidden></div>
     <div class="day-body">
       <div><h3>Off this day</h3><div class="day-list" id="day-list"></div></div>
       <form id="day-form" novalidate>
@@ -123,7 +124,7 @@
     const today = L.operatingDay(new Date());
     const FILTERS = [['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['upcoming', 'Upcoming'], ['all', 'All']];
     const TYPE_CLASS = { VACATION: 't-vacation', PERSONAL: 't-personal', SICK: 't-sick', BEREAVEMENT: 't-bereavement', UNPAID: 't-unpaid' };
-    let vacations = [], view = 'time', filter = 'week', month = today.slice(0, 7), dayOpen = null;
+    let vacations = [], loaded = false, view = 'time', filter = 'upcoming', month = today.slice(0, 7), dayOpen = null;
 
     const canEdit = () => canManage();
     const nameOf = (id) => { const d = lists.allDrivers.find(x => x.id === id); return d ? d.name : id; };
@@ -158,17 +159,41 @@
       if (dayOpen) paintDay();
     }
 
-    function paintTime(edit) {
-      document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + vacations.filter(v => inFilter(v, k)).length + '</b></button>').join('');
+    // Oldest first: January at the top, December at the bottom (Joe 10/10), in every view.
+    function shownList() {
+      return vacations.filter(v => inFilter(v, filter)).sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.endDate || a.startDate).localeCompare(String(b.endDate || b.startDate)) || nameOf(a.driverId).localeCompare(nameOf(b.driverId)));
+    }
+    function rangeText() {
       const r = ['today', 'week', 'month'].indexOf(filter) >= 0 ? range(filter) : null;
-      document.getElementById('range-hint').textContent = r ? (r[0] === r[1] ? shortDate(r[0]) : shortDate(r[0]) + ' – ' + shortDate(r[1])) : filter === 'upcoming' ? 'From today on' : 'Every entry';
-      const list = vacations.filter(v => inFilter(v, filter)).sort((a, b) => a.startDate.localeCompare(b.startDate) || nameOf(a.driverId).localeCompare(nameOf(b.driverId)));
+      return r ? (r[0] === r[1] ? shortDate(r[0]) : shortDate(r[0]) + ' – ' + shortDate(r[1])) : filter === 'upcoming' ? 'From today on' : 'Every entry';
+    }
+    const filterName = (k) => FILTERS.find(f => f[0] === k)[1];
+    function paintTime(edit) {
+      // One View drop-down in place of the five buttons (Joe 10/10); each choice keeps its count.
+      const pick = document.getElementById('filters');
+      pick.innerHTML = FILTERS.map(([k, label]) => '<option value="' + k + '">' + label + ' (' + vacations.filter(v => inFilter(v, k)).length + ')</option>').join('');
+      pick.value = filter;
+      document.getElementById('range-hint').textContent = rangeText();
+      if (!loaded) return;
+      const list = shownList();
       document.getElementById('rows').innerHTML = list.map(v => '<tr data-id="' + escapeHtml(v.id) + '"><td class="left"><b>' + escapeHtml(nameOf(v.driverId)) + '</b>' + typeChip(v.vacationType) + '</td>' +
         '<td>' + escapeHtml(shortDate(v.startDate)) + '</td><td>' + escapeHtml(shortDate(v.endDate || v.startDate)) + '</td><td>' + days(v.startDate, v.endDate) + '</td>' +
         '<td><span class="vstatus s-' + escapeHtml(String(v.status).toLowerCase()) + '">' + escapeHtml(v.status) + '</span></td><td class="left" title="' + escapeHtml(v.notes || '') + '">' + escapeHtml(v.notes || '') + '</td>' +
         '<td>' + (edit ? '<button type="button" class="edit" data-edit-id="' + escapeHtml(v.id) + '">Edit</button>' : '') + '</td></tr>').join('') ||
-        '<tr><td colspan="7" class="empty">No time off ' + (filter === 'all' ? 'entered yet.' : 'in ' + FILTERS.find(f => f[0] === filter)[1].toLowerCase() + '.') + '</td></tr>';
+        '<tr><td colspan="7" class="empty">No time off ' + (filter === 'all' ? 'entered yet.' : 'in ' + filterName(filter).toLowerCase() + '.') + '</td></tr>';
     }
+
+    // Print: exactly the list the screen shows for the chosen view, oldest first, with the view and its dates in the heading.
+    document.getElementById('print-list').onclick = () => {
+      const list = shownList();
+      document.getElementById('print').innerHTML = '<h2>Vacation Schedule &middot; ' + escapeHtml(filterName(filter)) + ' &middot; ' + escapeHtml(rangeText()) + '</h2>' +
+        '<p class="vac-print-sub">' + list.length + ' entr' + (list.length === 1 ? 'y' : 'ies') + ' &middot; Printed ' + escapeHtml(shortDate(today)) + '</p>' +
+        '<table class="vac-print"><thead><tr><th>Driver</th><th>Type</th><th>First day</th><th>Last day</th><th>Days</th><th>Status</th><th>Notes</th></tr></thead><tbody>' +
+        (list.map(v => '<tr><td><b>' + escapeHtml(nameOf(v.driverId)) + '</b></td><td>' + escapeHtml(L.VACATION_TYPE_NAMES[v.vacationType] || 'Vacation Day') + '</td><td>' + escapeHtml(shortDate(v.startDate)) + '</td><td>' + escapeHtml(shortDate(v.endDate || v.startDate)) + '</td>' +
+          '<td>' + days(v.startDate, v.endDate) + '</td><td>' + escapeHtml(v.status) + '</td><td>' + escapeHtml(v.notes || '') + '</td></tr>').join('') || '<tr><td colspan="7">No time off in this view.</td></tr>') +
+        '</tbody></table>';
+      window.print();
+    };
 
     // The form: Add Vacation (empty) or Edit (filled). One call saves it; the limit check is on the server.
     function openForm(v) {
@@ -204,7 +229,7 @@
     document.getElementById('cancel').onclick = () => { document.getElementById('form').hidden = true; };
     document.getElementById('add').onclick = () => openForm(null);
     document.getElementById('rows').addEventListener('click', e => { const b = e.target.closest('[data-edit-id]'); if (b) openForm(vacations.find(v => v.id === b.dataset.editId)); });
-    document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
+    document.getElementById('filters').addEventListener('change', e => { filter = e.target.value; render(); });
 
     /* ---------- Calendar: the month, who is off each day; a day opens the day-off box ---------- */
     function offOn(day) { return vacations.filter(v => approved(v) && v.startDate <= day && (v.endDate || v.startDate) >= day); }
@@ -252,7 +277,10 @@
         '<small>' + escapeHtml(v.startDate === (v.endDate || v.startDate) ? shortDate(v.startDate) : shortDate(v.startDate) + ' – ' + shortDate(v.endDate)) + ' &middot; ' + days(v.startDate, v.endDate) + ' day' + (days(v.startDate, v.endDate) === 1 ? '' : 's') + (v.notes ? ' &middot; ' + escapeHtml(v.notes) : '') + '</small></div>' +
         '<span class="vstatus s-' + escapeHtml(String(v.status).toLowerCase()) + '">' + escapeHtml(v.status) + '</span></div>').join('') || '<p class="empty">Nobody is off this day.</p>';
     }
-    function closeDay() { dayOpen = null; document.getElementById('modal-back').hidden = true; document.getElementById('day-modal').hidden = true; }
+    // A message from saving in the day box shows inside the box, not behind it.
+    new MutationObserver(() => { const src = document.getElementById('error'), box = document.getElementById('day-error'); box.textContent = src.textContent; box.hidden = src.hidden || !dayOpen; })
+      .observe(document.getElementById('error'), { attributes: true, childList: true, characterData: true, subtree: true });
+    function closeDay() { document.getElementById('day-error').hidden = true; dayOpen = null; document.getElementById('modal-back').hidden = true; document.getElementById('day-modal').hidden = true; }
     document.getElementById('modal-back').onclick = closeDay;
     document.querySelector('#day-modal [data-close]').onclick = closeDay;
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && dayOpen) closeDay(); });
@@ -285,7 +313,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
-      onSnapshot(collection(db, 'vacations'), snap => { vacations = snap.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the vacation schedule: ' + e.message));
+      onSnapshot(collection(db, 'vacations'), snap => { vacations = snap.docs.map(d => Object.assign({}, d.data(), { id: d.id })); loaded = true; render(); }, e => showError('Could not read the vacation schedule: ' + e.message));
       window.addEventListener('resize', render);
     });
   </script>
