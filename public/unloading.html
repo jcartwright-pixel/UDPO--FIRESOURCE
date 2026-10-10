@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unloading &amp; Washing · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page unload-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Unloading &amp; Washing</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Operations</span><h1>Unloading &amp; Washing</h1></div>
+      <div class="field">
+        <label for="work-date">Return day</label>
+        <div class="stepper">
+          <button type="button" id="prev" aria-label="Previous day" title="Previous day">&#9664;</button>
+          <input id="work-date" type="date">
+          <button type="button" id="next" aria-label="Next day" title="Next day">&#9654;</button>
+        </div>
+      </div>
+      <div class="dayname" id="dayname"></div>
+      <div class="hstats" id="hstats"></div>
+      <div class="tabs mode" role="group" aria-label="Check Off or View Only"><button type="button" data-mode="check">Check Off</button><button type="button" data-mode="view">View Only</button></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="areas six" id="areas"></div>
+      <div class="uw-tabrow"><div class="tabs" id="tabs"></div><span class="uw-scope" id="scope"></span></div>
+      <div id="banner"></div>
+      <div class="uw-split">
+        <div class="sheet scroll-list">
+          <table class="loadout unload">
+            <colgroup><col style="width:13%"><col style="width:24%"><col style="width:9%"><col style="width:10%"><col style="width:8%"><col style="width:10%"><col style="width:8%"><col style="width:10%"><col style="width:8%"></colgroup>
+            <thead><tr><th>Route · Run</th><th>Trailer</th><th>Status</th><th id="qty-head">Cases In</th><th>RTA</th><th>Washed</th><th></th><th>Total Time</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <aside class="uw-side" id="side" aria-label="Department stats"></aside>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as P from './js/plant-core.js';
+
+    const L = window.UDLogic, U = window.UDPlant;
+    const params = new URLSearchParams(location.search);
+    const today = () => L.operatingDay(new Date());
+    let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
+    let area = P.AREAS.indexOf(String(params.get('area') || '').toUpperCase()) >= 0 ? String(params.get('area')).toUpperCase() : 'CASE';
+    let tab = 'needs', editKey = '', mode = 'check';
+    try { mode = localStorage.getItem('udPlantUnloadMode') === 'view' ? 'view' : 'check'; } catch (e) { /* no storage */ }
+    let runs = [], journal = [], sheetWash = [], appWash = [], person = null, app = {};
+    const pending = {};        // unload key -> what is shown before the server has it
+    const washedNow = {};      // wash item id -> true while its Wash press is saving
+    const unsubs = [];
+
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const check = () => mode === 'check' && canSave();
+
+    function data() {
+      const returns = P.returnsFor(runs, date, journal).map(x => (pending.returns && pending.returns[x.id] ? Object.assign({}, x, { pending: false }) : x));
+      const loads = P.loadoutRows(runs, date);
+      const rows = P.unloadRows(runs, date, journal, returns, loads).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r));
+      const wash = P.washItems(date, sheetWash, appWash, journal).filter(w => !washedNow[w.id]);
+      return { returns, rows, wash };
+    }
+
+    function pill(r) {
+      return '<span class="pill ' + (r.status === 'COMPLETE' ? 'done' : r.status === 'UNLOADING' ? 'run' : 'wait') + '">' + (r.status === 'COMPLETE' ? 'Done' : r.status === 'UNLOADING' ? 'Unloading' : 'Waiting') + '</span>';
+    }
+
+    function render() {
+      const { returns, rows: all, wash } = data(), unit = P.UNLOAD_UNIT[area], name = P.UNLOAD_TILE[area];
+      const c = P.unloadCounts(all), pendingReturns = returns.filter(x => x.pending);
+      document.getElementById('work-date').value = date;
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + (date === today() ? '' : '  ·  ' + shortDate(date));
+      document.getElementById('hstats').innerHTML = [['Trucks', c.total, ''], ['Waiting', c.waiting, ''], ['Unloading', c.unloading, 'warn'], ['Complete', c.complete, 'good'], ['Returns', pendingReturns.length, pendingReturns.length ? 'bad' : ''], ['To Wash', wash.length, wash.length ? 'wash' : '']]
+        .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
+      // Tiles: the four areas, then Returns and Washing (each opens its own screen).
+      document.getElementById('areas').innerHTML = P.AREAS.map(a => {
+        const ac = P.unloadCounts(all.filter(r => r.area === a)), pct = ac.total ? Math.round(ac.complete * 100 / ac.total) : 0;
+        return '<button type="button" class="area' + (a === area ? ' on' : '') + '" data-area="' + a + '" style="--area:' + P.AREA[a].color + '"><span class="ring" style="--p:' + pct + '"><b>' + ac.complete + '/' + ac.total + '</b></span>' +
+          '<span><strong>' + P.UNLOAD_TILE[a] + '</strong><small><b class="w">' + ac.waiting + '</b> waiting <b class="u">' + ac.unloading + '</b> unloading <b class="d">' + ac.complete + '</b> done</small></span></button>';
+      }).join('') +
+        '<a class="area go" href="returns.html?date=' + date + '" style="--area:#b42332"><span class="ring" style="--p:' + (pendingReturns.length ? 0 : 100) + '"><b>' + pendingReturns.length + '</b></span><span><strong>Returns &rsaquo;</strong><small><b class="r">' + pendingReturns.length + '</b> to the cooler · opens its own screen</small></span></a>' +
+        '<a class="area go" href="washing.html?date=' + date + '" style="--area:#0093b5"><span class="ring" style="--p:' + (wash.length ? 0 : 100) + '"><b>' + wash.length + '</b></span><span><strong>Washing &rsaquo;</strong><small><b class="o">' + wash.length + '</b> trailers to wash · opens its own screen</small></span></a>';
+      const mine = all.filter(r => r.area === area), needs = mine.filter(r => r.status !== 'COMPLETE'), rows = tab === 'all' ? mine : needs;
+      document.getElementById('tabs').innerHTML = [['needs', 'Needs Unloading', needs.length], ['all', 'All Loads', mine.length]]
+        .map(([k, l, n]) => '<button type="button" data-tab="' + k + '" aria-selected="' + (tab === k) + '">' + l + ' <b>' + n + '</b></button>').join('');
+      document.getElementById('scope').textContent = name + ' only';
+      const retLoads = mine.filter(r => r.pendingReturns.length).length;
+      document.getElementById('banner').innerHTML = retLoads ? '<div class="uw-banner"><b>Product returns need attention · ' + retLoads + ' load' + (retLoads === 1 ? '' : 's') + '</b><span>Assigned product must be returned to the cooler. Do not dump.</span><a href="returns.html?date=' + date + '">Open Returns &rarr;</a></div>' : '';
+      document.getElementById('qty-head').textContent = unit + ' In';
+      // Side stats for the area.
+      const ac = P.unloadCounts(mine), toWash = mine.filter(r => P.washesForRow(r, wash).length).length, washed = mine.filter(r => !P.washesForRow(r, wash).length && r.washed).length;
+      const line = (l, v, k) => '<div class="line ' + (k || '') + '"><span>' + escapeHtml(l) + '</span><b>' + escapeHtml(String(v)) + '</b></div>';
+      document.getElementById('side').innerHTML = '<h2>' + name + ' today</h2>' + line('Loads', ac.total) + line('Waiting', ac.waiting, 'w') + line('Unloading', ac.unloading, 'u') + line('Done', ac.complete, 'd') + '<hr>' +
+        line(unit + ' in', ac.qty.toLocaleString()) + line('Average time', ac.avg === null ? '—' : P.minutesText(ac.avg)) + '<hr>' + line('To the cooler', retLoads, retLoads ? 'r' : '') + line('To wash', toWash, toWash ? 'o' : '') + line('Washed', washed);
+      // The table.
+      const ck = check(), k = (r) => ' data-key="' + escapeHtml(r.key) + '"';
+      let html = '';
+      rows.forEach(r => {
+        const s = r.status, washes = P.washesForRow(r, wash), hadReturn = r.returns.length > 0;
+        const trailer = r.trailer ? '<span class="trl">' + escapeHtml(r.trailer) + '</span>' : !ck ? '<span class="na">—</span>' : '<input data-f="trailer"' + k(r) + ' placeholder="Trailer #" aria-label="Trailer back for ' + escapeHtml(r.route) + '">';
+        const next = r.nextLoad ? '<small class="next">Next: ' + escapeHtml([r.nextLoad.route, r.nextLoad.run, r.nextLoad.time].filter(Boolean).join(' · ')) + '</small>' : '';
+        const qty = r.casesIn !== '' ? '<span class="chk ok">&#10003; ' + escapeHtml(r.casesIn) + ' ' + unit.toLowerCase() + '</span>' : !ck ? '<span class="na">—</span>' :
+          s === 'UNLOADING' ? '<input data-f="casesIn"' + k(r) + ' inputmode="numeric" placeholder="' + unit + '" aria-label="' + unit + ' in for ' + escapeHtml(r.route) + '">' : '<span class="chk na">Start first</span>';
+        const titleRet = r.pendingReturns.map(x => x.detail).join('; ');
+        const rta = r.pendingReturns.length ? (ck ? '<button type="button" class="rta" data-do="rta"' + k(r) + ' title="Return to the cooler (RTA): ' + escapeHtml(titleRet) + '">RTA</button>' : '<span class="pill ret">Return pending</span>')
+          : hadReturn ? '<span class="chk ok">&#10003; Returned</span>' : '<span class="chk na">None</span>';
+        const washCell = washes.length ? (ck ? '<button type="button" class="wash" data-do="wash"' + k(r) + ' title="Mark the trailer washed">Wash</button>' : '<span class="pill washp">Wash needed</span>')
+          : r.washed ? '<span class="chk ok">&#10003; Washed</span>' : '<span class="chk na">Not washed</span>';
+        const mins = P.minutesTaken({ startedAt: r.startedAt, completedAt: r.completedAt });
+        const time = s === 'WAITING' || mins === null ? '<span class="na">—</span>' : '<span class="' + (s === 'UNLOADING' ? 'running' : '') + '">' + P.minutesText(mins) + '</span>';
+        const clockCell = !ck ? '' : s === 'WAITING' ? '<button type="button" class="clock" data-do="start"' + k(r) + '>Start</button>' : s === 'UNLOADING' ? '<button type="button" class="clock end" data-do="end"' + k(r) + '>End</button>' : '<span class="tick">&#10003;</span>';
+        html += '<tr' + k(r) + ' class="' + (r.pendingReturns.length ? 'needs-return ' : '') + (s === 'COMPLETE' ? 'done' : s === 'UNLOADING' ? 'loading' : '') + '"' + (titleRet ? ' title="Return: ' + escapeHtml(titleRet) + '"' : '') + '>' +
+          '<td class="rr"><b>' + escapeHtml(r.route) + '</b><span>' + escapeHtml(r.run) + '</span></td><td class="trlcell">' + trailer + next + '</td><td>' + pill(r) + '</td><td>' + qty + '</td><td>' + rta + '</td><td>' + washCell + '</td>' +
+          '<td>' + clockCell + '</td><td>' + time + '</td><td>' + (ck ? '<button type="button" class="edit-row" data-do="edit"' + k(r) + '>Edit</button>' : '') + '</td></tr>';
+        if (ck && editKey === r.key) {
+          html += '<tr class="editrow"><td colspan="9"><div class="editbar"><b>Edit · ' + escapeHtml(r.route + ' ' + r.run) + '</b><span class="read">Started ' + escapeHtml(P.clock(r.startedAt) || '—') + ' · Finished ' + escapeHtml(P.clock(r.completedAt) || '—') + '</span>' +
+            '<label>' + unit + ' In<input data-e="casesIn" inputmode="numeric" value="' + escapeHtml(r.casesIn) + '"></label><label>Trailer Back<input data-e="trailer" value="' + escapeHtml(r.trailer) + '"></label>' +
+            '<label class="grow">Notes<input data-e="notes" maxlength="1200" value="' + escapeHtml(r.notes) + '"></label><button type="button" class="primary" data-do="editsave"' + k(r) + '>Save</button><button type="button" data-do="editclose">Cancel</button></div></td></tr>';
+        }
+      });
+      const focused = document.activeElement && document.activeElement.dataset && (document.activeElement.dataset.f || document.activeElement.dataset.e) ? document.activeElement : null;
+      const keep = focused ? [focused.dataset.key || '', focused.dataset.f || '', focused.dataset.e || '', focused.value] : null;
+      document.getElementById('rows').innerHTML = html || '<tr><td colspan="9" class="empty">' + (!mine.length ? 'No ' + name.toLowerCase() + ' unloading is scheduled for this date.' : 'Every load is unloaded.') + '</td></tr>';
+      if (keep) {
+        const el = keep[1] ? document.querySelector('input[data-f="' + keep[1] + '"][data-key="' + CSS.escape(keep[0]) + '"]') : document.querySelector('input[data-e="' + keep[2] + '"]');
+        if (el) { el.value = keep[3]; el.focus(); }
+      }
+      document.getElementById('foot').textContent = mine.length + ' ' + name.toLowerCase() + ' loads back ' + (date === today() ? 'today' : 'on ' + shortDate(date)) + '. ' +
+        (ck ? 'Start, type the count, then End. One unload at a time.' : canSave() ? 'View Only: press Check Off to work the list.' : 'View only.') + ' Changes show on every screen at once.';
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+    }
+
+    const rowByKey = (key) => data().rows.find(r => r.key === key);
+
+    // One save, shown at once; if the server refuses it the row goes back and the reason shows.
+    let saveNo = 0;
+    const chain = {};
+    async function saveUnload(r, fields, shown) {
+      const mine = ++saveNo, p = pending[r.key] = Object.assign({}, pending[r.key], shown, { _no: mine });
+      if (fields.returnIds) { pending.returns = pending.returns || {}; fields.returnIds.forEach(id => { pending.returns[id] = true; }); }
+      render();
+      // Saves on one load go to the server in the order they were made (a count typed, then End).
+      const turn = (chain[r.key] || Promise.resolve()).then(() => save('saveUnloading', { date, route: r.route, run: r.run, runDocId: r.runDocId, day: r.day, fields }));
+      chain[r.key] = turn.catch(() => {});
+      try {
+        await turn;
+        showError('');
+      } catch (e) {
+        showError(r.route + ' ' + r.run + ': ' + (e.message || e));
+      }
+      if (pending[r.key] && pending[r.key]._no === mine) delete pending[r.key];
+      if (fields.returnIds && pending.returns) fields.returnIds.forEach(id => { delete pending.returns[id]; });
+      render();
+      return p;
+    }
+
+    // Wash: one press per trailer closes every wash item that trailer has (the requests and the after-unloading wash).
+    async function washTrailer(items) {
+      const byUnit = {};
+      items.forEach(w => { const u = U.unitKey(w.trailer); (byUnit[u] = byUnit[u] || []).push(w); });
+      Object.keys(byUnit).forEach(u => byUnit[u].forEach(w => { washedNow[w.id] = true; }));
+      render();
+      for (const u of Object.keys(byUnit)) {
+        const list = byUnit[u];
+        try {
+          await save('completeWash', { date, trailer: list[0].trailer, close: list.flatMap(w => w.refs) });
+        } catch (e) {
+          showError('Wash ' + list[0].trailer + ': ' + (e.message || e));
+          list.forEach(w => { delete washedNow[w.id]; });
+          render();
+        }
+      }
+      // The server's answer is in the lists now; what was hidden while saving can show from them again.
+      setTimeout(() => { items.forEach(w => { delete washedNow[w.id]; }); render(); }, 1500);
+    }
+
+    const rowsEl = document.getElementById('rows');
+    function fieldSave(el) {
+      const r = rowByKey(el.dataset.key), f = el.dataset.f;
+      if (!r || !f) return;
+      let v = String(el.value || '').trim();
+      if (!v) return;
+      if (f === 'casesIn') {
+        if (!/^\d+$/.test(v.replace(/,/g, ''))) { showError('Enter a whole quantity, including zero if none.'); return; }
+        v = String(Number(v.replace(/,/g, '')));
+        saveUnload(r, { casesIn: v }, { casesIn: v });
+      } else {
+        v = U.trailerText(v);
+        saveUnload(r, { trailer: v }, { trailer: v, trailerTyped: true });
+      }
+    }
+    rowsEl.addEventListener('change', e => { if (e.target.dataset.f) fieldSave(e.target); });
+    // Pressing a button (End right after typing the count) keeps the typing box focused, so the press is not lost to a redraw;
+    // End reads the typed count itself.
+    rowsEl.addEventListener('mousedown', e => { if (e.target.closest('button[data-do]') && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.f) e.preventDefault(); });
+    rowsEl.addEventListener('keydown', e => {
+      if (e.target.dataset.e) {
+        if (e.key === 'Enter') { const b = rowsEl.querySelector('[data-do="editsave"]'); if (b) b.click(); }
+        else if (e.key === 'Escape') { editKey = ''; render(); }
+        return;
+      }
+      if (e.key === 'Enter' && e.target.dataset.f) { e.preventDefault(); e.target.blur(); }
+    });
+    rowsEl.addEventListener('click', e => {
+      const b = e.target.closest('button[data-do]');
+      if (!b || b.disabled) return;
+      const a = b.dataset.do;
+      if (a === 'editclose') { editKey = ''; render(); return; }
+      const r = rowByKey(b.dataset.key);
+      if (!r) return;
+      const now = new Date().toISOString();
+      if (a === 'start') {
+        const active = data().rows.find(x => x.key !== r.key && x.status === 'UNLOADING');
+        if (active) { showError('Stop unloading ' + active.route + ' · ' + active.run + ' before starting another.'); return; }
+        saveUnload(r, { start: true }, { status: 'UNLOADING', startedAt: now });
+      } else if (a === 'end') {
+        const typed = rowsEl.querySelector('input[data-f="casesIn"][data-key="' + CSS.escape(r.key) + '"]');
+        const v = typed && typed.value.trim();
+        if (r.casesIn === '' && v && /^\d+$/.test(v)) { saveUnload(r, { casesIn: String(Number(v)) }, { casesIn: String(Number(v)) }).then(() => { const x = rowByKey(r.key); if (x) saveUnload(x, { end: true }, { status: 'COMPLETE', completedAt: new Date().toISOString() }); }); return; }
+        if (r.casesIn === '') { showError('Enter the quantity before ending unloading.'); if (typed) typed.focus(); return; }
+        saveUnload(r, { end: true }, { status: 'COMPLETE', completedAt: now });
+      } else if (a === 'edit') {
+        editKey = editKey === r.key ? '' : r.key; render();
+        const first = rowsEl.querySelector('[data-e]'); if (first) first.focus();
+      } else if (a === 'editsave') {
+        const val = (n) => { const el = rowsEl.querySelector('[data-e="' + n + '"]'); return el ? el.value.trim() : null; };
+        const fields = {}, shown = {}, q = val('casesIn').replace(/,/g, ''), t = U.trailerText(val('trailer')), n = val('notes');
+        if (q !== r.casesIn) {
+          if (!/^\d+$/.test(q) && !(q === '' && r.status !== 'COMPLETE')) { showError('Enter a whole quantity, including zero if none.'); return; }
+          fields.casesIn = q === '' ? '' : String(Number(q)); shown.casesIn = fields.casesIn;
+        }
+        if (t !== r.trailer) { fields.trailer = t; shown.trailer = t; shown.trailerTyped = !!t; }
+        if (n !== r.notes) { fields.notes = n; shown.notes = n; }
+        editKey = '';
+        if (!Object.keys(fields).length) { render(); return; }
+        saveUnload(r, fields, shown);
+      } else if (a === 'rta') {
+        saveUnload(r, { returnIds: r.pendingReturns.map(x => x.id) }, {});
+      } else if (a === 'wash') {
+        washTrailer(P.washesForRow(r, data().wash));
+      }
+    });
+
+    document.getElementById('areas').addEventListener('click', e => {
+      const b = e.target.closest('button[data-area]');
+      if (!b) return;
+      if (b.dataset.area !== area) { area = b.dataset.area; tab = 'needs'; editKey = ''; }
+      history.replaceState(null, '', '?date=' + date + '&area=' + area);
+      render();
+    });
+    document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { tab = b.dataset.tab; editKey = ''; render(); } });
+    document.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => { mode = b.dataset.mode; editKey = ''; try { localStorage.setItem('udPlantUnloadMode', mode); } catch (e) { /* no storage */ } render(); }; });
+    function setDate(d) {
+      if (!L.isDateKey(d) || d === date) return;
+      date = d; editKey = '';
+      history.replaceState(null, '', '?date=' + date + '&area=' + area);
+      watch();
+      render();
+    }
+    document.getElementById('prev').onclick = () => setDate(L.addDays(date, -1));
+    document.getElementById('next').onclick = () => setDate(L.addDays(date, 1));
+    document.getElementById('work-date').addEventListener('change', e => setDate(e.target.value));
+
+    let db = null;
+    function watch() {
+      while (unsubs.length) unsubs.pop()();
+      const weeks = [...new Set(L.weeksForLoadDate(date).concat([L.weekStart(date)]))];
+      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, fail('the loads')));
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the unloading list')));
+    }
+
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      onSnapshot(collection(db, 'plantWash'), s => { sheetWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); render(); }, e => showError('Could not read the wash list: ' + e.message));
+      onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); render(); }, e => showError('Could not read the wash requests: ' + e.message));
+      watch();
+      // The day rolls at 6 AM; a running unload's time ticks along.
+      let shown = today();
+      setInterval(() => { const t = today(); if (t !== shown) { if (date === shown) setDate(t); shown = t; } if (!document.activeElement || !document.activeElement.dataset || !(document.activeElement.dataset.f || document.activeElement.dataset.e)) render(); }, 30000);
+      render();
+    });
+  </script>
+</body>
+</html>

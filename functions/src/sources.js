@@ -7,7 +7,7 @@
 'use strict';
 
 const UNIONTOWN = Object.freeze({
-  live: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', maintenanceQueues: true }, // queues: TRUCK / TRAILER / FORK TRUCK LIVE tabs
+  live: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', maintenanceQueues: true, plant: true }, // queues: TRUCK / TRAILER / FORK TRUCK LIVE tabs
   masters: {
     routes: { spreadsheetId: '19neEpXEPFbon6-8DeZSG5BCTj2s2PfrCVRibWhUuFKc', tab: 'ROUTES_MASTER' },
     drivers: { spreadsheetId: '1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU', tab: 'DRIVERS_MASTER' },
@@ -21,7 +21,9 @@ const UNIONTOWN = Object.freeze({
     odometers: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' },
     // And its route check-ins and inspections, for the Driver Scorecard.
     plantEvents: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' }
-  }
+  },
+  // The plant side (plant.js). Pickups live in the Plant Operations workbook (UDPO_V7000_STORAGE.MASTER.PLANT_OPERATIONS).
+  plant: { pickups: { spreadsheetId: '1to7JVLHCqkIiU4uuIKP1ogjPBi_52eSS-b7TBKMBed0', tab: 'LIVE PLANT OPERATIONS' } }
 });
 
 // SOURCES_JSON replaces only what it names: {"live":{"spreadsheetId":"..."}} points the copy at a Live workbook
@@ -34,7 +36,8 @@ function transferSources(env) {
   const named = given.masters || {};
   // The odometers and plant events come from the plant journal, so a copy named for plantLoads is read for them too.
   Object.keys(UNIONTOWN.masters).forEach(k => { masters[k] = Object.assign({}, UNIONTOWN.masters[k], (k === 'odometers' || k === 'plantEvents') && !named[k] ? named.plantLoads : named[k]); });
-  return { live: Object.assign({}, UNIONTOWN.live, given.live), masters };
+  // The plant's own workbook is read only when a copy is named ("plant": {"pickups": {...}}); never the real one by default.
+  return { live: Object.assign({}, UNIONTOWN.live, given.live), masters, plant: given.plant || {} };
 }
 
 module.exports = { UNIONTOWN, transferSources };

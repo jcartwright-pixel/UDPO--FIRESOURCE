@@ -1,0 +1,164 @@
+/* New Plant Operations: the plant screens' few extra pieces, built on app.css's colours and type so every screen
+   keeps one look. Area colours are the current app's (CASE blue, TOTES purple, BOXING orange, TANKER green). */
+.plant-page .eyebrow { display: block; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.plant-page .dayname { align-self: center; margin: 0 auto; font-size: 26px; font-weight: 800; color: var(--ud-blue-dark); letter-spacing: .02em; }
+.plant-page .hstats { display: flex; gap: 8px; align-self: center; }
+.plant-page .hstats div { min-width: 86px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 5px 12px; text-align: center; }
+.plant-page .hstats b { display: block; font-size: 24px; line-height: 1.1; color: var(--ud-blue); }
+.plant-page .hstats span { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.plant-page .hstats .good b { color: var(--runs-ink); }
+.plant-page .hstats .warn b { color: #b45f00; }
+
+/* Department tiles with a ring: done of total. */
+.plant-page .areas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 16px; }
+.plant-page .area { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--line); border-left: 6px solid var(--area); border-radius: 12px; padding: 8px 14px; cursor: pointer; font: inherit; color: var(--ink); text-align: left; }
+.plant-page .area:hover { box-shadow: 0 4px 14px #0b4f8a1f; }
+.plant-page .area.on { background: #eef6ff; box-shadow: inset 0 0 0 2px var(--area); }
+.plant-page .ring { --p: 0; width: 54px; height: 54px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: conic-gradient(var(--area) calc(var(--p) * 1%), #e6edf4 0); }
+.plant-page .ring b { width: 42px; height: 42px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 13px; color: var(--ink); }
+.plant-page .area strong { display: block; font-size: 18px; color: var(--ud-blue-dark); }
+.plant-page .area small { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* The strip under the tiles: loaded bar, left over, loading, quantity, pickups, behind. */
+.plant-page .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 16px; }
+.plant-page .strip > span { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 5px 14px; font-size: 14px; color: var(--muted); }
+.plant-page .strip > span b { color: var(--ink); font-size: 15px; }
+.plant-page .strip .bar { width: 160px; height: 8px; border-radius: 4px; background: #e6edf4; overflow: hidden; }
+.plant-page .strip .bar i { display: block; height: 100%; background: var(--runs-ink); }
+.plant-page .strip .amber { background: #fff4d6; border-color: #f0d38a; color: #8a5a00; }
+.plant-page .strip .amber b { color: #8a5a00; }
+.plant-page .strip .red { background: #fde5e3; border-color: #f2b8b2; color: var(--pickup); }
+.plant-page .strip .red b { color: var(--pickup); }
+
+/* Loadout table. */
+.plant-page table.loadout td { height: 44px; }
+.plant-page table.loadout td input { width: 100%; height: 32px; border: 1px solid var(--line); border-radius: 7px; text-align: center; font: inherit; color: var(--ink); background: #fff; }
+.plant-page table.loadout td input:focus { outline: 2px solid var(--ud-blue); border-color: var(--ud-blue); }
+.plant-page table.loadout td input:disabled { background: transparent; border-color: transparent; }
+.plant-page tr.divider td { height: 30px; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-align: left; padding-left: 14px; }
+.plant-page tr.divider.prior td { background: #fff1dc !important; color: #a35400; }
+.plant-page tr.divider.today td { background: var(--band) !important; color: var(--ud-blue); }
+.plant-page tr.done > td { background: #f1faf4 !important; }
+.plant-page tr.loading > td { background: #fffaeb !important; }
+.plant-page button.state { min-width: 96px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: #eef2f5; color: #516273; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.plant-page button.state.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
+.plant-page button.state.loading { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
+.plant-page button.clock { min-width: 64px; height: 30px; border-radius: 8px; border: 1px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.plant-page button.clock.end { background: var(--ud-blue); color: #fff; }
+.plant-page .tick { color: var(--runs-ink); font-weight: 800; }
+.plant-page .running { color: #8a5a00; }
+.plant-page .running::after { content: ' \25CF'; color: #e5891a; }
+.plant-page button.pu { min-width: 44px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--muted); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.plant-page button.pu.open { background: #fde5e3; border-color: #f2b8b2; color: var(--pickup); }
+.plant-page button.pu.done { background: #e6f6ec; border-color: #a8dcb8; color: var(--runs-ink); }
+.plant-page button.pu i { font-style: normal; display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; border-radius: 9px; background: var(--pickup); color: #fff; font-size: 11px; }
+.plant-page button.edit-row { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.plant-page .picker-pop { position: fixed; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px #0003; padding: 6px; display: grid; gap: 4px; }
+.plant-page .picker-pop button { min-width: 140px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.plant-page .picker-pop button.done { color: var(--runs-ink); }
+.plant-page .picker-pop button.loading { color: #8a5a00; }
+.plant-page .pu-list { display: grid; gap: 6px; margin-bottom: 12px; }
+.plant-page .pu-item { display: flex; align-items: center; gap: 10px; border: 1px solid #f2b8b2; background: #fff6f5; border-radius: 9px; padding: 8px 10px; }
+.plant-page .pu-item.done { border-color: #a8dcb8; background: #f1faf4; }
+.plant-page .pu-item span { flex: 1; color: var(--ink); }
+.plant-page .pu-item small { display: block; color: var(--muted); font-weight: 600; }
+.plant-page .pu-item button { height: 32px; padding: 0 12px; border-radius: 8px; border: 0; background: var(--runs-ink); color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.plant-page .modal-actions .left { margin-right: auto; }
+.plant-page button.danger-line { color: var(--pickup); border-color: #f2b8b2; }
+
+/* Plant Distribution Departments: the four department cards keep the home cards' look. */
+.plant-page .dc-bar { margin: 2px 16px 0; height: 8px; border-radius: 4px; background: #e6edf4; overflow: hidden; }
+.plant-page .dc-bar i { display: block; height: 100%; background: var(--accent); }
+.plant-page .dc-note { margin: 4px 16px 0; font-size: 13px; color: var(--muted); }
+
+.plant-page .dc-links.two { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(40px, 48px); }
+.plant-page .dc-links.two .dc-link { font-size: 15px; }
+.plant-page .dc-link .dc-side { font-size: 13px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.plant-page .dc-link .dc-side.alert { color: var(--pickup); }
+
+@media (max-width: 1500px) {
+  .plant-page .area { padding: 6px 10px; gap: 10px; }
+  .plant-page .ring { width: 44px; height: 44px; }
+  .plant-page .ring b { width: 34px; height: 34px; font-size: 12px; }
+  .plant-page .area strong { font-size: 16px; }
+  .plant-page .dayname { font-size: 20px; }
+  .plant-page .hstats div { min-width: 70px; }
+  .plant-page .hstats b { font-size: 20px; }
+}
+
+/* Unloading & Washing, Product Returns, Truck Washing (the current app's uw- screens). */
+.plant-page .areas.six { grid-template-columns: repeat(6, 1fr); }
+.plant-page a.area { text-decoration: none; }
+.plant-page .area small b { font-weight: 900; }
+.plant-page .area small b.w { color: #516273; } .plant-page .area small b.u { color: #b45f00; } .plant-page .area small b.d { color: var(--runs-ink); }
+.plant-page .area small b.r { color: #b42332; } .plant-page .area small b.o { color: #0080a0; }
+.plant-page .hstats .bad b { color: #b42332; }
+.plant-page .hstats .wash b { color: #0080a0; }
+.plant-page .head .tabs.mode button { white-space: nowrap; }
+.plant-page .uw-tabrow { display: flex; align-items: center; gap: 12px; margin: 0 16px; }
+.plant-page .uw-scope { font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.plant-page .uw-banner { display: flex; align-items: center; gap: 14px; margin: 0 16px; padding: 8px 14px; border-radius: 10px; background: #fde5e3; border: 1px solid #f2b8b2; color: #8f1d1d; }
+.plant-page .uw-banner span { flex: 1; color: #8f1d1d; font-weight: 600; }
+.plant-page .uw-banner a { color: #b42332; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.plant-page .uw-split { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+.plant-page .uw-split > .sheet { flex: 1 1 auto; min-width: 0; }
+.plant-page .uw-side { flex: 0 0 240px; margin-right: 16px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.plant-page .uw-side h2 { margin: 0 0 4px; font-size: 13px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--ud-blue); }
+.plant-page .uw-side h3 { margin: 8px 0 0; font-size: 12px; font-weight: 900; letter-spacing: .08em; color: var(--muted); }
+.plant-page .uw-side hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
+.plant-page .uw-side .line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; color: var(--muted); }
+.plant-page .uw-side .line b { font-size: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.plant-page .uw-side .line.w b { color: #516273; } .plant-page .uw-side .line.u b { color: #b45f00; } .plant-page .uw-side .line.d b { color: var(--runs-ink); }
+.plant-page .uw-side .line.r b { color: #b42332; } .plant-page .uw-side .line.o b { color: #0080a0; }
+.plant-page table.unload td.rr { text-align: left; padding-left: 14px; }
+.plant-page td.rr b { display: block; font-size: 17px; color: var(--ud-blue-dark); }
+.plant-page td.rr span { display: block; font-size: 12px; color: var(--muted); }
+.plant-page .trl { display: inline-block; padding: 3px 10px; border-radius: 7px; background: var(--band); color: var(--ud-blue-dark); font-weight: 800; }
+.plant-page small.next { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.plant-page .na { color: #9aa8b6; }
+.plant-page .chk { font-weight: 800; white-space: nowrap; }
+.plant-page .chk.ok { color: var(--runs-ink); }
+.plant-page .chk.na { color: #9aa8b6; font-weight: 700; }
+.plant-page .pill { display: inline-block; min-width: 92px; padding: 5px 10px; border-radius: 14px; font-size: 13px; font-weight: 800; border: 1px solid var(--line); background: #eef2f5; color: #516273; }
+.plant-page .pill.run { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
+.plant-page .pill.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
+.plant-page .pill.ret, .plant-page .pill.pend { background: #fde5e3; color: #b42332; border-color: #f2b8b2; }
+.plant-page .pill.washp { background: #e0f4f9; color: #006b86; border-color: #9fd6e4; }
+.plant-page button.rta, .plant-page button.wash { min-width: 70px; height: 30px; border-radius: 8px; border: 0; color: #fff; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.plant-page button.rta { background: #b42332; }
+.plant-page button.wash { background: #e5891a; }
+.plant-page tr.needs-return > td:first-child { box-shadow: inset 5px 0 0 #b42332; }
+.plant-page tr.editrow > td { background: #f4f8fc !important; text-align: left; }
+.plant-page .editbar { display: flex; align-items: flex-end; gap: 12px; padding: 6px 8px; flex-wrap: wrap; }
+.plant-page .editbar > b { align-self: center; color: var(--ud-blue-dark); }
+.plant-page .editbar .read { align-self: center; color: var(--muted); font-size: 13px; }
+.plant-page .editbar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.plant-page .editbar label.grow { flex: 1; min-width: 200px; }
+.plant-page .editbar input { width: auto; min-width: 110px; }
+.plant-page .editbar button { height: 34px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; color: var(--ud-blue); }
+.plant-page .editbar button.primary { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.plant-page .addwash { display: flex; align-items: flex-end; gap: 12px; margin: 0 16px; padding: 8px 14px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.plant-page .addwash label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.plant-page .addwash input { height: 34px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; font: inherit; }
+.plant-page .addwash > b { align-self: center; color: var(--ud-blue-dark); }
+.plant-page .addwash button, .plant-page button.addwash-open { height: 34px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; color: var(--ud-blue); }
+.plant-page .addwash button.wash, .plant-page button.addwash-open { background: #e5891a; border-color: #e5891a; color: #fff; }
+.plant-page .uw-side .repeat { display: flex; justify-content: space-between; font-size: 14px; color: var(--muted); margin: 0; }
+.plant-page .uw-side .repeat b { color: var(--ink); }
+.plant-page table.unload td.detail { text-align: left; }
+@media (max-width: 1500px) {
+  .plant-page .areas.six { gap: 8px; }
+  .plant-page .areas.six .area small { font-size: 11px; }
+  .plant-page .uw-side { flex-basis: 200px; }
+  .plant-page td.rr b { font-size: 15px; }
+}
+@media (max-width: 1500px) {
+  /* Smaller screens: the day is in the date box, so the big day name gives its room to the counts. */
+  .unload-page .dayname, .returns-page .dayname, .washing-page .dayname { display: none; }
+  .unload-page .hstats { gap: 6px; }
+  .unload-page .hstats div { min-width: 60px; padding: 3px 8px; }
+  .unload-page .hstats b { font-size: 18px; }
+  .unload-page .hstats span { font-size: 10px; }
+  .plant-page small.next { font-size: 11px; }
+}
