@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#0b4f8a">
   <title>Route Check-In</title>
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/stations.css">
 </head>
 <body class="phone">
   <header class="phone-top"><b>United Dairy</b><span id="who"></span><button type="button" id="change" hidden>Change</button></header>
@@ -31,6 +32,9 @@
 
   <!-- 3. Today's loads (or yesterday's) and the Check-In for one. -->
   <section class="phone-card" id="step-loads" hidden>
+    <!-- Joe 10/10: the old Route Distribution menu's other two cards, View Loadout and DVIR, beside the Check-In. -->
+    <div class="drv-menu"><button type="button" id="to-board" class="drv-card blue"><b>View Loadout</b><small>Read-only route list and loadout status</small></button>
+      <button type="button" id="to-dvir" class="drv-card gold"><b>DVIR</b><small>Driver vehicle inspection report</small></button></div>
     <div class="phone-days" id="days"></div>
     <div id="loads"></div>
   </section>
@@ -49,6 +53,43 @@
       <label class="wide">Notes<input name="checkinNotes" maxlength="500"></label>
     </div>
     <div class="phone-buttons"><button type="button" id="back">Back</button><button type="submit" class="primary" id="send">Check In</button></div>
+  </form>
+
+  <!-- View Loadout: the Driver Room board, read only, rolling. -->
+  <section class="phone-card" id="step-board" hidden>
+    <div class="drv-head"><h1>View Loadout</h1><button type="button" id="board-refresh" class="primary">Refresh</button><button type="button" data-back>&larr; Back</button></div>
+    <p class="drv-hint" id="board-updated"></p>
+    <section class="drv-board" aria-label="Route loadout status"><div class="drv-track" id="board-track"></div></section>
+    <p class="drv-hint">Same list as the Driver Room · No editing</p>
+    <button type="button" id="board-pause">Pause scrolling</button>
+  </section>
+
+  <!-- DVIR: the pre-trip / post-trip inspection. -->
+  <form class="phone-card drv-dvir" id="step-dvir" hidden novalidate>
+    <div class="drv-head"><h1>DVIR</h1><button type="button" data-back>&larr; Back</button></div>
+    <label id="dv-route-box">Assigned route<select id="dv-route" required></select></label>
+    <p class="drv-hint">Confirm assigned equipment and complete every inspection item.</p>
+    <div class="phone-grid">
+      <label>Inspection<select id="dv-inspection" required><option value="">Select…</option><option>Pre-trip</option><option>Post-trip</option></select></label>
+      <label>Odometer<input id="dv-odometer" type="number" min="0" inputmode="numeric"></label>
+    </div>
+    <div class="drv-cols">
+      <div class="drv-col truck"><h2>Truck inspection</h2><label>Truck number<input id="dv-truck" required maxlength="60" class="drv-unit"></label><div id="dv-truck-items"></div>
+        <label>Tractor write-up<textarea id="dv-tractor" rows="2" maxlength="1500" placeholder="Describe tractor defects and their location"></textarea></label></div>
+      <div class="drv-col trailer" data-trailer="1"><h2>Trailer inspection</h2><label>Trailer number<input class="dv-trailer drv-unit" maxlength="20" placeholder="T-" autocapitalize="characters"></label><div class="dv-items"></div>
+        <label>Trailer write-up<textarea class="dv-issues" rows="2" maxlength="1500" placeholder="Describe trailer defects and their location"></textarea></label></div>
+    </div>
+    <div id="dv-extra"></div>
+    <div class="drv-add"><button type="button" id="dv-add">+ Add trailer inspection</button><p class="drv-hint">One trailer per box. Drop and hook: add an inspection for each extra trailer, in order. Each trailer is saved as its own inspection record.</p></div>
+    <label>Additional notes<textarea id="dv-notes" rows="2" maxlength="1500"></textarea></label>
+    <div class="drv-sign"><div class="drv-head"><h2>Driver signature</h2><button type="button" id="dv-clear">Clear signature</button></div>
+      <label>Driver name<input id="dv-name" required maxlength="150"></label>
+      <p class="drv-hint">Sign below with your finger, stylus or mouse.</p>
+      <canvas id="dv-sig" width="1200" height="300"></canvas>
+      <label class="check"><input type="checkbox" id="dv-typed"> Use my typed name as my signature instead</label>
+      <p class="drv-hint" id="dv-sig-status">No signature entered</p></div>
+    <button type="submit" class="primary" id="dv-send">Review inspection</button>
+    <p class="drv-msg" id="dv-msg" role="status"></p>
   </form>
 
   <script type="module">
@@ -71,7 +112,7 @@
         throw e;
       }
     }
-    const steps = ['step-code', 'step-name', 'step-loads', 'step-form'];
+    const steps = ['step-code', 'step-name', 'step-loads', 'step-form', 'step-board', 'step-dvir'];
     function step(id) { steps.forEach(s => { document.getElementById(s).hidden = s !== id; }); }
 
     async function show() {
@@ -129,7 +170,159 @@
       open = null;
       await show();
     }));
-    show().catch(err => showError(err.message));
+    show().then(() => { const v = new URLSearchParams(location.search).get('view'); if (driverId && v === 'loadout') openBoard(); if (driverId && v === 'dvir') openDvir(); }).catch(err => showError(err.message));
+
+    /* ---------- View Loadout (the Driver Room board on the phone) ---------- */
+    let boardTimer = null, boardPaused = window.matchMedia('(prefers-reduced-motion: reduce)').matches, boardAt = 0;
+    const PILL = { LOADED: 'loaded', LOADING: 'loading', WAITING: 'waiting' };
+    async function readBoard() {
+      const btn = document.getElementById('board-refresh'); btn.disabled = true;
+      try {
+        const r = await call('board'); boardAt = Date.now(); showError('');
+        const day = new Date(r.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }), m = r.rows.length;
+        const list = '<div class="drv-band start"><span>&#9660; Start of loadout</span><span>' + escapeHtml(day) + '</span><div><b>' + r.remaining + ' remaining</b> of ' + m + ' load' + (m === 1 ? '' : 's') + '</div></div>' +
+          r.rows.map(x => '<div class="drv-row"><span class="rt"><b>' + escapeHtml(x.route) + (x.run ? ' · ' + escapeHtml(x.run) : '') + '</b> <i>' + escapeHtml(x.trailer || '—') + '</i></span><span class="pill ' + PILL[x.state] + '">' + escapeHtml(x.status) + '</span>' +
+            (x.pickup ? '<span class="pu"><b>PICKUP</b>' + (x.pickupText ? ' · ' + escapeHtml(x.pickupText) : '') + '</span>' : '') + '</div>').join('') +
+          '<div class="drv-band end">&#9632; End of loadout <small>· starts over at the top</small></div>';
+        const track = document.getElementById('board-track');
+        // It rolls (with a second copy to start over from) only when the list is longer than the box, as on the old board.
+        track.innerHTML = '<div>' + list + '</div>';
+        const rolls = track.firstChild.offsetHeight > track.parentNode.clientHeight;
+        if (rolls) track.insertAdjacentHTML('beforeend', '<div aria-hidden="true">' + list + '</div>');
+        track.classList.toggle('still', !rolls);
+        document.getElementById('board-pause').hidden = !rolls;
+        track.style.animationDuration = Math.max(10, track.firstChild.offsetHeight / 18) + 's';
+        track.classList.toggle('paused', boardPaused);
+        document.getElementById('board-updated').textContent = 'View only · Updated ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+      } catch (e) { showError(e.message); } finally { btn.disabled = false; }
+    }
+    function openBoard() { step('step-board'); readBoard(); clearInterval(boardTimer); boardTimer = setInterval(() => { if (!document.hidden && !document.getElementById('step-board').hidden && Date.now() - boardAt > 120000) readBoard(); }, 30000); }
+    document.getElementById('to-board').addEventListener('click', openBoard);
+    document.getElementById('board-refresh').addEventListener('click', readBoard);
+    document.getElementById('board-pause').addEventListener('click', e => { boardPaused = !boardPaused; document.getElementById('board-track').classList.toggle('paused', boardPaused); e.target.textContent = boardPaused ? 'Resume scrolling' : 'Pause scrolling'; });
+    document.addEventListener('visibilitychange', () => document.getElementById('board-track').classList.toggle('paused', boardPaused || document.hidden));
+    document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => { clearInterval(boardTimer); open = null; show().catch(err => showError(err.message)); }));
+
+    /* ---------- DVIR ---------- */
+    const TRUCK_ITEMS = ['Brakes', 'Steering', 'Lights and reflectors', 'Tires and wheels', 'Mirrors and visibility', 'Horn and wipers', 'Emergency equipment'];
+    const TRAILER_ITEMS = ['Trailer brakes', 'Trailer lights and reflectors', 'Trailer tires and wheels', 'Coupling and connections', 'Doors and body'];
+    const RESULTS = ['Checked — no defect', 'Defect found', 'Not applicable'];
+    const $ = (id) => document.getElementById(id), form = $('step-dvir');
+    const pick = (label) => '<label>' + escapeHtml(label) + '<select required><option value="">Select…</option>' + RESULTS.map(r => '<option>' + r + '</option>').join('') + '</select></label>';
+    $('dv-truck-items').innerHTML = TRUCK_ITEMS.map(pick).join('');
+    form.querySelector('[data-trailer="1"] .dv-items').innerHTML = TRAILER_ITEMS.map(pick).join('');
+    let dvRequest = '', reviewed = false, dvLoads = [], inked = false, saved = false;
+    const sigKey = 'udRoute.signature';
+    function extraBox(n) {
+      const d = document.createElement('div');
+      d.className = 'drv-col trailer extra'; d.dataset.trailer = String(n);
+      d.innerHTML = '<h2>Trailer ' + n + ' inspection</h2><label>Trailer number<input class="dv-trailer drv-unit" required maxlength="20" placeholder="T-" autocapitalize="characters"></label><div class="dv-items">' + TRAILER_ITEMS.map(pick).join('') + '</div>' +
+        '<label>Trailer write-up<textarea class="dv-issues" rows="2" maxlength="1500" placeholder="Describe trailer defects and their location"></textarea></label><button type="button" class="dv-remove">Remove this trailer</button>';
+      return d;
+    }
+    function renumber() { [...$('dv-extra').children].forEach((d, i) => { d.dataset.trailer = String(i + 2); d.querySelector('h2').textContent = 'Trailer ' + (i + 2) + ' inspection'; }); $('dv-add').hidden = $('dv-extra').children.length >= 3; }
+    function addTrailer(value) { if ($('dv-extra').children.length >= 3) return null; const d = extraBox($('dv-extra').children.length + 2); $('dv-extra').appendChild(d); if (value) d.querySelector('.dv-trailer').value = value; renumber(); return d; }
+    $('dv-add').addEventListener('click', () => addTrailer());
+    $('dv-extra').addEventListener('click', e => { if (e.target.closest('.dv-remove')) { e.target.closest('.extra').remove(); renumber(); unreview(); } });
+    // One trailer per box: a / , ; & + ends the trailer and moves the rest to the next box (4 trailers at most).
+    form.addEventListener('input', e => {
+      if (!e.target.classList.contains('dv-trailer')) return unreview();
+      const parts = e.target.value.toUpperCase().split(/[\/,;&+]+/).map(x => x.trim());
+      if (/^N\/A$/i.test(e.target.value.trim())) return unreview();
+      e.target.value = parts[0];
+      let box = e.target.closest('.drv-col'), left = [];
+      parts.slice(1).filter(Boolean).forEach(t => {
+        const next = box.classList.contains('extra') ? box.nextElementSibling : $('dv-extra').firstElementChild;
+        if (next && !next.querySelector('.dv-trailer').value) { next.querySelector('.dv-trailer').value = t; box = next; }
+        else { const d = addTrailer(t); if (d) box = d; else left.push(t); }
+      });
+      $('dv-msg').textContent = left.length ? 'A run can have at most 4 trailers. Not added: ' + left.join(', ') + '.' : '';
+      unreview();
+    });
+    form.addEventListener('change', unreview);
+    function unreview() { if (reviewed) { reviewed = false; $('dv-send').textContent = 'Review inspection'; } }
+    function fillRoute() {
+      const l = dvLoads[Number($('dv-route').value)];
+      if (!l) return;
+      $('dv-truck').value = l.truck || '';
+      const t = String(l.trailer || '').split(/[\/,;&+]+/).map(x => x.trim()).filter(Boolean);
+      form.querySelector('[data-trailer="1"] .dv-trailer').value = (t[0] || '').toUpperCase();
+      $('dv-extra').innerHTML = ''; t.slice(1, 4).forEach(x => addTrailer(x.toUpperCase())); renumber();
+    }
+    $('dv-route').addEventListener('change', fillRoute);
+    async function openDvir() {
+      step('step-dvir'); form.reset(); $('dv-extra').innerHTML = ''; renumber(); saved = false; reviewed = false; $('dv-send').textContent = 'Review inspection'; $('dv-msg').textContent = '';
+      [...form.elements].forEach(el => { el.disabled = false; });
+      dvRequest = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9-]/g, '');
+      const r = await call('loads', { driverId, date: dates[0] || '' });
+      dvLoads = r.loads;
+      $('dv-route').innerHTML = '<option value="">Select route…</option>' + dvLoads.map((l, i) => '<option value="' + i + '">' + escapeHtml(String(l.route).replace(/_\d+$/, '') + ' · ' + l.run) + '</option>').join('');
+      if (dvLoads.length) { $('dv-route').value = '0'; fillRoute(); }
+      $('dv-route-box').hidden = dvLoads.length === 1;
+      if (!dvLoads.length) $('dv-msg').textContent = 'Dispatch has no route for you today, so there is nothing to inspect yet.';
+      $('dv-name').value = driverName;
+      clearCanvas(false);
+      try { const s = JSON.parse(localStorage.getItem(sigKey) || 'null'); if (s && s.driver === driverName && s.image) { const img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); inked = true; sigStatus('Saved signature'); }; img.src = s.image; } } catch (e) {}
+    }
+    $('to-dvir').addEventListener('click', () => openDvir().catch(err => showError(err.message)));
+
+    const canvas = $('dv-sig'), ctx = canvas.getContext('2d');
+    ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#193e66';
+    const sigStatus = (t) => { $('dv-sig-status').textContent = t; };
+    function clearCanvas(forget) { ctx.clearRect(0, 0, canvas.width, canvas.height); inked = false; if (forget) { try { localStorage.removeItem(sigKey); } catch (e) {} sigStatus('No drawn signature'); } else sigStatus('No signature entered'); }
+    let drawing = false;
+    const at = (e) => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) * canvas.width / r.width, (e.clientY - r.top) * canvas.height / r.height]; };
+    canvas.addEventListener('pointerdown', e => { if ($('dv-typed').checked) return; drawing = true; canvas.setPointerCapture(e.pointerId); const [x, y] = at(e); ctx.beginPath(); ctx.moveTo(x, y); });
+    canvas.addEventListener('pointermove', e => { if (!drawing) return; const [x, y] = at(e); ctx.lineTo(x, y); ctx.stroke(); inked = true; sigStatus('Signature entered'); });
+    ['pointerup', 'pointercancel'].forEach(t => canvas.addEventListener(t, () => { if (!drawing) return; drawing = false; unreview(); try { localStorage.setItem(sigKey, JSON.stringify({ driver: driverName, image: canvas.toDataURL('image/png') })); } catch (e) {} }));
+    $('dv-clear').addEventListener('click', () => { clearCanvas(true); unreview(); });
+    $('dv-typed').addEventListener('change', e => sigStatus(e.target.checked ? 'Typed name will be used as your signature' : inked ? 'Drawn signature entered' : 'No signature entered'));
+    function smallSig() {
+      for (const w of [640, 520, 420, 340, 280, 220]) {
+        const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w / 4);
+        const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(canvas, 0, 0, c.width, c.height);
+        const url = c.toDataURL('image/png'); if (url.length <= 28000) return url;
+      }
+      return '';
+    }
+    const valuesOf = (box) => [...box.querySelectorAll('.dv-items select')].map(s => s.value);
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (saved) return;
+      const msg = $('dv-msg'), bad = (t) => { msg.textContent = t; };
+      const firstEmpty = [...form.querySelectorAll('[required]')].find(el => !el.closest('[hidden]') && !String(el.value).trim());
+      if (firstEmpty) { firstEmpty.focus(); return bad('Fill in ' + (firstEmpty.closest('label') ? firstEmpty.closest('label').firstChild.textContent.trim() : 'every box') + '.'); }
+      if (!inked && !$('dv-typed').checked) return bad('Please sign or choose to use your typed name.');
+      const l = dvLoads[Number($('dv-route').value)];
+      if (!l) return bad('Select the assigned route.');
+      const truckChecks = [...$('dv-truck-items').querySelectorAll('select')].map(s => s.value), first = form.querySelector('[data-trailer="1"]');
+      const t1 = valuesOf(first), t1Issues = first.querySelector('.dv-issues').value.trim();
+      if ((truckChecks.indexOf('Defect found') >= 0 && !$('dv-tractor').value.trim()) || (t1.indexOf('Defect found') >= 0 && !t1Issues)) return bad('Describe the defects in the corresponding write-up.');
+      const extras = [...$('dv-extra').children];
+      for (const d of extras) {
+        const n = d.dataset.trailer;
+        if (!d.querySelector('.dv-trailer').value.trim()) return bad('Enter the trailer number for trailer ' + n + ', or remove it.');
+        if (valuesOf(d).indexOf('Defect found') >= 0 && !d.querySelector('.dv-issues').value.trim()) return bad('Describe the defects for trailer ' + n + '.');
+      }
+      if (extras.length && !first.querySelector('.dv-trailer').value.trim()) return bad('Enter the number for trailer 1 before adding another trailer.');
+      const signature = $('dv-typed').checked ? 'TYPED' : smallSig();
+      if (!signature) return bad('The drawn signature is too detailed to send. Clear it and sign with a shorter line, or use your typed name.');
+      const trailers = [first.querySelector('.dv-trailer').value.trim()].concat(extras.map(d => d.querySelector('.dv-trailer').value.trim())).filter(Boolean);
+      const defects = truckChecks.concat(t1).concat(...extras.map(valuesOf)).filter(v => v === 'Defect found').length;
+      if (!reviewed) {
+        reviewed = true; $('dv-send').textContent = 'Submit inspection';
+        return bad('Review: ' + l.route + ' · ' + l.run + ' · ' + $('dv-inspection').value + ' · Truck ' + $('dv-truck').value.trim() + ' · Trailer ' + (trailers.join(', ') || '—') + ' · ' + defects + ' defect' + (defects === 1 ? '' : 's') + '. Confirm your entries above, then submit.');
+      }
+      const fields = { inspection: $('dv-inspection').value, odometer: $('dv-odometer').value.trim(), truck: $('dv-truck').value.trim(), trailer: first.querySelector('.dv-trailer').value.trim(),
+        checks: truckChecks.concat(t1), moreTrailers: extras.map(d => ({ trailer: d.querySelector('.dv-trailer').value.trim(), checks: valuesOf(d), issues: d.querySelector('.dv-issues').value.trim() })),
+        tractorIssues: $('dv-tractor').value.trim(), trailerIssues: t1Issues, notes: $('dv-notes').value.trim(), signatureName: $('dv-name').value.trim(), signature };
+      $('dv-send').disabled = true; bad('Saving inspection…');
+      try {
+        const r = await call('dvir', { driverId, runDocId: l.runDocId, day: l.day, requestId: dvRequest, fields });
+        saved = true; [...form.elements].forEach(el => { if (!el.matches('[data-back]')) el.disabled = true; });
+        bad('Inspection saved' + (r.trailers > 1 ? ' · ' + r.trailers + ' trailers' : '') + ' · ' + r.recordId);
+      } catch (err) { $('dv-send').disabled = false; bad(err.message); }
+    });
   </script>
 </body>
 </html>

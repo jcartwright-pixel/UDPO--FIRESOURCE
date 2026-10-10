@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Garage Station · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/stations.css">
+</head>
+<body class="fill gs-page">
+  <div id="screen">
+    <div class="topbar">
+      <span class="gs-people" id="people"></span>
+      <button id="gs-signout" type="button" hidden>Sign Out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1 id="title">Garage Station</h1><small>Technicians: tap your name, then your login ID. No email needed.</small></div>
+    </div>
+    <div class="view">
+      <div class="gs">
+        <p class="gs-msg" id="gs-message" role="alert" hidden></p>
+
+        <!-- Who's working? Name, then the login ID. -->
+        <section class="gs-sign" id="view-sign">
+          <div class="gs-card">
+            <h2 id="sign-title">Who's working?</h2>
+            <p class="gs-hint" id="sign-hint">Tap your name, then your login ID.</p>
+            <div class="gs-names" id="names"></div>
+          </div>
+          <div class="gs-card">
+            <h2 id="pin-title">Tap your name</h2>
+            <div class="gs-dots" id="dots"></div>
+            <div class="gs-keys" id="keys"></div>
+            <button type="button" class="gs-btn dark" id="helper-cancel" hidden>Back to the job</button>
+          </div>
+        </section>
+
+        <!-- Jobs -->
+        <section id="view-jobs" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+          <div class="gs-bar"><h2>Jobs</h2><button type="button" class="gs-btn red" id="to-report">+ Report a Problem</button></div>
+          <div class="gs-jobs" id="jobs"></div>
+        </section>
+
+        <!-- One job -->
+        <section id="view-job" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+          <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="jobs">&larr; Jobs</button><h2 id="job-unit"></h2></div>
+          <div class="gs-card"><div class="gs-label" id="job-label"></div><div class="gs-problem" id="job-problem"></div><div class="gs-now" id="job-now"></div></div>
+          <div class="gs-two">
+            <button type="button" class="gs-btn gray" id="job-parts">&#9203; Need Parts</button>
+            <button type="button" class="gs-btn" id="job-helper">&#128101; Add a Helper</button>
+          </div>
+          <button type="button" class="gs-btn green gs-done" id="job-done">&#10004; Done</button>
+        </section>
+
+        <!-- Done, step 1: what was fixed -->
+        <section id="view-fix" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+          <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="job">&larr; Back</button><h2 id="fix-unit"></h2><span class="gs-progress"><i class="on"></i><i></i></span></div>
+          <p class="gs-q">What did you fix?</p>
+          <input class="gs-note" id="fix-note" maxlength="300" placeholder="Anything to add? (you can leave this empty)">
+          <div class="gs-fixes" id="fixes"></div>
+        </section>
+
+        <!-- Done, step 2: safe to drive + finger signature -->
+        <section id="view-safe" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+          <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="fix">&larr; Back</button><h2 id="safe-unit"></h2><span class="gs-progress"><i class="on"></i><i class="on"></i></span></div>
+          <p class="gs-q" id="safe-q"></p>
+          <div class="gs-yesno"><button type="button" class="gs-btn green" data-safe="yes">Yes, safe</button><button type="button" class="gs-btn line" data-safe="no">No, still down</button></div>
+          <div class="gs-label" id="sign-line">Sign with your finger</div>
+          <div class="gs-sigbox"><button type="button" class="gs-btn dark" id="sig-clear">Clear</button><canvas id="sig"></canvas></div>
+          <button type="button" class="gs-btn green" id="finish">&#10004; Finish Job</button>
+        </section>
+
+        <!-- Report a Problem -->
+        <section id="view-report" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+          <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="jobs">&larr; Jobs</button><h2>Report a Problem</h2></div>
+          <div class="gs-report">
+            <div class="gs-card">
+              <div class="gs-label">1. Truck or trailer number</div>
+              <div class="gs-typed"><span id="typed"></span><small id="typed-match"></small></div>
+              <div class="gs-matches" id="matches"></div>
+              <div class="gs-keys" id="unit-keys"></div>
+            </div>
+            <div class="gs-card">
+              <div class="gs-label">2. What's wrong?</div>
+              <div class="gs-cats" id="cats"></div>
+              <input class="gs-note" id="report-note" maxlength="300" placeholder="Anything to add? (you can leave this empty)">
+              <div class="gs-label">3. Can it run?</div>
+              <div class="gs-yesno"><button type="button" class="gs-btn green" data-run="yes">Yes</button><button type="button" class="gs-btn line" data-run="no">No, it's down</button></div>
+              <button type="button" class="gs-btn red" id="send-report">Send</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, escapeHtml } from './js/app.js';
+    import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+
+    // The current app's Garage Station (GarageStation.html, 7.0.276), with the login ID in place of the PIN (Joe 10/10).
+    const KEY = 'udGarage.tokens', IDLE_MS = 30 * 60000, MAX_TECHS = 2;
+    const store = {
+      get() { try { return JSON.parse(localStorage.getItem(KEY) || '[]').slice(0, MAX_TECHS); } catch (e) { return []; } },
+      set(v) { try { if (v.length) localStorage.setItem(KEY, JSON.stringify(v)); else localStorage.removeItem(KEY); } catch (e) {} }
+    };
+    const $ = (id) => document.getElementById(id);
+    let tokens = store.get(), techs = [], people = [], jobs = [], units = [], categories = [], fixes = [];
+    let picked = null, typed = '', helperFor = null, open = null, fixPick = '', safePick = null, inked = false;
+    let unitTyped = '', unitPick = '', catPick = '', runPick = null, busy = false, lastTouch = Date.now();
+
+    async function call(op, fields) {
+      const { functions } = await start();
+      try { return (await httpsCallable(functions, 'garage')(Object.assign({ op, tokens }, fields || {}))).data; }
+      catch (e) {
+        if (/GARAGE_SIGN_IN_REQUIRED/.test(e.message)) { signOutAll(true); throw new Error('You were signed out. Tap your name and enter your login ID.'); }
+        throw e;
+      }
+    }
+    function message(text, ok) { const m = $('gs-message'); m.textContent = text || ''; m.hidden = !text; m.classList.toggle('ok', !!ok); }
+    const VIEWS = ['sign', 'jobs', 'job', 'fix', 'safe', 'report'];
+    function view(v) { VIEWS.forEach(k => { $('view-' + k).hidden = k !== v; }); if (v === 'safe') sizeCanvas(); }
+    const shownView = () => VIEWS.find(k => !$('view-' + k).hidden);
+    const names = (list) => list.length > 2 ? list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1] : list.join(' and ');
+    const elapsed = (iso) => { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)); return isFinite(m) ? (m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' m' : m + ' m') : ''; };
+    const jobKey = (j) => j.id || j.writeUp;
+
+    async function load() {
+      const r = await call('read');
+      techs = r.techs; units = r.units; categories = r.categories; fixes = r.fixes;
+      people = r.signedIn; tokens = people.map(p => p.token); store.set(tokens);
+      jobs = r.jobs;
+      draw();
+      if (!people.length) view('sign');
+      else if (shownView() === 'sign' && !helperFor) view('jobs');
+    }
+
+    function draw() {
+      $('people').innerHTML = people.map(p => '<span class="p"><i>' + escapeHtml(p.name.slice(0, 1).toUpperCase()) + '</i>' + escapeHtml(p.name) + '</span>').join('');
+      $('gs-signout').hidden = !people.length;
+      drawSign(); drawJobs();
+      if (open) drawJob();
+    }
+
+    /* ---------- sign-in ---------- */
+    function drawSign() {
+      $('sign-title').textContent = helperFor ? 'Who is helping?' : 'Who\'s working?';
+      $('sign-hint').textContent = helperFor ? 'The helper taps their name, then their login ID.' : 'Tap your name, then your login ID.';
+      $('helper-cancel').hidden = !helperFor;
+      const inIds = people.map(p => p.id);
+      $('names').innerHTML = techs.map(t => {
+        const isIn = inIds.indexOf(t.id) >= 0, on = picked && picked.id === t.id;
+        return '<button type="button" class="gs-name' + (isIn ? ' in' : on ? ' on' : '') + '" data-tech="' + escapeHtml(t.id) + '"' + (isIn ? ' disabled' : '') + '>' + escapeHtml(t.name) + '<small>' + (isIn ? 'signed in' : on ? 'enter login ID' : '&nbsp;') + '</small></button>';
+      }).join('') || '<p class="gs-hint">No technicians yet. The office adds them on the GARAGE TECHNICIANS list.</p>';
+      $('pin-title').textContent = picked ? picked.name + ', your login ID' : 'Tap your name';
+      $('dots').innerHTML = [0, 1, 2, 3, 4, 5].map(i => '<i class="' + (i < typed.length ? 'on' : '') + (i === 5 ? ' extra' : '') + '"></i>').join('');
+      $('keys').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'go'].map(k => k === 'go' ? '<button type="button" class="go" data-key="go"' + (typed.length >= 5 && !busy ? '' : ' disabled') + '>Enter</button>' :
+        k === 'del' ? '<button type="button" class="small" data-key="del" title="Hold to clear">&#9003;</button>' : '<button type="button" data-key="' + k + '">' + k + '</button>').join('');
+    }
+    $('names').addEventListener('click', e => { const b = e.target.closest('[data-tech]'); if (!b || b.disabled) return; picked = techs.find(t => t.id === b.dataset.tech); typed = ''; message(''); drawSign(); });
+    let holdTimer = null;
+    $('keys').addEventListener('pointerdown', e => { if (e.target.closest('[data-key="del"]')) holdTimer = setTimeout(() => { holdTimer = 'held'; typed = ''; drawSign(); }, 600); });
+    $('keys').addEventListener('click', async e => {
+      const b = e.target.closest('[data-key]');
+      if (!b || busy) return;
+      if (!picked) { message('Tap your name first.'); return; }
+      const k = b.dataset.key;
+      if (k === 'del') { if (holdTimer === 'held') { holdTimer = null; return; } clearTimeout(holdTimer); typed = typed.slice(0, -1); drawSign(); return; }
+      if (k !== 'go') { if (typed.length < 6) typed += k; drawSign(); return; }
+      busy = true; drawSign();
+      try {
+        const r = await call('signIn', { techId: picked.id, loginId: typed });
+        tokens = tokens.filter(t => t !== r.token).concat(r.token).slice(-MAX_TECHS); store.set(tokens);
+        people = people.filter(p => p.id !== r.id).concat({ token: r.token, id: r.id, name: r.name });
+        picked = null; typed = ''; message('');
+        if (helperFor) { const j = jobs.find(x => jobKey(x) === helperFor); helperFor = null; if (j) { addNames(j); queue('HELPER', j); open = j; view('job'); drawJob(); } else view('jobs'); }
+        else view('jobs');
+        await load();
+      } catch (err) { typed = ''; message(err.message); }
+      finally { busy = false; drawSign(); }
+    });
+    $('helper-cancel').addEventListener('click', () => { helperFor = null; picked = null; typed = ''; drawSign(); view(open ? 'job' : 'jobs'); });
+
+    function signOutAll(quiet) {
+      const had = tokens.slice();
+      tokens = []; people = []; store.set([]); open = null; helperFor = null; picked = null; typed = ''; jobs = [];
+      if (had.length) start().then(({ functions }) => httpsCallable(functions, 'garage')({ op: 'signOut', tokens: had })).catch(() => {});
+      draw(); view('sign');
+      if (!quiet) message('');
+    }
+    $('gs-signout').addEventListener('click', () => signOutAll());
+
+    /* ---------- jobs ---------- */
+    function rowClass(j) { return j.status === 'PARTS' ? 'parts' : j.status === 'WORKING' ? 'working' : !j.canRun ? 'down' : j.source === 'OFFICE' ? 'office' : ''; }
+    function drawJobs() {
+      $('jobs').innerHTML = jobs.map((j, i) => {
+        const subs = [];
+        if (j.status === 'PARTS') subs.push('<small>WAITING ON PARTS</small>');
+        if (j.status === 'WORKING' && j.techs.length) subs.push('<small class="green">' + escapeHtml(names(j.techs)) + ' working' + (j.startedAt ? ' · ' + elapsed(j.startedAt) : '') + '</small>');
+        if (!j.canRun && j.status !== 'PARTS') subs.push('<small class="red">CAN\'T RUN</small>');
+        if (j.source === 'OFFICE' && j.status === 'NEW') subs.push('<small>From the office</small>');
+        const busyJob = j.status === 'WORKING' || j.status === 'PARTS';
+        return '<div class="gs-job ' + rowClass(j) + '" data-i="' + i + '"><span class="unit">' + escapeHtml(j.unit) + '</span><span class="what">' + escapeHtml(j.problem || j.category) + subs.join('') + '</span>' +
+          '<button type="button" class="gs-btn ' + (j.status === 'WORKING' ? 'green' : j.status === 'PARTS' ? 'gray' : '') + '" data-i="' + i + '">' + (busyJob ? 'Open' : 'Start') + '</button></div>';
+      }).join('') || '<p class="gs-empty">No jobs right now.</p>';
+    }
+    function addNames(j) { people.forEach(p => { if (j.techs.indexOf(p.name) < 0) j.techs.push(p.name); }); }
+    $('jobs').addEventListener('click', e => {
+      const b = e.target.closest('button[data-i]');
+      if (!b) return;
+      const j = jobs[Number(b.dataset.i)];
+      if (j.status !== 'WORKING' && j.status !== 'PARTS') { j.status = 'WORKING'; if (!j.startedAt) j.startedAt = new Date().toISOString(); addNames(j); queue('START', j); }
+      open = j; drawJob(); view('job'); drawJobs();
+    });
+
+    function drawJob() {
+      const j = open;
+      $('job-unit').textContent = j.unit;
+      $('job-label').textContent = j.source === 'OFFICE' ? 'Sent by the office:' : j.source === 'TECH' ? 'Reported at the garage:' : 'Driver wrote on the inspection:';
+      $('job-problem').textContent = j.problem || j.category;
+      $('job-now').textContent = j.status === 'PARTS' ? 'Waiting on parts' : j.techs.length ? 'Working now: ' + names(j.techs) + (j.startedAt ? ' · ' + elapsed(j.startedAt) : '') : '';
+      $('job-parts').innerHTML = j.status === 'PARTS' ? '&#9203; Parts are here' : '&#9203; Need Parts';
+      $('job-helper').hidden = people.length >= MAX_TECHS && people.every(p => j.techs.indexOf(p.name) >= 0);
+    }
+    $('job-parts').addEventListener('click', () => {
+      const j = open;
+      if (j.status === 'PARTS') { j.status = 'WORKING'; queue('RESUME', j); drawJob(); return; }
+      j.status = 'PARTS'; queue('PARTS', j); open = null; view('jobs'); jobs.sort((a, b) => (a.status === 'PARTS') - (b.status === 'PARTS')); drawJobs();
+    });
+    $('job-helper').addEventListener('click', () => {
+      const j = open, missing = people.filter(p => j.techs.indexOf(p.name) < 0);
+      if (missing.length) { addNames(j); queue('HELPER', j); drawJob(); return; }
+      helperFor = jobKey(j); picked = null; typed = ''; drawSign(); view('sign');
+    });
+    $('job-done').addEventListener('click', () => { fixPick = ''; $('fix-note').value = ''; $('fix-unit').textContent = open.unit + ' · Done'; drawFixes(); view('fix'); });
+    document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.go; if (v === 'jobs') { open = null; drawJobs(); } view(v); }));
+
+    /* ---------- Done ---------- */
+    function drawFixes() { $('fixes').innerHTML = fixes.map(f => '<button type="button" class="gs-btn' + (f === fixPick ? ' pick-on' : '') + '" data-fix="' + escapeHtml(f) + '">' + escapeHtml(f) + '</button>').join(''); }
+    $('fixes').addEventListener('click', e => {
+      const b = e.target.closest('[data-fix]'); if (!b) return;
+      fixPick = b.dataset.fix; safePick = null; clearSig();
+      $('safe-unit').textContent = open.unit + ' · Done';
+      $('safe-q').textContent = 'Is ' + open.unit + ' safe to drive?';
+      $('sign-line').textContent = people.length ? people[0].name + ', sign with your finger' : 'Sign with your finger';
+      drawSafe(); view('safe');
+    });
+    function drawSafe() { document.querySelectorAll('[data-safe]').forEach(b => b.classList.toggle('pick-on', safePick !== null && (b.dataset.safe === 'yes') === safePick)); }
+    document.querySelectorAll('[data-safe]').forEach(b => b.addEventListener('click', () => { safePick = b.dataset.safe === 'yes'; drawSafe(); }));
+
+    const canvas = $('sig'), ctx = canvas.getContext('2d');
+    function sizeCanvas() {
+      requestAnimationFrame(() => {
+        const r = canvas.getBoundingClientRect(); if (!r.width) return;
+        const keep = inked ? canvas.toDataURL() : null;
+        canvas.width = Math.round(r.width); canvas.height = Math.round(r.height);
+        ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0b4f86';
+        if (keep) { const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0); img.src = keep; }
+      });
+    }
+    function clearSig() { inked = false; ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    let drawing = false;
+    const pt = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    canvas.addEventListener('pointerdown', e => { drawing = true; canvas.setPointerCapture(e.pointerId); const [x, y] = pt(e); ctx.beginPath(); ctx.moveTo(x, y); });
+    canvas.addEventListener('pointermove', e => { if (!drawing) return; const [x, y] = pt(e); ctx.lineTo(x, y); ctx.stroke(); inked = true; });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => canvas.addEventListener(t, () => { drawing = false; }));
+    $('sig-clear').addEventListener('click', clearSig);
+    window.addEventListener('resize', () => { if (shownView() === 'safe') sizeCanvas(); });
+    function smallSignature(scale) {
+      const w = Math.min(480, canvas.width) * (scale || 1), h = Math.round(canvas.height * w / canvas.width), c = document.createElement('canvas');
+      c.width = Math.round(w); c.height = h;
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(canvas, 0, 0, c.width, c.height);
+      const url = c.toDataURL('image/png');
+      return url.length > 29000 && (scale || 1) > 0.2 ? smallSignature((scale || 1) / 2) : url;
+    }
+    $('finish').addEventListener('click', () => {
+      if (safePick === null) { message('Tap Yes or No for "Safe to drive?".'); return; }
+      if (!inked) { message('Sign with your finger in the box.'); return; }
+      message('');
+      const j = open;
+      queue('DONE', j, { fixed: fixPick, note: $('fix-note').value.trim(), safe: safePick, signature: smallSignature() });
+      if (safePick) jobs = jobs.filter(x => x !== j); else { j.status = 'WORKING'; j.canRun = false; }
+      open = null; view('jobs'); drawJobs();
+    });
+
+    /* ---------- Report a Problem ---------- */
+    const alnum = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    function matchUnit() {
+      const key = alnum(unitTyped);
+      if (!key) return { list: [] };
+      const exact = units.filter(u => alnum(u) === key || alnum(u) === 'T' + key);
+      if (exact.length === 1) return { unit: exact[0], exact: true, list: [] };
+      const ends = key.length >= 2 ? units.filter(u => alnum(u).endsWith(key)) : [];
+      if (ends.length === 1) return { unit: ends[0], list: [] };
+      return { list: (exact.length > 1 ? exact : ends).slice(0, 4), none: key.length >= 2 && !ends.length && !exact.length };
+    }
+    function drawReport() {
+      const m = matchUnit();
+      unitPick = m.unit || (m.list.indexOf(unitPick) >= 0 ? unitPick : '');
+      $('typed').textContent = unitTyped;
+      const s = $('typed-match');
+      s.className = m.none ? 'bad' : '';
+      s.textContent = m.unit ? (m.exact ? m.unit : '→ ' + m.unit) + ' ✔' : unitPick ? unitPick + ' ✔' : m.none ? 'not found' : '';
+      $('matches').innerHTML = m.list.map(u => '<button type="button" class="gs-btn dark' + (u === unitPick ? ' pick-on' : '') + '" data-unit="' + escapeHtml(u) + '">' + escapeHtml(u) + '</button>').join('');
+      $('unit-keys').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'T-', '0', 'del'].map(k => '<button type="button" data-k="' + k + '">' + (k === 'del' ? '&#9003;' : k) + '</button>').join('');
+      $('cats').innerHTML = categories.map(c => '<button type="button" class="gs-btn' + (c === catPick ? ' pick-on' : '') + '" data-cat="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>').join('');
+      document.querySelectorAll('[data-run]').forEach(b => b.classList.toggle('pick-on', runPick !== null && (b.dataset.run === 'yes') === runPick));
+    }
+    $('to-report').addEventListener('click', () => { unitTyped = ''; unitPick = ''; catPick = ''; runPick = null; $('report-note').value = ''; drawReport(); view('report'); });
+    $('unit-keys').addEventListener('click', e => {
+      const b = e.target.closest('[data-k]'); if (!b) return;
+      const k = b.dataset.k;
+      if (k === 'del') unitTyped = unitTyped.slice(0, -1);
+      else if (k === 'T-') { if (!/^T-/.test(unitTyped)) unitTyped = 'T-' + unitTyped; }
+      else if (unitTyped.length < 12) unitTyped += k;
+      drawReport();
+    });
+    $('matches').addEventListener('click', e => { const b = e.target.closest('[data-unit]'); if (b) { unitPick = b.dataset.unit; unitTyped = unitPick; drawReport(); } });
+    $('cats').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if (b) { catPick = b.dataset.cat; drawReport(); } });
+    document.querySelectorAll('[data-run]').forEach(b => b.addEventListener('click', () => { runPick = b.dataset.run === 'yes'; drawReport(); }));
+    $('send-report').addEventListener('click', () => {
+      if (!unitPick) { message('Type the truck or trailer number.'); return; }
+      if (!catPick) { message('Tap what\'s wrong.'); return; }
+      if (runPick === null) { message('Tap Yes or No for "Can it run?".'); return; }
+      message('');
+      const note = $('report-note').value.trim();
+      const job = { id: '', unit: unitPick, type: /^T-/.test(unitPick) ? 'TRAILER' : 'TRUCK', problem: note ? catPick + ': ' + note : catPick, category: catPick, canRun: runPick, source: 'TECH', status: 'NEW', techs: [], createdAt: new Date().toISOString() };
+      jobs.unshift(job);
+      queue('REPORT', job, { unit: unitPick, category: catPick, canRun: runPick, problem: note });
+      view('jobs'); drawJobs();
+    });
+
+    /* ---------- saves: one after another, in the background ---------- */
+    let chain = Promise.resolve();
+    const rid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
+    function queue(op, job, extra) {
+      const requestId = rid();
+      chain = chain.then(async () => {
+        try {
+          const r = await call('step', Object.assign({ step: op, id: job.id, writeUp: job.id ? '' : job.writeUp, requestId }, extra || {}));
+          if (r.job && r.job.id) job.id = r.job.id;
+          if (r.warning) message(r.warning);
+        } catch (err) { message(err.message); await load().catch(() => {}); }
+      });
+      return chain;
+    }
+
+    // Back (menu): one step at a time on this screen first.
+    window.udBack = () => {
+      const v = shownView();
+      if (v === 'safe') { view('fix'); return true; }
+      if (v === 'fix') { view('job'); return true; }
+      if (v === 'job' || v === 'report') { open = null; view('jobs'); drawJobs(); return true; }
+      if (v === 'sign' && helperFor) { $('helper-cancel').click(); return true; }
+      return false;
+    };
+    // Idle: 30 minutes with nothing touched signs everyone out and shows the names again.
+    ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { lastTouch = Date.now(); }, true));
+    setInterval(() => {
+      if (people.length && Date.now() - lastTouch > IDLE_MS) { signOutAll(true); message('You were signed out. Tap your name and enter your login ID.'); return; }
+      if (shownView() === 'jobs') drawJobs(); else if (shownView() === 'job' && open) drawJob();
+    }, 60000);
+    // The list comes back fresh every 2 minutes while the jobs show (what the office sent, the other tablet's work).
+    setInterval(() => { if (people.length && shownView() === 'jobs' && Date.now() - lastTouch > 10000) load().catch(() => {}); }, 120000);
+
+    view('sign'); drawSign();
+    load().catch(err => message(err.message));
+  </script>
+</body>
+</html>

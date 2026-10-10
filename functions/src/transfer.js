@@ -235,14 +235,18 @@ const QUEUE_KINDS = Object.freeze({ maintTruck: { tab: 'TRUCK LIVE', kind: 'TRUC
   workOrders: { tab: 'GARAGE WORK ORDERS', kind: 'WORK_ORDER', idColumn: 'work_order_id', collection: 'workOrders' },
   // Fleet Service's unit dates and the garage technicians (220_V7276), read only. A technician's PIN is never copied.
   fleetSetup: { tab: 'FLEET SERVICE SETUP', kind: 'FLEET_SETUP', idColumn: 'unit', collection: 'fleetSetup' },
-  garageTechs: { tab: 'GARAGE TECHNICIANS', kind: 'GARAGE_TECH', idColumn: 'tech_id', collection: 'garageTechs', drop: ['pin_hash'] } });
+  // Joe 10/10: mechanics sign in on the Garage Station with their login ID (column login_id); only a hash of it is kept, in
+  // garageLogins, which no screen can read (garage.js).
+  garageTechs: { tab: 'GARAGE TECHNICIANS', kind: 'GARAGE_TECH', idColumn: 'tech_id', collection: 'garageTechs', drop: ['pin_hash', 'login_id'], secret: { column: 'login_id', collection: 'garageLogins' } } });
+// The same hash as garage.js loginHash (a test checks they agree).
+const GARAGE_HASH = (techId, loginId) => crypto.createHash('sha256').update('UDPO-GARAGE|' + String(techId).trim() + '|' + String(loginId).trim()).digest('hex');
 const queueDocId = (recordId) => String(recordId).replace(/[^A-Za-z0-9_-]+/g, '_');
 
 function parseQueue(list, values) {
-  const spec = QUEUE_KINDS[list], rows = values || [], docs = {}, warnings = [], idCol = spec.idColumn || 'record_id';
+  const spec = QUEUE_KINDS[list], rows = values || [], docs = {}, warnings = [], secrets = {}, idCol = spec.idColumn || 'record_id';
   let h = -1;
   for (let i = 0; i < Math.min(rows.length, 10); i++) if ((rows[i] || []).map(M.normalizeHeader).indexOf(idCol) >= 0) { h = i; break; }
-  if (h < 0) return { docs, warnings: rows.length ? [{ list, problem: spec.tab + ' has no ' + idCol + ' column' }] : [] };
+  if (h < 0) return { docs, secrets, warnings: rows.length ? [{ list, problem: spec.tab + ' has no ' + idCol + ' column' }] : [] };
   const index = headerIndex(rows[h]);
   rows.slice(h + 1).forEach((row, i) => {
     const id = cellText(row[index[idCol]]);
@@ -250,10 +254,14 @@ function parseQueue(list, values) {
     const docId = queueDocId(id);
     if (docs[docId]) { warnings.push({ list, row: h + 2 + i, id, problem: 'same ' + idCol + ' appears twice; the first row is used' }); return; }
     const cells = cellsOf(row, index);
+    if (spec.secret) {
+      const secret = String(cells[spec.secret.column] || '').trim();
+      if (secret) secrets[docId] = { id, hash: GARAGE_HASH(id, secret), cells: { h: GARAGE_HASH(id, secret) } };
+    }
     (spec.drop || []).forEach(k => { delete cells[k]; });
     docs[docId] = Object.assign({}, cells, { [idCol]: id, kind: spec.kind, status: (cells.status || (spec.idColumn ? 'NEW' : 'OPEN')).toUpperCase(), sheetRow: h + 2 + i, cells });
   });
-  return { docs, warnings };
+  return { docs, warnings, secrets };
 }
 
 /* ---------- Live week tabs ---------- */
@@ -467,6 +475,14 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
     const d = diffOps(db, QUEUE_KINDS[list].collection || C.maintenance, queues[list].docs, prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
     ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
     summary.queues[list] = { rows: Object.keys(queues[list].docs).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
+    const secret = QUEUE_KINDS[list].secret;
+    if (secret) {
+      const sMeta = db.collection(META).doc(secret.collection), sPrev = (await sMeta.get()).data() || {};
+      const s = diffOps(db, secret.collection, queues[list].secrets || {}, sPrev.hashes || {}, force, { transferredAt: stamp }, revBase);
+      // Only the hash goes in: no copy of the sheet's cells.
+      s.ops.forEach(op => { if (op.data) op.data = { techId: op.data.id, hash: op.data.hash, transferredAt: stamp }; });
+      ops.push(...s.ops, { ref: sMeta, data: { hashes: s.hashes, transferredAt: stamp } });
+    }
   }
   // 2b. The plant side (plant.js): journal, pickups, wash and returns lists. A list that cannot be read is left as it was.
   const plant = await PLANT.readPlant(reader, sources);

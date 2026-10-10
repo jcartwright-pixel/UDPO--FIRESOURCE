@@ -39,7 +39,7 @@ export const ADMIN_GROUPS = [
   ]],
   ['System Tools', 'Stations and checks', [
     ['window-test', 'Window Test Center', 'Opens every screen at each window size to check nothing is cut off.', '', 'check'],
-    ['driver-station', 'Driver Station', 'The driver board and check-in station.', '', 'distribution-truck-v1-560.webp']
+    ['driver-station', 'Driver Station', 'The driver board and check-in station.', 'driver-station.html', 'distribution-truck-v1-560.webp']
   ]],
   ['Diagnostics', 'Checks and repairs for the data behind the app', [
     ['preflight', 'Run Runtime Pre-Flight', 'Checks every sheet, column and setting the app needs and lists anything missing.', '', 'check'],
