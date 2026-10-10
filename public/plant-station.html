@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="css/stations.css">
   <script src="js/logic.js"></script>
 </head>
-<body class="fill ps-page">
+<body class="phone ps-page">
   <div class="signin" id="signin" hidden>
     <h1>Plant Station</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -21,15 +21,17 @@
   </div>
 
   <div id="screen" hidden>
-    <div class="topbar">
-      <span class="who" id="who"></span>
-      <button id="signout" type="button">Sign out</button>
-    </div>
-    <div class="head">
-      <div class="title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
+    <!-- Joe 10/10: the Plant Station is a tablet screen, like the drivers' phone page: a slim header, no desktop menu. -->
+    <header class="topbar" id="ps-top">
+      <button type="button" id="go-back" title="Back one screen">&#8249; Back</button>
+      <button type="button" id="go-home" title="Home">Home</button>
+      <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Plant Station</strong></span>
       <span class="ps-pill" id="pill" hidden>Uniontown</span>
-      <button type="button" id="change" data-top hidden>Change Station</button>
-    </div>
+      <button type="button" id="change" hidden>Change Station</button>
+      <span class="who" id="who"></span>
+      <button type="button" id="signout">Sign out</button>
+    </header>
+    <div class="ps-title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
       <section id="pick">
@@ -44,7 +46,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, goBack } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -99,6 +101,8 @@
       if (!b) return;
       stationId = b.dataset.station; write(stationId); render();
     });
+    document.getElementById('go-back').addEventListener('click', goBack);
+    document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
     document.getElementById('change').addEventListener('click', () => { stationId = ''; write(''); history.replaceState(null, '', location.pathname); render(); });
 
     requireSignIn(async () => {
