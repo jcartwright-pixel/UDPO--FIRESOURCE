@@ -1034,9 +1034,11 @@ async function noScroll(page) {
     await Promise.all([lp.waitForURL(/manager\.html/), lp.click('#go-back')]);
     await Promise.all([lp.waitForURL(/index\.html/), lp.click('#go-home')]);
     await Promise.all([lp.waitForURL(/maint\.html/), lp.click('.launch-card[data-side="fleet"]')]);
-    await lp.waitForSelector('.sidemenu .side-sec');
-    assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)), ['Equipment', 'GPS / Fleet'], 'the Fleet & Maintenance side lists only its own sections');
-    // Joe 10/10: Over the Road and Trucks Today are manager reports, only under Route Distribution's Reports; opened
+    await lp.waitForSelector('.sidemenu a[href="fleet.html"]');
+    // Joe 10/10 evening: GPS / Fleet is not on the Fleet & Maintenance side; its one section (Equipment) lists its screens straight in the menu.
+    assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)), [], 'the Fleet & Maintenance side lists only its own screens');
+    assert.equal(await lp.$$eval('.sidemenu a[href="gps.html"], .sidemenu a[href="scorecard.html"]', a => a.length), 0, 'no GPS screens on the Fleet & Maintenance side');
+    // Joe 10/10: Over the Road and Trucks Today are manager reports, only under Route Distribution's Manager Reports; opened
     // after Fleet & Maintenance, Over the Road shows the Route Distribution side.
     await lp.goto(lp.url().replace(/maint\.html.*/, 'otr.html?testEmail=manager.test@uniteddairy.com'));
     await lp.waitForSelector('.sidemenu a.side-name');
@@ -1054,8 +1056,8 @@ async function noScroll(page) {
     assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template (assign routes)') >= 0).map(m => m[0]), ['Drivers']);
     assert.deepEqual(sec('Drivers'), ['Drivers', 'Driver Weekly Template (assign routes)', 'Driver Assignment Board', 'Vacation Schedule'], 'Joe 10/10: route assignment has a link under Drivers');
     assert.ok(sec('Dispatch').indexOf('Driver Assignment Board') >= 0, 'the board stays under Dispatch too');
-    assert.deepEqual(menu.map(m => m[0]), ['Dispatch', 'Drivers', 'Reports', 'Overall', 'Administration'], 'the Route Distribution side lists only its own sections');
-    assert.deepEqual(sec('Reports'), ['Driver Scorecard', 'Over the Road', 'Trucks Today'], 'Joe 10/10: the manager reports');
+    assert.deepEqual(menu.map(m => m[0]), ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'], 'the Route Distribution side lists only its own sections');
+    assert.deepEqual(sec('Manager Reports'), ['Driver Scorecard', 'Over the Road', 'Trucks Today', 'GPS Setup'], 'Joe 10/10: the manager reports, GPS included');
     await mp.close();
     const mq = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
     await mq.waitForSelector('.side-flyouts .flyout', { state: 'attached' });
