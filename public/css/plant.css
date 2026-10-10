@@ -287,25 +287,28 @@
 .yard-page .yd-status::before { content: '● '; font-size: 11px; }
 .yard-page .yd-status.left { color: #8a4b00; }
 @media (max-width: 1500px) { .yard-page .yd-cycle { display: none; } }
-/* Phone (the plant's yard tablet / phone): Trailer, Temp, Set, Fuel, Notes, Action; the due time goes under the trailer. */
+/* Phone (the yard hands): one card per trailer, each box saves as it is left, one big Left Yard button; no history. */
+.yard-page .yd-cards { display: none; }
 @media (max-width: 760px) {
-  .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .yd-bar p { display: none; }
-  .yard-page table.yd-table:not(.yd-history) col:nth-child(6), .yard-page table.yd-table:not(.yd-history) col:nth-child(7),
-  .yard-page table.yd-table:not(.yd-history) th:nth-child(6), .yard-page table.yd-table:not(.yd-history) th:nth-child(7),
-  .yard-page table.yd-table:not(.yd-history) td:nth-child(6), .yard-page table.yd-table:not(.yd-history) td:nth-child(7) { display: none; }
-  .yard-page .yd-trailer small { display: block; }
-  .yard-page th .l { display: none; } .yard-page th .s { display: inline; }
-  .yard-page .yd-bar { margin: 0 8px 8px; padding: 8px 10px; } .yard-page .yd-bar .yd-icon { display: none; } .yard-page .yd-bar h2 { font-size: 17px; }
-  .yard-page .sheet { margin: 0 8px; }
-  .yard-page table.yd-table:not(.yd-history) col:nth-child(1) { width: 19% !important; } .yard-page table.yd-table:not(.yd-history) col:nth-child(2) { width: 15% !important; }
-  .yard-page table.yd-table:not(.yd-history) col:nth-child(3) { width: 13% !important; } .yard-page table.yd-table:not(.yd-history) col:nth-child(4) { width: 17% !important; }
-  .yard-page table.yd-table:not(.yd-history) col:nth-child(5) { width: 18% !important; } .yard-page table.yd-table:not(.yd-history) col:nth-child(8) { width: 18% !important; }
-  .yard-page table.yd-table th { font-size: 11px; padding: 6px 2px; white-space: normal; }
-  .yard-page table.yd-table td { padding: 4px 2px; height: auto; }
-  .yard-page table.yd-table td input, .yard-page table.yd-table td select { height: 44px; padding: 0 3px; font-size: 14px; }
-  .yard-page .yd-trailer b { font-size: 14px; }
-  .yard-page .yd-trailer small { font-size: 10px; white-space: normal; }
-  .yard-page .yd-act button { display: block; width: 100%; min-width: 0; margin: 2px 0; padding: 0 2px; height: 40px; font-size: 12px; }
-  .yard-page .yd-history col:nth-child(4), .yard-page .yd-history th:nth-child(4), .yard-page .yd-history td:nth-child(4) { display: none; }
-  .yard-page table.yd-history th, .yard-page table.yd-history td { font-size: 12px; }
+  .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .head .tabs, .yard-page .head .badge-test span, .yard-page .yd-bar, .yard-page #pane-current, .yard-page #pane-history, .yard-page .foot { display: none !important; }
+  .yard-page .yd-cards { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 10px 16px; }
+  .yard-page .yd-card { background: #fff; border: 1px solid var(--line); border-left: 6px solid #bf2020; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .yard-page .yd-card.done { border-left-color: var(--runs-ink); background: #f6fcf8; }
+  .yard-page .yd-card header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .yard-page .yd-card header b { font-size: 24px; color: var(--ud-blue-dark); }
+  .yard-page .yd-run { font-size: 14px; color: var(--muted); font-weight: 700; }
+  .yard-page .yd-due, .yard-page .yd-tick { margin-left: auto; font-size: 15px; font-weight: 800; color: #b45f00; }
+  .yard-page .yd-due.now { color: #bf2020; }
+  .yard-page .yd-tick { color: var(--runs-ink); }
+  .yard-page .yd-tick.saving { color: var(--muted); }
+  .yard-page .yd-tick.error { color: #bf2020; }
+  .yard-page .yd-f { display: flex; align-items: center; gap: 10px; }
+  .yard-page .yd-f > span { flex: 0 0 74px; font-size: 15px; font-weight: 800; color: var(--muted); }
+  .yard-page .yd-f input { flex: 1; min-width: 0; height: 50px; border: 1px solid #b8cadb; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 20px; color: var(--ink); background: #fff; }
+  .yard-page .yd-fuel { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .yard-page .yd-fuel button { height: 50px; border: 1px solid #b8cadb; border-radius: 10px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 17px; font-weight: 800; padding: 0; }
+  .yard-page .yd-fuel button[aria-pressed="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+  .yard-page button.yd-leave { height: 54px; border: 2px solid #9fb3c6; border-radius: 12px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 18px; font-weight: 800; }
+  .yard-page button.yd-leave[data-armed="true"] { background: #fff6e0; border-color: #f0a020; color: #8a4b00; }
+  .yard-page .yd-none { text-align: center; color: var(--muted); font-size: 17px; margin: 30px 0; }
 }

@@ -113,9 +113,32 @@ async function seed() {
     const saved = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp);
     assert.deepEqual(saved.map(x => x.payload.trailer + ' ' + x.payload.status).sort(), ['T-701 COMPLETE', 'T-704 DEPARTED']);
     // The phone view (yard hands): Trailer, Temp, Set, Fuel, Notes, Action.
+    // The phone (yard hands): one card per trailer, no Record button and no history; each box saves as it is left.
     const phone = await openPage(browser, 412, 860, '/yard.html' + MANAGER);
-    await phone.waitForFunction(() => document.querySelectorAll('#rows tr[data-trailer]').length === 1);
+    const card = '.yd-card[data-trailer="T-702"]';
+    await phone.waitForSelector(card);
+    assert.equal(await phone.isVisible('#panes'), false, 'no 24-hour history on the phone');
+    assert.equal(await phone.$$eval('[data-record]', b => b.filter(x => x.offsetParent).length), 0, 'no Record button on the phone');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-412.png'), scale: 'css' });
+    await phone.fill(card + ' [data-k="temperature"]', '37');
+    await phone.press(card + ' [data-k="temperature"]', 'Enter');
+    await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
+    await phone.click(card + ' [data-fuel="3/4"]');
+    await phone.fill(card + ' [data-k="notes"]', 'Doors sealed');
+    await phone.press(card + ' [data-k="notes"]', 'Enter');
+    await new Promise(r => setTimeout(r, 1500));
+    await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
+    const one = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp && x.payload.trailer === 'T-702');
+    assert.equal(one.length, 1, 'the three boxes fill in one check');
+    assert.deepEqual([one[0].payload.temperature, one[0].payload.fuelLevel, one[0].payload.notes], ['37', '3/4', 'Doors sealed']);
+    results.push('Phone: T-702 temp, fuel and notes each saved as they were left, into one check; the card stays with "Saved"');
+    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-saved-412.png'), scale: 'css' });
+    await phone.click(card + ' [data-left]');
+    assert.match(await phone.textContent(card + ' [data-left]'), /Tap again to confirm/);
+    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-confirm-412.png'), scale: 'css' });
+    await phone.click(card + ' [data-left]');
+    await phone.waitForFunction((c) => !document.querySelector(c), card);
+    results.push('Phone: Left Yard asks once more, then the card is gone');
     assert.deepEqual(phone.errors, []);
     assert.deepEqual(desk.errors, []);
     assert.deepEqual(watcher.errors, []);
