@@ -44,16 +44,20 @@ const COLUMNS = ({
   exceptions: { idColumn: 'exception_id', fields: {
     driverId: ['driver_id', 'text'], startDate: ['start_date', 'date'], endDate: ['end_date', 'date'], type: ['exception_type', 'text'],
     status: ['status', 'text'], reasonCode: ['reason_code', 'text'], notes: ['notes', 'text'], decisionNotes: ['decision_notes', 'text'], facilityId: ['facility_id', 'text'] } },
+  // Administration > People & Roles (admin.js): the Users list, found by email.
+  users: { idColumn: 'email', fields: {
+    name: ['display_name', 'text'], status: ['status', 'text'], roles: ['roles_json', 'json'], facilities: ['facility_ids_json', 'json'] } },
   vacations: { idColumn: 'id', fields: {
     driverId: ['driver_id', 'text'], startDate: ['start_date', 'date'], endDate: ['end_date', 'date'], status: ['status', 'text'],
     vacationType: ['vacation_type', 'text'], notes: ['notes', 'text'], facilityId: ['facility_id', 'text'] } }
 });
 // The maintenance queues (maintenance.js): new records only, written column for column; a column the tab lacks is skipped.
 ['maintTruck', 'maintTrailer', 'maintFork', 'maintWash', 'maintReturns'].forEach(k => { COLUMNS[k] = { idColumn: 'record_id', passThrough: true, collection: C.maintenance }; });
-const KIND_OF = { [C.drivers]: 'drivers', [C.equipment]: 'equipment', [C.routes]: 'routes', [C.exceptions]: 'exceptions', [C.vacations]: 'vacations' };
+const KIND_OF = { [C.users]: 'users', [C.drivers]: 'drivers', [C.equipment]: 'equipment', [C.routes]: 'routes', [C.exceptions]: 'exceptions', [C.vacations]: 'vacations' };
 
 function cellValue(kind, v) {
   if (v === null || v === undefined) return '';
+  if (kind === 'json') return JSON.stringify(v);
   if (kind === 'bool') return v === true ? 'TRUE' : v === false ? 'FALSE' : String(v);
   if (kind === 'time') return typeof v === 'number' ? L.timeText(v) : String(v);
   if (kind === 'number') return typeof v === 'number' ? v : String(v);
