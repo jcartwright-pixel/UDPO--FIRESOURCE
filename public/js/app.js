@@ -74,25 +74,37 @@ function addSideMenu() {
       '<div class="side-sec' + (items.some(([, href]) => href === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
       svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span><i aria-hidden="true">&#9656;</i></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join('');
-  const close = (except) => nav.querySelectorAll('.side-sec.open').forEach(x => { if (x !== except) { x.classList.remove('open'); x.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'false'); } });
+  // Joe 10/10: the fly-outs live in their own layer on the page, not inside the menu, so no screen, table or pop-up can draw over them.
+  const layer = document.createElement('nav');
+  layer.className = 'side-flyouts';
+  layer.setAttribute('aria-label', 'Screens in this section');
+  document.body.appendChild(layer);
+  const flyOf = (sec) => sec._fly;
+  nav.querySelectorAll('.side-sec').forEach(sec => { sec._fly = sec.querySelector('.flyout'); sec._fly._sec = sec; layer.appendChild(sec._fly); });
+  const shut = (x) => { x.classList.remove('open'); flyOf(x).classList.remove('open'); x.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'false'); };
+  const close = (except) => nav.querySelectorAll('.side-sec.open').forEach(x => { if (x !== except) shut(x); });
   const openSec = (sec) => {
     close(sec);
-    const r = sec.getBoundingClientRect(), fly = sec.querySelector('.flyout');
+    const r = sec.getBoundingClientRect(), fly = flyOf(sec);
     fly.style.left = nav.getBoundingClientRect().right + 'px';
-    fly.style.top = Math.max(8, Math.min(r.top, window.innerHeight - fly.offsetHeight - 8 || r.top)) + 'px';
+    fly.style.top = Math.max(8, r.top) + 'px';
     sec.classList.add('open');
+    fly.classList.add('open');
     sec.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'true');
     const h = fly.offsetHeight;
     if (r.top + h > window.innerHeight - 8) fly.style.top = Math.max(8, window.innerHeight - h - 8) + 'px';
   };
   nav.querySelectorAll('.side-sec').forEach(sec => {
     let timer = null, hoverAt = 0;
+    const later = () => { clearTimeout(timer); timer = setTimeout(() => shut(sec), 180); };
     // A tap fires mouseenter just before click: that click keeps the fly-out open instead of closing it.
     sec.addEventListener('mouseenter', () => { clearTimeout(timer); if (!sec.classList.contains('open')) { openSec(sec); hoverAt = Date.now(); } });
-    sec.addEventListener('mouseleave', () => { timer = setTimeout(() => { sec.classList.remove('open'); sec.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'false'); }, 180); });
+    sec.addEventListener('mouseleave', later);
+    flyOf(sec).addEventListener('mouseenter', () => clearTimeout(timer));
+    flyOf(sec).addEventListener('mouseleave', later);
     sec.querySelector('.side-sec-btn').addEventListener('click', e => { e.stopPropagation(); if (sec.classList.contains('open') && Date.now() - hoverAt > 400) close(); else openSec(sec); });
   });
-  document.addEventListener('click', e => { if (!e.target.closest('.side-sec')) close(); });
+  document.addEventListener('click', e => { if (!e.target.closest('.side-sec, .side-flyouts')) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   const wrap = document.createElement('div'), main = document.createElement('div');
   wrap.className = 'side-wrap'; main.className = 'side-main';

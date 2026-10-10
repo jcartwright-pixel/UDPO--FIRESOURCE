@@ -726,6 +726,31 @@ async function noScroll(page) {
     assert.deepEqual(hop.errors, []);
     await hop.close();
     results.push('Daily and Weekly: a tile on each opens the other for the same week in this window; Weekly has no Assigned key; Menu > Driver Assignment Board opens Weekly at the board');
+    // Joe 10/10: a menu fly-out draws above the screen (tables, cards, pop-ups), with the menu open and folded, on Daily and Equipment.
+    for (const url of ['/daily.html?date=2026-10-05', '/equipment.html?x=1']) {
+      for (const folded of [false, true]) {
+        const fly = await openPage(browser, 1920, 950, url + '&testEmail=dispatch.test@uniteddairy.com');
+        await fly.waitForSelector('.sidemenu .side-sec');
+        if (folded) await fly.evaluate(() => document.body.classList.add('side-folded'));
+        const sec = fly.locator('.sidemenu .side-sec').first();
+        await sec.hover();
+        await fly.waitForSelector('.side-flyouts .flyout.open', { state: 'visible' });
+        const covered = await fly.evaluate(() => {
+          const f = document.querySelector('.side-flyouts .flyout.open'), r = f.getBoundingClientRect(), bad = [];
+          for (const fx of [0.25, 0.5, 0.85]) for (const fy of [0.2, 0.5, 0.8]) {
+            const x = r.left + r.width * fx, y = r.top + r.height * fy, hit = document.elementFromPoint(x, y);
+            if (!hit || !f.contains(hit)) bad.push(Math.round(x) + ',' + Math.round(y) + ' ' + (hit ? hit.tagName + '.' + hit.className : 'none'));
+          }
+          return bad;
+        });
+        assert.deepEqual(covered, [], url + (folded ? ' folded' : '') + ': the fly-out is drawn over the screen');
+        assert.equal(await fly.$$eval('.sidemenu .flyout', f => f.length), 0, 'fly-outs live in their own layer, not inside the menu');
+        if (!folded && url.startsWith('/daily')) await Promise.all([fly.waitForURL(/weekly\.html/), fly.click('.side-flyouts .flyout.open a[href="weekly.html"]')]);
+        assert.deepEqual(fly.errors, []);
+        await fly.close();
+      }
+    }
+    results.push('Menu fly-outs draw above the screen on Daily Dispatch and Equipment, with the menu open and folded');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).

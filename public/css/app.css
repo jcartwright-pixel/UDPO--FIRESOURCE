@@ -896,3 +896,19 @@ tr.otr-on td { background: #e3f3e8; }
 /* Link tiles match the button tiles. */
 .head .actions.in-head a.button { display: inline-flex; align-items: center; justify-content: center; width: 92px; min-width: 92px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px; white-space: normal; line-height: 1.12; font-size: 13px; font-weight: 800; text-align: center; }
 @media (max-width: 1500px) { .head .actions.in-head a.button { width: 82px; min-width: 82px; font-size: 12px; } }
+
+/* Joe 10/10: the menu (and its fly-outs) always draws above the screen. Its view-transition name makes it a layer of its own,
+   so the fly-out's z-index only counts inside the menu; the menu itself is lifted above the content, tables, cards and pop-ups. */
+.sidemenu { position: relative; z-index: 300; }
+/* The fly-outs' own layer (Joe 10/10): above everything on the screen. */
+.side-flyouts { position: fixed; inset: 0 auto auto 0; width: 0; height: 0; z-index: 1000; view-transition-name: ud-flyouts; }
+.side-flyouts .flyout { display: none; position: fixed; min-width: 250px; padding: 8px 0 10px; background: #0b3d6b; color: #dbe8f5; border-radius: 0 12px 12px 0; box-shadow: 8px 6px 28px rgba(0,0,0,.32); border-left: 3px solid var(--ud-gold); }
+.side-flyouts .flyout.open { display: flex; flex-direction: column; gap: 1px; }
+.side-flyouts .flyout-title { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #9fbcd8; padding: 6px 18px 6px; }
+.side-flyouts a { display: flex; align-items: center; gap: 12px; margin: 0 8px; padding: 9px 12px; border-radius: 9px; color: #fff; text-decoration: none; font-size: 15px; font-weight: 700; white-space: nowrap; justify-content: flex-start; }
+.side-flyouts a svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.side-flyouts a span { flex: 1; }
+.side-flyouts a i { font-style: normal; font-size: 14px; color: #f2c14e; }
+.side-flyouts a:hover { background: #ffffff1c; }
+.side-flyouts a.on { background: #fff; color: #0b3d6b; }
+@media print { .side-flyouts { display: none !important; } }
