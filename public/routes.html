@@ -74,7 +74,7 @@
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
-    const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // the Route Master's own order
+    const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']; // Joe 10/10: every week runs Sunday to Saturday
     const NAME = (p) => L.DAY_NAMES[L.DAYS.indexOf(p)];
     const LOADOUT = ['None', 'Case Loadout', 'Tote', 'Boxing', 'Tanker'];
     const RUN_BY = ['Uniontown', 'Fairmont', 'Marietta', 'Charleston', 'Carrier', 'Anyone'];
@@ -271,9 +271,14 @@
     /* ---------- Saves: shown at once, one call each ---------- */
     // The redraw waits a moment so Tab / Enter has already moved to the next box (render keeps the focus there).
     const renderSoon = () => setTimeout(render, 0);
+    // Changes still saving, by run: a Route Master update that lands before them is shown with them laid on top,
+    // so a block paste saving one run at a time never flashes back to the older times.
+    const pending = [];
     function saveRun(r, fields, days, apply) {
-      const before = JSON.parse(JSON.stringify(r));
-      return saveOptimistic('saveRoute', { runId: r.id, fields: fields || {}, days: days || {} }, () => apply(r), () => { Object.keys(r).forEach(k => delete r[k]); Object.assign(r, before); }, renderSoon);
+      const before = JSON.parse(JSON.stringify(r)), mine = { id: r.id, apply };
+      pending.push(mine);
+      const done = () => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); };
+      return saveOptimistic('saveRoute', { runId: r.id, fields: fields || {}, days: days || {} }, () => apply(r), () => { done(); Object.keys(r).forEach(k => delete r[k]); Object.assign(r, before); }, renderSoon).then(x => { done(); return x; });
     }
     function saveCell(input) {
       const r = routes.find(x => x.id === input.closest('tr').dataset.id), p = input.dataset.day, field = GRID[view].field;
@@ -288,6 +293,8 @@
         : field === 'trailer' ? (value && !/^T-/i.test(value) ? 'T-' + value.toUpperCase() : value.toUpperCase()) : ['tractor', 'forklift'].indexOf(field) >= 0 ? value.toUpperCase() : value;
     }
     const table = document.getElementById('table');
+    // A Route Master update that arrived while a box was being typed in is drawn once the box is left (after its own save).
+    table.addEventListener('focusout', () => { if (redrawLater) { redrawLater = false; renderSoon(); } });
     table.addEventListener('change', e => {
       if (e.target.matches('input.cell')) return saveCell(e.target);
       if (e.target.matches('input.dcell')) {
@@ -452,8 +459,11 @@
       watchLists(user, render);
       onSnapshot(collection(db, 'routes'), snap => {
         routes = snap.docs.map(d => Object.assign({ days: {} }, d.data(), { id: d.id }));
-        // A box being typed in keeps its text: the grid redraws when it loses focus.
-        if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#table') && document.activeElement.matches('input')) return;
+        pending.forEach(c => { const r = routes.find(x => x.id === c.id); if (r) c.apply(r); });
+        // A box being typed in keeps its text: the grid redraws when it is left. A grid box that only has the focus (Tab moved
+        // there, or a paste filled it) redraws at once, so a save that lands meanwhile is never hidden behind an older copy.
+        const a = document.activeElement;
+        if (a && a.closest && a.closest('#table') && a.matches('input') && (!a.matches('input.cell') || a.value !== a.defaultValue)) { redrawLater = true; return; }
         render();
       }, e => showError('Could not read Route Master: ' + e.message));
       window.addEventListener('resize', render);
