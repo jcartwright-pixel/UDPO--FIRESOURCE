@@ -225,8 +225,11 @@ function validate(input) {
       if (!out.runId) throw new SaveError('BAD_REQUEST', 'Pick the run');
       out.include = input.include === true;
       out.destination = OTR.otrNormDest_(input.destination);
-      if (out.destination && OTR.OTR_CORE.DESTINATIONS.indexOf(out.destination) < 0) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
+      // Joe 10/10: the run is the destination (OTR Routes Setup sends the run name), so any name is kept; who takes it is Delivered By.
+      out.destination = text(out.destination, 60);
       if (out.include && !out.destination) throw new SaveError('BAD_REQUEST', 'Pick where this route goes before including it');
+      out.deliveredBy = text(input.deliveredBy, 40);
+      if (out.deliveredBy && ['Carrier Pickup', 'United Dairy Delivered'].indexOf(out.deliveredBy) < 0) throw new SaveError('BAD_REQUEST', 'Delivered By must be Carrier Pickup or United Dairy Delivered');
     } else if (out.op === 'figure') {
       out.year = Number(input.year); out.month = Number(input.month); out.key = text(input.key, 40);
       if (!Number.isInteger(out.year) || out.year < 2000 || out.year > 2100 || !Number.isInteger(out.month) || out.month < 1 || out.month > 12) throw new SaveError('BAD_REQUEST', 'Pick a month');
@@ -930,7 +933,7 @@ async function saveDriverTemplate(tx, db, req, email, stamp, logRef, mode) {
  */
 async function saveOtr(tx, db, req, email, stamp, logRef, mode) {
   let ref, data;
-  if (req.op === 'route') { ref = db.collection('otrRoutes').doc(M.safeIdPart(req.runId)); data = { runId: req.runId, include: req.include, destination: req.destination }; }
+  if (req.op === 'route') { ref = db.collection('otrRoutes').doc(M.safeIdPart(req.runId)); data = { runId: req.runId, include: req.include, destination: req.destination, deliveredBy: req.deliveredBy || '' }; }
   else if (req.op === 'figure') { ref = db.collection('otrMonthly').doc(req.year + '-' + String(req.month).padStart(2, '0')); data = { year: req.year, month: req.month, [req.key]: req.value, source: 'TYPED' }; }
   else { ref = db.collection('otrDaily').doc(req.date + '__' + M.safeIdPart(req.destination)); data = { date: req.date, destination: req.destination, runs: req.runs, source: 'MANUAL' }; }
   const snap = await tx.get(ref), before = snap.exists ? snap.data() : null;

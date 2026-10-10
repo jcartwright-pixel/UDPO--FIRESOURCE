@@ -853,6 +853,7 @@ tr.otr-on td { background: #e3f3e8; }
 .otr-setup select:disabled { background-color: #eef2f6; color: #7a8797; cursor: not-allowed; }
 .otr-setup input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; vertical-align: middle; }
 .otr-setup input[type=checkbox]:disabled { cursor: not-allowed; }
+.otr-rep small.otr-by { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
 
 /* Driver Scorecard */
 .sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
