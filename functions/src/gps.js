@@ -50,7 +50,7 @@ async function test(d, vehicle, fetchFn) {
   }
   if (res.status === 401 || res.status === 403) return { ok: false, step: 'login', message: 'Fleetmatics refused the login (' + res.status + '). Check the API user name and password.' };
   // 400 is what Fleetmatics gives a login that is not an API (REST) user, such as the everyday Reveal login.
-  if (res.status === 400) return { ok: false, step: 'login', message: 'Fleetmatics did not accept this user name and password as an integration (REST) login (400). The Developer Portal login and the everyday Reveal login do not work here: use the integration user name and password Verizon Connect gives for the REST API.' };
+  if (res.status === 400) return { ok: false, step: 'login', message: 'Fleetmatics did not accept this user name and password as an integration (REST) login (400). The Developer Portal login and the everyday Reveal login do not work here: use the integration user name and password Verizon Connect gives for the REST API. This connection is for Verizon Connect Reveal accounts; a Verizon Connect Fleet account (the old Telogis) needs Fleet API access from Verizon first.' };
   if (res.status >= 300) return { ok: false, step: 'login', message: 'Fleetmatics answered ' + res.status + ' to the login. Try again in a minute; if it stays, call Verizon Connect.' };
   const token = String(await res.text() || '').trim().replace(/^"|"$/g, '');
   if (!token) return { ok: false, step: 'login', message: 'Fleetmatics accepted the login but sent no key back.' };
