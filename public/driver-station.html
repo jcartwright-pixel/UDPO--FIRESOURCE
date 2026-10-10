@@ -41,7 +41,7 @@
           <div class="ds-row ds-headrow"><span>ROUTE</span><span>RUN</span><span>DRIVER</span><span>TRAILER</span><span>CASES</span><span>LOAD STATUS</span><span>PICKUP</span></div>
           <div class="ds-scroll" id="board-scroll"><div id="board"></div></div>
         </section>
-        <aside class="ds-weather" id="weather" hidden><span class="sym" aria-hidden="true">&#9728;</span><b>LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p>Weather is not connected yet.</p></aside>
+        <aside class="ds-weather" id="weather" hidden><span class="sym" id="weather-sym" aria-hidden="true">&#9728;</span><b>LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p class="now" id="weather-now">Reading the weather…</p><p id="weather-today"></p><p class="next" id="weather-next"></p></aside>
         <section class="ds-week" aria-label="Driver weekly schedule">
           <div class="ds-week-title"><b>DRIVER WEEKLY SCHEDULE</b><span id="week-of"></span></div>
           <div class="ds-scroll" id="week-scroll"><table class="ds-week-table"><thead id="week-head"></thead><tbody id="week-rows"></tbody></table></div>
@@ -54,6 +54,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, goBack } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as W from './js/weather.js';
 
     // The current app's Driver Room board and TV (DriverLoadoutPickup.html, 052_V749). Read only. In the new app it opens with a
     // United Dairy sign-in (no branch code); "Driver Room TV" is the old DISPLAY mode: dark, no menu, notes shown, both lists roll.
@@ -116,6 +117,20 @@
       }, ms);
     }
     roll('board-scroll', 45); roll('week-scroll', 50);
+
+    // The weather window: Open-Meteo (free, no key) every 15 minutes; the last reading stays if one read fails.
+    async function weather() {
+      const set = (id, t) => { document.getElementById(id).textContent = t; };
+      try {
+        const res = await fetch(W.forecastUrl(W.PLANTS.Uniontown));
+        const w = res.ok ? W.summary(await res.json()) : null;
+        if (!w) throw new Error('no forecast');
+        set('weather-sym', w.symbol); set('weather-now', w.now); set('weather-today', w.today); set('weather-next', w.tomorrow);
+      } catch (e) {
+        if (/Reading/.test(document.getElementById('weather-now').textContent)) set('weather-now', 'The weather is not available right now.');
+      }
+    }
+    if (tv) { weather(); setInterval(weather, 15 * 60000); }
 
     document.getElementById('tv').addEventListener('click', () => { location.search = tv ? '?view=desk' : ''; });
     document.getElementById('refresh').addEventListener('click', () => { sig = ''; weekSig = ''; render(); });
