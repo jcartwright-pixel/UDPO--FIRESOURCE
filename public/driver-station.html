@@ -13,7 +13,7 @@
   <script src="js/logic.js"></script>
   <script src="js/board-rules.js"></script>
 </head>
-<body class="fill ds-page">
+<body class="fill phone ds-page">
   <div class="signin" id="signin" hidden>
     <h1>Driver Station</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -22,7 +22,10 @@
   </div>
 
   <div id="screen" hidden>
+    <!-- Joe 10/10: the Driver Room kiosk opens full screen like the phone and tablet screens: a slim header, no desktop menu. -->
     <div class="topbar">
+      <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
+      <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
       <span class="who" id="who"></span>
       <button id="signout" type="button">Sign out</button>
     </div>
@@ -49,7 +52,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, goBack } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Driver Room board and TV (DriverLoadoutPickup.html, 052_V749). Read only. In the new app it opens with a
@@ -58,6 +61,8 @@
     const params = new URLSearchParams(location.search);
     const tv = params.get('tv') === '1';
     document.body.classList.toggle('ds-tv', tv);
+    document.getElementById('go-back').addEventListener('click', goBack);
+    document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
     document.getElementById('tv').textContent = tv ? 'Leave TV mode' : 'Driver Room TV';
     document.getElementById('eyebrow').textContent = tv ? 'Driver Room Display' : 'Driver Loadout & Pickup';
     document.getElementById('weather').hidden = !tv;
