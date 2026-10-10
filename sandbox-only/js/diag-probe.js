@@ -136,7 +136,7 @@
       var r = read(KEY_RUN);
       if (!r || r.id !== run.id || r.queue[0] !== asked) return;
       var res = result(capped);
-      if (asked !== page) res.errors.unshift({ kind: 'opened', text: asked + ' opened ' + page + ' instead', at: 0 });
+      res.asked = asked; // a screen that opens another (Home sends an administrator to the all-plants page) is noted, not an error
       r.results.push(res);
       r.queue.shift();
       r.navAt = Date.now();
@@ -177,7 +177,7 @@
           var body = page === 'administration.html' && document.getElementById('body');
           if (body) {
             var addGroup = function () {
-              if (!body.querySelector('.adm-group') || body.querySelector('.diag-group')) return;
+              if (!body.children.length || body.querySelector('.diag-group')) return;
               var g = document.createElement('section');
               g.className = 'adm-group diag-group';
               g.innerHTML = '<header><h2>Sandbox tools</h2><span>Only on the sandbox; the real app has none of this</span></header><div class="adm-tiles">' +

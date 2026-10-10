@@ -86,7 +86,7 @@
       return list.map(r => {
         const bad = issues(r), calls = (r.calls || []).filter(c => c.ms != null), slow = r.loadedMs > SLOW_SCREEN || calls.some(c => c.ms > SLOW_CALL);
         return '<tr class="' + (bad.length ? 'bad' : slow ? 'slow' : '') + '">' + (withWhen ? '<td>' + escapeHtml(clock(r.when)) + '</td>' : '') +
-          '<td>' + escapeHtml(r.title) + '</td><td>' + escapeHtml(r.page) + '</td><td class="num">' + sec(r.shownMs) + '</td><td class="num">' + sec(r.loadedMs) + (r.stillChanging && !r.signedOut ? ' +' : '') + '</td>' +
+          '<td>' + escapeHtml(r.title) + '</td><td>' + escapeHtml(r.asked && r.asked !== r.page ? r.asked + ' → ' + r.page : r.page) + '</td><td class="num">' + sec(r.shownMs) + '</td><td class="num">' + sec(r.loadedMs) + (r.stillChanging && !r.signedOut ? ' +' : '') + '</td>' +
           '<td class="num">' + (calls.length ? calls.length + ' · ' + sec(Math.max(...calls.map(c => c.ms))) : '') + '</td><td class="num">' + (bad.length || '') + '</td>' +
           '<td class="issue">' + escapeHtml(bad.join(' · ')) + '</td></tr>';
       }).join('');

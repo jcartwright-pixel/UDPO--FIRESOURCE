@@ -88,7 +88,7 @@ async function newPage(context) {
     await page.waitForFunction(() => { try { const r = JSON.parse(localStorage.getItem('udDiagLastRun') || 'null'); return r && r.server && document.querySelectorAll('#sheet tbody tr').length > 5; } catch (e) { return false; } }, null, { timeout: 60000 });
     const run = await page.evaluate(() => JSON.parse(localStorage.getItem('udDiagLastRun')));
     console.log('Check took ' + Math.round((Date.now() - started) / 1000) + ' s for ' + run.results.length + ' screens');
-    assert.deepEqual(run.results.map(r => r.page), queue, 'every screen was checked, in menu order');
+    assert.deepEqual(run.results.map(r => r.asked), queue, 'every screen was checked, in menu order');
     assert.equal(await page.evaluate(() => localStorage.getItem('udDiagRun')), null, 'the check switched itself off at the end');
     run.results.forEach(r => {
       assert.ok(r.shownMs != null && r.loadedMs != null && r.loadedMs >= r.shownMs, r.page + ' has its times ' + JSON.stringify(r));
