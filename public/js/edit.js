@@ -9,7 +9,7 @@ import { start, save, showError, escapeHtml } from './app.js';
 import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const L = window.UDLogic;
-export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], fleetTrucks: [], fleetTrailers: [], exceptions: [], person: null, app: {} };
+export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], fleetTrucks: [], fleetTrailers: [], exceptions: [], ops: L.opsAssignments([]), person: null, app: {} };
 
 // The screen's key in the per-screen switch (L.SCREENS); each page sets it once.
 let screenKey = 'dailyDispatch';
@@ -42,6 +42,8 @@ export async function watchLists(user, onChange) {
   });
   // Days off (Driver Call-Off, Weekly availability, Vacation Schedule): those drivers are left out unless OVR is ticked.
   onSnapshot(collection(db, 'exceptions'), snap => { lists.exceptions = snap.docs.map(d => d.data()); onChange(); });
+  // Operational Assignments: Carrier, Fairmont... offered under Other CVG / Carriers in the driver lists.
+  onSnapshot(collection(db, 'opsAssignments'), snap => { lists.ops = L.opsAssignments(snap.docs.map(d => d.data())); onChange(); });
   // Which app runs each screen: a screen still run from the current app is view only here once any screen has moved.
   onSnapshot(doc(db, 'config', 'app'), snap => { lists.app = snap.data() || {}; onChange(); });
   onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), snap => { lists.person = snap.exists() ? snap.data() : null; onChange(); });
@@ -83,11 +85,16 @@ export function optionsHtml(kind, current, busy, opts) {
   const list = KINDS[kind].list(opts);
   // A unit already on the run stays shown even when it is kept at another branch.
   if (current && kind !== 'driver' && !list.some(o => o.id === current) && pickText(kind, current)) list.unshift({ id: current, text: pickText(kind, current) });
-  return '<option value="">(none)</option>' + list.map(o =>
-    '<option value="' + escapeHtml(o.id) + '"' + (o.id === current ? ' selected' : '') + '>' + escapeHtml(o.text + (busy && busy[o.id] && o.id !== current ? '  (' + busy[o.id] + ')' : '')) + '</option>').join('');
+  const opt = (o) => '<option value="' + escapeHtml(o.id) + '"' + (o.id === current ? ' selected' : '') + '>' + escapeHtml(o.text + (busy && busy[o.id] && o.id !== current ? '  (' + busy[o.id] + ')' : '')) + '</option>';
+  const cvg = kind === 'driver' ? cvgOptions() : [];
+  return '<option value="">(none)</option>' + list.map(opt).join('') + (cvg.length ? '<optgroup label="Other CVG / Carriers">' + cvg.map(opt).join('') + '</optgroup>' : '');
 }
 
+// Operational Assignments that are active, as driver choices (the current app's "Other CVG / Carriers").
+export function cvgOptions() { return lists.ops.filter(o => o.active !== false).map(o => ({ id: '__CVG__:' + o.assignment, text: o.assignment })); }
+
 export function pickText(kind, id) {
+  if (kind === 'driver' && /^__CVG__:/.test(String(id || ''))) return String(id).slice(8);
   const pool = kind === 'driver' ? lists.allDrivers : kind === 'truck' ? lists.fleetTrucks : lists.fleetTrailers;
   const item = pool.find(o => o.id === id);
   return item ? (kind === 'driver' ? item.name : item.unit) : '';
@@ -157,7 +164,7 @@ export function saveAssignment(getRuns, runDocId, day, kind, pick, render, overr
   const fields = spec ? { [spec.field]: pick.id } : { note: pick };
   if (override) fields.override = true;
   return saveRunChange(getRuns, runDocId, day, spec ? spec.action : 'setDriverNote', fields,
-    (d) => { if (spec) { d[spec.idKey] = pick.id; d[spec.textKey] = pick.id ? pick.text : ''; } else d.driverNotes = pick; }, render);
+    (d) => { if (spec) { d[spec.idKey] = /^__CVG__:/.test(pick.id) ? '' : pick.id; d[spec.textKey] = pick.id ? pick.text : ''; } else d.driverNotes = pick; }, render);
 }
 
 // New load order for one load date: the rows in their new order. Shown at once, saved as one call.

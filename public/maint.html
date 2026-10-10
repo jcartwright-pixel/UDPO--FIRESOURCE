@@ -23,10 +23,10 @@
     <div class="head">
       <div class="title"><h1>Fleet &amp; Maintenance</h1><small>Equipment › Maintenance</small></div>
       <div class="actions tiles hub-tiles">
-        <a class="button" id="to-garage-station" href="garage.html"><img src="img/library/maintenance-tractor-v1-560.webp" alt=""><span>Garage Station</span></a>
+        <a class="button" id="to-garage-station" href="soon.html?what=garage-station"><img src="img/library/maintenance-tractor-v1-560.webp" alt=""><span>Garage Station</span></a>
         <a class="button" href="fleet.html"><img src="img/library/maintenance-trailer-v1-560.webp" alt=""><span>Fleet Service</span></a>
         <a class="button" href="otr.html"><img src="img/library/distribution-truck-v1-560.webp" alt=""><span>Over the Road</span></a>
-        <a class="button" id="to-trucks-today" href="#"><img src="img/library/distribution-truck-v1-560.webp" alt=""><span>Trucks Today</span></a>
+        <a class="button" id="to-trucks-today" href="soon.html?what=trucks-today"><img src="img/library/distribution-truck-v1-560.webp" alt=""><span>Trucks Today</span></a>
         <a class="button" href="equipment.html"><img src="img/library/maintenance-tractor-v1-560.webp" alt=""><span>Equipment</span></a>
       </div>
     </div>
@@ -48,7 +48,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, CURRENT_APP } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // Joe 10/10: the current app's Fleet & Maintenance hub, where the maintenance side starts. Each list is read once
@@ -59,8 +59,6 @@
     const data = { maintenance: [], workOrders: [], equipment: [], fleetSetup: [], odometers: [] };
     const now = () => Date.now();
     const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
-    document.getElementById('to-trucks-today').href = CURRENT_APP + 'trucks-today';
-    document.getElementById('to-garage-station').href = CURRENT_APP + 'garage-station';
 
     function units() {
       const seen = {};

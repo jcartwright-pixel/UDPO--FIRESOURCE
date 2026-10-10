@@ -712,6 +712,42 @@ async function noScroll(page) {
     assert.deepEqual(adm.errors, []);
     await adm.close();
     results.push('Dispatch Administration: 15 cards from the Route Editor button; Driver Weekly Template opens in the same window');
+    // Joe 10/10: Print Layouts took him into the old program. Every Dispatch Administration card opens a new-app screen; Operational
+    // Assignments, Print Layouts and Dispatch Settings are built here, and an active assignment is a driver choice on Daily.
+    const ops = await openPage(browser, 1920, 950, '/admin.html?testEmail=manager.test@uniteddairy.com');
+    await ops.waitForSelector('.admin-card');
+    assert.deepEqual(await ops.$$eval('.admin-card', a => a.filter(x => !/^[a-z]+\.html/.test(x.getAttribute('href')) || x.textContent.includes('current app')).map(x => x.textContent)), [], 'no card leaves the new app');
+    for (const [name, page, sel] of [['Print Layouts', 'print', '#grid .admin-card'], ['Dispatch Settings', 'settings', '#owners tr'], ['Operational Assignments', 'ops', '#rows tr[data-name]']]) {
+      await ops.goto(ops.url().replace(/\/[a-z]+\.html.*/, '/admin.html?testEmail=manager.test@uniteddairy.com'));
+      await ops.waitForSelector('.admin-card');
+      await Promise.all([ops.waitForURL(new RegExp('/' + page + '\\.html')), ops.click('.admin-card:has-text("' + name + '")')]);
+      await ops.waitForSelector(sel);
+    }
+    assert.deepEqual(await ops.$$eval('#rows tr[data-name]', r => r.map(x => x.dataset.name)), ['Carrier', 'Fairmont', 'Marietta', 'Martins Ferry']);
+    await ops.waitForFunction(() => !document.getElementById('add').disabled);
+    await ops.click('#add');
+    await ops.fill('#new-name', 'Beckley');
+    await ops.press('#new-name', 'Enter');
+    await ops.waitForSelector('#rows tr[data-name="Beckley"]');
+    await ops.click('#rows tr[data-name="Marietta"] [data-active]');
+    await ops.waitForSelector('#rows tr.off[data-name="Marietta"]');
+    await ops.waitForFunction(() => document.querySelector('#rows tr[data-name="Beckley"] td.muted').textContent.includes('manager'), null, { timeout: 8000 });
+    assert.deepEqual(ops.errors, []);
+    const cvgDaily = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await cvgDaily.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="driver"]');
+    await cvgDaily.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="driver"]');
+    const cvg = await cvgDaily.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker optgroup[label="Other CVG / Carriers"] option', o => o.map(x => x.textContent));
+    assert.deepEqual(cvg, ['Carrier', 'Fairmont', 'Martins Ferry', 'Beckley'], 'active assignments are driver choices: ' + cvg.join(', '));
+    await cvgDaily.keyboard.press('Escape');
+    assert.deepEqual(cvgDaily.errors, []);
+    await cvgDaily.close();
+    await ops.goto(ops.url().replace(/\/[a-z]+\.html.*/, '/maint.html?testEmail=manager.test@uniteddairy.com'));
+    await ops.waitForSelector('#to-garage-station');
+    await Promise.all([ops.waitForURL(/soon\.html\?what=garage-station/), ops.click('#to-garage-station')]);
+    await ops.waitForFunction(() => document.getElementById('title').textContent === 'Garage Station');
+    assert.deepEqual(ops.errors, []);
+    await ops.close();
+    results.push('Dispatch Administration: no card leaves the new app; Print Layouts, Dispatch Settings and Operational Assignments open here; a manager added Beckley and turned Marietta off, and Daily offers the active ones under Other CVG / Carriers; Garage Station opens a being-built page inside the new app');
     // Joe 10/10: Daily and Weekly each have a tile to the other (same window, same week); the menu's Driver Assignment Board opens Weekly at the board.
     const hop = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await hop.waitForSelector('#go-weekly[href*="week=2026-10-06"]');
@@ -820,7 +856,7 @@ async function noScroll(page) {
     await mp.waitForSelector('.side-flyouts .flyout', { state: 'attached' });
     const menu = await mp.$$eval('.side-flyouts .flyout', fs => fs.map(f => [f.querySelector('.flyout-title').textContent, [...f.querySelectorAll('a')].map(a => a.textContent.trim())]));
     const sec = (name) => (menu.find(m => m[0] === name) || [name, []])[1];
-    assert.deepEqual(sec('Administration'), ['Dispatch Administration']);
+    assert.deepEqual(sec('Administration'), ['Dispatch Administration', 'Operational Assignments', 'Print Layouts', 'Dispatch Settings']);
     assert.equal(sec('Dispatch').indexOf('Dispatch Administration'), -1, 'not under Dispatch');
     assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template') >= 0).map(m => m[0]), ['Drivers']);
     assert.equal(sec('Equipment')[0], 'Fleet & Maintenance', 'the maintenance side starts on the hub');

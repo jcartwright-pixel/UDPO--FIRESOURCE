@@ -1047,3 +1047,24 @@ tr.issue-more p { margin: 6px 0; font-size: 16px; white-space: pre-wrap; }
 table.old-issues thead th { background: var(--ud-blue); }
 .kind-tabs button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); }
 .kind-tabs button[aria-selected="true"] b { color: var(--ud-blue-dark); }
+
+/* Operational Assignments, Dispatch Settings and "being built" pages (Joe 10/10: nothing opens the old program). */
+.ops-note { margin: 0 16px 10px; color: #44515e; font-size: 15px; }
+.ops-sheet { max-width: 980px; }
+table.ops th, table.ops td { text-align: center; height: 48px; border-bottom: 1px solid var(--line); }
+table.ops thead th { background: var(--ud-blue); color: #fff; }
+table.ops td.strong { font-weight: 800; font-size: 17px; }
+table.ops td.muted { color: var(--muted); font-size: 14px; }
+table.ops tr.off td.strong { color: var(--muted); text-decoration: line-through; }
+table.ops input.ops-seq { width: 80px; height: 34px; text-align: center; font-size: 16px; }
+table.ops tr.adding input#new-name { width: 90%; }
+table.ops button.toggle { min-width: 70px; }
+.set-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 0 16px 16px; }
+.set-card, .soon-card { background: #fff; border: 1px solid #d5e1eb; border-top: 4px solid var(--ud-blue); border-radius: 14px; padding: 14px 18px; }
+.set-card h2, .soon-card h2 { margin: 0 0 10px; font-size: 18px; color: #123f70; }
+table.set th, table.set td { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 15px; }
+table.set tbody th { width: 34%; color: #123f70; }
+table.set thead th { background: var(--ud-blue); color: #fff; }
+.soon-card { margin: 0 16px; max-width: 760px; }
+.soon-card p { font-size: 16px; line-height: 1.45; }
+@media (max-width: 1100px) { .set-grid { grid-template-columns: 1fr; } }

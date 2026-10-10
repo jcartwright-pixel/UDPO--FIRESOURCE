@@ -39,6 +39,7 @@ service cloud.firestore {
     match /otrMonthRuns/{id} { allow read: if activeUser(); }
     match /plantEvents/{id} { allow read: if activeUser(); }
     match /scorecard/{id} { allow read: if activeUser(); }
+    match /opsAssignments/{id} { allow read: if activeUser(); }
     // The plant side: the plant journal, pickups, and the wash and returns lists.
     match /plantJournal/{id} { allow read: if activeUser(); }
     match /pickups/{id} { allow read: if activeUser(); }

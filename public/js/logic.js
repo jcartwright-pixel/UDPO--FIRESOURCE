@@ -446,6 +446,19 @@
   }
   // Who leases a truck (the fleet list's LEASE column, kept in the unit's notes), or '' for one we own. A driver's short
   // number is the end of one unit's number (876 = 223876) when exactly one unit ends that way, as the current app's lessor routing.
+  // Operational Assignments (the current app's DESKTOP DISPATCH OPERATIONAL ASSIGNMENTS): non-driver coverage offered under
+  // "Other CVG / Carriers" in the driver lists. The current app's four start the list until someone changes them.
+  var OPS_DEFAULTS = ['Carrier', 'Fairmont', 'Marietta', 'Martins Ferry'];
+  function opsKey(name) { return String(name || '').trim().replace(/\s+/g, ' ').toUpperCase(); }
+  function opsAssignments(docs) {
+    var by = {};
+    (docs || []).forEach(function (d) { var k = opsKey(d && d.assignment); if (k) by[k] = d; });
+    OPS_DEFAULTS.forEach(function (n, i) { var k = opsKey(n); if (!by[k]) by[k] = { assignment: n, active: true, sequence: i + 1, builtIn: true }; });
+    return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) {
+      return (Number(a.sequence) || 9999) - (Number(b.sequence) || 9999) || String(a.assignment).localeCompare(String(b.assignment));
+    });
+  }
+
   function unitLessor(units, unitText) {
     var key = issueUnitKey(unitText), list = units || [];
     var hit = list.filter(function (u) { return issueUnitKey(u.unit) === key; });
@@ -790,7 +803,7 @@
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers,
-    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, runWindow: runWindow, unitConflicts: unitConflicts,
+    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
