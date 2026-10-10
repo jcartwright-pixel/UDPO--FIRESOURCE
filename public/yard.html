@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yard Checks · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page yard-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Yard Checks</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Live Trailer Monitoring · Timestamped Checks</span><h1>Yard Checks</h1></div>
+      <div class="tabs" id="panes" role="tablist" aria-label="Yard view"><button type="button" data-pane="current">Active Yard Queue</button><button type="button" data-pane="history">24-Hour History</button></div>
+      <div class="dayname" id="dayname"></div>
+      <div class="hstats" id="hstats"></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="yd-bar" id="bar-current">
+        <img class="yd-icon" src="img/library/yard-checks.webp" alt="">
+        <div><h2>Active Yard Queue</h2><p>Trailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.</p></div>
+        <span class="yd-cycle"><b>2-hour recheck cycle</b> · Trailers past dispatch time will not reappear.</span>
+        <button type="button" class="yd-refresh" id="refresh">&#8635; Refresh</button>
+      </div>
+      <div class="yd-bar" id="bar-history" hidden>
+        <img class="yd-icon" src="img/library/yard-checks.webp" alt="">
+        <div><h2>24-Hour History</h2><p>All recorded yard checks with timestamps.</p></div>
+        <span class="yd-grow"></span>
+        <button type="button" class="yd-refresh" id="refresh-history">&#8635; Refresh History</button>
+      </div>
+      <div class="sheet scroll-list" id="pane-current">
+        <table class="loadout yd-table">
+          <colgroup><col style="width:11%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:23%"><col style="width:11%"><col style="width:11%"><col style="width:14%"></colgroup>
+          <thead><tr><th><span class="l">Trailer #</span><span class="s">Trailer</span></th><th><span class="l">Actual Temp (°F)</span><span class="s">Temp °F</span></th><th><span class="l">Temp Set Point (°F)</span><span class="s">Set °F</span></th><th><span class="l">Fuel Level</span><span class="s">Fuel</span></th><th>Notes</th><th>Last Check</th><th>Next Recheck</th><th>Action</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="sheet scroll-list" id="pane-history" hidden>
+        <table class="loadout yd-table yd-history">
+          <colgroup><col style="width:15%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:11%"><col style="width:28%"><col style="width:15%"></colgroup>
+          <thead><tr><th>Date / Time</th><th>Trailer #</th><th>Temp (°F)</th><th>Set Point (°F)</th><th>Fuel Level</th><th>Notes</th><th>Recorded By / Status</th></tr></thead>
+          <tbody id="history"></tbody>
+        </table>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic, U = window.UDPlant;
+    const FUEL = [['', ''], ['FULL', 'FULL'], ['3/4', '3/4'], ['1/2', '1/2'], ['EMPTY', 'EMPTY']];
+    const params = new URLSearchParams(location.search);
+    const today = () => L.operatingDay(new Date());
+    let date = today(), pane = params.get('view') === 'history' ? 'history' : 'current';
+    let runs = [], journal = [], person = null, app = {};
+    const drafts = {};          // trailer -> what was typed and not recorded yet
+    const pending = [];         // checks pressed and not back from the database yet (shown at once)
+    const armed = {};           // trailer -> Left Yard pressed once, waiting for Confirm Left
+    const unsubs = [];
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
+    const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : String(v || ''); };
+    const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
+    const STATUS = { COMPLETE: 'Recorded', RECORDED: 'Recorded', DEPARTED: 'Left Yard' };
+
+    function all() { return journal.concat(pending); }
+    function queue() { return U.yardQueue(runs, all(), date, Date.now()); }
+
+    // A re-draw while someone is typing in the table waits until they leave the box.
+    let waiting = false;
+    function typing() { const a = document.activeElement; return !!(a && a.closest && a.closest('#rows') && /INPUT|SELECT/.test(a.tagName)); }
+    function render() {
+      if (typing()) { waiting = true; return; }
+      waiting = false;
+      const q = queue(), ck = canSave(), hist = U.yardHistory(all(), date, Date.now());
+      const latest = hist.find(h => h.status !== 'DEPARTED');
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase();
+      document.getElementById('hstats').innerHTML = [['Active', q.rows.length + q.locked.length, ''], ['Due', q.rows.length, q.rows.length ? 'warn' : ''], ['Checked', q.locked.length, q.locked.length ? 'good' : ''],
+        ['Latest', latest ? clock(latest.recordedAt) : 'None', '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + l + '</span></div>').join('');
+      document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
+      ['current', 'history'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; });
+      document.getElementById('rows').innerHTML = q.rows.map(x => {
+        const d = drafts[x.trailer] || {}, v = (k) => d[k] !== undefined ? d[k] : x[k];
+        const next = x.minutesUntilDue > 0 ? 'Due in ' + x.minutesUntilDue + ' min' : 'Due now';
+        const last = x.recordedAt ? escapeHtml(clock(x.recordedAt)) + ' · ' + escapeHtml(initials(x.recordedBy)) : '—';
+        const dis = ck ? '' : ' disabled';
+        return '<tr data-trailer="' + escapeHtml(x.trailer) + '" data-route="' + escapeHtml(x.routeRun) + '"><td class="yd-trailer"><b>' + escapeHtml(x.trailer) + '</b><small>' + escapeHtml(next) + '</small></td>' +
+          '<td><input class="yd-temp" data-k="temperature" inputmode="decimal" placeholder="Temp" value="' + escapeHtml(v('temperature')) + '"' + dis + '></td>' +
+          '<td><input class="yd-set" value="' + escapeHtml(x.setPoint) + '" readonly tabindex="-1"></td>' +
+          '<td><select data-k="fuelLevel"' + dis + '>' + FUEL.map(([val, label]) => '<option value="' + val + '"' + (v('fuelLevel') === val ? ' selected' : '') + '>' + label + '</option>').join('') + '</select></td>' +
+          '<td><input class="yd-notes" data-k="notes" placeholder="Add notes (optional)…" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></td>' +
+          '<td class="yd-last">' + last + '</td><td class="yd-next' + (x.minutesUntilDue === 0 ? ' overdue' : '') + '">' + escapeHtml(next) + '<small>' + escapeHtml(x.routeRun) + '</small></td>' +
+          '<td class="yd-act">' + (ck ? '<button type="button" class="yd-record" data-record>Record</button><button type="button" class="yd-left" data-left' + (armed[x.trailer] ? ' data-armed="true">Confirm Left' : ' title="Trailer has left the yard">Left Yard') + '</button>' : '<span class="pill">View only</span>') + '</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="empty">No loaded trailers are currently due for a yard check.</td></tr>';
+      document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="yd-trailer"><b>' + escapeHtml(h.trailer) + '</b></td><td>' + escapeHtml(h.temperature) + '</td><td>' + escapeHtml(h.setPoint) + '</td>' +
+        '<td>' + escapeHtml(h.fuelLevel) + '</td><td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + ' <span class="yd-status' + (h.status === 'DEPARTED' ? ' left' : '') + '">' + escapeHtml(STATUS[h.status] || h.status) + '</span></td></tr>').join('') ||
+        '<tr><td colspan="7" class="empty">No yard checks in the last 24 hours.</td></tr>';
+      document.getElementById('foot').textContent = pane === 'current'
+        ? q.rows.length + ' trailer' + (q.rows.length === 1 ? '' : 's') + ' due, ' + q.locked.length + ' checked in the last 2 hours. ' + (ck ? 'Record saves the check and locks the trailer for 2 hours; Left Yard takes it off the list.' : 'View only.')
+        : hist.length + ' record' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+    }
+
+    const rowsEl = document.getElementById('rows');
+    rowsEl.addEventListener('input', e => {
+      const tr = e.target.closest('tr'), k = e.target.dataset.k;
+      if (!tr || !k) return;
+      (drafts[tr.dataset.trailer] = drafts[tr.dataset.trailer] || {})[k] = e.target.value;
+    });
+    rowsEl.addEventListener('change', e => { const tr = e.target.closest('tr'), k = e.target.dataset.k; if (tr && k) (drafts[tr.dataset.trailer] = drafts[tr.dataset.trailer] || {})[k] = e.target.value; });
+    rowsEl.addEventListener('focusout', () => setTimeout(() => { if (waiting && !typing()) render(); }, 0));
+
+    // Record and Left Yard show at once; the database copy replaces them when it arrives.
+    async function send(trailer, routeRun, departed) {
+      const d = drafts[trailer] || {}, x = queue().rows.find(r => r.trailer === trailer) || {};
+      const fields = departed ? { date, trailer, routeRun, departed: true }
+        : { date, trailer, routeRun, temperature: d.temperature !== undefined ? d.temperature : x.temperature || '', setPoint: x.setPoint || '', fuelLevel: d.fuelLevel !== undefined ? d.fuelLevel : x.fuelLevel || '', notes: d.notes !== undefined ? d.notes : x.notes || '' };
+      const mine = { type: 'YARD_CHECK', date, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, run: routeRun,
+        payload: departed ? { route: routeRun, run: routeRun, trailer, notes: 'Left the yard', status: 'DEPARTED' } : Object.assign({ route: routeRun, run: routeRun, status: 'COMPLETE' }, fields) };
+      pending.push(mine);
+      delete drafts[trailer];
+      delete armed[trailer];
+      render();
+      try {
+        await save('saveYardCheck', fields);
+        showError('');
+        setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); render(); }, 1500);
+      } catch (e) {
+        const i = pending.indexOf(mine);
+        if (i >= 0) pending.splice(i, 1);
+        if (!departed) drafts[trailer] = { temperature: fields.temperature, fuelLevel: fields.fuelLevel, notes: fields.notes };
+        showError((departed ? 'Left Yard ' : 'Yard check ') + trailer + ': ' + (e.message || e));
+        render();
+      }
+    }
+    rowsEl.addEventListener('click', e => {
+      const b = e.target.closest('button'), tr = b && b.closest('tr');
+      if (!b || !tr) return;
+      const trailer = tr.dataset.trailer, route = tr.dataset.route;
+      if (b.hasAttribute('data-record')) { send(trailer, route, false); return; }
+      if (!b.hasAttribute('data-left')) return;
+      // Left Yard asks once more ("Confirm Left") for 6 seconds, as on the current app.
+      if (!armed[trailer]) { armed[trailer] = true; render(); setTimeout(() => { if (armed[trailer]) { delete armed[trailer]; render(); } }, 6000); return; }
+      send(trailer, route, true);
+    });
+    document.getElementById('panes').addEventListener('click', e => {
+      const b = e.target.closest('[data-pane]');
+      if (!b) return;
+      pane = b.dataset.pane;
+      history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
+      render();
+    });
+    document.getElementById('refresh').onclick = () => render();
+    document.getElementById('refresh-history').onclick = () => render();
+
+    let db = null;
+    function watch() {
+      while (unsubs.length) unsubs.pop()();
+      // The loads of the week before, this week and the week after (the current app's three Live weeks), and two days of checks.
+      const weeks = [...new Set([L.addDays(date, -6), date, L.addDays(date, 6)].map(L.weekStart))];
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read the loads: ' + e.message)));
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { journal = s.docs.map(d => d.data()); render(); }, e => showError('Could not read the yard checks: ' + e.message)));
+    }
+
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      watch();
+      // Due times count down and trailers leave at their dispatch time, so the list is redrawn every 30 seconds.
+      setInterval(() => { const t = today(); if (t !== date) { date = t; watch(); } render(); }, 30000);
+      render();
+    });
+  </script>
+</body>
+</html>

@@ -166,3 +166,49 @@ test('scheduler: Save Load checks what the current app checks', () => {
   assert.throws(() => P.validateSchedule({ lane: 'SHIPPING', op: 'addSupplier', name: 'X' }, SaveError), /Suppliers are on Receiving/);
   assert.throws(() => P.validateSchedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'X', code: 'TOO-LONG-1' }, SaveError), /up to 8/);
 });
+
+test('yard checks: a loaded trailer is on the yard until its dispatch time; a check locks it for 2 hours; Left Yard takes the load off', () => {
+  const at = (s) => Date.parse(s);
+  // Wednesday 10/7 loads: Jersey (done 11:33 AM, dispatch 1 PM, delivers Thursday), an early Walmart load for Saturday,
+  // a waiting load (not loaded), and a load with no trailer.
+  const runs = [{ id: 'w1', weekStart: '2026-10-04', sheetRow: 7, route: '852', run: 'JERSEY 1', days: {
+    thu: { loadDate: '2026-10-07', deliveryDate: '2026-10-08', trailer: '901', dispatchTime: 13 * 60, completeTime: '2026-10-07T15:33:00Z' },
+    sat: { loadDate: '2026-10-07', deliveryDate: '2026-10-10', trailer: 'T-955', dispatchTime: 3 * 60, loadStatus: 'COMPLETE' } } },
+  { id: 'w2', weekStart: '2026-10-04', sheetRow: 8, route: '805', run: 'UT DSD MILK', days: {
+    thu: { loadDate: '2026-10-07', deliveryDate: '2026-10-08', trailer: 'T-960', dispatchTime: 2 * 60 },
+    fri: { loadDate: '2026-10-07', deliveryDate: '2026-10-09', trailer: '', dispatchTime: 2 * 60, loadStatus: 'COMPLETE' } } }];
+  const holds = R.yardHolds(runs, '2026-10-07');
+  assert.deepEqual(holds.map(h => h.trailer), ['T-901', 'T-955']);
+  // Wednesday noon: both on the yard, never checked, due now; at 1 PM Jersey has left.
+  let q = R.yardQueue(runs, [], '2026-10-07', at('2026-10-07T16:00:00Z'));
+  assert.deepEqual(q.rows.map(r => [r.trailer, r.minutesUntilDue, r.routeRun]), [['T-901', 0, 'JERSEY 1'], ['T-955', 0, 'JERSEY 1']]);
+  q = R.yardQueue(runs, [], '2026-10-07', at('2026-10-07T17:05:00Z'));
+  assert.deepEqual(q.rows.map(r => r.trailer), ['T-955']);
+  // The early Saturday load waits until 3 AM Saturday (the operating day before its departure date), so it is still there Friday.
+  assert.equal(R.yardQueue(runs, [], '2026-10-09', at('2026-10-09T20:00:00Z')).rows.length, 1);
+  assert.equal(R.yardQueue(runs, [], '2026-10-09', at('2026-10-10T07:10:00Z')).rows.length, 0);
+  // A check at 12:10 PM locks T-955 for 2 hours; it is due again after.
+  const check = { type: 'YARD_CHECK', date: '2026-10-07', recordedAt: '2026-10-07T16:10:00Z', recordedBy: 'yard@uniteddairy.com',
+    payload: { trailer: 'T-955', temperature: '34', fuelLevel: '3/4', notes: 'ok', status: 'COMPLETE' } };
+  q = R.yardQueue(runs, [check], '2026-10-07', at('2026-10-07T17:10:00Z'));
+  assert.deepEqual([q.rows.length, q.locked.length, q.locked[0].minutesUntilDue, q.locked[0].temperature, q.locked[0].fuelLevel], [0, 1, 60, '34', '3/4']);
+  q = R.yardQueue(runs, [check], '2026-10-08', at('2026-10-08T16:20:00Z'));
+  assert.deepEqual([q.rows.length, q.rows[0].recordedAt, q.rows[0].temperature], [1, '2026-10-07T16:10:00Z', '34']);
+  assert.equal(R.yardLockLeft([check], '2026-10-07', '955', at('2026-10-07T17:10:00Z')), 60);
+  assert.equal(R.yardLockLeft([check], '2026-10-07', '955', at('2026-10-07T18:11:00Z')), 0);
+  // Left Yard (trailer + run) takes that load off.
+  const left = { type: 'YARD_CHECK', date: '2026-10-08', recordedAt: '2026-10-08T12:00:00Z', payload: { trailer: 'T-955', run: 'JERSEY 1', notes: 'Left the yard', status: 'DEPARTED' } };
+  assert.equal(R.yardQueue(runs, [check, left], '2026-10-08', at('2026-10-08T16:20:00Z')).rows.length, 0);
+  // History: both, newest first, within 24 hours.
+  assert.deepEqual(R.yardHistory([check, left], '2026-10-08', at('2026-10-08T16:20:00Z')).map(h => h.status), ['DEPARTED']);
+  assert.deepEqual(R.yardHistory([check, left], '2026-10-08', at('2026-10-08T12:20:00Z')).map(h => h.status), ['DEPARTED', 'COMPLETE']);
+  assert.equal(R.yardTrailer(' t 961 '), 'T-961');
+  assert.equal(R.wallMinutes('10/7/2026 11:33:00 AM') % 1440, 11 * 60 + 33);
+});
+
+test('yard checks save: trailer required, fuel Full, 3/4, 1/2 or Empty', () => {
+  assert.throws(() => P.validateYard({ date: '2026-10-07', trailer: '' }, SaveError), /Trailer is required/);
+  assert.throws(() => P.validateYard({ date: '2026-10-07', trailer: '955', fuelLevel: '1/4' }, SaveError), /Fuel level/);
+  const ok = P.validateYard({ date: '2026-10-07', trailer: '955', fuelLevel: 'full', temperature: '34', notes: 'x'.repeat(900) }, SaveError);
+  assert.deepEqual([ok.trailer, ok.fuelLevel, ok.notes.length, ok.departed], ['T-955', 'FULL', 800, false]);
+});

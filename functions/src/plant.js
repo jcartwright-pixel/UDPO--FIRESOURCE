@@ -491,6 +491,40 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
   return result;
 }
 
-module.exports = { PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+/* ---------- Yard Checks ---------- */
+
+// saveYardCheck: Record (temperature, fuel, notes) or Left Yard for a loaded trailer, as desktopUiSavePlantYardCheckV5063.
+// A trailer checked less than 2 hours ago that operating day is refused; Left Yard is always taken.
+function validateYard(input, SaveError) {
+  const out = { date: text(input.date), trailer: R.yardTrailer(input.trailer).slice(0, 30), departed: input.departed === true, routeRun: text(input.routeRun).slice(0, 120) };
+  if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+  if (!out.trailer) throw new SaveError('BAD_REQUEST', 'Trailer is required.');
+  out.temperature = text(input.temperature).slice(0, 30);
+  out.setPoint = text(input.setPoint).slice(0, 30);
+  out.fuelLevel = text(input.fuelLevel).toUpperCase();
+  if (out.fuelLevel && R.FUEL_LEVELS.indexOf(out.fuelLevel) < 0) throw new SaveError('BAD_REQUEST', 'Fuel level must be Full, 3/4, 1/2, or Empty.');
+  out.notes = text(input.notes).slice(0, 800);
+  return out;
+}
+
+async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const journal = db.collection('plantJournal');
+  if (!req.departed) {
+    const same = (await tx.get(journal.where('date', '==', req.date))).docs.map(d => d.data());
+    const left = R.yardLockLeft(same, req.date, req.trailer, Date.parse(stamp));
+    if (left) throw new SaveError('CONFLICT', 'Trailer ' + req.trailer + ' was already checked. It can be checked again in ' + left + ' minutes.');
+  }
+  const id = 'YARD_CHECK_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+  const payload = req.departed ? { route: req.routeRun, run: req.routeRun, trailer: req.trailer, notes: 'Left the yard', status: 'DEPARTED' }
+    : { route: req.routeRun, run: req.routeRun, trailer: req.trailer, temperature: req.temperature, setPoint: req.setPoint, fuelLevel: req.fuelLevel, notes: req.notes, status: 'COMPLETE' };
+  tx.set(journal.doc(id), { recordId: 'YARD-' + req.requestId.slice(0, 40), type: 'YARD_CHECK', date: req.date, status: payload.status, route: req.routeRun, run: req.routeRun, trailer: req.trailer,
+    temperature: payload.temperature || '', notes: payload.notes, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  const result = { ok: true, requestId: req.requestId, trailer: req.trailer, status: payload.status, recordedAt: stamp,
+    message: req.departed ? 'Trailer ' + req.trailer + ' marked as left the yard.' : 'Yard check recorded. Trailer is locked for 2 hours.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, trailer: req.trailer, after: payload, result });
+  return result;
+}
+
+module.exports = { validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

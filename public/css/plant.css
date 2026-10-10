@@ -255,3 +255,57 @@
   .sched-page .hstats b { font-size: 18px; }
   .sched-page .hstats span { font-size: 10px; }
 }
+
+/* ---------- Yard Checks (yard.html) ---------- */
+.yard-page .yd-bar { display: flex; align-items: center; gap: 14px; margin: 0 16px 10px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; }
+.yard-page .yd-bar[hidden] { display: none; }
+.yard-page .yd-icon { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; flex: none; }
+.yard-page .yd-bar h2 { margin: 0; font-size: 20px; color: var(--ud-blue-dark); }
+.yard-page .yd-bar p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+.yard-page .yd-cycle { margin-left: auto; background: #edf6ff; border-radius: 9px; padding: 9px 13px; font-size: 13px; color: var(--ud-blue); }
+.yard-page .yd-grow { margin-left: auto; }
+.yard-page .yd-refresh { min-height: 38px; border: 0; border-radius: 9px; background: #e6f1ff; color: var(--ud-blue); font: inherit; font-weight: 800; padding: 0 15px; cursor: pointer; }
+.yard-page table.yd-table { width: 100%; table-layout: fixed; }
+.yard-page table.yd-table td { height: 52px; }
+.yard-page table.yd-table td input, .yard-page table.yd-table td select { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 7px; font: inherit; color: var(--ink); background: #fff; padding: 0 8px; box-sizing: border-box; }
+.yard-page table.yd-table td input.yd-notes { text-align: left; }
+.yard-page table.yd-table td input[readonly] { background: #f1f5f8; color: var(--muted); }
+.yard-page .yd-trailer b { display: block; font-size: 17px; white-space: nowrap; }
+.yard-page .yd-trailer small { display: none; font-size: 12px; color: var(--muted); }
+.yard-page .yd-last { font-weight: 800; white-space: nowrap; }
+.yard-page .yd-next { font-weight: 800; line-height: 1.25; white-space: nowrap; }
+.yard-page .yd-next small { display: block; font-weight: 700; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.yard-page .yd-next.overdue { color: #bf2020; }
+.yard-page .yd-act { white-space: nowrap; }
+.yard-page button.yd-record, .yard-page button.yd-left { height: 34px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; padding: 0 10px; }
+.yard-page button.yd-record { min-width: 84px; border: 0; background: var(--ud-blue); color: #fff; }
+.yard-page button.yd-left { margin-left: 6px; border: 1px solid #9fb3c6; background: #fff; color: var(--ud-blue-dark); }
+.yard-page button.yd-left[data-armed="true"] { background: #fff6e0; border-color: #f0a020; color: #8a4b00; }
+.yard-page .yd-history td.detail { text-align: left; }
+.yard-page th .s { display: none; }
+.yard-page .yd-status { color: var(--runs-ink); font-weight: 800; white-space: nowrap; }
+.yard-page .yd-status::before { content: '● '; font-size: 11px; }
+.yard-page .yd-status.left { color: #8a4b00; }
+@media (max-width: 1500px) { .yard-page .yd-cycle { display: none; } }
+/* Phone (the plant's yard tablet / phone): Trailer, Temp, Set, Fuel, Notes, Action; the due time goes under the trailer. */
+@media (max-width: 760px) {
+  .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .yd-bar p { display: none; }
+  .yard-page table.yd-table:not(.yd-history) col:nth-child(6), .yard-page table.yd-table:not(.yd-history) col:nth-child(7),
+  .yard-page table.yd-table:not(.yd-history) th:nth-child(6), .yard-page table.yd-table:not(.yd-history) th:nth-child(7),
+  .yard-page table.yd-table:not(.yd-history) td:nth-child(6), .yard-page table.yd-table:not(.yd-history) td:nth-child(7) { display: none; }
+  .yard-page .yd-trailer small { display: block; }
+  .yard-page th .l { display: none; } .yard-page th .s { display: inline; }
+  .yard-page .yd-bar { margin: 0 8px 8px; padding: 8px 10px; } .yard-page .yd-bar .yd-icon { display: none; } .yard-page .yd-bar h2 { font-size: 17px; }
+  .yard-page .sheet { margin: 0 8px; }
+  .yard-page table.yd-table:not(.yd-history) col:nth-child(1) { width: 19% !important; } .yard-page table.yd-table:not(.yd-history) col:nth-child(2) { width: 15% !important; }
+  .yard-page table.yd-table:not(.yd-history) col:nth-child(3) { width: 13% !important; } .yard-page table.yd-table:not(.yd-history) col:nth-child(4) { width: 17% !important; }
+  .yard-page table.yd-table:not(.yd-history) col:nth-child(5) { width: 18% !important; } .yard-page table.yd-table:not(.yd-history) col:nth-child(8) { width: 18% !important; }
+  .yard-page table.yd-table th { font-size: 11px; padding: 6px 2px; white-space: normal; }
+  .yard-page table.yd-table td { padding: 4px 2px; height: auto; }
+  .yard-page table.yd-table td input, .yard-page table.yd-table td select { height: 44px; padding: 0 3px; font-size: 14px; }
+  .yard-page .yd-trailer b { font-size: 14px; }
+  .yard-page .yd-trailer small { font-size: 10px; white-space: normal; }
+  .yard-page .yd-act button { display: block; width: 100%; min-width: 0; margin: 2px 0; padding: 0 2px; height: 40px; font-size: 12px; }
+  .yard-page .yd-history col:nth-child(4), .yard-page .yd-history th:nth-child(4), .yard-page .yd-history td:nth-child(4) { display: none; }
+  .yard-page table.yd-history th, .yard-page table.yd-history td { font-size: 12px; }
+}
