@@ -929,9 +929,24 @@ td.eq-day span { display: block; white-space: nowrap; }
 .actions.tiles { flex-wrap: nowrap; align-items: center; gap: 6px; }
 .actions.tiles > button, .actions.tiles > a.button {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
-  width: 92px; min-width: 92px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px;
+  width: auto; min-width: 92px; max-width: 116px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px;
   white-space: normal; line-height: 1.12; font-size: 13px; font-weight: 800; text-align: center; overflow-wrap: normal; hyphens: none;
 }
-@media (max-width: 1500px) { .actions.tiles > button, .actions.tiles > a.button { width: 82px; min-width: 82px; font-size: 12px; } }
+@media (max-width: 1500px) { .actions.tiles > button, .actions.tiles > a.button { min-width: 82px; font-size: 12px; } }
 .day-table input.dcell::placeholder { color: #9aa7b4; font-style: italic; font-weight: 400; }
 .day-table td.day-notes { min-width: 160px; }
+
+/* Driver Weekly Template laid out like the current app's (Joe 10/10, old-screen picture): relief drivers first, names bold on
+   the left, section lines on the left, every day shows + Add Run and Copy / Paste / Paste + Add, Save Template green top right. */
+.template-page .tpl-bar { align-items: center; gap: 10px; }
+.template-page .tpl-about { flex: 1; color: #4a5a6a; font-size: 15px; }
+.template-page button.go { background: #1f7a3a; border-color: #1f7a3a; color: #fff; font-weight: 800; }
+.template-page button.go:disabled { background: #8fbf9e; border-color: #8fbf9e; color: #fff; }
+.template-page .tpl tr.tpl-group td { text-align: left; text-transform: uppercase; letter-spacing: .04em; font-size: 15px; }
+.template-page .tpl td.tpl-name { text-align: left; font-weight: 900; font-size: 16px; color: #14202c; padding: 10px 8px; }
+.template-page .tcell.on { background: transparent; }
+.template-page .tcell select { height: 36px; font-size: 16px; }
+.template-page .tcell .tpl-add { display: block; margin: 7px 0 4px; padding: 0; border: 0; background: none; color: #175b92; font-weight: 800; font-size: 13px; cursor: pointer; }
+.template-page .tcell .tpl-add:disabled { color: #9aa9b7; cursor: default; }
+.template-page .tpl-tools, .template-page .tcell:hover .tpl-tools { visibility: visible; display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 4px; margin-top: 4px; }
+.template-page .tpl-tools .mini { font-size: 12px; padding: 6px 2px; white-space: normal; line-height: 1.1; color: #175b92; }

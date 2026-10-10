@@ -390,6 +390,50 @@
       .filter(function (s) { return s && !/^Route Day\b/i.test(s); }).join(' | ');
   }
 
+  // Route hours as typed (12, 9.5, 9:30) to minutes, or null.
+  function hoursMinutes(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number') return isFinite(value) && value > 0 ? Math.round(value * 60) : null;
+    var s = String(value).trim(), m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (m) return +m[1] * 60 + +m[2] || null;
+    var n = Number(s);
+    return isFinite(n) && n > 0 ? Math.round(n * 60) : null;
+  }
+  // One run's time on the road that day: start = its dispatch time, end = start + route hours (+1 day past midnight).
+  function runWindow(row, hoursFor) {
+    var start = row.dispatchTime !== null && row.dispatchTime !== undefined ? row.dispatchTime : row.startTime;
+    start = typeof start === 'number' ? start : minutesOfDay(start);
+    var hours = hoursMinutes(row.routeHours);
+    if (hours === null && hoursFor) hours = hoursMinutes(hoursFor(row));
+    var end = start !== null && start !== undefined && hours !== null ? start + hours : null;
+    if (start === undefined) start = null;
+    if (end !== null && end <= start) end += 1440;
+    return { start: start, end: end };
+  }
+  /*
+   * Joe 10/10: the truck and trailer lists follow the current app's availability rule (039_V740 udpoV740ResourceBusy_,
+   * 047_V744 optionsFor): a unit is left out when another run that delivery day has it and their times on the road
+   * overlap (15 minutes' leeway at the turn), or when that run's return is not known. Returns {unitId: reason} for one
+   * row, e.g. "ON ROAD UNTIL 2:00 PM (802)". kind: 'truck' | 'trailer'. hoursFor(row) gives Route Master hours when the
+   * Live row has none.
+   */
+  function unitConflicts(rows, target, kind, hoursFor) {
+    var key = kind === 'truck' ? 'truckId' : 'trailerId', out = {}, mine = runWindow(target, hoursFor), tol = 15;
+    rows.forEach(function (r) {
+      if (r === target || r.off || r.deliveryDate !== target.deliveryDate || !r[key] || out[r[key]]) return;
+      var w = runWindow(r, hoursFor), busy;
+      if (w.start === null || w.end === null) busy = w.start === null || mine.end === null || mine.end > w.start;
+      else busy = mine.start !== null && mine.end !== null && w.start < mine.end - tol && mine.start < w.end - tol;
+      if (busy) out[r[key]] = 'ON ROAD' + (w.end !== null ? ' UNTIL ' + timeText(w.end % 1440) : ' \u2014 RETURN UNKNOWN') + ' (' + r.route + ')';
+    });
+    return out;
+  }
+
+  // A leased unit (the fleet sync writes "Lease: Idealease" into the External Fleet text): not on Fleet Service (Joe 10/10).
+  function unitLeased(unit) {
+    return /External Fleet:[\s\S]*\bLease:\s*\S/i.test(String(unit && unit.notes || ''));
+  }
+
   function fleetKind(type) {
     var t = String(type || '').trim().toUpperCase().replace(/_/g, ' ');
     if (['TRUCK', 'TRACTOR', 'POWER UNIT', 'TRACTOR TRUCK', 'STRAIGHT TRUCK', 'BOX TRUCK'].indexOf(t) >= 0) return 'TRUCK';
@@ -722,7 +766,7 @@
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers,
-    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote,
+    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
