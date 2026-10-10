@@ -56,7 +56,7 @@
   <div class="mc-modal" id="modal" hidden>
     <div class="mc-dialog" role="dialog" aria-modal="true" aria-labelledby="rp-subject">
       <div class="mc-dhead"><div><span class="eyebrow">Send Current Report · To: Plant Managers group</span><h2 id="rp-subject"></h2></div>
-        <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn send" id="send">&#9993; Send Current Report</button></div></div>
+        <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn" id="copy">&#10697; Copy</button><button type="button" class="mc-btn" id="print-report">&#9113; Print</button><button type="button" class="mc-btn send" id="send">&#9993; Send Current Report</button></div></div>
       <label class="mc-note">Note at the top of the email (optional)<textarea id="note" maxlength="1500" placeholder="Add a note to this report…"></textarea></label>
       <div class="mc-report-body" id="rp-body"></div>
     </div>
@@ -226,6 +226,20 @@
     }
     document.getElementById('send-card').onclick = (e) => send(e.currentTarget);
     document.getElementById('send').onclick = (e) => send(e.currentTarget);
+    // Copy and Print, as the current app's report: the email's words on the clipboard, or the email itself on paper.
+    const reportNote = () => (document.getElementById('note').value || '').trim();
+    document.getElementById('copy').onclick = async (e) => {
+      const b = e.currentTarget, text = (reportNote() ? 'NOTE: ' + reportNote() + '\n\n' : '') + report.subject + '\n\n' + report.text;
+      try { await navigator.clipboard.writeText(text); b.textContent = '\u2713 Copied'; } catch (err) { showError('Could not copy the report: ' + err.message); }
+      setTimeout(() => { b.innerHTML = '&#10697; Copy'; }, 2000);
+    };
+    document.getElementById('print-report').onclick = () => {
+      const f = document.createElement('iframe');
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+      document.body.appendChild(f);
+      f.contentDocument.open(); f.contentDocument.write('<!doctype html><title>' + escapeHtml(report.subject) + '</title>' + U.reportHtml(report, reportNote())); f.contentDocument.close();
+      setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 1000); }, 300);
+    };
 
     requireSignIn(async (user) => {
       const { db } = await start();
