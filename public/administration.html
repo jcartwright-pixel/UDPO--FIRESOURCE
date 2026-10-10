@@ -42,11 +42,12 @@
     import { requireSignIn, start, escapeHtml, ICON, callServer } from './js/app.js';
     import { ADMIN_GROUPS, adminItem } from './js/admin-items.js';
     import { PAGES } from './js/admin-pages.js';
+    import { TOOL_PAGES } from './js/admin-tools.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     const L = window.UDLogic;
     const testEmail = new URLSearchParams(location.search).get('testEmail');
     // Pages built here (js/admin-pages.js), not a separate screen: they go through the server, Administrators only.
-    const PANELS = PAGES;
+    const PANELS = Object.assign({}, PAGES, TOOL_PAGES);
     let admin = null, find = '', current = ADMIN_GROUPS[0][2][0][0];
     const icon = (k) => /\.webp$/.test(k) ? '<img src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.gear) + '</svg>';
     const withTest = (href) => testEmail ? href + (href.indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + encodeURIComponent(testEmail) : href;

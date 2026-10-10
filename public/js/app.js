@@ -7,7 +7,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/fireba
 import {
   getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signOut, GoogleAuthProvider, connectAuthEmulator
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { getFirestore, connectFirestoreEmulator, doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { getFirestore, connectFirestoreEmulator, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 
 export const DOMAIN = 'uniteddairy.com';
@@ -380,6 +380,9 @@ export async function requireSignIn(ready) {
     if (!user) { remember(''); gate.hidden = false; screen.hidden = true; return; }
     const email = String(user.email).toLowerCase();
     const early = known === email;
+    // Administration > Start Plant Fresh From Today: loads from before that day stop showing as prior-day work (plant-core.js).
+    // Listened to before the screen's own listeners, so the screen draws with it.
+    if (!window.UDPlantStartWatch) { window.UDPlantStartWatch = true; start().then(({ db }) => onSnapshot(doc(db, 'config', 'app'), s => { window.UDPlantStart = ((s.data() || {}).plantStart || {}).date || ''; }, () => { window.UDPlantStartWatch = false; })); }
     if (early) { gate.hidden = true; screen.hidden = false; showWho(user); ready(user); }
     // The database shows dispatch data only to people ACTIVE in USERS_MASTER; say so plainly instead of a blank screen.
     const { db } = await start();

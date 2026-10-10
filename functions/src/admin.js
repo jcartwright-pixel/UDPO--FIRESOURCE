@@ -12,6 +12,7 @@
  *   Report Recipients     reportGroups, saveReportGroup                                reportGroups/{id}
  *   Sent Email Log        sentLog, setSending                                          sentEmails, private/emailSettings
  *   Remaining Repairs     repairItems, saveRepairItem, completeRepairItem              repairItems/{id}
+ * The email, schedule and diagnostics items are in admintools.js.
  */
 'use strict';
 
@@ -378,10 +379,13 @@ async function adminCall(db, user, input, deps) {
     if (!p || p.status !== 'ACTIVE' || !L.isAdmin(p)) return { count: 0 };
     return { count: (await repairItems(db)).count };
   }
-  if (!OPS[op] && !(d.ops && d.ops[op])) fail('BAD_REQUEST', 'Unknown Administration step: ' + op);
+  // Email, schedules and diagnostics (admintools.js), loaded here because it builds on this file.
+  const TOOLS = require('./admintools').OPS;
+  const fn = (d.ops && d.ops[op]) || OPS[op] || TOOLS[op];
+  if (!fn) fail('BAD_REQUEST', 'Unknown Administration step: ' + op);
   const email = await requireAdmin(db, user);
   const stamp = (d.now ? d.now() : new Date()).toISOString();
-  return (d.ops && d.ops[op] ? d.ops[op] : OPS[op])(db, email, input, stamp, d);
+  return fn(db, email, input, stamp, d);
 }
 
 module.exports = { adminCall, stationRelease, AdminError, savePerson, personRevision, OPS, requireAdmin, fail, text, plantName, activePlants };

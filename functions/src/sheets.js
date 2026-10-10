@@ -14,9 +14,11 @@ function makeSheetsReader(options) {
   const auth = (options && options.auth) || new GoogleAuth({ scopes: [SCOPE] });
   return {
     // One request per spreadsheet, however many tabs. Returns one 2-D array of cell texts per range.
-    async batchGet(spreadsheetId, ranges) {
+    async batchGet(spreadsheetId, ranges, render) {
       const client = await auth.getClient();
-      const query = ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&') + '&valueRenderOption=FORMATTED_VALUE&majorDimension=ROWS';
+      // render: FORMATTED_VALUE (what people see; the default) or UNFORMATTED_VALUE (a real date comes back as its serial number).
+      const how = render === 'UNFORMATTED_VALUE' ? 'UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER' : 'FORMATTED_VALUE';
+      const query = ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&') + '&valueRenderOption=' + how + '&majorDimension=ROWS';
       const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '/values:batchGet?' + query;
       const res = await client.request({ url, method: 'GET' });
       const valueRanges = (res.data && res.data.valueRanges) || [];
@@ -42,6 +44,22 @@ function makeSheetsWriter(options) {
         method: 'POST',
         data: { valueInputOption: 'RAW', data }
       });
+    },
+    // The tabs of a workbook: [{title, sheetId, rows}] (Archive now and Date Convert need a tab's sheetId).
+    async tabs(spreadsheetId) {
+      const client = await auth.getClient();
+      const res = await client.request({ url: 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '?fields=sheets.properties(sheetId,title,gridProperties.rowCount)', method: 'GET' });
+      return ((res.data && res.data.sheets) || []).map(s => ({ title: s.properties.title, sheetId: s.properties.sheetId, rows: (s.properties.gridProperties || {}).rowCount || 0 }));
+    },
+    // Rows added under the last row of a tab (RAW).
+    async append(spreadsheetId, range, values) {
+      const client = await auth.getClient();
+      await client.request({ url: 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', method: 'POST', data: { values } });
+    },
+    // Structure and formats (delete rows, a column's number format).
+    async structure(spreadsheetId, requests) {
+      const client = await auth.getClient();
+      await client.request({ url: 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + ':batchUpdate', method: 'POST', data: { requests } });
     }
   };
 }

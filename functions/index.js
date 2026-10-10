@@ -19,6 +19,7 @@
  *   mocreo                Administration > MOCREO & Sensors: save or replace the key (never shown again), test it, thermometer locations
  *   admin                 Administration's own pages (src/admin.js): people, role templates, links and codes, email, repairs, tools
  *   stationRelease        the Plant Station tablet's Change Station: the plant's manager release code, when one is set
+ *   adminJobsEvery5Minutes  repair emails to lessors, the driver check-in mailbox and the weekly archive, each at its Refresh Rate
  */
 'use strict';
 
@@ -43,6 +44,7 @@ const { runFleetSync } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
 const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
 const { adminCall, stationRelease, AdminError } = require('./src/admin');
+const TOOLS = require('./src/admintools');
 const L = require('./src/logic');
 
 admin.initializeApp();
@@ -77,6 +79,8 @@ function transferSetup() {
 exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone: 'America/New_York', timeoutSeconds: 120 }, async () => {
   const setup = transferSetup();
   if (!setup) return;
+  // Administration > Refresh Rates: every minute unless an administrator chose a slower rate.
+  if (!(await TOOLS.jobDue(db, 'transfer'))) return;
   await runTransfer({ db, reader: setup.reader, sources: setup.sources });
 });
 
@@ -144,9 +148,32 @@ exports.mocreo = onCall({ timeoutSeconds: 60 }, async (request) => {
 });
 
 // Administration (src/admin.js): Administrators only, checked inside.
+// The sandbox sheet copies the Administration tools may read (Date Inventory) and change (Archive now, Date Convert, both
+// refused on a production sheet by writeback.js), and a copy from the sheets on request (Refresh Home Summary Now).
+function adminDeps() {
+  const setup = transferSetup(), live = process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1' ? JSON.parse(process.env.WRITEBACK_JSON).spreadsheetId : '';
+  return {
+    env: process.env,
+    sources: setup && process.env.DEMO_DATA !== '1' ? setup.sources : null,
+    sheets: setup && process.env.DEMO_DATA !== '1' ? () => makeSheetsWriter() : null,
+    liveId: live,
+    runTransfer: setup ? () => runTransfer({ db, reader: setup.reader, sources: setup.sources }) : null
+  };
+}
+
 exports.admin = onCall({ timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
   const user = signedIn(request);
-  try { return await adminCall(db, user, request.data, { env: process.env }); } catch (error) { throw asHttps(error); }
+  try { return await adminCall(db, user, request.data, adminDeps()); } catch (error) { throw asHttps(error); }
+});
+
+// Repair emails (Immediately / Once a day), the driver check-in mailbox and the weekly archive, each only when its
+// Refresh Rate says it is due. Each does nothing until an administrator switches it on.
+exports.adminJobsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
+  const run = async (key, fn) => { try { if (await TOOLS.jobDue(db, key)) await fn(); } catch (e) { console.error(key, e); } };
+  await run('repairEmail', () => TOOLS.repairSweep(db, {}));
+  await run('checkinMail', () => TOOLS.checkinRun(db, {}));
+  const d = adminDeps();
+  if (d.sheets && d.liveId) await run('archive', () => TOOLS.archiveCompleted(db, 'SCHEDULE', { sheets: d.sheets(), liveId: d.liveId }));
 });
 
 exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
@@ -157,7 +184,9 @@ exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
 exports.save = onCall(async (request) => {
   const user = signedIn(request);
   try {
-    return await applyAction(db, user, request.data);
+    const result = await applyAction(db, user, request.data);
+    // A manager's Lessor button: the repair email goes out after the save (Administration > Repair Email).
+    return await TOOLS.afterSave(db, user, request.data, result);
   } catch (error) {
     if (error instanceof SaveError) throw new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined);
     throw error;
@@ -225,6 +254,7 @@ exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'Americ
 
 // MOCREO sensors (src/mocreo.js): the key is read each run, so the sync starts by itself once a key is saved and tested.
 exports.mocreoEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  if (!(await TOOLS.jobDue(db, 'mocreo'))) return;
   const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
   // The key saved in Administration > MOCREO & Sensors; else the Secret Manager secrets.
   const getSecrets = () => appSecrets(db, async () => {

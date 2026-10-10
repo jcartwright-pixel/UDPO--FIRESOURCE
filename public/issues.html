@@ -29,6 +29,8 @@
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Email stays off in the new app</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <!-- The Lessor button's email result (Administration > Repair Email): emailed, or why not. -->
+    <div class="notice" id="info" hidden></div>
     <div class="view">
       <div class="actions issue-bar">
         <div class="kind-tabs" role="tablist" id="kinds"></div>
@@ -86,7 +88,7 @@
       const typed = document.querySelector('[data-why]') ? document.querySelector('[data-why]').value : '', cols = truck ? 9 : 7, d = edit ? '' : ' disabled';
       document.getElementById('rows').innerHTML = shown.map(r => {
         const sent = r.atGarage || r.toLessor, who = truck ? L.unitLessor(lists.fleetTrucks, r.unit) : null;
-        const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || sent || !who.lessor ? ' disabled' : '') + ' title="' + escapeHtml(who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor). Email stays off in the new app, so this marks it sent.' : who ? who.why : '') + '">Lessor</button>';
+        const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || sent || !who.lessor ? ' disabled' : '') + ' title="' + escapeHtml(who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor): marks it sent and emails it as set in Administration > Repair Email.' : who ? who.why : '') + '">Lessor</button>';
         const garageBtn = '<button type="button" class="' + (truck ? 'seg-g' : 'to-garage') + '" data-step="garage"' + (!edit || sent ? ' disabled' : '') + ' title="Send to the garage">' + (truck ? 'Garage' : 'To garage') + '</button>';
         const actions = removeFor === r.id
           ? '<span class="down-box"><input data-why maxlength="200" placeholder="Why remove it?"><button type="button" class="warn" data-remove-save>Remove</button><button type="button" data-remove-cancel>Cancel</button></span>'
@@ -118,7 +120,14 @@
         if (name === 'lessor') doc.notes = (doc.notes ? doc.notes + '\n' : '') + 'Sent to lessor ' + note + ' ' + at + ' by ' + me;
         if (name === 'reviewed') Object.assign(doc, { status: 'OPEN', notes: (doc.notes ? doc.notes + '\n' : '') + 'Reviewed by ' + me + ' at ' + at });
       };
-      saveOptimistic('updateIssue', { recordId: r.recordId, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render);
+      saveOptimistic('updateIssue', { recordId: r.recordId, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render).then(res => {
+        if (name !== 'lessor' || !res || !res.message) return;
+        const info = document.getElementById('info');
+        info.textContent = res.message;
+        info.hidden = false;
+        clearTimeout(step.timer);
+        step.timer = setTimeout(() => { info.hidden = true; }, 15000);
+      });
     }
 
     document.getElementById('kinds').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) { kind = b.dataset.kind; filter = 'all'; removeFor = openFor = null; render(); } });
