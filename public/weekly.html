@@ -50,7 +50,7 @@
       </div>
       <div class="legend" id="legend">
         <span><i class="assigned"></i>Assigned</span><span><i class="relief"></i>Relief Driver</span><span><i class="needs"></i>Needs Driver</span>
-        <span><i class="vacation-needs"></i>Vacation &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span>
+        <span><i class="vacation-needs"></i>Vacation &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span>
       </div>
       <button type="button" class="override" id="override" aria-pressed="false">Override</button>
     </section>
@@ -160,7 +160,7 @@
         if ((b.relief ? 'R' : 'D') !== role) { role = b.relief ? 'R' : 'D'; head = '<tr class="group"><td colspan="8">' + (b.relief ? 'RELIEF DRIVERS' : 'DRIVERS &mdash; SENIORITY ORDER') + '</td></tr>'; }
         return head + '<tr data-driver="' + escapeHtml(b.id) + '"' + (b.relief ? ' class="relief"' : '') + '><td class="strong left">' + escapeHtml(b.name) + '</td>' + L.DAYS.map(p => {
           const c = b.days[p];
-          return '<td class="day b-' + c.kind + '">' + (edit ? '<button type="button" class="avail" data-date="' + c.date + '">' + escapeHtml(c.text) + '</button>' : escapeHtml(c.text)) + '</td>';
+          return '<td class="day b-' + c.kind + (c.extra ? ' b-extra' : '') + '"' + (c.extra ? ' title="Changed by hand this week"' : '') + '>' + (edit ? '<button type="button" class="avail" data-date="' + c.date + '">' + escapeHtml(c.text) + '</button>' : escapeHtml(c.text)) + '</td>';
         }).join('') + '</tr>';
       }).join('') || '<tr><td colspan="8" class="empty">No active drivers in the Driver Master copy.</td></tr>';
 

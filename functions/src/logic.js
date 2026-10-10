@@ -282,7 +282,7 @@
           date: addDays(week, i), runs: !!d.runs, loadSequence: effectiveSequence(d),
           driverId: d.driverId || '', driver: d.driver || '', truckId: d.truckId || '', truck: d.truck || '',
           trailerId: d.trailerId || '', trailer: d.trailer || '', dispatchTime: d.dispatchTime,
-          intendedDriver: d.intendedDriver || '', driverExceptionStatus: d.driverExceptionStatus || ''
+          intendedDriver: d.intendedDriver || '', driverExceptionStatus: d.driverExceptionStatus || '', routeOverride: yes(d.routeOverride)
         };
       });
       return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
@@ -551,14 +551,15 @@
     list.sort(function (a, b) { return (a.relief === b.relief ? 0 : a.relief ? -1 : 1) || a.seniorityDate.localeCompare(b.seniorityDate) || a.name.localeCompare(b.name); });
     list.forEach(function (driver) {
       DAYS.forEach(function (p, i) {
-        var date = addDays(week, i), routes = [];
+        var date = addDays(week, i), routes = [], extra = false;
         // Like the current board: the run's stream (SAVE-A-LOT 1, 825), else the route, plus the run when it differs.
-        (rows || []).forEach(function (r) { var d = r.days[p]; if (d.runs && d.driverId === driver.id) routes.push(boardLabel(r)); });
+        (rows || []).forEach(function (r) { var d = r.days[p]; if (d.runs && d.driverId === driver.id) { routes.push(boardLabel(r)); if (d.routeOverride) extra = true; } });
         var off = exceptionOn(exceptions, driver.id, date);
         // OFF: Driver Master does not have the driver available that day (<day>_available), as on the current board.
         var dayOff = !!driver.cells && !yes(driver.cells[p + '_available']);
         var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (/VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : dayOff ? 'off' : 'available';
-        driver.days[p] = { date: date, routes: routes, kind: kind, text: routes.length ? routes.join(' / ') : off ? exceptionLabel(off) : dayOff ? 'OFF' : 'AVAILABLE' };
+        // extra: a day someone changed by hand (the run's route_override), light blue on the board as in the current app.
+        driver.days[p] = { date: date, routes: routes, kind: kind, extra: extra && routes.length > 0, text: routes.length ? routes.join(' / ') : off ? exceptionLabel(off) : dayOff ? 'OFF' : 'AVAILABLE' };
       });
     });
     return list;

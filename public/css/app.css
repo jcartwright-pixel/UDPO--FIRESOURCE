@@ -656,3 +656,6 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .dc-links:has(> .dc-link:nth-child(4)) .owner.ext { font-size: 0; padding: 2px 7px; }
 .dc-links:has(> .dc-link:nth-child(4)) .owner.ext::after { content: "\2197  current app"; font-size: 11px; }
 @media (max-width: 1500px) { .dc-links:has(> .dc-link:nth-child(4)) .owner.ext::after { content: "\2197"; font-size: 13px; } }
+/* Driver Assignment Board: a day changed by hand this week (route_override) is light blue, as in the current app. */
+.weekly-page .board td.b-extra, .weekly-page .board tr.relief td.b-extra { background: #d9ebfb !important; color: #000 !important; }
+.legend i.extra { background: #d9ebfb; border: 1px solid #9cc4ea; }

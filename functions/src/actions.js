@@ -374,10 +374,14 @@ async function applyAction(db, user, input, now) {
     Object.keys(after).forEach(k => { before[k] = day[k] === undefined ? null : day[k]; });
     const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp };
     Object.keys(after).forEach(k => { update['days.' + req.day + '.' + k] = after[k]; });
+    // Any driver change marks the day as changed by hand (<day>_route_override), as the current app's driver saves do;
+    // the Driver Assignment Board shows those days light blue.
+    const marks = req.action === 'assignDriver' ? { routeOverride: 'TRUE' } : {};
+    Object.keys(marks).forEach(k => { update['days.' + req.day + '.' + k] = marks[k]; });
     update['days.' + req.day + '.updatedAt'] = stamp;
     update['days.' + req.day + '.updatedBy'] = email;
     tx.update(runRef, update);
-    if (mode.writeBack) queueSheetCells(tx, db, req.requestId, '', run, req.runDocId, req.day, after, stamp, email);
+    if (mode.writeBack) queueSheetCells(tx, db, req.requestId, '', run, req.runDocId, req.day, Object.assign({}, after, marks), stamp, email);
     const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }] };
     if (writeMaint) result.maintenance = writeMaint(maintQueue(tx, db, mode, req.requestId, stamp, email));
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });
