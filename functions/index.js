@@ -13,6 +13,7 @@
  *   masterWriteBackOnSave writes Driver / Route / Equipment Master, day off and vacation saves into SANDBOX copies
  *   fleetSyncNightly      brings Equipment Master in step with the United Dairy fleet list every night (SANDBOX copy only)
  *   fleetSyncNow          the same from Equipment's "Sync fleet list" button, for a manager or administrator
+ *   mailPlantReport       emails a plant report straight after Send Current Report saves it (reportmail.js; MAIL_FROM)
  */
 'use strict';
 
@@ -33,6 +34,7 @@ const { runMasterWriteBack } = require('./src/masterwrite');
 const { transferSources } = require('./src/sources');
 const { safeIdPart } = require('./src/model');
 const { runFleetSync } = require('./src/fleetsync');
+const { mailReport } = require('./src/reportmail');
 const L = require('./src/logic');
 
 admin.initializeApp();
@@ -147,6 +149,13 @@ async function writeBackIfOn(part) {
 if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
   exports.writeBackOnSave = onDocumentCreated({ document: 'outbox/{id}', maxInstances: 1, concurrency: 1 }, () => writeBackIfOn('live'));
   exports.masterWriteBackOnSave = onDocumentCreated({ document: 'masterOutbox/{id}', maxInstances: 1, concurrency: 1 }, () => writeBackIfOn('master'));
+}
+// Send Current Report: the email goes out after the save, so a slow or refused email never holds up the screen.
+if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
+  exports.mailPlantReport = onDocumentCreated({ document: 'plantReports/{id}', timeoutSeconds: 60 }, (event) => {
+    if (!event.data) return null;
+    return mailReport(event.data.ref, event.data.data());
+  });
 }
 exports.writeBackEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 120, maxInstances: 1 }, () => writeBackIfOn('both'));
 

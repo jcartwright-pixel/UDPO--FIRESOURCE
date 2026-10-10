@@ -194,3 +194,14 @@ test('Send Current Report: the report is kept as sent and not emailed (email is 
   const kept = (await db().collection('plantReports').doc(res.reportId).get()).data();
   assert.deepEqual([kept.subject, kept.note, kept.status, kept.emailed], ['Plant Update 10/8 10:00 AM: All routes on time', 'Short staffed on second shift', 'HELD', false]);
 });
+
+test('Send Current Report with email set up: the report is SENDING, with the report kept for the email layout', async () => {
+  process.env.MAIL_FROM = 'joe@uniteddairy.com';
+  try {
+    const report = { dayLabel: 'Thursday 10/8', behind: [], loaded: [], nextUp: [], totalLoads: 0, leftToLoad: 0, pickups: [], down: [], lines: [], temperatures: [] };
+    const res = await applyAction(db(), DISPATCHER, { action: 'sendPlantReport', requestId: rid(), subject: 'Plant Update 10/8 10:00 AM: All routes on time', text: 'ROUTES BEHIND (0)', note: '', report });
+    assert.deepEqual([res.sent, res.sending, res.message], [false, true, 'Report saved. Sending the email…']);
+    const kept = (await db().collection('plantReports').doc(res.reportId).get()).data();
+    assert.deepEqual([kept.status, kept.emailed, JSON.parse(kept.reportJson).dayLabel], ['SENDING', false, 'Thursday 10/8']);
+  } finally { delete process.env.MAIL_FROM; }
+});

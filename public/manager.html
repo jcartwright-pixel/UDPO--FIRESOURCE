@@ -86,7 +86,7 @@
     const today = () => L.operatingDay(new Date());
     let date = today();
     const data = { runs: [], journal: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [] };
-    let person = null, app = {}, report = null, note = '';
+    let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null;
     const canSend = () => L.hasRole(person, L.SAVE_ROLES) && L.screenState(app, 'plant').open;
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : 'None'; };
     const pct = (a, b) => b ? Math.min(100, Math.round(a / b * 100)) : 0;
@@ -187,19 +187,39 @@
       const label = btn.innerHTML, ok = document.getElementById('saved');
       btn.disabled = true; btn.textContent = 'Sending…';
       try {
-        const res = await save('sendPlantReport', { subject: report.subject, text: (note.trim() ? 'NOTE: ' + note.trim() + '\n\n' : '') + report.text, note: note.trim(), groupName: 'Plant Managers' });
+        const res = await save('sendPlantReport', { subject: report.subject, text: (note.trim() ? 'NOTE: ' + note.trim() + '\n\n' : '') + report.text, note: note.trim(), groupName: 'Plant Managers', report });
         ok.textContent = res && res.message || 'Report saved.'; ok.hidden = false;
         note = ''; document.getElementById('note').value = ''; document.getElementById('modal').hidden = true;
         showError('');
-        setTimeout(() => { ok.hidden = true; }, 8000);
+        if (res && res.sending && res.reportId && fsdb) followEmail(res.reportId, ok);
+        else setTimeout(() => { ok.hidden = true; }, 8000);
       } catch (e) { showError(e.message || String(e)); }
       finally { btn.disabled = false; btn.innerHTML = label; }
+    }
+    // The email goes out just after the save; the report's status says whether it went, and to whom.
+    function followEmail(id, ok) {
+      if (watchSent) watchSent();
+      watchSent = onSnapshot(doc(fsdb, 'plantReports', id), s => {
+        const r = s.data() || {};
+        if (r.status === 'SENDING' || !r.status) return;
+        watchSent(); watchSent = null;
+        const to = (r.sentTo || []).join(', ');
+        if (r.status === 'SENT') {
+          ok.className = 'notice ok';
+          ok.textContent = r.testCopy ? 'Report emailed to you only (' + to + '), as a test. The Plant Managers group will get it once the new app runs the plant.' : 'Report emailed to ' + (r.groupName || 'Plant Managers') + ' (' + to + ').';
+        } else {
+          ok.className = 'notice error';
+          ok.textContent = 'Report saved but not emailed. ' + (r.reason || '');
+        }
+        setTimeout(() => { ok.hidden = true; ok.className = 'notice ok'; }, 15000);
+      }, () => { ok.textContent = 'Report saved. Could not check whether the email went out.'; });
     }
     document.getElementById('send-card').onclick = (e) => send(e.currentTarget);
     document.getElementById('send').onclick = (e) => send(e.currentTarget);
 
     requireSignIn(async (user) => {
       const { db } = await start();
+      fsdb = db;
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       let timer = null;
       const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 50); };
