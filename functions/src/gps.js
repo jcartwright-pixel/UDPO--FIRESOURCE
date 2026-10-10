@@ -43,13 +43,14 @@ async function test(d, vehicle, fetchFn) {
   if (!d.user || !d.password || !d.appId) return { ok: false, step: 'login', message: 'Not tested: save the API user name, password and App ID first.' };
   let res;
   try {
-    res = await fetchFn(d.baseUrl + '/token', { headers: { Authorization: 'Basic ' + Buffer.from(d.user + ':' + d.password).toString('base64') } });
+    // Fleetmatics' Token API takes plain text (its Integration Start Up guide: Accept and Content-Type text/plain, no App ID).
+    res = await fetchFn(d.baseUrl + '/token', { headers: { Authorization: 'Basic ' + Buffer.from(d.user + ':' + d.password).toString('base64'), Accept: 'text/plain', 'Content-Type': 'text/plain' } });
   } catch (e) {
     return { ok: false, step: 'login', message: 'Could not reach Fleetmatics at ' + d.baseUrl + '. Check the address.' };
   }
   if (res.status === 401 || res.status === 403) return { ok: false, step: 'login', message: 'Fleetmatics refused the login (' + res.status + '). Check the API user name and password.' };
   // 400 is what Fleetmatics gives a login that is not an API (REST) user, such as the everyday Reveal login.
-  if (res.status === 400) return { ok: false, step: 'login', message: 'Fleetmatics did not accept this as an API login (400). The everyday Reveal login does not work here: Verizon Connect must create an API (REST) user and give its user name, password and App ID.' };
+  if (res.status === 400) return { ok: false, step: 'login', message: 'Fleetmatics did not accept this user name and password as an integration (REST) login (400). The Developer Portal login and the everyday Reveal login do not work here: use the integration user name and password Verizon Connect gives for the REST API.' };
   if (res.status >= 300) return { ok: false, step: 'login', message: 'Fleetmatics answered ' + res.status + ' to the login. Try again in a minute; if it stays, call Verizon Connect.' };
   const token = String(await res.text() || '').trim().replace(/^"|"$/g, '');
   if (!token) return { ok: false, step: 'login', message: 'Fleetmatics accepted the login but sent no key back.' };

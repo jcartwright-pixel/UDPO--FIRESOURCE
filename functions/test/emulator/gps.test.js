@@ -36,7 +36,7 @@ test('GPS Setup: only a manager or administrator; the login is never sent back; 
 
   await gpsCall(db(), ADMIN, { op: 'save', user: 'reveal', password: 'pw', appId: 'app1' }, o);
   s = await gpsCall(db(), ADMIN, { op: 'test' }, o);
-  assert.match(s.result.message, /not accept this as an API login \(400\)/);
+  assert.match(s.result.message, /integration \(REST\) login \(400\)/);
 
   s = await gpsCall(db(), ADMIN, { op: 'save', user: 'api', password: 'wrong', appId: 'app1' }, o);
   assert.deepEqual([s.hasUser, s.hasPassword, s.hasAppId], [true, true, true]);
