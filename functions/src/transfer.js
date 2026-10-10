@@ -11,6 +11,7 @@
 const crypto = require('crypto');
 const L = require('./logic');
 const M = require('./model');
+const PLANT = require('./plant');
 
 const C = M.COLLECTIONS;
 const META = 'meta';
@@ -441,6 +442,16 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
     const d = diffOps(db, QUEUE_KINDS[list].collection || C.maintenance, queues[list].docs, prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
     ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
     summary.queues[list] = { rows: Object.keys(queues[list].docs).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
+  }
+  // 2b. The plant side (plant.js): journal, pickups, wash and returns lists. A list that cannot be read is left as it was.
+  const plant = await PLANT.readPlant(reader, sources);
+  summary.plant = { skipped: plant.skipped };
+  for (const list of Object.keys(plant.lists)) {
+    const metaRef = db.collection(META).doc(list);
+    const prev = (await metaRef.get()).data() || {};
+    const d = diffOps(db, PLANT.PLANT_LISTS[list].collection, plant.lists[list], prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
+    ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
+    summary.plant[list] = { rows: Object.keys(plant.lists[list]).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
   }
   const waiting = await db.collection(C.outbox).where('status', '==', 'pending').get();
   const hold = {};

@@ -1,0 +1,88 @@
+/* New Plant Operations: the plant screens' few extra pieces, built on app.css's colours and type so every screen
+   keeps one look. Area colours are the current app's (CASE blue, TOTES purple, BOXING orange, TANKER green). */
+.plant-page .eyebrow { display: block; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.plant-page .dayname { align-self: center; margin: 0 auto; font-size: 26px; font-weight: 800; color: var(--ud-blue-dark); letter-spacing: .02em; }
+.plant-page .hstats { display: flex; gap: 8px; align-self: center; }
+.plant-page .hstats div { min-width: 86px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 5px 12px; text-align: center; }
+.plant-page .hstats b { display: block; font-size: 24px; line-height: 1.1; color: var(--ud-blue); }
+.plant-page .hstats span { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.plant-page .hstats .good b { color: var(--runs-ink); }
+.plant-page .hstats .warn b { color: #b45f00; }
+
+/* Department tiles with a ring: done of total. */
+.plant-page .areas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 16px; }
+.plant-page .area { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--line); border-left: 6px solid var(--area); border-radius: 12px; padding: 8px 14px; cursor: pointer; font: inherit; color: var(--ink); text-align: left; }
+.plant-page .area:hover { box-shadow: 0 4px 14px #0b4f8a1f; }
+.plant-page .area.on { background: #eef6ff; box-shadow: inset 0 0 0 2px var(--area); }
+.plant-page .ring { --p: 0; width: 54px; height: 54px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: conic-gradient(var(--area) calc(var(--p) * 1%), #e6edf4 0); }
+.plant-page .ring b { width: 42px; height: 42px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 13px; color: var(--ink); }
+.plant-page .area strong { display: block; font-size: 18px; color: var(--ud-blue-dark); }
+.plant-page .area small { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* The strip under the tiles: loaded bar, left over, loading, quantity, pickups, behind. */
+.plant-page .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 16px; }
+.plant-page .strip > span { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 5px 14px; font-size: 14px; color: var(--muted); }
+.plant-page .strip > span b { color: var(--ink); font-size: 15px; }
+.plant-page .strip .bar { width: 160px; height: 8px; border-radius: 4px; background: #e6edf4; overflow: hidden; }
+.plant-page .strip .bar i { display: block; height: 100%; background: var(--runs-ink); }
+.plant-page .strip .amber { background: #fff4d6; border-color: #f0d38a; color: #8a5a00; }
+.plant-page .strip .amber b { color: #8a5a00; }
+.plant-page .strip .red { background: #fde5e3; border-color: #f2b8b2; color: var(--pickup); }
+.plant-page .strip .red b { color: var(--pickup); }
+
+/* Loadout table. */
+.plant-page table.loadout td { height: 44px; }
+.plant-page table.loadout td input { width: 100%; height: 32px; border: 1px solid var(--line); border-radius: 7px; text-align: center; font: inherit; color: var(--ink); background: #fff; }
+.plant-page table.loadout td input:focus { outline: 2px solid var(--ud-blue); border-color: var(--ud-blue); }
+.plant-page table.loadout td input:disabled { background: transparent; border-color: transparent; }
+.plant-page tr.divider td { height: 30px; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-align: left; padding-left: 14px; }
+.plant-page tr.divider.prior td { background: #fff1dc !important; color: #a35400; }
+.plant-page tr.divider.today td { background: var(--band) !important; color: var(--ud-blue); }
+.plant-page tr.done > td { background: #f1faf4 !important; }
+.plant-page tr.loading > td { background: #fffaeb !important; }
+.plant-page button.state { min-width: 96px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: #eef2f5; color: #516273; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.plant-page button.state.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
+.plant-page button.state.loading { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
+.plant-page button.clock { min-width: 64px; height: 30px; border-radius: 8px; border: 1px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.plant-page button.clock.end { background: var(--ud-blue); color: #fff; }
+.plant-page .tick { color: var(--runs-ink); font-weight: 800; }
+.plant-page .running { color: #8a5a00; }
+.plant-page .running::after { content: ' \25CF'; color: #e5891a; }
+.plant-page button.pu { min-width: 44px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--muted); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.plant-page button.pu.open { background: #fde5e3; border-color: #f2b8b2; color: var(--pickup); }
+.plant-page button.pu.done { background: #e6f6ec; border-color: #a8dcb8; color: var(--runs-ink); }
+.plant-page button.pu i { font-style: normal; display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; border-radius: 9px; background: var(--pickup); color: #fff; font-size: 11px; }
+.plant-page button.edit-row { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.plant-page .picker-pop { position: fixed; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px #0003; padding: 6px; display: grid; gap: 4px; }
+.plant-page .picker-pop button { min-width: 140px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.plant-page .picker-pop button.done { color: var(--runs-ink); }
+.plant-page .picker-pop button.loading { color: #8a5a00; }
+.plant-page .pu-list { display: grid; gap: 6px; margin-bottom: 12px; }
+.plant-page .pu-item { display: flex; align-items: center; gap: 10px; border: 1px solid #f2b8b2; background: #fff6f5; border-radius: 9px; padding: 8px 10px; }
+.plant-page .pu-item.done { border-color: #a8dcb8; background: #f1faf4; }
+.plant-page .pu-item span { flex: 1; color: var(--ink); }
+.plant-page .pu-item small { display: block; color: var(--muted); font-weight: 600; }
+.plant-page .pu-item button { height: 32px; padding: 0 12px; border-radius: 8px; border: 0; background: var(--runs-ink); color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.plant-page .modal-actions .left { margin-right: auto; }
+.plant-page button.danger-line { color: var(--pickup); border-color: #f2b8b2; }
+
+/* Plant Distribution Departments: the four department cards keep the home cards' look. */
+.plant-page .dc-bar { margin: 2px 16px 0; height: 8px; border-radius: 4px; background: #e6edf4; overflow: hidden; }
+.plant-page .dc-bar i { display: block; height: 100%; background: var(--accent); }
+.plant-page .dc-note { margin: 4px 16px 0; font-size: 13px; color: var(--muted); }
+
+.plant-page .dc-links.two { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(40px, 48px); }
+.plant-page .dc-links.two .dc-link { font-size: 15px; }
+.plant-page .dc-link .dc-side { font-size: 13px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.plant-page .dc-link .dc-side.alert { color: var(--pickup); }
+
+@media (max-width: 1500px) {
+  .plant-page .area { padding: 6px 10px; gap: 10px; }
+  .plant-page .ring { width: 44px; height: 44px; }
+  .plant-page .ring b { width: 34px; height: 34px; font-size: 12px; }
+  .plant-page .area strong { font-size: 16px; }
+  .plant-page .dayname { font-size: 20px; }
+  .plant-page .hstats div { min-width: 70px; }
+  .plant-page .hstats b { font-size: 20px; }
+}

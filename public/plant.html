@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plant Distribution Departments · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="plant-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Plant Distribution Departments</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+  <div id="screen" class="home-screen" hidden>
+    <div class="topbar"><span class="who" id="who"></span><button id="signout" type="button">Sign out</button></div>
+    <div class="dtitle">
+      <div class="dtitle-wrap"><span class="dtitle-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V10l6 3V10l6 3V6l6-3v18z"/><path d="M7 17h2M12 17h2M17 17h2"/></svg></span>
+        <div><h1>Plant Distribution Departments</h1><div class="dtitle-sub">Manager-Launched Plant Workspaces</div></div></div>
+      <div class="dlive"><span id="mode-text">TEST COPY</span><span id="copied">Waiting for the first copy</span><span id="today">-</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="cards cards4">
+      <div class="card dc home4" style="--accent:#1976d2">
+        <div class="dc-head"><span class="dc-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h11v10H2zM13 9h5l3 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M5 9h5M5 12h5"/></svg></span><span class="dc-text"><small>Loadout Center</small><strong>Loading</strong><em>Cases, totes, boxes and tanker loads for the day, with pickups.</em></span></div>
+        <div class="dc-links two" id="links-load"></div>
+        <div class="dc-metrics n4"><span class="dc-metric"><em>Today</em><b data-n="load.total">-</b><small>Loads Today</small></span><span class="dc-metric"><em>Waiting</em><b data-n="load.waiting">-</b><small>Waiting</small></span><span class="dc-metric"><em>Loading</em><b data-n="load.loading">-</b><small>Loading</small></span><span class="dc-metric"><em>Done</em><b data-n="load.done">-</b><small>Complete</small></span></div>
+        <div class="dc-bar"><i id="load-bar" style="width:0%"></i></div>
+        <div class="dc-note" id="load-note">-</div>
+      </div>
+      <div class="card dc home4" style="--accent:#526d82">
+        <div class="dc-head"><span class="dc-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h11v10H2zM13 9h5l3 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M10 11H4M6 9l-2 2 2 2"/></svg></span><span class="dc-text"><small>Trailers back from the routes</small><strong>Unloading</strong><em>Cases returned, product returns to the cooler, and trailers to wash.</em></span></div>
+        <div class="dc-links two" id="links-unload"></div>
+        <div class="dc-metrics n4"><span class="dc-metric"><em>Total</em><b data-n="unload.total">-</b><small>Trailers</small></span><span class="dc-metric"><em>Waiting</em><b data-n="unload.waiting">-</b><small>Waiting</small></span><span class="dc-metric"><em>Unloading</em><b data-n="unload.unloading">-</b><small>Unloading</small></span><span class="dc-metric"><em>Done</em><b data-n="unload.done">-</b><small>Complete</small></span></div>
+        <div class="dc-bar"><i id="unload-bar" style="width:0%"></i></div>
+        <div class="dc-note" id="unload-note">-</div>
+      </div>
+      <div class="card dc home4" style="--accent:#0093b5">
+        <div class="dc-head"><span class="dc-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3s-6 7-6 11a6 6 0 0012 0c0-4-6-11-6-11z"/><path d="M9.5 15a2.5 2.5 0 002.5 2.5"/></svg></span><span class="dc-text"><small>Trailer washing</small><strong>Washing</strong><em>Trailers drivers and the dock asked to have washed.</em></span></div>
+        <div class="dc-links two" id="links-wash"></div>
+        <div class="dc-metrics n2"><span class="dc-metric"><em>Open</em><b data-n="wash.open" data-alert>-</b><small>To wash</small></span><span class="dc-metric"><em>Washed</em><b data-n="wash.done">-</b><small>Today</small></span></div>
+      </div>
+      <div class="card dc home4" style="--accent:#b42332">
+        <div class="dc-head"><span class="dc-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11a5 5 0 010 10H9"/><path d="M8 3L4 7l4 4"/></svg></span><span class="dc-text"><small>Product returns (RTA)</small><strong>Returns</strong><em>Product that came back on the trucks. It goes to the cooler, never dumped.</em></span></div>
+        <div class="dc-links two" id="links-ret"></div>
+        <div class="dc-metrics n2"><span class="dc-metric"><em>Returns</em><b data-n="ret.total">-</b><small>Today</small></span><span class="dc-metric"><em>Pending</em><b data-n="ret.pending" data-alert>-</b><small>Not returned</small></span></div>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import { start, requireSignIn, showError, shortDate, escapeHtml, CURRENT_APP } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as P from './js/plant-core.js';
+
+    const L = window.UDLogic;
+    const params = new URLSearchParams(location.search);
+    const date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
+    const data = { runs: [], journal: [], wash: [], returns: [] };
+    // Unloading, Washing and Returns are built next; until then their links open the current app's plant screens.
+    const OLD_PLANT = CURRENT_APP + 'plant';
+    const link = (href, label, side, alert) => '<a class="dc-link" href="' + href + '"><span>' + escapeHtml(label) + '</span>' + (side !== undefined ? '<b class="dc-side' + (alert ? ' alert' : '') + '">' + escapeHtml(side) + '</b>' : '') + '<i class="dc-arrow">&rarr;</i></a>';
+
+    // Trailers back today: every load delivering today (Joe: unloading counts all routes delivering today), with the
+    // unloading record the dock keeps for it (PLANT_OPERATIONS UNLOADING: WAITING / UNLOADING / COMPLETE).
+    function unloadingNumbers() {
+      const loads = [];
+      data.runs.forEach(run => {
+        if (!P.areaOf(run.loadType) || run.displayPlant === false || String(run.routeStatus || '').toUpperCase() === 'INACTIVE') return;
+        const p = L.dayPrefix(date), d = run.days && run.days[p];
+        if (d && d.runs && L.weekStart(date) === run.weekStart) loads.push(run);
+      });
+      const recs = data.journal.filter(j => j.type === 'UNLOADING' && j.date === date);
+      const state = (run) => { const r = recs.find(j => (j.runId && j.runId === run.runId) || (j.route === run.route && j.run === run.run)); return r ? r.status : 'WAITING'; };
+      const n = { total: loads.length, waiting: 0, unloading: 0, done: 0 };
+      loads.forEach(run => { const s = state(run); if (s === 'COMPLETE') n.done++; else if (s === 'UNLOADING') n.unloading++; else n.waiting++; });
+      return n;
+    }
+
+    function render() {
+      // Loads Today / Waiting / Loading / Complete count today's loads; yesterday's unfinished ones are added below the bar.
+      const rows = P.loadoutRows(data.runs, date), all = P.counts(rows), c = P.counts(rows.filter(r => !r.prior));
+      const load = { total: c.total, waiting: c.waiting, loading: c.loading, done: c.done };
+      const unload = unloadingNumbers();
+      const washOpen = data.wash.filter(w => ['OPEN', 'NEEDS_REVIEW', 'NEW'].indexOf(w.status) >= 0).length;
+      const washed = data.wash.filter(w => ['COMPLETE', 'COMPLETED', 'DONE', 'CLOSED', 'WASHED'].indexOf(w.status) >= 0 && String(w.completed_at || w.updated_at || '').slice(0, 10) >= date).length;
+      const rets = data.returns.filter(r => r.date === date || ['PENDING_REVIEW', 'PENDING'].indexOf(String(r.disposition || '').toUpperCase()) >= 0);
+      const n = { load, unload, wash: { open: washOpen, done: washed }, ret: { total: rets.length, pending: rets.filter(r => ['RETURNED', 'COMPLETE', 'CLOSED'].indexOf(r.status) < 0).length } };
+      document.querySelectorAll('[data-n]').forEach(el => {
+        const [a, b] = el.dataset.n.split('.');
+        el.textContent = n[a][b];
+        if (el.hasAttribute('data-alert')) el.classList.toggle('alert', Number(n[a][b]) > 0);
+      });
+      document.getElementById('load-bar').style.width = (c.total ? Math.round(c.done * 100 / c.total) : 0) + '%';
+      document.getElementById('load-note').textContent = c.done + ' of ' + c.total + ' loads complete' + (all.prior ? '  ·  + ' + all.prior + ' from yesterday' : '');
+      // Each department's own screens, as on the current app's Plant Menu.
+      document.getElementById('links-load').innerHTML = P.AREAS.map(a => { const ac = P.counts(rows.filter(r => r.area === a && !r.prior)); return link('loadout.html?date=' + date + '&area=' + a, P.AREA[a].title.replace('Daily ', ''), ac.done + ' / ' + ac.total); }).join('');
+      document.getElementById('links-unload').innerHTML = [['Case Unloading', 'CASE'], ['Tote Unloading', 'TOTES'], ['Box Unloading', 'BOXING'], ['Tanker Unloading', 'TANKER']].map(([l]) => link(OLD_PLANT, l)).join('');
+      const openWash = data.wash.filter(w => ['OPEN', 'NEEDS_REVIEW', 'NEW'].indexOf(w.status) >= 0);
+      document.getElementById('links-wash').innerHTML = openWash.slice(0, 3).map(w => link(OLD_PLANT, (w.unit_number || 'Trailer') + ' · ' + (w.wash_reason || w.issue_details || 'Wash'))).join('') + link(OLD_PLANT, 'Truck Washing', openWash.length + ' open', openWash.length > 0);
+      const pend = rets.filter(r => ['RETURNED', 'COMPLETE', 'CLOSED'].indexOf(r.status) < 0);
+      document.getElementById('links-ret').innerHTML = pend.slice(0, 3).map(r => { const run = data.runs.find(x => x.runId === r.run_id); return link(OLD_PLANT, (run ? run.route + ' · ' : '') + (r.reason_details || r.issue_details || 'Product return'), 'Pending', true); }).join('') + link(OLD_PLANT, 'Product Returns', pend.length + ' pending', pend.length > 0);
+      document.getElementById('unload-bar').style.width = (unload.total ? Math.round(unload.done * 100 / unload.total) : 0) + '%';
+      document.getElementById('unload-note').textContent = unload.done + ' of ' + unload.total + ' trailers unloaded';
+    }
+
+    requireSignIn(async () => {
+      const { db } = await start();
+      document.getElementById('today').textContent = L.dayName(date) + ' ' + shortDate(date);
+      document.getElementById('today').title = 'Operating day (rolls at 6 AM)';
+      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
+      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the loads'));
+      onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { data.journal = s.docs.map(d => d.data()); render(); }, fail('the plant journal'));
+      onSnapshot(collection(db, 'plantWash'), s => { data.wash = s.docs.map(d => d.data()); render(); }, fail('the wash list'));
+      onSnapshot(collection(db, 'plantReturns'), s => { data.returns = s.docs.map(d => d.data()); render(); }, fail('the returns list'));
+      onSnapshot(doc(db, 'config', 'app'), snap => {
+        const c = snap.data() || {};
+        const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
+        document.getElementById('copied').textContent = at ? 'Last Sync: ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy';
+      });
+      render();
+    });
+  </script>
+</body>
+</html>

@@ -43,7 +43,9 @@ const ICON = {
   check: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 12l3 3 5-6"/>',
   swap: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
   issue: '<path d="M4 20h16"/><path d="M6 20V9l6-5 6 5v11"/><path d="M12 10v4M12 16.5v.5"/>',
-  alert: '<path d="M12 3l9 17H3z"/><path d="M12 10v4M12 17v.5"/>'
+  alert: '<path d="M12 3l9 17H3z"/><path d="M12 10v4M12 17v.5"/>',
+  factory: '<path d="M3 21V10l6 3V10l6 3V6l6-3v18z"/><path d="M7 17h2M12 17h2M17 17h2"/>',
+  load: '<path d="M2 6h11v10H2zM13 9h5l3 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M5 9h5M5 12h5"/>'
 };
 export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
@@ -52,7 +54,9 @@ export const MENU = [
   ['Equipment', [['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'], ['Garage Work Orders', 'garage.html', 'wrench'], ['Fleet Service', 'fleet.html', 'gear']]],
   ['GPS / Fleet', [['GPS Setup', 'gps.html', 'gear'], ['Trucks Today', CURRENT_APP + 'trucks-today', 'pin'], ['Driver Scorecard', 'scorecard.html', 'star']]],
   ['Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road']]],
-  ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Sheet Conflicts', 'conflicts.html', 'alert']]]
+  ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Sheet Conflicts', 'conflicts.html', 'alert']]],
+  // The plant side (the current app's Plant Menu): the departments page and each department's screen.
+  ['Plant', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load']]]
 ];
 function addSideMenu() {
   const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
@@ -63,7 +67,7 @@ function addSideMenu() {
   nav.className = 'sidemenu';
   nav.setAttribute('aria-label', 'Screens');
   // Joe 10/9: the menu lists only the sections; hovering (or tapping) a section opens its screens beside it.
-  const SECTION_ICON = { 'GPS / Fleet': 'pin', Dispatch: 'day', Drivers: 'people', Equipment: 'truck', Reports: 'star', Overall: 'check' };
+  const SECTION_ICON = { Plant: 'factory', 'GPS / Fleet': 'pin', Dispatch: 'day', Drivers: 'people', Equipment: 'truck', Reports: 'star', Overall: 'check' };
   const link = ([label, href, icon]) => {
     const ext = /^https:/.test(href);
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
