@@ -1321,3 +1321,8 @@ body.embed .head > .title { display: none; }
 .vac-view select { height: 38px; min-width: 190px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 15px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--ud-blue); background: #fff; cursor: pointer; }
 #day-modal .notice.error { margin: 0 0 10px; }
 @media print { body:has(#print .vac-print) { background: #fff !important; } #print .vac-print-sub { margin: 0 0 8px; font-size: 12px; } #print table.vac-print { width: 100%; font-size: 12px; } #print table.vac-print :is(td, th):is(:first-child, :last-child) { text-align: left; } }
+
+/* Readable tables (Joe 10/10): Daily, Driver Check-ins and Sheet Conflicts keep 16px rows; a busy day scrolls inside the table. */
+.sheet.fit-scroll { overflow-y: auto !important; overflow-x: hidden; }
+.sheet.fit-scroll thead th { position: sticky; top: 0; z-index: 2; }
+@media print { .sheet.fit-scroll { max-height: none !important; overflow: visible !important; } }
