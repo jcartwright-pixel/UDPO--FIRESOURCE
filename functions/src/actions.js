@@ -62,7 +62,10 @@ const ACTIONS = Object.freeze({
   // The plant side (plant.js): Loadout Center loads and pickups.
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   addPickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
-  completePickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' }
+  completePickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  // Unloading & Washing, Product Returns and Truck Washing.
+  saveUnloading: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plant' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -262,6 +265,8 @@ function validate(input) {
     return out;
   }
   if (action === 'addPickup' || action === 'completePickup') return Object.assign(out, PLANT.validatePickup(action, input, SaveError));
+  if (action === 'saveUnloading') return Object.assign(out, PLANT.validateUnload(input, SaveError));
+  if (action === 'completeWash') return Object.assign(out, PLANT.validateWash(input, SaveError));
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
     if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
@@ -429,6 +434,8 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveRoute') return saveRoute(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderRouteDay') return reorderRouteDay(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'addPickup' || req.action === 'completePickup') return PLANT.savePickup(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveUnloading') return PLANT.saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, queueSheetCells);
+    if (req.action === 'completeWash') return PLANT.saveWash(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);

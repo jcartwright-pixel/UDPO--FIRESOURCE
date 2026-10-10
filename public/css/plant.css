@@ -86,3 +86,79 @@
   .plant-page .hstats div { min-width: 70px; }
   .plant-page .hstats b { font-size: 20px; }
 }
+
+/* Unloading & Washing, Product Returns, Truck Washing (the current app's uw- screens). */
+.plant-page .areas.six { grid-template-columns: repeat(6, 1fr); }
+.plant-page a.area { text-decoration: none; }
+.plant-page .area small b { font-weight: 900; }
+.plant-page .area small b.w { color: #516273; } .plant-page .area small b.u { color: #b45f00; } .plant-page .area small b.d { color: var(--runs-ink); }
+.plant-page .area small b.r { color: #b42332; } .plant-page .area small b.o { color: #0080a0; }
+.plant-page .hstats .bad b { color: #b42332; }
+.plant-page .hstats .wash b { color: #0080a0; }
+.plant-page .head .tabs.mode button { white-space: nowrap; }
+.plant-page .uw-tabrow { display: flex; align-items: center; gap: 12px; margin: 0 16px; }
+.plant-page .uw-scope { font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.plant-page .uw-banner { display: flex; align-items: center; gap: 14px; margin: 0 16px; padding: 8px 14px; border-radius: 10px; background: #fde5e3; border: 1px solid #f2b8b2; color: #8f1d1d; }
+.plant-page .uw-banner span { flex: 1; color: #8f1d1d; font-weight: 600; }
+.plant-page .uw-banner a { color: #b42332; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.plant-page .uw-split { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+.plant-page .uw-split > .sheet { flex: 1 1 auto; min-width: 0; }
+.plant-page .uw-side { flex: 0 0 240px; margin-right: 16px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.plant-page .uw-side h2 { margin: 0 0 4px; font-size: 13px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--ud-blue); }
+.plant-page .uw-side h3 { margin: 8px 0 0; font-size: 12px; font-weight: 900; letter-spacing: .08em; color: var(--muted); }
+.plant-page .uw-side hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
+.plant-page .uw-side .line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; color: var(--muted); }
+.plant-page .uw-side .line b { font-size: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.plant-page .uw-side .line.w b { color: #516273; } .plant-page .uw-side .line.u b { color: #b45f00; } .plant-page .uw-side .line.d b { color: var(--runs-ink); }
+.plant-page .uw-side .line.r b { color: #b42332; } .plant-page .uw-side .line.o b { color: #0080a0; }
+.plant-page table.unload td.rr { text-align: left; padding-left: 14px; }
+.plant-page td.rr b { display: block; font-size: 17px; color: var(--ud-blue-dark); }
+.plant-page td.rr span { display: block; font-size: 12px; color: var(--muted); }
+.plant-page .trl { display: inline-block; padding: 3px 10px; border-radius: 7px; background: var(--band); color: var(--ud-blue-dark); font-weight: 800; }
+.plant-page small.next { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.plant-page .na { color: #9aa8b6; }
+.plant-page .chk { font-weight: 800; white-space: nowrap; }
+.plant-page .chk.ok { color: var(--runs-ink); }
+.plant-page .chk.na { color: #9aa8b6; font-weight: 700; }
+.plant-page .pill { display: inline-block; min-width: 92px; padding: 5px 10px; border-radius: 14px; font-size: 13px; font-weight: 800; border: 1px solid var(--line); background: #eef2f5; color: #516273; }
+.plant-page .pill.run { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
+.plant-page .pill.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
+.plant-page .pill.ret, .plant-page .pill.pend { background: #fde5e3; color: #b42332; border-color: #f2b8b2; }
+.plant-page .pill.washp { background: #e0f4f9; color: #006b86; border-color: #9fd6e4; }
+.plant-page button.rta, .plant-page button.wash { min-width: 70px; height: 30px; border-radius: 8px; border: 0; color: #fff; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.plant-page button.rta { background: #b42332; }
+.plant-page button.wash { background: #e5891a; }
+.plant-page tr.needs-return > td:first-child { box-shadow: inset 5px 0 0 #b42332; }
+.plant-page tr.editrow > td { background: #f4f8fc !important; text-align: left; }
+.plant-page .editbar { display: flex; align-items: flex-end; gap: 12px; padding: 6px 8px; flex-wrap: wrap; }
+.plant-page .editbar > b { align-self: center; color: var(--ud-blue-dark); }
+.plant-page .editbar .read { align-self: center; color: var(--muted); font-size: 13px; }
+.plant-page .editbar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.plant-page .editbar label.grow { flex: 1; min-width: 200px; }
+.plant-page .editbar input { width: auto; min-width: 110px; }
+.plant-page .editbar button { height: 34px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; color: var(--ud-blue); }
+.plant-page .editbar button.primary { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.plant-page .addwash { display: flex; align-items: flex-end; gap: 12px; margin: 0 16px; padding: 8px 14px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.plant-page .addwash label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.plant-page .addwash input { height: 34px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; font: inherit; }
+.plant-page .addwash > b { align-self: center; color: var(--ud-blue-dark); }
+.plant-page .addwash button, .plant-page button.addwash-open { height: 34px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; color: var(--ud-blue); }
+.plant-page .addwash button.wash, .plant-page button.addwash-open { background: #e5891a; border-color: #e5891a; color: #fff; }
+.plant-page .uw-side .repeat { display: flex; justify-content: space-between; font-size: 14px; color: var(--muted); margin: 0; }
+.plant-page .uw-side .repeat b { color: var(--ink); }
+.plant-page table.unload td.detail { text-align: left; }
+@media (max-width: 1500px) {
+  .plant-page .areas.six { gap: 8px; }
+  .plant-page .areas.six .area small { font-size: 11px; }
+  .plant-page .uw-side { flex-basis: 200px; }
+  .plant-page td.rr b { font-size: 15px; }
+}
+@media (max-width: 1500px) {
+  /* Smaller screens: the day is in the date box, so the big day name gives its room to the counts. */
+  .unload-page .dayname, .returns-page .dayname, .washing-page .dayname { display: none; }
+  .unload-page .hstats { gap: 6px; }
+  .unload-page .hstats div { min-width: 60px; padding: 3px 8px; }
+  .unload-page .hstats b { font-size: 18px; }
+  .unload-page .hstats span { font-size: 10px; }
+  .plant-page small.next { font-size: 11px; }
+}

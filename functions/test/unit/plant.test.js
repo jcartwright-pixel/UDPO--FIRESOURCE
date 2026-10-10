@@ -72,3 +72,52 @@ test('a plant tab that cannot be read is skipped and the rest are read', async (
   // Without live.plant nothing in the Live workbook is read for the plant.
   assert.deepEqual(Object.keys((await P.readPlant(reader, { live: { spreadsheetId: 'live' } })).lists), []);
 });
+
+const fs = require('node:fs');
+const path = require('node:path');
+const R = require('../../src/plant-rules');
+
+test('the screens and the server load the same plant rules file', () => {
+  assert.equal(fs.readFileSync(path.join(__dirname, '../../src/plant-rules.js'), 'utf8'), fs.readFileSync(path.join(__dirname, '../../../public/js/plant-rules.js'), 'utf8'));
+});
+
+test('the newest unloading record is the unloading now, and returns put back add up', () => {
+  const docs = [
+    { type: 'UNLOADING', date: '2026-10-08', recordedAt: '2026-10-08T15:00:00Z', payload: { unloadKey: '2026-10-08|801|MILK', startedAt: 'a', productReturnRemovedIds: ['r1'] } },
+    { type: 'UNLOADING', date: '2026-10-08', recordedAt: '2026-10-08T15:30:00Z', payload: { unloadKey: '2026-10-08|801|MILK', startedAt: 'a', completedAt: 'b', casesIn: '40', productReturnRemovedIds: [] } },
+    // The app's own record wins over the sheet's even with an older clock.
+    { type: 'UNLOADING', date: '2026-10-08', recordedAt: '2026-10-08T14:00:00Z', createdInApp: true, route: '802', run: 'MILK', payload: { route: '802', run: 'MILK', trailer: 'T-9' } },
+    { type: 'UNLOADING', date: '2026-10-08', recordedAt: '2026-10-08T14:30:00Z', route: '802', run: 'MILK', payload: { route: '802', run: 'MILK', trailer: 'T-1' } },
+    { type: 'RETURN', date: '2026-10-08', payload: {} }
+  ];
+  const u = R.latestUnloads(docs, '2026-10-08');
+  assert.deepEqual(Object.keys(u).sort(), ['2026-10-08|801|MILK', '2026-10-08|802|MILK']);
+  assert.equal(u['2026-10-08|801|MILK'].status, 'COMPLETE');
+  assert.equal(u['2026-10-08|801|MILK'].casesIn, '40');
+  assert.deepEqual(u['2026-10-08|801|MILK'].removed, ['r1']);
+  assert.equal(u['2026-10-08|802|MILK'].trailer, 'T-9');
+  assert.equal(u['2026-10-08|802|MILK'].status, 'WAITING');
+});
+
+test('trailer numbers, washes and wash statuses', () => {
+  assert.equal(R.trailerText(' 977 '), 'T-977');
+  assert.equal(R.trailerText('t-977'), 'T-977');
+  assert.equal(R.unitKey('T-977'), R.unitKey('977'));
+  const done = R.washesDone([{ type: 'WASHING', trailer: 'T-9', status: 'COMPLETE', completedAt: '2026-10-08T10:00:00Z' }, { type: 'WASHING', payload: { trailer: '9', status: 'COMPLETE', completedAt: '2026-10-08T12:00:00Z' } }]);
+  assert.equal(done['9'].completedAt, '2026-10-08T12:00:00Z');
+  assert.equal(R.washOpen('REQUESTED'), true);
+  assert.equal(R.washOpen('COMPLETE'), false);
+});
+
+test('unloading saves: whole quantities, T- trailers, one press at a time', () => {
+  const v = (fields) => P.validateUnload({ date: '2026-10-08', route: '801', run: 'MILK', fields }, SaveError).unload;
+  assert.deepEqual(v({ casesIn: '1,240', trailer: '977' }), { casesIn: '1240', trailer: 'T-977' });
+  assert.deepEqual(v({ casesIn: '0' }), { casesIn: '0' });
+  assert.throws(() => v({ casesIn: '3.5' }), /whole quantity/);
+  assert.throws(() => v({ start: true, end: true }), /two presses/);
+  assert.throws(() => v({}), /Nothing to save/);
+  assert.throws(() => P.validateUnload({ date: 'x', route: '801', run: 'M', fields: { start: true } }, SaveError), /yyyy-mm-dd/);
+  assert.deepEqual(P.validateWash({ date: '2026-10-08', trailer: '951', close: [{ list: 'plantWash', id: 'w1' }] }, SaveError), { date: '2026-10-08', trailer: 'T-951', close: [{ list: 'plantWash', id: 'w1' }] });
+  assert.throws(() => P.validateWash({ date: '2026-10-08', trailer: '951', close: [{ list: 'runs', id: 'x' }] }, SaveError), /wash request/);
+  assert.throws(() => P.validateWash({ date: '2026-10-08', trailer: '' }, SaveError), /trailer number/);
+});

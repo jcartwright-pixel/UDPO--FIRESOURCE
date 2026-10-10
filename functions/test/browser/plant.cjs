@@ -129,9 +129,13 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       const home = await openPage(browser, w, h, '/plant.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
       await home.waitForFunction(() => document.querySelector('[data-n="load.total"]').textContent === '16');
-      assert.equal(await home.textContent('[data-n="unload.done"]'), '1');
-      assert.equal(await home.textContent('[data-n="unload.total"]'), '1');
-      assert.equal(await home.textContent('[data-n="wash.open"]'), '2');
+      // Thursday's trailers back: 16 runs plus 6303; 6303 and 802 unloaded, 805 unloading (plant-demo.js).
+      await home.waitForFunction(() => document.querySelector('[data-n="unload.total"]').textContent === '17');
+      assert.equal(await home.textContent('[data-n="unload.done"]'), '2');
+      assert.equal(await home.textContent('[data-n="unload.unloading"]'), '1');
+      // T-951 and T-960 asked for a wash; T-993 was unloaded and not washed yet.
+      assert.equal(await home.textContent('[data-n="wash.open"]'), '3');
+      assert.equal(await home.textContent('[data-n="ret.pending"]'), '2');
       if (SHOTS) {
         await home.screenshot({ path: path.join(SHOTS, 'departments-' + w + '.png'), scale: 'css' });
         if (w === 1920) await home.screenshot({ path: path.join(SHOTS, 'departments-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 475 }, scale: 'device' });

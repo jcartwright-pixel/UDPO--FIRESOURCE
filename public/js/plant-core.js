@@ -146,3 +146,123 @@ export function localToStamp(local) {
   }
   return new Date(Date.parse(local + ':00Z') + 5 * 3600000).toISOString();
 }
+
+/* ---------- Unloading & Washing, Product Returns, Truck Washing ---------- */
+// The shared rules (js/plant-rules.js, the same file the server uses).
+const U = window.UDPlant;
+export const UNLOAD_UNIT = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Gallons' };
+export const UNLOAD_TILE = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Tankers' };
+const txt = (v) => (v === null || v === undefined ? '' : String(v).trim());
+const reported = (v) => !!txt(v) && !L.noWriteUp(v);
+
+/*
+ * Product returns for one date (getDesktopUiProductReturnsCurrent): the plant journal's RETURN records, plus every driver
+ * check-in that reported cases back or refused / returned product. Pending until RTA (put back in the cooler, never dumped).
+ */
+export function returnsFor(runs, date, journal) {
+  const removed = {}, unloads = U.latestUnloads(journal, date), out = [];
+  Object.keys(unloads).forEach(k => unloads[k].removed.forEach(id => { removed[id] = true; }));
+  (journal || []).forEach(d => {
+    if (String(d.type || '').toUpperCase() !== 'RETURN' || d.date !== date) return;
+    const p = d.payload || {};
+    out.push({ id: d.recordId, source: 'RETURN', route: txt(p.route || d.route), run: txt(p.run || d.run), trailer: txt(p.trailer || d.trailer), cases: txt(p.casesReturned || p.quantity || d.quantity),
+      refused: !!p.refusedReturned, detail: txt(p.notes || p.description || d.notes) || 'Returned product reported', recordedAt: d.recordedAt || '' });
+  });
+  const prefix = L.dayPrefix(date), week = L.weekStart(date);
+  (runs || []).forEach(run => {
+    const d = run.weekStart === week && run.days && run.days[prefix];
+    if (!d || !d.runs) return;
+    const cases = Number(String(d.driverCaseReturn == null ? '' : d.driverCaseReturn).replace(/,/g, '')) || 0, refused = reported(d.refusedReturned);
+    if (cases <= 0 && !refused) return;
+    out.push({ id: 'CHECKIN|' + run.id + '|' + prefix, source: 'DRIVER CHECK-IN', runDocId: run.id, day: prefix, route: txt(run.route), run: txt(run.run), trailer: txt(d.trailer), cases: cases ? String(cases) : '',
+      refused, detail: [txt(d.refusedReturned), txt(d.refusedReturnedSource)].filter(Boolean).join(' · ') || txt(d.checkinNotes) || 'Returned product reported at driver check-in', recordedAt: d.checkinCompletedAt || '' });
+  });
+  out.forEach(x => { x.pending = !removed[x.id]; });
+  return out.sort((a, b) => String(b.recordedAt).localeCompare(String(a.recordedAt)) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
+}
+
+/*
+ * Open wash items on a date (udpoInboundWashingRows_ plus the unloading rule): the wash requests on WASH / CLEANING LIVE
+ * (the sheet's copy and the ones the app's check-ins made) reported on or before the date and not done, and each trailer
+ * unloaded that day with its number typed, until a wash of it is recorded after the unload ended.
+ * sheet / app = docs with _list and _id (where they live, so a Wash press can close them).
+ */
+export function washItems(date, sheet, app, journal) {
+  const out = [], byRecord = {};
+  (sheet || []).concat(app || []).forEach(w => {
+    if (String(w.kind || 'WASH').toUpperCase() !== 'WASH' || !U.washOpen(w.status)) return;
+    const on = L.dateKey(w.service_date) || w.date || '';
+    if (!on || on > date) return;
+    const ref = { list: w._list, id: w._id };
+    if (byRecord[w.record_id]) { byRecord[w.record_id].refs.push(ref); return; }
+    const item = { id: 'REQ|' + w.record_id, kind: 'REQUEST', trailer: txt(w.unit_number), route: '', run: '', runId: txt(w.run_id), need: txt(w.wash_reason || w.issue_details || w.notes) || 'Cleaning requested',
+      reported: w.opened_at || on, refs: [ref] };
+    byRecord[w.record_id] = item;
+    out.push(item);
+  });
+  const done = U.washesDone(journal), unloads = U.latestUnloads(journal, date);
+  Object.keys(unloads).forEach(k => {
+    const u = unloads[k], unit = U.unitKey(u.trailer);
+    if (!u.completedAt || !unit) return;
+    if (done[unit] && U.when(done[unit].completedAt) >= U.when(u.completedAt)) return;
+    out.push({ id: 'UNLOAD|' + k, kind: 'UNLOAD', trailer: txt(u.trailer), route: u.route, run: u.run, need: 'Trailer washing required after unloading', reported: u.completedAt, refs: [] });
+  });
+  return out;
+}
+
+// The wash items that belong to an unloading row: its own route and run, or (for a request with no run) the same trailer.
+export function washesForRow(row, items) {
+  const unit = U.unitKey(row.trailer || row.truck);
+  return (items || []).filter(w => (w.route || w.run ? w.route === row.route && w.run === row.run : (w.runId && w.runId === row.runId) || (!!unit && U.unitKey(w.trailer) === unit)));
+}
+
+/*
+ * Trailers back on `date`: every load delivering that day (Joe: unloading counts all routes delivering today), with the
+ * unloading record kept for it, its returns, and the next load that needs the same trailer (loads = loadoutRows of the date).
+ */
+export function unloadRows(runs, date, journal, returns, loads) {
+  const prefix = L.dayPrefix(date), week = L.weekStart(date), unloads = U.latestUnloads(journal, date), done = U.washesDone(journal), rows = [];
+  (runs || []).forEach(run => {
+    const area = areaOf(run.loadType), d = run.weekStart === week && run.days && run.days[prefix];
+    if (!area || !shownForPlant(run) || !d || !d.runs) return;
+    const key = U.unloadKey(date, run.route, run.run), u = unloads[key] || {};
+    const trailer = u.trailer !== undefined && u.trailer !== '' ? u.trailer : run.dropAndHook ? '' : txt(d.trailer);
+    const mine = (returns || []).filter(x => (x.runDocId ? x.runDocId === run.id : x.route === txt(run.route) && x.run === txt(run.run)));
+    const unit = U.unitKey(trailer || d.truck), wash = done[unit];
+    rows.push({ id: key, key, runDocId: run.id, day: prefix, route: txt(run.route), run: txt(run.run), runId: run.runId || '', area, driver: d.driver || '', truck: txt(d.truck), trailer,
+      trailerTyped: u.trailer !== undefined && u.trailer !== '', dropAndHook: !!run.dropAndHook, casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn),
+      startedAt: u.startedAt || '', completedAt: u.completedAt || '', notes: u.notes || '', status: u.status || 'WAITING', returns: mine, pendingReturns: mine.filter(x => x.pending),
+      washed: !!(wash && (!u.completedAt || U.when(wash.completedAt) >= U.when(u.completedAt))), checkedIn: !!d.checkinCompletedAt, nextLoad: null, nextRank: 999999 });
+  });
+  // When each trailer is next needed: the first unfinished load (in loading order) that uses the same unit.
+  (loads || []).forEach((l, i) => {
+    if (l.state === 'DONE') return;
+    const unit = U.unitKey(l.trailer || l.truck);
+    if (!unit) return;
+    rows.forEach(r => {
+      if (r.nextLoad || U.unitKey(r.trailer || (r.dropAndHook ? '' : r.truck)) !== unit || (l.prior && l.runDocId === r.runDocId)) return;
+      r.nextLoad = { route: l.route, run: l.run, time: timeOfDay(l.dispatchTime) }; r.nextRank = i;
+    });
+  });
+  const order = { UNLOADING: 0, WAITING: 2, COMPLETE: 3 };
+  return rows.sort((a, b) => (order[a.status] - order[b.status]) || a.nextRank - b.nextRank || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
+}
+
+export function unloadCounts(rows) {
+  const c = { total: rows.length, waiting: 0, unloading: 0, complete: 0, qty: 0, mins: [] };
+  rows.forEach(r => {
+    c[r.status === 'COMPLETE' ? 'complete' : r.status === 'UNLOADING' ? 'unloading' : 'waiting']++;
+    if (r.casesIn !== '') c.qty += Number(r.casesIn) || 0;
+    const a = Date.parse(r.startedAt), b = Date.parse(r.completedAt);
+    if (r.status === 'COMPLETE' && isFinite(a) && isFinite(b) && b >= a) c.mins.push((b - a) / 60000);
+  });
+  c.avg = c.mins.length ? Math.round(c.mins.reduce((t, m) => t + m, 0) / c.mins.length) : null;
+  return c;
+}
+
+// "Oct 8, 4:10 AM" for a stamp, "" when not set.
+export function shortStamp(stamp) {
+  const t = Date.parse(stamp || '');
+  if (!isFinite(t)) return txt(stamp);
+  return new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(t));
+}

@@ -15,6 +15,8 @@
 
 const L = require('./logic');
 const MAINT = require('./maintenance');
+const R = require('./plant-rules');
+const { queueMaster } = require('./masterwrite');
 
 // Everyone who may save on Daily Dispatch, plus the plant floor.
 const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
@@ -254,5 +256,132 @@ async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
   return result;
 }
 
+/* ---------- unloading, product returns and washing ---------- */
+
+// saveUnloading: Start, End, the quantity in, the trailer back, notes, and RTA (returns put back in the cooler).
+function validateUnload(input, SaveError) {
+  const out = { date: text(input.date), route: text(input.route).slice(0, 60), run: text(input.run).slice(0, 120), runDocId: text(input.runDocId).slice(0, 200), day: text(input.day).slice(0, 10) };
+  if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+  if (!out.route || !out.run) throw new SaveError('BAD_REQUEST', 'Pick the load');
+  if (out.day && L.DAYS.indexOf(out.day) < 0) throw new SaveError('BAD_REQUEST', 'day must be sun to sat');
+  const f = input.fields || {}, u = {};
+  if (f.start === true) u.start = true;
+  if (f.end === true) u.end = true;
+  if (u.start && u.end) throw new SaveError('BAD_REQUEST', 'Start and End are two presses');
+  if (f.casesIn !== undefined) {
+    const t = text(f.casesIn).replace(/,/g, '');
+    if (t !== '' && (!/^\d+$/.test(t) || Number(t) > 999999)) throw new SaveError('BAD_REQUEST', 'Enter a whole quantity, including zero if none.');
+    u.casesIn = t === '' ? '' : String(Number(t));
+  }
+  if (f.trailer !== undefined) u.trailer = R.trailerText(f.trailer).slice(0, 60);
+  if (f.notes !== undefined) u.notes = text(f.notes).slice(0, 1200);
+  if (f.returnIds !== undefined) {
+    if (!Array.isArray(f.returnIds) || f.returnIds.length > 30) throw new SaveError('BAD_REQUEST', 'returnIds must be a list');
+    u.returnIds = f.returnIds.map(x => text(x).slice(0, 300)).filter(Boolean);
+    if (!u.returnIds.length) throw new SaveError('BAD_REQUEST', 'Pick the return');
+  }
+  if (!Object.keys(u).length) throw new SaveError('BAD_REQUEST', 'Nothing to save');
+  out.unload = u;
+  return out;
+}
+
+const appUnloadId = (key) => docId('UNLOADING_app_' + key);
+// A driver check-in that reported product back is a return too (the current app's ROUTE_CHECKIN returns).
+const checkinReturnId = (runDocId, day) => 'CHECKIN|' + runDocId + '|' + day;
+
+async function saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, queueSheetCells) {
+  const key = R.unloadKey(req.date, req.route, req.run), u = req.unload;
+  const dayDocs = (await tx.get(db.collection('plantJournal').where('date', '==', req.date))).docs.map(d => d.data());
+  const runRef = req.runDocId ? db.collection('runs').doc(req.runDocId) : null;
+  const runSnap = runRef ? await tx.get(runRef) : null;
+  // All reads are done; the rest works out the new record and writes it.
+  const all = R.latestUnloads(dayDocs, req.date), prev = all[key] || { removed: [], casesIn: '', startedAt: '', completedAt: '', notes: '' };
+  const next = { unloadKey: key, route: req.route, run: req.run, casesIn: prev.casesIn === undefined || prev.casesIn === null ? '' : String(prev.casesIn), startedAt: prev.startedAt || '',
+    completedAt: prev.completedAt || '', notes: prev.notes || '', productReturnRemovedIds: prev.removed.slice() };
+  if (prev.trailer !== undefined) next.trailer = prev.trailer;
+  if (u.returnIds) {
+    const known = dayDocs.filter(d => String(d.type).toUpperCase() === 'RETURN' && text((d.payload || {}).route || d.route) === req.route && text((d.payload || {}).run || d.run) === req.run).map(d => d.recordId);
+    if (req.runDocId && req.day) known.push(checkinReturnId(req.runDocId, req.day));
+    if (u.returnIds.some(id => known.indexOf(id) < 0)) throw new SaveError('CONFLICT', 'That product return no longer matches this run. The list was refreshed; try again.');
+    u.returnIds.forEach(id => { if (next.productReturnRemovedIds.indexOf(id) < 0) next.productReturnRemovedIds.push(id); });
+    next.productReturnRemovedAt = stamp;
+  }
+  if (u.trailer !== undefined) next.trailer = u.trailer;
+  if (u.notes !== undefined) next.notes = u.notes;
+  if (u.casesIn !== undefined) next.casesIn = u.casesIn;
+  if (u.start && !next.startedAt) {
+    // One unload at a time, as on the current app.
+    const active = Object.keys(all).filter(k => k !== key && all[k].startedAt && !all[k].completedAt)[0];
+    if (active) throw new SaveError('CONFLICT', 'Stop unloading ' + all[active].route + ' · ' + all[active].run + ' before starting another.');
+    next.startedAt = stamp;
+  }
+  if (u.end) {
+    if (!next.startedAt) throw new SaveError('BAD_REQUEST', 'Start unloading before ending.');
+    if (next.casesIn === '') throw new SaveError('BAD_REQUEST', 'Enter the quantity before ending unloading.');
+    next.completedAt = next.completedAt || stamp;
+  }
+  const status = next.completedAt ? 'COMPLETE' : next.startedAt ? 'UNLOADING' : 'WAITING';
+  const run = runSnap && runSnap.exists ? runSnap.data() : null;
+  const doc = { recordId: key, type: 'UNLOADING', date: req.date, status, route: req.route, run: req.run, runId: (run && run.runId) || '', runDocId: req.runDocId || '', day: req.day || '',
+    trailer: next.trailer || '', quantity: next.casesIn, startedAt: next.startedAt, completedAt: next.completedAt, notes: next.notes, area: '', payload: next,
+    recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp };
+  tx.set(db.collection('plantJournal').doc(appUnloadId(key)), doc);
+  const result = { ok: true, requestId: req.requestId, status, runs: [] };
+  // The quantity in also goes on the Live week as the plant's case return, as the current app writes it.
+  const day = run && run.days && req.day ? run.days[req.day] : null;
+  if (u.casesIn !== undefined && day) {
+    const v = next.casesIn === '' ? null : Number(next.casesIn);
+    if ((day.plantCaseReturn === undefined ? null : day.plantCaseReturn) !== v) {
+      tx.update(runRef, { ['days.' + req.day + '.plantCaseReturn']: v, rev: (run.rev || 0) + 1, testEdited: true, editedAt: stamp });
+      if (mode.writeBack) queueSheetCells(tx, db, req.requestId, 'u', run, req.runDocId, req.day, { plantCaseReturn: v }, stamp, email);
+      result.runs.push({ runDocId: req.runDocId, rev: (run.rev || 0) + 1 });
+    }
+  }
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, unloadKey: key, before: prev.key ? { status: prev.status, casesIn: prev.casesIn, trailer: prev.trailer || '' } : null, after: { status, casesIn: next.casesIn, trailer: next.trailer || '', returns: u.returnIds || [] }, result });
+  return result;
+}
+
+// completeWash: a trailer was washed. Closes the wash requests picked for it (the sheet's and the app's) and records the
+// wash, which also clears the "wash after unloading" for that trailer. addWash ("+ Add Wash") is the same press for a
+// trailer typed in by hand.
+const WASH_LISTS = ['plantWash', 'maintenance'];
+function validateWash(input, SaveError) {
+  const out = { date: text(input.date), trailer: R.trailerText(input.trailer).slice(0, 60), close: [] };
+  if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+  if (!out.trailer) throw new SaveError('BAD_REQUEST', 'Enter the trailer number.');
+  const close = input.close === undefined ? [] : input.close;
+  if (!Array.isArray(close) || close.length > 20) throw new SaveError('BAD_REQUEST', 'close must be a list');
+  close.forEach(c => {
+    const list = text(c && c.list), id = text(c && c.id).slice(0, 200);
+    if (WASH_LISTS.indexOf(list) < 0 || !id) throw new SaveError('BAD_REQUEST', 'Pick the wash request');
+    out.close.push({ list, id });
+  });
+  return out;
+}
+
+async function saveWash(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const refs = req.close.map(c => db.collection(c.list).doc(c.id));
+  const snaps = refs.length ? await tx.getAll(...refs) : [];
+  const unit = R.unitKey(req.trailer), closed = [];
+  const change = { status: 'COMPLETE', wash_status: 'CLEANED', completed_at: stamp, completed_by: email, resolution: 'CLEANED', updated_at: stamp, updated_by: email };
+  snaps.forEach((s, i) => {
+    if (!s.exists) return;
+    const r = s.data();
+    if (R.unitKey(r.unit_number) !== unit) throw new SaveError('BAD_REQUEST', 'That wash request is for trailer ' + (r.unit_number || '(none)'));
+    if (!R.washOpen(r.status)) return;
+    tx.update(refs[i], Object.assign({}, change, { testEdited: true, editedAt: stamp, editedBy: email }));
+    // With the write-back on, the sandbox Live workbook's WASH / CLEANING LIVE row is marked done too.
+    queueMaster(tx, db, mode, req.requestId, 'w' + i, refs[i], r.record_id, r.createdInApp ? Object.assign({}, r, change) : change, !!r.createdInApp, stamp, email, MAINT.LISTS.WASH);
+    closed.push(r.record_id);
+  });
+  const id = 'WASHING_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+  const payload = { trailer: req.trailer, status: 'COMPLETE', completedAt: stamp, completedBy: email, closed };
+  tx.set(db.collection('plantJournal').doc(id), { recordId: 'WASH|' + req.date + '|' + req.trailer, type: 'WASHING', date: req.date, status: 'COMPLETE', trailer: req.trailer, completedAt: stamp,
+    payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  const result = { ok: true, requestId: req.requestId, trailer: req.trailer, closed, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, trailer: req.trailer, after: payload, result });
+  return result;
+}
+
 module.exports = { PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
-  validateLoad, loadValues, validatePickup, savePickup };
+  validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId };

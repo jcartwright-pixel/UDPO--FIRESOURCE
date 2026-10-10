@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
 </head>
 <body class="plant-page">
   <div class="signin" id="signin" hidden>
@@ -51,43 +52,27 @@
     </div>
   </div>
   <script type="module">
-    import { start, requireSignIn, showError, shortDate, escapeHtml, CURRENT_APP } from './js/app.js';
+    import { start, requireSignIn, showError, shortDate, escapeHtml } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
     const L = window.UDLogic;
     const params = new URLSearchParams(location.search);
     const date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
-    const data = { runs: [], journal: [], wash: [], returns: [] };
-    // Unloading, Washing and Returns are built next; until then their links open the current app's plant screens.
-    const OLD_PLANT = CURRENT_APP + 'plant';
+    const data = { runs: [], journal: [], wash: [], appWash: [] };
     const link = (href, label, side, alert) => '<a class="dc-link" href="' + href + '"><span>' + escapeHtml(label) + '</span>' + (side !== undefined ? '<b class="dc-side' + (alert ? ' alert' : '') + '">' + escapeHtml(side) + '</b>' : '') + '<i class="dc-arrow">&rarr;</i></a>';
-
-    // Trailers back today: every load delivering today (Joe: unloading counts all routes delivering today), with the
-    // unloading record the dock keeps for it (PLANT_OPERATIONS UNLOADING: WAITING / UNLOADING / COMPLETE).
-    function unloadingNumbers() {
-      const loads = [];
-      data.runs.forEach(run => {
-        if (!P.areaOf(run.loadType) || run.displayPlant === false || String(run.routeStatus || '').toUpperCase() === 'INACTIVE') return;
-        const p = L.dayPrefix(date), d = run.days && run.days[p];
-        if (d && d.runs && L.weekStart(date) === run.weekStart) loads.push(run);
-      });
-      const recs = data.journal.filter(j => j.type === 'UNLOADING' && j.date === date);
-      const state = (run) => { const r = recs.find(j => (j.runId && j.runId === run.runId) || (j.route === run.route && j.run === run.run)); return r ? r.status : 'WAITING'; };
-      const n = { total: loads.length, waiting: 0, unloading: 0, done: 0 };
-      loads.forEach(run => { const s = state(run); if (s === 'COMPLETE') n.done++; else if (s === 'UNLOADING') n.unloading++; else n.waiting++; });
-      return n;
-    }
 
     function render() {
       // Loads Today / Waiting / Loading / Complete count today's loads; yesterday's unfinished ones are added below the bar.
       const rows = P.loadoutRows(data.runs, date), all = P.counts(rows), c = P.counts(rows.filter(r => !r.prior));
       const load = { total: c.total, waiting: c.waiting, loading: c.loading, done: c.done };
-      const unload = unloadingNumbers();
-      const washOpen = data.wash.filter(w => ['OPEN', 'NEEDS_REVIEW', 'NEW'].indexOf(w.status) >= 0).length;
-      const washed = data.wash.filter(w => ['COMPLETE', 'COMPLETED', 'DONE', 'CLOSED', 'WASHED'].indexOf(w.status) >= 0 && String(w.completed_at || w.updated_at || '').slice(0, 10) >= date).length;
-      const rets = data.returns.filter(r => r.date === date || ['PENDING_REVIEW', 'PENDING'].indexOf(String(r.disposition || '').toUpperCase()) >= 0);
-      const n = { load, unload, wash: { open: washOpen, done: washed }, ret: { total: rets.length, pending: rets.filter(r => ['RETURNED', 'COMPLETE', 'CLOSED'].indexOf(r.status) < 0).length } };
+      // Unloading, washing and returns: the same lists their screens show (plant-core.js).
+      const returns = P.returnsFor(data.runs, date, data.journal), urows = P.unloadRows(data.runs, date, data.journal, returns, rows), uc = P.unloadCounts(urows);
+      const unload = { total: uc.total, waiting: uc.waiting, unloading: uc.unloading, done: uc.complete };
+      const openWash = P.washItems(date, data.wash, data.appWash, data.journal);
+      const washed = data.journal.filter(d => String(d.type).toUpperCase() === 'WASHING').length;
+      const pend = returns.filter(x => x.pending);
+      const n = { load, unload, wash: { open: openWash.length, done: washed }, ret: { total: returns.length, pending: pend.length } };
       document.querySelectorAll('[data-n]').forEach(el => {
         const [a, b] = el.dataset.n.split('.');
         el.textContent = n[a][b];
@@ -97,11 +82,9 @@
       document.getElementById('load-note').textContent = c.done + ' of ' + c.total + ' loads complete' + (all.prior ? '  ·  + ' + all.prior + ' from yesterday' : '');
       // Each department's own screens, as on the current app's Plant Menu.
       document.getElementById('links-load').innerHTML = P.AREAS.map(a => { const ac = P.counts(rows.filter(r => r.area === a && !r.prior)); return link('loadout.html?date=' + date + '&area=' + a, P.AREA[a].title.replace('Daily ', ''), ac.done + ' / ' + ac.total); }).join('');
-      document.getElementById('links-unload').innerHTML = [['Case Unloading', 'CASE'], ['Tote Unloading', 'TOTES'], ['Box Unloading', 'BOXING'], ['Tanker Unloading', 'TANKER']].map(([l]) => link(OLD_PLANT, l)).join('');
-      const openWash = data.wash.filter(w => ['OPEN', 'NEEDS_REVIEW', 'NEW'].indexOf(w.status) >= 0);
-      document.getElementById('links-wash').innerHTML = openWash.slice(0, 3).map(w => link(OLD_PLANT, (w.unit_number || 'Trailer') + ' · ' + (w.wash_reason || w.issue_details || 'Wash'))).join('') + link(OLD_PLANT, 'Truck Washing', openWash.length + ' open', openWash.length > 0);
-      const pend = rets.filter(r => ['RETURNED', 'COMPLETE', 'CLOSED'].indexOf(r.status) < 0);
-      document.getElementById('links-ret').innerHTML = pend.slice(0, 3).map(r => { const run = data.runs.find(x => x.runId === r.run_id); return link(OLD_PLANT, (run ? run.route + ' · ' : '') + (r.reason_details || r.issue_details || 'Product return'), 'Pending', true); }).join('') + link(OLD_PLANT, 'Product Returns', pend.length + ' pending', pend.length > 0);
+      document.getElementById('links-unload').innerHTML = P.AREAS.map(a => { const ac = P.unloadCounts(urows.filter(r => r.area === a)); return link('unloading.html?date=' + date + '&area=' + a, ({ CASE: 'Case', TOTES: 'Tote', BOXING: 'Box', TANKER: 'Tanker' })[a] + ' Unloading', ac.complete + ' / ' + ac.total); }).join('');
+      document.getElementById('links-wash').innerHTML = openWash.slice(0, 3).map(w => link('washing.html?date=' + date, (w.trailer || 'Trailer') + ' · ' + w.need)).join('') + link('washing.html?date=' + date, 'Truck Washing', openWash.length + ' open', openWash.length > 0);
+      document.getElementById('links-ret').innerHTML = pend.slice(0, 3).map(x => link('returns.html?date=' + date, x.route + ' · ' + x.detail, 'Pending', true)).join('') + link('returns.html?date=' + date, 'Product Returns', pend.length + ' pending', pend.length > 0);
       document.getElementById('unload-bar').style.width = (unload.total ? Math.round(unload.done * 100 / unload.total) : 0) + '%';
       document.getElementById('unload-note').textContent = unload.done + ' of ' + unload.total + ' trailers unloaded';
     }
@@ -114,8 +97,8 @@
       const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
       onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the loads'));
       onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { data.journal = s.docs.map(d => d.data()); render(); }, fail('the plant journal'));
-      onSnapshot(collection(db, 'plantWash'), s => { data.wash = s.docs.map(d => d.data()); render(); }, fail('the wash list'));
-      onSnapshot(collection(db, 'plantReturns'), s => { data.returns = s.docs.map(d => d.data()); render(); }, fail('the returns list'));
+      onSnapshot(collection(db, 'plantWash'), s => { data.wash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); render(); }, fail('the wash list'));
+      onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { data.appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); render(); }, fail('the wash requests'));
       onSnapshot(doc(db, 'config', 'app'), snap => {
         const c = snap.data() || {};
         const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
