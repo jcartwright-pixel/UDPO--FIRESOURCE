@@ -185,3 +185,12 @@ test('Temperatures: a manual reading is saved with HIGH / LOW from the limits an
   const rows = R.tempRows((await db().collection('plantSetup').get()).docs.map(d => d.data()), all, Date.now());
   assert.deepEqual(rows.map(r => [r.location, r.lastManualTemperature, r.lastStatus, r.locked]), [['Cooler North', 44.5, 'HIGH', true], ['Cooler Middle', 36, 'RECORDED', true]]);
 });
+
+/* ---------- Send Current Report ---------- */
+test('Send Current Report: the report is kept as sent and not emailed (email is not set up in the new app)', async () => {
+  const res = await applyAction(db(), DISPATCHER, { action: 'sendPlantReport', requestId: rid(), subject: 'Plant Update 10/8 10:00 AM: All routes on time', text: 'ROUTES BEHIND (0)', note: 'Short staffed on second shift' });
+  assert.equal(res.sent, false);
+  assert.match(res.message, /Report saved\. Email is not set up in the new app yet, so it was not emailed to Plant Managers/);
+  const kept = (await db().collection('plantReports').doc(res.reportId).get()).data();
+  assert.deepEqual([kept.subject, kept.note, kept.status, kept.emailed], ['Plant Update 10/8 10:00 AM: All routes on time', 'Short staffed on second shift', 'HELD', false]);
+});

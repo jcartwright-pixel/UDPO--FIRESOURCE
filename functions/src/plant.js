@@ -676,6 +676,26 @@ async function saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
-module.exports = { validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+/* ---------- Send Current Report ---------- */
+
+// sendPlantReport: keeps the report as it was sent (subject, text, note). Email is not set up in the new app yet, so it is held,
+// not emailed; the current app's Send Current Report emails the Plant Managers group through its outbound email policy.
+function validateReport(input, SaveError) {
+  const out = { subject: text(input.subject).slice(0, 200), body: text(input.text).slice(0, 20000), note: text(input.note).slice(0, 1500), groupName: text(input.groupName).slice(0, 100) || 'Plant Managers' };
+  if (!out.subject || !out.body) throw new SaveError('BAD_REQUEST', 'The report is still loading. Try again in a moment.');
+  return out;
+}
+
+async function sendReport(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const id = 'REPORT_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 30);
+  const record = { subject: req.subject, text: req.body, note: req.note, groupName: req.groupName, status: 'HELD', emailed: false, date: L.operatingDay(new Date(stamp)), at: stamp, by: email, mode: mode.mode };
+  tx.set(db.collection('plantReports').doc(id), record);
+  const result = { ok: true, requestId: req.requestId, reportId: id, sent: false, subject: req.subject,
+    message: 'Report saved. Email is not set up in the new app yet, so it was not emailed to ' + req.groupName + '.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, reportId: id, result });
+  return result;
+}
+
+module.exports = { validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };
