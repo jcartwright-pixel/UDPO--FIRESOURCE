@@ -24,7 +24,6 @@
     </div>
     <div class="head">
       <div class="title"><span class="eyebrow">Plant Operations Scheduler · <b id="lane-name">Shipping</b></span><h1 id="range">Plant Operations Scheduler</h1></div>
-      <div class="hstats" id="hstats"></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -41,9 +40,10 @@
           <button type="button" id="next" aria-label="Next" title="Next">&#9654;</button>
         </div>
         <div class="stepper"><input id="pick" type="date" aria-label="Schedule date"></div>
-        <span class="sc-grow spacer"></span>
-        <span class="sc-key"><i></i>Holiday</span>
       </div>
+      <!-- Joe 10/10: the counts and the holiday colour key sit in a slim strip under the top line, so the month title and the
+           buttons keep their room. -->
+      <div class="sc-strip"><div class="hstats" id="hstats"></div><span class="sc-grow"></span><span class="sc-key"><i></i>Holiday</span></div>
       <div class="sc-body" id="body"></div>
     </div>
   </div>

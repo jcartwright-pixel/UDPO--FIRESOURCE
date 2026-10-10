@@ -252,9 +252,6 @@
   .sched-page .sc-whos { flex-basis: 210px; }
   .sched-page .sc-day small { font-size: 12px; }
   .sched-page .sc-dn b { font-size: 15px; }
-  .sched-page .hstats div { min-width: 64px; padding: 3px 8px; }
-  .sched-page .hstats b { font-size: 18px; }
-  .sched-page .hstats span { font-size: 10px; }
 }
 
 /* ---------- Yard Checks (yard.html) ---------- */
@@ -546,7 +543,7 @@
 .manager-page .mc-routes span i { font-style: normal; font-size: 11px; align-self: center; }
 .manager-page .mc-routes .ok { background: #e2f4ea; color: #1f7a4d; } .manager-page .mc-routes .behind { background: #b42318; color: #fff; } .manager-page .mc-routes .no { background: #fde8e6; color: #b42318; }
 @media (max-width: 1500px) { .manager-page .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; align-content: start; } .manager-page .mc-card, .manager-page .mc-tiles { min-height: auto; } .manager-page .mc-report { grid-row: 1 / span 3; min-height: 360px; } .manager-page .mc-tile { min-height: 92px; } }
-@media (max-width: 1100px) { @media (max-width: 760px) {
+@media (max-width: 760px) {
   .manager-page .head .badge-test span { display: none; }
   .manager-page .mc-shell { padding: 0 8px 8px; overflow: auto; }
   .manager-page .mc-shell { align-items: flex-start; }
@@ -568,4 +565,13 @@
 .plant-page .head .actions.in-head.top-row .tabs { flex: none; }
 .plant-page .head .actions.in-head.top-row .tabs button { flex: none; }
 .plant-page .head .actions.in-head.top-row .seg > button { width: auto; min-width: 0; max-width: none; height: 38px; min-height: 38px; padding: 0 12px; white-space: nowrap; font-size: 14px; }
-.sched-page .head .actions.in-head.top-row .sc-key { order: 3; }
+/* Scheduler top line (Joe 10/10, "buttons overlapping"): the full month title, then Add Load and Print the same size on one
+   line with Shipping/Receiving, Day/Week/Month, the month stepper and the date; the counts and holiday key go to the strip below. */
+.sched-page .head .title { flex: none; }
+.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: 140px; min-width: 140px; max-width: 140px; height: 38px; min-height: 38px; padding: 0 10px; font-size: 14px; white-space: nowrap; }
+@media screen { .sched-page .head .actions.in-head.top-row .sc-ctrl > #print { display: inline-block; } }
+.sched-page .sc-strip { display: flex; align-items: center; gap: 12px; margin: 0 16px 8px; }
+.sched-page .sc-strip .hstats { align-self: auto; gap: 8px; }
+.sched-page .sc-strip .hstats div { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; padding: 3px 12px; border-radius: 999px; }
+.sched-page .sc-strip .hstats b { display: inline; font-size: 16px; }
+.sched-page .sc-strip .hstats span { font-size: 11px; }
