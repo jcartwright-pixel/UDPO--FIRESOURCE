@@ -552,6 +552,53 @@
     return L.join('\n');
   }
 
+  // The email as the current app sends it (udpoV7275ReportHtml_): one phone-width column, loaded routes in green then not loaded
+  // in red, pickups, breakdowns, production and temperatures; tables and inline styles so Gmail and phone mail keep the layout.
+  function reportHtml(r, note) {
+    function e(v) { return String(v === null || v === undefined ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    var F = 'font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;', RED = '#b42318', GREEN = '#1f7a4d', GREY = '#5b6775', INK = '#1c2733';
+    function head(title, count, color) { return '<tr><td style="' + F + 'padding:16px 14px 6px;font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + (color || GREY) + '">' + e(title) + (count !== null && count !== undefined ? '<span style="float:right;color:' + (color || INK) + '">' + e(count) + '</span>' : '') + '</td></tr>'; }
+    function pill(t, bg, fg) { return '<span style="display:inline-block;font-size:12px;font-weight:800;padding:2px 7px;border-radius:10px;background:' + bg + ';color:' + fg + '">' + e(t) + '</span>'; }
+    function rows(list) { return '<tr><td style="padding:0 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">' + list.map(function (x) { return '<tr><td style="' + F + 'padding:8px 0;border-bottom:1px solid #edf0f3;font-size:16px;font-weight:700;color:' + INK + '">' + e(x[0]) + '</td><td align="right" style="' + F + 'padding:8px 0;border-bottom:1px solid #edf0f3;font-size:14px;color:' + GREY + '">' + x[1] + '</td></tr>'; }).join('') + '</table></td></tr>'; }
+    function plain(t) { return '<tr><td style="' + F + 'padding:0 14px 4px;font-size:15px;color:' + GREY + '">' + e(t) + '</td></tr>'; }
+    function grid(list) {
+      var out = '';
+      for (var i = 0; i < list.length; i += 2) out += '<tr>' + [list[i], list[i + 1]].map(function (x) {
+        if (!x) return '<td width="50%" style="padding:3px"></td>';
+        return '<td width="50%" style="padding:3px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + x.bg + ';border-radius:6px"><tr><td style="' + F + 'padding:9px 10px;font-size:17px;font-weight:800;color:' + x.fg + '">' + e(x.route) + '</td><td align="right" style="' + F + 'padding:9px 10px;font-size:12px;font-weight:800;color:' + x.fg + '">' + e(x.word) + '</td></tr></table></td>';
+      }).join('') + '</tr>';
+      return '<tr><td style="padding:2px 11px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + out + '</table></td></tr>';
+    }
+    var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
+    var loaded = (r.loaded || []).slice().sort(function (a, b) { return Number(a.priorDay) - Number(b.priorDay) || a.loadSequence - b.loadSequence || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
+      .map(function (x) { return { route: x.route, word: 'LOADED', bg: '#e2f4ea', fg: GREEN }; });
+    var notLoaded = (r.behind || []).map(function (x) { return { route: x.route, word: 'BEHIND', bg: RED, fg: '#ffffff' }; })
+      .concat((r.nextUp || []).map(function (x) { return { route: x.route, word: 'NOT LOADED', bg: '#fde8e6', fg: RED }; }));
+    var H = [];
+    H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : GREEN) + ';color:#ffffff"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
+    if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
+    H.push(head('Routes', loadedCount + ' of ' + total + ' loaded'));
+    if (loaded.length) { H.push(head('Loaded (' + loaded.length + ')', null, GREEN)); H.push(grid(loaded)); }
+    if (notLoaded.length) { H.push(head('Not loaded (' + notLoaded.length + ')', null, RED)); H.push(grid(notLoaded)); }
+    if (!loaded.length && !notLoaded.length) H.push(plain('No loads on the dispatch sheet for this day.'));
+    var pickups = r.pickups || [], down = r.down || [], lines = r.lines || [], temps = r.temperatures || [];
+    H.push(head('Pickups open', pickups.length, pickups.length ? RED : null));
+    if (!pickups.length) H.push(plain('None open.'));
+    pickups.forEach(function (p) { H.push('<tr><td style="padding:0 14px 6px"><div style="' + F + 'border-left:4px solid ' + RED + ';background:#fff6f5;padding:7px 10px;font-size:15px;color:' + INK + '"><b style="color:' + RED + '">PICKUP ' + e([p.route, p.run].filter(Boolean).join(' ')) + '</b> ' + e([p.quantity, p.product].filter(Boolean).join(' ')) + '</div></td></tr>'); });
+    H.push(head('Plant breakdowns', down.length, down.length ? RED : null));
+    if (!down.length) H.push(plain('None open.'));
+    else H.push(rows(down.map(function (d) { return [d.equipment || 'Plant equipment', e([d.entry, d.at ? 'logged ' + d.at : ''].filter(Boolean).join(' · ')) + ' ' + pill(d.status, '#fde8e6', RED)]; })));
+    H.push(head('Production'));
+    if (!lines.length) H.push(plain('No production lines set up.'));
+    else H.push(rows(lines.map(function (l) { return [l.line, (l.product ? e(l.product) + ' ' : '') + (l.qualityCheck ? pill('QC ' + l.qualityCheck, l.qualityCheck === 'FAIL' ? '#fde8e6' : '#e2f4ea', l.qualityCheck === 'FAIL' ? RED : GREEN) + ' ' : '') + (l.status ? pill(l.status, l.flag ? '#fde8e6' : '#eef1f4', l.flag ? RED : GREY) : 'no status')]; })));
+    H.push(head('Temperatures'));
+    if (!temps.length) H.push(plain('No temperature locations set up.'));
+    else H.push(rows(temps.map(function (t) { var ok = t.status === 'OK', due = t.due || t.status === 'NO CHECK'; return [t.location, (t.reading !== '' && t.reading !== undefined ? e(t.reading) + '&deg;F ' : '&ndash; ') + (t.flag ? pill(t.status, '#fde8e6', RED) : due ? pill(t.status === 'NO CHECK' ? 'CHECK DUE' : t.status + ' · CHECK DUE', '#fff1d6', '#9a5b00') : pill(t.status || '-', ok ? '#e2f4ea' : '#eef1f4', ok ? GREEN : GREY))]; })));
+    H.push('<tr><td style="' + F + 'padding:16px 14px;font-size:12px;color:#8a95a3;text-align:center">United Dairy Plant Operations</td></tr>');
+    return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#ffffff">' +
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff">' + H.join('') + '</table></body></html>';
+  }
+
   return { unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
@@ -562,5 +609,5 @@
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
-    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName };
+    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, reportText: reportText, reportHtml: reportHtml };
 });

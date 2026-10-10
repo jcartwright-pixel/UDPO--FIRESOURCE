@@ -48,6 +48,8 @@ service cloud.firestore {
     // The production lines, temperature locations and the lines' last checks.
     match /plantSetup/{id} { allow read: if activeUser(); }
     match /plantLineStatus/{id} { allow read: if activeUser(); }
+    // Plant reports sent from the Manager Center, and whether each was emailed.
+    match /plantReports/{id} { allow read: if activeUser(); }
     // Sheet cells the write-back did not write, so a dispatcher can check them.
     match /conflicts/{id} { allow read: if activeUser(); }
     match /{other=**} { allow read, write: if false; }

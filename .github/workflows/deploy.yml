@@ -78,6 +78,7 @@ jobs:
           SANDBOX_SOURCES_JSON: ${{ vars.SANDBOX_SOURCES_JSON }}
           SANDBOX_WRITEBACK_JSON: ${{ vars.SANDBOX_WRITEBACK_JSON }}
           SANDBOX_ADMINS: ${{ vars.SANDBOX_ADMINS || 'jcartwright@uniteddairy.com' }}
+          SANDBOX_MAIL_FROM: ${{ vars.SANDBOX_MAIL_FROM || 'jcartwright@uniteddairy.com' }}
           PRODUCTION_ENV: ${{ vars.PRODUCTION_ENV }}
         run: |
           set -euo pipefail
@@ -100,6 +101,26 @@ jobs:
             else
               printf 'DEMO_DATA=1\nDEMO_ADMINS=%s\n' "$SANDBOX_ADMINS" > .env
             fi
+            # Send Current Report email (src/mail.js): Gmail sent as MAIL_FROM by the server account, which signs for itself
+            # through IAM Credentials (no key). The sandbox emails only the person who pressed Send (no REPORT_TO here).
+            printf 'MAIL_FROM=%s\n' "$SANDBOX_MAIL_FROM" >> .env
+            gcloud services enable iamcredentials.googleapis.com gmail.googleapis.com --project "$PROJECT" --quiet \
+              || echo "::warning::Could not turn on IAM Credentials and Gmail for $PROJECT; report email will fail until they are on."
+            number=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null || true)
+            runtime="${number}-compute@developer.gserviceaccount.com"
+            gcloud iam service-accounts add-iam-policy-binding "$runtime" --project "$PROJECT" \
+              --member="serviceAccount:$runtime" --role=roles/iam.serviceAccountTokenCreator --quiet >/dev/null \
+              && echo "Server account may sign for itself: yes" \
+              || echo "::warning::Could not let $runtime sign for itself (Service Account Token Creator on itself); report email will fail until it can."
+            client=$(gcloud iam service-accounts describe "$runtime" --project "$PROJECT" --format='value(oauth2ClientId)' 2>/dev/null || true)
+            {
+              echo "### Report email"
+              echo "Sent as: $SANDBOX_MAIL_FROM"
+              echo "Server account: $runtime"
+              echo "Client ID for Google Workspace domain-wide delegation: ${client:-could not read}"
+              echo "Scope: https://www.googleapis.com/auth/gmail.send"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "Report email client ID: ${client:-could not read}"
           else
             printf '%s\n' "$PRODUCTION_ENV" > .env
           fi
