@@ -728,3 +728,23 @@ table.day-table input.dcell { width: 100%; height: 34px; border: 1px solid var(-
 table.day-table input.dcell:focus { border-color: var(--ud-blue); outline: none; }
 table.day-table button[data-runday] { width: 100%; height: 34px; border-radius: 7px; font-weight: 800; font-size: 14px; border: 1px solid #171c20; background: #171c20; color: #e8edf2; cursor: pointer; }
 table.day-table button[data-runday].on { background: #e3f3e8; color: #1c6b3a; border-color: #a9d8b8; }
+
+/* Side menu (Joe 10/9): only the sections; each opens a fly-out with its screens on hover or tap. */
+.sidemenu { --side: 200px; }
+.sidemenu .side-sec-btn { display: flex; align-items: center; gap: 12px; margin: 0 8px; width: calc(100% - 16px); padding: 11px 10px; border: 0; border-radius: 9px; background: transparent; color: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; text-align: left; white-space: nowrap; }
+.sidemenu .side-sec-btn svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sidemenu .side-sec-btn span { flex: 1; }
+.sidemenu .side-sec-btn i { font-style: normal; font-size: 12px; opacity: .7; }
+.sidemenu .side-sec-btn:hover, .sidemenu .side-sec.open > .side-sec-btn { background: #ffffff1c; }
+.sidemenu .side-sec.on > .side-sec-btn { background: #fff; color: #0b3d6b; }
+.sidemenu .flyout { display: none; position: fixed; z-index: 200; min-width: 250px; padding: 8px 0 10px; background: #0b3d6b; border-radius: 0 12px 12px 0; box-shadow: 8px 6px 28px rgba(0,0,0,.32); border-left: 3px solid var(--ud-gold); }
+.sidemenu .side-sec.open > .flyout { display: flex; flex-direction: column; gap: 1px; }
+.sidemenu .flyout-title { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #9fbcd8; padding: 6px 18px 6px; }
+.sidemenu .flyout a span, .sidemenu .flyout a i { display: inline !important; }
+.sidemenu .flyout a { justify-content: flex-start !important; padding: 9px 12px !important; }
+body.side-folded .sidemenu .side-sec-btn span, body.side-folded .sidemenu .side-sec-btn i { display: none; }
+body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11px 0; }
+@media (max-width: 1500px) {
+  body:not(.side-open) .sidemenu .side-sec-btn span, body:not(.side-open) .sidemenu .side-sec-btn i { display: none; }
+  body:not(.side-open) .sidemenu .side-sec-btn { justify-content: center; padding: 11px 0; }
+}

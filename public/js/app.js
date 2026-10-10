@@ -61,15 +61,38 @@ function addSideMenu() {
   const nav = document.createElement('nav');
   nav.className = 'sidemenu';
   nav.setAttribute('aria-label', 'Screens');
-  // Joe 10/9: Home shows every section; a screen shows only its own section's screens (Back returns Home).
-  const section = MENU.find(([group, items]) => group && items.some(([, href]) => href === here));
-  const groups = here === 'index.html' || !section ? MENU : [MENU[0], section];
+  // Joe 10/9: the menu lists only the sections; hovering (or tapping) a section opens its screens beside it.
+  const SECTION_ICON = { Dispatch: 'day', Drivers: 'people', Equipment: 'truck', Reports: 'star', Overall: 'check' };
+  const link = ([label, href, icon]) => {
+    const ext = /^https:/.test(href);
+    return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
+      '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
+  };
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' +
-    groups.map(([group, items]) => (group ? '<div class="side-group">' + group + '</div>' : '') + items.map(([label, href, icon]) => {
-      const ext = /^https:/.test(href);
-      return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
-        '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
-    }).join('')).join('');
+    MENU.map(([group, items]) => !group ? items.map(link).join('') :
+      '<div class="side-sec' + (items.some(([, href]) => href === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
+      svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span><i aria-hidden="true">&#9656;</i></button>' +
+      '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join('');
+  const close = (except) => nav.querySelectorAll('.side-sec.open').forEach(x => { if (x !== except) { x.classList.remove('open'); x.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'false'); } });
+  const openSec = (sec) => {
+    close(sec);
+    const r = sec.getBoundingClientRect(), fly = sec.querySelector('.flyout');
+    fly.style.left = nav.getBoundingClientRect().right + 'px';
+    fly.style.top = Math.max(8, Math.min(r.top, window.innerHeight - fly.offsetHeight - 8 || r.top)) + 'px';
+    sec.classList.add('open');
+    sec.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'true');
+    const h = fly.offsetHeight;
+    if (r.top + h > window.innerHeight - 8) fly.style.top = Math.max(8, window.innerHeight - h - 8) + 'px';
+  };
+  nav.querySelectorAll('.side-sec').forEach(sec => {
+    let timer = null, hoverAt = 0;
+    // A tap fires mouseenter just before click: that click keeps the fly-out open instead of closing it.
+    sec.addEventListener('mouseenter', () => { clearTimeout(timer); if (!sec.classList.contains('open')) { openSec(sec); hoverAt = Date.now(); } });
+    sec.addEventListener('mouseleave', () => { timer = setTimeout(() => { sec.classList.remove('open'); sec.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'false'); }, 180); });
+    sec.querySelector('.side-sec-btn').addEventListener('click', e => { e.stopPropagation(); if (sec.classList.contains('open') && Date.now() - hoverAt > 400) close(); else openSec(sec); });
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.side-sec')) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   const wrap = document.createElement('div'), main = document.createElement('div');
   wrap.className = 'side-wrap'; main.className = 'side-main';
   [...screen.children].filter(c => c !== bar).forEach(c => main.appendChild(c));
