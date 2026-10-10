@@ -30,6 +30,7 @@
 
   <script type="module">
     import { requireSignIn } from './js/app.js';
+    import { adminItem } from './js/admin-items.js';
 
     // Joe 10/10: a screen not built yet opens this page inside the new app, never the old program.
     const SCREENS = {
@@ -37,7 +38,13 @@
       'trucks-today': ['Trucks Today', 'Where every truck is today, from Verizon Connect. It is finished once Verizon turns on Fleet API access (see GPS Setup).', 'gps.html', 'GPS Setup'],
       'fleet-service-setup': ['Fleet Service Setup', 'Changing the service rules (PM miles, reefer months, DOT and plate warnings).', 'fleet.html', 'Fleet Service']
     };
-    const key = new URLSearchParams(location.search).get('what') || '', s = SCREENS[key] || ['This screen', 'It is next on the build list.', 'index.html', 'Home'];
+    // Administration items not built yet come back to the Administration Center.
+    const key = new URLSearchParams(location.search).get('what') || '', a = /^admin-/.test(key) && adminItem(key.slice(6));
+    if (a) SCREENS[key] = [a.title, a.what, 'administration.html', 'Administration'];
+    // A plant with no data source yet (Joe 10/10: Charleston and Martins Ferry on the all-plants overview).
+    const plant = /^plant-/.test(key) && window.UDLogic.PLANTS.find(p => p.id === 'fac_' + key.slice(6));
+    if (plant) SCREENS[key] = [plant.name + ' Operations', plant.name + ' is not connected to the new app yet. Its loads, unloading and maintenance show here once its sheets are added.', 'company.html', 'All plants'];
+    const s = SCREENS[key] || ['This screen', 'It is next on the build list.', 'index.html', 'Home'];
     document.title = s[0] + ' · New Plant Operations';
     document.getElementById('title').textContent = s[0];
     document.getElementById('what').textContent = s[0] + ' is being built in the new app';

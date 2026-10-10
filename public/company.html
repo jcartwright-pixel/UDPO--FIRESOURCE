@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Operations Overview · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="company-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Operations Overview</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <!-- Joe 10/10: the current app's all-plants home, for Administrators and the people he picks: every plant at a glance,
+         then pick a plant. Someone who sees only one plant never comes here. -->
+    <section class="co-hero">
+      <div><h1>Operations Overview</h1><p>Real-time status across all facilities. Keep your routes moving.</p></div>
+      <div class="co-date"><small>Today</small><b id="today">-</b></div>
+    </section>
+    <div class="notice error" id="error" hidden></div>
+    <section class="co-kpis" id="kpis"></section>
+    <section class="co-plants" id="plants"></section>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as P from './js/plant-core.js';
+    const L = window.UDLogic;
+    const today = () => L.operatingDay(new Date());
+    let date = today(), person = null, ready = false;
+    const data = { runs: [], journal: [], pickups: [], maintenance: [] };
+
+    // Uniontown's numbers, worked out the same way as the plant screens (Loadout Center, Unloading, Manager Center).
+    function uniontown() {
+      const loads = P.loadoutRows(data.runs, date), c = P.counts(loads), todays = data.journal.filter(d => d.date === date);
+      const returns = P.returnsFor(data.runs, date, todays), uc = P.unloadCounts(P.unloadRows(data.runs, date, todays, returns, loads));
+      const pickups = data.pickups.filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length)).length;
+      const issues = ['TRUCK', 'TRAILER', 'FORK_TRUCK'].reduce((n, k) => n + L.issueRows(data.maintenance, k, Date.now()).length, 0);
+      const loading = loads.find(r => r.state === 'LOADING'), next = loads.find(r => r.state === 'WAITING');
+      const last = loads.filter(r => r.state === 'DONE' && r.completedAt).sort((a, b) => String(b.completedAt).localeCompare(String(a.completedAt)))[0];
+      return { total: c.total, done: c.done, loading: c.loading, unloaded: uc.complete, waiting: uc.waiting, pickups, issues, loadingRow: loading, lastRow: last, nextRow: next };
+    }
+    const unit = (r) => [r.truck, r.trailer].filter(Boolean).join(' / ') || 'No truck yet';
+    const act = (label, r, time) => '<div class="co-act"><span>' + label + '</span>' + (r ? '<b>' + escapeHtml([r.route, r.run].filter(Boolean).join(' · ')) + '</b><i>' + escapeHtml(unit(r)) + '</i><time>' + escapeHtml(time || '') + '</time>' : '<b class="none">None</b>') + '</div>';
+    const cell = (label, value, cls) => '<div class="co-cell' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span><b>' + value + '</b></div>';
+
+    function render() {
+      if (!ready) return;
+      const plants = L.plantsFor(person);
+      // Someone who sees one plant never lands here; if they open it, it shows their plant only.
+      const u = plants.indexOf('fac_uniontown') >= 0 ? uniontown() : null;
+      const kpi = (label, value, sub, color) => '<div class="co-kpi" style="--accent:' + color + '"><span>' + label + '</span><b>' + value + '</b><small>' + sub + '</small></div>';
+      document.getElementById('kpis').innerHTML = kpi('Scheduled Loads', u ? u.total : 0, 'Today', '#0d6efd') + kpi('Loaded', u ? u.done + ' / ' + u.total : '0 / 0', 'Loadout complete today', '#0c9a4b') +
+        kpi('Loads Completed', u ? u.done : 0, 'Across all facilities', '#5b7fa6') + kpi('Currently Loading', u ? u.loading : 0, 'Active work', '#7a3ff2') +
+        kpi('Unloaded', u ? u.unloaded : 0, 'Completed returns', '#f38a00') + kpi('Waiting to Unload', u ? u.waiting : 0, 'Open arrivals', '#0b8fae');
+      document.getElementById('plants').innerHTML = L.PLANTS.filter(p => plants.indexOf(p.id) >= 0).map(p => {
+        const live = p.id === 'fac_uniontown' && u, href = live ? 'index.html' : 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
+        const head = '<header><i class="dot"></i><strong>' + escapeHtml(p.name) + '</strong><em class="' + (p.status === 'ACTIVE' ? 'on' : '') + '">' + p.status + '</em><span aria-hidden="true">&rarr;</span></header>';
+        if (!live) {
+          return '<a class="co-plant planned" data-plant="' + p.id + '" href="' + href + '">' + head + '<div class="co-soon"><b>Being built</b><span>' + escapeHtml(p.name) + ' is not connected to the new app yet. Its numbers show here once its sheets are added.</span></div>' +
+            '<footer><span>Next Loadout</span><b>--:--</b><em>View Details &rarr;</em></footer></a>';
+        }
+        return '<a class="co-plant" data-plant="' + p.id + '" href="' + href + '">' + head + '<div class="co-grid">' +
+          cell('Scheduled', u.total) + cell('Completed', u.done, 'good') + cell('Unloaded', u.unloaded) + cell('Loaded', u.done + ' / ' + u.total) +
+          cell('Loading', u.loading) + cell('Waiting', u.waiting) + cell('Pickups', u.pickups, u.pickups ? 'bad' : '') + cell('Maintenance', u.issues, u.issues ? 'warn' : '') + '</div>' +
+          '<div class="co-recent"><h3>Recent Activity</h3>' + act('Route Being Loaded', u.loadingRow, u.loadingRow && P.clock(u.loadingRow.startedAt)) +
+          act('Last Route Loaded', u.lastRow, u.lastRow && P.clock(u.lastRow.completedAt)) + act('Next in Line', u.nextRow, u.nextRow && P.timeOfDay(u.nextRow.dispatchTime)) + '</div>' +
+          '<footer><span>&#128666; Next Loadout</span><b>' + escapeHtml(u.nextRow ? P.timeOfDay(u.nextRow.dispatchTime) || '--:--' : '--:--') + '</b><em>View Details &rarr;</em></footer></a>';
+      }).join('');
+    }
+    // Picking a plant opens that plant's home (Route Distribution, Plant Operations, Fleet & Maintenance).
+    document.getElementById('plants').addEventListener('click', e => { const a = e.target.closest('[data-plant]'); if (a) try { sessionStorage.setItem('udPlant', a.dataset.plant); } catch (x) { /* no storage */ } });
+    try { sessionStorage.removeItem('udPlant'); } catch (e) { /* no storage */ }
+
+    requireSignIn(async (user) => {
+      document.getElementById('today').textContent = L.dayName(date) + ' ' + shortDate(date);
+      const { db } = await start();
+      const fail = (what) => e => showError('Could not read ' + what + ': ' + e.message);
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; ready = true; render(); });
+      onSnapshot(collection(db, 'maintenance'), s => { data.maintenance = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, fail('the maintenance list'));
+      const unsubs = [];
+      const watch = () => {
+        date = today();
+        unsubs.splice(0).forEach(u => u());
+        const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
+        unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the loads')));
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); render(); }, fail('the plant journal')));
+        unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); render(); }, fail('the pickups')));
+      };
+      watch();
+      setInterval(() => { if (today() !== date) watch(); render(); }, 60000);
+    });
+  </script>
+</body>
+</html>
