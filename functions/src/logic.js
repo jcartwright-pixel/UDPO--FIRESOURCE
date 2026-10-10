@@ -342,6 +342,68 @@
   }
 
   // The driver list in seniority order (oldest seniority date first; drivers with no date last), numbered.
+  /*
+   * Fleet Service due list (the current app's udpoV7276DueItems_). units: [{unit, type TRUCK|TRAILER}]; setup: FLEET SERVICE SETUP rows;
+   * miles: {unit: {miles, date}} from the daily inspections; openJobs: open work orders [{unit, service_key, work_order_id}].
+   * Trucks: PM every truckMiles. Trailers: reefer every trailerMonths or trailerHours. Everyone: DOT yearly, plate expiry.
+   */
+  var FLEET_RULES = { truckMiles: 15000, truckWarnMiles: 1000, trailerMonths: 4, trailerHours: 1200, trailerWarnDays: 14, dotMonths: 12, dotWarnDays: 30, plateWarnDays: 30 };
+  function fleetNumber(v) { var s = String(v == null ? '' : v).replace(/[, ]+/g, '').trim(); if (s === '') return null; var n = Number(s); return isFinite(n) ? n : null; }
+  function addMonths(key, months) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || '')); if (!m) return '';
+    var y = Number(m[1]), mo = Number(m[2]) - 1 + Number(months || 0), day = Number(m[3]);
+    var out = new Date(Date.UTC(y, mo, 1)), last = new Date(Date.UTC(out.getUTCFullYear(), out.getUTCMonth() + 1, 0)).getUTCDate();
+    out.setUTCDate(Math.min(day, last));
+    return out.toISOString().slice(0, 10);
+  }
+  function fleetKind(type) {
+    var t = String(type || '').trim().toUpperCase().replace(/_/g, ' ');
+    if (['TRUCK', 'TRACTOR', 'POWER UNIT', 'TRACTOR TRUCK', 'STRAIGHT TRUCK', 'BOX TRUCK'].indexOf(t) >= 0) return 'TRUCK';
+    return t === 'TRAILER' ? 'TRAILER' : '';
+  }
+  function fleetDue(units, setup, miles, openJobs, rules, today) {
+    rules = Object.assign({}, FLEET_RULES, rules || {});
+    var setupBy = {}, openBy = {}, items = [], out = [];
+    (setup || []).forEach(function (r) { setupBy[String(r.unit || '').trim().toUpperCase()] = r; });
+    (openJobs || []).forEach(function (j) { if (j.service_key) openBy[String(j.unit).toUpperCase() + '|' + j.service_key] = j; });
+    (units || []).forEach(function (u) {
+      var s = setupBy[String(u.unit).toUpperCase()] || {}, trackRaw = String(s.track || '').trim(), tracked = trackRaw ? yes(trackRaw) : true;
+      var odo = u.type === 'TRUCK' ? (miles || {})[String(u.unit).toUpperCase()] : null;
+      var row = { unit: u.unit, type: u.type, tracked: tracked, trackSet: trackRaw ? (yes(trackRaw) ? 'YES' : 'NO') : '', miles: odo ? odo.miles : null, milesDate: odo ? odo.date : '',
+        lastServiceDate: dateKey(s.last_service_date), lastServiceMiles: fleetNumber(s.last_service_miles), lastServiceHours: fleetNumber(s.last_service_hours),
+        currentHours: fleetNumber(s.current_hours), dotDue: dateKey(s.dot_due), plateExpires: dateKey(s.plate_expires), notes: String(s.notes || '') };
+      out.push(row);
+      if (!tracked) return;
+      function push(key, what, dueAt, now, left, status, last) {
+        var job = openBy[String(u.unit).toUpperCase() + '|' + key];
+        items.push({ unit: u.unit, type: u.type, key: key, what: what, dueAt: dueAt, now: now, left: left, status: job ? 'AT_GARAGE' : status, last: last || '', jobId: job ? job.work_order_id : '' });
+      }
+      if (u.type === 'TRUCK') {
+        if (row.lastServiceMiles == null) push('PM', 'PM service', '', row.miles != null ? row.miles : '', '', 'SET_UP', row.lastServiceDate);
+        else {
+          var dueMiles = row.lastServiceMiles + rules.truckMiles, leftMiles = row.miles == null ? null : dueMiles - row.miles;
+          push('PM', 'PM service', dueMiles, row.miles == null ? '' : row.miles, leftMiles == null ? '' : leftMiles,
+            leftMiles == null ? 'NO_MILES' : leftMiles < 0 ? 'OVERDUE' : leftMiles <= rules.truckWarnMiles ? 'DUE_SOON' : 'OK', row.lastServiceDate);
+        }
+      } else {
+        if (!row.lastServiceDate) push('REEFER', 'Reefer service', '', row.currentHours == null ? '' : row.currentHours, '', 'SET_UP', '');
+        else {
+          var dueDate = addMonths(row.lastServiceDate, rules.trailerMonths), daysLeft = daysBetween(today, dueDate);
+          var hoursLeft = row.currentHours != null && row.lastServiceHours != null ? row.lastServiceHours + rules.trailerHours - row.currentHours : null;
+          var late = daysLeft < 0 || (hoursLeft != null && hoursLeft < 0), soon = daysLeft <= rules.trailerWarnDays || (hoursLeft != null && hoursLeft <= 50);
+          push('REEFER', 'Reefer service', dueDate, row.currentHours == null ? '' : row.currentHours, hoursLeft != null && hoursLeft < daysLeft * 10 ? hoursLeft + ' hrs' : daysLeft + ' days',
+            late ? 'OVERDUE' : soon ? 'DUE_SOON' : 'OK', row.lastServiceDate);
+        }
+      }
+      if (!row.dotDue) push('DOT', 'DOT annual inspection', '', '', '', 'SET_UP', '');
+      else { var d = daysBetween(today, row.dotDue); push('DOT', 'DOT annual inspection', row.dotDue, '', d + ' days', d < 0 ? 'OVERDUE' : d <= rules.dotWarnDays ? 'DUE_SOON' : 'OK', ''); }
+      if (row.plateExpires) { var p = daysBetween(today, row.plateExpires); push('PLATE', 'Plate / registration', row.plateExpires, '', p + ' days', p < 0 ? 'OVERDUE' : p <= rules.plateWarnDays ? 'DUE_SOON' : 'OK', ''); }
+    });
+    var rank = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
+    items.sort(function (a, b) { return rank[a.status] - rank[b.status] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }); });
+    return { units: out, items: items };
+  }
+
   function driverRosterRows(drivers, asOf) {
     var rows = (drivers || []).map(function (d) {
       var seniority = dateKey(d.seniorityDate) || dateKey(d.hireDate);
@@ -622,6 +684,7 @@
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers,
+    fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,

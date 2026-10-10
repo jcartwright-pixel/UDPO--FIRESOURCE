@@ -813,3 +813,12 @@ html { background: var(--page); }
 .admin-card em { margin-top: auto; font-style: normal; font-size: 12px; font-weight: 700; color: #7a8a99; }
 @media (max-width: 1500px) { .admin-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Fleet Service */
+.fleet-page .tabs b { margin-left: 6px; color: #c62828; }
+.fleet-page .tabs button[aria-selected="true"] b { color: #ffd7d7; }
+.fleet-page .pill.soon { background: #fff4d6; color: #8a5a00; border-color: #f0d38a; }
+.fleet-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.fleet-split.wide-left { grid-template-columns: 3fr 1fr; }
+.fleet-split h2 { margin: 6px 4px 8px; font-size: 17px; color: var(--ud-blue); }
+@media (max-width: 1200px) { .fleet-split, .fleet-split.wide-left { grid-template-columns: 1fr; } }

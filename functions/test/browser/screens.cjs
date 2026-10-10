@@ -643,6 +643,14 @@ async function noScroll(page) {
     await dispatcherTpl.waitForSelector('.tcell select[data-status]');
     assert.equal(await dispatcherTpl.isDisabled('.tcell select[data-status]'), true, 'a dispatcher sees the template read only');
     await Promise.all([tpl.close(), dispatcherTpl.close()]);
+    // Fleet Service: the four tabs open with no page errors; Equipment's menu opens it in this window.
+    const fs2 = await openPage(browser, 1920, 950, '/fleet.html?testEmail=manager.test@uniteddairy.com');
+    await fs2.waitForSelector('.kpis div');
+    for (const v of ['work', 'history', 'setup', 'due']) { await fs2.click('.tabs [data-view="' + v + '"]'); await fs2.waitForSelector('#sheet table'); }
+    assert.equal(await fs2.textContent('#fs-print'), 'Print Fleet Service Report');
+    assert.deepEqual(fs2.errors, []);
+    await fs2.close();
+    results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
     // Dispatch Administration: the current app's cards; a built screen opens in this window, from the Route Editor too.
     const adm = await openPage(browser, 1920, 950, '/routes.html?testEmail=manager.test@uniteddairy.com');
     await adm.waitForSelector('#to-admin');

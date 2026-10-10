@@ -118,6 +118,23 @@ const MASTER_KINDS = Object.freeze({
         cases: String(d.cases || ''), product: String(d.product || ''), notes: String(d.notes || get('notes') || ''), facilityId: get('facility_id') };
     }
   },
+  /*
+   * Fleet Service miles (udpoV7276Odometers_): the odometer a driver typed on the daily inspection, record_type DVIR,
+   * payload_json {truck, odometer}. One doc per inspection; the screen takes each truck's newest.
+   */
+  odometers: {
+    collection: 'odometers', idColumn: 'record_id', journal: true,
+    keep: (get) => {
+      if (get('record_type').toUpperCase() !== 'DVIR') return false;
+      let d = {};
+      try { d = JSON.parse(get('payload_json') || '{}') || {}; } catch (e) { return false; }
+      return Number(String(d.odometer || '').replace(/,/g, '')) > 0 && !!String(d.truck || '').trim();
+    },
+    build: (get) => {
+      const d = JSON.parse(get('payload_json') || '{}') || {};
+      return { unit: String(d.truck).trim().toUpperCase().replace(/\s+/g, ''), miles: Number(String(d.odometer).replace(/,/g, '')), date: L.dateKey(get('business_date')) || '', at: get('recorded_at') };
+    }
+  },
   users: {
     collection: C.users, idColumn: 'email',
     build: (get, warn) => {
@@ -186,7 +203,10 @@ function lookupsFrom(masters) {
  */
 const QUEUE_KINDS = Object.freeze({ maintTruck: { tab: 'TRUCK LIVE', kind: 'TRUCK' }, maintTrailer: { tab: 'TRAILER LIVE', kind: 'TRAILER' }, maintFork: { tab: 'FORK TRUCK LIVE', kind: 'FORK_TRUCK' },
   // The garage's work orders (the current app's Garage Station writes them, 220_V7276): read only here, into `workOrders`.
-  workOrders: { tab: 'GARAGE WORK ORDERS', kind: 'WORK_ORDER', idColumn: 'work_order_id', collection: 'workOrders' } });
+  workOrders: { tab: 'GARAGE WORK ORDERS', kind: 'WORK_ORDER', idColumn: 'work_order_id', collection: 'workOrders' },
+  // Fleet Service's unit dates and the garage technicians (220_V7276), read only. A technician's PIN is never copied.
+  fleetSetup: { tab: 'FLEET SERVICE SETUP', kind: 'FLEET_SETUP', idColumn: 'unit', collection: 'fleetSetup' },
+  garageTechs: { tab: 'GARAGE TECHNICIANS', kind: 'GARAGE_TECH', idColumn: 'tech_id', collection: 'garageTechs', drop: ['pin_hash'] } });
 const queueDocId = (recordId) => String(recordId).replace(/[^A-Za-z0-9_-]+/g, '_');
 
 function parseQueue(list, values) {
@@ -201,6 +221,7 @@ function parseQueue(list, values) {
     const docId = queueDocId(id);
     if (docs[docId]) { warnings.push({ list, row: h + 2 + i, id, problem: 'same ' + idCol + ' appears twice; the first row is used' }); return; }
     const cells = cellsOf(row, index);
+    (spec.drop || []).forEach(k => { delete cells[k]; });
     docs[docId] = Object.assign({}, cells, { [idCol]: id, kind: spec.kind, status: (cells.status || (spec.idColumn ? 'NEW' : 'OPEN')).toUpperCase(), sheetRow: h + 2 + i, cells });
   });
   return { docs, warnings };

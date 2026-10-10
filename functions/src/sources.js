@@ -16,7 +16,9 @@ const UNIONTOWN = Object.freeze({
     exceptions: { spreadsheetId: '1Iczex1skLAFBX9atk0kRvEQimBTnhCRauKWH6SL4KoM', tab: 'DRIVER_EXCEPTIONS' },
     vacations: { spreadsheetId: '14gP6bChKZABMglED78OZLmy0LcJF91-tQWVo5bXtGW4', tab: 'DRIVER_VACATIONS' },
     // The Plant Operations Scheduler's journal, in the Live workbook (Weekly's PLANT LOAD marks).
-    plantLoads: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' }
+    plantLoads: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' },
+    // The same journal's daily inspections (DVIR): each truck's newest odometer, for Fleet Service's PM due miles.
+    odometers: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'PLANT_OPERATIONS' }
   }
 });
 
@@ -27,7 +29,9 @@ function transferSources(env) {
   if (!raw) return UNIONTOWN;
   const given = JSON.parse(raw);
   const masters = {};
-  Object.keys(UNIONTOWN.masters).forEach(k => { masters[k] = Object.assign({}, UNIONTOWN.masters[k], (given.masters || {})[k]); });
+  const named = given.masters || {};
+  // The odometers come from the plant journal, so a copy named for plantLoads is read for them too.
+  Object.keys(UNIONTOWN.masters).forEach(k => { masters[k] = Object.assign({}, UNIONTOWN.masters[k], k === 'odometers' && !named.odometers ? named.plantLoads : named[k]); });
   return { live: Object.assign({}, UNIONTOWN.live, given.live), masters };
 }
 
