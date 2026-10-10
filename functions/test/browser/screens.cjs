@@ -764,6 +764,24 @@ async function noScroll(page) {
     await eqd.close();
     await db().collection('equipment').doc('veh_trailer_t_904').delete();
     results.push('Equipment: Sun to Sat show each unit\'s default runs from Route Master; an inactive unit that is not down is left off');
+    // Joe 10/10: the fleet list syncs every night; a manager sees Sync fleet list and when it last ran, a dispatcher does not.
+    await db().collection('config').doc('fleetSync').set({ ok: true, at: '2026-10-11T06:00:00.000Z', by: 'nightly', added: ['T-950'], inactive: ['900002'], back: [], changed: [] });
+    const eqm = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
+    await eqm.waitForSelector('#fleet-sync:not([hidden])');
+    await eqm.waitForFunction(() => /synced Oct 11, 2:00/.test(document.getElementById('fleet-synced').textContent));
+    assert.match(await eqm.textContent('#fleet-synced'), /1 added, 1 off the list/);
+    await eqm.click('#fleet-sync');
+    // The test project names no sandbox Equipment Master copy, so the server says so on the line (no pop-up).
+    await eqm.waitForFunction(() => /not set up here/.test(document.getElementById('fleet-synced').textContent));
+    assert.equal(await eqm.$eval('#fleet-synced', x => x.className), 'bad');
+    await eqm.close();
+    const eqv = await openPage(browser, 1920, 950, '/equipment.html?testEmail=dispatch.test@uniteddairy.com');
+    await eqv.waitForSelector('#rows tr[data-id="veh_truck_900001"]');
+    assert.equal(await eqv.$eval('#fleet-sync', b => b.hidden), true, 'a dispatcher has no Sync button');
+    assert.match(await eqv.textContent('#fleet-synced'), /Fleet list synced/);
+    await eqv.close();
+    await db().collection('config').doc('fleetSync').delete();
+    results.push('Equipment: a manager sees Sync fleet list with when it last synced; the button answers on the line; a dispatcher has no button');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
     // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).
