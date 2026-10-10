@@ -74,8 +74,31 @@ const SCREENS = [
     await Promise.all([side.waitForURL(/report=1/), side.click('.sidemenu a[href="manager.html?report=1"]')]);
     await side.waitForSelector('#modal:not([hidden])');
     assert.ok(await side.isVisible('#rp-subject'), 'Send Report in the menu opens the full report');
+    // Joe 10/10: a menu click always opens the screen's default view (Scheduler = Shipping, the month, today), never the
+    // last tab or mode used; the switches inside the screen stay.
+    const menuHrefs = await side.$$eval('.sidemenu a[href], .side-flyouts a[href]', a => a.map(x => x.getAttribute('href')));
+    assert.deepEqual(menuHrefs.filter(h => /\?/.test(h)), ['manager.html?report=1'], 'no plant menu link opens a remembered or side view');
     await side.close();
-    results.push('Plant Operations side reaches all 11 plant screens, Manager Center included');
+    const sch = await openPage(browser, 1920, 950, '/scheduler.html' + MANAGER);
+    await sch.waitForSelector('.sc-day');
+    await sch.click('[data-lane="RECEIVING"]');
+    await sch.click('[data-view="week"]');
+    await sch.click('#next');
+    await sch.waitForURL(/lane=receiving/);
+    await Promise.all([sch.waitForURL(u => /scheduler\.html$/.test(u.pathname) && !/lane=/.test(u.search)), sch.click('.sidemenu a[href="scheduler.html"]')]);
+    await sch.waitForSelector('.sc-day');
+    assert.equal(await sch.getAttribute('[data-lane="SHIPPING"]', 'aria-selected'), 'true', 'the Scheduler menu link opens Shipping');
+    assert.equal(await sch.getAttribute('[data-view="month"]', 'aria-selected'), 'true', 'the Scheduler menu link opens the month');
+    assert.equal(await sch.textContent('#lane-name'), 'Shipping');
+    await sch.close();
+    const unl = await openPage(browser, 1920, 950, '/unloading.html' + MANAGER);
+    await unl.waitForSelector('#screen:not([hidden])');
+    await unl.click('[data-mode="view"]');
+    await unl.waitForSelector('[data-mode="view"][aria-selected="true"]');
+    await unl.goto(HOSTING + '/unloading.html' + MANAGER);
+    await unl.waitForSelector('[data-mode="check"][aria-selected="true"]', { timeout: 8000 }); // Check Off again, not the mode last used
+    await unl.close();
+    results.push('Plant Operations side reaches all 11 plant screens, Manager Center included; a menu click opens each screen\'s default view');
 
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       for (const [page, line, parts] of SCREENS) {

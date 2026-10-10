@@ -66,7 +66,6 @@
     let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
     let area = P.AREAS.indexOf(String(params.get('area') || '').toUpperCase()) >= 0 ? String(params.get('area')).toUpperCase() : 'CASE';
     let tab = 'needs', editKey = '', mode = 'check';
-    try { mode = localStorage.getItem('udPlantUnloadMode') === 'view' ? 'view' : 'check'; } catch (e) { /* no storage */ }
     let runs = [], journal = [], sheetWash = [], appWash = [], person = null, app = {};
     const pending = {};        // unload key -> what is shown before the server has it
     const washedNow = {};      // wash item id -> true while its Wash press is saving
@@ -273,7 +272,7 @@
       render();
     });
     document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { tab = b.dataset.tab; editKey = ''; render(); } });
-    document.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => { mode = b.dataset.mode; editKey = ''; try { localStorage.setItem('udPlantUnloadMode', mode); } catch (e) { /* no storage */ } render(); }; });
+    document.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => { mode = b.dataset.mode; editKey = ''; render(); }; });
     function setDate(d) {
       if (!L.isDateKey(d) || d === date) return;
       date = d; editKey = '';
