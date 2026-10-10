@@ -1,0 +1,8 @@
+{
+  "_about": "What the PRODUCTION server is told when it is deployed (tools/production-env.cjs turns this into functions/.env and refuses anything unsafe). Production reads Joe's real Uniontown sheets, read only: the Live workbook UDPO LIVE DATA - UNIONTOWN, Route, Driver, Equipment and Users Master, day offs and vacations, and the Plant Operations workbook (the IDs are in functions/src/sources.js, the same as the current app). It never writes to any sheet: WRITEBACK_JSON is refused here, and functions/src/writeback.js refuses every production sheet in code. Reports are emailed as MAIL_FROM; REPORT_TO (the plant managers) stays empty until Joe names them, so until then a report goes only to the person who pressed Send.",
+  "env": {
+    "READ_UNIONTOWN_SHEETS": "1",
+    "MAIL_FROM": "jcartwright@uniteddairy.com",
+    "REPORT_TO": ""
+  }
+}

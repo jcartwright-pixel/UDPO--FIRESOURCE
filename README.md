@@ -154,7 +154,7 @@ run keeps the trigger.
 After changing `functions/src/logic.js` run `npm run sync-logic`; a test fails if the screens' copy differs.
 
 Deploy: `.github/workflows/deploy.yml`, run by hand, sandbox first. Production only after Joe's
-release words for the new app. Until the workflow is on `main`, a commit on the work branch whose message contains
+release words for the new app; what production needs, who makes it and the safety stops are in `PRODUCTION.md`. Until the workflow is on `main`, a commit on the work branch whose message contains
 `[deploy sandbox]` deploys to the sandbox. The sandbox is https://ud-distribution-sandbox.web.app. It shows the made-up
 sheets (`DEMO_DATA=1`, Joe as administrator) until `sandbox-sources.json` names its sheet copies, and the copy never
 reads the real sheets unless `READ_UNIONTOWN_SHEETS=1` is set. One-time setup in the Firebase console: Firestore
