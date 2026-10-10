@@ -159,7 +159,21 @@ const MASTER_KINDS = Object.freeze({
         try { roles = JSON.parse(raw); } catch (e) { warn('roles not readable'); }
         if (!Array.isArray(roles)) roles = [];
       }
-      return { name: get('display_name'), status: get('status').toUpperCase(), roles: roles.map(r => String(r).trim().toUpperCase()).filter(Boolean) };
+      roles = roles.map(r => String(r).trim().toUpperCase()).filter(Boolean);
+      // The plants a person may see (facility_ids_json: ["fac_uniontown"], or ["*"] for all), as in the current app.
+      let facilities = [];
+      const rawF = get('facility_ids_json');
+      if (rawF) {
+        try { facilities = JSON.parse(rawF); } catch (e) { warn('plants not readable'); }
+        if (!Array.isArray(facilities)) facilities = [];
+      }
+      facilities = facilities.map(f => String(f).trim()).filter(Boolean);
+      // The current app's primary administrator is always an Administrator for every plant (PRIMARY_ADMIN_EMAILS).
+      if (L.PRIMARY_ADMINS.indexOf(get('email').toLowerCase()) >= 0) {
+        if (roles.indexOf('ADMINISTRATOR') < 0) roles.push('ADMINISTRATOR');
+        facilities = ['*'];
+      }
+      return { name: get('display_name'), status: get('status').toUpperCase(), roles, facilities };
     }
   }
 });

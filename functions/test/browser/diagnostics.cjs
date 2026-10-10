@@ -71,6 +71,16 @@ async function newPage(context) {
     const tops = await page.$$eval('#controls > button, #controls .tabs', x => x.map(e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2)));
     assert.ok(Math.max(...tops) - Math.min(...tops) <= 3, 'the controls sit on one line ' + JSON.stringify(tops));
 
+    // The Administration page has a Sandbox tools group with Diagnostics, kept when its filters redraw the tiles.
+    await page.goto(HOST + '/administration.html');
+    await page.waitForSelector('.diag-group a.adm-tile[href="diagnostics.html"]', { timeout: 15000 });
+    await page.fill('#find', 'diag');
+    await page.waitForSelector('.diag-group a.adm-tile[href="diagnostics.html"]');
+    await page.fill('#find', '');
+    await page.screenshot({ path: path.join(SHOTS, 'administration-sandbox-tools-1920.png'), fullPage: true });
+    await Promise.all([page.waitForURL(/diagnostics\.html/), page.click('.diag-group a.adm-tile')]);
+    await page.waitForSelector('#controls:not([hidden])');
+
     // Run the check: every screen opens in this window, one after another, and it comes back here.
     const started = Date.now();
     await page.click('#run');

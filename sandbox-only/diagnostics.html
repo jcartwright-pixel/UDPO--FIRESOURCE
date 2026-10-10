@@ -158,7 +158,8 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       const me = await getDoc(doc(db, 'users', String(user.email).toLowerCase())).catch(() => null);
-      if (!L.hasRole(me && me.exists() ? me.data() : null, ['ADMINISTRATOR'])) {
+      const person = me && me.exists() ? me.data() : null;
+      if (!(L.isAdmin ? L.isAdmin(person) : L.hasRole(person, ['ADMINISTRATOR']))) {
         write(KEY_RUN, null);
         showError('Diagnostics is for administrators only.');
         return;

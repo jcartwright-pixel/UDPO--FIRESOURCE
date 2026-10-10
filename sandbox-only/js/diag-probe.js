@@ -162,7 +162,8 @@
         var fs = mods[1];
         fs.getDoc(fs.doc(fs.getFirestore(apps[0]), 'users', email)).then(function (snap) {
           var u = snap.exists() ? snap.data() : null;
-          if (!(u && u.status === 'ACTIVE' && (u.roles || []).indexOf('ADMINISTRATOR') >= 0)) return;
+          var L = window.UDLogic;
+          if (!(L && L.isAdmin ? L.isAdmin(u) : (u && u.status === 'ACTIVE' && (u.roles || []).indexOf('ADMINISTRATOR') >= 0))) return;
           var icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>';
           document.querySelectorAll('.side-flyouts .flyout').forEach(function (fly) {
             var t = fly.querySelector('.flyout-title');
@@ -172,6 +173,21 @@
             a.innerHTML = icon + '<span>Diagnostics (sandbox)</span>';
             fly.appendChild(a);
           });
+          // The Administration page (its tiles are drawn again on every filter): a Sandbox tools group at the end.
+          var body = page === 'administration.html' && document.getElementById('body');
+          if (body) {
+            var addGroup = function () {
+              if (!body.querySelector('.adm-group') || body.querySelector('.diag-group')) return;
+              var g = document.createElement('section');
+              g.className = 'adm-group diag-group';
+              g.innerHTML = '<header><h2>Sandbox tools</h2><span>Only on the sandbox; the real app has none of this</span></header><div class="adm-tiles">' +
+                '<a class="adm-tile" href="diagnostics.html" title="Check every screen and time loads and saves"><span class="adm-ic">' + icon + '</span><strong>Diagnostics</strong>' +
+                '<small>Check every screen, time loads and saves, list slow and failed items</small><em>Open &rsaquo;</em></a></div>';
+              body.appendChild(g);
+            };
+            addGroup();
+            new MutationObserver(addGroup).observe(body, { childList: true });
+          }
           document.querySelectorAll('[data-sandbox-tools]').forEach(function (slot) {
             if (slot.querySelector('a[href="diagnostics.html"]')) return;
             var a = document.createElement('a');

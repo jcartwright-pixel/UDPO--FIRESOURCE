@@ -106,6 +106,7 @@
     function formKey(line) { const cur = roundCheck(line); return line.operationId + '|' + roundStart + '|' + (cur && (!form || form.fill.id !== cur.docId) ? cur.docId : form && form.operationId === line.operationId ? form.fill.id : ''); }
 
     function render() {
+      if (window.matchMedia('(max-width: 760px)').matches) pane = 'current'; // phones: the check only, no history tab
       const all = lines(), line = current(), hist = U.qualityHistory(journalAll(), lineStatus, Date.now()), ck = canSave();
       if (line) chosen = line.operationId;
       const fails = all.filter(l => l.last && (l.last.status === 'DOWN' || l.last.status === 'REVIEW')).length;

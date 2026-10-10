@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Administration · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="admin-center-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Administration</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Administration</h1><small>Control Center · everything the current app's Administration does</small></div>
+      <div class="actions in-head top-row">
+        <div class="seg" id="show" role="group" aria-label="Show">
+          <button type="button" data-show="all" aria-pressed="true">All</button>
+          <button type="button" data-show="ready" aria-pressed="false">In the new app</button>
+          <button type="button" data-show="soon" aria-pressed="false">Being built</button>
+        </div>
+        <input type="search" id="find" placeholder="Find a setting" aria-label="Find a setting">
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="adm-body" id="body"></div>
+  </div>
+
+  <script type="module">
+    import { requireSignIn, start, escapeHtml, ICON } from './js/app.js';
+    import { ADMIN_GROUPS } from './js/admin-items.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    const L = window.UDLogic;
+    let show = 'all', find = '', admin = null;
+    const icon = (k) => /\.webp$/.test(k) ? '<img src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.gear) + '</svg>';
+
+    function render() {
+      const body = document.getElementById('body');
+      if (admin === null) { body.innerHTML = ''; return; }
+      if (!admin) { body.innerHTML = '<section class="soon-card"><h2>Administrators only</h2><p>Administration is for Administrators. Ask an administrator if you need something changed.</p></section>'; return; }
+      const q = find.trim().toLowerCase();
+      body.innerHTML = ADMIN_GROUPS.map(([group, about, items]) => {
+        const shown = items.filter(([, title, what, page]) => (show === 'all' || (show === 'ready') === !!page) && (!q || (title + ' ' + what + ' ' + group).toLowerCase().indexOf(q) >= 0));
+        if (!shown.length) return '';
+        return '<section class="adm-group"><header><h2>' + escapeHtml(group) + '</h2><span>' + escapeHtml(about) + '</span></header><div class="adm-tiles">' +
+          shown.map(([key, title, what, page, ic]) => '<a class="adm-tile' + (page ? '' : ' soon') + '" data-key="' + key + '" title="' + escapeHtml(what) + '" href="' + (page || 'soon.html?what=admin-' + key) + '">' +
+            '<span class="adm-ic">' + icon(ic) + '</span><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(what) + '</small>' +
+            '<em>' + (page ? 'Open &rsaquo;' : 'Being built') + '</em></a>').join('') + '</div></section>';
+      }).join('') || '<section class="soon-card"><h2>Nothing matches</h2><p>Try another word, or show All.</p></section>';
+    }
+    document.getElementById('show').addEventListener('click', e => {
+      const b = e.target.closest('[data-show]');
+      if (!b) return;
+      show = b.dataset.show;
+      document.querySelectorAll('#show [data-show]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      render();
+    });
+    document.getElementById('find').addEventListener('input', e => { find = e.target.value; render(); });
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { admin = L.isAdmin(s.exists() ? s.data() : null); render(); });
+    });
+  </script>
+</body>
+</html>

@@ -25,7 +25,7 @@ document.querySelectorAll('.topbar').forEach(bar => {
 // The menu on the left (Joe, 10/9: "the action buttons ... supposed to be a menu option to the left"), the same on every
 // screen. A link marked with the small arrow still opens the current app in a new tab. On a laptop it folds to icons;
 // the button at its top opens it.
-const ICON = {
+export const ICON = {
   home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
   back: '<path d="M15 5l-7 7 7 7"/><path d="M8 12h12"/>',
   day: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h3v3H8z"/>',
@@ -85,7 +85,8 @@ export const SIDES = [
 const pageOf = (href) => String(href).split(/[?#]/)[0];
 const sideHas = (side, page) => page === side.home || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
 export function sideFor(page) {
-  if (!page || page === 'index.html') return null;
+  // Home, the all-plants overview and the Administration Center sit above the three sides: their menu lists the sides.
+  if (!page || ['index.html', 'company.html', 'administration.html'].indexOf(page) >= 0) return null;
   let last = '';
   try { last = sessionStorage.getItem('udSide') || ''; } catch (e) { /* no storage */ }
   const kept = SIDES.find(s => s.key === last);
@@ -112,7 +113,7 @@ function addSideMenu() {
   const side = sideFor(here), groups = side ? MENU.filter(([g]) => side.sections.indexOf(g) >= 0) : [];
   // Home lists the three sides; a side shows its name (back to its first page), then only its own sections. A side with one
   // section lists its screens straight in the menu.
-  const top = link(MENU[0][1][0]) + (!side ? SIDES.map(s => link([s.name, s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ')).join('') :
+  const top = link(MENU[0][1][0]) + (!side ? SIDES.map(s => link([s.name, s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ')).join('') + link(['Administration', 'administration.html', 'gear']) :
     link([side.name, side.home, side.pic]).replace('<a ', '<a data-side="' + side.key + '" ').replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (here === side.home ? ' on' : '') + '" '));
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
     (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? items.map(link).join('') : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
@@ -265,21 +266,44 @@ export function goBack() {
   let fromHere = false;
   try { fromHere = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (e) { /* no referrer */ }
   // Up one level: a side's screen goes to that side's first page, and the side's first page goes Home.
-  const side = sideFor(here), up = side && here !== side.home ? side.home : 'index.html';
-  if (!main && side && here !== side.home && fromHere && history.length > 1) history.back();
+  const side = sideFor(here), up = side && here !== side.home ? side.home : here === 'index.html' && multiPlant() ? 'company.html' : 'index.html';
+  if ((here === 'company.html' || (!main && side && here !== side.home)) && fromHere && history.length > 1) history.back();
   else location.href = up;
 }
 // Joe 10/10: every screen has a Back button and a Home button, in the same place at the top of the menu (built here, once).
+// Joe 10/10: someone who may see more than one plant (an Administrator, or a plant list of "*") starts on the all-plants
+// overview and picks a plant; a plant's home then has Back to the overview. Known once the Users list is read.
+function multiPlant() { try { return sessionStorage.getItem('udMulti') === '1'; } catch (e) { return false; } }
+function backButton() {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'side-back'; b.id = 'go-back'; b.title = 'Back one screen';
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.back + '</svg><span>Back</span>';
+  b.onclick = goBack;
+  return b;
+}
+function plantHomeBack() {
+  const here = location.pathname.split('/').pop() || 'index.html', home = document.getElementById('go-home');
+  if (here === 'index.html' && home && multiPlant() && !document.getElementById('go-back')) home.before(backButton());
+}
+function noteAccess(person) {
+  const L = window.UDLogic;
+  if (!L || !L.plantsFor) return;
+  try {
+    sessionStorage.setItem('udMulti', L.plantsFor(person).length > 1 ? '1' : '0');
+    sessionStorage.setItem('udAdmin', L.isAdmin(person) ? '1' : '0');
+  } catch (e) { /* no storage */ }
+  document.body.classList.toggle('is-admin', L.isAdmin(person));
+  plantHomeBack();
+}
+// The Administration links show only to Administrators (the screens check again).
+try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add('is-admin'); } catch (e) { /* no storage */ }
 (function addBack() {
   const here = location.pathname.split('/').pop() || 'index.html';
   const home = document.querySelector('.sidemenu a[href="index.html"]');
   if (!home) return;
   home.id = 'go-home';
-  if (here === 'index.html') return;
-  const b = document.createElement('button');
-  b.type = 'button'; b.className = 'side-back'; b.id = 'go-back'; b.title = 'Back one screen';
-  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.back + '</svg><span>Back</span>';
-  b.onclick = goBack;
+  if (here === 'index.html') { plantHomeBack(); return; }
+  const b = backButton();
   const h = document.createElement('button');
   h.type = 'button'; h.className = 'side-back side-home'; h.id = 'go-home'; h.title = 'Home';
   h.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.home + '</svg><span>Home</span>';
@@ -353,6 +377,7 @@ export async function requireSignIn(ready) {
       return;
     }
     remember(email);
+    noteAccess(Object.assign({ email }, entry.data()));
     if (early) return;
     gate.hidden = true;
     screen.hidden = false;
