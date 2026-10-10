@@ -59,9 +59,10 @@ export const MENU = [
   ['Equipment', [['Fleet & Maintenance', 'maint.html', 'maintenance-tractor-v1-560.webp'], ['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'],
     ['Truck Issues', 'issues.html?kind=TRUCK', 'maintenance-tractor-v1-560.webp'], ['Trailer Issues', 'issues.html?kind=TRAILER', 'maintenance-trailer-v1-560.webp'],
     ['Fork Truck / Pallet Jack Issues', 'issues.html?kind=FORK_TRUCK', 'forklift-truck-v1-560.webp'], ['Garage Work Orders', 'garage.html', 'wrench'], ['Fleet Service', 'fleet.html', 'gear'],
-    ['Garage Station', 'soon.html?what=garage-station', 'wrench'], ['Over the Road', 'otr.html', 'distribution-truck-v1-560.webp'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
-  ['GPS / Fleet', [['GPS Setup', 'gps.html', 'gear'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin'], ['Driver Scorecard', 'scorecard.html', 'star']]],
-  ['Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road']]],
+    ['Garage Station', 'soon.html?what=garage-station', 'wrench']]],
+  ['GPS / Fleet', [['GPS Setup', 'gps.html', 'gear'], ['Driver Scorecard', 'scorecard.html', 'star']]],
+  // Joe 10/10: Over the Road and Trucks Today (GPS) are manager reports (he prints Over the Road), so they sit here only.
+  ['Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
   ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Sheet Conflicts', 'conflicts.html', 'alert']]],
   // Joe 10/10: Dispatch Administration has its own Administration section (out of the Dispatch menu).
   ['Administration', [['Dispatch Administration', 'admin.html', 'gear'], ['Operational Assignments', 'ops.html', 'people'], ['Print Layouts', 'print.html', 'day'], ['Dispatch Settings', 'settings.html', 'gear']]],

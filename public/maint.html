@@ -25,8 +25,6 @@
       <div class="actions tiles hub-tiles">
         <a class="button" id="to-garage-station" href="soon.html?what=garage-station"><img src="img/library/maintenance-tractor-v1-560.webp" alt=""><span>Garage Station</span></a>
         <a class="button" href="fleet.html"><img src="img/library/maintenance-trailer-v1-560.webp" alt=""><span>Fleet Service</span></a>
-        <a class="button" href="otr.html"><img src="img/library/distribution-truck-v1-560.webp" alt=""><span>Over the Road</span></a>
-        <a class="button" id="to-trucks-today" href="soon.html?what=trucks-today"><img src="img/library/distribution-truck-v1-560.webp" alt=""><span>Trucks Today</span></a>
         <a class="button" href="equipment.html"><img src="img/library/maintenance-tractor-v1-560.webp" alt=""><span>Equipment</span></a>
       </div>
     </div>
@@ -75,10 +73,12 @@
 
     function render() {
       const lists = KINDS.map(([k]) => L.issueRows(data.maintenance, k, now())), nums = lists.map(o => L.issueNumbers(o, now()));
+      // Repeat units counts each unit once (the current app's repeat offenders), not each repeat write-up.
+      const repeatUnits = new Set(KINDS.flatMap(([k], i) => lists[i].filter(r => r.occurrences > 1).map(r => k + '|' + (r.unitKey || r.unit)))).size;
       const all = [].concat(...lists), oldest = Math.max(0, ...nums.map(n => n.oldestDays));
       const kpi = (n, label, cls) => '<div class="' + (cls || '') + '"><b>' + n + '</b><span>' + label + '</span></div>';
       document.getElementById('kpis').innerHTML = kpi(all.length, 'Open issues') + kpi(nums.reduce((a, n) => a + n.needReview, 0), 'Need review', 'warn') +
-        kpi(nums.reduce((a, n) => a + n.repeat, 0), 'Repeat units · 90 days', 'warn') + kpi(nums[0].notEmailed, 'Trucks not emailed', 'warn') +
+        kpi(repeatUnits, 'Repeat units · 90 days', 'warn') + kpi(nums[0].notEmailed, 'Trucks not emailed', 'warn') +
         kpi(oldest + (oldest === 1 ? ' day' : ' days'), 'Oldest open') + kpi(nums.reduce((a, n) => a + n.repaired30, 0), 'Repaired · last 30 days', 'good');
       const issueCard = ([k, title, img], i) => {
         const n = nums[i], go = (f) => 'issues.html?kind=' + k + (f ? '&filter=' + f : '');
@@ -99,7 +99,7 @@
         tile(due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates · 30 days', 'fleet.html') + '</div></div>';
       document.getElementById('cards').innerHTML = issueCard(KINDS[0], 0) + issueCard(KINDS[1], 1) + issueCard(KINDS[2], 2) + garage;
       const type = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };
-      const latest = KINDS.flatMap(([k], i) => lists[i].map(r => Object.assign({ kind: k }, r))).sort((a, b) => b.openedMs - a.openedMs).slice(0, 12);
+      const latest = KINDS.flatMap(([k], i) => lists[i].map(r => Object.assign({ kind: k }, r))).sort((a, b) => b.openedMs - a.openedMs).slice(0, 11);
       document.getElementById('latest').innerHTML = latest.map(r => '<tr data-go="issues.html?kind=' + r.kind + '"><td class="strong">' + escapeHtml(r.unit || '?') + '</td><td>' + type[r.kind] + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + escapeHtml(r.text) + '</td><td>' + dateText(r.reported) + '</td></tr>').join('') ||
         '<tr><td colspan="4" class="empty">No open write-ups.</td></tr>';
     }
