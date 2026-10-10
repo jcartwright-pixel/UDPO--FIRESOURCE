@@ -239,6 +239,8 @@ async function loadValues(tx, db, req, day, stamp, SaveError) {
     [['truck', 'TRUCK', 'truckId'], ['trailer', 'TRAILER', 'trailerId']].forEach(([k, type, idField]) => {
       if (f[k] === undefined) return;
       if (!f[k]) { after[k] = ''; after[idField] = ''; return; }
+      // TBA: the trailer is not known yet. Kept as plain TBA, never T-TBA.
+      if (/^T\.?B\.?A\.?$/i.test(String(f[k]).trim())) { after[k] = 'TBA'; after[idField] = ''; return; }
       const u = MAINT.resolveUnit(f[k], type, equipment);
       // A number no unit matches is kept as typed, the same as the current app.
       after[k] = type === 'TRAILER' && !u.resolved && /^\d+$/.test(u.unit) ? 'T-' + u.unit : u.unit;
