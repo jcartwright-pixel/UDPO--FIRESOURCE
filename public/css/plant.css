@@ -554,9 +554,10 @@
 .manager-page .mc-modal { position: fixed; inset: 0; z-index: 50; background: rgba(10, 30, 50, .45); display: grid; place-items: center; padding: 16px; }
 .manager-page .mc-modal[hidden] { display: none; }
 .manager-page .mc-dialog { width: min(760px, 100%); max-height: 100%; overflow: auto; background: #fff; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
-.manager-page .mc-dhead { display: flex; align-items: flex-start; gap: 12px; }
+.manager-page .mc-dhead { display: flex; flex-direction: column-reverse; gap: 10px; }
 .manager-page .mc-dhead > div:first-child { flex: 1; min-width: 0; }
 .manager-page .mc-dhead h2 { margin: 2px 0 0; font-size: 20px; color: var(--ud-blue-dark); }
+.manager-page .mc-dacts { justify-content: flex-end; }
 .manager-page .mc-dacts .mc-btn { flex: none; min-width: 110px; }
 .manager-page .mc-note { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 800; color: var(--muted); }
 .manager-page .mc-note textarea { min-height: 64px; border: 1px solid #b8cadb; border-radius: 9px; padding: 8px 10px; font: inherit; font-size: 16px; color: var(--ink); resize: vertical; }
