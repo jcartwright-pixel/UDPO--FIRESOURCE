@@ -65,14 +65,21 @@ export const MENU = [
   ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Sheet Conflicts', 'conflicts.html', 'alert']]],
   // Joe 10/10: Dispatch Administration has its own Administration section (out of the Dispatch menu).
   ['Administration', [['Dispatch Administration', 'admin.html', 'gear'], ['Operational Assignments', 'ops.html', 'people'], ['Print Layouts', 'print.html', 'day'], ['Dispatch Settings', 'settings.html', 'gear']]],
-  // The plant side (the current app's Plant Menu): the departments page and each department's screen.
-  ['Plant', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Plant Operations Scheduler', 'scheduler.html', 'week'], ['Yard Checks', 'yard.html', 'yard-checks.webp'], ['Production Line Status & Quality', 'quality.html', 'production.webp'], ['Shift Notes', 'shiftnotes.html', 'alert'], ['Temperatures & Coolers', 'temps.html', 'temperatures.webp'], ['Manager Center', 'manager.html', 'star']]]
+  // The plant side (Joe 10/10): sections like the Distribution side, each with its screens in the fly-out, as the current
+  // app's Manager Menu groups them; no menu inside the screens.
+  ['Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash']]],
+  ['Scheduler', [['Shipping', 'scheduler.html?lane=SHIPPING', 'week'], ['Receiving', 'scheduler.html?lane=RECEIVING', 'week']]],
+  ['Yard Checks', [['Active Yard Queue', 'yard.html', 'yard-checks.webp'], ['24-Hour History', 'yard.html?view=history', 'yard-checks.webp']]],
+  ['Quality', [['Production Line Status & Quality', 'quality.html', 'production.webp'], ['Quality History', 'quality.html?view=history', 'production.webp']]],
+  ['Coolers', [['Manual Read', 'temps.html', 'temperatures.webp'], ['Status / Alerts', 'temps.html?view=alerts', 'temperatures.webp'], ['24-Hour History', 'temps.html?view=history', 'temperatures.webp']]],
+  ['Shift Notes', [['Shift Handoff', 'shiftnotes.html', 'alert'], ['24-Hour History', 'shiftnotes.html?view=history', 'alert']]],
+  ['Manager Center', [['Manager Center', 'manager.html', 'star'], ['Send Current Report', 'manager.html?report=1', 'star']]]
 ];
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
 // lists only that side's screens. A screen listed on two sides stays on the side it was opened from.
 export const SIDES = [
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Reports', 'Overall', 'Administration'] },
-  { key: 'plant', name: 'Plant Operations', home: 'plant.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks, shift notes and reports', sections: ['Plant'] },
+  { key: 'plant', name: 'Plant Operations', home: 'plant.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks, shift notes and reports', sections: ['Departments', 'Scheduler', 'Yard Checks', 'Quality', 'Coolers', 'Shift Notes', 'Manager Center'] },
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders, fleet service and GPS', sections: ['Equipment', 'GPS / Fleet'] }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
@@ -96,7 +103,7 @@ function addSideMenu() {
   nav.setAttribute('aria-label', 'Screens');
   // Joe 10/9: the menu lists only the sections; hovering (or tapping) a section opens its screens beside it.
   // Joe 10/10: the United Dairy icon library wherever a picture fits; line icons where none does.
-  const SECTION_ICON = { 'GPS / Fleet': 'pin', Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', Reports: 'star', Overall: 'check', Administration: 'gear', Plant: 'plant-building-v1-560.webp' };
+  const SECTION_ICON = { 'GPS / Fleet': 'pin', Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', Reports: 'star', Overall: 'check', Administration: 'gear', Departments: 'factory', Scheduler: 'week', 'Yard Checks': 'yard-checks.webp', Quality: 'production.webp', Coolers: 'temperatures.webp', 'Shift Notes': 'alert', 'Manager Center': 'star' };
   const link = ([label, href, icon]) => {
     const ext = /^https:/.test(href);
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
@@ -109,7 +116,7 @@ function addSideMenu() {
     link([side.name, side.home, side.pic]).replace('<a ', '<a data-side="' + side.key + '" ').replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (here === side.home ? ' on' : '') + '" '));
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
     (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? items.map(link).join('') :
-      '<div class="side-sec' + (items.some(([, href]) => href === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
+      '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
       svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span><i aria-hidden="true">&#9656;</i></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join(''));
   nav.addEventListener('click', e => { const a = e.target.closest('a[data-side]'); if (a) try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ } });
