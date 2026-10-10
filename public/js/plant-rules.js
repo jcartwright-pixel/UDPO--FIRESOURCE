@@ -21,6 +21,12 @@
  *     takes that load off;
  *   - a checked trailer leaves the Active Yard Queue for 2 hours, then comes back until it leaves;
  *   - fuel is Full, 3/4, 1/2 or Empty; the 24-hour history lists every check and every Left Yard.
+ *
+ * And Production Line Status & Quality's (027_V734_ProductionQuality.gs, Plant.html desktopQualityMarkupV780):
+ *   - the lines are the active PRODUCTION_AREA rows of PLANT_OPERATIONS_MASTER, in view order;
+ *   - a line's form starts from its last check (product, tip test, label / date code, overall result, notes, weights);
+ *   - Boxing records no cycle time; Totes and Raypak no cycle time or weight; HTST #1 and #2 no cycle time, weight or tip test;
+ *   - the overall result is Pass (RUNNING), Review, Fail (DOWN) or Finished; the 24-hour history lists every line's checks.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -300,9 +306,62 @@
     return age < YARD_LOCK_MINUTES ? Math.ceil(YARD_LOCK_MINUTES - age) : 0;
   }
 
+
+  /* ---------- Production Line Status & Quality ---------- */
+  var QUALITY_TYPE = 'PRODUCTION_QUALITY', LINE_STATUSES = ['RUNNING', 'REVIEW', 'CHANGEOVER', 'DOWN', 'FINISHED'];
+  function lineKey(v) { return text(v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  function qualitySkip(line) {
+    var k = lineKey(line);
+    if (k === 'BOXING') return { cycle: true };
+    if (k === 'TOTES' || k === 'RAYPAK') return { cycle: true, weight: true };
+    if (k === 'HTST1' || k === 'HTST2') return { cycle: true, weight: true, tip: true };
+    return {};
+  }
+  function isBlowMold(line) { return lineKey(line) === 'BLOWMOLD'; }
+  // The active production lines of the plant (setup = plantSetup docs), in view order.
+  function productionLines(setup) {
+    return (setup || []).filter(function (d) { return text(d.type).toUpperCase() === 'PRODUCTION_AREA' && text(d.status).toUpperCase() === 'ACTIVE'; })
+      .map(function (d) { return { operationId: text(d.operationId), name: text(d.name) || text(d.area), viewSequence: Number(d.viewSequence) || 0 }; })
+      .sort(function (a, b) { return a.viewSequence - b.viewSequence || a.name.localeCompare(b.name); });
+  }
+  // Every quality check: the app's records (plantJournal PRODUCTION_QUALITY) and each line's last check on the sheet (PLANT LINE STATUS).
+  function qualityChecks(journal, lineStatus) {
+    var out = [];
+    (lineStatus || []).forEach(function (d) {
+      var p = payloadOf(d);
+      out.push(Object.assign({}, p, { operationId: text(d.operationId || p.operationId), area: text(p.area || d.area), status: text(p.status || d.status).toUpperCase(),
+        recordedAt: text(d.updatedAt), recordedBy: text(d.updatedBy), fromSheet: true }));
+    });
+    (journal || []).forEach(function (d) {
+      if (text(d.type).toUpperCase() !== QUALITY_TYPE) return;
+      var p = payloadOf(d);
+      out.push(Object.assign({}, p, { operationId: text(p.operationId), area: text(p.area), status: text(p.status).toUpperCase(), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), inApp: true }));
+    });
+    return out.sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
+  }
+  // Each line with its last check and the number of checks in the last 24 hours.
+  function qualityLines(setup, journal, lineStatus, nowMs) {
+    var checks = qualityChecks(journal, lineStatus);
+    return productionLines(setup).map(function (l) {
+      var mine = checks.filter(function (c) { return c.operationId === l.operationId; }), last = mine[0] || {};
+      return Object.assign({}, l, { last: last, today: mine.filter(function (c) { return when(c.recordedAt) >= nowMs - 86400000; }).length });
+    });
+  }
+  function qualityHistory(journal, lineStatus, nowMs) {
+    return qualityChecks(journal, lineStatus).filter(function (c) { var t = when(c.recordedAt); return t && t >= nowMs - 86400000; });
+  }
+  // What a weight reads as on the history: "3990, 3992" or the six blow mold heads.
+  function weightText(w) {
+    w = w || {};
+    if (w.result !== undefined) return text(w.result);
+    return [1, 2, 3, 4, 5, 6].map(function (n) { return text(w['head' + n]); }).some(Boolean) ? [1, 2, 3, 4, 5, 6].map(function (n) { return 'H' + n + ' ' + (text(w['head' + n]) || '—'); }).join(' · ') : '';
+  }
+
   return { unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, yardHolds: yardHolds, yardDeparted: yardDeparted,
-    yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft };
+    yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
+    QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, productionLines: productionLines, qualityLines: qualityLines,
+    qualityHistory: qualityHistory, weightText: weightText };
 });
