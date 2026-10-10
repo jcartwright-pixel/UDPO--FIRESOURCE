@@ -36,7 +36,7 @@
       </div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Route Master is not changed yet</span></div>
     </div>
-    <div class="actions">
+    <div class="actions tiles">
       <select id="active-filter" aria-label="Which routes"><option value="ACTIVE">Active routes</option><option value="ALL">All routes</option><option value="INACTIVE">Inactive routes</option></select>
       <button type="button" id="refresh" title="The list is live; this only redraws it">Refresh</button>
       <button type="button" class="primary" id="add-route">+ Add Route</button>
@@ -222,12 +222,15 @@
     }
     // Route Editor (Joe 10/9): the run's whole normal week on one page: runs or not, start time, load day, miles, hours
     // and the default truck, trailer and jack for each day. Each box saves when it changes, like the grids.
-    const DAY_FIELDS = [['dispatchTime', 'Start Time'], ['loadDayOffset', 'Load Day'], ['miles', 'Miles'], ['hours', 'Hours'], ['tractor', 'Truck'], ['trailer', 'Trailer'], ['forklift', 'Jack']];
+    // The old Route Editor's day fields, all of them (RouteManagement.html loadEditor): Order and Day Notes too.
+    const DAY_FIELDS = [['dispatchTime', 'Start Time'], ['loadDayOffset', 'Load Day'], ['miles', 'Miles'], ['hours', 'Hours'], ['loadOrder', 'Order'], ['tractor', 'Truck'], ['trailer', 'Trailer'], ['forklift', 'Jack'], ['notes', 'Day Notes']];
+    // A blank default on a running day says so: Route Master has no unit set there (Joe 10/10, route 855).
+    const UNIT_FIELDS = ['tractor', 'trailer', 'forklift'];
     function dayTable(r, edit) {
       return '<h3 class="day-title">Each day of the normal week</h3><table class="day-table"><thead><tr><th>Day</th><th>Runs?</th>' + DAY_FIELDS.map(f => '<th>' + f[1] + '</th>').join('') + '</tr></thead><tbody>' +
         DAYS.map(p => { const on = !!day(r, p).active;
           return '<tr data-id="' + escapeHtml(r.id) + '"' + (on ? '' : ' class="off"') + '><td class="strong">' + NAME(p) + '</td><td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>' +
-            DAY_FIELDS.map(f => '<td><input class="dcell" data-day="' + p + '" data-field="' + f[0] + '" value="' + escapeHtml(cellValue(r, p, f[0])) + '" autocomplete="off"' + (edit ? '' : ' readonly') + '></td>').join('') + '</tr>';
+            DAY_FIELDS.map(f => '<td' + (f[0] === 'notes' ? ' class="day-notes"' : '') + '><input class="dcell" data-day="' + p + '" data-field="' + f[0] + '" value="' + escapeHtml(cellValue(r, p, f[0])) + '"' + (on && UNIT_FIELDS.indexOf(f[0]) >= 0 ? ' placeholder="none set"' : '') + ' autocomplete="off"' + (edit ? '' : ' readonly') + '></td>').join('') + '</tr>';
         }).join('') + '</tbody></table>';
     }
     // Show / Hide Rules: every true/false the screens read, where it comes from, and what Weekly does with it this week.

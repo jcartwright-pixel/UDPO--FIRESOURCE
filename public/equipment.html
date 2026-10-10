@@ -25,6 +25,7 @@
     </div>
     <div class="head">
       <div class="title"><h1>Equipment</h1><small>Trucks and trailers the dispatch lists offer (Equipment Master)</small></div>
+      <div class="actions in-head fleet-sync"><button type="button" id="fleet-sync" hidden>Sync fleet list</button><span id="fleet-synced"></span></div>
       <div class="counts"><div><b id="n-trucks">-</b>Trucks</div><div><b id="n-trailers">-</b>Trailers</div><div><b id="n-down">-</b>Down / out</div></div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Equipment Master is not changed yet. Fleet service and work orders stay in the current app.</span></div>
     </div>
@@ -45,10 +46,10 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer } from './js/app.js';
     import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     forScreen('dailyDispatch');
-    import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
@@ -64,7 +65,34 @@
     // Joe 10/9: only a real down reason shows; the sheet's sync notes ("External Fleet: ...", "Route Day ...") stay in the sheet.
     const downReason = (e) => String(e.status).toUpperCase() === 'DOWN' || /^DOWN:/i.test(String(e.notes || '')) ? reasonOf(e) : '';
 
+    // Joe 10/10: the fleet list is the master list; it syncs every night, and a manager can sync it now.
+    let fleetSync = null, syncing = false;
+    const MANAGERS = ['ADMINISTRATOR', 'ADMIN', 'MANAGER'];
+    function syncText() {
+      if (syncing) return 'Syncing the fleet list...';
+      if (!fleetSync || !fleetSync.at) return 'Fleet list: not synced yet';
+      const when = new Date(fleetSync.at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      if (!fleetSync.ok) return 'Fleet list sync failed ' + when + ': ' + fleetSync.error;
+      const n = (k) => (fleetSync[k] || []).length;
+      const what = [n('added') && n('added') + ' added', n('inactive') && n('inactive') + ' off the list', n('back') && n('back') + ' back', n('changed') && n('changed') + ' updated'].filter(Boolean).join(', ');
+      return 'Fleet list synced ' + when + (what ? ': ' + what : ': no changes');
+    }
+    function paintSync() {
+      const button = document.getElementById('fleet-sync'), line = document.getElementById('fleet-synced');
+      button.hidden = !L.hasRole(lists.person, MANAGERS);
+      button.disabled = syncing;
+      line.textContent = syncText();
+      line.className = fleetSync && fleetSync.ok === false && !syncing ? 'bad' : '';
+    }
+    document.getElementById('fleet-sync').addEventListener('click', async () => {
+      syncing = true; paintSync();
+      try { fleetSync = await callServer('fleetSyncNow', {}); }
+      catch (e) { fleetSync = { ok: false, at: new Date().toISOString(), error: String(e.message || e) }; }
+      syncing = false; paintSync();
+    });
+
     function render() {
+      paintSync();
       const edit = canSave(), all = units(), on = L.unitDefaultDays(routes, all), todayP = L.dayPrefix(today);
       document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
       document.getElementById('n-trucks').textContent = lists.allTrucks.filter(listed).length;
@@ -116,6 +144,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
+      onSnapshot(doc(db, 'config', 'fleetSync'), s => { if (!syncing) { fleetSync = s.exists() ? s.data() : null; paintSync(); } }, () => {});
       onSnapshot(collection(db, 'routes'), s => { routes = s.docs.map(d => d.data()); render(); }, e => showError('Could not read Route Master: ' + e.message));
     });
   </script>

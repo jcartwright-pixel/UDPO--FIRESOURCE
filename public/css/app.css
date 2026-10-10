@@ -919,3 +919,19 @@ td.eq-day.today { background: #fff8e1; }
 td.eq-day.busy { color: #b3261e; font-weight: 800; }
 td.eq-day { font-size: 12px; font-weight: 800; overflow: visible !important; text-overflow: clip !important; }
 td.eq-day span { display: block; white-space: nowrap; }
+
+/* Equipment: Sync fleet list tile with the last sync beside it. */
+.head .actions.fleet-sync { display: flex; align-items: center; gap: 10px; flex: none; }
+.head .actions.fleet-sync #fleet-synced { font-size: 13px; color: #44515e; max-width: 260px; line-height: 1.25; }
+.head .actions.fleet-sync #fleet-synced.bad { color: #b3261e; font-weight: 600; }
+
+/* Route Editor: the action buttons are square, word-wrapped tiles in one row, like Daily and Weekly. */
+.actions.tiles { flex-wrap: nowrap; align-items: center; gap: 6px; }
+.actions.tiles > button, .actions.tiles > a.button {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 92px; min-width: 92px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px;
+  white-space: normal; line-height: 1.12; font-size: 13px; font-weight: 800; text-align: center; overflow-wrap: normal; hyphens: none;
+}
+@media (max-width: 1500px) { .actions.tiles > button, .actions.tiles > a.button { width: 82px; min-width: 82px; font-size: 12px; } }
+.day-table input.dcell::placeholder { color: #9aa7b4; font-style: italic; font-weight: 400; }
+.day-table td.day-notes { min-width: 160px; }

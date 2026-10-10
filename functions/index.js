@@ -11,6 +11,8 @@
  *   writeBackOnSave       writes each save into the SANDBOX Live workbook (phase 2; production is refused)
  *   writeBackEveryMinute  retries anything the write-back could not finish
  *   masterWriteBackOnSave writes Driver / Route / Equipment Master, day off and vacation saves into SANDBOX copies
+ *   fleetSyncNightly      brings Equipment Master in step with the United Dairy fleet list every night (SANDBOX copy only)
+ *   fleetSyncNow          the same from Equipment's "Sync fleet list" button, for a manager or administrator
  */
 'use strict';
 
@@ -30,6 +32,8 @@ const { runWriteBack } = require('./src/writeback');
 const { runMasterWriteBack } = require('./src/masterwrite');
 const { transferSources } = require('./src/sources');
 const { safeIdPart } = require('./src/model');
+const { runFleetSync } = require('./src/fleetsync');
+const L = require('./src/logic');
 
 admin.initializeApp();
 setGlobalOptions({ region: 'us-east4', maxInstances: 5 });
@@ -145,3 +149,32 @@ if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
   exports.masterWriteBackOnSave = onDocumentCreated({ document: 'masterOutbox/{id}', maxInstances: 1, concurrency: 1 }, () => writeBackIfOn('master'));
 }
 exports.writeBackEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 120, maxInstances: 1 }, () => writeBackIfOn('both'));
+
+// Fleet list sync: reads the fleet list, writes only the Equipment Master copy the write-back writes (and the transfer reads).
+// Production has no WRITEBACK_JSON, so there the current app's weekly sync stays in charge and this does nothing.
+function fleetSyncTarget() {
+  if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
+  const target = (JSON.parse(process.env.WRITEBACK_JSON).masters || {}).equipment;
+  const source = transferSources(process.env).masters.equipment;
+  if (!target || target.spreadsheetId !== source.spreadsheetId || target.tab !== source.tab) return null;
+  return target;
+}
+
+exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  const target = fleetSyncTarget();
+  if (!target) return;
+  const sheets = makeSheetsWriter();
+  await runFleetSync({ db, reader: sheets, sheets, target, by: 'nightly' });
+});
+
+exports.fleetSyncNow = onCall({ timeoutSeconds: 120, maxInstances: 1 }, async (request) => {
+  const user = signedIn(request);
+  const person = (await db.collection('users').doc(safeIdPart(user.email)).get()).data();
+  if (!person || person.status !== 'ACTIVE' || !L.hasRole(person, ['ADMINISTRATOR', 'ADMIN', 'MANAGER'])) {
+    throw new HttpsError('permission-denied', 'Only a manager or administrator can sync the fleet list');
+  }
+  const target = fleetSyncTarget();
+  if (!target) throw new HttpsError('failed-precondition', 'The fleet list sync is not set up here; the current app syncs it every week');
+  const sheets = makeSheetsWriter();
+  return runFleetSync({ db, reader: sheets, sheets, target, by: user.email });
+});
