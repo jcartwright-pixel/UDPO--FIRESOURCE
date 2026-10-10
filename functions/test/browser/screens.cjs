@@ -730,10 +730,10 @@ async function noScroll(page) {
     assert.deepEqual(fsB.errors, []);
     await fsB.close();
     results.push('Fleet Service (mock-up A): one row per unit, PM / Reefer, DOT, Plates, Miles / hours now and Status, units that need something first');
-    // Over the Road: a manager ticks route 801 for Jersey in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
+    // Over the Road: a manager marks route 801 Carrier Pickup and ticks it in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
     const otr = await openPage(browser, 1920, 950, '/otr.html?view=routes&testEmail=manager.test@uniteddairy.com');
-    await otr.waitForSelector('[data-dest="run_t801"]');
-    await otr.selectOption('[data-dest="run_t801"]', 'Jersey');
+    await otr.waitForSelector('[data-by="run_t801"]');
+    await otr.selectOption('[data-by="run_t801"]', 'Carrier Pickup');
     await otr.waitForFunction(() => !document.querySelector('[data-inc="run_t801"]').disabled);
     await otr.check('[data-inc="run_t801"]');
     await otr.waitForSelector('tr.otr-on [data-inc="run_t801"]');
@@ -751,14 +751,15 @@ async function noScroll(page) {
       return null;
     });
     assert.ok(otrSaved, 'the tick and both figures saved');
-    assert.equal(otrSaved[0].destination, 'Jersey');
+    assert.equal(otrSaved[0].deliveredBy, 'Carrier Pickup');
+    assert.ok(otrSaved[0].destination, 'the run is the destination');
     await otr.click('.tabs [data-view="dash"]');
     await otr.waitForSelector('.otr-week');
     await otr.click('.tabs [data-view="report"]');
     await otr.waitForSelector('#otr-report table');
     assert.deepEqual(otr.errors, []);
     await otr.close();
-    results.push('Over the Road: a manager ticked 801 for Jersey and typed September figures (cost per gallon $0.400); Dashboard and Report open');
+    results.push('Over the Road: a manager ticked 801 (Carrier Pickup) and typed September figures (cost per gallon $0.400); Dashboard and Report open');
     // Driver Scorecard: the month board, a driver's misses, the year and Settings open with no errors; a manager changes a point value.
     const sc = await openPage(browser, 1920, 950, '/scorecard.html?testEmail=manager.test@uniteddairy.com');
     await sc.waitForSelector('.sc-board');
