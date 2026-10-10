@@ -537,11 +537,24 @@ function validateYard(input, SaveError) {
   out.fuelLevel = text(input.fuelLevel).toUpperCase();
   if (out.fuelLevel && R.FUEL_LEVELS.indexOf(out.fuelLevel) < 0) throw new SaveError('BAD_REQUEST', 'Fuel level must be Full, 3/4, 1/2, or Empty.');
   out.notes = text(input.notes).slice(0, 800);
+  // The phone saves each box as it is left: the first save is the check, later ones fill in the same check.
+  out.checkId = text(input.checkId).slice(0, 150);
+  if (out.checkId && !/^YARD_CHECK_app_[A-Za-z0-9]+$/.test(out.checkId)) throw new SaveError('BAD_REQUEST', 'checkId is not a yard check');
   return out;
 }
 
 async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const journal = db.collection('plantJournal');
+  if (req.checkId && !req.departed) {
+    const ref = journal.doc(req.checkId), had = await tx.get(ref), d = had.exists ? had.data() : null, p = (d && d.payload) || {};
+    if (!d || d.type !== 'YARD_CHECK' || p.status !== 'COMPLETE' || R.yardTrailer(p.trailer) !== req.trailer) throw new SaveError('NOT_FOUND', 'That yard check is no longer open. Record the trailer again.');
+    if (Date.parse(stamp) - R.when(d.recordedAt) >= R.YARD_LOCK_MINUTES * 60000) throw new SaveError('CONFLICT', 'That yard check is more than 2 hours old. Record the trailer again.');
+    const payload = Object.assign({}, p, { temperature: req.temperature, setPoint: req.setPoint || p.setPoint || '', fuelLevel: req.fuelLevel, notes: req.notes });
+    tx.update(ref, { payload, temperature: req.temperature, notes: req.notes, editedAt: stamp, editedBy: email, testEdited: true });
+    const result = { ok: true, requestId: req.requestId, trailer: req.trailer, status: 'COMPLETE', checkId: req.checkId, recordedAt: d.recordedAt, message: 'Yard check updated.' };
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, trailer: req.trailer, checkId: req.checkId, before: p, after: payload, result });
+    return result;
+  }
   if (!req.departed) {
     const same = (await tx.get(journal.where('date', '==', req.date))).docs.map(d => d.data());
     const left = R.yardLockLeft(same, req.date, req.trailer, Date.parse(stamp));
@@ -552,7 +565,7 @@ async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
     : { route: req.routeRun, run: req.routeRun, trailer: req.trailer, temperature: req.temperature, setPoint: req.setPoint, fuelLevel: req.fuelLevel, notes: req.notes, status: 'COMPLETE' };
   tx.set(journal.doc(id), { recordId: 'YARD-' + req.requestId.slice(0, 40), type: 'YARD_CHECK', date: req.date, status: payload.status, route: req.routeRun, run: req.routeRun, trailer: req.trailer,
     temperature: payload.temperature || '', notes: payload.notes, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
-  const result = { ok: true, requestId: req.requestId, trailer: req.trailer, status: payload.status, recordedAt: stamp,
+  const result = { ok: true, requestId: req.requestId, trailer: req.trailer, status: payload.status, recordedAt: stamp, checkId: id,
     message: req.departed ? 'Trailer ' + req.trailer + ' marked as left the yard.' : 'Yard check recorded. Trailer is locked for 2 hours.' };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, trailer: req.trailer, after: payload, result });
   return result;
