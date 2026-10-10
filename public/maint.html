@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Fleet &amp; Maintenance · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill issues-page hub-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Fleet &amp; Maintenance</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Fleet &amp; Maintenance</h1><small>Equipment › Maintenance</small></div>
+      <div class="actions tiles hub-tiles">
+        <a class="button" id="to-garage-station" href="garage-station.html"><img src="img/library/maintenance-tractor-v1-560.webp" alt=""><span>Garage Station</span></a>
+        <a class="button" href="fleet.html"><img src="img/library/maintenance-trailer-v1-560.webp" alt=""><span>Fleet Service</span></a>
+        <a class="button" href="equipment.html"><img src="img/library/maintenance-tractor-v1-560.webp" alt=""><span>Equipment</span></a>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view hub-view">
+      <div class="kpis hub-kpis" id="kpis"></div>
+      <div class="hub-body">
+        <div class="hub-cards" id="cards"></div>
+        <div class="hub-latest">
+          <h2>Latest write-ups</h2>
+          <table class="issues">
+            <colgroup><col style="width:14%"><col style="width:14%"><col style="width:56%"><col style="width:16%"></colgroup>
+            <thead><tr><th>Unit</th><th>Type</th><th>What's Wrong</th><th>Date</th></tr></thead>
+            <tbody id="latest"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
+    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    // Joe 10/10: the current app's Fleet & Maintenance hub, where the maintenance side starts. Each list is read once
+    // (write-ups, work orders, units, service setup, odometers) and every card is counted from that one copy.
+    const L = window.UDLogic;
+    const KINDS = [['TRUCK', 'Truck Issues', 'maintenance-tractor-v1-560.webp', 'Truck'], ['TRAILER', 'Trailer Issues', 'maintenance-trailer-v1-560.webp', 'Trailer'],
+      ['FORK_TRUCK', 'Fork Truck / Pallet Jack Issues', 'forklift-truck-v1-560.webp', 'Fork truck']];
+    const data = { maintenance: [], workOrders: [], equipment: [], fleetSetup: [], odometers: [] };
+    const now = () => Date.now();
+    const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
+
+    function units() {
+      const seen = {};
+      return data.equipment.map(e => ({ e, type: L.fleetKind(e.type) })).filter(({ e, type }) => type && e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') &&
+        e.sourcePresent !== false && !L.unitLeased(e) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
+        .map(({ e, type }) => ({ unit: String(e.unit).toUpperCase(), type })).filter(u => !seen[u.unit] && (seen[u.unit] = true));
+    }
+    function miles() {
+      const out = {};
+      data.odometers.forEach(o => { const u = String(o.unit || '').toUpperCase(); if (u && (!out[u] || String(o.at) > String(out[u].at))) out[u] = o; });
+      return out;
+    }
+    const tile = (n, label, href, cls) => '<a class="hub-tile' + (cls ? ' ' + cls : '') + '" href="' + href + '"><b>' + n + '</b><span>' + label + '</span></a>';
+
+    function render() {
+      const lists = KINDS.map(([k]) => L.issueRows(data.maintenance, k, now())), nums = lists.map(o => L.issueNumbers(o, now()));
+      // Repeat units counts each unit once (the current app's repeat offenders), not each repeat write-up.
+      const repeatUnits = new Set(KINDS.flatMap(([k], i) => lists[i].filter(r => r.occurrences > 1).map(r => k + '|' + (r.unitKey || r.unit)))).size;
+      const all = [].concat(...lists), oldest = Math.max(0, ...nums.map(n => n.oldestDays));
+      const kpi = (n, label, cls, go) => '<div class="' + (cls || '') + '" data-open="' + (go || 'issues.html?kind=TRUCK') + '"><b>' + n + '</b><span>' + label + '</span></div>';
+      document.getElementById('kpis').innerHTML = kpi(all.length, 'Open issues') + kpi(nums.reduce((a, n) => a + n.needReview, 0), 'Need review', 'warn', 'issues.html?kind=TRUCK&filter=review') +
+        kpi(repeatUnits, 'Repeat units · 90 days', 'warn', 'issues.html?kind=TRUCK&filter=repeat') + kpi(nums[0].notEmailed, 'Trucks not emailed', 'warn') +
+        kpi(oldest + (oldest === 1 ? ' day' : ' days'), 'Oldest open') + kpi(nums.reduce((a, n) => a + n.repaired30, 0), 'Repaired · last 30 days', 'good', 'fleet.html?view=history');
+      const issueCard = ([k, title, img], i) => {
+        const n = nums[i], go = (f) => 'issues.html?kind=' + k + (f ? '&filter=' + f : '');
+        return '<div class="hub-card" data-kind="' + k + '" data-card="' + go('') + '"><a class="hub-card-head" href="' + go('') + '"><img src="img/library/' + img + '" alt=""><strong>' + title + '</strong><span class="hub-big"><b>' + n.open + '</b><small>Open</small></span></a>' +
+          '<div class="hub-tiles4">' + tile(n.needReview, 'Need review', go('review'), 'warn') + tile(n.repeat, 'Repeat', go('repeat'), 'warn') + tile(n.atGarage, 'At garage', go('garage')) + tile(n.newWeek, 'New · 7 days', go('new')) +
+          tile(n.oldestDays + ' d', 'Oldest', go('')) + tile(n.averageDays + ' d', 'Average age', go('')) + (k === 'TRUCK' ? tile(n.emailed, 'Emailed', go('')) + tile(n.notEmailed, 'Not emailed', go(''), 'warn') : '') + '</div></div>';
+      };
+      const t = L.operatingDay(new Date()), month = t.slice(0, 7), weekAgo = L.addDays(t, -7);
+      const open = data.workOrders.filter(o => String(o.status || 'NEW').toUpperCase() !== 'DONE');
+      const week = data.workOrders.filter(o => String(o.status).toUpperCase() === 'DONE' && String(o.completed_at || '').slice(0, 10) >= weekAgo);
+      const due = L.fleetDue(units(), data.fleetSetup, miles(), open, null, t);
+      const hours = Math.round(week.reduce((s, x) => s + (Number(x.minutes) || 0), 0) / 6) / 10;
+      const garage = '<div class="hub-card garage" data-kind="GARAGE" data-card="fleet.html?view=work"><a class="hub-card-head" href="fleet.html?view=work"><span class="hub-wrench"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></span><strong>Garage</strong><span class="hub-big"><b>' + open.length + '</b><small>Work orders</small></span></a>' +
+        '<div class="hub-tiles4">' + tile(open.filter(x => String(x.status).toUpperCase() === 'WORKING').length, 'Working now', 'fleet.html?view=work') + tile(open.filter(x => String(x.status).toUpperCase() === 'PARTS').length, 'Waiting on parts', 'fleet.html?view=work', 'warn') +
+        tile(due.items.filter(i => i.status === 'OVERDUE').length, 'Overdue service', 'fleet.html', 'warn') + tile(due.items.filter(i => i.status === 'DUE_SOON').length, 'Due soon', 'fleet.html', 'warn') +
+        tile(week.length, 'Finished · week', 'fleet.html?view=work', 'good') + tile(hours.toFixed(1), 'Hours · week', 'fleet.html?view=work') +
+        tile(due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'DOT this month', 'fleet.html') +
+        tile(due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates · 30 days', 'fleet.html') + '</div></div>';
+      document.getElementById('cards').innerHTML = issueCard(KINDS[0], 0) + issueCard(KINDS[1], 1) + issueCard(KINDS[2], 2) + garage;
+      const type = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };
+      const latest = KINDS.flatMap(([k], i) => lists[i].map(r => Object.assign({ kind: k }, r))).sort((a, b) => b.openedMs - a.openedMs).slice(0, 11);
+      document.getElementById('latest').innerHTML = latest.map(r => '<tr data-open="issues.html?kind=' + r.kind + '"><td class="strong">' + escapeHtml(r.unit || '?') + '</td><td>' + type[r.kind] + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + escapeHtml(r.text) + '</td><td>' + dateText(r.reported) + '</td></tr>').join('') ||
+        '<tr><td colspan="4" class="empty">No open write-ups.</td></tr>';
+    }
+
+    requireSignIn(async () => {
+      const { db } = await start();
+      Object.keys(data).forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read ' + name + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
+      render();
+    });
+  </script>
+</body>
+</html>

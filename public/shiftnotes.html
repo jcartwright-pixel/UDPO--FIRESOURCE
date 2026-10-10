@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Incident &amp; Breakdown Log · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page quality-page shift-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Incident &amp; Breakdown Log</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Shift Notes</span><h1>Incident &amp; Breakdown Log</h1></div>
+      <div class="tabs" id="panes" role="tablist" aria-label="Log view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
+      <div class="hstats" id="hstats"></div>
+      <span class="sn-since" id="since"></span>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="notice ok" id="saved" hidden></div>
+    <div class="view">
+      <div class="qc-split" id="pane-current">
+        <aside class="qc-lines" aria-label="Shift note types"><h2>Shift Notes</h2><div id="lines"></div>
+          <div class="sn-carry" id="carry" hidden></div>
+          <div class="sn-lastrep" id="lastrep"></div>
+        </aside>
+        <section class="qc-form sn-form">
+          <div class="qc-top"><h2 id="kind-title">Breakdowns</h2><span class="qc-last" id="kind-count"></span>
+            <span class="sn-autosave" id="form-last"></span>
+            <div class="qc-actions"><button type="button" class="qc-btn" id="another" hidden>Start Another Entry</button></div></div>
+          <div id="open-box"></div>
+          <div class="sn-sec" id="new-title">New breakdown</div>
+          <div class="qc-fields" id="fields"></div>
+        </section>
+      </div>
+      <section class="sn-history" id="pane-history" hidden>
+        <h2>Last 24 Hours</h2>
+        <div id="history"></div>
+      </section>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { fillIn, savedText, watchRound, clockOf } from './js/autosave.js';
+
+    // Shift Notes, option A (Joe 10/10): the kinds of entry down the left with their counts; open breakdowns carry over at the
+    // top until someone marks them Resolved; the new entry below them saves box by box. The shift comes from the time of the
+    // entry (no shift to pick). Send Current Report empties the entry boxes; anything still open stays on the list.
+    const L = window.UDLogic, U = window.UDPlant;
+    const params = new URLSearchParams(location.search);
+    const today = () => L.operatingDay(new Date());
+    const phone = window.matchMedia('(max-width: 760px)');
+    const KINDS = [['Handoff', 'Handoff', 'Shift to shift'], ['Breakdown', 'Breakdowns'], ['Incident', 'Incidents'], ['Safety', 'Safety'], ['Quality', 'Quality'], ['Other', 'Other']];
+    const NEW_WORD = { Handoff: 'New handoff note', Breakdown: 'New breakdown', Incident: 'New incident', Safety: 'New safety note', Quality: 'New quality note', Other: 'New entry' };
+    let pane = params.get('view') === 'history' ? 'history' : 'current', kind = 'Breakdown';
+    let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null;
+    const pending = [];
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const FOLLOW = { OPEN: 'Needs attention', MONITOR: 'Monitor', RESOLVED: 'Resolved' };
+    const ST_CLASS = { OPEN: 'open', MONITOR: 'mon', RESOLVED: 'res' };
+    const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '') : ''; };
+    const dayStamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '') : ''; };
+    const clockNow = () => new Date().toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
+    const opt = (value, current, label) => '<option value="' + value + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + escapeHtml(label || value) + '</option>';
+    const shiftWord = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : '';
+    const isKind = (r, k) => String(r.type || '').toLowerCase() === k.toLowerCase();
+    const since = (at) => { const t = Date.parse(at || ''), r = Date.parse(roundStart || ''); return !isFinite(r) || (isFinite(t) && t > r); };
+    const hoursAgo = (at) => { const t = Date.parse(at || ''); return isFinite(t) ? Math.round((Date.now() - t) / 3600000) : 0; };
+
+    // A saved entry stays on screen as sent until its own record comes back from the database, then only that one shows.
+    function merged() { const have = new Set(journal.map(d => d.recordId)); return journal.concat(pending.filter(p => !have.has(p.payload.entryId))); }
+    const week = () => U.shiftLog(merged(), Date.now(), 168);
+    const day = () => U.shiftLog(merged(), Date.now(), 24);
+
+    // The new entry: the type picked on the left, the shift written in from the clock.
+    function drawForm() {
+      const ck = canSave(), m = phone.matches, shift = shiftWord(U.shiftAt(Date.now()));
+      const types = '<label>Type<select class="sn-type">' + U.ENTRY_TYPES.map(t => opt(t, kind)).join('') + '</select></label>';
+      const equip = '<label' + (m ? ' class="wide"' : '') + '>Equipment / area<input class="sn-equip" maxlength="80" placeholder="Dock 3 door, Palletizer, Truck 214…"></label>';
+      const shiftBox = '<div class="qc-field sn-shift-text">Shift<span id="shift-now">' + escapeHtml(shift) + '</span><small>From the time of the entry</small></div>';
+      const follow = '<label>Follow-up<select class="sn-follow">' + U.FOLLOW_UPS.map(f => opt(f, 'OPEN', FOLLOW[f])).join('') + '</select></label>';
+      document.getElementById('fields').innerHTML = m
+        ? types + shiftBox + equip + '<label class="wide">What happened?<textarea class="sn-entry" maxlength="4000" placeholder="What happened, and what has been done."></textarea></label>' +
+          '<label class="wide"><span>Next steps <i class="sn-opt">Optional</i></span><textarea class="sn-notes" maxlength="1500" placeholder="What needs attention or follow-up from the next shift?"></textarea></label>' + follow
+        : types + equip + shiftBox + '<label>Reading Time<input class="sn-time" type="time" value="' + clockNow() + '"></label>' +
+          '<label class="wide">Entry / Measurements<textarea class="sn-entry" maxlength="4000" placeholder="Enter readings, production status, outage details, quality results, or handoff information."></textarea></label>' +
+          '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500" placeholder="What the next shift needs to know or do"></textarea></label>' + follow;
+      document.getElementById('fields').querySelectorAll('input,select,textarea').forEach(x => { x.disabled = !ck; });
+      // No Save button: the entry saves to the log as each box is left; Start Another Entry empties the form for the next one.
+      entry = { fill: fillIn('saveShiftNote', save), mine: null, round: roundStart };
+      const last = document.getElementById('form-last');
+      last.textContent = ck ? 'Every box saves when you leave it' : ''; last.classList.remove('bad', 'done');
+      document.getElementById('another').hidden = true;
+      drawnFor = (m ? 'phone' : 'desk') + '|' + ck;
+    }
+    const formEmpty = () => !entry || (!entry.mine && ![...document.querySelectorAll('#fields .sn-entry, #fields .sn-notes, #fields .sn-equip')].some(x => x.value.trim()));
+
+    // One entry on the list: open items carry their status drop-down and a review box, both saving as they are changed or left.
+    function card(x, ck, tag) {
+      const id = escapeHtml(x.entryId), saved = x.entryId && !/^pending-/.test(x.entryId), st = x.status || 'OPEN';
+      const edge = st === 'RESOLVED' ? '#1f9d55' : st === 'MONITOR' ? '#e5891a' : isKind(x, 'Handoff') ? 'var(--ud-blue)' : '#c62828';
+      const status = ck && saved
+        ? '<select class="st ' + ST_CLASS[st] + '" data-status="' + id + '" aria-label="Status">' + U.FOLLOW_UPS.map(f => opt(f, st, FOLLOW[f])).join('') + '</select>'
+        : '<span class="sn-status s-' + st.toLowerCase() + '">' + escapeHtml(U.followLabel(st)) + '</span>';
+      return '<article class="sn-card" data-entry="' + id + '" style="border-left-color:' + edge + '"><div class="sn-card-head"><strong>' + escapeHtml([stamp(x.recordedAt) || x.readingTime, tag ? '' : (x.type || 'Note'), x.equipment, x.shift].filter(Boolean).join(' · ')) + '</strong>' +
+        (tag || '') + status + '</div>' +
+        (x.entry ? '<p>' + escapeHtml(x.entry) + '</p>' : '') + (x.notes ? '<p class="sn-next"><b>Notes / Follow-up:</b> ' + escapeHtml(x.notes) + '</p>' : '') +
+        x.reviews.map(r => '<div class="sn-review"><b>Review ' + escapeHtml(stamp(r.recordedAt)) + '</b> · ' + escapeHtml(U.followLabel(r.followUpStatus)) + ' · ' + escapeHtml(r.entry) + '<small>' + escapeHtml(r.recordedBy) + '</small></div>').join('') +
+        (ck && saved ? '<div class="sn-addreview"><input data-review="' + id + '" maxlength="500" placeholder="Add a review note (saves when you leave the box)"></div>' : '') +
+        '<small class="sn-by">' + escapeHtml(x.recordedBy) + (saved ? '' : ' · saving…') + '</small></article>';
+    }
+    const tagOf = (x) => since(x.recordedAt) ? '<span class="tag new">NEW SINCE REPORT</span>' : '<span class="tag carry">CARRIED OVER' + (hoursAgo(x.recordedAt) ? ' · ' + hoursAgo(x.recordedAt) + ' h' : '') + '</span>';
+    const busy = (box) => box.contains(document.activeElement) && document.activeElement.matches('input') && document.activeElement.value;
+
+    function render() {
+      if (phone.matches) pane = 'current'; // phones: the entry only, no history tab
+      const all = week(), rows = day(), ck = canSave(), mineId = entry && entry.mine && entry.mine.payload.entryId;
+      document.getElementById('hstats').innerHTML = [['Entries 24 h', rows.length, ''], ['Needs attention', all.filter(r => r.status === 'OPEN' && !isKind(r, 'Handoff')).length, 'warn'], ['Monitor', all.filter(r => r.status === 'MONITOR' && !isKind(r, 'Handoff')).length, ''], ['Resolved', rows.filter(r => r.status === 'RESOLVED').length, 'good']]
+        .map(([l, n, k]) => '<div class="' + (n ? k : '') + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('since').innerHTML = roundStart ? 'Since last report <b>' + escapeHtml(clockOf(roundStart)) + '</b>' : 'No report sent yet';
+      document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
+      document.getElementById('pane-current').hidden = pane !== 'current';
+      document.getElementById('pane-history').hidden = pane !== 'history';
+      if (drawnFor !== (phone.matches ? 'phone' : 'desk') + '|' + ck) drawForm();
+
+      // The tiles: entries of each kind in the last 24 hours, and what is still open of it.
+      const tally = (k) => { const of = all.filter(r => isKind(r, k)); return { n: rows.filter(r => isKind(r, k)).length, open: of.filter(r => r.status === 'OPEN').length, mon: of.filter(r => r.status === 'MONITOR').length }; };
+      document.getElementById('lines').innerHTML = KINDS.map(([k, name, sub]) => {
+        const t = tally(k), hand = k === 'Handoff';
+        const words = hand ? sub : t.open ? t.open + (k === 'Breakdown' ? ' still open' : ' open') : t.mon ? t.mon + ' monitor' : t.n ? 'resolved' : '';
+        const dot = hand ? '' : t.open ? 'st-down' : t.mon ? 'st-review' : t.n ? 'st-running' : '';
+        const badge = hand ? '' : t.open ? 'red' : t.mon ? 'amber' : t.n ? 'green' : '';
+        return '<button type="button" data-kind="' + k + '"' + (k === kind ? ' class="active"' : '') + '><span class="qc-dot ' + dot + '"></span><span>' + name + (words ? '<small>' + escapeHtml(words) + '</small>' : '') + '</span><b class="' + badge + '">' + t.n + '</b></button>';
+      }).join('');
+      const carried = all.filter(r => isKind(r, 'Breakdown') && r.status !== 'RESOLVED' && !since(r.recordedAt)).length;
+      const carry = document.getElementById('carry');
+      carry.hidden = !carried;
+      carry.innerHTML = '<b>Carried over</b>' + carried + ' breakdown' + (carried === 1 ? '' : 's') + ' from earlier shifts stay' + (carried === 1 ? 's' : '') + ' on this list and in every report until someone marks ' + (carried === 1 ? 'it' : 'them') + ' Resolved.';
+      const fresh = all.filter(r => since(r.recordedAt)).length;
+      document.getElementById('lastrep').innerHTML = (lastReport ? '<b>Last report sent</b>' + escapeHtml(dayStamp(lastReport.at)) + (lastReport.by ? ' by ' + escapeHtml(String(lastReport.by).split('@')[0]) : '') : '<b>Last report sent</b>None yet') +
+        '<span>' + fresh + ' new entr' + (fresh === 1 ? 'y' : 'ies') + ' will go in the next one</span>';
+
+      // The kind picked: what is still open of it (for Handoff, the notes since the last report), then the new entry.
+      const name = KINDS.find(x => x[0] === kind)[1], hand = kind === 'Handoff';
+      const open = all.filter(r => isKind(r, kind) && (hand ? since(r.recordedAt) : r.status !== 'RESOLVED') && r.entryId !== mineId);
+      document.getElementById('kind-title').textContent = name;
+      document.getElementById('kind-count').textContent = rows.filter(r => isKind(r, kind)).length + ' in the last 24 hours' + (hand ? '' : ' · ' + all.filter(r => isKind(r, kind) && r.status !== 'RESOLVED').length + ' still open');
+      document.getElementById('new-title').innerHTML = escapeHtml(NEW_WORD[kind]) + ' <span class="why">fills in as you type; Start Another Entry empties the boxes</span>';
+      const box = document.getElementById('open-box');
+      if (!busy(box)) box.innerHTML = open.length
+        ? '<div class="sn-sec' + (hand ? '' : ' red') + '">' + (hand ? 'Since last report' : 'Still open') + ' <span class="n">' + open.length + '</span><span class="why">' + (hand ? 'goes in the next report' : 'carried over until resolved') + '</span></div><div class="sn-open">' + open.map(r => card(r, ck, tagOf(r))).join('') + '</div>'
+        : '';
+
+      // The log is not redrawn while someone is typing a review note in it.
+      const hist = document.getElementById('history');
+      if (!busy(hist)) hist.innerHTML = rows.map(r => card(r, ck)).join('') || '<div class="empty">No entries in the last 24 hours.</div>';
+      document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Every box saves by itself when you leave it. Send Current Report sends what is new since the last report and empties the entry boxes; anything not resolved stays here until it is.' : 'View only.') : rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' in the last 24 hours.';
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+    }
+
+    const record = (values, extra) => ({ type: U.SHIFT_TYPE, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, area: 'HANDOFF', payload: Object.assign({ section: 'HANDOFF', values }, extra) });
+
+    // A review under an entry (a new status, a note, or both): shown at once, taken off again if the save fails.
+    async function review(id, note, status) {
+      const values = { Entry: note, Type: 'REVIEW', ParentId: id }, mine = record(values, { followUpStatus: status });
+      pending.push(mine);
+      render();
+      const ok = document.getElementById('saved');
+      try {
+        const done = await save('saveShiftNote', { values, notes: '', readingTime: clockNow(), followUpStatus: status });
+        if (done && done.entryId) { mine.payload.entryId = done.entryId; render(); }
+        showError('');
+        ok.textContent = savedText() + ' · review on ' + (document.querySelector('[data-entry="' + CSS.escape(id) + '"] strong') || { textContent: 'the entry' }).textContent.split(' · ').slice(1).join(' · ');
+        ok.hidden = false;
+        setTimeout(() => { ok.hidden = true; }, 2500);
+        setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); render(); }, 20000);
+      } catch (e) {
+        const i = pending.indexOf(mine);
+        if (i >= 0) pending.splice(i, 1);
+        render();
+        showError(e.message || String(e));
+      }
+    }
+    function onCards(box) {
+      box.addEventListener('change', e => {
+        const t = e.target, all = week();
+        if (t.matches('[data-status]')) {
+          const id = t.dataset.status, note = (box.querySelector('[data-review="' + CSS.escape(id) + '"]') || {}).value || '';
+          const text = note.trim() || 'Marked ' + FOLLOW[t.value];
+          review(id, text, t.value);
+        } else if (t.matches('[data-review]')) {
+          const id = t.dataset.review, note = t.value.trim();
+          if (!note) return;
+          const x = all.find(r => r.entryId === id), sel = box.querySelector('[data-status="' + CSS.escape(id) + '"]');
+          t.value = '';
+          review(id, note, sel ? sel.value : (x && x.status) || 'OPEN');
+        }
+      });
+      box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-review]')) e.target.blur(); });
+    }
+    onCards(document.getElementById('open-box'));
+    onCards(document.getElementById('history'));
+
+    // Each box of the new entry saves as it is left, once the entry has some words: the first save puts the entry on the log,
+    // later boxes fill it in.
+    document.getElementById('fields').addEventListener('change', async () => {
+      if (!canSave() || !entry) return;
+      const f = document.getElementById('fields'), v = (c) => { const n = f.querySelector('.' + c); return n ? n.value.trim() : ''; };
+      const text = v('sn-entry'), notes = v('sn-notes'), mine0 = entry.mine, cur = entry;
+      if (!text && !notes) return;
+      const values = { Entry: text, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') };
+      const fields = { values, notes, shift: '', readingTime: v('sn-time') || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
+      const mine = mine0 || record(values, { entryId: 'pending-' + Date.now(), shift: U.shiftAt(Date.now()) });
+      Object.assign(mine.payload, { values, readingTime: fields.readingTime, notes, followUpStatus: fields.followUpStatus });
+      mine.status = fields.followUpStatus;
+      if (!mine0) { cur.mine = mine; pending.push(mine); }
+      const last = document.getElementById('form-last');
+      last.textContent = 'Saving…'; last.classList.remove('bad', 'done');
+      render();
+      try {
+        const done = await cur.fill.send(fields);
+        if (done && done.entryId) mine.payload.entryId = done.entryId;
+        if (done && done.shift) mine.payload.shift = done.shift;
+        showError('');
+        if (entry === cur) { last.textContent = '✓ ' + savedText() + ' · on the log'; last.classList.add('done'); document.getElementById('another').hidden = false; }
+        render();
+        setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0 && journal.some(d => d.recordId === mine.payload.entryId)) { pending.splice(i, 1); render(); } }, 20000);
+      } catch (e) {
+        if (!cur.fill.id) { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); cur.mine = null; }
+        if (entry === cur) { last.textContent = 'Not saved'; last.classList.add('bad'); }
+        render();
+        showError(e.message || String(e));
+      }
+    });
+    document.getElementById('another').onclick = () => { drawForm(); render(); };
+    document.getElementById('lines').addEventListener('click', e => {
+      const b = e.target.closest('[data-kind]');
+      if (!b) return;
+      kind = b.dataset.kind;
+      if (formEmpty()) drawForm();
+      render();
+    });
+    document.getElementById('panes').addEventListener('click', e => {
+      const b = e.target.closest('[data-pane]');
+      if (!b) return;
+      pane = b.dataset.pane;
+      history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
+      render();
+    });
+    phone.addEventListener('change', render);
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      // A new report empties the entry boxes for the next round; open items stay on the list.
+      watchRound(db, (at, data) => { const first = roundStart === null; roundStart = at; lastReport = data; if (!first && entry && entry.round !== at) drawForm(); render(); });
+      // A week of the log, so a breakdown still open from earlier shifts stays on the list until it is resolved.
+      let unsub = null, day0 = '';
+      const watch = () => { const t = today(); if (t === day0) return; day0 = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', [0, 1, 2, 3, 4, 5, 6, 7].map(n => L.addDays(t, -n)))), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the log')); };
+      watch();
+      setInterval(() => { watch(); render(); const s = document.getElementById('shift-now'); if (s) s.textContent = shiftWord(U.shiftAt(Date.now())); }, 60000);
+      render();
+    });
+  </script>
+</body>
+</html>

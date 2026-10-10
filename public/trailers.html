@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Trailer Assignments · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/stations.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill ta-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Trailer Assignments</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Operations / Trailers</span><h1>Trailer Assignments</h1></div>
+      <span class="ta-day" id="dayname"></span>
+      <button type="button" id="refresh" data-top>&#8635; Refresh</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <p class="ta-summary" id="summary"></p>
+      <div class="ta-wrap">
+        <div class="ta-grid" role="table" aria-label="Trailer for each route">
+          <div class="ta-row ta-headrow" role="row"><span>Route</span><span>Run</span><span>Driver</span><span>Truck</span><span>Trailer</span><span class="ta-depart">Depart Time</span></div>
+          <div id="rows"></div>
+        </div>
+        <aside class="ta-yard" id="yard" aria-label="Trailer yard"></aside>
+      </div>
+    </div>
+  </div>
+  <datalist id="ta-units"></datalist>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as P from './js/plant-core.js';
+
+    // The current app's Mobile Plant "Trailer Assignments" (MobilePlant.html, view trailers): which trailer goes on each
+    // load that is not finished (today's, plus yesterday's still open). Type a trailer and press Enter to save and move to
+    // the next route; on a tablet tap an open trailer in the yard to put it on the picked route. Only errors are shown.
+    const L = window.UDLogic;
+    const today = () => L.operatingDay(new Date());
+    let date = today(), runs = [], person = null, app = {}, trailers = [], selected = '', editing = false;
+    const pending = {}, unsubs = [];   // pending: row id -> trailer shown before the server has it
+    let queue = Promise.resolve(), db = null;
+
+    const DOWN = ['DOWN', 'OUT OF SERVICE', 'OOS', 'REPAIR'], OFF = DOWN.concat(['INACTIVE', 'OUT', 'DISABLED', 'UNAVAILABLE']);
+    const canLoad = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const key = (v) => String(v || '').toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/[^A-Z0-9]/g, '');
+    const tText = (v) => { const t = String(v || '').trim().toUpperCase().replace(/\s+/g, ''); const m = /^T?-?T?-?(\d+)$/.exec(t); return m ? 'T-' + m[1] : t; };
+    const AREA_SUB = { TOTES: 'Totes', BOXING: 'Box', TANKER: 'Tanker' };
+
+    function rowsNow() {
+      return P.loadoutRows(runs, date).filter(r => r.state !== 'DONE').map(r => (r.id in pending ? Object.assign({}, r, { trailer: pending[r.id] }) : r));
+    }
+    function dupes(rows) {
+      const on = {};
+      rows.forEach(r => { const k = key(r.trailer); if (k && k !== 'TBA') (on[k] = on[k] || []).push(r); });
+      return on;
+    }
+
+    let gotRuns = false, trailersFailed = false;
+    function render() {
+      const rows = rowsNow(), on = dupes(rows), can = canLoad(), blank = rows.filter(r => !r.trailer).length;
+      document.getElementById('dayname').textContent = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      document.getElementById('summary').textContent = rows.length + (rows.length === 1 ? ' route · ' : ' routes · ') + blank + (blank === 1 ? ' needs a trailer' : ' need a trailer') + (can ? '' : ' · View Only');
+      if (!selected || !rows.some(r => r.id === selected)) selected = (rows.find(r => !r.trailer) || rows[0] || {}).id || '';
+      if (!editing) {
+        document.getElementById('rows').innerHTML = rows.map(r => {
+          const k = key(r.trailer), others = k && on[k] ? on[k].filter(x => x.id !== r.id) : [];
+          const cls = !r.trailer ? ' blank' : others.length ? ' dup' : '';
+          const note = !r.trailer ? 'Needs a trailer' : others.length ? 'Also on ' + others.map(x => String(x.route).replace(/_\d+$/, '')).join(', ') : '';
+          const sub = (AREA_SUB[r.area] ? AREA_SUB[r.area] : '') + (r.prior ? (AREA_SUB[r.area] ? ' · ' : '') + 'Still open from ' + new Date(r.loadDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '');
+          return '<div class="ta-row' + cls + (r.id === selected ? ' sel' : '') + '" role="row" data-row="' + escapeHtml(r.id) + '">' +
+            '<span class="rt"><b>' + escapeHtml(String(r.route).replace(/_\d+$/, '')) + '</b>' + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span>' +
+            '<span>' + escapeHtml(r.run) + '</span><span>' + escapeHtml(r.driver || '—') + '</span><span class="grey">' + escapeHtml(r.truck || '—') + '</span>' +
+            '<span class="tr"><input type="text" maxlength="20" list="ta-units" autocomplete="off" placeholder="Trailer #" value="' + escapeHtml(r.trailer) + '" data-trailer="' + escapeHtml(r.id) + '"' +
+            ' aria-label="Trailer for route ' + escapeHtml(r.route + ' ' + r.run) + '"' + (can ? '' : ' disabled') + '><small>' + escapeHtml(note) + '</small></span>' +
+            '<span class="ta-depart">' + escapeHtml(P.timeOfDay(r.dispatchTime) || '—') + '</span></div>';
+        }).join('') || (gotRuns ? '<p class="empty">No loads are waiting for a trailer.</p>' : '<p class="empty">Loading the loads&hellip;</p>');
+      }
+      drawYard(rows, on, can);
+    }
+
+    // The yard (tablet): open trailers to tap, trailers already on a route, and down trailers with their reason.
+    function drawYard(rows, on, can) {
+      const open = [], busy = [], down = [];
+      trailers.forEach(t => {
+        const st = String(t.status || '').trim().toUpperCase(), k = key(t.unit);
+        if (DOWN.indexOf(st) >= 0) down.push({ unit: t.unit, sub: (/DOWN:\s*([^|]+)/i.exec(t.notes || '') || [])[1] || st });
+        else if (OFF.indexOf(st) >= 0) return;
+        else if (on[k]) busy.push({ unit: t.unit, sub: 'On ' + on[k].map(x => String(x.route).replace(/_\d+$/, '')).join(', ') });
+        else open.push({ unit: t.unit });
+      });
+      const sort = (a, b) => String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
+      const sel = rows.find(r => r.id === selected);
+      const chips = (list, kind, empty) => list.length ? '<div class="ta-chips">' + list.sort(sort).map(t => '<button type="button" class="ta-chip ' + kind + '"' + (kind === 'open' && can && sel ? ' data-chip="' + escapeHtml(t.unit) + '"' : ' disabled') + '>' + escapeHtml(t.unit) + (t.sub ? '<small>' + escapeHtml(t.sub) + '</small>' : '') + '</button>').join('') + '</div>' : '<p class="empty">' + empty + '</p>';
+      document.getElementById('yard').innerHTML = '<p class="ta-help">' + (sel ? 'Route ' + escapeHtml(String(sel.route).replace(/_\d+$/, '')) + ' picked. Tap an open trailer to put it on.' : 'Pick a route.') + '</p>' +
+        '<h3>Open trailers</h3>' + chips(open, 'open', trailersFailed ? 'Could not read the trailer list; type trailer numbers in the boxes.' : 'No open trailers in Equipment Master.') + '<h3>On a route</h3>' + chips(busy, 'busy', 'None.') + '<h3>Down</h3>' + chips(down, 'down', 'None.');
+      const list = trailers.filter(t => OFF.indexOf(String(t.status || '').trim().toUpperCase()) < 0 || DOWN.indexOf(String(t.status || '').trim().toUpperCase()) >= 0).sort(sort)
+        .map(t => { const st = String(t.status || '').trim().toUpperCase(), k = key(t.unit); return '<option value="' + escapeHtml(t.unit) + '">' + (DOWN.indexOf(st) >= 0 ? 'Down' : on[k] ? 'On ' + on[k].map(x => String(x.route).replace(/_\d+$/, '')).join(', ') : 'Open') + '</option>'; }).join('');
+      const dl = document.getElementById('ta-units');
+      if (dl.dataset.sig !== list) { dl.innerHTML = '<option value="TBA">Trailer not known yet</option>' + list; dl.dataset.sig = list; }
+    }
+
+    // One save at a time, shown at once; on an error the last saved trailer comes back and the error shows.
+    function assign(id, typed) {
+      const row = P.loadoutRows(runs, date).find(r => r.id === id);
+      if (!row) return;
+      const value = tText(typed);
+      if (value === tText(row.trailer) && !(id in pending)) return;
+      if (!canLoad()) { showError('Trailer assignment is read-only for this account.'); render(); return; }
+      if (value && !/^[A-Z0-9-]{1,20}$/.test(value)) { showError('Enter one trailer number: letters, numbers and dashes only.'); render(); return; }
+      pending[id] = value;
+      render();
+      queue = queue.then(async () => {
+        try {
+          await save('savePlantLoad', { runDocId: row.runDocId, day: row.day, fields: { trailer: value }, assign: true });
+          showError('');
+        } catch (e) {
+          showError(row.route + ' ' + row.run + ' not saved (' + (e.message || e) + '). The trailer went back to its last saved value; type it again.');
+        } finally {
+          delete pending[id];
+          render();
+        }
+      });
+    }
+
+    const boxes = () => [...document.querySelectorAll('[data-trailer]')];
+    function moveFrom(id, step) {
+      const all = boxes(), i = all.findIndex(b => b.dataset.trailer === id), next = all[i + step];
+      if (next) next.focus(); else document.activeElement && document.activeElement.blur();
+    }
+    const rowsBox = document.getElementById('rows');
+    rowsBox.addEventListener('focusin', e => {
+      const b = e.target.closest('[data-trailer]');
+      if (!b) return;
+      editing = true; selected = b.dataset.trailer;
+      document.querySelectorAll('.ta-row.sel').forEach(r => r.classList.remove('sel'));
+      b.closest('.ta-row').classList.add('sel');
+      drawYard(rowsNow(), dupes(rowsNow()), canLoad());
+    });
+    // Leaving a box saves it. Moving straight to the next box (Enter, Tab) keeps the list as it is, so the cursor stays in the
+    // box it went to; the list is redrawn once the cursor leaves the boxes.
+    rowsBox.addEventListener('focusout', e => {
+      const b = e.target.closest('[data-trailer]');
+      if (!b) return;
+      const id = b.dataset.trailer, value = b.value, skip = !!b.dataset.skip;
+      delete b.dataset.skip;
+      setTimeout(() => {
+        const a = document.activeElement;
+        editing = !!(a && a.closest && a.closest('#rows [data-trailer]'));
+        if (skip) { render(); return; }
+        assign(id, value);
+      }, 0);
+    });
+    rowsBox.addEventListener('keydown', e => {
+      const b = e.target.closest('[data-trailer]');
+      if (!b) return;
+      if (e.key === 'Enter') { e.preventDefault(); moveFrom(b.dataset.trailer, 1); }
+      else if (e.key === 'Escape') { const r = rowsNow().find(x => x.id === b.dataset.trailer); b.value = r ? r.trailer : ''; b.dataset.skip = '1'; b.blur(); }
+      else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !b.value) { e.preventDefault(); moveFrom(b.dataset.trailer, e.key === 'ArrowDown' ? 1 : -1); }
+    });
+    rowsBox.addEventListener('click', e => {
+      const r = e.target.closest('[data-row]');
+      if (!r || e.target.closest('input')) return;
+      selected = r.dataset.row; render();
+    });
+    document.getElementById('yard').addEventListener('click', e => {
+      const c = e.target.closest('[data-chip]');
+      if (!c || !selected) return;
+      const id = selected;
+      assign(id, c.dataset.chip);
+      // Then the next route (going round) that still needs a trailer.
+      const rows = rowsNow(), i = rows.findIndex(r => r.id === id);
+      const next = rows.slice(i + 1).concat(rows.slice(0, i)).find(r => !r.trailer);
+      if (next) { selected = next.id; render(); }
+    });
+    document.getElementById('refresh').addEventListener('click', () => { watch(); render(); });
+
+    function watch() {
+      while (unsubs.length) unsubs.pop()();
+      date = today();
+      const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); gotRuns = true; render(); }, e => showError('Could not read the loads (' + e.message + '). Check the network and reload the page.')));
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      onSnapshot(query(collection(db, 'equipment'), where('type', '==', 'TRAILER')), s => {
+        trailers = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)) && e.sourcePresent !== false);
+        trailersFailed = false;
+        render();
+      }, () => { trailersFailed = true; render(); });
+      watch();
+      // The day rolls at 6 AM: the list moves to the new day by itself.
+      setInterval(() => { if (today() !== date) watch(); }, 60000);
+    });
+  </script>
+</body>
+</html>

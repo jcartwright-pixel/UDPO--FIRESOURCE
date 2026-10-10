@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Daily Dispatch · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="daily-look">
+  <div class="signin" id="signin" hidden>
+    <h1>Daily Dispatch</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="weekly.html" id="to-weekly">Weekly Dispatch</a>
+      <a href="conflicts.html" id="to-conflicts" hidden>Sheet conflicts</a>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Daily Dispatch</h1></div>
+      <div class="field">
+        <label>Week beginning</label>
+        <div class="stepper">
+          <button type="button" id="week-prev" aria-label="Previous week" title="Previous week">&#9664;</button>
+          <input id="week-begin" readonly tabindex="-1">
+          <button type="button" id="week-next" aria-label="Next week" title="Next week">&#9654;</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="load-day">Loadout day</label>
+        <div class="stepper">
+          <button type="button" id="prev" aria-label="Previous day">&#9664;</button>
+          <select id="load-day"></select>
+          <button type="button" id="next" aria-label="Next day">&#9654;</button>
+        </div>
+      </div>
+      <div class="field"><label>Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
+      <div class="actions in-head">
+        <a class="button" id="go-weekly" href="weekly.html">Weekly Dispatch</a>
+        <button type="button" class="primary" id="print-sheet">&#9635; Print Dispatch Sheet</button>
+        <button type="button" class="warn" id="open-down">&#128667; Down Trucks / Trailers</button>
+        <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
+        <button type="button" class="primary" id="open-calloff">Driver Call-Off</button>
+        <button type="button" class="primary" id="open-add">+ Add Route / Run</button>
+      </div>
+      <div class="badge-test" id="mode"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="sheet">
+      <table class="daily">
+        <colgroup>
+          <col style="width:5%"><col style="width:13%"><col style="width:7%"><col style="width:15%"><col style="width:4%"><col style="width:7%">
+          <col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:22%"><col style="width:7%">
+        </colgroup>
+        <thead><tr>
+          <th>Route</th><th>Run</th><th>Runs?</th><th>Driver / CVG</th><th>OVR</th><th>Truck</th><th>Trailer</th><th>Depart time</th><th>Jack</th><th>Driver notes</th><th>Action</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="footer"><span id="count"></span><span id="footnote">Changes in the sheets show here within about a minute.</span></div>
+  </div>
+
+  <div class="modal-back" id="modal-back" hidden></div>
+  <section class="modal" id="edit-modal" role="dialog" aria-labelledby="edit-title" hidden></section>
+
+  <section class="modal" id="calloff-panel" role="dialog" aria-labelledby="calloff-title" hidden>
+    <h2 id="calloff-title">Driver Off / Call-Off</h2>
+    <div class="modal-grid">
+      <label class="wide">Driver<select id="off-driver"></select></label>
+      <label>Reason<select id="off-reason"><option>SICK DAY</option><option>BEREAVEMENT</option><option>PERSONAL DAY</option><option>UNPAID DAY</option><option>VACATION</option><option>CALLED OFF</option><option>OTHER</option></select></label>
+      <label>Status<select id="off-status"><option value="UNAVAILABLE">Unavailable</option><option value="CLEAR">Return Available</option></select></label>
+      <label>Start Date<input id="off-start" type="date"></label>
+      <label>End Date<input id="off-end" type="date"></label>
+      <label class="wide">Note<input id="off-note" maxlength="300"></label>
+    </div>
+    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="off-save">Save Driver Status</button></div>
+  </section>
+
+  <section class="modal" id="add-panel" role="dialog" aria-labelledby="add-title" hidden>
+    <h2 id="add-title">Add Route / Run</h2>
+    <div class="modal-grid"><label class="wide">Route / Run<select id="add-pick"></select></label></div>
+    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="add-save">Add to This Day</button></div>
+  </section>
+
+  <section class="modal wide-modal" id="down-panel" role="dialog" aria-labelledby="down-title" hidden>
+    <h2 id="down-title">Down Trucks / Trailers</h2>
+    <div class="down-add">
+      <label>Truck / Trailer<input id="down-unit" list="down-units" maxlength="20" autocomplete="off" placeholder="Unit #"></label>
+      <label>Reason<input id="down-reason" maxlength="120" placeholder="Why is it down?"></label>
+      <button type="button" class="warn" id="down-add">Add</button>
+    </div>
+    <datalist id="down-units"></datalist>
+    <div class="down-list"><table><thead><tr><th>Unit</th><th>Type</th><th>Reason</th><th>Since</th><th></th></tr></thead><tbody id="down-rows"></tbody></table></div>
+    <div class="modal-actions"><button type="button" data-close>Close</button></div>
+  </section>
+
+  <div id="print" aria-hidden="true"></div>
+
+  <script type="module">
+    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
+    import { lists, watchLists, canSave, canReorder, openPicker, openNote, optionsHtml, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    forScreen('dailyDispatch');
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    const params = new URLSearchParams(location.search);
+    let loadDate = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
+    let unsubscribeRuns = null, runs = [], rows = [], editing = false, dragging = null, writeBack = false, editRow = null;
+    const getRuns = () => runs;
+    // Session-only screen state, like the current screen: rows switched to NO RUN stay in view, and OVR ticks per row.
+    const keptOff = {}, ovr = {};
+
+    // Like the current Daily Dispatch: the Loadout Day list runs Saturday to Friday (the Saturday loadout delivers into the next week),
+    // and Week Beginning shows that week's Sunday.
+    const weekBegin = (key) => L.addDays(key, -((L.DAYS.indexOf(L.dayPrefix(key)) + 1) % 7));
+    const show = (v) => v === null || v === undefined ? '' : String(v);
+    const departText = (r) => L.timeText(r.dispatchTime !== null && r.dispatchTime !== undefined ? r.dispatchTime : r.startTime);
+    const coverageName = (r) => r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '';
+
+    function cell(value, extra, edit) {
+      const text = show(value);
+      return '<td class="' + (extra || '') + (text ? '' : ' empty') + (edit ? ' editable' : '') + '"' + (edit ? ' data-edit="' + edit + '"' : '') + ' title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</td>';
+    }
+
+    // The day's loads, plus any switched to NO RUN in this session (shown greyed in their old place).
+    function buildRows() {
+      const on = L.dailyRows(runs, loadDate), ids = new Set(on.map(r => r.id));
+      Object.values(keptOff).forEach(k => {
+        const run = runs.find(x => x.id === k.runDocId), d = run && run.days && run.days[k.day];
+        if (!d || d.runs || ids.has(k.id) || k.loadDate !== loadDate) return;
+        const row = Object.assign({}, k, { off: true, driverId: d.driverId, driver: d.driver, truckId: d.truckId, truck: d.truck, trailerId: d.trailerId,
+          trailer: d.trailer, dispatchTime: d.dispatchTime, startTime: d.startTime, palletJack: d.palletJack, driverNotes: d.driverNotes, pickup: d.pickup, rev: run.rev || 0 });
+        let at = on.findIndex(r => r.deliveryDate > row.deliveryDate || (r.deliveryDate === row.deliveryDate && Number(r.loadSequence) > Number(row.loadSequence)));
+        if (at < 0) at = on.length;
+        on.splice(at, 0, row);
+      });
+      return on;
+    }
+
+    function render() {
+      if (editing) return; // a picker is open; the next render happens when it closes
+      rows = buildRows();
+      const edit = canSave(), order = canReorder();
+      document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
+      ['open-down', 'open-calloff', 'open-add'].forEach(id => { document.getElementById(id).disabled = !edit; });
+      const body = [];
+      let group = '';
+      rows.forEach((r, i) => {
+        if (r.deliveryDate !== group) {
+          group = r.deliveryDate;
+          body.push('<tr class="group"><td colspan="11">' + escapeHtml(r.deliveryDay.toUpperCase() + ' DELIVERIES, ' + shortDate(r.deliveryDate)) + '</td></tr>');
+        }
+        const driver = r.driver || coverageName(r), live = edit && !r.off, needs = !r.off;
+        body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (order && !r.off ? ' draggable="true"' : '') + (r.off ? ' class="off"' : '') + '>' +
+          '<td class="route' + (order && !r.off ? ' grab' : '') + '" title="' + (order ? 'Drag to change the load order' : '') + '">' + escapeHtml(r.route) + '</td>' +
+          cell(r.run, 'strong') +
+          '<td><button type="button" class="toggle' + (r.off ? '' : ' on') + '" data-runs' + (edit ? '' : ' disabled') + ' aria-pressed="' + !r.off + '" title="Click to change whether this run runs">' + (r.off ? 'NO RUN' : 'RUNS') + '</button></td>' +
+          cell(driver, driver || !needs ? '' : 'missing', live && 'driver') +
+          '<td><input type="checkbox" class="ovr" data-ovr aria-label="Override" title="Override: choose a driver or unit that is off or down"' + (ovr[r.id] ? ' checked' : '') + (live ? '' : ' disabled') + '></td>' +
+          cell(r.truck, r.truck || !needs || coverageName(r) ? '' : 'missing', live && 'truck') +
+          cell(r.trailer, r.trailer || !needs ? '' : 'missing', live && 'trailer') +
+          cell(departText(r), '', live && 'time') + cell(r.palletJack, '', live && 'jack') +
+          (r.pickup ? cell('PICKUP ' + r.pickup, 'pickup') : cell(r.driverNotes, 'left', live && 'note')) +
+          '<td>' + (edit ? '<button type="button" class="edit" data-open>Edit</button>' : '') + '</td></tr>');
+      });
+      if (!rows.length) body.push('<tr><td colspan="11" class="empty">No loads go out on this day in the copied Live weeks.</td></tr>');
+      document.getElementById('rows').innerHTML = body.join('');
+      const running = rows.filter(r => !r.off), covered = running.filter(r => !L.needsDriver(r)).length;
+      document.getElementById('coverage').firstElementChild.textContent = (running.length ? Math.round(100 * covered / running.length) : 0) + '%';
+      const days = [...new Set(rows.map(r => r.deliveryDay))];
+      document.getElementById('delivery-day').value = days.join(' / ') || '-';
+      const groups = new Set(rows.map(r => r.deliveryDate)).size;
+      document.getElementById('count').textContent = running.length + ' loads' + (running.length - covered ? ', ' + (running.length - covered) + ' need a driver' : '');
+      fitToWindow(rows.length + groups, 5);
+      if (editRow) paintEdit();
+      if (!document.getElementById('down-panel').hidden) paintDown();
+    }
+
+    // Joe 10/10: trucks and trailers on the road on another run at the same time (or down) are left out of the list
+    // unless OVR is ticked; with OVR they show why. Route Master's hours stand in when the Live row has none.
+    let routeHours = {};
+    const rmHours = (r) => { const d = routeHours[r.runId]; return d && d[r.day]; };
+    const pickOpts = (kind, row) => ({ override: !!ovr[row.id], date: row.deliveryDate, conflicts: kind === 'truck' || kind === 'trailer' ? L.unitConflicts(rows, row, kind, rmHours) : null });
+
+    // Drivers and units already used on this delivery day, so the list can show "(on 802)".
+    function busyFor(kind, row) {
+      const key = kind === 'driver' ? 'driverId' : kind === 'truck' ? 'truckId' : 'trailerId', busy = {};
+      rows.forEach(r => { if (r !== row && !r.off && r.deliveryDate === row.deliveryDate && r[key]) busy[r[key]] = 'on ' + r.route; });
+      return busy;
+    }
+
+    function setRuns(row, on) {
+      if (!on) keptOff[row.id] = Object.assign({}, row, { loadDate });
+      return saveRunChange(getRuns, row.runDocId, row.day, 'setRuns', { runs: on }, d => { d.runs = on; }, render);
+    }
+    const setTime = (row, text) => saveRunChange(getRuns, row.runDocId, row.day, 'setDispatchTime', { time: text }, d => { d.dispatchTime = text ? L.minutesOfDay(text) : null; }, render);
+    const setJack = (row, text) => saveRunChange(getRuns, row.runDocId, row.day, 'setJack', { jack: text }, d => { d.palletJack = text.toUpperCase(); }, render);
+
+    const body = document.getElementById('rows');
+    body.addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-index]');
+      if (!tr || editing) return;
+      const row = rows[Number(tr.dataset.index)];
+      if (e.target.closest('[data-runs]')) { if (canSave()) setRuns(row, !!row.off); return; }
+      if (e.target.closest('[data-ovr]')) { ovr[row.id] = e.target.checked; return; }
+      if (e.target.closest('[data-open]')) { openEdit(row); return; }
+      const td = e.target.closest('td[data-edit]');
+      if (!td) return;
+      const kind = td.dataset.edit;
+      editing = true;
+      const close = () => { editing = false; render(); };
+      if (kind === 'note' || kind === 'time' || kind === 'jack') {
+        const current = kind === 'note' ? row.driverNotes : kind === 'time' ? departText(row) : row.palletJack;
+        openNote(td, current, (value) => {
+          editing = false;
+          if (value === null) return render();
+          if (kind === 'note') saveAssignment(getRuns, row.runDocId, row.day, 'note', value, render);
+          else if (kind === 'time') setTime(row, value);
+          else setJack(row, value);
+        });
+        return;
+      }
+      openPicker(td, kind, kind === 'driver' ? row.driverId : kind === 'truck' ? row.truckId : row.trailerId, busyFor(kind, row), (pick) => {
+        if (pick === null) return close();
+        editing = false;
+        saveAssignment(getRuns, row.runDocId, row.day, kind, pick, render, ovr[row.id]);
+      }, pickOpts(kind, row));
+    });
+
+    // Managers drag a load by its route number to a new place; the whole day's order is saved as one call.
+    body.addEventListener('dragstart', e => { const tr = e.target.closest('tr[data-index]'); if (tr) { dragging = Number(tr.dataset.index); e.dataTransfer.effectAllowed = 'move'; } });
+    body.addEventListener('dragover', e => { if (dragging !== null && e.target.closest('tr[data-index]')) e.preventDefault(); });
+    body.addEventListener('drop', e => {
+      const tr = e.target.closest('tr[data-index]');
+      if (!tr || dragging === null) return;
+      e.preventDefault();
+      const to = Number(tr.dataset.index), from = dragging;
+      dragging = null;
+      if (to === from) return;
+      const ordered = rows.filter(r => !r.off);
+      const a = ordered.indexOf(rows[from]), b = ordered.indexOf(rows[to]);
+      if (a < 0 || b < 0) return;
+      const [moved] = ordered.splice(a, 1);
+      ordered.splice(b, 0, moved);
+      saveOrder(getRuns, loadDate, ordered, render);
+    });
+    body.addEventListener('dragend', () => { dragging = null; });
+
+    /* ---------- Edit box: the same fields as the current screen; each change saves the moment it is made ---------- */
+    const modals = ['edit-modal', 'calloff-panel', 'add-panel', 'down-panel'];
+    function openModal(id) { modals.forEach(m => { document.getElementById(m).hidden = m !== id; }); document.getElementById('modal-back').hidden = false; }
+    function closeModals() { modals.forEach(m => { document.getElementById(m).hidden = true; }); document.getElementById('modal-back').hidden = true; editRow = null; }
+    document.getElementById('modal-back').onclick = closeModals;
+    document.querySelectorAll('[data-close]').forEach(b => { b.onclick = closeModals; });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('modal-back').hidden) closeModals(); });
+
+    function openEdit(row) { editRow = { id: row.id }; paintEdit(true); openModal('edit-modal'); }
+
+    function moveChoices(row) {
+      let html = '<option value="">Pick a day</option>';
+      for (let i = -6; i <= 13; i++) {
+        if (!i) continue;
+        const key = L.addDays(row.deliveryDate, i);
+        html += '<option value="' + key + '">' + escapeHtml(L.dayName(key) + ' ' + shortDate(key)) + '</option>';
+      }
+      return html;
+    }
+
+    function paintEdit(first) {
+      const box = document.getElementById('edit-modal');
+      const row = rows.find(r => r.id === editRow.id);
+      if (!row) { closeModals(); return; }
+      if (!first && box.contains(document.activeElement) && document.activeElement.matches('input, textarea, select')) return; // do not wipe typing or an open list
+      const select = (kind, current) => '<select data-field="' + kind + '"' + (row.off ? ' disabled' : '') + '>' + optionsHtml(kind, current, busyFor(kind, row), pickOpts(kind, row)) + '</select>';
+      box.innerHTML = '<h2 id="edit-title">' + escapeHtml(row.route + ' ' + row.run) + ' <small>' + escapeHtml(row.deliveryDay + ' ' + shortDate(row.deliveryDate)) + '</small></h2>' +
+        '<div class="modal-grid">' +
+        '<label>Route<input value="' + escapeHtml(row.route) + '" disabled></label><label>Run<input value="' + escapeHtml(row.run) + '" disabled></label>' +
+        '<label>Does it run?<select data-field="runs"><option value="true"' + (row.off ? '' : ' selected') + '>YES</option><option value="false"' + (row.off ? ' selected' : '') + '>NO</option></select></label>' +
+        '<label>Driver' + (coverageName(row) ? ' / CVG' : '') + select('driver', row.driverId) + '</label>' +
+        '<label>Truck' + select('truck', row.truckId) + '</label><label>Trailer' + select('trailer', row.trailerId) + '</label>' +
+        '<label>Dispatch time<input data-field="time" value="' + escapeHtml(departText(row)) + '"' + (row.off ? ' disabled' : '') + '></label>' +
+        '<label>Jack no.<input data-field="jack" value="' + escapeHtml(show(row.palletJack)) + '"' + (row.off ? ' disabled' : '') + '></label>' +
+        '<label>Move to another day<select data-move' + (row.off ? ' disabled' : '') + '>' + moveChoices(row) + '</select></label>' +
+        '<div class="move-act"><button type="button" class="primary" data-move-run disabled>Move Route</button><span>Driver, truck and trailer come off when it moves.</span></div>' +
+        '<label class="wide">Driver notes<textarea data-field="note" maxlength="500"' + (row.off ? ' disabled' : '') + '>' + escapeHtml(show(row.driverNotes)) + '</textarea></label>' +
+        '<label class="wide check"><input type="checkbox" data-field="ovr"' + (ovr[row.id] ? ' checked' : '') + '> OVR: offer drivers who are off and units that are down</label>' +
+        '</div><div class="modal-actions"><button type="button" data-print-one>&#9635; Print Dispatch</button><button type="button" class="primary" data-close>Close</button></div>';
+      box.querySelector('[data-close]').onclick = closeModals;
+      box.querySelector('[data-print-one]').onclick = () => printSheet([row]);
+      const move = box.querySelector('[data-move]'), moveBtn = box.querySelector('[data-move-run]');
+      move.onchange = () => { moveBtn.disabled = !move.value; };
+      moveBtn.onclick = () => {
+        const to = move.value;
+        if (!to) return;
+        closeModals();
+        saveRunChange(getRuns, row.runDocId, row.day, 'moveRun', { toDate: to },
+          d => { d.runs = false; d.driverId = ''; d.driver = ''; d.truckId = ''; d.truck = ''; d.trailerId = ''; d.trailer = ''; }, render);
+      };
+      box.querySelectorAll('[data-field]').forEach(node => {
+        node.onchange = () => {
+          const f = node.dataset.field;
+          if (f === 'ovr') { ovr[row.id] = node.checked; paintEdit(true); render(); return; }
+          if (f === 'runs') return setRuns(row, node.value === 'true');
+          if (f === 'time') return setTime(row, node.value.trim());
+          if (f === 'jack') return setJack(row, node.value.trim());
+          if (f === 'note') return saveAssignment(getRuns, row.runDocId, row.day, 'note', node.value.trim(), render);
+          saveAssignment(getRuns, row.runDocId, row.day, f, { id: node.value, text: pickText(f, node.value) }, render, ovr[row.id]);
+        };
+      });
+    }
+
+    /* ---------- Driver Call-Off: a day off (or back to available) for a driver, saved to Driver Exceptions ---------- */
+    document.getElementById('open-calloff').onclick = () => {
+      const first = rows.find(r => !r.off), day = first ? first.deliveryDate : loadDate;
+      document.getElementById('off-driver').innerHTML = '<option value="">Pick a driver</option>' + lists.allDrivers.filter(d => L.driverActive(d))
+        .map(d => '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(d.name) + '</option>').join('');
+      document.getElementById('off-start').value = day;
+      document.getElementById('off-end').value = day;
+      document.getElementById('off-note').value = '';
+      openModal('calloff-panel');
+    };
+    document.getElementById('off-save').onclick = () => {
+      const get = (id) => document.getElementById(id).value.trim();
+      const fields = { driverId: get('off-driver'), reason: get('off-reason'), status: get('off-status'), startDate: get('off-start'), endDate: get('off-end') || get('off-start'), note: get('off-note') };
+      if (!fields.driverId || !fields.startDate) { showError('Pick the driver and the start date.'); return; }
+      if (fields.endDate < fields.startDate) { showError('End Date cannot be before Start Date.'); return; }
+      closeModals();
+      const temp = { driverId: fields.driverId, startDate: fields.startDate, endDate: fields.endDate, type: 'UNAVAILABLE', status: 'UNAVAILABLE', reasonCode: fields.reason };
+      saveOptimistic('saveDriverException', fields,
+        () => { if (fields.status === 'UNAVAILABLE') lists.exceptions.push(temp); },
+        () => { const i = lists.exceptions.indexOf(temp); if (i >= 0) lists.exceptions.splice(i, 1); }, render);
+    };
+
+    /* ---------- Add Route / Run: a run that does not run on this day is turned on ---------- */
+    let addable = [];
+    document.getElementById('open-add').onclick = () => {
+      addable = L.notRunningRows(runs, loadDate);
+      document.getElementById('add-pick').innerHTML = addable.length
+        ? '<option value="">Select a route / run</option>' + addable.map((r, i) => '<option value="' + i + '">' + escapeHtml(r.route + ' ' + r.run + ', ' + L.dayName(r.deliveryDate) + ' ' + shortDate(r.deliveryDate)) + '</option>').join('')
+        : '<option value="">Every route already runs on this day</option>';
+      openModal('add-panel');
+    };
+    document.getElementById('add-save').onclick = () => {
+      const r = addable[Number(document.getElementById('add-pick').value)];
+      if (!r || document.getElementById('add-pick').value === '') { showError('Select a route / run to add.'); return; }
+      closeModals();
+      delete keptOff[r.id];
+      saveRunChange(getRuns, r.runDocId, r.day, 'setRuns', { runs: true }, d => { d.runs = true; }, render);
+    };
+
+    /* ---------- Down Trucks / Trailers ---------- */
+    const allUnits = () => lists.fleetTrucks.concat(lists.fleetTrailers);
+    const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:\s*/i, '');
+    function paintDown() {
+      const down = allUnits().filter(e => L.unitOff(e));
+      document.getElementById('down-rows').innerHTML = down.map(e => '<tr><td><b>' + escapeHtml(e.unit) + '</b></td><td><span class="tag">' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</span></td>' +
+        '<td class="left">' + escapeHtml(String(e.status).toUpperCase() === 'DOWN' ? reasonOf(e) : String(e.status).replace(/_/g, ' ')) + '</td>' +
+        '<td>' + escapeHtml(e.downSince ? shortDate(String(e.downSince).slice(0, 10)) : '') + '</td>' +
+        '<td>' + (String(e.status).toUpperCase() === 'DOWN' ? '<button type="button" data-up="' + escapeHtml(e.id) + '">Back in service</button>' : '') + '</td></tr>').join('') ||
+        '<tr><td colspan="5" class="empty">No trucks or trailers are down.</td></tr>';
+      document.getElementById('down-units').innerHTML = allUnits().filter(e => !L.unitOff(e)).map(e => '<option value="' + escapeHtml(e.unit) + '" label="' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '"></option>').join('');
+      document.querySelectorAll('[data-up]').forEach(b => { b.onclick = () => {
+        const unit = allUnits().find(e => e.id === b.dataset.up), before = { status: unit.status, notes: unit.notes };
+        saveOptimistic('setUnitUp', { equipmentId: unit.id }, () => { unit.status = 'ACTIVE'; unit.notes = ''; }, () => Object.assign(unit, before), render);
+      }; });
+    }
+    document.getElementById('open-down').onclick = () => { openModal('down-panel'); paintDown(); document.getElementById('down-unit').focus(); };
+    document.getElementById('down-add').onclick = () => {
+      const typed = document.getElementById('down-unit').value.trim().toUpperCase(), reason = document.getElementById('down-reason').value.trim();
+      const unit = allUnits().find(e => String(e.unit).toUpperCase() === typed) || allUnits().find(e => String(e.unit).toUpperCase() === 'T-' + typed);
+      if (!unit) { showError(typed ? typed + ' is not in Equipment Master.' : 'Type the truck or trailer number.'); return; }
+      if (!reason) { showError('Say why ' + unit.unit + ' is down.'); return; }
+      document.getElementById('down-unit').value = '';
+      document.getElementById('down-reason').value = '';
+      const before = { status: unit.status, notes: unit.notes, downSince: unit.downSince };
+      saveOptimistic('setUnitDown', { equipmentId: unit.id, reason, today: L.operatingDay(new Date()) },
+        () => Object.assign(unit, { status: 'DOWN', notes: 'DOWN: ' + reason, downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
+    };
+
+    /* ---------- Print: straight to the printer, the same columns as the current dispatch sheet ---------- */
+    function printSheet(only) {
+      const list = (only || rows).filter(r => !r.off);
+      let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(shortDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
+        ' &middot; Delivery Day ' + escapeHtml(document.getElementById('delivery-day').value) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
+        '<th>C/O</th><th>P/O</th><th>T/O</th><th>L/D</th><th>DR</th><th>CHECKED BY</th><th>JACK</th><th>DRIVER NOTES</th></tr></thead><tbody>';
+      let group = '';
+      list.forEach(r => {
+        if (r.deliveryDate !== group && new Set(list.map(x => x.deliveryDate)).size > 1) html += '<tr class="pgroup"><td colspan="14">' + escapeHtml(r.deliveryDay + ' Deliveries, ' + shortDate(r.deliveryDate)) + '</td></tr>';
+        group = r.deliveryDate;
+        html += '<tr><td>' + [r.route, r.run, r.driver || coverageName(r), r.truck, r.trailer, departText(r), '', '', '', '', '', '', r.palletJack, r.pickup ? 'PICKUP ' + r.pickup : r.driverNotes].map(v => escapeHtml(show(v))).join('</td><td>') + '</td></tr>';
+      });
+      document.getElementById('print').innerHTML = html + '</tbody></table>';
+      window.print();
+    }
+    document.getElementById('print-sheet').onclick = () => printSheet();
+    // Print Layouts opens Daily with #print: the sheet prints once the day's runs are on screen.
+    if (location.hash === '#print') { const t = setInterval(() => { if (!rows.length) return; clearInterval(t); history.replaceState(null, '', location.pathname + location.search); printSheet(); }, 300); }
+
+    /* ---------- Week and day ---------- */
+    async function watchRuns() {
+      const { db } = await start();
+      if (unsubscribeRuns) unsubscribeRuns();
+      const begin = weekBegin(loadDate);
+      document.getElementById('week-begin').value = shortDate(L.addDays(begin, 1));
+      document.getElementById('load-day').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
+        const key = L.addDays(begin, i);
+        return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key) + ' ' + shortDate(key)) + '</option>';
+      }).join('');
+      document.getElementById('go-weekly').href = 'weekly.html?week=' + L.addDays(loadDate, 1) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
+      history.replaceState(null, '', '?date=' + loadDate + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
+      // One live query: every open screen gets each change the moment it is saved, without checking every 30 seconds.
+      const q = query(collection(db, 'runs'), where('weekStart', 'in', L.weeksForLoadDate(loadDate)));
+      unsubscribeRuns = onSnapshot(q, snap => {
+        runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        render();
+      }, e => showError('Could not read the dispatch: ' + e.message));
+    }
+
+    function move(days) { closeModals(); loadDate = L.addDays(loadDate, days); watchRuns(); }
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      onSnapshot(collection(db, 'routes'), snap => {
+        routeHours = {};
+        snap.docs.forEach(d => { const r = d.data(), h = {}; L.DAYS.forEach(p => { h[p] = r.days && r.days[p] && r.days[p].hours; }); routeHours[d.id] = h; });
+      }, () => {});
+      onSnapshot(doc(db, 'config', 'app'), snap => {
+        const c = snap.data() || {};
+        writeBack = !!(c.writeBack && c.writeBack.enabled === true);
+        // The conflict link shows only while the write-back is on (it is the only thing that makes conflicts).
+        document.getElementById('to-conflicts').hidden = !writeBack;
+        render();
+        const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
+        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy from the sheets';
+      });
+      watchLists(user, render);
+      document.getElementById('prev').onclick = () => move(-1);
+      document.getElementById('next').onclick = () => move(1);
+      document.getElementById('week-prev').onclick = () => move(-7);
+      document.getElementById('week-next').onclick = () => move(7);
+      document.getElementById('load-day').onchange = e => { if (L.isDateKey(e.target.value)) { closeModals(); loadDate = e.target.value; watchRuns(); } };
+      window.addEventListener('resize', render);
+      watchRuns();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+name: Deploy distribution app (Firebase)
+
+# Puts the new distribution app live on Firebase. Run by hand only:
+# - sandbox: after the tests pass, to try the new screens side by side with the current app;
+# - production: only after Joe's release words for the new app.
+# Needs, per target, the repository secret FIREBASE_SERVICE_ACCOUNT_SANDBOX / FIREBASE_SERVICE_ACCOUNT_PRODUCTION
+# (a deploy key for that Firebase project) and the variable FIREBASE_PROJECT_SANDBOX / FIREBASE_PROJECT_PRODUCTION.
+# Without them it stops with a notice and deploys nothing. It never changes the current Apps Script app.
+# Until this file is on main (where GitHub lists it for "Run workflow"), a push to the work branch whose commit
+# message contains [deploy sandbox] also deploys, to the SANDBOX only.
+on:
+  push:
+    branches: [claude/project-thread-ell22c]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: sandbox or production
+        required: true
+        default: sandbox
+        type: choice
+        options: [sandbox, production]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-distribution-app-${{ inputs.target || 'sandbox' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy sandbox]')
+    runs-on: ubuntu-latest
+    environment: distribution-${{ inputs.target || 'sandbox' }}
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Check settings
+        id: settings
+        env:
+          SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
+          SA_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
+          PROJECT_SANDBOX: ${{ vars.FIREBASE_PROJECT_SANDBOX }}
+          PROJECT_PRODUCTION: ${{ vars.FIREBASE_PROJECT_PRODUCTION }}
+          TARGET: ${{ inputs.target || 'sandbox' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = production ]; then sa="$SA_PRODUCTION"; project="$PROJECT_PRODUCTION"; else sa="$SA_SANDBOX"; project="$PROJECT_SANDBOX"; fi
+          if [ -z "$sa" ] || [ -z "$project" ]; then
+            echo "::notice::The $TARGET Firebase project is not set up yet; nothing was deployed. See README.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          printf '%s' "$sa" > "$RUNNER_TEMP/sa.json"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.settings.outputs.ready == 'true'
+        run: npm ci
+      - name: Test before deploying
+        if: steps.settings.outputs.ready == 'true'
+        run: npm test && npm run test:emulator
+      - name: Deploy screens, server, database rules and indexes
+        if: steps.settings.outputs.ready == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+          PROJECT: ${{ steps.settings.outputs.project }}
+          TARGET: ${{ inputs.target || 'sandbox' }}
+          SANDBOX_SOURCES_JSON: ${{ vars.SANDBOX_SOURCES_JSON }}
+          SANDBOX_WRITEBACK_JSON: ${{ vars.SANDBOX_WRITEBACK_JSON }}
+          SANDBOX_ADMINS: ${{ vars.SANDBOX_ADMINS || 'jcartwright@uniteddairy.com' }}
+          SANDBOX_MAIL_FROM: ${{ vars.SANDBOX_MAIL_FROM || 'jcartwright@uniteddairy.com' }}
+          PRODUCTION_ENV: ${{ vars.PRODUCTION_ENV }}
+        run: |
+          set -euo pipefail
+          node ../tools/sync-logic.cjs
+          # What the copy reads (index.js transferSetup). The sandbox shows the made-up sheets until SANDBOX_SOURCES_JSON
+          # names its sheet copies; production reads nothing until PRODUCTION_ENV is set after Joe says go.
+          # The sandbox sheet copies can also be named in sandbox-sources.json at the repository root
+          # ({"sources": SOURCES_JSON, "writeBack": WRITEBACK_JSON}); spreadsheet IDs of copies are not secrets.
+          if [ "$TARGET" = sandbox ] && [ -z "$SANDBOX_SOURCES_JSON" ] && [ -f ../sandbox-sources.json ]; then
+            SANDBOX_SOURCES_JSON=$(node -e "console.log(JSON.stringify(require('../sandbox-sources.json').sources))")
+            SANDBOX_WRITEBACK_JSON=$(node -e "const w=require('../sandbox-sources.json').writeBack; console.log(w ? JSON.stringify(w) : '')")
+          fi
+          if [ "$TARGET" = sandbox ]; then
+            # The copy reads the sheets through the Google Sheets API.
+            gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet
+            gcloud services enable sheets.googleapis.com --project "$PROJECT" --quiet
+            if [ -n "$SANDBOX_SOURCES_JSON" ]; then
+              printf 'SOURCES_JSON=%s\n' "$SANDBOX_SOURCES_JSON" > .env
+              if [ -n "$SANDBOX_WRITEBACK_JSON" ]; then printf 'WRITEBACK_JSON=%s\n' "$SANDBOX_WRITEBACK_JSON" >> .env; fi
+            else
+              printf 'DEMO_DATA=1\nDEMO_ADMINS=%s\n' "$SANDBOX_ADMINS" > .env
+            fi
+            # Send Current Report email (src/mail.js): Gmail sent as MAIL_FROM by the server account, which signs for itself
+            # through IAM Credentials (no key). The sandbox emails only the person who pressed Send (no REPORT_TO here).
+            printf 'MAIL_FROM=%s\n' "$SANDBOX_MAIL_FROM" >> .env
+            gcloud services enable iamcredentials.googleapis.com gmail.googleapis.com --project "$PROJECT" --quiet \
+              || echo "::warning::Could not turn on IAM Credentials and Gmail for $PROJECT; report email will fail until they are on."
+            number=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null || true)
+            runtime="${number}-compute@developer.gserviceaccount.com"
+            gcloud iam service-accounts add-iam-policy-binding "$runtime" --project "$PROJECT" \
+              --member="serviceAccount:$runtime" --role=roles/iam.serviceAccountTokenCreator --quiet >/dev/null \
+              && echo "Server account may sign for itself: yes" \
+              || echo "::warning::Could not let $runtime sign for itself (Service Account Token Creator on itself); report email will fail until it can."
+            client=$(gcloud iam service-accounts describe "$runtime" --project "$PROJECT" --format='value(oauth2ClientId)' 2>/dev/null || true)
+            {
+              echo "### Report email"
+              echo "Sent as: $SANDBOX_MAIL_FROM"
+              echo "Server account: $runtime"
+              echo "Client ID for Google Workspace domain-wide delegation: ${client:-could not read}"
+              echo "Scope: https://www.googleapis.com/auth/gmail.send"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "Report email client ID: ${client:-could not read}"
+            # MOCREO sensors (src/mocreo.js): the server reads MOCREO_API_KEY and MOCREO_ASSET_ID from Secret Manager each run.
+            # Joe adds the two secrets himself; nothing here sees them.
+            gcloud services enable secretmanager.googleapis.com --project "$PROJECT" --quiet \
+              || echo "::warning::Could not turn on Secret Manager for $PROJECT; MOCREO sensors stay off until it is on."
+            gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$runtime" \
+              --role=roles/secretmanager.secretAccessor --condition=None --quiet >/dev/null \
+              && echo "Server account may read the MOCREO secrets: yes" \
+              || echo "::warning::Could not let $runtime read secrets (Secret Manager Secret Accessor); MOCREO sensors stay off until it can."
+          else
+            printf '%s\n' "$PRODUCTION_ENV" > .env
+          fi
+          # A new address for the styles on every deploy, so no browser or cache can pair a new page with old styles.
+          cd .. && sed -i "s|css/app.css\"|css/app.css?v=${GITHUB_SHA::12}\"|" public/*.html
+          # Diagnostics are sandbox only (Joe 10/10): the sandbox gets the Diagnostics screen and its probe on every screen;
+          # production must have none of it, and the deploy stops if it does.
+          if [ "$TARGET" = sandbox ]; then node tools/sandbox-diagnostics.cjs add public; else node tools/sandbox-diagnostics.cjs check public; fi
+          npx --prefix functions firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
+          {
+            echo "## Distribution app ($TARGET)"
+            echo "Screens: https://$PROJECT.web.app"
+            echo "Commit: $GITHUB_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Check the deployed app answers
+        if: steps.settings.outputs.ready == 'true'
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          set -uo pipefail
+          ok=true
+          init=$(curl -fsS "https://$PROJECT.web.app/__/firebase/init.json") || init=''
+          if echo "$init" | grep -q '"apiKey"'; then echo "Firebase web settings: found"; else echo "::error::https://$PROJECT.web.app/__/firebase/init.json has no web app settings. In the Firebase console: Project settings > General > Your apps > Add app > Web (</>), any nickname, no Hosting tick, Register app. Then deploy again."; ok=false; fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://$PROJECT.web.app/index.html"); echo "Home page: HTTP $code"; [ "$code" = 200 ] || ok=false
+          # The live home page must ask for this deploy's styles, and those styles must be the current ones.
+          page=$(curl -fsS "https://$PROJECT.web.app/index.html?check=$GITHUB_SHA") || page=''
+          if [[ "$page" == *"css/app.css?v=${GITHUB_SHA::12}"* ]]; then echo "Home page asks for this deploy's styles: yes"; else echo "::error::The live home page does not ask for this deploy's styles"; ok=false; fi
+          css=$(curl -fsS "https://$PROJECT.web.app/css/app.css?v=${GITHUB_SHA::12}") || css=''
+          if [[ "$css" == *'.dc-head'* ]]; then echo "Styles are current: yes"; else echo "::error::The live styles are not the current ones"; ok=false; fi
+          # A save with no sign-in must be refused by the server (proves the function is up and checks sign-in).
+          reply=$(curl -s -X POST -H 'Content-Type: application/json' -d '{"data":{}}' "https://us-east4-$PROJECT.cloudfunctions.net/save")
+          echo "Save without sign-in: $reply"
+          echo "$reply" | grep -q 'PERMISSION_DENIED' || ok=false
+          {
+            echo "Web settings: $( [ -n "$init" ] && echo found || echo missing )"
+            echo "Home page: HTTP $code"
+            echo "Save without sign-in: $reply"
+          } >> "$GITHUB_STEP_SUMMARY"
+          $ok
+      - name: Open the live home page in a browser and check its styles applied
+        if: steps.settings.outputs.ready == 'true'
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          npx playwright install --with-deps chromium
+          node test/browser/live-look.cjs "https://$PROJECT.web.app"
+      - name: Time the phone pages and server calls
+        if: steps.settings.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          node test/browser/phone-speed.cjs "https://$PROJECT.web.app" "$PROJECT" | tee speed.txt
+          { echo "### Phone speed"; sed 's/^/- /' speed.txt; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Show what the sandbox copy read from the sheets
+        if: steps.settings.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: |
+          since=$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%S)
+          node test/browser/last-transfer.cjs "$PROJECT" "$since" && exit 0
+          # The deploy key may not read the database; the copy's own log says whether it ran and what went wrong.
+          sleep 150
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet
+          gcloud logging read "resource.labels.service_name=\"transfereveryminute\" AND timestamp>=\"${since}Z\"" --project "$PROJECT" --limit 40 --format='value(timestamp,severity,httpRequest.status,textPayload,jsonPayload.message)'

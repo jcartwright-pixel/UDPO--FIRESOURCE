@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Plant Station · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/stations.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill ps-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Plant Station</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
+      <span class="ps-pill" id="pill" hidden>Uniontown</span>
+      <button type="button" id="change" data-top hidden>Change Station</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <section id="pick">
+        <p class="ps-intro">Pick the work area this tablet is for. The tablet remembers it and opens straight to that station next time.</p>
+        <div class="ps-stations" id="stations"></div>
+      </section>
+      <section id="station" hidden>
+        <div class="ps-tabs" id="tabs"></div>
+        <p class="ps-foot" id="foot"></p>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as P from './js/plant-core.js';
+
+    // The current app's Plant Station tablet (PlantStation.html, 057_V774): one station, only its work areas. In the new app
+    // the tablet signs in with a United Dairy account (no station code) and picks its station once; it is remembered on the
+    // tablet. Each work area opens the plant's own screen for that area (Loadout Center, Unloading & Washing, ...).
+    const L = window.UDLogic;
+    const STATIONS = [
+      { id: 'CASE', label: 'Case Loadout', what: 'Case loading only (unloading is the Case Unloading station)', area: 'CASE', views: ['loading'] },
+      { id: 'CASE_UNLOADING', label: 'Case Unloading', what: 'Case unloading, product returns and trailer washing (no loading)', area: 'CASE', views: ['unloading', 'washing', 'returns'] },
+      { id: 'TOTES', label: 'Tote Loadout', what: 'Tote loading and tote unloading', area: 'TOTES', views: ['loading', 'unloading'] },
+      { id: 'BOXING', label: 'Boxing Loadout', what: 'Box loading and box unloading', area: 'BOXING', views: ['loading', 'unloading'] },
+      { id: 'YARD_SERVICES', label: 'Yard Services', what: 'Unloading, washing, and product returns', area: '', views: ['unloading', 'washing', 'returns'] }
+    ];
+    const VIEWS = {
+      loading: { label: 'Loading', what: 'Assigned loadout work', accent: '#1976d2', tone: '#e8f3ff', page: 'loadout.html', pic: { CASE: 'case-v1.webp', TOTES: 'tote-v1.webp', BOXING: 'box-v1.webp' } },
+      unloading: { label: 'Unloading', what: 'Assigned unloading work', accent: '#168a55', tone: '#e8f8ef', page: 'unloading.html', pic: 'tanker-v1.webp' },
+      washing: { label: 'Washing', what: 'Assigned trailer washing', accent: '#0b8da5', tone: '#e7f8fb', page: 'washing.html', pic: 'maintenance-trailer-v1-560.webp' },
+      returns: { label: 'Returns', what: 'Return product to the cooler', accent: '#bd7400', tone: '#fff4db', page: 'returns.html', pic: 'box-v1.webp' }
+    };
+    const KEY = 'udPlantStation';
+    const read = () => { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } };
+    const write = (v) => { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* private window: not remembered */ } };
+    let stationId = new URLSearchParams(location.search).get('station') || read(), runs = [];
+
+    function render() {
+      const st = STATIONS.find(s => s.id === stationId);
+      document.getElementById('pick').hidden = !!st;
+      document.getElementById('station').hidden = !st;
+      document.getElementById('change').hidden = !st;
+      document.getElementById('pill').hidden = !st;
+      document.getElementById('eyebrow').textContent = st ? 'Assigned Plant Station' : 'Plant Station';
+      document.getElementById('title').textContent = st ? st.label : 'Pick this tablet\'s station';
+      if (!st) {
+        document.getElementById('stations').innerHTML = STATIONS.map(s => '<button type="button" class="ps-station" data-station="' + s.id + '"><b>' + escapeHtml(s.label) + '</b><span>' + escapeHtml(s.what) + '</span></button>').join('');
+        return;
+      }
+      const date = L.operatingDay(new Date());
+      document.getElementById('pill').textContent = 'Uniontown · ' + new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const loads = P.loadoutRows(runs, date).filter(r => r.area === st.area), left = loads.filter(r => r.state !== 'DONE').length;
+      document.getElementById('tabs').innerHTML = st.views.map(v => {
+        const x = VIEWS[v], pic = typeof x.pic === 'string' ? x.pic : x.pic[st.area];
+        const href = x.page + (st.area && (v === 'loading' || v === 'unloading') ? '?area=' + st.area : '');
+        const count = v === 'loading' ? '<span class="ps-count">' + left + ' remaining of ' + loads.length + ' load' + (loads.length === 1 ? '' : 's') + '</span>' : '';
+        return '<a class="ps-tab" href="' + href + '" style="--accent:' + x.accent + ';--tone:' + x.tone + '"><img src="img/library/' + pic + '" alt=""><span><b>' + x.label + '</b><small>' + x.what + '</small>' + count + '</span></a>';
+      }).join('');
+      document.getElementById('foot').textContent = st.what + '. This tablet opens this station each time; use Change Station to move it.';
+    }
+
+    document.getElementById('stations').addEventListener('click', e => {
+      const b = e.target.closest('[data-station]');
+      if (!b) return;
+      stationId = b.dataset.station; write(stationId); render();
+    });
+    document.getElementById('change').addEventListener('click', () => { stationId = ''; write(''); history.replaceState(null, '', location.pathname); render(); });
+
+    requireSignIn(async () => {
+      const { db } = await start();
+      const date = L.operatingDay(new Date());
+      const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
+      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message));
+      render();
+      setInterval(render, 60000);
+    });
+  </script>
+</body>
+</html>

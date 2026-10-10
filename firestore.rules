@@ -1,0 +1,65 @@
+rules_version = '2';
+// United Dairy Distribution app. Screens may only READ, and only when signed in with a verified
+// @uniteddairy.com Google account that is ACTIVE in USERS_MASTER (the same list the current app uses).
+// Every write goes through the server (functions/index.js), never the browser.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function unitedDairy() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower().matches('.*@uniteddairy[.]com$');
+    }
+    // A United Dairy account is not enough to see dispatch data or driver phone numbers: the person must be an
+    // ACTIVE user in USERS_MASTER (copied to users/{email}). One extra read per query, not per document.
+    function activeUser() {
+      return unitedDairy()
+        && get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('status', '') == 'ACTIVE';
+    }
+    match /config/app { allow read: if activeUser(); }
+    match /config/fleetSync { allow read: if activeUser(); }
+    match /config/mocreo { allow read: if activeUser(); }
+    // MOCREO cooler sensors (server only writes them).
+    match /sensors/{id} { allow read: if activeUser(); }
+    // Thermometer locations changed in Administration > MOCREO & Sensors (the server writes them; the key stays in private/).
+    match /tempLocations/{id} { allow read: if activeUser(); }
+    match /weeks/{id} { allow read: if activeUser(); }
+    match /runs/{id} { allow read: if activeUser(); }
+    match /drivers/{id} { allow read: if activeUser(); }
+    match /equipment/{id} { allow read: if activeUser(); }
+    match /routes/{id} { allow read: if activeUser(); }
+    // Each person may read their own entry (to know which buttons to show, or that they are not on the list), not everyone's.
+    match /users/{email} { allow read: if unitedDairy() && request.auth.token.email.lower() == email; }
+    match /transfers/{id} { allow read: if activeUser(); }
+    match /exceptions/{id} { allow read: if activeUser(); }
+    match /vacations/{id} { allow read: if activeUser(); }
+    match /plantLoads/{id} { allow read: if activeUser(); }
+    match /maintenance/{id} { allow read: if activeUser(); }
+    match /workOrders/{id} { allow read: if activeUser(); }
+    match /fleetSetup/{id} { allow read: if activeUser(); }
+    match /garageTechs/{id} { allow read: if activeUser(); }
+    match /odometers/{id} { allow read: if activeUser(); }
+    match /otrRoutes/{id} { allow read: if activeUser(); }
+    match /otrDaily/{id} { allow read: if activeUser(); }
+    match /otrMonthly/{id} { allow read: if activeUser(); }
+    match /otrMonthRuns/{id} { allow read: if activeUser(); }
+    match /plantEvents/{id} { allow read: if activeUser(); }
+    // The drivers' DVIR inspections (phone.js), one per trailer.
+    match /dvirs/{id} { allow read: if activeUser(); }
+    match /scorecard/{id} { allow read: if activeUser(); }
+    match /opsAssignments/{id} { allow read: if activeUser(); }
+    // The plant side: the plant journal, pickups, and the wash and returns lists.
+    match /plantJournal/{id} { allow read: if activeUser(); }
+    match /pickups/{id} { allow read: if activeUser(); }
+    match /plantWash/{id} { allow read: if activeUser(); }
+    match /plantReturns/{id} { allow read: if activeUser(); }
+    // The production lines, temperature locations and the lines' last checks.
+    match /plantSetup/{id} { allow read: if activeUser(); }
+    match /plantProducts/{id} { allow read: if activeUser(); }
+    match /plantLineStatus/{id} { allow read: if activeUser(); }
+    // Plant reports sent from the Manager Center, and whether each was emailed.
+    match /plantReports/{id} { allow read: if activeUser(); }
+    // Sheet cells the write-back did not write, so a dispatcher can check them.
+    match /conflicts/{id} { allow read: if activeUser(); }
+    match /{other=**} { allow read, write: if false; }
+  }
+}

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Equipment · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill">
+  <div class="signin" id="signin" hidden>
+    <h1>Equipment</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="daily.html">Daily Dispatch</a>
+      <a href="routes.html">Route Editor</a>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Equipment</h1><small>Trucks and trailers the dispatch lists offer (Equipment Master)</small></div>
+      <div class="actions in-head fleet-sync"><button type="button" id="fleet-sync" hidden>Sync fleet list</button><span id="fleet-synced"></span></div>
+      <div class="counts"><div><b id="n-trucks">-</b>Trucks</div><div><b id="n-trailers">-</b>Trailers</div><div><b id="n-down">-</b>Down / out</div></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Equipment Master is not changed yet. Fleet service and work orders stay in the current app.</span></div>
+    </div>
+    <div class="view">
+      <div class="actions" data-top>
+        <div class="chips" id="filters"></div>
+        <input type="search" id="search" placeholder="Find a unit, location or reason" aria-label="Find">
+      </div>
+      <div class="notice error" id="error" hidden></div>
+      <div class="sheet scroll-list">
+        <table>
+          <colgroup><col style="width:7%"><col style="width:5%"><col style="width:7%"><col style="width:11%"><col span="7" style="width:7.6%"><col style="width:9.8%"><col style="width:7%"></colgroup>
+          <thead><tr><th>Unit</th><th>Type</th><th>Status</th><th>Location</th><th class="eq-day">Sun</th><th class="eq-day">Mon</th><th class="eq-day">Tue</th><th class="eq-day">Wed</th><th class="eq-day">Thu</th><th class="eq-day">Fri</th><th class="eq-day">Sat</th><th>Down reason</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer } from './js/app.js';
+    import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    forScreen('dailyDispatch');
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    // Today follows the clock (6 a.m. roll), so a screen left open overnight marks and takes units off the right day.
+    const today = () => L.operatingDay(new Date());
+    const nyDate = (t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric' }); };
+    const FILTERS = [['all', 'All'], ['TRUCK', 'Trucks'], ['TRAILER', 'Trailers'], ['down', 'Down / out']];
+    let filter = 'all', search = '', downFor = null;
+
+    // Joe 10/10: what each unit runs by default on each weekday (Route Master's tractor and trailer defaults), not just today.
+    let routes = [];
+    // Joe 10/10: inactive units that are not down are old-list leftovers and are left off this screen.
+    const listed = (e) => String(e.status || '').toUpperCase() !== 'INACTIVE';
+    const units = () => lists.allTrucks.concat(lists.allTrailers).filter(listed);
+    const reasonOf = (e) => L.cleanUnitNote(String(e.notes || '').replace(/^DOWN:\s*/i, ''));
+    // Joe 10/9: only a real down reason shows; the sheet's sync notes ("External Fleet: ...", "Route Day ...") stay in the sheet.
+    const downReason = (e) => String(e.status).toUpperCase() === 'DOWN' || /^DOWN:/i.test(String(e.notes || '')) ? reasonOf(e) : '';
+
+    // Joe 10/10: the fleet list is the master list; it syncs every night, and a manager can sync it now.
+    let fleetSync = null, syncing = false;
+    const MANAGERS = ['ADMINISTRATOR', 'ADMIN', 'MANAGER'];
+    function syncText() {
+      if (syncing) return 'Syncing the fleet list...';
+      if (!fleetSync || !fleetSync.at) return 'Fleet list: not synced yet';
+      const when = new Date(fleetSync.at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      if (!fleetSync.ok) return 'Fleet list sync failed ' + when + ': ' + fleetSync.error + '. Press Sync again, or it runs again at 2 AM.';
+      const n = (k) => (fleetSync[k] || []).length;
+      const what = [n('added') && n('added') + ' added', n('inactive') && n('inactive') + ' off the list', n('back') && n('back') + ' back', n('changed') && n('changed') + ' updated'].filter(Boolean).join(', ');
+      return 'Fleet list synced ' + when + (what ? ': ' + what : ': no changes');
+    }
+    function paintSync() {
+      const button = document.getElementById('fleet-sync'), line = document.getElementById('fleet-synced');
+      button.hidden = !L.hasRole(lists.person, MANAGERS);
+      button.disabled = syncing;
+      line.textContent = syncText();
+      line.className = fleetSync && fleetSync.ok === false && !syncing ? 'bad' : '';
+    }
+    document.getElementById('fleet-sync').addEventListener('click', async () => {
+      syncing = true; paintSync();
+      try { fleetSync = await callServer('fleetSyncNow', {}); }
+      catch (e) { fleetSync = { ok: false, at: new Date().toISOString(), error: String(e.message || e) }; }
+      syncing = false; paintSync();
+    });
+
+    function render() {
+      paintSync();
+      const edit = canSave(), all = units(), on = L.unitDefaultDays(routes, all), todayP = L.dayPrefix(today());
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      document.getElementById('n-trucks').textContent = lists.allTrucks.filter(listed).length;
+      document.getElementById('n-trailers').textContent = lists.allTrailers.filter(listed).length;
+      document.getElementById('n-down').textContent = all.filter(e => L.unitOff(e)).length;
+      const match = (e, k) => k === 'all' || (k === 'down' ? L.unitOff(e) : e.type === k);
+      document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + all.filter(e => match(e, k)).length + '</b></button>').join('');
+      const typed = document.querySelector('[data-reason]') ? document.querySelector('[data-reason]').value : '';
+      const q = search.toUpperCase();
+      const list = all.filter(e => match(e, filter) && (!q || [e.unit, e.location, downReason(e), e.status].join(' ').toUpperCase().indexOf(q) >= 0));
+      document.getElementById('rows').innerHTML = list.map(e => {
+        const off = L.unitOff(e), down = String(e.status).toUpperCase() === 'DOWN', days = on[e.id] || {};
+        const action = !edit ? '' : downFor === e.id
+          ? '<span class="down-box"><input data-reason maxlength="120" aria-label="Why ' + escapeHtml(e.unit) + ' is down" placeholder="Why is it down?"><button type="button" class="warn" data-down-save>Down</button><button type="button" data-down-cancel>Cancel</button></span>'
+          : down ? '<button type="button" data-up>Back in service</button>' : off ? '' : '<button type="button" class="warn" data-down>Put down</button>';
+        return '<tr data-id="' + escapeHtml(e.id) + '"' + (off ? ' class="off"' : '') + '><td class="strong">' + escapeHtml(e.unit) + '</td><td><span class="tag">' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</span></td>' +
+          '<td><span class="status' + (off ? ' off' : '') + '">' + escapeHtml(String(e.status || '').replace(/_/g, ' ') || 'ACTIVE') + '</span></td><td>' + escapeHtml(e.location || '') + '</td>' +
+          L.DAYS.map(p => { const r = days[p] || []; return '<td class="eq-day' + (p === todayP ? ' today' : '') + (off && r.length ? ' issue' : '') + (r.length > 1 ? ' busy' : '') + '"' + (r.length > 1 ? ' title="Set for ' + r.length + ' runs that day"' : '') + '>' + r.map(n => '<span>' + escapeHtml(n) + '</span>').join('') + '</td>'; }).join('') +
+          '<td class="left">' + escapeHtml(downReason(e) + (down && e.downSince ? ' (since ' + nyDate(e.downSince) + ')' : '')) + '</td><td>' + action + '</td></tr>';
+      }).join('') || '<tr><td colspan="13" class="empty">No units match.</td></tr>';
+      const box = document.querySelector('[data-reason]');
+      if (box) { box.value = typed; if (document.activeElement !== box) box.focus(); }
+    }
+
+    document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
+    document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
+    document.getElementById('rows').addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-id]');
+      if (!tr) return;
+      const unit = units().find(x => x.id === tr.dataset.id);
+      if (e.target.closest('[data-down]')) { downFor = unit.id; render(); return; }
+      if (e.target.closest('[data-down-cancel]')) { downFor = null; render(); return; }
+      if (e.target.closest('[data-down-save]')) {
+        const reason = tr.querySelector('[data-reason]').value.trim();
+        if (!reason) { showError('Say why ' + unit.unit + ' is down.'); return; }
+        downFor = null;
+        const before = { status: unit.status, notes: unit.notes, downSince: unit.downSince };
+        // Down takes the unit off today's and later loads (the server does it in the same call); Daily shows it at once.
+        saveOptimistic('setUnitDown', { equipmentId: unit.id, reason, today: today() }, () => Object.assign(unit, { status: 'DOWN', notes: 'DOWN: ' + reason, downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
+        return;
+      }
+      if (e.target.closest('[data-up]')) {
+        const before = { status: unit.status, notes: unit.notes };
+        saveOptimistic('setUnitUp', { equipmentId: unit.id }, () => Object.assign(unit, { status: 'ACTIVE', notes: '' }), () => Object.assign(unit, before), render);
+      }
+    });
+    document.getElementById('rows').addEventListener('keydown', e => { if (e.target.matches('[data-reason]')) { if (e.key === 'Enter') e.target.closest('tr').querySelector('[data-down-save]').click(); if (e.key === 'Escape') { downFor = null; render(); } } });
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      let shownDay = today();
+      setInterval(() => { if (today() !== shownDay) { shownDay = today(); render(); } }, 60000);
+      onSnapshot(doc(db, 'config', 'fleetSync'), s => { if (!syncing) { fleetSync = s.exists() ? s.data() : null; paintSync(); } }, () => {});
+      onSnapshot(collection(db, 'routes'), s => { routes = s.docs.map(d => d.data()); render(); }, e => showError('Could not read Route Master (' + e.message + '). Check the network and reload the page.'));
+    });
+  </script>
+</body>
+</html>

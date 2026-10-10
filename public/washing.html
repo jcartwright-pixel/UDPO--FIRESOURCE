@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Truck Washing · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page washing-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Truck Washing</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Operations</span><h1>Truck Washing</h1></div>
+      <div class="field">
+        <label for="work-date">Day</label>
+        <div class="stepper">
+          <button type="button" id="prev" aria-label="Previous day" title="Previous day">&#9664;</button>
+          <input id="work-date" type="date">
+          <button type="button" id="next" aria-label="Next day" title="Next day">&#9654;</button>
+        </div>
+      </div>
+      <div class="dayname" id="dayname"></div>
+      <div class="hstats" id="hstats"></div>
+      <button type="button" class="addwash-open" id="add-open" data-top>+ Add Wash</button>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <form class="addwash" id="add-bar" hidden>
+        <b>Wash a trailer</b>
+        <label>Trailer #<input id="add-trailer" autocomplete="off" placeholder="e.g. 615"></label>
+        <button type="submit" class="wash">Wash</button>
+        <button type="button" id="add-close">Cancel</button>
+      </form>
+      <div class="uw-split">
+        <div class="sheet scroll-list">
+          <table class="loadout unload">
+            <colgroup><col style="width:14%"><col style="width:13%"><col style="width:33%"><col style="width:10%"><col style="width:15%"><col style="width:15%"></colgroup>
+            <thead><tr><th>Trailer</th><th>Reported</th><th>Work Needed</th><th>Reports</th><th>Notification</th><th>Work Action</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <aside class="uw-side" id="side" aria-label="Wash analytics"></aside>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as P from './js/plant-core.js';
+
+    const L = window.UDLogic, U = window.UDPlant;
+    const params = new URLSearchParams(location.search);
+    const today = () => L.operatingDay(new Date());
+    let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
+    let week = [], sheetWash = [], appWash = [], person = null, app = {};
+    const washedNow = {};      // trailer unit -> true while its Wash press is saving
+    const unsubs = [];
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    // This week = Sunday through the day shown (the current app's "Washes this week").
+    const weekDays = () => { const s = L.weekStart(date), out = []; for (let d = s; d <= date; d = L.addDays(d, 1)) out.push(d); return out; };
+
+    // The requests and the day's unloads, plus trailers unloaded earlier this week and not washed since: they stay on the list
+    // until a wash is pressed for them (as the requests already do), instead of dropping off at 6 a.m.
+    function items() {
+      const earlier = weekDays().filter(d => d < date).flatMap(d => P.washItems(d, [], [], week).filter(w => w.kind === 'UNLOAD'));
+      return P.washItems(date, sheetWash, appWash, week).concat(earlier).filter(w => !washedNow[U.unitKey(w.trailer)]);
+    }
+    const got = { week: false, sheet: false, app: false };
+
+    function render() {
+      const list = items(), repeat = {}, ck = canSave();
+      list.forEach(w => { const k = U.unitKey(w.trailer); repeat[k] = (repeat[k] || 0) + 1; });
+      const repeats = Object.keys(repeat).filter(k => repeat[k] > 1);
+      // Washes this week: each wash pressed in the app, plus requests the sheet shows done this week that no press closed.
+      const days = weekDays(), presses = week.filter(d => String(d.type).toUpperCase() === 'WASHING' && days.indexOf(d.date) >= 0), closedByPress = {};
+      presses.forEach(d => ((d.payload || {}).closed || []).forEach(id => { closedByPress[id] = true; }));
+      const seen = {}, sheetDone = sheetWash.concat(appWash).filter(w => { const on = L.dateKey(w.completed_at); if (!on || days.indexOf(on) < 0 || U.washOpen(w.status) || closedByPress[w.record_id] || seen[w.record_id]) return false; seen[w.record_id] = true; return true; });
+      const thisWeek = presses.length + sheetDone.length;
+      document.getElementById('work-date').value = date;
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + (date === today() ? '' : '  ·  ' + shortDate(date));
+      document.getElementById('hstats').innerHTML = [['To Wash', list.length, list.length ? 'wash' : ''], ['Repeat Trailers', repeats.length, repeats.length ? 'warn' : '']]
+        .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('add-open').hidden = !ck;
+      document.getElementById('rows').innerHTML = list.map(w => '<tr><td class="rr"><b>' + escapeHtml(w.trailer || 'Trailer') + '</b>' + (w.route || w.run ? '<span>' + escapeHtml([w.route, w.run].filter(Boolean).join(' · ')) + '</span>' : '') + '</td>' +
+        '<td>' + escapeHtml(P.shortStamp(w.reported) || '—') + '</td><td class="detail"><b>' + escapeHtml(w.need) + '</b></td><td>' + (repeat[U.unitKey(w.trailer)] || 1) + '</td><td><span class="chk na">Not verified</span></td>' +
+        '<td>' + (ck ? '<button type="button" class="wash" data-wash="' + escapeHtml(w.id) + '" title="Mark the trailer washed">Wash</button>' : '<span class="pill washp">Wash needed</span>') + '</td></tr>').join('') ||
+        (got.week && got.sheet && got.app ? '<tr><td colspan="6" class="empty">No trailers waiting to be washed.</td></tr>' : '<tr><td colspan="6" class="empty">Loading the wash list&hellip;</td></tr>');
+      document.getElementById('side').innerHTML = '<h2>Wash Analytics</h2><div class="line"><span>Open wash items</span><b>' + list.length + '</b></div><div class="line"><span>Washes this week</span><b>' + thisWeek + '</b></div>' +
+        '<div class="line"><span>Repeat-report trailers</span><b>' + repeats.length + '</b></div><hr><h3>HIGHEST REPEAT COUNTS</h3>' +
+        (Object.keys(repeat).sort((a, b) => repeat[b] - repeat[a]).slice(0, 5).map(k => '<p class="repeat"><b>' + escapeHtml(list.find(w => U.unitKey(w.trailer) === k).trailer || k) + '</b><span>' + repeat[k] + ' report' + (repeat[k] === 1 ? '' : 's') + '</span></p>').join('') || '<p class="repeat"><span>None</span></p>');
+      document.getElementById('foot').textContent = list.length + (list.length === 1 ? ' wash item. ' : ' wash items. ') + (ck ? 'Wash marks the trailer washed and clears every report for it.' : 'View only.') + ' Requests come from the drivers\' check-ins, the email reports and unloading.';
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+    }
+
+    // One press washes a trailer: every open item for it closes.
+    async function washTrailer(trailer) {
+      const unit = U.unitKey(trailer), mine = items().filter(w => U.unitKey(w.trailer) === unit);
+      washedNow[unit] = true;
+      render();
+      try {
+        await save('completeWash', { date, trailer: U.trailerText(trailer), close: mine.flatMap(w => w.refs) });
+        showError('');
+        setTimeout(() => { delete washedNow[unit]; render(); }, 1500);
+      } catch (e) {
+        delete washedNow[unit];
+        showError('Wash ' + trailer + ' not saved (' + (e.message || e) + '). Press Wash again.');
+        render();
+      }
+    }
+    document.getElementById('rows').addEventListener('click', e => {
+      const b = e.target.closest('[data-wash]');
+      if (!b) return;
+      const w = items().find(x => x.id === b.dataset.wash);
+      if (w) washTrailer(w.trailer);
+    });
+    const bar = document.getElementById('add-bar'), input = document.getElementById('add-trailer');
+    document.getElementById('add-open').onclick = () => { bar.hidden = !bar.hidden; if (!bar.hidden) { input.value = ''; input.focus(); } };
+    document.getElementById('add-close').onclick = () => { bar.hidden = true; };
+    bar.addEventListener('keydown', e => { if (e.key === 'Escape') bar.hidden = true; });
+    bar.addEventListener('submit', e => {
+      e.preventDefault();
+      const v = U.trailerText(input.value);
+      if (!v) { showError('Type the trailer number, then press Wash.'); input.focus(); return; }
+      bar.hidden = true;
+      washTrailer(v);
+    });
+
+    function setDate(d) {
+      if (!L.isDateKey(d) || d === date) return;
+      date = d;
+      history.replaceState(null, '', '?date=' + date);
+      watch();
+      render();
+    }
+    document.getElementById('prev').onclick = () => setDate(L.addDays(date, -1));
+    document.getElementById('next').onclick = () => setDate(L.addDays(date, 1));
+    document.getElementById('work-date').addEventListener('change', e => setDate(e.target.value));
+
+    let db = null;
+    function watch() {
+      while (unsubs.length) unsubs.pop()();
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', weekDays())), s => { week = s.docs.map(d => d.data()); got.week = true; render(); }, e => showError('Could not read the washes (' + e.message + '). Check the network and reload the page.')));
+    }
+
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      onSnapshot(collection(db, 'plantWash'), s => { sheetWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); got.sheet = true; render(); }, e => showError('Could not read the wash list (' + e.message + '). Check the network and reload the page.'));
+      onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); got.app = true; render(); }, e => showError('Could not read the wash requests (' + e.message + '). Check the network and reload the page.'));
+      watch();
+      let shown = today();
+      setInterval(() => { const t = today(); if (t !== shown) { if (date === shown) setDate(t); shown = t; } }, 60000);
+      render();
+    });
+  </script>
+</body>
+</html>

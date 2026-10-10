@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Loadout Center · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill issues-page plant-page loadout-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Loadout Center</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Operations</span><h1 id="title">Daily Case Loadout</h1></div>
+      <div class="field">
+        <label for="load-date">Loadout day</label>
+        <div class="stepper">
+          <button type="button" id="prev" aria-label="Previous day" title="Previous day">&#9664;</button>
+          <input id="load-date" type="date">
+          <button type="button" id="next" aria-label="Next day" title="Next day">&#9654;</button>
+        </div>
+      </div>
+      <div class="dayname" id="dayname"></div>
+      <div class="hstats" id="hstats"></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span id="copied">Saves stay in the new app's test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="areas" id="areas"></div>
+      <div class="strip" id="strip"></div>
+      <div class="sheet scroll-list">
+        <table class="loadout">
+          <colgroup id="cols"></colgroup>
+          <thead><tr id="head-row"></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <div class="modal-back" id="modal-back" hidden></div>
+  <section class="modal wide-modal" id="edit-modal" role="dialog" aria-labelledby="edit-title" hidden>
+    <h2 id="edit-title">Edit Load <small id="edit-sub"></small></h2>
+    <div class="modal-grid">
+      <label>Start Time<input id="edit-start" type="datetime-local"></label>
+      <label>End Time<input id="edit-end" type="datetime-local"></label>
+      <label>Temperature<input id="edit-temp" inputmode="decimal" maxlength="6"></label>
+      <label>Shift<select id="edit-shift"><option value=""></option><option>FIRST SHIFT</option><option>SECOND SHIFT</option><option>THIRD SHIFT</option></select></label>
+      <label class="wide">Notes<textarea id="edit-notes" maxlength="1200"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="left danger-line" id="edit-notrunning">Ended Up Not Running</button>
+      <button type="button" id="edit-pickup">Add Pickup</button>
+      <button type="button" data-close>Cancel</button>
+      <button type="button" class="primary" id="edit-save">Save Times &amp; Notes</button>
+    </div>
+  </section>
+
+  <section class="modal" id="pu-modal" role="dialog" aria-labelledby="pu-title" hidden>
+    <h2 id="pu-title">Pickups <small id="pu-sub"></small></h2>
+    <p class="modal-context">Product that did not load at loadout. The driver picks it up before leaving.</p>
+    <div class="pu-list" id="pu-list"></div>
+    <div class="modal-grid" id="pu-form">
+      <label class="wide">Product / Item<input id="pu-item" maxlength="200"></label>
+      <label>Quantity / Cases<input id="pu-qty" inputmode="numeric" maxlength="6"></label>
+      <label>Optional Note<input id="pu-note" maxlength="500"></label>
+    </div>
+    <div class="modal-actions"><button type="button" data-close>Close</button><button type="button" class="primary" id="pu-add">Add Pickup</button></div>
+  </section>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as P from './js/plant-core.js';
+
+    const L = window.UDLogic;
+    const params = new URLSearchParams(location.search);
+    let date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
+    let area = P.AREAS.indexOf(String(params.get('area') || '').toUpperCase()) >= 0 ? String(params.get('area')).toUpperCase() : 'CASE';
+    const today = () => L.operatingDay(new Date());
+    let runs = [], pickups = [], person = null, app = {};
+    const pending = {};           // row id -> fields shown before the server has them
+    const unsubs = [];
+
+    const canLoad = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
+
+    function rowsNow() {
+      return P.loadoutRows(runs, date).map(r => {
+        const p = pending[r.id];
+        if (!p) return r;
+        const x = Object.assign({}, r, p);
+        return x;
+      });
+    }
+
+    const COLS = {
+      normal: [['Route', 6], ['Run', 13], ['Driver / CVG', 14], ['Truck', 8], ['Trailer', 8], ['', 8], ['Depart', 7], ['Status', 9], ['', 7], ['Total Time', 7], ['P/U', 6], ['', 7]],
+      TANKER: [['Route', 7], ['Run', 15], ['Driver / CVG', 15], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
+    };
+
+    function render() {
+      const all = rowsNow(), byArea = {};
+      P.AREAS.forEach(a => { byArea[a] = all.filter(r => r.area === a); });
+      const rows = byArea[area], c = P.counts(rows), info = P.AREA[area];
+      document.getElementById('title').textContent = info.title;
+      document.title = info.title + ' · New Plant Operations';
+      document.getElementById('load-date').value = date;
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + (date === today() ? '' : '  ·  ' + shortDate(date));
+      document.getElementById('hstats').innerHTML = [['Runs', c.total, ''], ['Loaded', c.done, 'good'], ['Loading', c.loading, 'warn']]
+        .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('areas').innerHTML = P.AREAS.map(a => {
+        const ac = P.counts(byArea[a]), pct = ac.total ? Math.round(ac.done * 100 / ac.total) : 0;
+        return '<button type="button" class="area' + (a === area ? ' on' : '') + '" data-area="' + a + '" style="--area:' + P.AREA[a].color + '">' +
+          '<span class="ring" style="--p:' + pct + '"><b>' + ac.done + '/' + ac.total + '</b></span><span><strong>' + P.AREA[a].tile + '</strong><small>' + ac.done + ' loaded · ' + (ac.total - ac.done) + ' to load</small></span></button>';
+      }).join('');
+      drawTrailers(rows);
+      const pu = rows.flatMap(r => P.pickupsFor(r, pickups)), puOpen = pu.filter(P.pickupOpen).length;
+      const behind = rows.filter(r => P.isBehind(r, today())).length, pct = c.total ? Math.round(c.done * 100 / c.total) : 0;
+      document.getElementById('strip').innerHTML =
+        '<span><b>' + c.done + ' of ' + c.total + '</b> loaded <span class="bar"><i style="width:' + pct + '%"></i></span></span>' +
+        '<span class="' + (c.prior ? 'amber' : '') + '">Left over <b>' + c.prior + '</b></span>' +
+        '<span class="' + (c.loading ? 'amber' : '') + '">Loading <b>' + c.loading + '</b></span>' +
+        '<span>' + escapeHtml(info.label) + ' <b>' + c.quantity.toLocaleString() + '</b></span>' +
+        '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
+        '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
+      const cols = area === 'TANKER' ? COLS.TANKER : COLS.normal;
+      document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
+      document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
+      const edit = canLoad(), dis = edit ? '' : ' disabled';
+      let html = '', lastPrior = null;
+      rows.forEach(r => {
+        if (r.prior !== lastPrior) {
+          html += r.prior ? '<tr class="divider prior"><td colspan="' + cols.length + '">PRIOR DAY LOADS · ' + shortDate(r.loadDate) + ' — complete these to clear them</td></tr>'
+            : (lastPrior === true ? '<tr class="divider today"><td colspan="' + cols.length + '">TODAY · ' + shortDate(date) + '</td></tr>' : '');
+          lastPrior = r.prior;
+        }
+        const st = r.state, items = P.pickupsFor(r, pickups), open = items.filter(P.pickupOpen).length;
+        const puBtn = '<button type="button" class="pu ' + (open ? 'open' : items.length ? 'done' : '') + '" data-pu="' + r.id + '">' + (open ? 'P/U<i>' + open + '</i>' : items.length ? 'Completed' : 'P/U') + '</button>';
+        const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
+        const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : k === 'truck' ? ' list="lo-trucks" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
+        const mins = P.minutesTaken(r);
+        const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' : '';
+        const total = mins === null ? '' : '<span class="' + (st === 'LOADING' ? 'running' : '') + '">' + P.minutesText(mins) + '</span>';
+        const cls = st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '';
+        if (area === 'TANKER') {
+          html += '<tr class="' + cls + '" data-row="' + r.id + '"><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.driver) + '</td>' +
+            '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
+            '<td>' + status + '</td><td>' + escapeHtml(r.shift) + '</td><td>' + puBtn + '</td><td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
+        } else {
+          html += '<tr class="' + cls + '" data-row="' + r.id + '"><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.driver) + '</td>' +
+            '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
+            '<td>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
+            '<td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
+        }
+      });
+      // Keep the cursor where it is when a redraw lands while someone types.
+      const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.id ? [document.activeElement.dataset.id, document.activeElement.dataset.k, document.activeElement.value] : null;
+      document.getElementById('rows').innerHTML = html || '<tr><td colspan="' + cols.length + '" class="empty">No ' + P.AREA[area].tile.toLowerCase() + ' loads for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>';
+      if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
+      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' : 'View only.') + ' Changes from the sheets show here within about a minute.';
+      const s = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = s.live ? (s.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+    }
+
+    function rowById(id) { return rowsNow().find(r => r.id === id); }
+
+    // One save, shown at once; if the server refuses it the row goes back and the reason shows. What was shown is kept
+    // until the server answers (by then the database copy holds the saved value), and only if no later change replaced it.
+    let saveNo = 0;
+    async function saveLoad(row, fields, shown) {
+      const mine = ++saveNo;
+      const p = pending[row.id] = Object.assign({}, pending[row.id]);
+      Object.keys(shown).forEach(k => { p[k] = shown[k]; (p._by = p._by || {})[k] = mine; });
+      render();
+      try {
+        await save('savePlantLoad', { runDocId: row.runDocId, day: row.day, fields });
+        showError('');
+      } catch (e) {
+        showError(row.route + ' ' + row.run + ': ' + (e.message || e));
+      }
+      const now = pending[row.id];
+      if (now) {
+        Object.keys(shown).forEach(k => { if (now._by && now._by[k] === mine) { delete now[k]; delete now._by[k]; } });
+        if (!Object.keys(now).some(k => k !== '_by')) delete pending[row.id];
+      }
+      render();
+    }
+
+    // Status picker: Waiting / Loading / Done.
+    function openStatus(btn, row) {
+      closePop();
+      const pop = document.createElement('div');
+      pop.className = 'picker-pop';
+      pop.id = 'state-pop';
+      pop.innerHTML = '<button type="button" data-s="NOT_STARTED">Waiting</button><button type="button" class="loading" data-s="LOADING">&#9679; Loading</button><button type="button" class="done" data-s="COMPLETE">&#10003; Done</button>';
+      const b = btn.getBoundingClientRect();
+      pop.style.left = Math.min(b.left, window.innerWidth - 170) + 'px';
+      pop.style.top = Math.min(b.bottom + 4, window.innerHeight - 140) + 'px';
+      document.body.appendChild(pop);
+      pop.addEventListener('click', e => {
+        const s = e.target.closest('[data-s]');
+        if (!s) return;
+        closePop();
+        const now = new Date().toISOString();
+        const shown = s.dataset.s === 'COMPLETE' ? { state: 'DONE', completedAt: row.completedAt || now, startedAt: row.startedAt || now } :
+          s.dataset.s === 'LOADING' ? { state: 'LOADING', completedAt: '', startedAt: row.startedAt || now } : { state: 'WAITING', completedAt: '', startedAt: '' };
+        saveLoad(row, { status: s.dataset.s }, shown);
+      });
+    }
+    function closePop() { const p = document.getElementById('state-pop'); if (p) p.remove(); }
+
+    // Edit box: Start Time, End Time, Notes (plus temperature and shift, kept on the Live row).
+    let editing = null;
+    function openModal(id) { document.getElementById('modal-back').hidden = false; document.getElementById(id).hidden = false; }
+    function closeModals() { document.getElementById('modal-back').hidden = true; document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); editing = null; }
+    function openEdit(row) {
+      editing = row;
+      document.getElementById('edit-sub').textContent = row.route + ' · ' + row.run;
+      document.getElementById('edit-start').value = P.stampToLocal(row.startedAt);
+      document.getElementById('edit-end').value = P.stampToLocal(row.completedAt);
+      document.getElementById('edit-temp').value = qty(row.temperature);
+      document.getElementById('edit-shift').value = row.shift || '';
+      document.getElementById('edit-notes').value = row.notes || '';
+      ['edit-start', 'edit-end', 'edit-temp', 'edit-shift', 'edit-notes', 'edit-save', 'edit-notrunning', 'edit-pickup'].forEach(k => { document.getElementById(k).disabled = !canLoad(); });
+      openModal('edit-modal');
+    }
+    document.getElementById('edit-save').onclick = () => {
+      const row = editing;
+      if (!row) return;
+      const startedAt = P.localToStamp(document.getElementById('edit-start').value), completedAt = P.localToStamp(document.getElementById('edit-end').value);
+      if (startedAt && completedAt && completedAt < startedAt) { showError('End Time cannot be before Start Time.'); return; }
+      const fields = { startedAt, completedAt, notes: document.getElementById('edit-notes').value, temperature: document.getElementById('edit-temp').value, shift: document.getElementById('edit-shift').value };
+      closeModals();
+      saveLoad(row, fields, { startedAt, completedAt, notes: fields.notes, temperature: fields.temperature, shift: fields.shift, state: completedAt ? 'DONE' : startedAt ? 'LOADING' : 'WAITING' });
+    };
+    document.getElementById('edit-notrunning').onclick = () => {
+      const row = editing, btn = document.getElementById('edit-notrunning');
+      if (!row) return;
+      if (btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Press again: ' + row.route + ' did not run'; return; }
+      btn.dataset.armed = ''; btn.textContent = 'Ended Up Not Running';
+      closeModals();
+      const hide = Object.assign({}, row);
+      runs = runs.map(x => (x.id === row.runDocId ? Object.assign({}, x, { days: Object.assign({}, x.days, { [row.day]: Object.assign({}, x.days[row.day], { runs: false }) }) }) : x));
+      render();
+      save('savePlantLoad', { runDocId: hide.runDocId, day: hide.day, fields: { runs: false } }).catch(e => showError(hide.route + ': ' + (e.message || e)));
+    };
+    document.getElementById('edit-pickup').onclick = () => { const row = editing; closeModals(); if (row) openPickups(row); };
+
+    // Pickups: the list for this load, Pickup Complete on each open one, and Add Pickup.
+    let puRow = null;
+    function drawPickups() {
+      const row = puRow, items = P.pickupsFor(row, pickups), edit = canLoad();
+      document.getElementById('pu-sub').textContent = row.route + ' · ' + row.run;
+      document.getElementById('pu-list').innerHTML = items.map(p => '<div class="pu-item' + (P.pickupOpen(p) ? '' : ' done') + '"><span>' + escapeHtml(p.item) + ' · ' + escapeHtml(p.quantity) +
+        '<small>' + (p.notes ? escapeHtml(p.notes) + ' · ' : '') + (P.pickupOpen(p) ? 'Not loaded · driver picks up before leaving' : 'Completed ' + P.clock(p.completedAt)) + '</small></span>' +
+        (P.pickupOpen(p) && edit ? '<button type="button" data-done="' + escapeHtml(p.pickupId) + '">Pickup Complete</button>' : '') + '</div>').join('') || '<div class="hint">No pickups for this load.</div>';
+      document.getElementById('pu-form').hidden = !edit;
+      document.getElementById('pu-add').hidden = !edit;
+    }
+    function openPickups(row) { puRow = row; ['pu-item', 'pu-qty', 'pu-note'].forEach(k => { document.getElementById(k).value = ''; }); drawPickups(); openModal('pu-modal'); }
+    document.getElementById('pu-list').addEventListener('click', e => {
+      const b = e.target.closest('[data-done]');
+      if (!b) return;
+      const id = b.dataset.done;
+      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: new Date().toISOString() }) : p));
+      drawPickups(); render();
+      save('completePickup', { pickupId: id }).catch(err => showError('Pickup: ' + (err.message || err)));
+    });
+    document.getElementById('pu-add').onclick = () => {
+      const row = puRow, item = document.getElementById('pu-item').value.trim(), quantity = document.getElementById('pu-qty').value.trim(), notes = document.getElementById('pu-note').value.trim();
+      if (!item || !quantity) { showError('Enter the product and the quantity for the pickup.'); return; }
+      showError('');
+      const temp = { pickupId: 'new-' + Date.now(), runDocId: row.runDocId, day: row.day, runId: row.runId, date: row.loadDate, item, quantity, notes, status: 'PENDING' };
+      pickups = pickups.concat([temp]);
+      ['pu-item', 'pu-qty', 'pu-note'].forEach(k => { document.getElementById(k).value = ''; });
+      drawPickups(); render();
+      save('addPickup', { runDocId: row.runDocId, day: row.day, date: row.loadDate, item, quantity, notes }).catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
+    };
+
+    // Typing in the table: Enter or leaving the box saves; arrow keys and Enter move between rows.
+    const rowsEl = document.getElementById('rows');
+    rowsEl.addEventListener('change', e => {
+      const el = e.target.closest('input[data-k]');
+      if (!el) return;
+      const row = rowById(el.dataset.id);
+      if (!row) return;
+      const k = el.dataset.k, v = el.value.trim();
+      if (String(qty(row[k])) === v) return;
+      if (k === 'quantity' && v && !/^\d[\d,]*$/.test(v)) { showError('Type a whole number for ' + P.AREA[area].label + '.'); el.value = qty(row[k]); return; }
+      saveLoad(row, { [k]: v }, { [k]: k === 'quantity' ? (v ? Number(v.replace(/,/g, '')) : null) : v.toUpperCase() });
+    });
+    rowsEl.addEventListener('keydown', e => {
+      const el = e.target.closest('input[data-k]');
+      if (!el || ['Enter', 'ArrowDown', 'ArrowUp'].indexOf(e.key) < 0) return;
+      e.preventDefault();
+      const all = [...rowsEl.querySelectorAll('input[data-k="' + el.dataset.k + '"]')], i = all.indexOf(el);
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      const next = all[i + (e.key === 'ArrowUp' ? -1 : 1)];
+      if (next) { next.focus(); next.select(); }
+    });
+    rowsEl.addEventListener('click', e => {
+      const t = e.target.closest('button');
+      if (!t) return;
+      if (t.dataset.state) { const r = rowById(t.dataset.state); if (r && canLoad()) openStatus(t, r); return; }
+      if (t.dataset.clock) {
+        const r = rowById(t.dataset.clock), now = new Date().toISOString();
+        if (!r) return;
+        if (r.state === 'LOADING') saveLoad(r, { completedAt: now }, { completedAt: now, state: 'DONE' });
+        else saveLoad(r, { startedAt: now, completedAt: '' }, { startedAt: now, completedAt: '', state: 'LOADING' });
+        return;
+      }
+      if (t.dataset.pu) { const r = rowById(t.dataset.pu); if (r) openPickups(r); return; }
+      if (t.dataset.edit) { const r = rowById(t.dataset.edit); if (r) openEdit(r); }
+    });
+    document.addEventListener('click', e => { if (!e.target.closest('#state-pop, [data-state]')) closePop(); });
+    document.querySelectorAll('[data-close]').forEach(b => { b.onclick = closeModals; });
+    document.getElementById('modal-back').onclick = closeModals;
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePop(); closeModals(); } });
+    window.udBack = () => { if (document.getElementById('state-pop')) { closePop(); return true; } return false; };
+
+    document.getElementById('areas').addEventListener('click', e => {
+      const b = e.target.closest('[data-area]');
+      if (!b) return;
+      area = b.dataset.area;
+      history.replaceState(null, '', '?date=' + date + '&area=' + area);
+      render();
+    });
+    function setDate(d) {
+      if (!L.isDateKey(d) || d === date) return;
+      date = d;
+      history.replaceState(null, '', '?date=' + date + '&area=' + area);
+      watchRuns();
+      render();
+    }
+    document.getElementById('prev').onclick = () => setDate(L.addDays(date, -1));
+    document.getElementById('next').onclick = () => setDate(L.addDays(date, 1));
+    document.getElementById('load-date').addEventListener('change', e => setDate(e.target.value));
+
+    let db = null;
+    function watchRuns() {
+      while (unsubs.length) unsubs.pop()();
+      const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message)));
+      const days = [-1, 0, 1, 2].map(n => L.addDays(date, n));
+      unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', days)), s => { pickups = s.docs.map(d => d.data()); render(); if (puRow && !document.getElementById('pu-modal').hidden) drawPickups(); }, e => showError('Could not read the pickups: ' + e.message)));
+    }
+
+    // The truck and trailer boxes offer the fleet's units, as Daily Dispatch does (Joe 10/10): open ones first, then those on a
+    // route today, then those marked down. Any number can still be typed. The trailer list starts with TBA: the trailer is not
+    // known yet (saved as plain TBA, never T-TBA).
+    let units = { TRUCK: [], TRAILER: [] }, unitsShown = { TRUCK: '', TRAILER: '' };
+    const unitKey = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    function drawTrailers(rows) {
+      [['TRUCK', 'truck', 'lo-trucks'], ['TRAILER', 'trailer', 'lo-trailers']].forEach(([type, k, id]) => {
+        const busy = new Set(rows.filter(r => !r.prior && r[k]).map(r => unitKey(r[k])));
+        const word = (t) => t.down ? 'DOWN' : busy.has(unitKey(t.unit)) ? 'ON A ROUTE' : 'OPEN', rank = { OPEN: 0, 'ON A ROUTE': 1, DOWN: 2 };
+        const html = (type === 'TRAILER' ? '<option value="TBA" label="Trailer not known yet">Trailer not known yet</option>' : '') +
+          units[type].map(t => ({ unit: t.unit, word: word(t) })).sort((a, b) => rank[a.word] - rank[b.word] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }))
+            .map(t => '<option value="' + escapeHtml(t.unit) + '" label="' + t.word + '">' + t.word + '</option>').join('');
+        if (html !== unitsShown[type]) { document.getElementById(id).innerHTML = html; unitsShown[type] = html; }
+      });
+    }
+    // The list opens when the box is clicked, not only after typing.
+    document.addEventListener('click', e => {
+      const box = e.target.closest && e.target.closest('input[list^="lo-"]');
+      if (box && !box.disabled && box.showPicker) { try { box.showPicker(); } catch (err) { /* not allowed here */ } }
+    });
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
+        const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));
+        ['TRUCK', 'TRAILER'].forEach(t => { units[t] = all.filter(e => e.type === t).map(e => ({ unit: e.unit, down: !!e.status && String(e.status).toUpperCase() !== 'ACTIVE' })); });
+        render();
+      }, () => {});
+      watchRuns();
+      // The day rolls at 6 AM: the screen moves to the new day by itself when it was showing today.
+      let shown = today();
+      setInterval(() => { const t = today(); if (t !== shown) { if (date === shown) setDate(t); shown = t; } render(); }, 60000);
+      render();
+    });
+  </script>
+  <datalist id="lo-trailers"></datalist>
+  <datalist id="lo-trucks"></datalist>
+</body>
+</html>

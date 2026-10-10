@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Machine Products · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page quality-page products-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Machine Products</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Administration · Plant Setup</span><h1>Machine Products</h1></div>
+      <div class="hstats" id="hstats"></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+      <button type="button" id="add" data-top>Add Product</button>
+      <button type="button" id="reset" data-top>RedZone List</button>
+      <input type="search" id="find" placeholder="Find a product or SKU" aria-label="Find a product or SKU" data-top>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="qc-split">
+        <aside class="qc-lines" aria-label="Machines"><h2>Machines</h2><div id="lines"></div></aside>
+        <section class="qc-form pm-form">
+          <div class="qc-top"><h2 id="form-title">Products</h2><span class="qc-last" id="form-last"></span></div>
+          <table class="loadout pm-table">
+            <colgroup><col style="width:44%"><col style="width:16%"><col style="width:16%"><col style="width:14%"><col style="width:10%"></colgroup>
+            <thead><tr><th>Product</th><th>SKU</th><th>RedZone Type</th><th>Group</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </section>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { watchProducts, startingList } from './js/products.js';
+    import { savedText } from './js/autosave.js';
+
+    // Joe 10/10: the products each machine runs (RedZone, Uniontown) are the product drop-down on the Quality check. A manager or
+    // administrator changes a machine's list here; each box saves as it is left, and RedZone List (press twice) puts the
+    // machine back on the RedZone starting list.
+    const L = window.UDLogic, U = window.UDPlant;
+    const params = new URLSearchParams(location.search);
+    let setup = [], products = {}, changed = {}, person = null, app = {}, chosen = params.get('line') || '', find = '', note = '', armed = null, busy = Promise.resolve();
+    // A machine being changed here shows its list as typed until the database has caught up.
+    const mine = {};
+    const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+    const machines = () => U.qualityLines(setup, [], [], Date.now());
+    const listOf = (id) => mine[id] || products[id] || [];
+    function current() { const all = machines(); return all.find(l => l.operationId === chosen) || all[0] || null; }
+    const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
+
+    function render(force) {
+      const all = machines(), line = current(), ck = canSave();
+      if (line) chosen = line.operationId;
+      const total = all.reduce((n, l) => n + listOf(l.operationId).length, 0);
+      // Joe 10/10: the product name is what counts; some RedZone SKUs are wrong. A SKU given to more than one product is marked
+      // to check (GV and Jersey both on 280305, for one), and the name is still what Quality saves.
+      const bySku = {};
+      all.forEach(l => listOf(l.operationId).forEach(p => { const k = String(p.sku || '').trim(); if (k && p.name) (bySku[k] = bySku[k] || new Set()).add(p.name); }));
+      const shared = (p) => { const k = String(p.sku || '').trim(), set = k && bySku[k]; return set && set.size > 1 ? [...set].filter(n => n !== p.name) : null; };
+      const toCheck = Object.values(bySku).filter(x => x.size > 1).length;
+      document.getElementById('hstats').innerHTML = [['Machines', all.length, ''], ['Products', total, ''], ['SKUs to check', toCheck, toCheck ? 'warn' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('lines').innerHTML = all.map(l => '<button type="button" data-line="' + escapeHtml(l.operationId) + '" class="' + (line && l.operationId === line.operationId ? 'active' : '') + '"><span>' + escapeHtml(l.name) + '</span><b>' + listOf(l.operationId).length + '</b></button>').join('') ||
+        '<p class="empty">No machines are set up for this plant.</p>';
+      ['add', 'reset'].forEach(id => { document.getElementById(id).disabled = !ck || !line; });
+      document.getElementById('reset').textContent = armed === chosen ? 'Press again' : 'RedZone List';
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('foot').textContent = (ck ? 'Each box saves as you leave it. These are the choices in the Product drop-down on Quality Checks for this machine; Quality Checks also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
+      if (!line) { document.getElementById('rows').innerHTML = ''; return; }
+      const c = changed[line.operationId];
+      document.getElementById('form-title').textContent = line.name + ' Products';
+      document.getElementById('form-last').textContent = c ? 'Changed ' + when(c.updatedAt) + (c.updatedBy ? ' by ' + c.updatedBy : '') : 'RedZone list (10/10)';
+      // Not drawn again while someone types in the list.
+      if (force === 'keep' || (!force && document.getElementById('rows').contains(document.activeElement))) return;
+      const dis = ck ? '' : ' disabled', q = find.trim().toUpperCase();
+      const cell = (i, k, v, ph, also) => '<td' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><input data-i="' + i + '" data-k="' + k + '" aria-label="' + escapeHtml(ph + (k === 'name' ? '' : ' for ' + (listOf(line.operationId)[i] || {}).name)) + '" value="' + escapeHtml(v || '') + '" placeholder="' + ph + '" maxlength="120"' + dis + '>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
+      const rows = listOf(line.operationId).map((p, i) => [p, i]).filter(([p]) => !q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0);
+      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr>' + cell(i, 'name', p.name, 'Product name') + cell(i, 'sku', p.sku, 'SKU', shared(p)) + cell(i, 'mfgType', p.mfgType, 'Type') + cell(i, 'productGroup', p.productGroup, 'Group') +
+        '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + i + '">' + (armed === line.operationId + '|' + i ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
+        '<tr><td colspan="5" class="empty">' + (q ? 'No product matches ' + escapeHtml(find) + '.' : 'No products for this machine. Add Product puts one in.') + '</td></tr>';
+    }
+
+    // The machine's whole list is saved each time; saves go one at a time.
+    function send(line, list, what) {
+      mine[line.operationId] = list;
+      note = 'Saving…';
+      // A box just left is saved without drawing the list again, so the next box being typed in stays as it is.
+      render(what ? true : 'keep');
+      const run = busy.then(() => save('saveMachineProducts', { operationId: line.operationId, products: list.filter(p => String(p.name || '').trim()) }));
+      busy = run.catch(() => {});
+      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.operationId]; }).then(() => render());
+    }
+    document.getElementById('rows').addEventListener('change', e => {
+      const box = e.target.closest('[data-k]'), line = current();
+      if (!box || !line || !canSave()) return;
+      const list = listOf(line.operationId).map(p => Object.assign({}, p));
+      if (!list[box.dataset.i]) return;
+      list[box.dataset.i][box.dataset.k] = box.value.trim();
+      send(line, list);
+    });
+    document.getElementById('rows').addEventListener('click', e => {
+      const b = e.target.closest('[data-remove]'), line = current();
+      if (!b || !line || !canSave()) return;
+      const key = line.operationId + '|' + b.dataset.remove;
+      if (armed !== key) { armed = key; render(true); setTimeout(() => { if (armed === key) { armed = null; render(true); } }, 7000); return; }
+      armed = null;
+      const list = listOf(line.operationId).slice(), gone = list.splice(Number(b.dataset.remove), 1)[0];
+      send(line, list, (gone && gone.name || 'Product') + ' removed');
+    });
+    document.getElementById('add').addEventListener('click', () => {
+      const line = current();
+      if (!line || !canSave()) return;
+      find = ''; document.getElementById('find').value = '';
+      mine[line.operationId] = [{ name: '', sku: '', mfgType: '', productGroup: '' }].concat(listOf(line.operationId));
+      render(true);
+      const first = document.querySelector('#rows input[data-k="name"]');
+      if (first) first.focus();
+    });
+    document.getElementById('reset').addEventListener('click', async () => {
+      const line = current();
+      if (!line || !canSave()) return;
+      if (armed !== chosen) { armed = chosen; render(true); setTimeout(() => { if (armed === chosen) { armed = null; render(true); } }, 7000); return; }
+      armed = null;
+      const base = (await startingList()).lines.find(l => l.operationId === line.operationId);
+      // Never save an empty list because the RedZone file did not load.
+      if (!base) { showError('Could not load the RedZone list for ' + line.name + '; nothing was changed. Reload the page and try again.'); render(true); return; }
+      send(line, base.products.map(p => Object.assign({}, p)), 'Back on the RedZone list');
+    });
+    document.getElementById('find').addEventListener('input', e => { find = e.target.value; render(true); });
+    document.getElementById('lines').addEventListener('click', e => {
+      const b = e.target.closest('[data-line]');
+      if (!b) return;
+      chosen = b.dataset.line; armed = null; note = '';
+      history.replaceState(null, '', '?line=' + encodeURIComponent(chosen));
+      render(true);
+    });
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(true); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(true); });
+      onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(true); }, fail('the machines'));
+      watchProducts(db, (p, c) => {
+        products = p; changed = c;
+        // A saved list has caught up with what was typed here.
+        // A new line still without its product name stays on screen as typed (it is not saved until it has one).
+        Object.keys(mine).forEach(id => { if (mine[id].some(x => !String(x.name || '').trim())) return; if (c[id] && JSON.stringify(c[id].products) === JSON.stringify(mine[id].filter(x => String(x.name || '').trim()))) delete mine[id]; });
+        render();
+      }, fail('the machine products'));
+    });
+  </script>
+</body>

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Administration · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill admin-center-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Administration</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <!-- Joe 10/10: like the current app's Administration tab, only better: a menu of every item on the left, and the item
+         opens on the right (its table, settings or screen) without leaving the page. Nothing from the old tab is left out. -->
+    <div class="adm-shell" id="shell">
+      <aside class="adm-nav" aria-label="Administration items">
+        <div class="adm-nav-head"><h1>Administration</h1><input type="search" id="find" placeholder="Find a setting" aria-label="Find a setting"></div>
+        <div class="adm-nav-list" id="nav"></div>
+      </aside>
+      <section class="adm-panel" id="panel" aria-live="polite"></section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireSignIn, start, escapeHtml, ICON, callServer } from './js/app.js';
+    import { ADMIN_GROUPS, adminItem } from './js/admin-items.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    const L = window.UDLogic;
+    const testEmail = new URLSearchParams(location.search).get('testEmail');
+    // Screens built here (not a separate page): they read through the server, Administrators only.
+    const PANELS = { people: renderPeople };
+    let admin = null, find = '', current = ADMIN_GROUPS[0][2][0][0];
+    const icon = (k) => /\.webp$/.test(k) ? '<img src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.gear) + '</svg>';
+    const withTest = (href) => testEmail ? href + (href.indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + encodeURIComponent(testEmail) : href;
+    const state = (it) => it.page ? 'ready' : PANELS[it.key] ? 'viewonly' : 'soon';
+    const PILL = { ready: '', viewonly: 'View only', soon: 'Being built' };
+
+    function renderNav() {
+      const q = find.trim().toLowerCase();
+      document.getElementById('nav').innerHTML = ADMIN_GROUPS.map(([group, , items]) => {
+        const shown = items.map(i => adminItem(i[0])).filter(it => !q || (it.title + ' ' + it.what + ' ' + group).toLowerCase().indexOf(q) >= 0);
+        if (!shown.length) return '';
+        return '<div class="adm-nav-group"><h2>' + escapeHtml(group) + '</h2>' + shown.map(it => {
+          const st = state(it);
+          return '<button type="button" class="adm-item ' + st + (it.key === current ? ' on' : '') + '" data-key="' + it.key + '"' + (it.key === current ? ' aria-current="true"' : '') + '>' +
+            '<span class="adm-ic">' + icon(it.icon) + '</span><span class="adm-name">' + escapeHtml(it.title) + '</span>' + (PILL[st] ? '<em>' + PILL[st] + '</em>' : '') + '</button>';
+        }).join('') + '</div>';
+      }).join('') || '<p class="adm-none">Nothing matches. Try another word.</p>';
+    }
+
+    function renderPanel() {
+      const panel = document.getElementById('panel'), it = adminItem(current), st = state(it);
+      const head = '<header class="adm-panel-head"><span class="adm-ic big">' + icon(it.icon) + '</span><div><h2>' + escapeHtml(it.title) + '</h2><small>' + escapeHtml(it.group) + ' &middot; ' + escapeHtml(it.what) + '</small></div>' +
+        '<div class="adm-actions">' + (st === 'ready' ? '<a class="button" id="full" href="' + withTest(it.page) + '">Open full screen</a>' : '<span class="adm-state ' + st + '">' + PILL[st] + '</span>') + '</div></header>';
+      if (st === 'ready') {
+        panel.innerHTML = head + '<iframe class="adm-frame" id="frame" title="' + escapeHtml(it.title) + '" src="' + withTest(it.page) + '"></iframe>';
+      } else if (st === 'viewonly') {
+        panel.innerHTML = head + '<div class="adm-view" id="view"><p class="adm-loading">Loading&hellip;</p></div>';
+        PANELS[it.key](document.getElementById('view'));
+      } else {
+        panel.innerHTML = head + '<div class="adm-view"><div class="adm-soon"><h3>Being built in the new app</h3><p>' + escapeHtml(it.what) + '</p>' +
+          '<p class="muted">In the current app this is under Administration &rsaquo; ' + escapeHtml(it.group) + '. It opens right here as soon as it is ready; nothing in the new app opens the old program.</p></div></div>';
+      }
+    }
+
+    // People & Roles: everyone on the Users list with their role and the plants they see (changes still go in the Users sheet).
+    async function renderPeople(box) {
+      try {
+        const { people } = await callServer('people', {});
+        if (!box.isConnected) return;
+        const plantNames = (p) => { const ids = L.plantsFor(Object.assign({}, p, { status: 'ACTIVE' })); return ids.length === L.PLANTS.length ? 'All plants' : ids.map(id => (L.PLANTS.find(x => x.id === id) || {}).name || id).join(', '); };
+        const role = (r) => (r || []).map(x => String(x).charAt(0) + String(x).slice(1).toLowerCase().replace(/_/g, ' ')).join(', ') || 'None';
+        const rows = people.slice().sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
+        const n = (f) => rows.filter(f).length;
+        box.innerHTML = '<div class="kpis adm-kpis"><div><b>' + rows.length + '</b><span>People</span></div><div><b>' + n(p => p.status === 'ACTIVE') + '</b><span>Active</span></div>' +
+          '<div><b>' + n(p => L.isAdmin(p)) + '</b><span>Administrators</span></div><div><b>' + n(p => plantNames(p) === 'All plants') + '</b><span>See all plants</span></div></div>' +
+          '<div class="scroll-list"><table class="issues adm-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Plants</th><th>Status</th></tr></thead><tbody id="people">' +
+          rows.map(p => '<tr data-email="' + escapeHtml(p.email) + '"><td class="strong">' + escapeHtml(p.name || p.email) + '</td><td>' + escapeHtml(p.email) + '</td><td>' + escapeHtml(role(p.roles)) + '</td><td>' + escapeHtml(plantNames(p)) + '</td>' +
+            '<td><span class="pill ' + (p.status === 'ACTIVE' ? 'good' : 'muted') + '">' + escapeHtml(p.status === 'ACTIVE' ? 'Active' : p.status || 'Unknown') + '</span></td></tr>').join('') +
+          '</tbody></table></div><p class="muted adm-note">Changing a role or plants is still done in the Users sheet; editing here is being built.</p>';
+      } catch (e) {
+        if (box.isConnected) box.innerHTML = '<div class="notice error">Could not read the Users list: ' + escapeHtml(e.message) + '</div>';
+      }
+    }
+
+    function render() {
+      const shell = document.getElementById('shell');
+      if (admin === null) { shell.hidden = true; return; }
+      if (!admin) {
+        shell.hidden = false;
+        shell.innerHTML = '<section class="soon-card"><h2>Administrators only</h2><p>Administration is for Administrators. Ask an administrator if you need something changed.</p></section>';
+        return;
+      }
+      shell.hidden = false;
+      renderNav();
+      renderPanel();
+    }
+    document.getElementById('nav').addEventListener('click', e => {
+      const b = e.target.closest('[data-key]');
+      if (!b || b.dataset.key === current) return;
+      current = b.dataset.key;
+      renderNav();
+      renderPanel();
+    });
+    document.getElementById('find').addEventListener('input', e => { find = e.target.value; renderNav(); });
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        const was = admin;
+        admin = L.isAdmin(s.exists() ? s.data() : null);
+        if (was !== admin) render();
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1324 @@
+/* United Dairy Distribution app: one look for every screen, matched to the current app's Daily Dispatch. */
+:root {
+  --ud-blue: #0b4f8a;
+  --ud-blue-dark: #083d6b;
+  --ud-gold: #f2b705;
+  --ink: #12263a;
+  --muted: #5a6b7d;
+  --line: #c9d6e3;
+  --band: #e8f0f8;
+  --page: #f3f6f9;
+  --card: #ffffff;
+  --runs-bg: #e7f6ec;
+  --runs-ink: #1d7a3e;
+  --missing: #fff1dc;
+  --missing-edge: #e5891a;
+  --pickup: #c62828;
+  --test-bg: #fff4cc;
+  --test-ink: #7a5600;
+  --error-bg: #fde8e8;
+  --error-ink: #9b1c1c;
+  --row: 34px;
+  --font: 15px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--page); color: var(--ink); overflow: hidden;
+  font: 600 15px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+.topbar { min-height: 74px; background: linear-gradient(90deg, #074c84, #075b9c); border-bottom: 4px solid var(--ud-gold); display: flex; align-items: center; gap: 10px; padding: 6px 20px; }
+.brand { display: flex; align-items: center; gap: 14px; margin-right: auto; color: #fff; text-decoration: none; min-width: 0; }
+.brand img { width: 170px; height: 56px; object-fit: contain; background: #fff; border-radius: 7px; padding: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+.brand strong { display: block; font-size: 21px; line-height: 1.1; }
+.brand small { display: block; margin-top: 4px; font-size: 11px; letter-spacing: .12em; font-weight: 600; }
+.topbar a, .topbar button { background: #fff; color: var(--ud-blue); border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+.topbar a.brand { background: none; border: 0; padding: 0; color: #fff; }
+.topbar .who { color: #fff; font-weight: 600; font-size: 13px; }
+.topbar a, .topbar button { border: 1px solid #b9c7d3; }
+.head { display: flex; align-items: flex-end; gap: 16px; padding: 10px 16px 8px; flex-wrap: wrap; }
+.title h1 { margin: 0; font-size: 26px; color: var(--ud-blue-dark); }
+.title small { color: var(--muted); font-weight: 600; font-size: 13px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 11px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; text-align: center; }
+.stepper { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; height: 40px; }
+.stepper button { border: 0; background: none; color: var(--ud-blue); font-size: 16px; padding: 0 10px; height: 100%; cursor: pointer; }
+.stepper input { border: 0; font: inherit; font-weight: 700; color: var(--ud-blue-dark); width: 150px; text-align: center; background: none; }
+.badge-test { margin-left: auto; background: var(--test-bg); color: var(--test-ink); border: 1px solid #e8cf73; border-radius: 8px; padding: 6px 12px; font-size: 13px; text-align: center; line-height: 1.3; }
+.badge-test b { display: block; font-size: 14px; }
+.notice.error { margin: 0 16px 8px; background: var(--error-bg); color: var(--error-ink); border-radius: 8px; padding: 8px 12px; }
+.notice:not(.error):not(.warning) { display: none; }
+.sheet { margin: 0 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--font); }
+thead th { background: var(--ud-blue); color: #fff; font-size: calc(var(--font) - 1px); text-transform: uppercase; height: calc(var(--row) + 8px); padding: 0 6px; text-align: center; }
+tbody td { height: var(--row); line-height: 1.1; border-bottom: 1px solid var(--line); border-right: 1px solid #e3eaf1; text-align: center; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+tbody tr:nth-child(even) td { background: #f8fbfd; }
+tr.group td { background: var(--band) !important; color: var(--ud-blue); font-weight: 700; height: calc(var(--row) - 4px); }
+td.runs span { display: inline-block; background: var(--runs-bg); color: var(--runs-ink); border: 1px solid #a8dcb8; border-radius: 6px; padding: 0 12px; font-size: calc(var(--font) - 2px); line-height: 1.3; }
+td.missing { background: var(--missing) !important; box-shadow: inset 3px 0 0 var(--missing-edge); }
+td.pickup { color: var(--pickup); }
+td.empty { color: var(--muted); font-weight: 500; }
+.footer { padding: 6px 16px; font-size: 12px; color: var(--muted); font-weight: 500; display: flex; gap: 16px; }
+.footer .spacer { flex: 1; }
+.footer button { font: inherit; font-weight: 700; color: var(--ud-blue); background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 1px 10px; cursor: pointer; }
+.footer b#phone-code { color: var(--ink); letter-spacing: 1px; }
+.signin { max-width: 460px; margin: 12vh auto; background: #fff; border-radius: 12px; padding: 28px; border: 1px solid var(--line); text-align: center; }
+.signin h1 { color: var(--ud-blue-dark); margin-top: 0; }
+.signin button, .signin a.btn { background: var(--ud-blue); color: #fff; border: 0; border-radius: 8px; padding: 12px 18px; font: inherit; font-weight: 700; cursor: pointer; display: inline-block; text-decoration: none; margin: 6px; }
+/* Weekly grid */
+.week td.day { font-size: calc(var(--font) - 2px); line-height: 1.15; padding: 0 4px; }
+.week td.day .unit { color: var(--muted); font-weight: 600; font-size: calc(var(--font) - 2px); margin-left: 6px; }
+.roomy .week td.day { white-space: normal; }
+.roomy .week td.day .unit { display: block; margin-left: 0; }
+.week td.off { background: #eef2f6 !important; color: #9aa8b6; font-weight: 500; }
+.week th.today { background: var(--ud-blue-dark); box-shadow: inset 0 -4px 0 var(--ud-gold); }
+.editable { cursor: pointer; }
+.editable:hover { outline: 2px solid var(--ud-gold); outline-offset: -2px; }
+td.grab { cursor: grab; }
+.picker { width: 100%; height: calc(var(--row) - 4px); font: inherit; border: 2px solid var(--ud-blue); border-radius: 6px; padding: 0 4px; }
+.popover { position: fixed; z-index: 10; background: #fff; border: 2px solid var(--ud-blue); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.2); display: grid; grid-template-columns: auto 220px; gap: 6px 10px; align-items: center; font-size: 14px; }
+.popover select { height: 32px; font: inherit; }
+.popover .close { grid-column: 1 / 3; justify-self: end; background: var(--ud-blue); color: #fff; border: 0; border-radius: 6px; padding: 6px 14px; font: inherit; cursor: pointer; }
+button.check { background: var(--ud-blue); color: #fff; border: 0; border-radius: 6px; padding: 0 12px; height: calc(var(--row) - 8px); font: inherit; font-size: calc(var(--font) - 2px); cursor: pointer; }
+/* Route Distribution home: six cards that always fill the window, two rows of three. */
+/* Route Distribution home: the approved 7.0.279 look (picture A) of the current app's Route Distribution screen. */
+.dtitle { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 16px 10px; max-width: 1720px; margin: 0 auto; }
+.dtitle-wrap { display: flex; align-items: center; gap: 15px; }
+.dtitle-icon { width: 58px; height: 58px; border-radius: 15px; background: #e8f3ff; display: grid; place-items: center; color: #0e416f; }
+.dtitle-icon svg, .dc-icon svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dtitle h1 { margin: 0; font-size: 30px; line-height: 1; color: #0e416f; }
+.dtitle-sub { margin-top: 7px; font-size: 12px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; color: #66809a; }
+.dlive { display: flex; background: #fff; border: 1px solid #d4e0ec; border-radius: 13px; overflow: hidden; box-shadow: 0 7px 22px rgba(16,56,92,.08); }
+.dlive span { padding: 11px 15px; border-right: 1px solid #dce5ee; font-weight: 700; color: #0e416f; white-space: nowrap; }
+.dlive span:last-child { border-right: 0; }
+.dlive #mode-text { color: #8a5a00; background: var(--test-bg); }
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 0 16px 14px; max-width: 1720px; width: 100%; margin: 0 auto; flex: 1; min-height: 0; }
+#screen.home-screen:not([hidden]) { display: flex; flex-direction: column; height: 100vh; }
+.home-screen .dtitle { width: 100%; }
+.card { background: var(--card); border: 1px solid #d7e3ee; border-top: 5px solid var(--accent, #1976d2); border-radius: 14px; box-shadow: 0 7px 18px rgba(13,52,87,.075); display: flex; flex-direction: column; text-decoration: none; color: inherit; min-height: 0; overflow: hidden; }
+.card:hover { box-shadow: 0 10px 24px rgba(13,52,87,.16); }
+.dc-head { display: flex; align-items: flex-start; gap: 13px; padding: 14px 14px 8px; }
+.dc-icon { flex: none; width: 48px; height: 48px; border-radius: 12px; background: #edf5fc; display: grid; place-items: center; color: #0e416f; }
+.dc-icon svg { width: 26px; height: 26px; }
+.dc-text { flex: 1; min-width: 0; }
+.dc-text small, .dc-text strong, .dc-text em { display: block; }
+.dc-text small { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.dc-text strong { font-size: clamp(18px, 2.5vh, 22px); margin: 3px 0 5px; color: #0a3866; }
+.dc-text em { font-style: normal; font-weight: 500; font-size: 12px; line-height: 1.35; color: #4f6d88; }
+.dc-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.dc-arrow { font-style: normal; font-size: 30px; line-height: .8; color: var(--accent); }
+.dc-metrics { flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: end; grid-auto-rows: minmax(70px, 112px); gap: 9px; padding: 4px 13px 13px; }
+.dc-metrics.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.dc-metric { display: flex; flex-direction: column; justify-content: center; text-align: center; background: #edf6ff; border-radius: 11px; padding: 6px 4px; min-width: 0; }
+.dc-metric em { font-style: normal; font-size: 13px; font-weight: 800; color: #2c4f72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-metric b { font-size: clamp(22px, 3.6vh, 40px); line-height: 1.1; margin: 3px 0 2px; color: #0a3866; }
+.dc-metric b.alert { color: var(--pickup); }
+.dc-metric small { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #4b6a87; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .owner { font-size: 11px; letter-spacing: 0; text-transform: none; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #eef2f6; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.card .owner.new { background: #e3f4e8; color: #1d6b35; border-color: #9fd3ae; }
+.card .owner.can { cursor: pointer; }
+.card .owner.can:hover { border-color: var(--ud-blue); }
+.card .owner.armed { background: var(--ud-gold); color: #3b2a00; border-color: var(--ud-gold); }
+/* Toggle buttons on the driver list and the check-in editor */
+button.toggle { border: 1px solid var(--line); border-radius: 999px; padding: 0 12px; height: calc(var(--row) - 8px); font: inherit; font-size: calc(var(--font) - 2px); cursor: pointer; background: #eef2f6; color: var(--muted); }
+button.toggle.on { background: var(--runs-bg); color: var(--runs-ink); border-color: #a8dcb8; }
+button.toggle:disabled { cursor: default; }
+.popover input, .popover textarea { font: inherit; height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; }
+.popover textarea { height: 54px; padding: 4px 6px; resize: none; }
+.popover .check-row { display: flex; align-items: center; gap: 6px; }
+td.ok { color: var(--runs-ink); }
+td.issue { color: var(--pickup); }
+.counts { display: flex; gap: 10px; margin-left: auto; }
+.counts div { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 4px 14px; text-align: center; font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.counts b { display: block; font-size: 20px; color: var(--ud-blue); }
+/* Two-part screens (Driver Roster): the list on the left, totals and the edit panel on the right. */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; padding: 0 16px; }
+.split .sheet { margin: 0; }
+.split .footer { padding: 6px 0; }
+.split-main { min-width: 0; }
+.split-side { display: flex; flex-direction: column; gap: 10px; height: calc(100vh - 158px); min-height: 0; }
+.filters { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.filters input, .filters select { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; background: #fff; color: var(--ink); }
+.filters input { flex: 1; min-width: 140px; }
+.filters .sort { color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
+@media (max-width: 1500px) { .filters .sort { display: none; } .split { grid-template-columns: minmax(0, 1fr) 330px; } }
+button.danger { height: 38px; padding: 0 16px; border: 1px solid #f1b4ae; border-radius: 8px; background: #fff; color: #b42318; font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+button.primary { min-height: 42px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--ud-blue); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+.summary { display: flex; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+.summary div { flex: 1; text-align: center; border-radius: 8px; padding: 6px 2px; font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.summary b { display: block; font-size: 26px; line-height: 1.1; }
+.summary .m-active { background: #16a34a14; } .summary .m-active b { color: #16a34a; }
+.summary .m-relief { background: #d9770614; } .summary .m-relief b { color: #d97706; }
+.summary .m-inactive { background: #64748b14; } .summary .m-inactive b { color: #64748b; }
+.panel { flex: 1; min-height: 0; background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+.panel-empty { margin: auto; text-align: center; color: var(--muted); font-weight: 500; line-height: 1.5; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; }
+.panel-head h2 { margin: 0; font-size: 20px; color: var(--ud-blue-dark); }
+.panel-head span { color: var(--muted); }
+.panel label { display: grid; gap: 3px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.panel input[type=text], .panel input[type=date], .panel select, .panel textarea { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; color: var(--ink); }
+.panel textarea { height: 60px; padding: 6px 8px; resize: none; }
+.panel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.panel-facts { display: flex; justify-content: space-between; }
+label.panel-check { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 14px; color: var(--ink); letter-spacing: 0; }
+.panel-state { display: flex; justify-content: space-between; align-items: center; background: var(--band); border-radius: 8px; padding: 6px 10px; }
+.panel-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: auto; }
+.panel-actions button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.panel-actions button.primary { background: var(--ud-blue); color: #fff; border: 0; }
+td.name { font-weight: 800; }
+td small { color: var(--muted); font-weight: 500; }
+.chip { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 9px; background: #fdecc4; color: #8a5a00; font-size: 11px; font-weight: 800; vertical-align: middle; }
+tr.off td { background: #fff8e6 !important; color: #7a8797; }
+tr.editing td { background: #e4efff !important; }
+span.status { display: inline-block; padding: 0 10px; border-radius: 12px; background: #dcf3e4; color: #11703a; font-size: calc(var(--font) - 2px); }
+span.status.off { background: #fdecc4; color: #8a5a00; }
+button.switch { width: 42px; height: 22px; border: 0; border-radius: 12px; background: #cfd8e2; position: relative; cursor: pointer; vertical-align: middle; }
+button.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0003; }
+button.switch.on { background: #16a34a; } button.switch.on::after { left: 23px; }
+button.edit { height: calc(var(--row) - 8px); max-height: 28px; padding: 0 10px; border: 1px solid #9fc0e0; border-radius: 6px; background: #fff; color: var(--ud-blue); font: inherit; font-size: calc(var(--font) - 2px); cursor: pointer; }
+input.truck { width: 100%; height: calc(var(--row) - 8px); max-height: 32px; border: 1px solid #bcd0e3; border-radius: 6px; padding: 0 6px; font: inherit; text-align: center; color: var(--ink); }
+
+/* Daily Dispatch: action bar, edit box and panels (the same buttons and boxes as the current screen). */
+.stepper select { border: 0; font: inherit; font-weight: 700; color: var(--ud-blue-dark); background: none; height: 100%; text-align: center; min-width: 150px; }
+.actions { display: flex; align-items: center; gap: 10px; padding: 0 16px 8px; flex-wrap: wrap; }
+.actions button { min-height: 38px; padding: 0 16px; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
+button.warn { background: #fff4e5; color: #9a4b00; border: 1px solid #f0b46a; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; min-height: 38px; padding: 0 16px; }
+.coverage { display: inline-flex; align-items: baseline; gap: 6px; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px 14px; }
+.coverage b { font-size: 20px; color: var(--runs-ink); }
+.coverage span { font-size: 11px; letter-spacing: .06em; color: var(--muted); }
+table.daily td.strong { font-weight: 700; }
+table.daily button.toggle { font-size: calc(var(--font) - 3px); }
+td.left { text-align: left; padding-left: 8px; }
+input.ovr { width: 15px; height: min(15px, calc(var(--row) - 6px)); margin: 0; vertical-align: middle; cursor: pointer; }
+table.daily button.toggle, table.daily button.edit { line-height: 1; padding-top: 0; padding-bottom: 0; }
+.modal-back { position: fixed; inset: 0; background: #0b1f3366; z-index: 20; }
+.modal { position: fixed; z-index: 21; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; background: #fff; border-radius: 12px; border-top: 6px solid var(--ud-blue); padding: 16px 18px; box-shadow: 0 18px 50px #0004; }
+.modal.wide-modal { width: min(760px, calc(100vw - 32px)); }
+.modal h2 { margin: 0 0 12px; color: var(--ud-blue-dark); font-size: 20px; }
+.modal h2 small { color: var(--muted); font-size: 14px; font-weight: 600; margin-left: 8px; }
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.modal-grid .wide, .modal-grid .move-act { grid-column: 1 / 3; }
+.modal label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.modal label.check { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 13px; letter-spacing: 0; }
+.modal input:not([type=checkbox]), .modal select, .modal textarea { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px; color: var(--ink); background: #fff; }
+.modal input:disabled, .modal select:disabled, .modal textarea:disabled { background: #eef2f6; color: #7a8797; }
+.modal textarea { height: 64px; padding: 6px 8px; resize: none; }
+.move-act { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.modal-actions button, .down-add button, .down-list button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.modal-actions button.primary { background: var(--ud-blue); color: #fff; border: 0; }
+.down-add { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: end; }
+.down-add button.warn { background: #fff4e5; color: #9a4b00; border-color: #f0b46a; }
+.down-list { margin-top: 12px; max-height: calc(100vh - 300px); overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.down-list table { font-size: 14px; }
+.down-list td { height: 36px; }
+.down-list button { min-height: 28px; padding: 0 10px; font-size: 13px; }
+.tag { display: inline-block; padding: 0 8px; border-radius: 9px; background: var(--band); color: var(--ud-blue); font-size: 12px; font-weight: 700; }
+#print { display: none; }
+@media print {
+  body > *:not(#print) { display: none !important; }
+  #print { display: block; color: #000; font: 11px Arial, sans-serif; }
+  #print h2 { margin: 0 0 4px; font-size: 16px; }
+  #print table { table-layout: auto; font-size: 11px; }
+  #print th, #print td { border: 1px solid #000; padding: 3px 4px; height: auto; color: #000; background: #fff !important; }
+  #print .pgroup td { font-weight: 700; background: #eee !important; }
+  @page { size: landscape; margin: 10mm; }
+}
+
+/* Weekly Dispatch: legend colours (the same meanings as the current Weekly), tabs, Override and the driver board. */
+:root { --c-assigned: #e3f4e8; --c-relief: #e6efff; --c-needs: #fff1dc; --c-vacation: #fde2e7; --c-plant: #efe5ff; --c-conflict: #ffe0dc; --c-off: #eef2f6; }
+.legend { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); font-weight: 600; margin-left: auto; white-space: nowrap; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 14px; height: 14px; border-radius: 4px; border: 1px solid #0002; display: inline-block; }
+.legend i.assigned { background: var(--c-assigned); } .legend i.relief { background: var(--c-relief); } .legend i.needs { background: var(--c-needs); }
+.legend i.vacation-needs { background: var(--c-vacation); } .legend i.plant { background: var(--c-plant); } .legend i.conflict { background: var(--c-conflict); } .legend i.off { background: var(--c-off); }
+button.override { min-height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+button.override.on { background: #fff4e5; color: #9a4b00; border-color: #f0b46a; }
+.actions .spacer { flex: 1; }
+.actions > button:not(.primary):not(.warn):not(.publish) { background: #fff; color: var(--ud-blue); border: 1px solid var(--line); }
+.actions button.publish { background: #277b43; color: #fff; border: 0; }
+.actions button.armed { background: #b45309; color: #fff; border-color: #b45309; }
+:not(.in-head) > #reset { min-width: 112px; }
+.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+.tabs button { border: 0; border-radius: 0; background: #fff; color: var(--muted); min-height: 40px; padding: 0 16px; font: inherit; font-weight: 700; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--ud-blue); color: #fff; }
+.week td.c-assigned { background: var(--c-assigned) !important; }
+.week td.c-relief { background: var(--c-relief) !important; }
+.week td.c-needs { background: var(--c-needs) !important; color: #9a4b00; font-weight: 700; box-shadow: inset 3px 0 0 var(--missing-edge); }
+.week td.c-plant { background: var(--c-plant) !important; color: #5b21b6; font-weight: 700; box-shadow: inset 3px 0 0 #7c3aed; }
+.week td.plant-load { outline: 2px dashed #7c3aed; outline-offset: -3px; }
+.week td.c-vacation-needs { background: var(--c-vacation) !important; color: #9b1c3a; font-weight: 700; }
+.week td.c-conflict, .week td.c-booked { background: var(--c-conflict) !important; color: #9b1c1c; }
+.week td.c-carrier, .week td.c-open { background: #f4f6f8 !important; color: var(--ud-blue); font-weight: 700; }
+.week td.c-coverage { background: #f4f6f8 !important; color: var(--muted); }
+.board td.b-assigned { background: var(--c-assigned) !important; }
+.board td.b-booked, .board td.b-conflict { background: var(--c-conflict) !important; }
+.board td.b-vacation { background: var(--c-vacation) !important; }
+.board td.b-unavailable { background: var(--c-needs) !important; }
+.board button.avail { width: 100%; height: calc(var(--row) - 4px); border: 0; background: none; font: inherit; font-size: calc(var(--font) - 2px); color: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board button.avail:hover { outline: 2px solid var(--ud-gold); outline-offset: -2px; }
+.modal-context { margin: -6px 0 12px; color: var(--muted); font-weight: 600; }
+#days-rows button.toggle { height: 28px; }
+@media (max-width: 1500px) { .actions { gap: 6px; } .actions button, .tabs button { font-size: 13px; padding: 0 10px; min-height: 34px; } .legend { gap: 8px; font-size: 11px; } }
+
+/* Vacation Schedule: the page is one window high; a long list scrolls inside its box, never the page. */
+body.fill #screen:not([hidden]) { display: flex; flex-direction: column; height: 100vh; }
+body.fill .view:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: 12px; }
+body.fill .scroll-list { flex: 1; min-height: 0; overflow: auto; }
+body.fill .scroll-list thead th { position: sticky; top: 0; z-index: 1; }
+.head .tabs { align-self: center; }
+.chips { display: inline-flex; gap: 6px; }
+.chips button { background: #fff; color: var(--ud-blue); border: 1px solid var(--line); }
+.chips button.on { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.chips button b { margin-left: 8px; display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: #0b4f8a1a; font-size: 12px; }
+.chips button.on b { background: #ffffff33; }
+.hint { color: var(--muted); font-size: 13px; font-weight: 600; }
+.vac-form { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr 1.3fr 1.6fr auto; gap: 8px; align-items: end; margin: 0 16px 10px; background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 10px; padding: 10px 12px; }
+.vac-form label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.vac-form input, .vac-form select { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px; color: var(--ink); background: #fff; min-width: 0; }
+.form-buttons { display: flex; gap: 6px; }
+.form-buttons button, .actions > button#cal-prev, .actions > button#cal-next { min-height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.form-buttons button.primary { background: var(--ud-blue); color: #fff; border: 0; }
+.type { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 9px; font-size: 11px; font-weight: 700; vertical-align: middle; }
+.t-vacation { background: #dcecff; color: #0b4f8a; } .t-personal { background: #efe5ff; color: #5b3a9b; } .t-sick { background: #ffe5d6; color: #9a4b00; }
+.t-bereavement { background: #e6e9ee; color: #3b4652; } .t-unpaid { background: #fdecc4; color: #7a5600; }
+.vstatus { display: inline-block; padding: 0 10px; border-radius: 12px; font-size: 12px; font-weight: 700; background: #e6e9ee; color: #3b4652; }
+.vstatus.s-approved { background: #dcf3e4; color: #11703a; } .vstatus.s-pending { background: #fdecc4; color: #8a5a00; } .vstatus.s-denied, .vstatus.s-cancelled { background: #fde8e8; color: #9b1c1c; }
+.cal-title { margin: 0; min-width: 190px; text-align: center; color: var(--ud-blue-dark); font-size: 22px; }
+#cal-month, #print-who { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; background: #fff; }
+.cal-key { display: inline-flex; gap: 10px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.cal-key span { display: inline-flex; align-items: center; gap: 4px; }
+.cal-key i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+.calendar { flex: 1; min-height: 0; margin: 0 16px; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 28px repeat(var(--weeks, 5), minmax(0, 1fr)); gap: 4px; }
+.calendar .dow { background: var(--ud-blue); color: #fff; font-weight: 700; font-size: 12px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+.calendar .cday { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; cursor: pointer; min-height: 0; }
+.calendar .cday:hover { outline: 2px solid var(--ud-gold); outline-offset: -2px; }
+.calendar .cday.today { border: 2px solid var(--ud-blue); }
+.calendar .cday.full { background: #fff6f5; }
+.calendar .cday b { color: var(--ud-blue-dark); font-size: 13px; }
+.calendar .cday span { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calendar .cday span.more { background: none; color: var(--muted); }
+.day-body { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; }
+.day-body h3 { margin: 0 0 8px; color: var(--ud-blue-dark); font-size: 15px; }
+.day-list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; }
+.day-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.day-row.pending { border-style: dashed; }
+.day-row small { display: block; color: var(--muted); font-weight: 500; }
+.modal.wide-modal#day-modal { width: min(860px, calc(100vw - 32px)); }
+.vac-form[hidden], form[hidden] { display: none; }
+
+/* Route Editor */
+.selectors { display: flex; gap: 10px; }
+.selectors label { display: grid; gap: 3px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.selectors select, #active-filter, #seq-day { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px; background: #fff; color: var(--ink); min-width: 150px; }
+.seq-day { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+table.routes td small { display: block; color: var(--muted); font-weight: 500; font-size: calc(var(--font) - 3px); }
+table.routes td.norun { background: #eef2f6 !important; }
+table.routes input.cell { width: 100%; height: calc(var(--row) - 6px); max-height: 34px; border: 1px solid transparent; border-radius: 6px; background: transparent; font: inherit; text-align: center; color: var(--ink); }
+table.routes input.cell:focus { border-color: var(--ud-blue); background: #fff; outline: none; }
+table.routes input.cell:not([readonly]):hover { border-color: #bcd0e3; }
+table.routes input.cell.picked { background: #e8f0fb; border-color: #9fbbe0; }
+table.routes button.toggle { font-size: calc(var(--font) - 3px); }
+table.routes td.details-cell { height: auto; padding: 16px; white-space: normal; text-align: left; }
+table.routes td.pick-one { height: 120px; }
+form.details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; }
+form.details .wide { grid-column: 1 / 4; }
+form.details label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+form.details input, form.details select { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px; color: var(--ink); background: #fff; }
+form.details input[readonly] { background: #eef2f6; color: #6b7a89; }
+
+/* Equipment */
+#search { height: 38px; min-width: 280px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; background: #fff; }
+.down-box { display: inline-flex; gap: 4px; align-items: center; }
+.down-box input { width: 160px; height: 30px; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font: inherit; font-size: 13px; }
+table td button.warn, table td button[data-up], table td button[data-down-cancel] { min-height: 30px; padding: 0 10px; border-radius: 6px; font-size: 13px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font-weight: 700; cursor: pointer; }
+table td button.warn { background: #fff4e5; color: #9a4b00; border-color: #f0b46a; }
+
+/* ---------- Drivers' phone Check-In (route.html) ---------- */
+body.phone { min-height: 100dvh; background: var(--bg, #f2f5f9); }
+.phone-top { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--ud-blue); color: #fff; border-bottom: 3px solid #f2b705; }
+.phone-top span { flex: 1; text-align: right; font-weight: 700; }
+.phone-top button { background: #fff; color: var(--ud-blue); border: 0; border-radius: 8px; padding: 6px 12px; font: inherit; font-weight: 700; }
+body.phone .notice { margin: 12px 16px 0; }
+.phone-card { margin: 14px 16px; padding: 16px; background: #fff; border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 10px; }
+.phone-card h1 { margin: 0; font-size: 20px; color: var(--ud-blue); }
+.phone-card label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.phone-card input, .phone-card select { box-sizing: border-box; width: 100%; min-width: 0; font: inherit; font-size: 17px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; }
+.phone-card button { min-height: 46px; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 700; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); }
+.phone-card button.primary { background: var(--ud-blue); color: #fff; border: 0; }
+.phone-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; }
+.phone-grid .wide { grid-column: 1 / 3; }
+.phone-grid input { padding: 7px 9px; font-size: 16px; }
+.phone-grid label.check { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink); }
+.phone-grid label.check input { width: 22px; height: 22px; flex: none; }
+.phone-buttons { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 10px; }
+.phone-days { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.phone-days button.on { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.phone-load { display: grid !important; grid-template-columns: 1fr auto; text-align: left; padding: 10px 12px; width: 100%; margin-top: 8px; }
+.phone-load small { grid-column: 1; color: var(--muted); font-weight: 600; font-size: 13px; }
+.phone-load span { grid-column: 2; grid-row: 1 / 3; align-self: center; background: var(--ud-blue); color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 14px; }
+.phone-load.done span { background: #277b43; }
+.phone-empty { color: var(--muted); margin: 8px 0 0; }
+
+/* Short windows (a 1366x650 laptop): a slimmer header so a busy day's full list still fits on one page. */
+@media (max-height: 720px) {
+  .topbar { min-height: 54px; padding: 3px 16px; }
+  .brand img { width: 128px; height: 42px; }
+  .brand strong { font-size: 18px; }
+  .brand small { margin-top: 2px; font-size: 10px; }
+  .split-side { height: calc(100vh - 138px); }
+}
+
+/* Weekly Dispatch, laid out like the current app's Weekly screen (WeeklyDispatch.html): the buttons on the right,
+   the week and the colour key in one bar, Route / Run Assignments with the Driver Assignment Board under it.
+   Rows keep the current screen's height; the two tables scroll inside the page, under their column heads. */
+body.weekly-page { background: #eef3f7; }
+.weekly-page .head { padding: 8px 16px 2px; align-items: center; }
+.weekly-page .actions { padding: 0 16px 8px; }
+.weekly-page .actions button { min-height: 42px; border-radius: 10px; }
+.wk-summary { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 16px 8px; padding: 6px 14px; background: #fff; border: 1px solid #d2dde6; border-radius: 14px; }
+.wk-summary .field { flex-direction: row; align-items: center; gap: 10px; }
+.wk-summary .field label { font-size: 14px; font-weight: 800; color: #536b81; }
+.wk-summary .stepper input { font-size: 19px; }
+.wk-summary .legend { margin-left: 0; flex: 1; flex-wrap: wrap; gap: 10px; font-size: 13px; font-weight: 800; color: #294a69; }
+.wk-summary .legend i { width: 26px; height: 16px; border-radius: 5px; border: 2px solid #bfd1e0; box-sizing: border-box; }
+.wk-summary .legend i.assigned { background: #f4f8fb; } .wk-summary .legend i.relief { background: #dff4f1; }
+.wk-summary .legend i.needs { background: #ffd32e; border-color: #e1ae00; } .wk-summary .legend i.vacation-needs { background: #ffd32e; border-color: #ef4545; }
+.wk-summary .legend i.plant { background: #ffd32e; border: 2px dashed #c2410c; } .wk-summary .legend i.conflict { background: #f4f8fb; border-color: #ef4545; }
+.wk-summary .legend i.off { background: #171c20; border-color: #171c20; }
+.wk-summary .override { min-height: 32px; padding: 0 14px; border-radius: 16px; }
+.wk-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0 16px; background: #fff; border: 1px solid #d0dce5; border-radius: 14px; }
+.wk-panel h2 { margin: 0; padding: 8px 24px 10px; color: #123f70; font-size: 19px; font-weight: 500; }
+.weekly-page .sheet.week { margin: 0; border: 0; border-radius: 0; overflow: visible; }
+.weekly-page .week table { min-width: 1120px; }
+.weekly-page .week th { position: sticky; top: 0; z-index: 2; height: auto; padding: 8px 6px; background: #194a7e; color: #fff; font-size: 15px; line-height: 1.08; text-transform: uppercase; border-right: 1px solid #d6e1e9; }
+.weekly-page .week th small { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; }
+.weekly-page .week th.today { background: #0f3a66; box-shadow: inset 0 -4px 0 var(--ud-gold); }
+.weekly-page .week td { height: 44px; padding: 0; border: 1px solid #bfd0df; color: #0d365d; font-size: 15px; white-space: nowrap; }
+.weekly-page .week tbody td.strong { padding: 0 8px; background: #fff; text-align: center; font-size: 16px; font-weight: 900; }
+.weekly-page #routes-sheet td.day { background: #171c20 !important; box-shadow: none; outline: 0; }
+.weekly-page #routes-sheet td.day:not(.off) { position: relative; padding: 0 9px; text-align: center; color: #0e3a62; font-size: 14px; font-weight: 850; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
+.weekly-page #routes-sheet td.day:not(.off)::before { content: ""; position: absolute; inset: 3px; border: 1px solid #bfd1e0; border-radius: 7px; background: #f4f8fb; }
+.weekly-page #routes-sheet td.day:not(.off) > * { position: relative; }
+.weekly-page #routes-sheet td.day .nm { display: block; }
+.weekly-page #routes-sheet td.day .unit { display: block; margin: 1px 0 0; color: #5d7286; font-size: 11px; font-weight: 700; }
+.weekly-page #routes-sheet td.c-relief::before { background: #dff4f1 !important; }
+.weekly-page #routes-sheet td.c-needs::before { background: #ffd32e !important; border: 2px solid #e1ae00 !important; }
+.weekly-page #routes-sheet td.c-plant::before { background: #ffd32e !important; border: 2px dashed #c2410c !important; }
+.weekly-page #routes-sheet td.c-vacation-needs::before { background: #ffd32e !important; border: 2px solid #ef4545 !important; }
+.weekly-page #routes-sheet td.c-conflict::before { border: 2px solid #ef4545 !important; }
+.weekly-page #routes-sheet td.c-booked::before { background: #ffdbe6 !important; border: 2px solid #f0a5bd !important; }
+.weekly-page #routes-sheet td.c-carrier::before { background: #bcd9ff !important; border: 2px solid #4a8fe0 !important; }
+.weekly-page #routes-sheet td.c-open::before { background: #e6defa !important; border: 2px solid #9b86d6 !important; }
+.weekly-page #routes-sheet td.c-coverage::before { background: #e7edf3 !important; }
+.weekly-page #routes-sheet td.c-coverage { color: #536b81 !important; }
+.weekly-page #routes-sheet td.editable { cursor: pointer; }
+.weekly-page #routes-sheet td.editable:not(.off):hover::before { outline: 2px solid var(--ud-gold); outline-offset: -1px; }
+.weekly-page #routes-sheet td.off.editable:hover { box-shadow: inset 0 0 0 2px var(--ud-gold); }
+.wk-divider { padding: 9px 14px; background: #f4f7fa; color: #0e3a62; text-align: center; font-size: 17px; font-weight: 900; border-top: 3px solid #1d5b91; }
+.weekly-page .board th { background: #e6eef5; color: #0e3a62; border-bottom: 2px solid #1d5b91; }
+.weekly-page .board td { height: 34px; font-size: 12px; font-weight: 850; text-align: center; }
+.weekly-page .board td.strong { font-size: 14px; }
+.weekly-page .board tr.group td { height: 30px; background: #f3f6f9 !important; color: #0e3a62; font-size: 15px; font-weight: 900; border-top: 2px solid #1d5b91; }
+.weekly-page .board td.day { padding: 0; background: #fff !important; color: #0e3a62; text-transform: uppercase; }
+.weekly-page .board td.b-available { background: #e7f6e5 !important; color: #0e3a62; }
+.weekly-page .board td.b-assigned, .weekly-page .board td.b-booked { background: #282d33 !important; color: #8fc6ff; }
+.weekly-page .board td.b-vacation { background: #f5c6c8 !important; color: #7d2bd0; box-shadow: inset 0 0 0 2px #ee3e3e; }
+.weekly-page .board td.b-conflict { background: #f5bfc1 !important; color: #0e3a62; box-shadow: inset 0 0 0 2px #ee3e3e; }
+.weekly-page .board td.b-off { background: #ffe1b5 !important; color: #914600; }
+.weekly-page .board td.b-unavailable { background: #dfe5e9 !important; color: #0e3a62; }
+.weekly-page .board th.today { background: #d3e2ef; color: #0e3a62; box-shadow: inset 0 -4px 0 var(--ud-gold); }
+.weekly-page .board button.avail { display: block; width: 100%; min-height: 32px; margin: 0; padding: 3px 6px; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; white-space: normal; line-height: 1.15; box-shadow: none; }
+.weekly-page .board button.avail:hover, .weekly-page .board button.avail:focus-visible { background: #dceaf5; color: #0e3a62; outline: 2px solid #3978aa; outline-offset: -2px; }
+.weekly-page .footer { padding: 4px 16px 6px; }
+@media (max-height: 720px) { .weekly-page .actions button { min-height: 34px; } .wk-summary { padding: 3px 12px; margin-bottom: 6px; } .wk-panel h2 { padding: 4px 20px 6px; font-size: 17px; } }
+/* Like the current Weekly grid: the cell shows the driver only (truck and trailer are in the cell's tooltip and the editor),
+   with a drop-down arrow, and the Driver Assignment Board wraps long run names. */
+.weekly-page #routes-sheet td.day .unit { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.weekly-page #routes-sheet td.day.editable:not(.off)::after { content: "\25BE"; position: absolute; top: 50%; right: 11px; transform: translateY(-50%); color: #0e3a62; font-size: 13px; }
+.weekly-page #routes-sheet td.day:not(.off) { padding-right: 22px; font-size: 15px; }
+.weekly-page .board td { white-space: normal; }
+.weekly-page .wk-scroll { scrollbar-gutter: stable; }
+/* Current board: a working day is blacked out, except on relief drivers, whose working days stay light. */
+.weekly-page .board tr.relief td.b-assigned, .weekly-page .board tr.relief td.b-booked { background: #dff4f1 !important; color: #0e3a62; }
+/* Joe 10/9: no TEST COPY box on the pages (the words stay for screen readers and the checks); Daily's buttons sit up beside the day pickers. */
+.badge-test { position: absolute !important; width: 1px; height: 1px; padding: 0 !important; margin: 0 !important; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0 !important; }
+.dlive #mode-text { display: none; }
+.head .actions.in-head { margin-left: auto; padding: 0; align-self: flex-end; justify-content: flex-end; }
+
+/* Driver Roster: taller rows and larger print; the list scrolls inside its box under a fixed header. */
+.drivers-page { --row: 40px; --font: 17px; }
+.drivers-page .split .sheet { overflow: auto; }
+.drivers-page .sheet thead th { position: sticky; top: 0; z-index: 1; height: 46px; font-size: 15px; }
+.drivers-page .sheet tbody td { font-size: 17px; }
+.drivers-page .sheet td.name { cursor: pointer; }
+.drivers-page .sheet td.name:hover { text-decoration: underline; }
+.drivers-page button.edit, .drivers-page input.truck { font-size: 16px; height: 34px; max-height: none; }
+.relief-yes { display: inline-block; padding: 2px 12px; border-radius: 10px; background: #dff4f1; color: #0b6b5e; font-size: 14px; font-weight: 800; text-transform: uppercase; }
+.drivers-page .panel-empty { font-size: 16px; }
+
+/* Vacation calendar: larger names and day numbers. */
+.calendar .cday { gap: 3px; }
+.calendar .cday b { font-size: clamp(14px, 1.8vh, 19px); }
+.calendar .cday span { font-size: clamp(12px, 1.6vh, 17px); line-height: 1.35; padding: 1px 8px; }
+.calendar .dow { font-size: 14px; }
+.cal-key { font-size: 14px; }
+.drivers-page .panel input[type="text"], .drivers-page .panel input[type="date"] { font-size: 16px; height: 40px; }
+.drivers-page .panel label, .drivers-page .panel-check { font-size: 14px; }
+
+/* Route Editor: readable rows and print; the grid scrolls inside its box with the headings fixed on top. */
+.routes-page { --row: 40px; --font: 16px; }
+.routes-page .sheet#sheet { overflow: auto; }
+.routes-page table.routes thead th { position: sticky; top: 0; z-index: 2; }
+.routes-page table.routes.days td:has(> button[data-runday]) { padding: 3px 4px; }
+.routes-page table.routes.days button[data-runday] { width: 100%; height: 32px; border-radius: 7px; font-size: 14px; font-weight: 800; }
+.routes-page table.routes.days td:has(> button[data-runday]:not(.on)) { background: #171c20; }
+.routes-page table.routes.days button[data-runday]:not(.on) { background: #171c20; color: #9aa7b3; border-color: #171c20; }
+.routes-page table.routes.days button[data-runday].on { background: #f4f8fb; color: #0e3a62; border: 1px solid #bfd1e0; }
+
+/* Route Distribution home: four cards, each a doorway with its screens listed inside. */
+.cards.cards4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); max-width: 1500px; }
+.card.home4 .dc-text strong { font-size: clamp(20px, 2.8vh, 26px); }
+.card.home4 .dc-text em { font-size: 14px; }
+.dc-links { display: grid; grid-auto-rows: minmax(44px, 54px); gap: 8px; padding: 6px 14px 10px; }
+.dc-link { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0 16px; border: 1px solid #cfdeec; border-radius: 11px; background: #fff; color: #0a3866; text-decoration: none; font-weight: 800; font-size: 17px; }
+.dc-link span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-link .dc-arrow { font-size: 22px; }
+.dc-link:hover { border-color: var(--accent); background: #f5f9fd; }
+.card.home4:hover { box-shadow: 0 7px 18px rgba(13,52,87,.075); }
+.card.home4 .dc-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.card .owner.ext { background: #fff4d9; color: #8a5a00; border-color: #f0d48a; }
+@media (max-width: 900px) { .cards.cards4 { grid-template-columns: 1fr; grid-template-rows: none; } }
+
+/* Look C (Joe picked 10/9): run cards. Each row is a rounded white strip with a little space between,
+   the first column (route, unit, driver #) is a blue badge; headings sit quietly on the page colour. */
+.sheet:has(> table.cards-look), .sheet.scroll-list:has(table.cards-look) { background: transparent; border: 0; box-shadow: none; }
+table.cards-look { border-collapse: separate; border-spacing: 0 6px; }
+table.cards-look.daily { border-spacing: 0 3px; }
+table.cards-look th, table.cards-look td { border: 0; }
+table.cards-look thead th { background: #eef3f7; color: #43607c; font-size: 13px; letter-spacing: .06em; }
+table.cards-look tbody tr td { background: #fff; box-shadow: 0 1px 0 #dbe4ec, 0 -1px 0 #dbe4ec; }
+table.cards-look tbody tr td:first-child { border-radius: 10px 0 0 10px; box-shadow: 0 1px 0 #dbe4ec, 0 -1px 0 #dbe4ec, -1px 0 0 #dbe4ec; }
+table.cards-look tbody tr td:last-child { border-radius: 0 10px 10px 0; box-shadow: 0 1px 0 #dbe4ec, 0 -1px 0 #dbe4ec, 1px 0 0 #dbe4ec; }
+table.cards-look tbody tr td:only-child { border-radius: 10px; }
+table.cards-look.daily tbody tr:not(.group):not(.off) td:first-child, table.cards-look.routes tbody tr td:first-child { font-weight: 900; color: #fff; background: #1d5b91; }
+table.cards-look.routes tbody tr td:first-child small { color: #cfe0f1; }
+table.cards-look.routes tbody tr td:first-child button.edit { background: #fff; }
+table.cards-look tbody tr.group td { background: transparent !important; box-shadow: none; color: #0e3a62; text-align: left; font-size: 15px; padding: 8px 6px 0; border-radius: 0; }
+table.cards-look tbody tr:hover td:not(:first-child):not(.missing) { background: #f5f9fd; }
+table.cards-look tbody tr.off td { background: #fff8e6; }
+table.cards-look td.empty { border-radius: 10px; }
+/* Route Days: Runs light, Does Not Run black; the black cells keep their colour inside the strips. */
+.routes-page table.routes.days.cards-look td:has(> button[data-runday]:not(.on)) { background: #171c20; }
+/* Weekly keeps its black / yellow grid (the current app's colours); look C gives the route column the blue badge. */
+@media (max-height: 800px) { table.cards-look, table.cards-look.daily { border-spacing: 0 1px; } }
+/* Home header menu (Joe 10/9): the current app's extra screens as buttons, the new app's screens in one drop-down. */
+.home-menu a.ext::after { content: " \2197"; font-size: 12px; opacity: .7; }
+.home-menu select { height: 38px; border: 1px solid #b9c7d3; border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 700; color: var(--ud-blue); background: #fff; cursor: pointer; }
+@media (max-width: 1500px) { .home-menu a.ext, .home-menu select { padding: 6px 9px; font-size: 13px; } .home-menu .who { display: none; } }
+/* Route Editor · Show / Hide Rules: each true/false the screens read, as a clear YES / NO / BLANK. */
+.routes-page table.routes.rules td:has(> button.rule) { padding: 3px 6px; }
+.routes-page table.routes.rules button.rule { width: 100%; height: 32px; border-radius: 7px; font-size: 14px; font-weight: 800; border: 1px solid transparent; cursor: pointer; }
+.routes-page table.routes.rules button.rule:disabled { cursor: default; }
+.routes-page table.routes.rules button.rule.yes { background: #e3f3e8; color: #1c6b3a; border-color: #a9d8b8; }
+.routes-page table.routes.rules button.rule.no { background: #171c20; color: #e8edf2; border-color: #171c20; }
+.routes-page table.routes.rules button.rule.blank { background: #f1f3f5; color: #7a8794; border: 1px dashed #b7c2cc; }
+.routes-page table.routes.rules b.shown { color: #1c6b3a; }
+.routes-page table.routes.rules b.off { color: #b3261e; }
+.routes-page table.routes.rules td.why { text-align: left; white-space: normal; font-size: calc(var(--font) - 2px); }
+.routes-page table.routes.rules.cards-look tr.hidden-run > td:not(:first-child) { background: #fdf1ef; }
+
+/* Left menu (Joe, 10/9): the same on every screen; the header keeps the logo, the user and Sign out. */
+body.has-side .topbar > a:not(.brand):not(#to-conflicts) { display: none; }
+body.has-side #screen:not([hidden]) { display: flex; flex-direction: column; height: 100vh; }
+.side-wrap { flex: 1; min-height: 0; display: flex; position: relative; }
+.side-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+body.fill .side-main, body.weekly-page .side-main, body.drivers-page .side-main, body.routes-page .side-main { overflow: hidden; }
+.sidemenu { --side: 246px; flex: none; width: var(--side); background: #0b3d6b; color: #dbe8f5; overflow-y: auto; overflow-x: hidden; padding: 8px 0 16px; display: flex; flex-direction: column; gap: 1px; transition: width .12s ease; }
+.sidemenu .side-toggle { display: none; align-self: flex-start; margin: 2px 12px 6px; width: 40px; height: 36px; border: 1px solid #ffffff44; border-radius: 8px; background: transparent; color: #fff; font-size: 20px; line-height: 1; cursor: pointer; padding: 0; }
+.sidemenu .side-toggle:hover { background: #ffffff1c; }
+.side-group { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #9fbcd8; padding: 14px 18px 5px; white-space: nowrap; }
+.sidemenu a { display: flex; align-items: center; gap: 12px; margin: 0 8px; padding: 9px 10px; border-radius: 9px; color: #fff; text-decoration: none; font-size: 15px; font-weight: 700; white-space: nowrap; }
+.sidemenu a svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sidemenu a span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sidemenu a i { font-style: normal; font-size: 14px; color: #f2c14e; }
+.sidemenu a:hover { background: #ffffff1c; }
+.sidemenu a.on { background: #fff; color: #0b3d6b; }
+@media (max-width: 1500px) {
+  body:not(.side-open) .sidemenu { --side: 64px; }
+  body:not(.side-open) .side-group, body:not(.side-open) .sidemenu a span, body:not(.side-open) .sidemenu a i { display: none; }
+  body:not(.side-open) .sidemenu a { justify-content: center; padding: 10px 0; }
+  body:not(.side-open) .side-group + a, body:not(.side-open) .sidemenu a:first-of-type { margin-top: 6px; }
+  .sidemenu .side-toggle { display: block; }
+  /* Opened on a laptop, the menu lies over the screen instead of squeezing it. */
+  body.side-open .sidemenu { position: absolute; left: 0; top: 0; bottom: 0; z-index: 50; box-shadow: 6px 0 24px rgba(0,0,0,.25); }
+  body.side-open .side-main { margin-left: 64px; }
+}
+@media print { .sidemenu { display: none !important; } .side-main { overflow: visible !important; } }
+
+/* Home on any screen (Joe, 10/9, smaller laptop): cards take the room there is and never cut off. */
+body.has-side #screen.home-screen .side-main { overflow: auto; }
+.cards.cards4 { grid-template-rows: repeat(2, auto); align-content: stretch; }
+.card.home4 { overflow: visible; min-height: min-content; }
+@media (max-height: 1000px) {
+  .card.home4 .dc-text em { display: none; }
+  .card.home4 .dc-head { padding: 10px 12px 4px; }
+  .card.home4 .dc-icon { width: 40px; height: 40px; }
+  .card.home4 .dc-links { grid-auto-rows: 40px; gap: 6px; padding: 4px 12px 8px; }
+  .card.home4 .dc-link { font-size: 16px; }
+  .card.home4 .dc-metrics { grid-auto-rows: minmax(58px, 96px); gap: 7px; padding: 2px 12px 10px; }
+  .home-screen .dtitle { padding-top: 8px; padding-bottom: 8px; }
+  .cards.cards4 { gap: 10px; }
+}
+@media (max-height: 800px) {
+  .card.home4 .dc-links { grid-auto-rows: 36px; }
+  .card.home4 .dc-metrics { grid-auto-rows: minmax(52px, 90px); }
+  .card.home4 .dc-metric b { font-size: 24px; margin: 1px 0; }
+  .card.home4 .dc-text strong { font-size: 20px; margin: 1px 0 2px; }
+}
+
+/* Weekly (Joe, 10/9): every action button on one row (Save Draft is gone: each pick saves itself), rows a little
+   shorter, and long names fit their day box. */
+.weekly-page .head { flex-wrap: nowrap; gap: 12px; }
+.weekly-page .head .title { flex: none; }
+.weekly-page .head .actions.in-head { flex-wrap: nowrap; gap: 6px; align-self: center; }
+.weekly-page .head .actions.in-head button { white-space: nowrap; min-height: 38px; padding: 0 11px; font-size: 14px; }
+.weekly-page .head .tabs button { white-space: nowrap; }
+.weekly-page .week td { height: 40px; }
+.weekly-page #routes-sheet td.day:not(.off) { padding: 0 17px 0 6px; font-size: clamp(11px, .72vw, 14px); letter-spacing: -.02em; }
+.weekly-page #routes-sheet td.day.editable:not(.off)::after { right: 7px; font-size: 11px; }
+@media (max-width: 1500px) {
+  .weekly-page .head { flex-wrap: wrap; }
+  .weekly-page .head .actions.in-head { margin-left: 0; width: 100%; justify-content: flex-start; }
+}
+
+/* Header shows only the user's initials; the full email is on hover. */
+.topbar .who.initials { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.45); color: #fff; font-size: 14px; font-weight: 800; letter-spacing: .02em; }
+/* Relief has its own column on the Driver Roster, so the small tag beside the name is not shown. */
+.drivers-page td.name .chip { display: none; }
+/* Driver Roster on laptops: smaller type so every heading and name fits. */
+@media (max-width: 1500px) {
+  .drivers-page .sheet thead th { font-size: 12px; padding: 0 4px; letter-spacing: 0; white-space: normal; line-height: 1.1; }
+  .drivers-page .sheet tbody td { font-size: 14px; padding: 0 5px; }
+  .drivers-page .sheet td.name { font-size: 15px; }
+  .drivers-page .sheet td .status, .drivers-page .sheet td .pill { font-size: 12px; padding: 2px 6px; }
+  .drivers-page button.edit, .drivers-page input.truck { font-size: 14px; height: 30px; }
+}
+/* Back button: top of the left menu on every screen except Home. */
+.sidemenu .side-back { display: flex; align-items: center; gap: 12px; margin: 0 8px 4px; width: calc(100% - 16px); padding: 9px 10px; border-radius: 9px; border: 1px solid #ffffff59; background: #ffffff14; color: #fff; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; text-align: left; }
+.sidemenu .side-back svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.sidemenu .side-back:hover { background: #ffffff2b; }
+@media (max-width: 1500px) {
+  body:not(.side-open) .sidemenu .side-back span { display: none; }
+  body:not(.side-open) .sidemenu .side-back { justify-content: center; padding: 10px 0; }
+}
+.routes-page button.rule small { display: block; font-size: 10px; font-weight: 700; color: #c7d3de; text-transform: lowercase; line-height: 1; }
+/* Equipment Issues */
+.issues-page .view { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.issues-page .kpis, .issues-page .kind-line, .issues-page .foot { margin: 0 16px; }
+.issues-page .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.issues-page .kpis div { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.issues-page .kpis b { font-size: 28px; color: var(--ud-blue); line-height: 1.1; }
+.issues-page .kpis span { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.issues-page .kpis .warn b { color: #b45f00; }
+.issues-page .kpis .good b { color: #1d7a3e; }
+.issues-page .kind-line { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; color: var(--muted); padding: 0 4px; }
+.issues-page .kind-line b { color: #12324f; }
+.issues-page .tabs button b { margin-left: 6px; display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: #0b4f8a1a; font-size: 12px; }
+.issues-page .tabs button[aria-selected="true"] b { background: #ffffff33; }
+.issues-page table.issues td { height: 46px; font-size: 15px; }
+.issues-page table.issues td small { display: block; font-size: 11px; color: var(--muted); }
+.issues-page table.issues td.wrong { white-space: normal; line-height: 1.25; font-weight: 600; color: #12324f; }
+.issues-page table.issues tr.review > td { background: #fff8ec; }
+.issues-page .pill { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.issues-page .pill.yes { background: #e3f4e8; color: #1d6b37; }
+.issues-page .pill.no { background: #eef2f5; color: #6b7c8c; }
+.issues-page .pill.warn { background: #fdecc4; color: #8a5a00; }
+.issues-page .count { display: inline-grid; place-items: center; min-width: 28px; height: 28px; border-radius: 14px; background: #eef2f5; font-weight: 800; }
+.issues-page .count.repeat { background: #fde3df; color: #a8321f; }
+.issues-page .work { display: inline-flex; flex-wrap: nowrap; gap: 4px; justify-content: center; }
+.issues-page .work button { min-height: 30px; padding: 0 8px; font-size: 13px; white-space: nowrap; border-radius: 7px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font-weight: 700; cursor: pointer; }
+.issues-page .work button.good { background: #1d7a3e; color: #fff; border-color: #1d7a3e; }
+.issues-page .work button.link { color: #a8321f; border-color: #f0c6bf; }
+.issues-page .work button:disabled { opacity: .45; cursor: not-allowed; }
+.issues-page .foot { font-size: 12px; color: var(--muted); }
+@media (max-width: 1500px) {
+  .issues-page .kpis b { font-size: 22px; }
+  .issues-page .kpis span { font-size: 11px; }
+  .issues-page table.issues td { font-size: 13px; }
+  .issues-page .work button { padding: 0 5px; font-size: 11px; min-height: 26px; }
+  .issues-page .work { gap: 3px; }
+}
+/* A card with four links shows them two by two so the home still fits a laptop screen. */
+.dc-links:has(> .dc-link:nth-child(4)) { display: grid; grid-template-columns: 1fr 1fr; }
+.dc-links:has(> .dc-link:nth-child(4)) .owner.ext { font-size: 0; padding: 2px 7px; }
+.dc-links:has(> .dc-link:nth-child(4)) .owner.ext::after { content: "\2197  current app"; font-size: 11px; }
+@media (max-width: 1500px) { .dc-links:has(> .dc-link:nth-child(4)) .owner.ext::after { content: "\2197"; font-size: 13px; } }
+/* Driver Assignment Board: a day changed by hand this week (route_override) is light blue, as in the current app. */
+.weekly-page .board td.b-extra, .weekly-page .board tr.relief td.b-extra { background: #d9ebfb !important; color: #000 !important; }
+.legend i.extra { background: #d9ebfb; border: 1px solid #9cc4ea; }
+/* Route Week Override (the current app's screen, look B): grid on the left, the week's changes on the right. */
+.routeweek-page .rw-shell { display: grid !important; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; padding: 0 16px 12px; }
+.routeweek-page .rw-grid { margin: 0; min-height: 0; overflow: auto; }
+.routeweek-page table.rw th small { display: block; font-size: 11px; font-weight: 600; opacity: .8; }
+.routeweek-page table.rw td { height: 38px; padding: 2px 4px; font-size: 14px; }
+.routeweek-page table.rw tr.first > td { border-top: 2px solid #c9d8e7; }
+.routeweek-page .rw-day { width: 94%; min-height: 28px; border: 0; border-radius: 13px; background: #e3f5ee; color: #0f7b5f; font: inherit; font-size: 12px; font-weight: 900; white-space: nowrap; cursor: pointer; }
+.routeweek-page .rw-day.off { background: #fde8e6; color: #c0392b; }
+.routeweek-page .rw-day.over { background: repeating-linear-gradient(135deg, #fff3dc 0 6px, #ffe6b3 6px 12px); color: #8a5a00; box-shadow: inset 0 0 0 2px #f2b632; }
+.routeweek-page .rw-day:disabled { cursor: default; }
+.routeweek-page .rw-side { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.routeweek-page .rw-week { display: flex; align-items: center; gap: 10px; }
+.routeweek-page .rw-week > div { flex: 1; text-align: center; }
+.routeweek-page .rw-week b { display: block; font-size: 20px; color: var(--ud-blue); }
+.routeweek-page .rw-week small { color: var(--muted); font-weight: 700; }
+.routeweek-page .rw-week button { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ud-blue); cursor: pointer; }
+.routeweek-page .rw-reason { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+.routeweek-page .rw-reason textarea { font: inherit; font-size: 15px; text-transform: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; resize: vertical; color: #12324f; }
+.routeweek-page .rw-counts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.routeweek-page .rw-counts div { background: #f4f8fb; border-radius: 10px; padding: 8px; text-align: center; }
+.routeweek-page .rw-counts b { display: block; font-size: 28px; color: #8a5a00; }
+.routeweek-page .rw-counts span { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+.routeweek-page .rw-filter { display: grid; grid-template-columns: 1fr 1fr; }
+.routeweek-page .rw-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.routeweek-page .rw-list > div { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 6px 8px; border-radius: 8px; background: #fbfcfd; border: 1px solid #edf1f5; }
+.routeweek-page .rw-list em { font-style: normal; font-weight: 900; }
+.routeweek-page .rw-list em.on { color: #0f7b5f; } .routeweek-page .rw-list em.off { color: #c0392b; }
+.routeweek-page .rw-list .empty { color: var(--muted); text-align: center; padding: 18px 0; border: 0; background: none; }
+@media (max-width: 1500px) { .routeweek-page .rw-shell { grid-template-columns: minmax(0, 1fr) 290px; } .routeweek-page .rw-day { font-size: 10px; } }
+
+/* Joe 10/9: the side menu folds to icons on any screen (the button at its top), row lines are clearer, and table print
+   matches the Route Editor (16px) everywhere; a cell too narrow for its text shrinks it to fit (app.js fitCells). */
+.sidemenu .side-toggle { display: block; }
+@media (min-width: 1501px) {
+  body.side-folded .sidemenu { --side: 64px; }
+  body.side-folded .side-group, body.side-folded .sidemenu a span, body.side-folded .sidemenu a i, body.side-folded .sidemenu .side-back span { display: none; }
+  body.side-folded .sidemenu a, body.side-folded .sidemenu .side-back { justify-content: center; padding: 10px 0; }
+  body.side-folded .side-group + a, body.side-folded .sidemenu a:first-of-type { margin-top: 6px; }
+}
+:root { --font: 16px; }
+.drivers-page { --font: 17px; }
+.routes-page { --font: 16px; }
+tbody td { border-bottom: 1px solid #a9bbcd; }
+table.cards-look tbody tr td { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 #a9bbcd; }
+table.cards-look tbody tr td:first-child { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 #a9bbcd, -1px 0 0 #a9bbcd; }
+table.cards-look tbody tr td:last-child { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 #a9bbcd, 1px 0 0 #a9bbcd; }
+.weekly-page .week td { border-color: #9fb3c7; font-size: 16px; }
+.weekly-page .week tbody td.strong { font-size: 17px; }
+.weekly-page #routes-sheet td.day:not(.off) { font-size: 15px; letter-spacing: 0; }
+.weekly-page .board td { font-size: 13px; }
+.weekly-page .board td.strong { font-size: 15px; }
+.issues-page table.issues td { font-size: 16px; }
+@media (max-width: 1500px) { .issues-page table.issues td { font-size: 14px; } }
+
+/* Route Days (Joe 10/9): RUNS is green like the current app; Edit Route opens the Route Editor form; the Holiday Week
+   Editor is one click away. */
+.routes-page table.routes.days button[data-runday].on { background: #e3f3e8; color: #1c6b3a; border: 1px solid #a9d8b8; }
+.routes-page table.routes.days button.edit-route { width: 100%; max-width: 130px; font-weight: 800; background: #fff; color: var(--ud-blue); border: 1px solid #1d5b91; }
+.routes-page table.routes.days button.edit-route:hover { background: #1d5b91; color: #fff; }
+.actions a.button { display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.actions a.button:hover { background: #e8f0fb; }
+h3.day-title { margin: 18px 0 8px; font-size: 15px; color: var(--ud-blue); text-transform: uppercase; letter-spacing: .05em; }
+table.day-table { table-layout: fixed; }
+table.day-table td { height: 42px; padding: 3px 5px; }
+table.day-table tr.off td:not(:nth-child(2)) { background: #f1f3f5 !important; color: #7a8794; }
+table.day-table input.dcell { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 7px; text-align: center; font: inherit; color: var(--ink); background: #fff; }
+table.day-table input.dcell:focus { border-color: var(--ud-blue); outline: none; }
+table.day-table button[data-runday] { width: 100%; height: 34px; border-radius: 7px; font-weight: 800; font-size: 14px; border: 1px solid #171c20; background: #171c20; color: #e8edf2; cursor: pointer; }
+table.day-table button[data-runday].on { background: #e3f3e8; color: #1c6b3a; border-color: #a9d8b8; }
+
+/* Side menu (Joe 10/9): only the sections; each opens a fly-out with its screens on hover or tap. */
+.sidemenu { --side: 200px; }
+.sidemenu .side-sec-btn { display: flex; align-items: center; gap: 12px; margin: 0 8px; width: calc(100% - 16px); padding: 11px 10px; border: 0; border-radius: 9px; background: transparent; color: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; text-align: left; white-space: nowrap; }
+.sidemenu .side-sec-btn svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sidemenu .side-sec-btn span { flex: 1; }
+.sidemenu .side-sec-btn i { font-style: normal; font-size: 12px; opacity: .7; }
+.sidemenu .side-sec-btn:hover, .sidemenu .side-sec.open > .side-sec-btn { background: #ffffff1c; }
+.sidemenu .side-sec.on > .side-sec-btn { background: #fff; color: #0b3d6b; }
+.sidemenu .flyout { display: none; position: fixed; z-index: 200; min-width: 250px; padding: 8px 0 10px; background: #0b3d6b; border-radius: 0 12px 12px 0; box-shadow: 8px 6px 28px rgba(0,0,0,.32); border-left: 3px solid var(--ud-gold); }
+.sidemenu .side-sec.open > .flyout { display: flex; flex-direction: column; gap: 1px; }
+.sidemenu .flyout-title { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #9fbcd8; padding: 6px 18px 6px; }
+.sidemenu .flyout a span, .sidemenu .flyout a i { display: inline !important; }
+.sidemenu .flyout a { justify-content: flex-start !important; padding: 9px 12px !important; }
+body.side-folded .sidemenu .side-sec-btn span, body.side-folded .sidemenu .side-sec-btn i { display: none; }
+body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11px 0; }
+@media (max-width: 1500px) {
+  body:not(.side-open) .sidemenu .side-sec-btn span, body:not(.side-open) .sidemenu .side-sec-btn i { display: none; }
+  body:not(.side-open) .sidemenu .side-sec-btn { justify-content: center; padding: 11px 0; }
+}
+
+/* GPS Setup (Joe 10/9): the Verizon Connect login and a plain pass / fail test. */
+.gps-page .gps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 16px 16px; }
+.gps-page .gps-card { background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.gps-page .gps-card.wide { grid-column: 1 / 3; }
+.gps-page h2 { margin: 0; font-size: 19px; color: var(--ud-blue); display: flex; align-items: center; gap: 10px; }
+.gps-page .hint { margin: 0; color: var(--muted); font-size: 14px; }
+.gps-page label { display: grid; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.gps-page input { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.gps-page form { display: grid; gap: 10px; }
+.gps-page .gps-buttons { display: flex; gap: 10px; }
+.gps-page .gps-buttons button { min-height: 40px; padding: 0 18px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 800; cursor: pointer; }
+.gps-page .gps-buttons button.primary { background: var(--ud-blue); color: #fff; }
+.gps-page .gps-buttons button.big { min-height: 48px; font-size: 17px; padding: 0 28px; }
+.gps-page .gps-buttons button.armed { background: #b45309; border-color: #b45309; color: #fff; }
+.gps-page .pill { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 800; }
+.gps-page .pill.yes { background: #e3f4e8; color: #1d6b37; }
+.gps-page .pill.warn { background: #fdecc4; color: #8a5a00; }
+.gps-page .pill.no { background: #eef2f5; color: #6b7c8c; }
+.gps-page .gps-result { padding: 14px 16px; border-radius: 10px; font-size: 17px; background: #eef2f6; color: var(--ink); }
+.gps-page .gps-result.ok { background: #e3f4e8; color: #1d6b37; border: 1px solid #a9d8b8; }
+.gps-page .gps-result.bad { background: #fde3df; color: #a8321f; border: 1px solid #f0b4aa; }
+.gps-page .gps-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 15px; }
+
+/* One app, not page after page (Joe 10/9): the page colour shows while a screen loads (no white flash), and Chrome
+   cross-fades from one screen to the next with the header and the menu held in place. */
+html { background: var(--page); }
+@view-transition { navigation: auto; }
+.topbar { view-transition-name: ud-topbar; }
+.sidemenu { view-transition-name: ud-menu; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 120ms; }
+::view-transition-group(ud-topbar), ::view-transition-group(ud-menu) { animation-duration: 0s; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+
+/* Driver Weekly Template */
+.template-page table.tpl { table-layout: fixed; }
+.template-page .tpl td { vertical-align: top; padding: 6px; }
+.template-page .tpl tr.tpl-group td { background: #dfeaf3; color: #123f70; font-weight: 800; font-size: 14px; padding: 7px 10px; }
+.template-page .tcell select { width: 100%; height: 32px; border: 1px solid #b7c9d8; border-radius: 7px; background: #fff; font-weight: 700; font-size: 14px; }
+.template-page .tcell.on { background: #e3f3e8; }
+.template-page .tcell.off { background: #fff1e2; }
+.template-page .tcell.changed { box-shadow: inset 0 0 0 2px #7fb2e5; background-color: #e8f2fd; }
+.template-page .run-line { display: flex; gap: 4px; margin-top: 5px; }
+.template-page .run-line select { flex: 1; min-width: 0; }
+.template-page .mini { border: 1px solid #b9c9d7; background: #fff; border-radius: 6px; padding: 3px 6px; font-size: 11px; font-weight: 700; color: #175b92; cursor: pointer; }
+.template-page .mini:disabled { opacity: .45; cursor: default; }
+.template-page .tpl-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.template-page .tpl-copy { padding: 6px 12px; border: 1px solid #b9d8c3; border-radius: 999px; background: #edf9f0; color: #17683a; font-weight: 800; font-size: 13px; }
+.template-page .tpl-dirty { color: #175b92; font-weight: 800; }
+/* One quiet line of cell tools; they show on hover or while the cell has focus (always on touch screens). */
+.template-page .tpl-tools { flex-wrap: nowrap; gap: 3px; margin-top: 5px; visibility: hidden; }
+.template-page .tpl-tools .mini { font-size: 10px; padding: 2px 4px; white-space: nowrap; }
+.template-page .tcell:hover .tpl-tools, .template-page .tcell:focus-within .tpl-tools { visibility: visible; }
+@media (hover: none) { .template-page .tpl-tools { visibility: visible; } }
+
+/* Dispatch Administration: the current app's cards, as links in this window */
+.admin-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; padding: 4px 16px 16px; }
+.admin-card { display: flex; flex-direction: column; gap: 6px; min-height: 120px; padding: 18px; background: #fff; border: 1px solid #d5e1eb; border-top: 4px solid #1976d2; border-radius: 14px; color: #123f70; text-decoration: none; box-shadow: 0 6px 18px rgba(18,63,112,.06); }
+.admin-card:hover { box-shadow: 0 10px 24px rgba(18,63,112,.14); transform: translateY(-1px); }
+.admin-card strong { font-size: 19px; }
+.admin-card span { color: #60798f; line-height: 1.4; font-size: 15px; }
+.admin-card.ext { border-top-color: #9aa9b8; }
+.admin-card em { margin-top: auto; font-style: normal; font-size: 12px; font-weight: 700; color: #7a8a99; }
+@media (max-width: 1500px) { .admin-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Fleet Service */
+.fleet-page .tabs b { margin-left: 6px; color: #c62828; }
+.fleet-page .tabs button[aria-selected="true"] b { color: #ffd7d7; }
+.fleet-page .pill.soon { background: #fff4d6; color: #8a5a00; border-color: #f0d38a; }
+.fleet-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.fleet-split.wide-left { grid-template-columns: 3fr 1fr; }
+.fleet-split h2 { margin: 6px 4px 8px; font-size: 17px; color: var(--ud-blue); }
+@media (max-width: 1200px) { .fleet-split, .fleet-split.wide-left { grid-template-columns: 1fr; } }
+
+/* Over the Road */
+.otr-dash { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; padding: 4px; }
+.otr-card { background: #fff; border: 1px solid #d5e1eb; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.otr-card.wide { grid-column: 1 / -1; }
+.otr-card h2 { margin: 0; font-size: 18px; color: var(--ud-blue); }
+.otr-card p { margin: 0; color: var(--muted); }
+.otr-card > button { align-self: flex-start; }
+.otr-big { font-size: 56px; font-weight: 800; color: #123f70; line-height: 1; }
+.otr-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+.otr-week div { display: flex; flex-direction: column; align-items: center; padding: 10px; border: 1px solid #d5e1eb; border-radius: 10px; }
+.otr-week div.today { background: #e3f3e8; border-color: #a9d8b8; }
+.otr-week span { font-size: 28px; font-weight: 800; color: #123f70; }
+.otr-rep td, .otr-rep th { padding: 4px 6px; font-size: 14px; }
+.otr-rep td.neg { color: #c62828; font-weight: 700; }
+.otr-fig input.otr-in { width: 100%; height: 32px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: right; padding: 0 6px; font: inherit; font-size: 14px; }
+.otr-fig small, .otr-fig td small { display: block; color: #8a99a8; font-size: 11px; }
+tr.otr-on td { background: #e3f3e8; }
+#otr-report h2 { margin: 4px; font-size: 18px; color: var(--ud-blue); }
+.otr-card > button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.otr-page .actions select { min-height: 38px; padding: 0 10px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-weight: 700; }
+/* OTR Routes Setup: destination drop-downs and Include boxes sized to the row, like the other table pickers. */
+.otr-setup select { box-sizing: border-box; width: 88%; max-width: 380px; height: 40px; padding: 0 36px 0 12px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-size: 16px; font-weight: 700; color: var(--ud-blue); text-align: left; cursor: pointer;
+  appearance: none; -webkit-appearance: none; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%230b4f8a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.otr-setup select:hover { border-color: var(--ud-blue); }
+.otr-setup select:focus { border-color: var(--ud-blue); outline: 2px solid #3978aa55; outline-offset: 1px; }
+.otr-setup select:has(option[value=""]:checked) { color: #6b7d8f; font-weight: 600; }
+.otr-setup select option { color: var(--ink); font-weight: 600; }
+.otr-setup select:disabled { background-color: #eef2f6; color: #7a8797; cursor: not-allowed; }
+.otr-setup input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; vertical-align: middle; }
+.otr-setup input[type=checkbox]:disabled { cursor: not-allowed; }
+.otr-rep small.otr-by { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+
+/* Driver Scorecard */
+.sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
+.sc.g-A { background: #e3f3e8; color: #1c6b3a; } .sc.g-B { background: #e6f0fb; color: #1d5b91; }
+.sc.g-C { background: #fff4d6; color: #8a5a00; } .sc.g-D { background: #fde8e8; color: #b42318; }
+.sc-board td.sc-ok { color: #1c6b3a; } .sc-board td.sc-bad { color: #b42318; font-weight: 700; }
+.sc-board td small, .sc-board th small { display: block; font-size: 11px; font-weight: 600; }
+.sc-board th.later, .sc-board td.later { color: #9aa9b8; }
+.sc-board tr[data-key] { cursor: pointer; }
+.sc-board tr.sc-open td { background: #e8f2fd; }
+.sc-board tr.sc-misses td { text-align: left; background: #f7fbfe; font-size: 14px; }
+.sc-board tr.sc-misses div { padding: 2px 0; }
+.sc-pts { color: #b42318; font-weight: 800; }
+.sc-period { font-size: 18px; color: var(--ud-blue); min-width: 170px; text-align: center; }
+.sc-set { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; padding: 4px; }
+.sc-set p { color: inherit; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sc-set p.later { color: #9aa9b8; }
+.sc-n { width: 64px; height: 34px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: center; font: inherit; font-weight: 700; }
+.sc-reasons { display: flex; flex-wrap: wrap; gap: 14px; }
+.sc-set .otr-card > button { align-self: flex-end; }
+
+/* Driver Assignment Board (Joe 10/10): the day box grows to fit; each run is on its own line and never split. The tab names never cut. */
+.weekly-page .board button.avail { height: auto; overflow: visible; }
+.weekly-page .board td.day .run { display: block; white-space: nowrap; }
+.weekly-page .board td.day.many { font-size: 11px; }
+.weekly-page .head .tabs { flex: none; }
+
+/* Action buttons as square tiles (Joe 10/10): the words wrap onto two lines so every button fits on one row with the title and pickers. */
+.head .actions.in-head { flex-wrap: nowrap; gap: 6px; align-self: center; }
+.head .actions.in-head button, .weekly-page .head .actions.in-head button {
+  width: 92px; min-width: 92px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px;
+  white-space: normal; line-height: 1.12; font-size: 13px; font-weight: 800; text-align: center; overflow-wrap: normal; hyphens: none;
+}
+@media (max-width: 1500px) {
+  .weekly-page .head { flex-wrap: nowrap; }
+  .weekly-page .head .actions.in-head { margin-left: auto; width: auto; justify-content: flex-end; }
+  .head .actions.in-head button, .weekly-page .head .actions.in-head button { width: 82px; min-width: 82px; font-size: 12px; }
+}
+/* Daily: the coverage figure is a tile too, and the pickers and tiles share one row. */
+.head:has(#print-sheet) { flex-wrap: nowrap; gap: 12px; }
+.head:has(#print-sheet) .coverage { flex-direction: column; align-items: center; justify-content: center; gap: 0; width: 92px; height: 58px; padding: 2px 4px; border-radius: 10px; text-align: center; }
+.head:has(#print-sheet) .coverage b { font-size: 21px; line-height: 1.05; }
+.head:has(#print-sheet) .coverage span { font-size: 10px; line-height: 1.1; letter-spacing: .03em; }
+.head:has(#print-sheet) .actions.in-head { align-self: flex-end; }
+@media (max-width: 1700px) {
+  .head:has(#print-sheet) .field .stepper input, .head:has(#print-sheet) .field .stepper select { min-width: 0; width: 150px; }
+  .head:has(#print-sheet) #delivery-day { width: 110px; }
+  .head:has(#print-sheet) h1 { font-size: 26px; }
+  .head:has(#print-sheet) .coverage { width: 82px; }
+}
+/* Link tiles match the button tiles. */
+.head .actions.in-head a.button { display: inline-flex; align-items: center; justify-content: center; width: 92px; min-width: 92px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px; white-space: normal; line-height: 1.12; font-size: 13px; font-weight: 800; text-align: center; }
+@media (max-width: 1500px) { .head .actions.in-head a.button { width: 82px; min-width: 82px; font-size: 12px; } }
+
+/* Joe 10/10: the menu (and its fly-outs) always draws above the screen. Its view-transition name makes it a layer of its own,
+   so the fly-out's z-index only counts inside the menu; the menu itself is lifted above the content, tables, cards and pop-ups. */
+.sidemenu { position: relative; z-index: 300; }
+/* The fly-outs' own layer (Joe 10/10): above everything on the screen. */
+.side-flyouts { position: fixed; inset: 0 auto auto 0; width: 0; height: 0; z-index: 1000; view-transition-name: ud-flyouts; }
+.side-flyouts .flyout { display: none; position: fixed; min-width: 250px; padding: 8px 0 10px; background: #0b3d6b; color: #dbe8f5; border-radius: 0 12px 12px 0; box-shadow: 8px 6px 28px rgba(0,0,0,.32); border-left: 3px solid var(--ud-gold); }
+.side-flyouts .flyout.open { display: flex; flex-direction: column; gap: 1px; }
+.side-flyouts .flyout-title { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #9fbcd8; padding: 6px 18px 6px; }
+.side-flyouts a { display: flex; align-items: center; gap: 12px; margin: 0 8px; padding: 9px 12px; border-radius: 9px; color: #fff; text-decoration: none; font-size: 15px; font-weight: 700; white-space: nowrap; justify-content: flex-start; }
+.side-flyouts a svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.side-flyouts a span { flex: 1; }
+.side-flyouts a i { font-style: normal; font-size: 14px; color: #f2c14e; }
+.side-flyouts a:hover { background: #ffffff1c; }
+.side-flyouts a.on { background: #fff; color: #0b3d6b; }
+@media print { .side-flyouts { display: none !important; } }
+/* Equipment (Joe 10/10): Sun to Sat show each unit's default runs; today's column is marked. */
+th.eq-day, td.eq-day { padding-left: 2px !important; padding-right: 2px !important; font-size: 14px; text-align: center; white-space: normal; line-height: 1.1; }
+th.eq-day { text-transform: uppercase; }
+td.eq-day.today { background: #fff8e1; }
+td.eq-day.busy { color: #b3261e; font-weight: 800; }
+td.eq-day { font-size: 12px; font-weight: 800; overflow: visible !important; text-overflow: clip !important; }
+td.eq-day span { display: block; white-space: nowrap; }
+
+/* Equipment: Sync fleet list tile with the last sync beside it. */
+.head .actions.fleet-sync { display: flex; align-items: center; gap: 10px; flex: none; }
+.head .actions.fleet-sync #fleet-synced { font-size: 13px; color: #44515e; max-width: 260px; line-height: 1.25; }
+.head .actions.fleet-sync #fleet-synced.bad { color: #b3261e; font-weight: 600; }
+
+/* Route Editor: the action buttons are square, word-wrapped tiles in one row, like Daily and Weekly. */
+.actions.tiles { flex-wrap: nowrap; align-items: center; gap: 6px; }
+.actions.tiles > button, .actions.tiles > a.button {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 116px; min-width: 116px; max-width: 116px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px;
+  white-space: normal; line-height: 1.12; font-size: 13px; font-weight: 800; text-align: center; overflow-wrap: normal; hyphens: none;
+}
+@media (max-width: 1500px) { .actions.tiles > button, .actions.tiles > a.button { font-size: 12px; } }
+.day-table input.dcell::placeholder { color: #9aa7b4; font-style: italic; font-weight: 400; }
+.day-table td.day-notes { min-width: 160px; }
+
+/* Driver Weekly Template laid out like the current app's (Joe 10/10, old-screen picture): relief drivers first, names bold on
+   the left, section lines on the left, every day shows + Add Run and Copy / Paste / Paste + Add, Save Template green top right. */
+.template-page .tpl-bar { align-items: center; gap: 10px; }
+.template-page .tpl-about { flex: 1; color: #4a5a6a; font-size: 15px; }
+.template-page button.go { background: #1f7a3a; border-color: #1f7a3a; color: #fff; font-weight: 800; }
+.template-page button.go:disabled { background: #8fbf9e; border-color: #8fbf9e; color: #fff; }
+.template-page .tpl tr.tpl-group td { text-align: left; text-transform: uppercase; letter-spacing: .04em; font-size: 15px; }
+.template-page .tpl td.tpl-name { text-align: left; font-weight: 900; font-size: 16px; color: #14202c; padding: 10px 8px; }
+.template-page .tcell.on { background: transparent; }
+.template-page .tcell select { height: 36px; font-size: 16px; }
+.template-page .tcell .tpl-add { display: block; margin: 7px 0 4px; padding: 0; border: 0; background: none; color: #175b92; font-weight: 800; font-size: 13px; cursor: pointer; }
+.template-page .tcell .tpl-add:disabled { color: #9aa9b7; cursor: default; }
+.template-page .tpl-tools, .template-page .tcell:hover .tpl-tools { visibility: visible; display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 4px; margin-top: 4px; }
+.template-page .tpl-tools .mini { font-size: 12px; padding: 6px 2px; white-space: normal; line-height: 1.1; color: #175b92; }
+
+/* Fleet & Maintenance hub (Joe 10/10, the current app's hub picture): count strip, four cards with pictures from the
+   United Dairy icon library and their counts, the latest write-ups on the right. Every number opens its list in this window. */
+.hub-page .head .hub-tiles { margin-left: auto; }
+.hub-tiles > a.button { gap: 6px; max-width: 150px !important; min-width: 120px !important; }
+.hub-tiles > a.button img { width: 34px; height: 30px; object-fit: contain; flex: none; }
+.hub-view { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; padding-bottom: 14px; }
+.hub-page .kpis div { align-items: center; text-align: center; padding: 12px 10px; }
+.hub-page .kpis b { font-size: 34px; }
+.hub-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin: 0 16px; align-items: start; }
+.hub-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.hub-card { background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.hub-card.garage { border-top-color: #1d7a3e; }
+.hub-card-head { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; }
+.hub-card-head img { width: 96px; height: 76px; object-fit: contain; }
+.hub-card-head strong { font-size: 21px; line-height: 1.15; color: var(--ud-blue-dark); }
+.hub-card-head:hover strong { text-decoration: underline; }
+.hub-big { display: flex; flex-direction: column; align-items: flex-end; }
+.hub-big b { font-size: 44px; line-height: 1; color: var(--ud-blue-dark); }
+.hub-big small { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.hub-wrench { width: 96px; height: 76px; border-radius: 12px; background: #e3f4e8; display: grid; place-items: center; }
+.hub-wrench svg { width: 46px; height: 46px; fill: none; stroke: #1d7a3e; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hub-tiles4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.hub-tile { background: var(--band); border-radius: 9px; padding: 8px 4px; text-align: center; text-decoration: none; color: var(--ink); display: flex; flex-direction: column; gap: 2px; min-height: 64px; justify-content: center; }
+.hub-tile:hover { background: #d8e6f3; }
+.hub-tile b { font-size: 24px; color: var(--ud-blue-dark); line-height: 1.05; }
+.hub-tile span { font-size: 12.5px; font-weight: 700; color: var(--muted); line-height: 1.15; }
+.hub-tile.warn b { color: #b45f00; }
+.hub-tile.good b { color: #1d7a3e; }
+.hub-latest { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.hub-latest h2 { margin: 0; padding: 12px 16px; font-size: 18px; color: var(--ud-blue-dark); background: var(--band); }
+.hub-latest table { width: 100%; table-layout: fixed; }
+.hub-latest tbody tr { cursor: pointer; }
+.hub-latest td.wrong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Joe 10/10: the hub fits his screen with no scrolling: eleven write-ups, each a little shorter, ending in line with the cards. */
+.issues-page .hub-latest table.issues td { height: 40px; padding-top: 3px; padding-bottom: 3px; line-height: 1.15; }
+.issues-page .hub-latest table.issues th { height: 40px; }
+@media (max-width: 1500px) {
+  .hub-body { grid-template-columns: 1fr; }
+  .hub-card-head { grid-template-columns: 72px 1fr auto; }
+  .hub-card-head img, .hub-wrench { width: 72px; height: 58px; }
+}
+/* Pictures from the United Dairy icon library in the menu sit on a small white tile so they read on the blue menu too. */
+img.lib-icon { flex: none; width: 26px; height: 22px; object-fit: contain; background: #fff; border-radius: 5px; padding: 1px; }
+.dc-icon.pic { background: #fff; border: 1px solid var(--line); }
+.dc-icon.pic img { width: 88%; height: 88%; object-fit: contain; }
+
+/* Truck / Trailer / Fork Truck Issues laid out like the current app's lists (Joe 10/10 pictures): three list buttons with
+   counts on the left, search on the right; Reviewed is a tick box, Emailed and Garage a tick or a dash; the work buttons are
+   the envelope, Lessor | Garage (trucks) or To garage, Repaired and the red X. */
+.issues-page .head .title small a { color: var(--ud-blue); text-decoration: none; }
+.issues-page .head .title small a:hover { text-decoration: underline; }
+.issue-bar { margin: 0 16px; display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
+.issue-bar #search { margin-left: auto; width: 420px; max-width: 32vw; min-height: 44px; font-size: 16px; }
+.kind-tabs { display: flex; gap: 10px; }
+.kind-tabs button { min-height: 46px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.kind-tabs button b { margin-left: 8px; display: inline-block; min-width: 26px; padding: 1px 7px; border-radius: 13px; background: #e1ebf5; color: var(--ud-blue-dark); font-size: 14px; text-align: center; }
+.kind-tabs button[aria-selected="true"] { background: #0f2e52; color: #fff; border-color: #0f2e52; }
+.kind-tabs button[aria-selected="true"] b { background: var(--ud-gold); color: #0f2e52; }
+.issue-bar .chips button { min-height: 34px; font-size: 13px; }
+table.old-issues thead th { background: #0f2e52; color: #fff; text-align: center; }
+table.old-issues td { text-align: center; }
+table.old-issues td.wrong { text-align: left; }
+table.old-issues .tick { color: #1d7a3e; font-size: 24px; font-weight: 900; line-height: 1; }
+table.old-issues .dash { color: #8a97a5; font-size: 20px; }
+table.old-issues input[data-review] { width: 26px; height: 26px; cursor: pointer; accent-color: #1d7a3e; }
+table.old-issues .count { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #eef2f6; font-weight: 800; }
+table.old-issues .count.repeat { background: #fdebd3; color: #b45f00; }
+.work-acts { display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.work-acts button { min-height: 40px; padding: 0 12px; border-radius: 9px; font: inherit; font-weight: 800; cursor: pointer; border: 1px solid var(--line); background: #fff; white-space: nowrap; }
+.work-acts button:disabled { opacity: .45; cursor: default; }
+.work-acts .ic { width: 44px; padding: 0; font-size: 18px; color: var(--ud-blue-dark); }
+.work-acts .seg { display: inline-flex; }
+.work-acts .seg button { border-radius: 0; }
+.work-acts .seg .seg-l { background: #1f5f9e; color: #fff; border-color: #1f5f9e; border-radius: 9px 0 0 9px; }
+.work-acts .seg .seg-g { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; border-radius: 0 9px 9px 0; }
+.work-acts .to-garage { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; }
+.work-acts .done { background: #eaf7ee; color: #1d7a3e; border-color: #a9d8b8; }
+.work-acts .remove { color: #c62828; border-color: #f0b8b8; font-size: 20px; }
+tr.issue-more > td { background: #f6f9fc; text-align: left; padding: 10px 16px; font-weight: 600; }
+tr.issue-more p { margin: 6px 0; font-size: 16px; white-space: pre-wrap; }
+@media (max-width: 1500px) {
+  .kind-tabs button { font-size: 14px; padding: 0 12px; min-height: 40px; }
+  .issue-bar #search { width: 260px; }
+  .work-acts { gap: 5px; } .work-acts button { padding: 0 8px; min-height: 34px; font-size: 13px; } .work-acts .ic { width: 34px; }
+}
+.issue-bar .chips { flex-wrap: nowrap; }
+.issue-bar .chips button { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; padding: 0 12px; white-space: nowrap; }
+.issue-bar .chips button b { font-size: 13px; }
+
+/* One theme (Joe 10/10): every screen title starts with the same tile (a United Dairy icon library picture or a line icon),
+   every count strip is centered like the current app's, and every table head and list button uses the same blue. */
+.title h1 { display: flex; align-items: center; gap: 10px; }
+.title-pic { flex: none; width: 40px; height: 34px; border-radius: 8px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; }
+.title-pic img { width: 34px; height: 28px; object-fit: contain; }
+.title-pic svg { width: 22px; height: 22px; fill: none; stroke: var(--ud-blue); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.issues-page .kpis div { align-items: center; text-align: center; }
+table.old-issues thead th { background: var(--ud-blue); }
+.kind-tabs button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); }
+.kind-tabs button[aria-selected="true"] b { color: var(--ud-blue-dark); }
+
+/* Operational Assignments, Dispatch Settings and "being built" pages (Joe 10/10: nothing opens the old program). */
+.ops-note { margin: 0 16px 10px; color: #44515e; font-size: 15px; }
+.ops-sheet { max-width: 980px; }
+table.ops th, table.ops td { text-align: center; height: 48px; border-bottom: 1px solid var(--line); }
+table.ops thead th { background: var(--ud-blue); color: #fff; }
+table.ops td.strong { font-weight: 800; font-size: 17px; }
+table.ops td.muted { color: var(--muted); font-size: 14px; }
+table.ops tr.off td.strong { color: var(--muted); text-decoration: line-through; }
+table.ops input.ops-seq { width: 80px; height: 34px; text-align: center; font-size: 16px; }
+table.ops tr.adding input#new-name { width: 90%; }
+table.ops button.toggle { min-width: 70px; }
+.set-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 0 16px 16px; }
+.set-card, .soon-card { background: #fff; border: 1px solid #d5e1eb; border-top: 4px solid var(--ud-blue); border-radius: 14px; padding: 14px 18px; }
+.set-card h2, .soon-card h2 { margin: 0 0 10px; font-size: 18px; color: #123f70; }
+table.set th, table.set td { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 15px; }
+table.set tbody th { width: 34%; color: #123f70; }
+table.set thead th { background: var(--ud-blue); color: #fff; }
+.soon-card { margin: 0 16px; max-width: 760px; }
+.soon-card p { font-size: 16px; line-height: 1.45; }
+@media (max-width: 1100px) { .set-grid { grid-template-columns: 1fr; } }
+
+/* Fleet Service, mock-up A (Joe 10/10): one row per unit, colored words with a thin colored edge on each service cell. */
+table.fs-grid td.gc { text-align: left; padding: 6px 10px; white-space: normal; border-left: 5px solid transparent; }
+table.fs-grid td.gc b { display: block; font-size: 16px; }
+table.fs-grid td.gc small { display: block; font-size: 12px; color: #5a6b7d; }
+table.fs-grid td.gc.OVERDUE { border-left-color: #c62828; } table.fs-grid td.gc.OVERDUE b { color: #c62828; }
+table.fs-grid td.gc.DUE_SOON { border-left-color: #e5891a; } table.fs-grid td.gc.DUE_SOON b { color: #b45f00; }
+table.fs-grid td.gc.OK b { color: #1d7a3e; }
+table.fs-grid td.gc.SET_UP b, table.fs-grid td.gc.NO_MILES b { color: #5a6b7d; font-style: italic; }
+table.fs-grid td.gc.AT_GARAGE { border-left-color: #1f5f9e; } table.fs-grid td.gc.AT_GARAGE b { color: #1f5f9e; }
+.fs-legend { display: flex; align-items: center; margin: 0 0 8px; font-size: 13px; font-weight: 700; }
+.fs-legend em { margin-left: auto; font-style: normal; color: #5a6b7d; }
+
+/* Back and Home sit together at the top of the menu on every screen (Joe 10/10); Home looks like Back. */
+.sidemenu .side-home { margin-bottom: 6px; }
+
+/* Daily Dispatch, Joe's pick 10/10 (mock-up A): every row a white card with a blue edge, route numbers in blue,
+   delivery-day lines as blue banners, RUNS and Edit as round buttons. Rows still size to fit the window. */
+body.daily-look .sheet { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+body.daily-look table.daily { border-collapse: separate; border-spacing: 0 5px; background: transparent; margin-top: -5px; }
+body.daily-look table.daily thead th { background: #0f2747; color: #fff; letter-spacing: .08em; border: 0; }
+body.daily-look table.daily thead th:first-child { border-radius: 10px 0 0 10px; }
+body.daily-look table.daily thead th:last-child { border-radius: 0 10px 10px 0; }
+body.daily-look table.daily tbody tr:not(.group) td { background: #fff; border: 0; border-top: 1px solid #dfe6ee; border-bottom: 1px solid #dfe6ee; }
+body.daily-look table.daily tbody tr:not(.group) td:first-child { border-left: 5px solid #1f6feb; border-radius: 10px 0 0 10px; }
+body.daily-look table.daily tbody tr:not(.group) td:last-child { border-right: 1px solid #dfe6ee; border-radius: 0 10px 10px 0; }
+body.daily-look table.daily tbody tr:not(.group):hover td { background: #f3f8ff; }
+body.daily-look table.daily td.route { font-weight: 900; color: #0b4fb3; font-size: calc(var(--font) + 2px); }
+body.daily-look table.daily tbody tr.group td { background: linear-gradient(90deg, #1f6feb, #6aa8ff) !important; color: #fff !important; font-weight: 900; letter-spacing: .1em; border-radius: 10px; text-align: left; padding-left: 14px; }
+body.daily-look table.daily td.missing { background: #fff1f0; color: #b3261e; box-shadow: inset 0 0 0 2px #f3b8b3; border-radius: 6px; }
+body.daily-look table.daily button.toggle.on { background: #16a34a; color: #fff; border-radius: 999px; border: 0; font-weight: 900; }
+body.daily-look table.daily button.edit { border-radius: 999px; background: #0f2747; color: #fff; border: 0; }
+body.daily-look table.daily td.pickup { color: #b3261e; font-weight: 900; }
+
+/* Joe 10/10: Home is the old app's launcher: one big picture card per side (Route Distribution, Plant Operations, Fleet & Maintenance). */
+.launch-title { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 4px 16px; margin: 18px 24px; }
+.launch-title h1 { margin: 0; font-size: 30px; font-weight: 900; color: #0b3d6b; }
+.launch-title p { margin: 0; grid-column: 1; color: #4a6b8d; font-size: 16px; }
+.launch-title #today { grid-column: 2; grid-row: 1 / span 2; align-self: center; padding: 8px 16px; border-radius: 10px; background: #eef5fc; color: #0b3d6b; font-weight: 800; }
+.launch-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin: 0 24px 24px; }
+.launch-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 22px 22px; border-radius: 18px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 8px 24px rgba(11, 61, 107, .10); color: #0b3d6b; text-decoration: none; text-align: center; transition: transform .12s, box-shadow .12s; }
+.launch-card:hover, .launch-card:focus-visible { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(11, 61, 107, .20); border-color: #1f6feb; }
+.launch-art { display: flex; align-items: center; justify-content: center; width: 100%; height: clamp(150px, 26vh, 260px); border-radius: 14px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
+.launch-art img { max-width: 78%; max-height: 88%; object-fit: contain; }
+.launch-card strong { font-size: 24px; font-weight: 900; margin-top: 6px; }
+.launch-card small { color: #4a6b8d; font-size: 15px; min-height: 2.6em; }
+.launch-card b { margin-top: 4px; padding: 10px 22px; border-radius: 999px; background: #0f2747; color: #fff; font-size: 15px; }
+@media (max-width: 900px) { .launch-grid { grid-template-columns: 1fr; } .launch-art { height: 140px; } }
+/* A side's name sits under Back and Home, so it is plain which side the menu belongs to. */
+.sidemenu a.side-name { margin-bottom: 6px; border-bottom: 1px solid #ffffff33; border-radius: 9px 9px 0 0; font-size: 15px; font-weight: 900; }
+/* Long screen names wrap onto a second line instead of being cut off. */
+body:not(.side-folded) .sidemenu a { white-space: normal; line-height: 1.15; }
+body:not(.side-folded) .sidemenu a span { overflow: visible; text-overflow: clip; }
+.sidemenu a.side-name.on { border-radius: 9px; }
+
+/* Joe 10/10: every screen's action buttons sit in one row in the top line, all the same size; filters sit to their right. */
+.head .actions.in-head.top-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-left: auto; }
+.head .actions.in-head.top-row .top-part { display: contents; }
+.head .actions.in-head.top-row :is(select, input, label, .chips, .seg, .hint, .spacer, .tpl-dirty, .tpl-copy, .stepper, .seq-day, .sort) { order: 2; }
+.head .actions.in-head.top-row :is(.chips, .seg) button, .head .actions.in-head.top-row .stepper button { width: auto; min-width: 0; height: 38px; min-height: 38px; white-space: nowrap; font-size: 14px; }
+.head .actions.in-head.top-row .spacer { display: none; }
+.head .actions.in-head.top-row input[type="search"] { width: 220px; }
+/* The top line stays one line: the title gives way first; long hints wrap in their own small box; month arrows count as filters. */
+.head:has(.top-row) { flex-wrap: nowrap; }
+.head:has(.top-row) .title { min-width: 0; flex: 0 1 auto; }
+.head:has(.top-row) .title small { white-space: normal; }
+.head .actions.in-head.top-row .hint { max-width: 380px; white-space: normal; font-size: 13px; line-height: 1.25; }
+.head .actions.in-head.top-row :is(#prev, #next, .sc-period) { order: 2; }
+.head .actions.in-head.top-row :is(#prev, #next) { width: 40px; min-width: 40px; height: 38px; min-height: 38px; }
+@media (max-width: 1500px) { .head:has(.top-row) { flex-wrap: wrap; } }
+@media (max-width: 1500px) { .head .actions.in-head.top-row > :is(button, a.button), .head .actions.in-head.top-row .top-part > :is(button, a.button) { width: 92px; min-width: 92px; font-size: 12px; } }
+/* A tile row moved up keeps its wider tiles, so long names like Dispatch Administration fit. */
+.head .actions.in-head.top-row .actions.tiles > :is(button, a.button) { width: 116px; min-width: 116px; max-width: 116px; }
+
+/* Joe 10/10: the menu is a slim strip of icons until the mouse is over it (or a tablet taps it); then it opens over the screen,
+   so nothing on the screen moves. The menu button pins it open beside the screen. */
+body.side-rail .sidemenu { position: absolute; left: 0; top: 0; bottom: 0; z-index: 300; transition: none; }
+body.side-rail .side-main { margin-left: 64px; }
+body.side-rail.side-open .sidemenu { box-shadow: 6px 0 24px rgba(0, 0, 0, .25); }
+body.side-pinned.side-open .sidemenu { position: relative; box-shadow: none; }
+body.side-pinned.side-open .side-main { margin-left: 0; }
+
+/* Joe 10/10: Administrators get a fourth home card, Administration; its link in the menu shows only to them. */
+body:not(.is-admin) .sidemenu a[href="administration.html"] { display: none; }
+.launch-grid.with-admin { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.launch-art svg.launch-admin { width: auto; height: 78%; max-width: 78%; }
+@media (max-width: 1200px) { .launch-grid.with-admin { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* The Administration Center: every item of the current app's Administration, grouped, same-size tiles. */
+
+/* The all-plants overview (the current app's Company Home): banner, six numbers, one card per plant. */
+.company-page #screen { background: #f3f6fa; }
+.co-hero { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 16px 16px 14px; padding: 22px 28px; border-radius: 18px; background: linear-gradient(100deg, #1768c6, #6fb0ef); color: #fff; box-shadow: 0 10px 26px rgba(23, 104, 198, .25); }
+.co-hero h1 { margin: 0; font-size: 32px; font-weight: 900; }
+.co-hero p { margin: 4px 0 0; font-size: 16px; opacity: .92; }
+.co-date { display: flex; flex-direction: column; align-items: center; padding: 10px 22px; border-radius: 12px; background: #fff; color: #0b3d6b; }
+.co-date small { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #5a6b7d; }
+.co-date b { font-size: 18px; font-weight: 900; }
+.co-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin: 0 16px 16px; }
+.co-kpi { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 10px; border-radius: 14px; background: #fff; border: 1px solid #dfe6ee; border-top: 5px solid var(--accent); text-align: center; }
+.co-kpi span { font-size: 13px; font-weight: 800; color: #4a6b8d; text-transform: uppercase; letter-spacing: .06em; }
+.co-kpi b { font-size: 30px; font-weight: 900; color: var(--accent); }
+.co-kpi small { font-size: 13px; color: #5a6b7d; }
+.co-plants { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0 16px 24px; }
+.co-plant { display: flex; flex-direction: column; border-radius: 16px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 6px 18px rgba(11, 61, 107, .10); color: #0b3d6b; text-decoration: none; overflow: hidden; transition: transform .12s, box-shadow .12s; }
+.co-plant:hover, .co-plant:focus-visible { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(11, 61, 107, .18); }
+.co-plant header { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px; padding: 14px 18px; background: #0f2747; color: #fff; }
+.co-plant header .dot { width: 12px; height: 12px; border-radius: 50%; background: #20ad54; }
+.co-plant.planned header .dot { background: #9aa8b5; }
+.co-plant header strong { text-align: center; font-size: 20px; font-weight: 900; }
+.co-plant header em { font-style: normal; font-size: 12px; font-weight: 900; padding: 3px 10px; border-radius: 999px; background: #8996a3; color: #fff; }
+.co-plant header em.on { background: #20ad54; }
+.co-plant header span { font-size: 20px; }
+.co-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 14px 16px 6px; }
+.co-cell { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 10px; background: #f3f8ff; }
+.co-cell span { font-size: 12px; font-weight: 800; color: #4a6b8d; text-transform: uppercase; letter-spacing: .04em; }
+.co-cell b { font-size: 22px; font-weight: 900; }
+.co-cell.good b { color: #0c9a4b; } .co-cell.bad b { color: #b3261e; } .co-cell.warn b { color: #b86b00; }
+.co-recent { padding: 6px 16px 10px; }
+.co-recent h3 { margin: 6px 0; font-size: 13px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: #4a6b8d; }
+.co-act { display: grid; grid-template-columns: 150px 1fr auto auto; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid #edf1f5; font-size: 14px; }
+.co-act span { font-weight: 800; color: #4a6b8d; }
+.co-act b { font-weight: 900; } .co-act b.none { color: #8996a3; font-weight: 700; }
+.co-act i { font-style: normal; color: #4a6b8d; }
+.co-act time { font-weight: 800; }
+.co-plant footer { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 12px 18px; background: #eef5fc; font-weight: 800; }
+.co-plant footer b { font-size: 18px; }
+.co-plant footer em { margin-left: auto; font-style: normal; color: #1f6feb; }
+.co-soon { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; flex: 1; min-height: 260px; padding: 24px; text-align: center; color: #5a6b7d; }
+.co-soon b { font-size: 20px; color: #0b3d6b; }
+.co-plant.planned { opacity: .92; }
+@media (max-width: 1200px) { .co-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .co-plants { grid-template-columns: 1fr; } }
+
+/* Joe 10/10: Administration like the current app's tab, only better: every item in a menu on the left, the item opens on the right. */
+body.embed .topbar, body.embed .sidemenu, body.embed .side-flyouts { display: none !important; }
+body.embed .side-main { margin-left: 0 !important; }
+.adm-shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; gap: 14px; padding: 12px 16px 14px; }
+.adm-shell[hidden] { display: none; }
+.adm-shell > .soon-card { grid-column: 1 / -1; }
+.adm-nav { min-height: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #dfe6ee; border-radius: 14px; box-shadow: 0 4px 14px rgba(11, 61, 107, .06); overflow: hidden; }
+.adm-nav-head { padding: 14px 14px 10px; border-bottom: 1px solid #e6ecf2; display: flex; flex-direction: column; gap: 10px; }
+.adm-nav-head h1 { margin: 0; font-size: 22px; font-weight: 900; color: #0b3d6b; }
+.adm-nav-head input { min-height: 40px; padding: 0 12px; border: 1px solid #cfd9e3; border-radius: 9px; font: inherit; }
+.adm-nav-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px 12px; }
+.adm-nav-group h2 { margin: 12px 8px 4px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; color: #5a6b7d; }
+.adm-item { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 5px 8px; border: 0; border-radius: 9px; background: none; color: #0b3d6b; font: inherit; font-size: 15px; font-weight: 700; text-align: left; cursor: pointer; }
+.adm-item:hover { background: #eef5fc; }
+.adm-item.on { background: #0b3d6b; color: #fff; }
+.adm-item .adm-name { flex: 1; min-width: 0; }
+.adm-item em { flex: none; font-style: normal; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: #f1f3f5; color: #6a7885; }
+.adm-item.viewonly em { background: #e3f3e8; color: #1c6b3a; }
+.adm-item.on em { background: rgba(255, 255, 255, .18); color: #fff; }
+.adm-ic { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
+.adm-ic img { max-width: 28px; max-height: 24px; object-fit: contain; }
+.adm-ic svg { width: 19px; height: 19px; fill: none; stroke: #1f6feb; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.adm-ic.big { width: 48px; height: 48px; border-radius: 12px; }
+.adm-ic.big img { max-width: 42px; max-height: 36px; }
+.adm-ic.big svg { width: 26px; height: 26px; }
+.adm-none { margin: 14px 8px; color: #5a6b7d; }
+.adm-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #dfe6ee; border-radius: 14px; box-shadow: 0 4px 14px rgba(11, 61, 107, .06); overflow: hidden; }
+.adm-panel-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid #e6ecf2; background: linear-gradient(180deg, #f7fafd, #fff); }
+.adm-panel-head > div:not(.adm-actions) { flex: 1; min-width: 0; }
+.adm-panel-head h2 { margin: 0; font-size: 20px; font-weight: 900; color: #0b3d6b; }
+.adm-panel-head small { display: block; color: #4a6b8d; font-size: 13px; line-height: 1.35; }
+.adm-actions { flex: none; display: flex; gap: 8px; }
+.adm-actions .button { min-height: 40px; min-width: 170px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: #0b3d6b; color: #fff; font-weight: 800; text-decoration: none; }
+.adm-actions .button:hover { background: #1f6feb; }
+body.embed .head > .title { display: none; }
+.adm-state { font-size: 13px; font-weight: 800; padding: 6px 14px; border-radius: 999px; background: #f1f3f5; color: #6a7885; }
+.adm-state.viewonly { background: #e3f3e8; color: #1c6b3a; }
+.adm-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: #f2f5f9; }
+.adm-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; overflow: hidden; }
+.adm-view .scroll-list { flex: 1; min-height: 0; overflow: auto; border: 1px solid #e6ecf2; border-radius: 10px; }
+.adm-view .scroll-list thead th { position: sticky; top: 0; z-index: 1; }
+.adm-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.adm-kpis div { background: #f7fafd; border: 1px solid #e6ecf2; border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.adm-kpis b { font-size: 26px; color: #0b3d6b; line-height: 1.1; }
+.adm-kpis span { font-size: 12px; font-weight: 800; color: #5a6b7d; text-transform: uppercase; letter-spacing: .03em; }
+.adm-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.adm-table th { background: #0b3d6b; color: #fff; text-align: center; padding: 9px 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+.adm-table td { text-align: center; padding: 8px 10px; border-bottom: 1px solid #e6ecf2; }
+.adm-table td.strong { font-weight: 800; color: #0b3d6b; }
+.adm-table .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.adm-table .pill.good { background: #e3f3e8; color: #1c6b3a; }
+.adm-table .pill.muted { background: #f1f3f5; color: #6a7885; }
+.adm-note { margin: 0; font-size: 13px; }
+.adm-loading { color: #5a6b7d; }
+.adm-soon { margin: 30px auto; max-width: 620px; text-align: center; padding: 28px; border: 1px dashed #c9d5e1; border-radius: 14px; background: #f9fbfd; }
+.adm-soon h3 { margin: 0 0 8px; font-size: 20px; color: #0b3d6b; }
+.adm-soon p { margin: 6px 0; color: #34495e; }
+@media (max-width: 900px) { .adm-shell { grid-template-columns: 1fr; } .adm-nav { max-height: 40vh; } }
+
+/* Phones (360-480 wide): the header title wraps beside a smaller logo and never runs under the initials or Sign out. */
+@media (max-width: 480px) {
+  .topbar { gap: 8px; padding: 4px 10px; }
+  .brand { gap: 8px; flex: 1 1 auto; }
+  .brand img { width: 92px; height: 32px; padding: 2px; }
+  .brand > span { min-width: 0; }
+  .brand strong { font-size: 15px; line-height: 1.15; white-space: normal; overflow-wrap: anywhere; }
+  .brand small { display: none; }
+  .topbar .who, .topbar #signout { flex: none; }
+}
+
+/* Joe 10/10: a whole card opens its screen; a line or number inside opens that screen. */
+[data-card], [data-open] { cursor: pointer; }
+[data-open]:hover { background-color: rgba(31, 111, 235, .08); border-radius: 8px; }
+.co-plant header a { color: #fff; text-decoration: none; text-align: center; }
+.co-plant footer > a { margin-left: auto; color: #1f6feb; text-decoration: none; }
+.co-plant footer > a:hover { text-decoration: underline; }
+.co-plant footer > span { padding: 2px 6px; }
+
+/* Weekly Dispatch (Joe 10/10): names never run into the drop-down arrow; a day marked not running that still holds a
+   driver shows the driver, light and dashed, never black; the editor says why truck and trailer wait for a driver. */
+.weekly-page #routes-sheet td.day .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.weekly-page #routes-sheet td.day.c-notrun { color: #5d7286; }
+.weekly-page #routes-sheet td.day.c-notrun::before { background: #eef1f4; border: 1px dashed #9aa9b7; }
+.weekly-page #routes-sheet td.day .notrun { display: block; margin-top: 1px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #a35b00; }
+.popover select:disabled { background: #f1f3f5; color: #6b7785; cursor: not-allowed; }
+
+/* Route Run Days (Joe 10/10): a little wider so every route and run reads in full; day over date like the board;
+   all seven days fit with no sideways scrollbar. */
+.modal.wide-modal#days-modal { width: min(960px, calc(100vw - 32px)); }
+#days-modal .down-list { overflow-x: hidden; }
+#days-modal .down-list table { width: 100%; table-layout: fixed; }
+#days-modal thead th { line-height: 1.15; padding: 6px 2px; }
+#days-modal thead th small { display: block; font-size: 10px; font-weight: 700; letter-spacing: .03em; opacity: .85; }
+#days-modal thead th:nth-child(1) { width: 62px; }
+#days-modal thead th:nth-child(2) { width: 200px; }
+#days-modal tbody td { padding: 0 3px; }
+#days-modal tbody td:nth-child(2) { text-align: left; padding-left: 8px; }
+#days-modal #days-rows button.toggle { width: 100%; max-width: 84px; padding: 0 4px; }
+/* Weekly (Joe 10/10): the driver drop-down opens right on the clicked box, like the current screen. */
+.popover.cell-pick { display: block; padding: 0; border: 0; border-radius: 7px; background: transparent; box-shadow: 0 0 0 2px var(--ud-gold), 0 6px 18px rgba(0,0,0,.25); }
+.popover.cell-pick select { width: 100%; height: 100%; border: 1px solid #bfd1e0; border-radius: 7px; background: #fff; color: #0e3a62; text-align: center; text-align-last: center; font-size: 15px; font-weight: 850; }
+
+/* Vacation Schedule (Joe 10/10): one View drop-down in place of the five filter buttons, and Print for the list shown. */
+.vac-view { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.vac-view select { height: 38px; min-width: 190px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 15px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--ud-blue); background: #fff; cursor: pointer; }
+#day-modal .notice.error { margin: 0 0 10px; }
+@media print { body:has(#print .vac-print) { background: #fff !important; } #print .vac-print-sub { margin: 0 0 8px; font-size: 12px; } #print table.vac-print { width: 100%; font-size: 12px; } #print table.vac-print :is(td, th):is(:first-child, :last-child) { text-align: left; } }

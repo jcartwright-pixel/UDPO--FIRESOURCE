@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>GPS Setup · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="gps-page">
+  <div class="signin" id="signin" hidden>
+    <h1>GPS Setup</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>GPS Setup</h1><small>Waiting on Verizon Fleet API access. United Dairy is on Verizon Connect Fleet; this connection is finished once Verizon turns on Fleet API services and sends the API login and docs.</small></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="gps-grid">
+      <section class="gps-card">
+        <h2>1. Verizon Connect login <span class="pill" id="state">-</span></h2>
+        <p class="hint">Type these here only, never in a chat or email. They are locked away on the server and never shown again. Leave a box blank to keep what is saved.</p>
+        <form id="form" autocomplete="off" onsubmit="return false">
+          <label>API user name<input id="f-user" autocomplete="off"></label>
+          <label>API password<input id="f-pass" type="password" autocomplete="new-password"></label>
+          <label>App ID<input id="f-app" autocomplete="off"></label>
+          <label>Fleetmatics address<input id="f-base" autocomplete="off"></label>
+          <div class="gps-buttons">
+            <button type="button" class="primary" id="save">Save login</button>
+            <button type="button" id="clear">Remove login</button>
+          </div>
+        </form>
+        <p class="hint" id="saved"></p>
+      </section>
+      <section class="gps-card">
+        <h2>2. Test connection</h2>
+        <p class="hint">Test checks the user name and password. Add one truck's vehicle number (as Reveal shows it) to check the App ID too.</p>
+        <label>Vehicle number (optional)<input id="f-vehicle" autocomplete="off" placeholder="for example 223876"></label>
+        <div class="gps-buttons"><button type="button" class="primary big" id="test">Test connection</button></div>
+        <div class="gps-result" id="result" hidden></div>
+        <p class="hint" id="last"></p>
+      </section>
+      <section class="gps-card wide">
+        <h2>3. Waiting on Verizon Fleet API access</h2>
+        <ol class="gps-steps">
+          <li>The Developer Portal login and the everyday Verizon login do not work here. This box needs the separate API (integration) user name and password that Verizon Connect gives you.</li>
+          <li>United Dairy is on Verizon Connect <b>Fleet</b> (the old Telogis). Ask Verizon Connect support: "Please turn on API services for our Fleet account (united-dairy), create an API user for an in-house integration that reads vehicle locations and trip history, and send the user name, password and Fleet API documentation."</li>
+          <li>When Verizon answers, type the user name and password in box 1 and press <b>Save login</b>. Type them here only, never in a chat or email.</li>
+          <li>Press <b>Test connection</b>. Green means it works; red says what to fix.</li>
+        </ol>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer } from './js/app.js';
+
+    let s = null, armed = null;
+    const $ = (id) => document.getElementById(id);
+    // Date and time both in New York time (the stored time is UTC, so its first 10 characters are tomorrow after 8 p.m.).
+    const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '') : ''; };
+    function render() {
+      if (!s) return;
+      const all = s.hasUser && s.hasPassword && s.hasAppId, some = s.hasUser || s.hasPassword || s.hasAppId;
+      $('state').textContent = all ? 'Saved' : some ? 'Partly saved' : 'Not saved';
+      $('state').className = 'pill ' + (all ? 'yes' : some ? 'warn' : 'no');
+      $('f-user').placeholder = s.hasUser ? 'saved (type to change)' : '';
+      $('f-pass').placeholder = s.hasPassword ? 'saved (type to change)' : '';
+      $('f-app').placeholder = s.hasAppId ? 'saved (type to change)' : '';
+      if (document.activeElement !== $('f-base')) $('f-base').value = s.baseUrl || '';
+      $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
+      const t = s.lastTest;
+      $('last').textContent = t ? 'Last test ' + stamp(t.at) + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
+    }
+    async function call(fields, button) {
+      showError('');
+      if (button) button.disabled = true;
+      try { s = await callServer('gps', fields); render(); return s; }
+      catch (e) { showError('Could not reach the GPS settings (' + (e.message || String(e)) + '). Check the network and try again.'); if (!s) { $('state').textContent = 'Unknown'; $('state').className = 'pill warn'; } return null; }
+      finally { if (button) button.disabled = false; }
+    }
+    $('save').onclick = async () => {
+      const r = await call({ op: 'save', user: $('f-user').value, password: $('f-pass').value, appId: $('f-app').value, baseUrl: $('f-base').value }, $('save'));
+      if (r) { ['f-user', 'f-pass', 'f-app'].forEach(id => { $(id).value = ''; }); $('result').hidden = true; }
+    };
+    // No pop-up: the first tap arms the button, a second tap within 5 seconds removes the login.
+    $('clear').onclick = async () => {
+      const b = $('clear');
+      if (!armed) { b.textContent = 'Tap again to remove'; b.classList.add('armed'); armed = setTimeout(() => { armed = null; b.textContent = 'Remove login'; b.classList.remove('armed'); }, 5000); return; }
+      clearTimeout(armed); armed = null; b.textContent = 'Remove login'; b.classList.remove('armed');
+      await call({ op: 'clear' }, b);
+    };
+    $('test').onclick = async () => {
+      $('result').hidden = false; $('result').className = 'gps-result'; $('result').textContent = 'Testing...';
+      const r = await call({ op: 'test', vehicle: $('f-vehicle').value }, $('test'));
+      if (!r) { $('result').hidden = true; return; }
+      $('result').className = 'gps-result ' + (r.result.ok ? 'ok' : 'bad');
+      $('result').innerHTML = '<b>' + (r.result.ok ? 'PASSED' : 'FAILED') + '</b> ' + escapeHtml(r.result.message);
+    };
+    // Enter in a login box saves it; Enter in the vehicle box runs the test.
+    ['f-user', 'f-pass', 'f-app', 'f-base'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
+    $('f-vehicle').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('test').click(); } });
+    requireSignIn(async () => { await start(); await call({ op: 'status' }); });
+  </script>
+</body>
+</html>

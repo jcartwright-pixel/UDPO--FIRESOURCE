@@ -1,0 +1,59 @@
+name: Distribution app tests
+
+# The new Firebase distribution app (this repository). Runs its tests against Google's local emulators with
+# made-up sheets: no Firebase project, no Google Sheets and no production data are touched.
+on:
+  push:
+    paths:
+      - '**'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    paths:
+      - '**'
+      - '.github/workflows/tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribution-app-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install
+        run: npm ci
+      - name: Unit tests (dispatch rules, transfer, save checks, sign-in)
+        run: npm test
+      - name: Database tests on the local emulator (transfer, saves, security rules)
+        run: npm run test:emulator
+      - name: Install the test browser
+        run: npx playwright install --with-deps chromium
+      - name: Screen tests on the local emulator (Daily, Weekly, fit to one page, live update)
+        # Pictures go outside functions/: the emulator reloads the server when a file appears there, which slowed
+        # saves mid-test and made the Route Editor checks time out.
+        run: mkdir -p "$RUNNER_TEMP/shots" && SHOTS_DIR="$RUNNER_TEMP/shots" npm run test:browser
+      - name: Keep the screen pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: distribution-app-screens
+          path: ${{ runner.temp }}/shots/
+          if-no-files-found: ignore
+          retention-days: 14

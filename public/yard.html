@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Yard Checks · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page yard-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Yard Checks</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Live Trailer Monitoring · Timestamped Checks</span><h1>Yard Checks</h1></div>
+      <div class="tabs" id="panes" role="tablist" aria-label="Yard view"><button type="button" role="tab" data-pane="current">Active Yard Queue</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
+      <button type="button" class="yd-refresh" id="refresh" data-top>&#8635; Refresh</button><button type="button" class="yd-refresh" id="refresh-history" data-top hidden>&#8635; Refresh History</button>
+      <div class="dayname" id="dayname"></div>
+      <div class="hstats" id="hstats"></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="yd-bar" id="bar-current">
+        <img class="yd-icon" src="img/library/yard-checks.webp" alt="">
+        <div><h2>Active Yard Queue</h2><p>Trailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.</p></div>
+        <span class="yd-cycle"><b>2-hour recheck cycle</b> · Trailers past dispatch time will not reappear.</span>
+      </div>
+      <div class="yd-bar" id="bar-history" hidden>
+        <img class="yd-icon" src="img/library/yard-checks.webp" alt="">
+        <div><h2>24-Hour History</h2><p>All recorded yard checks with timestamps.</p></div>
+        <span class="yd-grow"></span>
+      </div>
+      <div class="yd-cards" id="cards" aria-label="Trailers to check"></div>
+      <div class="sheet scroll-list" id="pane-current">
+        <table class="loadout yd-table">
+          <colgroup><col style="width:11%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:23%"><col style="width:11%"><col style="width:11%"><col style="width:14%"></colgroup>
+          <thead><tr><th><span class="l">Trailer #</span><span class="s">Trailer</span></th><th><span class="l">Actual Temp (°F)</span><span class="s">Temp °F</span></th><th><span class="l">Temp Set Point (°F)</span><span class="s">Set °F</span></th><th><span class="l">Fuel Level</span><span class="s">Fuel</span></th><th>Notes</th><th>Last Check</th><th>Next Recheck</th><th>Action</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="sheet scroll-list" id="pane-history" hidden>
+        <table class="loadout yd-table yd-history">
+          <colgroup><col style="width:15%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:11%"><col style="width:28%"><col style="width:15%"></colgroup>
+          <thead><tr><th>Date / Time</th><th>Trailer #</th><th>Temp (°F)</th><th>Set Point (°F)</th><th>Fuel Level</th><th>Notes</th><th>Recorded By / Status</th></tr></thead>
+          <tbody id="history"></tbody>
+        </table>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { savedText, watchRound } from './js/autosave.js';
+
+    const L = window.UDLogic, U = window.UDPlant;
+    const FUEL = [['', ''], ['FULL', 'FULL'], ['3/4', '3/4'], ['1/2', '1/2'], ['EMPTY', 'EMPTY']];
+    const params = new URLSearchParams(location.search);
+    const today = () => L.operatingDay(new Date());
+    let date = today(), pane = params.get('view') === 'history' ? 'history' : 'current';
+    let runs = [], journal = [], person = null, app = {};
+    const drafts = {};          // trailer -> what was typed and not recorded yet
+    const pending = [];         // checks pressed and not back from the database yet (shown at once)
+    const armed = {};           // trailer -> Left Yard pressed once, waiting for Confirm Left
+    const unsubs = [];
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
+    const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : String(v || ''); };
+    const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
+    const STATUS = { COMPLETE: 'Recorded', RECORDED: 'Recorded', DEPARTED: 'Left Yard' };
+
+    function all() { return journal.concat(pending); }
+    function queue() { return U.yardQueue(runs, all(), date, Date.now()); }
+
+    // A re-draw while someone is typing in the table waits until they leave the box.
+    let waiting = false;
+    function typing() { const a = document.activeElement; return !!(a && a.closest && (a.closest('#rows') || a.closest('#cards')) && /INPUT|SELECT|TEXTAREA/.test(a.tagName)); }
+    // The phone (yard hands): one card per trailer, every box saves as it is left, no Record button and no history.
+    const phoneQuery = window.matchMedia('(max-width: 760px)');
+    const phone = () => phoneQuery.matches;
+    phoneQuery.addEventListener('change', () => render());
+    function render() {
+      if (typing()) { waiting = true; return; }
+      waiting = false;
+      forgetOld();
+      const q = queue(), ck = canSave(), hist = U.yardHistory(all(), date, Date.now());
+      const latest = hist.find(h => h.status !== 'DEPARTED');
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase();
+      document.getElementById('hstats').innerHTML = [['Active', q.rows.length + q.locked.length, ''], ['Due', q.rows.length, q.rows.length ? 'warn' : ''], ['Checked', q.locked.length, q.locked.length ? 'good' : ''],
+        ['Latest', latest ? clock(latest.recordedAt) : 'None', '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + l + '</span></div>').join('');
+      document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
+      ['current', 'history'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; }); document.getElementById('refresh').hidden = pane !== 'current'; document.getElementById('refresh-history').hidden = pane !== 'history';
+      // Joe 10/10: no Record button on the desktop either. Each box saves as it is left; a trailer checked here stays on the list
+      // while it is filled in, and a trailer due again starts with empty boxes (its last check is in Last Check).
+      document.getElementById('rows').innerHTML = q.rows.concat(q.locked.filter(x => mine[x.trailer])).map(x => {
+        const m = mine[x.trailer], d = drafts[x.trailer] || {}, v = (k) => d[k] !== undefined ? d[k] : (m || x.locked ? x[k] || '' : '');
+        const next = x.minutesUntilDue > 0 ? 'Due in ' + x.minutesUntilDue + ' min' : 'Due now';
+        const last = x.recordedAt ? escapeHtml(clock(x.recordedAt)) + ' · ' + escapeHtml(initials(x.recordedBy)) : '—';
+        const dis = ck ? '' : ' disabled';
+        return '<tr data-trailer="' + escapeHtml(x.trailer) + '" data-route="' + escapeHtml(x.routeRun) + '"><td class="yd-trailer"><b>' + escapeHtml(x.trailer) + '</b><small>' + escapeHtml(next) + '</small></td>' +
+          '<td><input class="yd-temp" data-k="temperature" inputmode="decimal" aria-label="Temperature for trailer ' + escapeHtml(x.trailer) + '" placeholder="Temp" value="' + escapeHtml(v('temperature')) + '"' + dis + '></td>' +
+          '<td><input class="yd-set" value="' + escapeHtml(x.setPoint) + '" readonly tabindex="-1"></td>' +
+          '<td><select data-k="fuelLevel"' + dis + '>' + FUEL.map(([val, label]) => '<option value="' + val + '"' + (v('fuelLevel') === val ? ' selected' : '') + '>' + label + '</option>').join('') + '</select></td>' +
+          '<td><input class="yd-notes" data-k="notes" placeholder="Add notes (optional)…" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></td>' +
+          '<td class="yd-last">' + last + '</td><td class="yd-next' + (x.minutesUntilDue === 0 ? ' overdue' : '') + '">' + escapeHtml(next) + '<small>' + escapeHtml(x.routeRun) + '</small></td>' +
+          '<td class="yd-act">' + (ck ? (m ? (m.saved === 'saving' ? '<span class="yd-tick saving">Saving…</span>' : m.saved === 'error' ? '<span class="yd-tick error">Not saved</span>' : '<span class="yd-tick">&#10003; ' + escapeHtml(m.at || 'Saved') + '</span>') : '') + '<button type="button" class="yd-left" data-left' + (armed[x.trailer] ? ' data-armed="true">Confirm Left' : ' title="Trailer has left the yard">Left Yard') + '</button>' : '<span class="pill">View only</span>') + '</td></tr>';
+      }).join('') || (got.runs && got.journal ? '<tr><td colspan="8" class="empty">No loaded trailers are currently due for a yard check.</td></tr>' : '<tr><td colspan="8" class="empty">Loading the trailers&hellip;</td></tr>');
+      drawCards(q, ck);
+      document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="yd-trailer"><b>' + escapeHtml(h.trailer) + '</b></td><td>' + escapeHtml(h.temperature) + '</td><td>' + escapeHtml(h.setPoint) + '</td>' +
+        '<td>' + escapeHtml(h.fuelLevel) + '</td><td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + ' <span class="yd-status' + (h.status === 'DEPARTED' ? ' left' : '') + '">' + escapeHtml(STATUS[h.status] || h.status) + '</span></td></tr>').join('') ||
+        '<tr><td colspan="7" class="empty">No yard checks in the last 24 hours.</td></tr>';
+      document.getElementById('foot').textContent = pane === 'current'
+        ? q.rows.length + ' trailer' + (q.rows.length === 1 ? '' : 's') + ' due, ' + q.locked.length + ' checked in the last 2 hours. ' + (ck ? 'Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.' : 'View only.')
+        : hist.length + ' record' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+    }
+
+
+    // Phone cards: the trailers due, plus the ones checked on this phone in this visit (kept on screen so the rest can be filled in).
+    const got = { runs: false, journal: false }; // the first loads and checks have arrived
+    const mine = {};            // trailer -> { checkId, saved: 'saving' | 'saved' | 'error', at, first }
+    // A check made here is finished once its 2-hour lock runs out: the trailer is due again with empty boxes, and its next
+    // save starts a new check (the old one can no longer be filled in).
+    const LOCK_MS = (U.YARD_LOCK_MINUTES || 120) * 60000;
+    function forgetOld() {
+      Object.keys(mine).forEach(t => { const m = mine[t]; if (m.first && m.saved !== 'saving' && Date.now() - m.first >= LOCK_MS) { delete mine[t]; delete drafts[t]; } });
+    }
+    const queues = {};          // trailer -> the saves of that trailer, one after the other
+    function drawCards(q, ck) {
+      const box = document.getElementById('cards');
+      if (!phone()) { box.innerHTML = ''; return; }
+      const list = q.rows.concat(q.locked.filter(x => mine[x.trailer])).sort((a, b) => a.departureDate.localeCompare(b.departureDate) || (a.departureTime == null ? 99999 : a.departureTime) - (b.departureTime == null ? 99999 : b.departureTime) || a.index - b.index);
+      box.innerHTML = list.map(x => {
+        const m = mine[x.trailer], d = drafts[x.trailer] || {}, v = (k) => d[k] !== undefined ? d[k] : (m || x.locked ? x[k] : '');
+        const dis = ck ? '' : ' disabled', fuel = v('fuelLevel');
+        const state = m ? (m.saved === 'saving' ? '<span class="yd-tick saving">Saving…</span>' : m.saved === 'error' ? '<span class="yd-tick error">Not saved</span>' : '<span class="yd-tick">&#10003; Saved</span>')
+          : '<span class="yd-due' + (x.minutesUntilDue === 0 ? ' now' : '') + '">' + (x.minutesUntilDue > 0 ? 'Due in ' + x.minutesUntilDue + ' min' : 'Due now') + '</span>';
+        return '<article class="yd-card' + (m ? ' done' : '') + '" data-trailer="' + escapeHtml(x.trailer) + '" data-route="' + escapeHtml(x.routeRun) + '">' +
+          '<header><b>' + escapeHtml(x.trailer) + '</b><span class="yd-run">' + escapeHtml(x.routeRun) + '</span>' + state + '</header>' +
+          '<label class="yd-f"><span>Temp °F</span><input data-k="temperature" inputmode="decimal" enterkeyhint="done" placeholder="Temp" value="' + escapeHtml(v('temperature')) + '"' + dis + '></label>' +
+          '<div class="yd-f"><span>Fuel</span><div class="yd-fuel">' + ['FULL', '3/4', '1/2', 'EMPTY'].map(f => '<button type="button" data-fuel="' + f + '" aria-pressed="' + (fuel === f) + '"' + dis + '>' + (f === 'FULL' ? 'Full' : f === 'EMPTY' ? 'Empty' : f) + '</button>').join('') + '</div></div>' +
+          '<label class="yd-f"><span>Notes</span><input data-k="notes" enterkeyhint="done" placeholder="Optional" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></label>' +
+          (ck ? '<button type="button" class="yd-leave" data-left' + (armed[x.trailer] ? ' data-armed="true">Tap again to confirm: left the yard' : '>Left Yard') + '</button>' : '') + '</article>';
+      }).join('') || (got.runs && got.journal ? '<p class="yd-none">No loaded trailers are due for a yard check.</p>' : '<p class="yd-none">Loading the trailers&hellip;</p>');
+    }
+    // One box was left (or a fuel button tapped): save that trailer's check. The first save is the check (locked for 2 hours);
+    // the next ones fill in the same check.
+    // The row's "Saving… / Saved" shows at once, even while the next box of the row is being typed in (the row is not redrawn then).
+    function tick(trailer) {
+      const m = mine[trailer], td = [...document.querySelectorAll('#rows tr[data-trailer]')].find(r => r.dataset.trailer === trailer);
+      const cell = td && td.querySelector('.yd-act');
+      if (!m || !cell) return;
+      let t = cell.querySelector('.yd-tick');
+      if (!t) { t = document.createElement('span'); cell.prepend(t); }
+      t.className = 'yd-tick' + (m.saved === 'saving' ? ' saving' : m.saved === 'error' ? ' error' : '');
+      t.textContent = m.saved === 'saving' ? 'Saving…' : m.saved === 'error' ? 'Not saved' : '\u2713 ' + (m.at || 'Saved');
+    }
+    function autoSave(card) {
+      const trailer = card.dataset.trailer, routeRun = card.dataset.route, d = drafts[trailer] || {};
+      // The temperature must be a number (or left empty); anything else is not sent and the box says why.
+      if (d.temperature !== undefined && String(d.temperature).trim() !== '' && !/^-?\d+(\.\d+)?$/.test(String(d.temperature).trim())) {
+        if (mine[trailer]) { mine[trailer].saved = 'error'; tick(trailer); }
+        showError('Yard check ' + trailer + ' not saved: the temperature must be a number, like 35.');
+        return;
+      }
+      forgetOld();
+      const x = queue().rows.concat(queue().locked).find(r => r.trailer === trailer) || {};
+      const m = mine[trailer] = mine[trailer] || { saved: 'saving' };
+      m.saved = 'saving';
+      tick(trailer);
+      const pick = (k) => d[k] !== undefined ? d[k] : (m.checkId ? x[k] || '' : '');
+      const run = async () => {
+        const fields = { date, trailer, routeRun, temperature: pick('temperature'), setPoint: x.setPoint || '', fuelLevel: pick('fuelLevel'), notes: pick('notes') };
+        if (m.checkId) fields.checkId = m.checkId;
+        let mineRec = null;
+        if (!m.checkId) {
+          mineRec = { type: 'YARD_CHECK', date, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, run: routeRun, payload: Object.assign({ route: routeRun, run: routeRun, status: 'COMPLETE' }, fields) };
+          pending.push(mineRec);
+        }
+        render();
+        try {
+          const res = await save('saveYardCheck', fields);
+          m.checkId = res && res.checkId || m.checkId;
+          if (!m.first) m.first = Date.now();
+          m.saved = 'saved';
+          m.at = savedText();
+          tick(trailer);
+          showError('');
+        } catch (e) {
+          m.saved = 'error';
+          tick(trailer);
+          showError('Yard check ' + trailer + ' not saved (' + (e.message || e) + '). Type it again to retry.');
+        }
+        if (mineRec) setTimeout(() => { const i = pending.indexOf(mineRec); if (i >= 0) pending.splice(i, 1); render(); }, 1500);
+        render();
+      };
+      queues[trailer] = (queues[trailer] || Promise.resolve()).then(run);
+    }
+    const cardsEl = document.getElementById('cards');
+    cardsEl.addEventListener('input', e => { const c = e.target.closest('.yd-card'), k = e.target.dataset.k; if (c && k) (drafts[c.dataset.trailer] = drafts[c.dataset.trailer] || {})[k] = e.target.value; });
+    cardsEl.addEventListener('change', e => { const c = e.target.closest('.yd-card'); if (c && e.target.dataset.k) autoSave(c); });
+    cardsEl.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.k) e.target.blur(); });
+    cardsEl.addEventListener('focusout', () => setTimeout(() => { if (waiting && !typing()) render(); }, 0));
+    cardsEl.addEventListener('click', e => {
+      const b = e.target.closest('button'), c = b && b.closest('.yd-card');
+      if (!b || !c) return;
+      const trailer = c.dataset.trailer;
+      if (b.dataset.fuel) { (drafts[trailer] = drafts[trailer] || {}).fuelLevel = b.dataset.fuel; autoSave(c); return; }
+      if (!b.hasAttribute('data-left')) return;
+      if (!armed[trailer]) { armed[trailer] = true; render(); setTimeout(() => { if (armed[trailer]) { delete armed[trailer]; render(); } }, 6000); return; }
+      delete mine[trailer];
+      send(trailer, c.dataset.route, true);
+    });
+
+    const rowsEl = document.getElementById('rows');
+    rowsEl.addEventListener('input', e => {
+      const tr = e.target.closest('tr'), k = e.target.dataset.k;
+      if (!tr || !k) return;
+      (drafts[tr.dataset.trailer] = drafts[tr.dataset.trailer] || {})[k] = e.target.value;
+    });
+    rowsEl.addEventListener('change', e => { const tr = e.target.closest('tr'), k = e.target.dataset.k; if (tr && k) { (drafts[tr.dataset.trailer] = drafts[tr.dataset.trailer] || {})[k] = e.target.value; if (canSave()) autoSave(tr); } });
+    rowsEl.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.k) e.target.blur(); });
+    rowsEl.addEventListener('focusout', () => setTimeout(() => { if (waiting && !typing()) render(); }, 0));
+
+    // Record and Left Yard show at once; the database copy replaces them when it arrives.
+    async function send(trailer, routeRun, departed) {
+      const d = drafts[trailer] || {}, x = queue().rows.find(r => r.trailer === trailer) || {};
+      const fields = departed ? { date, trailer, routeRun, departed: true }
+        : { date, trailer, routeRun, temperature: d.temperature !== undefined ? d.temperature : x.temperature || '', setPoint: x.setPoint || '', fuelLevel: d.fuelLevel !== undefined ? d.fuelLevel : x.fuelLevel || '', notes: d.notes !== undefined ? d.notes : x.notes || '' };
+      const mine = { type: 'YARD_CHECK', date, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, run: routeRun,
+        payload: departed ? { route: routeRun, run: routeRun, trailer, notes: 'Left the yard', status: 'DEPARTED' } : Object.assign({ route: routeRun, run: routeRun, status: 'COMPLETE' }, fields) };
+      pending.push(mine);
+      delete drafts[trailer];
+      delete armed[trailer];
+      render();
+      try {
+        await save('saveYardCheck', fields);
+        showError('');
+        setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); render(); }, 1500);
+      } catch (e) {
+        const i = pending.indexOf(mine);
+        if (i >= 0) pending.splice(i, 1);
+        if (!departed) drafts[trailer] = { temperature: fields.temperature, fuelLevel: fields.fuelLevel, notes: fields.notes };
+        showError((departed ? 'Left Yard ' : 'Yard check ') + trailer + ': ' + (e.message || e));
+        render();
+      }
+    }
+    rowsEl.addEventListener('click', e => {
+      const b = e.target.closest('button'), tr = b && b.closest('tr');
+      if (!b || !tr) return;
+      const trailer = tr.dataset.trailer, route = tr.dataset.route;
+      if (!b.hasAttribute('data-left')) return;
+      // Left Yard asks once more ("Confirm Left") for 6 seconds, as on the current app.
+      if (!armed[trailer]) { armed[trailer] = true; render(); setTimeout(() => { if (armed[trailer]) { delete armed[trailer]; render(); } }, 6000); return; }
+      delete mine[trailer];
+      send(trailer, route, true);
+    });
+    document.getElementById('panes').addEventListener('click', e => {
+      const b = e.target.closest('[data-pane]');
+      if (!b) return;
+      pane = b.dataset.pane;
+      history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
+      render();
+    });
+    document.getElementById('refresh').onclick = () => render();
+    document.getElementById('refresh-history').onclick = () => render();
+
+    let db = null;
+    function watch() {
+      while (unsubs.length) unsubs.pop()();
+      // The loads of the week before, this week and the week after (the current app's three Live weeks), and two days of checks.
+      const weeks = [...new Set([L.addDays(date, -6), date, L.addDays(date, 6)].map(L.weekStart))];
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); got.runs = true; render(); }, e => showError('Could not read the loads (' + e.message + '). Check the network and reload the page.')));
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { journal = s.docs.map(d => d.data()); got.journal = true; render(); }, e => showError('Could not read the yard checks (' + e.message + '). Check the network and reload the page.')));
+    }
+
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      // Joe 10/10: after each Send Current Report the yard starts empty too: trailers finished here leave the screen, typed boxes clear.
+      let round = null;
+      watchRound(db, at => { if (round !== null && at !== round) { [mine, drafts].forEach(o => Object.keys(o).forEach(k => delete o[k])); render(); } round = at; });
+      watch();
+      // Due times count down and trailers leave at their dispatch time, so the list is redrawn every 30 seconds.
+      setInterval(() => { const t = today(); if (t !== date) { date = t; watch(); } render(); }, 30000);
+      render();
+    });
+  </script>
+</body>
+</html>

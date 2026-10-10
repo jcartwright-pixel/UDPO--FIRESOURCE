@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Driver Station · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/stations.css">
+  <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
+</head>
+<body class="fill ds-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Driver Station</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Driver Loadout &amp; Pickup</span><h1><span id="plant">Uniontown</span> Loadout <span class="ds-day" id="weekday"></span></h1></div>
+      <p class="ds-welcome" id="welcome" hidden></p>
+      <button type="button" id="tv" data-top>Driver Room TV</button><button type="button" id="refresh" data-top>&#8635; Refresh</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="ds-grid">
+        <section class="ds-board" aria-label="Today's loadout">
+          <div class="ds-row ds-headrow"><span>ROUTE</span><span>RUN</span><span>DRIVER</span><span>TRAILER</span><span>CASES</span><span>LOAD STATUS</span><span>PICKUP</span></div>
+          <div class="ds-scroll" id="board-scroll"><div id="board"></div></div>
+        </section>
+        <aside class="ds-weather" id="weather" hidden><b>&#9728; LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p>Weather is not connected yet.</p></aside>
+        <section class="ds-week" aria-label="Driver weekly schedule">
+          <div class="ds-week-title"><b>DRIVER WEEKLY SCHEDULE</b><span id="week-of"></span></div>
+          <div class="ds-scroll" id="week-scroll"><table class="ds-week-table"><thead id="week-head"></thead><tbody id="week-rows"></tbody></table></div>
+        </section>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    // The current app's Driver Room board and TV (DriverLoadoutPickup.html, 052_V749). Read only. In the new app it opens with a
+    // United Dairy sign-in (no branch code); "Driver Room TV" is the old DISPLAY mode: dark, no menu, notes shown, both lists roll.
+    const L = window.UDLogic, B = window.UDBoard;
+    const params = new URLSearchParams(location.search);
+    const tv = params.get('tv') === '1';
+    document.body.classList.toggle('ds-tv', tv);
+    document.getElementById('tv').textContent = tv ? 'Leave TV mode' : 'Driver Room TV';
+    document.getElementById('eyebrow').textContent = tv ? 'Driver Room Display' : 'Driver Loadout & Pickup';
+    document.getElementById('weather').hidden = !tv;
+    let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = B.calendarDay(new Date()), updated = null;
+
+    const overflows = (id) => { const el = document.getElementById(id); return el.scrollHeight > el.clientHeight + 2; };
+    const fmt = (k) => { const [y, m, d] = k.split('-'); return m + '/' + d + '/' + y; };
+    function render() {
+      date = B.calendarDay(new Date());
+      const rows = B.boardRows(runs, pickups, date), dayName = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(date))];
+      document.getElementById('weekday').textContent = dayName.charAt(0) + dayName.slice(1).toLowerCase();
+      if (tv) {
+        const h = new Date().getHours(), w = document.getElementById('welcome');
+        w.hidden = false; w.innerHTML = '<i></i><b>Good ' + (h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening') + ', Uniontown drivers.</b> ' + fmt(date) + ' · Work safely and have a strong day.';
+      }
+      const one = rows.map(r => '<div class="ds-row ' + r.state.toLowerCase() + '">' + (r.streamId ? '<span class="rt span2">' + escapeHtml(r.streamId) + '</span>' : '<span class="rt">' + escapeHtml(r.route) + '</span><span>' + escapeHtml(r.run) + '</span>') +
+        '<span>' + escapeHtml(r.driver || '—') + '</span><span class="strong">' + escapeHtml(r.trailer || '—') + '</span><span>' + escapeHtml(r.cases === '' ? '—' : String(r.cases)) + '</span><span class="st">' + r.state + '</span>' +
+        '<span class="' + (r.pickup ? 'pu-yes' : '') + '">' + (r.pickup ? 'YES' : '—') + '</span>' +
+        (r.pickup ? '<span class="ds-strip pu"><b>PICKUP</b> ' + escapeHtml(r.pickupText) + '</span>' : '') + (tv && r.notes ? '<span class="ds-strip note"><b>NOTE</b> ' + escapeHtml(r.notes) + '</span>' : '') + '</div>').join('');
+      const s = JSON.stringify(rows.map(r => [r.route, r.run, r.driver, r.trailer, r.cases, r.state, r.pickupText, tv ? r.notes : '']));
+      if (s !== sig) {
+        sig = s;
+        const box = document.getElementById('board');
+        box.innerHTML = one || '<p class="empty">No routes scheduled today.</p>';
+        // On the TV a list longer than the screen rolls: a second copy follows an END OF LIST and a START OF LIST band.
+        if (tv && one && overflows('board-scroll')) box.innerHTML = one + '<div class="ds-band end">&#9632; END OF LIST</div><div class="ds-band start">&#9660; START OF LIST</div>' + one;
+      }
+      const wk = B.weeklySchedule(runs, drivers, date), ws = JSON.stringify(wk);
+      if (ws !== weekSig) {
+        weekSig = ws;
+        document.getElementById('week-of').textContent = 'Week of ' + fmt(wk.weekStart);
+        document.getElementById('week-head').innerHTML = '<tr><th>DRIVER</th>' + wk.dates.map((d, i) => '<th>' + L.DAY_NAMES[i].slice(0, 3).toUpperCase() + '<small>' + fmt(d) + '</small></th>').join('') + '</tr>';
+        const body = wk.rows.map(r => '<tr><td class="strong">' + escapeHtml(r.driver) + '</td>' + r.cells.map(c => c.length ? '<td>' + escapeHtml(c.join(', ')) + '</td>' : '<td class="off">—</td>').join('') + '</tr>').join('');
+        const wr = document.getElementById('week-rows');
+        wr.innerHTML = body || '<tr><td colspan="8" class="empty">No weekly driver assignments are available.</td></tr>';
+        if (tv && body && overflows('week-scroll')) wr.innerHTML = body + '<tr class="ds-band end"><td colspan="8">&#9632; END OF LIST</td></tr><tr class="ds-band start"><td colspan="8">&#9660; START OF LIST</td></tr>' + body;
+      }
+      document.getElementById('foot').textContent = 'Uniontown · Updated ' + (updated || new Date()).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' · ' + rows.length + ' route' + (rows.length === 1 ? '' : 's') + ', ' + B.remaining(rows) + ' not loaded · UNITED DAIRY ▪ QUALITY MILK & ICE CREAM PRODUCTS';
+    }
+
+    // TV: both lists roll on their own when they are longer than the screen (1 px every 45 ms and 50 ms, as on the old TV).
+    function roll(id, ms) {
+      setInterval(() => {
+        const el = document.getElementById(id);
+        if (!tv || document.hidden || !el.querySelector('.ds-band')) return;
+        el.scrollTop += 1;
+        if (el.scrollTop >= el.scrollHeight / 2) el.scrollTop = 0;
+      }, ms);
+    }
+    roll('board-scroll', 45); roll('week-scroll', 50);
+
+    document.getElementById('tv').addEventListener('click', () => { location.search = tv ? '' : '?tv=1'; });
+    document.getElementById('refresh').addEventListener('click', () => { sig = ''; weekSig = ''; render(); });
+    window.udBack = () => { if (tv) { location.search = ''; return true; } return false; };
+
+    requireSignIn(async () => {
+      const { db } = await start();
+      const week = L.weekStart(date), err = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      // The board updates the moment Dispatch or the plant saves (no 10-minute wait).
+      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', [week, L.addDays(week, 7)])), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); updated = new Date(); render(); }, err('the loads'));
+      onSnapshot(collection(db, 'pickups'), s => { pickups = s.docs.map(d => d.data()); render(); }, err('the pickups'));
+      onSnapshot(collection(db, 'drivers'), s => { drivers = s.docs.map(d => d.data()); render(); }, err('the drivers'));
+      setInterval(render, 60000);
+    });
+  </script>
+</body>
+</html>

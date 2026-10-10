@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Plant Operations Scheduler · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page sched-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Plant Operations Scheduler</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <!-- Joe 10/10: the date right beside the month, and Shipping / Receiving right beside the date, a little apart, the one in use lit. -->
+      <div class="title"><span class="eyebrow">Plant Operations Scheduler · <b id="lane-name">Shipping</b></span>
+        <div class="sc-titleline"><h1 id="range">Plant Operations Scheduler</h1><input id="pick" type="date" aria-label="Schedule date">
+          <div class="tabs lane seg sc-lane" role="group" aria-label="Shipping or Receiving"><button type="button" data-lane="SHIPPING">Shipping</button><button type="button" data-lane="RECEIVING">Receiving</button></div></div></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="sc-ctrl" data-top>
+        <!-- Joe 10/10: the buttons first, the same size, then the filters, all in the top line (data-top). -->
+        <button type="button" class="sc-btn primary" id="add">＋ Add Load</button>
+        <button type="button" class="sc-btn" id="print">Print Monthly</button>
+        <div class="tabs seg" id="views" role="tablist" aria-label="Schedule view"><button type="button" data-view="day">Day</button><button type="button" data-view="week">Week</button><button type="button" data-view="month">Month</button></div>
+        <div class="stepper">
+          <button type="button" id="prev" aria-label="Previous" title="Previous">&#9664;</button>
+          <button type="button" id="today" class="sc-today">This month</button>
+          <button type="button" id="next" aria-label="Next" title="Next">&#9654;</button>
+        </div>
+      </div>
+      <!-- Joe 10/10: the counts and the holiday colour key sit in a slim strip under the top line, so the month title and the
+           buttons keep their room. -->
+      <div class="sc-strip"><div class="hstats" id="hstats"></div><span class="sc-grow"></span><span class="sc-key"><i></i>Holiday</span></div>
+      <div class="sc-body" id="body"></div>
+    </div>
+  </div>
+
+  <div class="modal-back" id="modal-back" hidden></div>
+  <section class="modal wide-modal sc-modal" id="modal" role="dialog" aria-labelledby="modal-title" hidden></section>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot, getDocs } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as P from './js/plant-core.js';
+
+    const L = window.UDLogic, R = window.UDPlant;
+    const params = new URLSearchParams(location.search);
+    const today = () => L.operatingDay(new Date());
+    const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    let lane = R.lane(params.get('lane')), view = ['day', 'week', 'month'].indexOf(params.get('view')) >= 0 ? params.get('view') : (window.matchMedia('(max-width: 760px)').matches ? 'day' : 'month'); // a phone opens on the day: a month of boxes is too small to read
+    let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
+    let loads = { SHIPPING: [], RECEIVING: [] }, seen = { SHIPPING: false, RECEIVING: false }, supplierDocs = [], routeDocs = [], person = null, app = {}, db = null, search = '';
+    const pending = {};           // load id -> the load as saved (or {deleted: true}) while its save is on its way
+    const pendingSuppliers = [];  // suppliers added while their save is on its way
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const who = () => lane === 'RECEIVING' ? 'Supplier' : 'Customer';
+
+    /* ---------- dates ---------- */
+    const at = (key) => new Date(key + 'T12:00:00');
+    const monthStart = (key) => key.slice(0, 8) + '01';
+    function monthEnd(key) { const d = at(monthStart(key)); d.setMonth(d.getMonth() + 1, 0); return key.slice(0, 8) + String(d.getDate()).padStart(2, '0'); }
+    function range() {
+      if (view === 'day') return { start: date, end: date };
+      if (view === 'week') { const s = L.weekStart(date); return { start: s, end: L.addDays(s, 6) }; }
+      return { start: monthStart(date), end: monthEnd(date) };
+    }
+    function step(dir) {
+      if (view === 'day') return L.addDays(date, dir);
+      if (view === 'week') return L.addDays(L.weekStart(date), 7 * dir);
+      const d = at(monthStart(date)); d.setMonth(d.getMonth() + dir, 1);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+    }
+    const md = (key) => { const p = String(key || '').split('-'); return p.length === 3 ? Number(p[1]) + '/' + Number(p[2]) : String(key || ''); };
+    function rangeTitle() {
+      const r = range();
+      if (view === 'month') return at(date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      if (view === 'week') { const s = at(r.start), e = at(r.end); return s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' – ' + (s.getMonth() === e.getMonth() ? e.getDate() + ', ' + e.getFullYear() : e.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })); }
+      return at(date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+    const longDay = (key) => at(key).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric', year: 'numeric' });
+    // 06:00 shows as 6:00 AM.
+    function clock(t) { const m = /^(\d{2}):(\d{2})$/.exec(t || ''); if (!m) return t || ''; const h = Number(m[1]); return (h % 12 || 12) + ':' + m[2] + (h < 12 ? ' AM' : ' PM'); }
+
+    /* ---------- the lists ---------- */
+    function entries() {
+      const list = R.scheduleEntries(loads[lane], lane).filter(x => !pending[x.id]);
+      Object.keys(pending).forEach(id => { const p = pending[id]; if (p.lane === lane && !p.deleted) list.push(p); });
+      return list.sort((a, b) => a.date.localeCompare(b.date) || (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99'));
+    }
+    function catalog() {
+      if (lane === 'RECEIVING') return R.scheduleSuppliers(supplierDocs).concat(pendingSuppliers);
+      return R.scheduleCustomers(routeDocs);
+    }
+    function routeFor(x) {
+      return catalog().find(r => x.runId ? r.runId === x.runId : r.routeId === x.routeId && r.run === x.run) || {};
+    }
+    const entryName = (x) => String(routeFor(x).name || x.run || x.route || 'Plant pickup');
+    function titleCase(t) { t = String(t || '').trim(); if (!t || /[a-z]/.test(t)) return t; return t.split(/(\s+)/).map(w => /^\s+$/.test(w) ? w : w.toLowerCase() === 'and' ? 'and' : w.length <= 2 || /[0-9/&]/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase()).join(''); }
+    // The day list's run name: the customer's short name plus what the run adds to it (as the current app shows it).
+    function runName(x) {
+      const short = String(routeFor(x).name || '').trim(), run = String(x.run || '').trim();
+      if (!short) return titleCase(run) || x.route || 'Plant pickup';
+      if (!run || run.length <= short.length) return short;
+      const words = short.toUpperCase().split(/[\s-]+/).filter(Boolean);
+      const rest = run.split(/[\s-]+/).filter(w => { const u = w.toUpperCase(); return u && !words.some(s => s.indexOf(u) === 0 || u.indexOf(s) === 0); }).join(' ');
+      return rest ? short + ' ' + titleCase(rest) : short;
+    }
+    const byDate = (list) => { const m = {}; list.forEach(x => { (m[x.date] = m[x.date] || []).push(x); }); return m; };
+
+    /* ---------- drawing ---------- */
+    function render() {
+      const ck = canSave(), r = range(), list = entries(), inRange = list.filter(x => x.date >= r.start && x.date <= r.end);
+      document.body.classList.toggle('sc-recv', lane === 'RECEIVING');
+      document.getElementById('lane-name').textContent = lane === 'RECEIVING' ? 'Receiving' : 'Shipping';
+      document.querySelectorAll('[data-lane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.lane === lane)));
+      document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
+      document.getElementById('range').lastChild.textContent = rangeTitle();
+      document.getElementById('today').textContent = view === 'month' ? 'This month' : view === 'week' ? 'This week' : 'Today';
+      // The arrows say what they step through.
+      const unit = view === 'month' ? 'month' : view === 'week' ? 'week' : 'day';
+      [['prev', 'Previous '], ['next', 'Next ']].forEach(([id, w]) => { const b = document.getElementById(id); b.title = w + unit; b.setAttribute('aria-label', w + unit); });
+      document.getElementById('print').textContent = 'Print ' + (view === 'week' ? 'Weekly' : view === 'day' ? 'Daily' : 'Monthly');
+      document.getElementById('pick').value = date;
+      document.getElementById('add').hidden = !ck;
+      let tiles;
+      if (view === 'day') { const c = inRange.filter(x => x.scheduleType === 'CARRIER').length; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [c, 'Carrier'], [inRange.length - c, inRange.length - c === 1 ? 'Route' : 'Routes']]; }
+      else { let hol = 0; for (let d = r.start; d <= r.end; d = L.addDays(d, 1)) if (R.holidayName(d)) hol++; const days = new Set(inRange.map(x => x.date)).size; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [days, 'Days booked'], [hol, hol === 1 ? 'Holiday' : 'Holidays']]; }
+      document.getElementById('hstats').innerHTML = tiles.map(([n, l]) => '<div><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      const body = document.getElementById('body');
+      body.className = 'sc-body sc-v-' + view;
+      body.innerHTML = view === 'month' ? monthHtml(list) : view === 'week' ? weekHtml(list, ck) : dayHtml(list, ck);
+      const s = body.querySelector('#who-search');
+      if (s) { s.value = search; s.oninput = () => { search = s.value; filterWho(); }; filterWho(); }
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      if (!document.getElementById('modal').hidden && openDay) drawDay(openDay);
+    }
+    function filterWho() {
+      const q = search.trim().toLowerCase();
+      document.querySelectorAll('.sc-who').forEach(row => { row.hidden = !!q && String(row.dataset.text || '').indexOf(q) < 0; });
+    }
+    const sortTime = (a, b) => (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99');
+    function monthHtml(list) {
+      const first = at(monthStart(date)), start = L.addDays(monthStart(date), -first.getDay()), t = today(), map = byDate(list), month = date.slice(0, 7);
+      const weeks = Math.ceil((first.getDay() + Number(monthEnd(date).slice(8))) / 7);
+      let h = '<div class="sc-month" style="--weeks:' + weeks + '">' + DAYS.map(d => '<div class="sc-wd">' + d + '</div>').join('');
+      for (let i = 0; i < weeks * 7; i++) {
+        const key = L.addDays(start, i), items = (map[key] || []).slice().sort(sortTime), hol = R.holidayName(key);
+        h += '<button type="button" class="sc-day' + (key.slice(0, 7) !== month ? ' other' : '') + (key === t ? ' today' : '') + (hol ? ' holiday' : '') + '" data-day="' + key + '"' + (hol ? ' title="' + escapeHtml(hol) + '"' : '') + '>' +
+          '<span class="sc-dn"><b>' + Number(key.slice(8)) + '</b>' + (hol ? '<em class="sc-hol">' + escapeHtml(hol) + '</em>' : '') + (items.length ? '<em class="sc-badge">' + items.length + ' load' + (items.length === 1 ? '' : 's') + '</em>' : '') + '</span>' +
+          items.slice(0, 3).map(x => '<small class="' + (x.scheduleType === 'CARRIER' ? 'car' : '') + '"><strong>' + escapeHtml(entryName(x)) + (x.pickupTime ? ' · ' + escapeHtml(clock(x.pickupTime)) : '') + '</strong></small>').join('') +
+          (items.length > 3 ? '<small class="sc-more">+' + (items.length - 3) + ' more</small>' : '') + '</button>';
+      }
+      return h + '</div>';
+    }
+    const idAttrs = (r) => ' data-route-id="' + escapeHtml(r.routeId || '') + '" data-run-id="' + escapeHtml(r.runId || '') + '"';
+    function weekHtml(list, ck) {
+      const s = L.weekStart(date), t = today(), map = byDate(list), days = [0, 1, 2, 3, 4, 5, 6].map(i => L.addDays(s, i));
+      const addDate = days.indexOf(t) >= 0 ? t : s, w = who();
+      const side = '<aside class="sc-whos"><h3>' + w + 's' + (lane === 'RECEIVING' && ck ? '<button type="button" class="sc-btn small" id="supplier-add">＋ New</button>' : '') + '</h3>' +
+        '<input id="who-search" type="search" placeholder="Search ' + w.toLowerCase() + 's…" aria-label="Search ' + w.toLowerCase() + 's"><div class="sc-wholist">' +
+        (catalog().map(r => { const name = r.name || r.run || r.route || ''; return '<div class="sc-who" data-text="' + escapeHtml([name, r.route, r.run].join(' ').toLowerCase()) + '"><span><strong>' + escapeHtml(name) + '</strong><small>' + escapeHtml([r.route, r.run].filter(Boolean).join(' · ')) + '</small></span>' +
+          (ck ? '<button type="button" class="sc-plus" data-new="' + addDate + '"' + idAttrs(r) + ' aria-label="Add load for ' + escapeHtml(name) + '">＋</button>' : '') + '</div>'; }).join('') || '<p class="sc-none">No ' + w.toLowerCase() + 's on the list.</p>') + '</div></aside>';
+      const counts = days.map(d => { const hol = R.holidayName(d); return '<div class="sc-count' + (d === t ? ' today' : '') + (hol ? ' holiday' : '') + '"' + (hol ? ' title="' + escapeHtml(hol) + '"' : '') + '><span>' + DAYS[at(d).getDay()] + ' ' + md(d) + '</span><strong>' + (map[d] || []).length + '</strong></div>'; }).join('');
+      const cols = days.map(d => {
+        const items = (map[d] || []).slice().sort(sortTime);
+        return '<div class="sc-col' + (d === t ? ' today' : '') + '">' + (items.length ? items.map(x => {
+          const moved = x.loadDate && x.loadDate !== x.date;
+          return '<button type="button" class="sc-load' + (x.scheduleType === 'CARRIER' ? ' car' : '') + '" data-edit="' + escapeHtml(x.id) + '"><strong>' + escapeHtml(entryName(x)) + '</strong><span>' +
+            escapeHtml([clock(x.pickupTime), x.poNumber ? 'PO ' + x.poNumber : '', x.trailer].filter(Boolean).join(' · ')) + '</span>' + (moved ? '<small>Load ' + escapeHtml(md(x.loadDate)) + ' → Deliver ' + escapeHtml(md(x.date)) + '</small>' : '') + '</button>';
+        }).join('') : '<p class="sc-none">No loads</p>') + (ck ? '<button type="button" class="sc-add" data-new="' + d + '">＋ Add</button>' : '') + '</div>';
+      }).join('');
+      return side + '<div class="sc-weekgrid">' + counts + cols + '</div>';
+    }
+    function dayHtml(list, ck) {
+      const rows = list.filter(x => x.date === date).sort(sortTime);
+      const cell = (v, cls) => { v = String(v == null ? '' : v).trim(); return '<td' + (cls ? ' class="' + cls + '"' : '') + (v ? ' title="' + escapeHtml(v) + '"' : '') + '>' + (v ? escapeHtml(v) : '—') + '</td>'; };
+      return '<div class="sheet scroll-list"><table class="sc-table"><colgroup><col style="width:7%"><col style="width:15%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:12%"><col style="width:15%"><col style="width:7%"></colgroup>' +
+        '<thead><tr><th>' + (lane === 'RECEIVING' ? 'Code' : 'Route') + '</th><th>' + (lane === 'RECEIVING' ? 'Supplier' : 'Run') + '</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th><th></th></tr></thead><tbody>' +
+        (rows.map(x => '<tr>' + cell(x.route) + cell(runName(x), 'run') + cell(clock(x.pickupTime)) + cell(x.scheduleType === 'CARRIER' ? 'Carrier' : 'Route') + cell(x.loadDate ? md(x.loadDate) : '') + cell(x.trailer) + cell(x.poNumber) + cell(x.cases) +
+          cell(x.product, 'txt') + cell(x.notes, 'txt') + '<td><button type="button" class="sc-btn small" data-edit="' + escapeHtml(x.id) + '">' + (ck ? 'Edit' : 'View') + '</button></td></tr>').join('') ||
+          (seen[lane] ? '<tr><td colspan="11" class="empty">No plant schedule entries for this date.</td></tr>' : '<tr><td colspan="11" class="empty">Loading the schedule&hellip;</td></tr>')) + '</tbody></table></div>' +
+        (ck ? '<div class="sc-dayadd"><button type="button" class="sc-btn primary" data-new="' + date + '">＋ Add ' + (lane === 'RECEIVING' ? 'Load' : 'Route') + '</button></div>' : '');
+    }
+
+    /* ---------- dialogs ---------- */
+    const modal = document.getElementById('modal'), back = document.getElementById('modal-back');
+    let openDay = null;
+    function openModal(html) { modal.innerHTML = html; modal.hidden = false; back.hidden = false; }
+    function closeModal() { modal.hidden = true; back.hidden = true; modal.innerHTML = ''; openDay = null; }
+    back.onclick = closeModal;
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+
+    // A day on the month: its loads, each with Edit, and Add a Route.
+    function drawDay(key) {
+      openDay = key;
+      const rows = entries().filter(x => x.date === key).sort(sortTime), hol = R.holidayName(key), ck = canSave();
+      openModal('<h2 id="modal-title">' + escapeHtml(longDay(key)) + '</h2>' + (hol ? '<p class="sc-holnote">' + escapeHtml(hol) + '</p>' : '') +
+        '<div class="sc-daylist">' + (rows.length ? '<div class="sc-dayhead"><span>Run</span><span>Time</span><span>Product</span><span>Cases</span><span></span></div>' + rows.map(x =>
+          '<div class="sc-dayrow"><span class="run" title="' + escapeHtml(runName(x)) + '">' + escapeHtml(runName(x)) + '</span><span>' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span title="' + escapeHtml(x.product) + '">' + escapeHtml(x.product || '—') + '</span><span>' + escapeHtml(x.cases || '—') + '</span>' +
+          '<button type="button" class="sc-btn small" data-edit="' + escapeHtml(x.id) + '">' + (ck ? 'Edit' : 'View') + '</button></div>').join('') : '<p class="sc-none">No ' + (lane === 'RECEIVING' ? 'loads' : 'routes') + ' scheduled for this day.</p>') + '</div>' +
+        '<div class="modal-actions"><button type="button" data-close>Close</button>' + (ck ? '<button type="button" class="primary" data-new="' + key + '">＋ Add a ' + (lane === 'RECEIVING' ? 'Load' : 'Route') + '</button>' : '') + '</div>');
+    }
+
+    function dialogTitle(id, key) { const d = at(key); return (id ? 'Edit' : 'Add') + ' Load · ' + (isNaN(d) ? key : d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + '/' + d.getFullYear()); }
+    // Add / Edit Load, as the current app's (Route / Run or Supplier, type, load and delivery dates, pickup time, trailer, PO, cases, product, notes).
+    function openLoad(key, id, pick) {
+      openDay = null;
+      const x = id ? entries().find(e => e.id === id) || null : null;
+      if (id && !x) return;
+      const ck = canSave(), list = catalog(), dis = ck ? '' : ' disabled';
+      const sel = x ? { routeId: x.routeId, runId: x.runId } : pick || {};
+      const loadDate = x ? (x.loadDate || x.date) : L.addDays(key, -1);
+      const options = (x && !list.some(r => r.runId === x.runId && r.routeId === x.routeId) ? [{ routeId: x.routeId, runId: x.runId, route: x.route, run: x.run, name: '(no longer on the list)' }] : []).concat(list);
+      openModal('<h2 id="modal-title">' + escapeHtml(dialogTitle(x ? x.id : '', key)) + '</h2><div class="modal-grid sc-form">' +
+        '<label>' + (lane === 'RECEIVING' ? 'Supplier' : 'Route / Run') + '<select id="f-route"' + dis + '>' + (sel.runId ? '' : '<option value="">Pick one…</option>') + options.map((r, i) => '<option value="' + i + '"' + (r.runId === sel.runId && r.routeId === sel.routeId ? ' selected' : '') + '>' + escapeHtml([r.route, r.run, r.name].filter(Boolean).join(' · ')) + '</option>').join('') + '</select></label>' +
+        '<label>Schedule Type<select id="f-type"' + dis + '><option value="ROUTE">Plant Route</option><option value="CARRIER"' + (x && x.scheduleType === 'CARRIER' ? ' selected' : '') + '>Carrier</option></select></label>' +
+        '<div class="wide sc-three"><label>Load Date<input id="f-load" type="date" value="' + escapeHtml(loadDate) + '"' + dis + '></label><label>Delivery Date<input id="f-date" type="date" value="' + escapeHtml(x ? x.date : key) + '"' + dis + '><small>The day you clicked</small></label>' +
+        '<label>Pickup Time<input id="f-time" type="time" value="' + escapeHtml(x ? x.pickupTime : '') + '"' + dis + '></label></div>' +
+        '<label>Trailer<input id="f-trailer" list="f-trailers" autocomplete="off" maxlength="24" placeholder="Pick or type a trailer" value="' + escapeHtml(x ? x.trailer : '') + '"' + dis + '><datalist id="f-trailers"></datalist><small id="f-trailer-note">Pick from the list or type one</small></label>' +
+        '<label>PO Number<input id="f-po" maxlength="40" placeholder="Needed for a carrier load" value="' + escapeHtml(x ? x.poNumber : '') + '"' + dis + '></label>' +
+        '<label>Cases<input id="f-cases" inputmode="numeric" maxlength="6" placeholder="Optional" value="' + escapeHtml(x ? x.cases : '') + '"' + dis + '></label>' +
+        '<label>Product<input id="f-product" maxlength="80" placeholder="Optional" value="' + escapeHtml(x ? x.product : '') + '"' + dis + '></label>' +
+        '<label class="wide">Notes<textarea id="f-notes"' + dis + '>' + escapeHtml(x ? x.notes : '') + '</textarea></label></div>' +
+        '<div class="notice error sc-err" id="f-error" hidden></div>' +
+        '<div class="modal-actions">' + (x && ck ? '<button type="button" class="danger sc-left" id="f-delete">Delete Load</button>' : '') + '<button type="button" data-close>' + (ck ? 'Cancel' : 'Close') + '</button>' + (ck ? '<button type="button" class="primary" id="f-save">Save Load</button>' : '') + '</div>');
+      const loadIn = document.getElementById('f-load'), dateIn = document.getElementById('f-date');
+      loadIn.onchange = () => trailers(loadIn.value);
+      dateIn.onchange = () => { document.getElementById('modal-title').textContent = dialogTitle(x ? x.id : '', dateIn.value); };
+      trailers(loadIn.value || key);
+      if (!ck) return;
+      document.getElementById('f-save').onclick = () => saveLoad(x, options);
+      // The cursor starts in the first box of a new load; Enter in any box but Notes saves.
+      if (!x) document.getElementById('f-route').focus();
+      modal.querySelector('.sc-form').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName !== 'TEXTAREA' && ev.target.tagName !== 'BUTTON') { ev.preventDefault(); document.getElementById('f-save').click(); } });
+      const del = document.getElementById('f-delete');
+      if (del) del.onclick = () => confirmDelete(x);
+    }
+
+    // The trailer list: every active trailer, the ones not on a load that day marked available (read when the box opens).
+    let trailerAsk = '';
+    async function trailers(loadDate) {
+      const list = document.getElementById('f-trailers'), note = document.getElementById('f-trailer-note');
+      if (!list || !L.isDateKey(loadDate)) return;
+      trailerAsk = loadDate;
+      try {
+        const [eq, runs] = await Promise.all([getDocs(query(collection(db, 'equipment'), where('type', '==', 'TRAILER'))),
+          getDocs(query(collection(db, 'runs'), where('weekStart', 'in', [...new Set(L.weeksForLoadDate(loadDate).concat([L.weekStart(loadDate)]))])))]);
+        if (trailerAsk !== loadDate || !document.getElementById('f-trailers')) return;
+        const busy = new Set(P.loadoutRows(runs.docs.map(d => Object.assign({ id: d.id }, d.data())), loadDate).filter(r => !r.prior && r.trailer).map(r => R.unitKey(r.trailer)));
+        const units = eq.docs.map(d => d.data()).filter(e => !e.status || String(e.status).toUpperCase() === 'ACTIVE').map(e => ({ unit: e.unit, available: !busy.has(R.unitKey(e.unit)) }))
+          .sort((a, b) => (b.available - a.available) || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }));
+        // Standing rule: the trailer list offers TBA (trailer not known yet), saved as plain TBA.
+        list.innerHTML = '<option value="TBA">Trailer not known yet</option>' + units.map(t => '<option value="' + escapeHtml(t.unit) + '"' + (t.available ? ' label="AVAILABLE"' : '') + '>' + (t.available ? 'AVAILABLE' : '') + '</option>').join('');
+        note.textContent = 'Pick from the list or type one · ' + units.filter(t => t.available).length + ' available';
+      } catch (e) { if (note && trailerAsk === loadDate) note.textContent = 'Trailer list unavailable. Type the trailer number.'; }
+    }
+
+    function formError(text) { const b = document.getElementById('f-error'); if (b) { b.textContent = text; b.hidden = !text; } }
+    async function saveLoad(x, options) {
+      const r = options[Number(document.getElementById('f-route').value)];
+      const f = { routeId: r ? r.routeId : '', runId: r ? r.runId : '', route: r ? r.route : '', run: r ? r.run : '', scheduleType: document.getElementById('f-type').value,
+        loadDate: document.getElementById('f-load').value, pickupTime: document.getElementById('f-time').value, trailer: document.getElementById('f-trailer').value.trim().toUpperCase(),
+        poNumber: document.getElementById('f-po').value.trim(), cases: document.getElementById('f-cases').value.trim(), product: document.getElementById('f-product').value.trim(), notes: document.getElementById('f-notes').value };
+      const key = document.getElementById('f-date').value;
+      // The same checks as the server, so a mistake is fixed in the box.
+      if (!r) return formError(lane === 'RECEIVING' ? 'Pick the supplier.' : 'Pick the route / run.');
+      if (!L.isDateKey(key)) return formError('Pick the delivery date.');
+      if (!R.time24(f.pickupTime)) return formError('Enter the pickup time.');
+      if (f.scheduleType === 'CARRIER' && !f.poNumber) return formError('A carrier load needs its PO number.');
+      if (f.cases && !/^[0-9]{1,6}$/.test(f.cases)) return formError('Cases must be a whole number.');
+      if (f.loadDate && f.loadDate > key) return formError('The load date cannot be after the delivery date.');
+      const tmp = x ? x.id : 'new-' + Date.now();
+      pending[tmp] = Object.assign({ id: tmp, lane, date: key, status: 'SCHEDULED' }, f, { pickupTime: R.time24(f.pickupTime), trailer: R.trailerText(f.trailer) });
+      closeModal();
+      if (view !== 'month' && (key < range().start || key > range().end)) date = key;
+      render();
+      try {
+        await save('savePlantSchedule', { lane, op: 'save', id: x ? x.id : '', date: key, fields: f });
+        showError('');
+        setTimeout(() => { delete pending[tmp]; render(); }, 1500);
+      } catch (e) {
+        // Nothing typed is lost: the box opens again with the same entries and says why.
+        delete pending[tmp]; render();
+        openLoad(key, x ? x.id : '', r ? { routeId: r.routeId, runId: r.runId } : null);
+        const put = (id, v) => { const el = document.getElementById(id); if (el && !el.disabled) el.value = v; };
+        put('f-type', f.scheduleType); put('f-date', key); put('f-load', f.loadDate); put('f-time', f.pickupTime); put('f-trailer', f.trailer); put('f-po', f.poNumber); put('f-cases', f.cases); put('f-product', f.product); put('f-notes', f.notes);
+        formError('Not saved (' + (e.message || e) + '). Check the entries and press Save Load again.');
+      }
+    }
+    function confirmDelete(x) {
+      openModal('<h2 id="modal-title">Delete this load?</h2><dl class="sc-dl"><dt>' + who() + '</dt><dd>' + escapeHtml(entryName(x)) + '</dd><dt>Run</dt><dd>' + escapeHtml([x.route, x.run].filter(Boolean).join(' · ') || '—') + '</dd>' +
+        '<dt>Delivery</dt><dd>' + escapeHtml(longDay(x.date)) + '</dd><dt>Pickup</dt><dd>' + escapeHtml(clock(x.pickupTime) || '—') + '</dd></dl><p class="modal-context">It comes off the schedule. The record is kept.</p>' +
+        '<div class="modal-actions"><button type="button" id="keep">No, keep it</button><button type="button" class="danger" id="yes-delete">Yes, delete</button></div>');
+      document.getElementById('keep').onclick = () => openLoad(x.date, x.id);
+      document.getElementById('yes-delete').onclick = async () => {
+        pending[x.id] = { id: x.id, lane, deleted: true };
+        closeModal(); render();
+        try {
+          await save('savePlantSchedule', { lane, op: 'remove', id: x.id, date: x.date });
+          showError('');
+          setTimeout(() => { delete pending[x.id]; render(); }, 1500);
+        } catch (e) { delete pending[x.id]; showError('Delete Load: ' + (e.message || e)); render(); }
+      };
+    }
+    function openSupplier() {
+      openModal('<h2 id="modal-title">New Supplier</h2><div class="modal-grid"><label>Supplier Name<input id="s-name" maxlength="60" placeholder="Company name"></label><label>Short Name<input id="s-label" maxlength="40" placeholder="Shown on the schedule"></label>' +
+        '<label>Code<input id="s-code" maxlength="8" placeholder="Optional, e.g. S06"></label></div><div class="notice error sc-err" id="f-error" hidden></div>' +
+        '<div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="s-save">Save Supplier</button></div>');
+      document.getElementById('s-name').focus();
+      document.getElementById('s-save').onclick = async () => {
+        const name = document.getElementById('s-name').value.trim().replace(/\s+/g, ' ').toUpperCase(), label = document.getElementById('s-label').value.trim(), code = document.getElementById('s-code').value.trim().toUpperCase();
+        if (!name) return formError('Type the supplier name.');
+        if (code && !/^[A-Z0-9_-]{1,8}$/.test(code)) return formError('The code can be up to 8 letters or numbers.');
+        const list = catalog();
+        if (list.some(s => s.run.toUpperCase() === name)) return formError(name + ' is already on the list.');
+        if (code && list.some(s => s.route === code)) return formError('Code ' + code + ' is already used.');
+        const temp = { routeId: 'new-' + Date.now(), runId: '', route: code || '…', run: name, name: label || name, temp: true };
+        pendingSuppliers.push(temp);
+        closeModal(); render();
+        try {
+          const res = await save('savePlantSchedule', { lane: 'RECEIVING', op: 'addSupplier', name, label, code });
+          Object.assign(temp, res.supplier || {});
+          showError('');
+          setTimeout(() => { pendingSuppliers.splice(pendingSuppliers.indexOf(temp), 1); render(); }, 1500);
+        } catch (e) { pendingSuppliers.splice(pendingSuppliers.indexOf(temp), 1); showError('New Supplier: ' + (e.message || e)); render(); }
+      };
+    }
+
+    // One listener for every button on the page and in the boxes.
+    document.addEventListener('click', e => {
+      const t = e.target.closest('button, [data-day]');
+      if (!t) return;
+      if (t.hasAttribute('data-close')) return closeModal();
+      if (t.dataset.day) return drawDay(t.dataset.day);
+      if (t.dataset.edit) { const x = entries().find(y => y.id === t.dataset.edit); if (x) openLoad(x.date, x.id); return; }
+      if (t.dataset.new) {
+        if (t.dataset.runId !== undefined) return openLoad(t.dataset.new, '', { routeId: t.dataset.routeId, runId: t.dataset.runId });
+        return openLoad(t.dataset.new, '');
+      }
+      if (t.id === 'supplier-add') return openSupplier();
+      if (t.dataset.view) { setView(t.dataset.view); return; }
+      if (t.dataset.lane) { lane = t.dataset.lane; search = ''; push(); render(); }
+    });
+    function push() { history.replaceState(null, '', '?' + new URLSearchParams(Object.assign({ view, date }, lane === 'RECEIVING' ? { lane: 'receiving' } : {})).toString()); }
+    function setView(v) {
+      // Leaving the month that holds today for a week or day shows today (as the current app).
+      const t = today();
+      if (view === 'month' && v !== 'month' && date.slice(0, 7) === t.slice(0, 7)) date = t;
+      if (view === 'week' && v !== 'week' && t >= L.weekStart(date) && t <= L.addDays(L.weekStart(date), 6)) date = t;
+      view = v; push(); render();
+    }
+    function setDate(d) { if (!L.isDateKey(d)) return; date = d; push(); render(); }
+    document.getElementById('prev').onclick = () => setDate(step(-1));
+    document.getElementById('next').onclick = () => setDate(step(1));
+    document.getElementById('today').onclick = () => setDate(today());
+    document.getElementById('pick').addEventListener('change', e => setDate(e.target.value));
+    document.getElementById('add').onclick = () => { const r = range(), t = today(); openLoad(t >= r.start && t <= r.end ? t : view === 'day' ? date : r.start, ''); };
+    document.getElementById('print').onclick = printView;
+
+    // Print: a landscape page in a hidden frame, so the screen stays where it is.
+    function printHtml(html) {
+      const old = document.getElementById('print-frame'); if (old) old.remove();
+      const f = document.createElement('iframe');
+      f.id = 'print-frame'; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+      document.body.appendChild(f);
+      const d = f.contentWindow.document; d.open(); d.write(html); d.close();
+      setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); }, 150);
+    }
+    function printView() {
+      const head = 'United Dairy · Plant Operations Schedule' + (lane === 'RECEIVING' ? ' · Receiving' : ''), list = entries();
+      const css = '@page{size:landscape;margin:.25in}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#112f53}.top{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 10px}h1{margin:0;font-size:22px}.sub{font-size:13px}' +
+        '.cal{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid #7890a8}.wd{background:#0b5596;color:#fff;padding:6px;text-align:center;font-size:10px;font-weight:800}.d{min-height:1.05in;padding:5px;border-right:1px solid #b9c7d4;border-top:1px solid #b9c7d4;font-size:12px}' +
+        '.d:nth-child(7n){border-right:0}.d.other{background:#f3f5f7;color:#6e7f8e}.d.hol{background:#fff1d6}.d b{display:block;font-size:12px;margin-bottom:4px}.d b i{font-style:normal;color:#8a4b00;font-size:9px;margin-left:4px}.d small{display:block;font-size:11.5px;line-height:1.25;margin-top:3px;color:#1d4468}' +
+        'table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #9fb3c6;padding:4px 6px;text-align:left}th{background:#0b5596;color:#fff}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}';
+      const detail = (x) => [entryName(x), clock(x.pickupTime), x.scheduleType === 'CARRIER' ? 'CARRIER' : '', x.poNumber ? 'PO ' + x.poNumber : '', x.cases ? x.cases + ' cases' : '', x.product, x.trailer ? 'Trailer ' + x.trailer : '',
+        x.loadDate && x.loadDate !== x.date ? 'Load ' + md(x.loadDate) : ''].filter(Boolean).join(' · ') + (x.notes ? ' — ' + x.notes : '');
+      let inner;
+      if (view === 'month') {
+        const first = at(monthStart(date)), start = L.addDays(monthStart(date), -first.getDay()), map = byDate(list), weeks = Math.ceil((first.getDay() + Number(monthEnd(date).slice(8))) / 7);
+        inner = '<div class="cal">' + DAYS.map(d => '<div class="wd">' + d + '</div>').join('');
+        for (let i = 0; i < weeks * 7; i++) { const k = L.addDays(start, i), hol = R.holidayName(k); inner += '<section class="d' + (k.slice(0, 7) !== date.slice(0, 7) ? ' other' : '') + (hol ? ' hol' : '') + '"><b>' + Number(k.slice(8)) + (hol ? ' <i>' + escapeHtml(hol) + '</i>' : '') + '</b>' + (map[k] || []).slice().sort(sortTime).map(x => '<small>' + escapeHtml(detail(x)) + '</small>').join('') + '</section>'; }
+        inner += '</div>';
+      } else {
+        const r = range(), rows = list.filter(x => x.date >= r.start && x.date <= r.end);
+        inner = '<table><thead><tr><th>Delivery</th><th>' + who() + '</th><th>Route · Run</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th></tr></thead><tbody>' +
+          (rows.map(x => '<tr><td>' + escapeHtml(DAYS[at(x.date).getDay()] + ' ' + md(x.date)) + '</td><td>' + escapeHtml(entryName(x)) + '</td><td>' + escapeHtml([x.route, x.run].filter(Boolean).join(' · ')) + '</td><td>' + escapeHtml(clock(x.pickupTime)) + '</td><td>' + (x.scheduleType === 'CARRIER' ? 'Carrier' : 'Route') + '</td><td>' +
+            escapeHtml(x.loadDate ? md(x.loadDate) : '') + '</td><td>' + escapeHtml(x.trailer) + '</td><td>' + escapeHtml(x.poNumber) + '</td><td>' + escapeHtml(x.cases) + '</td><td>' + escapeHtml(x.product) + '</td><td>' + escapeHtml(x.notes) + '</td></tr>').join('') ||
+            '<tr><td colspan="11">No loads scheduled.</td></tr>') + '</tbody></table>';
+      }
+      printHtml('<!doctype html><html><head><title>Plant Schedule · ' + escapeHtml(rangeTitle()) + '</title><style>' + css + '</style></head><body><div class="top"><h1>' + escapeHtml(head) + '</h1><div class="sub">' + escapeHtml(rangeTitle()) + '</div></div>' + inner + '</body></html>');
+    }
+
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
+      // Every load of each lane (the journal keeps scheduler records), so a load moved to another day is never shown twice.
+      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING)), s => { loads.SHIPPING = s.docs.map(d => d.data()); seen.SHIPPING = true; render(); }, fail('the Shipping schedule'));
+      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.RECEIVING)), s => { loads.RECEIVING = s.docs.map(d => d.data()); seen.RECEIVING = true; render(); }, fail('the Receiving schedule'));
+      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.SUPPLIER_TYPE)), s => { supplierDocs = s.docs.map(d => d.data()); render(); }, fail('the suppliers'));
+      onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, fail('Route Master'));
+      render();
+    });
+  </script>
+</body>
+</html>

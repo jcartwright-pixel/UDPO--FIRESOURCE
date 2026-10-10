@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Sheet Conflicts · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* A line refused more than once says how often under its time. */
+    .cf-times { display: block; font-size: 11px; color: #a3471a; font-weight: 600; line-height: 1.1; }
+  </style>
+  <script src="js/logic.js"></script>
+</head>
+<body>
+  <div class="signin" id="signin" hidden>
+    <h1>Sheet Conflicts</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="daily.html">Daily Dispatch</a>
+      <a href="weekly.html">Weekly Dispatch</a>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Sheet Conflicts</h1><small>Saves the new app did not write because someone changed the same cell in the sheet</small></div>
+      <div class="badge-test"><b>TEST COPY</b><span>Sandbox sheet only</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="sheet">
+      <table>
+        <colgroup>
+          <col style="width:9%"><col style="width:15%"><col style="width:7%"><col style="width:12%"><col style="width:11%">
+          <col style="width:11%"><col style="width:26%"><col style="width:9%">
+        </colgroup>
+        <thead><tr>
+          <th>When</th><th>Saved by</th><th>Route</th><th>Cell</th><th>Sheet has</th><th>App saved</th><th>What happened</th><th>Checked</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="footer"><span id="count"></span><span>The sheet value was kept. Fix the sheet or the app by hand, then mark the line checked.</span></div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, fitToWindow, escapeHtml, save, showError } from './js/app.js';
+    import { watchLists, canSave, forScreen, modeLabel } from './js/edit.js';
+    forScreen('dailyDispatch');
+    import { collection, query, where, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    const MAX = 200;
+    let items = [], loaded = false;
+    const hidden = new Set(); // checked on this screen, waiting for the database to agree
+
+    // "tue_trailer" reads as "Tue trailer".
+    function cellName(column) {
+      if (!column) return '';
+      const [day, ...rest] = String(column).split('_');
+      const i = L.DAYS.indexOf(day);
+      return (i >= 0 ? L.DAY_NAMES[i].slice(0, 3) + ' ' : day + ' ') + rest.join(' ');
+    }
+    const when = (at) => { const d = new Date(at); return isNaN(d) ? '' : d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+    const whereOf = (c) => c.route || (c.tab ? c.tab + ' ' + (c.rowId || '') : '');
+
+    // The same cell refused again and again (each retry of one save) is one line: how many times, first and last time.
+    // Checked marks every one of them.
+    function groups(list) {
+      const out = new Map();
+      list.forEach(c => {
+        const key = [whereOf(c), c.column || '', c.sheetValue, c.newValue, c.problem, c.by].map(String).join('\u0001');
+        const g = out.get(key);
+        if (g) { g.ids.push(c.id); g.first = c.at < g.first ? c.at : g.first; g.last = c.at > g.last ? c.at : g.last; }
+        else out.set(key, Object.assign({}, c, { ids: [c.id], first: c.at, last: c.at }));
+      });
+      return [...out.values()];
+    }
+
+    function render() {
+      const shown = items.filter(c => !hidden.has(c.id)), edit = canSave(), lines = groups(shown);
+      const rows = lines.map(c => '<tr>' +
+        '<td>' + escapeHtml(when(c.last)) + (c.ids.length > 1 ? '<small class="cf-times" title="First ' + escapeHtml(when(c.first)) + '">' + c.ids.length + ' times since ' + escapeHtml(when(c.first)) + '</small>' : '') + '</td>' +
+        '<td>' + escapeHtml(c.by) + '</td>' +
+        '<td>' + escapeHtml(whereOf(c)) + '</td>' +
+        '<td>' + escapeHtml(c.column ? cellName(c.column) : 'whole row') + '</td>' +
+        '<td>' + escapeHtml(c.sheetValue) + '</td>' +
+        '<td>' + escapeHtml(c.newValue) + '</td>' +
+        '<td title="' + escapeHtml(c.problem) + '">' + escapeHtml(c.problem) + '</td>' +
+        '<td>' + (edit ? '<button type="button" class="check" data-id="' + escapeHtml(c.id) + '" data-ids="' + escapeHtml(c.ids.join(' ')) + '" aria-label="Mark ' + escapeHtml(whereOf(c) + ' ' + (c.column ? cellName(c.column) : 'whole row')) + ' checked">Checked' + (c.ids.length > 1 ? ' (' + c.ids.length + ')' : '') + '</button>' : '') + '</td></tr>');
+      document.getElementById('rows').innerHTML = !loaded ? '<tr><td colspan="8" class="empty">Loading the conflict list&hellip;</td></tr>' :
+        rows.join('') || '<tr><td colspan="8" class="empty">No conflicts. Every save reached the sheet.</td></tr>';
+      // The list reads the newest MAX: say so when there may be more.
+      document.getElementById('count').textContent = !loaded ? '' : (items.length >= MAX ? MAX + '+ open (newest ' + MAX + ' shown)' : shown.length + ' open') +
+        (lines.length < shown.length ? ' on ' + lines.length + (lines.length === 1 ? ' line' : ' lines') : '');
+      fitToWindow(Math.max(lines.length, 1));
+    }
+
+    // Checked: off the list at once, saved in the background; back on the list if the save is refused.
+    document.getElementById('rows').addEventListener('click', async e => {
+      const button = e.target.closest('button.check');
+      if (!button) return;
+      const ids = button.dataset.ids.split(' ').filter(Boolean);
+      ids.forEach(id => hidden.add(id));
+      render();
+      const failed = [];
+      for (const id of ids) {
+        try { await save('clearConflict', { conflictId: id }); }
+        catch (err) { hidden.delete(id); failed.push(err.message || String(err)); }
+      }
+      if (failed.length) { render(); showError('Could not mark ' + failed.length + ' of them checked (' + failed[0] + '). They are back on the list; press Checked again.'); }
+      else showError('');
+    });
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      const q = query(collection(db, 'conflicts'), where('open', '==', true), orderBy('at', 'desc'), limit(MAX));
+      onSnapshot(q, snap => {
+        items = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        loaded = true;
+        render();
+      }, e => showError('Could not read the conflict list (' + e.message + '). Check the network and reload the page.'));
+      window.addEventListener('resize', render);
+    });
+  </script>
+</body>
+</html>

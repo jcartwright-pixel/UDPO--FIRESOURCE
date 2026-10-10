@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Print Layouts · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="admin-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Print Layouts</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Print Layouts</h1><small>Dispatch Administration &rsaquo; every printed sheet in one place; each opens its screen in this window</small></div>
+      <div class="actions tiles"><a class="button" href="admin.html">Dispatch Administration</a></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="admin-grid print-grid" id="grid"></div>
+  </div>
+
+  <script type="module">
+    import { requireSignIn, escapeHtml } from './js/app.js';
+
+    // The current app's Print Layouts card held the dispatch and weekly schedule print tools. Daily and Weekly print at once
+    // (#print); the others open the screen with its Print button.
+    const CARDS = [
+      ['Daily Dispatch Sheet', 'daily.html#print', 'The load day\'s dispatch sheet: route, run, driver, truck, trailer, depart time, check columns, jack and notes.', 'Prints now'],
+      ['Weekly Dispatch', 'weekly.html#print', 'The week Sunday to Saturday: every run with its driver, truck and trailer for each day.', 'Prints now'],
+      ['Vacation Year', 'vacations.html', 'One driver\'s or everyone\'s time off for the year (Print … Year).', 'Opens the screen'],
+      ['Fleet Service Report', 'fleet.html', 'Overdue and due-soon services, DOT and plates, one page.', 'Opens the screen'],
+      ['Over the Road Report', 'otr.html', 'The year\'s OTR runs month by month against last year, with the figures, letter size, landscape.', 'Opens the screen'],
+      ['Driver Scorecard', 'scorecard.html', 'The month\'s or year\'s scorecard for every driver.', 'Opens the screen'],
+      ['Plant Scheduler Monthly', 'scheduler.html', 'Shipping and Receiving for the month (Print Monthly).', 'Opens the screen']
+    ];
+    document.getElementById('grid').innerHTML = CARDS.map(([name, href, text, how]) => '<a class="admin-card" href="' + escapeHtml(href) + '"><strong>' + escapeHtml(name) + '</strong><span>' + escapeHtml(text) + '</span><em>' + escapeHtml(how) + '</em></a>').join('');
+    requireSignIn(async () => {});
+  </script>
+</body>
+</html>

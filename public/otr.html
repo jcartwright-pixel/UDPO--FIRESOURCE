@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Over the Road · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+  <script src="js/otr-core.js"></script>
+</head>
+<body class="fill issues-page otr-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Over the Road</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Over the Road Runs</h1><small id="sub">OTR report and cost per gallon</small></div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-view="dash" aria-selected="true">Dashboard</button>
+        <button type="button" role="tab" data-view="report" aria-selected="false">Print Report</button>
+        <button type="button" role="tab" data-view="figures" aria-selected="false">Monthly Figures</button>
+        <button type="button" role="tab" data-view="routes" aria-selected="false">OTR Routes Setup</button>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="actions" id="bar" data-top></div>
+      <div class="sheet scroll-list" id="sheet"></div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
+    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    // The current app's Over the Road module (OverTheRoad.html, 221/222_V7276): every run of a route ticked for the report is one
+    // mark for its destination on its delivery day. Counts come from the copied Live weeks; a count typed by hand wins.
+    forScreen('otr');
+    const L = window.UDLogic, O = window.UDOtr, CORE = O.OTR_CORE;
+    const q = new URLSearchParams(location.search);
+    let view = ['dash', 'report', 'figures', 'routes'].indexOf(q.get('view')) >= 0 ? q.get('view') : 'dash';
+    let routes = [], picks = {}, runs = [], daily = [], monthly = [], monthRuns = [], year = Number(L.operatingDay(new Date()).slice(0, 4)), copied = '';
+    const money = (v) => v == null ? '' : '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    const cents = (v) => v == null ? '–' : '$' + Number(v).toFixed(3);
+    const n0 = (v) => v == null ? '' : Number(v).toLocaleString();
+
+    // Joe 10/10: the run is the destination; the setup only says who takes it (a carrier picks it up, or United Dairy delivers).
+    const DELIVERED_BY = ['Carrier Pickup', 'United Dairy Delivered'];
+    function otrRoutes() {
+      return O.otrRouteList_(routes.filter(r => L.masterActive(r)).map(r => {
+        const p = picks[r.id] || {}, miles = {};
+        L.DAYS.forEach(d => { miles[d] = r.days && r.days[d] ? r.days[d].miles : ''; });
+        return { runId: r.id, route: r.route, run: r.run, include: p.include ? 'TRUE' : '', destination: O.otrNormDest_(r.run), miles };
+      })).map(x => Object.assign(x, { deliveredBy: (picks[x.runId] || {}).deliveredBy || '' }));
+    }
+    // Each date in the copied Live weeks, counted the current app's way (otrCountDay_).
+    function liveCounts(list) {
+      const byDate = {};
+      runs.forEach(run => L.DAYS.forEach((p, i) => {
+        const day = run.days && run.days[p]; if (!day) return;
+        const date = L.addDays(run.weekStart, i);
+        (byDate[date] = byDate[date] || []).push({ runId: run.runId, route: run.route, run: run.run, routeStatus: run.routeStatus, active: run.active === false ? 'FALSE' : '', runs: day.runs ? 'TRUE' : '', driver: day.driver || '', truck: day.tractor || day.truck || '', dispatchTime: day.dispatchTime || '' });
+      }));
+      const out = {};
+      Object.keys(byDate).forEach(d => { out[d] = O.otrCountDay_(d, byDate[d], list); });
+      return out;
+    }
+
+    // Replacing the page can blur a typed box, whose save asks for a redraw while this one is still running: that one waits its turn.
+    let painting = false, again = false;
+    function render() {
+      if (painting) { again = true; return; }
+      painting = true;
+      try { paint(); } finally { painting = false; }
+      if (again) { again = false; render(); }
+    }
+    function paint() {
+      const list = otrRoutes(), live = liveCounts(list), merged = O.otrMergeDaily_(daily, live), today = L.operatingDay(new Date());
+      const todayCount = live[today] || { date: today, total: 0, byDestination: {}, runs: [] };
+      const byRun = {}, byDest = {};
+      list.forEach(r => { byRun[r.route + '|' + r.run] = r.deliveredBy; if (r.include && r.deliveredBy) (byDest[r.destination] = byDest[r.destination] || new Set()).add(r.deliveredBy); });
+      const edit = canManage();
+      document.getElementById('sub').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY') + ' · counts from the dispatch sheet';
+      document.querySelectorAll('.tabs [data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
+      const bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
+      if (view === 'dash') {
+        const dash = O.otrDashboard_(today, merged, todayCount, monthly), c = dash.costPerGallon;
+        bar.innerHTML = '<span class="hint">' + escapeHtml(dash.todayLabel) + ' · ' + dash.monthToDate + ' OTR runs in ' + escapeHtml(dash.monthLabel) + '</span><span class="spacer"></span>' + (copied ? '<span class="hint">' + escapeHtml(copied) + '</span>' : '') +
+          '<button type="button" id="copy">Copy Daily Count</button><button type="button" class="primary" data-go="report">Print OTR Report</button><button type="button" data-go="routes">OTR Routes Setup</button>';
+        sheet.innerHTML = '<div class="otr-dash"><section class="otr-card"><h2>Today</h2><div class="otr-big">' + todayCount.total + '</div><p>OTR runs today</p>' +
+          '<table class="issues"><thead><tr><th>Route</th><th>Run</th><th>Delivered By</th><th>Driver</th></tr></thead><tbody>' + (todayCount.runs.map(r => '<tr><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(byRun[r.route + '|' + r.run] || '') + '</td><td>' + escapeHtml(r.driver) + '</td></tr>').join('') || '<tr><td colspan="4" class="empty">No OTR runs today' + (list.some(r => r.include) ? '' : ': tick routes in OTR Routes Setup') + '.</td></tr>') + '</tbody></table></section>' +
+          '<section class="otr-card"><h2>Cost Per Gallon' + (c ? ' · ' + escapeHtml(c.label) : '') + '</h2><div class="otr-big">' + (c ? cents(c.cpg) : '–') + '</div><p>' + (c ? (c.lastYearCpg != null ? 'Last year ' + cents(c.lastYearCpg) : 'No figures for last year') + (c.employeeCpg != null ? ' · Employee ' + cents(c.employeeCpg) : '') + (c.fuelCpg != null ? ' · Fuel ' + cents(c.fuelCpg) : '') : 'Type a month\'s delivery cost and gallons in Monthly Figures') + '</p>' +
+          '<button type="button" data-go="figures">Enter Month Figures</button></section>' +
+          '<section class="otr-card wide"><h2>This Week</h2><div class="otr-week">' + dash.week.map(d => '<div class="' + (d.today ? 'today' : '') + '"><b>' + d.day + '</b><small>' + d.label + '</small><span>' + (d.total == null ? '–' : d.total) + '</span></div>').join('') + '</div></section></div>';
+        foot.textContent = list.filter(r => r.include).length + ' runs ticked for the report · counts for days outside the copied Live weeks come from typed fixes or imports.';
+        document.getElementById('copy').onclick = async () => { const t = O.otrDailyCountText_(todayCount); try { await navigator.clipboard.writeText(t); copied = 'Copied: ' + t; } catch (e) { copied = t; } render(); };
+      } else if (view === 'report') {
+        const r = O.otrYearReport_(year, today, merged, monthRuns, monthly), M = CORE.MONTHS;
+        // The year list always runs from this year back (picking last year keeps this year on the list); buttons first, the year on the right.
+        const thisYear = Number(today.slice(0, 4)), years = [thisYear, thisYear - 1, thisYear - 2].concat([thisYear, thisYear - 1, thisYear - 2].indexOf(year) < 0 ? [year] : []);
+        bar.innerHTML = '<button type="button" class="primary" id="print-report">Print</button><span class="hint">One page, letter size, landscape.</span><span class="spacer"></span><select id="year" aria-label="Report year">' + years.map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
+        const rowsFor = (d) => '<tr><td class="strong" rowspan="2">' + escapeHtml(d.name) + (byDest[d.name] ? '<small class="otr-by">' + escapeHtml([...byDest[d.name]].join(' / ')) + '</small>' : '') + '</td><td>' + r.prior + '</td>' + d.prior.map(v => '<td>' + (v || '') + '</td>').join('') + '<td class="strong">' + (d.priorYear || '') + '</td><td rowspan="2" class="' + (d.change < 0 ? 'neg' : '') + '">' + (d.change ? (d.change > 0 ? '+' : '') + d.change : '') + '</td></tr>' +
+          '<tr><td>' + r.year + '</td>' + d.current.map(v => '<td>' + (v == null ? '' : v || '') + '</td>').join('') + '<td class="strong">' + (d.currentYear || '') + '</td></tr>';
+        const shown = r.destinations.filter(d => d.priorYear || d.currentYear);
+        const recap = (label, s, f) => '<tr><td class="strong" rowspan="2">' + label + '</td><td>' + r.prior + '</td>' + s.prior.map(v => '<td>' + f(v) + '</td>').join('') + '<td class="strong">' + f(s.ytdPrior) + '</td><td rowspan="2"></td></tr><tr><td>' + r.year + '</td>' + s.current.map(v => '<td>' + f(v) + '</td>').join('') + '<td class="strong">' + f(s.ytdCurrent) + '</td></tr>';
+        sheet.innerHTML = '<div id="otr-report"><h2>Over the Road Runs · ' + r.year + ' vs ' + r.prior + '</h2><table class="issues otr-rep"><thead><tr><th>Run</th><th>Year</th>' + M.map(m => '<th>' + m + '</th>').join('') + '<th>Total</th><th>Change</th></tr></thead><tbody>' +
+          (shown.map(rowsFor).join('') || '<tr><td colspan="16" class="empty">No OTR runs counted for ' + r.prior + ' or ' + r.year + ' yet.</td></tr>') +
+          rowsFor({ name: 'Total', prior: r.totals.prior, current: r.totals.current, priorYear: r.runsYear.prior, currentYear: r.runsYear.current, change: r.runsYear.current - r.runsYear.priorSame }) +
+          recap('Gallons sold', r.recap.gallons, n0) + recap('Delivery cost', r.recap.distribution, money) + recap('Cost per gallon', r.recap.cpg, v => v == null ? '' : '$' + v.toFixed(3)) + recap('Fuel per gallon', r.recap.fuelCpg, v => v == null ? '' : '$' + v.toFixed(3)) + '</tbody></table></div>';
+        foot.textContent = 'Through ' + (r.throughMonth ? M[r.throughMonth - 1] : 'no months') + ' ' + r.year + ' · year to date compares only months with figures in both years (' + r.figureMonths + ').';
+        document.getElementById('year').onchange = (e) => { year = Number(e.target.value); render(); };
+        document.getElementById('print-report').onclick = () => {
+          let box = document.getElementById('print'); if (!box) { box = document.createElement('div'); box.id = 'print'; document.body.appendChild(box); }
+          box.innerHTML = document.getElementById('otr-report').innerHTML; window.print();
+        };
+      } else if (view === 'figures') {
+        const fm = O.otrFigureMap_(monthly), dis = edit ? '' : ' disabled';
+        const thisYear = Number(today.slice(0, 4)), years = [thisYear + 1, thisYear, thisYear - 1, thisYear - 2].concat([thisYear + 1, thisYear, thisYear - 1, thisYear - 2].indexOf(year) < 0 ? [year] : []);
+        bar.innerHTML = '<button type="button" disabled title="Importing the accounting package is in the current app for now">Import From Accounting</button><span class="hint">Type a month\'s total; it saves by itself. Gray = last year. Cost per gallon = delivery cost ÷ gallons sold.</span><span class="spacer"></span><select id="year" aria-label="Figures year">' + years.map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
+        sheet.innerHTML = '<table class="issues otr-fig"><thead><tr><th>Month</th>' + CORE.FIGURES.map(f => '<th>' + escapeHtml(f.label) + '</th>').join('') + '<th>Cost per gallon</th></tr></thead><tbody>' +
+          CORE.MONTHS.map((m, i) => {
+            const cur = fm[year + '-' + (i + 1)] || {}, ly = fm[(year - 1) + '-' + (i + 1)] || {};
+            return '<tr><td class="strong">' + m + ' ' + year + '</td>' + CORE.FIGURES.map(f => '<td><input class="otr-in" inputmode="decimal" aria-label="' + escapeHtml(m + ' ' + year + ' ' + f.label) + '" data-m="' + (i + 1) + '" data-k="' + f.key + '" value="' + escapeHtml(cur[f.key] == null ? '' : cur[f.key]) + '"' + dis + '><small>' + (ly[f.key] == null ? '' : (f.money ? money(ly[f.key]) : n0(ly[f.key]))) + '</small></td>').join('') +
+              '<td class="strong">' + (O.otrCostPerGallon_(cur) == null ? '' : cents(O.otrCostPerGallon_(cur))) + '<small>' + (O.otrCostPerGallon_(ly) == null ? '' : cents(O.otrCostPerGallon_(ly))) + '</small></td></tr>';
+          }).join('') + '</tbody></table>';
+        foot.textContent = 'Gallons sold and delivery cost make the cost per gallon. Employee cost and fuel cost come from P&L Expenses by Dept.';
+        document.getElementById('year').onchange = (e) => { year = Number(e.target.value); render(); };
+        sheet.querySelectorAll('.otr-in').forEach(inp => { inp.onchange = () => {
+          const m = Number(inp.dataset.m), key = inp.dataset.k, value = inp.value.trim(), id = year + '-' + m;
+          let rec = monthly.find(x => Number(x.year) === year && Number(x.month) === m), made = false, before = rec ? rec[key] : undefined;
+          // Kept on top of the figures until saved: a copy of an earlier figure's save can land first and must not wipe this one.
+          const y = year, put = () => { let r = monthly.find(x => Number(x.year) === y && Number(x.month) === m); if (!r) { r = { year: y, month: m }; monthly.push(r); } r[key] = value === '' ? null : O.otrNum_(value); return r; };
+          pendingFigures.push(put);
+          const done = () => { const k = pendingFigures.indexOf(put); if (k >= 0) pendingFigures.splice(k, 1); };
+          saveOptimistic('saveOtr', { op: 'figure', year, month: m, key, value },
+            () => { made = !rec; rec = put(); },
+            () => { done(); if (made) monthly.splice(monthly.indexOf(rec), 1); else rec[key] = before; }, render).then(done);
+        }; });
+      } else {
+        const dis = edit ? '' : ' disabled';
+        bar.innerHTML = '<span class="hint">Tick a route once and every run of it counts on the OTR report, every day. Miles come from Route Master; DRAFT miles are not confirmed and not saved.</span>';
+        sheet.innerHTML = '<table class="issues otr-setup"><colgroup><col style="width:8%"><col style="width:12%"><col style="width:28%"><col style="width:26%"><col style="width:26%"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Run</th><th>Delivered By</th><th>Round-trip miles</th></tr></thead><tbody>' +
+          list.map(r => '<tr' + (r.include ? ' class="otr-on"' : '') + '><td><input type="checkbox" aria-label="' + escapeHtml('Include ' + r.route + ' ' + r.run) + '" data-inc="' + escapeHtml(r.runId) + '"' + (r.include ? ' checked' : '') + dis + '></td><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td><select aria-label="' + escapeHtml('Delivered by for ' + r.route + ' ' + r.run) + '" data-by="' + escapeHtml(r.runId) + '"' + dis + '><option value="">Choose who delivers</option>' +
+            DELIVERED_BY.map(d => '<option' + (d === r.deliveredBy ? ' selected' : '') + '>' + escapeHtml(d) + '</option>').join('') + '</select></td><td>' + (r.miles ? n0(r.miles) : r.draftMiles ? n0(r.draftMiles) + ' <span class="pill warn">DRAFT</span>' : '') + '</td></tr>').join('') + '</tbody></table>';
+        foot.textContent = list.filter(r => r.include).length + ' of ' + list.length + ' active runs are on the OTR report.';
+        const saveRoute = (r, include, deliveredBy) => {
+          const runId = r.runId, destination = r.destination, before = picks[runId] ? Object.assign({}, picks[runId]) : null;
+          saveOptimistic('saveOtr', { op: 'route', runId, include, destination, deliveredBy }, () => { picks[runId] = { include, destination, deliveredBy }; }, () => { if (before) picks[runId] = before; else delete picks[runId]; }, render);
+        };
+        sheet.querySelectorAll('[data-inc]').forEach(c => { c.onchange = () => { const r = list.find(x => x.runId === c.dataset.inc); if (c.checked && !r.deliveredBy) { c.checked = false; showError('Choose who delivers ' + r.route + ' ' + r.run + ' before including it.'); return; } showError(''); saveRoute(r, c.checked, r.deliveredBy); }; });
+        sheet.querySelectorAll('[data-by]').forEach(s => { s.onchange = () => { const r = list.find(x => x.runId === s.dataset.by); if (!s.value && r.include) { showError('Untick ' + r.route + ' before clearing who delivers it.'); render(); return; } saveRoute(r, r.include, s.value); }; });
+      }
+      bar.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { view = b.dataset.go; render(); }; });
+      sheet.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { view = b.dataset.go; render(); }; });
+    }
+
+    const pendingFigures = [];
+    document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; render(); } });
+    window.udBack = () => { if (view !== 'dash') { view = 'dash'; render(); return true; } return false; };
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + name + ': ' + e.message));
+      watch('routes', v => { routes = v; });
+      watch('runs', v => { runs = v; });
+      watch('otrRoutes', v => { picks = {}; v.forEach(p => { picks[p.runId] = { include: p.include === true, destination: p.destination || '', deliveredBy: p.deliveredBy || '' }; }); });
+      watch('otrDaily', v => { daily = v; });
+      watch('otrMonthly', v => { monthly = v; pendingFigures.forEach(put => put()); });
+      watch('otrMonthRuns', v => { monthRuns = v; });
+    });
+  </script>
+</body>
+</html>

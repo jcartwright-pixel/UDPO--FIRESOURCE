@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Vacation Schedule · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill">
+  <div class="signin" id="signin" hidden>
+    <h1>Vacation Schedule</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <a href="index.html">Home</a>
+      <a href="weekly.html">Weekly Dispatch</a>
+      <a href="drivers.html">Drivers</a>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Vacation Schedule</h1><small>At most 3 drivers off a day, 2 in a holiday week</small></div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-view="time" aria-selected="true">Time Off</button>
+        <button type="button" role="tab" data-view="calendar" aria-selected="false">Calendar</button>
+        <button type="button" role="tab" data-view="eligibility" aria-selected="false">Eligibility</button>
+      </div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Driver Vacations is not changed yet</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+
+    <section class="view" id="view-time">
+      <div class="actions" data-top>
+        <button type="button" class="primary" id="add">+ Add Vacation</button>
+        <button type="button" id="print-list">&#128424; Print</button>
+        <label class="vac-view">View<select id="filters" aria-label="Which time off to show"></select></label>
+        <span class="hint" id="range-hint"></span>
+      </div>
+      <form class="vac-form" id="form" hidden>
+        <input type="hidden" name="vacationId">
+        <label>Driver<select name="driverId" required></select></label>
+        <label>First day<input name="startDate" type="date" required></label>
+        <label>Last day<input name="endDate" type="date" required></label>
+        <label>Type<select name="type"><option value="VACATION">Vacation Day</option><option value="PERSONAL">Personal Day</option><option value="SICK">Sick Day</option><option value="BEREAVEMENT">Bereavement Day</option><option value="UNPAID">Unpaid Day</option></select></label>
+        <label>Status<select name="status"><option>APPROVED</option><option>PENDING</option><option>DENIED</option><option>CANCELLED</option></select></label>
+        <label>Notification email<input name="email" type="email" placeholder="Optional"></label>
+        <label>Notes<input name="notes" placeholder="Optional" autocomplete="off"></label>
+        <div class="form-buttons"><button type="submit" class="primary" id="save">Save Vacation</button><button type="button" id="cancel">Cancel</button></div>
+      </form>
+      <div class="sheet scroll-list">
+        <table>
+          <colgroup><col style="width:24%"><col style="width:11%"><col style="width:11%"><col style="width:7%"><col style="width:12%"><col style="width:27%"><col style="width:8%"></colgroup>
+          <thead><tr><th>Driver</th><th>First day</th><th>Last day</th><th>Days</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="rows"><tr><td colspan="7" class="empty" id="loading">Loading the vacation schedule&hellip;</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view" id="view-calendar" hidden>
+      <div class="actions">
+        <button type="button" id="cal-prev" aria-label="Previous month">&lsaquo;</button>
+        <h2 class="cal-title" id="cal-title"></h2>
+        <button type="button" id="cal-next" aria-label="Next month">&rsaquo;</button>
+        <input type="month" id="cal-month" aria-label="Month and year">
+        <span class="cal-key"><span><i class="t-vacation"></i>Vacation Day</span><span><i class="t-personal"></i>Personal Day</span><span><i class="t-sick"></i>Sick Day</span><span><i class="t-bereavement"></i>Bereavement Day</span><span><i class="t-unpaid"></i>Unpaid Day</span></span>
+        <span class="spacer"></span>
+        <select id="print-who" aria-label="Print the year for"></select>
+        <button type="button" class="primary" id="print-year">&#128424; Print <span id="print-year-label"></span> Year</button>
+      </div>
+      <div class="calendar" id="calendar"></div>
+    </section>
+
+    <section class="view" id="view-eligibility" hidden>
+      <div class="sheet scroll-list">
+        <table>
+          <colgroup><col style="width:26%"><col style="width:22%"><col style="width:16%"><col style="width:14%"><col style="width:22%"></colgroup>
+          <thead><tr><th>Driver</th><th>Date used</th><th>Tenure</th><th>Vacation weeks</th><th>Status</th></tr></thead>
+          <tbody id="elig-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-back" id="modal-back" hidden></div>
+  <section class="modal wide-modal" id="day-modal" role="dialog" aria-labelledby="day-title" hidden>
+    <h2 id="day-title"></h2>
+    <p class="modal-context" id="day-sub"></p>
+    <div class="notice error" id="day-error" hidden></div>
+    <div class="day-body">
+      <div><h3>Off this day</h3><div class="day-list" id="day-list"></div></div>
+      <form id="day-form" novalidate>
+        <h3>Add a Day Off</h3>
+        <div class="modal-grid">
+          <label class="wide">Driver<select name="driverId"></select></label>
+          <label>First day<input name="startDate" type="date"></label>
+          <label>Last day<input name="endDate" type="date"></label>
+          <label>Type<select name="type"><option value="VACATION">Vacation Day</option><option value="PERSONAL">Personal Day</option><option value="SICK">Sick Day</option><option value="BEREAVEMENT">Bereavement Day</option><option value="UNPAID">Unpaid Day</option></select></label>
+          <label>Status<select name="status"><option>APPROVED</option><option>PENDING</option></select></label>
+          <label class="wide">Notes<input name="notes" placeholder="Optional" autocomplete="off"></label>
+        </div>
+        <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="submit" class="primary" id="day-save">Save Day Off</button></div>
+      </form>
+    </div>
+  </section>
+  <div id="print" aria-hidden="true"></div>
+
+  <script type="module">
+    import { vacationYearHtml, printVacationYear } from './js/vacation-print.js';
+    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
+    import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
+    forScreen('vacations');
+    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    const L = window.UDLogic;
+    const today = L.operatingDay(new Date());
+    const FILTERS = [['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['upcoming', 'Upcoming'], ['all', 'All']];
+    const TYPE_CLASS = { VACATION: 't-vacation', PERSONAL: 't-personal', SICK: 't-sick', BEREAVEMENT: 't-bereavement', UNPAID: 't-unpaid' };
+    let vacations = [], loaded = false, view = 'time', filter = 'upcoming', month = today.slice(0, 7), dayOpen = null;
+
+    const canEdit = () => canManage();
+    const nameOf = (id) => { const d = lists.allDrivers.find(x => x.id === id); return d ? d.name : id; };
+    const days = (a, b) => L.daysBetween(a, b || a) + 1;
+    const approved = (v) => v.status === 'APPROVED';
+    function range(name) {
+      if (name === 'today') return [today, today];
+      if (name === 'week') return [L.weekStart(today), L.addDays(L.weekStart(today), 6)];
+      const first = today.slice(0, 8) + '01';
+      const [y, m] = first.split('-').map(Number);
+      return [first, new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)];
+    }
+    function inFilter(v, name) {
+      if (name === 'all') return true;
+      if (name === 'upcoming') return (v.endDate || v.startDate) >= today && !/^(CANCELLED|DENIED)$/.test(v.status);
+      const r = range(name);
+      return approved(v) && v.startDate <= r[1] && (v.endDate || v.startDate) >= r[0];
+    }
+    const typeChip = (t) => '<span class="type ' + (TYPE_CLASS[t] || 't-vacation') + '">' + escapeHtml(L.VACATION_TYPE_NAMES[t] || 'Vacation Day') + '</span>';
+    const driverOptions = (current) => '<option value="">Pick a driver</option>' + L.driverRosterRows(lists.allDrivers, today).filter(d => d.active || d.id === current)
+      .map(d => '<option value="' + escapeHtml(d.id) + '"' + (d.id === current ? ' selected' : '') + '>' + escapeHtml(d.name) + '</option>').join('');
+
+    function render() {
+      const edit = canEdit();
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      document.getElementById('add').disabled = !edit;
+      document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
+      ['time', 'calendar', 'eligibility'].forEach(v => { document.getElementById('view-' + v).hidden = v !== view; });
+      if (view === 'time') paintTime(edit);
+      if (view === 'calendar') paintCalendar();
+      if (view === 'eligibility') paintEligibility();
+      if (dayOpen) paintDay();
+    }
+
+    // Oldest first: January at the top, December at the bottom (Joe 10/10), in every view.
+    function shownList() {
+      return vacations.filter(v => inFilter(v, filter)).sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.endDate || a.startDate).localeCompare(String(b.endDate || b.startDate)) || nameOf(a.driverId).localeCompare(nameOf(b.driverId)));
+    }
+    function rangeText() {
+      const r = ['today', 'week', 'month'].indexOf(filter) >= 0 ? range(filter) : null;
+      return r ? (r[0] === r[1] ? shortDate(r[0]) : shortDate(r[0]) + ' – ' + shortDate(r[1])) : filter === 'upcoming' ? 'From today on' : 'Every entry';
+    }
+    const filterName = (k) => FILTERS.find(f => f[0] === k)[1];
+    function paintTime(edit) {
+      // One View drop-down in place of the five buttons (Joe 10/10); each choice keeps its count.
+      const pick = document.getElementById('filters');
+      pick.innerHTML = FILTERS.map(([k, label]) => '<option value="' + k + '">' + label + ' (' + vacations.filter(v => inFilter(v, k)).length + ')</option>').join('');
+      pick.value = filter;
+      document.getElementById('range-hint').textContent = rangeText();
+      if (!loaded) return;
+      const list = shownList();
+      document.getElementById('rows').innerHTML = list.map(v => '<tr data-id="' + escapeHtml(v.id) + '"><td class="left"><b>' + escapeHtml(nameOf(v.driverId)) + '</b>' + typeChip(v.vacationType) + '</td>' +
+        '<td>' + escapeHtml(shortDate(v.startDate)) + '</td><td>' + escapeHtml(shortDate(v.endDate || v.startDate)) + '</td><td>' + days(v.startDate, v.endDate) + '</td>' +
+        '<td><span class="vstatus s-' + escapeHtml(String(v.status).toLowerCase()) + '">' + escapeHtml(v.status) + '</span></td><td class="left" title="' + escapeHtml(v.notes || '') + '">' + escapeHtml(v.notes || '') + '</td>' +
+        '<td>' + (edit ? '<button type="button" class="edit" data-edit-id="' + escapeHtml(v.id) + '">Edit</button>' : '') + '</td></tr>').join('') ||
+        '<tr><td colspan="7" class="empty">No time off ' + (filter === 'all' ? 'entered yet.' : 'in ' + filterName(filter).toLowerCase() + '.') + '</td></tr>';
+    }
+
+    // Print: exactly the list the screen shows for the chosen view, oldest first, with the view and its dates in the heading.
+    document.getElementById('print-list').onclick = () => {
+      const list = shownList();
+      document.getElementById('print').innerHTML = '<h2>Vacation Schedule &middot; ' + escapeHtml(filterName(filter)) + ' &middot; ' + escapeHtml(rangeText()) + '</h2>' +
+        '<p class="vac-print-sub">' + list.length + ' entr' + (list.length === 1 ? 'y' : 'ies') + ' &middot; Printed ' + escapeHtml(shortDate(today)) + '</p>' +
+        '<table class="vac-print"><thead><tr><th>Driver</th><th>Type</th><th>First day</th><th>Last day</th><th>Days</th><th>Status</th><th>Notes</th></tr></thead><tbody>' +
+        (list.map(v => '<tr><td><b>' + escapeHtml(nameOf(v.driverId)) + '</b></td><td>' + escapeHtml(L.VACATION_TYPE_NAMES[v.vacationType] || 'Vacation Day') + '</td><td>' + escapeHtml(shortDate(v.startDate)) + '</td><td>' + escapeHtml(shortDate(v.endDate || v.startDate)) + '</td>' +
+          '<td>' + days(v.startDate, v.endDate) + '</td><td>' + escapeHtml(v.status) + '</td><td>' + escapeHtml(v.notes || '') + '</td></tr>').join('') || '<tr><td colspan="7">No time off in this view.</td></tr>') +
+        '</tbody></table>';
+      window.print();
+    };
+
+    // The form: Add Vacation (empty) or Edit (filled). One call saves it; the limit check is on the server.
+    function openForm(v) {
+      const f = document.getElementById('form');
+      f.hidden = false;
+      f.vacationId.value = v ? v.id : '';
+      f.driverId.innerHTML = driverOptions(v ? v.driverId : '');
+      f.startDate.value = v ? v.startDate : today;
+      f.endDate.value = v ? (v.endDate || v.startDate) : today;
+      f.type.value = v ? (v.vacationType || 'VACATION') : 'VACATION';
+      f.status.value = v ? v.status : 'APPROVED';
+      f.email.value = v ? (v.notificationEmail || '') : '';
+      f.notes.value = v ? (v.notes || '') : '';
+      f.driverId.focus();
+    }
+    function saveEntry(fields) {
+      if (!fields.driverId || !fields.startDate) { showError('Driver and First day are required.'); return false; }
+      if ((fields.endDate || fields.startDate) < fields.startDate) { showError('Last day cannot be before First day.'); return false; }
+      const existing = fields.vacationId ? vacations.find(v => v.id === fields.vacationId) : null, before = existing ? Object.assign({}, existing) : null;
+      const shown = existing || { id: 'new-' + Date.now(), saving: true };
+      saveOptimistic('saveVacation', fields, () => {
+        Object.assign(shown, { driverId: fields.driverId, startDate: fields.startDate, endDate: fields.endDate || fields.startDate, vacationType: fields.type, status: fields.status, notes: fields.notes, notificationEmail: fields.email || '' });
+        if (!existing) vacations.push(shown);
+      }, () => { if (existing) Object.assign(existing, before); else vacations.splice(vacations.indexOf(shown), 1); }, render);
+      return true;
+    }
+    document.getElementById('form').addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      const fields = { vacationId: f.vacationId.value, driverId: f.driverId.value, startDate: f.startDate.value, endDate: f.endDate.value, type: f.type.value, status: f.status.value, email: f.email.value.trim(), notes: f.notes.value.trim() };
+      if (saveEntry(fields)) f.hidden = true;
+    });
+    document.getElementById('cancel').onclick = () => { document.getElementById('form').hidden = true; };
+    document.getElementById('add').onclick = () => openForm(null);
+    document.getElementById('rows').addEventListener('click', e => { const b = e.target.closest('[data-edit-id]'); if (b) openForm(vacations.find(v => v.id === b.dataset.editId)); });
+    document.getElementById('filters').addEventListener('change', e => { filter = e.target.value; render(); });
+
+    /* ---------- Calendar: the month, who is off each day; a day opens the day-off box ---------- */
+    function offOn(day) { return vacations.filter(v => approved(v) && v.startDate <= day && (v.endDate || v.startDate) >= day); }
+    function paintCalendar() {
+      const [y, m] = month.split('-').map(Number), first = month + '-01', count = new Date(Date.UTC(y, m, 0)).getUTCDate(), lead = L.DAYS.indexOf(L.dayPrefix(first));
+      document.getElementById('cal-title').textContent = new Date(Date.UTC(y, m - 1, 15)).toLocaleString(undefined, { month: 'long', timeZone: 'UTC' }) + ' ' + y;
+      document.getElementById('cal-month').value = month;
+      document.getElementById('print-year-label').textContent = y;
+      const who = document.getElementById('print-who'), keep = who.value;
+      who.innerHTML = '<option value="">Every driver &middot; one page each</option>' + L.driverRosterRows(lists.allDrivers, today).filter(d => d.active).map(d => '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(d.name) + '</option>').join('');
+      who.value = keep;
+      let html = L.DAY_NAMES.map(n => '<div class="dow">' + n.slice(0, 3) + '</div>').join('');
+      for (let i = 0; i < lead; i++) html += '<div class="pad"></div>';
+      for (let i = 1; i <= count; i++) {
+        const key = month + '-' + String(i).padStart(2, '0'), off = offOn(key), limit = L.dayLimit(key);
+        html += '<div class="cday' + (key === today ? ' today' : '') + (off.length >= limit.maxOff ? ' full' : '') + '" data-day="' + key + '" role="button" tabindex="0" title="' + escapeHtml(off.length + ' of ' + limit.maxOff + ' off' + (limit.label ? ' (' + limit.label + ' week)' : '')) + '"><b>' + i + '</b>' +
+          off.slice(0, 3).map(v => '<span class="' + (TYPE_CLASS[v.vacationType] || 't-vacation') + '">' + escapeHtml(nameOf(v.driverId)) + '</span>').join('') + (off.length > 3 ? '<span class="more">+' + (off.length - 3) + ' more</span>' : '') + '</div>';
+      }
+      const cells = lead + count, weeks = Math.ceil(cells / 7);
+      document.getElementById('calendar').style.setProperty('--weeks', weeks);
+      document.getElementById('calendar').innerHTML = html;
+    }
+    const shiftMonth = (n) => { const [y, m] = month.split('-').map(Number), d = new Date(Date.UTC(y, m - 1 + n, 1)); month = d.toISOString().slice(0, 7); render(); };
+    document.getElementById('cal-prev').onclick = () => shiftMonth(-1);
+    document.getElementById('cal-next').onclick = () => shiftMonth(1);
+    document.getElementById('cal-month').onchange = e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { month = e.target.value; render(); } };
+    document.getElementById('calendar').addEventListener('click', e => { const c = e.target.closest('[data-day]'); if (c) openDay(c.dataset.day); });
+    document.getElementById('calendar').addEventListener('keydown', e => { const c = e.target.closest('[data-day]'); if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDay(c.dataset.day); } });
+
+    function openDay(day) {
+      dayOpen = day;
+      const f = document.getElementById('day-form');
+      f.driverId.innerHTML = driverOptions('');
+      f.startDate.value = day; f.endDate.value = day; f.type.value = 'VACATION'; f.status.value = 'APPROVED'; f.notes.value = '';
+      f.hidden = !canEdit();
+      paintDay();
+      document.getElementById('modal-back').hidden = false;
+      document.getElementById('day-modal').hidden = false;
+    }
+    function paintDay() {
+      const off = vacations.filter(v => v.status !== 'CANCELLED' && v.status !== 'DENIED' && v.startDate <= dayOpen && (v.endDate || v.startDate) >= dayOpen), limit = L.dayLimit(dayOpen);
+      document.getElementById('day-title').textContent = L.dayName(dayOpen) + ', ' + shortDate(dayOpen);
+      document.getElementById('day-sub').textContent = off.filter(approved).length + ' of ' + limit.maxOff + ' drivers off' + (limit.label ? ' (' + limit.label + ' week: holiday limit ' + limit.maxOff + ')' : '');
+      document.getElementById('day-list').innerHTML = off.map(v => '<div class="day-row' + (v.status === 'PENDING' ? ' pending' : '') + '"><div><b>' + escapeHtml(nameOf(v.driverId)) + '</b>' + typeChip(v.vacationType) +
+        '<small>' + escapeHtml(v.startDate === (v.endDate || v.startDate) ? shortDate(v.startDate) : shortDate(v.startDate) + ' – ' + shortDate(v.endDate)) + ' &middot; ' + days(v.startDate, v.endDate) + ' day' + (days(v.startDate, v.endDate) === 1 ? '' : 's') + (v.notes ? ' &middot; ' + escapeHtml(v.notes) : '') + '</small></div>' +
+        '<span class="vstatus s-' + escapeHtml(String(v.status).toLowerCase()) + '">' + escapeHtml(v.status) + '</span></div>').join('') || '<p class="empty">Nobody is off this day.</p>';
+    }
+    // A message from saving in the day box shows inside the box, not behind it.
+    new MutationObserver(() => { const src = document.getElementById('error'), box = document.getElementById('day-error'); box.textContent = src.textContent; box.hidden = src.hidden || !dayOpen; })
+      .observe(document.getElementById('error'), { attributes: true, childList: true, characterData: true, subtree: true });
+    function closeDay() { document.getElementById('day-error').hidden = true; dayOpen = null; document.getElementById('modal-back').hidden = true; document.getElementById('day-modal').hidden = true; }
+    document.getElementById('modal-back').onclick = closeDay;
+    document.querySelector('#day-modal [data-close]').onclick = closeDay;
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && dayOpen) closeDay(); });
+    document.getElementById('day-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      if (saveEntry({ vacationId: '', driverId: f.driverId.value, startDate: f.startDate.value, endDate: f.endDate.value, type: f.type.value, status: f.status.value, email: '', notes: f.notes.value.trim() })) { f.driverId.value = ''; f.notes.value = ''; }
+    });
+
+    // The driver's copy: one page per driver with the whole year, their days, the limits and the memo to sign and turn in.
+    document.getElementById('print-year').onclick = () => {
+      const y = Number(month.slice(0, 4)), who = document.getElementById('print-who').value;
+      const drivers = L.driverRosterRows(lists.allDrivers, today).filter(d => who ? d.id === who : d.active);
+      if (!drivers.length) return showError('No drivers to print.');
+      printVacationYear(vacationYearHtml(y, drivers, vacations, today));
+    };
+
+    /* ---------- Eligibility: weeks of vacation by years of service ---------- */
+    function paintEligibility() {
+      document.getElementById('elig-rows').innerHTML = L.driverRosterRows(lists.allDrivers, today).filter(d => d.active).map(d => {
+        const used = d.seniorityDate ? 'Seniority date' : 'Hire date', date = d.seniorityDate || d.hireDate, years = date ? Math.max(0, Math.floor(L.daysBetween(date, today) / 365.25)) : null;
+        return '<tr><td class="left"><b>' + escapeHtml(d.name) + '</b></td><td>' + escapeHtml(used + ': ' + (date ? shortDate(date) : 'Not supplied')) + '</td>' +
+          '<td>' + (years === null ? 'Tenure not available' : years + ' completed years') + '</td><td>' + (d.vacationWeeks === null || d.vacationWeeks === undefined ? 'Allowance not available' : d.vacationWeeks + ' vacation weeks') + '</td>' +
+          '<td class="left">' + escapeHtml(d.status) + ' &middot; As of ' + escapeHtml(shortDate(today)) + '</td></tr>';
+      }).join('') || '<tr><td colspan="5" class="empty">No drivers in the Driver Master copy.</td></tr>';
+    }
+
+    document.querySelectorAll('[data-view]').forEach(b => { b.onclick = () => { view = b.dataset.view; render(); }; });
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      onSnapshot(collection(db, 'vacations'), snap => { vacations = snap.docs.map(d => Object.assign({}, d.data(), { id: d.id })); loaded = true; render(); }, e => showError('Could not read the vacation schedule: ' + e.message));
+      window.addEventListener('resize', render);
+    });
+  </script>
+</body>
+</html>

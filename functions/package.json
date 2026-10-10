@@ -1,0 +1,26 @@
+{
+  "name": "ud-distribution-functions",
+  "private": true,
+  "description": "United Dairy Distribution app server: one-way transfer from the Live sheets, one-call saves, United Dairy sign-in only.",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "node --test test/unit/*.test.js",
+    "test:emulator": "firebase emulators:exec --only firestore,auth --project demo-ud-distribution \"node --test --test-concurrency=1 test/emulator/*.test.js\"",
+    "sync-logic": "node ../tools/sync-logic.cjs",
+    "test:browser": "firebase emulators:exec --only firestore,auth,functions,hosting --project demo-ud-distribution \"node test/browser/screens.cjs && node test/browser/plant.cjs && node test/browser/plant-unload.cjs && node test/browser/plant-sched.cjs && node test/browser/plant-yard.cjs && node test/browser/plant-quality.cjs && node test/browser/plant-shift.cjs && node test/browser/plant-temps.cjs && node test/browser/plant-manager.cjs && node test/browser/plant-shell.cjs && node test/browser/plant-autosave.cjs && node test/browser/plant-products.cjs && node test/browser/plant-units.cjs && node test/browser/mocreo.cjs && node test/browser/home-access.cjs && node test/browser/diagnostics.cjs && node test/browser/stations.cjs\""
+  },
+  "dependencies": {
+    "firebase-admin": "13.10.0",
+    "firebase-functions": "7.2.0",
+    "google-auth-library": "10.5.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "firebase": "12.18.0",
+    "firebase-tools": "15.30.2",
+    "playwright": "1.56.1"
+  }
+}

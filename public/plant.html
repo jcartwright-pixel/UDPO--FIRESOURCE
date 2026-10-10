@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Plant Distribution Departments · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <link rel="stylesheet" href="css/plant-dept.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="plant-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Plant Distribution Departments</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+  <div id="screen" class="home-screen" hidden>
+    <div class="topbar"><span class="who" id="who"></span><button id="signout" type="button">Sign out</button></div>
+    <div class="dtitle">
+      <div class="dtitle-wrap"><span class="dtitle-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V10l6 3V10l6 3V6l6-3v18z"/><path d="M7 17h2M12 17h2M17 17h2"/></svg></span>
+        <div><h1>Plant Distribution Departments</h1><div class="dtitle-sub">Manager-Launched Plant Workspaces</div></div></div>
+      <div class="dlive"><span id="mode-text">TEST COPY</span><span id="copied">Waiting for the first copy</span><span id="today">-</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="dept-a" id="mk"></div>
+  </div>
+  <script type="module">
+    // Option A (Joe 10/10): the four department cards, their bottom halves filled (js/plant-dept.js).
+    // The shared shell (menu, Back and Home) comes from js/app.js, as on every screen.
+    import './js/app.js';
+    import { draw } from './js/plant-dept.js';
+    draw(document.getElementById('mk'));
+  </script>
+</body>
+</html>

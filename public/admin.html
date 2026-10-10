@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Dispatch Administration · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="admin-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Dispatch Administration</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Dispatch Administration</h1><small>Routes, runs, drivers, vacations, templates and dispatch settings in one place</small></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="admin-grid" id="grid"></div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml } from './js/app.js';
+
+    // The current app's Dispatch Administration cards (RouteManagement.html, renderDispatchAdmin), in the same order.
+    // Every card opens its screen in the new app, in this window (Joe 10/10: never the old program).
+    const CARDS = [
+      ['Route Editor', 'routes.html', 'Pick one route and edit run days, times, load order, equipment and details.'],
+      ['Unit Assignments', 'equipment.html', 'Trucks and trailers, which are down, and what each is on today.'],
+      ['Route Day Setup', 'routes.html', 'The normal days each run goes out (Route Days).'],
+      ['Holiday Week Editor', 'routeweek.html', 'Change which days routes run for one week only.'],
+      ['Driver Management', 'drivers.html', 'Driver records, seniority and Relief / Regular.'],
+      ['Driver Weekly Template', 'template.html', "Each driver's normal week: Available, Off or their runs."],
+      ['Operational Assignments', 'ops.html', 'Carrier, Fairmont, Marietta, Martins Ferry and other non-driver coverage.'],
+      ['Schedule Template (Weekly)', 'weekly.html', 'Build and keep the Route × Day schedule for the week.'],
+      ['Vacation Management', 'vacations.html', 'Enter and approve driver time off.'],
+      ['Driver Roster', 'drivers.html', 'The active and relief driver list.'],
+      ['Issue History', 'issues.html', 'Open, finished and past equipment issues.'],
+      ['Data Quality', 'conflicts.html', 'Sheet changes that need a look.'],
+      ['Unit Master', 'equipment.html', 'Tractor, trailer and pallet jack status.'],
+      ['Print Layouts', 'print.html', 'Dispatch and weekly schedule print tools.'],
+      ['Dispatch Settings', 'settings.html', 'Dispatch preferences and setup.']
+    ];
+    document.getElementById('grid').innerHTML = CARDS.map(([name, href, text]) => {
+      return '<a class="admin-card" href="' + escapeHtml(href) + '"><strong>' + escapeHtml(name) + '</strong><span>' + escapeHtml(text) + '</span></a>';
+    }).join('');
+    requireSignIn(async () => { await start(); });
+  </script>
+</body>
+</html>

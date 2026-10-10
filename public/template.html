@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Driver Weekly Template · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill template-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Driver Weekly Template</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Driver Weekly Template</h1></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Driver Master is not changed yet</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="actions tpl-bar">
+        <span class="tpl-about">Maintain the normal weekly pattern once; it becomes the standard default for every schedule week. Weekly changes override it. A driver can have more than one run on the same day.</span>
+        <span class="tpl-dirty" id="dirty" data-top></span>
+        <button type="button" id="refresh" data-top>Refresh</button>
+        <span class="tpl-copy" id="copy-state" data-top>No copied cell</span>
+        <button type="button" class="go" id="save" data-top>Save Template</button>
+      </div>
+      <div class="sheet scroll-list">
+        <table class="tpl">
+          <colgroup><col style="width:12%"><col span="7" style="width:12.57%"></colgroup>
+          <thead><tr><th>Driver</th><th>Sunday</th><th>Monday</th><th>Tuesday</th><th>Wednesday</th><th>Thursday</th><th>Friday</th><th>Saturday</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, save } from './js/app.js';
+    import { watchLists, forScreen, modeLabel, canManage } from './js/edit.js';
+    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    // The current app's Driver Weekly Template (DriverWeeklyTemplate.html): Available, Off or Assigned runs per driver and day,
+    // Copy / Paste / Paste + Add, one Save Template. Each changed cell is one saveDriverTemplate, which also updates the copied Live weeks.
+    forScreen('drivers');
+    const L = window.UDLogic, DAYS = L.DAYS;
+    let drivers = [], routes = [], edits = {}, copied = null, saving = false, note = '';
+    const key = (id, p) => id + '|' + p;
+
+    function saved(d, p) {
+      const c = d.cells || {};
+      let list = [];
+      try { list = JSON.parse(c[p + '_assignments_json'] || '[]'); } catch (e) { list = []; }
+      const runs = (Array.isArray(list) ? list : [list]).map(a => typeof a === 'string' ? a : a && (a.runId || a.run_id)).filter(Boolean);
+      const off = String(c[p + '_available']).toUpperCase() === 'FALSE';
+      return { status: runs.length ? 'ASSIGNMENT' : off ? 'OFF' : 'AVAILABLE', runs };
+    }
+    const cell = (d, p) => edits[key(d.id, p)] || saved(d, p);
+    const runsOn = (p) => routes.filter(r => L.masterActive(r) && r.days && r.days[p] && r.days[p].active)
+      .sort((a, b) => String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run || '').localeCompare(String(b.run || '')));
+    const runName = (r) => r.route + (r.run ? ' · ' + r.run : '');
+    function runSelect(p, current) {
+      const list = runsOn(p), known = list.some(r => (r.id || r.runId) === current);
+      return '<select data-run>' + '<option value="">Pick a run</option>' + (current && !known ? '<option value="' + escapeHtml(current) + '" selected>' + escapeHtml(current) + ' (not running)</option>' : '') +
+        list.map(r => { const id = r.id || r.runId; return '<option value="' + escapeHtml(id) + '"' + (id === current ? ' selected' : '') + '>' + escapeHtml(runName(r)) + '</option>'; }).join('') + '</select>';
+    }
+    function cellHtml(d, p, edit) {
+      const c = cell(d, p), dirty = !!edits[key(d.id, p)], dis = edit ? '' : ' disabled';
+      return '<td class="tcell ' + (c.status === 'OFF' ? 'off' : c.status === 'ASSIGNMENT' ? 'on' : '') + (dirty ? ' changed' : '') + '" data-driver="' + escapeHtml(d.id) + '" data-day="' + p + '">' +
+        '<select data-status aria-label="' + escapeHtml(d.name + ' ' + L.DAY_NAMES[DAYS.indexOf(p)] + ' status') + '"' + dis + '><option value="AVAILABLE"' + (c.status === 'AVAILABLE' ? ' selected' : '') + '>Available</option><option value="OFF"' + (c.status === 'OFF' ? ' selected' : '') + '>Off</option><option value="ASSIGNMENT"' + (c.status === 'ASSIGNMENT' ? ' selected' : '') + '>Assigned</option></select>' +
+        c.runs.map((id, i) => '<div class="run-line" data-i="' + i + '">' + runSelect(p, id).replace('<select data-run>', '<select data-run aria-label="' + escapeHtml(d.name + ' ' + L.DAY_NAMES[DAYS.indexOf(p)] + ' run ' + (i + 1)) + '"' + dis + '>') + '<button type="button" class="mini" data-remove' + dis + ' aria-label="Remove run">×</button></div>').join('') +
+        '<button type="button" class="tpl-add" data-add' + dis + '>+ Add Run</button>' +
+        '<div class="tpl-tools"><button type="button" class="mini" data-copy' + dis + '>Copy</button><button type="button" class="mini" data-paste' + (copied && edit ? '' : ' disabled') + '>Paste</button><button type="button" class="mini" data-pasteadd' + (copied && edit ? '' : ' disabled') + '>Paste + Add</button></div></td>';
+    }
+    function render() {
+      const edit = canManage();
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      const rows = L.driverRosterRows(drivers, L.operatingDay(new Date())).filter(r => r.active), byId = {};
+      drivers.forEach(d => { byId[d.id] = d; });
+      let html = '';
+      // As in the current app: relief drivers first, then the regular / set schedule drivers.
+      [[true, 'Relief drivers · default available'], [false, 'Regular / set schedule drivers']].forEach(([relief, label]) => {
+        const group = rows.filter(r => r.reliefDriver === relief);
+        if (!group.length) return;
+        html += '<tr class="tpl-group"><td colspan="8">' + label + '</td></tr>';
+        group.forEach(r => { const d = byId[r.id]; html += '<tr><td class="tpl-name">' + escapeHtml(d.name) + '</td>' + DAYS.map(p => cellHtml(d, p, edit)).join('') + '</tr>'; });
+      });
+      document.getElementById('rows').innerHTML = html || '<tr><td colspan="8" class="empty">No active drivers.</td></tr>';
+      const n = Object.keys(edits).length;
+      document.getElementById('dirty').textContent = saving ? 'Saving...' : n ? n + ' unsaved change' + (n === 1 ? '' : 's') : note;
+      document.getElementById('save').disabled = !edit || !n || saving;
+      document.getElementById('refresh').disabled = saving;
+    }
+
+    function setCell(td, next) {
+      const d = drivers.find(x => x.id === td.dataset.driver), p = td.dataset.day, now = saved(d, p);
+      next.runs = [...new Set(next.runs.filter(Boolean))].slice(0, 6);
+      if (next.runs.length) next.status = 'ASSIGNMENT';
+      else if (next.status === 'ASSIGNMENT') next.status = next.keep ? 'ASSIGNMENT' : 'AVAILABLE';
+      delete next.keep;
+      const same = next.status === now.status && next.runs.join() === now.runs.join();
+      if (same) delete edits[key(d.id, p)]; else edits[key(d.id, p)] = next;
+      render();
+    }
+    const current = (td) => { const d = drivers.find(x => x.id === td.dataset.driver); return JSON.parse(JSON.stringify(cell(d, td.dataset.day))); };
+    const rowsEl = document.getElementById('rows');
+    rowsEl.addEventListener('change', e => {
+      const td = e.target.closest('.tcell'); if (!td) return;
+      const c = current(td);
+      if (e.target.matches('[data-status]')) {
+        c.status = e.target.value;
+        if (c.status !== 'ASSIGNMENT') c.runs = [];
+        else if (!c.runs.length) { c.runs = ['']; c.keep = true; }
+      } else if (e.target.matches('[data-run]')) {
+        c.runs[Number(e.target.closest('.run-line').dataset.i)] = e.target.value;
+        c.keep = true;
+      }
+      setCell(td, c);
+    });
+    rowsEl.addEventListener('click', e => {
+      const b = e.target.closest('button'), td = b && b.closest('.tcell'); if (!td) return;
+      const c = current(td);
+      if (b.matches('[data-remove]')) { c.runs.splice(Number(b.closest('.run-line').dataset.i), 1); setCell(td, c); }
+      else if (b.matches('[data-add]')) { c.runs.push(''); c.status = 'ASSIGNMENT'; c.keep = true; setCell(td, c); }
+      else if (b.matches('[data-copy]')) {
+        copied = { status: c.status, runs: c.runs.filter(Boolean) };
+        const d = drivers.find(x => x.id === td.dataset.driver);
+        document.getElementById('copy-state').textContent = 'Copied ' + d.name + ' · ' + L.DAY_NAMES[DAYS.indexOf(td.dataset.day)];
+        render();
+      } else if (b.matches('[data-paste], [data-pasteadd]') && copied) {
+        const p = td.dataset.day, ok = new Set(runsOn(p).map(r => r.id || r.runId)), bad = copied.runs.find(id => !ok.has(id));
+        if (bad) { showError('That run does not run on ' + L.DAY_NAMES[DAYS.indexOf(p)] + '. Nothing was pasted.'); return; }
+        showError('');
+        setCell(td, b.matches('[data-pasteadd]') ? { status: c.status, runs: c.runs.filter(Boolean).concat(copied.runs) } : { status: copied.status, runs: copied.runs.slice() });
+      }
+    });
+
+    // One save per changed cell, in order. A cell that saves leaves the list; one that fails stays changed with the reason.
+    document.getElementById('save').onclick = async () => {
+      if (saving) return;
+      const keys = Object.keys(edits), problems = [];
+      const blank = keys.find(k => edits[k].status === 'ASSIGNMENT' && edits[k].runs.some(id => !id));
+      if (blank) { const [id, p] = blank.split('|'); showError((drivers.find(x => x.id === id) || {}).name + ' on ' + L.DAY_NAMES[DAYS.indexOf(p)] + ' has an empty run box. Pick a run or remove it.'); return; }
+      saving = true; showError(''); render();
+      let liveDays = 0;
+      for (const k of keys) {
+        const [driverId, day] = k.split('|'), c = edits[k];
+        try {
+          const r = await save('saveDriverTemplate', { driverId, day, status: c.status, runIds: c.runs });
+          liveDays += (r && r.liveDays || []).length;
+          const d = drivers.find(x => x.id === driverId);
+          if (d) { d.cells = Object.assign({}, d.cells, { [day + '_available']: c.status === 'OFF' ? 'FALSE' : 'TRUE', [day + '_assignments_json']: JSON.stringify(c.runs.map(runId => ({ runId }))) }); }
+          delete edits[k];
+        } catch (e) { problems.push(((drivers.find(x => x.id === driverId) || {}).name || driverId) + ' ' + L.DAY_NAMES[DAYS.indexOf(day)] + ': ' + (e.message || e)); }
+        render();
+      }
+      saving = false;
+      if (problems.length) showError('Not saved: ' + problems.join('; ') + '. Those cells stay marked; press Save Template to try again.');
+      note = problems.length ? '' : 'Template saved. ' + (liveDays ? liveDays + ' day' + (liveDays === 1 ? '' : 's') + ' in the Live weeks now follow it.' : 'No Live week days needed to change.');
+      render();
+    };
+    // Refresh drops unsaved changes and shows the saved template again.
+    // With unsaved changes it asks once more first ("Drop 3? Press again").
+    let refreshArmed = null;
+    document.getElementById('refresh').onclick = (ev) => {
+      const b = ev.currentTarget, n = Object.keys(edits).length;
+      if (n && !refreshArmed) {
+        const label = b.textContent;
+        b.textContent = 'Drop ' + n + '? Press again';
+        refreshArmed = setTimeout(() => { refreshArmed = null; b.textContent = label; }, 6000);
+        b.dataset.label = label;
+        return;
+      }
+      if (refreshArmed) { clearTimeout(refreshArmed); refreshArmed = null; b.textContent = b.dataset.label; }
+      edits = {}; copied = null; document.getElementById('copy-state').textContent = 'No copied cell'; note = ''; showError(''); render();
+    };
+    // Leaving the screen with changes not saved asks first.
+    window.addEventListener('beforeunload', e => { if (Object.keys(edits).length) { e.preventDefault(); e.returnValue = ''; } });
+    window.udBack = () => { if (copied) { copied = null; document.getElementById('copy-state').textContent = 'No copied cell'; render(); return true; } return false; };
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      onSnapshot(collection(db, 'drivers'), s => { drivers = s.docs.map(d => d.data()); render(); }, e => showError('Could not read the drivers: ' + e.message));
+      onSnapshot(collection(db, 'routes'), s => { routes = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read Route Master: ' + e.message));
+    });
+  </script>
+</body>
+</html>
