@@ -1036,3 +1036,14 @@ tr.issue-more p { margin: 6px 0; font-size: 16px; white-space: pre-wrap; }
 .issue-bar .chips { flex-wrap: nowrap; }
 .issue-bar .chips button { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; padding: 0 12px; white-space: nowrap; }
 .issue-bar .chips button b { font-size: 13px; }
+
+/* One theme (Joe 10/10): every screen title starts with the same tile (a United Dairy icon library picture or a line icon),
+   every count strip is centered like the current app's, and every table head and list button uses the same blue. */
+.title h1 { display: flex; align-items: center; gap: 10px; }
+.title-pic { flex: none; width: 40px; height: 34px; border-radius: 8px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; }
+.title-pic img { width: 34px; height: 28px; object-fit: contain; }
+.title-pic svg { width: 22px; height: 22px; fill: none; stroke: var(--ud-blue); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.issues-page .kpis div { align-items: center; text-align: center; }
+table.old-issues thead th { background: var(--ud-blue); }
+.kind-tabs button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); }
+.kind-tabs button[aria-selected="true"] b { color: var(--ud-blue-dark); }

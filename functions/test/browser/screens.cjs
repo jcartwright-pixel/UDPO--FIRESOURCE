@@ -817,7 +817,7 @@ async function noScroll(page) {
     await hub.waitForSelector('.hub-card[data-kind="GARAGE"] .hub-tile');
     assert.equal(await hub.$$eval('.hub-kpis div', d => d.length), 6);
     assert.deepEqual(await hub.$$eval('.hub-card strong', d => d.map(x => x.textContent)), ['Truck Issues', 'Trailer Issues', 'Fork Truck / Pallet Jack Issues', 'Garage']);
-    assert.equal(await hub.$$eval('.hub-card img', d => d.filter(i => i.complete && i.naturalWidth > 0).length), 3, 'the three library pictures load');
+    await hub.waitForFunction(() => [...document.querySelectorAll('.hub-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 3, null, { timeout: 10000 });
     await Promise.all([hub.waitForNavigation(), hub.click('.hub-card[data-kind="TRUCK"] .hub-card-head')]);
     assert.match(hub.url(), /issues\.html\?kind=TRUCK$/);
     await hub.waitForSelector('#head th');

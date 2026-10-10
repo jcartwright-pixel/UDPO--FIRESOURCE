@@ -70,7 +70,8 @@ function addSideMenu() {
   nav.className = 'sidemenu';
   nav.setAttribute('aria-label', 'Screens');
   // Joe 10/9: the menu lists only the sections; hovering (or tapping) a section opens its screens beside it.
-  const SECTION_ICON = { 'GPS / Fleet': 'pin', Dispatch: 'day', Drivers: 'people', Equipment: 'truck', Reports: 'star', Overall: 'check', Administration: 'gear' };
+  // Joe 10/10: the United Dairy icon library wherever a picture fits; line icons where none does.
+  const SECTION_ICON = { 'GPS / Fleet': 'pin', Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', Reports: 'star', Overall: 'check', Administration: 'gear' };
   const link = ([label, href, icon]) => {
     const ext = /^https:/.test(href);
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
@@ -132,6 +133,26 @@ function addSideMenu() {
   main.addEventListener('click', () => document.body.classList.remove('side-open'));
 }
 addSideMenu();
+
+// One look on every screen (Joe 10/10): each screen title starts with its picture from the United Dairy icon library
+// (img/library), or with its line icon in the same tile where no picture fits.
+const PAGE_ICON = {
+  'daily.html': 'distribution-truck-v1-560.webp', 'weekly.html': 'distribution-truck-v1-560.webp', 'routes.html': 'distribution-truck-v1-560.webp',
+  'routeweek.html': 'distribution-truck-v1-560.webp', 'admin.html': 'distribution-truck-v1-560.webp', 'otr.html': 'distribution-truck-v1-560.webp',
+  'gps.html': 'distribution-truck-v1-560.webp', 'scorecard.html': 'distribution-truck-v1-560.webp',
+  'equipment.html': 'maintenance-tractor-v1-560.webp', 'maint.html': 'maintenance-tractor-v1-560.webp', 'issues.html': 'maintenance-tractor-v1-560.webp',
+  'garage.html': 'maintenance-tractor-v1-560.webp', 'fleet.html': 'maintenance-trailer-v1-560.webp',
+  'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
+};
+(function addTitleIcon() {
+  const here = location.pathname.split('/').pop() || 'index.html', k = PAGE_ICON[here], h1 = document.querySelector('#screen .head .title h1, #screen .head h1');
+  if (!k || !h1 || h1.querySelector('.title-pic')) return;
+  const box = document.createElement('span');
+  box.className = 'title-pic';
+  box.setAttribute('aria-hidden', 'true');
+  box.innerHTML = /\.webp$/.test(k) ? '<img src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24">' + ICON[k] + '</svg>';
+  h1.prepend(box);
+})();
 
 // Moving between screens feels like one app (Joe 10/9): Chrome gets each screen ready while the pointer rests on its menu
 // link, so a click shows it at once. Pages of the current app and the drivers' phone page are left out.
