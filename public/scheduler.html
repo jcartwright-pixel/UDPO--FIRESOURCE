@@ -61,7 +61,7 @@
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
     const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    let lane = R.lane(params.get('lane')), view = ['day', 'week', 'month'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'month';
+    let lane = R.lane(params.get('lane')), view = ['day', 'week', 'month'].indexOf(params.get('view')) >= 0 ? params.get('view') : (window.matchMedia('(max-width: 760px)').matches ? 'day' : 'month'); // a phone opens on the day: a month of boxes is too small to read
     let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
     let loads = { SHIPPING: [], RECEIVING: [] }, supplierDocs = [], routeDocs = [], person = null, app = {}, db = null, search = '';
     const pending = {};           // load id -> the load as saved (or {deleted: true}) while its save is on its way

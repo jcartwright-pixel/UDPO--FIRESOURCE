@@ -635,3 +635,31 @@
 .sched-page .head .sc-lane { display: inline-flex; margin: 10px 0 2px; }
 .sched-page .head .sc-lane button { height: 42px; min-height: 42px; padding: 0 22px; font-size: 16px; font-weight: 800; white-space: nowrap; }
 .sched-page .head .actions.in-head.top-row { align-self: flex-start; margin-top: 4px; }
+/* Joe 10/10: one line at the top. On a wide screen the Check Off / View Only and Needs Unloading / All Loads switches sit on
+   the title line; the day is in the date box, so the big day name gives way to them. */
+@media (min-width: 1760px) {
+  .unload-page .head:has(.top-row) { flex-wrap: nowrap; }
+  .unload-page .head .actions.in-head.top-row { flex-basis: auto; }
+  .unload-page .head .dayname, .unload-page .uw-scope { display: none; }
+  .unload-page .hstats div { min-width: 74px; padding: 4px 8px; }
+}
+/* Phones (10/10 rules: very simple, no history tabs). The plant tables keep their columns readable and slide sideways instead of
+   squeezing every column into the phone's width; Quality and Shift Notes show only the entry, no 24-Hour History tab. */
+@media (max-width: 760px) {
+  .plant-page:is(.loadout-page, .unload-page, .returns-page, .washing-page) .sheet.scroll-list { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .plant-page:is(.loadout-page, .unload-page, .returns-page, .washing-page) .sheet.scroll-list table.loadout { min-width: 860px; }
+  .plant-page:is(.loadout-page, .unload-page, .returns-page, .washing-page) table.loadout td { font-size: 15px; }
+  .quality-page #panes, .shift-page #panes { display: none; }
+  .shift-page .sn-lastrep, .shift-page .sn-carry, .shift-page .sn-sec .why, .shift-page .qc-lines h2 { display: none; }
+}
+@media (max-width: 760px) {
+  .plant-page .uw-banner { flex-wrap: wrap; gap: 4px 10px; }
+  .plant-page .uw-banner span { flex: 1 1 100%; }
+}
+@media (max-width: 760px) {
+  .plant-page .uw-split { flex-direction: column; overflow: auto; }
+  .plant-page .uw-split > .sheet { flex: none; }
+  .plant-page .uw-side { flex: none; margin: 0 8px; }
+  .sched-page .sheet.scroll-list { overflow-x: auto; }
+  .sched-page table.sc-table { min-width: 900px; }
+}

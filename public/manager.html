@@ -103,7 +103,8 @@
       const openPickups = data.pickups.filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       // Joe 10/10: only what was checked since the last report was sent goes in; the rest is "Not checked".
       report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart }, now);
-      return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N };
+      const S = U.shiftReport(week, data.roundStart);
+      return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N, S };
     }
 
     function render() {
@@ -129,9 +130,11 @@
         tile('temps.html', 'Sensor Temp', x.T.sensors, '', x.T.offline ? 'sensors · ' + x.T.offline + ' offline' : 'sensors', null, x.T.offline ? 'warn' : ''),
         tile('temps.html', 'Manual Read', x.T.lastManual ? clock(x.T.lastManual) : 'None', '', 'last manual read'),
         tile('temps.html?view=alerts', 'Status', x.T.alerts, '', x.T.alerts ? 'need attention' : 'all in range', null, x.T.alerts ? 'bad' : 'good'), tile('temps.html?view=history', '24-Hour History', x.T.history, '', 'readings in 24 hours')]));
-      put('notes', card('&#9998;', 'Shift Notes', 'Shift handoff, issues and follow-up', 'shiftnotes.html', [
-        tile('shiftnotes.html', 'Handoff', x.N.handoff, '', 'in 24 hours'), tile('shiftnotes.html?view=history', 'Issues', x.N.issues, '', 'in 24 hours'),
-        tile('shiftnotes.html?view=history', 'Follow-up', x.N.open, '', 'still open', null, x.N.open ? 'warn' : ''), tile('shiftnotes.html?view=history', '24-Hour History', x.N.history, '', 'notes')]));
+      // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.
+      const carried = x.S.down.filter(d => d.carried).length;
+      put('notes', card('&#9998;', 'Shift Notes', 'Breakdowns carried over until resolved, shift handoff', 'shiftnotes.html', [
+        tile('shiftnotes.html', 'Breakdowns', x.S.down.length, '', 'still open', null, x.S.down.length ? 'bad' : ''), tile('shiftnotes.html', 'Carried Over', carried, '', 'from earlier shifts', null, carried ? 'warn' : ''),
+        tile('shiftnotes.html', 'Handoff', x.S.handoff.length, '', 'since the last report'), tile('shiftnotes.html?view=history', '24-Hour History', x.N.history, '', 'notes')]));
       // The report card's preview: subject, the counts and the first loads still to go.
       document.getElementById('pv-subject').textContent = r.subject;
       document.getElementById('pv-subject').className = 'mc-subject' + (r.behind.length ? ' bad' : ' good');
