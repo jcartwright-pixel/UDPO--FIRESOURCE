@@ -391,10 +391,12 @@
       followUpStatus: text(p.followUpStatus || 'OPEN').toUpperCase(), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), inApp: !!d.createdInApp };
   }
   // The log of the last 24 hours, newest first; each entry with its reviews (oldest first) and its status now.
-  function shiftLog(journal, nowMs) {
+  // hours: how far back (24 by default); Shift Notes and the report look back further for open items carried over.
+  function shiftLog(journal, nowMs, hours) {
+    var back = (hours || 24) * 3600000;
     var all = (journal || []).filter(function (d) { return text(d.type).toUpperCase() === SHIFT_TYPE; }).map(shiftRecord)
       .filter(function (r) { return !r.section || r.section === 'HANDOFF'; })
-      .filter(function (r) { var t = when(r.recordedAt); return !t || t >= nowMs - 86400000; })
+      .filter(function (r) { var t = when(r.recordedAt); return !t || t >= nowMs - back; })
       .sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
     var ids = {}, kids = {}, parents = [];
     all.forEach(function (r) { if (r.entryId) ids[r.entryId] = true; });
@@ -403,6 +405,24 @@
       var reviews = (kids[r.entryId] || []).slice().reverse();
       return Object.assign({}, r, { reviews: reviews, status: (reviews.length ? reviews[reviews.length - 1] : r).followUpStatus });
     });
+  }
+
+  // Shift Notes option A (Joe 10/10) in the report: open breakdowns every time until resolved (carried over when logged before
+  // the last report), the breakdowns fixed since the last report, the shift handoff and the other entries since then.
+  var OTHER_TYPES = ['INCIDENT', 'SAFETY', 'QUALITY', 'OTHER'];
+  function shiftReport(log, roundStart) {
+    var since = when(roundStart) || 0, fresh = function (at) { return !since || when(at) > since; };
+    var kind = function (r) { return text(r.type).toUpperCase(); };
+    var lastReview = function (r) { var v = r.reviews || []; return v.length ? v[v.length - 1] : null; };
+    var item = function (r) { var rv = lastReview(r); return { equipment: r.equipment, type: r.type, entry: r.entry, notes: r.notes, shift: r.shift, status: r.status || 'OPEN', at: r.recordedAt ? clockOf(r.recordedAt) : '',
+      carried: !fresh(r.recordedAt), review: rv ? rv.entry : '', reviewAt: rv && rv.recordedAt ? clockOf(rv.recordedAt) : '' }; };
+    var all = log || [];
+    return {
+      down: all.filter(function (r) { return kind(r) === 'BREAKDOWN' && r.status !== 'RESOLVED'; }).map(item),
+      fixed: all.filter(function (r) { var rv = lastReview(r); return kind(r) === 'BREAKDOWN' && r.status === 'RESOLVED' && fresh(rv ? rv.recordedAt : r.recordedAt); }).map(item),
+      handoff: all.filter(function (r) { return kind(r) === 'HANDOFF' && fresh(r.recordedAt); }).map(item),
+      others: all.filter(function (r) { return OTHER_TYPES.indexOf(kind(r)) >= 0 && fresh(r.recordedAt); }).map(item)
+    };
   }
 
   /* ---------- Cooler Temperatures ---------- */
@@ -503,8 +523,7 @@
     out.behind.sort(byDepart);
     out.nextUp.sort(function (a, b) { return Number(a.priorDay) - Number(b.priorDay) || a.loadSequence - b.loadSequence || byDepart(a, b); });
     out.loaded.sort(function (a, b) { return byDepart(b, a); });
-    var down = (input.shiftLog || []).filter(function (r) { return text(r.type).toUpperCase() === 'BREAKDOWN' && r.status !== 'RESOLVED'; })
-      .map(function (r) { return { equipment: r.equipment, entry: r.entry, shift: r.shift, status: r.status || 'OPEN', at: r.recordedAt ? clockOf(r.recordedAt) : '' }; });
+    var shift = shiftReport(input.shiftLog, input.roundStart), down = shift.down;
     var pickups = (input.pickups || []).filter(function (p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(text(p.status).toUpperCase()) < 0; })
       .map(function (p) { return { route: text(p.route), run: text(p.run), product: text(p.item || p.product), quantity: text(p.quantity) }; });
     // Joe 10/10: a report takes only what was checked since the last report was sent (input.roundStart); anything older is
@@ -525,7 +544,7 @@
     var r = { timeLabel: zoned(nowMs, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ''),
       dayLabel: zoned(nowMs, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + zoned(nowMs, { hour: 'numeric', minute: '2-digit' }),
       behindMinutes: REPORT_BEHIND, behind: out.behind, nextUp: out.nextUp, loaded: out.loaded, leftToLoad: out.leftToLoad, totalLoads: out.total,
-      areas: REPORT_AREAS.map(function (a) { return areas[a]; }).filter(function (a) { return a.total > 0; }), down: down, pickups: pickups, lines: lines, temperatures: temps };
+      areas: REPORT_AREAS.map(function (a) { return areas[a]; }).filter(function (a) { return a.total > 0; }), down: down, fixed: shift.fixed, handoff: shift.handoff, others: shift.others, pickups: pickups, lines: lines, temperatures: temps };
     r.counts = { behind: r.behind.length, leftToLoad: r.leftToLoad, pickups: pickups.length, down: down.length, linesDown: lines.filter(function (l) { return l.flag; }).length, tempsOut: temps.filter(function (t) { return t.flag; }).length };
     r.subject = 'Plant Update ' + r.timeLabel + ': ' + (r.behind.length ? r.behind.length + ' route' + (r.behind.length === 1 ? '' : 's') + ' behind' : 'All routes on time');
     r.smooth = !r.counts.behind && !r.counts.down && !r.counts.linesDown && !r.counts.tempsOut;
@@ -539,7 +558,10 @@
     r.behind.forEach(function (x) { L.push('  ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.startedAt ? ' since ' + x.startedAt : '') + '  ' + x.late + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '')); });
     L.push('');
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in the Incident & Breakdown Log'));
-    r.down.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + (d.at ? '  logged ' + d.at : '') + (d.shift ? ' ' + d.shift.toLowerCase() : '') + '  ' + d.status); });
+    r.down.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + (d.at ? '  logged ' + d.at : '') + (d.shift ? ' ' + d.shift.toLowerCase() : '') + '  ' + d.status + (d.carried ? '  (carried over)' : '') + (d.review ? '  review ' + d.reviewAt + ': ' + d.review : '')); });
+    if ((r.fixed || []).length) { L.push(''); L.push('FIXED SINCE LAST REPORT (' + r.fixed.length + ')'); r.fixed.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + '  RESOLVED' + (d.reviewAt ? ' ' + d.reviewAt : '') + (d.review ? ': ' + d.review : '')); }); }
+    if ((r.handoff || []).length) { L.push(''); L.push('SHIFT HANDOFF (' + r.handoff.length + ')'); r.handoff.forEach(function (d) { L.push('  ' + (d.shift ? d.shift.toLowerCase() + ' ' : '') + (d.at || '') + ': ' + [d.entry, d.notes].filter(Boolean).join(' · ')); }); }
+    if ((r.others || []).length) { L.push(''); L.push('INCIDENTS · SAFETY · QUALITY (' + r.others.length + ')'); r.others.forEach(function (d) { L.push('  ' + (d.equipment || d.type) + '  ' + d.type + '  ' + (d.entry || '') + '  ' + d.status); }); }
     L.push('');
     L.push('PICKUPS OPEN (' + r.pickups.length + ')');
     r.pickups.forEach(function (p) { L.push('  ' + [p.route, p.run].filter(Boolean).join(' ') + '  ' + [p.quantity, p.product].filter(Boolean).join(' ')); });
@@ -559,6 +581,7 @@
 
   // The email as the current app sends it (udpoV7275ReportHtml_): one phone-width column, loaded routes in green then not loaded
   // in red, pickups, breakdowns, production and temperatures; tables and inline styles so Gmail and phone mail keep the layout.
+  function followWord(v) { v = text(v).toUpperCase(); return v === 'RESOLVED' ? 'RESOLVED' : v === 'MONITOR' ? 'MONITOR' : 'NEEDS ATTENTION'; }
   function reportHtml(r, note) {
     function e(v) { return String(v === null || v === undefined ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     var F = 'font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;', RED = '#b42318', GREEN = '#1f7a4d', GREY = '#5b6775', INK = '#1c2733';
@@ -592,7 +615,11 @@
     pickups.forEach(function (p) { H.push('<tr><td style="padding:0 14px 6px"><div style="' + F + 'border-left:4px solid ' + RED + ';background:#fff6f5;padding:7px 10px;font-size:15px;color:' + INK + '"><b style="color:' + RED + '">PICKUP ' + e([p.route, p.run].filter(Boolean).join(' ')) + '</b> ' + e([p.quantity, p.product].filter(Boolean).join(' ')) + '</div></td></tr>'); });
     H.push(head('Plant breakdowns', down.length, down.length ? RED : null));
     if (!down.length) H.push(plain('None open.'));
-    else H.push(rows(down.map(function (d) { return [d.equipment || 'Plant equipment', e([d.entry, d.at ? 'logged ' + d.at : ''].filter(Boolean).join(' · ')) + ' ' + pill(d.status, '#fde8e6', RED)]; })));
+    else H.push(rows(down.map(function (d) { return [d.equipment || 'Plant equipment', e([d.entry, d.at ? 'logged ' + d.at : '', d.review ? 'review ' + d.reviewAt + ': ' + d.review : ''].filter(Boolean).join(' · ')) + ' ' + (d.carried ? pill('CARRIED OVER', '#fff1d6', '#9a5b00') + ' ' : '') + pill(followWord(d.status), d.status === 'MONITOR' ? '#fff1d6' : '#fde8e6', d.status === 'MONITOR' ? '#9a5b00' : RED)]; })));
+    var fixed = r.fixed || [], handoff = r.handoff || [], others = r.others || [];
+    if (fixed.length) { H.push(head('Fixed since last report', fixed.length, GREEN)); H.push(rows(fixed.map(function (d) { return [d.equipment || 'Plant equipment', e([d.review || d.entry, d.reviewAt].filter(Boolean).join(' · ')) + ' ' + pill('RESOLVED', '#e2f4ea', GREEN)]; }))); }
+    if (handoff.length) { H.push(head('Shift handoff')); handoff.forEach(function (d) { H.push('<tr><td style="padding:0 14px 6px"><div style="' + F + 'border-left:4px solid #0b4f8a;background:#f0f5fb;padding:8px 10px;font-size:15px;color:' + INK + '"><b>' + e((d.shift ? d.shift.charAt(0) + d.shift.slice(1).toLowerCase() : 'Handoff') + (d.at ? ' (' + d.at + ')' : '')) + ':</b> ' + e([d.entry, d.notes].filter(Boolean).join(' · ')) + '</div></td></tr>'); }); }
+    if (others.length) { H.push(head('Incidents · Safety · Quality', others.length)); H.push(rows(others.map(function (d) { return [d.equipment || d.type, e(d.entry || '') + ' <span style="color:' + GREY + '">' + e(d.type) + '</span> ' + pill(followWord(d.status), d.status === 'RESOLVED' ? '#e2f4ea' : d.status === 'MONITOR' ? '#fff1d6' : '#fde8e6', d.status === 'RESOLVED' ? GREEN : d.status === 'MONITOR' ? '#9a5b00' : RED)]; }))); }
     H.push(head('Production'));
     if (!lines.length) H.push(plain('No production lines set up.'));
     else H.push(rows(lines.map(function (l) { return [l.line, (l.product ? e(l.product) + ' ' : '') + (l.qualityCheck ? pill('QC ' + l.qualityCheck, l.qualityCheck === 'FAIL' ? '#fde8e6' : '#e2f4ea', l.qualityCheck === 'FAIL' ? RED : GREEN) + ' ' : '') + (l.notChecked ? pill('NOT CHECKED', '#fff1d6', '#9a5b00') : l.status ? pill(l.status, l.flag ? '#fde8e6' : '#eef1f4', l.flag ? RED : GREY) : 'no status')]; })));
@@ -609,7 +636,7 @@
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
-    QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, productionLines: productionLines, qualityLines: qualityLines,
+    shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,

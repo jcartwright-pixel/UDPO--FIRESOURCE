@@ -2,9 +2,9 @@
 // the boxes start empty again after the next Send Current Report, so no leftover reading goes out as if it were new.
 import { collection, query, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
-// The round: everything entered since the last report was sent. cb gets the time of that report ('' = none sent yet).
+// The round: everything entered since the last report was sent. cb gets the time of that report ('' = none sent yet) and the report.
 export function watchRound(db, cb) {
-  return onSnapshot(query(collection(db, 'plantReports'), orderBy('at', 'desc'), limit(1)), s => cb(s.docs.length ? String(s.docs[0].data().at || '') : ''), () => cb(''));
+  return onSnapshot(query(collection(db, 'plantReports'), orderBy('at', 'desc'), limit(1)), s => cb(s.docs.length ? String(s.docs[0].data().at || '') : '', s.docs.length ? s.docs[0].data() : null), () => cb('', null));
 }
 
 // One record filled in box by box: the first save makes it, later saves fill in the same record (checkId). Saves go one at a
