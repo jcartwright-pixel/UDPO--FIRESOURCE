@@ -302,7 +302,7 @@ export function goBack() {
   else location.href = up;
 }
 // Joe 10/10: every screen has a Back button and a Home button. Joe 10/10 evening: they sit in the header beside the logo,
-// never in the menu (built here, once). The main screens' header also has the Administration button (Administrators only).
+// never in the menu (built here, once). Every screen's header also has the Administration button (Administrators only).
 // Joe 10/10: someone who may see more than one plant (an Administrator, or a plant list of "*") starts on the all-plants
 // overview and picks a plant; a plant's home then has Back to the overview. Known once the Users list is read.
 function multiPlant() { try { return sessionStorage.getItem('udMulti') === '1'; } catch (e) { return false; } }
@@ -348,7 +348,7 @@ try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add
   nav.append(h);
   brand.after(nav);
   if (here === 'index.html') plantHomeBack();
-  if (['company.html', 'index.html'].indexOf(here) >= 0) {
+  if (here !== 'administration.html') {
     const adm = headerButton('go-admin', 'gear', 'Administration', 'Administration');
     adm.classList.add('hdr-admin');
     adm.onclick = () => { location.href = 'administration.html'; };
