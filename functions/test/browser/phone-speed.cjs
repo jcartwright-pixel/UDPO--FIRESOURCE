@@ -37,7 +37,7 @@ async function post(url, body) {
       const page = await ctx.newPage();
       const t = Date.now();
       await page.goto(site + '/' + p, { waitUntil: 'load' });
-      await page.waitForFunction(() => [...document.querySelectorAll('#signin, #screen, .phone-step, main, section')].some(e => !e.hidden && e.getBoundingClientRect().height > 0), null, { timeout: 15000 }).catch(() => {});
+      await page.waitForFunction(() => [...document.querySelectorAll('#signin, #screen, .phone-card, main, section')].some(e => !e.hidden && e.getBoundingClientRect().height > 0), null, { timeout: 15000 }).catch(() => {});
       times.push(Date.now() - t);
       await ctx.close();
     }
