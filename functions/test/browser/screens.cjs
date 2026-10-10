@@ -370,9 +370,14 @@ async function noScroll(page) {
     await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => /WHEELING/.test(tr.textContent)), null, { timeout: 5000 });
     await rt.selectOption('#route-select', '');
     await rt.selectOption('#view-select', 'seq');
-    await rt.waitForSelector('table.routes tr[data-i="1"]');
+    // The Load Order list is drawn and the saves above have settled, so no copy redraws the rows in the middle of the drag.
+    await rt.waitForFunction(() => document.querySelector('table.routes thead th') && document.querySelector('table.routes thead th').textContent === 'Order' && document.querySelector('table.routes tr[data-i="1"]'), null, { timeout: 5000 });
+    await rt.waitForTimeout(600);
+    const orderShown = () => rt.evaluate(() => [...document.querySelectorAll('table.routes tbody tr[data-i]')].map(tr => tr.children[1].textContent).join(','));
+    const beforeDrag = await orderShown();
     await rt.dragAndDrop('table.routes tr[data-i="1"] td:nth-child(2)', 'table.routes tr[data-i="0"] td:nth-child(2)');
-    await rt.waitForFunction(() => document.querySelector('table.routes tr[data-i="0"] td:nth-child(2)').textContent === '801', null, { timeout: 5000 });
+    await rt.waitForFunction(() => document.querySelector('table.routes tr[data-i="0"] td:nth-child(2)').textContent === '801', null, { timeout: 5000 })
+      .catch(async e => { throw new Error('Load order drag: before ' + beforeDrag + ', after ' + await orderShown() + ' (' + e.message + ')'); });
     const saved801 = await rt.evaluate(async () => {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
