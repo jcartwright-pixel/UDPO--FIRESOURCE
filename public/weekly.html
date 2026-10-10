@@ -160,7 +160,9 @@
         if ((b.relief ? 'R' : 'D') !== role) { role = b.relief ? 'R' : 'D'; head = '<tr class="group"><td colspan="8">' + (b.relief ? 'RELIEF DRIVERS' : 'DRIVERS &mdash; SENIORITY ORDER') + '</td></tr>'; }
         return head + '<tr data-driver="' + escapeHtml(b.id) + '"' + (b.relief ? ' class="relief"' : '') + '><td class="strong left">' + escapeHtml(b.name) + '</td>' + L.DAYS.map(p => {
           const c = b.days[p];
-          return '<td class="day b-' + c.kind + (c.extra ? ' b-extra' : '') + '"' + (c.extra ? ' title="Changed by hand this week"' : '') + '>' + (edit ? '<button type="button" class="avail" data-date="' + c.date + '">' + escapeHtml(c.text) + '</button>' : escapeHtml(c.text)) + '</td>';
+          // Each run on its own line, kept whole; three or more runs get a smaller font so the day box never cuts them.
+          const body = c.lines && c.lines.length ? c.lines.map(n => '<span class="run">' + escapeHtml(n) + '</span>').join('') : escapeHtml(c.text);
+          return '<td class="day b-' + c.kind + (c.extra ? ' b-extra' : '') + (c.lines && c.lines.length > 2 ? ' many' : '') + '" title="' + escapeHtml(c.text + (c.extra ? '. Changed by hand this week' : '')) + '">' + (edit ? '<button type="button" class="avail" data-date="' + c.date + '">' + body + '</button>' : body) + '</td>';
         }).join('') + '</tr>';
       }).join('') || '<tr><td colspan="8" class="empty">No active drivers in the Driver Master copy.</td></tr>';
 
@@ -251,7 +253,7 @@
       const driver = lists.allDrivers.find(x => x.id === b.closest('tr').dataset.driver);
       avail = { driverId: driver.id, date: b.dataset.date };
       const off = L.exceptionOn(lists.exceptions, driver.id, avail.date);
-      document.getElementById('avail-context').textContent = driver.name + ', ' + L.dayName(avail.date) + ' ' + shortDate(avail.date) + ': ' + b.textContent;
+      document.getElementById('avail-context').textContent = driver.name + ', ' + L.dayName(avail.date) + ' ' + shortDate(avail.date) + ': ' + b.closest('td').title.replace(/\. Changed by hand this week$/, '');
       const reason = off ? (off.type === 'UNAVAILABLE' ? off.reasonCode : off.type) : 'AVAILABLE';
       const sel = document.getElementById('avail-reason');
       sel.value = [...sel.options].some(o => o.value === reason) ? reason : 'OFF';

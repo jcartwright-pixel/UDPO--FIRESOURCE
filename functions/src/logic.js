@@ -621,7 +621,11 @@
         var dayOff = !!driver.cells && !yes(driver.cells[p + '_available']);
         var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (/VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : dayOff ? 'off' : 'available';
         // extra: a day someone changed by hand (the run's route_override), light blue on the board as in the current app.
-        driver.days[p] = { date: date, routes: routes, kind: kind, extra: extra && routes.length > 0, text: routes.length ? routes.join(' / ') : off ? exceptionLabel(off) : dayOff ? 'OFF' : 'AVAILABLE' };
+        // Joe 10/10: one run name once (8303 twice reads 8303 ×2), each on its own line, so nothing is cut or left with a stray slash.
+        var lines = [], seen = {};
+        routes.forEach(function (n) { if (seen[n]) seen[n].n++; else { seen[n] = { name: n, n: 1 }; lines.push(seen[n]); } });
+        lines = lines.map(function (x) { return x.n > 1 ? x.name + ' \u00d7' + x.n : x.name; });
+        driver.days[p] = { date: date, routes: routes, lines: lines, kind: kind, extra: extra && routes.length > 0, text: routes.length ? lines.join(' / ') : off ? exceptionLabel(off) : dayOff ? 'OFF' : 'AVAILABLE' };
       });
     });
     return list;

@@ -113,3 +113,16 @@ test('Weekly colours and the Driver Assignment Board follow the current Weekly l
   assert.deepEqual([board[2].days.mon.text, board[2].days.mon.kind], ['806', 'conflict']);
   assert.deepEqual([board[2].days.tue.text, board[2].days.tue.kind], ['AVAILABLE', 'available']);
 });
+
+test('Driver Assignment Board names a repeated run once with its count, one line each', () => {
+  const day = (o) => Object.fromEntries(L.DAYS.map((p, i) => [p, Object.assign({ date: '2026-10-' + String(4 + i).padStart(2, '0'), runs: false }, p === 'mon' ? o : {})]));
+  const rows = [
+    { route: '8303', run: '8303', days: day({ runs: true, driverId: 'a', driver: 'ADAMS' }) },
+    { route: '8303', run: '8303', days: day({ runs: true, driverId: 'a', driver: 'ADAMS' }) },
+    { route: '801', streamId: 'FERRY PRODUCT', days: day({ runs: true, driverId: 'a', driver: 'ADAMS' }) }
+  ];
+  const board = L.driverBoardRows([{ id: 'a', name: 'ADAMS', status: 'ACTIVE' }], rows, [], '2026-10-04');
+  assert.deepEqual(board[0].days.mon.lines, ['8303 ×2', 'FERRY PRODUCT']);
+  assert.equal(board[0].days.mon.text, '8303 ×2 / FERRY PRODUCT');
+  assert.equal(board[0].days.mon.kind, 'booked');
+});

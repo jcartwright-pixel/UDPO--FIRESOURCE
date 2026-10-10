@@ -863,3 +863,33 @@ tr.otr-on td { background: #e3f3e8; }
 .sc-n { width: 64px; height: 34px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: center; font: inherit; font-weight: 700; }
 .sc-reasons { display: flex; flex-wrap: wrap; gap: 14px; }
 .sc-set .otr-card > button { align-self: flex-end; }
+
+/* Driver Assignment Board (Joe 10/10): the day box grows to fit; each run is on its own line and never split. The tab names never cut. */
+.weekly-page .board button.avail { height: auto; overflow: visible; }
+.weekly-page .board td.day .run { display: block; white-space: nowrap; }
+.weekly-page .board td.day.many { font-size: 11px; }
+.weekly-page .head .tabs { flex: none; }
+
+/* Action buttons as square tiles (Joe 10/10): the words wrap onto two lines so every button fits on one row with the title and pickers. */
+.head .actions.in-head { flex-wrap: nowrap; gap: 6px; align-self: center; }
+.head .actions.in-head button, .weekly-page .head .actions.in-head button {
+  width: 92px; min-width: 92px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px;
+  white-space: normal; line-height: 1.12; font-size: 13px; font-weight: 800; text-align: center; overflow-wrap: normal; hyphens: none;
+}
+@media (max-width: 1500px) {
+  .weekly-page .head { flex-wrap: nowrap; }
+  .weekly-page .head .actions.in-head { margin-left: auto; width: auto; justify-content: flex-end; }
+  .head .actions.in-head button, .weekly-page .head .actions.in-head button { width: 82px; min-width: 82px; font-size: 12px; }
+}
+/* Daily: the coverage figure is a tile too, and the pickers and tiles share one row. */
+.head:has(#print-sheet) { flex-wrap: nowrap; gap: 12px; }
+.head:has(#print-sheet) .coverage { flex-direction: column; align-items: center; justify-content: center; gap: 0; width: 92px; height: 58px; padding: 2px 4px; border-radius: 10px; text-align: center; }
+.head:has(#print-sheet) .coverage b { font-size: 21px; line-height: 1.05; }
+.head:has(#print-sheet) .coverage span { font-size: 10px; line-height: 1.1; letter-spacing: .03em; }
+.head:has(#print-sheet) .actions.in-head { align-self: flex-end; }
+@media (max-width: 1700px) {
+  .head:has(#print-sheet) .field .stepper input, .head:has(#print-sheet) .field .stepper select { min-width: 0; width: 150px; }
+  .head:has(#print-sheet) #delivery-day { width: 110px; }
+  .head:has(#print-sheet) h1 { font-size: 26px; }
+  .head:has(#print-sheet) .coverage { width: 82px; }
+}
