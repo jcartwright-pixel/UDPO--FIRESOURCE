@@ -61,7 +61,7 @@ function addSideMenu() {
   const nav = document.createElement('nav');
   nav.className = 'sidemenu';
   nav.setAttribute('aria-label', 'Screens');
-  nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Open the menu" title="Menu">&#9776;</button>' +
+  nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' +
     MENU.map(([group, items]) => (group ? '<div class="side-group">' + group + '</div>' : '') + items.map(([label, href, icon]) => {
       const ext = /^https:/.test(href);
       return '<a href="' + href + '"' + (ext ? ' target="_blank" rel="noopener" class="ext" title="' + label + ' (opens the current app)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
@@ -73,7 +73,16 @@ function addSideMenu() {
   wrap.append(nav, main);
   screen.appendChild(wrap);
   document.body.classList.add('has-side');
-  nav.querySelector('.side-toggle').onclick = () => document.body.classList.toggle('side-open');
+  // Wide screens fold the menu to icons and open it again; the choice is remembered on this computer.
+  // Narrow screens keep it folded and open it over the page.
+  const wide = () => window.matchMedia('(min-width: 1501px)').matches;
+  try { if (localStorage.getItem('udSideFolded') === '1') document.body.classList.add('side-folded'); } catch (e) { /* no storage */ }
+  nav.querySelector('.side-toggle').onclick = () => {
+    if (!wide()) { document.body.classList.toggle('side-open'); return; }
+    const folded = document.body.classList.toggle('side-folded');
+    try { localStorage.setItem('udSideFolded', folded ? '1' : '0'); } catch (e) { /* no storage */ }
+    window.dispatchEvent(new Event('resize'));
+  };
   main.addEventListener('click', () => document.body.classList.remove('side-open'));
 }
 addSideMenu();

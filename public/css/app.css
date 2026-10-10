@@ -688,3 +688,27 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .routeweek-page .rw-list em.on { color: #0f7b5f; } .routeweek-page .rw-list em.off { color: #c0392b; }
 .routeweek-page .rw-list .empty { color: var(--muted); text-align: center; padding: 18px 0; border: 0; background: none; }
 @media (max-width: 1500px) { .routeweek-page .rw-shell { grid-template-columns: minmax(0, 1fr) 290px; } .routeweek-page .rw-day { font-size: 10px; } }
+
+/* Joe 10/9: the side menu folds to icons on any screen (the button at its top), row lines are clearer and table print a
+   little larger. */
+.sidemenu .side-toggle { display: block; }
+@media (min-width: 1501px) {
+  body.side-folded .sidemenu { --side: 64px; }
+  body.side-folded .side-group, body.side-folded .sidemenu a span, body.side-folded .sidemenu a i, body.side-folded .sidemenu .side-back span { display: none; }
+  body.side-folded .sidemenu a, body.side-folded .sidemenu .side-back { justify-content: center; padding: 10px 0; }
+  body.side-folded .side-group + a, body.side-folded .sidemenu a:first-of-type { margin-top: 6px; }
+}
+:root { --font: 16px; }
+.drivers-page { --font: 18px; }
+.routes-page { --font: 17px; }
+tbody td { border-bottom: 1px solid #a9bbcd; }
+table.cards-look tbody tr td { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 #a9bbcd; }
+table.cards-look tbody tr td:first-child { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 #a9bbcd, -1px 0 0 #a9bbcd; }
+table.cards-look tbody tr td:last-child { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 #a9bbcd, 1px 0 0 #a9bbcd; }
+.weekly-page .week td { border-color: #9fb3c7; font-size: 16px; }
+.weekly-page .week tbody td.strong { font-size: 17px; }
+.weekly-page #routes-sheet td.day:not(.off) { font-size: clamp(11px, .77vw, 15px); }
+.weekly-page .board td { font-size: 13px; }
+.weekly-page .board td.strong { font-size: 15px; }
+.issues-page table.issues td { font-size: 16px; }
+@media (max-width: 1500px) { .issues-page table.issues td { font-size: 14px; } }
