@@ -19,6 +19,7 @@ function fleetmatics(calls) {
   return async (url, init) => {
     calls.push(url);
     const auth = init.headers.Authorization;
+    if (url.endsWith('/token') && auth === 'Basic ' + Buffer.from('reveal:pw').toString('base64')) return { status: 400, text: async () => '' };
     if (url.endsWith('/token')) return auth === 'Basic ' + Buffer.from('api:pw').toString('base64') ? { status: 200, text: async () => '"key123"' } : { status: 401, text: async () => '' };
     if (!/atmosphere_app_id=app1, Bearer key123/.test(auth)) return { status: 401, text: async () => '' };
     return /\/vehicles\/223876\/location$/.test(url) ? { status: 200, text: async () => '{}' } : { status: 404, text: async () => '' };
@@ -32,6 +33,10 @@ test('GPS Setup: only a manager or administrator; the login is never sent back; 
   assert.equal(s.result.ok, false);
   assert.match(s.result.message, /save the API user/);
   await assert.rejects(gpsCall(db(), ADMIN, { op: 'save', baseUrl: 'https://example.com' }, o), /must look like/);
+
+  await gpsCall(db(), ADMIN, { op: 'save', user: 'reveal', password: 'pw', appId: 'app1' }, o);
+  s = await gpsCall(db(), ADMIN, { op: 'test' }, o);
+  assert.match(s.result.message, /not accept this as an API login \(400\)/);
 
   s = await gpsCall(db(), ADMIN, { op: 'save', user: 'api', password: 'wrong', appId: 'app1' }, o);
   assert.deepEqual([s.hasUser, s.hasPassword, s.hasAppId], [true, true, true]);

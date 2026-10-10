@@ -48,6 +48,8 @@ async function test(d, vehicle, fetchFn) {
     return { ok: false, step: 'login', message: 'Could not reach Fleetmatics at ' + d.baseUrl + '. Check the address.' };
   }
   if (res.status === 401 || res.status === 403) return { ok: false, step: 'login', message: 'Fleetmatics refused the login (' + res.status + '). Check the API user name and password.' };
+  // 400 is what Fleetmatics gives a login that is not an API (REST) user, such as the everyday Reveal login.
+  if (res.status === 400) return { ok: false, step: 'login', message: 'Fleetmatics did not accept this as an API login (400). The everyday Reveal login does not work here: Verizon Connect must create an API (REST) user and give its user name, password and App ID.' };
   if (res.status >= 300) return { ok: false, step: 'login', message: 'Fleetmatics answered ' + res.status + ' to the login. Try again in a minute; if it stays, call Verizon Connect.' };
   const token = String(await res.text() || '').trim().replace(/^"|"$/g, '');
   if (!token) return { ok: false, step: 'login', message: 'Fleetmatics accepted the login but sent no key back.' };
