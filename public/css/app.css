@@ -1515,3 +1515,5 @@ span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-
 /* Polish 16: the no-connection bar. */
 .offline-bar { position: sticky; top: 0; z-index: 1000; background: #fff3c4; color: #6b4d00; border-bottom: 2px solid #e5b800; padding: 10px 16px; font-size: 16px; font-weight: 800; text-align: center; }
 .offline-bar[hidden] { display: none; }
+/* Joe 10/11: the plant home stays blank for the moment it takes to know whether this person starts on the all-plants overview. */
+body.deciding #screen { visibility: hidden; }
