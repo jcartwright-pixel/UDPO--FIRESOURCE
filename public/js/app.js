@@ -107,6 +107,25 @@ const SIDE_PAGES = {};
 // A side's own first page; Plant Production and Plant Maintenance start on the being-built page with their own name.
 const isHome = (side, page) => page === pageOf(side.home) && (side.home.indexOf('?') < 0 || location.search.indexOf(side.home.split('?')[1]) >= 0);
 const sideHas = (side, page) => isHome(side, page) || (SIDE_PAGES[side.key] || []).indexOf(page) >= 0 || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
+// Joe 10/11: a module Under Construction (building: true) opens only for Administrators, so Joe can watch it being built;
+// everyone else sees its card with the banner but cannot open it. requireSignIn refuses every screen of such a module to
+// anyone else, so a bookmark or typed address is refused too, not just the card. Any new module marked building uses this.
+export const buildingSideFor = (page) => SIDES.find(s => s.building && sideHas(s, page)) || null;
+export const mayOpenBuilding = (person) => !!(person && window.UDLogic && window.UDLogic.isAdmin(person));
+function refuseBuilding(side) {
+  if (document.getElementById('uc-refused')) return;
+  const box = document.createElement('section');
+  box.id = 'uc-refused';
+  box.className = 'uc-refused';
+  box.setAttribute('role', 'alert');
+  box.innerHTML = '<h1></h1><p></p><a class="button" href="index.html">Plant home</a>';
+  box.querySelector('h1').textContent = side.name + ' is under construction';
+  box.querySelector('p').textContent = 'Only Administrators can open ' + side.name + ' while it is being built. It opens for everyone once it is ready.';
+  // The header (Home, Back, Sign out) stays; everything else on the screen is hidden and the screen never loads its data.
+  const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
+  document.body.classList.add('uc-locked');
+  if (bar) bar.after(box); else (screen || document.body).appendChild(box);
+}
 export function sideFor(page) {
   // Home, the all-plants overview and the Administration Center sit above the three sides: their menu lists the sides.
   if (!page || ['index.html', 'company.html', 'administration.html'].indexOf(page) >= 0) return null;
@@ -147,7 +166,7 @@ function addSideMenu() {
   // lists only the plants; each plant opens its Plant Operations, Route Distribution and Fleet & Maintenance beside it.
   // A plant's home lists its three sides; a side shows its name (back to its first page), then only its own sections.
   // A side with one section lists its screens straight in the menu. Administration is a header button, not a menu item.
-  const sideLink = (s, href) => link([s.name, href || s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ');
+  const sideLink = (s, href) => link([s.name, href || s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '"' + (s.building ? ' data-building="1"' : '') + ' ');
   const plantSec = (p) => {
     const live = p.status === 'ACTIVE', soon = 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
     return '<div class="side-sec side-plant" data-plant="' + p.id + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + p.name + '">' +
@@ -488,6 +507,10 @@ export async function requireSignIn(ready) {
   const gate = document.getElementById('signin'), screen = document.getElementById('screen');
   let known = '';
   try { known = sessionStorage.getItem('udActive') || ''; } catch (e) { /* no storage */ }
+  const building = buildingSideFor(location.pathname.split('/').pop() || 'index.html');
+  let knownAdmin = false;
+  try { knownAdmin = sessionStorage.getItem('udAdmin') === '1'; } catch (e) { /* no storage */ }
+  if (building && !knownAdmin) known = '';
   if (known) { gate.hidden = true; screen.hidden = false; }
   const { auth } = await start();
   const showWho = (user) => {
@@ -536,6 +559,13 @@ export async function requireSignIn(ready) {
     }
     remember(email);
     noteAccess(Object.assign({ email }, entry.data()));
+    if (building && !mayOpenBuilding(Object.assign({ email }, entry.data()))) {
+      gate.hidden = true;
+      screen.hidden = false;
+      showWho(user);
+      refuseBuilding(building);
+      return;
+    }
     if (early) return;
     gate.hidden = true;
     screen.hidden = false;
