@@ -85,21 +85,6 @@ export function nowMinutes(now) {
   return Number(parts.hour) * 60 + Number(parts.minute);
 }
 
-// The plant's calendar day (New York), not the 6 AM operating day.
-export function calendarDay(now) {
-  const parts = {};
-  new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now || new Date()).forEach(p => { parts[p.type] = p.value; });
-  return parts.year + '-' + parts.month + '-' + parts.day;
-}
-
-// Unloading "Not back HH:MM" (the current app's uwOut): still waiting, the driver has not checked in, and the load is not due
-// back yet.
-export function notBack(row, now) {
-  if (row.status !== 'WAITING' || row.checkedIn || !row.returnDate || row.returnTime === null || row.returnTime === undefined) return false;
-  const today = calendarDay(now);
-  return row.returnDate > today || (row.returnDate === today && row.returnTime > nowMinutes(now));
-}
-
 // Behind: today's load (or a prior-day load) not done 30 minutes after its depart time.
 export function isBehind(row, today, now) {
   if (row.state === 'DONE') return false;
@@ -270,11 +255,7 @@ export function unloadRows(runs, date, journal, returns, loads) {
     const trailer = u.trailer !== undefined && u.trailer !== '' ? u.trailer : run.dropAndHook ? '' : txt(d.trailer);
     const mine = (returns || []).filter(x => (x.runDocId ? x.runDocId === run.id : x.route === txt(run.route) && x.run === txt(run.run)));
     const unit = U.unitKey(trailer || d.truck), wash = done[unit];
-    // When the load is due back (the current app's udpoV7273DeliveryReturn_): departure date plus the return day offset, at the
-    // calculated return time (New York time on the Live sheet).
-    const cell = (k) => (run.cells && run.cells[prefix + '_' + k]) || '', offset = Number(cell('return_day_offset')) || 0;
-    const depart = d.departureDate || date, returnDate = offset > 0 ? L.addDays(depart, offset) : depart, returnTime = L.minutesOfDay(cell('calculated_return_time'));
-    rows.push({ id: key, key, runDocId: run.id, day: prefix, returnDate, returnTime, route: txt(run.route), run: txt(run.run), runId: run.runId || '', area, driver: d.driver || '', truck: txt(d.truck), trailer,
+    rows.push({ id: key, key, runDocId: run.id, day: prefix, route: txt(run.route), run: txt(run.run), runId: run.runId || '', area, driver: d.driver || '', truck: txt(d.truck), trailer,
       trailerTyped: u.trailer !== undefined && u.trailer !== '', dropAndHook: !!run.dropAndHook, casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn),
       startedAt: u.startedAt || '', completedAt: u.completedAt || '', notes: u.notes || '', status: u.status || 'WAITING', returns: mine, pendingReturns: mine.filter(x => x.pending),
       washed: !!(wash && (!u.completedAt || U.when(wash.completedAt) >= U.when(u.completedAt))), checkedIn: !!d.checkinCompletedAt, nextLoad: null, nextRank: 999999 });
