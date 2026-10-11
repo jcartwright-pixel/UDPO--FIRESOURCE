@@ -5,7 +5,8 @@
 export const PAPER = { letter: [8.5, 11], legal: [8.5, 14] }, MARGIN = { narrow: 0.25, normal: 0.4, wide: 0.75 }, DPI = 96;
 export const BASE = { orient: 'landscape', size: 'letter', margin: 'normal', fit: true, onePage: false, copies: 1 };
 // The current app printed the Daily Dispatch Sheet on ONE landscape page, 3 copies (DailyDispatch.html 7.0.226).
-export const SHEET_DEFAULTS = { daily: { onePage: true, copies: 3 }, weekly: { onePage: true }, vacation: { margin: 'narrow' }, scheduler: { margin: 'narrow' } };
+// The current app's Fleet Service & Compliance Report was one portrait letter page.
+export const SHEET_DEFAULTS = { daily: { onePage: true, copies: 3 }, weekly: { onePage: true }, vacation: { margin: 'narrow' }, scheduler: { margin: 'narrow' }, fleet: { orient: 'portrait' } };
 export const PAGE_CSS = '.pl-paper{box-sizing:border-box;background:#fff;overflow:hidden;position:relative}.pl-slice{overflow:hidden;position:relative}' +
   '.pl-wrap{margin:18px auto 6px}.pl-wrap .pl-paper{box-shadow:0 2px 10px rgba(10,40,70,.25)}.pl-no{text-align:center;font:600 13px system-ui,Arial,sans-serif;color:#40576c;margin:6px 0 0}' +
   '.pl-wrap.skip .pl-paper{opacity:.35}.pl-wrap.skip .pl-no b{color:#9b1c1c}';

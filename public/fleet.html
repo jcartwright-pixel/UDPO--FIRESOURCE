@@ -44,6 +44,7 @@
 
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { printSaved } from './js/print-sheet.js';
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Fleet Service (FleetService.html, 220_V7276_GarageFleetService.gs), Send to Garage puts a PM, reefer
@@ -70,6 +71,16 @@
       return out;
     }
     const open = () => orders.filter(o => String(o.status || 'NEW').toUpperCase() !== 'DONE');
+    // The current app's Work Orders list (FleetService.html renderWork): who sent the job in plain words, working first, then sent from
+    // the office, waiting on parts, not started; newest first within each. "What they fixed" is the fix and the mechanic's note together.
+    const SOURCE = { WRITE_UP: 'Driver write-up', OFFICE: 'Office · Fleet Service', TECH: 'Garage found it' };
+    const cameFrom = (x) => x.source_from || SOURCE[String(x.source || '').toUpperCase()] || x.source || '';
+    const JOB_RANK = (x) => { const s = String(x.status || 'NEW').toUpperCase(); return s === 'WORKING' ? 0 : s === 'PARTS' ? 2 : String(x.source).toUpperCase() === 'OFFICE' ? 1 : 3; };
+    const openSorted = () => open().sort((a, b) => JOB_RANK(a) - JOB_RANK(b) || String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    const fixedText = (x) => [x.fixed, x.fixed_note].filter(Boolean).join(' · ');
+    // A job's mechanic minutes: the saved total, else each mechanic's finished clock added up.
+    const minsOf = (x) => Number(x.minutes) || (Array.isArray(x.labor) ? x.labor.reduce((n, l) => n + (l && l.end ? Number(l.minutes) || 0 : 0), 0) : 0);
+    const hrs = (m) => m ? Math.round(m / 6) / 10 : '';
     const done = () => orders.filter(o => String(o.status).toUpperCase() === 'DONE').sort((a, b) => String(b.completed_at || '').localeCompare(String(a.completed_at || '')));
     const kpis = (list) => list.map(([n, label, c]) => '<div class="' + (c || '') + '"><b>' + n + '</b><span>' + label + '</span></div>').join('');
     const table = (cols, head, rows, empty) => '<table class="issues"><colgroup>' + cols.map(w => '<col style="width:' + w + '%">').join('') + '</colgroup><thead><tr>' +
@@ -108,6 +119,48 @@
             box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td>' + now(r) + '</td><td>' + pill(STATUS[r.worst]) + '</td><td>' + send(r) + '</td></tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
     }
 
+    // Every Uniontown truck and trailer on the fleet list, leased ones too, with the year / make / model, plate and lessor the fleet sync
+    // keeps in the unit's notes ("External Fleet: year | make | model | VIN | plate | state | Lease: ...").
+    function fleetInfo() {
+      const out = {};
+      equipment.forEach(e => {
+        const type = L.fleetKind(e.type), unit = String(e.unit || '').toUpperCase();
+        if (!type || !unit || out[unit] || (e.facilityId && e.facilityId !== 'fac_uniontown')) return;
+        const notes = String(e.notes || ''), m = /External Fleet:\s*([^\n]*)/i.exec(notes), lease = /\bLease:\s*([^|\n]+)/i.exec(notes);
+        const parts = (m ? m[1].split('|') : []).map(x => x.trim()).filter(x => x && !/^Lease:/i.test(x)), vin = parts.findIndex(x => /^[A-HJ-NPR-Z0-9]{17}$/i.test(x));
+        const plate = vin >= 0 && parts[vin + 1] && !/^[A-Z]{2}$/i.test(parts[vin + 1]) ? parts[vin + 1] : '';
+        out[unit] = { unit, type, lease: lease ? lease[1].trim() : 'Own', model: (vin >= 0 ? parts.slice(0, vin) : parts.slice(0, 3)).join(' '), plate };
+      });
+      return out;
+    }
+    // The unit a typed number means (the current app's unitMatch): the whole number, T- and the number for a trailer, or the last
+    // few digits when exactly one unit ends that way.
+    function unitMatch(typed, list) {
+      const al = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''), t = al(typed), all = [...new Set(list.filter(Boolean))];
+      if (!t) return '';
+      const exact = all.filter(u => al(u) === t || al(u) === 'T' + t);
+      if (exact.length === 1) return exact[0];
+      const ends = all.filter(u => t.length >= 2 && al(u).length > t.length && al(u).slice(-t.length) === t);
+      return ends.length === 1 ? ends[0] : '';
+    }
+    // The History tab's unit panel (the current app's hFacts): miles, PM, DOT, plate, lease, open jobs and the year's garage hours.
+    function facts(u, info, due, yearAgo) {
+      if (!u) return '<small>ONE UNIT</small><h3>Type a number</h3><p class="hint">Type a truck or trailer number above (the last few digits are enough) to see its miles, service dates and everything the garage did on it.</p>';
+      const i = info[u] || {}, row = due.units.find(x => String(x.unit).toUpperCase() === u) || {}, truck = (i.type || row.type || 'TRUCK') === 'TRUCK', R = L.FLEET_RULES;
+      const mine = orders.filter(x => String(x.unit || '').toUpperCase() === u), live = mine.filter(x => String(x.status || 'NEW').toUpperCase() !== 'DONE');
+      const year = mine.filter(x => String(x.status).toUpperCase() !== 'DONE' || String(x.completed_at || '').slice(0, 10) >= yearAgo), odo = truck ? miles()[u] : null;
+      const line = (label, v) => '<p><span>' + label + '</span><b>' + escapeHtml(v === null || v === undefined || v === '' ? '—' : String(v)) + '</b></p>';
+      const now = row.miles != null ? row.miles : odo ? odo.miles : null;
+      return '<small>' + (truck ? 'TRUCK' : 'TRAILER') + (i.model ? ' · ' + escapeHtml(i.model.toUpperCase()) : '') + '</small><h3>' + escapeHtml(u) + '</h3>' +
+        (truck ? line('Miles now', now != null ? num(now) + ' mi' : '') + line('Last PM', row.lastServiceDate || row.lastServiceMiles != null ? [when(row.lastServiceDate), row.lastServiceMiles != null ? num(row.lastServiceMiles) + ' mi' : ''].filter(Boolean).join(' · ') : '') +
+            line('Next PM', row.lastServiceMiles != null ? num(row.lastServiceMiles + R.truckMiles) + ' mi' : '')
+          : line('Reefer hours now', row.currentHours != null ? num(row.currentHours) : '') + line('Last reefer service', when(row.lastServiceDate)) +
+            line('Next reefer service', row.lastServiceDate ? when(L.addMonths(row.lastServiceDate, R.trailerMonths)) : '')) +
+        line('Next DOT inspection', when(row.dotDue)) + line('Plate expires', when(row.plateExpires)) + (i.plate ? line('Plate', i.plate) : '') + line('Lease', i.lease || '') +
+        line('Open work orders', String(live.length)) + line('Garage jobs · 12 months', String(year.length)) + line('Mechanic hours · 12 months', String(hrs(year.reduce((n, x) => n + minsOf(x), 0)) || 0)) +
+        (i.lease && i.lease !== 'Own' ? '<p class="hint">Leased: the lessor does its PM and DOT, so it is not on the Due list.</p>' : '');
+    }
+
     function render() {
       const t = today(), due = L.fleetDue(units(), setup, miles(), open(), null, t), month = t.slice(0, 7), weekAgo = L.addDays(t, -7);
       const late = due.items.filter(i => i.status === 'OVERDUE').length, soon = due.items.filter(i => i.status === 'DUE_SOON').length, week = done().filter(o => String(o.completed_at || '').slice(0, 10) >= weekAgo);
@@ -124,31 +177,35 @@
         sheet.innerHTML = unitGrid(due, hit);
         foot.textContent = due.units.length + ' trucks and trailers at Uniontown · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(L.FLEET_RULES.truckMiles) + ' miles, reefer every ' + L.FLEET_RULES.trailerMonths + ' months or ' + num(L.FLEET_RULES.trailerHours) + ' hours, DOT every ' + L.FLEET_RULES.dotMonths + ' months.';
       } else if (view === 'work') {
-        const o = open(), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
+        const o = openSorted(), mins = week.reduce((s, x) => s + minsOf(x), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
-          [o.filter(x => String(x.source).toUpperCase() === 'OFFICE').length, 'Sent from office'], [week.length, 'Finished · last 7 days', 'good'], [Math.round(mins / 6) / 10, 'Mechanic hours · 7 days']]);
+          [o.filter(x => String(x.source).toUpperCase() === 'OFFICE').length, 'Sent from office'], [week.length, 'Finished · last 7 days', 'good'], [hrs(mins) || 0, 'Mechanic hours · 7 days']]);
         bar.innerHTML = '<span class="spacer"></span><a class="button" href="garage.html">Garage Work Orders</a><a class="button" href="garage-station.html">Garage Station</a>';
         sheet.innerHTML = '<div class="fleet-split"><div><h2>Open Work Orders</h2>' + table([14, 12, 34, 14, 12, 14], ['#', 'Unit', "What's wrong", 'Came from', 'Tech', 'Status'],
-          o.map(x => '<tr><td class="strong">' + escapeHtml(x.work_order_id) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(x.source || '') +
+          o.map(x => '<tr data-hist="' + escapeHtml(x.unit) + '" title="Show everything on ' + escapeHtml(x.unit) + '"><td class="strong">' + escapeHtml(x.work_order_id) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(cameFrom(x)) +
             '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + pill(JOB[String(x.status).toUpperCase()] || [x.status, 'no']) + '</td></tr>').join(''), 'No open work orders.') +
-          '</div><div><h2>What the Mechanics Did · Last 7 Days</h2>' + table([12, 12, 22, 28, 14, 12], ['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours'],
-          week.map(x => '<tr><td>' + when(x.completed_at) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td class="wrong">' + escapeHtml(x.fixed_note || x.fixed || '') +
-            '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td></tr>').join(''), 'Nothing finished in the last 7 days.') + '</div></div>';
+          '</div><div><h2>What the Mechanics Did · Last 7 Days <small>' + hrs(mins) + ' hours</small></h2>' + table([12, 12, 22, 28, 14, 12], ['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours'],
+          week.map(x => '<tr data-hist="' + escapeHtml(x.unit) + '" title="Show everything on ' + escapeHtml(x.unit) + '"><td>' + when(x.completed_at) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td class="wrong">' + escapeHtml(fixedText(x)) +
+            '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + hrs(minsOf(x)) + '</td></tr>').join(''), 'Nothing finished in the last 7 days.') + '</div></div>';
         foot.textContent = orders.length + ' work orders from the garage list.';
       } else if (view === 'history') {
         k.innerHTML = '';
         bar.innerHTML = '<input type="search" id="search" placeholder="Type a truck or trailer number" aria-label="Find" value="' + escapeHtml(search) + '"><div class="chips">' +
           [['', 'All'], ['work', 'Work orders'], ['service', 'Services'], ['dot', 'DOT']].map(([v, l]) => '<button type="button" data-kind="' + v + '" class="' + (kindFilter === v ? 'on' : '') + '">' + l + '</button>').join('') + '</div><span class="spacer"></span><span class="hint">Last 12 months</span>';
-        const yearAgo = L.addDays(t, -365);
-        const rows = done().filter(x => String(x.completed_at || '').slice(0, 10) >= yearAgo && hit(x.unit)).map(x => {
+        const yearAgo = L.addDays(t, -365), info = fleetInfo(), u = unitMatch(search, Object.keys(info).concat(orders.map(x => String(x.unit || '').toUpperCase())));
+        // Every work order, service and DOT inspection of the last 12 months, the open ones too, newest first (the current app's History).
+        const stamp = (x) => String(x.completed_at || x.started_at || x.created_at || '');
+        const rows = orders.filter(x => (String(x.status).toUpperCase() !== 'DONE' || String(x.completed_at || '').slice(0, 10) >= yearAgo) && (u ? String(x.unit || '').toUpperCase() === u : hit(x.unit))).map(x => {
           const kind = x.service_key === 'DOT' ? 'dot' : x.service_key ? 'service' : 'work';
           return { x, kind };
-        }).filter(r => !kindFilter || r.kind === kindFilter);
-        sheet.innerHTML = table([11, 10, 11, 32, 14, 8, 14], ['Date', 'Unit', 'Kind', 'What', 'Who', 'Hours', 'Result'],
-          rows.map(({ x, kind }) => '<tr><td>' + when(x.completed_at) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td>' + ({ work: 'Work order', service: 'Service', dot: 'DOT' })[kind] + '</td><td class="wrong">' +
-            escapeHtml(x.problem || '') + (x.fixed_note ? '<small>' + escapeHtml(x.fixed_note) + '</small>' : '') + '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' +
-            escapeHtml(x.fixed || '') + (x.signed_by ? '<small>signed ' + escapeHtml(x.signed_by) + '</small>' : '') + '</td></tr>').join(''), 'Nothing in the garage history yet.');
-        foot.textContent = rows.length + ' finished jobs shown.';
+        }).filter(r => !kindFilter || r.kind === kindFilter).sort((p, q) => stamp(q.x).localeCompare(stamp(p.x)));
+        sheet.innerHTML = '<div class="fs-hist"><div class="fs-facts">' + facts(u, info, due, yearAgo) + '</div><div><h2>' + escapeHtml(u ? 'Everything on ' + u : search ? 'Units matching ' + search : 'Everything in the garage') + ', newest first</h2>' +
+          table([11, 10, 11, 32, 14, 8, 14], ['Date', 'Unit', 'Kind', 'What', 'Who', 'Hours', 'Result'],
+          rows.map(({ x, kind }) => '<tr><td>' + when(stamp(x)) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td>' + ({ work: 'Work order', service: 'Service', dot: 'DOT' })[kind] + '</td><td class="wrong">' +
+            escapeHtml(x.problem || '') + (x.fixed_note ? '<small>' + escapeHtml(x.fixed_note) + '</small>' : '') + '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + hrs(minsOf(x)) + '</td><td>' +
+            (String(x.status).toUpperCase() === 'DONE' ? escapeHtml(x.fixed || '') + (x.signed_by ? '<small>signed ' + escapeHtml(x.signed_by) + '</small>' : '') : pill(JOB[String(x.status || 'NEW').toUpperCase()] || [x.status, 'no'])) + '</td></tr>').join(''),
+          search ? 'Nothing in the garage for ' + escapeHtml(search) + ' in the last 12 months.' : 'Nothing in the garage history yet.') + '</div></div>';
+        foot.textContent = rows.length + ' garage jobs shown.';
       } else {
         k.innerHTML = '';
         const R = L.FLEET_RULES;
@@ -167,20 +224,40 @@
       bar.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { kindFilter = b.dataset.kind; render(); }; });
     }
 
-    // The one-page report (the current app's Fleet Service & Compliance Report): everything overdue or due soon, then what is at the garage.
+    // The one-page report (the current app's Fleet Service & Compliance Report, FleetService.html renderReport): the tiles, everything
+    // overdue, due soon or at the garage, DOT inspections and plates of the next 90 days, and the last 7 days' garage work with who signed.
     function printReport(due, t) {
       let box = document.getElementById('print');
       if (!box) { box = document.createElement('div'); box.id = 'print'; document.body.appendChild(box); }
-      const rows = (list) => list.map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + (i.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + escapeHtml(i.what) + '</td><td>' +
-        (i.key === 'PM' ? num(i.dueAt) + ' mi' : when(i.dueAt)) + '</td><td>' + (typeof i.left === 'number' ? num(i.left) + ' mi' : escapeHtml(i.left)) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('');
-      const head = '<tr><th>Unit</th><th>Type</th><th>What</th><th>Due at</th><th>Left</th><th>Status</th></tr>';
-      box.innerHTML = '<h2>Fleet Service &amp; Compliance Report · ' + shortDate(t) + '</h2><p><b>Overdue and due soon</b></p><table>' + head + (rows(due.items.filter(i => i.status === 'OVERDUE' || i.status === 'DUE_SOON')) || '<tr><td colspan="6">Nothing</td></tr>') + '</table>' +
-        '<p><b>At the garage</b></p><table>' + head + (rows(due.items.filter(i => i.status === 'AT_GARAGE')) || '<tr><td colspan="6">Nothing</td></tr>') + '</table>';
-      window.print();
+      const info = fleetInfo(), all = due.items, weekAgo = L.addDays(t, -7), month = t.slice(0, 7);
+      const count = (st) => all.filter(i => i.status === st).length, overdue = count('OVERDUE');
+      const in90 = (key) => all.filter(i => i.key === key && /^\d{4}-\d\d-\d\d/.test(String(i.dueAt)) && L.daysBetween(t, String(i.dueAt).slice(0, 10)) <= 90).sort((x, y) => String(x.dueAt).localeCompare(String(y.dueAt)));
+      const rows = (list, cols, empty) => list.length ? list.map(x => '<tr>' + cols.map(c => '<td>' + c(x) + '</td>').join('') + '</tr>').join('') : '<tr><td colspan="' + cols.length + '" class="fs-none">' + empty + '</td></tr>';
+      const tbl = (head, body) => '<table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table>';
+      const nowText = (i) => i.now === '' || i.now === undefined || i.now === null ? '—' : num(i.now) + (i.type === 'TRUCK' ? ' mi' : ' hrs');
+      const left = (i) => typeof i.left === 'number' ? num(i.left) + ' mi' : escapeHtml(i.left || '—');
+      const late = all.filter(i => i.status === 'OVERDUE' || i.status === 'DUE_SOON' || i.status === 'AT_GARAGE');
+      const week = done().filter(o => String(o.completed_at || '').slice(0, 10) >= weekAgo);
+      const day = new Date(t + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+      box.innerHTML = '<div class="fs-report"><div class="fs-rhead"><div><small>UNITED DAIRY · FLEET SERVICE</small><h2>Fleet Service &amp; Compliance Report</h2><b>As of ' + day + ' ' + shortDate(t) + '</b></div>' +
+        '<div class="fs-rover">Overdue now<b>' + overdue + '</b></div></div>' +
+        '<div class="fs-ptiles"><div><small>OVERDUE</small><b>' + overdue + '</b></div><div><small>DUE SOON</small><b>' + count('DUE_SOON') + '</b></div><div><small>AT THE GARAGE</small><b>' + open().length + '</b></div>' +
+        '<div><small>FINISHED THIS MONTH</small><b>' + done().filter(o => String(o.completed_at || '').slice(0, 7) === month).length + '</b></div></div>' +
+        '<h3>Overdue, due soon and at the garage</h3>' + tbl(['Unit', 'Type', "What's due", 'Due at', 'Now', 'Left', 'Status'],
+          rows(late, [i => '<b>' + escapeHtml(i.unit) + '</b>', i => i.type === 'TRAILER' ? 'Trailer' : 'Truck', i => escapeHtml(i.what), i => i.key === 'PM' ? num(i.dueAt) + ' mi' : when(i.dueAt), nowText, left, i => STATUS[i.status][0]], 'Nothing is overdue or due soon.')) +
+        '<div class="fs-two"><div><h3>DOT inspections · next 90 days</h3>' + tbl(['Unit', 'Due'], rows(in90('DOT'), [i => '<b>' + escapeHtml(i.unit) + '</b>', i => when(i.dueAt) + (i.status === 'OVERDUE' ? ' (overdue)' : '')], 'None due.')) + '</div>' +
+        '<div><h3>Plates / license · next 90 days</h3>' + tbl(['Unit', 'Plate', 'Expires'], rows(in90('PLATE'), [i => '<b>' + escapeHtml(i.unit) + '</b>', i => escapeHtml((info[String(i.unit).toUpperCase()] || {}).plate || '—'), i => when(i.dueAt) + (i.status === 'OVERDUE' ? ' (expired)' : '')], 'None expiring.')) + '</div></div>' +
+        '<h3>Work done · last 7 days (from garage work orders)</h3>' + tbl(['Date', 'Unit', 'Work done', 'By', 'Minutes', 'Signed'],
+          rows(week.slice(0, 14), [x => when(x.completed_at), x => '<b>' + escapeHtml(x.unit) + '</b>', x => escapeHtml([x.problem, x.fixed, x.fixed_note].filter(Boolean).join(' · ')), x => escapeHtml(x.techs || ''), x => minsOf(x) || '', x => x.signed_by ? '&#10004; ' + escapeHtml(x.signed_by) : ''], 'No finished garage work in the last 7 days.')) +
+        '<div class="fs-sign"><span>Reviewed by ______________________________</span><span>Date ______________</span></div>' +
+        '<div class="fs-rfoot"><span>Miles from the driver\'s daily inspection; work history from Garage work orders. Leased tractors: service by the lessor.</span><span>Page 1 of 1</span></div></div>';
+      printSaved('fleet');
     }
 
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; search = ''; render(); } });
     document.getElementById('sheet').addEventListener('click', async e => {
+      const h = e.target.closest('tr[data-hist]');
+      if (h && !e.target.closest('button, a')) { view = 'history'; search = h.dataset.hist; kindFilter = ''; render(); document.getElementById('sheet').scrollTop = 0; return; }
       const b = e.target.closest('[data-send]');
       if (!b) return;
       b.disabled = true; showError('');

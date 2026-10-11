@@ -131,7 +131,7 @@
           { id: 'year', label: 'Year', type: 'select', choices: () => years(2, 1), def: () => String(thisYear) }],
         url: () => 'vacations.html', prep: (w) => click(w, '[data-view="calendar"]'), ready: (d) => d.querySelectorAll('#print-who option').length > 1,
         print: async (w, o) => { setValue(w, '#cal-month', o.year + '-01'); await wait(50); setValue(w, '#print-who', o.who); click(w, '#print-year'); } },
-      { key: 'fleet', name: 'Fleet Service Report', text: 'Overdue and due-soon services, DOT and plates', opts: [],
+      { key: 'fleet', name: 'Fleet Service Report', text: 'Tiles, overdue and due soon, DOT and plates for 90 days, last 7 days\' work with sign-off', opts: [],
         url: () => 'fleet.html?view=due', ready: (d) => d.querySelector('#fs-print') && d.getElementById('foot').textContent, print: (w) => click(w, '#fs-print') },
       { key: 'otr', name: 'Over the Road Report', text: 'The year\'s OTR runs month by month against last year, with the figures',
         opts: [{ id: 'year', label: 'Year', type: 'select', choices: () => years(2, 0), def: () => String(thisYear) }],
