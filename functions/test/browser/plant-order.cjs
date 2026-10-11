@@ -55,15 +55,20 @@ async function touchDrag(page, from, to) {
   const cdp = await page.context().newCDPSession(page);
   // The finger goes down only once the screen has settled: both rows in view, the handle where it was 300 ms ago and
   // nothing over it (on a slower machine the rows were still moving when the finger went down, and nothing was dragged).
-  await page.$eval(from, el => el.scrollIntoView({ block: 'center' }));
-  let a = null, b = null;
-  for (let i = 0; i < 40; i++) {
-    const a2 = await box(page, from), b2 = await box(page, to);
-    const hit = await page.evaluate(([sel, x, y]) => { const el = document.elementFromPoint(x, y); return !!(el && el.closest(sel)); }, [from, a2.x + a2.width / 2, a2.y + a2.height / 2]);
-    if (hit && a && b && a.y === a2.y && b.y === b2.y && b2.y > 0) { a = a2; b = b2; break; }
+  // The row it goes to must show too, not sit under the table's fixed header (the finger would land on the header and the
+  // load would go nowhere), so the list is scrolled to the middle of the two and the spot checked for both.
+  await page.evaluate(([f, t]) => { const a = document.querySelector(f), b = document.querySelector(t), s = a.closest('.scroll-list');
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(), rs = s.getBoundingClientRect();
+    s.scrollTop += (Math.min(ra.top, rb.top) + Math.max(ra.bottom, rb.bottom)) / 2 - (rs.top + rs.bottom) / 2; }, [from, to]);
+  const hits = (sel, x, y) => page.evaluate(([s, px, py]) => { const el = document.elementFromPoint(px, py); return !!(el && el.closest(s)); }, [sel, x, y]);
+  let a = null, b = null, ready = false;
+  for (let i = 0; i < 40 && !ready; i++) {
+    const a2 = await box(page, from), b2 = await box(page, to), x = a2.x + a2.width / 2;
+    ready = !!(a && b && a.y === a2.y && b.y === b2.y) && await hits(from, x, a2.y + a2.height / 2) && await hits(to, x, b2.y + 6);
     a = a2; b = b2;
-    await page.waitForTimeout(300);
+    if (!ready) await page.waitForTimeout(300);
   }
+  if (!ready) throw new Error('The tablet screen did not settle with both rows showing: ' + JSON.stringify({ a, b }));
   const p = (x, y) => [{ x, y, id: 1 }];
   const x0 = a.x + a.width / 2, y0 = a.y + a.height / 2, y1 = b.y + 6;
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: p(x0, y0) });
