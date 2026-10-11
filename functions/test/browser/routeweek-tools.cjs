@@ -40,7 +40,7 @@ async function openPage(browser, width, height, url) {
     const p = await openPage(browser, 1920, 1080, '/routeweek.html?week=' + want + '&testEmail=manager.test@uniteddairy.com');
     await p.waitForSelector('#rows tr[data-id] button[data-day]:not([disabled])');
     const [y, m, d] = want.split('-').map(Number);
-    assert.equal(await p.textContent('#week-label'), 'Week of ' + m + '/' + d + '/' + y, 'opens at the week asked for');
+    assert.equal(await p.textContent('#week-label'), 'Week of ' + m + '-' + d + '-' + String(y).slice(2), 'opens at the week asked for');
     results.push('Route Week Override opened at the week of ' + want + ' (asked for), not the default ' + (live.next || live.current));
 
     // Change one day, then Reset: the first click only asks; the second puts the day back.

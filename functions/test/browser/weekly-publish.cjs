@@ -42,7 +42,7 @@ const routesShown = (page) => page.$$eval('#rows tr td:first-child', tds => tds.
     assert.equal(await page.textContent('#publish'), 'Publish to Daily Dispatch');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '1-next-week-before-publish-1920.png') });
     await page.click('#publish');
-    assert.match(await page.textContent('#publish'), /^Click Again: Push 10\/11 Live$/);
+    assert.match(await page.textContent('#publish'), /^Click Again: Push 10-11-26 Live$/);
     assert.match(await page.textContent('#wk-note'), /move Current to Previous, Next to Current, and create the new Next week/);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '2-click-again-1920.png') });
     await page.click('#publish');

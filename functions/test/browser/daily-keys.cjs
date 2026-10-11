@@ -182,7 +182,7 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     const sat = await openPage(browser, 1920, 1080, '/daily.html?date=2026-10-10&testEmail=dispatch.test@uniteddairy.com');
     await sat.waitForSelector('tr.group.loaded');
     const bands = await sat.$$eval('#rows tr.group, #rows tr[data-id]', n => n.map(x => x.dataset.id ? x.dataset.id.split('__')[1] : x.textContent));
-    assert.deepEqual(bands.slice(bands.indexOf('MONDAY DELIVERIES, 10/12/2026')), ['MONDAY DELIVERIES, 10/12/2026', 'LOADED SATURDAY, 10/10/2026', 'run_t801|mon', 'LOADED SUNDAY, 10/11/2026', 'run_t802|mon'], bands.join(' | '));
+    assert.deepEqual(bands.slice(bands.indexOf('MONDAY DELIVERIES, 10-12-26')), ['MONDAY DELIVERIES, 10-12-26', 'LOADED SATURDAY, 10-10-26', 'run_t801|mon', 'LOADED SUNDAY, 10-11-26', 'run_t802|mon'], bands.join(' | '));
     if (SHOTS) await sat.screenshot({ path: path.join(SHOTS, 'daily-saturday-loaded-1920.png') });
     assert.deepEqual(sat.errors, []);
     results.push('Saturday 10/10: Monday deliveries show LOADED SATURDAY (801) and LOADED SUNDAY (802)');

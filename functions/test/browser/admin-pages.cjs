@@ -49,7 +49,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     assert.deepEqual(pills, [], 'nothing in Administration says Being built or View only: ' + pills.join(', '));
     assert.equal(await p.$('.adm-state'), null);
     assert.equal(/Users sheet; editing here is being built/.test(await p.textContent('#view')), false);
-    assert.deepEqual(await p.$$eval('#view .ap-bar > button', b => b.map(x => x.textContent)), ['+ Add Person', '+ Add Role', 'Reload']);
+    assert.deepEqual(await p.$$eval('#view .ap-bar > button', b => b.map(x => x.textContent)), ['+ Add Person', '+ Add Role', 'Refresh']);
     assert.ok(await oneLine(p));
     await shot(p, 'people-1920.png');
     await shot(p, 'people-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
