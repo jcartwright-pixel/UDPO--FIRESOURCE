@@ -1062,8 +1062,10 @@ async function noScroll(page) {
     assert.deepEqual(sec('Manager Reports'), ['Driver Scorecard', 'Over the Road', 'Trucks Today', 'GPS Setup'], 'Joe 10/10: the manager reports, GPS included');
     await mp.close();
     const mq = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
-    await mq.waitForSelector('.side-flyouts .flyout', { state: 'attached' });
-    assert.equal(await mq.$eval('.side-flyouts .flyout a', a => a.textContent.trim()), 'Fleet & Maintenance', 'the maintenance side starts on the hub');
+    // Joe 10/10 evening: Fleet & Maintenance lists its screens straight in the menu (no fly-out); the side's name opens the hub.
+    await mq.waitForSelector('.sidemenu a.side-name', { state: 'attached' });
+    assert.equal(await mq.$eval('.sidemenu a.side-name', a => a.textContent.trim()), 'Fleet & Maintenance', 'the maintenance side starts on the hub');
+    assert.equal(await mq.getAttribute('.sidemenu a.side-name', 'href'), 'maint.html');
     await mq.close();
     // Joe 10/10 (old hub picture): Fleet & Maintenance shows the six counts, four cards with the icon library pictures and the
     // latest write-ups; a card opens its list in this window, with the old columns and Lessor | Garage on trucks.
