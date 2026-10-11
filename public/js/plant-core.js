@@ -153,6 +153,16 @@ export function minutesText(m) {
   return m < 120 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min';
 }
 
+// Polish item 5 (Joe 10/11): a load or unload still running after 12 hours shows when it started instead of a huge clock
+// ("Started Wed 5:13 AM · forgot End?"); otherwise the plain minutes text.
+export const LONG_RUN_MINUTES = 720;
+export function runningText(startedAt, m) {
+  if (m === null || m === undefined) return '';
+  if (m < LONG_RUN_MINUTES || !startedAt || !isFinite(Date.parse(startedAt))) return minutesText(m);
+  const when = new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(startedAt));
+  return 'Started ' + when.replace(',', '') + ' · forgot End?';
+}
+
 // "yyyy-mm-ddTHH:MM" in plant time from a stamp, for a time box; and back.
 export function stampToLocal(stamp) {
   if (!stamp) return '';

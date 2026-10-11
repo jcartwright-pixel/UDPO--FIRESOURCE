@@ -207,10 +207,13 @@
           (r.pickup ? cell('PICKUP ' + r.pickup, 'pickup') : cell(r.driverNotes, 'left', live && 'note')) +
           '<td>' + (edit ? '<button type="button" class="edit" data-open>Edit</button>' : '') + '</td></tr>');
       });
-      if (!rows.length) body.push('<tr><td colspan="11" class="empty">No loads go out on this day in the copied Live weeks.</td></tr>');
+      // Polish item 17 (Joe 10/11): a plain line that names the day and says what to do.
+      if (!rows.length) body.push('<tr><td colspan="11" class="empty">No loads on ' + L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(loadDate))] + ' ' + Number(loadDate.slice(5, 7)) + '/' + Number(loadDate.slice(8, 10)) + '. Use the arrows to pick another day.</td></tr>');
       keepCursor(document.getElementById('rows'), () => { document.getElementById('rows').innerHTML = body.join(''); });
       const running = rows.filter(r => !r.off), covered = running.filter(r => !L.needsDriver(r)).length;
-      document.getElementById('coverage').firstElementChild.textContent = (running.length ? Math.round(100 * covered / running.length) : 0) + '%';
+      // Polish item 3 (Joe 10/11): a day with no loads says so instead of showing 0% covered.
+      document.getElementById('coverage').firstElementChild.textContent = running.length ? Math.round(100 * covered / running.length) + '%' : '—';
+      document.getElementById('coverage').lastElementChild.textContent = running.length ? 'DRIVERS COVERED' : 'NO LOADS';
       document.getElementById('delivery-day').value = deliveryDayName(loadDate);
       const groups = new Set(rows.map(r => r.deliveryDate)).size;
       document.getElementById('count').textContent = running.length + ' loads' + (running.length - covered ? ', ' + (running.length - covered) + ' need a driver' : '');

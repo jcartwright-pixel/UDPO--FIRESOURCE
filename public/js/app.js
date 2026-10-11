@@ -247,6 +247,33 @@ export function buttonsToTop() {
   });
 }
 buttonsToTop();
+/* Polish item 1 (Joe 10/11): the top buttons keep their words on one line. They stay all the same size: every button takes the
+   width of the longest one on that screen (measured once the words are drawn, and again when a button or the window changes). */
+export function evenTopButtons() {
+  const head = document.querySelector('#screen .head');
+  if (!head) return;
+  const btns = [...head.querySelectorAll('.actions button, .actions a.button')].filter(b => !b.closest('.chips, .seg, .stepper, .tabs') && !/^(prev|next)$/.test(b.id));
+  head.style.removeProperty('--top-btn-w');
+  const widths = btns.map(b => b.getBoundingClientRect().width).filter(w => w > 0);
+  if (!widths.length) return;
+  head.style.setProperty('--top-btn-w', Math.ceil(Math.max(...widths)) + 'px');
+  // Where the window is too narrow for equal buttons in one row (Weekly on a laptop), each button keeps its own width instead.
+  const right = Math.min(head.getBoundingClientRect().right, document.documentElement.clientWidth) + 1;
+  const tops = new Set(btns.map(b => Math.round(b.getBoundingClientRect().top)));
+  if (tops.size > 1 || btns.some(b => b.getBoundingClientRect().right > right)) head.style.removeProperty('--top-btn-w');
+}
+(() => {
+  const head = document.querySelector('#screen .head');
+  if (!head) return;
+  let queued = false;
+  const again = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; evenTopButtons(); }); };
+  again();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
+  new MutationObserver(again).observe(head, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'class'] });
+  window.addEventListener('resize', again);
+  // The screen shows only after sign-in; measure again once the top line has a size.
+  if (window.ResizeObserver) new ResizeObserver(again).observe(head);
+})();
 
 // One look on every screen (Joe 10/10): each screen title starts with its picture from the United Dairy icon library
 // (img/library), or with its line icon in the same tile where no picture fits.
