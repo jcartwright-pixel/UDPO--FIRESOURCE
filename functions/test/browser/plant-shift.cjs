@@ -55,10 +55,10 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       const page = await openPage(browser, w, h, '/shiftnotes.html' + MANAGER);
       await page.waitForSelector('#fields .sn-entry');
-      // Joe 10/10: no shift picker (the shift comes from the time) and no Save button (each box saves as it is left).
-      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'Reading Time', 'Entry / Measurements', 'Notes / Follow-up', 'Follow-up']);
+      // Joe 10/11: a Shift drop-down that starts on the shift now; no Save button (each box saves as it is left).
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'Shift', 'Reading Time', 'Entry / Measurements', 'Notes / Follow-up', 'Follow-up']);
       assert.equal(await page.$('#record'), null, 'Shift Notes has no Save button');
-      assert.match(await page.textContent('#shift-now'), /^(First|Second|Third) shift$/);
+      assert.match(await page.inputValue('#shift-now'), /^(FIRST|SECOND|THIRD) SHIFT$/);
       await fits(page, 'Shift Notes ' + w + 'x' + h);
       await shots(page, 'shiftnotes-current', w);
       await page.click('[data-pane="history"]');
@@ -105,7 +105,7 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     if (SHOTS) await watcher.screenshot({ path: path.join(SHOTS, 'shiftnotes-reviewed-1920.png'), scale: 'css' });
     const phone = await openPage(browser, 412, 860, '/shiftnotes.html' + MANAGER);
     await phone.waitForSelector('#fields .sn-entry');
-    assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'What happened?', 'Next steps Optional', 'Follow-up']);
+    assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'Equipment / area', 'What happened?', 'Next steps Optional', 'Follow-up']);
     assert.equal(await phone.$('#record'), null, 'no Save button on the phone');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'shiftnotes-phone-412.png'), scale: 'css' });
     assert.equal(await phone.isVisible('[data-pane="history"]'), false, 'no log tab on the phone');

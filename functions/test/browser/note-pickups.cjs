@@ -81,7 +81,9 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     await watcher.click('#pu-list [data-done]');
     await watcher.waitForFunction(() => /Added by Case Loadout · [\s\S]*Completed by Test Manager · /.test(document.getElementById('pu-list').textContent), null, { timeout: 8000 });
     if (SHOTS) await watcher.screenshot({ path: path.join(SHOTS, 'pickup-who-1920.png'), scale: 'css' });
-    const skim = (await db().collection('pickups').where('runDocId', '==', '2026-10-04__run_p812').get()).docs.map(d => d.data())[0];
+    // The pop-up shows Completed at once; the save lands a moment later, so wait for it before reading the record.
+    let skim;
+    for (let i = 0; i < 40; i++) { skim = (await db().collection('pickups').where('runDocId', '==', '2026-10-04__run_p812').get()).docs.map(d => d.data())[0]; if (skim && skim.status === 'COMPLETE') break; await watcher.waitForTimeout(200); }
     assert.equal(skim.createdByName, 'Case Loadout');
     assert.equal(skim.completedByName, 'Test Manager');
     results.push('Pickups pop-up: "Added by Case Loadout" from the tablet, "Completed by Test Manager", with the times');
