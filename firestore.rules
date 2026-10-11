@@ -45,6 +45,7 @@ service cloud.firestore {
     match /otrDaily/{id} { allow read: if activeUser(); }
     match /otrMonthly/{id} { allow read: if activeUser(); }
     match /otrMonthRuns/{id} { allow read: if activeUser(); }
+    match /otrComments/{id} { allow read: if activeUser(); }
     match /plantEvents/{id} { allow read: if activeUser(); }
     // The drivers' DVIR inspections (phone.js), one per trailer.
     match /dvirs/{id} { allow read: if activeUser(); }
@@ -58,6 +59,8 @@ service cloud.firestore {
     // The production lines, temperature locations and the lines' last checks.
     match /plantSetup/{id} { allow read: if activeUser(); }
     match /plantProducts/{id} { allow read: if activeUser(); }
+    // Each plant's own product areas and groups (Administration > Products).
+    match /productSetup/{id} { allow read: if activeUser(); }
     match /plantShifts/{id} { allow read: if activeUser(); }
     match /plantLineStatus/{id} { allow read: if activeUser(); }
     // Plant reports sent from the Manager Center, and whether each was emailed.

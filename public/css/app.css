@@ -881,6 +881,67 @@ tr.otr-on td { background: #e3f3e8; }
 .otr-import td { padding: 3px 14px 3px 0; font-size: 14px; text-align: left; border: 0; height: auto; }
 .otr-import p { margin: 6px 0 0; color: var(--muted); }
 .otr-rep small.otr-by { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+/* Over the Road 10/11: Joe's OTR Trips workbook tabs (By Date, Month Recap, Cost Per Gallon), laid out like the sheets, 16px. */
+.otr-page .hint { font-size: 16px; }
+.otr-page .sheet:has(.otr-sheet) { background: transparent; border: 0; }
+.otr-kc { display: flex; gap: 12px; margin: 0 0 12px; }
+.otr-kc.grid { display: grid; grid-template-columns: 1fr 1fr; flex: 1; margin: 0; }
+.otr-kd { flex: 1; min-height: 84px; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; padding: 10px 14px; }
+.otr-kd b { display: block; font-size: 16px; font-weight: 600; color: #36475a; }
+.otr-kd .big { font-size: 28px; font-weight: 800; color: #0b2540; }
+.otr-kd .big.bad { color: #c62828; }
+.otr-kd .vs { font-size: 16px; color: #5b6b7d; }
+.otr-kd .bad { color: #c62828; font-weight: 700; }
+.otr-kd .good { color: #2b8a3e; font-weight: 700; }
+.otr-top { display: flex; gap: 14px; align-items: stretch; margin: 0 0 12px; }
+svg.otr-trend { width: 560px; flex: none; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; }
+svg.otr-trend text { font-size: 16px; fill: #5b6b7d; }
+svg.otr-trend text.t { font-weight: 700; fill: #0b2540; }
+svg.otr-trend text.k { font-weight: 700; }
+svg.otr-trend line { stroke: #e3e8ef; }
+svg.otr-trend path { fill: none; stroke-width: 4; }
+svg.otr-trend .cur { stroke: var(--ud-blue); fill: var(--ud-blue); }
+svg.otr-trend path.cur, svg.otr-trend path.ly { fill: none; }
+svg.otr-trend .ly { stroke: #9aa8b8; fill: #9aa8b8; }
+.otr-trend.empty { width: 560px; padding: 14px; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; color: var(--muted); }
+table.otr-sheet { border-collapse: collapse; background: #fff; font-size: 16px; width: 100%; table-layout: fixed; }
+table.otr-sheet th, table.otr-sheet td { border: 1px solid #d3dae3; padding: 4px; height: auto; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.otr-sheet thead { position: sticky; top: 0; z-index: 2; }
+body.fill .scroll-list table.otr-sheet thead th { position: static; }
+table.otr-sheet thead th { background: #074c84; color: #fff; font-weight: 700; text-transform: none; letter-spacing: 0; font-size: 16px; white-space: normal; line-height: 1.15; vertical-align: bottom; }
+table.otr-sheet thead tr.sub th { background: #2f6aa0; font-weight: 600; padding: 4px 0; text-overflow: clip; }
+.otr-page .otr-fig small, .otr-page .otr-fig td small { font-size: 16px; }
+.otr-page .otr-fig input.otr-in { font-size: 16px; }
+table.otr-sheet .l { text-align: left; padding-left: 8px; }
+table.otr-sheet tr.wk td { border-top: 3px solid #074c84; }
+table.otr-sheet tr.tot td { background: #e8eef6; font-weight: 800; }
+table.otr-sheet tr.today td { background: #fff6d6; }
+table.otr-sheet td.z { color: #b3bcc7; }
+table.otr-sheet td.neg { color: #c62828; font-weight: 700; }
+table.otr-sheet td.pos { color: #2b8a3e; font-weight: 700; }
+table.otr-sheet td.ly { color: #5b6b7d; }
+table.otr-sheet .gap { background: #f4f6f9; border-color: #f4f6f9; padding: 0; }
+table.otr-sheet small.otr-by { display: block; font-size: 16px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.otr-bydate th.vh-th { height: 150px; }
+table.otr-bydate .vh { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; display: inline-block; text-align: left; }
+table.otr-bydate td { padding: 0; height: 36px; }
+table.otr-bydate td.l { padding-left: 8px; }
+table.otr-bydate input { width: 100%; height: 34px; border: 0; background: transparent; text-align: center; font: inherit; font-size: 16px; }
+table.otr-bydate input.otr-note { text-align: left; padding: 0 6px; }
+table.otr-bydate input:focus { outline: 2px solid var(--ud-blue); outline-offset: -2px; background: #fff; }
+table.otr-fuel { width: 560px; margin-top: 14px; }
+.otr-print-title { display: none; }
+@media print {
+  #print.otr-print .otr-kc, #print.otr-print .otr-top > :not(.otr-kc) { display: none; }
+  #print.otr-print .otr-top { display: none; }
+  #print.otr-print .otr-print-title { display: block; }
+  #print.otr-print table { width: 100%; table-layout: fixed; font-size: 10px; }
+  #print.otr-print th, #print.otr-print td { padding: 1px 2px; text-align: center; }
+  #print.otr-print .gap { border: 0; width: 3px; }
+  #print.otr-print input { border: 0; width: 100%; font: inherit; text-align: center; background: none; }
+  #print.otr-print .vh { writing-mode: vertical-rl; transform: rotate(180deg); }
+  #print.otr-print table.otr-fuel { width: 40%; margin-top: 8px; }
+}
 
 /* Driver Scorecard */
 .sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
@@ -1548,3 +1609,42 @@ table.old-issues th { padding-left: 4px; padding-right: 4px; }
    words come from data-cover so the cell itself stays empty for typing a driver. */
 body.daily-look table.daily td.missing.offcover, table.daily td.missing.offcover { background: #f5c6c8 !important; color: #9b1c3a; box-shadow: inset 0 0 0 2px #ee3e3e; font-weight: 800; }
 table.daily td.offcover::before { content: attr(data-cover); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+/* Daily Dispatch, Sunday: the Sunday deliveries already loaded Saturday are shown for reference, a little quieter than
+   what is loading today. */
+body.daily-look table.daily tbody tr.group.loaded.already td { background: linear-gradient(90deg, #64748b, #94a3b8) !important; }
+body.daily-look table.daily tbody tr.group.loaded.already td .gtext, body.daily-look table.daily tbody tr.group.loaded.already td { color: #fff !important; }
+body.daily-look table.daily tbody tr.already:not(.group) td { background: #f6f8fb; }
+body.daily-look table.daily tbody tr.already:not(.group) td:first-child { border-left-color: #94a3b8; }
+
+/* Joe 10/11: six cards after picking a plant, three to a row; the pictures shrink so both rows fit a 1920x1080 or 1536x864 screen. */
+.launch-grid.six { gap: 18px; }
+.launch-grid.six .launch-card { padding: 16px 18px 16px; gap: 6px; }
+.launch-grid.six .launch-art { height: clamp(110px, calc((100vh - 560px) / 2), 230px); }
+.launch-grid.six .launch-card strong { font-size: 22px; margin-top: 2px; }
+.launch-grid.six .launch-card small { min-height: 2.4em; }
+.launch-art svg.launch-icon { width: auto; height: 70%; fill: none; stroke: #0b3d6b; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.launch-art { position: relative; overflow: hidden; }
+.launch-card.building .launch-art img, .launch-card.building .launch-art svg { opacity: .55; }
+/* Joe 10/11: Plant Production and Plant Maintenance use his own pictures with the banner already on them, at full colour.
+   The clean pictures (plant-production-v1-*, plant-maintenance-v1-*) are kept in the library for when those modules are built. */
+.launch-card.banner-pic .launch-art img { opacity: 1; }
+.uc-banner { position: absolute; left: -12%; right: -12%; top: 50%; transform: translateY(-50%) rotate(-9deg); padding: 9px 0; text-align: center;
+  background: #ffc61a; color: #1b1b1b; font-size: 20px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase;
+  border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+  border-image: repeating-linear-gradient(45deg, #1b1b1b 0 12px, #ffc61a 12px 24px) 7; box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
+/* Joe 10/11: the Reports module: every report as a card, grouped by where it comes from. */
+.rc-page #rc-groups { padding: 4px 24px 24px; overflow: auto; }
+.rc-group h2 { margin: 14px 0 10px; font-size: 18px; font-weight: 900; color: #0b3d6b; letter-spacing: .02em; }
+.rc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.rc-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 6px 18px rgba(11, 61, 107, .08); color: #0b3d6b; text-decoration: none; transition: transform .12s, box-shadow .12s; }
+.rc-card:hover, .rc-card:focus-visible { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(11, 61, 107, .18); border-color: #1f6feb; }
+.rc-icon { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 58px; height: 58px; border-radius: 12px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
+.rc-icon svg { width: 32px; height: 32px; fill: none; stroke: #0b3d6b; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rc-icon img { max-width: 46px; max-height: 46px; }
+.rc-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rc-text strong { font-size: 18px; font-weight: 900; }
+.rc-text small { color: #4a6b8d; font-size: 15px; }
+.rc-card > b { font-size: 20px; color: #1f6feb; }
+@media (max-width: 1100px) { .rc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .rc-grid { grid-template-columns: 1fr; } }

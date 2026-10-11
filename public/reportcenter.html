@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Reports · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="rc-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Reports</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Reports</h1><small>Every report in one place. Click a card to open the report.</small></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <!-- Joe 10/11: Reports is its own module: the plant's reports (moved here from Plant Operations), the Route Distribution
+         reports and the Fleet report. The menu on the left lists the same reports. -->
+    <div id="rc-groups"></div>
+  </div>
+
+  <script type="module">
+    import { requireSignIn, MENU, ICON, SIDES, escapeHtml } from './js/app.js';
+    // What each report shows, under its name on the card.
+    const NOTE = {
+      'reports.html': 'Plant Scorecard, Shift Comparison and Trends for the week',
+      'shiftreports.html': 'Every shift report sent with Send Current Report, newest first',
+      'plant-kiosk.html': 'Today\'s plant numbers on the TV screen',
+      'scorecard.html': 'Every driver starts the month at 100: check-ins, cases, inspections, attendance and miles',
+      'otr.html': 'The OTR report and cost per gallon, month by month',
+      'soon.html?what=trucks-today': 'Where every truck is today (GPS)',
+      'fleet.html': 'Fleet Service & Compliance: overdue and due soon, and what is at the garage'
+    };
+    const reports = SIDES.find(s => s.key === 'reports');
+    const icon = (k) => /\.webp$/.test(k) ? '<img src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.chart) + '</svg>';
+    document.getElementById('rc-groups').innerHTML = MENU.filter(([g]) => reports.sections.indexOf(g) >= 0).map(([group, items]) =>
+      '<section class="rc-group"><h2>' + escapeHtml(group) + '</h2><div class="rc-grid">' + items.map(([label, href, ic]) =>
+        '<a class="rc-card" href="' + href + '"><span class="rc-icon">' + icon(ic) + '</span><span class="rc-text"><strong>' + escapeHtml(label) + '</strong><small>' + escapeHtml(NOTE[href] || '') + '</small></span><b aria-hidden="true">&rarr;</b></a>').join('') +
+      '</div></section>').join('');
+    requireSignIn(async () => {});
+  </script>
+</body>
+</html>

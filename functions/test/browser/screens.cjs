@@ -732,10 +732,13 @@ async function noScroll(page) {
     assert.deepEqual(fsB.errors, []);
     await fsB.close();
     results.push('Fleet Service (mock-up A): one row per unit, PM / Reefer, DOT, Plates, Miles / hours now and Status, units that need something first');
-    // Over the Road: a manager marks route 801 Carrier Pickup and ticks it in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
+    // Over the Road: a manager marks route 801 Carrier Pickup, picks its By Date column (SAL), ticks it in OTR Routes Setup and types a
+    // month's figures on Recap; Tuesday 10/6 counts it. Then Joe's workbook tabs: By Date, Month Recap and Cost Per Gallon.
     const otr = await openPage(browser, 1920, 950, '/otr.html?view=routes&testEmail=manager.test@uniteddairy.com');
     await otr.waitForSelector('[data-by="run_t801"]');
     await otr.selectOption('[data-by="run_t801"]', 'Carrier Pickup');
+    await otr.waitForFunction(() => !document.querySelector('[data-col="run_t801"]').disabled);
+    await otr.selectOption('[data-col="run_t801"]', 'SAL');
     await otr.waitForFunction(() => !document.querySelector('[data-inc="run_t801"]').disabled);
     await otr.check('[data-inc="run_t801"]');
     await otr.waitForSelector('tr.otr-on [data-inc="run_t801"]');
@@ -754,11 +757,18 @@ async function noScroll(page) {
     });
     assert.ok(otrSaved, 'the tick and both figures saved');
     assert.equal(otrSaved[0].deliveredBy, 'Carrier Pickup');
-    assert.ok(otrSaved[0].destination, 'the run is the destination');
+    assert.equal(otrSaved[0].destination, 'SAL', 'the run counts in the By Date column picked for it');
     await otr.click('.tabs [data-view="dash"]');
     await otr.waitForSelector('.otr-week');
     await otr.click('.tabs [data-view="report"]');
     await otr.waitForSelector('#otr-report table');
+    assert.equal(await otr.$$eval('#otr-report thead tr:first-child th:not(.gap)', ths => ths.map(t => t.textContent).join(' ')), 'Trip Dec Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec', 'Month Recap: last December, then January to December');
+    await otr.click('.tabs [data-view="bydate"]');
+    await otr.waitForSelector('table.otr-bydate');
+    assert.equal(await otr.$$eval('table.otr-bydate thead th', ths => ths.length), 24, 'By Date: Date, the 21 workbook columns, Total and Comment');
+    await otr.click('.tabs [data-view="cpg"]');
+    await otr.waitForSelector('table.otr-cpg');
+    assert.match(await otr.textContent('table.otr-cpg'), /\$0\.40000/, 'Cost Per Gallon shows the month typed on Recap');
     assert.deepEqual(otr.errors, []);
     await otr.close();
     results.push('Over the Road: a manager ticked 801 (Carrier Pickup) and typed September figures (cost per gallon $0.400); Dashboard and Report open');
@@ -1015,12 +1025,16 @@ async function noScroll(page) {
     }
     results.push('Route Days: Refresh, Add Route, Add Run and Holiday Week Editor sit together in one even row at both sizes');
     // Joe 10/10: Home is the old app's launcher, one big picture per side; each side's menu lists only its own screens.
+    // Joe 10/11: six cards after picking a plant: Plant Operations, Plant Production and Plant Maintenance (both Under
+    // Construction), Route Distribution, Fleet & Maintenance and Reports. Five carry pictures; Reports has a drawn icon.
+    const SIX = ['Plant Operations', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports'];
     const lp = await openPage(browser, 1920, 950, '/index.html?testEmail=manager.test@uniteddairy.com');
     await lp.waitForSelector('.launch-card');
-    assert.deepEqual(await lp.$$eval('.launch-card strong', s => s.map(x => x.textContent)), ['Route Distribution', 'Plant Operations', 'Fleet & Maintenance']);
-    await lp.waitForFunction(() => [...document.querySelectorAll('.launch-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 3, null, { timeout: 10000 });
+    assert.deepEqual(await lp.$$eval('.launch-card strong', s => s.map(x => x.textContent)), SIX);
+    await lp.waitForFunction(() => [...document.querySelectorAll('.launch-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 5, null, { timeout: 10000 });
+    assert.equal(await lp.$$eval('.launch-card[data-side="reports"] svg.launch-icon', s => s.length), 1, 'Reports shows its icon');
     assert.equal(await lp.$('.sidemenu .side-sec'), null, 'Home lists the sides, not every screen');
-    assert.deepEqual(await lp.$$eval('.sidemenu a[data-side]', a => a.map(x => x.textContent.trim())), ['Route Distribution', 'Plant Operations', 'Fleet & Maintenance']);
+    assert.deepEqual(await lp.$$eval('.sidemenu a[data-side]', a => a.map(x => x.textContent.trim())), SIX);
     if (SHOTS) await lp.screenshot({ path: path.join(SHOTS, 'home-launcher-1920.png') });
     // Joe 10/10: the Plant Operations picture opens Manager Center; the Plant side shows its sections (Manager Center's cards)
     // with fly-outs, and Back from a plant screen goes up to Manager Center.
@@ -1028,7 +1042,7 @@ async function noScroll(page) {
     await lp.waitForSelector('.sidemenu a.side-name');
     assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'plant');
     const plantMenu = await lp.$$eval('.sidemenu > a:not(.side-name), .sidemenu > .side-sec', e => e.map(x => x.matches('a') ? x.textContent.trim() : x.querySelector('.side-sec-btn').getAttribute('title')));
-    assert.deepEqual(plantMenu.filter(x => x !== 'Home'), ['Send Report', 'Reports', 'Yard Checks', 'Plant Operations Scheduler', 'Plant Distribution Departments', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'], 'the Plant side lists its own sections');
+    assert.deepEqual(plantMenu.filter(x => x !== 'Home'), ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'], 'the Plant side lists its own sections');
     assert.equal(await lp.$$eval('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]', b => b.length), 1, 'a section with several screens has a fly-out');
     assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)).then(t => t.filter(x => ['Dispatch', 'Drivers', 'Equipment', 'GPS / Fleet'].indexOf(x) >= 0)), [], 'no Dispatch, Drivers or Equipment sections on the Plant side');
     await lp.hover('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]');
@@ -1049,7 +1063,7 @@ async function noScroll(page) {
     assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'distribution');
     assert.deepEqual(lp.errors, []);
     await lp.close();
-    results.push('Home: three big pictures (Route Distribution, Plant Operations, Fleet & Maintenance); each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
+    results.push('Home: six cards (Plant Operations, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance, Reports); each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
     // Joe 10/10: an Administration section holds Dispatch Administration; Driver Weekly Template is under Drivers only.
     const mp = await openPage(browser, 1920, 950, '/daily.html?testEmail=manager.test@uniteddairy.com');
     await mp.waitForSelector('.side-flyouts .flyout', { state: 'attached' });

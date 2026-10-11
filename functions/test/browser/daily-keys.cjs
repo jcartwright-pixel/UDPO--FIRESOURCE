@@ -193,6 +193,21 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.deepEqual(sun.errors, []);
     results.push('Saturday 10/10 shows only Saturday-loaded 801; Sunday-loaded 802 shows on Sunday 10/11');
 
+    // Joe 10/11, as the current app's weekend sheet: Sunday also shows Sunday's deliveries already loaded Saturday, under
+    // ALREADY LOADED SATURDAY, then what is loading today under LOADING TODAY. The already-loaded rows are for reference:
+    // no grab handle, and not in the count, the coverage or the print.
+    await next('run_t801').update({ 'days.sun': Object.assign({}, n801.days.sun, { runs: true, loadDayOffset: -1 }) });
+    await next('run_t802').update({ 'days.sun': Object.assign({}, n802.days.sun, { runs: true, loadDayOffset: 0 }) });
+    await sun.waitForSelector('#rows tr.already[data-id="2026-10-11__run_t801|sun"]');
+    await sun.waitForSelector('#rows tr[data-id="2026-10-11__run_t802|sun"]');
+    assert.deepEqual(await bandsOf(sun), ['SUNDAY DELIVERIES, 10-11-26', 'ALREADY LOADED SATURDAY, 10-10-26', 'run_t801|sun',
+      'LOADING TODAY, SUNDAY 10-11-26', 'run_t802|sun', 'MONDAY DELIVERIES, 10-12-26', 'run_t802|mon']);
+    assert.equal(await sun.$$eval('#rows tr.already [data-grip]', g => g.length), 0, 'no grab handle on an already-loaded row');
+    assert.match(await sun.textContent('#count'), /^2 loads/, 'the count leaves out the already-loaded row');
+    if (SHOTS) await sun.screenshot({ path: path.join(SHOTS, 'daily-sunday-already-loaded-1920.png') });
+    assert.deepEqual(sun.errors, []);
+    results.push('Sunday 10/11 shows 801 under ALREADY LOADED SATURDAY, 10-10-26, then 802 under LOADING TODAY; count 2 loads');
+
     assert.deepEqual(p.errors, []);
     console.log('Daily keys:\n- ' + results.join('\n- '));
   } finally {

@@ -7,15 +7,16 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Machine Products · New Plant Operations</title>
+  <title>Products · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
+  <link rel="stylesheet" href="css/reports.css">
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page quality-page products-page">
   <div class="signin" id="signin" hidden>
-    <h1>Machine Products</h1>
+    <h1>Products</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -27,26 +28,53 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Administration · Plant Setup</span><h1>Machine Products</h1></div>
-      <div class="hstats" id="hstats"></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+      <div class="title"><span class="eyebrow">Administration · Plant Setup</span><h1>Products</h1></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <button type="button" id="add" data-top>Add Product</button>
-      <button type="button" id="reset" data-top>RedZone List</button>
-      <input type="search" id="find" placeholder="Find a product or SKU" aria-label="Find a product or SKU" data-top>
+      <button type="button" id="reset" data-top>Starting List</button>
+      <button type="button" id="edit-setup" data-top>Areas &amp; Groups</button>
+      <button type="button" id="template" data-top>Download Template</button>
+      <button type="button" id="upload" data-top>Upload</button>
+      <input type="file" id="upload-file" accept=".csv,text/csv" hidden>
+      <select id="group" class="pm-pick" aria-label="Group" title="Group" data-top></select>
+      <select id="area" class="pm-pick" aria-label="Area" title="Area" data-top></select>
+      <select id="plant" class="pm-pick" aria-label="Plant" title="Plant" data-top></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="qc-split">
-        <aside class="qc-lines" aria-label="Machines"><h2>Machines</h2><div id="lines"></div></aside>
-        <section class="qc-form pm-form">
-          <div class="qc-top"><h2 id="form-title">Products</h2><span class="qc-last" id="form-last"></span></div>
+      <section class="qc-form pm-form" id="list-pane">
+        <div class="qc-top"><h2 id="form-title">Products</h2><div class="hstats" id="hstats"></div><span class="qc-last" id="form-last"></span>
+          <input type="search" id="find" placeholder="Find a product or SKU" aria-label="Find a product or SKU"></div>
+        <div class="pm-scroll">
           <table class="loadout pm-table">
-            <colgroup><col style="width:44%"><col style="width:16%"><col style="width:16%"><col style="width:14%"><col style="width:10%"></colgroup>
-            <thead><tr><th>Product</th><th>SKU</th><th>RedZone Type</th><th>Group</th><th></th></tr></thead>
+            <colgroup><col style="width:40%"><col style="width:16%"><col style="width:14%"><col style="width:20%"><col style="width:10%"></colgroup>
+            <thead><tr><th>Product</th><th>SKU</th><th>Type</th><th>Group</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
-        </section>
-      </div>
+        </div>
+      </section>
+      <!-- Areas & Groups: the plant's machines (from Plant Operations), the areas it adds itself, and its group list. -->
+      <section class="qc-form pm-form" id="setup-pane" hidden>
+        <div class="qc-top"><h2 id="setup-title">Areas &amp; Groups</h2><span class="qc-last">Machines come from Plant Operations. Add, rename or remove this plant's own areas and groups.</span></div>
+        <div class="pm-setup">
+          <div><h3>Areas</h3><div id="setup-areas"></div><button type="button" class="rp-btn" id="add-area">+ Add Area</button></div>
+          <div><h3>Groups</h3><div id="setup-groups"></div><button type="button" class="rp-btn" id="add-group">+ Add Group</button></div>
+        </div>
+        <div class="pm-acts"><button type="button" class="rp-btn" id="setup-cancel">Cancel</button><button type="button" class="rp-btn primary" id="setup-save">Save Areas &amp; Groups</button></div>
+      </section>
+      <!-- Upload: what the file will add, change and remove, before anything is saved. -->
+      <section class="qc-form pm-form" id="preview-pane" hidden>
+        <div class="qc-top"><h2 id="preview-title">Upload</h2><div class="hstats" id="preview-stats"></div><span class="qc-last" id="preview-note"></span></div>
+        <div class="pm-scroll">
+          <table class="loadout pm-table pm-preview">
+            <colgroup><col style="width:15%"><col style="width:30%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:19%"></colgroup>
+            <thead><tr><th>Area</th><th>Product</th><th>SKU</th><th>Type</th><th>Group</th><th>Change</th></tr></thead>
+            <tbody id="preview-rows"></tbody>
+          </table>
+        </div>
+        <div class="pm-acts"><button type="button" class="rp-btn" id="preview-cancel">Cancel</button><button type="button" class="rp-btn primary" id="preview-save">Save Upload</button></div>
+      </section>
+      <datalist id="group-list"></datalist>
       <div class="foot" id="foot"></div>
     </div>
   </div>
@@ -54,69 +82,102 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchProducts, startingList } from './js/products.js';
+    import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, TEMPLATE, toCsv, parseCsv } from './js/products.js';
     import { savedText } from './js/autosave.js';
 
-    // Joe 10/10: the products each machine runs (RedZone, Uniontown) are the product drop-down on the Quality check. A manager or
-    // administrator changes a machine's list here; each box saves as it is left, and RedZone List (press twice) puts the
-    // machine back on the RedZone starting list.
+    // Joe 10/10: the products each machine runs are the product drop-down on the Quality check. Joe 10/11: products are plant by
+    // plant and area by area (a plant's machines plus the areas it adds itself, Uniontown's CASES and TANKER), each plant keeps its
+    // own groups (Milk, Drinks, TEA), and the list goes in with a template: Download Template, fill it in, Upload, check what it
+    // changes, Save Upload. A manager or administrator changes the lists; each box saves as it is left.
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
-    let setup = [], products = {}, changed = {}, person = null, app = {}, chosen = params.get('line') || '', find = '', note = '', armed = null, busy = Promise.resolve();
-    // A machine being changed here shows its list as typed until the database has caught up.
+    const ALL_PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
+    let setup = [], products = {}, changed = {}, own = [], person = null, app = {}, plant = params.get('plant') || '', chosen = params.get('line') || '', group = '', find = '', note = '', armed = null, busy = Promise.resolve();
+    let pane = 'list', draft = null, upload = null, setupRead = false;
+    // An area being changed here shows its list as typed until the database has caught up.
     const mine = {};
     const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
-    const machines = () => U.qualityLines(setup, [], [], Date.now());
+    const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
+    const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
+    const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
+    const ownOf = () => plantSetupOf(own, plant);
+    // The plant's areas: its machines in view order, then its own areas.
+    function areas() {
+      const machines = U.qualityLines(setup.filter(d => plantOf(d) === plant), [], [], Date.now()).map(l => ({ id: l.operationId, name: l.name, machine: true }));
+      return machines.concat(ownOf().areas.map(a => ({ id: a.id, name: a.name, machine: false })));
+    }
     const listOf = (id) => mine[id] || products[id] || [];
-    function current() { const all = machines(); return all.find(l => l.operationId === chosen) || all[0] || null; }
+    function current() { const all = areas(); return all.find(a => a.id === chosen) || all[0] || null; }
     const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
+    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const inGroup = (p) => !group || groupsOf(p).some(g => g.toUpperCase() === group.toUpperCase());
+    function setUrl() { history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (chosen ? '&line=' + encodeURIComponent(chosen) : '')); }
+
+    function drawTop() {
+      const ps = plants();
+      if (!ps.some(p => p.id === plant) && (person || !plant)) plant = ps[0].id;
+      document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
+      const all = areas(), line = current();
+      // The area asked for stays chosen until the machines have been read.
+      if (line && setupRead) chosen = line.id;
+      document.getElementById('area').innerHTML = all.map(a => opt(a.id, line ? line.id : '', a.name + ' (' + listOf(a.id).length + ')')).join('') || '<option value="">No areas</option>';
+      const gs = ownOf().groups;
+      if (group && !gs.some(g => g === group)) group = '';
+      document.getElementById('group').innerHTML = opt('', group, 'All groups') + gs.map(g => opt(g, group, g)).join('');
+      document.getElementById('group-list').innerHTML = gs.map(g => '<option value="' + escapeHtml(g) + '">').join('');
+      const ck = canSave(), st = L.screenState(app, 'plant');
+      document.getElementById('add').disabled = !ck || !line || pane !== 'list';
+      document.getElementById('reset').disabled = !ck || !line || !line.machine || pane !== 'list';
+      document.getElementById('reset').textContent = armed === chosen ? 'Press again' : 'Starting List';
+      ['edit-setup', 'upload'].forEach(id => { document.getElementById(id).disabled = !ck || pane !== 'list'; });
+      document.getElementById('template').disabled = pane !== 'list';
+      ['group', 'area', 'plant'].forEach(id => { document.getElementById(id).disabled = pane !== 'list'; });
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      ['list', 'setup', 'preview'].forEach(p => { document.getElementById(p + '-pane').hidden = pane !== p; });
+    }
 
     function render(force) {
-      const all = machines(), line = current(), ck = canSave();
-      if (line) chosen = line.operationId;
-      const total = all.reduce((n, l) => n + listOf(l.operationId).length, 0);
-      // Joe 10/10: the product name is what counts; some RedZone SKUs are wrong. A SKU given to more than one product is marked
+      drawTop();
+      if (pane === 'setup') return drawSetup(force);
+      if (pane === 'preview') return drawPreview();
+      const all = areas(), line = current(), ck = canSave();
+      const total = all.reduce((n, a) => n + listOf(a.id).length, 0);
+      // Joe 10/10: the product name is what counts; some SKUs are wrong. A SKU given to more than one product at the plant is marked
       // to check (GV and Jersey both on 280305, for one), and the name is still what Quality saves.
       const bySku = {};
-      all.forEach(l => listOf(l.operationId).forEach(p => { const k = String(p.sku || '').trim(); if (k && p.name) (bySku[k] = bySku[k] || new Set()).add(p.name); }));
+      all.forEach(a => listOf(a.id).forEach(p => { const k = String(p.sku || '').trim(); if (k && p.name) (bySku[k] = bySku[k] || new Set()).add(p.name); }));
       const shared = (p) => { const k = String(p.sku || '').trim(), set = k && bySku[k]; return set && set.size > 1 ? [...set].filter(n => n !== p.name) : null; };
       const toCheck = Object.values(bySku).filter(x => x.size > 1).length;
-      document.getElementById('hstats').innerHTML = [['Machines', all.length, ''], ['Products', total, ''], ['SKUs to check', toCheck, toCheck ? 'warn' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.getElementById('lines').innerHTML = all.map(l => '<button type="button" data-line="' + escapeHtml(l.operationId) + '" class="' + (line && l.operationId === line.operationId ? 'active' : '') + '"><span>' + escapeHtml(l.name) + '</span><b>' + listOf(l.operationId).length + '</b></button>').join('') ||
-        '<p class="empty">No machines are set up for this plant.</p>';
-      ['add', 'reset'].forEach(id => { document.getElementById(id).disabled = !ck || !line; });
-      document.getElementById('reset').textContent = armed === chosen ? 'Press again' : 'RedZone List';
-      const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
-      document.getElementById('foot').textContent = (ck ? 'Each box saves as you leave it. These are the choices in the Product drop-down on Quality Checks for this machine; Quality Checks also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
-      if (!line) { document.getElementById('rows').innerHTML = ''; return; }
-      const c = changed[line.operationId];
+      document.getElementById('hstats').innerHTML = [['Areas', all.length, ''], ['Products', total, ''], ['SKUs to check', toCheck, toCheck ? 'warn' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('foot').textContent = (ck ? 'Each box saves as you leave it. A machine\'s list is the Product drop-down on its Quality Check, which also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
+      if (!line) { document.getElementById('form-title').textContent = plantName(plant) + ' Products'; document.getElementById('form-last').textContent = ''; document.getElementById('rows').innerHTML = '<tr><td colspan="5" class="empty">' + escapeHtml(plantName(plant)) + ' has no areas yet. Areas &amp; Groups adds one, or Upload adds them from the template.</td></tr>'; return; }
+      const c = changed[line.id];
       document.getElementById('form-title').textContent = line.name + ' Products';
-      document.getElementById('form-last').textContent = c ? 'Changed ' + when(c.updatedAt) + (c.updatedBy ? ' by ' + c.updatedBy : '') : 'RedZone list (10/10)';
+      document.getElementById('form-last').textContent = c ? (c.uploaded ? 'Uploaded ' : 'Changed ') + when(c.updatedAt) + (c.updatedBy ? ' by ' + c.updatedBy : '') : line.machine ? 'Starting list (10/10)' : '';
       // Not drawn again while someone types in the list.
       if (force === 'keep' || (!force && document.getElementById('rows').contains(document.activeElement))) return;
       const dis = ck ? '' : ' disabled', q = find.trim().toUpperCase();
-      const cell = (i, k, v, ph, also) => '<td' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><input data-i="' + i + '" data-k="' + k + '" aria-label="' + escapeHtml(ph + (k === 'name' ? '' : ' for ' + (listOf(line.operationId)[i] || {}).name)) + '" value="' + escapeHtml(v || '') + '" placeholder="' + ph + '" maxlength="120"' + dis + '>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
-      const rows = listOf(line.operationId).map((p, i) => [p, i]).filter(([p]) => !q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0);
-      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr>' + cell(i, 'name', p.name, 'Product name') + cell(i, 'sku', p.sku, 'SKU', shared(p)) + cell(i, 'mfgType', p.mfgType, 'Type') + cell(i, 'productGroup', p.productGroup, 'Group') +
-        '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + i + '">' + (armed === line.operationId + '|' + i ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
-        '<tr><td colspan="5" class="empty">' + (q ? 'No product matches ' + escapeHtml(find) + '.' : 'No products for this machine. Add Product puts one in.') + '</td></tr>';
+      const cell = (i, k, v, ph, also, extra) => '<td' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><input data-i="' + i + '" data-k="' + k + '" aria-label="' + escapeHtml(ph + (k === 'name' ? '' : ' for ' + (listOf(line.id)[i] || {}).name)) + '" value="' + escapeHtml(v || '') + '" placeholder="' + ph + '" maxlength="120"' + (extra || '') + dis + '>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
+      const rows = listOf(line.id).map((p, i) => [p, i]).filter(([p]) => (!q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0) && (!p.name || inGroup(p)));
+      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr>' + cell(i, 'name', p.name, 'Product name') + cell(i, 'sku', p.sku, 'SKU', shared(p)) + cell(i, 'mfgType', p.mfgType, 'Type') + cell(i, 'productGroup', p.productGroup, 'Group', null, ' list="group-list"') +
+        '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + i + '">' + (armed === line.id + '|' + i ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
+        '<tr><td colspan="5" class="empty">' + (q || group ? 'No product matches' + (q ? ' ' + escapeHtml(find) : '') + (group ? ' in ' + escapeHtml(group) : '') + '.' : 'No products in ' + escapeHtml(line.name) + '. Add Product puts one in.') + '</td></tr>';
     }
 
-    // The machine's whole list is saved each time; saves go one at a time.
+    // The area's whole list is saved each time; saves go one at a time.
     function send(line, list, what) {
-      mine[line.operationId] = list;
+      mine[line.id] = list;
       note = 'Saving…';
       // A box just left is saved without drawing the list again, so the next box being typed in stays as it is.
       render(what ? true : 'keep');
-      const run = busy.then(() => save('saveMachineProducts', { operationId: line.operationId, products: list.filter(p => String(p.name || '').trim()) }));
+      const run = busy.then(() => save('saveMachineProducts', { operationId: line.id, products: list.filter(p => String(p.name || '').trim()) }));
       busy = run.catch(() => {});
-      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.operationId]; }).then(() => render());
+      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.id]; }).then(() => render());
     }
     document.getElementById('rows').addEventListener('change', e => {
       const box = e.target.closest('[data-k]'), line = current();
       if (!box || !line || !canSave()) return;
-      const list = listOf(line.operationId).map(p => Object.assign({}, p));
+      const list = listOf(line.id).map(p => Object.assign({}, p));
       if (!list[box.dataset.i]) return;
       list[box.dataset.i][box.dataset.k] = box.value.trim();
       send(line, list);
@@ -124,37 +185,165 @@
     document.getElementById('rows').addEventListener('click', e => {
       const b = e.target.closest('[data-remove]'), line = current();
       if (!b || !line || !canSave()) return;
-      const key = line.operationId + '|' + b.dataset.remove;
+      const key = line.id + '|' + b.dataset.remove;
       if (armed !== key) { armed = key; render(true); setTimeout(() => { if (armed === key) { armed = null; render(true); } }, 7000); return; }
       armed = null;
-      const list = listOf(line.operationId).slice(), gone = list.splice(Number(b.dataset.remove), 1)[0];
+      const list = listOf(line.id).slice(), gone = list.splice(Number(b.dataset.remove), 1)[0];
       send(line, list, (gone && gone.name || 'Product') + ' removed');
     });
     document.getElementById('add').addEventListener('click', () => {
       const line = current();
       if (!line || !canSave()) return;
       find = ''; document.getElementById('find').value = '';
-      mine[line.operationId] = [{ name: '', sku: '', mfgType: '', productGroup: '' }].concat(listOf(line.operationId));
+      mine[line.id] = [{ name: '', sku: '', mfgType: '', productGroup: group }].concat(listOf(line.id));
       render(true);
       const first = document.querySelector('#rows input[data-k="name"]');
       if (first) first.focus();
     });
     document.getElementById('reset').addEventListener('click', async () => {
       const line = current();
-      if (!line || !canSave()) return;
+      if (!line || !line.machine || !canSave()) return;
       if (armed !== chosen) { armed = chosen; render(true); setTimeout(() => { if (armed === chosen) { armed = null; render(true); } }, 7000); return; }
       armed = null;
-      const base = (await startingList()).lines.find(l => l.operationId === line.operationId);
-      // Never save an empty list because the RedZone file did not load.
-      if (!base) { showError('Could not load the RedZone list for ' + line.name + '; nothing was changed. Reload the page and try again.'); render(true); return; }
-      send(line, base.products.map(p => Object.assign({}, p)), 'Back on the RedZone list');
+      const base = (await startingList()).lines.find(l => l.operationId === line.id);
+      // Never save an empty list because the starting file did not load.
+      if (!base) { showError('Could not load the starting list for ' + line.name + '; nothing was changed. Reload the page and try again.'); render(true); return; }
+      send(line, base.products.map(p => Object.assign({}, p)), 'Back on the starting list');
     });
     document.getElementById('find').addEventListener('input', e => { find = e.target.value; render(true); });
-    document.getElementById('lines').addEventListener('click', e => {
-      const b = e.target.closest('[data-line]');
+    document.getElementById('area').addEventListener('change', e => { chosen = e.target.value; armed = null; note = ''; setUrl(); render(true); });
+    document.getElementById('group').addEventListener('change', e => { group = e.target.value; render(true); });
+    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; chosen = ''; group = ''; armed = null; note = ''; render(true); setUrl(); });
+
+    /* ---------- Areas & Groups ---------- */
+    document.getElementById('edit-setup').addEventListener('click', () => {
+      const o = ownOf();
+      draft = { areas: o.areas.map(a => ({ id: a.id, name: a.name })), groups: o.groups.slice() };
+      pane = 'setup'; showError(''); render(true);
+    });
+    function drawSetup(force) {
+      document.getElementById('setup-title').textContent = plantName(plant) + ' Areas & Groups';
+      // Drawn once when opened and again only by its own buttons, so a box being typed in stays as it is.
+      if (draft.drawn && force !== 'setup') return;
+      draft.drawn = true;
+      const machines = areas().filter(a => a.machine);
+      const row = (kind, i, v, ph) => '<div class="pm-srow"><input data-s="' + kind + '" data-i="' + i + '" value="' + escapeHtml(v) + '" placeholder="' + ph + '" maxlength="60" aria-label="' + ph + '"><button type="button" class="pm-remove" data-sremove="' + kind + '|' + i + '">Remove</button></div>';
+      document.getElementById('setup-areas').innerHTML = machines.map(m => '<div class="pm-srow machine"><span>' + escapeHtml(m.name) + '</span><em>Machine · ' + listOf(m.id).length + '</em></div>').join('') +
+        draft.areas.map((a, i) => row('area', i, a.name, 'Area name')).join('');
+      document.getElementById('setup-groups').innerHTML = draft.groups.map((g, i) => row('group', i, g, 'Group name')).join('') || '<p class="empty">No groups.</p>';
+    }
+    document.getElementById('setup-pane').addEventListener('input', e => {
+      const b = e.target.closest('[data-s]');
       if (!b) return;
-      chosen = b.dataset.line; armed = null; note = '';
-      history.replaceState(null, '', '?line=' + encodeURIComponent(chosen));
+      if (b.dataset.s === 'area') draft.areas[b.dataset.i].name = b.value; else draft.groups[b.dataset.i] = b.value;
+    });
+    document.getElementById('setup-pane').addEventListener('click', e => {
+      const r = e.target.closest('[data-sremove]');
+      if (r) { const [k, i] = r.dataset.sremove.split('|'); (k === 'area' ? draft.areas : draft.groups).splice(Number(i), 1); drawSetup('setup'); return; }
+      if (e.target.id === 'add-area') { draft.areas.push({ id: '', name: '' }); drawSetup('setup'); const ins = document.querySelectorAll('#setup-areas input'); if (ins.length) ins[ins.length - 1].focus(); }
+      if (e.target.id === 'add-group') { draft.groups.push(''); drawSetup('setup'); const ins = document.querySelectorAll('#setup-groups input'); if (ins.length) ins[ins.length - 1].focus(); }
+    });
+    document.getElementById('setup-cancel').addEventListener('click', () => { pane = 'list'; draft = null; showError(''); render(true); });
+    document.getElementById('setup-save').addEventListener('click', async () => {
+      const b = document.getElementById('setup-save');
+      b.disabled = true; b.textContent = 'Saving…';
+      try {
+        await save('saveProductSetup', { facilityId: plant, areas: draft.areas.filter(a => a.name.trim()), groups: draft.groups.filter(g => g.trim()) });
+        pane = 'list'; draft = null; note = 'Areas and groups saved · ' + savedText(); showError('');
+      } catch (err) { showError('Areas and groups not saved (' + (err.message || err) + ').'); }
+      b.disabled = false; b.textContent = 'Save Areas & Groups';
+      render(true);
+    });
+
+    /* ---------- Template and upload ---------- */
+    // The template is the plant's lists as they are now (or one example row for a plant with none), in the TEMPLATE columns.
+    document.getElementById('template').addEventListener('click', () => {
+      const rows = [];
+      areas().forEach(a => listOf(a.id).forEach(p => rows.push([plantName(plant), a.name, p.name, p.sku, p.mfgType, p.productGroup])));
+      if (!rows.length) rows.push([plantName(plant), 'AREA NAME', 'Product name', 'SKU', 'Gallon', ownOf().groups[0] || 'Milk']);
+      const blob = new Blob(['﻿' + toCsv(rows)], { type: 'text/csv' }), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = plantName(plant).replace(/\s+/g, '-') + '-Products-Template.csv';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      note = 'Template downloaded. Fill it in (keep the headings), save it as CSV, then Upload.'; render(true);
+    });
+    document.getElementById('upload').addEventListener('click', () => { const f = document.getElementById('upload-file'); f.value = ''; f.click(); });
+    document.getElementById('upload-file').addEventListener('change', async e => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      try { upload = readUpload(f.name, await f.text()); pane = 'preview'; showError(''); }
+      catch (err) { upload = null; showError(err.message); }
+      render(true);
+    });
+    // The file -> what it changes: {areas: [{areaId, name, products}], changes: [...], skipped, problems}.
+    function readUpload(name, txt) {
+      const rows = parseCsv(txt);
+      if (!rows.length) throw new Error(name + ' is empty. Download Template gives the layout.');
+      const head = rows[0].map(h => String(h).trim().toUpperCase()), at = {};
+      TEMPLATE.forEach(t => { at[t] = head.indexOf(t.toUpperCase()); });
+      const missing = TEMPLATE.filter(t => t !== 'Plant' && at[t] < 0);
+      if (missing.length) throw new Error(name + ' is missing the ' + missing.join(', ') + ' column' + (missing.length > 1 ? 's' : '') + '. Download Template gives the layout: ' + TEMPLATE.join(', ') + '.');
+      const get = (r, t) => at[t] < 0 ? '' : String(r[at[t]] == null ? '' : r[at[t]]).trim();
+      const me = plantName(plant).toUpperCase(), byArea = {}, order = [], problems = [];
+      let skipped = 0;
+      rows.slice(1).forEach((r, n) => {
+        const p = get(r, 'Plant');
+        if (p && p.toUpperCase() !== me && p.toUpperCase() !== plant.toUpperCase()) { skipped++; return; }
+        const area = get(r, 'Area'), prod = get(r, 'Product');
+        if (!area || !prod) { problems.push('Row ' + (n + 2) + ': ' + (!area ? 'no Area' : 'no Product') + '.'); return; }
+        const k = area.toUpperCase();
+        if (!byArea[k]) { byArea[k] = { name: area, products: [], seen: {} }; order.push(k); }
+        if (byArea[k].seen[prod.toUpperCase()]) { problems.push('Row ' + (n + 2) + ': ' + prod + ' is in ' + area + ' twice.'); return; }
+        byArea[k].seen[prod.toUpperCase()] = true;
+        byArea[k].products.push({ name: prod, sku: get(r, 'SKU'), mfgType: get(r, 'Type'), productGroup: get(r, 'Group') });
+      });
+      const known = areas(), changes = [], newGroups = new Set(), gs = ownOf().groups.map(g => g.toUpperCase());
+      const out = order.map(k => {
+        const a = byArea[k], have = known.find(x => x.name.toUpperCase() === k), was = have ? listOf(have.id) : [];
+        const wasBy = {}; was.forEach(p => { wasBy[p.name.toUpperCase()] = p; });
+        a.products.forEach(p => {
+          groupsOf(p).forEach(g => { if (gs.indexOf(g.toUpperCase()) < 0) newGroups.add(g); });
+          const w = wasBy[p.name.toUpperCase()];
+          if (!w) changes.push({ area: a.name, p, kind: 'add', newArea: !have });
+          else {
+            const diff = [['sku', 'SKU'], ['mfgType', 'Type'], ['productGroup', 'Group']].filter(([f]) => String(w[f] || '') !== String(p[f] || '')).map(([f, l]) => l + ' ' + (w[f] || 'blank') + ' → ' + (p[f] || 'blank'));
+            if (w.name !== p.name) diff.unshift('Name ' + w.name + ' → ' + p.name);
+            changes.push({ area: a.name, p, kind: diff.length ? 'change' : 'same', diff });
+          }
+        });
+        was.forEach(w => { if (!a.seen[w.name.toUpperCase()]) changes.push({ area: a.name, p: w, kind: 'remove' }); });
+        return { areaId: have ? have.id : '', name: have ? have.name : a.name, products: a.products, isNew: !have };
+      });
+      if (!out.length && !problems.length) throw new Error(name + ' has no rows for ' + plantName(plant) + '.');
+      return { file: name, areas: out, changes, skipped, problems, newGroups: [...newGroups] };
+    }
+    function drawPreview() {
+      const u = upload, c = (k) => u.changes.filter(x => x.kind === k).length, newAreas = u.areas.filter(a => a.isNew).map(a => a.name);
+      document.getElementById('preview-title').textContent = 'Upload ' + u.file;
+      document.getElementById('preview-stats').innerHTML = [['Added', c('add'), c('add') ? 'good' : ''], ['Changed', c('change'), c('change') ? 'warn' : ''], ['Removed', c('remove'), c('remove') ? 'bad' : ''], ['Same', c('same'), '']]
+        .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('preview-note').textContent = [u.areas.length + ' area' + (u.areas.length === 1 ? '' : 's') + ' in the file; areas not in it stay as they are.',
+        newAreas.length ? 'New areas: ' + newAreas.join(', ') + '.' : '', u.newGroups.length ? 'New groups: ' + u.newGroups.join(', ') + '.' : '',
+        u.skipped ? u.skipped + ' row' + (u.skipped === 1 ? '' : 's') + ' for other plants left out.' : ''].filter(Boolean).join(' ');
+      const word = { add: 'Added', change: 'Changed', remove: 'Removed', same: 'Same' };
+      const rank = { remove: 0, change: 1, add: 2, same: 3 };
+      const list = u.changes.slice().sort((a, b) => rank[a.kind] - rank[b.kind]);
+      document.getElementById('preview-rows').innerHTML = u.problems.map(p => '<tr class="pm-bad"><td colspan="6">' + escapeHtml(p) + ' Fix the file and upload it again.</td></tr>').join('') +
+        list.map(x => '<tr class="pm-' + x.kind + '"><td>' + escapeHtml(x.area) + (x.newArea ? ' <em>new</em>' : '') + '</td><td>' + escapeHtml(x.p.name) + '</td><td>' + escapeHtml(x.p.sku || '') + '</td><td>' + escapeHtml(x.p.mfgType || '') + '</td><td>' + escapeHtml(x.p.productGroup || '') + '</td><td><b>' + word[x.kind] + '</b>' + (x.diff && x.diff.length ? '<small>' + escapeHtml(x.diff.join(' · ')) + '</small>' : '') + '</td></tr>').join('');
+      const nothing = !u.changes.some(x => x.kind !== 'same') && !newAreas.length && !u.newGroups.length;
+      const sv = document.getElementById('preview-save');
+      sv.disabled = !canSave() || u.problems.length > 0 || nothing;
+      sv.textContent = u.problems.length ? 'Fix the file first' : nothing ? 'Nothing to change' : 'Save Upload';
+      document.getElementById('foot').textContent = 'Nothing is saved until Save Upload. Each area in the file gets the file\'s list; a product not in the file is removed from that area.';
+    }
+    document.getElementById('preview-cancel').addEventListener('click', () => { pane = 'list'; upload = null; note = 'Upload cancelled; nothing was changed.'; showError(''); render(true); });
+    document.getElementById('preview-save').addEventListener('click', async () => {
+      const b = document.getElementById('preview-save');
+      b.disabled = true; b.textContent = 'Saving…';
+      try {
+        const res = await save('saveProductUpload', { facilityId: plant, areas: upload.areas.map(a => ({ areaId: a.areaId, name: a.name, products: a.products })) });
+        upload.areas.forEach(a => { if (a.areaId) delete mine[a.areaId]; });
+        pane = 'list'; upload = null; note = ((res && res.message) || 'Upload saved.') + ' · ' + savedText(); showError('');
+      } catch (err) { showError('Upload not saved (' + (err.message || err) + '). Nothing was changed.'); b.disabled = false; b.textContent = 'Save Upload'; }
       render(true);
     });
 
@@ -163,14 +352,16 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(true); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(true); });
-      onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(true); }, fail('the machines'));
+      onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupRead = true; render(true); }, fail('the machines'));
+      watchProductSetup(db, s => { own = s; render(true); }, fail('the areas and groups'));
       watchProducts(db, (p, c) => {
         products = p; changed = c;
         // A saved list has caught up with what was typed here.
         // A new line still without its product name stays on screen as typed (it is not saved until it has one).
         Object.keys(mine).forEach(id => { if (mine[id].some(x => !String(x.name || '').trim())) return; if (c[id] && JSON.stringify(c[id].products) === JSON.stringify(mine[id].filter(x => String(x.name || '').trim()))) delete mine[id]; });
         render();
-      }, fail('the machine products'));
+      }, fail('the products'));
     });
   </script>
 </body>
+</html>

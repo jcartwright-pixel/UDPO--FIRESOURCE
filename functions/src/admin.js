@@ -7,7 +7,7 @@
  *   People & Roles        people, savePerson             USERS_MASTER row + personRights/{email} (Allow / Deny)
  *   Role Templates        roleTemplates, saveRoleTemplate private/roleTemplates
  *   Access & QR Codes     accessLinks, accessGenerate, accessRevoke, accessEmail      personAccess/{email}
- *   App Links & Codes     appLinks, routeCodeNew, routeCodeOnOff                       config/routePhone (phone.js)
+ *   Driver Station Codes  appLinks, routeCodeNew, routeCodeOnOff                       config/routePhone (phone.js)
  *   Plant Station Codes   releaseCodes, releaseCodeNew                                 private/releaseCodes
  *   Report Recipients     reportGroups, saveReportGroup                                reportGroups/{id}
  *   Sent Email Log        sentLog, setSending                                          sentEmails, private/emailSettings
@@ -221,7 +221,7 @@ async function accessEmail(db, email, input) {
   return { ok: out.status === 'SENT', message: out.status === 'SENT' ? 'Emailed to ' + out.sentTo.join(', ') + (out.testCopy ? ' (sandbox: a test copy to you only).' : '.') : out.reason };
 }
 
-/* ---------- App Links & Codes: the Route Distribution phone code ---------- */
+/* ---------- Driver Station Codes: the Route Distribution phone code ---------- */
 
 async function appLinks(db) {
   const [c, shown] = await Promise.all([db.collection(M.COLLECTIONS.config).doc('routePhone').get(), db.collection('private').doc('routeCodeShown').get()]);

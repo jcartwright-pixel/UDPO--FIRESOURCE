@@ -38,7 +38,7 @@ test('the Users list copy keeps each person\'s plants, and the primary administr
 
 test('Administration lists every item of the current app\'s Administration', () => {
   const text = fs.readFileSync(path.join(__dirname, '../../../public/js/admin-items.js'), 'utf8');
-  ['People & Roles', 'Role Templates', 'Access & QR Codes', 'App Links & Codes', 'Plant Station Codes', 'Repair Email', 'Manager Report Recipients', 'Sent Email Log',
+  ['People & Roles', 'Role Templates', 'Access & QR Codes', 'Manager Links', 'Plant Station Codes', 'Driver Station Codes', 'Repair Email', 'Manager Report Recipients', 'Sent Email Log',
     'Driver Check-In Email', 'Refresh Rates', 'Window Test Center', 'Driver Station', 'MOCREO & Sensors', 'Run Runtime Pre-Flight', 'Update Live Sheets',
     'Refresh Home Summary Now', 'Start Plant Fresh From Today', 'Date Inventory', 'Date Column Dry Run / Convert', 'Remaining Repair Items',
     'Dispatch Administration', 'Operational Assignments', 'Print Layouts', 'Dispatch Settings'].forEach(t => assert.ok(text.indexOf("'" + t + "'") >= 0, t));

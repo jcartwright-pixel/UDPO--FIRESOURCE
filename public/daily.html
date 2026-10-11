@@ -151,6 +151,12 @@
     function sheetRows() {
       // Joe 10/11: a loadout day's sheet shows only the loads loaded that day; Sunday-loaded runs show when Sunday is picked.
       const list = L.dailyRows(runs, loadDate);
+      // Joe 10/11, as the current app's weekend sheet: Sunday also shows, for reference, Sunday's deliveries that were already
+      // loaded Saturday, under their own line above what is loading today. They are not part of the day's count or print.
+      if (L.dayPrefix(loadDate) === 'sun') {
+        const sat = L.addDays(loadDate, -1);
+        L.dailyRows(runs, sat).filter(r => r.deliveryDate === loadDate).forEach(r => list.push(Object.assign(r, { already: true })));
+      }
       return list.map((r, i) => ({ r, i })).sort((a, b) => (a.r.deliveryDate < b.r.deliveryDate ? -1 : a.r.deliveryDate > b.r.deliveryDate ? 1 : 0)
         || (a.r.loadDate < b.r.loadDate ? -1 : a.r.loadDate > b.r.loadDate ? 1 : 0) || a.i - b.i).map(x => x.r);
     }
@@ -195,14 +201,17 @@
           loaded = '';
           body.push('<tr class="group"><td colspan="11"><span class="gtext">' + escapeHtml(r.deliveryDay.toUpperCase() + ' DELIVERIES, ' + shortDate(r.deliveryDate)) + '</span></td></tr>');
         }
-        if (mixed(r.deliveryDate) && r.loadDate !== loaded) {
+        if ((mixed(r.deliveryDate) || r.already) && r.loadDate !== loaded) {
           loaded = r.loadDate;
           subs++;
-          body.push('<tr class="group loaded"><td colspan="11"><span class="gtext">' + escapeHtml('LOADED ' + L.dayName(r.loadDate).toUpperCase() + ', ' + shortDate(r.loadDate)) + '</span></td></tr>');
+          const line = r.already ? 'ALREADY LOADED ' + L.dayName(r.loadDate).toUpperCase() + ', ' + shortDate(r.loadDate)
+            : r.loadDate === loadDate ? 'LOADING TODAY, ' + L.dayName(r.loadDate).toUpperCase() + ' ' + shortDate(r.loadDate)
+            : 'LOADED ' + L.dayName(r.loadDate).toUpperCase() + ', ' + shortDate(r.loadDate);
+          body.push('<tr class="group loaded' + (r.already ? ' already' : '') + '"><td colspan="11"><span class="gtext">' + escapeHtml(line) + '</span></td></tr>');
         }
         const driver = r.driver || coverageName(r), live = edit && !r.off, needs = !r.off;
-        body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (order && !r.off ? ' draggable="true"' : '') + (r.off ? ' class="off"' : '') + '>' +
-          (order && !r.off
+        body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (order && !r.off && !r.already ? ' draggable="true"' : '') + (r.off ? ' class="off"' : r.already ? ' class="already"' : '') + '>' +
+          (order && !r.off && !r.already
             ? '<td class="route"><button type="button" class="dd-grip" data-grip aria-label="Drag ' + escapeHtml(r.route + ' ' + r.run) + ' to a new place in the load order" title="Drag to change the load order">' + escapeHtml(r.route) + '</button></td>'
             : '<td class="route">' + escapeHtml(r.route) + '</td>') +
           cell(r.run, 'strong') +
@@ -220,7 +229,7 @@
       // Polish item 17 (Joe 10/11): a plain line that names the day and says what to do.
       if (!rows.length) body.push('<tr><td colspan="11" class="empty">No loads on ' + L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(loadDate))] + ' ' + shortDate(loadDate) + '. Use the arrows to pick another day.</td></tr>');
       keepCursor(document.getElementById('rows'), () => { document.getElementById('rows').innerHTML = body.join(''); });
-      const running = rows.filter(r => !r.off), covered = running.filter(r => !L.needsDriver(r)).length;
+      const running = rows.filter(r => !r.off && !r.already), covered = running.filter(r => !L.needsDriver(r)).length;
       // Polish item 3 (Joe 10/11): a day with no loads says so instead of showing 0% covered.
       document.getElementById('coverage').firstElementChild.textContent = running.length ? Math.round(100 * covered / running.length) + '%' : '—';
       document.getElementById('coverage').lastElementChild.textContent = running.length ? 'DRIVERS COVERED' : 'NO LOADS';
@@ -559,7 +568,7 @@
     // The printed sheet keeps its approved date style (10/8/2026); the screen uses the short 10-8-26.
     const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8, 10)) + '/' + k.slice(0, 4);
     function printSheet(only) {
-      const list = (only || rows).filter(r => !r.off);
+      const list = (only || rows).filter(r => !r.off && !r.already);
       let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(usDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
         ' &middot; Delivery Day ' + escapeHtml(document.getElementById('delivery-day').value) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
         '<th>C/O</th><th>P/O</th><th>T/O</th><th>L/D</th><th>DR</th><th>CHECKED BY</th><th>JACK</th><th>DRIVER NOTES</th></tr></thead><tbody>';

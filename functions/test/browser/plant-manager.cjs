@@ -106,6 +106,10 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       await page.mouse.move(1500, 900);
       await page.mouse.click(1500, 940);
     }
+    // Joe 10/11: the card's preview is a brief: routes behind and other problems only, never the loaded or still-to-load list.
+    const brief = await page.textContent('#pv-list');
+    assert.match(brief, /Routes1 of 4 loaded[\s\S]*Routes behind[\s\S]*502[\s\S]*BEHIND/, brief);
+    assert.doesNotMatch(brief, /501|LOADED$|NOT LOADED/, brief);
     await page.click('.mc-preview');
     await page.waitForSelector('#modal:not([hidden])');
     const body = await page.textContent('#rp-body');

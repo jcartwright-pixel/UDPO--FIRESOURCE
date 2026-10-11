@@ -64,3 +64,17 @@ test('Over the Road import: a 188-month accounting file saves every month in bat
   assert.equal((await db().collection('otrMonthly').doc('2026-08').get()).data().fuel_cost, 1187);
   assert.equal((await db().collection('otrDaily').doc('2026-08-03__Jersey').get()).data().runs, 5, 'a typed day count is never replaced');
 });
+
+test('Over the Road By Date comments: typed on a day, imported from the workbook, a typed one is kept', async () => {
+  await applyAction(db(), MANAGER, { action: 'saveOtr', requestId: rid(), op: 'comment', date: '2021-05-25', text: 'Lost 5 Walmart routes' }, now);
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveOtr', requestId: rid(), op: 'comment', date: '5/25/21', text: 'x' }, now), /yyyy-mm-dd/);
+  const res = await applyAction(db(), MANAGER, { action: 'saveOtr', requestId: rid(), op: 'import', figures: [], daily: [],
+    comments: [{ date: '2021-05-25', text: 'Lost 5 Walmart Rts' }, { date: '2021-05-26', text: 'Added 2 walmart rts' }] }, now);
+  assert.equal(res.comments, 1);
+  assert.equal((await db().collection('otrComments').doc('2021-05-25').get()).data().text, 'Lost 5 Walmart routes', 'a typed comment wins');
+  const d = (await db().collection('otrComments').doc('2021-05-26').get()).data();
+  assert.equal(d.text, 'Added 2 walmart rts');
+  assert.equal(d.source, 'IMPORT');
+  await applyAction(db(), MANAGER, { action: 'saveOtr', requestId: rid(), op: 'comment', date: '2021-05-26', text: '' }, now);
+  assert.equal((await db().collection('otrComments').doc('2021-05-26').get()).data().text, '', 'an empty box clears it');
+});

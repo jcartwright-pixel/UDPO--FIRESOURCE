@@ -7,9 +7,10 @@ export const ADMIN_GROUPS = [
     ['role-templates', 'Role Templates', 'Pick a role and tick the rights it gets. The Administrator role is protected and has every right.', '', 'check'],
     ['access-codes', 'Access & QR Codes', 'A revocable phone link and QR code for each employee: Generate, Regenerate (press twice) and Text the link (texting is off).', '', 'pin']
   ]],
-  ['App Links & Codes', 'Every link and code people use to reach the app', [
-    ['app-links', 'App Links & Codes', 'Web app, phone, tablet, company and browser links, plant-station and driver-board codes: copy, print a QR, open, change a link, and turn a public link off (press twice).', '', 'swap'],
-    ['station-codes', 'Plant Station Codes', 'The manager release code for each plant station: New code (press twice to replace).', '', 'factory']
+  ['Links & Codes', 'Every link and code people use to reach the app, each where it belongs', [
+    ['app-links', 'Manager Links', 'The links for managers and office staff: United Dairy Operations, the phone link, Manager Web App and personal phone links: copy, print a QR, open.', '', 'swap'],
+    ['station-codes', 'Plant Station Codes', 'The Plant Station and Garage Station tablet links (copy, print a QR, open) and each plant\'s manager release code: New code (press twice to replace).', '', 'factory'],
+    ['driver-codes', 'Driver Station Codes', 'The Driver Station and TV link and the drivers\' phone link with its Route Distribution code: copy, print a QR, open, new code, and turn the phone link off (press twice).', '', 'people']
   ]],
   ['Email & Schedules', 'Where email goes, how often, and how often the app refreshes', [
     ['repair-email', 'Repair Email', 'Where repair email goes (Idealease, Penske, owned units), on or off, how often for each lessor, the digest hour, and Send now.', '', 'alert'],
@@ -28,8 +29,8 @@ export const ADMIN_GROUPS = [
     ['switch', 'Which App Runs Each Screen', 'On the Route Distribution page, an administrator clicks a screen\'s tag twice to run it from the new app, and turns the write-back on or off.', 'distribution.html', 'swap']
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
-    ['machine-products', 'Machine Products', 'The products each machine runs (RedZone, Uniontown): the Product drop-down on Quality Checks. Add, change or remove a product and its SKU.', 'products.html', 'production.webp'],
-    ['plant-shifts', 'Plant Shifts', 'Each plant\'s shifts (Uniontown: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week']
+    ['machine-products', 'Products', "Each plant's products by area and group: the Product drop-down on Quality Checks. Add or change a product, or load the whole list from the template.", 'products.html', 'production.webp'],
+    ['plant-shifts', 'Plant Shifts', 'Each plant\'s Distribution and Plant Production shifts (Uniontown distribution: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week']
   ]],
   // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.
   ['Connections & Keys', 'The API keys the app uses: paste, replace and test them here', [
