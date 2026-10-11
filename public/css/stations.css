@@ -327,3 +327,5 @@ body.ds-tv .foot { color: #cfe3f6; }
 .phone-card button.speak { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); min-height: 0; height: 30px; padding: 0 10px; font-size: 14px; border-radius: 7px; background: #eef4fa; border: 1px solid #c4d6e8; }
 .phone-card .speak-box.area button.speak { top: auto; bottom: 6px; transform: none; }
 .phone-card button.speak.on { background: #c62828; color: #fff; border-color: #c62828; }
+/* The phone Check-In: what went wrong, right under the Check In button (improvements item 12). */
+.phone-card .send-error { margin: 8px 2px 0; color: #a3261b; font-weight: 700; font-size: 15px; }

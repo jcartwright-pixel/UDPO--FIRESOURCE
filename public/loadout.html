@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page loadout-page">
   <div class="signin" id="signin" hidden>
@@ -96,6 +97,14 @@
     const today = () => L.operatingDay(new Date());
     let runs = [], pickups = [], person = null, app = {};
     const pending = {};           // row id -> fields shown before the server has them
+    /* The current app's Plant Station SKIP (PlantStation.html:263-269, Joe 10/07: "only to be able to come back to it later"):
+       it saves nothing. A load not started moves to the bottom of its group on this screen, marked SKIPPED · COME BACK, until
+       it is started. Kept on this tablet for the loadout day (sessionStorage), so going to another screen and back keeps it. */
+    const SKIP_KEY = 'udLoadoutSkipped';
+    const readSkips = () => { try { return JSON.parse(sessionStorage.getItem(SKIP_KEY) || '{}') || {}; } catch (e) { return {}; } };
+    const skipped = readSkips();
+    const keepSkips = () => { try { sessionStorage.setItem(SKIP_KEY, JSON.stringify(skipped)); } catch (e) { /* private window: this visit only */ } };
+    const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state !== 'DONE' && r.state !== 'LOADING';
     const unsubs = [];
 
     const canLoad = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
@@ -111,13 +120,13 @@
     }
 
     const COLS = {
-      normal: [['Route', 6], ['Run', 10], ['Driver / CVG', 13], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 7], ['Status', 9], ['', 7], ['Total Time', 7], ['P/U', 8], ['', 7]],
+      normal: [['Route', 6], ['Run', 9], ['Driver / CVG', 11], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
       TANKER: [['Route', 7], ['Run', 15], ['Driver / CVG', 15], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
     // With the loading order editable (today, someone who can load), the Route column also holds the up / down arrows and
     // the route becomes the drag handle, so it is wider; Driver, Depart and Edit give up the room (Truck and Trailer keep theirs).
     const ORDER_COLS = {
-      normal: [['Route', 11], ['Run', 9], ['Driver / CVG', 11], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 6], ['Status', 9], ['', 7], ['Total Time', 7], ['P/U', 8], ['', 6]],
+      normal: [['Route', 11], ['Run', 9], ['Driver / CVG', 9], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 6], ['Status', 9], ['', 11], ['Total Time', 5], ['P/U', 8], ['', 6]],
       TANKER: [['Route', 11], ['Run', 13], ['Driver / CVG', 13], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
 
@@ -126,13 +135,17 @@
     // and Plant Station follow. Only today (the operating day, rolling at 6 AM); prior-day loads keep their place on top.
     const canOrder = () => canLoad() && date === today();
     const orderRows = (rows) => rows.filter(r => !r.prior && r.loadDate === date);
+    // A skipped load waits at the bottom without arrows or handle; the others move around it (its place in the order is kept).
+    const shownOrder = () => orderRows(rowsNow().filter(r => r.area === area)).filter(r => !isSkipped(r));
     let drag = null, heldRender = false;
 
     function render() {
       if (drag) { heldRender = true; return; }
       const all = rowsNow(), byArea = {};
       P.AREAS.forEach(a => { byArea[a] = all.filter(r => r.area === a); });
-      const rows = byArea[area], c = P.counts(rows), info = P.AREA[area];
+      // Skipped loads go to the bottom of their group (still open from a prior day first, then today).
+      const rows = byArea[area].map((r, i) => ({ r, i, k: (r.prior ? 0 : 2) + (isSkipped(r) ? 1 : 0) })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.r);
+      const c = P.counts(rows), info = P.AREA[area];
       document.getElementById('title').textContent = info.title;
       document.title = info.title + ' · New Plant Operations';
       document.getElementById('load-date').value = date;
@@ -145,7 +158,8 @@
           '<span class="ring" style="--p:' + pct + '"><b>' + ac.done + '/' + ac.total + '</b></span><span><strong>' + P.AREA[a].tile + '</strong><small>' + ac.done + ' loaded · ' + (ac.total - ac.done) + ' to load</small></span></button>';
       }).join('');
       drawTrailers(rows);
-      const pu = rows.flatMap(r => P.pickupsFor(r, pickups)), puOpen = pu.filter(P.pickupOpen).length;
+      const pk = P.withNotePickups(all, pickups);
+      const pu = rows.flatMap(r => P.pickupsFor(r, pk)), puOpen = pu.filter(P.pickupOpen).length;
       const behind = rows.filter(r => P.isBehind(r, today())).length, pct = c.total ? Math.round(c.done * 100 / c.total) : 0;
       document.getElementById('strip').innerHTML =
         '<span><b>' + c.done + ' of ' + c.total + '</b> loaded <span class="bar"><i style="width:' + pct + '%"></i></span></span>' +
@@ -154,7 +168,7 @@
         '<span>' + escapeHtml(info.label) + ' <b>' + c.quantity.toLocaleString() + '</b></span>' +
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
-      const movable = canOrder() ? orderRows(rows) : [], ordering = movable.length > 1;
+      const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r)) : [], ordering = movable.length > 1;
       const cols = (ordering ? ORDER_COLS : COLS)[area === 'TANKER' ? 'TANKER' : 'normal'];
       document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
@@ -173,24 +187,26 @@
       let html = '', lastPrior = null;
       rows.forEach(r => {
         if (r.prior !== lastPrior) {
-          html += r.prior ? '<tr class="divider prior"><td colspan="' + cols.length + '">PRIOR DAY LOADS · ' + shortDate(r.loadDate) + ' — complete these to clear them</td></tr>'
+          html += r.prior ? '<tr class="divider prior"><td colspan="' + cols.length + '">PRIOR DAY LOADS · ' + shortDate(r.loadDate) + ' — still open, finish these first</td></tr>'
             : (lastPrior === true ? '<tr class="divider today"><td colspan="' + cols.length + '">TODAY · ' + shortDate(date) + '</td></tr>' : '');
           lastPrior = r.prior;
         }
-        const st = r.state, items = P.pickupsFor(r, pickups), open = items.filter(P.pickupOpen).length;
+        const st = r.state, items = P.pickupsFor(r, pk), open = items.filter(P.pickupOpen).length;
         const puBtn = '<button type="button" class="pu ' + (open ? 'open' : items.length ? 'done' : '') + '" data-pu="' + r.id + '">' + (open ? 'P/U<i>' + open + '</i>' : items.length ? 'Completed' : 'P/U') + '</button>';
         const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
         const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : k === 'truck' ? ' list="lo-trucks" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
         const mins = P.minutesTaken(r);
-        const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' : '';
+        const skip = isSkipped(r), skipBtn = edit && st !== 'DONE' && st !== 'LOADING' && !skip ? '<button type="button" class="skip" data-skip="' + r.id + '" title="Skip for now and come back to it">Skip</button>' : '';
+        const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
+        const runCell = escapeHtml(r.run) + (skip ? '<span class="skip-tag">SKIPPED · COME BACK</span>' : '');
         const total = mins === null ? '' : '<span class="' + (st === 'LOADING' ? 'running' : '') + '">' + P.minutesText(mins) + '</span>';
-        const cls = st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '';
+        const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (skip ? ' skipped' : '');
         if (area === 'TANKER') {
           html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + status + '</td><td>' + escapeHtml(r.shift) + '</td><td>' + puBtn + '</td><td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         } else {
-          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.driver) + '</td>' +
+          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + runCell + '</td><td>' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
             '<td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
@@ -274,8 +290,8 @@
       document.body.classList.remove('lo-dragging');
       let saved = false;
       if (apply && d.target) {
-        const from = d.ids.indexOf(d.id);
-        let to = d.ids.indexOf(d.target.id) + (d.target.after ? 1 : 0);
+        const full = orderRows(rowsNow().filter(r => r.area === area)).map(r => r.id), from = full.indexOf(d.id);
+        let to = full.indexOf(d.target.id) + (d.target.after ? 1 : 0);
         if (to > from) to--;
         if (to !== from) { moveLoad(d.id, to); saved = true; }
       }
@@ -287,7 +303,7 @@
       if (!g || !canOrder() || (e.pointerType === 'mouse' && e.button !== 0)) return;
       e.preventDefault();
       closePop();
-      const ids = orderRows(rowsNow().filter(r => r.area === area)).map(r => r.id);
+      const ids = shownOrder().map(r => r.id);
       drag = { id: g.dataset.grip, ids, target: null, y: e.clientY, x: e.clientX, row: g.closest('tr'), scroller: null };
       drag.row.classList.add('dragging');
       document.body.classList.add('lo-dragging');
@@ -396,9 +412,9 @@
     // Pickups: the list for this load, Pickup Complete on each open one, and Add Pickup.
     let puRow = null;
     function drawPickups() {
-      const row = puRow, items = P.pickupsFor(row, pickups), edit = canLoad();
+      const row = puRow, items = P.pickupsFor(row, P.withNotePickups(rowsNow(), pickups)), edit = canLoad();
       document.getElementById('pu-sub').textContent = row.route + ' · ' + row.run;
-      document.getElementById('pu-list').innerHTML = items.map(p => '<div class="pu-item' + (P.pickupOpen(p) ? '' : ' done') + '"><span>' + escapeHtml(p.item) + ' · ' + escapeHtml(p.quantity) +
+      document.getElementById('pu-list').innerHTML = items.map(p => '<div class="pu-item' + (P.pickupOpen(p) ? '' : ' done') + '"><span>' + escapeHtml(p.item) + (p.quantity ? ' · ' + escapeHtml(p.quantity) : '') +
         '<small>' + (p.notes ? escapeHtml(p.notes) + ' · ' : '') + (P.pickupOpen(p) ? 'Not loaded · driver picks up before leaving' : 'Completed ' + P.clock(p.completedAt)) + '</small></span>' +
         (P.pickupOpen(p) && edit ? '<button type="button" data-done="' + escapeHtml(p.pickupId) + '">Pickup Complete</button>' : '') + '</div>').join('') || '<div class="hint">No pickups for this load.</div>';
       document.getElementById('pu-form').hidden = !edit;
@@ -408,8 +424,18 @@
     document.getElementById('pu-list').addEventListener('click', e => {
       const b = e.target.closest('[data-done]');
       if (!b) return;
-      const id = b.dataset.done;
-      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: new Date().toISOString() }) : p));
+      const id = b.dataset.done, now = new Date().toISOString();
+      const note = P.withNotePickups(rowsNow(), pickups).find(p => p.pickupId === id && p.source === 'LOAD_NOTE');
+      if (note) {
+        // A pickup the load note asked for: completing it saves it as a pickup (the note as the item), already complete.
+        const temp = Object.assign({}, note, { source: '', quantity: 'See note', status: 'COMPLETE', completedAt: now });
+        pickups = pickups.concat([temp]);
+        drawPickups(); render();
+        save('completePickup', { pickupId: id, runDocId: note.runDocId, day: note.day, date: note.date })
+          .catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
+        return;
+      }
+      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: now }) : p));
       drawPickups(); render();
       save('completePickup', { pickupId: id }).catch(err => showError('Pickup: ' + (err.message || err)));
     });
@@ -449,14 +475,22 @@
       const t = e.target.closest('button');
       if (!t) return;
       if (t.dataset.state) { const r = rowById(t.dataset.state); if (r && canLoad()) openStatus(t, r); return; }
+      if (t.dataset.skip) { (skipped[date] = skipped[date] || {})[t.dataset.skip] = true; keepSkips(); render(); return; }
       if (t.dataset.clock) {
         const r = rowById(t.dataset.clock), now = new Date().toISOString();
         if (!r) return;
+        if (skipped[date] && skipped[date][r.id]) { delete skipped[date][r.id]; keepSkips(); }
         if (r.state === 'LOADING') saveLoad(r, { completedAt: now }, { completedAt: now, state: 'DONE' });
         else saveLoad(r, { startedAt: now, completedAt: '' }, { startedAt: now, completedAt: '', state: 'LOADING' });
         return;
       }
-      if (t.dataset.idMove) { const list = orderRows(rowsNow().filter(r => r.area === area)), i = list.findIndex(r => r.id === t.dataset.idMove); if (i >= 0 && canOrder()) moveLoad(t.dataset.idMove, i + Number(t.dataset.move)); return; }
+      if (t.dataset.idMove) {
+        // One place up or down among the loads shown (a skipped load at the bottom is stepped over).
+        const shown = shownOrder(), i = shown.findIndex(r => r.id === t.dataset.idMove), next = shown[i + Number(t.dataset.move)];
+        const full = orderRows(rowsNow().filter(r => r.area === area));
+        if (i >= 0 && next && canOrder()) moveLoad(t.dataset.idMove, full.findIndex(r => r.id === next.id));
+        return;
+      }
       if (t.dataset.pu) { const r = rowById(t.dataset.pu); if (r) openPickups(r); return; }
       if (t.dataset.edit) { const r = rowById(t.dataset.edit); if (r) openEdit(r); }
     });

@@ -18,6 +18,7 @@ const MAINT = require('./maintenance');
 const R = require('./plant-rules');
 const { queueMaster } = require('./masterwrite');
 const M = require('./model');
+const B = require('./board-rules');
 
 // Everyone who may save on Daily Dispatch, plus the plant floor.
 const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
@@ -280,8 +281,16 @@ function assignCheck(typed, u, equipment, run, prefix, stamp, SaveError) {
 function validatePickup(action, input, SaveError) {
   const out = {};
   if (action === 'completePickup') {
-    out.pickupId = text(input.pickupId).slice(0, 120);
+    out.pickupId = text(input.pickupId).slice(0, 320);
     if (!out.pickupId) throw new SaveError('BAD_REQUEST', 'Pick the pickup');
+    // A pickup a load note asked for (board-rules.js notePickup) is not saved yet: it names its load.
+    if (/^note:/.test(out.pickupId)) {
+      out.runDocId = text(input.runDocId).slice(0, 200);
+      out.day = text(input.day).slice(0, 10);
+      out.date = text(input.date);
+      if (!out.runDocId || L.DAYS.indexOf(out.day) < 0 || !L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'runDocId, day and date are required');
+      if (out.pickupId !== B.notePickupId(out.runDocId, out.day, out.date)) throw new SaveError('BAD_REQUEST', 'That pickup does not match its load');
+    }
     return out;
   }
   out.runDocId = text(input.runDocId).slice(0, 200);
@@ -298,6 +307,24 @@ function validatePickup(action, input, SaveError) {
 }
 
 async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  if (req.action === 'completePickup' && /^note:/.test(req.pickupId)) {
+    // Completing a load note's pickup saves it as a pickup record (the note is the item), complete, so the note's listing goes.
+    const runSnap = await tx.get(db.collection('runs').doc(req.runDocId));
+    if (!runSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer on the Live sheet');
+    const run = Object.assign({}, runSnap.data(), { id: req.runDocId });
+    const id = 'pu_note_' + docId(req.runDocId + '_' + req.day + '_' + req.date);
+    const ref = db.collection('pickups').doc(id), already = await tx.get(ref);
+    if (already.exists) return { ok: true, requestId: req.requestId, pickupId: id, already: true };
+    const note = B.notePickup(run, req.day, req.date, []);
+    if (!note) throw new SaveError('NOT_FOUND', 'The load note no longer asks for a pickup');
+    const p = { pickupId: id, date: req.date, routeId: run.routeId || '', runId: run.runId || '', route: run.route || '', run: run.run || '', runDocId: req.runDocId, day: req.day,
+      item: note.item, quantity: 'See note', location: '', notes: 'From the load note', status: 'COMPLETE', createdAt: note.createdAt || stamp, createdBy: note.createdBy || email,
+      completedAt: stamp, completedBy: email, createdInApp: true, testEdited: true, editedAt: stamp };
+    tx.set(ref, p);
+    const result = { ok: true, requestId: req.requestId, pickupId: id };
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, pickupId: id, fromNote: req.pickupId, after: p, result });
+    return result;
+  }
   if (req.action === 'completePickup') {
     const ref = db.collection('pickups').doc(docId(req.pickupId));
     const snap = await tx.get(ref);

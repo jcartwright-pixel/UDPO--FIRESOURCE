@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/kiosk.css">
   <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
 <body class="fill phone pk-page">
@@ -68,7 +69,7 @@
       date = L.operatingDay(new Date(now));
       document.getElementById('clock').textContent = new Date(now).toLocaleString('en-US', { timeZone: L.TIME_ZONE, weekday: 'long', hour: 'numeric', minute: '2-digit' });
       const loads = P.loadoutRows(data.runs, date), mine = loads.filter(r => !r.prior);
-      const openPickups = data.pickups.filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
+      const openPickups = P.withNotePickups(loads, data.pickups).filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       const rep = U.plantReport({ loads, pickups: openPickups, shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
       const day = R.daySummary(date, data.runs, data.pickups, data.journal, now), done = P.counts(mine);
       document.getElementById('k-loaded').innerHTML = done.done + '<small> of ' + done.total + '</small>';

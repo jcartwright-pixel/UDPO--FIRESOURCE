@@ -109,6 +109,17 @@ async function touchDrag(page, from, to) {
     results.push('Finger drag on a 1280 tablet: 6302 moved up before 805');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '4-loadout-order-tablet-1280.png') });
 
+    // Skip on the tablet (Plant Station): 812 waits at the bottom with no handle; 808's down arrow steps over it.
+    await tablet.click(row('812') + ' button.skip');
+    await tablet.waitForSelector(row('812') + '.skipped');
+    assert.equal(await tablet.$(row('812') + ' .lo-grip'), null, 'a skipped load has no handle');
+    assert.ok(await tablet.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1)), 'Start and Skip fit their cell with the order arrows shown');
+    await tablet.click(row('808') + ' .lo-move.down');
+    await waitOrder(tablet, ['801', '802', '6302', '805', '815', '811', '808']);
+    assert.equal(await tablet.$eval('#rows tr[data-row]:last-child', t => t.dataset.row.split('|')[0]), '2026-10-04__run_p812', 'the skipped load stays at the bottom');
+    results.push('Skip with the order arrows: 812 waits at the bottom without a handle; 808 moved down past 811');
+    if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '5-loadout-order-skip-tablet-1280.png') });
+
     // Another day: no handles, the old widths.
     await loader.click('#next');
     await loader.waitForFunction(() => document.querySelector('#load-date').value === '2026-10-09');
