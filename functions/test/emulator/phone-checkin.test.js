@@ -93,3 +93,9 @@ test('Who is driving: a fill-in name on today\'s dispatch, a route instead of a 
   await phoneCall(db(), { code, op: 'checkIn', driverId: 'skip', runDocId: brook.runDocId, day: 'tue', requestId: rid(), fields: { casesDelivered: '7' } }, at(3));
   assert.equal((await day('801', 'tue')).casesDelivered, 7);
 });
+
+test('a phone link a manager turned off says where to turn it back on', async () => {
+  const { code } = await newRouteCode(db(), MANAGER);
+  await db().collection('config').doc('routePhone').update({ enabled: false });
+  await assert.rejects(phoneCall(db(), { code, op: 'roster' }, at()), /turned off right now\. A manager turns it back on in Administration > Links & Codes > Driver Station Codes/);
+});
