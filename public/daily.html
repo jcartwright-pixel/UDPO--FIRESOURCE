@@ -112,7 +112,8 @@
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, canReorder, openPicker, openNote, optionsHtml, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, pickChoices, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { bindDailyKeys, keepCursor } from './js/daily-keys.js';
     forScreen('dailyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
@@ -136,7 +137,7 @@
 
     function cell(value, extra, edit) {
       const text = show(value);
-      return '<td class="' + (extra || '') + (text ? '' : ' empty') + (edit ? ' editable' : '') + '"' + (edit ? ' data-edit="' + edit + '"' : '') + ' title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</td>';
+      return '<td class="' + (extra || '') + (text ? '' : ' empty') + (edit ? ' editable' : '') + '"' + (edit ? ' data-edit="' + edit + '" tabindex="0"' : '') + ' title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</td>';
     }
 
     // The day's loads, plus any switched to NO RUN in this session (shown greyed in their old place).
@@ -181,7 +182,7 @@
           '<td>' + (edit ? '<button type="button" class="edit" data-open>Edit</button>' : '') + '</td></tr>');
       });
       if (!rows.length) body.push('<tr><td colspan="11" class="empty">No loads go out on this day in the copied Live weeks.</td></tr>');
-      document.getElementById('rows').innerHTML = body.join('');
+      keepCursor(document.getElementById('rows'), () => { document.getElementById('rows').innerHTML = body.join(''); });
       const running = rows.filter(r => !r.off), covered = running.filter(r => !L.needsDriver(r)).length;
       document.getElementById('coverage').firstElementChild.textContent = (running.length ? Math.round(100 * covered / running.length) : 0) + '%';
       document.getElementById('delivery-day').value = deliveryDayName(loadDate);
@@ -223,24 +224,31 @@
       const td = e.target.closest('td[data-edit]');
       if (!td) return;
       const kind = td.dataset.edit;
+      // Driver, Truck and Trailer: a click only selects the cell, like the current app; a double-click, F2 or typing opens the list (daily-keys.js).
+      if (kind === 'note' || kind === 'time' || kind === 'jack') editText(td, row, kind);
+    });
+
+    // Time, Jack and Notes: a box in the cell; typed = what was typed on the selected cell (it starts over, as in Sheets).
+    function editText(td, row, kind, typed) {
       editing = true;
-      const close = () => { editing = false; render(); };
-      if (kind === 'note' || kind === 'time' || kind === 'jack') {
-        const current = kind === 'note' ? row.driverNotes : kind === 'time' ? departText(row) : row.palletJack;
-        openNote(td, current, (value) => {
-          editing = false;
-          if (value === null) return render();
-          if (kind === 'note') saveAssignment(getRuns, row.runDocId, row.day, 'note', value, render);
-          else if (kind === 'time') setTime(row, value);
-          else setJack(row, value);
-        });
-        return;
-      }
-      openPicker(td, kind, kind === 'driver' ? row.driverId : kind === 'truck' ? row.truckId : row.trailerId, busyFor(kind, row), (pick) => {
-        if (pick === null) return close();
+      const current = kind === 'note' ? row.driverNotes : kind === 'time' ? departText(row) : row.palletJack;
+      openNote(td, current, (value) => {
         editing = false;
-        saveAssignment(getRuns, row.runDocId, row.day, kind, pick, render, ovr[row.id]);
-      }, pickOpts(kind, row));
+        if (value === null) return render();
+        if (kind === 'note') saveAssignment(getRuns, row.runDocId, row.day, 'note', value, render);
+        else if (kind === 'time') setTime(row, value);
+        else setJack(row, value);
+      });
+      const input = td.querySelector('input.picker');
+      if (input && typed !== null && typed !== undefined) input.value = typed;
+    }
+    const idOf = { driver: 'driverId', truck: 'truckId', trailer: 'trailerId' };
+    bindDailyKeys(body, {
+      rowOf: (td) => { const tr = td.closest('tr[data-index]'); return tr ? rows[Number(tr.dataset.index)] : null; },
+      current: (row, kind) => row[idOf[kind]] || (kind === 'driver' && coverageName(row) ? '__CVG__:' + coverageName(row) : ''),
+      choices: (kind, row) => pickChoices(kind, row[idOf[kind]], busyFor(kind, row), pickOpts(kind, row)),
+      pick: (row, kind, value) => saveAssignment(getRuns, row.runDocId, row.day, kind, { id: value, text: pickText(kind, value) }, render, ovr[row.id]),
+      editText, setEditing: (on) => { editing = on; }, render
     });
 
     // Managers drag a load by its route number to a new place; the whole day's order is saved as one call.
