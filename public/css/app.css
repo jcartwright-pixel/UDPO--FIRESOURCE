@@ -903,9 +903,15 @@ tr.otr-on td { background: #e3f3e8; }
 .head:has(#print-sheet) .coverage b { font-size: 21px; line-height: 1.05; }
 .head:has(#print-sheet) .coverage span { font-size: 10px; line-height: 1.1; letter-spacing: .03em; }
 .head:has(#print-sheet) .actions.in-head { align-self: flex-end; }
+/* Joe 10/11: Week Beginning a little narrower, Loadout Day shows only the weekday, Delivery Day a little wider (one day name). */
+.head:has(#print-sheet) #week-begin { width: 118px; min-width: 0; }
+.head:has(#print-sheet) #load-day { width: 140px; min-width: 0; }
+.head:has(#print-sheet) #delivery-day { width: 160px; }
 @media (max-width: 1700px) {
   .head:has(#print-sheet) .field .stepper input, .head:has(#print-sheet) .field .stepper select { min-width: 0; width: 150px; }
-  .head:has(#print-sheet) #delivery-day { width: 110px; }
+  .head:has(#print-sheet) #week-begin { width: 118px; }
+  .head:has(#print-sheet) #load-day { width: 140px; }
+  .head:has(#print-sheet) #delivery-day { width: 160px; }
   .head:has(#print-sheet) h1 { font-size: 26px; }
   .head:has(#print-sheet) .coverage { width: 82px; }
 }
