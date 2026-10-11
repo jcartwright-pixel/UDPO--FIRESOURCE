@@ -408,7 +408,8 @@ try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add
   const nav = document.createElement('div');
   nav.className = 'hdr-nav';
   const h = headerButton('go-home', 'home', 'Home', 'Home');
-  h.onclick = () => { location.href = 'index.html'; };
+  // Joe 10/11: someone who sees several plants goes Home to the all-plants overview directly (no plant page first).
+  h.onclick = () => { location.href = multiPlant() ? 'company.html' : 'index.html'; };
   // The main screen (all plants) and a plant's home are the top: no Back there (a plant's home gets Back to the overview below).
   if (['index.html', 'company.html'].indexOf(here) < 0) nav.append(backButton());
   nav.append(h);
