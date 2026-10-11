@@ -63,12 +63,16 @@ async function openPage(browser, url, when) {
       if (SHOTS) await lo.screenshot({ path: path.join(SHOTS, SHOT_NAME + '-loadout-1920.png'), scale: 'css' });
       assert.match(await lo.textContent('#strip'), /Behind 0/);
       results.push('12:27 AM Sunday: the Saturday loadout for Monday is on time on Manager Center and the Loadout Center');
-      // 6:40 PM Sunday: 844 (6:00 PM) is behind; the midnight and 2 AM routes are not yet.
-      const later = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-11T22:40:00Z');
+      // 12:45 AM Monday: 971 (12:00 AM Monday) is 45 minutes past, not behind; at 12:46 AM it is.
+      const at45 = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-12T04:45:10Z');
+      await at45.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent));
+      await at45.waitForTimeout(1500);
+      assert.match(await at45.textContent('#pv-subject'), /All routes on time/);
+      const later = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-12T04:46:10Z');
       await later.waitForFunction(() => /1 route behind/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
-      assert.match(await later.textContent('body'), /844[\s\S]*BEHIND/);
-      results.push('6:40 PM Sunday: only 844 (departs 6:00 PM) is behind');
-      for (const p of [early, lo, later]) assert.deepEqual(p.errors, []);
+      assert.match(await later.textContent('body'), /971[\s\S]*BEHIND/);
+      results.push('Monday 12:45 AM: 971 (departs 12:00 AM Monday) is not behind; 12:46 AM it is');
+      for (const p of [early, lo, at45, later]) assert.deepEqual(p.errors, []);
     }
   } finally {
     await browser.close();
