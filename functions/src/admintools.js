@@ -364,6 +364,9 @@ async function saveMailCheckin(db, msg, c, sender, stamp) {
       }
     }
     tx.set(seenRef, { at: stamp, route: c.route, driver: c.driver, run: hit ? hit.snap.id + '|' + hit.day : '', made });
+    // Review item 33 (Joe 10/11): the original email, for Maintenance's View email (readable by signed-in users).
+    tx.set(db.collection('mailCopies').doc(M.safeIdPart(msg.id)), { id: msg.id, from: String(msg.from || sender).slice(0, 200), to: String(msg.to || '').slice(0, 300), subject: String(msg.subject || '').slice(0, 200),
+      receivedAt: Number(msg.internalDate) ? new Date(Number(msg.internalDate)).toISOString() : stamp, body: String(msg.body || '').slice(0, 20000), route: c.route, driver: c.driver, records: made, savedAt: stamp });
     return { made, review, run: !!hit };
   });
 }

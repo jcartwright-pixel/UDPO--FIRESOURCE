@@ -179,7 +179,9 @@
         text: text, status: status, needsReview: status === 'NEEDS_REVIEW' || !text, reviewed: !!reviewed, reviewedBy: reviewed ? reviewed[1] : '',
         emailed: !!sent, emailedAt: sent ? sent[1] : '', atGarage: !!garage, garageAt: garage ? garage[1] : '', garageBy: garage ? garage[2].trim() : '',
         toLessor: !!lessor, lessor: lessor ? lessor[1].trim() : '', lessorAt: lessor ? lessor[2] : '', lessorBy: lessor ? lessor[3].trim() : '',
-        done: ISSUE_DONE.test(status), occurrences: 1 };
+        done: ISSUE_DONE.test(status), occurrences: 1,
+        // From the answering-service email (Driver Check-In Email): the message id opens the stored email (mailCopies).
+        fromEmail: String(r.source_type || '').toUpperCase() === 'GMAIL', emailId: String(r.source_type || '').toUpperCase() === 'GMAIL' ? String(r.source_id || '') : '' };
     }).filter(function (r) { return r.recordId && r.status !== 'REMOVED' && !noWriteUp(r.text); });
     var seen = {};
     written.slice().sort(function (a, b) { return a.openedMs - b.openedMs; }).forEach(function (r) {

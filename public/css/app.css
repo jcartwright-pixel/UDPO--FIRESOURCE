@@ -637,6 +637,12 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .issues-page .pill.yes { background: #e3f4e8; color: #1d6b37; }
 .issues-page .pill.no { background: #eef2f5; color: #6b7c8c; }
 .issues-page .pill.warn { background: #fdecc4; color: #8a5a00; }
+.issues-page .from-mail { font-weight: 800; white-space: nowrap; }
+.issues-page .link-btn { border: 0; background: none; padding: 0; color: var(--ud-blue); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.issues-page .mail-meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 10px; font-size: 16px; }
+.issues-page .mail-meta dt { font-weight: 800; color: var(--ud-blue-dark); }
+.issues-page .mail-meta dd { margin: 0; }
+.issues-page .mail-text { white-space: pre-wrap; font: inherit; font-size: 16px; background: #f5f8fb; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; max-height: 55vh; overflow: auto; margin: 0; }
 .issues-page .count { display: inline-grid; place-items: center; min-width: 28px; height: 28px; border-radius: 14px; background: #eef2f5; font-weight: 800; }
 .issues-page .count.repeat { background: #fde3df; color: #a8321f; }
 .issues-page .work { display: inline-flex; flex-wrap: nowrap; gap: 4px; justify-content: center; }
