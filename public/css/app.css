@@ -840,6 +840,8 @@ html { background: var(--page); }
 .fs-addtech input { flex: 1; min-width: 0; height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; }
 table.fs-facts th { text-align: left; width: 48%; color: var(--muted); font-weight: 700; }
 .fleet-page tr.clicky { cursor: pointer; }
+.fleet-page .head .tabs { flex: none; }
+.fleet-page .head .tabs button { white-space: nowrap; }
 .fleet-page tr.clicky:hover td { background: #eef5fb; }
 
 /* Over the Road */

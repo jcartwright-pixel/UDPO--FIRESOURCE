@@ -55,7 +55,7 @@
     const STATUS = { OVERDUE: ['Overdue', 'warn'], AT_GARAGE: ['At garage', 'yes'], DUE_SOON: ['Due soon', 'warn soon'], NO_MILES: ['No miles yet', 'no'], SET_UP: ['Needs start date', 'no'], OK: ['OK', 'yes'] };
     const READ_NAMES = { equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', workOrders: 'work orders', garageTechs: 'technician list' };
     const JOB = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
-    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], orders = [], techs = [], search = '', kindFilter = '', savedRules = null;
+    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], orders = [], techs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
     const rules = () => Object.assign({}, L.FLEET_RULES, savedRules || {});
     const num = (n) => n === '' || n == null ? '' : Number(n).toLocaleString();
     const when = (s) => { const k = L.localDay(s); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
@@ -140,7 +140,7 @@
           '</div><div><h2>What the Mechanics Did · This Week (Sun-Sat)</h2>' + table([12, 12, 22, 28, 14, 12], ['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours'],
           week.map(x => '<tr class="clicky" data-unit="' + escapeHtml(x.unit) + '"><td>' + when(x.completed_at) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td class="wrong">' + escapeHtml(fixedText(x)) +
             '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td></tr>').join(''), 'Nothing finished this week yet.') + '</div></div>';
-        foot.textContent = orders.length + ' work orders from the garage list.';
+        foot.textContent = orders.length + (orders.length === 1 ? ' work order' : ' work orders') + ' from the garage list.';
       } else if (view === 'history') {
         k.innerHTML = '';
         bar.innerHTML = '<input type="search" id="search" placeholder="Type a truck or trailer number" aria-label="Find" value="' + escapeHtml(search) + '"><div class="chips">' +
@@ -158,7 +158,7 @@
             escapeHtml(x.problem || '') + (x.fixed_note ? '<small>' + escapeHtml(x.fixed_note) + '</small>' : '') + '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' +
             (isOpen ? pill(JOB[String(x.status || 'NEW').toUpperCase()] || [x.status, 'no']) : escapeHtml(x.fixed || '') + (x.safe === 'YES' ? '<small>SAFE' + (x.signed_by ? ' · SIGNED ' + escapeHtml(x.signed_by) : '') + '</small>' : x.signed_by ? '<small>signed ' + escapeHtml(x.signed_by) + '</small>' : '')) + '</td></tr>'; }).join(''), 'Nothing in the garage history yet.');
         sheet.innerHTML = unit ? '<div class="fleet-split wide-left"><div>' + list + '</div><div>' + factsPanel(unit, due, t) + '</div></div>' : list;
-        foot.textContent = rows.length + ' jobs shown' + (unit ? ' for ' + unit.unit : '') + '.' + (unit ? '' : ' Type one unit\'s number to see its facts.');
+        foot.textContent = rows.length + (rows.length === 1 ? ' job shown' : ' jobs shown') + (unit ? ' for ' + unit.unit : '') + '.' + (unit ? '' : ' Type one unit\'s number to see its facts.');
       } else {
         k.innerHTML = '';
         const R = rules(), boss = canEdit();
