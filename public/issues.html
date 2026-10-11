@@ -61,7 +61,9 @@
     const FILTERS = [['all', 'All open'], ['review', 'Need review'], ['repeat', 'Repeat'], ['garage', 'At garage'], ['new', 'New · 7 days']];
     const params = new URLSearchParams(location.search);
     let kind = KINDS.some(k => k[0] === params.get('kind')) ? params.get('kind') : 'TRUCK', filter = FILTERS.some(f => f[0] === params.get('filter')) ? params.get('filter') : 'all';
-    let search = '', records = [], removeFor = null, openFor = null;
+    // ?q= (a Latest write-ups line on Fleet & Maintenance): the list opens searched for that unit, as in the current app.
+    let search = (params.get('q') || '').trim(), records = [], removeFor = null, openFor = null;
+    document.getElementById('search').value = search;
     const now = () => Date.now();
     const daysAgo = (ms) => ms ? Math.floor((now() - ms) / 86400000) : '';
     const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
