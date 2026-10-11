@@ -40,14 +40,18 @@ function recordsFor(run, runDocId, day, date, c, who, equipment, stamp) {
   const issues = [];
   const add = (kind, key, text, unit) => { if (!noWriteUp(text)) issues.push({ kind, key, text: String(text).trim().slice(0, 4000), unit }); };
   add('FORK_TRUCK', 'pallet', c.palletJackIssues, c.palletJack);
-  if (c.trailerNeedsCleaned === true || /^(y|yes|true)$/i.test(String(c.trailerNeedsCleaned || ''))) issues.push({ kind: 'WASH', key: 'cleaning', text: 'Trailer cleaning requested', unit: c.trailer });
+  // Drop and hook (Joe 10/11, as the current app's 7.0.259): up to 3 more trailers in c.moreTrailers ({trailer, issues, needsCleaned}),
+  // each with its own cleaning and write-up record (keys cleaning2, trailer2 ...) and "2nd trailer: " in front when there are several.
+  const more = Array.isArray(c.moreTrailers) ? c.moreTrailers : [], label = (i) => more.length ? ['1st', '2nd', '3rd', '4th'][i] + ' trailer: ' : '';
+  const trailers = [{ trailer: c.trailer, issues: c.trailerIssues, needsCleaned: c.trailerNeedsCleaned }].concat(more);
+  trailers.forEach((t, i) => { if (t.needsCleaned === true || /^(y|yes|true)$/i.test(String(t.needsCleaned || ''))) issues.push({ kind: 'WASH', key: 'cleaning' + (i ? i + 1 : ''), text: label(i) + 'Trailer cleaning requested', unit: t.trailer, first: !i }); });
   add('TRUCK', 'tractor', c.tractorIssues, c.truck);
-  add('TRAILER', 'trailer', c.trailerIssues, c.trailer);
+  trailers.forEach((t, i) => { if (!noWriteUp(t.issues)) issues.push({ kind: 'TRAILER', key: 'trailer' + (i ? i + 1 : ''), text: label(i) + String(t.issues).trim().slice(0, 4000), unit: t.trailer, first: !i }); });
   if (String(c.refusedReturned || '').trim()) issues.push({ kind: 'RETURN', key: 'refusedreturned', text: String(c.refusedReturnedSource || c.refusedReturned).trim() || 'Refused or returned product reported', unit: '', source: String(c.refusedReturnedSource || '').trim() });
   return issues.map(issue => {
     const unit = issue.kind === 'RETURN' ? { id: '', unit: '', resolved: true }
       : issue.kind === 'TRUCK' && c.truckId ? { id: c.truckId, unit: c.truck, resolved: true }
-      : (issue.kind === 'TRAILER' || issue.kind === 'WASH') && c.trailerId ? { id: c.trailerId, unit: c.trailer, resolved: true }
+      : (issue.kind === 'TRAILER' || issue.kind === 'WASH') && issue.first && c.trailerId ? { id: c.trailerId, unit: c.trailer, resolved: true }
       : resolveUnit(issue.unit, issue.kind, equipment);
     const review = !unit.resolved;
     const id = 'APP|' + runDocId + '|' + day + '|' + issue.key;

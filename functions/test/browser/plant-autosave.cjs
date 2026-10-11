@@ -108,9 +108,8 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     await leave(notes, '.sn-notes', 'Maintenance to check the drain');
     await nWatch.waitForFunction((n) => document.querySelectorAll('#history .sn-card').length === n + 1 && /Water on the floor[\s\S]*Maintenance to check the drain/.test(document.getElementById('history').textContent), cards, { timeout: 8000 });
     await notes.waitForSelector('#another:not([hidden])');
-    // Option A (Joe 10/10): no shift to pick; the shift comes from the time of the entry and is kept with it.
-    assert.equal(await notes.$('select.sn-shift'), null, 'Shift Notes has no shift picker');
-    assert.match(await notes.textContent('#shift-now'), /^(First|Second|Third) shift$/);
+    // Joe 10/11: the Shift drop-down starts on the shift now (from Plant Shifts) and is kept with the entry.
+    assert.match(await notes.inputValue('select.sn-shift'), /^(FIRST|SECOND|THIRD) SHIFT$/);
     assert.deepEqual(await notes.$$eval('#lines [data-kind]', b => b.map(x => x.dataset.kind)), ['Handoff', 'Breakdown', 'Incident', 'Safety', 'Quality', 'Other']);
     assert.match(await nWatch.textContent('#history'), /Cooler 2 floor · (FIRST|SECOND|THIRD) SHIFT/);
     await notes.click('#another');
@@ -124,7 +123,7 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     await leave(notes, open + ' [data-review]', 'Drain snaked, still slow');
     await nWatch.waitForFunction(() => /Drain snaked, still slow/.test(document.getElementById('history').textContent), null, { timeout: 8000 });
     await notes.waitForFunction(() => /1 monitor/.test(document.querySelector('#lines [data-kind="Breakdown"]').textContent), null, { timeout: 8000 });
-    results.push('Shift Notes: the entry went on the other screen\'s log at the first box with the shift from the clock (no shift picker); Start Another Entry empties the form; the breakdown sits under Still open, and its status and review note save as they are changed');
+    results.push('Shift Notes: the entry went on the other screen\'s log at the first box with the shift drop-down starting on the shift now; Start Another Entry empties the form; the breakdown sits under Still open, and its status and review note save as they are changed');
 
     /* ---------- Yard Checks (desktop) ---------- */
     // Trailer T-701, loaded today and never checked (the yard list follows the real clock).

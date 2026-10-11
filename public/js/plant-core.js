@@ -57,7 +57,7 @@ function rowFor(run, block, loadDate, prior) {
     route: run.route || '', run: run.run || '', routeId: run.routeId || '', runId: run.runId || '', area: runArea(run),
     loadDate, deliveryDate: block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
     driver: day.driver || '', truck: day.truck || '', trailer: day.trailer || '', dispatchTime: day.dispatchTime,
-    quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '',
+    quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '',
     startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day)
   };
 }
@@ -66,13 +66,15 @@ const byLoad = (a, b) => (Number(b.prior) - Number(a.prior)) || String(a.loadDat
   (Number(a.loadSequence == null ? 999999 : a.loadSequence) - Number(b.loadSequence == null ? 999999 : b.loadSequence)) ||
   String(a.route).localeCompare(String(b.route), undefined, { numeric: true });
 
-// Every load for the plant on `date` (all areas), plus yesterday's loads that are not done yet.
-export function loadoutRows(runs, date) {
-  const out = [], yesterday = L.addDays(date, -1);
+// Every load for the plant on `date` (all areas), plus yesterday's loads that are not done yet, unless the plant was started
+// fresh after yesterday (Administration > Start Plant Fresh From Today, udpoV780PlantLoadingRows_ UDPO_PLANT_START_DATE).
+export function loadoutRows(runs, date, plantStart) {
+  const out = [], yesterday = L.addDays(date, -1), start = plantStart === undefined ? (typeof window !== 'undefined' && window.UDPlantStart) || '' : plantStart;
+  const carry = !start || yesterday >= start;
   (runs || []).forEach(run => {
     if (!shownForPlant(run) || !runArea(run)) return;
     L.loadBlocksFor(run, date).forEach(b => out.push(rowFor(run, b, date, false)));
-    L.loadBlocksFor(run, yesterday).forEach(b => { const r = rowFor(run, b, yesterday, true); if (r.state !== 'DONE') out.push(r); });
+    if (carry) L.loadBlocksFor(run, yesterday).forEach(b => { const r = rowFor(run, b, yesterday, true); if (r.state !== 'DONE') out.push(r); });
   });
   return out.sort(byLoad);
 }
@@ -97,6 +99,23 @@ export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].index
 export function pickupsFor(row, pickups) {
   return (pickups || []).filter(p => (p.runDocId ? p.runDocId === row.runDocId && (!p.day || p.day === row.day) : String(p.runId) === String(row.runId)) &&
     (p.date === row.loadDate || p.date === row.deliveryDate));
+}
+
+// Pickups plus the open pickups that load notes ask for ("pickup", "P/U", "PU"): a load whose note asks for a pickup and that has
+// no pickup entered gets one listed, red like the others, until it is completed (board-rules.js notePickup, as the old app's
+// 019_V722 udpoV7268NotePickupRows_). rows = loadoutRows; pages that use it load js/board-rules.js.
+export function withNotePickups(rows, pickups) {
+  const B = typeof window !== 'undefined' && window.UDBoard;
+  if (!B) return pickups || [];
+  const out = (pickups || []).slice(), seen = {};
+  (rows || []).forEach(r => {
+    if (seen[r.id + '|' + r.loadDate]) return;
+    seen[r.id + '|' + r.loadDate] = true;
+    const note = B.notePickup({ id: r.runDocId, runId: r.runId, route: r.route, run: r.run, days: { [r.day]: { plantNotes: r.notes, updatedAt: r.updatedAt, updatedBy: r.updatedBy } } },
+      r.day, r.loadDate, pickupsFor(r, pickups));
+    if (note) out.push(Object.assign(note, { deliveryDate: r.deliveryDate }));
+  });
+  return out;
 }
 
 export function counts(rows) {
@@ -132,6 +151,16 @@ export function minutesTaken(row, now) {
 export function minutesText(m) {
   if (m === null || m === undefined) return '';
   return m < 120 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min';
+}
+
+// Polish item 5 (Joe 10/11): a load or unload still running after 12 hours shows when it started instead of a huge clock
+// ("Started Wed 5:13 AM · forgot End?"); otherwise the plain minutes text.
+export const LONG_RUN_MINUTES = 720;
+export function runningText(startedAt, m) {
+  if (m === null || m === undefined) return '';
+  if (m < LONG_RUN_MINUTES || !startedAt || !isFinite(Date.parse(startedAt))) return minutesText(m);
+  const when = new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(startedAt));
+  return 'Started ' + when.replace(',', '') + ' · forgot End?';
 }
 
 // "yyyy-mm-ddTHH:MM" in plant time from a stamp, for a time box; and back.
@@ -173,7 +202,7 @@ export function returnsFor(runs, date, journal) {
     if (String(d.type || '').toUpperCase() !== 'RETURN' || d.date !== date) return;
     const p = d.payload || {};
     out.push({ id: d.recordId, source: 'RETURN', route: txt(p.route || d.route), run: txt(p.run || d.run), trailer: txt(p.trailer || d.trailer), cases: txt(p.casesReturned || p.quantity || d.quantity),
-      refused: !!p.refusedReturned, detail: txt(p.notes || p.description || d.notes) || 'Returned product reported', recordedAt: d.recordedAt || '' });
+      refused: !!p.refusedReturned, detail: txt(p.notes || p.description || d.notes) || 'Returned product reported', recordedAt: d.recordedAt || '', added: p.enteredAt === 'PLANT_STATION' });
   });
   const prefix = L.dayPrefix(date), week = L.weekStart(date);
   (runs || []).forEach(run => {
@@ -271,5 +300,6 @@ export function unloadCounts(rows) {
 export function shortStamp(stamp) {
   const t = Date.parse(stamp || '');
   if (!isFinite(t)) return txt(stamp);
-  return new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(t));
+  const d = new Date(t), p = new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: '2-digit', month: 'numeric', day: 'numeric' }).formatToParts(d), g = (k) => (p.find(x => x.type === k) || {}).value;
+  return g('month') + '-' + g('day') + '-' + g('year') + ' ' + new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, hour: 'numeric', minute: '2-digit' }).format(d);
 }

@@ -13,7 +13,7 @@
   <script src="js/logic.js"></script>
   <script src="js/board-rules.js"></script>
 </head>
-<body class="fill ds-page">
+<body class="fill phone ds-page">
   <div class="signin" id="signin" hidden>
     <h1>Driver Station</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -22,7 +22,10 @@
   </div>
 
   <div id="screen" hidden>
+    <!-- Joe 10/10: the Driver Room kiosk opens full screen like the phone and tablet screens: a slim header, no desktop menu. -->
     <div class="topbar">
+      <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
+      <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
       <span class="who" id="who"></span>
       <button id="signout" type="button">Sign out</button>
     </div>
@@ -38,7 +41,7 @@
           <div class="ds-row ds-headrow"><span>ROUTE</span><span>RUN</span><span>DRIVER</span><span>TRAILER</span><span>CASES</span><span>LOAD STATUS</span><span>PICKUP</span></div>
           <div class="ds-scroll" id="board-scroll"><div id="board"></div></div>
         </section>
-        <aside class="ds-weather" id="weather" hidden><b>&#9728; LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p>Weather is not connected yet.</p></aside>
+        <aside class="ds-weather" id="weather" hidden><span class="sym" id="weather-sym" aria-hidden="true">&#9728;</span><b>LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p class="now" id="weather-now">Reading the weather…</p><p id="weather-today"></p><p class="next" id="weather-next"></p></aside>
         <section class="ds-week" aria-label="Driver weekly schedule">
           <div class="ds-week-title"><b>DRIVER WEEKLY SCHEDULE</b><span id="week-of"></span></div>
           <div class="ds-scroll" id="week-scroll"><table class="ds-week-table"><thead id="week-head"></thead><tbody id="week-rows"></tbody></table></div>
@@ -49,25 +52,31 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as W from './js/weather.js';
 
     // The current app's Driver Room board and TV (DriverLoadoutPickup.html, 052_V749). Read only. In the new app it opens with a
     // United Dairy sign-in (no branch code); "Driver Room TV" is the old DISPLAY mode: dark, no menu, notes shown, both lists roll.
     const L = window.UDLogic, B = window.UDBoard;
     const params = new URLSearchParams(location.search);
-    const tv = params.get('tv') === '1';
+    // Joe 10/10: the Driver Room board opens as the old Driver Room display: both lists roll and the weather window sits on the
+    // right. ?tv=1 is the TV itself (no header); ?view=desk is the plain list for the office.
+    const full = params.get('tv') === '1', tv = full || params.get('view') !== 'desk';
     document.body.classList.toggle('ds-tv', tv);
-    document.getElementById('tv').textContent = tv ? 'Leave TV mode' : 'Driver Room TV';
+    document.body.classList.toggle('ds-full', full);
+    document.getElementById('go-back').addEventListener('click', goBack);
+    document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
+    document.getElementById('tv').textContent = tv ? 'Desk view' : 'Driver Room display';
     document.getElementById('eyebrow').textContent = tv ? 'Driver Room Display' : 'Driver Loadout & Pickup';
     document.getElementById('weather').hidden = !tv;
-    let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = B.calendarDay(new Date()), updated = null;
+    let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = L.operatingDay(new Date()), updated = null;
 
     const overflows = (id) => { const el = document.getElementById(id); return el.scrollHeight > el.clientHeight + 2; };
-    const fmt = (k) => { const [y, m, d] = k.split('-'); return m + '/' + d + '/' + y; };
+    const fmt = (k) => shortDate(k);
     function render() {
-      date = B.calendarDay(new Date());
-      const rows = B.boardRows(runs, pickups, date), dayName = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(date))];
+      date = L.operatingDay(new Date());
+      const rows = B.loadoutBoardRows(runs, pickups, date), dayName = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(date))];
       document.getElementById('weekday').textContent = dayName.charAt(0) + dayName.slice(1).toLowerCase();
       if (tv) {
         const h = new Date().getHours(), w = document.getElementById('welcome');
@@ -109,9 +118,23 @@
     }
     roll('board-scroll', 45); roll('week-scroll', 50);
 
-    document.getElementById('tv').addEventListener('click', () => { location.search = tv ? '' : '?tv=1'; });
+    // The weather window: Open-Meteo (free, no key) every 15 minutes; the last reading stays if one read fails.
+    async function weather() {
+      const set = (id, t) => { document.getElementById(id).textContent = t; };
+      try {
+        const res = await fetch(W.forecastUrl(W.PLANTS.Uniontown));
+        const w = res.ok ? W.summary(await res.json()) : null;
+        if (!w) throw new Error('no forecast');
+        set('weather-sym', w.symbol); set('weather-now', w.now); set('weather-today', w.today); set('weather-next', w.tomorrow);
+      } catch (e) {
+        if (/Reading/.test(document.getElementById('weather-now').textContent)) set('weather-now', 'The weather is not available right now.');
+      }
+    }
+    if (tv) { weather(); setInterval(weather, 15 * 60000); }
+
+    document.getElementById('tv').addEventListener('click', () => { location.search = tv ? '?view=desk' : ''; });
     document.getElementById('refresh').addEventListener('click', () => { sig = ''; weekSig = ''; render(); });
-    window.udBack = () => { if (tv) { location.search = ''; return true; } return false; };
+    window.udBack = () => { if (full) { location.search = ''; return true; } return false; };
 
     requireSignIn(async () => {
       const { db } = await start();

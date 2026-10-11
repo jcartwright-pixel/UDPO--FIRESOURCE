@@ -47,7 +47,7 @@ async function noScroll(page) {
       const routes = await page.$$eval('#rows tr[data-id] td:first-child', tds => tds.map(td => td.textContent));
       assert.deepEqual(routes, ['801', '802'], 'Monday 10/5 loads Tuesday 801 then 802');
       const group = await page.textContent('#rows tr.group td');
-      assert.equal(group, 'TUESDAY DELIVERIES, 10/6/2026');
+      assert.equal(group, 'TUESDAY DELIVERIES, 10-6-26');
       const size = await noScroll(page);
       assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Daily fits ' + w + 'x' + h + ' with no scrolling: ' + JSON.stringify(size));
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'daily-' + w + '.png') });
@@ -88,22 +88,22 @@ async function noScroll(page) {
     // Editing on the screens: pick a trailer on Daily, the change shows at once and on the other open screen.
     const editor = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await editor.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
-    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    await editor.dblclick('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
     const t0 = Date.now();
-    await editor.selectOption('tr[data-id="2026-10-04__run_t802|tue"] select.picker', 'veh_trailer_t_901');
+    await editor.click('.cell-pop [data-i]:has-text("T-901")');
     await editor.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[6].textContent === 'T-901');
     const shownMs = Date.now() - t0;
     await watcher.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[6].textContent === 'T-901', null, { timeout: 5000 });
     const seenMs = Date.now() - t0;
     // Joe 10/10: a trailer on the road on another run at the same time (T-902 on 801) is left out of the list unless OVR is ticked;
     // with OVR it is offered and says why.
-    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
-    const labels = await editor.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    const labels = await editor.$$eval('.cell-pop [data-i]', os => os.map(o => o.textContent));
     assert.ok(!labels.some(t => /T-902/.test(t)), 'T-902 (on the road on 801) is left out: ' + labels.join(' | '));
     await editor.keyboard.press('Escape');
     await editor.check('tr[data-id="2026-10-04__run_t802|tue"] input[data-ovr]');
-    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
-    const ovrLabels = await editor.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    const ovrLabels = await editor.$$eval('.cell-pop [data-i]', os => os.map(o => o.textContent));
     assert.ok(ovrLabels.some(t => /T-902\s+\[ON ROAD.*\(801\)\]/.test(t)), 'with OVR, T-902 is offered as on the road on 801: ' + ovrLabels.join(' | '));
     await editor.keyboard.press('Escape');
     await editor.uncheck('tr[data-id="2026-10-04__run_t802|tue"] input[data-ovr]');
@@ -162,13 +162,13 @@ async function noScroll(page) {
       return null;
     });
     assert.ok(downDoc && downDoc.notes === 'DOWN: Brakes', 'Down saved to Equipment Master copy: ' + JSON.stringify(downDoc));
-    await editor.click(r802 + ' td[data-edit="truck"]');
-    let trucks = await editor.$$eval(r802 + ' select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick(r802 + ' td[data-edit="truck"]');
+    let trucks = await editor.$$eval('.cell-pop [data-i]', os => os.map(o => o.textContent));
     assert.ok(!trucks.some(t => /900001/.test(t)), 'a down truck is not offered: ' + trucks.join(' | '));
     await editor.keyboard.press('Escape');
     await editor.check(r802 + ' input[data-ovr]');
-    await editor.click(r802 + ' td[data-edit="truck"]');
-    trucks = await editor.$$eval(r802 + ' select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick(r802 + ' td[data-edit="truck"]');
+    trucks = await editor.$$eval('.cell-pop [data-i]', os => os.map(o => o.textContent));
     assert.ok(trucks.some(t => /900001\s+\[DOWN\]/.test(t)), 'with OVR the down truck is offered and marked: ' + trucks.join(' | '));
     await editor.keyboard.press('Escape');
     await editor.uncheck(r802 + ' input[data-ovr]');
@@ -185,8 +185,8 @@ async function noScroll(page) {
     await editor.fill('#off-end', '2026-10-06');
     await editor.click('#off-save');
     await editor.waitForTimeout(300);
-    await editor.click(r802 + ' td[data-edit="driver"]');
-    const drivers = await editor.$$eval(r802 + ' select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick(r802 + ' td[data-edit="driver"]');
+    const drivers = await editor.$$eval('.cell-pop [data-i]:not(.off)', os => os.map(o => o.textContent));
     assert.ok(!drivers.some(t => /CASEY/.test(t)), 'a called-off driver is not offered: ' + drivers.join(' | '));
     await editor.keyboard.press('Escape');
     const callOff = await editor.evaluate(async () => {
@@ -235,11 +235,13 @@ async function noScroll(page) {
     await wkEdit.waitForSelector('.popover', { state: 'detached' });
     await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6]; return /ADAMS/.test(td.textContent) && td.classList.contains('plant-load') && !td.classList.contains('c-plant'); }, null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-plant-load-1920.png') });
-    await wkEdit.click('#run-days');
-    await wkEdit.click('xpath=//tbody[@id="days-rows"]/tr[td[1]/b[text()="802"]]/td[2+5]/button');
-    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 5000 });
+    // Route Run Days opens Route Week Override at this week (as in the current app); 802 Thursday turned on there needs a driver here.
+    await Promise.all([wkEdit.waitForURL(/routeweek\.html\?week=2026-10-04/), wkEdit.click('#run-days')]);
+    await wkEdit.click('xpath=//tbody[@id="rows"]/tr[td[1][text()="802"]]/td[2+5]/button');
+    await wkEdit.waitForFunction(() => /RUNS/.test([...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[6].textContent) && !/NOT/.test([...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[6].textContent), null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-run-days-1920.png') });
-    await wkEdit.click('#days-modal [data-close]');
+    await wkEdit.goBack();
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 8000 });
     // Joe 10/10: no tab buttons; the menu's Driver Assignment Board opens Weekly at the board (the test sign-in rides on the address).
     assert.equal(await wkEdit.$('#tab-board'), null, 'no tab buttons');
     await wkEdit.$eval('.side-flyouts a[href="weekly.html#board"]', a => { a.href = 'weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com#board'; a.click(); });
@@ -282,8 +284,8 @@ async function noScroll(page) {
     // Vacation Schedule: Time Off, Calendar and Eligibility each fit one page; a manager adds and edits time off; the holiday limit holds.
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       const vac = await openPage(browser, w, h, '/vacations.html?testEmail=manager.test@uniteddairy.com');
-      await vac.waitForSelector('#filters button[data-filter="all"]');
-      await vac.click('#filters button[data-filter="all"]');
+      await vac.waitForSelector('#filters option[value="all"]', { state: 'attached' });
+      await vac.selectOption('#filters', 'all');
       await vac.waitForSelector('#rows tr[data-id="vac_test_1"]');
       for (const v of ['time', 'calendar', 'eligibility']) {
         await vac.click('.tabs [data-view="' + v + '"]');
@@ -295,10 +297,10 @@ async function noScroll(page) {
       await vac.close();
     }
     const vac = await openPage(browser, 1920, 950, '/vacations.html?testEmail=manager.test@uniteddairy.com');
-    await vac.waitForSelector('#filters button[data-filter="all"]');
-    await vac.click('#filters button[data-filter="all"]');
+    await vac.waitForSelector('#filters option[value="all"]', { state: 'attached' });
+    await vac.selectOption('#filters', 'all');
     await vac.waitForSelector('#rows tr[data-id="vac_test_1"]');
-    assert.match(await vac.textContent('#rows tr[data-id="vac_test_1"]'), /ADAMS, PAT.*Vacation Day.*10\/12\/2026.*10\/16\/2026.*5.*APPROVED/);
+    assert.match(await vac.textContent('#rows tr[data-id="vac_test_1"]'), /ADAMS, PAT.*Vacation Day.*10-12-26.*10-16-26.*5.*APPROVED/);
     await vac.click('#add');
     await vac.selectOption('#form select[name="driverId"]', 'drv_test_brook');
     await vac.fill('#form input[name="startDate"]', '2026-11-23');
@@ -306,7 +308,7 @@ async function noScroll(page) {
     await vac.selectOption('#form select[name="type"]', 'PERSONAL');
     await vac.fill('#form input[name="notes"]', 'Family');
     await vac.click('#save');
-    await vac.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => /BROOK, SAM.*Personal Day.*11\/23\/2026.*11\/24\/2026.*2.*APPROVED.*Family/.test(tr.textContent) && !/^new-/.test(tr.dataset.id)), null, { timeout: 5000 });
+    await vac.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => /BROOK, SAM.*Personal Day.*11-23-26.*11-24-26.*2.*APPROVED.*Family/.test(tr.textContent) && !/^new-/.test(tr.dataset.id)), null, { timeout: 5000 });
     // Thanksgiving week allows 2 off: ADAMS makes 2, CASEY on the same day is refused and taken back off the screen.
     await vac.click('.tabs [data-view="calendar"]');
     await vac.fill('#cal-month', '2026-11');
@@ -329,7 +331,7 @@ async function noScroll(page) {
     await vac.click('#save');
     await vac.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => /BROOK, SAM.*CANCELLED/.test(tr.textContent)), null, { timeout: 5000 });
     const dispatcherVac = await openPage(browser, 1366, 650, '/vacations.html?testEmail=dispatch.test@uniteddairy.com');
-    await dispatcherVac.waitForSelector('#filters button');
+    await dispatcherVac.waitForSelector('#filters option', { state: 'attached' });
     await dispatcherVac.waitForTimeout(300);
     assert.equal(await dispatcherVac.isDisabled('#add'), true, 'a dispatcher sees the schedule read only, as on the current screen');
     await Promise.all([vac.close(), dispatcherVac.close()]);
@@ -593,9 +595,11 @@ async function noScroll(page) {
     // With the write-back on: the badge says saves go to the sandbox sheet, and the conflict list is one click away.
     await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
     const batch = db().batch();
-    for (let i = 0; i < 40; i++) {
+    // 40 different cells, plus the newest one refused 4 more times: the repeats are one line with one Checked button.
+    for (let i = 0; i < 44; i++) {
+      const route = String(802 + (i < 40 ? i : 39));
       batch.set(db().collection('conflicts').doc('test-conflict-' + String(i).padStart(2, '0')), { open: true, at: new Date(Date.parse('2026-10-09T12:00:00Z') + i * 60000).toISOString(),
-        by: 'dispatch.test@uniteddairy.com', tab: 'LIVE CURRENT WEEK', route: '802', run: 'TEST 802', column: 'tue_trailer', sheetValue: 'T-902', newValue: 'T-901',
+        by: 'dispatch.test@uniteddairy.com', tab: 'LIVE CURRENT WEEK', route, run: 'TEST ' + route, column: 'tue_trailer', sheetValue: 'T-902', newValue: 'T-901',
         problem: 'changed in the sheet since the app last saw it; the sheet value was kept' });
     }
     await batch.commit();
@@ -609,18 +613,24 @@ async function noScroll(page) {
       const size = await noScroll(page);
       assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Sheet Conflicts with 40 lines fits ' + w + 'x' + h + ': ' + JSON.stringify(size));
       assert.equal(await page.textContent('#rows tr:first-child td:nth-child(4)'), 'Tue trailer');
+      assert.equal(await page.textContent('#rows tr:first-child button.check'), 'Checked (5)', 'the cell refused 5 times is one line');
+      assert.match(await page.textContent('#rows tr:first-child td:first-child'), /5 times since/);
+      assert.match(await page.textContent('#count'), /^44 open on 40 lines/);
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'conflicts-' + w + '.png') });
       assert.deepEqual(page.errors, []);
       await page.close();
     }
     const checker = await openPage(browser, 1366, 650, '/conflicts.html?testEmail=dispatch.test@uniteddairy.com');
     await checker.waitForSelector('#rows button.check');
-    const firstId = await checker.getAttribute('#rows button.check', 'data-id');
+    const firstIds = (await checker.getAttribute('#rows button.check', 'data-ids')).split(' ');
+    assert.equal(firstIds.length, 5);
     await checker.click('#rows button.check');
-    for (let i = 0; i < 50 && (await db().collection('conflicts').doc(firstId).get()).data().open !== false; i++) await checker.waitForTimeout(100);
-    assert.equal((await db().collection('conflicts').doc(firstId).get()).data().open, false, 'Checked is saved');
+    const allChecked = async () => (await Promise.all(firstIds.map(id => db().collection('conflicts').doc(id).get()))).every(d => d.data().open === false);
+    for (let i = 0; i < 80 && !(await allChecked()); i++) await checker.waitForTimeout(100);
+    assert.ok(await allChecked(), 'one Checked saves every repeat of that cell');
+    await checker.waitForFunction(() => document.querySelectorAll('#rows button.check').length === 39);
     await checker.close();
-    results.push('Sheet Conflicts: 40 open lines fit on one page at both sizes; Checked takes a line off the list and saves it');
+    results.push('Sheet Conflicts: 40 open lines fit on one page at both sizes; a cell refused 5 times is one line, and its one Checked saves all 5');
 
     // Back: closes what is open first (an opened driver), then a main screen goes Home. Home has no Back.
     const backPage = await openPage(browser, 1366, 768, '/drivers.html?testEmail=manager.test@uniteddairy.com');
@@ -674,7 +684,7 @@ async function noScroll(page) {
     assert.deepEqual(fs2.errors, []);
     await fs2.close();
     results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
-    // Joe 10/10: every screen, plant screens included, shows Back and Home together at the top of the menu.
+    // Joe 10/10: every screen, plant screens included, shows Back and Home together; Joe 10/10 evening: in the header, not the menu.
     const fsMod = require('fs'), pathMod = require('path');
     const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html');
     const bh = await openPage(browser, 1366, 768, '/index.html?testEmail=manager.test@uniteddairy.com');
@@ -683,11 +693,11 @@ async function noScroll(page) {
       await bh.goto(bh.url().replace(/\/[a-z-]+\.html.*/, '/' + pg + '?testEmail=manager.test@uniteddairy.com'));
       await bh.waitForSelector('#go-home', { timeout: 8000 }).catch(() => {});
       const seen = await bh.evaluate(() => ['go-back', 'go-home'].filter(id => { const e = document.getElementById(id); return e && e.getBoundingClientRect().width > 0; }));
-      const want = pg === 'index.html' ? ['go-home'] : ['go-back', 'go-home'];
+      const want = pg === 'index.html' || pg === 'company.html' ? ['go-home'] : ['go-back', 'go-home'];
       if (want.some(id => seen.indexOf(id) < 0)) missing.push(pg + ': ' + seen.join(','));
     }
     assert.deepEqual(missing, [], 'every screen has Back and Home');
-    results.push('Back and Home: all ' + pages.length + ' screens show both at the top of the menu (Home shows Home)');
+    results.push('Back and Home: all ' + pages.length + ' screens show both in the header (Home and the all-plants overview show Home)');
     // Joe 10/10: "move the action buttons all in a line up above": on every screen the action buttons sit in one row in the top
     // line, all the same size, above the tables; no action row is left down in the screen.
     const topBad = [];
@@ -704,7 +714,7 @@ async function noScroll(page) {
         return { stray: stray.map(a => a.textContent.trim().slice(0, 40)), tiles: tiles.map(t => [Math.round(t.top), Math.round(t.width), Math.round(t.height)]), headBottom: Math.round(hb.bottom), tableTop: table ? Math.round(table.getBoundingClientRect().top) : null };
       });
       if (r.stray.length) topBad.push(pg + ': action row left in the screen: ' + r.stray.join(' / '));
-      if (r.tiles.some(t => Math.abs(t[0] - r.tiles[0][0]) > 4 || t[1] !== r.tiles[0][1] || t[2] !== r.tiles[0][2])) topBad.push(pg + ': buttons not one even row: ' + JSON.stringify(r.tiles));
+      if (r.tiles.some(t => Math.abs(t[0] - r.tiles[0][0]) > 4 || t[2] !== r.tiles[0][2])) topBad.push(pg + ': buttons not one even row: ' + JSON.stringify(r.tiles));
       if (r.tableTop !== null && r.tableTop < r.headBottom - 8) topBad.push(pg + ': a table above the buttons');
     }
     assert.deepEqual(topBad, [], 'action buttons in one even row at the top');
@@ -722,10 +732,10 @@ async function noScroll(page) {
     assert.deepEqual(fsB.errors, []);
     await fsB.close();
     results.push('Fleet Service (mock-up A): one row per unit, PM / Reefer, DOT, Plates, Miles / hours now and Status, units that need something first');
-    // Over the Road: a manager ticks route 801 for Jersey in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
+    // Over the Road: a manager marks route 801 Carrier Pickup and ticks it in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
     const otr = await openPage(browser, 1920, 950, '/otr.html?view=routes&testEmail=manager.test@uniteddairy.com');
-    await otr.waitForSelector('[data-dest="run_t801"]');
-    await otr.selectOption('[data-dest="run_t801"]', 'Jersey');
+    await otr.waitForSelector('[data-by="run_t801"]');
+    await otr.selectOption('[data-by="run_t801"]', 'Carrier Pickup');
     await otr.waitForFunction(() => !document.querySelector('[data-inc="run_t801"]').disabled);
     await otr.check('[data-inc="run_t801"]');
     await otr.waitForSelector('tr.otr-on [data-inc="run_t801"]');
@@ -743,14 +753,15 @@ async function noScroll(page) {
       return null;
     });
     assert.ok(otrSaved, 'the tick and both figures saved');
-    assert.equal(otrSaved[0].destination, 'Jersey');
+    assert.equal(otrSaved[0].deliveredBy, 'Carrier Pickup');
+    assert.ok(otrSaved[0].destination, 'the run is the destination');
     await otr.click('.tabs [data-view="dash"]');
     await otr.waitForSelector('.otr-week');
     await otr.click('.tabs [data-view="report"]');
     await otr.waitForSelector('#otr-report table');
     assert.deepEqual(otr.errors, []);
     await otr.close();
-    results.push('Over the Road: a manager ticked 801 for Jersey and typed September figures (cost per gallon $0.400); Dashboard and Report open');
+    results.push('Over the Road: a manager ticked 801 (Carrier Pickup) and typed September figures (cost per gallon $0.400); Dashboard and Report open');
     // Driver Scorecard: the month board, a driver's misses, the year and Settings open with no errors; a manager changes a point value.
     const sc = await openPage(browser, 1920, 950, '/scorecard.html?testEmail=manager.test@uniteddairy.com');
     await sc.waitForSelector('.sc-board');
@@ -792,7 +803,7 @@ async function noScroll(page) {
     const ops = await openPage(browser, 1920, 950, '/admin.html?testEmail=manager.test@uniteddairy.com');
     await ops.waitForSelector('.admin-card');
     assert.deepEqual(await ops.$$eval('.admin-card', a => a.filter(x => !/^[a-z]+\.html/.test(x.getAttribute('href')) || x.textContent.includes('current app')).map(x => x.textContent)), [], 'no card leaves the new app');
-    for (const [name, page, sel] of [['Print Layouts', 'print', '#grid .admin-card'], ['Dispatch Settings', 'settings', '#owners tr'], ['Operational Assignments', 'ops', '#rows tr[data-name]']]) {
+    for (const [name, page, sel] of [['Print Layouts', 'print', '#sheets .pl-item'], ['Dispatch Settings', 'settings', '#owners tr'], ['Operational Assignments', 'ops', '#rows tr[data-name]']]) {
       await ops.goto(ops.url().replace(/\/[a-z]+\.html.*/, '/admin.html?testEmail=manager.test@uniteddairy.com'));
       await ops.waitForSelector('.admin-card');
       await Promise.all([ops.waitForURL(new RegExp('/' + page + '\\.html')), ops.click('.admin-card:has-text("' + name + '")')]);
@@ -810,8 +821,8 @@ async function noScroll(page) {
     assert.deepEqual(ops.errors, []);
     const cvgDaily = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await cvgDaily.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="driver"]');
-    await cvgDaily.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="driver"]');
-    const cvg = await cvgDaily.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker optgroup[label="Other CVG / Carriers"] option', o => o.map(x => x.textContent));
+    await cvgDaily.dblclick('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="driver"]');
+    const cvg = await cvgDaily.$$eval('.cell-pop h6 ~ [data-i]', o => o.filter(x => /^OTHER CVG/.test([...x.parentNode.querySelectorAll('h6')].filter(h => h.compareDocumentPosition(x) & 4).pop().textContent)).map(x => x.textContent));
     assert.deepEqual(cvg, ['Carrier', 'Fairmont', 'Martins Ferry', 'Beckley'], 'active assignments are driver choices: ' + cvg.join(', '));
     await cvgDaily.keyboard.press('Escape');
     assert.deepEqual(cvgDaily.errors, []);
@@ -837,8 +848,9 @@ async function noScroll(page) {
     assert.deepEqual(hop.errors, []);
     await hop.close();
     results.push('Daily and Weekly: a tile on each opens the other for the same week in this window; Weekly has no Assigned key; Menu > Driver Assignment Board opens Weekly at the board');
-    // Joe 10/10: a menu fly-out draws above the screen (tables, cards, pop-ups), with the menu open and folded, on Daily and Equipment.
-    for (const url of ['/daily.html?date=2026-10-05', '/equipment.html?x=1']) {
+    // Joe 10/10: a menu fly-out draws above the screen (tables, cards, pop-ups), with the menu open and folded, on Daily and Manager Center
+    // (Fleet & Maintenance lists its screens straight in the menu since 10/10 evening, so Equipment has no fly-out).
+    for (const url of ['/daily.html?date=2026-10-05', '/manager.html?x=1']) {
       for (const folded of [false, true]) {
         const fly = await openPage(browser, 1920, 950, url + '&testEmail=dispatch.test@uniteddairy.com');
         await fly.waitForSelector('.sidemenu .side-sec');
@@ -861,7 +873,7 @@ async function noScroll(page) {
         await fly.close();
       }
     }
-    results.push('Menu fly-outs draw above the screen on Daily Dispatch and Equipment, with the menu open and folded');
+    results.push('Menu fly-outs draw above the screen on Daily Dispatch and Manager Center, with the menu open and folded');
     // Joe 10/10: the menu is a slim icon strip until the mouse is over it; then it opens over the screen (nothing moves), a
     // section's screens open beside it, and leaving folds it again. The menu button pins it open; a tablet tap opens it first.
     const rail = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
@@ -955,7 +967,7 @@ async function noScroll(page) {
     await db().collection('config').doc('fleetSync').set({ ok: true, at: '2026-10-11T06:00:00.000Z', by: 'nightly', added: ['T-950'], inactive: ['900002'], back: [], changed: [] });
     const eqm = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
     await eqm.waitForSelector('#fleet-sync:not([hidden])');
-    await eqm.waitForFunction(() => /synced Oct 11, 2:00/.test(document.getElementById('fleet-synced').textContent));
+    await eqm.waitForFunction(() => /synced 10-11-26 2:00/.test(document.getElementById('fleet-synced').textContent));
     assert.match(await eqm.textContent('#fleet-synced'), /1 added, 1 off the list/);
     await eqm.click('#fleet-sync');
     // The test project names no sandbox Equipment Master copy, so the server says so on the line (no pop-up).
@@ -983,7 +995,7 @@ async function noScroll(page) {
       const tiles = await one.$$eval('.actions.tiles > button, .actions.tiles > a.button', b => b.map(x => { const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), fits: x.scrollWidth <= x.clientWidth }; }));
       assert.equal(tiles.length, 4);
       assert.equal(await one.$('#to-template'), null, 'Joe 10/10: Driver Weekly Template is on the Drivers menu, not the Route Editor');
-      assert.ok(tiles.every(t => t.w <= 116 && t.h >= 56 && t.fits && t.top === tiles[0].top), 'square tiles in one row at ' + w + ': ' + JSON.stringify(tiles));
+      assert.ok(tiles.every(t => t.h === 42 && t.fits && t.top === tiles[0].top), 'one-line tiles in one row at ' + w + ': ' + JSON.stringify(tiles));
       assert.deepEqual(one.errors, []);
       await one.close();
     }
@@ -1026,9 +1038,11 @@ async function noScroll(page) {
     await Promise.all([lp.waitForURL(/manager\.html/), lp.click('#go-back')]);
     await Promise.all([lp.waitForURL(/index\.html/), lp.click('#go-home')]);
     await Promise.all([lp.waitForURL(/maint\.html/), lp.click('.launch-card[data-side="fleet"]')]);
-    await lp.waitForSelector('.sidemenu .side-sec');
-    assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)), ['Equipment', 'GPS / Fleet'], 'the Fleet & Maintenance side lists only its own sections');
-    // Joe 10/10: Over the Road and Trucks Today are manager reports, only under Route Distribution's Reports; opened
+    await lp.waitForSelector('.sidemenu a[href="fleet.html"]');
+    // Joe 10/10 evening: GPS / Fleet is not on the Fleet & Maintenance side; its one section (Equipment) lists its screens straight in the menu.
+    assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)), [], 'the Fleet & Maintenance side lists only its own screens');
+    assert.equal(await lp.$$eval('.sidemenu a[href="gps.html"], .sidemenu a[href="scorecard.html"]', a => a.length), 0, 'no GPS screens on the Fleet & Maintenance side');
+    // Joe 10/10: Over the Road and Trucks Today are manager reports, only under Route Distribution's Manager Reports; opened
     // after Fleet & Maintenance, Over the Road shows the Route Distribution side.
     await lp.goto(lp.url().replace(/maint\.html.*/, 'otr.html?testEmail=manager.test@uniteddairy.com'));
     await lp.waitForSelector('.sidemenu a.side-name');
@@ -1044,14 +1058,16 @@ async function noScroll(page) {
     assert.deepEqual(sec('Administration'), ['Dispatch Administration', 'Operational Assignments', 'Print Layouts', 'Dispatch Settings']);
     assert.equal(sec('Dispatch').indexOf('Dispatch Administration'), -1, 'not under Dispatch');
     assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template (assign routes)') >= 0).map(m => m[0]), ['Drivers']);
-    assert.deepEqual(sec('Drivers'), ['Drivers', 'Driver Weekly Template (assign routes)', 'Driver Assignment Board', 'Vacation Schedule'], 'Joe 10/10: route assignment has a link under Drivers');
+    assert.deepEqual(sec('Drivers'), ['Driver Roster', 'Driver Weekly Template (assign routes)', 'Driver Assignment Board', 'Vacation Schedule'], 'Joe 10/10: route assignment has a link under Drivers');
     assert.ok(sec('Dispatch').indexOf('Driver Assignment Board') >= 0, 'the board stays under Dispatch too');
-    assert.deepEqual(menu.map(m => m[0]), ['Dispatch', 'Drivers', 'Reports', 'Overall', 'Administration'], 'the Route Distribution side lists only its own sections');
-    assert.deepEqual(sec('Reports'), ['Driver Scorecard', 'Over the Road', 'Trucks Today'], 'Joe 10/10: the manager reports');
+    assert.deepEqual(menu.map(m => m[0]), ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'], 'the Route Distribution side lists only its own sections');
+    assert.deepEqual(sec('Manager Reports'), ['Driver Scorecard', 'Over the Road', 'Trucks Today', 'GPS Setup'], 'Joe 10/10: the manager reports, GPS included');
     await mp.close();
     const mq = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
-    await mq.waitForSelector('.side-flyouts .flyout', { state: 'attached' });
-    assert.equal(await mq.$eval('.side-flyouts .flyout a', a => a.textContent.trim()), 'Fleet & Maintenance', 'the maintenance side starts on the hub');
+    // Joe 10/10 evening: Fleet & Maintenance lists its screens straight in the menu (no fly-out); the side's name opens the hub.
+    await mq.waitForSelector('.sidemenu a.side-name', { state: 'attached' });
+    assert.equal(await mq.$eval('.sidemenu a.side-name', a => a.textContent.trim()), 'Fleet & Maintenance', 'the maintenance side starts on the hub');
+    assert.equal(await mq.getAttribute('.sidemenu a.side-name', 'href'), 'maint.html');
     await mq.close();
     // Joe 10/10 (old hub picture): Fleet & Maintenance shows the six counts, four cards with the icon library pictures and the
     // latest write-ups; a card opens its list in this window, with the old columns and Lessor | Garage on trucks.

@@ -17,6 +17,9 @@
  *   mailPlantReport       emails a plant report straight after Send Current Report saves it (reportmail.js; MAIL_FROM)
  *   mocreoEvery5Minutes   reads the MOCREO cooler sensors (read only) once a key is saved in Administration and tested
  *   mocreo                Administration > MOCREO & Sensors: save or replace the key (never shown again), test it, thermometer locations
+ *   admin                 Administration's own pages (src/admin.js): people, role templates, links and codes, email, repairs, tools
+ *   stationRelease        the Plant Station tablet's Change Station: the plant's manager release code, when one is set
+ *   adminJobsEvery5Minutes  repair emails to lessors, the driver check-in mailbox and the weekly archive, each at its Refresh Rate
  */
 'use strict';
 
@@ -40,6 +43,9 @@ const { safeIdPart } = require('./src/model');
 const { runFleetSync } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
 const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
+const ADMIN = require('./src/admin');
+const { adminCall, stationRelease, AdminError } = ADMIN;
+const TOOLS = require('./src/admintools');
 const L = require('./src/logic');
 
 admin.initializeApp();
@@ -74,7 +80,18 @@ function transferSetup() {
 exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone: 'America/New_York', timeoutSeconds: 120 }, async () => {
   const setup = transferSetup();
   if (!setup) return;
+  // Administration > Refresh Rates: every minute unless an administrator chose a slower rate.
+  if (!(await TOOLS.jobDue(db, 'transfer'))) return;
   await runTransfer({ db, reader: setup.reader, sources: setup.sources });
+  // Nobody pressed Publish and the calendar reached the Next week: publish it, as the current app's scheduled refresh does.
+  try { await require('./src/weekroll').autoPublish(db); } catch (e) { console.error('Automatic Publish failed: ' + (e && e.message || e)); }
+});
+
+// Sandbox only: Joe's Over the Road history (OTR Trips 2026 + the August accounting package), filled in once (src/otr-seed.js).
+exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
+  const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
+  if (project !== 'ud-distribution-sandbox') return;
+  await require('./src/otr-seed').seedOtrOnce(db);
 });
 
 exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
@@ -89,7 +106,7 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
 });
 
-const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
@@ -133,10 +150,48 @@ exports.mocreo = onCall({ timeoutSeconds: 60 }, async (request) => {
   try { return await mocreoCall(db, user, request.data); } catch (error) { throw asHttps(error); }
 });
 
+// Administration (src/admin.js): Administrators only, checked inside.
+// The sandbox sheet copies the Administration tools may read (Date Inventory) and change (Archive now, Date Convert, both
+// refused on a production sheet by writeback.js), and a copy from the sheets on request (Refresh Home Summary Now).
+function adminDeps() {
+  const setup = transferSetup(), live = process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1' ? JSON.parse(process.env.WRITEBACK_JSON).spreadsheetId : '';
+  return {
+    env: process.env,
+    sources: setup && process.env.DEMO_DATA !== '1' ? setup.sources : null,
+    sheets: setup && process.env.DEMO_DATA !== '1' ? () => makeSheetsWriter() : null,
+    liveId: live,
+    runTransfer: setup ? () => runTransfer({ db, reader: setup.reader, sources: setup.sources }) : null
+  };
+}
+
+exports.admin = onCall({ timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
+  const user = signedIn(request);
+  try { return await adminCall(db, user, request.data, adminDeps()); } catch (error) { throw asHttps(error); }
+});
+
+// Repair emails (Immediately / Once a day), the driver check-in mailbox and the weekly archive, each only when its
+// Refresh Rate says it is due. Each does nothing until an administrator switches it on.
+exports.adminJobsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
+  const run = async (key, fn) => { try { if (await TOOLS.jobDue(db, key)) await fn(); } catch (e) { console.error(key, e); } };
+  await run('repairEmail', () => TOOLS.repairSweep(db, {}));
+  await run('checkinMail', () => TOOLS.checkinRun(db, {}));
+  const d = adminDeps();
+  if (d.sheets && d.liveId) await run('archive', () => TOOLS.archiveCompleted(db, 'SCHEDULE', { sheets: d.sheets(), liveId: d.liveId }));
+});
+
+exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
+  const user = signedIn(request);
+  try { return await stationRelease(db, user, request.data || {}); } catch (error) { throw asHttps(error); }
+});
+
 exports.save = onCall(async (request) => {
   const user = signedIn(request);
   try {
-    return await applyAction(db, user, request.data);
+    // Local test database only: a browser test can set the server's clock (?testNow) to its made-up day.
+    const testNow = process.env.FUNCTIONS_EMULATOR === 'true' && request.data && request.data.testNow ? new Date(request.data.testNow) : null;
+    const result = await applyAction(db, user, request.data, testNow && !isNaN(testNow) ? () => testNow : undefined);
+    // A manager's Lessor button: the repair email goes out after the save (Administration > Repair Email).
+    return await TOOLS.afterSave(db, user, request.data, result);
   } catch (error) {
     if (error instanceof SaveError) throw new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined);
     throw error;
@@ -147,8 +202,15 @@ exports.save = onCall(async (request) => {
 // workbook ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
 async function writeBackIfOn(part) {
   const config = (await db.collection('config').doc('app').get()).data() || {};
-  if (!config.writeBack || config.writeBack.enabled !== true || !process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
+  if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
   const target = JSON.parse(process.env.WRITEBACK_JSON);
+  // With the switch off, only People & Roles saves go out, and only to the sandbox's Users sheet copy (admin.js usersCopy).
+  if (!config.writeBack || config.writeBack.enabled !== true) {
+    if (part === 'live' || !ADMIN.usersCopy(process.env)) return null;
+    const users = target.masters.users, source = transferSources(process.env).masters.users;
+    if (!source || source.spreadsheetId !== users.spreadsheetId || source.tab !== users.tab) throw new Error('Write-back stopped: WRITEBACK_JSON.masters.users and SOURCES_JSON must name the same sandbox copy');
+    return { live: null, master: await runMasterWriteBack({ db, sheets: makeSheetsWriter(), targets: { users }, only: true }) };
+  }
   // The conflict check compares with what the copy last read, so the write-back must write the workbook the copy reads.
   if (target.spreadsheetId !== transferSources(process.env).live.spreadsheetId) {
     throw new Error('Write-back stopped: WRITEBACK_JSON and SOURCES_JSON must name the same sandbox Live workbook');
@@ -204,6 +266,7 @@ exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'Americ
 
 // MOCREO sensors (src/mocreo.js): the key is read each run, so the sync starts by itself once a key is saved and tested.
 exports.mocreoEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  if (!(await TOOLS.jobDue(db, 'mocreo'))) return;
   const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
   // The key saved in Administration > MOCREO & Sensors; else the Secret Manager secrets.
   const getSecrets = () => appSecrets(db, async () => {

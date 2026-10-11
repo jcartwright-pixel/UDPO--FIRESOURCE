@@ -61,7 +61,7 @@ async function shots(page, name, w) {
       // Week: the customers list and Sunday to Saturday.
       await page.click('[data-view="week"]');
       await page.waitForSelector('.sc-weekgrid');
-      assert.deepEqual(await page.$$eval('.sc-count span', s => s.map(x => x.textContent)), ['SUN 10/4', 'MON 10/5', 'TUE 10/6', 'WED 10/7', 'THU 10/8', 'FRI 10/9', 'SAT 10/10']);
+      assert.deepEqual(await page.$$eval('.sc-count span', s => s.map(x => x.textContent)), ['SUN 10-4', 'MON 10-5', 'TUE 10-6', 'WED 10-7', 'THU 10-8', 'FRI 10-9', 'SAT 10-10']);
       assert.deepEqual(await page.$$eval('.sc-who strong', s => s.map(x => x.textContent)), ['Sun Valley', 'Garber Farms', 'Aldi Charleston', 'Fairmont', 'Walmart DC']);
       await fits(page, 'Scheduler week ' + w + 'x' + h);
       await shots(page, 'sched-week', w);
@@ -71,7 +71,7 @@ async function shots(page, name, w) {
       // Leaving a week that holds today shows today (as the current app); pick Thursday.
       await page.fill('#pick', DATE);
       await page.dispatchEvent('#pick', 'change');
-      await page.waitForFunction(() => /Thursday, October 8/.test(document.getElementById('range').textContent));
+      await page.waitForFunction(() => /Thursday 10-8-26/.test(document.getElementById('range').textContent));
       assert.deepEqual(await page.$$eval('table.sc-table tbody tr td:nth-child(3)', t => t.map(x => x.textContent)), ['6:30 AM', '7:00 AM', '1:00 PM']);
       await fits(page, 'Scheduler day ' + w + 'x' + h);
       await shots(page, 'sched-day', w);

@@ -10,7 +10,8 @@ let NOW = new Date();
 const data = { runs: [], journal: [], wash: [], appWash: [], pickups: [] };
 const esc = escapeHtml;
 const link = (href, label, side, alert, cls) => '<a class="dc-link' + (cls ? ' ' + cls : '') + '" href="' + href + '"><span>' + escapeHtml(label) + '</span>' + (side !== undefined ? '<b class="dc-side' + (alert ? ' alert' : '') + '">' + escapeHtml(side) + '</b>' : '') + '<i class="dc-arrow">&rarr;</i></a>';
-const hm = (m) => m == null ? '-' : (m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'));
+// Polish item 5 (Joe 10/11): past a day it reads "2 days 7 h" instead of "55 h 51".
+const hm = (m) => m == null ? '-' : m < 60 ? m + ' min' : m >= 1440 ? Math.floor(m / 1440) + (m < 2880 ? ' day ' : ' days ') + Math.floor((m % 1440) / 60) + ' h' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
 const since = (stamp) => { const t = Date.parse(stamp || ''); return isFinite(t) ? Math.max(0, Math.round((NOW.getTime() - t) / 60000)) : null; };
 const avg = (a) => a.length ? Math.round(a.reduce((t, x) => t + x, 0) / a.length) : null;
 function reason(text) {
@@ -24,8 +25,8 @@ function reason(text) {
 
 function model() {
   NOW = new Date();
-  const rows = P.loadoutRows(data.runs, date), all = P.counts(rows), today = rows.filter(r => !r.prior), c = P.counts(today);
-  const pu = today.flatMap(r => P.pickupsFor(r, data.pickups).map(p => Object.assign({ route: r.route }, p))), puOpen = pu.filter(P.pickupOpen);
+  const rows = P.loadoutRows(data.runs, date), all = P.counts(rows), today = rows.filter(r => !r.prior), c = P.counts(today), pickups = P.withNotePickups(rows, data.pickups);
+  const pu = today.flatMap(r => P.pickupsFor(r, pickups).map(p => Object.assign({ route: r.route }, p))), puOpen = pu.filter(P.pickupOpen);
   const load = { total: c.total + pu.length, waiting: c.waiting + puOpen.length, loading: c.loading, done: c.done + pu.length - puOpen.length };
   const returns = P.returnsFor(data.runs, date, data.journal), urows = P.unloadRows(data.runs, date, data.journal, returns, rows), uc = P.unloadCounts(urows);
   const unload = { total: uc.total, waiting: uc.waiting, unloading: uc.unloading, done: uc.complete };
@@ -38,7 +39,7 @@ function model() {
   const loadingNow = rows.filter(r => r.state === 'LOADING').map(r => ({ r, m: P.minutesTaken(r, NOW) }));
   // loads by depart hour, the loading shift's order (evening first, overnight departures, then the day)
   const hours = {};
-  today.forEach(r => { if (r.dispatchTime == null) return; const h = Math.floor(r.dispatchTime / 60); (hours[h] = hours[h] || { h, done: 0, loading: 0, waiting: 0, behind: 0, pickups: 0 }); hours[h][r.state === 'DONE' ? 'done' : r.state === 'LOADING' ? 'loading' : 'waiting']++; if (P.isBehind(r, date, NOW)) hours[h].behind++; hours[h].pickups += P.pickupsFor(r, data.pickups).filter(P.pickupOpen).length; });
+  today.forEach(r => { if (r.dispatchTime == null) return; const h = Math.floor(r.dispatchTime / 60); (hours[h] = hours[h] || { h, done: 0, loading: 0, waiting: 0, behind: 0, pickups: 0 }); hours[h][r.state === 'DONE' ? 'done' : r.state === 'LOADING' ? 'loading' : 'waiting']++; if (P.isBehind(r, date, NOW)) hours[h].behind++; hours[h].pickups += P.pickupsFor(r, pickups).filter(P.pickupOpen).length; });
   const byHour = Object.values(hours).sort((a, b) => ((a.h - 18 + 24) % 24) - ((b.h - 18 + 24) % 24));
   const hourText = (h) => (h % 12 || 12) + (h < 12 ? ' AM' : ' PM');
   // today vs yesterday (same time of day)
@@ -63,7 +64,8 @@ function model() {
     behind, avgLoad: avg(mins), loadingNow, byHour, hourText, yrows, yDoneByNow, tDoneByNow, yAvg: avg(yMins), areas,
     waitingTrailers, backWaiting, neededNext, washAges, reasons: Object.values(reasons).sort((a, b) => b.n - a.n), casesBack,
     oldestBack: backWaiting.length ? backWaiting[0].back : null,
-    loadLinks: P.AREAS.map(a => { const ac = P.counts(today.filter(r => r.area === a)); return link('loadout.html?date=' + date + '&area=' + a, P.AREA[a].title.replace('Daily ', ''), ac.done + ' / ' + ac.total); }),
+    // Polish item 4 (Joe 10/11): each department counts yesterday's leftover loads too, the same as its Loadout screen.
+    loadLinks: P.AREAS.map(a => { const ac = P.counts(rows.filter(r => r.area === a)); return link('loadout.html?date=' + date + '&area=' + a, P.AREA[a].title.replace('Daily ', ''), ac.done + ' / ' + ac.total); }),
     unloadLinks: P.AREAS.map(a => { const ac = P.unloadCounts(urows.filter(r => r.area === a)); return link('unloading.html?date=' + date + '&area=' + a, ({ CASE: 'Case', TOTES: 'Tote', BOXING: 'Box', TANKER: 'Tanker' })[a] + ' Unloading', ac.complete + ' / ' + ac.total); }),
     washLinks: openWash.slice(0, 3).map(w => link('washing.html?date=' + date, (w.trailer || 'Trailer') + ' · ' + w.need)), washMain: link('washing.html?date=' + date, 'Truck Washing', openWash.length + ' open', openWash.length > 0),
     retLinks: pend.slice(0, 3).map(x => link('returns.html?date=' + date, x.route + ' · ' + x.detail, 'Pending', true)), retMain: link('returns.html?date=' + date, 'Product Returns', pend.length + ' pending', pend.length > 0),
@@ -118,7 +120,7 @@ function card(k, inner, cls) {
 const head = (k) => '<div class="dc-head"><span class="dc-icon">' + ICON[k] + '</span><span class="dc-text"><small>' + D[k].small + '</small><strong>' + D[k].title + '</strong></span></div>';
 const met = (em, b, small, red, n) => '<span class="dc-metric"><em>' + em + '</em><b' + (n ? ' data-n="' + n + '"' : '') + (red ? ' class="red"' : '') + '>' + b + '</b><small>' + small + '</small></span>';
 function metrics(m, k) {
-  if (k === 'load') return '<div class="dc-metrics n4">' + met('Today', m.load.total, 'Loads Today', false, 'load.total') + met('Waiting', m.load.waiting, 'Waiting', false, 'load.waiting') + met('Loading', m.load.loading, 'Loading', false, 'load.loading') + met('Done', m.load.done, 'Complete', false, 'load.done') + '</div>';
+  if (k === 'load') return '<div class="dc-metrics n4">' + met('Today', m.load.total, m.pu.length ? m.c.total + ' loads · ' + m.pu.length + (m.pu.length === 1 ? ' pickup' : ' pickups') : 'Loads Today', false, 'load.total') + met('Waiting', m.load.waiting, 'Waiting', false, 'load.waiting') + met('Loading', m.load.loading, 'Loading', false, 'load.loading') + met('Done', m.load.done, 'Complete', false, 'load.done') + '</div>';
   if (k === 'unload') return '<div class="dc-metrics n4">' + met('Total', m.unload.total, 'Trailers', false, 'unload.total') + met('Waiting', m.unload.waiting, 'Waiting', false, 'unload.waiting') + met('Unloading', m.unload.unloading, 'Unloading', false, 'unload.unloading') + met('Done', m.unload.done, 'Complete', false, 'unload.done') + '</div>';
   if (k === 'wash') return met('Open', m.openWash.length, 'To wash', m.openWash.length > 0, 'wash.open') + met('Washed', m.washed, 'Today', false, 'wash.done');
   return met('Returns', m.returns.length, 'Today', false, 'ret.total') + met('Pending', m.pend.length, 'Not returned', m.pend.length > 0, 'ret.pending');
@@ -147,14 +149,14 @@ function washList(m, n) {
 }
 function reasonBars(m) {
   const max = Math.max(1, ...m.reasons.map(r => r.n));
-  return m.reasons.map(r => '<div class="hb"><span>' + esc(r.k) + '</span><div class="track"><i style="width:' + Math.round(r.n * 100 / max) + '%;background:#b42332"></i></div><b>' + r.n + (r.cases ? ' · ' + r.cases + 'c' : '') + '</b></div>').join('');
+  return m.reasons.map(r => '<div class="hb"><span>' + esc(r.k) + '</span><div class="track"><i style="width:' + Math.round(r.n * 100 / max) + '%;background:#b42332"></i></div><b>' + r.n + ' ' + (r.n === 1 ? 'return' : 'returns') + (r.cases ? ' · ' + r.cases + ' ' + (r.cases == 1 ? 'case' : 'cases') : '') + '</b></div>').join('');
 }
 /* ---------------- A: same four cards, the empty middle filled ---------------- */
 function A(m) {
   return card('load', head('load') + '<div class="dc-links two">' + m.loadLinks.join('') + '</div>' +
     '<div class="mid">' +
       '<div class="panel" style="display:flex;flex-direction:column"><div class="sec-t"><span>Loads by depart time</span><span>done / scheduled</span></div><div style="flex:1;min-height:0">' + hourBars(m, 62) + '</div>' + legend + '</div>' +
-      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, 'not done 30 min after depart', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, m.puOpen.map(p => p.route).join(', ') || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
+      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, 'all departments · 30+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, m.puOpen.map(p => p.route).join(', ') || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
     '</div>' + metrics(m, 'load') + '<div class="dc-bar"><i style="width:' + m.loadPct + '%"></i></div><div class="dc-note">' + m.loadNote + '  ·  ' + m.tDoneByNow + ' done by now, yesterday ' + m.yDoneByNow + ' at this time</div>', 'home4') +
   card('unload', head('unload') + '<div class="dc-links two">' + m.unloadLinks.join('') + '</div>' +
     '<div class="mid">' +

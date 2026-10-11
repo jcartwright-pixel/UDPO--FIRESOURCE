@@ -19,6 +19,8 @@ const OTR = require('./otr-core');
 const SC = require('./sc-core');
 const PLANT = require('./plant');
 const GARAGE = require('./garage');
+const RIGHTS = require('./rights');
+const ROLL = require('./weekroll');
 
 const C = M.COLLECTIONS;
 
@@ -65,9 +67,12 @@ const ACTIONS = Object.freeze({
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   addPickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   completePickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  // Loadout Center: drag a load to change today's loading order (saved as the day's load_sequence_override).
+  reorderPlantLoads: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   // Unloading & Washing, Product Returns and Truck Washing.
   saveUnloading: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  addReturn: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   // Plant Operations Scheduler (Shipping and Receiving).
   savePlantSchedule: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveYardCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
@@ -77,8 +82,14 @@ const ACTIONS = Object.freeze({
   sendPlantReport: { roles: L.SAVE_ROLES, screen: 'plant' },
   // Administration > Machine Products: the products each machine runs.
   saveMachineProducts: { roles: REORDER_ROLES, screen: 'plant' },
+  // Administration > Plant Shifts: each plant's shifts (Plant Reports' Shift Comparison).
+  savePlantShifts: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
-  sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' }
+  sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
+  // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js).
+  saveFleetRules: { roles: REORDER_ROLES, screen: 'checkIns' },
+  saveFleetUnit: { roles: REORDER_ROLES, screen: 'checkIns' },
+  saveGarageTech: { roles: REORDER_ROLES, screen: 'checkIns' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -110,7 +121,7 @@ function validate(input) {
   const requestId = text(input.requestId, 80);
   if (!/^[A-Za-z0-9_-]{8,80}$/.test(requestId)) throw new SaveError('BAD_REQUEST', 'Each save needs a requestId');
   const out = { action, requestId };
-  if (action === 'reorderLoads') {
+  if (action === 'reorderLoads' || action === 'reorderPlantLoads') {
     if (!L.isDateKey(input.loadDate)) throw new SaveError('BAD_REQUEST', 'loadDate must be yyyy-mm-dd');
     if (!Array.isArray(input.order) || !input.order.length || input.order.length > 150) throw new SaveError('BAD_REQUEST', 'order must list the loads');
     out.loadDate = input.loadDate;
@@ -225,8 +236,11 @@ function validate(input) {
       if (!out.runId) throw new SaveError('BAD_REQUEST', 'Pick the run');
       out.include = input.include === true;
       out.destination = OTR.otrNormDest_(input.destination);
-      if (out.destination && OTR.OTR_CORE.DESTINATIONS.indexOf(out.destination) < 0) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
+      // Joe 10/10: the run is the destination (OTR Routes Setup sends the run name), so any name is kept; who takes it is Delivered By.
+      out.destination = text(out.destination, 60);
       if (out.include && !out.destination) throw new SaveError('BAD_REQUEST', 'Pick where this route goes before including it');
+      out.deliveredBy = text(input.deliveredBy, 40);
+      if (out.deliveredBy && ['Carrier Pickup', 'United Dairy Delivered'].indexOf(out.deliveredBy) < 0) throw new SaveError('BAD_REQUEST', 'Delivered By must be Carrier Pickup or United Dairy Delivered');
     } else if (out.op === 'figure') {
       out.year = Number(input.year); out.month = Number(input.month); out.key = text(input.key, 40);
       if (!Number.isInteger(out.year) || out.year < 2000 || out.year > 2100 || !Number.isInteger(out.month) || out.month < 1 || out.month > 12) throw new SaveError('BAD_REQUEST', 'Pick a month');
@@ -238,7 +252,32 @@ function validate(input) {
       if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
       if (OTR.OTR_CORE.DESTINATIONS.indexOf(out.destination) < 0) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
       if (out.runs === null) throw new SaveError('BAD_REQUEST', 'Type the number of runs');
-    } else throw new SaveError('BAD_REQUEST', 'op must be route, figure or day');
+    } else if (out.op === 'import') {
+      // Import From Accounting (the current app's otrImportApply_): the screen reads the Excel files and sends what it found.
+      const figs = Array.isArray(input.figures) ? input.figures : [], days = Array.isArray(input.daily) ? input.daily : [];
+      if (figs.length > 1000 || days.length > 300) throw new SaveError('BAD_REQUEST', 'Too many numbers in one save');
+      const months = {};
+      figs.forEach(f => {
+        const y = Number(f && f.year), m = Number(f && f.month), key = text(f && f.key, 40), v = OTR.otrNum_(f && f.value);
+        if (!Number.isInteger(y) || y < 2000 || y > 2100 || !Number.isInteger(m) || m < 1 || m > 12) throw new SaveError('BAD_REQUEST', 'Pick a month');
+        if (!OTR.OTR_CORE.FIGURES.some(x => x.key === key)) throw new SaveError('BAD_REQUEST', 'Unknown figure ' + key);
+        if (v === null) throw new SaveError('BAD_REQUEST', 'A figure is not a number');
+        (months[y + '-' + m] = months[y + '-' + m] || { year: y, month: m })[key] = v;
+      });
+      out.months = Object.values(months);
+      if (out.months.length > 60) throw new SaveError('BAD_REQUEST', 'Too many months in one save');
+      const seen = {};
+      out.daily = [];
+      days.forEach(d => {
+        const date = text(d && d.date, 10), dest = text(OTR.otrNormDest_(d && d.destination), 60), runs = count(d && d.runs, 'Runs');
+        if (!L.isDateKey(date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+        if (!dest) throw new SaveError('BAD_REQUEST', 'Pick a destination');
+        if (runs === null) throw new SaveError('BAD_REQUEST', 'Type the number of runs');
+        seen[date + '|' + dest] = { date, destination: dest, runs };
+      });
+      out.daily = Object.values(seen);
+      if (!out.months.length && !out.daily.length) throw new SaveError('BAD_REQUEST', 'Nothing to import');
+    } else throw new SaveError('BAD_REQUEST', 'op must be route, figure, day or import');
     return out;
   }
   // Driver Scorecard Settings (the current app's scSaveSettings_): one points or grade number, or the call-off reasons.
@@ -282,7 +321,7 @@ function validate(input) {
     out.equipmentId = text(input.equipmentId);
     if (!out.equipmentId) throw new SaveError('BAD_REQUEST', 'Pick the truck or trailer');
     out.reason = text(input.reason, 120);
-    if (action === 'setUnitDown' && !out.reason) throw new SaveError('BAD_REQUEST', 'Say why the unit is down');
+    // Like the current app, the reason is optional.
     if (input.today !== undefined && !L.isDateKey(input.today)) throw new SaveError('BAD_REQUEST', 'today must be yyyy-mm-dd');
     out.today = input.today;
     return out;
@@ -290,6 +329,7 @@ function validate(input) {
   if (action === 'addPickup' || action === 'completePickup') return Object.assign(out, PLANT.validatePickup(action, input, SaveError));
   if (action === 'saveUnloading') return Object.assign(out, PLANT.validateUnload(input, SaveError));
   if (action === 'completeWash') return Object.assign(out, PLANT.validateWash(input, SaveError));
+  if (action === 'addReturn') return Object.assign(out, PLANT.validateReturn(input, SaveError));
   if (action === 'savePlantSchedule') return Object.assign(out, PLANT.validateSchedule(input, SaveError));
   if (action === 'saveYardCheck') return Object.assign(out, PLANT.validateYard(input, SaveError));
   if (action === 'saveQualityCheck') return Object.assign(out, PLANT.validateQuality(input, SaveError));
@@ -297,7 +337,9 @@ function validate(input) {
   if (action === 'saveTemperatureCheck') return Object.assign(out, PLANT.validateTemperature(input, SaveError));
   if (action === 'sendPlantReport') return Object.assign(out, PLANT.validateReport(input, SaveError));
   if (action === 'saveMachineProducts') return Object.assign(out, PLANT.validateMachineProducts(input, SaveError));
+  if (action === 'savePlantShifts') return Object.assign(out, PLANT.validatePlantShifts(input, SaveError));
   if (action === 'sendToGarage') return GARAGE.validateSend(input, out);
+  if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(action) >= 0) return GARAGE.validateFleet(action, input, out);
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
     if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
@@ -314,7 +356,12 @@ function validate(input) {
     out.expectedRev = Number(input.expectedRev);
   }
   if (action === 'assignDriver') out.driverId = text(input.driverId);
-  if (action === 'assignTruck' || action === 'assignTrailer') out.equipmentId = text(input.equipmentId);
+  if (action === 'assignTruck' || action === 'assignTrailer') {
+    out.equipmentId = text(input.equipmentId);
+    // A unit typed on Daily that is not on Equipment Master (the current app took any number): kept as typed, trailers as T-###.
+    const typed = text(input.unit, 20).toUpperCase().replace(/\s+/g, '');
+    if (!out.equipmentId && typed) out.unit = action === 'assignTrailer' ? 'T-' + typed.replace(/^T-?/, '') : typed;
+  }
   // OVR on Daily: a driver who is off that day, or a unit that is down, may still be picked on purpose.
   if (['assignDriver', 'assignTruck', 'assignTrailer'].indexOf(action) >= 0 && input.override === true) out.override = true;
   if (action === 'setRuns') out.runs = input.runs === true;
@@ -341,12 +388,17 @@ function validate(input) {
   return out;
 }
 
-async function requireSaver(tx, db, user, roles) {
+async function requireSaver(tx, db, user, roles, action) {
   const email = String(user && user.email || '').toLowerCase();
   const snap = await tx.get(db.collection(C.users).doc(M.safeIdPart(email)));
   const person = snap.exists ? snap.data() : null;
   if (!person || person.status !== 'ACTIVE') throw new SaveError('NOT_ALLOWED', email + ' is not an active user in the Users list');
-  if (!L.hasRole(person, roles)) throw new SaveError('NOT_ALLOWED', email + ' does not have a role that can make this save (' + roles.join(', ') + ')');
+  // Administration's Role Templates and the person's Allow / Deny (rights.js) change the role check only where set.
+  const [tpl, ex] = await Promise.all([tx.get(db.collection('private').doc('roleTemplates')), tx.get(db.collection('personRights').doc(M.safeIdPart(email)))]);
+  const roleOk = L.hasRole(person, roles);
+  if (!RIGHTS.saveAllowed(person, action, roleOk, tpl.exists ? tpl.data().templates : null, ex.exists ? ex.data() : null)) {
+    throw new SaveError('NOT_ALLOWED', roleOk ? email + ' is not allowed this save (Administration > People & Roles)' : email + ' does not have a role that can make this save (' + roles.join(', ') + ')');
+  }
   return person;
 }
 
@@ -388,8 +440,15 @@ async function resolveAssignment(tx, db, req, stamp, run) {
   if (req.action === 'assignTruck' || req.action === 'assignTrailer') {
     const type = req.action === 'assignTruck' ? 'TRUCK' : 'TRAILER';
     const idField = type === 'TRUCK' ? 'truckId' : 'trailerId', unitField = type === 'TRUCK' ? 'truck' : 'trailer';
-    if (!req.equipmentId) return { [idField]: '', [unitField]: '' };
-    const snap = await tx.get(db.collection(C.equipment).doc(M.safeIdPart(req.equipmentId)));
+    let snap = null;
+    if (!req.equipmentId && req.unit) {
+      // A typed unit that is on Equipment Master after all is used as that unit (same checks); otherwise it is kept as typed.
+      const hit = await tx.get(db.collection(C.equipment).where('unit', '==', req.unit));
+      snap = hit.docs.find(d => d.data().type === type) || null;
+      if (!snap) return { [idField]: '', [unitField]: req.unit };
+    }
+    if (!req.equipmentId && !snap) return { [idField]: '', [unitField]: '' };
+    snap = snap || await tx.get(db.collection(C.equipment).doc(M.safeIdPart(req.equipmentId)));
     if (!snap.exists) throw new SaveError('NOT_FOUND', req.equipmentId + ' is not in Equipment Master');
     const e = snap.data();
     if (e.type !== type) throw new SaveError('BAD_REQUEST', e.unit + ' is a ' + e.type + ', not a ' + type);
@@ -407,8 +466,13 @@ async function resolveAssignment(tx, db, req, stamp, run) {
 // Sheet column suffix for each day field the saves change (the reverse of model.DAY_FIELDS).
 const COLUMN_FOR = {}, TIME_FIELDS = {};
 // Kept in the new app only (the Live sheet has no column for them): who a day was for before the driver went off, and why.
-const APP_ONLY = { intendedDriverId: true, intendedDriver: true, driverExceptionStatus: true };
+// checkinTruck / checkinTrailer / moreTrailers: the units the driver corrected on the phone and the drop-and-hook trailers (no Live column).
+const APP_ONLY = { intendedDriverId: true, intendedDriver: true, driverExceptionStatus: true, checkinTruck: true, checkinTrailer: true, moreTrailers: true };
 M.DAY_FIELDS.forEach(([field, suffix, kind]) => { COLUMN_FOR[field] = suffix; if (kind === 'time') TIME_FIELDS[field] = true; });
+// A day's "changed by hand" marks (the current app's <day>_equipment_override / _dispatch_time_override): a Route Master or
+// Driver Master save that reaches the Live weeks leaves those cells alone (D6).
+COLUMN_FOR.equipmentOverride = 'equipment_override';
+COLUMN_FOR.dispatchTimeOverride = 'dispatch_time_override';
 
 /*
  * The write-back queue: each save also adds the sheet cells it changes, in the same transaction, so a save
@@ -416,6 +480,17 @@ M.DAY_FIELDS.forEach(([field, suffix, kind]) => { COLUMN_FOR[field] = suffix; if
  * column; the row is found by run_id when it is written, never by row number.
  */
 function queueSheetCells(tx, db, requestId, part, run, runDocId, day, values, stamp, email) {
+  queueCells(tx, db, requestId, part, run, runDocId, dayCells(day, values, stamp, email), stamp, email);
+}
+// One queued row: `cells` may hold several days and the run's own columns; extra.append = a run new to the Live tab.
+function queueCells(tx, db, requestId, part, run, runDocId, cells, stamp, email, extra) {
+  const days = L.DAYS.filter(p => run.days && run.days[p] && run.days[p].runs);
+  tx.set(db.collection(C.outbox).doc(requestId + (part ? '-' + part : '')), Object.assign({
+    status: 'pending', at: stamp, by: email, requestId, runDocId, tab: run.sourceTab, weekStart: run.weekStart,
+    match: { runId: run.runId || '', route: run.route || '', run: run.run || '', days }, cells
+  }, extra || {}));
+}
+function dayCells(day, values, stamp, email) {
   const cells = {};
   Object.keys(values).forEach(field => {
     if (APP_ONLY[field]) return;
@@ -428,11 +503,7 @@ function queueSheetCells(tx, db, requestId, part, run, runDocId, day, values, st
   });
   cells[day + '_updated_at'] = stamp;
   cells[day + '_updated_by'] = email;
-  const days = L.DAYS.filter(p => run.days && run.days[p] && run.days[p].runs);
-  tx.set(db.collection(C.outbox).doc(requestId + (part ? '-' + part : '')), {
-    status: 'pending', at: stamp, by: email, requestId, runDocId, tab: run.sourceTab, weekStart: run.weekStart,
-    match: { runId: run.runId || '', route: run.route || '', run: run.run || '', days }, cells
-  });
+  return cells;
 }
 
 /*
@@ -443,7 +514,7 @@ async function applyAction(db, user, input, now) {
   const spec = ACTIONS[req.action];
   const stamp = (now ? now() : new Date()).toISOString();
   const email = String(user && user.email || '').toLowerCase();
-  return db.runTransaction(async (tx) => {
+  const out = await db.runTransaction(async (tx) => {
     const logRef = db.collection(C.actions).doc(req.requestId);
     const logSnap = await tx.get(logRef);
     if (logSnap.exists) {
@@ -452,13 +523,20 @@ async function applyAction(db, user, input, now) {
       return Object.assign({}, prior.result, { repeated: true });
     }
     const mode = await requireTestMode(tx, db, spec.screen);
-    await requireSaver(tx, db, user, spec.roles);
+    await requireSaver(tx, db, user, spec.roles, req.action);
 
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'reorderPlantLoads') {
+      // The plant changes the order of today's loads only (the operating day rolls at 6 AM).
+      const today = L.operatingDay(now ? now() : new Date());
+      if (req.loadDate !== today) throw new SaveError('NOT_ALLOWED', 'The loading order can only be changed for today\'s loads');
+      return reorder(tx, db, req, email, stamp, logRef, mode);
+    }
     if (req.action === 'moveRun') return moveRun(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setUnitDown' || req.action === 'setUnitUp') return setUnitDown(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'updateIssue') return updateIssue(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'sendToGarage') return GARAGE.sendToGarage(tx, db, req, email, stamp, logRef, mode);
+    if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(req.action) >= 0) return GARAGE.saveFleet(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'clearConflict') return clearConflict(tx, db, req, email, stamp, logRef, mode);
     if (DRIVER_ACTIONS.indexOf(req.action) >= 0) return editDriver(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriver') return saveDriver(tx, db, req, email, stamp, logRef, mode);
@@ -477,6 +555,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'addPickup' || req.action === 'completePickup') return PLANT.savePickup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveUnloading') return PLANT.saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, queueSheetCells);
     if (req.action === 'completeWash') return PLANT.saveWash(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'addReturn') return PLANT.saveReturn(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePlantSchedule') return PLANT.saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveYardCheck') return PLANT.saveYard(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveQualityCheck') return PLANT.saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError);
@@ -484,6 +563,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveTemperatureCheck') return PLANT.saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'sendPlantReport') return PLANT.sendReport(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveMachineProducts') return PLANT.saveMachineProducts(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'savePlantShifts') return PLANT.savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);
@@ -505,7 +585,10 @@ async function applyAction(db, user, input, now) {
     Object.keys(after).forEach(k => { update['days.' + req.day + '.' + k] = after[k]; });
     // Any driver change marks the day as changed by hand (<day>_route_override), as the current app's driver saves do;
     // the Driver Assignment Board shows those days light blue.
-    const marks = req.action === 'assignDriver' || req.action === 'setRuns' ? { routeOverride: 'TRUE' } : {};
+    // A truck or trailer picked by hand marks <day>_equipment_override, as the current app's Live save does (034_V740 line 115), and a
+    // depart time typed by hand marks <day>_dispatch_time_override: Route Master and Driver Master saves then leave that day's pick alone (D6).
+    const marks = req.action === 'assignDriver' || req.action === 'setRuns' ? { routeOverride: 'TRUE' }
+      : req.action === 'assignTruck' || req.action === 'assignTrailer' ? { equipmentOverride: 'TRUE' } : req.action === 'setDispatchTime' ? { dispatchTimeOverride: 'TRUE' } : {};
     Object.keys(marks).forEach(k => { update['days.' + req.day + '.' + k] = marks[k]; });
     update['days.' + req.day + '.updatedAt'] = stamp;
     update['days.' + req.day + '.updatedBy'] = email;
@@ -516,6 +599,8 @@ async function applyAction(db, user, input, now) {
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });
     return result;
   });
+  if (req.action === 'saveRoute' && !out.repeated) await routeLiveFollow(db, req, email, stamp, out);
+  return out;
 }
 
 // Each new maintenance record also goes to its tab of the sandbox Live workbook when the write-back is on.
@@ -586,7 +671,7 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
   const weeks = [L.weekStart(today), L.addDays(L.weekStart(today), 7)];
   const runs = await tx.get(db.collection(C.runs).where('weekStart', 'in', weeks));
   const idKey = unit.type === 'TRAILER' ? 'trailerId' : 'truckId', textKey = unit.type === 'TRAILER' ? 'trailer' : 'truck';
-  const removed = [];
+  const removed = [], taken = [];
   runs.docs.forEach(r => {
     const run = r.data(), update = {}, cells = {};
     L.DAYS.forEach((p, i) => {
@@ -595,15 +680,18 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
       update['days.' + p + '.' + idKey] = ''; update['days.' + p + '.' + textKey] = '';
       cells[p] = true;
       removed.push(run.route + ' ' + L.addDays(run.weekStart, i));
+      taken.push({ route: String(run.route || ''), run: String(run.run || ''), date: L.addDays(run.weekStart, i) });
     });
     if (!Object.keys(update).length) return;
     tx.update(r.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp }));
     result.runs.push({ runDocId: r.id, rev: run.rev + 1 });
     if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id.slice(-6) + p + i, run, r.id, p, { [idKey]: '', [textKey]: '' }, stamp, email));
   });
-  tx.update(ref, { status: 'DOWN', notes: 'DOWN: ' + req.reason, downSince: stamp, testEdited: true, editedAt: stamp, editedBy: email });
-  queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'DOWN', notes: 'DOWN: ' + req.reason }, false, stamp, email);
+  const downNote = req.reason ? 'DOWN: ' + req.reason : 'DOWN';
+  tx.update(ref, { status: 'DOWN', notes: downNote, downSince: stamp, testEdited: true, editedAt: stamp, editedBy: email });
+  queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'DOWN', notes: downNote }, false, stamp, email);
   result.removedFrom = removed;
+  result.taken = taken.sort((a, b) => a.date.localeCompare(b.date) || a.route.localeCompare(b.route, undefined, { numeric: true }));
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' }, after: { status: 'DOWN', reason: req.reason, removedFrom: removed }, result });
   return result;
 }
@@ -625,8 +713,8 @@ async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
     if (notes.indexOf('Sent to garage') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the garage.' };
     change = { notes: add('Sent to garage ' + stamp + ' by ' + email) };
   } else if (req.step === 'lessor') {
-    // Joe 10/10: a truck write-up goes to our garage or to the company that leases the truck. Email stays off in the new
-    // app, so this marks it sent to the lessor (named in the note) once; the Lessor email itself is still sent from the current app.
+    // Joe 10/10: a truck write-up goes to our garage or to the company that leases the truck. This marks it sent to the lessor
+    // (named in the note) once; the email itself goes out after the save (admintools.afterSave, Administration > Repair Email).
     if (String(r.kind || '').toUpperCase() !== 'TRUCK') throw new SaveError('NOT_ALLOWED', 'Only a truck write-up goes to a lessor');
     const lessor = String(req.note || '').replace(/[\n|]+/g, ' ').trim().slice(0, 40);
     if (!lessor) throw new SaveError('BAD_REQUEST', 'Say which lessor');
@@ -714,11 +802,14 @@ async function editDriver(tx, db, req, email, stamp, logRef, mode) {
   } else {
     after = { reliefDriver: req.relief };
   }
+  // D6: a new assigned truck follows the driver onto the Current and Next Live weeks (driverToLive).
+  const live = req.action === 'setDriverTruck' && after.defaultTruckId ? await liveRead(tx, db, '') : null;
   const before = {};
   Object.keys(after).forEach(k => { before[k] = d[k] === undefined ? null : d[k]; });
   tx.update(ref, Object.assign({}, after, { testEdited: true, editedAt: stamp, editedBy: email }));
   queueMaster(tx, db, mode, req.requestId, '', ref, d.id, after, false, stamp, email);
   const result = { ok: true, requestId: req.requestId, runs: [] };
+  if (live) { result.liveWeeks = { updated: 0, added: 0, warnings: [] }; driverToLive(tx, db, mode, req, stamp, email, { id: d.id, name: '' }, after.defaultTruckId, live, result); }
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: d.id, before, after, result });
   return result;
 }
@@ -744,9 +835,13 @@ async function saveDriver(tx, db, req, email, stamp, logRef, mode) {
     existing = snap.data();
   }
   const truckId = await truckByUnit(tx, db, req.truck);
+  // D6: an existing driver's name and own truck reach the Current and Next Live weeks (driverToLive).
+  const live = existing ? await liveRead(tx, db, '') : null;
   const after = { name: req.name, hireDate: req.hireDate, seniorityDate: req.seniorityDate, defaultTruckId: truckId, reliefDriver: req.relief };
   const result = { ok: true, requestId: req.requestId, runs: [] };
   if (existing) {
+    result.liveWeeks = { updated: 0, added: 0, warnings: [] };
+    driverToLive(tx, db, mode, req, stamp, email, { id: existing.id, name: req.name }, truckId, live, result);
     const before = {};
     Object.keys(after).forEach(k => { before[k] = existing[k] === undefined ? null : existing[k]; });
     tx.update(ref, Object.assign({}, after, { testEdited: true, editedAt: stamp, editedBy: email }));
@@ -787,6 +882,144 @@ async function requireDriver(tx, db, driverId) {
   const snap = await tx.get(db.collection(C.drivers).doc(M.safeIdPart(driverId)));
   if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + driverId + ' is not in Driver Master');
   return snap.data();
+}
+
+/*
+ * D6: Route Master and Driver Master saves reach the Current and Next Live weeks, as the current app's 7.0.267 does (Joe 10/5: "when i
+ * change and add a run on the route change menu it should add to the live sheet and the route master"; udpoV7267RouteMasterToLive_ and
+ * udpoV7267DriverMasterToLive_, 207_V780_HybridDataRouters.gs). Only days not loaded yet (load day today or later). A day changed by
+ * hand keeps it: route_override keeps RUNS, the time overrides keep the times, route_hours_override the hours, equipment_override the
+ * truck and trailer. Reads first (liveRead), then the writes (writeLive), as a transaction needs.
+ */
+const OVERRIDE_DAY = { route_override: 'routeOverride', equipment_override: 'equipmentOverride', dispatch_time_override: 'dispatchTimeOverride' };
+const byHand = (run, p, col) => L.yes(((run.days && run.days[p]) || {})[OVERRIDE_DAY[col]]) || L.yes((run.cells || {})[p + '_' + col]);
+const loadDay = (week, p, offset) => L.addDays(week, L.DAYS.indexOf(p) + (Number.isFinite(Number(offset)) && offset !== null && offset !== '' ? Number(offset) : 0));
+const LIVE_RUN_COLUMNS = {};
+M.RUN_FIELDS.forEach(([field, col]) => { LIVE_RUN_COLUMNS[field] = col; });
+
+// runId given: that run's Live rows; else every run of the two weeks.
+async function liveRead(tx, db, runId) {
+  const cfg = await tx.get(db.collection(C.config).doc('app'));
+  const w = (cfg.exists && cfg.data().liveWeeks) || {};
+  const weeks = [w.current, w.next].filter(Boolean);
+  const [runSnap, eqSnap] = await Promise.all([weeks.length ? tx.get(runId ? db.collection(C.runs).where('runId', '==', runId) : db.collection(C.runs).where('weekStart', 'in', weeks)) : null,
+    tx.get(db.collection(C.equipment))]);
+  const units = eqSnap.docs.map(d => d.data());
+  const unit = (v, type) => { const k = String(v || '').trim().toUpperCase(); return k ? units.find(e => e.type === type && (String(e.id).toUpperCase() === k || String(e.unit).toUpperCase() === k)) || null : null; };
+  return { weeks, runs: runSnap ? runSnap.docs.filter(s => weeks.indexOf(s.data().weekStart) >= 0) : [], unit, tabs: { [w.current]: M.LIVE_TABS.current, [w.next]: M.LIVE_TABS.next } };
+}
+
+// One Live run's changes ({run: {field: v}, days: {p: {field: v}}}) as one update and, with the write-back on, one queued row.
+function writeLive(tx, db, mode, req, stamp, email, snap, run, ch, result) {
+  const ps = Object.keys(ch.days).filter(p => Object.keys(ch.days[p]).length);
+  if (!ps.length && !Object.keys(ch.run).length) return;
+  const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp }, cells = {};
+  Object.keys(ch.run).forEach(k => { update[k] = ch.run[k]; cells[LIVE_RUN_COLUMNS[k]] = String(ch.run[k]); });
+  ps.forEach(p => {
+    Object.keys(ch.days[p]).forEach(k => { update['days.' + p + '.' + k] = ch.days[p][k]; });
+    update['days.' + p + '.updatedAt'] = stamp; update['days.' + p + '.updatedBy'] = email;
+    Object.assign(cells, dayCells(p, ch.days[p], stamp, email));
+  });
+  tx.update(snap.ref, update);
+  if (mode.writeBack) queueCells(tx, db, req.requestId, 'L' + result.runs.length, run, snap.id, cells, stamp, email);
+  result.runs.push({ runDocId: snap.id, rev: run.rev + 1 });
+  result.liveWeeks.updated++;
+}
+
+const hoursNumber = (h) => { const t = String(h == null ? '' : h).trim(), m = t.match(/^(\d{1,2}):(\d{2})$/); const n = m ? Number(m[1]) + Number(m[2]) / 60 : Number(t); return t && Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
+
+// One run's Route Master standards into its Live rows of the two weeks; a run with no Live row in a week gets one.
+function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
+  const today = L.operatingDay(new Date(stamp));
+  live.weeks.forEach(week => {
+    const rows = live.runs.filter(s => s.data().weekStart === week);
+    if (!rows.length) return addLiveRun(tx, db, mode, req, stamp, email, m, live, week, today, result);
+    const changes = rows.map(() => ({ run: {}, days: {} }));
+    rows.forEach((s, i) => { const run = s.data();
+      // 7.0.272: who runs it follows Route Master too (route name, run, Run By).
+      ['routeName', 'run', 'coverageType', 'coverageOwner'].forEach(f => { const v = String(m[f] || '').trim(); if (v && String(run[f] || '').trim() !== v) changes[i].run[f] = v; });
+    });
+    L.DAYS.forEach(p => {
+      // A run on two rows (one per set of days): the day belongs to the row that runs it, else the first row.
+      let i = rows.findIndex(s => ((s.data().days || {})[p] || {}).runs);
+      if (i < 0) i = 0;
+      const run = rows[i].data(), day = (run.days || {})[p] || {}, want = (m.days || {})[p] || {}, ch = {};
+      if (loadDay(week, p, day.loadDayOffset) < today) return;
+      // Joe 10/10: a day with a driver always runs, so Route Master never turns such a day off.
+      if (!byHand(run, p, 'route_override') && !!day.runs !== !!want.active && (want.active || !day.driver)) ch.runs = !!want.active;
+      if (want.dispatchTime !== null && want.dispatchTime !== undefined) {
+        if (!byHand(run, p, 'dispatch_time_override') && day.dispatchTime !== want.dispatchTime) ch.dispatchTime = want.dispatchTime;
+        if (!byHand(run, p, 'start_time_override') && day.startTime !== want.dispatchTime) ch.startTime = want.dispatchTime;
+      }
+      const hours = hoursNumber(want.hours);
+      if (hours !== null && !byHand(run, p, 'route_hours_override') && day.routeHours !== hours) ch.routeHours = hours;
+      if (!byHand(run, p, 'equipment_override')) [['tractor', 'TRUCK', 'truckId', 'truck'], ['trailer', 'TRAILER', 'trailerId', 'trailer']].forEach(([f, type, idF, unitF]) => {
+        const u = live.unit(want[f], type);
+        if (!u || L.unitOff(u) || String(day[idF] || '').toUpperCase() === String(u.id).toUpperCase()) return;
+        ch[idF] = u.id; ch[unitF] = u.unit;
+      });
+      changes[i].days[p] = ch;
+    });
+    rows.forEach((s, i) => writeLive(tx, db, mode, req, stamp, email, s, s.data(), changes[i], result));
+  });
+}
+
+// A run Route Master has but the Live week does not: a new Live row from Route Master; days already loaded do not run.
+function addLiveRun(tx, db, mode, req, stamp, email, m, live, week, today, result) {
+  if (!L.masterActive(m) || !m.id) return;
+  // A run with no day left to run that week (a new run with no days ticked yet) gets its Live row from the save that ticks one.
+  if (!L.DAYS.some(p => { const want = (m.days || {})[p] || {}; return want.active && loadDay(week, p, Number.isFinite(want.loadDayOffset) ? want.loadDayOffset : null) >= today; })) return;
+  const run = { weekStart: week, sourceTab: live.tabs[week], sheetRow: null, addedFromRouteMaster: true, weekOrder: m.weekOrder === undefined ? null : m.weekOrder,
+    weeklyShowMaster: typeof m.displayWeekly === 'boolean' ? m.displayWeekly : null, masterShow: { daily: m.displayDaily === undefined ? null : m.displayDaily, mobile: m.displayMobile === undefined ? null : m.displayMobile, loadType: m.loadType || '' },
+    days: {}, cells: {}, rev: Date.parse(stamp), testEdited: true, editedAt: stamp };
+  M.RUN_FIELDS.forEach(([f, , kind]) => { run[f] = kind === 'flag' ? null : ''; });
+  Object.assign(run, { facilityId: m.facilityId || '', streamId: m.streamId || '', routeId: m.routeId || '', route: m.route || '', routeName: m.routeName || '', runId: m.id, run: m.run || '',
+    routeRunType: m.routeRunType || '', loadType: m.loadType || '', movementType: m.movementType || '', coverageType: m.coverageType || '', coverageOwner: m.coverageOwner || '',
+    dedicatedType: m.dedicatedType || '', routeStatus: 'ACTIVE', active: true, displayDaily: m.displayDaily === undefined ? null : m.displayDaily,
+    displayWeekly: m.displayWeekly === undefined ? null : m.displayWeekly, displayPlant: m.displayPlant === undefined ? null : m.displayPlant, displayMobileRoute: m.displayMobile === undefined ? null : m.displayMobile });
+  const cells = { week_start_date: week };
+  Object.keys(LIVE_RUN_COLUMNS).forEach(f => { if (run[f] !== null && run[f] !== '') cells[LIVE_RUN_COLUMNS[f]] = typeof run[f] === 'boolean' ? (run[f] ? 'TRUE' : 'FALSE') : String(run[f]); });
+  L.DAYS.forEach(p => {
+    const want = (m.days || {})[p] || {}, day = {};
+    M.DAY_FIELDS.forEach(([f, , kind]) => { day[f] = kind === 'yes' ? false : kind === 'text' ? '' : null; });
+    const truck = live.unit(want.tractor, 'TRUCK'), trailer = live.unit(want.trailer, 'TRAILER'), offset = Number.isFinite(want.loadDayOffset) ? want.loadDayOffset : null;
+    Object.assign(day, { runs: !!want.active && loadDay(week, p, offset) >= today, loadSequence: want.loadOrder == null ? null : want.loadOrder, deliveryDate: L.addDays(week, L.DAYS.indexOf(p)),
+      loadDayOffset: offset, loadDate: loadDay(week, p, offset), dispatchTime: want.dispatchTime == null ? null : want.dispatchTime, startTime: want.dispatchTime == null ? null : want.dispatchTime,
+      routeHours: hoursNumber(want.hours), miles: want.miles == null ? null : want.miles,
+      truckId: truck ? truck.id : '', truck: truck ? truck.unit : '', trailerId: trailer ? trailer.id : '', trailer: trailer ? trailer.unit : '' });
+    run.days[p] = day;
+    M.DAY_FIELDS.forEach(([f, suffix]) => { const v = day[f]; if (v === null || v === '' || (v === false && f !== 'runs')) return; cells[p + '_' + suffix] = typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : TIME_FIELDS[f] ? L.timeText(v) : v; });
+  });
+  const id = M.runDocId(week, m.id);
+  tx.set(db.collection(C.runs).doc(id), run);
+  if (mode.writeBack) queueCells(tx, db, req.requestId, 'A' + week, Object.assign({}, run, { days: {} }), id, cells, stamp, email, { append: true });
+  result.runs.push({ runDocId: id, rev: run.rev });
+  result.liveWeeks.added++;
+}
+
+// A Driver Master save: the Live name follows Driver Master, and the driver's own truck goes on the days he drives, unless the day's
+// equipment was picked by hand, the truck is down, or it is already on another run that day (udpoV7267DriverOwnTruck_).
+function driverToLive(tx, db, mode, req, stamp, email, d, truckId, live, result) {
+  const today = L.operatingDay(new Date(stamp)), truck = truckId ? live.unit(truckId, 'TRUCK') : null, warn = (t) => { if (result.liveWeeks.warnings.indexOf(t) < 0) result.liveWeeks.warnings.push(t); };
+  const rows = live.runs.map(s => ({ s, run: s.data(), ch: { run: {}, days: {} } }));
+  rows.forEach(x => L.DAYS.forEach(p => {
+    const day = (x.run.days || {})[p] || {};
+    if (day.driverId !== d.id || loadDay(x.run.weekStart, p, day.loadDayOffset) < today) return;
+    const ch = {};
+    if (d.name && day.driver !== d.name) ch.driver = d.name;
+    if (truckId && day.runs && !byHand(x.run, p, 'equipment_override') && day.truckId !== truckId) {
+      if (!truck) warn(d.name + "'s truck " + truckId + ' is not in Equipment Master; the route\'s truck was kept.');
+      else if (L.unitOff(truck)) warn(d.name + "'s truck " + truck.unit + ' is ' + (truck.status || 'not usable') + '; the route\'s truck was kept.');
+      else {
+        const on = (o) => { const od = Object.assign({}, (o.run.days || {})[p], o.ch.days[p]); return od.runs && (od.truckId === truck.id || (!!truck.unit && od.truck === truck.unit)); };
+        const other = rows.find(o => o !== x && o.run.weekStart === x.run.weekStart && on(o));
+        if (other) warn(d.name + "'s truck " + truck.unit + ' is already on route ' + other.run.route + ' ' + (other.run.run || '') + ' on ' + L.addDays(x.run.weekStart, L.DAYS.indexOf(p)) + '; the route\'s truck was kept.');
+        else { ch.truckId = truck.id; ch.truck = truck.unit; }
+      }
+    }
+    if (Object.keys(ch).length) x.ch.days[p] = ch;
+  }));
+  rows.forEach(x => writeLive(tx, db, mode, req, stamp, email, x.s, x.run, x.ch, result));
 }
 
 /* ---------- Route Editor (Route Master copy; ROUTES_MASTER itself is not written yet) ---------- */
@@ -836,9 +1069,30 @@ async function saveRoute(tx, db, req, email, stamp, logRef, mode) {
     const { createdInApp, createdAt, createdBy, testEdited, editedAt, editedBy, id: madeId, ...sheetFields } = made;
     queueMaster(tx, db, mode, req.requestId, '', ref, id, sheetFields, true, stamp, email);
   }
-  const result = { ok: true, requestId: req.requestId, runs: [], runId: id };
+  // D6: the Current and Next Live weeks follow in their own step once this save is in (routeLiveFollow).
+  const result = { ok: true, requestId: req.requestId, runs: [], runId: id, liveWeeks: { updated: 0, added: 0, warnings: [] } };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runId: id, before: before ? { fields: Object.keys(req.fields).reduce((o, k) => Object.assign(o, { [k]: before[k] === undefined ? null : before[k] }), {}) } : null, after: { fields: req.fields, days: req.days }, result });
   return result;
+}
+
+// D6, after a Route Master save is in: the run's Live rows of the Current and Next weeks follow, in their own transaction, so
+// several quick Route Editor saves (block fill, paste) never wait on each other's Live rows. It reads the run as saved last.
+async function routeLiveFollow(db, req, email, stamp, result) {
+  try {
+    const live = await db.runTransaction(async (tx) => {
+      const mode = await requireTestMode(tx, db, ACTIONS.saveRoute.screen);
+      const snap = await tx.get(db.collection(C.routes).doc(M.safeIdPart(result.runId)));
+      if (!snap.exists) return null;
+      const m = Object.assign({ id: result.runId }, snap.data());
+      const weeks = await liveRead(tx, db, m.id);
+      const out = { runs: [], liveWeeks: { updated: 0, added: 0, warnings: [] } };
+      routeToLive(tx, db, mode, req, stamp, email, m, weeks, out);
+      return out;
+    });
+    if (live) { result.runs = result.runs.concat(live.runs); result.liveWeeks = live.liveWeeks; }
+  } catch (e) {
+    result.liveWeeks.warnings.push('Route Master is saved, but the Current and Next weeks did not update (' + (e.message || e) + '). Save the run again to retry.');
+  }
 }
 
 // Load Order (drag) for one weekday: the runs in their new order get 10, 20, 30 ...
@@ -858,9 +1112,13 @@ async function reorderRouteDay(tx, db, req, email, stamp, logRef, mode) {
 
 /*
  * Publish to Daily Dispatch. In the new app Weekly and Daily read the same runs, so every Weekly pick is already on
- * Daily; Publish records that the week was checked and sent (who and when), which the Weekly header shows.
+ * Daily. Publishing the Live Next week moves the weeks on (weekroll.js); publishing another week records that it was
+ * checked and sent (who and when), which the Weekly header shows.
  */
 async function publishWeek(tx, db, req, email, stamp, logRef, mode) {
+  // Joe 10/11 (review item 6): publishing the Live Next week moves the weeks on and builds the new Next week, as the current app does.
+  const live = ((await tx.get(db.collection(C.config).doc('app'))).data() || {}).liveWeeks || {};
+  if (live.next && req.weekStart === live.next) return ROLL.publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveError);
   const ref = db.collection(C.weeks).doc(req.weekStart);
   const snap = await tx.get(ref);
   if (!snap.exists) throw new SaveError('NOT_FOUND', 'The week of ' + req.weekStart + ' is not one of the copied Live weeks');
@@ -929,8 +1187,25 @@ async function saveDriverTemplate(tx, db, req, email, stamp, logRef, mode) {
  * over the count from the dispatch sheet).
  */
 async function saveOtr(tx, db, req, email, stamp, logRef, mode) {
+  if (req.op === 'import') {
+    // Imported numbers fill their months (typed figures for other keys stay); imported day counts never replace a typed one.
+    const monthRefs = req.months.map(m => db.collection('otrMonthly').doc(m.year + '-' + String(m.month).padStart(2, '0')));
+    const dayRefs = req.daily.map(d => db.collection('otrDaily').doc(d.date + '__' + M.safeIdPart(d.destination)));
+    const daySnaps = dayRefs.length ? await tx.getAll(...dayRefs) : [];
+    const meta = { updatedAt: stamp, updatedBy: email, testEdited: mode.mode === 'test' };
+    req.months.forEach((m, i) => tx.set(monthRefs[i], Object.assign({}, m, { source: 'IMPORT' }, meta), { merge: true }));
+    let kept = 0;
+    req.daily.forEach((d, i) => {
+      const old = daySnaps[i].exists ? daySnaps[i].data() : null;
+      if (old && String(old.source || '').toUpperCase() === 'MANUAL') { kept++; return; }
+      tx.set(dayRefs[i], Object.assign({}, d, { source: 'IMPORT' }, meta), { merge: true });
+    });
+    const result = { ok: true, requestId: req.requestId, runs: [], months: req.months.length, days: req.daily.length - kept, keptTyped: kept };
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, op: 'import', months: req.months.length, days: req.daily.length, result });
+    return result;
+  }
   let ref, data;
-  if (req.op === 'route') { ref = db.collection('otrRoutes').doc(M.safeIdPart(req.runId)); data = { runId: req.runId, include: req.include, destination: req.destination }; }
+  if (req.op === 'route') { ref = db.collection('otrRoutes').doc(M.safeIdPart(req.runId)); data = { runId: req.runId, include: req.include, destination: req.destination, deliveredBy: req.deliveredBy || '' }; }
   else if (req.op === 'figure') { ref = db.collection('otrMonthly').doc(req.year + '-' + String(req.month).padStart(2, '0')); data = { year: req.year, month: req.month, [req.key]: req.value, source: 'TYPED' }; }
   else { ref = db.collection('otrDaily').doc(req.date + '__' + M.safeIdPart(req.destination)); data = { date: req.date, destination: req.destination, runs: req.runs, source: 'MANUAL' }; }
   const snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
@@ -1111,6 +1386,7 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
  * a driver's own other entries do not count against them. An approved entry also puts the days off on Dispatch
  * (the vsched_ exception, as udpoV7277MirrorVacationToExceptions_ does); any other status cancels that.
  */
+const usDay = (key) => { const [y, m, d] = String(key).split('-'); return Number(m) + '/' + Number(d) + '/' + y; };
 const VACATION_EXCEPTION = { VACATION: ['VACATION', 'VACATION'], SICK: ['SICK DAY', 'SICK DAY'], BEREAVEMENT: ['BEREAVEMENT', 'BEREAVEMENT'], UNPAID: ['UNPAID DAY', 'UNPAID DAY'], PERSONAL: ['UNAVAILABLE', 'PERSONAL DAY'] };
 async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
   const driver = await requireDriver(tx, db, req.driverId);
@@ -1120,6 +1396,12 @@ async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
   if (req.vacationId && !existing.exists) throw new SaveError('NOT_FOUND', 'That vacation entry no longer exists');
   const vsRef = db.collection(C.exceptions).doc(M.safeIdPart('vsched_' + id));
   const vsSnap = await tx.get(vsRef);
+  // The same driver cannot be off twice for the same day (the current app refuses it: "X is already off ... Edit that entry instead").
+  if (req.status !== 'CANCELLED' && req.status !== 'DENIED') {
+    const mine = await tx.get(db.collection(C.vacations).where('driverId', '==', driver.id));
+    const clash = mine.docs.map(d => Object.assign({ docId: d.id }, d.data())).find(v => v.docId !== ref.id && v.status !== 'CANCELLED' && v.status !== 'DENIED' && v.startDate && v.startDate <= req.endDate && (v.endDate || v.startDate) >= req.startDate);
+    if (clash) throw new SaveError('NOT_ALLOWED', (driver.name || driver.id) + ' is already off ' + usDay(clash.startDate) + (clash.endDate && clash.endDate !== clash.startDate ? ' – ' + usDay(clash.endDate) : '') + '. Edit that entry instead.');
+  }
   if (req.status === 'APPROVED') {
     const approved = await tx.get(db.collection(C.vacations).where('status', '==', 'APPROVED'));
     const others = approved.docs.map(d => Object.assign({ docId: d.id }, d.data())).filter(v => v.docId !== ref.id && v.driverId !== driver.id && v.startDate && (v.endDate || v.startDate) >= req.startDate && v.startDate <= req.endDate);

@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="css/stations.css">
   <script src="js/logic.js"></script>
 </head>
-<body class="fill ps-page">
+<body class="phone ps-page">
   <div class="signin" id="signin" hidden>
     <h1>Plant Station</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -21,15 +21,17 @@
   </div>
 
   <div id="screen" hidden>
-    <div class="topbar">
-      <span class="who" id="who"></span>
-      <button id="signout" type="button">Sign out</button>
-    </div>
-    <div class="head">
-      <div class="title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
+    <!-- Joe 10/10: the Plant Station is a tablet screen, like the drivers' phone page: a slim header, no desktop menu. -->
+    <header class="topbar" id="ps-top">
+      <button type="button" id="go-back" title="Back one screen">&#8249; Back</button>
+      <button type="button" id="go-home" title="Home">Home</button>
+      <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Plant Station</strong></span>
       <span class="ps-pill" id="pill" hidden>Uniontown</span>
-      <button type="button" id="change" data-top hidden>Change Station</button>
-    </div>
+      <button type="button" id="change" hidden>Change Station</button>
+      <span class="who" id="who"></span>
+      <button type="button" id="signout">Sign out</button>
+    </header>
+    <div class="ps-title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
       <section id="pick">
@@ -39,12 +41,20 @@
       <section id="station" hidden>
         <div class="ps-tabs" id="tabs"></div>
         <p class="ps-foot" id="foot"></p>
+        <!-- Administration > Plant Station Codes: once a plant has a manager release code, Change Station asks for it. -->
+        <form class="ps-release" id="release" hidden>
+          <p>A manager must type the manager release code to change this tablet's station.</p>
+          <label>Manager release code <input id="release-code" maxlength="48" autocomplete="off" autocapitalize="characters"></label>
+          <button type="submit" id="release-go">RELEASE THIS STATION</button>
+          <button type="button" id="release-cancel">CANCEL</button>
+          <span class="ps-release-msg" id="release-msg"></span>
+        </form>
       </section>
     </div>
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -68,7 +78,11 @@
     const KEY = 'udPlantStation';
     const read = () => { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } };
     const write = (v) => { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* private window: not remembered */ } };
-    let stationId = new URLSearchParams(location.search).get('station') || read(), runs = [];
+    // A link with ?station= sets up a new tablet only. Once the tablet has a station, changing it goes through Change Station
+    // (and the manager release code, when the plant has one), as on the current app.
+    const asked = new URLSearchParams(location.search).get('station') || '';
+    let stationId = read() || (STATIONS.some(s => s.id === asked) ? asked : ''), runs = [];
+    if (stationId && !read()) write(stationId);
 
     function render() {
       const st = STATIONS.find(s => s.id === stationId);
@@ -83,7 +97,7 @@
         return;
       }
       const date = L.operatingDay(new Date());
-      document.getElementById('pill').textContent = 'Uniontown · ' + new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      document.getElementById('pill').textContent = 'Uniontown · ' + shortDate(date);
       const loads = P.loadoutRows(runs, date).filter(r => r.area === st.area), left = loads.filter(r => r.state !== 'DONE').length;
       document.getElementById('tabs').innerHTML = st.views.map(v => {
         const x = VIEWS[v], pic = typeof x.pic === 'string' ? x.pic : x.pic[st.area];
@@ -99,15 +113,44 @@
       if (!b) return;
       stationId = b.dataset.station; write(stationId); render();
     });
-    document.getElementById('change').addEventListener('click', () => { stationId = ''; write(''); history.replaceState(null, '', location.pathname); render(); });
+    document.getElementById('go-back').addEventListener('click', goBack);
+    document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
+    const leave = () => { stationId = ''; write(''); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true; render(); };
+    const releaseBox = document.getElementById('release'), releaseMsg = document.getElementById('release-msg');
+    document.getElementById('change').addEventListener('click', async () => {
+      let required = false;
+      try { required = (await callServer('stationRelease', { op: 'status', facilityId: 'fac_uniontown' })).required; } catch (err) {
+        // No answer: the station stays as it is (a code may be needed), so a dropped network cannot get past the code.
+        showError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and press Change Station again.');
+        return;
+      }
+      showError('');
+      if (!required) { leave(); return; }
+      releaseBox.hidden = false; releaseMsg.textContent = ''; document.getElementById('release-code').value = ''; document.getElementById('release-code').focus();
+    });
+    document.getElementById('release-cancel').addEventListener('click', () => { releaseBox.hidden = true; });
+    releaseBox.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      releaseMsg.textContent = 'Checking…';
+      try {
+        const out = await callServer('stationRelease', { op: 'release', facilityId: 'fac_uniontown', code: document.getElementById('release-code').value });
+        if (out.ok) leave(); else releaseMsg.textContent = out.message;
+      } catch (err) { releaseMsg.textContent = String(err.message || err); }
+    });
 
     requireSignIn(async () => {
       const { db } = await start();
-      const date = L.operatingDay(new Date());
-      const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
-      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message));
+      // Read again when the day rolls at 6 AM (Saturday to Sunday is a new week), so the counts never show last week.
+      let date = '', stop = null;
+      const watch = () => {
+        date = L.operatingDay(new Date());
+        if (stop) stop();
+        const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
+        stop = onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message));
+      };
+      watch();
       render();
-      setInterval(render, 60000);
+      setInterval(() => { if (L.operatingDay(new Date()) !== date) watch(); render(); }, 60000);
     });
   </script>
 </body>

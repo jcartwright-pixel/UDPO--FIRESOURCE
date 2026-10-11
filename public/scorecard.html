@@ -48,7 +48,8 @@
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Driver Scorecard (screen A, 224/225_V7279): one table of every driver for the month or the year.
-    // Days come from the copied Live weeks (check-ins, cases out vs in) and the plant journal (inspections, route check-ins).
+    // Days come from every week the app keeps (the copied Live weeks, the weeks Publish moved on, and the current app's DISPATCH WEEK
+    // HISTORY archive: check-ins, cases out vs in) and the plant journal (inspections, route check-ins).
     forScreen('scorecard');
     const L = window.UDLogic, S = window.UDScore, CORE = S.SC_CORE;
     let mode = 'month', runs = [], events = [], drivers = [], exceptions = [], saved = {}, open = '';
@@ -90,7 +91,7 @@
       }
       const rows = mode === 'year' ? S.scScoreYear_(months, s) : (months[0] ? months[0].rows : []);
       const minDays = mode === 'year' ? Math.round(s.monthMinDays * months.length / 2) : s.monthMinDays;
-      return { rows, summary: S.scSummary_(rows, s, minDays), through: yesterday, days: Object.keys(days).sort() };
+      return { rows, minDays, summary: S.scSummary_(rows, s, minDays), through: yesterday, days: Object.keys(days).sort() };
     }
 
     // Replacing the page can blur a typed box, whose save asks for a redraw while this one is still running: that one waits its turn.
@@ -104,7 +105,7 @@
     function paint() {
       const s = S.scSettings_(saved), edit = canManage();
       document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
-      document.getElementById('sub').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY') + ' · every driver starts at 100';
+      { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Every driver starts at 100'; }
       const k = document.getElementById('kpis'), bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
       if (mode === 'settings') {
         k.innerHTML = '';
@@ -133,7 +134,7 @@
       }
       const b = board(s), sm = b.summary, label = mode === 'year' ? String(year) : CORE.MONTHS[month - 1] + ' ' + year;
       k.innerHTML = [[sm.drivers, 'Drivers graded'], [sm.average == null ? '–' : sm.average, 'Plant average score'], [sm.missedCheckins, 'Missed check-ins', sm.missedCheckins ? 'warn' : ''],
-        [sm.lostCases, 'Cases lost on routes', sm.lostCases ? 'warn' : ''], [sm.leader || '–', mode === 'year' ? 'Leading for Driver of the Year' : 'Leading for Driver of the Month', 'good']]
+        [sm.lostCases, 'Cases lost on routes', sm.lostCases ? 'warn' : ''], [sm.leader || 'Nobody yet', (mode === 'year' ? 'Leading for Driver of the Year' : 'Leading for Driver of the Month') + (sm.leader ? '' : ', needs ' + b.minDays + ' days worked'), sm.leader ? 'good' : 'none']]
         .map(([v, l, c]) => '<div class="' + (c || '') + '"><b>' + escapeHtml(String(v)) + '</b><span>' + l + '</span></div>').join('');
       bar.innerHTML = '<button type="button" id="prev" aria-label="Earlier">◀</button><b class="sc-period">' + escapeHtml(label) + '</b><button type="button" id="next" aria-label="Later">▶</button><span class="spacer"></span><button type="button" class="primary" id="sc-print">Print</button>';
       const cell = (bad, good, text) => '<td class="' + (bad ? 'sc-bad' : good ? 'sc-ok' : '') + '">' + text + '</td>';
@@ -162,13 +163,14 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
-      const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + name + ': ' + e.message));
+      const NAMES = { runs: 'the dispatch runs', plantEvents: 'the plant check-ins', drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master' };
+      const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + (NAMES[name] || name) + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.'));
       watch('runs', v => { runs = v; });
       watch('plantEvents', v => { events = v; });
       watch('drivers', v => { drivers = v; });
       watch('exceptions', v => { exceptions = v; });
       watch('routes', v => { routeMiles = {}; L.DAYS.forEach(p => { routeMiles[p] = {}; }); v.forEach(r => L.DAYS.forEach(p => { if (r.days && r.days[p] && r.days[p].miles) routeMiles[p][r.id] = r.days[p].miles; })); });
-      onSnapshot(doc(db, 'scorecard', 'settings'), s => { saved = s.exists() ? s.data() : {}; render(); }, e => showError('Could not read the scorecard settings: ' + e.message));
+      onSnapshot(doc(db, 'scorecard', 'settings'), s => { saved = s.exists() ? s.data() : {}; render(); }, e => showError('Could not read the scorecard settings (' + e.message + '). The scores use the standard settings until it loads; reload the page.'));
     });
   </script>
 </body>

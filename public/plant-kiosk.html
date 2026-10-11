@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Plant Performance · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/kiosk.css">
+  <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill phone pk-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Plant Performance</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <!-- Joe 10/10: a kiosk like the Driver Station: a slim header, no desktop menu; ?tv=1 is the TV itself (no header). -->
+    <div class="topbar">
+      <button type="button" class="pk-nav" id="go-back" title="Back one screen">&#8249; Back</button>
+      <button type="button" class="pk-nav" id="go-home" title="Home">Home</button>
+      <button type="button" class="pk-nav" id="tv" title="Full screen for the TV">TV display</button>
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="pk">
+      <div class="pk-title"><h1><span id="plant">UNIONTOWN PLANT</span> · TODAY</h1><b id="clock"></b></div>
+      <div class="pk-kpis">
+        <div><span>Loaded</span><b id="k-loaded">—</b></div>
+        <div><span>On time today</span><b id="k-ontime">—</b><i id="k-ontime-line"></i></div>
+        <div><span>Behind now</span><b id="k-behind">—</b></div>
+        <div><span>Pickups open</span><b id="k-pickups">—</b></div>
+      </div>
+      <div class="pk-areas" id="areas"></div>
+      <section class="pk-next"><div class="pk-row pk-headrow"><span>NEXT TO LOAD</span><span>AREA</span><span>DEPART</span><span>TRUCK / TRAILER</span><span>STATUS</span></div>
+        <div class="pk-scroll" id="next-scroll"><div id="next"></div></div></section>
+      <div class="pk-foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, goBack } from './js/app.js';
+    import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as P from './js/plant-core.js';
+    import * as R from './js/plant-reports.js';
+
+    // Plant Performance (Joe 10/10): today's loadout on a TV, live: loaded so far, on time, behind now, pickups, each department's
+    // progress and what loads next. Read only. The same rules as Manager Center (Behind) and Plant Reports (on time).
+    const L = window.UDLogic, U = window.UDPlant, params = new URLSearchParams(location.search), full = params.get('tv') === '1';
+    document.body.classList.toggle('pk-full', full);
+    document.getElementById('go-back').addEventListener('click', goBack);
+    document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
+    document.getElementById('tv').addEventListener('click', () => { location.search = '?tv=1'; });
+    window.udBack = () => { if (full) { location.search = ''; return true; } return false; };
+    const data = { runs: [], pickups: [], journal: [], shift: [], setup: [], lineStatus: [], tempLocs: [], sensors: [] };
+    let date = L.operatingDay(new Date()), sig = '';
+
+    function render() {
+      const now = Date.now();
+      date = L.operatingDay(new Date(now));
+      document.getElementById('clock').textContent = new Date(now).toLocaleString('en-US', { timeZone: L.TIME_ZONE, weekday: 'long', hour: 'numeric', minute: '2-digit' });
+      const loads = P.loadoutRows(data.runs, date), mine = loads.filter(r => !r.prior);
+      const openPickups = P.withNotePickups(loads, data.pickups).filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
+      const rep = U.plantReport({ loads, pickups: openPickups, shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
+      const day = R.daySummary(date, data.runs, data.pickups, data.journal, now), done = P.counts(mine);
+      document.getElementById('k-loaded').innerHTML = done.done + '<small> of ' + done.total + '</small>';
+      const on = document.getElementById('k-ontime');
+      on.textContent = day.onTimePct === null ? '—' : day.onTimePct + '%';
+      on.className = day.onTimePct === null ? '' : day.onTimePct >= 90 ? 'good' : day.onTimePct >= 80 ? 'warn' : 'bad';
+      document.getElementById('k-ontime-line').textContent = day.judged ? day.onTime + ' of ' + day.judged + ' due so far' : 'none due yet';
+      const behind = document.getElementById('k-behind'), pk = document.getElementById('k-pickups');
+      behind.textContent = rep.behind.length; behind.className = rep.behind.length ? 'bad' : 'good';
+      pk.textContent = openPickups.length; pk.className = openPickups.length ? 'bad' : 'good';
+      document.getElementById('areas').innerHTML = R.AREA_ORDER.map(a => { const rows = mine.filter(r => r.area === a), d = rows.filter(r => r.state === 'DONE').length; return rows.length ? '<div><span>' + R.AREA_NAME[a] + '</span><b>' + d + ' of ' + rows.length + '</b><u><s style="width:' + Math.round(d / rows.length * 100) + '%"></s></u></div>' : ''; }).join('');
+      const row = (z, k, word) => '<div class="pk-row ' + k + '"><span class="rt">' + escapeHtml(U.reportName(z)) + '</span><span>' + escapeHtml(R.AREA_NAME[z.area] || '') + '</span><span>' + escapeHtml(z.depart || '—') + '</span><span>' + escapeHtml([z.truck, z.trailer].filter(Boolean).join(' / ') || '—') + '</span><span class="st">' + escapeHtml(word) + '</span></div>';
+      const list = rep.behind.map(z => row(z, 'bad', (z.status === 'LOADING' ? 'LOADING · ' : '') + (/departs in/.test(z.late || '') ? 'DUE · ' + z.late : 'BEHIND' + (z.late ? ' · ' + z.late.replace(' late', '') : '')))).concat(rep.nextUp.map(z => row(z, z.status === 'LOADING' ? 'loading' : '', U.statusWord(z.status)))).join('');
+      if (list !== sig) {
+        sig = list;
+        const box = document.getElementById('next'), sc = document.getElementById('next-scroll');
+        box.innerHTML = list || '<p class="pk-empty">Everything for today is loaded.</p>';
+        if (list && sc.scrollHeight > sc.clientHeight + 2) box.innerHTML = list + '<div class="pk-band">&#9632; END OF LIST &#9632;</div>' + list;
+      }
+      const lines = U.qualityLines(data.setup, data.journal, data.lineStatus, now), down = lines.filter(l => { const x = l.last || {}; return String(x.status || '').toUpperCase() === 'DOWN'; });
+      const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), data.journal, now, data.sensors).filter(t => ['HIGH', 'LOW'].indexOf(t.status) >= 0 || ['HIGH', 'LOW'].indexOf(t.lastStatus) >= 0);
+      const brk = U.shiftReport(U.shiftLog(data.shift, now, 168), '').down;
+      document.getElementById('foot').innerHTML = [
+        '<span class="' + (down.length ? 'bad' : '') + '">Lines: ' + (down.length ? down.length + ' down (' + escapeHtml(down.map(l => l.name || l.line).join(', ')) + ')' : 'all running') + '</span>',
+        '<span class="' + (temps.length ? 'bad' : '') + '">Temps: ' + (temps.length ? escapeHtml(temps.map(t => t.location + ' ' + (t.sensorTemp !== '' ? t.sensorTemp + '°F' : t.lastManualTemperature !== '' ? t.lastManualTemperature + '°F' : t.status)).join(', ')) : 'all in range') + '</span>',
+        '<span class="' + (brk.length ? 'bad' : '') + '">Breakdowns open: ' + brk.length + '</span>', '<span>Updates by itself</span>'].join('<i>·</i>');
+    }
+
+    // The next-to-load list rolls on the TV when it is longer than the screen.
+    setInterval(() => { const el = document.getElementById('next-scroll'); if (document.hidden || !el.querySelector('.pk-band')) return; el.scrollTop += 1; if (el.scrollTop >= el.scrollHeight / 2) el.scrollTop = 0; }, 45);
+
+    requireSignIn(async () => {
+      const { db } = await start();
+      let timer = null;
+      const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 80); };
+      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
+      onSnapshot(collection(db, 'plantLineStatus'), s => { data.lineStatus = s.docs.map(d => d.data()); later(); }, () => {});
+      onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});
+      onSnapshot(collection(db, 'sensors'), s => { data.sensors = s.docs.map(d => d.data()); later(); }, () => {});
+      const unsubs = [];
+      const watch = () => {
+        date = L.operatingDay(new Date());
+        unsubs.splice(0).forEach(u => u());
+        const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
+        unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); later(); }, fail('the loads')));
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => Object.assign({ _id: d.id }, d.data())); later(); }, fail('the plant journal')));
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', [0, 1, 2, 3, 4, 5, 6, 7].map(n => L.addDays(date, -n)))), s => { data.shift = s.docs.map(d => d.data()); later(); }, fail('the shift notes')));
+        unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); later(); }, fail('the pickups')));
+      };
+      watch();
+      // Behind moves with the clock; the day rolls at 6 AM.
+      setInterval(() => { if (L.operatingDay(new Date()) !== date) watch(); render(); }, 30000);
+      render();
+    });
+  </script>
+</body>
+</html>

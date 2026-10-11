@@ -54,6 +54,21 @@
 .plant-page button.pu.done { background: #e6f6ec; border-color: #a8dcb8; color: var(--runs-ink); }
 .plant-page button.pu i { font-style: normal; display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; border-radius: 9px; background: var(--pickup); color: #fff; font-size: 11px; }
 .plant-page button.edit-row { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+/* Loadout loading order: the up / down arrows stacked beside the route, and the route number itself is the drag handle (today's
+   loads only). The arrows are drawn by CSS so the cell's text stays the route. */
+.plant-page.loadout-page table.loadout td.lo-route { white-space: nowrap; padding-left: 4px; padding-right: 4px; }
+.plant-page .lo-order { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+.plant-page .lo-arrows { display: inline-flex; flex-direction: column; gap: 2px; }
+.plant-page .lo-move { width: 30px; height: 19px; padding: 0; border-radius: 5px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; }
+.plant-page .lo-move:disabled { color: #c3cdd8; cursor: default; }
+.plant-page .lo-move.up::before { content: "\25B2"; }
+.plant-page .lo-move.down::before { content: "\25BC"; }
+.plant-page .lo-grip { height: 38px; padding: 0 5px 0 3px; border-radius: 7px; border: 1px dashed #9fb3c8; background: #f5f8fb; color: var(--ink); font: inherit; font-size: 16px; font-weight: 800; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
+.plant-page .lo-grip::before { content: "\22EE"; margin-right: 3px; color: #7a8ca0; font-weight: 400; }
+.plant-page table.loadout tr.dragging td { background: #e8f1fa; }
+.plant-page table.loadout tr.drop-before td { box-shadow: inset 0 3px 0 var(--ud-blue); }
+.plant-page table.loadout tr.drop-after td { box-shadow: inset 0 -3px 0 var(--ud-blue); }
+body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select: none; }
 .plant-page .picker-pop { position: fixed; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px #0003; padding: 6px; display: grid; gap: 4px; }
 .plant-page .picker-pop button { min-width: 140px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page .picker-pop button.done { color: var(--runs-ink); }
@@ -156,6 +171,7 @@
 @media (max-width: 1500px) {
   /* Smaller screens: the day is in the date box, so the big day name gives its room to the counts. */
   .unload-page .dayname, .returns-page .dayname, .washing-page .dayname { display: none; }
+  body.yard-page .head .dayname { font-size: 18px; }
   .unload-page .hstats { gap: 6px; }
   .unload-page .hstats div { min-width: 60px; padding: 3px 8px; }
   .unload-page .hstats b { font-size: 18px; }
@@ -277,7 +293,7 @@
 .yard-page .yd-next small { display: block; font-weight: 700; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 .yard-page .yd-next.overdue { color: #bf2020; }
 .yard-page .yd-act { white-space: nowrap; }
-.yard-page button.yd-record, .yard-page button.yd-left { height: 34px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; padding: 0 10px; }
+.yard-page button.yd-record, .yard-page button.yd-left { height: 40px; min-width: 96px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; padding: 0 10px; }
 .yard-page button.yd-record { min-width: 84px; border: 0; background: var(--ud-blue); color: #fff; }
 .yard-page button.yd-left { margin-left: 6px; border: 1px solid #9fb3c6; background: #fff; color: var(--ud-blue-dark); }
 .yard-page button.yd-left[data-armed="true"] { background: #fff6e0; border-color: #f0a020; color: #8a4b00; }
@@ -326,6 +342,11 @@
 .quality-page .qc-lines button b { min-width: 26px; text-align: center; border-radius: 12px; background: #0b4f8a14; color: var(--ud-blue); font-size: 13px; padding: 2px 6px; }
 .quality-page .qc-lines button.active { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
 .quality-page .qc-lines button.active b { background: #ffffff33; color: #fff; }
+.quality-page .qc-lines button:has(small.qc-htst) { flex-wrap: wrap; row-gap: 0; padding-top: 6px; padding-bottom: 6px; }
+.quality-page .qc-lines button small.qc-htst { flex: 0 0 100%; padding-left: 22px; font-size: 14px; font-weight: 700; color: #1f7a45; }
+.quality-page .qc-lines button small.qc-htst.st-changeover { color: #b45f00; }
+.quality-page .qc-lines button small.qc-htst.st-down { color: #b42332; }
+.quality-page .qc-lines button.active small.qc-htst { color: #fff; }
 .quality-page .qc-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: #c5d1dc; }
 .quality-page .qc-dot.st-running { background: #1f9d55; } .quality-page .qc-dot.st-review, .quality-page .qc-dot.st-changeover { background: #e5891a; }
 .quality-page .qc-dot.st-down { background: #c62828; } .quality-page .qc-dot.st-finished { background: #5b6b7a; }
@@ -444,7 +465,29 @@
 .temp-page .tp-copy h2 { margin: 0; font-size: 20px; color: var(--ud-blue-dark); }
 .temp-page .tp-copy p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
 .temp-page .tp-actions { margin-left: auto; display: flex; gap: 8px; }
-.temp-page .tp-sensor { font-size: 14px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.temp-page .tp-sensor { margin-left: auto; font-size: 15px; font-weight: 800; color: var(--ud-blue-dark); white-space: nowrap; }
+/* Joe 10/10 picture: the top line fits on one line at 1920 and at 125% zoom: the title on one line, the counts compact,
+   and every button there the same height with its whole word. */
+.temp-page .head { flex-wrap: nowrap; align-items: center; }
+.temp-page .head .title { flex: none; }
+.temp-page .head .title h1 { white-space: nowrap; }
+.temp-page .head .hstats { flex: none; }
+.temp-page .head .hstats span { white-space: nowrap; }
+.temp-page .head .actions.in-head.top-row { flex: none; margin-left: auto; }
+.temp-page .head .actions.in-head.top-row button, .temp-page .head .actions.in-head.top-row .seg > button { width: auto; min-width: 0; max-width: none; height: 40px; min-height: 40px; padding: 0 12px; font-size: 14px; white-space: nowrap; flex: none; }
+.temp-page .head .actions.in-head.top-row .tp-actions { margin-left: 0; gap: 6px; }
+@media (max-width: 1750px) {
+  .temp-page .head { gap: 10px; }
+  .temp-page .head .title h1 { font-size: 24px; }
+  .temp-page .head .hstats div { min-width: 0; padding: 4px 9px; }
+  .temp-page .head .hstats b { font-size: 20px; }
+  .temp-page .head .hstats span { font-size: 10px; letter-spacing: .03em; }
+}
+/* Action column: Due, Locked and Saved read as clear tags (there is no Save button; each box saves as it is left). */
+.temp-page .tp-act .tp-pill { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.temp-page .tp-act .tp-pill.due { background: #fff3df; color: #b45f00; border: 1px solid #f1c98a; }
+.temp-page .tp-act .tp-pill.locked { background: #eef2f6; color: #4c5d6e; }
+.temp-page .tp-act .tp-pill.saved { background: #e6f6ec; color: var(--runs-ink); }
 .temp-page .tp-btn { min-width: 118px; height: 40px; border: 1px solid var(--ud-blue); border-radius: 9px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 15px; font-weight: 800; padding: 0 14px; cursor: pointer; white-space: nowrap; }
 .temp-page .tp-btn.on { background: var(--ud-blue); color: #fff; }
 .temp-page .tp-btn.alert { border-color: #c62828; color: #c62828; }
@@ -468,7 +511,7 @@
 .temp-page .tp-detail.bad { color: #c62828; }
 .temp-page button.tp-save { width: 100%; height: 38px; border: 0; border-radius: 8px; background: var(--ud-blue); color: #fff; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
 .temp-page button.tp-save:disabled { background: #c9d5e0; color: #4c5d6e; cursor: default; }
-@media (max-width: 1500px) { .temp-page .tp-sensor { display: none; } }
+
 @media (max-width: 1400px) { .temp-page .tp-copy p { display: none; } .temp-page .tp-btn { min-width: 0; } }
 /* Phone: manual checks only, as the current app's phone screen (name, manual read, notes, save); no history. */
 @media (max-width: 760px) {
@@ -684,17 +727,24 @@
 .plant-page .card[data-card], .manager-page .mc-card[data-href] { cursor: pointer; }
 
 /* Administration > MOCREO & Sensors (mocreo.html): the key and test on the left, the thermometers on the right. */
-.mocreo-page .mc-grid { display: grid; grid-template-columns: 440px 1fr; gap: 16px; padding: 0 16px 16px; align-items: start; }
-.mocreo-page .mc-left { display: grid; gap: 16px; }
+.mocreo-page .mc-grid { display: grid; grid-template-columns: minmax(330px, 400px) minmax(0, 1fr); gap: 16px; padding: 0 16px 16px; align-items: start; }
+.mocreo-page .mc-left { display: grid; gap: 12px; max-height: calc(100vh - 110px); overflow: auto; }
+.mocreo-page .mc-left .gps-card { padding: 12px 16px; gap: 8px; }
+.mocreo-page .mc-left .hint { font-size: 13px; }
+.mocreo-page .mc-left .gps-buttons button.big { min-height: 42px; font-size: 16px; }
 .mocreo-page .mc-therm { min-width: 0; }
 .mocreo-page .mc-scroll { max-height: calc(100vh - 330px); overflow: auto; }
 .mocreo-page .mc-table { width: 100%; table-layout: fixed; }
-.mocreo-page .mc-table input:not([type="checkbox"]), .mocreo-page .mc-table select { width: 100%; height: 36px; font-size: 15px; box-sizing: border-box; }
+.mocreo-page .mc-table input:not([type="checkbox"]), .mocreo-page .mc-table select { width: 100%; height: 36px; font-size: 15px; box-sizing: border-box; padding: 0 6px; text-align: left; }
+.mocreo-page .mc-table input[data-k$="Limit"] { text-align: center; }
+.mocreo-page .mc-table th, .mocreo-page .mc-table td { padding-left: 4px; padding-right: 4px; }
+.mocreo-page .mc-table .pm-remove { padding: 0 2px; font-size: 13px; }
 .mocreo-page .mc-table input[type="checkbox"] { width: 22px; height: 22px; }
 .mocreo-page .mc-table tr.off td { opacity: .55; }
-.mocreo-page .mc-now { font-weight: 800; color: var(--ud-blue); }
+.mocreo-page .mc-now { font-weight: 800; color: var(--ud-blue); white-space: nowrap; text-align: center; }
 @media (max-width: 1100px) { .mocreo-page .mc-grid { grid-template-columns: 1fr; } .mocreo-page .mc-scroll { max-height: none; } }
-.mocreo-page #add { white-space: nowrap; }
+/* MOCREO in Administration (Joe 10/10 picture): Add Thermometer keeps its whole name in the top line. */
+.mocreo-page .head .actions.in-head.top-row #add { width: auto; min-width: 92px; padding: 4px 14px; white-space: nowrap; flex: none; }
 /* Narrow screens (1366 laptops) and wider system fonts: the buttons keep their size and one line; the eyebrow, day name and
    header counts give way first. */
 .plant-page .head .actions.in-head.top-row { flex-shrink: 0; }
@@ -707,3 +757,95 @@
   .plant-page .head .hstats div { min-width: 0; padding: 4px 8px; }
   .plant-page .head .hstats b { font-size: 20px; }
 }
+
+/* 10/10 improvements: the Wash and RTA buttons on their own screens are big enough for a gloved tap on the tablet. */
+.washing-page button.wash, .returns-page button.rta { height: 40px; min-width: 84px; font-size: 14px; }
+
+/* 10/10 improvements: on a phone, Product Returns and Truck Washing show each line as a card (every column, labelled), with the
+   RTA / Wash button full width at the bottom, instead of a wide table to slide sideways. */
+@media (max-width: 760px) {
+  .plant-page:is(.returns-page, .washing-page) .sheet.scroll-list { overflow-x: hidden; }
+  .plant-page:is(.returns-page, .washing-page) .sheet.scroll-list table.loadout { min-width: 0; width: 100%; table-layout: auto; border-collapse: separate; border-spacing: 0 8px; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout colgroup, .plant-page:is(.returns-page, .washing-page) table.loadout thead { display: none; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody tr { display: block; background: #fff; border: 1px solid #d5dee8; border-radius: 10px; padding: 8px 10px; margin: 0 4px; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 0; padding: 3px 0; height: auto; text-align: right; white-space: normal; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td::before { flex: none; color: #5a6b7d; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; text-align: left; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td:first-child { justify-content: flex-start; text-align: left; font-size: 18px; border-bottom: 1px solid #e6edf3; padding-bottom: 6px; margin-bottom: 2px; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td:first-child::before { display: none; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td:last-child:has(button) { padding-top: 8px; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td:last-child::before { display: none; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td:last-child button { width: 100%; height: 46px; font-size: 16px; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td:empty { display: none; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td.empty { display: block; text-align: center; font-size: 15px; }
+  .plant-page:is(.returns-page, .washing-page) table.loadout tbody td.empty::before { display: none; }
+  .returns-page table.loadout tbody td:nth-child(2)::before { content: "Trailer"; }
+  .returns-page table.loadout tbody td:nth-child(3)::before { content: "Reported by"; }
+  .returns-page table.loadout tbody td:nth-child(4)::before { content: "Cases"; }
+  .returns-page table.loadout tbody td:nth-child(5)::before { content: "What came back"; }
+  .returns-page table.loadout tbody td:nth-child(6)::before { content: "Reported"; }
+  .returns-page table.loadout tbody td:nth-child(7)::before { content: "Status"; }
+  .washing-page table.loadout tbody td:nth-child(2)::before { content: "Reported"; }
+  .washing-page table.loadout tbody td:nth-child(3)::before { content: "Work needed"; }
+  .washing-page table.loadout tbody td:nth-child(4)::before { content: "Reports"; }
+  .washing-page table.loadout tbody td:nth-child(5)::before { content: "Notification"; }
+  /* A return still to put back: the red mark runs down the card's left edge instead of over the route number. */
+  .plant-page.returns-page tr.needs-return > td:first-child { box-shadow: none; }
+  .plant-page.returns-page table.loadout tbody tr.needs-return { box-shadow: inset 5px 0 0 #b42332; padding-left: 14px; }
+}
+
+/* Manager Center: the Reports button (Joe 10/10), opens the Plant Scorecard. */
+.manager-page .mc-repbtn { align-self: center; display: inline-flex; align-items: center; justify-content: center; height: 44px; min-width: 170px; padding: 0 18px; border-radius: 9px; border: 2px solid var(--ud-blue); background: var(--ud-blue); color: #fff; font-size: 17px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.manager-page .mc-repbtn:hover { background: var(--ud-blue-dark); }
+/* Joe 10/11: Receiving History (every past load, newest first) with a search box over the table. */
+.sched-page .sc-v-history { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.sched-page .sc-histbar input { width: 420px; max-width: 100%; height: 40px; font-size: 16px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; }
+
+/* Table text (Joe's standing rule, 10/10): the Loadout, Unloading, Returns and Washing tables keep about 16px text with their
+   buttons and pills at 15px, on the desktop and on a 1280 tablet. On a narrower screen the table keeps its columns and slides
+   sideways under the sticky header instead of squeezing; the truck box always shows the whole unit number. */
+.plant-page tr.divider td { font-size: 15px; }
+.plant-page:is(.loadout-page, .unload-page, .returns-page, .washing-page) table.loadout td { font-size: 16px; }
+.plant-page button.state, .plant-page button.clock, .plant-page button.pu, .plant-page button.edit-row,
+.plant-page button.rta, .plant-page button.wash, .plant-page .pill { font-size: 15px; }
+.plant-page button.pu i { font-size: 13px; }
+.plant-page small.next, .plant-page td.rr span { font-size: 14px; }
+.plant-page table.loadout td input { min-width: 0; padding: 0 4px; font-size: 16px; }
+.plant-page .running { white-space: nowrap; }
+@media (max-width: 1500px) {
+  .plant-page small.next { font-size: 14px; }
+  .plant-page:is(.loadout-page, .unload-page) .sheet.scroll-list { overflow-x: auto; }
+  .plant-page.loadout-page .sheet.scroll-list table.loadout { min-width: 1150px; }
+  .plant-page.unload-page .sheet.scroll-list table.loadout { min-width: 1150px; }
+}
+/* Temperatures: the range under each cooler, its status and the last reading stay readable. */
+.temp-page .tp-table small, .temp-page .tp-status, .plant-page .as-last, .plant-page .as-note { font-size: 14px; }
+.plant-page button.pu { white-space: nowrap; padding: 0 6px; max-width: 100%; }
+.temp-page .tp-pill { font-size: 14px; }
+.plant-page table.loadout td:has(> button.pu) { padding-left: 3px; padding-right: 3px; }
+.plant-page table.loadout td button { overflow-wrap: normal !important; }
+
+/* Product Returns: + Add Return (a return nobody noted). Big touch boxes for the Plant Station tablet, 16px text. */
+.returns-page .addret { flex-wrap: wrap; font-size: 16px; }
+.returns-page .addret label { font-size: 14px; font-weight: 700; }
+.returns-page .addret label.wide { flex: 1 1 280px; }
+.returns-page .addret select, .returns-page .addret input { height: 44px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; font: inherit; font-size: 16px; background: #fff; color: var(--ink); }
+.returns-page .addret select { min-width: 220px; max-width: 100%; }
+.returns-page .addret #add-other { margin-top: 6px; }
+.returns-page .addret #add-cases { width: 110px; }
+.returns-page .addret button { height: 44px; font-size: 16px; }
+@media (max-width: 700px) {
+  .returns-page .addret { margin: 0 8px; }
+  .returns-page .addret label, .returns-page .addret select { width: 100%; }
+}
+
+/* Loadout SKIP (the current app's Plant Station): Skip beside Start; a skipped load sits at the bottom of its group, marked. */
+/* Where the tablet's font runs wider, Skip drops under Start instead of running past the cell. */
+.plant-page .clock-cell { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; align-items: center; max-width: 100%; }
+.plant-page .clock-cell button.clock { min-width: 56px; padding: 0 8px; }
+.plant-page button.skip { min-width: 48px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid #bd7a00; background: #fff6df; color: #855400; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
+.plant-page .skip-tag { display: block; width: fit-content; margin: 3px auto 0; padding: 2px 8px; border-radius: 6px; background: #fff0d2; color: #8d5d00; font-size: 12px; font-weight: 800; letter-spacing: .03em; line-height: 1.25; }
+.plant-page tr.skipped > td { background: #fffaf0 !important; }
+/* Polish item 5 (Joe 10/11): a load or unload left running past 12 hours shows its start time in orange. */
+.plant-page .stale { color: #b45309; font-weight: 800; white-space: normal; line-height: 1.15; }
+/* Polish 6: Yard Checks shows the short date under the weekday, so the top line keeps its room. */
+.yard-page .head .dayname { white-space: pre-line; text-align: center; line-height: 1.1; }

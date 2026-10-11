@@ -59,13 +59,17 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, shortTime, showError, dateTimeText } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { fillIn, savedText, watchRound, clockOf } from './js/autosave.js';
+    import { shiftsFor, shiftAt } from './js/plant-reports.js';
+    import { nowMinutes } from './js/plant-core.js';
 
     // Shift Notes, option A (Joe 10/10): the kinds of entry down the left with their counts; open breakdowns carry over at the
-    // top until someone marks them Resolved; the new entry below them saves box by box. The shift comes from the time of the
-    // entry (no shift to pick). Send Current Report empties the entry boxes; anything still open stays on the list.
+    // top until someone marks them Resolved; the new entry below them saves box by box. Send Current Report empties the entry
+    // boxes; anything still open stays on the list. Joe 10/11 (review item 43): the shift is a drop-down of the plant's shifts
+    // (Administration > Plant Setup > Plant Shifts) that starts on the shift now (the earlier shift during an overlap) and can be
+    // changed by hand.
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
@@ -73,13 +77,13 @@
     const KINDS = [['Handoff', 'Handoff', 'Shift to shift'], ['Breakdown', 'Breakdowns'], ['Incident', 'Incidents'], ['Safety', 'Safety'], ['Quality', 'Quality'], ['Other', 'Other']];
     const NEW_WORD = { Handoff: 'New handoff note', Breakdown: 'New breakdown', Incident: 'New incident', Safety: 'New safety note', Quality: 'New quality note', Other: 'New entry' };
     let pane = params.get('view') === 'history' ? 'history' : 'current', kind = 'Breakdown';
-    let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null;
+    let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null, shifts = shiftsFor(null, 'fac_uniontown');
     const pending = [];
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
     const FOLLOW = { OPEN: 'Needs attention', MONITOR: 'Monitor', RESOLVED: 'Resolved' };
     const ST_CLASS = { OPEN: 'open', MONITOR: 'mon', RESOLVED: 'res' };
-    const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '') : ''; };
-    const dayStamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '') : ''; };
+    const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
+    const dayStamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortDate(t) + ' ' + shortTime(t) : ''; };
     const clockNow = () => new Date().toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
     const opt = (value, current, label) => '<option value="' + value + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + escapeHtml(label || value) + '</option>';
     const shiftWord = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : '';
@@ -92,12 +96,19 @@
     const week = () => U.shiftLog(merged(), Date.now(), 168);
     const day = () => U.shiftLog(merged(), Date.now(), 24);
 
-    // The new entry: the type picked on the left, the shift written in from the clock.
+    // The shift now on the plant's clock, as saved with an entry (FIRST SHIFT, ...).
+    const shiftNow = () => String(shiftAt(nowMinutes(new Date()), shifts) || U.shiftAt(Date.now())).toUpperCase();
+    const shiftOptions = (current) => {
+      const names = shifts.map(x => x.name.toUpperCase());
+      if (current && names.indexOf(current) < 0) names.push(current);
+      return names.map(n => opt(n, current, shiftWord(n))).join('');
+    };
+    // The new entry: the type picked on the left, the shift starting on the shift now.
     function drawForm() {
-      const ck = canSave(), m = phone.matches, shift = shiftWord(U.shiftAt(Date.now()));
+      const ck = canSave(), m = phone.matches, shift = shiftNow();
       const types = '<label>Type<select class="sn-type">' + U.ENTRY_TYPES.map(t => opt(t, kind)).join('') + '</select></label>';
       const equip = '<label' + (m ? ' class="wide"' : '') + '>Equipment / area<input class="sn-equip" maxlength="80" placeholder="Dock 3 door, Palletizer, Truck 214…"></label>';
-      const shiftBox = '<div class="qc-field sn-shift-text">Shift<span id="shift-now">' + escapeHtml(shift) + '</span><small>From the time of the entry</small></div>';
+      const shiftBox = '<label>Shift<select class="sn-shift" id="shift-now">' + shiftOptions(shift) + '</select></label>';
       const follow = '<label>Follow-up<select class="sn-follow">' + U.FOLLOW_UPS.map(f => opt(f, 'OPEN', FOLLOW[f])).join('') + '</select></label>';
       document.getElementById('fields').innerHTML = m
         ? types + shiftBox + equip + '<label class="wide">What happened?<textarea class="sn-entry" maxlength="4000" placeholder="What happened, and what has been done."></textarea></label>' +
@@ -107,7 +118,7 @@
           '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500" placeholder="What the next shift needs to know or do"></textarea></label>' + follow;
       document.getElementById('fields').querySelectorAll('input,select,textarea').forEach(x => { x.disabled = !ck; });
       // No Save button: the entry saves to the log as each box is left; Start Another Entry empties the form for the next one.
-      entry = { fill: fillIn('saveShiftNote', save), mine: null, round: roundStart };
+      entry = { fill: fillIn('saveShiftNote', save), mine: null, round: roundStart, shiftPicked: false };
       const last = document.getElementById('form-last');
       last.textContent = ck ? 'Every box saves when you leave it' : ''; last.classList.remove('bad', 'done');
       document.getElementById('another').hidden = true;
@@ -120,13 +131,13 @@
       const id = escapeHtml(x.entryId), saved = x.entryId && !/^pending-/.test(x.entryId), st = x.status || 'OPEN';
       const edge = st === 'RESOLVED' ? '#1f9d55' : st === 'MONITOR' ? '#e5891a' : isKind(x, 'Handoff') ? 'var(--ud-blue)' : '#c62828';
       const status = ck && saved
-        ? '<select class="st ' + ST_CLASS[st] + '" data-status="' + id + '" aria-label="Status">' + U.FOLLOW_UPS.map(f => opt(f, st, FOLLOW[f])).join('') + '</select>'
+        ? '<select class="st ' + ST_CLASS[st] + '" data-status="' + id + '" aria-label="Follow-up status for ' + escapeHtml(x.equipment || x.type || 'this entry') + '">' + U.FOLLOW_UPS.map(f => opt(f, st, FOLLOW[f])).join('') + '</select>'
         : '<span class="sn-status s-' + st.toLowerCase() + '">' + escapeHtml(U.followLabel(st)) + '</span>';
       return '<article class="sn-card" data-entry="' + id + '" style="border-left-color:' + edge + '"><div class="sn-card-head"><strong>' + escapeHtml([stamp(x.recordedAt) || x.readingTime, tag ? '' : (x.type || 'Note'), x.equipment, x.shift].filter(Boolean).join(' · ')) + '</strong>' +
         (tag || '') + status + '</div>' +
         (x.entry ? '<p>' + escapeHtml(x.entry) + '</p>' : '') + (x.notes ? '<p class="sn-next"><b>Notes / Follow-up:</b> ' + escapeHtml(x.notes) + '</p>' : '') +
         x.reviews.map(r => '<div class="sn-review"><b>Review ' + escapeHtml(stamp(r.recordedAt)) + '</b> · ' + escapeHtml(U.followLabel(r.followUpStatus)) + ' · ' + escapeHtml(r.entry) + '<small>' + escapeHtml(r.recordedBy) + '</small></div>').join('') +
-        (ck && saved ? '<div class="sn-addreview"><input data-review="' + id + '" maxlength="500" placeholder="Add a review note (saves when you leave the box)"></div>' : '') +
+        (ck && saved ? '<div class="sn-addreview"><input data-review="' + id + '" aria-label="Review note for ' + escapeHtml(x.equipment || x.type || 'this entry') + '" maxlength="500" placeholder="Add a review note (saves when you leave the box)"></div>' : '') +
         '<small class="sn-by">' + escapeHtml(x.recordedBy) + (saved ? '' : ' · saving…') + '</small></article>';
     }
     const tagOf = (x) => since(x.recordedAt) ? '<span class="tag new">NEW SINCE REPORT</span>' : '<span class="tag carry">CARRIED OVER' + (hoursAgo(x.recordedAt) ? ' · ' + hoursAgo(x.recordedAt) + ' h' : '') + '</span>';
@@ -224,15 +235,16 @@
 
     // Each box of the new entry saves as it is left, once the entry has some words: the first save puts the entry on the log,
     // later boxes fill it in.
-    document.getElementById('fields').addEventListener('change', async () => {
+    document.getElementById('fields').addEventListener('change', async (e) => {
       if (!canSave() || !entry) return;
+      if (e && e.target && e.target.matches('.sn-shift')) entry.shiftPicked = true;
       const f = document.getElementById('fields'), v = (c) => { const n = f.querySelector('.' + c); return n ? n.value.trim() : ''; };
       const text = v('sn-entry'), notes = v('sn-notes'), mine0 = entry.mine, cur = entry;
       if (!text && !notes) return;
       const values = { Entry: text, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') };
-      const fields = { values, notes, shift: '', readingTime: v('sn-time') || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
-      const mine = mine0 || record(values, { entryId: 'pending-' + Date.now(), shift: U.shiftAt(Date.now()) });
-      Object.assign(mine.payload, { values, readingTime: fields.readingTime, notes, followUpStatus: fields.followUpStatus });
+      const fields = { values, notes, shift: v('sn-shift') || shiftNow(), readingTime: v('sn-time') || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
+      const mine = mine0 || record(values, { entryId: 'pending-' + Date.now(), shift: fields.shift });
+      Object.assign(mine.payload, { values, shift: fields.shift, readingTime: fields.readingTime, notes, followUpStatus: fields.followUpStatus });
       mine.status = fields.followUpStatus;
       if (!mine0) { cur.mine = mine; pending.push(mine); }
       const last = document.getElementById('form-last');
@@ -281,7 +293,16 @@
       let unsub = null, day0 = '';
       const watch = () => { const t = today(); if (t === day0) return; day0 = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', [0, 1, 2, 3, 4, 5, 6, 7].map(n => L.addDays(t, -n)))), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the log')); };
       watch();
-      setInterval(() => { watch(); render(); const s = document.getElementById('shift-now'); if (s) s.textContent = shiftWord(U.shiftAt(Date.now())); }, 60000);
+      // The plant's own shifts; the drop-down follows the clock until someone picks a shift or the entry is saved.
+      onSnapshot(doc(db, 'plantShifts', 'fac_uniontown'), s => { shifts = shiftsFor(s.exists() ? s.data() : null, 'fac_uniontown'); followClock(true); }, () => {});
+      function followClock(redraw) {
+        const box = document.getElementById('shift-now');
+        if (!box || !entry || entry.shiftPicked || entry.mine) return;
+        const now = shiftNow();
+        if (redraw) box.innerHTML = shiftOptions(now);
+        box.value = now;
+      }
+      setInterval(() => { watch(); render(); followClock(false); }, 60000);
       render();
     });
   </script>

@@ -210,6 +210,7 @@ table.daily button.toggle, table.daily button.edit { line-height: 1; padding-top
 .modal-actions button, .down-add button, .down-list button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 .modal-actions button.primary { background: var(--ud-blue); color: #fff; border: 0; }
 .down-add { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: end; }
+.down-msg { margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: #fff4e5; color: #7a3d00; border: 1px solid #f0b46a; font-weight: 700; }
 .down-add button.warn { background: #fff4e5; color: #9a4b00; border-color: #f0b46a; }
 .down-list { margin-top: 12px; max-height: calc(100vh - 300px); overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
 .down-list table { font-size: 14px; }
@@ -636,6 +637,12 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .issues-page .pill.yes { background: #e3f4e8; color: #1d6b37; }
 .issues-page .pill.no { background: #eef2f5; color: #6b7c8c; }
 .issues-page .pill.warn { background: #fdecc4; color: #8a5a00; }
+.issues-page .from-mail { font-weight: 800; white-space: nowrap; }
+.issues-page .link-btn { border: 0; background: none; padding: 0; color: var(--ud-blue); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.issues-page .mail-meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 10px; font-size: 16px; }
+.issues-page .mail-meta dt { font-weight: 800; color: var(--ud-blue-dark); }
+.issues-page .mail-meta dd { margin: 0; }
+.issues-page .mail-text { white-space: pre-wrap; font: inherit; font-size: 16px; background: #f5f8fb; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; max-height: 55vh; overflow: auto; margin: 0; }
 .issues-page .count { display: inline-grid; place-items: center; min-width: 28px; height: 28px; border-radius: 14px; background: #eef2f5; font-weight: 800; }
 .issues-page .count.repeat { background: #fde3df; color: #a8321f; }
 .issues-page .work { display: inline-flex; flex-wrap: nowrap; gap: 4px; justify-content: center; }
@@ -822,6 +829,20 @@ html { background: var(--page); }
 .fleet-split.wide-left { grid-template-columns: 3fr 1fr; }
 .fleet-split h2 { margin: 6px 4px 8px; font-size: 17px; color: var(--ud-blue); }
 @media (max-width: 1200px) { .fleet-split, .fleet-split.wide-left { grid-template-columns: 1fr; } }
+.fleet-split h2 small { color: var(--muted); font-size: 13px; font-weight: 600; margin-left: 6px; }
+/* Fleet Service Setup: the service rules, Add Technician, and History's unit facts. */
+.fs-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin: 0 4px 6px; }
+.fs-rules label { display: grid; gap: 3px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.fs-rule { display: flex; align-items: center; gap: 6px; }
+.fs-rule input { width: 96px; height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px; }
+.fs-rule small { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.fs-addtech { display: flex; gap: 6px; margin: 8px 4px; }
+.fs-addtech input { flex: 1; min-width: 0; height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; }
+table.fs-facts th { text-align: left; width: 48%; color: var(--muted); font-weight: 700; }
+.fleet-page tr.clicky { cursor: pointer; }
+.fleet-page .head .tabs { flex: none; }
+.fleet-page .head .tabs button { white-space: nowrap; }
+.fleet-page tr.clicky:hover td { background: #eef5fb; }
 
 /* Over the Road */
 .otr-dash { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; padding: 4px; }
@@ -843,6 +864,22 @@ tr.otr-on td { background: #e3f3e8; }
 #otr-report h2 { margin: 4px; font-size: 18px; color: var(--ud-blue); }
 .otr-card > button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 .otr-page .actions select { min-height: 38px; padding: 0 10px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-weight: 700; }
+/* OTR Routes Setup: destination drop-downs and Include boxes sized to the row, like the other table pickers. */
+.otr-setup select { box-sizing: border-box; width: 88%; max-width: 380px; height: 40px; padding: 0 36px 0 12px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-size: 16px; font-weight: 700; color: var(--ud-blue); text-align: left; cursor: pointer;
+  appearance: none; -webkit-appearance: none; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%230b4f8a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.otr-setup select:hover { border-color: var(--ud-blue); }
+.otr-setup select:focus { border-color: var(--ud-blue); outline: 2px solid #3978aa55; outline-offset: 1px; }
+.otr-setup select:has(option[value=""]:checked) { color: #6b7d8f; font-weight: 600; }
+.otr-setup select option { color: var(--ink); font-weight: 600; }
+.otr-setup select:disabled { background-color: #eef2f6; color: #7a8797; cursor: not-allowed; }
+.otr-setup input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; vertical-align: middle; }
+.otr-setup input[type=checkbox]:disabled { cursor: not-allowed; }
+.otr-import { margin: 6px 6px 10px; padding: 10px 14px; border: 1px solid #a9c4dc; border-radius: 10px; background: #eef5fb; }
+.otr-import b { color: var(--ud-blue); font-size: 15px; }
+.otr-import table { width: auto; margin-top: 6px; border-collapse: collapse; }
+.otr-import td { padding: 3px 14px 3px 0; font-size: 14px; text-align: left; border: 0; height: auto; }
+.otr-import p { margin: 6px 0 0; color: var(--muted); }
+.otr-rep small.otr-by { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
 
 /* Driver Scorecard */
 .sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
@@ -887,9 +924,15 @@ tr.otr-on td { background: #e3f3e8; }
 .head:has(#print-sheet) .coverage b { font-size: 21px; line-height: 1.05; }
 .head:has(#print-sheet) .coverage span { font-size: 10px; line-height: 1.1; letter-spacing: .03em; }
 .head:has(#print-sheet) .actions.in-head { align-self: flex-end; }
+/* Joe 10/11: Week Beginning a little narrower, Loadout Day shows only the weekday, Delivery Day a little wider (one day name). */
+.head:has(#print-sheet) #week-begin { width: 118px; min-width: 0; }
+.head:has(#print-sheet) #load-day { width: 140px; min-width: 0; }
+.head:has(#print-sheet) #delivery-day { width: 160px; }
 @media (max-width: 1700px) {
   .head:has(#print-sheet) .field .stepper input, .head:has(#print-sheet) .field .stepper select { min-width: 0; width: 150px; }
-  .head:has(#print-sheet) #delivery-day { width: 110px; }
+  .head:has(#print-sheet) #week-begin { width: 118px; }
+  .head:has(#print-sheet) #load-day { width: 140px; }
+  .head:has(#print-sheet) #delivery-day { width: 160px; }
   .head:has(#print-sheet) h1 { font-size: 26px; }
   .head:has(#print-sheet) .coverage { width: 82px; }
 }
@@ -1305,3 +1348,170 @@ body.embed .head > .title { display: none; }
 /* Weekly (Joe 10/10): the driver drop-down opens right on the clicked box, like the current screen. */
 .popover.cell-pick { display: block; padding: 0; border: 0; border-radius: 7px; background: transparent; box-shadow: 0 0 0 2px var(--ud-gold), 0 6px 18px rgba(0,0,0,.25); }
 .popover.cell-pick select { width: 100%; height: 100%; border: 1px solid #bfd1e0; border-radius: 7px; background: #fff; color: #0e3a62; text-align: center; text-align-last: center; font-size: 15px; font-weight: 850; }
+
+/* Vacation Schedule (Joe 10/10): one View drop-down in place of the five filter buttons, and Print for the list shown. */
+.vac-view { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.vac-view select { height: 38px; min-width: 190px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 15px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--ud-blue); background: #fff; cursor: pointer; }
+#day-modal .notice.error { margin: 0 0 10px; }
+@media print { body:has(#print .vac-print) { background: #fff !important; } #print .vac-print-sub { margin: 0 0 8px; font-size: 12px; } #print table.vac-print { width: 100%; font-size: 12px; } #print table.vac-print :is(td, th):is(:first-child, :last-child) { text-align: left; } }
+
+/* Readable tables (Joe 10/10): Daily, Driver Check-ins and Sheet Conflicts keep 16px rows; a busy day scrolls inside the table. */
+.sheet.fit-scroll { overflow-y: auto !important; overflow-x: hidden; }
+.sheet.fit-scroll thead th { position: sticky; top: 0; z-index: 2; }
+@media print { .sheet.fit-scroll { max-height: none !important; overflow: visible !important; } }
+
+/* Joe 10/10 evening: Back and Home sit in the header beside the logo, not in the menu; the main screens' header has the
+   Administration button (Administrators only). The main screen's menu lists only the plants. */
+.topbar .brand:has(+ .hdr-nav) { margin-right: 0; }
+.topbar .hdr-nav { display: flex; align-items: center; gap: 8px; margin: 0 auto 0 12px; }
+.topbar .hdr-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 16px; font-size: 16px; font-weight: 800; white-space: nowrap; }
+.topbar .hdr-btn svg { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.topbar .hdr-btn:hover { background: #e8f1fb; }
+body:not(.is-admin) .topbar .hdr-admin { display: none; }
+.sidemenu .side-plant[hidden], .side-flyouts a[data-plant][hidden] { display: none !important; }
+@media (max-width: 1100px) { .topbar .hdr-btn span { display: none; } .topbar .hdr-btn { padding: 0 11px; } }
+/* Joe 10/10 evening: no icons in the menu on any page, so folded it is just the menu button; the mouse over it (or a tap)
+   opens the menu over the screen, and the menu button pins it open. */
+.sidemenu a, .sidemenu .side-sec-btn { padding-left: 14px; }
+body.side-folded .sidemenu > :not(.side-toggle) { opacity: 0; }
+body.side-folded .sidemenu .side-toggle { align-self: center; margin: 2px 0 6px; }
+/* Phones: Back and Home take their own row under the logo, so the title keeps its room beside the logo. */
+@media (max-width: 480px) {
+  body.has-side .topbar { flex-wrap: wrap; row-gap: 4px; }
+  body.has-side .topbar .brand { flex: 1 1 0; }
+  body.has-side .topbar .hdr-nav { order: 5; flex-basis: 100%; margin: 0; }
+}
+
+/* Joe 10/11 (review item 1): Daily Dispatch on a phone. The top boxes wrap onto more lines, and the table keeps every
+   column at readable 16px text: it scrolls sideways with the Route column pinned, and a long day scrolls under a
+   sticky heading. Phones only; laptops and desk screens keep their one-line layout. */
+@media (max-width: 700px) {
+  body.daily-look .head:has(#print-sheet) { flex-wrap: wrap; row-gap: 8px; align-items: flex-end; }
+  body.daily-look .head:has(#print-sheet) .title { flex-basis: 100%; }
+  body.daily-look .head:has(#print-sheet) h1 { font-size: 24px; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head { flex-wrap: wrap; width: 100%; margin-left: 0; justify-content: flex-start; gap: 8px; }
+  body.daily-look .sheet, body.daily-look .sheet.fit-scroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  body.daily-look table.daily { min-width: 1250px; }
+  body.daily-look table.daily td, body.daily-look table.daily th { font-size: 16px !important; height: 44px; }
+  body.daily-look table.daily td.route { font-size: 18px !important; }
+  body.daily-look table.daily thead th { position: sticky; top: 0; z-index: 3; white-space: normal; line-height: 1.1; }
+  body.daily-look table.daily tbody tr:not(.group) td:first-child { position: sticky; left: 0; z-index: 1; }
+  body.daily-look table.daily thead th:first-child { left: 0; z-index: 4; }
+  body.daily-look table.daily col:first-child { width: 84px !important; }
+  body.daily-look table.daily thead th { letter-spacing: .03em; }
+  body.daily-look table.daily tbody tr.group td { overflow: visible; }
+  body.daily-look table.daily tbody tr.group td .gtext { display: inline-block; position: sticky; left: 14px; }
+  body.daily-look .footer { flex-wrap: wrap; }
+}
+
+/* Table text (Joe's standing rule, 10/10): tables keep about 16px text and scroll under a sticky header; they never shrink
+   text to fit. A cell whose text still does not fit at 15px wraps onto a second line instead of being cut off. */
+td.fit-wrap, td.fit-wrap * { white-space: normal !important; text-overflow: clip !important; overflow-wrap: break-word; }
+.weekly-page #routes-sheet td.day.fit-wrap .nm { line-height: 1.05; }
+.weekly-page #routes-sheet td.day:not(.off) { font-size: 16px; }
+.weekly-page .week th small { font-size: 13px; }
+.weekly-page #routes-sheet td.day .notrun { font-size: 12px; }
+.weekly-page .board td { font-size: 15px; }
+.weekly-page .board td.strong { font-size: 16px; }
+.weekly-page .board td.day.many { font-size: 14px; }
+.weekly-page #routes-sheet td.day.editable:not(.off)::after { font-size: 14px; }
+/* Equipment: the day columns show the run each unit is on at the same size as the rest of the row. */
+th.eq-day { font-size: 16px; }
+td.eq-day { font-size: 16px; }
+.equipment-page span.tag, table td span.tag { font-size: 14px; }
+table td button.warn { font-size: 15px; }
+/* Vacation calendar day box: Edit and Remove on each entry (Remove asks twice); a name on the calendar opens it to edit. */
+.day-row .day-acts { display: inline-flex; gap: 4px; flex: none; }
+.day-row .day-acts button { min-height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.day-row .day-acts button.danger { color: #b3261e; border-color: #e7b4b0; }
+.day-row .day-acts button.armed { background: #b3261e; color: #fff; border-color: #b3261e; }
+.day-row.editing { border-color: var(--ud-blue); box-shadow: inset 4px 0 0 var(--ud-blue); }
+.day-row > div { min-width: 0; flex: 1; }
+.calendar .cday span[data-vac-id]:hover { outline: 2px solid var(--ud-blue); outline-offset: -1px; }
+.modal.wide-modal#day-modal { width: min(1040px, calc(100vw - 32px)); }
+#day-modal .day-body { grid-template-columns: 1.15fr 1fr; }
+#day-modal .day-row { flex-wrap: wrap; }
+#day-modal .day-row > div:first-child { flex: 1 1 200px; }
+#day-modal .day-row b { white-space: nowrap; margin-right: 6px; }
+
+/* Route Distribution home (review item 16): the Dispatch and Drivers cards carry the current app's quick staffing numbers,
+   Covered % and drivers Available today, as a fifth tile. */
+.card.home4 .dc-metrics.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* Route Editor tools (old Route Editor, review item 14): Recap totals, Load Order up / down, Route Details for many runs. */
+.routes-page .recap-totals { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 0 16px 8px; }
+.routes-page .recap-totals > div { padding: 10px 8px; text-align: center; background: #edf6ff; border: 1px solid #c6dced; border-radius: 12px; color: #0e3a62; }
+.routes-page .recap-totals strong { display: block; font-size: 28px; line-height: 1.1; }
+.routes-page .recap-totals span { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.routes-page .recap-totals p { grid-column: 1 / -1; margin: 0; font-size: 14px; color: var(--muted); }
+.routes-page .recap-totals[hidden] { display: none; }
+.routes-page table.routes.recap tfoot td { text-align: center; position: sticky; bottom: 0; z-index: 1; background: #e3edf6; font-weight: 800; color: #0e3a62; border-top: 2px solid #9fbbe0; }
+.routes-page table.routes.seq td.move { padding: 3px 4px; white-space: nowrap; }
+.routes-page table.routes.seq button.seq-move { width: 44px; height: 32px; margin: 0 2px; border: 1px solid #9dc2df; border-radius: 7px; background: #edf7ff; color: #0a5e9d; font-size: 16px; cursor: pointer; }
+.routes-page table.routes.seq button.seq-move:disabled { opacity: .35; cursor: default; }
+.routes-page table.routes.many td:has(> select.rf) { padding: 3px 4px; }
+.routes-page table.routes.many select.rf { width: 100%; height: 34px; border: 1px solid #c5d3df; border-radius: 6px; font: inherit; font-weight: 700; color: var(--ink); background: #fff; }
+.routes-page table.routes.many input[type="checkbox"].rf { width: 22px; height: 22px; margin: 0; cursor: pointer; accent-color: #0e4f87; }
+.routes-page table.routes.many input[type="checkbox"].rf:disabled { cursor: default; }
+/* Route Week Override: Reset asks twice (the button turns orange and says Click Again). */
+.routeweek-page #reset.armed { background: #b45309; color: #fff; border-color: #b45309; }
+/* Improvements 10/10: an error stays readable above an open pop-up's dimmed backdrop. */
+.notice.error:not([hidden]) { position: relative; z-index: 30; }
+/* Joe 10/11 (polish pass, item 1): the top buttons keep their words on one line, all the same height; each button is as wide
+   as its words. This replaces the square word-wrapped tiles of 10/10. On a laptop the buttons may move to a line of their own
+   under the title, but a button's words are never split. */
+.head .actions.in-head button, .weekly-page .head .actions.in-head button, .head .actions.in-head a.button,
+.actions.tiles > button, .actions.tiles > a.button,
+.head .actions.in-head.top-row > :is(button, a.button), .head .actions.in-head.top-row .top-part > :is(button, a.button),
+.head .actions.in-head.top-row .actions.tiles > :is(button, a.button) {
+  width: var(--top-btn-w, auto); min-width: var(--top-btn-w, 0); max-width: none; height: 42px; min-height: 42px; padding: 0 14px; border-radius: 9px;
+  white-space: nowrap; justify-content: center; text-align: center; line-height: 1; font-size: 14px; font-weight: 800; flex: none;
+}
+/* The coverage figure is the same height as the buttons; a top line too long for one row puts the buttons on a row of their own. */
+.head:has(#print-sheet) .coverage { width: auto; min-width: 92px; height: 42px; padding: 1px 10px; }
+.head:has(#print-sheet) .coverage b { font-size: 18px; }
+.head:has(#print-sheet) .coverage span { white-space: nowrap; }
+@media (max-width: 1700px) { .head:has(#print-sheet) .coverage { width: auto; } }
+.head:has(.actions.in-head) { flex-wrap: wrap; row-gap: 8px; }
+.head .actions.in-head { margin-left: auto; }
+.hub-tiles > a.button { max-width: none !important; min-width: var(--top-btn-w, 0) !important; width: var(--top-btn-w, auto) !important; }
+.hub-tiles > a.button span { white-space: nowrap; }
+.head .actions.in-head.top-row :is(#prev, #next) { height: 42px; min-height: 42px; }
+body .head :is(.sc-btn, .tp-btn, .sc-today):not(.small) { height: 42px; min-height: 42px; white-space: nowrap; }
+/* Polish item 7 (Joe 10/11): a zero count is plain grey, never orange or red. */
+.zero b, .hub-tile.zero b { color: #7b8794 !important; }
+body.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: var(--top-btn-w, 140px); min-width: var(--top-btn-w, 140px); max-width: none; height: 42px; min-height: 42px; }
+.temp-page .head .actions.in-head.top-row > .tp-btn { width: var(--top-btn-w, auto); min-width: var(--top-btn-w, 0); height: 42px; min-height: 42px; }
+.head:has(#print-sheet) { flex-wrap: wrap; }
+
+/* Fleet Service report: the Reviewed by / Date line under the week's work (the current app's sign-off). */
+#print .print-sign { margin: 18px 0 6px; font-weight: 700; }
+/* Weekly: the Publish note and the read-only / preview notes (Joe 10/11, review item 6). */
+.wk-note { margin: 0 16px 8px; padding: 8px 14px; border-radius: 10px; font-size: 16px; font-weight: 600; }
+.wk-note.warn { background: #fff4d6; color: #6b4b00; border: 1px solid #f0d58a; }
+.wk-note.good { background: #e3f4e8; color: #1d5b2f; border: 1px solid #a9d8b6; }
+/* Polish item 2 (Joe 10/11): the screen an old-app Dispatch Administration card opens, in small grey under its words. */
+.admin-card .admin-opens { display: block; margin-top: 6px; font-style: normal; font-size: 14px; font-weight: 700; color: #6b7a89; }
+/* Polish 13: status tags read in normal case ("Approved", "Manual only"); the stored words stay as they are. */
+span.status, .vstatus, .temp-page .tp-status, .nice-case { display: inline-block; text-transform: lowercase; }
+span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-letter, .nice-case::first-letter { text-transform: uppercase; }
+/* Polish 10: the one "Test copy" badge in the header. */
+.topbar .test-copy-badge { align-self: center; flex: none; background: var(--test-bg, #fff6d6); color: var(--test-ink, #7a5a00); border: 1px solid #e8cf73; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+@media (max-width: 700px) { .topbar .test-copy-badge { padding: 2px 8px; font-size: 12px; } }
+/* Polish 11: Fleet Service tabs even and on one line (an empty count no longer pads a tab), and the long subtitle wraps under
+   under the title. */
+.issues-page .tabs button b:empty { display: none; }
+.fleet-page .head .tabs { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.fleet-page .head .tabs button { white-space: nowrap; height: 42px; min-height: 42px; }
+.fleet-page .head .title { flex: 1 1 300px; min-width: 260px; }
+.fleet-page .head .title small { white-space: normal; display: block; }
+.fleet-page .head .title h1 { white-space: nowrap; }
+/* Polish 23: on a phone the header never squeezes the app name into a one-letter column (Phone Screens, Garage Station):
+   with the Administration button (or on the garage tablet) the logo stands alone, and buttons keep their words on one line. */
+@media (max-width: 480px) {
+  body.is-admin .topbar:has(.hdr-admin) .brand > span, body.gs-page .topbar .brand > span { display: none; }
+  body.is-admin .topbar:has(.hdr-admin) .brand, body.gs-page .topbar .brand { flex: none; }
+  .topbar button, .topbar .hdr-btn, .topbar a.button { white-space: nowrap; }
+}
+/* Polish 16: the no-connection bar. */
+.offline-bar { position: sticky; top: 0; z-index: 1000; background: #fff3c4; color: #6b4d00; border-bottom: 2px solid #e5b800; padding: 10px 16px; font-size: 16px; font-weight: 800; text-align: center; }
+.offline-bar[hidden] { display: none; }

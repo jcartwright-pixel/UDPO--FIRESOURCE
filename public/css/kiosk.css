@@ -1,0 +1,42 @@
+/* Plant Performance kiosk (Joe 10/10): big text for a TV, like the Driver Station; ?tv=1 hides the slim header. */
+html:has(body.pk-page) { background: #0d1b2a; }
+body.pk-page { background: #0d1b2a; color: #fff; font-size: 16px; }
+body.pk-page .topbar { min-height: 52px; }
+body.pk-page .pk-nav { min-width: 90px; }
+body.pk-full .topbar { display: none !important; }
+.pk { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding: 18px 26px 16px; }
+.pk-title { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; }
+.pk-title h1 { margin: 0; font-size: 40px; color: #f2b705; letter-spacing: .02em; }
+.pk-title b { font-size: 34px; }
+.pk-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.pk-kpis div { background: #16263a; border-radius: 16px; padding: 16px 22px; }
+.pk-kpis span { font-size: 22px; color: #9fb3c8; text-transform: uppercase; }
+.pk-kpis b { display: block; font-size: 80px; line-height: 1.05; }
+.pk-kpis b small { font-size: 38px; color: #9fb3c8; }
+.pk-kpis i { font-style: normal; font-size: 20px; color: #9fb3c8; }
+.pk-kpis b.good { color: #22c55e; } .pk-kpis b.warn { color: #facc15; } .pk-kpis b.bad { color: #ef4444; }
+.pk-areas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+.pk-areas:empty { display: none; }
+.pk-areas div { background: #16263a; border-radius: 14px; padding: 12px 22px; font-size: 26px; display: grid; grid-template-columns: 1fr auto; row-gap: 8px; }
+.pk-areas u { grid-column: 1 / 3; display: block; height: 22px; background: #2a3d55; border-radius: 11px; overflow: hidden; text-decoration: none; }
+.pk-areas s { display: block; height: 100%; background: #22c55e; }
+.pk-next { flex: 1; min-height: 0; background: #16263a; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
+.pk-row { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1.4fr 1.6fr; gap: 12px; padding: 10px 20px; font-size: 26px; border-bottom: 1px solid #2a3d55; align-items: center; }
+.pk-row .rt { font-weight: 800; }
+.pk-headrow { background: #1f3a5c; font-size: 18px; color: #cfe3f6; letter-spacing: .06em; padding: 10px 20px; }
+.pk-scroll { flex: 1; min-height: 0; overflow: hidden; }
+.pk-row.bad .st { color: #ef4444; font-weight: 800; }
+.pk-row.loading .st { color: #facc15; font-weight: 800; }
+.pk-band { text-align: center; padding: 10px; font-size: 20px; color: #f2b705; background: #0d1b2a; letter-spacing: .12em; }
+.pk-empty { font-size: 26px; padding: 20px; color: #9fb3c8; margin: 0; }
+.pk-foot { font-size: 22px; color: #9fb3c8; display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.pk-foot .bad { color: #ef4444; }
+.pk-foot i { font-style: normal; }
+@media (max-width: 900px) {
+  .pk-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pk-kpis b { font-size: 54px; }
+  .pk-areas { grid-template-columns: 1fr; }
+  .pk-row { grid-template-columns: 2fr 1fr 1fr; font-size: 20px; }
+  .pk-row > :nth-child(4), .pk-row > :nth-child(2) { display: none; }
+  .pk-title h1 { font-size: 28px; } .pk-title b { font-size: 22px; }
+}

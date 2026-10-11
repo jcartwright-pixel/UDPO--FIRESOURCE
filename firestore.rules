@@ -18,6 +18,8 @@ service cloud.firestore {
     match /config/app { allow read: if activeUser(); }
     match /config/fleetSync { allow read: if activeUser(); }
     match /config/mocreo { allow read: if activeUser(); }
+    // Fleet Service's service rules (Fleet Service Setup; the server writes them).
+    match /config/fleetRules { allow read: if activeUser(); }
     // MOCREO cooler sensors (server only writes them).
     match /sensors/{id} { allow read: if activeUser(); }
     // Thermometer locations changed in Administration > MOCREO & Sensors (the server writes them; the key stays in private/).
@@ -34,6 +36,7 @@ service cloud.firestore {
     match /vacations/{id} { allow read: if activeUser(); }
     match /plantLoads/{id} { allow read: if activeUser(); }
     match /maintenance/{id} { allow read: if activeUser(); }
+    match /mailCopies/{id} { allow read: if activeUser(); }
     match /workOrders/{id} { allow read: if activeUser(); }
     match /fleetSetup/{id} { allow read: if activeUser(); }
     match /garageTechs/{id} { allow read: if activeUser(); }
@@ -55,6 +58,7 @@ service cloud.firestore {
     // The production lines, temperature locations and the lines' last checks.
     match /plantSetup/{id} { allow read: if activeUser(); }
     match /plantProducts/{id} { allow read: if activeUser(); }
+    match /plantShifts/{id} { allow read: if activeUser(); }
     match /plantLineStatus/{id} { allow read: if activeUser(); }
     // Plant reports sent from the Manager Center, and whether each was emailed.
     match /plantReports/{id} { allow read: if activeUser(); }

@@ -27,7 +27,8 @@ export const ADMIN_GROUPS = [
     ['switch', 'Which App Runs Each Screen', 'On the Route Distribution page, an administrator clicks a screen\'s tag twice to run it from the new app, and turns the write-back on or off.', 'distribution.html', 'swap']
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
-    ['machine-products', 'Machine Products', 'The products each machine runs (RedZone, Uniontown): the Product drop-down on Quality Checks. Add, change or remove a product and its SKU.', 'products.html', 'production.webp']
+    ['machine-products', 'Machine Products', 'The products each machine runs (RedZone, Uniontown): the Product drop-down on Quality Checks. Add, change or remove a product and its SKU.', 'products.html', 'production.webp'],
+    ['plant-shifts', 'Plant Shifts', 'Each plant\'s shifts (Uniontown: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week']
   ]],
   // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.
   ['Connections & Keys', 'The API keys the app uses: paste, replace and test them here', [
@@ -39,11 +40,13 @@ export const ADMIN_GROUPS = [
   ]],
   ['System Tools', 'Stations and checks', [
     ['window-test', 'Window Test Center', 'Opens every screen at each window size to check nothing is cut off.', '', 'check'],
-    ['driver-station', 'Driver Station', 'The driver board and check-in station.', 'driver-station.html', 'distribution-truck-v1-560.webp']
+    ['driver-station', 'Driver Station', 'The driver board and check-in station.', 'driver-station.html', 'distribution-truck-v1-560.webp'],
+    ['plant-station', 'Plant Station', 'The plant floor tablet: pick its station, then Loading, Unloading, Washing and Returns.', 'plant-station.html', 'plant-building-v1-560.webp'],
+    ['phone-screens', 'Phone Screens', 'Every phone, tablet and kiosk screen with its link (Driver Check-In, Garage and Plant Station, Driver Room kiosk and TV), to try from this computer.', 'phone-screens.html', 'people']
   ]],
   ['Diagnostics', 'Checks and repairs for the data behind the app', [
     ['preflight', 'Run Runtime Pre-Flight', 'Checks every sheet, column and setting the app needs and lists anything missing.', '', 'check'],
-    ['update-live', 'Update Live Sheets', 'Writes the latest changes to the Live sheets (press twice).', '', 'swap'],
+    ['update-live', 'Update Live Sheets', 'Rebuilds the Current and Next weeks from Route Master and the drivers\' standard runs, and adds missing runs (press twice).', '', 'swap'],
     ['refresh-home', 'Refresh Home Summary Now', 'Rebuilds the all-plants overview numbers right away.', '', 'factory'],
     ['plant-fresh', 'Start Plant Fresh From Today', 'Starts the plant screens over from today\'s loads.', '', 'factory'],
     ['date-inventory', 'Date Inventory', 'Lists the dates each sheet holds.', '', 'day'],

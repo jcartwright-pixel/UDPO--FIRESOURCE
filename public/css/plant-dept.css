@@ -44,7 +44,7 @@
 .dept-a .card .li.bad { border-color: #f2c4c4; background: #fff7f7; } .dept-a .card .li.bad .tag { color: var(--pickup); }
 .dept-a .card .li .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 /* horizontal bars */
-.dept-a .hb { display: grid; grid-template-columns: 150px 1fr 54px; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #0a3866; margin-bottom: 6px; }
+.dept-a .hb { display: grid; grid-template-columns: 150px 1fr auto; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #0a3866; margin-bottom: 6px; }
 .dept-a .hb .track { height: 14px; background: #e6edf4; border-radius: 7px; overflow: hidden; } .dept-a .hb .track i { display: block; height: 100%; border-radius: 7px; }
 .dept-a .hb b { text-align: right; font-size: 13px; }
 .dept-a { grid-template-columns: 1fr 1fr; grid-template-rows: 1.25fr 1fr; }

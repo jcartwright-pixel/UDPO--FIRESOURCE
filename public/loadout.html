@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page loadout-page">
   <div class="signin" id="signin" hidden>
@@ -96,6 +97,14 @@
     const today = () => L.operatingDay(new Date());
     let runs = [], pickups = [], person = null, app = {};
     const pending = {};           // row id -> fields shown before the server has them
+    /* The current app's Plant Station SKIP (PlantStation.html:263-269, Joe 10/07: "only to be able to come back to it later"):
+       it saves nothing. A load not started moves to the bottom of its group on this screen, marked SKIPPED · COME BACK, until
+       it is started. Kept on this tablet for the loadout day (sessionStorage), so going to another screen and back keeps it. */
+    const SKIP_KEY = 'udLoadoutSkipped';
+    const readSkips = () => { try { return JSON.parse(sessionStorage.getItem(SKIP_KEY) || '{}') || {}; } catch (e) { return {}; } };
+    const skipped = readSkips();
+    const keepSkips = () => { try { sessionStorage.setItem(SKIP_KEY, JSON.stringify(skipped)); } catch (e) { /* private window: this visit only */ } };
+    const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state !== 'DONE' && r.state !== 'LOADING';
     const unsubs = [];
 
     const canLoad = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
@@ -111,18 +120,36 @@
     }
 
     const COLS = {
-      normal: [['Route', 6], ['Run', 13], ['Driver / CVG', 14], ['Truck', 8], ['Trailer', 8], ['', 8], ['Depart', 7], ['Status', 9], ['', 7], ['Total Time', 7], ['P/U', 6], ['', 7]],
+      normal: [['Route', 6], ['Run', 9], ['Driver / CVG', 11], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
       TANKER: [['Route', 7], ['Run', 15], ['Driver / CVG', 15], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
+    // With the loading order editable (today, someone who can load), the Route column also holds the up / down arrows and
+    // the route becomes the drag handle, so it is wider; Driver, Depart and Edit give up the room (Truck and Trailer keep theirs).
+    const ORDER_COLS = {
+      normal: [['Route', 11], ['Run', 9], ['Driver / CVG', 9], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 6], ['Status', 9], ['', 11], ['Total Time', 5], ['P/U', 8], ['', 6]],
+      TANKER: [['Route', 11], ['Run', 13], ['Driver / CVG', 13], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
+    };
+
+    // Loading order (as in the old app): today's loads of the shown department can be dragged by the handle, or moved one
+    // place with the arrows; the new order is saved as today's load_sequence_override, which Driver Station, View Loadout
+    // and Plant Station follow. Only today (the operating day, rolling at 6 AM); prior-day loads keep their place on top.
+    const canOrder = () => canLoad() && date === today();
+    const orderRows = (rows) => rows.filter(r => !r.prior && r.loadDate === date);
+    // A skipped load waits at the bottom without arrows or handle; the others move around it (its place in the order is kept).
+    const shownOrder = () => orderRows(rowsNow().filter(r => r.area === area)).filter(r => !isSkipped(r));
+    let drag = null, heldRender = false;
 
     function render() {
+      if (drag) { heldRender = true; return; }
       const all = rowsNow(), byArea = {};
       P.AREAS.forEach(a => { byArea[a] = all.filter(r => r.area === a); });
-      const rows = byArea[area], c = P.counts(rows), info = P.AREA[area];
+      // Skipped loads go to the bottom of their group (still open from a prior day first, then today).
+      const rows = byArea[area].map((r, i) => ({ r, i, k: (r.prior ? 0 : 2) + (isSkipped(r) ? 1 : 0) })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.r);
+      const c = P.counts(rows), info = P.AREA[area];
       document.getElementById('title').textContent = info.title;
       document.title = info.title + ' · New Plant Operations';
       document.getElementById('load-date').value = date;
-      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + (date === today() ? '' : '  ·  ' + shortDate(date));
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       document.getElementById('hstats').innerHTML = [['Runs', c.total, ''], ['Loaded', c.done, 'good'], ['Loading', c.loading, 'warn']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.getElementById('areas').innerHTML = P.AREAS.map(a => {
@@ -131,7 +158,8 @@
           '<span class="ring" style="--p:' + pct + '"><b>' + ac.done + '/' + ac.total + '</b></span><span><strong>' + P.AREA[a].tile + '</strong><small>' + ac.done + ' loaded · ' + (ac.total - ac.done) + ' to load</small></span></button>';
       }).join('');
       drawTrailers(rows);
-      const pu = rows.flatMap(r => P.pickupsFor(r, pickups)), puOpen = pu.filter(P.pickupOpen).length;
+      const pk = P.withNotePickups(all, pickups);
+      const pu = rows.flatMap(r => P.pickupsFor(r, pk)), puOpen = pu.filter(P.pickupOpen).length;
       const behind = rows.filter(r => P.isBehind(r, today())).length, pct = c.total ? Math.round(c.done * 100 / c.total) : 0;
       document.getElementById('strip').innerHTML =
         '<span><b>' + c.done + ' of ' + c.total + '</b> loaded <span class="bar"><i style="width:' + pct + '%"></i></span></span>' +
@@ -140,31 +168,46 @@
         '<span>' + escapeHtml(info.label) + ' <b>' + c.quantity.toLocaleString() + '</b></span>' +
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
-      const cols = area === 'TANKER' ? COLS.TANKER : COLS.normal;
+      const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r)) : [], ordering = movable.length > 1;
+      const cols = (ordering ? ORDER_COLS : COLS)[area === 'TANKER' ? 'TANKER' : 'normal'];
       document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
       const edit = canLoad(), dis = edit ? '' : ' disabled';
+      const orderIds = ordering ? movable.map(r => r.id) : [];
+      // The arrows have no text of their own (drawn by CSS) and the handle is the route number, so the cell's text stays the route.
+      const routeCell = (r) => {
+        const i = orderIds.indexOf(r.id);
+        if (i < 0) return '<td class="strong">' + escapeHtml(r.route) + '</td>';
+        const name = escapeHtml(r.route + ' ' + r.run);
+        return '<td class="strong lo-route"><span class="lo-order"><span class="lo-arrows">' +
+          '<button type="button" class="lo-move up" data-move="-1" data-id-move="' + r.id + '" aria-label="Load ' + name + ' earlier" title="Load earlier"' + (i === 0 ? ' disabled' : '') + '></button>' +
+          '<button type="button" class="lo-move down" data-move="1" data-id-move="' + r.id + '" aria-label="Load ' + name + ' later" title="Load later"' + (i === orderIds.length - 1 ? ' disabled' : '') + '></button></span>' +
+          '<button type="button" class="lo-grip" data-grip="' + r.id + '" aria-label="Drag ' + name + ' to a new place in the loading order" title="Drag to change the loading order">' + escapeHtml(r.route) + '</button></span></td>';
+      };
       let html = '', lastPrior = null;
       rows.forEach(r => {
         if (r.prior !== lastPrior) {
-          html += r.prior ? '<tr class="divider prior"><td colspan="' + cols.length + '">PRIOR DAY LOADS · ' + shortDate(r.loadDate) + ' — complete these to clear them</td></tr>'
+          html += r.prior ? '<tr class="divider prior"><td colspan="' + cols.length + '">PRIOR DAY LOADS · ' + shortDate(r.loadDate) + ' — still open, finish these first</td></tr>'
             : (lastPrior === true ? '<tr class="divider today"><td colspan="' + cols.length + '">TODAY · ' + shortDate(date) + '</td></tr>' : '');
           lastPrior = r.prior;
         }
-        const st = r.state, items = P.pickupsFor(r, pickups), open = items.filter(P.pickupOpen).length;
+        const st = r.state, items = P.pickupsFor(r, pk), open = items.filter(P.pickupOpen).length;
         const puBtn = '<button type="button" class="pu ' + (open ? 'open' : items.length ? 'done' : '') + '" data-pu="' + r.id + '">' + (open ? 'P/U<i>' + open + '</i>' : items.length ? 'Completed' : 'P/U') + '</button>';
         const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
         const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : k === 'truck' ? ' list="lo-trucks" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
         const mins = P.minutesTaken(r);
-        const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' : '';
-        const total = mins === null ? '' : '<span class="' + (st === 'LOADING' ? 'running' : '') + '">' + P.minutesText(mins) + '</span>';
-        const cls = st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '';
+        const skip = isSkipped(r), skipBtn = edit && st !== 'DONE' && st !== 'LOADING' && !skip ? '<button type="button" class="skip" data-skip="' + r.id + '" title="Skip for now and come back to it">Skip</button>' : '';
+        const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
+        const runCell = escapeHtml(r.run) + (skip ? '<span class="skip-tag">SKIPPED · COME BACK</span>' : '');
+        const stale = st === 'LOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
+        const total = mins === null ? '' : '<span class="' + (stale ? 'stale' : st === 'LOADING' ? 'running' : '') + '">' + (st === 'LOADING' ? P.runningText(r.startedAt, mins) : P.minutesText(mins)) + '</span>';
+        const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (skip ? ' skipped' : '');
         if (area === 'TANKER') {
-          html += '<tr class="' + cls + '" data-row="' + r.id + '"><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.driver) + '</td>' +
+          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + status + '</td><td>' + escapeHtml(r.shift) + '</td><td>' + puBtn + '</td><td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         } else {
-          html += '<tr class="' + cls + '" data-row="' + r.id + '"><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.driver) + '</td>' +
+          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + runCell + '</td><td>' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
             '<td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
@@ -174,12 +217,116 @@
       const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.id ? [document.activeElement.dataset.id, document.activeElement.dataset.k, document.activeElement.value] : null;
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="' + cols.length + '" class="empty">No ' + P.AREA[area].tile.toLowerCase() + ' loads for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>';
       if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
-      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' : 'View only.') + ' Changes from the sheets show here within about a minute.';
+      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Drag a route by its number (or use the arrows) to change today\'s loading order.' : '') : 'View only.') + ' Changes from the sheets show here within about a minute.';
       const s = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = s.live ? (s.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
 
     function rowById(id) { return rowsNow().find(r => r.id === id); }
+
+    // Saves a new loading order for today's loads of the shown department: shown at once, one call, put back if refused.
+    // Same numbering as the server (actions.js reorder): the loads keep the order numbers they had, smallest first.
+    async function saveLoadOrder(ordered) {
+      const slots = ordered.map(r => r.loadSequence).filter(v => v !== null && v !== undefined && v !== '').map(Number).sort((a, b) => a - b);
+      const unique = slots.filter((v, i) => slots.indexOf(v) === i);
+      const numbers = unique.length === ordered.length ? unique : ordered.map((_, i) => (i + 1) * 5);
+      const setOverride = (pick) => {
+        runs = runs.map(run => {
+          const mine = ordered.map((r, i) => [r, i]).filter(([r]) => r.runDocId === run.id);
+          if (!mine.length) return run;
+          const days = Object.assign({}, run.days);
+          mine.forEach(([r, i]) => { days[r.day] = Object.assign({}, days[r.day], { loadSequenceOverride: pick(r, i) }); });
+          return Object.assign({}, run, { days });
+        });
+      };
+      const before = {};
+      ordered.forEach(r => { const run = runs.find(x => x.id === r.runDocId); before[r.id] = run && run.days[r.day] ? run.days[r.day].loadSequenceOverride : null; });
+      setOverride((r, i) => numbers[i]);
+      render();
+      try {
+        await save('reorderPlantLoads', { loadDate: date, order: ordered.map(r => ({ runDocId: r.runDocId, day: r.day })) });
+        showError('');
+      } catch (e) {
+        setOverride((r) => (before[r.id] === undefined ? null : before[r.id]));
+        render();
+        showError('Loading order: ' + (e.message || e));
+      }
+    }
+    function moveLoad(id, to) {
+      const list = orderRows(rowsNow().filter(r => r.area === area)), from = list.findIndex(r => r.id === id);
+      if (from < 0 || to < 0 || to >= list.length || to === from) return;
+      const next = list.slice();
+      next.splice(to, 0, next.splice(from, 1)[0]);
+      saveLoadOrder(next);
+    }
+
+    // Dragging by the handle works with a finger on the tablet as well as with a mouse (pointer events, not the browser's
+    // drag and drop, which a touch screen does not start). The row being moved is shaded and a blue line shows where it lands.
+    const sheetEl = document.querySelector('.sheet.scroll-list');
+    function dropTarget(x, y) {
+      const el = document.elementFromPoint(x, y), tr = el && el.closest && el.closest('#rows tr[data-row]');
+      if (!tr || drag.ids.indexOf(tr.dataset.row) < 0) {
+        // Above the first of today's loads (over the header or the prior-day loads) or below the last: the ends of the list.
+        const first = document.querySelector('#rows tr[data-row="' + drag.ids[0] + '"]'), last = document.querySelector('#rows tr[data-row="' + drag.ids[drag.ids.length - 1] + '"]');
+        if (first && y < first.getBoundingClientRect().top) return { id: drag.ids[0], after: false };
+        if (last && y > last.getBoundingClientRect().bottom) return { id: drag.ids[drag.ids.length - 1], after: true };
+        return null;
+      }
+      const box = tr.getBoundingClientRect();
+      return { id: tr.dataset.row, after: y > box.top + box.height / 2 };
+    }
+    function markDrop(t) {
+      document.querySelectorAll('#rows tr.drop-before, #rows tr.drop-after').forEach(tr => tr.classList.remove('drop-before', 'drop-after'));
+      if (!t) return;
+      const tr = document.querySelector('#rows tr[data-row="' + t.id + '"]');
+      if (tr) tr.classList.add(t.after ? 'drop-after' : 'drop-before');
+    }
+    function endDrag(apply) {
+      const d = drag;
+      if (!d) return;
+      drag = null;
+      clearInterval(d.scroller);
+      markDrop(null);
+      if (d.row) d.row.classList.remove('dragging');
+      document.body.classList.remove('lo-dragging');
+      let saved = false;
+      if (apply && d.target) {
+        const full = orderRows(rowsNow().filter(r => r.area === area)).map(r => r.id), from = full.indexOf(d.id);
+        let to = full.indexOf(d.target.id) + (d.target.after ? 1 : 0);
+        if (to > from) to--;
+        if (to !== from) { moveLoad(d.id, to); saved = true; }
+      }
+      if (!saved && heldRender) render();
+      heldRender = false;
+    }
+    rowsEl0().addEventListener('pointerdown', e => {
+      const g = e.target.closest('[data-grip]');
+      if (!g || !canOrder() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      e.preventDefault();
+      closePop();
+      const ids = shownOrder().map(r => r.id);
+      drag = { id: g.dataset.grip, ids, target: null, y: e.clientY, x: e.clientX, row: g.closest('tr'), scroller: null };
+      drag.row.classList.add('dragging');
+      document.body.classList.add('lo-dragging');
+      try { g.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+      // Near the top or bottom of the list, the list scrolls by itself so a load can be moved past what is on screen.
+      drag.scroller = setInterval(() => {
+        if (!drag) return;
+        const box = sheetEl.getBoundingClientRect(), edge = 48;
+        const step = drag.y < box.top + edge ? -12 : drag.y > box.bottom - edge ? 12 : 0;
+        if (step) { sheetEl.scrollTop += step; drag.target = dropTarget(drag.x, drag.y); markDrop(drag.target); }
+      }, 30);
+    });
+    rowsEl0().addEventListener('pointermove', e => {
+      if (!drag) return;
+      e.preventDefault();
+      drag.x = e.clientX; drag.y = e.clientY;
+      drag.target = dropTarget(e.clientX, e.clientY);
+      markDrop(drag.target);
+    });
+    rowsEl0().addEventListener('pointerup', () => endDrag(true));
+    rowsEl0().addEventListener('pointercancel', () => endDrag(false));
+    function rowsEl0() { return document.getElementById('rows'); }
 
     // One save, shown at once; if the server refuses it the row goes back and the reason shows. What was shown is kept
     // until the server answers (by then the database copy holds the saved value), and only if no later change replaced it.
@@ -229,9 +376,12 @@
     // Edit box: Start Time, End Time, Notes (plus temperature and shift, kept on the Live row).
     let editing = null;
     function openModal(id) { document.getElementById('modal-back').hidden = false; document.getElementById(id).hidden = false; }
-    function closeModals() { document.getElementById('modal-back').hidden = true; document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); editing = null; }
+    // The two-press "Ended Up Not Running" starts unarmed every time the box opens or closes, so one press never marks another load.
+    function disarm() { const b = document.getElementById('edit-notrunning'); b.dataset.armed = ''; b.textContent = 'Ended Up Not Running'; }
+    function closeModals() { document.getElementById('modal-back').hidden = true; document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); editing = null; disarm(); }
     function openEdit(row) {
       editing = row;
+      disarm();
       document.getElementById('edit-sub').textContent = row.route + ' · ' + row.run;
       document.getElementById('edit-start').value = P.stampToLocal(row.startedAt);
       document.getElementById('edit-end').value = P.stampToLocal(row.completedAt);
@@ -265,11 +415,22 @@
 
     // Pickups: the list for this load, Pickup Complete on each open one, and Add Pickup.
     let puRow = null;
+    // Who added and completed each pickup (Joe 10/11, review item 42, as the old app): the person's name, or on a Plant Station
+    // tablet the station's name (the station plant-station.html remembers on this tablet).
+    const STATION_NAMES = { CASE: 'Case Loadout', CASE_UNLOADING: 'Case Unloading', TOTES: 'Tote Loadout', BOXING: 'Boxing Loadout', YARD_SERVICES: 'Yard Services' };
+    const station = () => { try { return STATION_NAMES[localStorage.getItem('udPlantStation') || ''] || ''; } catch (e) { return ''; } };
+    const myName = () => station() || (person && person.name) || '';
+    const whoText = (name, email) => String(name || '').trim() || String(email || '').split('@')[0];
+    function pickupWhen(p) {
+      const added = p.createdAt || p.createdBy ? 'Added' + (whoText(p.createdByName, p.createdBy) ? ' by ' + whoText(p.createdByName, p.createdBy) : '') + (p.createdAt ? ' · ' + P.clock(p.createdAt) : '') : '';
+      const done = P.pickupOpen(p) ? 'Not loaded · driver picks up before leaving' : 'Completed' + (whoText(p.completedByName, p.completedBy) ? ' by ' + whoText(p.completedByName, p.completedBy) : '') + (p.completedAt ? ' · ' + P.clock(p.completedAt) : '');
+      return [added, done].filter(Boolean).map(escapeHtml).join('<br>');
+    }
     function drawPickups() {
-      const row = puRow, items = P.pickupsFor(row, pickups), edit = canLoad();
+      const row = puRow, items = P.pickupsFor(row, P.withNotePickups(rowsNow(), pickups)), edit = canLoad();
       document.getElementById('pu-sub').textContent = row.route + ' · ' + row.run;
-      document.getElementById('pu-list').innerHTML = items.map(p => '<div class="pu-item' + (P.pickupOpen(p) ? '' : ' done') + '"><span>' + escapeHtml(p.item) + ' · ' + escapeHtml(p.quantity) +
-        '<small>' + (p.notes ? escapeHtml(p.notes) + ' · ' : '') + (P.pickupOpen(p) ? 'Not loaded · driver picks up before leaving' : 'Completed ' + P.clock(p.completedAt)) + '</small></span>' +
+      document.getElementById('pu-list').innerHTML = items.map(p => '<div class="pu-item' + (P.pickupOpen(p) ? '' : ' done') + '"><span>' + escapeHtml(p.item) + (p.quantity ? ' · ' + escapeHtml(p.quantity) : '') +
+        '<small>' + (p.notes ? escapeHtml(p.notes) + '<br>' : '') + pickupWhen(p) + '</small></span>' +
         (P.pickupOpen(p) && edit ? '<button type="button" data-done="' + escapeHtml(p.pickupId) + '">Pickup Complete</button>' : '') + '</div>').join('') || '<div class="hint">No pickups for this load.</div>';
       document.getElementById('pu-form').hidden = !edit;
       document.getElementById('pu-add').hidden = !edit;
@@ -278,20 +439,30 @@
     document.getElementById('pu-list').addEventListener('click', e => {
       const b = e.target.closest('[data-done]');
       if (!b) return;
-      const id = b.dataset.done;
-      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: new Date().toISOString() }) : p));
+      const id = b.dataset.done, now = new Date().toISOString();
+      const note = P.withNotePickups(rowsNow(), pickups).find(p => p.pickupId === id && p.source === 'LOAD_NOTE');
+      if (note) {
+        // A pickup the load note asked for: completing it saves it as a pickup (the note as the item), already complete.
+        const temp = Object.assign({}, note, { source: '', quantity: 'See note', status: 'COMPLETE', completedAt: now, completedByName: myName(), completedBy: person && person.email || '' });
+        pickups = pickups.concat([temp]);
+        drawPickups(); render();
+        save('completePickup', { pickupId: id, runDocId: note.runDocId, day: note.day, date: note.date, station: station() })
+          .catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
+        return;
+      }
+      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: now, completedByName: myName(), completedBy: person && person.email || '' }) : p));
       drawPickups(); render();
-      save('completePickup', { pickupId: id }).catch(err => showError('Pickup: ' + (err.message || err)));
+      save('completePickup', { pickupId: id, station: station() }).catch(err => showError('Pickup: ' + (err.message || err)));
     });
     document.getElementById('pu-add').onclick = () => {
       const row = puRow, item = document.getElementById('pu-item').value.trim(), quantity = document.getElementById('pu-qty').value.trim(), notes = document.getElementById('pu-note').value.trim();
       if (!item || !quantity) { showError('Enter the product and the quantity for the pickup.'); return; }
       showError('');
-      const temp = { pickupId: 'new-' + Date.now(), runDocId: row.runDocId, day: row.day, runId: row.runId, date: row.loadDate, item, quantity, notes, status: 'PENDING' };
+      const temp = { pickupId: 'new-' + Date.now(), runDocId: row.runDocId, day: row.day, runId: row.runId, date: row.loadDate, item, quantity, notes, status: 'PENDING', createdAt: new Date().toISOString(), createdByName: myName(), createdBy: person && person.email || '' };
       pickups = pickups.concat([temp]);
       ['pu-item', 'pu-qty', 'pu-note'].forEach(k => { document.getElementById(k).value = ''; });
       drawPickups(); render();
-      save('addPickup', { runDocId: row.runDocId, day: row.day, date: row.loadDate, item, quantity, notes }).catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
+      save('addPickup', { runDocId: row.runDocId, day: row.day, date: row.loadDate, item, quantity, notes, station: station() }).catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
     };
 
     // Typing in the table: Enter or leaving the box saves; arrow keys and Enter move between rows.
@@ -319,11 +490,20 @@
       const t = e.target.closest('button');
       if (!t) return;
       if (t.dataset.state) { const r = rowById(t.dataset.state); if (r && canLoad()) openStatus(t, r); return; }
+      if (t.dataset.skip) { (skipped[date] = skipped[date] || {})[t.dataset.skip] = true; keepSkips(); render(); return; }
       if (t.dataset.clock) {
         const r = rowById(t.dataset.clock), now = new Date().toISOString();
         if (!r) return;
+        if (skipped[date] && skipped[date][r.id]) { delete skipped[date][r.id]; keepSkips(); }
         if (r.state === 'LOADING') saveLoad(r, { completedAt: now }, { completedAt: now, state: 'DONE' });
         else saveLoad(r, { startedAt: now, completedAt: '' }, { startedAt: now, completedAt: '', state: 'LOADING' });
+        return;
+      }
+      if (t.dataset.idMove) {
+        // One place up or down among the loads shown (a skipped load at the bottom is stepped over).
+        const shown = shownOrder(), i = shown.findIndex(r => r.id === t.dataset.idMove), next = shown[i + Number(t.dataset.move)];
+        const full = orderRows(rowsNow().filter(r => r.area === area));
+        if (i >= 0 && next && canOrder()) moveLoad(t.dataset.idMove, full.findIndex(r => r.id === next.id));
         return;
       }
       if (t.dataset.pu) { const r = rowById(t.dataset.pu); if (r) openPickups(r); return; }
@@ -332,7 +512,7 @@
     document.addEventListener('click', e => { if (!e.target.closest('#state-pop, [data-state]')) closePop(); });
     document.querySelectorAll('[data-close]').forEach(b => { b.onclick = closeModals; });
     document.getElementById('modal-back').onclick = closeModals;
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePop(); closeModals(); } });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { endDrag(false); closePop(); closeModals(); } });
     window.udBack = () => { if (document.getElementById('state-pop')) { closePop(); return true; } return false; };
 
     document.getElementById('areas').addEventListener('click', e => {
@@ -363,7 +543,7 @@
     }
 
     // The truck and trailer boxes offer the fleet's units, as Daily Dispatch does (Joe 10/10): open ones first, then those on a
-    // route today, then those marked down. Any number can still be typed. The trailer list starts with TBA: the trailer is not
+    // route today. A unit marked down is left off the list while it is down (Joe 10/11). Any number can still be typed. The trailer list starts with TBA: the trailer is not
     // known yet (saved as plain TBA, never T-TBA).
     let units = { TRUCK: [], TRAILER: [] }, unitsShown = { TRUCK: '', TRAILER: '' };
     const unitKey = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -372,7 +552,7 @@
         const busy = new Set(rows.filter(r => !r.prior && r[k]).map(r => unitKey(r[k])));
         const word = (t) => t.down ? 'DOWN' : busy.has(unitKey(t.unit)) ? 'ON A ROUTE' : 'OPEN', rank = { OPEN: 0, 'ON A ROUTE': 1, DOWN: 2 };
         const html = (type === 'TRAILER' ? '<option value="TBA" label="Trailer not known yet">Trailer not known yet</option>' : '') +
-          units[type].map(t => ({ unit: t.unit, word: word(t) })).sort((a, b) => rank[a.word] - rank[b.word] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }))
+          units[type].filter(t => !t.down).map(t => ({ unit: t.unit, word: word(t) })).sort((a, b) => rank[a.word] - rank[b.word] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }))
             .map(t => '<option value="' + escapeHtml(t.unit) + '" label="' + t.word + '">' + t.word + '</option>').join('');
         if (html !== unitsShown[type]) { document.getElementById(id).innerHTML = html; unitsShown[type] = html; }
       });

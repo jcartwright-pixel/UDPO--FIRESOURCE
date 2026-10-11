@@ -36,6 +36,10 @@ async function openPage(browser, width, height, url, clock) {
       }
     });
   }
+  // The Driver Room weather window reads Open-Meteo; the check answers with a fixed forecast.
+  await page.route(/api\.open-meteo\.com/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+    current: { temperature_2m: 54.4, weather_code: 2, wind_speed_10m: 7.6 },
+    daily: { weather_code: [2, 61], temperature_2m_max: [61.2, 58], temperature_2m_min: [43.8, 47.1], precipitation_probability_max: [20, 70] } }) }));
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
@@ -90,6 +94,49 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.deepEqual(phone.errors, []);
     results.push('Drivers\' phone: View Loadout and DVIR open from the driver menu and fit a 390 wide phone');
 
+    // The phone Check-In (Joe 10/11): over / short, a corrected truck, the jack, drop and hook, Speak; and Skip on Who is driving.
+    const L = require('../../src/logic');
+    const today = L.operatingDay(new Date()), p = L.dayPrefix(today);
+    await db().collection('runs').doc(L.weekStart(today) + '__run_pic802').set({ weekStart: L.weekStart(today), route: '802', run: 'UT DSD MILK', routeId: 'rte_t802', runId: 'run_pic802', rev: 0,
+      days: { [p]: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', truck: '900002', trailer: 'T-902/T-901' } } });
+    await db().collection('equipment').doc('veh_truck_900001').set({ id: 'veh_truck_900001', type: 'TRUCK', unit: '900001', status: 'ACTIVE' });
+    await phone.click('#step-dvir [data-back]');
+    await phone.waitForSelector('.phone-load', { timeout: 8000 });
+    await phone.click('.phone-load');
+    await phone.waitForSelector('#step-form:not([hidden])');
+    assert.equal(await phone.inputValue('#step-form [name=trailer]'), 'T-902');
+    assert.equal(await phone.inputValue('#step-form .ci-tr'), 'T-901', 'the second trailer of the cell gets its own box');
+    await shot(phone, 'phone-checkin-390.png');
+    const plain = await phone.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight }));
+    await phone.check('#step-form [name=overageShortage]');
+    await phone.check('#step-form [name=osKind][value=SHORT]', { force: true });
+    await phone.fill('#step-form [name=osCases]', '2');
+    await phone.fill('#step-form [name=osProduct]', '2% gallon');
+    await phone.fill('#step-form [name=osStore]', 'Giant Eagle');
+    await phone.fill('#step-form [name=truck]', '01');
+    await phone.press('#step-form [name=truck]', 'Tab');
+    assert.equal(await phone.inputValue('#step-form [name=truck]'), '900001', 'a short number finds the truck');
+    await phone.fill('#step-form [name=palletJack]', '7');
+    await phone.fill('#step-form .ci-tr-issues', 'Light out');
+    await phone.fill('#step-form input[name=casesDelivered]', '400');
+    await shot(phone, 'phone-checkin-filled-390.png', true);
+    assert.ok(await fits(phone), 'the Check-In fits the phone width');
+    await phone.click('#send');
+    await phone.waitForSelector('.phone-load.done', { timeout: 8000 });
+    const saved = (await db().collection('runs').doc(L.weekStart(today) + '__run_pic802').get()).data().days[p];
+    assert.equal(saved.overageShortageDetails, 'SHORT 2 cs · 2% gallon · Store: Giant Eagle');
+    assert.equal(saved.checkinTruck, '900001');
+    assert.deepEqual(saved.moreTrailers, [{ trailer: 'T-901', issues: 'Light out', needsCleaned: false }]);
+    await phone.click('#change');
+    await phone.waitForSelector('#step-name:not([hidden])', { timeout: 8000 });
+    await shot(phone, 'phone-who-is-driving-390.png');
+    await phone.click('#skip');
+    await phone.waitForSelector('.phone-load', { timeout: 8000 });
+    assert.equal(await phone.textContent('#who'), 'Driver not chosen');
+    await shot(phone, 'phone-skip-390.png');
+    assert.deepEqual(phone.errors, []);
+    results.push('Drivers\' phone Check-In: over / short, a short truck number, the jack and a second trailer saved; Skip lists the day\'s routes (Check-In ' + plain.scroll + ' of ' + plain.inner + ' px tall before ticking)');
+
     // Driver Station: the board and the Driver Room TV.
     const ds = await openPage(browser, 1920, 1080, '/driver-station.html' + MANAGER);
     await ds.waitForSelector('#screen:not([hidden])');
@@ -100,8 +147,12 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await tv.waitForTimeout(1500);
     assert.equal(await tv.$eval('body', b => b.classList.contains('ds-tv')), true);
     await shot(tv, 'driver-room-tv-1920.png');
+    await tv.waitForFunction(() => /°F/.test(document.getElementById('weather-now').textContent));
+    assert.equal(await tv.textContent('#weather-now'), '54°F · Partly cloudy');
+    assert.equal(await tv.textContent('#weather-today'), 'High 61° · Low 44° · Rain 20% · Wind 8 mph');
+    assert.equal(await tv.textContent('#weather-next'), 'Tomorrow: Rain, 58° / 47°');
     assert.deepEqual(ds.errors.concat(tv.errors), []);
-    results.push('Driver Station: the board and the Driver Room TV open');
+    results.push('Driver Station: the board and the Driver Room TV open, with the weather window filled in');
 
     // Trailer Assignments and Plant Station on the made-up plant day.
     await clear();
@@ -133,6 +184,18 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.deepEqual(await ps.$$eval('.ps-tab b', b => b.map(x => x.textContent)), ['Unloading', 'Washing', 'Returns']);
     assert.deepEqual(ps.errors, []);
     results.push('Plant Station: a tablet picks its station once; Case Loadout shows Loading only, Case Unloading shows Unloading, Washing and Returns');
+    // Joe 10/10: the Plant Station is a tablet screen: a slim header with Back and Home, no desktop side menu.
+    const tab = await openPage(browser, 1280, 800, '/plant-station.html' + MANAGER, clock);
+    await tab.waitForSelector('[data-station="CASE_UNLOADING"]');
+    assert.equal(await tab.$('.sidemenu'), null, 'no desktop side menu on the Plant Station');
+    assert.ok(await tab.isVisible('#go-back') && await tab.isVisible('#go-home'), 'Back and Home in the slim header');
+    assert.ok(await fits(tab), 'the Plant Station fits a tablet');
+    await shot(tab, 'plant-station-tablet-pick-1280.png');
+    await tab.click('[data-station="CASE_UNLOADING"]');
+    await tab.waitForSelector('.ps-tab');
+    await shot(tab, 'plant-station-tablet-unloading-1280.png');
+    assert.deepEqual(tab.errors, []);
+    results.push('Plant Station: tablet layout with a slim header (Back, Home) and no desktop menu');
   } finally {
     await browser.close();
   }

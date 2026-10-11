@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page manager-page">
@@ -29,6 +30,9 @@
     <div class="head">
       <div class="title"><span class="eyebrow">Plant Operations · Daily Review · Reports</span><h1>Manager Center</h1></div>
       <div class="dayname" id="dayname"></div>
+      <!-- Joe 10/10 (look B): a Reports button on Manager Center opens the Plant Scorecard; Shift Comparison, Day-of-Week Trends
+           and the Plant Performance TV are on that screen. -->
+      <a class="mc-repbtn" id="reports" href="reports.html" title="Plant Scorecard: the week day by day, shifts and trends">&#128202; Reports</a>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -61,13 +65,14 @@
     <div class="mc-dialog" role="dialog" aria-modal="true" aria-labelledby="rp-subject">
       <div class="mc-dhead"><div><span class="eyebrow">Send Current Report · To: Plant Managers group</span><h2 id="rp-subject"></h2></div>
         <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn" id="copy">&#10697; Copy</button><button type="button" class="mc-btn" id="print-report">&#9113; Print</button><button type="button" class="mc-btn send" id="send">&#9993; Send Current Report</button></div></div>
+      <div class="notice error" id="send-error" role="alert" hidden></div>
       <label class="mc-note">Note at the top of the email (optional)<textarea id="note" maxlength="1500" placeholder="Add a note to this report…"></textarea></label>
       <div class="mc-report-body" id="rp-body"></div>
     </div>
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import { watchRound } from './js/autosave.js';
@@ -106,7 +111,7 @@
       const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors), T = U.managerTemps(temps, U.tempHistory(journal, now));
       // The report carries open breakdowns over from earlier shifts (a week of the log); the tile counts the last 24 hours.
       const log = U.shiftLog(journal, now), N = U.managerNotes(log), week = U.shiftLog(data.shift, now, 168);
-      const openPickups = data.pickups.filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
+      const openPickups = P.withNotePickups(loads, data.pickups).filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       // Joe 10/10: only what was checked since the last report was sent goes in; the rest is "Not checked".
       report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart }, now);
       const S = U.shiftReport(week, data.roundStart);
@@ -115,11 +120,11 @@
 
     function render() {
       const x = build(), r = report;
-      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase();
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       const grid = document.getElementById('grid'), put = (k, html) => { const el = grid.querySelector('[data-card="' + k + '"]'); el.innerHTML = html; const bar = el.querySelector('a.mc-bar'); if (bar) el.dataset.href = bar.getAttribute('href'); };
       put('yard', card('&#10003;', 'Yard Checks', 'Loaded trailers remaining on yard · temperature · fuel · timestamped checks', 'yard.html', [
         tile('yard.html', 'Active', x.yard.rows.length + x.yard.locked.length, '', 'on the yard'), tile('yard.html', 'Due', x.yard.rows.length, '', 'need a check', null, x.yard.rows.length ? 'warn' : ''),
-        tile('yard.html', 'Checked', x.yard.locked.length, '', 'in the last 2 hours', null, 'good'), tile('yard.html?view=history', 'Latest', x.latestYard ? clock(x.latestYard.recordedAt) : 'None', '', 'last check')]));
+        tile('yard.html', 'Checked', x.yard.locked.length, '', 'in the last 2 hours', null, 'good'), tile('yard.html?view=history', 'Latest', x.latestYard ? clock(x.latestYard.recordedAt) : '—', '', x.latestYard ? 'last check' : 'no check yet')]));
       put('sched', card('&#128467;', 'Plant Operations Scheduler', 'Shipping out · Receiving in · Day, Week and Month', 'scheduler.html', [
         tile('scheduler.html?lane=SHIPPING', 'Shipping', x.ship.week, 'loads', 'this week · ' + x.ship.today + ' today'), tile('scheduler.html?lane=RECEIVING', 'Receiving', x.recv.week, 'loads', 'this week · ' + x.recv.today + ' today'),
         tile('scheduler.html?lane=SHIPPING&view=month', 'This Month', x.ship.month, 'loads', 'shipping'), tile('scheduler.html?lane=SHIPPING&view=week', 'Need Trailer', x.ship.needTrailer, '', x.ship.needTrailer ? 'this week' : 'all have trailers', null, x.ship.needTrailer ? 'warn' : 'good')]));
@@ -131,10 +136,10 @@
       put('quality', card('&#10003;', 'Quality Checks Report', 'Production quality results and 24-hour history', 'quality.html', [
         tile('quality.html', 'Quality Checks', x.Q.lines, 'lines', x.Q.down ? x.Q.down + ' down' : 'all running', null, x.Q.down ? 'bad' : ''),
         tile('quality.html?view=history', 'Tip Test', x.Q.tipTests, '', x.Q.tipFails ? x.Q.tipFails + ' fail or review' : 'in 24 hours · all pass', null, x.Q.tipFails ? 'bad' : ''),
-        tile('quality.html?view=history', 'Weights', x.Q.lastWeight ? clock(x.Q.lastWeight) : 'None', '', 'last weight'), tile('quality.html?view=history', 'History', x.Q.history, '', 'checks in 24 hours')]));
+        tile('quality.html?view=history', 'Weights', x.Q.lastWeight ? clock(x.Q.lastWeight) : '—', '', x.Q.lastWeight ? 'last weight' : 'no weight yet'), tile('quality.html?view=history', 'History', x.Q.history, '', 'checks in 24 hours')]));
       put('temps', card('&#127777;', 'Cooler Temperature Reports', 'Manual plant checks plus read-only sensor readings', 'temps.html', [
         tile('temps.html', 'Sensor Temp', x.T.sensors, '', x.T.offline ? 'sensors · ' + x.T.offline + ' offline' : 'sensors', null, x.T.offline ? 'warn' : ''),
-        tile('temps.html', 'Manual Read', x.T.lastManual ? clock(x.T.lastManual) : 'None', '', 'last manual read'),
+        tile('temps.html', 'Manual Read', x.T.lastManual ? clock(x.T.lastManual) : '—', '', x.T.lastManual ? 'last manual read' : 'no manual read yet'),
         tile('temps.html?view=alerts', 'Status', x.T.alerts, '', x.T.alerts ? 'need attention' : 'all in range', null, x.T.alerts ? 'bad' : 'good'), tile('temps.html?view=history', '24-Hour History', x.T.history, '', 'readings in 24 hours')]));
       // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.
       const carried = x.S.down.filter(d => d.carried).length;
@@ -162,6 +167,9 @@
         part('Production lines', r.counts.linesDown ? r.counts.linesDown + ' down' : 'all running', r.lines.map(l => line(l.line, [l.product, l.status || 'no status', l.notChecked && l.lastCheckedAt ? 'last ' + l.lastCheckedAt : ''].filter(Boolean).join(' · '), l.flag ? 'bad' : l.notChecked ? 'warn' : '')), 'No production lines set up.', true) +
         part('Temperatures', r.counts.tempsOut ? r.counts.tempsOut + ' out' : 'all in range', r.temperatures.map(t => line(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.', true);
       ['send-card', 'send'].forEach(id => { document.getElementById(id).hidden = !canSend(); });
+      // Not before the loads and the journal are read, or the email would say "0 of 0 loaded".
+      // Both Send buttons (the card's and the pop-up's), so either works again after a send.
+      ['send-card', 'send'].forEach(id => { const sb = document.getElementById(id); if (sb.textContent !== 'Sending…') { sb.disabled = !ready(); sb.title = ready() ? '' : 'Loading the plant\'s data…'; } });
       if (!document.getElementById('modal').hidden) drawReport();
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
@@ -190,7 +198,7 @@
         sect('Temperatures', null, '', r.temperatures.map(t => row(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : '') + (t.limit ? ' · limit ' + t.limit : '') + (t.due && t.status !== 'NO CHECK' ? ' · check due' : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.');
     }
 
-    function openReport() { document.getElementById('modal').hidden = false; document.getElementById('note').value = note; drawReport(); document.getElementById('note').focus(); }
+    function openReport() { document.getElementById('send-error').hidden = true; document.getElementById('modal').hidden = false; document.getElementById('note').value = note; drawReport(); document.getElementById('note').focus(); }
     document.querySelectorAll('[data-open-report]').forEach(b => b.addEventListener('click', openReport));
     document.getElementById('close').onclick = () => { note = document.getElementById('note').value; document.getElementById('modal').hidden = true; };
     document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') document.getElementById('close').click(); });
@@ -198,8 +206,10 @@
     // Back closes the report first.
     window.udBack = () => { if (document.getElementById('modal').hidden) return false; document.getElementById('close').click(); return true; };
     document.getElementById('note').addEventListener('input', e => { note = e.target.value; });
+    const loaded = { runs: false, journal: false }, ready = () => loaded.runs && loaded.journal;
     async function send(btn) {
-      if (!report || btn.disabled) return;
+      if (!report || btn.disabled || !ready()) return;
+      document.getElementById('send-error').hidden = true;
       const label = btn.innerHTML, ok = document.getElementById('saved');
       btn.disabled = true; btn.textContent = 'Sending…';
       try {
@@ -209,8 +219,12 @@
         showError('');
         if (res && res.sending && res.reportId && fsdb) followEmail(res.reportId, ok);
         else setTimeout(() => { ok.hidden = true; }, 8000);
-      } catch (e) { showError(e.message || String(e)); }
-      finally { btn.disabled = false; btn.innerHTML = label; }
+      } catch (e) {
+        // Shown in the report pop-up too, where the person is looking (the page's error line is behind it).
+        const m = e.message || String(e), box = document.getElementById('send-error');
+        showError(m); box.textContent = 'Not sent: ' + m; box.hidden = false;
+      }
+      finally { btn.innerHTML = label; render(); }
     }
     // The email goes out just after the save; the report's status says whether it went, and to whom.
     function followEmail(id, ok) {
@@ -268,9 +282,10 @@
       const watch = () => {
         date = today();
         unsubs.splice(0).forEach(u => u());
+        loaded.runs = loaded.journal = false;
         const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
-        unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); later(); }, fail('the loads')));
-        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); later(); }, fail('the plant journal')));
+        unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); loaded.runs = true; later(); }, fail('the loads')));
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); loaded.journal = true; later(); }, fail('the plant journal')));
         unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', [0, 1, 2, 3, 4, 5, 6, 7].map(n => L.addDays(date, -n)))), s => { data.shift = s.docs.map(d => d.data()); later(); }, fail('the shift notes')));
         unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); later(); }, fail('the pickups')));
       };

@@ -7,7 +7,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/fireba
 import {
   getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signOut, GoogleAuthProvider, connectAuthEmulator
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { getFirestore, connectFirestoreEmulator, doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { getFirestore, connectFirestoreEmulator, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 
 export const DOMAIN = 'uniteddairy.com';
@@ -20,6 +20,8 @@ document.querySelectorAll('.topbar').forEach(bar => {
   brand.href = 'index.html';
   brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>New Plant Operations</strong><small>UNITED DAIRY &middot; ROUTE DISTRIBUTION</small></span>';
   bar.prepend(brand);
+  // Polish 10: one small yellow "Test copy" badge in the header on the sandbox (and a local copy); it comes off by itself at go-live.
+  if (/sandbox|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) brand.insertAdjacentHTML('afterend', '<span class="test-copy-badge" title="This is the test copy: changes stay in the new app">Test copy</span>');
 });
 
 // Joe 10/10: Administration opens a screen inside its right-hand panel; there the screen shows without its own header and menu.
@@ -57,16 +59,16 @@ export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
   ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
   // Joe 10/10: assigning drivers their routes has a plain link here (it came off the Route Editor); the board is under Dispatch too.
-  ['Drivers', [['Drivers', 'drivers.html', 'people'], ['Driver Weekly Template (assign routes)', 'template.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
+  ['Drivers', [['Driver Roster', 'drivers.html', 'people'], ['Driver Weekly Template (assign routes)', 'template.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
   // Joe 10/10: the maintenance side starts on the Fleet & Maintenance hub and branches out from there, as in the current app.
   // An icon name ending .webp is a picture from the United Dairy icon library (img/library).
   ['Equipment', [['Fleet & Maintenance', 'maint.html', 'maintenance-tractor-v1-560.webp'], ['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'],
     ['Truck Issues', 'issues.html?kind=TRUCK', 'maintenance-tractor-v1-560.webp'], ['Trailer Issues', 'issues.html?kind=TRAILER', 'maintenance-trailer-v1-560.webp'],
     ['Fork Truck / Pallet Jack Issues', 'issues.html?kind=FORK_TRUCK', 'forklift-truck-v1-560.webp'], ['Garage Work Orders', 'garage.html', 'wrench'], ['Fleet Service', 'fleet.html', 'gear'],
     ['Garage Station', 'garage-station.html', 'wrench']]],
-  ['GPS / Fleet', [['GPS Setup', 'gps.html', 'gear'], ['Driver Scorecard', 'scorecard.html', 'star']]],
   // Joe 10/10: Over the Road and Trucks Today (GPS) are manager reports (he prints Over the Road), so they sit here only.
-  ['Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
+  // Joe 10/10 evening: GPS / Fleet is not a Fleet & Maintenance section; GPS Setup and Driver Scorecard sit in Manager Reports.
+  ['Manager Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin'], ['GPS Setup', 'gps.html', 'gear']]],
   ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Driver Station', 'driver-station.html', 'people'], ['Sheet Conflicts', 'conflicts.html', 'alert']]],
   // Joe 10/10: Dispatch Administration has its own Administration section (out of the Dispatch menu).
   ['Administration', [['Dispatch Administration', 'admin.html', 'gear'], ['Operational Assignments', 'ops.html', 'people'], ['Print Layouts', 'print.html', 'day'], ['Dispatch Settings', 'settings.html', 'gear']]],
@@ -75,7 +77,7 @@ export const MENU = [
   ['Send Report', [['Send Current Report', 'manager.html?report=1', 'star']]],
   ['Yard Checks', [['Yard Checks', 'yard.html', 'yard-checks.webp']]],
   ['Plant Operations Scheduler', [['Plant Operations Scheduler', 'scheduler.html', 'week']]],
-  ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Trailer Assignments', 'trailers.html', 'load'], ['Plant Station', 'plant-station.html', 'factory']]],
+  ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Trailer Assignments', 'trailers.html', 'load']]],
   ['Quality Checks', [['Quality Checks', 'quality.html', 'production.webp']]],
   ['Cooler Temperature', [['Cooler Temperature', 'temps.html', 'temperatures.webp']]],
   ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]]
@@ -83,12 +85,14 @@ export const MENU = [
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
 // lists only that side's screens. A screen listed on two sides stays on the side it was opened from.
 export const SIDES = [
-  { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Reports', 'Overall', 'Administration'] },
+  { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks, shift notes and reports', sections: ['Send Report', 'Yard Checks', 'Plant Operations Scheduler', 'Plant Distribution Departments', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'] },
-  { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders, fleet service and GPS', sections: ['Equipment', 'GPS / Fleet'] }
+  { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
-const sideHas = (side, page) => page === side.home || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
+// Pages opened from inside a side (not from its menu) that still belong to it, e.g. Plant Reports from a bookmark or the TV.
+const SIDE_PAGES = { plant: ['reports.html'] };
+const sideHas = (side, page) => page === side.home || (SIDE_PAGES[side.key] || []).indexOf(page) >= 0 || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
 export function sideFor(page) {
   // Home, the all-plants overview and the Administration Center sit above the three sides: their menu lists the sides.
   if (!page || ['index.html', 'company.html', 'administration.html'].indexOf(page) >= 0) return null;
@@ -99,38 +103,63 @@ export function sideFor(page) {
   try { sessionStorage.setItem('udSide', side.key); } catch (e) { /* no storage */ }
   return side;
 }
+// The plants, as on the Operations Overview; someone sees only the plants they may (known once the Users list is read).
+const PLANT_LIST = () => (window.UDLogic && window.UDLogic.PLANTS) || [{ id: 'fac_uniontown', name: 'Uniontown', status: 'ACTIVE' }, { id: 'fac_charleston', name: 'Charleston', status: 'PLANNED' }, { id: 'fac_martins_ferry', name: 'Martins Ferry', status: 'PLANNED' }];
+function limitPlants() {
+  let allowed = null;
+  try { allowed = JSON.parse(sessionStorage.getItem('udPlants') || 'null'); } catch (e) { /* no storage */ }
+  if (!Array.isArray(allowed)) return;
+  document.querySelectorAll('.side-plant[data-plant], .side-flyouts a[data-plant]').forEach(el => { el.hidden = allowed.indexOf(el.dataset.plant) < 0; });
+}
 function addSideMenu() {
   const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
   if (!bar || document.body.classList.contains('phone') || screen.querySelector('.sidemenu')) return;
   const here = (location.pathname.split('/').pop() || 'index.html');
-  const svg = (k) => /\.webp$/.test(k) ? '<img class="lib-icon" src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[k] + '</svg>';
+  // Joe 10/10 evening: the menu is words only, on every page (no pictures or icons).
+  const svg = () => '';
   const nav = document.createElement('nav');
   nav.className = 'sidemenu';
   nav.setAttribute('aria-label', 'Screens');
   // Joe 10/9: the menu lists only the sections; hovering (or tapping) a section opens its screens beside it.
   // Joe 10/10: the United Dairy icon library wherever a picture fits; line icons where none does.
-  const SECTION_ICON = { 'GPS / Fleet': 'pin', Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', Reports: 'star', Overall: 'check', Administration: 'gear', 'Send Report': 'star', 'Yard Checks': 'yard-checks.webp', 'Plant Operations Scheduler': 'week', 'Plant Distribution Departments': 'factory', 'Quality Checks': 'production.webp', 'Cooler Temperature': 'temperatures.webp', 'Shift Notes': 'alert' };
+  const SECTION_ICON = { Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', 'Manager Reports': 'star', Overall: 'check', Administration: 'gear', 'Send Report': 'star', 'Yard Checks': 'yard-checks.webp', 'Plant Operations Scheduler': 'week', 'Plant Distribution Departments': 'factory', 'Quality Checks': 'production.webp', 'Cooler Temperature': 'temperatures.webp', 'Shift Notes': 'alert' };
   const link = ([label, href, icon]) => {
     const ext = /^https:/.test(href);
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
       '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
   };
   const side = sideFor(here), groups = side ? MENU.filter(([g]) => side.sections.indexOf(g) >= 0) : [];
-  // Home lists the three sides; a side shows its name (back to its first page), then only its own sections. A side with one
-  // section lists its screens straight in the menu.
-  const top = link(MENU[0][1][0]) + (!side ? SIDES.map(s => link([s.name, s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ')).join('') + link(['Administration', 'administration.html', 'gear']) :
-    link([side.name, side.home, side.pic]).replace('<a ', '<a data-side="' + side.key + '" ').replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (here === side.home ? ' on' : '') + '" '));
+  // Joe 10/10 evening: Back and Home sit in the header, not in the menu. The main screen (the all-plants Operations Overview)
+  // lists only the plants; each plant opens its Plant Operations, Route Distribution and Fleet & Maintenance beside it.
+  // A plant's home lists its three sides; a side shows its name (back to its first page), then only its own sections.
+  // A side with one section lists its screens straight in the menu. Administration is a header button, not a menu item.
+  const sideLink = (s, href) => link([s.name, href || s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ');
+  const plantSec = (p) => {
+    const live = p.status === 'ACTIVE', soon = 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
+    const order = ['plant', 'distribution', 'fleet'].map(k => SIDES.find(s => s.key === k));
+    return '<div class="side-sec side-plant" data-plant="' + p.id + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + p.name + '">' +
+      svg('plant-building-v1-560.webp') + '<span>' + p.name + '</span><i aria-hidden="true">&#9656;</i></button>' +
+      '<div class="flyout" role="menu"><div class="flyout-title">' + p.name + '</div>' +
+      order.map(s => sideLink(s, live ? s.home : soon).replace('<a ', '<a data-plant="' + p.id + '" ')).join('') + '</div></div>';
+  };
+  const top = here === 'company.html' ? PLANT_LIST().map(plantSec).join('') : !side ? SIDES.map(s => sideLink(s)).join('') :
+    sideLink(side).replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (here === side.home ? ' on' : '') + '" ');
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
-    (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? items.map(link).join('') : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
+    (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
       '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
       svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span><i aria-hidden="true">&#9656;</i></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join(''));
-  nav.addEventListener('click', e => { const a = e.target.closest('a[data-side]'); if (a) try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ } });
   // Joe 10/10: the fly-outs live in their own layer on the page, not inside the menu, so no screen, table or pop-up can draw over them.
   const layer = document.createElement('nav');
   layer.className = 'side-flyouts';
   layer.setAttribute('aria-label', 'Screens in this section');
   document.body.appendChild(layer);
+  [nav, layer].forEach(el => el.addEventListener('click', e => {
+    const a = e.target.closest('a[data-side]');
+    if (!a) return;
+    try { sessionStorage.setItem('udSide', a.dataset.side); if (a.dataset.plant) sessionStorage.setItem('udPlant', a.dataset.plant); } catch (x) { /* no storage */ }
+  }));
+  limitPlants();
   const flyOf = (sec) => sec._fly;
   nav.querySelectorAll('.side-sec').forEach(sec => { sec._fly = sec.querySelector('.flyout'); sec._fly._sec = sec; layer.appendChild(sec._fly); });
   const shut = (x) => { x.classList.remove('open'); flyOf(x).classList.remove('open'); x.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'false'); };
@@ -179,7 +208,7 @@ function addSideMenu() {
   // (A tap's pointerdown comes before the mouse events a tablet makes up, so the strip is still folded here.)
   nav.addEventListener('pointerdown', e => { tapped = e.pointerType !== 'mouse' && !pinned && !document.body.classList.contains('side-open'); }, true);
   nav.addEventListener('click', e => {
-    if (tapped && e.target.closest('a, .side-back')) { e.preventDefault(); e.stopPropagation(); peek(true); }
+    if (tapped && e.target.closest('a')) { e.preventDefault(); e.stopPropagation(); peek(true); }
     tapped = false;
   }, true);
   nav.querySelector('.side-toggle').onclick = () => {
@@ -199,6 +228,13 @@ function addSideMenu() {
   }));
 }
 addSideMenu();
+// The header's second line names the side the screen is on (just United Dairy above the sides).
+(function headerSide() {
+  const small = document.querySelector('#screen > .topbar .brand small');
+  if (!small || !document.body.classList.contains('has-side')) return;
+  const side = sideFor(location.pathname.split('/').pop() || 'index.html');
+  small.innerHTML = 'UNITED DAIRY' + (side ? ' &middot; ' + side.name.toUpperCase() : '');
+})();
 /* Joe 10/10: "move the action buttons all in a line up above". Anything a screen marks data-top (a button, or a whole action or
    filter row, even one the screen fills later) joins one row in the screen's top line: buttons first, all the same size, and
    filters (pickers, chips, search boxes) to their right. A row that belongs to one view shows only while that view does. */
@@ -215,17 +251,45 @@ export function buttonsToTop() {
   });
 }
 buttonsToTop();
+/* Polish item 1 (Joe 10/11): the top buttons keep their words on one line. They stay all the same size: every button takes the
+   width of the longest one on that screen (measured once the words are drawn, and again when a button or the window changes). */
+export function evenTopButtons() {
+  const head = document.querySelector('#screen .head');
+  if (!head) return;
+  const btns = [...head.querySelectorAll('.actions button, .actions a.button')].filter(b => !b.closest('.chips, .seg, .stepper, .tabs') && !/^(prev|next)$/.test(b.id));
+  head.style.removeProperty('--top-btn-w');
+  const widths = btns.map(b => b.getBoundingClientRect().width).filter(w => w > 0);
+  if (!widths.length) return;
+  head.style.setProperty('--top-btn-w', Math.ceil(Math.max(...widths)) + 'px');
+  // Where the window is too narrow for equal buttons in one row (Weekly on a laptop), each button keeps its own width instead.
+  const right = Math.min(head.getBoundingClientRect().right, document.documentElement.clientWidth) + 1;
+  const tops = new Set(btns.map(b => Math.round(b.getBoundingClientRect().top)));
+  if (tops.size > 1 || btns.some(b => b.getBoundingClientRect().right > right)) head.style.removeProperty('--top-btn-w');
+}
+(() => {
+  const head = document.querySelector('#screen .head');
+  if (!head) return;
+  let queued = false;
+  const again = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; evenTopButtons(); }); };
+  again();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
+  new MutationObserver(again).observe(head, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'class'] });
+  window.addEventListener('resize', again);
+  // The screen shows only after sign-in; measure again once the top line has a size.
+  if (window.ResizeObserver) new ResizeObserver(again).observe(head);
+})();
 
 // One look on every screen (Joe 10/10): each screen title starts with its picture from the United Dairy icon library
 // (img/library), or with its line icon in the same tile where no picture fits.
 const PAGE_ICON = {
-  'daily.html': 'distribution-truck-v1-560.webp', 'weekly.html': 'distribution-truck-v1-560.webp', 'routes.html': 'distribution-truck-v1-560.webp',
-  'routeweek.html': 'distribution-truck-v1-560.webp', 'admin.html': 'distribution-truck-v1-560.webp', 'ops.html': 'distribution-truck-v1-560.webp', 'print.html': 'distribution-truck-v1-560.webp', 'settings.html': 'distribution-truck-v1-560.webp', 'soon.html': 'plant-building-v1-560.webp', 'otr.html': 'distribution-truck-v1-560.webp',
-  'gps.html': 'distribution-truck-v1-560.webp', 'scorecard.html': 'distribution-truck-v1-560.webp',
-  'equipment.html': 'maintenance-tractor-v1-560.webp', 'maint.html': 'maintenance-tractor-v1-560.webp', 'issues.html': 'maintenance-tractor-v1-560.webp',
-  'garage.html': 'maintenance-tractor-v1-560.webp', 'fleet.html': 'maintenance-trailer-v1-560.webp',
-  'plant.html': 'plant-building-v1-560.webp', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'distribution-truck-v1-560.webp', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
-  'garage-station.html': 'maintenance-tractor-v1-560.webp', 'driver-station.html': 'distribution-truck-v1-560.webp', 'trailers.html': 'maintenance-trailer-v1-560.webp', 'plant-station.html': 'plant-building-v1-560.webp',
+  // Joe 10/11: Daily Dispatch has no title picture, so its boxes sit further left; Weekly matches it (polish 21). The other
+  // screens use line drawings instead of the truck, tractor and building photos, so every title reads the same way.
+  'routes.html': 'road', 'routeweek.html': 'week', 'admin.html': 'gear', 'ops.html': 'swap', 'print.html': 'day', 'settings.html': 'gear', 'soon.html': 'factory', 'otr.html': 'road',
+  'gps.html': 'pin', 'scorecard.html': 'star',
+  'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
+  'garage.html': 'wrench', 'fleet.html': 'truck',
+  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
+  'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {
@@ -245,6 +309,33 @@ document.addEventListener('click', e => {
   const a = e.target.closest && e.target.closest('a[target]');
   if (a && a.target !== '_self') a.removeAttribute('target');
 }, true);
+
+// Polish 16: when the tablet or computer loses its connection a yellow bar says so at the top, so nobody thinks a press was
+// sent. Saves go to the server, so they wait for the signal; the bar goes away by itself when it is back.
+(function connectionBar() {
+  if (EMBED) return;
+  let bar = null;
+  const show = () => {
+    if (navigator.onLine) { if (bar) bar.hidden = true; return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'offline-bar'; bar.setAttribute('role', 'status');
+      bar.textContent = 'No connection. Changes will not save until it is back; press again once this bar goes away.';
+      document.body.prepend(bar);
+    }
+    bar.hidden = false;
+  };
+  addEventListener('online', show); addEventListener('offline', show); show();
+})();
+
+// Polish 19: a line cut off with "..." shows the whole line when the pointer rests on it.
+document.addEventListener('mouseover', e => {
+  const el = e.target;
+  if (!el || el.nodeType !== 1 || el.title || el.scrollWidth <= el.clientWidth + 1) return;
+  if (getComputedStyle(el).textOverflow !== 'ellipsis') return;
+  const text = el.textContent.trim();
+  if (text) el.title = text;
+}, { passive: true });
 
 (function prerenderOnHover() {
   try {
@@ -276,14 +367,19 @@ export function goBack() {
   if ((here === 'company.html' || (!main && side && here !== side.home)) && fromHere && history.length > 1) history.back();
   else location.href = up;
 }
-// Joe 10/10: every screen has a Back button and a Home button, in the same place at the top of the menu (built here, once).
+// Joe 10/10: every screen has a Back button and a Home button. Joe 10/10 evening: they sit in the header beside the logo,
+// never in the menu (built here, once). Every screen's header also has the Administration button (Administrators only).
 // Joe 10/10: someone who may see more than one plant (an Administrator, or a plant list of "*") starts on the all-plants
 // overview and picks a plant; a plant's home then has Back to the overview. Known once the Users list is read.
 function multiPlant() { try { return sessionStorage.getItem('udMulti') === '1'; } catch (e) { return false; } }
-function backButton() {
+function headerButton(id, icon, label, title) {
   const b = document.createElement('button');
-  b.type = 'button'; b.className = 'side-back'; b.id = 'go-back'; b.title = 'Back one screen';
-  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.back + '</svg><span>Back</span>';
+  b.type = 'button'; b.className = 'hdr-btn'; b.id = id; b.title = title;
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[icon] + '</svg><span>' + label + '</span>';
+  return b;
+}
+function backButton() {
+  const b = headerButton('go-back', 'back', 'Back', 'Back one screen');
   b.onclick = goBack;
   return b;
 }
@@ -297,24 +393,34 @@ function noteAccess(person) {
   try {
     sessionStorage.setItem('udMulti', L.plantsFor(person).length > 1 ? '1' : '0');
     sessionStorage.setItem('udAdmin', L.isAdmin(person) ? '1' : '0');
+    sessionStorage.setItem('udPlants', JSON.stringify(L.plantsFor(person)));
   } catch (e) { /* no storage */ }
   document.body.classList.toggle('is-admin', L.isAdmin(person));
   plantHomeBack();
+  limitPlants();
 }
-// The Administration links show only to Administrators (the screens check again).
+// The Administration button shows only to Administrators (the screens check again).
 try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add('is-admin'); } catch (e) { /* no storage */ }
 (function addBack() {
   const here = location.pathname.split('/').pop() || 'index.html';
-  const home = document.querySelector('.sidemenu a[href="index.html"]');
-  if (!home) return;
-  home.id = 'go-home';
-  if (here === 'index.html') { plantHomeBack(); return; }
-  const b = backButton();
-  const h = document.createElement('button');
-  h.type = 'button'; h.className = 'side-back side-home'; h.id = 'go-home'; h.title = 'Home';
-  h.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.home + '</svg><span>Home</span>';
+  const bar = document.querySelector('#screen > .topbar'), brand = bar && bar.querySelector('.brand');
+  if (!brand || !document.body.classList.contains('has-side') || document.getElementById('go-home')) return;
+  const nav = document.createElement('div');
+  nav.className = 'hdr-nav';
+  const h = headerButton('go-home', 'home', 'Home', 'Home');
   h.onclick = () => { location.href = 'index.html'; };
-  home.replaceWith(b, h);
+  // The main screen (all plants) and a plant's home are the top: no Back there (a plant's home gets Back to the overview below).
+  if (['index.html', 'company.html'].indexOf(here) < 0) nav.append(backButton());
+  nav.append(h);
+  brand.after(nav);
+  if (here === 'index.html') plantHomeBack();
+  if (here !== 'administration.html') {
+    const adm = headerButton('go-admin', 'gear', 'Administration', 'Administration');
+    adm.classList.add('hdr-admin');
+    adm.onclick = () => { location.href = 'administration.html'; };
+    const who = bar.querySelector('.who, #signout');
+    if (who) who.before(adm); else bar.append(adm);
+  }
 })();
 // Joe 10/10: on every screen with cards, clicking anywhere on a card opens that card's screen in its first view, and clicking
 // one line or number inside it opens that particular screen. A card carries data-card="page"; a line or number data-open="page"
@@ -325,6 +431,15 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-open], [data-card]');
   if (t) location.href = t.dataset.open || t.dataset.card;
 });
+// The same from the keyboard: cards and their lines can be reached with Tab and opened with Enter.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.target.matches('a[href], button, input, select, textarea')) return;
+  const t = e.target.matches('[data-open], [data-card]') ? e.target : null;
+  if (t) { e.preventDefault(); location.href = t.dataset.open || t.dataset.card; }
+});
+let markCards = 0;
+const tabCards = () => { markCards = 0; document.querySelectorAll('[data-open]:not([tabindex]), [data-card]:not([tabindex])').forEach(el => { el.tabIndex = 0; if (!el.getAttribute('role')) el.setAttribute('role', 'link'); }); };
+new MutationObserver(() => { if (!markCards) markCards = requestAnimationFrame(tabCards); }).observe(document.documentElement, { childList: true, subtree: true });
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
 async function firebaseConfig() {
@@ -380,6 +495,9 @@ export async function requireSignIn(ready) {
     if (!user) { remember(''); gate.hidden = false; screen.hidden = true; return; }
     const email = String(user.email).toLowerCase();
     const early = known === email;
+    // Administration > Start Plant Fresh From Today: loads from before that day stop showing as prior-day work (plant-core.js).
+    // Listened to before the screen's own listeners, so the screen draws with it.
+    if (!window.UDPlantStartWatch) { window.UDPlantStartWatch = true; start().then(({ db }) => onSnapshot(doc(db, 'config', 'app'), s => { window.UDPlantStart = ((s.data() || {}).plantStart || {}).date || ''; }, () => { window.UDPlantStartWatch = false; })); }
     if (early) { gate.hidden = true; screen.hidden = false; showWho(user); ready(user); }
     // The database shows dispatch data only to people ACTIVE in USERS_MASTER; say so plainly instead of a blank screen.
     const { db } = await start();
@@ -415,8 +533,51 @@ export async function requireSignIn(ready) {
 }
 
 // Every save is one call. A fresh requestId makes a retry safe: the server saves it once.
+// "Saving... / Saved" beside the screen's title (Daily's sign), on every screen that saves (polish 15). Screens that use
+// edit.js show it from there instead, around their own saves.
+let pillTimer = null, saving = 0, saveFailed = false;
+export function savePill(state) {
+  let pill = document.getElementById('save-pill');
+  if (!pill) {
+    const title = document.querySelector('.head .title h1');
+    if (!title) return;
+    pill = document.createElement('span');
+    pill.id = 'save-pill';
+    pill.setAttribute('role', 'status');
+    pill.style.cssText = 'display:inline-block;margin-left:12px;padding:2px 12px;border-radius:999px;font:800 16px/1.25 Arial,sans-serif;letter-spacing:0;vertical-align:middle;white-space:nowrap';
+    title.appendChild(pill); // on the title's line, without changing the header's height
+  }
+  const look = { saving: ['Saving\u2026', '#fff4d6', '#8a5a00'], saved: ['Saved \u2713', '#dff4e6', '#126334'], failed: ['Not saved', '#fde8e6', '#b3261e'] }[state];
+  pill.textContent = look[0];
+  pill.style.background = look[1];
+  pill.style.color = look[2];
+  pill.hidden = false;
+  clearTimeout(pillTimer);
+  if (state === 'saved') pillTimer = setTimeout(() => { pill.hidden = true; }, 4000);
+}
 export async function save(action, fields) {
-  return callServer('save', Object.assign({ action }, fields));
+  if (window.UD_EDIT_PILL) return callServer('save', Object.assign({ action }, fields));
+  if (!saving) saveFailed = false;
+  saving++; savePill('saving');
+  try {
+    const out = await callServer('save', Object.assign({ action }, fields));
+    saving--; if (!saving) savePill(saveFailed ? 'failed' : 'saved');
+    return out;
+  } catch (e) {
+    saving--; saveFailed = true; savePill(saving ? 'saving' : 'failed');
+    throw e;
+  }
+}
+
+// A failed call in plain words with the next step; the server's own messages (already plain) are kept.
+export function friendlyError(e) {
+  const code = String(e && e.code || '').replace(/^functions\/|^firestore\//, ''), msg = String(e && e.message || e || '');
+  if (code === 'unavailable' || /network|Failed to fetch|offline/i.test(msg)) return 'No connection to the server. Check the network and try again; nothing was saved.';
+  if (code === 'deadline-exceeded') return 'The server took too long to answer. Try again; if it did save, the screen will show it in a moment.';
+  if (code === 'unauthenticated') return 'You are signed out. Sign in again and try once more.';
+  if (code === 'permission-denied' && /insufficient permissions/i.test(msg)) return 'You do not have access to this. Ask an administrator to add it to your role.';
+  if (code === 'internal' && /^internal$/i.test(msg)) return 'Something went wrong on the server. Try again; if it keeps happening, tell an administrator.';
+  return msg;
 }
 
 // Any other server call that changes something (the per-screen switch): also one call with its own requestId.
@@ -429,6 +590,7 @@ export async function callServer(name, fields) {
 
 // Errors are the only messages the screens show (no status bars).
 export function showError(text) {
+  if (text && typeof text === 'object') text = friendlyError(text);
   ['error', 'signin-error'].forEach(id => {
     const box = document.getElementById(id);
     if (!box) return;
@@ -441,54 +603,94 @@ export function showError(text) {
 export function fitToWindow(lineCount, gap) {
   const sheet = document.querySelector('.sheet');
   if (!sheet) return;
+  // Joe 10/10: rows never shrink below readable print (16px text). A busy day scrolls inside the table instead.
+  sheet.classList.remove('fit-scroll');
+  sheet.style.maxHeight = '';
   const top = sheet.getBoundingClientRect().top;
   const footer = document.querySelector('.footer');
+  const footerH = footer ? footer.offsetHeight : 0;
   // gap: space between rows (Daily's card rows), taken from the room first.
-  const room = window.innerHeight - top - (footer ? footer.offsetHeight : 0) - 8 - (gap || 0) * (Math.max(lineCount, 1) + 2);
+  const room = window.innerHeight - top - footerH - 8 - (gap || 0) * (Math.max(lineCount, 1) + 2);
   const lines = Math.max(lineCount, 1) + 1.25; // the header row is a little taller than a line
   const apply = (row) => {
     document.documentElement.style.setProperty('--row', row + 'px');
-    document.documentElement.style.setProperty('--font', Math.max(9, Math.min(16, Math.round(row * 0.5))) + 'px');
+    document.documentElement.style.setProperty('--font', Math.max(FIT_FONT_MIN, Math.min(16, Math.round(row * 0.5))) + 'px');
     // Tall enough rows show a second line (the Weekly grid puts truck / trailer under the driver).
     document.body.classList.toggle('roomy', row >= 34);
   };
-  let row = Math.max(10, Math.min(44, Math.floor(room / lines)));
+  let row = Math.max(FIT_ROW_MIN, Math.min(44, Math.floor(room / lines)));
   apply(row);
   // Borders and the RUNS tags add a little to each line; step down until the page truly fits.
-  const root = document.scrollingElement;
-  while (row > 10 && root.scrollHeight > window.innerHeight) apply(--row);
+  // The page scrolls in the side-menu shell's content box when there is one, else the window.
+  const box = sheet.closest('.side-main') || document.scrollingElement;
+  const over = () => box.scrollHeight > box.clientHeight + 1 || document.scrollingElement.scrollHeight > window.innerHeight;
+  while (row > FIT_ROW_MIN && over()) apply(--row);
+  if (over()) {
+    // Still too many lines at the smallest readable size: the table scrolls, its header stays put.
+    sheet.classList.add('fit-scroll');
+    sheet.style.maxHeight = Math.max(160, Math.min(window.innerHeight, box.getBoundingClientRect().bottom || window.innerHeight) - top - footerH - 8) + 'px';
+  }
 }
+const FIT_ROW_MIN = 32, FIT_FONT_MIN = 16;
 
 export function escapeHtml(value) {
   return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-export function shortDate(key) {
-  const [y, m, d] = key.split('-').map(Number);
-  return m + '/' + d + '/' + y;
+// Joe 10/11 (polish 6): one short date everywhere, like 10-8-26 (month-day-two-digit year, no leading zeros, no time).
+// Takes a day key (2026-10-08), a time (ISO text, a number or a Date, read in plant time) or a sheet date (10/08/2026).
+export function shortDay(v) {
+  if (v == null || v === '') return '';
+  let m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(v));
+  if (m) return Number(m[2]) + '-' + Number(m[3]) + '-' + m[1].slice(2);
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(String(v).trim());
+  if (m) return Number(m[1]) + '-' + Number(m[2]) + '-' + m[3].slice(-2);
+  const t = v instanceof Date ? v : new Date(typeof v === 'number' ? v : String(v));
+  if (isNaN(t)) return String(v);
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: '2-digit', month: 'numeric', day: 'numeric' }).formatToParts(t);
+  const g = (k) => (p.find(x => x.type === k) || {}).value;
+  return g('month') + '-' + g('day') + '-' + g('year');
+}
+export function shortDate(key) { return shortDay(key); }
+// A date with its time, like 10-8-26 1:20 PM, for stamps where the time matters (when a check or a change was made).
+export function dateTimeText(v) { const d = shortDay(v instanceof Date || typeof v === 'number' ? v : new Date(v)), t = shortTime(v); return t ? d + ' ' + t : d; }
+// The time alone, like 1:20 PM, in plant time.
+export function shortTime(v) {
+  const t = v instanceof Date ? v : new Date(v);
+  return isNaN(t) ? '' : t.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 }
 
-// Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets smaller print until it fits (down to 11px),
-// so names and values are never cut off. Headers keep their size. Runs after every redraw and on resize.
-const FIT_MIN = 11;
+// Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets a little smaller print, so names and values are
+// never cut off. Joe's later rule (10/10) is never to shrink table text to fit: it stops at 15px, and a cell that still does
+// not fit wraps onto a second line (.fit-wrap) instead. Headers keep their size. Runs after every redraw and on resize.
+const FIT_MIN = 15;
 let fitQueued = false;
 function tooWide(td) {
   // The text's laid-out width against the room inside the padding (a day cell keeps its padding for the arrow).
   const cs = getComputedStyle(td), room = td.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const r = document.createRange();
   r.selectNodeContents(td);
-  return r.getBoundingClientRect().width > room + 0.5 || td.scrollWidth > td.clientWidth + 1;
+  if (r.getBoundingClientRect().width > room + 0.5 || td.scrollWidth > td.clientWidth + 1) return true;
+  // A name cut short with "..." inside the cell (Weekly day cells) counts too.
+  return [...td.children].some(el => {
+    if (getComputedStyle(el).textOverflow !== 'ellipsis') return false;
+    const inner = document.createRange();
+    inner.selectNodeContents(el);
+    return inner.getBoundingClientRect().width > el.getBoundingClientRect().width + 0.1;
+  });
 }
 function fitCells() {
   fitQueued = false;
   const cells = [...document.querySelectorAll('tbody td')].filter(td => td.offsetParent && td.textContent.trim() && !td.querySelector('input, textarea, select, table') && !td.classList.contains('details-cell') && td.colSpan === 1);
-  cells.forEach(td => { if (td.dataset.fit) { td.style.fontSize = ''; delete td.dataset.fit; } });
+  cells.forEach(td => { if (td.dataset.fit) { td.style.fontSize = ''; delete td.dataset.fit; } td.classList.remove('fit-wrap'); });
   let over = cells.filter(tooWide);
+  const wrap = [];
   for (let pass = 0; over.length && pass < 8; pass++) {
     const sizes = over.map(td => parseFloat(getComputedStyle(td).fontSize));
-    over = over.filter((td, i) => { if (sizes[i] <= FIT_MIN) return false; td.style.fontSize = Math.max(FIT_MIN, sizes[i] - 1) + 'px'; td.dataset.fit = '1'; return true; });
+    over = over.filter((td, i) => { if (sizes[i] <= FIT_MIN) { wrap.push(td); return false; } td.style.fontSize = Math.max(FIT_MIN, sizes[i] - 1) + 'px'; td.dataset.fit = '1'; return true; });
     over = over.filter(tooWide);
   }
+  wrap.concat(over).forEach(td => td.classList.add('fit-wrap'));
 }
 function queueFit() { if (!fitQueued) { fitQueued = true; requestAnimationFrame(fitCells); } }
 new MutationObserver(queueFit).observe(document.documentElement, { childList: true, subtree: true, characterData: true });

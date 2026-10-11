@@ -138,6 +138,31 @@ async function shots(page, name, w) {
       await page.close();
     }
 
+    // + Add Return on the Plant Station tablet: a return nobody noted, on 811 (RedZone product, cases), then RTA.
+    {
+      const page = await openPage(browser, 1280, 800, '/returns.html?date=' + DATE + WORKER);
+      await page.waitForFunction(() => /0Pending/.test(document.getElementById('hstats').textContent) && !document.getElementById('add-open').hidden);
+      await page.click('#add-open');
+      await page.waitForFunction(() => document.querySelectorAll('#add-product option').length > 10);
+      const load = await page.$$eval('#add-load option', os => os.find(o => /^811 · UT DSD MILK/.test(o.textContent)).value);
+      await page.selectOption('#add-load', load);
+      const product = await page.$$eval('#add-product option', os => os[1].value);
+      await page.selectOption('#add-product', product);
+      await page.fill('#add-cases', '4');
+      await shots(page, 'returns-add-tablet', 1280);
+      await page.click('#add-save');
+      await page.waitForFunction(() => /3Returns11Cases1Refused1Pending/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
+      assert.match(await page.textContent('#rows'), /Added at plant/);
+      assert.ok(await page.isHidden('#add-bar'), 'the form closes once the return is added');
+      await fits(page, 'Product Returns with + Add Return 1280x800');
+      await shots(page, 'returns-added-tablet', 1280);
+      await page.click('button.rta');
+      await page.waitForFunction(() => /0Pending/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
+      results.push('Product Returns: + Add Return records a return nobody noted on 811 (4 cases), and RTA clears it');
+      assert.deepEqual(page.errors, []);
+      await page.close();
+    }
+
     // Truck Washing: T-960 asked for a wash and T-993 was unloaded (T-951 is washed). + Add Wash T-960.
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       const page = await openPage(browser, w, h, '/washing.html?date=' + DATE + WORKER);
