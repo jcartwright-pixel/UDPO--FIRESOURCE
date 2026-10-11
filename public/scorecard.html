@@ -48,7 +48,8 @@
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Driver Scorecard (screen A, 224/225_V7279): one table of every driver for the month or the year.
-    // Days come from the copied Live weeks (check-ins, cases out vs in) and the plant journal (inspections, route check-ins).
+    // Days come from every week the app keeps (the copied Live weeks, the weeks Publish moved on, and the current app's DISPATCH WEEK
+    // HISTORY archive: check-ins, cases out vs in) and the plant journal (inspections, route check-ins).
     forScreen('scorecard');
     const L = window.UDLogic, S = window.UDScore, CORE = S.SC_CORE;
     let mode = 'month', runs = [], events = [], drivers = [], exceptions = [], saved = {}, open = '';

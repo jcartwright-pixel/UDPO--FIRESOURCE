@@ -140,11 +140,17 @@
 
     requireSignIn(async () => {
       const { db } = await start();
-      const date = L.operatingDay(new Date());
-      const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
-      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message));
+      // Read again when the day rolls at 6 AM (Saturday to Sunday is a new week), so the counts never show last week.
+      let date = '', stop = null;
+      const watch = () => {
+        date = L.operatingDay(new Date());
+        if (stop) stop();
+        const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
+        stop = onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message));
+      };
+      watch();
       render();
-      setInterval(render, 60000);
+      setInterval(() => { if (L.operatingDay(new Date()) !== date) watch(); render(); }, 60000);
     });
   </script>
 </body>

@@ -1482,3 +1482,10 @@ body .head :is(.sc-btn, .tp-btn, .sc-today):not(.small) { height: 42px; min-heig
 body.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: var(--top-btn-w, 140px); min-width: var(--top-btn-w, 140px); max-width: none; height: 42px; min-height: 42px; }
 .temp-page .head .actions.in-head.top-row > .tp-btn { width: var(--top-btn-w, auto); min-width: var(--top-btn-w, 0); height: 42px; min-height: 42px; }
 .head:has(#print-sheet) { flex-wrap: wrap; }
+
+/* Fleet Service report: the Reviewed by / Date line under the week's work (the current app's sign-off). */
+#print .print-sign { margin: 18px 0 6px; font-weight: 700; }
+/* Weekly: the Publish note and the read-only / preview notes (Joe 10/11, review item 6). */
+.wk-note { margin: 0 16px 8px; padding: 8px 14px; border-radius: 10px; font-size: 16px; font-weight: 600; }
+.wk-note.warn { background: #fff4d6; color: #6b4b00; border: 1px solid #f0d58a; }
+.wk-note.good { background: #e3f4e8; color: #1d5b2f; border: 1px solid #a9d8b6; }

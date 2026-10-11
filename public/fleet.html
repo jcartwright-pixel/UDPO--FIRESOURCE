@@ -46,6 +46,7 @@
 
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { printSaved } from './js/print-sheet.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Fleet Service (FleetService.html, 220_V7276_GarageFleetService.gs), Send to Garage puts a PM, reefer
@@ -192,10 +193,19 @@
 
     const jobRank = (x) => { const st = String(x.status || 'NEW').toUpperCase(); return st === 'WORKING' ? 0 : st === 'NEW' && String(x.source).toUpperCase() === 'OFFICE' ? 1 : st === 'PARTS' ? 2 : 3; };
     const FROM = { WRITE_UP: 'Driver write-up', WRITEUP: 'Driver write-up', OFFICE: 'Sent from the office', TECH: 'Found by the garage', GARAGE: 'Found by the garage', DVIR: 'Driver inspection' };
-    const cameFrom = (x) => FROM[String(x.source || '').toUpperCase()] || x.source || '';
+    const cameFrom = (x) => x.source_from || FROM[String(x.source || '').toUpperCase()] || x.source || '';
     const fixedText = (x) => [x.fixed, x.fixed_note].filter(Boolean).join(' · ');
     let me = null;
     const canEdit = () => !!me && L.hasRole(me, L.REORDER_ROLES);
+    // A unit's plate number from the fleet sync's text ("External Fleet: year | make | model | VIN | plate | state | Lease: ..."):
+    // the part after the 17-character VIN, unless that is the 2-letter state; a "Plate:" label wins when there is one.
+    function plateOf(unit) {
+      const e = equipment.find(x => String(x.unit).toUpperCase() === String(unit).toUpperCase()) || {}, notes = String(e.notes || '');
+      const tagged = (/\bPlate:\s*([^|\n]+)/i.exec(notes) || [])[1]; if (tagged) return tagged.trim();
+      const parts = ((/External Fleet:\s*([^\n]*)/i.exec(notes) || [])[1] || '').split('|').map(x => x.trim()).filter(x => x && !/^Lease:/i.test(x));
+      const vin = parts.findIndex(x => /^[A-HJ-NPR-Z0-9]{17}$/i.test(x)), next = vin >= 0 ? parts[vin + 1] : '';
+      return next && !/^[A-Z]{2}$/i.test(next) ? next : '';
+    }
     // One unit picked on History (typed in full, or the only one whose number ends with what was typed).
     function oneUnit(due) {
       const q = search.toUpperCase().replace(/\s+/g, ''); if (!q) return null;
@@ -216,7 +226,7 @@
         (u.type === 'TRUCK' ? row('Miles now', u.miles != null ? num(u.miles) + ' <small>' + when(u.milesDate) + '</small>' : '') : row('Reefer hours now', u.currentHours != null ? num(u.currentHours) : '')) +
         row('Last ' + (u.type === 'TRUCK' ? 'PM' : 'reefer service'), when(u.lastServiceDate) + (u.lastServiceMiles != null ? ' · ' + num(u.lastServiceMiles) + ' mi' : u.lastServiceHours != null ? ' · ' + num(u.lastServiceHours) + ' hrs' : '')) +
         row('Next ' + (u.type === 'TRUCK' ? 'PM' : 'reefer service'), pm && pm.dueAt !== '' ? (pm.key === 'PM' ? num(pm.dueAt) + ' mi' : when(pm.dueAt)) + ' ' + pill(STATUS[pm.status]) : pm ? pill(STATUS[pm.status]) : '') +
-        row('Next DOT', dot && dot.dueAt ? when(dot.dueAt) + ' ' + pill(STATUS[dot.status]) : '') + row('Plate expires', when(u.plateExpires)) + row('Lease', lease ? escapeHtml(lease.trim()) : 'Owned') +
+        row('Next DOT', dot && dot.dueAt ? when(dot.dueAt) + ' ' + pill(STATUS[dot.status]) : '') + row('Plate expires', when(u.plateExpires)) + (plateOf(u.unit) ? row('Plate', escapeHtml(plateOf(u.unit))) : '') + row('Lease', lease ? escapeHtml(lease.trim()) : 'Owned') +
         row('Open work orders', open().filter(x => String(x.unit).toUpperCase() === String(u.unit).toUpperCase()).length) + row('Jobs · 12 months', jobs.length) +
         row('Mechanic hours · 12 months', Math.round(jobs.reduce((a, x) => a + (Number(x.minutes) || 0), 0) / 6) / 10) + '</tbody></table>' +
         (canEdit() ? '<div class="gps-buttons"><button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit dates</button></div>' : '');
@@ -271,21 +281,22 @@
       const dueRows = (list) => list.map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + escapeHtml(i.what) + '</td><td>' +
         (i.key === 'PM' ? num(i.dueAt) + ' mi' : when(i.dueAt)) + '</td><td>' + (i.now !== '' && i.now != null ? num(i.now) : '') + '</td><td>' + (typeof i.left === 'number' ? num(i.left) + ' mi' : escapeHtml(i.left)) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('');
       const dated = (key) => due.items.filter(i => i.key === key && i.dueAt && i.dueAt <= in90).sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
-      const plateNo = (u) => { const e = equipment.find(x => String(x.unit).toUpperCase() === String(u).toUpperCase()) || {}; return (/\bPlate:\s*([^|\n]+)/i.exec(String(e.notes || '')) || [])[1] || ''; };
+      const plateNo = plateOf;
       const work = done().filter(o => L.localDay(o.completed_at) >= weekAgo);
       // The current app's report: four numbers, overdue and due soon, what is at the garage, DOT and plates for the next 90 days,
       // the week's work with the signed tick, and a footer (FleetService.html:155-167).
       box.innerHTML = '<h2>Fleet Service &amp; Compliance Report · ' + shortDate(t) + '</h2>' +
         '<p class="print-tiles"><b>' + late.length + '</b> overdue · <b>' + soon.length + '</b> due soon · <b>' + due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length + '</b> DOT this month · <b>' +
-          due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length + '</b> plates expiring in 30 days · <b>' + open().length + '</b> at the garage</p>' +
+          due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length + '</b> plates expiring in 30 days · <b>' + open().length + '</b> at the garage · <b>' + done().filter(o => L.localDay(o.completed_at).slice(0, 7) === month).length + '</b> finished this month</p>' +
         '<p><b>Overdue and due soon</b></p>' + tbl(['Unit', 'Type', 'What', 'Due at', 'Now', 'Left', 'Status'], dueRows(late.concat(soon))) +
         '<p><b>At the garage</b></p>' + tbl(['Unit', 'Type', 'What', 'Due at', 'Now', 'Left', 'Status'], dueRows(due.items.filter(i => i.status === 'AT_GARAGE'))) +
         '<p><b>DOT inspections · next 90 days</b></p>' + tbl(['Unit', 'Type', 'DOT due', 'Left', 'Status'], dated('DOT').map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + when(i.dueAt) + '</td><td>' + escapeHtml(i.left) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('')) +
         '<p><b>Plates · next 90 days</b></p>' + tbl(['Unit', 'Type', 'Plate', 'Expires', 'Left'], dated('PLATE').map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + escapeHtml(plateNo(i.unit)) + '</td><td>' + when(i.dueAt) + '</td><td>' + escapeHtml(i.left) + '</td></tr>').join('')) +
         '<p><b>Work done · this week (Sun-Sat)</b></p>' + tbl(['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours', 'Signed'], work.map(x => '<tr><td>' + when(x.completed_at) + '</td><td>' + escapeHtml(x.unit) + '</td><td>' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(fixedText(x)) +
           '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' + (x.safe === 'YES' && x.signed_by ? '&#10003;' : '') + '</td></tr>').join('')) +
+        '<p class="print-sign">Reviewed by ______________________________ &nbsp;&nbsp; Date ______________</p>' +
         '<p class="print-foot">United Dairy · Uniontown · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · DOT every ' + rules().dotMonths + ' months · leased tractors are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
-      window.print();
+      printSaved('fleet');
     }
 
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; search = ''; render(); } });

@@ -61,6 +61,7 @@
       <button type="button" class="override" id="override" aria-pressed="false">Override</button>
     </section>
     <div class="notice error" id="error" hidden></div>
+    <div class="wk-note" id="wk-note" hidden></div>
     <div class="wk-scroll" id="wk-scroll">
       <section class="wk-panel" id="routes-panel">
         <h2>Route / Run Assignments</h2>
@@ -104,7 +105,7 @@
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, saveOptimistic, savesDone, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
@@ -113,6 +114,16 @@
     const today = L.operatingDay(new Date());
     let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(today);
     let unsubscribe = null, unsubscribeWeek = null, unsubscribePlant = null, plantLoads = [], plantCtx = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
+    // The Live weeks (config/app liveWeeks; Publish moves them on). A week before Previous opens read only; a week after Next is a
+    // preview built from Route Master and Driver Master, as on the current screen, until the Next week is published.
+    let live = {}, routeList = null, unsubscribeRoutes = null, loaded = false;
+    const weekKind = () => (!live.previous ? 'live' : week < live.previous ? 'old' : live.next && week > live.next ? 'future' : 'live');
+    function previewRuns() {
+      if (!routeList) return [];
+      const ctx = L.weekBuildContext(lists.allDrivers, lists.exceptions, lists.fleetTrucks.concat(lists.fleetTrailers));
+      return routeList.slice().sort((a, b) => (a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder) - (b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }))
+        .map(r => Object.assign(L.buildWeekRun(r, week, ctx), { id: week + '__' + r.id, rev: 0 }));
+    }
     const getRuns = () => runs;
     const SPECIAL = { __CARRIER__: 'CARRIER', __OPEN__: 'OPEN' };
 
@@ -133,15 +144,19 @@
 
     function render() {
       if (popover) return; // the editor is open; the grid redraws when it closes
-      const edit = canSave();
+      const kind = weekKind(), preview = kind === 'future' && loaded && !runs.length;
+      const edit = canSave() && kind === 'live';
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
-      ['run-days', 'publish', 'override'].forEach(id => { document.getElementById(id).disabled = !edit; });
-      document.getElementById('reset').disabled = !canReorder();
+      ['run-days', 'override'].forEach(id => { document.getElementById(id).disabled = !edit; });
+      document.getElementById('publish').disabled = !canSave() || kind === 'old' || !!publishBusy;
+      if (publishArmed !== (kind === 'future' ? live.next : week)) document.getElementById('publish').textContent = kind === 'future' ? 'Publish Stored Next Week First' : 'Publish to Daily Dispatch';
+      document.getElementById('reset').disabled = !canReorder() || kind !== 'live';
+      showNote(kind, preview);
       const ob = document.getElementById('override');
       ob.textContent = override ? 'Override On' : 'Override';
       ob.classList.toggle('on', override);
       ob.setAttribute('aria-pressed', String(override));
-      rows = L.weeklyRows(runs, week);
+      rows = L.weeklyRows(preview ? previewRuns() : runs, week);
       const ctx = L.weeklyContext(rows, lists.allDrivers, lists.exceptions, plantLoads);
       plantCtx = ctx;
       document.getElementById('heads').innerHTML = headCells('<th>Route</th><th>Run / Destination</th>');
@@ -160,7 +175,7 @@
           const full = name + (units ? ', ' + units : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
           return '<td class="day c-' + cls + (plant ? ' plant-load' : '') + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(full) + '"><b class="nm">' + escapeHtml(name) + '</b>' +
             (units ? '<span class="unit">' + escapeHtml(units) + '</span>' : '') + '</td>';
-        }).join('') + '</tr>').join('') || '<tr><td colspan="9" class="empty">This week is not one of the copied Live weeks.</td></tr>';
+        }).join('') + '</tr>').join('') || '<tr><td colspan="9" class="empty">' + (kind === 'old' ? 'This older week was not kept in the new app.' : kind === 'future' ? 'Loading Route Master to preview this week.' : 'This week is not one of the copied Live weeks.') + '</td></tr>';
 
       const board = L.driverBoardRows(lists.allDrivers, rows, lists.exceptions, week);
       document.getElementById('board-heads').innerHTML = headCells('<th>Driver</th>');
@@ -322,10 +337,49 @@
       // The server works out the week; the grid changes when the saved runs arrive.
       saveOptimistic('resetWeek', { weekStart: week }, () => {}, () => {}, render);
     };
-    document.getElementById('publish').onclick = () => {
-      const before = weekDoc ? Object.assign({}, weekDoc) : null;
-      saveOptimistic('publishWeek', { weekStart: week }, () => { weekDoc = Object.assign({}, weekDoc, { publishedAt: new Date().toISOString(), publishedBy: lists.person && lists.person.email || '' }); showPublished(); },
-        () => { weekDoc = before; showPublished(); }, render);
+    /*
+     * Publish to Daily Dispatch. On the Live Next week (or, from a preview week, the stored Next week) it moves the weeks on,
+     * as on the current screen: a second click within 8 seconds confirms, saves still on their way finish first, then Current
+     * becomes Previous, Next becomes Current, the new Next week is built, and the screen opens the new Next week.
+     * On the Current or Previous week one click records that the week was checked and sent.
+     */
+    let publishArmed = '', publishBusy = false, noteText = '', noteKind = '';
+    function say(text, kind) { noteText = text || ''; noteKind = kind || ''; render(); }
+    function showNote(kind, preview) {
+      const el = document.getElementById('wk-note');
+      const text = noteText || (preview ? 'Future week preloaded from Route Master and Driver Master. Publish the stored Next Week (' + shortDate(live.next) + ') before editing this later week.'
+        : kind === 'future' ? 'This week is after the Live Next week (' + shortDate(live.next) + '): view only until that week is published.'
+        : kind === 'old' ? 'This week is older than the Live weeks: view only.' : '');
+      el.hidden = !text;
+      el.textContent = text;
+      el.className = 'wk-note' + (noteText ? ' ' + noteKind : ' warn');
+    }
+    document.getElementById('publish').onclick = async (e) => {
+      const b = e.currentTarget, kind = weekKind(), target = kind === 'future' ? live.next : week;
+      if (kind === 'old' || publishBusy) return;
+      if (!live.next || target !== live.next) {
+        const before = weekDoc ? Object.assign({}, weekDoc) : null;
+        saveOptimistic('publishWeek', { weekStart: week }, () => { weekDoc = Object.assign({}, weekDoc, { publishedAt: new Date().toISOString(), publishedBy: lists.person && lists.person.email || '' }); showPublished(); },
+          () => { weekDoc = before; showPublished(); }, render);
+        return;
+      }
+      if (publishArmed !== target) {
+        publishArmed = target; b.textContent = 'Click Again: Push ' + Number(target.slice(5, 7)) + '/' + Number(target.slice(8)) + ' Live'; b.classList.add('armed');
+        say('This will move Current to Previous, Next to Current, and create the new Next week. Click again to confirm publication.', 'warn');
+        setTimeout(() => { if (publishArmed === target && !publishBusy) { publishArmed = ''; b.classList.remove('armed'); say(''); } }, 8000);
+        return;
+      }
+      publishBusy = true; b.textContent = 'Publishing\u2026'; b.classList.remove('armed'); say('Waiting for saves still on their way, then publishing ' + shortDate(target) + '\u2026', 'warn');
+      await savesDone();
+      const out = await saveOptimistic('publishWeek', { weekStart: target }, () => {}, () => {}, render);
+      publishBusy = false; publishArmed = '';
+      if (!out || !out.nextWeek) { say(''); return; }
+      noteText = out.message || ('Week pushed live. Current is now ' + shortDate(out.currentWeek) + '.'); noteKind = 'good';
+      live = { previous: out.previousWeek, current: out.currentWeek, next: out.nextWeek };
+      week = out.nextWeek;
+      runs = [];
+      watch();
+      render();
     };
     function showPublished() {
       const at = weekDoc && weekDoc.publishedAt ? new Date(weekDoc.publishedAt) : null;
@@ -371,13 +425,16 @@
       if (unsubscribeWeek) unsubscribeWeek();
       closeModals();
       document.getElementById('week-date').value = week;
+      watchRoutes(db);
       // Daily Dispatch for this week: today's loadout when today is in it, else the Saturday loadout that delivers its Sunday.
       const opDay = L.operatingDay(new Date());
       document.getElementById("go-daily").href = 'daily.html?date=' + (opDay >= L.addDays(week, -1) && opDay <= L.addDays(week, 5) ? opDay : L.addDays(week, -1)) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
       history.replaceState(null, '', '?week=' + week + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '') + location.hash);
+      loaded = false;
       unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), snap => {
         runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
         runsRead = true;
+        loaded = true;
         render();
         if (jumpBoard) { jumpBoard = false; setTab('board'); }
       }, e => showError('Could not read the week: ' + e.message));
@@ -388,7 +445,12 @@
         plantLoads = snap.docs.map(d => d.data()); render();
       }, e => showError('Could not read the plant scheduler loads: ' + e.message));
     }
-    function move(days) { week = L.addDays(week, days); watch(); }
+    // Route Master, read only while a week after Next is open (its preview).
+    function watchRoutes(db) {
+      if (weekKind() !== 'future' || unsubscribeRoutes) return;
+      unsubscribeRoutes = onSnapshot(collection(db, 'routes'), snap => { routeList = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read Route Master: ' + e.message));
+    }
+    function move(days) { noteText = ''; week = L.addDays(week, days); watch(); }
 
     requireSignIn(async (user) => {
       const { db } = await start();
@@ -396,6 +458,8 @@
       onSnapshot(doc(db, 'config', 'app'), snap => {
         const c = snap.data() || {};
         writeBack = !!(c.writeBack && c.writeBack.enabled === true);
+        live = c.liveWeeks || {};
+        start().then(({ db }) => watchRoutes(db));
         // The conflict link shows only while the write-back is on (it is the only thing that makes conflicts).
         document.getElementById('to-conflicts').hidden = !writeBack;
         render();
@@ -406,7 +470,7 @@
       document.getElementById('next').onclick = () => move(7);
       document.getElementById('prev-week').onclick = () => move(-7);
       document.getElementById('next-week').onclick = () => move(7);
-      document.getElementById('week-date').onchange = e => { if (L.isDateKey(e.target.value)) { week = L.weekStart(e.target.value); watch(); } };
+      document.getElementById('week-date').onchange = e => { if (L.isDateKey(e.target.value)) { noteText = ''; week = L.weekStart(e.target.value); watch(); } };
       window.addEventListener('resize', render);
       watch();
     });

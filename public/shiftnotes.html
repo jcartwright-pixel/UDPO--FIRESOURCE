@@ -131,13 +131,13 @@
       const id = escapeHtml(x.entryId), saved = x.entryId && !/^pending-/.test(x.entryId), st = x.status || 'OPEN';
       const edge = st === 'RESOLVED' ? '#1f9d55' : st === 'MONITOR' ? '#e5891a' : isKind(x, 'Handoff') ? 'var(--ud-blue)' : '#c62828';
       const status = ck && saved
-        ? '<select class="st ' + ST_CLASS[st] + '" data-status="' + id + '" aria-label="Status">' + U.FOLLOW_UPS.map(f => opt(f, st, FOLLOW[f])).join('') + '</select>'
+        ? '<select class="st ' + ST_CLASS[st] + '" data-status="' + id + '" aria-label="Follow-up status for ' + escapeHtml(x.equipment || x.type || 'this entry') + '">' + U.FOLLOW_UPS.map(f => opt(f, st, FOLLOW[f])).join('') + '</select>'
         : '<span class="sn-status s-' + st.toLowerCase() + '">' + escapeHtml(U.followLabel(st)) + '</span>';
       return '<article class="sn-card" data-entry="' + id + '" style="border-left-color:' + edge + '"><div class="sn-card-head"><strong>' + escapeHtml([stamp(x.recordedAt) || x.readingTime, tag ? '' : (x.type || 'Note'), x.equipment, x.shift].filter(Boolean).join(' · ')) + '</strong>' +
         (tag || '') + status + '</div>' +
         (x.entry ? '<p>' + escapeHtml(x.entry) + '</p>' : '') + (x.notes ? '<p class="sn-next"><b>Notes / Follow-up:</b> ' + escapeHtml(x.notes) + '</p>' : '') +
         x.reviews.map(r => '<div class="sn-review"><b>Review ' + escapeHtml(stamp(r.recordedAt)) + '</b> · ' + escapeHtml(U.followLabel(r.followUpStatus)) + ' · ' + escapeHtml(r.entry) + '<small>' + escapeHtml(r.recordedBy) + '</small></div>').join('') +
-        (ck && saved ? '<div class="sn-addreview"><input data-review="' + id + '" maxlength="500" placeholder="Add a review note (saves when you leave the box)"></div>' : '') +
+        (ck && saved ? '<div class="sn-addreview"><input data-review="' + id + '" aria-label="Review note for ' + escapeHtml(x.equipment || x.type || 'this entry') + '" maxlength="500" placeholder="Add a review note (saves when you leave the box)"></div>' : '') +
         '<small class="sn-by">' + escapeHtml(x.recordedBy) + (saved ? '' : ' · saving…') + '</small></article>';
     }
     const tagOf = (x) => since(x.recordedAt) ? '<span class="tag new">NEW SINCE REPORT</span>' : '<span class="tag carry">CARRIED OVER' + (hoursAgo(x.recordedAt) ? ' · ' + hoursAgo(x.recordedAt) + ' h' : '') + '</span>';

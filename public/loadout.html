@@ -376,9 +376,12 @@
     // Edit box: Start Time, End Time, Notes (plus temperature and shift, kept on the Live row).
     let editing = null;
     function openModal(id) { document.getElementById('modal-back').hidden = false; document.getElementById(id).hidden = false; }
-    function closeModals() { document.getElementById('modal-back').hidden = true; document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); editing = null; }
+    // The two-press "Ended Up Not Running" starts unarmed every time the box opens or closes, so one press never marks another load.
+    function disarm() { const b = document.getElementById('edit-notrunning'); b.dataset.armed = ''; b.textContent = 'Ended Up Not Running'; }
+    function closeModals() { document.getElementById('modal-back').hidden = true; document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); editing = null; disarm(); }
     function openEdit(row) {
       editing = row;
+      disarm();
       document.getElementById('edit-sub').textContent = row.route + ' · ' + row.run;
       document.getElementById('edit-start').value = P.stampToLocal(row.startedAt);
       document.getElementById('edit-end').value = P.stampToLocal(row.completedAt);

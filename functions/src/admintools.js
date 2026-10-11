@@ -27,6 +27,7 @@ const { appMail, emailSettings } = require('./adminmail');
 const { addresses } = require('./mail');
 const { queueMaster } = require('./masterwrite');
 const { assertSandboxTarget, columnLetter } = require('./writeback');
+const ROLL = require('./weekroll');
 
 const C = M.COLLECTIONS;
 const fail = (code, message) => A.fail(code, message);
@@ -691,14 +692,19 @@ async function preflight(db, deps) {
  * Route Master and the drivers' standard runs into the current and next Live weeks (udpoV7267RouteMasterToLive_ /
  * DriverMasterToLive_): for each day loading today or later and not changed by hand (route_override), whether the run runs,
  * its depart time follows Route Master; a day with no driver, truck or trailer gets the standard one. A driver
- * who is off that day is not put on. Dry run first; Apply makes the same changes as saves (and writes the sheet copy).
+ * who is off that day is not put on. A Route Master run missing from either week is added to it. The weeks are the Live
+ * Current and Next weeks (config/app liveWeeks, moved on by Weekly's Publish). Dry run first; Apply makes the same changes
+ * as saves (and writes the sheet copy when the write-back is on).
  */
 async function updateLive(db, email, input, stamp, deps) {
-  const now = new Date(stamp), today = L.operatingDay(now), week = L.weekStart(today);
+  const now = new Date(stamp), today = L.operatingDay(now);
   const apply = input.apply === true;
   return db.runTransaction(async tx => {
     const mode = await (require('./actions').requireTestMode)(tx, db, 'weeklyDispatch');
-    const runSnaps = (await tx.get(db.collection(C.runs).where('weekStart', 'in', [week, L.addDays(week, 7)]))).docs;
+    // The Live Current and Next weeks (Weekly's Publish moves them on), else this calendar week and the next.
+    const live = ((await tx.get(db.collection(C.config).doc('app'))).data() || {}).liveWeeks || {};
+    const week = live.current && live.next ? live.current : L.weekStart(today), nextWeek = live.current && live.next ? live.next : L.addDays(week, 7);
+    const runSnaps = (await tx.get(db.collection(C.runs).where('weekStart', 'in', [week, nextWeek]))).docs;
     const [routeSnap, driverSnap, exSnap, equipSnap] = await Promise.all([tx.get(db.collection(C.routes)), tx.get(db.collection(C.drivers)), tx.get(db.collection(C.exceptions).where('endDate', '>=', week)), tx.get(db.collection(C.equipment))]);
     const routes = {};
     routeSnap.docs.forEach(x => { const r = x.data(); if (r.id) routes[r.id] = r; });
@@ -739,18 +745,24 @@ async function updateLive(db, email, input, stamp, deps) {
       });
       if (apply && Object.keys(update).length) updates.push(() => tx.update(snap.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp })));
     });
-    // Runs in Route Master that are not on a Live week at all.
-    const onLive = new Set(runSnaps.map(x => x.data().runId));
-    const missing = Object.values(routes).filter(r => L.masterActive(r) && ['INACTIVE', 'DISABLED', 'TERMINATED'].indexOf(String(r.routeStatus || 'ACTIVE').toUpperCase()) < 0 && !onLive.has(r.id) && L.DAYS.some(p => r.days && r.days[p] && r.days[p].active))
-      .map(r => ({ runId: r.id, route: r.route, run: r.run || r.routeName || '' }));
+    // Route Master runs missing from the Current or Next week are added to it (Joe 10/11, review item 49), built as Publish builds a
+    // week (weekroll.js), with the days still to load. With the write-back on they are only listed: the sheet copy has no row for them.
+    const byWeek = { [week]: [], [nextWeek]: [] };
+    runSnaps.forEach(x => byWeek[x.data().weekStart].push(x.data()));
+    const masters = { routes, drivers: driverSnap.docs.map(x => x.data()), exceptions, equipment: equip };
+    const add = ROLL.missingRuns(routes, byWeek, w => { const c = ROLL.contextOf(masters); byWeek[w].forEach(r => ROLL.bookExisting(c, r)); return c; }, stamp, email, today);
+    const missing = Object.keys(add).map(id => ({ runDocId: id, week: add[id].weekStart, runId: add[id].runId, route: add[id].route, run: add[id].run || add[id].routeName || '' }));
+    const adding = !mode.writeBack;
     if (apply) {
       updates.forEach(f => f());
-      tx.set(db.collection(C.actions).doc(rid('adm')), { action: 'updateLiveSheets', by: email, at: stamp, mode: mode.mode, changes: changes.slice(0, 400), missing });
+      if (adding) Object.keys(add).forEach(id => tx.set(db.collection(C.runs).doc(id), add[id]));
+      tx.set(db.collection(C.actions).doc(rid('adm')), { action: 'updateLiveSheets', by: email, at: stamp, mode: mode.mode, changes: changes.slice(0, 400), missing, added: adding ? missing.length : 0 });
     }
     const cells = changes.reduce((n, c) => n + Object.keys(c.after).length, 0), drivers = changes.filter(c => c.after.driverId).length;
     const message = (apply ? 'Live sheets updated: ' : 'Dry run: ') + cells + ' route cell' + (cells === 1 ? '' : 's') + ' on ' + changes.length + ' day' + (changes.length === 1 ? '' : 's') + ', ' + drivers + ' driver cell' + (drivers === 1 ? '' : 's') + (apply ? '' : ' would change') + '.' +
-      (missing.length ? ' WARNING: ' + missing.length + ' Route Master run' + (missing.length === 1 ? ' is' : 's are') + ' not on the Live weeks (listed below).' : '') + (apply && !mode.writeBack ? ' The write-back is off, so the sheet copy is not changed.' : '');
-    return { ok: true, applied: apply, message, changes: changes.slice(0, 400), missing, weeks: [week, L.addDays(week, 7)], today };
+      (missing.length ? (adding ? ' ' + missing.length + ' Route Master run' + (missing.length === 1 ? '' : 's') + (apply ? ' added to' : ' would be added to') + ' the Live weeks (listed below).'
+        : ' WARNING: ' + missing.length + ' Route Master run' + (missing.length === 1 ? ' is' : 's are') + ' not on the Live weeks (listed below).') : '') + (apply && !mode.writeBack ? ' The write-back is off, so the sheet copy is not changed.' : '');
+    return { ok: true, applied: apply, message, changes: changes.slice(0, 400), missing, added: apply && adding ? missing.length : 0, weeks: [week, nextWeek], today };
   });
 }
 
