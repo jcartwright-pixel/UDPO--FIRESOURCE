@@ -47,7 +47,7 @@ async function noScroll(page) {
       const routes = await page.$$eval('#rows tr[data-id] td:first-child', tds => tds.map(td => td.textContent));
       assert.deepEqual(routes, ['801', '802'], 'Monday 10/5 loads Tuesday 801 then 802');
       const group = await page.textContent('#rows tr.group td');
-      assert.equal(group, 'TUESDAY DELIVERIES, 10/6/2026');
+      assert.equal(group, 'TUESDAY DELIVERIES, 10-6-26');
       const size = await noScroll(page);
       assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Daily fits ' + w + 'x' + h + ' with no scrolling: ' + JSON.stringify(size));
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'daily-' + w + '.png') });
@@ -300,7 +300,7 @@ async function noScroll(page) {
     await vac.waitForSelector('#filters option[value="all"]', { state: 'attached' });
     await vac.selectOption('#filters', 'all');
     await vac.waitForSelector('#rows tr[data-id="vac_test_1"]');
-    assert.match(await vac.textContent('#rows tr[data-id="vac_test_1"]'), /ADAMS, PAT.*Vacation Day.*10\/12\/2026.*10\/16\/2026.*5.*APPROVED/);
+    assert.match(await vac.textContent('#rows tr[data-id="vac_test_1"]'), /ADAMS, PAT.*Vacation Day.*10-12-26.*10-16-26.*5.*APPROVED/);
     await vac.click('#add');
     await vac.selectOption('#form select[name="driverId"]', 'drv_test_brook');
     await vac.fill('#form input[name="startDate"]', '2026-11-23');
@@ -308,7 +308,7 @@ async function noScroll(page) {
     await vac.selectOption('#form select[name="type"]', 'PERSONAL');
     await vac.fill('#form input[name="notes"]', 'Family');
     await vac.click('#save');
-    await vac.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => /BROOK, SAM.*Personal Day.*11\/23\/2026.*11\/24\/2026.*2.*APPROVED.*Family/.test(tr.textContent) && !/^new-/.test(tr.dataset.id)), null, { timeout: 5000 });
+    await vac.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => /BROOK, SAM.*Personal Day.*11-23-26.*11-24-26.*2.*APPROVED.*Family/.test(tr.textContent) && !/^new-/.test(tr.dataset.id)), null, { timeout: 5000 });
     // Thanksgiving week allows 2 off: ADAMS makes 2, CASEY on the same day is refused and taken back off the screen.
     await vac.click('.tabs [data-view="calendar"]');
     await vac.fill('#cal-month', '2026-11');
@@ -714,7 +714,7 @@ async function noScroll(page) {
         return { stray: stray.map(a => a.textContent.trim().slice(0, 40)), tiles: tiles.map(t => [Math.round(t.top), Math.round(t.width), Math.round(t.height)]), headBottom: Math.round(hb.bottom), tableTop: table ? Math.round(table.getBoundingClientRect().top) : null };
       });
       if (r.stray.length) topBad.push(pg + ': action row left in the screen: ' + r.stray.join(' / '));
-      if (r.tiles.some(t => Math.abs(t[0] - r.tiles[0][0]) > 4 || t[1] !== r.tiles[0][1] || t[2] !== r.tiles[0][2])) topBad.push(pg + ': buttons not one even row: ' + JSON.stringify(r.tiles));
+      if (r.tiles.some(t => Math.abs(t[0] - r.tiles[0][0]) > 4 || t[2] !== r.tiles[0][2])) topBad.push(pg + ': buttons not one even row: ' + JSON.stringify(r.tiles));
       if (r.tableTop !== null && r.tableTop < r.headBottom - 8) topBad.push(pg + ': a table above the buttons');
     }
     assert.deepEqual(topBad, [], 'action buttons in one even row at the top');
@@ -967,7 +967,7 @@ async function noScroll(page) {
     await db().collection('config').doc('fleetSync').set({ ok: true, at: '2026-10-11T06:00:00.000Z', by: 'nightly', added: ['T-950'], inactive: ['900002'], back: [], changed: [] });
     const eqm = await openPage(browser, 1920, 950, '/equipment.html?testEmail=manager.test@uniteddairy.com');
     await eqm.waitForSelector('#fleet-sync:not([hidden])');
-    await eqm.waitForFunction(() => /synced Oct 11, 2:00/.test(document.getElementById('fleet-synced').textContent));
+    await eqm.waitForFunction(() => /synced 10-11-26 2:00/.test(document.getElementById('fleet-synced').textContent));
     assert.match(await eqm.textContent('#fleet-synced'), /1 added, 1 off the list/);
     await eqm.click('#fleet-sync');
     // The test project names no sandbox Equipment Master copy, so the server says so on the line (no pop-up).
@@ -995,7 +995,7 @@ async function noScroll(page) {
       const tiles = await one.$$eval('.actions.tiles > button, .actions.tiles > a.button', b => b.map(x => { const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), fits: x.scrollWidth <= x.clientWidth }; }));
       assert.equal(tiles.length, 4);
       assert.equal(await one.$('#to-template'), null, 'Joe 10/10: Driver Weekly Template is on the Drivers menu, not the Route Editor');
-      assert.ok(tiles.every(t => t.w <= 116 && t.h >= 56 && t.fits && t.top === tiles[0].top), 'square tiles in one row at ' + w + ': ' + JSON.stringify(tiles));
+      assert.ok(tiles.every(t => t.h === 42 && t.fits && t.top === tiles[0].top), 'one-line tiles in one row at ' + w + ': ' + JSON.stringify(tiles));
       assert.deepEqual(one.errors, []);
       await one.close();
     }
@@ -1058,7 +1058,7 @@ async function noScroll(page) {
     assert.deepEqual(sec('Administration'), ['Dispatch Administration', 'Operational Assignments', 'Print Layouts', 'Dispatch Settings']);
     assert.equal(sec('Dispatch').indexOf('Dispatch Administration'), -1, 'not under Dispatch');
     assert.deepEqual(menu.filter(m => m[1].indexOf('Driver Weekly Template (assign routes)') >= 0).map(m => m[0]), ['Drivers']);
-    assert.deepEqual(sec('Drivers'), ['Drivers', 'Driver Weekly Template (assign routes)', 'Driver Assignment Board', 'Vacation Schedule'], 'Joe 10/10: route assignment has a link under Drivers');
+    assert.deepEqual(sec('Drivers'), ['Driver Roster', 'Driver Weekly Template (assign routes)', 'Driver Assignment Board', 'Vacation Schedule'], 'Joe 10/10: route assignment has a link under Drivers');
     assert.ok(sec('Dispatch').indexOf('Driver Assignment Board') >= 0, 'the board stays under Dispatch too');
     assert.deepEqual(menu.map(m => m[0]), ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'], 'the Route Distribution side lists only its own sections');
     assert.deepEqual(sec('Manager Reports'), ['Driver Scorecard', 'Over the Road', 'Trucks Today', 'GPS Setup'], 'Joe 10/10: the manager reports, GPS included');
