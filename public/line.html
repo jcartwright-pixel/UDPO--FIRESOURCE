@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Line Tablet · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/stations.css">
+  <link rel="stylesheet" href="css/production.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+  <script src="js/production-rules.js"></script>
+</head>
+<body class="phone ps-page lt-tablet">
+  <div class="signin" id="signin" hidden>
+    <h1>Line Tablet</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <!-- The line tablet is a station like the Plant Station: a slim header, no desktop menu. -->
+    <header class="topbar" id="ps-top">
+      <button type="button" id="go-back" title="Back one screen">&#8249; Back</button>
+      <button type="button" id="go-home" title="Home">Home</button>
+      <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Line Tablet</strong></span>
+      <span class="ps-pill" id="pill" hidden></span>
+      <button type="button" id="change" hidden>Change Line</button>
+      <span class="who" id="who"></span>
+      <button type="button" id="signout">Sign out</button>
+    </header>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view" id="view">
+      <section id="pick" hidden>
+        <div class="ps-title"><span class="eyebrow">Plant Production · Line tablet</span><h1>Pick this tablet's line</h1></div>
+        <p class="ps-intro">Pick the production line this tablet is at. The tablet remembers it and opens straight to that line next time.</p>
+        <div class="ps-stations" id="line-list"></div>
+      </section>
+      <section id="board" hidden>
+        <div class="lb-head">
+          <div><span class="eyebrow">Plant Production · Line tablet</span><h1 id="line-name"></h1><div class="lb-sub" id="line-sub"></div></div>
+          <span class="lb-live" id="live"></span>
+        </div>
+        <div class="lb-cards">
+          <div class="lb-card"><span class="eyebrow">Running now</span><div class="lb-prod" id="prod"></div><div class="lb-mut" id="prod-sub"></div><div id="prod-pill"></div>
+            <button type="button" class="lb-btn" id="change-product">Change Product</button></div>
+          <div class="lb-card"><span class="eyebrow">Made this shift</span><div class="lb-big" id="made"></div><div class="lb-mut" id="so-far"></div><div class="lb-bar"><i id="bar"></i></div><div id="vs"></div>
+            <button type="button" class="lb-btn" id="enter-count">Enter Count</button></div>
+          <div class="lb-card" id="speed-card"><span class="eyebrow">Speed now</span><div class="lb-big" id="speed"></div><div class="lb-mut" id="speed-sub"></div><div id="speed-flag"></div></div>
+          <div class="lb-card"><span class="eyebrow">Stopped this shift</span><div class="lb-big lb-red" id="down"></div><div class="lb-mut" id="down-sub"></div></div>
+        </div>
+        <div class="lb-date" id="date-check"></div>
+        <div class="lb-status" id="status"><div id="status-text"></div><button type="button" id="status-btn"></button></div>
+        <div class="lb-reasons" id="reasons"></div>
+      </section>
+      <!-- Change Product: the line's products (the plant's Products list). -->
+      <section class="lb-pane" id="product-pane" hidden>
+        <div class="lb-pane-top"><h2>Pick the product running on <span id="pp-line"></span></h2><input type="search" id="pp-find" placeholder="Find a product or SKU" aria-label="Find a product or SKU"><button type="button" class="lb-btn" id="pp-cancel">Cancel</button></div>
+        <div class="lb-products" id="pp-list"></div>
+      </section>
+      <!-- Enter Count: the total made this shift, from the machine's counter. -->
+      <form class="lb-pane" id="count-pane" hidden>
+        <div class="lb-pane-top"><h2>How many made this shift so far?</h2></div>
+        <p class="lb-mut">Type the total from the filler's counter for this shift. Speed works out from one count to the next.</p>
+        <div class="lb-count-row"><input id="count-box" inputmode="numeric" maxlength="7" autocomplete="off" aria-label="Total made this shift"><button type="submit" class="lb-btn green" id="count-save">Save Count</button><button type="button" class="lb-btn" id="count-cancel">Cancel</button></div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError, goBack, shortDate } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { watchProduction, lineView, fmt, clock, shiftText, mayOpen, beingBuilt } from './js/production.js';
+
+    // The line tablet (Joe 10/11, mock-up A): at the line, big buttons. What is running, made vs target, the speed (Joe: it flashes
+    // when the product is run under or over its allowed speed), the minutes stopped, the code date check, and "Line stopped,
+    // tap why". Until a sensor or label reader is on the line, the operator types the count and picks the product here; the
+    // reader's feed fills the same places when it comes (production-rules.js lineNow reader).
+    const L = window.UDLogic, R = window.UDProduction, params = new URLSearchParams(location.search);
+    const KEY = 'udProductionLine';
+    const read = () => { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } };
+    const write = (v) => { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* not remembered */ } };
+    // Local test database only: a browser test sets the tablet's clock (?now=...).
+    const testNow = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && Date.parse(params.get('now') || '') ? Date.parse(params.get('now')) : 0;
+    const started = Date.now(), now = () => testNow ? testNow + (Date.now() - started) : Date.now();
+    let lineId = read() || params.get('line') || '', person = null, data = null, stop = null, db = null, pane = '', find = '', busy = false;
+    if (lineId && !read()) write(lineId);
+    const plant = () => { const ids = person ? L.plantsFor(person) : []; return params.get('plant') || ids[0] || 'fac_uniontown'; };
+    const plantName = (id) => ((L.PLANTS || []).find(p => p.id === id) || { name: 'Uniontown' }).name;
+
+    function render() {
+      if (!data) return;
+      const line = data.lines.find(l => l.operationId === lineId) || null;
+      if (lineId && !line && data.read.setup) { lineId = ''; write(''); }
+      document.getElementById('pick').hidden = !!line || !!pane;
+      document.getElementById('board').hidden = !line || !!pane;
+      document.getElementById('product-pane').hidden = pane !== 'product';
+      document.getElementById('count-pane').hidden = pane !== 'count';
+      document.getElementById('change').hidden = !line;
+      document.getElementById('pill').hidden = !line;
+      if (!line) {
+        document.getElementById('line-list').innerHTML = data.lines.map(l => '<button type="button" class="ps-station" data-line="' + escapeHtml(l.operationId) + '"><b>' + escapeHtml(l.name) + '</b><span>' + (data.products[l.operationId] || []).length + ' products</span></button>').join('') ||
+          '<p class="ps-intro">' + (data.read.setup ? 'No production lines are set up for this plant.' : 'Reading the lines…') + '</p>';
+        return;
+      }
+      const t = now(), v = lineView(data, line, t), s = data.shift;
+      document.getElementById('pill').textContent = line.name + ' · ' + plantName(plant());
+      if (pane === 'product') return drawProducts(v);
+      if (pane === 'count') return;
+      document.getElementById('line-name').textContent = line.name;
+      document.getElementById('line-sub').textContent = plantName(plant()).toUpperCase() + ' · ' + shortDate(s.date) + ' · ' + shiftText(s);
+      const live = document.getElementById('live');
+      live.textContent = v.counter === 'READER' ? 'Label reader on' : v.counter === 'SENSOR' ? 'Counts from sensor' : 'Counts typed on this tablet';
+      live.className = 'lb-live ' + (v.counter === 'TABLET' ? 'typed' : 'auto');
+      // Running now
+      const tg = v.target;
+      document.getElementById('prod').textContent = v.product || 'No product picked';
+      document.getElementById('prod-sub').textContent = v.product ? [v.sku ? 'SKU ' + v.sku : '', tg && tg.perHour ? 'target ' + fmt(tg.perHour) + ' an hour' : 'no target set'].filter(Boolean).join(' · ') : 'Pick what is running to start the target.';
+      document.getElementById('prod-pill').innerHTML = v.counter === 'READER' && v.product ? '<span class="lb-pill g">READ FROM JUG LABEL (UPC)</span>' : '';
+      document.getElementById('change-product').textContent = v.product ? 'Change Product' : 'Pick Product';
+      // Made this shift
+      document.getElementById('made').textContent = fmt(v.made);
+      document.getElementById('so-far').textContent = 'Target so far ' + fmt(v.soFar);
+      const bar = document.getElementById('bar');
+      bar.style.width = Math.min(100, v.pct || 0) + '%';
+      bar.className = 'c-' + (v.pct === null ? 'g' : v.pct >= 100 ? 'g' : v.pct >= 90 ? 'a' : 'r');
+      document.getElementById('vs').innerHTML = v.pct === null ? '' : v.made >= v.soFar ? '<span class="lb-pill g">' + fmt(v.made - v.soFar) + ' AHEAD · ' + v.pct + '%</span>' : '<span class="lb-pill ' + (v.pct >= 90 ? 'a' : 'r') + '">' + fmt(v.behind) + ' BEHIND · ' + v.pct + '%</span>';
+      document.getElementById('enter-count').hidden = v.counter !== 'TABLET';
+      // Speed (Joe 10/11): flashes under the lowest or over the highest speed set for the product on Line Targets.
+      const lo = tg && tg.minSpeed !== null ? tg.minSpeed : null, hi = tg && tg.maxSpeed !== null ? tg.maxSpeed : null;
+      document.getElementById('speed').textContent = v.speed === null ? '—' : v.speed + ' / min';
+      document.getElementById('speed-sub').textContent = lo !== null || hi !== null ? 'Allowed ' + (lo !== null ? lo : '0') + (hi !== null ? ' to ' + hi : ' and up') + ' a minute' : 'No speed range set (Line Targets)';
+      const flag = v.speedFlag, card = document.getElementById('speed-card');
+      card.classList.toggle('lb-flash', flag === 'OVER' || flag === 'UNDER');
+      document.getElementById('speed-flag').innerHTML = flag === 'OVER' ? '<span class="lb-pill r">TOO FAST</span>' : flag === 'UNDER' ? '<span class="lb-pill r">TOO SLOW</span>' : flag === 'OK' ? '<span class="lb-pill g">IN RANGE</span>' : '';
+      // Stopped this shift
+      document.getElementById('down').textContent = v.downMin + ' min';
+      document.getElementById('down-sub').textContent = v.stops + ' stop' + (v.stops === 1 ? '' : 's') + (v.needReason.length ? ' · ' + v.needReason.length + ' need' + (v.needReason.length === 1 ? 's' : '') + ' a reason' : '');
+      // Code date check: the label reader's, or what the code should be until one is on the line.
+      const rd = v.reader, dc = document.getElementById('date-check');
+      if (rd && v.counter === 'READER') {
+        const ok = rd.dateOk !== false;
+        dc.className = 'lb-date ' + (ok ? 'ok' : 'bad');
+        dc.innerHTML = '<span class="lb-pill ' + (ok ? 'g' : 'r') + '">' + (ok ? 'CODE DATE OK' : 'CODE DATE WRONG') + '</span><b>' + escapeHtml(rd.lastDate || v.expectedCode || '') + '</b><span>' + escapeHtml([v.expectedCode ? 'should be ' + v.expectedCode : '', rd.read !== undefined ? fmt(rd.read) + ' of ' + fmt(v.made) + ' jugs read' : '', rd.unreadable ? fmt(rd.unreadable) + ' unreadable' : '', rd.lastMissingAt ? 'last missing date ' + clock(rd.lastMissingAt) : ''].filter(Boolean).join(' · ')) + '</span>';
+      } else {
+        dc.className = 'lb-date wait';
+        dc.innerHTML = '<span class="lb-pill n">CODE DATE CHECK</span><b>' + escapeHtml(v.expectedCode || '—') + '</b><span>' + (v.expectedCode ? 'is today\'s code for this product. ' : 'Set the product\'s shelf life on Line Targets to see today\'s code. ') + 'The label reader checks every jug once it is on this line.</span>';
+      }
+      // Running or stopped, and why.
+      const st = document.getElementById('status'), btn = document.getElementById('status-btn'), txt = document.getElementById('status-text'), need = v.needReason[0];
+      let reasonFor = -1, chosen = '';
+      if (v.state === 'STOPPED') {
+        st.className = 'lb-status stopped';
+        txt.innerHTML = '<b>LINE STOPPED ' + v.stoppedMin + ' MIN</b> since ' + clock(v.stoppedAt) + '. ' + (v.openReason ? 'Reason: ' + escapeHtml(v.openReason) + '.' : 'Tap why it stopped.');
+        btn.textContent = 'RUNNING AGAIN'; btn.className = 'run';
+        reasonFor = v.stopIndex; chosen = v.openReason;
+      } else {
+        st.className = 'lb-status ' + (need ? 'needs' : 'running');
+        txt.innerHTML = need ? '<b>STOP AT ' + clock(need.start) + ' (' + need.minutes + ' MIN) NEEDS A REASON.</b> Tap why it stopped.' : '<b>LINE RUNNING</b>' + (v.product ? '' : ' · pick the product running');
+        btn.textContent = 'LINE STOPPED'; btn.className = 'stop';
+        reasonFor = need ? need.index : -1;
+      }
+      btn.disabled = busy;
+      const rs = document.getElementById('reasons');
+      rs.hidden = reasonFor < 0;
+      rs.dataset.stop = reasonFor;
+      rs.innerHTML = reasonFor < 0 ? '' : R.REASONS.map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
+    }
+    function drawProducts(v) {
+      const q = find.trim().toUpperCase();
+      document.getElementById('pp-line').textContent = v.line.name;
+      document.getElementById('pp-list').innerHTML = v.targets.filter(p => !q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0)
+        .map(p => '<button type="button" data-product="' + escapeHtml(p.name) + '"' + (p.name === v.product ? ' class="on"' : '') + '><b>' + escapeHtml(p.name) + '</b><span>' + escapeHtml([p.sku ? 'SKU ' + p.sku : '', p.perHour ? fmt(p.perHour) + ' an hour' : ''].filter(Boolean).join(' · ')) + '</span></button>').join('') ||
+        '<p class="lb-mut">' + (q ? 'No product matches ' + escapeHtml(find) + '.' : 'This line has no products yet. A manager adds them on Products.') + '</p>';
+    }
+
+    // Every tap is one save for the line's shift.
+    async function enter(op, fields) {
+      const line = data && data.lines.find(l => l.operationId === lineId);
+      if (!line || busy) return false;
+      busy = true; render();
+      try {
+        const s = data.shift;
+        await save('saveLineEntry', Object.assign({ operationId: line.operationId, op, shift: { key: s.key, name: s.name, date: s.date, start: s.start, end: s.end } }, fields || {}));
+        showError(''); return true;
+      } catch (err) { showError(line.name + ': not saved (' + (err.message || err) + '). Try again.'); return false; }
+      finally { busy = false; render(); }
+    }
+    document.getElementById('status-btn').addEventListener('click', () => {
+      const v = lineView(data, data.lines.find(l => l.operationId === lineId), now());
+      enter(v.state === 'STOPPED' ? 'run' : 'stop');
+    });
+    document.getElementById('reasons').addEventListener('click', e => {
+      const b = e.target.closest('[data-reason]');
+      if (!b) return;
+      enter('reason', { reason: b.dataset.reason, stopIndex: Number(document.getElementById('reasons').dataset.stop) });
+    });
+    document.getElementById('change-product').addEventListener('click', () => { pane = 'product'; find = ''; document.getElementById('pp-find').value = ''; render(); document.getElementById('pp-find').focus(); });
+    document.getElementById('pp-cancel').addEventListener('click', () => { pane = ''; render(); });
+    document.getElementById('pp-find').addEventListener('input', e => { find = e.target.value; render(); });
+    document.getElementById('pp-list').addEventListener('click', async e => {
+      const b = e.target.closest('[data-product]');
+      if (!b) return;
+      const v = lineView(data, data.lines.find(l => l.operationId === lineId), now()), p = v.targets.find(x => x.name === b.dataset.product);
+      pane = '';
+      await enter('product', { product: p.name, sku: p.sku });
+    });
+    document.getElementById('enter-count').addEventListener('click', () => {
+      const v = lineView(data, data.lines.find(l => l.operationId === lineId), now());
+      pane = 'count'; render();
+      const box = document.getElementById('count-box'); box.value = v.made ? String(v.made) : ''; box.focus(); box.select();
+    });
+    document.getElementById('count-cancel').addEventListener('click', () => { pane = ''; render(); });
+    document.getElementById('count-pane').addEventListener('submit', async e => {
+      e.preventDefault();
+      const raw = document.getElementById('count-box').value.replace(/[,\s]/g, '');
+      if (!/^\d+$/.test(raw)) { showError('Type the number made this shift, digits only.'); return; }
+      pane = '';
+      await enter('count', { count: Number(raw) });
+    });
+    document.getElementById('line-list').addEventListener('click', e => { const b = e.target.closest('[data-line]'); if (!b) return; lineId = b.dataset.line; write(lineId); render(); });
+    document.getElementById('change').addEventListener('click', () => { lineId = ''; write(''); pane = ''; history.replaceState(null, '', location.pathname); render(); });
+    document.getElementById('go-back').addEventListener('click', () => { if (pane) { pane = ''; render(); return; } goBack(); });
+    document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
+
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        // Joe 10/11: being built, so administrators only (production.js OPEN_TO_EVERYONE).
+        if (!mayOpen(person, 'line')) { if (stop) stop(); stop = null; data = null; beingBuilt(document.getElementById('view')); return; }
+        if (!stop) stop = watchProduction(db, plant(), d => { data = d; render(); }, e => showError('Could not read the line (' + e.message + '). Check the network.'), now);
+      });
+      // The clock moves the stopped minutes and target so far.
+      setInterval(render, 15000);
+    });
+  </script>
+</body>
+</html>

@@ -87,7 +87,9 @@ export const MENU = [
   // Operations; the Route Distribution and Fleet reports are listed here too and stay on their own sides as well.
   ['Plant Reports', [['Plant Reports', 'reports.html', 'star'], ['Shift Reports', 'shiftreports.html', 'day'], ['Plant Performance TV', 'plant-kiosk.html', 'star']]],
   ['Distribution Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
-  ['Fleet Reports', [['Fleet Service Report', 'fleet.html', 'truck']]]
+  ['Fleet Reports', [['Fleet Service Report', 'fleet.html', 'truck']]],
+  // Joe 10/11: Plant Production, our own RedZone: every line this shift, the line tablet, each product's targets and the TV.
+  ['Production Lines', [['Production Lines', 'production.html', 'production.webp'], ['Line Tablet', 'line.html', 'production.webp'], ['Line Targets', 'linetargets.html', 'production.webp'], ['Production TV', 'production.html?tv=1', 'production.webp']]]
 ];
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
 // lists only that side's screens. A screen listed on two sides stays on the side it was opened from.
@@ -95,7 +97,8 @@ export const MENU = [
 // Distribution, Fleet & Maintenance and Reports. Plant Production and Plant Maintenance are under construction.
 export const SIDES = [
   { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'] },
-  { key: 'production', name: 'Plant Production', home: 'soon.html?what=production', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: [], building: true, bannerInPic: true },
+  // Joe 10/11: still Under Construction, so its screens open only for administrators (production.js mayOpen).
+  { key: 'production', name: 'Plant Production', home: 'production.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines'], building: true, bannerInPic: true },
   { key: 'pmaint', name: 'Plant Maintenance', home: 'soon.html?what=plant-maintenance', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: [], building: true, bannerInPic: true },
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
@@ -303,7 +306,7 @@ const PAGE_ICON = {
   'gps.html': 'pin', 'scorecard.html': 'star', 'reportcenter.html': 'chart',
   'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
   'garage.html': 'wrench', 'fleet.html': 'truck',
-  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'redzone.html': 'production.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
+  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'production.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'redzone.html': 'production.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };

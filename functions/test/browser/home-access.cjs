@@ -166,13 +166,14 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await mods.waitForTimeout(500);
     const fits1536 = await mods.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.launch-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight }));
     assert.ok(fits1536.bottom <= fits1536.inner, 'the six cards fit a 1536x864 screen: ' + JSON.stringify(fits1536));
-    await Promise.all([mods.waitForURL(/soon\.html\?what=production/), mods.click('.launch-card[data-side="production"]')]);
-    await mods.waitForSelector('.soon-card');
-    assert.equal(await mods.textContent('#title'), 'Plant Production');
+    // Joe 10/11: Plant Production (still Under Construction) opens its Production Lines board for an administrator.
+    await Promise.all([mods.waitForURL(/production\.html/), mods.click('.launch-card[data-side="production"]')]);
+    await mods.waitForSelector('#tiles .pd-tile, #tiles .pd-empty');
+    assert.equal(await mods.$('.pd-building'), null, 'an administrator sees the board, not the being-built note');
     assert.equal(await mods.getAttribute('.sidemenu a.side-name', 'data-side'), 'production');
     assert.deepEqual(mods.errors, []);
     await mods.close();
-    results.push('Main screen fly-out and plant home list Plant Operations, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance and Reports; Reports lists every report and keeps its menu; Plant Production opens its being-built page; the six cards fit 1536x864');
+    results.push('Main screen fly-out and plant home list Plant Operations, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance and Reports; Reports lists every report and keeps its menu; Plant Production opens its Production Lines board for an administrator; the six cards fit 1536x864');
 
     // Joe 10/10: anywhere on a card opens its screen's first view; one line or number inside opens that screen.
     const cards = await openPage(browser, 1920, 1080, '/company.html?testEmail=admin.test@uniteddairy.com');

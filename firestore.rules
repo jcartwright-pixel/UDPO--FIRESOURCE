@@ -64,6 +64,9 @@ service cloud.firestore {
     // Each plant's own product areas and groups (Administration > Products).
     match /productSetup/{id} { allow read: if activeUser(); }
     match /plantShifts/{id} { allow read: if activeUser(); }
+    // Plant Production: each line's shift on the tablet, and how each line is counted (saved only through save).
+    match /productionRuns/{id} { allow read: if activeUser(); }
+    match /productionLines/{id} { allow read: if activeUser(); }
     match /plantLineStatus/{id} { allow read: if activeUser(); }
     // Plant reports sent from the Manager Center, and whether each was emailed.
     match /plantReports/{id} { allow read: if activeUser(); }

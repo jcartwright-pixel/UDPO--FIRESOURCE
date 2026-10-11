@@ -18,6 +18,7 @@ const SWITCH = require('./switch');
 const OTR = require('./otr-core');
 const SC = require('./sc-core');
 const PLANT = require('./plant');
+const PROD = require('./production');
 const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
 const ROLL = require('./weekroll');
@@ -86,6 +87,9 @@ const ACTIONS = Object.freeze({
   saveProductUpload: { roles: REORDER_ROLES, screen: 'plant' },
   // Administration > Plant Shifts: each plant's shifts (Plant Reports' Shift Comparison).
   savePlantShifts: { roles: REORDER_ROLES, screen: 'plant' },
+  // Plant Production (production.js): the line tablet's taps, and how each line is counted (Line Targets).
+  saveLineEntry: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  saveLineCounter: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
   sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
   // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js).
@@ -354,6 +358,8 @@ function validate(input) {
   if (action === 'saveProductSetup') return Object.assign(out, PLANT.validateProductSetup(input, SaveError));
   if (action === 'saveProductUpload') return Object.assign(out, PLANT.validateProductUpload(input, SaveError));
   if (action === 'savePlantShifts') return Object.assign(out, PLANT.validatePlantShifts(input, SaveError));
+  if (action === 'saveLineEntry') return Object.assign(out, PROD.validateLineEntry(input, SaveError));
+  if (action === 'saveLineCounter') return Object.assign(out, PROD.validateLineCounter(input, SaveError));
   if (action === 'sendToGarage') return GARAGE.validateSend(input, out);
   if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(action) >= 0) return GARAGE.validateFleet(action, input, out);
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
@@ -582,6 +588,8 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveProductSetup') return PLANT.saveProductSetup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveProductUpload') return PLANT.saveProductUpload(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePlantShifts') return PLANT.savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveLineEntry') return PROD.saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveLineCounter') return PROD.saveLineCounter(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);
