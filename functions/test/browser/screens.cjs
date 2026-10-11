@@ -846,8 +846,9 @@ async function noScroll(page) {
     assert.deepEqual(hop.errors, []);
     await hop.close();
     results.push('Daily and Weekly: a tile on each opens the other for the same week in this window; Weekly has no Assigned key; Menu > Driver Assignment Board opens Weekly at the board');
-    // Joe 10/10: a menu fly-out draws above the screen (tables, cards, pop-ups), with the menu open and folded, on Daily and Equipment.
-    for (const url of ['/daily.html?date=2026-10-05', '/equipment.html?x=1']) {
+    // Joe 10/10: a menu fly-out draws above the screen (tables, cards, pop-ups), with the menu open and folded, on Daily and Manager Center
+    // (Fleet & Maintenance lists its screens straight in the menu since 10/10 evening, so Equipment has no fly-out).
+    for (const url of ['/daily.html?date=2026-10-05', '/manager.html?x=1']) {
       for (const folded of [false, true]) {
         const fly = await openPage(browser, 1920, 950, url + '&testEmail=dispatch.test@uniteddairy.com');
         await fly.waitForSelector('.sidemenu .side-sec');
@@ -870,7 +871,7 @@ async function noScroll(page) {
         await fly.close();
       }
     }
-    results.push('Menu fly-outs draw above the screen on Daily Dispatch and Equipment, with the menu open and folded');
+    results.push('Menu fly-outs draw above the screen on Daily Dispatch and Manager Center, with the menu open and folded');
     // Joe 10/10: the menu is a slim icon strip until the mouse is over it; then it opens over the screen (nothing moves), a
     // section's screens open beside it, and leaving folds it again. The menu button pins it open; a tablet tap opens it first.
     const rail = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
