@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Plant Reports · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <link rel="stylesheet" href="css/reports.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page reports-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Plant Reports</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Operations · Reports</span><h1 id="title">Plant Scorecard</h1></div>
+      <!-- Joe 10/10 (look B): one Scorecard page, the week on top and a day's details under it; the other reports from the drop-down. -->
+      <div class="rp-ctrl">
+        <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="rp-print">&#9113; Print</button></label>
+        <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="tv" title="Plant Performance: today, live, big text for a TV">TV display</button></label>
+        <label class="rp-field"><span>Report</span><select id="report" aria-label="Report">
+          <option value="scorecard">Weekly Scorecard</option><option value="shifts">Shift Comparison</option><option value="trends">Day-of-Week Trends</option>
+        </select></label>
+        <label class="rp-field" id="week-field"><span>Week</span><span class="rp-step"><button type="button" id="prev" aria-label="Week before">&#9664;</button><input id="week" type="date" aria-label="A day in the week"><button type="button" id="next" aria-label="Week after">&#9654;</button></span></label>
+        <label class="rp-field" id="weeks-field" hidden><span>Weeks</span><select id="weeks" aria-label="How many weeks"><option value="4">Last 4 weeks</option><option value="6">Last 6 weeks</option><option value="8" selected>Last 8 weeks</option><option value="12">Last 12 weeks</option></select></label>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view rp-view">
+      <div class="rp-body" id="body"><p class="rp-wait">Reading the plant's days…</p></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { collection, doc, getDoc, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import * as R from './js/plant-reports.js';
+
+    // Plant Reports (Joe 10/10, look B): the Weekly Scorecard (seven day cards, a day's details under them), Shift Comparison
+    // and Day-of-Week Trends. Read only; every number from the Loadout Center, pickups, Shift Notes, temperatures, quality checks
+    // and the drivers' check-in (plant-reports.js says how each is counted).
+    const L = window.UDLogic;
+    const params = new URLSearchParams(location.search);
+    const today = () => L.operatingDay(new Date());
+    const sel = document.getElementById('report'), weekBox = document.getElementById('week'), weeksBox = document.getElementById('weeks');
+    let view = ['scorecard', 'shifts', 'trends'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'scorecard';
+    // The scorecard opens on yesterday's week with yesterday picked (on a Sunday that is last week's Saturday).
+    let pick = L.isDateKey(params.get('date')) ? params.get('date') : L.addDays(today(), -1);
+    let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(pick);
+    if (params.get('weeks') && weeksBox.querySelector('option[value="' + params.get('weeks') + '"]')) weeksBox.value = params.get('weeks');
+    let db = null, ask = 0, shifts = R.shiftsFor(null), days = [];
+    const cache = { runs: {}, pickups: {}, journal: {} };
+    const fmt = (k) => { const p = k.split('-'); return Number(p[1]) + '/' + Number(p[2]); };
+    const fmtY = (k) => { const p = k.split('-'); return Number(p[1]) + '/' + Number(p[2]) + '/' + p[0]; };
+    const nice = (name) => String(name).charAt(0) + String(name).slice(1).toLowerCase();
+    const pctClass = (p) => p === null || p === undefined ? '' : p >= 90 ? 'good' : p >= 80 ? 'warn' : 'bad';
+    const n = (v) => v === null || v === undefined ? '—' : String(v);
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: L.TIME_ZONE, hour: 'numeric', minute: '2-digit' }) : ''; };
+    const t12 = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ''); return m ? L.timeText(Number(m[1]) * 60 + Number(m[2])) : hm; };
+
+    // Reads the run documents, pickups and journal a span of days needs; each week or span is read once per opening.
+    async function load(from, to) {
+      const need = R.weeksFor(L.addDays(from, -1), to), weeks = need.filter(w => !cache.runs[w]);
+      for (let i = 0; i < weeks.length; i += 10) {
+        const part = weeks.slice(i, i + 10), snap = await getDocs(query(collection(db, 'runs'), where('weekStart', 'in', part)));
+        part.forEach(w => { cache.runs[w] = []; });
+        snap.docs.forEach(d => { const r = Object.assign({ id: d.id }, d.data()); (cache.runs[r.weekStart] = cache.runs[r.weekStart] || []).push(r); });
+      }
+      const key = from + '|' + to;
+      if (!cache.pickups[key]) cache.pickups[key] = (await getDocs(query(collection(db, 'pickups'), where('date', '>=', L.addDays(from, -1)), where('date', '<=', L.addDays(to, 7))))).docs.map(d => d.data());
+      if (!cache.journal[key]) cache.journal[key] = (await getDocs(query(collection(db, 'plantJournal'), where('date', '>=', from), where('date', '<=', to)))).docs.map(d => Object.assign({ _id: d.id }, d.data()));
+      return { runs: [].concat(...need.map(w => cache.runs[w] || [])), pickups: cache.pickups[key], journal: cache.journal[key] };
+    }
+    const summaries = (dates, d) => dates.map(x => R.daySummary(x, d.runs, d.pickups, d.journal, Date.now(), shifts));
+
+    function kpi(label, value, line, kind, small) { return '<div class="rp-kpi ' + (kind || '') + '"><span>' + escapeHtml(label) + '</span><b' + (small ? ' class="small"' : '') + '>' + value + '</b><i>' + escapeHtml(line || '') + '</i></div>'; }
+    function bar(p) { return p === null || p === undefined ? '—' : '<span class="rp-bar ' + pctClass(p) + '"><s style="width:' + p + '%"></s></span>' + p + '%'; }
+    function card(title, count, inner, cls) { return '<section class="rp-card ' + (cls || '') + '"><h3>' + escapeHtml(title) + '<em>' + escapeHtml(count) + '</em></h3><div class="rp-scroll">' + inner + '</div></section>'; }
+    function table(head, rows, empty) {
+      return rows.length ? '<table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>' : '<p class="rp-none">' + escapeHtml(empty) + '</p>';
+    }
+    const kpis = (c) => '<div class="rp-kpis">' +
+      kpi('Loads', n(c.loads), c.toCome ? c.toCome + ' still to come' : 'on the dispatch') +
+      kpi('On time', c.onTimePct === null ? '—' : c.onTimePct + '%', c.judged ? c.onTime + ' of ' + c.judged + ' loaded on time' : 'none due yet', pctClass(c.onTimePct)) +
+      kpi('Late', n(c.late), c.late ? 'avg ' + R.minutesText(c.avgLate) + ' after depart' : 'none late', c.late ? 'warn' : 'good') +
+      kpi('Not loaded', n(c.notLoaded), c.notLoaded ? 'never marked done' : 'none missed', c.notLoaded ? 'bad' : 'good') +
+      (c.firstStart === undefined ? kpi('Check-in shortages', n(c.shortages), 'drivers reported over / short', c.shortages ? 'warn' : '')
+        : kpi('Loadout', (c.firstStart !== null ? R.clockText(c.firstStart) : '—') + ' – ' + (c.lastFinish !== null ? R.clockText(c.lastFinish) : '—'), 'first start · last finish', '', true)) +
+      kpi('Avg load', c.avgTaken === null ? '—' : c.avgTaken + '<small> min</small>', 'Start to End') +
+      kpi('Pickups', n(c.pickups), 'product that did not load', c.pickups ? 'bad' : 'good') +
+      kpi('Breakdowns', n(c.breakdowns), c.tempsOut + ' temps out · ' + c.qualityFails + ' quality fails', c.breakdowns ? 'warn' : '') + '</div>';
+    const dayKpis = (c) => kpis(Object.assign({}, c, { pickups: c.pickups.length, breakdowns: c.breakdowns.length, tempsOut: c.tempsOut.length, qualityFails: c.qualityFails.length }));
+
+    // The seven day cards and the week's card (look B). A card's colour is its on-time share.
+    function strip(list, t) {
+      const now = today();
+      const one = (c) => {
+        const future = c.date > now, k = future || c.onTimePct === null ? 'none' : pctClass(c.onTimePct);
+        return '<button type="button" class="rp-day ' + k + (c.date === pick ? ' on' : '') + '" data-day="' + c.date + '" aria-pressed="' + (c.date === pick) + '"><h4>' + nice(c.weekday).slice(0, 3) + ' ' + fmt(c.date) + '</h4>' +
+          '<b>' + (future ? '—' : c.onTimePct === null ? (c.loads ? '—' : 'No loads') : c.onTimePct + '%') + '</b><span>' + (future ? 'to come' : c.judged ? c.onTime + ' of ' + c.judged + ' on time' : c.date === now ? 'today, none due yet' : 'on time') + '</span>' +
+          '<i>' + (future ? c.loads + ' loads' : c.late + ' late · ' + c.notLoaded + ' not loaded') + '</i><i class="' + (c.pickups.length ? 'bad' : '') + '">' + c.pickups.length + ' pickup' + (c.pickups.length === 1 ? '' : 's') + '</i></button>';
+      };
+      return '<div class="rp-days">' + list.map(one).join('') + '<button type="button" class="rp-day week ' + pctClass(t.onTimePct) + (pick === 'week' ? ' on' : '') + '" data-day="week" aria-pressed="' + (pick === 'week') + '"><h4>Week</h4><b>' + (t.onTimePct === null ? '—' : t.onTimePct + '%') + '</b><span>' + (t.judged ? t.onTime + ' of ' + t.judged + ' on time' : 'on time') + '</span><i>' + t.late + ' late · ' + t.notLoaded + ' not loaded</i><i class="' + (t.pickups ? 'bad' : '') + '">' + t.pickups + ' pickups</i></button></div>';
+    }
+
+    function byShift(list, title) {
+      const cmp = R.shiftComparison(list, shifts);
+      const rows = cmp.rows.map(r => '<tr><td><b>' + escapeHtml(r.shift) + '</b><small> ' + escapeHtml(t12(r.start) + '–' + t12(r.end)) + '</small></td><td>' + r.loads + '</td><td class="rp-pct">' + bar(r.onTimePct) + '</td><td>' + r.late + '</td><td class="' + (r.notLoaded ? 'bad' : '') + '">' + r.notLoaded + '</td>' +
+        '<td>' + (r.avgLate === null ? '—' : R.minutesText(r.avgLate)) + '</td><td>' + (r.avgTaken === null ? '—' : r.avgTaken + ' min') + '</td><td class="' + (r.pickups ? 'bad' : '') + '">' + r.pickups + '</td><td class="' + (r.shortages ? 'warn' : '') + '">' + r.shortages + '</td>' +
+        '<td>' + r.breakdowns + '</td><td>' + r.tempsOut + '</td><td>' + r.qualityFails + '</td><td><b>' + n(r.per100) + '</b></td></tr>');
+      return { cmp, html: card(title, 'a load counts for the shift it started loading in', table(['Shift', 'Loads', 'On time', 'Late', 'Not loaded', 'Avg late', 'Avg load', 'Pickups', 'Check-in shortages', 'Breakdowns', 'Temps out', 'Quality fails', 'Problems per 100 loads'], rows, ''), 'rp-wide') };
+    }
+
+    function drawDay(c) {
+      const late = c.problems.map(x => '<tr><td><b>' + escapeHtml([x.route, x.run].filter(Boolean).join(' ')) + '</b></td><td>' + escapeHtml(R.AREA_NAME[x.area] || x.area) + '</td><td>' + escapeHtml(x.shift) + '</td><td>' + escapeHtml(R.clockText(x.depart)) + '</td>' +
+        (x.result === 'NOT LOADED' ? '<td class="bad">NOT LOADED</td><td class="bad">—</td>' : '<td>' + escapeHtml(R.clockText(x.done)) + '</td><td class="' + (x.late > 60 ? 'bad' : 'warn') + '">' + escapeHtml(R.minutesText(x.late)) + '</td>') + '</tr>');
+      const areas = R.AREA_ORDER.map(a => c.areas[a]).filter(a => a && a.loads).map(a => { const p = a.judged ? Math.round(a.onTime / a.judged * 100) : null; return '<tr><td><b>' + R.AREA_NAME[a.area] + '</b></td><td>' + a.loads + '</td><td>' + a.onTime + '</td><td>' + a.late + '</td><td>' + a.notLoaded + '</td><td class="rp-pct">' + bar(p) + '</td></tr>'; });
+      const picks = c.pickups.map(p => '<tr><td><b>' + escapeHtml([p.route, p.run].filter(Boolean).join(' ')) + '</b></td><td class="bad">' + escapeHtml(p.product) + '</td><td>' + escapeHtml(p.quantity) + '</td><td>' + escapeHtml(p.shift) + '</td><td>' + (p.open ? '<span class="bad">OPEN</span>' : 'Done') + '</td></tr>')
+        .concat(c.shortages.map(x => '<tr><td><b>' + escapeHtml([x.route, x.run].filter(Boolean).join(' ')) + '</b></td><td class="warn">Check-in: ' + escapeHtml(x.what) + '</td><td></td><td>' + escapeHtml(x.shift) + '</td><td>Driver</td></tr>'));
+      const plant = c.breakdowns.map(b => '<tr><td><b>' + escapeHtml(b.equipment) + '</b></td><td>Breakdown</td><td>' + escapeHtml([b.entry, b.status].filter(Boolean).join(' · ')) + '</td><td>' + escapeHtml(clock(b.at)) + '</td></tr>')
+        .concat(c.tempsOut.map(t => '<tr><td><b>' + escapeHtml(t.location) + '</b></td><td>Temperature</td><td class="bad">' + escapeHtml((t.reading !== '' ? t.reading + '°F · ' : '') + t.status) + '</td><td>' + escapeHtml(clock(t.at)) + '</td></tr>'))
+        .concat(c.qualityFails.map(q => '<tr><td><b>' + escapeHtml(q.line) + '</b></td><td>Quality</td><td class="bad">' + escapeHtml([q.product, q.what].filter(Boolean).join(' · ')) + '</td><td>' + escapeHtml(clock(q.at)) + '</td></tr>'));
+      return '<h2 class="rp-dayhead">' + nice(c.weekday) + ' ' + fmtY(c.date) + (c.date === L.addDays(today(), -1) ? ' · yesterday' : c.date === today() ? ' · today so far' : '') + '</h2>' + dayKpis(c) + '<div class="rp-grid">' +
+        card('Late and not loaded', c.problems.length + ' load' + (c.problems.length === 1 ? '' : 's'), table(['Route / Run', 'Area', 'Shift', 'Depart', 'Loaded at', 'Late by'], late, c.loads ? 'Every load that came due was on time.' : 'No loads on the dispatch for this day.'), 'rp-tall') +
+        '<div class="rp-col">' + card('By department', 'on time', table(['Area', 'Loads', 'On time', 'Late', 'Not loaded', 'On time %'], areas, 'No loads.')) +
+        card('Pickups and check-in shortages', String(picks.length), table(['Route / Run', 'Product or what the driver reported', 'Qty', 'Shift', 'Status'], picks, 'None.')) +
+        card('Breakdowns · temperatures · quality', String(plant.length), table(['What', 'Kind', 'Details', 'Logged'], plant, 'Nothing logged.')) + '</div></div>' + byShift([c], 'By shift').html;
+    }
+
+    function drawWeekTable(list) {
+      const t = R.totals(list), now = today();
+      const rows = list.map(c => {
+        const future = c.date > now;
+        return '<tr class="' + (future ? 'rp-future' : '') + '" data-day="' + c.date + '" title="Open ' + nice(c.weekday) + ' ' + fmt(c.date) + '"><td><b>' + nice(c.weekday) + '</b> ' + fmt(c.date) + '</td><td>' + c.loads + '</td><td class="rp-pct">' + (future ? '—' : bar(c.onTimePct)) + '</td><td>' + (future ? '—' : c.late) + '</td><td>' + (c.avgLate === null ? '—' : R.minutesText(c.avgLate)) + '</td><td class="' + (c.notLoaded ? 'bad' : '') + '">' + (future ? '—' : c.notLoaded) + '</td>' +
+          '<td>' + (c.firstStart !== null ? R.clockText(c.firstStart) : '—') + '</td><td>' + (c.lastFinish !== null ? R.clockText(c.lastFinish) : '—') + '</td><td>' + (c.avgTaken === null ? '—' : c.avgTaken + ' min') + '</td>' +
+          '<td class="' + (c.pickups.length ? 'bad' : '') + '">' + c.pickups.length + '</td><td>' + c.shortages.length + '</td><td>' + c.breakdowns.length + '</td><td>' + c.tempsOut.length + '</td><td>' + c.qualityFails.length + '</td></tr>';
+      });
+      rows.push('<tr class="rp-total"><td><b>Week</b></td><td>' + t.loads + '</td><td class="rp-pct">' + bar(t.onTimePct) + '</td><td>' + t.late + '</td><td>' + (t.avgLate === null ? '—' : R.minutesText(t.avgLate)) + '</td><td>' + t.notLoaded + '</td><td></td><td></td><td>' + (t.avgTaken === null ? '—' : t.avgTaken + ' min') + '</td><td>' + t.pickups + '</td><td>' + t.shortages + '</td><td>' + t.breakdowns + '</td><td>' + t.tempsOut + '</td><td>' + t.qualityFails + '</td></tr>');
+      return '<h2 class="rp-dayhead">Week of ' + fmtY(list[0].date) + '</h2>' + kpis(Object.assign({}, t, { firstStart: undefined })) +
+        card('Day by day', 'Sunday to Saturday · click a day for its details', table(['Day', 'Loads', 'On time', 'Late', 'Avg late', 'Not loaded', 'First start', 'Last finish', 'Avg load', 'Pickups', 'Check-in shortages', 'Breakdowns', 'Temps out', 'Quality fails'], rows, ''), 'rp-wide') + byShift(list, 'By shift').html;
+    }
+
+    function drawScorecard() {
+      const c = days.find(d => d.date === pick);
+      document.getElementById('detail').innerHTML = pick === 'week' || !c ? drawWeekTable(days) : drawDay(c);
+      document.querySelectorAll('.rp-day').forEach(b => { b.classList.toggle('on', b.dataset.day === pick); b.setAttribute('aria-pressed', String(b.dataset.day === pick)); });
+    }
+
+    function drawShifts(list) {
+      const { cmp, html } = byShift(list, 'Shift Comparison · week of ' + fmtY(list[0].date));
+      const now = today(), done = list.filter(c => c.date <= now);
+      const head = ['Day'].concat(shifts.map(s => escapeHtml(s.name)));
+      const daily = done.map(c => { const one = R.shiftComparison([c], shifts).rows; return '<tr data-day="' + c.date + '"><td><b>' + nice(c.weekday) + '</b> ' + fmt(c.date) + '</td>' + one.map(r => '<td>' + (r.loads ? r.loads + ' loads · ' + (r.onTimePct === null ? '—' : '<span class="rp-' + pctClass(r.onTimePct) + '">' + r.onTimePct + '% on time</span>') + (r.pickups + r.shortages ? ' · <span class="rp-bad">' + (r.pickups + r.shortages) + ' short</span>' : '') : '—') + '</td>').join('') + '</tr>'; });
+      const shorts = [].concat(...list.map(c => c.shortages.map(x => '<tr><td>' + nice(c.weekday).slice(0, 3) + ' ' + fmt(c.date) + '</td><td><b>' + escapeHtml([x.route, x.run].filter(Boolean).join(' ')) + '</b></td><td>' + escapeHtml(x.shift) + '</td><td class="warn">' + escapeHtml(x.what) + '</td></tr>')));
+      return '<div class="rp-lead ' + (cmp.notes.length ? 'bad' : '') + '"><b>' + (cmp.notes.length ? 'What stands out: ' : 'So far: ') + '</b>' + escapeHtml(cmp.notes.length ? cmp.notes.join(' ') : 'No shift stands out this week.') + '</div>' + html +
+        card('Each day by shift', 'loads, on time, and pickups plus check-in shortages · click a day', table(head, daily, 'No days yet.'), 'rp-wide') +
+        card('Shortages drivers reported at check-in', String(shorts.length), table(['Day', 'Route / Run', 'Loaded by', 'What the driver reported'], shorts, 'No shortages reported this week.'), 'rp-wide') +
+        '<p class="rp-foot">Shifts: ' + shifts.map(s => escapeHtml(s.name + ' ' + t12(s.start) + '–' + t12(s.end))).join(' · ') + ' (Administration › Plant Shifts). A load counts for the shift it started loading in; in an overlap it stays with the earlier shift. Problems per 100 loads = late + not loaded + pickups + check-in shortages for every 100 loads.</p>';
+    }
+
+    function drawTrends(tr, weeks) {
+      const worst = (key, hi) => { const v = tr.rows.filter(r => r.days && r[key] !== null).map(r => r[key]); return v.length > 1 ? (hi ? Math.max(...v) : Math.min(...v)) : null; };
+      const wOn = worst('onTimePct', false), wPick = worst('pickups', true), wLate = worst('avgLate', true);
+      const rows = tr.rows.map(r => '<tr class="' + (r.days && r.onTimePct !== null && r.onTimePct === wOn ? 'rp-flag' : '') + '"><td><b>' + nice(r.weekday) + '</b></td><td>' + r.days + '</td><td>' + n(r.loads) + '</td><td class="rp-pct">' + bar(r.onTimePct) + '</td>' +
+        '<td class="' + (r.avgLate !== null && r.avgLate === wLate ? 'bad' : '') + '">' + (r.avgLate === null ? '—' : R.minutesText(r.avgLate)) + '</td><td>' + n(r.notLoaded) + '</td><td class="' + (r.pickups && r.pickups === wPick ? 'bad' : '') + '">' + n(r.pickups) + '</td><td>' + n(r.breakdowns) + '</td><td>' + n(r.tempsOut) + '</td></tr>');
+      const lead = !tr.days ? 'No finished days recorded yet in the last ' + weeks + ' weeks.'
+        : (tr.notes.length ? tr.notes.join(' ') : 'No weekday stands out yet.') + (tr.days >= 14 ? '' : ' Only ' + tr.days + ' day' + (tr.days === 1 ? '' : 's') + ' recorded so far, so treat this as early; patterns firm up after about three weeks.');
+      return '<div class="rp-lead ' + (tr.notes.length ? 'bad' : '') + '"><b>' + (tr.notes.length ? 'What stands out: ' : 'So far: ') + '</b>' + escapeHtml(lead) + '</div>' +
+        card('By weekday', 'last ' + weeks + ' weeks · ' + tr.days + ' days counted', table(['Weekday', 'Days counted', 'Loads a day', 'On time', 'Avg late', 'Not loaded a day', 'Pickups a day', 'Breakdowns a day', 'Temps out a day'], rows, ''), 'rp-wide') +
+        '<p class="rp-foot">Counts the days the new app has recorded' + (tr.first ? ', starting ' + fmtY(tr.first) : '') + '. On time = loaded no later than ' + R.ON_TIME_MINUTES + ' minutes after the depart time (the same rule as Behind). Line speed (cases an hour) and the time a truck really leaves are not recorded yet.</p>';
+    }
+
+    function remember() {
+      const url = new URL(location.href);
+      url.searchParams.set('view', view);
+      ['week', 'date', 'weeks'].forEach(k => url.searchParams.delete(k));
+      if (view === 'trends') url.searchParams.set('weeks', weeksBox.value);
+      else { url.searchParams.set('week', week); if (view === 'scorecard') url.searchParams.set('date', pick); }
+      history.replaceState(null, '', url);
+    }
+
+    async function draw() {
+      const mine = ++ask, body = document.getElementById('body'), now = today();
+      document.getElementById('week-field').hidden = view === 'trends';
+      document.getElementById('weeks-field').hidden = view !== 'trends';
+      sel.value = view;
+      weekBox.value = week;
+      remember();
+      body.innerHTML = '<p class="rp-wait">Reading the plant\'s days…</p>';
+      try {
+        let html = '', title = '';
+        if (view === 'trends') {
+          const weeks = Number(weeksBox.value), from = L.addDays(L.weekStart(now), -7 * weeks), to = L.addDays(now, -1), d = await load(from, to);
+          title = 'Day-of-Week Trends';
+          html = drawTrends(R.weekdayTrends(summaries(R.datesBetween(from, to), d)), weeks);
+        } else {
+          const dates = R.weekDates(week), d = await load(dates[0], dates[6]);
+          days = summaries(dates, d);
+          if (view === 'scorecard') {
+            if (pick !== 'week' && dates.indexOf(pick) < 0) pick = dates.indexOf(L.addDays(now, -1)) >= 0 ? L.addDays(now, -1) : dates[0] > now ? 'week' : dates[6] < now ? dates[6] : now;
+            title = 'Plant Scorecard';
+            html = strip(days, R.totals(days)) + '<div id="detail"></div>';
+          } else {
+            title = 'Shift Comparison';
+            html = drawShifts(days);
+          }
+        }
+        if (mine !== ask) return;
+        document.getElementById('title').textContent = title;
+        document.title = title + ' · Plant Reports';
+        body.innerHTML = html;
+        if (view === 'scorecard') { drawScorecard(); remember(); }
+        showError('');
+      } catch (e) { if (mine === ask) { body.innerHTML = ''; showError('Could not read the report: ' + (e.message || e)); } }
+    }
+
+    sel.addEventListener('change', () => { view = sel.value; draw(); });
+    weekBox.addEventListener('change', () => { if (L.isDateKey(weekBox.value)) { week = L.weekStart(weekBox.value); pick = weekBox.value; draw(); } });
+    const step = (k) => { week = L.addDays(week, 7 * k); pick = ''; draw(); };
+    document.getElementById('prev').onclick = () => step(-1);
+    document.getElementById('next').onclick = () => step(1);
+    weeksBox.addEventListener('change', draw);
+    document.getElementById('rp-print').onclick = () => window.print();
+    document.getElementById('tv').onclick = () => { location.href = 'plant-kiosk.html'; };
+    // A day card (or a day row) shows that day's details under the cards, without reading again.
+    document.getElementById('body').addEventListener('click', e => {
+      const b = e.target.closest('[data-day]');
+      if (!b) return;
+      if (view !== 'scorecard') { view = 'scorecard'; pick = b.dataset.day; draw(); return; }
+      pick = b.dataset.day; drawScorecard(); remember();
+      if (b.tagName === 'TR') document.querySelector('.rp-days').scrollIntoView({ block: 'start' });
+    });
+
+    requireSignIn(async () => {
+      ({ db } = await start());
+      try { const s = await getDoc(doc(db, 'plantShifts', 'fac_uniontown')); shifts = R.shiftsFor(s.exists() ? s.data() : null, 'fac_uniontown'); } catch (e) { /* the starting shifts */ }
+      draw();
+    });
+  </script>
+</body>
+</html>
