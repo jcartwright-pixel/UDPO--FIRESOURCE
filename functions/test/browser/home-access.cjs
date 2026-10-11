@@ -44,7 +44,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.match(sup.url(), /index\.html/);
     assert.deepEqual(await sup.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['distribution', 'plant', 'fleet']);
     assert.equal(await sup.$('#go-back'), null, 'nothing above the plant home');
-    assert.equal(await sup.isVisible('.sidemenu a[href="administration.html"]'), false, 'no Administration in the menu');
+    assert.equal(await sup.isVisible('#go-admin'), false, 'no Administration button');
     if (SHOTS) await sup.screenshot({ path: path.join(SHOTS, 'home-one-plant-1920.png') });
     await sup.goto(HOSTING + '/company.html?testEmail=super.test@uniteddairy.com');
     await sup.waitForSelector('.co-plant');
@@ -76,7 +76,9 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     const sizes = await adm.$$eval('.launch-card', c => c.map(x => Math.round(x.getBoundingClientRect().width) + 'x' + Math.round(x.getBoundingClientRect().height)));
     assert.equal(new Set(sizes).size, 1, 'the four cards are the same size: ' + sizes.join(' '));
     await adm.waitForSelector('#go-back');
-    assert.equal(await adm.isVisible('.sidemenu a[href="administration.html"]'), true, 'Administration is in an Administrator\'s menu');
+    // Joe 10/10 evening: Administration is a header button on the main screens, not a menu item.
+    assert.equal(await adm.isVisible('#go-admin'), true, 'Administration is in an Administrator\'s header');
+    assert.equal(await adm.$('.sidemenu a[href="administration.html"]'), null, 'Administration is not in the menu');
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-admin-uniontown-1920.png') });
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go-back')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');

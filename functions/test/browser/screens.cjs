@@ -682,7 +682,7 @@ async function noScroll(page) {
     assert.deepEqual(fs2.errors, []);
     await fs2.close();
     results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
-    // Joe 10/10: every screen, plant screens included, shows Back and Home together at the top of the menu.
+    // Joe 10/10: every screen, plant screens included, shows Back and Home together; Joe 10/10 evening: in the header, not the menu.
     const fsMod = require('fs'), pathMod = require('path');
     const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html');
     const bh = await openPage(browser, 1366, 768, '/index.html?testEmail=manager.test@uniteddairy.com');
@@ -691,11 +691,11 @@ async function noScroll(page) {
       await bh.goto(bh.url().replace(/\/[a-z-]+\.html.*/, '/' + pg + '?testEmail=manager.test@uniteddairy.com'));
       await bh.waitForSelector('#go-home', { timeout: 8000 }).catch(() => {});
       const seen = await bh.evaluate(() => ['go-back', 'go-home'].filter(id => { const e = document.getElementById(id); return e && e.getBoundingClientRect().width > 0; }));
-      const want = pg === 'index.html' ? ['go-home'] : ['go-back', 'go-home'];
+      const want = pg === 'index.html' || pg === 'company.html' ? ['go-home'] : ['go-back', 'go-home'];
       if (want.some(id => seen.indexOf(id) < 0)) missing.push(pg + ': ' + seen.join(','));
     }
     assert.deepEqual(missing, [], 'every screen has Back and Home');
-    results.push('Back and Home: all ' + pages.length + ' screens show both at the top of the menu (Home shows Home)');
+    results.push('Back and Home: all ' + pages.length + ' screens show both in the header (Home and the all-plants overview show Home)');
     // Joe 10/10: "move the action buttons all in a line up above": on every screen the action buttons sit in one row in the top
     // line, all the same size, above the tables; no action row is left down in the screen.
     const topBad = [];
