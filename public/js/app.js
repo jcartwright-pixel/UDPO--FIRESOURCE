@@ -77,18 +77,19 @@ export const MENU = [
   ['Send Report', [['Send Current Report', 'manager.html?report=1', 'star']]],
   // Joe 10/11: the reports have their own place, as on the current app: the shift reports sent, and the Plant Reports.
   ['Reports', [['Shift Reports', 'shiftreports.html', 'day'], ['Plant Reports', 'reports.html', 'star']]],
-  ['Yard Checks', [['Yard Checks', 'yard.html', 'yard-checks.webp']]],
-  ['Plant Operations Scheduler', [['Plant Operations Scheduler', 'scheduler.html', 'week']]],
+  // Joe 10/11: production first, then shift notes and quality, then temperatures and yard (as the Manager Center cards).
   ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Trailer Assignments', 'trailers.html', 'load']]],
+  ['Plant Operations Scheduler', [['Plant Operations Scheduler', 'scheduler.html', 'week']]],
+  ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]],
   ['Quality Checks', [['Quality Checks', 'quality.html', 'production.webp']]],
   ['Cooler Temperature', [['Cooler Temperature', 'temps.html', 'temperatures.webp']]],
-  ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]]
+  ['Yard Checks', [['Yard Checks', 'yard.html', 'yard-checks.webp']]]
 ];
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
 // lists only that side's screens. A screen listed on two sides stays on the side it was opened from.
 export const SIDES = [
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
-  { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks, shift notes and reports', sections: ['Send Report', 'Reports', 'Yard Checks', 'Plant Operations Scheduler', 'Plant Distribution Departments', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'] },
+  { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks, shift notes and reports', sections: ['Send Report', 'Reports', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'] },
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
