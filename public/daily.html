@@ -163,7 +163,7 @@
       rows.forEach((r, i) => {
         if (r.deliveryDate !== group) {
           group = r.deliveryDate;
-          body.push('<tr class="group"><td colspan="11">' + escapeHtml(r.deliveryDay.toUpperCase() + ' DELIVERIES, ' + shortDate(r.deliveryDate)) + '</td></tr>');
+          body.push('<tr class="group"><td colspan="11"><span class="gtext">' + escapeHtml(r.deliveryDay.toUpperCase() + ' DELIVERIES, ' + shortDate(r.deliveryDate)) + '</span></td></tr>');
         }
         const driver = r.driver || coverageName(r), live = edit && !r.off, needs = !r.off;
         body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (order && !r.off ? ' draggable="true"' : '') + (r.off ? ' class="off"' : '') + '>' +
