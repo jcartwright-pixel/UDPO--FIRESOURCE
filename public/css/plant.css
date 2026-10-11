@@ -172,6 +172,9 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
   /* Smaller screens: the day is in the date box, so the big day name gives its room to the counts. */
   .unload-page .dayname, .returns-page .dayname, .washing-page .dayname { display: none; }
   body.yard-page .head .dayname { font-size: 18px; }
+  /* Yard Checks on a laptop: tighter gaps keep Refresh on the top line (it only just fitted, and wrapped on wider fonts). */
+  body.yard-page .head { column-gap: 8px; }
+  body.yard-page .head .hstats { gap: 4px; }
   .unload-page .hstats { gap: 6px; }
   .unload-page .hstats div { min-width: 60px; padding: 3px 8px; }
   .unload-page .hstats b { font-size: 18px; }
