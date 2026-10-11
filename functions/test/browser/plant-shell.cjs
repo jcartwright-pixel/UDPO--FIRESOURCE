@@ -58,7 +58,7 @@ const SCREENS = [
     assert.equal(await side.getAttribute('.sidemenu a.side-name', 'href'), 'manager.html', 'Plant Operations opens Manager Center');
     assert.ok(await side.$('.sidemenu a.side-name.on'), 'Manager Center is the Plant Operations screen');
     assert.deepEqual(await side.$$eval('.sidemenu > a:not(.side-name):not(#go-home), .sidemenu > .side-sec > .side-sec-btn', x => x.map(e => e.textContent.replace(/[\u25b8]/g, '').trim())),
-      ['Send Report', 'Yard Checks', 'Plant Operations Scheduler', 'Plant Distribution Departments', 'Quality Checks', 'Cooler Temperature', 'Shift Notes']);
+      ['Send Report', 'Reports', 'Yard Checks', 'Plant Operations Scheduler', 'Plant Distribution Departments', 'Quality Checks', 'Cooler Temperature', 'Shift Notes']);
     const hrefs = await side.$$eval('.sidemenu a[href], .side-flyouts a[href]', a => a.map(x => x.getAttribute('href').split(/[?#]/)[0]));
     for (const [page] of SCREENS) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Operations side menu: ' + JSON.stringify(hrefs));
     assert.equal(await side.$('.mc-menu, aside'), null, 'Manager Center has no menu of its own');
