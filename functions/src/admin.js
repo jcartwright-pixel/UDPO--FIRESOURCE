@@ -11,6 +11,7 @@
  *   Plant Station Codes   releaseCodes, releaseCodeNew                                 private/releaseCodes
  *   Report Recipients     reportGroups, saveReportGroup                                reportGroups/{id}
  *   Sent Email Log        sentLog, setSending                                          sentEmails, private/emailSettings
+ *   Email Senders         emailSenders, saveEmailSenders                               private/emailSettings (senders, repairFrom)
  *   Remaining Repairs     repairItems, saveRepairItem, completeRepairItem              repairItems/{id}
  * The email, schedule and diagnostics items are in admintools.js.
  */
@@ -21,7 +22,7 @@ const L = require('./logic');
 const M = require('./model');
 const R = require('./rights');
 const { queueMaster } = require('./masterwrite');
-const { appMail, emailSettings } = require('./adminmail');
+const { appMail, emailSettings, ourAddress, DOMAIN } = require('./adminmail');
 const { addresses } = require('./mail');
 
 class AdminError extends Error {
@@ -332,6 +333,33 @@ async function setSending(db, email, input, stamp) {
   return { ok: true, message: input.on ? 'Sending is on.' : 'Sending is off.' };
 }
 
+/* ---------- Email Senders ---------- */
+
+// Joe 10/11: each plant's email can come from its own mailbox (e.g. "United Dairy Uniontown Operations",
+// uniontown.operations@uniteddairy.com); a plant left empty keeps the app's standard sender (MAIL_FROM). Every plant is
+// listed, planned ones too, so Charleston and Martins Ferry can be set before they go live.
+async function emailSenders(db, deps) {
+  const s = await emailSettings(db), env = (deps && deps.env) || process.env;
+  return { standard: String(env.MAIL_FROM || '').trim(), repairFrom: s.repairFrom, sending: s.sending,
+    plants: L.PLANTS.map(p => { const x = s.senders[p.id] || {}; return { id: p.id, plant: p.name, address: x.address || '', senderName: x.address ? x.name || '' : '', changedAt: x.changedAt || '', changedBy: x.changedBy || '' }; }) };
+}
+
+async function saveEmailSenders(db, email, input, stamp, deps) {
+  const before = await emailSettings(db), senders = {};
+  const given = input.senders || {};
+  L.PLANTS.forEach(p => {
+    const g = given[p.id] || {}, raw = text(g.address, 120).toLowerCase(), name = text(g.name, 80).replace(/[<>"\r\n]/g, '');
+    if (raw && !ourAddress(raw)) fail('BAD_REQUEST', p.name + ': "' + raw + '" is not a United Dairy email address (it must end in ' + DOMAIN + ').');
+    if (name && !raw) fail('BAD_REQUEST', p.name + ': type the email address the name goes with, or clear the name.');
+    const was = before.senders[p.id] || {};
+    const same = (was.address || '') === raw && (was.name || '') === name;
+    senders[p.id] = { address: raw, name, changedAt: same ? was.changedAt || '' : stamp, changedBy: same ? was.changedBy || '' : email };
+  });
+  const repairFrom = input.repairFrom === 'PERSON' ? 'PERSON' : 'PLANT';
+  await db.collection('private').doc('emailSettings').set({ senders, repairFrom, sendersChangedAt: stamp, sendersChangedBy: email }, { merge: true });
+  return Object.assign({ ok: true, message: 'Saved.' }, await emailSenders(db, deps));
+}
+
 /* ---------- Remaining Repair Items ---------- */
 
 const PRIORITIES = ['NORMAL', 'HIGH', 'BLOCKER'];
@@ -373,6 +401,7 @@ const OPS = {
   releaseCodes: (db) => releaseCodes(db), releaseCodeNew,
   reportGroups: (db, email, input) => reportGroups(db, input), saveReportGroup,
   sentLog: (db) => sentLog(db), setSending,
+  emailSenders: (db, email, input, stamp, d) => emailSenders(db, d), saveEmailSenders,
   repairItems: (db) => repairItems(db), saveRepairItem, completeRepairItem
 };
 

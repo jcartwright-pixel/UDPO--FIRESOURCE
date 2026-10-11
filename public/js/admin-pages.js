@@ -509,7 +509,7 @@ export async function renderSentLog(box) {
         (s.sending ? (s.changedBy ? 'Turned on by ' + e(s.changedBy) + ' ' + e(when(s.changedAt)) : '') : 'Nothing is emailed, and each attempt is logged as stopped.') + '</span>';
       $('#sl-rows').innerHTML = data.emails.map(m => {
         const st = STATUS[m.status] || [m.status, ''];
-        return '<tr><td>' + e(when(m.at)) + '</td><td><span class="ap-chip ' + st[1] + '">' + e(st[0]) + '</span></td><td><b>' + e(m.label || m.kind) + '</b><small>' + e([m.kind, m.detail, m.by].filter(Boolean).join(' · ')) + '</small></td>' +
+        return '<tr><td>' + e(when(m.at)) + '</td><td><span class="ap-chip ' + st[1] + '">' + e(st[0]) + '</span></td><td><b>' + e(m.label || m.kind) + '</b><small>' + e([m.kind, m.detail, m.by, m.from ? 'from ' + m.from : ''].filter(Boolean).join(' · ')) + '</small></td>' +
           '<td>' + e((m.sentTo && m.sentTo.length ? m.sentTo : m.meantFor || []).join('; ')) + (m.testCopy && m.meantFor && m.meantFor.length ? '<small>meant for ' + e(m.meantFor.join('; ')) + '</small>' : '') + '</td>' +
           '<td>' + e(m.subject) + (m.reason ? '<small>' + e(m.reason) + '</small>' : '') + '</td></tr>';
       }).join('') || '<tr><td colspan="5" class="ap-empty">No email has been sent or stopped yet.</td></tr>';
@@ -521,6 +521,42 @@ export async function renderSentLog(box) {
     if (b.id === 'sl-reload') load();
     if (b.id === 'sl-off') busy(box, b, async () => { const out = await call('setSending', { on: false }); await load(); say(box, out.message, 'good'); });
     if (b.id === 'sl-on') twice(b, 'Press again to turn on', () => busy(box, b, async () => { const out = await call('setSending', { on: true }); await load(); say(box, out.message, 'good'); }));
+  });
+  await load();
+}
+
+/* ---------- Email Senders ---------- */
+
+// Joe 10/11: each plant's email comes from its own mailbox (e.g. United Dairy Uniontown Operations); empty = the standard sender.
+export async function renderEmailSenders(box, ctx) {
+  let data = null;
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="es-save">Save</button><button type="button" class="ap-btn" id="es-reload">Refresh</button>' +
+    '<div class="ap-right"><span id="es-sending"></span></div></div><div class="ap-msg" hidden></div>' +
+    '<p class="ap-note">Which mailbox each plant\'s email comes from: plant reports and truck repair emails (other app email, such as access links, uses Uniontown\'s). Leave a plant empty to keep the standard sender. The mailbox must be a real United Dairy mailbox that IT has created.</p>' +
+    '<div class="ap-scroll"><table class="ap-t"><thead><tr><th>Plant</th><th>Send emails from</th><th>Name people see</th><th>Changed</th></tr></thead><tbody id="es-rows"></tbody></table>' +
+    '<div class="ap-section" style="margin:10px"><h3>Truck repair emails a manager sends</h3><p class="ap-note">The Lessor button on a truck or trailer write-up (Equipment Issues). Automatic and daily repair emails always come from the plant mailbox.</p>' +
+    '<label class="ap-field" style="max-width:520px">Comes from<select id="es-repair"><option value="PLANT">The plant mailbox</option><option value="PERSON">The manager who presses the button (their own email)</option></select></label></div></div></div>';
+  const $ = (s) => box.querySelector(s);
+  function render() {
+    $('#es-sending').innerHTML = data.sending ? '<span class="ap-chip good">Sending is ON</span>' : '<button type="button" class="ap-btn small" data-goto="sent-log">Sending is OFF: turn it on</button>';
+    const std = data.standard, empty = std ? 'Empty: sends as the standard sender, ' + e(std) : 'Empty: no email goes out for this plant until an address is set';
+    $('#es-rows').innerHTML = data.plants.map(p => '<tr><td><b>' + e(p.plant) + '</b></td>' +
+      '<td><input data-addr="' + e(p.id) + '" value="' + e(p.address) + '" maxlength="120" placeholder="' + e(std || 'name@uniteddairy.com') + '" style="width:100%">' + (p.address ? '' : '<small>' + empty + '</small>') + '</td>' +
+      '<td><input data-name="' + e(p.id) + '" value="' + e(p.senderName) + '" maxlength="80" placeholder="United Dairy ' + e(p.plant) + ' Operations" style="width:100%"></td>' +
+      '<td>' + (p.changedAt ? e(when(p.changedAt)) + '<small>' + e(p.changedBy) + '</small>' : '') + '</td></tr>').join('');
+    $('#es-repair').value = data.repairFrom;
+  }
+  async function load() { try { data = await call('emailSenders'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  box.addEventListener('click', ev => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    if (b.dataset.goto && ctx) { ctx.open(b.dataset.goto); return; }
+    if (b.id === 'es-reload') load();
+    if (b.id === 'es-save') {
+      const senders = {};
+      data.plants.forEach(p => { senders[p.id] = { address: box.querySelector('[data-addr="' + p.id + '"]').value, name: box.querySelector('[data-name="' + p.id + '"]').value }; });
+      busy(box, b, async () => { await call('saveEmailSenders', { senders, repairFrom: $('#es-repair').value }); await load(); say(box, 'Saved.', 'good'); });
+    }
   });
   await load();
 }
@@ -568,5 +604,6 @@ export const PAGES = {
   'station-codes': renderStationCodes,
   'report-recipients': renderReportRecipients,
   'sent-log': renderSentLog,
+  'email-senders': renderEmailSenders,
   'repair-items': renderRepairItems
 };

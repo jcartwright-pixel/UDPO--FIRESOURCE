@@ -1,7 +1,8 @@
 /*
  * Send Current Report, the email half: runs when a report is saved (plantReports/{id}) and emails it, outside the save.
  *
- *   MAIL_FROM    the United Dairy mailbox the report is sent from (unset: the report is kept, not emailed)
+ *   MAIL_FROM    the United Dairy mailbox the report is sent from (unset: the report is kept, not emailed), unless
+ *                Administration > Email Senders sets the plant's own mailbox (then that one)
  *   REPORT_TO    the Plant Managers group's addresses (comma-separated), used only for a report sent in live mode
  *
  * A report sent from test mode, or from live mode before REPORT_TO is set, goes only to the person who pressed Send,
@@ -12,6 +13,7 @@
 
 const R = require('./plant-rules');
 const { sendMail, addresses } = require('./mail');
+const { emailSettings, senderFor } = require('./adminmail');
 
 const REASON = {
   NOT_DELEGATED: 'Email is waiting on one Google Workspace step (letting the app send Gmail as United Dairy).',
@@ -35,10 +37,10 @@ function reportHtml(report) {
 }
 
 // Administration > Sent Email Log. A log line that cannot be written never stops the report.
-async function logReport(db, report, status, sentTo, reason) {
+async function logReport(db, report, status, sentTo, reason, from) {
   try {
     await db.collection('sentEmails').add({ at: new Date().toISOString(), kind: 'Plant report', label: report.group || 'Current report', detail: report.mode || '', by: report.by || '',
-      meantFor: [], subject: String(report.subject || '').slice(0, 300), sentTo, status, reason: String(reason || '').slice(0, 200), testCopy: report.mode !== 'live' });
+      meantFor: [], subject: String(report.subject || '').slice(0, 300), sentTo, status, reason: String(reason || '').slice(0, 200), testCopy: report.mode !== 'live', from: from || '' });
   } catch (e) { console.error('Sent Email Log', e.message || e); }
 }
 
@@ -48,8 +50,8 @@ async function mailReport(ref, report, deps) {
   let env = d.env || process.env;
   const send = d.sendMail || sendMail;
   if (!report || report.status !== 'SENDING') return null;
-  const from = String(env.MAIL_FROM || '').trim();
-  if (!from) {
+  let sender = { from: String(env.MAIL_FROM || '').trim(), fromName: 'United Dairy Plant Operations' };
+  if (!sender.from) {
     await ref.update({ status: 'HELD', emailed: false, reason: 'Email is not set up in the new app yet.' });
     return 'HELD';
   }
@@ -57,8 +59,9 @@ async function mailReport(ref, report, deps) {
   // sends to the sender). Both are read only where the report document comes from the database (not in the unit tests).
   const db = d.db || (ref && ref.firestore) || null;
   if (db) {
-    const s = (await db.collection('private').doc('emailSettings').get()).data() || {};
-    if (s.sending === false) {
+    const s = await emailSettings(db);
+    sender = senderFor(s, report.facilityId, env, 'United Dairy Plant Operations');
+    if (!s.sending) {
       await ref.update({ status: 'HELD', emailed: false, reason: 'Sending is OFF (Administration > Sent Email Log).' });
       await logReport(db, report, 'BLOCKED', [], 'Outbound email is turned off.');
       return 'HELD';
@@ -74,15 +77,15 @@ async function mailReport(ref, report, deps) {
     return 'FAILED';
   }
   try {
-    const sent = await send({ from, fromName: 'United Dairy Plant Operations', to, subject: report.subject, text: report.text, html: reportHtml(report) });
+    const sent = await send({ from: sender.from, fromName: sender.fromName, to, subject: report.subject, text: report.text, html: reportHtml(report) });
     await ref.update({ status: 'SENT', emailed: true, sentTo: sent.to, testCopy: copy, sentAt: Date.now(), gmailId: sent.id || '', reason: '' });
-    if (db) await logReport(db, report, 'SENT', sent.to, copy ? 'Test copy: sent only to ' + sent.to.join(', ') + '.' : '');
+    if (db) await logReport(db, report, 'SENT', sent.to, copy ? 'Test copy: sent only to ' + sent.to.join(', ') + '.' : '', sender.from);
     return 'SENT';
   } catch (e) {
     const reason = REASON[e.code] || ('The email did not go out: ' + (e.message || e));
     console.error('Send Current Report email failed', e.code || '', e.message || e);
     await ref.update({ status: 'FAILED', emailed: false, reason, errorCode: e.code || 'ERROR' });
-    if (db) await logReport(db, report, 'FAILED', [], reason);
+    if (db) await logReport(db, report, 'FAILED', [], reason, sender.from);
     return 'FAILED';
   }
 }
