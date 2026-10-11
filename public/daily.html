@@ -109,6 +109,7 @@
   <div id="print" aria-hidden="true"></div>
 
   <script type="module">
+    import { printSaved } from './js/print-sheet.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
     import { lists, watchLists, canSave, canReorder, openPicker, openNote, optionsHtml, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     forScreen('dailyDispatch');
@@ -300,7 +301,7 @@
         '<label class="wide check"><input type="checkbox" data-field="ovr"' + (ovr[row.id] ? ' checked' : '') + '> OVR: offer drivers who are off and units that are down</label>' +
         '</div><div class="modal-actions"><button type="button" data-print-one>&#9635; Print Dispatch</button><button type="button" class="primary" data-close>Close</button></div>';
       box.querySelector('[data-close]').onclick = closeModals;
-      box.querySelector('[data-print-one]').onclick = () => printSheet([row]);
+      box.querySelector('[data-print-one]').onclick = () => printSheet(); // the current app printed the whole sheet from here
       const move = box.querySelector('[data-move]'), moveBtn = box.querySelector('[data-move-run]');
       move.onchange = () => { moveBtn.disabled = !move.value; };
       moveBtn.onclick = () => {
@@ -391,7 +392,7 @@
         () => Object.assign(unit, { status: 'DOWN', notes: 'DOWN: ' + reason, downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
     };
 
-    /* ---------- Print: straight to the printer, the same columns as the current dispatch sheet ---------- */
+    /* ---------- Print: the same columns as the current dispatch sheet, with Print Layouts' saved setup (one landscape page, 3 copies) ---------- */
     function printSheet(only) {
       const list = (only || rows).filter(r => !r.off);
       let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(shortDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
@@ -404,7 +405,7 @@
         html += '<tr><td>' + [r.route, r.run, r.driver || coverageName(r), r.truck, r.trailer, departText(r), '', '', '', '', '', '', r.palletJack, r.pickup ? 'PICKUP ' + r.pickup : r.driverNotes].map(v => escapeHtml(show(v))).join('</td><td>') + '</td></tr>';
       });
       document.getElementById('print').innerHTML = html + '</tbody></table>';
-      window.print();
+      printSaved('daily');
     }
     document.getElementById('print-sheet').onclick = () => printSheet();
     // Print Layouts opens Daily with #print: the sheet prints once the day's runs are on screen.
