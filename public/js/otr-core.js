@@ -335,6 +335,9 @@ function otrParseImport_(values, yearHint, tabName) {
     (values[h] || []).forEach(function (c, i) { var d = otrNormDest_(c); if (i > 0 && OTR_CORE.DESTINATIONS.indexOf(d) >= 0) cols[i] = d; });
     if (Object.keys(cols).length >= 3) {
       out.kind = 'BY_DATE';
+      out.comments = [];
+      // The Comment column after the destinations (route changes, "Lost 5 Walmart Rts") rides along with its day.
+      var note = (values[h] || []).map(function (c) { return String(c == null ? '' : c).trim().toLowerCase(); }).indexOf('comment');
       for (var r = h + 1; r < values.length; r++) {
         var key = otrCellDateKey_(cell(r, 0), yearHint);
         if (!key) continue;
@@ -342,6 +345,7 @@ function otrParseImport_(values, yearHint, tabName) {
           var n = otrNum_(cell(r, Number(i)));
           if (n != null && n > 0) out.daily.push({date: key, destination: cols[i], runs: n});
         });
+        if (note > 0 && text(r, note)) out.comments.push({date: key, text: text(r, note).replace(/\s+/g, ' ').slice(0, 200)});
       }
       return out;
     }
@@ -464,10 +468,11 @@ function otrParseImport_(values, yearHint, tabName) {
  * A value read from a "this year" column beats a prior-year ("weak") copy of the same month from a newer tab.
  */
 function otrMergeImport_(parts) {
-  var daily = {}, figs = {}, tabs = [];
+  var daily = {}, figs = {}, tabs = [], notes = {};
   (parts || []).forEach(function (p) {
     tabs.push({tab: p.tab, kind: p.kind, rows: (p.daily || []).length + (p.figures || []).length});
     (p.daily || []).forEach(function (d) { daily[d.date + '|' + d.destination] = d; });
+    (p.comments || []).forEach(function (c) { notes[c.date] = c; });
     (p.figures || []).forEach(function (f) {
       var k = f.year + '-' + f.month + '|' + f.key, old = figs[k];
       if (!old || old.weak || !f.weak) figs[k] = f;
@@ -477,7 +482,8 @@ function otrMergeImport_(parts) {
   figures.sort(function (a, b) { return a.year - b.year || a.month - b.month || OTR_CORE.FIGURES.map(function (x) { return x.key; }).indexOf(a.key) - OTR_CORE.FIGURES.map(function (x) { return x.key; }).indexOf(b.key); });
   var list = Object.keys(daily).map(function (k) { return daily[k]; });
   list.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : OTR_CORE.DESTINATIONS.indexOf(a.destination) - OTR_CORE.DESTINATIONS.indexOf(b.destination); });
-  return {daily: list, figures: figures, tabs: tabs};
+  var comments = Object.keys(notes).sort().map(function (k) { return notes[k]; });
+  return {daily: list, figures: figures, comments: comments, tabs: tabs};
 }
 
 /**
@@ -493,6 +499,8 @@ function otrImportSummary_(merged, savedFigures) {
     lines.push({what: 'OTR runs (By Date)', count: Object.keys(days).length + ' days', from: otrShortDate_(first), to: otrShortDate_(last),
       total: runs, changed: null});
   }
+  var notes = merged.comments || [];
+  if (notes.length) lines.push({what: 'Comments (By Date)', count: notes.length + ' days', from: otrShortDate_(notes[0].date), to: otrShortDate_(notes[notes.length - 1].date), changed: null});
   OTR_CORE.FIGURES.forEach(function (def) {
     var list = merged.figures.filter(function (f) { return f.key === def.key; });
     if (!list.length) return;
@@ -508,7 +516,7 @@ function otrImportSummary_(merged, savedFigures) {
 
 /**
  * New app only: split an import into saves the server takes in one go (up to 40 months of figures, or 300 day counts, each).
- * Returns [{figures, daily}], figures first; every save carries at least one number.
+ * Returns [{figures, daily, comments}], figures first, then day counts, then By Date comments (300 a save); every save carries something.
  */
 function otrImportBatches_(merged, monthsPer, daysPer) {
   monthsPer = monthsPer || 40; daysPer = daysPer || 300;
@@ -519,11 +527,97 @@ function otrImportBatches_(merged, monthsPer, daysPer) {
     byMonth[k].push(f);
   });
   for (var i = 0; i < order.length; i += monthsPer) {
-    out.push({figures: [].concat.apply([], order.slice(i, i + monthsPer).map(function (k) { return byMonth[k]; })), daily: []});
+    out.push({figures: [].concat.apply([], order.slice(i, i + monthsPer).map(function (k) { return byMonth[k]; })), daily: [], comments: []});
   }
-  var daily = (merged && merged.daily) || [];
-  for (var j = 0; j < daily.length; j += daysPer) out.push({figures: [], daily: daily.slice(j, j + daysPer)});
+  var daily = (merged && merged.daily) || [], notes = (merged && merged.comments) || [];
+  for (var j = 0; j < daily.length; j += daysPer) out.push({figures: [], daily: daily.slice(j, j + daysPer), comments: []});
+  for (var c = 0; c < notes.length; c += daysPer) out.push({figures: [], daily: [], comments: notes.slice(c, c + daysPer)});
   return out;
+}
+
+/**
+ * New app: the Month Recap tab of Joe's OTR Trips workbook. Columns: last December (vs the December before), then Jan-Dec,
+ * each "this year | last year". Rows: the 21 By Date destinations (plus any other name with runs), Totals, Difference, then
+ * Fuel Used, Miles Driven and Tank fills from the monthly figures. A month not reached yet has no this-year number (null).
+ * Returns {year, months:[{label, y, py}], rows:[{name, cells:[[cur, prior]]}], totals:[[cur, prior]], diff:[n|null],
+ *          extra:[{name, key, cells}], ytd:{current, prior, through}, latest:{label, current, prior}|null, busiest:[names]}.
+ */
+function otrMonthRecap_(year, todayKey, daily, monthHistory, figures) {
+  var today = otrParseKey_(todayKey);
+  var byYear = {};
+  [year - 2, year - 1, year].forEach(function (y) { byYear[y] = otrMonthRuns_(daily, monthHistory, y); });
+  var months = [{label: 'Dec', y: year - 1, m: 12}].concat(OTR_CORE.MONTHS.map(function (n, i) { return {label: n, y: year, m: i + 1}; }));
+  months.forEach(function (c) { c.py = c.y - 1; c.reached = c.y < today.y || (c.y === today.y && c.m <= today.m); });
+  var names = OTR_CORE.DESTINATIONS.slice();
+  [year - 2, year - 1, year].forEach(function (y) { Object.keys(byYear[y]).forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); }); });
+  function runs(n, y, m) { var a = byYear[y] && byYear[y][n]; return a ? (a[m - 1] || 0) : 0; }
+  var totals = months.map(function () { return [0, 0]; });
+  var rows = names.map(function (n) {
+    var cells = months.map(function (c, i) {
+      var cur = c.reached ? runs(n, c.y, c.m) : null, prior = runs(n, c.py, c.m);
+      if (cur != null) totals[i][0] += cur;
+      totals[i][1] += prior;
+      return [cur, prior];
+    });
+    return {name: n, cells: cells, any: cells.some(function (p) { return p[0] || p[1]; })};
+  }).filter(function (r) { return r.any || OTR_CORE.DESTINATIONS.indexOf(r.name) >= 0; });
+  months.forEach(function (c, i) { if (!c.reached) totals[i][0] = null; });
+  var fm = otrFigureMap_(figures);
+  var extra = [{name: 'Fuel Used', key: 'fuel_used_gal'}, {name: 'Miles Driven', key: 'miles'}, {name: 'Tank fills', key: 'fuel_fills'}].map(function (x) {
+    x.cells = months.map(function (c) {
+      var a = fm[c.y + '-' + c.m], b = fm[c.py + '-' + c.m];
+      return [a && a[x.key] != null ? a[x.key] : null, b && b[x.key] != null ? b[x.key] : null];
+    });
+    return x;
+  });
+  // Year to date: January through the last month with runs counted, this year against the same months last year (a month
+  // reached with nothing counted yet, like September before its days come in, does not pull the comparison down).
+  var last = 0;
+  months.forEach(function (c, i) { if (i && c.reached && totals[i][0]) last = i; });
+  var ytd = {current: 0, prior: 0, through: last ? months[last].m : 0};
+  months.forEach(function (c, i) { if (i && i <= last) { ytd.current += totals[i][0]; ytd.prior += totals[i][1]; } });
+  var latest = last ? {label: months[last].label + ' ' + months[last].y, current: totals[last][0], prior: totals[last][1]} : null;
+  var busiest = rows.map(function (r) { return {name: r.name, n: r.cells.slice(1).reduce(function (s, p) { return s + (p[0] || 0); }, 0)}; })
+    .filter(function (r) { return r.n > 0; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 3).map(function (r) { return r.name; });
+  return {year: year, months: months, rows: rows, totals: totals,
+    diff: totals.map(function (t) { return t[0] == null ? null : t[0] - t[1]; }), extra: extra, ytd: ytd, latest: latest, busiest: busiest};
+}
+
+/**
+ * New app: the Cost Per Gallon tab of Joe's OTR Trips workbook, from the monthly figures, with the workbook's own signs:
+ * gallons Difference = this year - last year; Dist. Cost Difference and Var = last year - this year (a saving is positive);
+ * Cost Diff = Var x last year's gallons. Year To Date counts the months with gallons and cost in both years; its cost per
+ * gallon is the average of those months' (as the workbook's AVERAGE), and its Cost Diff their sum.
+ * Fuel Cost By Gallon = fuel cost / gallons; Difference = this year - last year; Avg and total over the months with both years.
+ */
+function otrCostSheet_(year, figures) {
+  var fm = otrFigureMap_(figures), prior = year - 1;
+  var ytd = {gal: [0, 0], cost: [0, 0], cpg: [0, 0], costDiff: 0, months: 0};
+  var fuel = {sum: [0, 0], months: 0};
+  var months = OTR_CORE.MONTHS.map(function (label, i) {
+    var a = fm[year + '-' + (i + 1)] || {}, b = fm[prior + '-' + (i + 1)] || {};
+    var r = {label: label, gal: [a.gallons_sold, b.gallons_sold], cost: [a.distribution_cost, b.distribution_cost]};
+    r.gal = r.gal.map(function (v) { return v == null ? null : v; });
+    r.cost = r.cost.map(function (v) { return v == null ? null : v; });
+    r.galDiff = r.gal[0] != null && r.gal[1] != null ? r.gal[0] - r.gal[1] : null;
+    r.costDiff = r.cost[0] != null && r.cost[1] != null ? r.cost[1] - r.cost[0] : null;
+    r.cpg = [otrCostPerGallon_(a), otrCostPerGallon_(b)];
+    r.vari = r.cpg[0] != null && r.cpg[1] != null ? r.cpg[1] - r.cpg[0] : null;
+    r.costDiffMoney = r.vari != null ? r.vari * r.gal[1] : null;
+    if (r.vari != null) {
+      ytd.gal[0] += r.gal[0]; ytd.gal[1] += r.gal[1]; ytd.cost[0] += r.cost[0]; ytd.cost[1] += r.cost[1]; ytd.cpg[0] += r.cpg[0]; ytd.cpg[1] += r.cpg[1]; ytd.costDiff += r.costDiffMoney; ytd.months++;
+    }
+    r.fuel = [a.gallons_sold && a.fuel_cost != null ? a.fuel_cost / a.gallons_sold : null, b.gallons_sold && b.fuel_cost != null ? b.fuel_cost / b.gallons_sold : null];
+    r.fuelDiff = r.fuel[0] != null && r.fuel[1] != null ? r.fuel[0] - r.fuel[1] : null;
+    if (r.fuelDiff != null) { fuel.sum[0] += r.fuel[0]; fuel.sum[1] += r.fuel[1]; fuel.months++; }
+    return r;
+  });
+  var y = ytd.months ? {gal: ytd.gal, galDiff: ytd.gal[0] - ytd.gal[1], cost: ytd.cost, costDiff: ytd.cost[1] - ytd.cost[0],
+    cpg: [ytd.cpg[0] / ytd.months, ytd.cpg[1] / ytd.months], costDiffMoney: ytd.costDiff, months: ytd.months} : null;
+  if (y) y.vari = y.cpg[1] - y.cpg[0];
+  var f = fuel.months ? {avg: [fuel.sum[0] / fuel.months, fuel.sum[1] / fuel.months], total: fuel.sum.slice(), months: fuel.months} : null;
+  if (f) { f.avgDiff = f.avg[0] - f.avg[1]; f.totalDiff = f.total[0] - f.total[1]; }
+  return {year: year, prior: prior, months: months, ytd: y, fuel: f};
 }
 
 function otrRound2_(v) { return v == null ? null : Math.round(v * 100) / 100; }
@@ -595,5 +689,5 @@ function otrGridValues_(rowData) {
   return rows.map(function (r) { while (r.length < width) r.push(''); return r; });
 }
 
-  return { OTR_CORE: OTR_CORE, otrNum_: otrNum_, otrFlagOn_: otrFlagOn_, otrNormDest_: otrNormDest_, otrDateKey_: otrDateKey_, otrParseKey_: otrParseKey_, otrAddDays_: otrAddDays_, otrWeekday_: otrWeekday_, otrShortDate_: otrShortDate_, otrRouteList_: otrRouteList_, otrCountDay_: otrCountDay_, otrScheduled_: otrScheduled_, otrMergeDaily_: otrMergeDaily_, otrMonthRuns_: otrMonthRuns_, otrFigureMap_: otrFigureMap_, otrCostPerGallon_: otrCostPerGallon_, otrSum_: otrSum_, otrYearReport_: otrYearReport_, otrDashboard_: otrDashboard_, otrDailyCountText_: otrDailyCountText_, otrParseImport_: otrParseImport_, otrMergeImport_: otrMergeImport_, otrImportSummary_: otrImportSummary_, otrRound2_: otrRound2_, otrImportBatches_: otrImportBatches_, otrMonthName_: otrMonthName_, otrTitleMonth_: otrTitleMonth_, otrCellDateKey_: otrCellDateKey_, otrCellMonth_: otrCellMonth_, otrGridValues_: otrGridValues_ };
+  return { OTR_CORE: OTR_CORE, otrNum_: otrNum_, otrFlagOn_: otrFlagOn_, otrNormDest_: otrNormDest_, otrDateKey_: otrDateKey_, otrParseKey_: otrParseKey_, otrAddDays_: otrAddDays_, otrWeekday_: otrWeekday_, otrShortDate_: otrShortDate_, otrRouteList_: otrRouteList_, otrCountDay_: otrCountDay_, otrScheduled_: otrScheduled_, otrMergeDaily_: otrMergeDaily_, otrMonthRuns_: otrMonthRuns_, otrFigureMap_: otrFigureMap_, otrCostPerGallon_: otrCostPerGallon_, otrSum_: otrSum_, otrYearReport_: otrYearReport_, otrDashboard_: otrDashboard_, otrDailyCountText_: otrDailyCountText_, otrParseImport_: otrParseImport_, otrMergeImport_: otrMergeImport_, otrImportSummary_: otrImportSummary_, otrRound2_: otrRound2_, otrImportBatches_: otrImportBatches_, otrMonthRecap_: otrMonthRecap_, otrCostSheet_: otrCostSheet_, otrMonthName_: otrMonthName_, otrTitleMonth_: otrTitleMonth_, otrCellDateKey_: otrCellDateKey_, otrCellMonth_: otrCellMonth_, otrGridValues_: otrGridValues_ };
 });
