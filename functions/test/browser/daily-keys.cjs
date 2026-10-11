@@ -69,8 +69,11 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-typing-1920.png') });
     await p.keyboard.press('Enter');
     await p.waitForFunction((s) => document.querySelector(s).children[5].textContent === '900001', R802);
+    // The Saving... / Saved sign beside the title (shared by Daily and Weekly through edit.js).
+    await p.waitForFunction(() => { const x = document.getElementById('save-pill'); return x && !x.hidden && /Saved/.test(x.textContent); });
+    assert.equal(await p.evaluate(() => { const r = document.getElementById('save-pill').getBoundingClientRect(), h = document.querySelector('.head .title h1').getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - (h.top + h.bottom) / 2) < 20; }), true, 'the sign sits beside the title');
     assert.equal(await at(p), 'run_t802|tue truck');
-    results.push('typing 1 in the Truck cell highlighted 900001; Enter saved it');
+    results.push('typing 1 in the Truck cell highlighted 900001; Enter saved it and "Saved \u2713" showed beside the title');
 
     // Esc keeps the old value.
     await p.keyboard.press('ArrowUp');
@@ -157,6 +160,12 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await text(p, R802, 5), 'N/A', 'the truck stays off after the saves');
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-carrier-1920.png') });
     results.push('picking BROOK, SAM brought his own truck 900003; picking Carrier took the truck off and Truck shows N/A');
+
+    // A refused save says Not saved, and leaving while a save is going asks first.
+    await p.evaluate(async () => { const m = await import('./js/edit.js'); try { await m.saveOptimistic('noSuchAction', {}, () => {}, () => {}, () => {}); } catch (e) { /* shown on screen */ } });
+    await p.waitForFunction(() => /Not saved/.test(document.getElementById('save-pill').textContent));
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-save-pill-failed-1920.png'), clip: { x: 0, y: 70, width: 1920, height: 300 } });
+    results.push('a refused save showed "Not saved" beside the title');
 
     assert.deepEqual(p.errors, []);
     console.log('Daily keys:\n- ' + results.join('\n- '));
