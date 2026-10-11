@@ -74,10 +74,13 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     /* ---------- Send Current Report starts a new round ---------- */
     const mgr = await openPage(browser, 1920, 950, '/manager.html');
     await mgr.waitForSelector('#screen:not([hidden])');
-    await mgr.waitForFunction(() => /TOTES[\s\S]*REVIEW/.test(document.getElementById('pv-list').textContent), null, { timeout: 8000 });
+    // Joe 10/11: the card shows only what needs attention; everything else is in the full report the preview opens.
+    const fullReport = async (re) => { await mgr.click('.mc-preview'); await mgr.waitForFunction((s) => new RegExp(s).test(document.getElementById('rp-body').textContent), re, { timeout: 8000 }); await mgr.click('#close'); };
+    await mgr.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
+    await fullReport('TOTES[\\s\\S]*REVIEW');
     await mgr.click('#send-card');
     await mgr.waitForFunction(() => /Report saved/.test(document.getElementById('saved').textContent), null, { timeout: 8000 });
-    await mgr.waitForFunction(() => /TOTES[\s\S]*NOT CHECKED/.test(document.getElementById('pv-list').textContent), null, { timeout: 8000 });
+    await fullReport('TOTES[\\s\\S]*NOT CHECKED');
     await desk.waitForFunction(() => document.querySelector('.prod-product').value === '' && /Last: Orange drink/.test(document.getElementById('fields').textContent), null, { timeout: 8000 });
     results.push('Send Current Report: TOTES boxes start empty with "Last: Orange drink" in grey; the next report lists TOTES as NOT CHECKED');
     await shots(desk, 'autosave-quality-new-round');
@@ -152,7 +155,8 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     await shots(notes, 'shift-notes-A');
     await notes.selectOption('#open-box .sn-card:has-text("Water on the floor") select[data-status]', 'RESOLVED');
     await notes.waitForFunction(() => !/Water on the floor/.test(document.getElementById('open-box').textContent), null, { timeout: 8000 });
-    await mgr.waitForFunction(() => /Fixed since last report[\s\S]*Cooler 2 floor/.test(document.getElementById('pv-list').textContent) && !/Plant breakdowns[\s\S]*Water on the floor/.test(document.getElementById('pv-list').textContent), null, { timeout: 8000 });
+    await mgr.waitForFunction(() => !/Plant breakdowns[\s\S]*Water on the floor/.test(document.getElementById('pv-list').textContent), null, { timeout: 8000 });
+    await fullReport('Fixed since last report[\\s\\S]*Cooler 2 floor');
     results.push('Shift Notes: after Send Current Report the open breakdown stays as CARRIED OVER, and the report lists it every time until it is marked Resolved; then it goes under Fixed since last report');
 
     for (const p of [watcher, desk, mgr, temps, tWatch, notes, nWatch, yard]) assert.deepEqual(p.errors, []);

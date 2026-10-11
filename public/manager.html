@@ -51,12 +51,13 @@
           <div class="mc-to" id="pv-to">To: Plant Managers group</div>
           <div class="mc-acts"><button type="button" class="mc-btn" data-open-report>&#9998; Edit / Add</button><button type="button" class="mc-btn send" id="send-card">&#9993; SEND CURRENT REPORT &rsaquo;</button></div>
         </div>
-        <div class="mc-card" style="--accent:#16813b" data-card="yard"></div>
-        <div class="mc-card" style="--accent:#1976d2" data-card="sched"></div>
+        <!-- Joe 10/11: production first (Departments, Scheduler), then Shift Notes and Quality, then Temperatures and Yard. -->
         <div class="mc-card" style="--accent:#d27b00" data-card="dept"></div>
+        <div class="mc-card" style="--accent:#1976d2" data-card="sched"></div>
+        <div class="mc-card" style="--accent:#0f766e" data-card="notes"></div>
         <div class="mc-card" style="--accent:#7b35b5" data-card="quality"></div>
         <div class="mc-card" style="--accent:#526d82" data-card="temps"></div>
-        <div class="mc-card" style="--accent:#0f766e" data-card="notes"></div>
+        <div class="mc-card" style="--accent:#16813b" data-card="yard"></div>
       </section>
     </div>
   </div>
@@ -146,26 +147,26 @@
       put('notes', card('&#9998;', 'Shift Notes', 'Breakdowns carried over until resolved, shift handoff', 'shiftnotes.html', [
         tile('shiftnotes.html', 'Breakdowns', x.S.down.length, '', 'still open', null, x.S.down.length ? 'bad' : ''), tile('shiftnotes.html', 'Carried Over', carried, '', 'from earlier shifts', null, carried ? 'warn' : ''),
         tile('shiftnotes.html', 'Handoff', x.S.handoff.length, '', 'since the last report'), tile('shiftnotes.html?view=history', '24-Hour History', x.N.history, '', 'notes')]));
-      // The report card's preview: subject, the counts and the first loads still to go.
+      // The report card's preview: subject, the counts and a brief of what needs attention.
       document.getElementById('pv-subject').textContent = r.subject;
       document.getElementById('pv-subject').className = 'mc-subject' + (r.behind.length ? ' bad' : ' good');
       document.getElementById('pv-chips').innerHTML = [['Behind', r.counts.behind, r.counts.behind ? 'bad' : ''], ['To load', r.leftToLoad + ' of ' + r.totalLoads, ''], ['Pickups', r.counts.pickups, r.counts.pickups ? 'bad' : ''],
         ['Breakdowns', r.counts.down, r.counts.down ? 'bad' : ''], ['Lines down', r.counts.linesDown, r.counts.linesDown ? 'bad' : ''], ['Temps out', r.counts.tempsOut, r.counts.tempsOut ? 'bad' : '']]
         .map(([l, n, k]) => '<span class="' + k + '"><b>' + escapeHtml(String(n)) + '</b> ' + l + '</span>').join('');
       const next = r.behind.concat(r.nextUp);
-      // Joe 10/10: the tall report card previews the email: every route in brief, then the rest of the email body.
+      // Joe 10/11: the card is a brief view, only what needs attention (routes behind, pickups, open breakdowns, lines down,
+      // temperatures out). The full report (tap the preview) and the email still carry everything.
       const rt = (z, k, word) => '<span class="mc-rt ' + k + '"><b>' + escapeHtml(U.reportName(z)) + '</b><em>' + escapeHtml(z.depart ? 'depart ' + z.depart : '') + '</em><i>' + escapeHtml(word) + '</i></span>';
-      const part = (title, n, items, empty, bad) => '<span class="mc-pvh' + (bad && n ? ' bad' : '') + '">' + escapeHtml(title) + '<em>' + escapeHtml(String(n)) + '</em></span>' + (items.length ? items.join('') : '<span class="mc-pvnone">' + escapeHtml(empty) + '</span>');
+      const part = (title, n, items) => '<span class="mc-pvh bad">' + escapeHtml(title) + '<em>' + escapeHtml(String(n)) + '</em></span>' + items.join('');
       const line = (a, b, k) => '<span class="mc-pvrow ' + (k || '') + '"><b>' + escapeHtml(a) + '</b> ' + escapeHtml(b) + '</span>';
-      document.getElementById('pv-list').innerHTML =
-        part('Routes', (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded', r.behind.map(z => rt(z, 'bad', 'BEHIND' + (z.late ? ' · ' + z.late : ''))).concat(r.nextUp.map(z => rt(z, 'no', U.statusWord(z.status)))).concat(r.loaded.map(z => rt(z, 'ok', 'LOADED'))), 'No loads on the dispatch sheet for this day.') +
-        part('Pickups open', r.pickups.length, r.pickups.map(p => line('PICKUP ' + [p.route, p.run].filter(Boolean).join(' '), [p.quantity, p.product].filter(Boolean).join(' '), 'bad')), 'None open.', true) +
-        part('Plant breakdowns', r.down.length, r.down.map(d => line(d.equipment || 'Plant equipment', [d.entry, d.at ? 'logged ' + d.at : '', d.carried ? 'carried over' : '', U.followLabel(d.status)].filter(Boolean).join(' · '), d.status === 'MONITOR' ? 'warn' : 'bad')), 'None open.', true) +
-        (r.fixed.length ? part('Fixed since last report', r.fixed.length, r.fixed.map(d => line(d.equipment || 'Plant equipment', [d.review || d.entry, d.reviewAt].filter(Boolean).join(' · '), 'ok')), '') : '') +
-        (r.handoff.length ? part('Shift handoff', r.handoff.length, r.handoff.map(d => line(d.shift ? d.shift.charAt(0) + d.shift.slice(1).toLowerCase() : 'Handoff', [d.at, d.entry, d.notes].filter(Boolean).join(' · '))), '') : '') +
-        (r.others.length ? part('Incidents · Safety · Quality', r.others.length, r.others.map(d => line(d.equipment || d.type, [d.type, d.entry, U.followLabel(d.status)].filter(Boolean).join(' · '), d.status === 'RESOLVED' ? '' : 'warn')), '') : '') +
-        part('Production lines', r.counts.linesDown ? r.counts.linesDown + ' down' : 'all running', r.lines.map(l => line(l.line, [l.product, l.status || 'no status', l.notChecked && l.lastCheckedAt ? 'last ' + l.lastCheckedAt : ''].filter(Boolean).join(' · '), l.flag ? 'bad' : l.notChecked ? 'warn' : '')), 'No production lines set up.', true) +
-        part('Temperatures', r.counts.tempsOut ? r.counts.tempsOut + ' out' : 'all in range', r.temperatures.map(t => line(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.', true);
+      const linesOut = r.lines.filter(l => l.flag), tempsOut = r.temperatures.filter(t => t.flag);
+      const brief = (r.behind.length ? part('Routes behind', r.behind.length, r.behind.map(z => rt(z, 'bad', 'BEHIND' + (z.late ? ' · ' + z.late : '')))) : '') +
+        (r.pickups.length ? part('Pickups open', r.pickups.length, r.pickups.map(p => line('PICKUP ' + [p.route, p.run].filter(Boolean).join(' '), [p.quantity, p.product].filter(Boolean).join(' '), 'bad'))) : '') +
+        (r.down.length ? part('Plant breakdowns', r.down.length, r.down.map(d => line(d.equipment || 'Plant equipment', [d.entry, d.at ? 'logged ' + d.at : '', d.carried ? 'carried over' : '', U.followLabel(d.status)].filter(Boolean).join(' · '), d.status === 'MONITOR' ? 'warn' : 'bad'))) : '') +
+        (linesOut.length ? part('Production lines down', linesOut.length, linesOut.map(l => line(l.line, [l.product, l.status || 'no status'].filter(Boolean).join(' · '), 'bad'))) : '') +
+        (tempsOut.length ? part('Temperatures out', tempsOut.length, tempsOut.map(t => line(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + t.status, 'bad'))) : '');
+      document.getElementById('pv-list').innerHTML = '<span class="mc-pvh">Routes<em>' + escapeHtml((r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded') + '</em></span>' +
+        (brief || '<span class="mc-pvnone">Nothing needs attention right now.</span>') + '<span class="mc-pvnone">Tap to see the full report.</span>';
       ['send-card', 'send'].forEach(id => { document.getElementById(id).hidden = !canSend(); });
       // Not before the loads and the journal are read, or the email would say "0 of 0 loaded".
       // Both Send buttons (the card's and the pop-up's), so either works again after a send.
