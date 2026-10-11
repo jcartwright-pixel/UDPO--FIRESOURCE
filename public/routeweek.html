@@ -63,6 +63,8 @@
 
     const L = window.UDLogic;
     const NAME = (p) => L.DAY_NAMES[L.DAYS.indexOf(p)];
+    // Opened from Weekly: the week Weekly was showing (?week=), as in the current app (RouteWeekOverride.html).
+    const asked = (() => { const w = new URLSearchParams(location.search).get('week'); return L.isDateKey(w) ? L.weekStart(w) : ''; })();
     let db = null, week = '', weeks = [], runs = [], routes = {}, weekDoc = null, show = 'all', stopRuns = null, stopWeek = null, typing = false;
     const getRuns = () => runs;
     // The normal week: Route Master's day switches for the run (routes/{runId}).
@@ -118,7 +120,18 @@
     });
     document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { show = b.dataset.show; render(); });
     // Reset Week to Normal: every changed day goes back to Route Master's normal week, one save each.
-    document.getElementById('reset').onclick = async () => {
+    // A second click within 6 seconds confirms, as on the current screen (the button says so, nothing pops up).
+    const RESET = 'Reset Week to Normal';
+    let resetArmed = null, resetTimer = null;
+    function disarm() { resetArmed = null; clearTimeout(resetTimer); const b = document.getElementById('reset'); b.textContent = RESET; b.classList.remove('armed'); }
+    document.getElementById('reset').onclick = async (e) => {
+      const b = e.currentTarget;
+      if (resetArmed !== week) {
+        resetArmed = week; b.textContent = 'Click Again: Reset Week'; b.classList.add('armed');
+        clearTimeout(resetTimer); resetTimer = setTimeout(disarm, 6000);
+        return;
+      }
+      disarm();
       const work = [];
       shown().forEach(r => L.DAYS.forEach(p => { if (isOver(r, p)) work.push([r, p]); }));
       for (const [r, p] of work) await toggle(r, p);
@@ -133,6 +146,7 @@
       try { await save('setWeekReason', { weekStart: week, reason: now }); } catch (e) { if (weekDoc) weekDoc.overrideReason = was; render(); showError('The week reason was not saved (' + (e.message || String(e)) + '). Type it again and click outside the box to retry.'); }
     });
     function setWeek(w) {
+      if (w !== week) disarm();
       week = w;
       if (stopRuns) stopRuns();
       if (stopWeek) stopWeek();
@@ -147,8 +161,8 @@
       db = (await start()).db;
       watchLists(user, () => {
         const live = lists.app.liveWeeks || {}, list = [live.previous, live.current, live.next].filter(Boolean);
-        if (!list.length && !week) setWeek(L.weekStart(L.operatingDay(new Date())));
-        if (list.length && list.join() !== weeks.join()) { weeks = list; if (!week || weeks.indexOf(week) < 0) setWeek(live.next || live.current || L.weekStart(L.operatingDay(new Date()))); }
+        if (!list.length && !week) setWeek(asked || L.weekStart(L.operatingDay(new Date())));
+        if (list.length && list.join() !== weeks.join()) { weeks = list; if (!week || weeks.indexOf(week) < 0) setWeek(weeks.indexOf(asked) >= 0 ? asked : live.next || live.current || L.weekStart(L.operatingDay(new Date()))); }
         render();
       });
       onSnapshot(collection(db, 'routes'), s => { routes = {}; s.docs.forEach(d => { const r = d.data(); routes[r.id || d.id] = r; }); render(); });

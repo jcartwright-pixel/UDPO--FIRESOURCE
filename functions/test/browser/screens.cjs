@@ -88,22 +88,22 @@ async function noScroll(page) {
     // Editing on the screens: pick a trailer on Daily, the change shows at once and on the other open screen.
     const editor = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await editor.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
-    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    await editor.dblclick('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
     const t0 = Date.now();
-    await editor.selectOption('tr[data-id="2026-10-04__run_t802|tue"] select.picker', 'veh_trailer_t_901');
+    await editor.click('.cell-pop [data-i]:has-text("T-901")');
     await editor.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[6].textContent === 'T-901');
     const shownMs = Date.now() - t0;
     await watcher.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[6].textContent === 'T-901', null, { timeout: 5000 });
     const seenMs = Date.now() - t0;
     // Joe 10/10: a trailer on the road on another run at the same time (T-902 on 801) is left out of the list unless OVR is ticked;
     // with OVR it is offered and says why.
-    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
-    const labels = await editor.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    const labels = await editor.$$eval('.cell-pop [data-i]', os => os.map(o => o.textContent));
     assert.ok(!labels.some(t => /T-902/.test(t)), 'T-902 (on the road on 801) is left out: ' + labels.join(' | '));
     await editor.keyboard.press('Escape');
     await editor.check('tr[data-id="2026-10-04__run_t802|tue"] input[data-ovr]');
-    await editor.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
-    const ovrLabels = await editor.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="trailer"]');
+    const ovrLabels = await editor.$$eval('.cell-pop [data-i]', os => os.map(o => o.textContent));
     assert.ok(ovrLabels.some(t => /T-902\s+\[ON ROAD.*\(801\)\]/.test(t)), 'with OVR, T-902 is offered as on the road on 801: ' + ovrLabels.join(' | '));
     await editor.keyboard.press('Escape');
     await editor.uncheck('tr[data-id="2026-10-04__run_t802|tue"] input[data-ovr]');
@@ -162,13 +162,13 @@ async function noScroll(page) {
       return null;
     });
     assert.ok(downDoc && downDoc.notes === 'DOWN: Brakes', 'Down saved to Equipment Master copy: ' + JSON.stringify(downDoc));
-    await editor.click(r802 + ' td[data-edit="truck"]');
-    let trucks = await editor.$$eval(r802 + ' select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick(r802 + ' td[data-edit="truck"]');
+    let trucks = await editor.$$eval('.cell-pop [data-i]', os => os.map(o => o.textContent));
     assert.ok(!trucks.some(t => /900001/.test(t)), 'a down truck is not offered: ' + trucks.join(' | '));
     await editor.keyboard.press('Escape');
     await editor.check(r802 + ' input[data-ovr]');
-    await editor.click(r802 + ' td[data-edit="truck"]');
-    trucks = await editor.$$eval(r802 + ' select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick(r802 + ' td[data-edit="truck"]');
+    trucks = await editor.$$eval('.cell-pop [data-i]', os => os.map(o => o.textContent));
     assert.ok(trucks.some(t => /900001\s+\[DOWN\]/.test(t)), 'with OVR the down truck is offered and marked: ' + trucks.join(' | '));
     await editor.keyboard.press('Escape');
     await editor.uncheck(r802 + ' input[data-ovr]');
@@ -185,8 +185,8 @@ async function noScroll(page) {
     await editor.fill('#off-end', '2026-10-06');
     await editor.click('#off-save');
     await editor.waitForTimeout(300);
-    await editor.click(r802 + ' td[data-edit="driver"]');
-    const drivers = await editor.$$eval(r802 + ' select.picker option', os => os.map(o => o.textContent));
+    await editor.dblclick(r802 + ' td[data-edit="driver"]');
+    const drivers = await editor.$$eval('.cell-pop [data-i]:not(.off)', os => os.map(o => o.textContent));
     assert.ok(!drivers.some(t => /CASEY/.test(t)), 'a called-off driver is not offered: ' + drivers.join(' | '));
     await editor.keyboard.press('Escape');
     const callOff = await editor.evaluate(async () => {
@@ -819,8 +819,8 @@ async function noScroll(page) {
     assert.deepEqual(ops.errors, []);
     const cvgDaily = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await cvgDaily.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="driver"]');
-    await cvgDaily.click('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="driver"]');
-    const cvg = await cvgDaily.$$eval('tr[data-id="2026-10-04__run_t802|tue"] select.picker optgroup[label="Other CVG / Carriers"] option', o => o.map(x => x.textContent));
+    await cvgDaily.dblclick('tr[data-id="2026-10-04__run_t802|tue"] td[data-edit="driver"]');
+    const cvg = await cvgDaily.$$eval('.cell-pop h6 ~ [data-i]', o => o.filter(x => /^OTHER CVG/.test([...x.parentNode.querySelectorAll('h6')].filter(h => h.compareDocumentPosition(x) & 4).pop().textContent)).map(x => x.textContent));
     assert.deepEqual(cvg, ['Carrier', 'Fairmont', 'Martins Ferry', 'Beckley'], 'active assignments are driver choices: ' + cvg.join(', '));
     await cvgDaily.keyboard.press('Escape');
     assert.deepEqual(cvgDaily.errors, []);
