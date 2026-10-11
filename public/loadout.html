@@ -411,11 +411,22 @@
 
     // Pickups: the list for this load, Pickup Complete on each open one, and Add Pickup.
     let puRow = null;
+    // Who added and completed each pickup (Joe 10/11, review item 42, as the old app): the person's name, or on a Plant Station
+    // tablet the station's name (the station plant-station.html remembers on this tablet).
+    const STATION_NAMES = { CASE: 'Case Loadout', CASE_UNLOADING: 'Case Unloading', TOTES: 'Tote Loadout', BOXING: 'Boxing Loadout', YARD_SERVICES: 'Yard Services' };
+    const station = () => { try { return STATION_NAMES[localStorage.getItem('udPlantStation') || ''] || ''; } catch (e) { return ''; } };
+    const myName = () => station() || (person && person.name) || '';
+    const whoText = (name, email) => String(name || '').trim() || String(email || '').split('@')[0];
+    function pickupWhen(p) {
+      const added = p.createdAt || p.createdBy ? 'Added' + (whoText(p.createdByName, p.createdBy) ? ' by ' + whoText(p.createdByName, p.createdBy) : '') + (p.createdAt ? ' · ' + P.clock(p.createdAt) : '') : '';
+      const done = P.pickupOpen(p) ? 'Not loaded · driver picks up before leaving' : 'Completed' + (whoText(p.completedByName, p.completedBy) ? ' by ' + whoText(p.completedByName, p.completedBy) : '') + (p.completedAt ? ' · ' + P.clock(p.completedAt) : '');
+      return [added, done].filter(Boolean).map(escapeHtml).join('<br>');
+    }
     function drawPickups() {
       const row = puRow, items = P.pickupsFor(row, P.withNotePickups(rowsNow(), pickups)), edit = canLoad();
       document.getElementById('pu-sub').textContent = row.route + ' · ' + row.run;
       document.getElementById('pu-list').innerHTML = items.map(p => '<div class="pu-item' + (P.pickupOpen(p) ? '' : ' done') + '"><span>' + escapeHtml(p.item) + (p.quantity ? ' · ' + escapeHtml(p.quantity) : '') +
-        '<small>' + (p.notes ? escapeHtml(p.notes) + ' · ' : '') + (P.pickupOpen(p) ? 'Not loaded · driver picks up before leaving' : 'Completed ' + P.clock(p.completedAt)) + '</small></span>' +
+        '<small>' + (p.notes ? escapeHtml(p.notes) + '<br>' : '') + pickupWhen(p) + '</small></span>' +
         (P.pickupOpen(p) && edit ? '<button type="button" data-done="' + escapeHtml(p.pickupId) + '">Pickup Complete</button>' : '') + '</div>').join('') || '<div class="hint">No pickups for this load.</div>';
       document.getElementById('pu-form').hidden = !edit;
       document.getElementById('pu-add').hidden = !edit;
@@ -428,26 +439,26 @@
       const note = P.withNotePickups(rowsNow(), pickups).find(p => p.pickupId === id && p.source === 'LOAD_NOTE');
       if (note) {
         // A pickup the load note asked for: completing it saves it as a pickup (the note as the item), already complete.
-        const temp = Object.assign({}, note, { source: '', quantity: 'See note', status: 'COMPLETE', completedAt: now });
+        const temp = Object.assign({}, note, { source: '', quantity: 'See note', status: 'COMPLETE', completedAt: now, completedByName: myName(), completedBy: person && person.email || '' });
         pickups = pickups.concat([temp]);
         drawPickups(); render();
-        save('completePickup', { pickupId: id, runDocId: note.runDocId, day: note.day, date: note.date })
+        save('completePickup', { pickupId: id, runDocId: note.runDocId, day: note.day, date: note.date, station: station() })
           .catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
         return;
       }
-      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: now }) : p));
+      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: now, completedByName: myName(), completedBy: person && person.email || '' }) : p));
       drawPickups(); render();
-      save('completePickup', { pickupId: id }).catch(err => showError('Pickup: ' + (err.message || err)));
+      save('completePickup', { pickupId: id, station: station() }).catch(err => showError('Pickup: ' + (err.message || err)));
     });
     document.getElementById('pu-add').onclick = () => {
       const row = puRow, item = document.getElementById('pu-item').value.trim(), quantity = document.getElementById('pu-qty').value.trim(), notes = document.getElementById('pu-note').value.trim();
       if (!item || !quantity) { showError('Enter the product and the quantity for the pickup.'); return; }
       showError('');
-      const temp = { pickupId: 'new-' + Date.now(), runDocId: row.runDocId, day: row.day, runId: row.runId, date: row.loadDate, item, quantity, notes, status: 'PENDING' };
+      const temp = { pickupId: 'new-' + Date.now(), runDocId: row.runDocId, day: row.day, runId: row.runId, date: row.loadDate, item, quantity, notes, status: 'PENDING', createdAt: new Date().toISOString(), createdByName: myName(), createdBy: person && person.email || '' };
       pickups = pickups.concat([temp]);
       ['pu-item', 'pu-qty', 'pu-note'].forEach(k => { document.getElementById(k).value = ''; });
       drawPickups(); render();
-      save('addPickup', { runDocId: row.runDocId, day: row.day, date: row.loadDate, item, quantity, notes }).catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
+      save('addPickup', { runDocId: row.runDocId, day: row.day, date: row.loadDate, item, quantity, notes, station: station() }).catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
     };
 
     // Typing in the table: Enter or leaving the box saves; arrow keys and Enter move between rows.

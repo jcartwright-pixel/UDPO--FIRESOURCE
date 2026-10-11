@@ -63,6 +63,28 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     assert.equal(saved.length, 1);
     assert.equal(saved[0].status, 'COMPLETE');
     results.push('Pickup Complete saved it (note as the item) and the other screen shows Completed');
+    // Who added and completed each pickup (review item 42): the person's name, or the Plant Station's name on a tablet.
+    await watcher.click(row('805') + ' button.pu');
+    assert.match(await watcher.textContent('#pu-list'), /Added by loader · /, 'a pickup from the sheet shows who added it');
+    await watcher.click('#pu-modal [data-close]');
+    await loader.waitForSelector('#pu-modal', { state: 'visible' });
+    await loader.waitForFunction(() => /Completed by Test Viewer · /.test(document.getElementById('pu-list').textContent), null, { timeout: 8000 });
+    await loader.click('#pu-modal [data-close]');
+    await loader.evaluate(() => localStorage.setItem('udPlantStation', 'CASE'));
+    await loader.click(row('812') + ' button.pu');
+    await loader.fill('#pu-item', '2 cases skim');
+    await loader.fill('#pu-qty', '2');
+    await loader.click('#pu-add');
+    await watcher.waitForFunction(r => document.querySelector(r + ' button.pu.open'), row('812'), { timeout: 8000 });
+    await watcher.click(row('812') + ' button.pu');
+    await watcher.waitForFunction(() => /Added by Case Loadout · /.test(document.getElementById('pu-list').textContent), null, { timeout: 8000 });
+    await watcher.click('#pu-list [data-done]');
+    await watcher.waitForFunction(() => /Added by Case Loadout · [\s\S]*Completed by Test Manager · /.test(document.getElementById('pu-list').textContent), null, { timeout: 8000 });
+    if (SHOTS) await watcher.screenshot({ path: path.join(SHOTS, 'pickup-who-1920.png'), scale: 'css' });
+    const skim = (await db().collection('pickups').where('runDocId', '==', '2026-10-04__run_p812').get()).docs.map(d => d.data())[0];
+    assert.equal(skim.createdByName, 'Case Loadout');
+    assert.equal(skim.completedByName, 'Test Manager');
+    results.push('Pickups pop-up: "Added by Case Loadout" from the tablet, "Completed by Test Manager", with the times');
     for (const p of [loader, watcher]) assert.deepEqual(p.errors, []);
   } finally {
     await browser.close();
