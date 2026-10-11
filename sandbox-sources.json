@@ -23,7 +23,8 @@
       "drivers": { "spreadsheetId": "1VIGHkWdjSDkYVEu-wh3EMTjTg_vgJgD8Lqyapy1Pprw", "tab": "DRIVERS_MASTER" },
       "equipment": { "spreadsheetId": "1hkq9BOyqDjeSpP_LFhmuO4LXf23mh26pvgUKa_JznOM", "tab": "EQUIPMENT_MASTER" },
       "exceptions": { "spreadsheetId": "1ihDrBpGfMgdB27zmn0TF3UZNBKPrHAayh1qGxKV0YV0", "tab": "DRIVER_EXCEPTIONS" },
-      "vacations": { "spreadsheetId": "1uv5lTlvP20EF8Z9_r2ejU5YSd84OmHddoDkPNgoex2A", "tab": "DRIVER_VACATIONS" }
+      "vacations": { "spreadsheetId": "1uv5lTlvP20EF8Z9_r2ejU5YSd84OmHddoDkPNgoex2A", "tab": "DRIVER_VACATIONS" },
+      "users": { "spreadsheetId": "1kfk1iMBf_nBmWqGmFHh_e98mefmbolzZQzAj3Xr7Pcc", "tab": "USERS_MASTER" }
     }
   }
 }

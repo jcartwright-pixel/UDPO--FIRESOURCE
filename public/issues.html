@@ -29,6 +29,8 @@
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Email stays off in the new app</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <!-- The Lessor button's email result (Administration > Repair Email): emailed, or why not. -->
+    <div class="notice" id="info" hidden></div>
     <div class="view">
       <div class="actions issue-bar">
         <div class="kind-tabs" role="tablist" id="kinds"></div>
@@ -45,11 +47,18 @@
       <div class="foot" id="foot"></div>
     </div>
   </div>
+  <!-- Review item 33 (Joe 10/11): the answering-service email a write-up came from, as Driver Check-In Email stored it. -->
+  <div class="modal-back" id="mail-back" hidden></div>
+  <section class="modal wide-modal" id="mail-modal" role="dialog" aria-labelledby="mail-title" hidden>
+    <h2 id="mail-title">Original email</h2>
+    <div id="mail-body"></div>
+    <div class="modal-actions"><button type="button" class="primary" data-close-mail>Close</button></div>
+  </section>
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
     import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     forScreen('checkIns');
 
     const L = window.UDLogic;
@@ -59,7 +68,9 @@
     const FILTERS = [['all', 'All open'], ['review', 'Need review'], ['repeat', 'Repeat'], ['garage', 'At garage'], ['new', 'New · 7 days']];
     const params = new URLSearchParams(location.search);
     let kind = KINDS.some(k => k[0] === params.get('kind')) ? params.get('kind') : 'TRUCK', filter = FILTERS.some(f => f[0] === params.get('filter')) ? params.get('filter') : 'all';
-    let search = '', records = [], removeFor = null, openFor = null;
+    // ?q= (a Latest write-ups line on Fleet & Maintenance): the list opens searched for that unit, as in the current app.
+    let search = (params.get('q') || '').trim(), records = [], removeFor = null, openFor = null;
+    document.getElementById('search').value = search;
     const now = () => Date.now();
     const daysAgo = (ms) => ms ? Math.floor((now() - ms) / 86400000) : '';
     const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
@@ -86,7 +97,7 @@
       const typed = document.querySelector('[data-why]') ? document.querySelector('[data-why]').value : '', cols = truck ? 9 : 7, d = edit ? '' : ' disabled';
       document.getElementById('rows').innerHTML = shown.map(r => {
         const sent = r.atGarage || r.toLessor, who = truck ? L.unitLessor(lists.fleetTrucks, r.unit) : null;
-        const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || sent || !who.lessor ? ' disabled' : '') + ' title="' + escapeHtml(who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor). Email stays off in the new app, so this marks it sent.' : who ? who.why : '') + '">Lessor</button>';
+        const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || sent || !who.lessor ? ' disabled' : '') + ' title="' + escapeHtml(who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor): marks it sent and emails it as set in Administration > Repair Email.' : who ? who.why : '') + '">Lessor</button>';
         const garageBtn = '<button type="button" class="' + (truck ? 'seg-g' : 'to-garage') + '" data-step="garage"' + (!edit || sent ? ' disabled' : '') + ' title="Send to the garage">' + (truck ? 'Garage' : 'To garage') + '</button>';
         const actions = removeFor === r.id
           ? '<span class="down-box"><input data-why maxlength="200" placeholder="Why remove it?"><button type="button" class="warn" data-remove-save>Remove</button><button type="button" data-remove-cancel>Cancel</button></span>'
@@ -99,7 +110,7 @@
         const more = openFor === r.id ? '<tr class="issue-more"><td colspan="' + cols + '"><b>' + escapeHtml(KINDS[i][2].replace(' #', '') + ' ' + (r.unit || '?')) + '</b>' + (r.driver ? ' · ' + escapeHtml(r.driver) : '') + (r.route ? ' · route ' + escapeHtml(r.route) : '') +
           ' · reported ' + dateText(r.reported) + ' (' + daysAgo(r.openedMs) + ' days ago)<p>' + escapeHtml(r.text) + '</p>' + (truck && who ? '<small>' + escapeHtml(who.lessor ? 'Leased from ' + who.lessor : who.why) + '</small>' : '') + '</td></tr>' : '';
         return '<tr data-id="' + escapeHtml(r.id) + '"' + (r.needsReview ? ' class="review"' : '') + '><td class="strong">' + escapeHtml(r.unit || '?') + '</td>' + (truck ? '<td>' + escapeHtml(r.driver) + '</td>' : '') +
-          '<td>' + dateText(r.reported) + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + (r.text ? escapeHtml(r.text) : '<i>No detail: needs review</i>') + '</td>' +
+          '<td>' + dateText(r.reported) + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + (r.fromEmail ? '<span class="pill warn from-mail" title="Added from the answering-service email, not entered in the app. Check it against the email.">From email</span> <button type="button" class="link-btn" data-mail>View email</button> ' : '') + (r.text ? escapeHtml(r.text) : '<i>No detail: needs review</i>') + '</td>' +
           '<td><span class="count' + (r.occurrences > 1 ? ' repeat' : '') + '">' + r.occurrences + '</span></td><td>' + reviewed + '</td>' +
           (truck ? '<td>' + (r.emailed ? tick('Emailed ' + r.emailedAt) : dash) + '</td>' : '') + '<td>' + garage + '</td><td>' + actions + '</td></tr>' + more;
       }).join('') || '<tr><td colspan="' + cols + '" class="empty">No open write-ups' + (filter === 'all' && !q ? '' : ' match') + '.</td></tr>';
@@ -107,6 +118,24 @@
       const box = document.querySelector('[data-why]');
       if (box) { box.value = typed; if (document.activeElement !== box) box.focus(); }
     }
+
+    // View email: the stored copy of the answering-service email (sender, time, subject, the text as received).
+    let mailDb = null;
+    async function showMail(r) {
+      const body = document.getElementById('mail-body');
+      body.innerHTML = '<p>Loading the email…</p>';
+      document.getElementById('mail-modal').hidden = document.getElementById('mail-back').hidden = false;
+      try {
+        const snap = r.emailId ? await getDoc(doc(mailDb, 'mailCopies', r.emailId.replace(/[\/\s]+/g, '_').replace(/[^A-Za-z0-9_.@\-|]/g, ''))) : null;
+        const m = snap && snap.exists() ? snap.data() : null;
+        body.innerHTML = m
+          ? '<dl class="mail-meta"><dt>From</dt><dd>' + escapeHtml(m.from) + '</dd><dt>Received</dt><dd>' + escapeHtml(new Date(m.receivedAt).toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })) + '</dd><dt>Subject</dt><dd>' + escapeHtml(m.subject) + '</dd></dl><pre class="mail-text">' + escapeHtml(m.body) + '</pre>'
+          : '<p>The original email was not kept for this write-up (it came in before the app started keeping copies). Email ID: ' + escapeHtml(r.emailId || 'none') + '.</p>';
+      } catch (err) { body.innerHTML = '<p>Could not open the email: ' + escapeHtml(err.message) + '</p>'; }
+    }
+    const closeMail = () => { document.getElementById('mail-modal').hidden = document.getElementById('mail-back').hidden = true; };
+    document.getElementById('mail-modal').addEventListener('click', e => { if (e.target.closest('[data-close-mail]')) closeMail(); });
+    document.getElementById('mail-back').addEventListener('click', closeMail);
 
     // Each button is one save; the row changes at once and goes back if the server refuses.
     function step(r, name, note) {
@@ -118,7 +147,14 @@
         if (name === 'lessor') doc.notes = (doc.notes ? doc.notes + '\n' : '') + 'Sent to lessor ' + note + ' ' + at + ' by ' + me;
         if (name === 'reviewed') Object.assign(doc, { status: 'OPEN', notes: (doc.notes ? doc.notes + '\n' : '') + 'Reviewed by ' + me + ' at ' + at });
       };
-      saveOptimistic('updateIssue', { recordId: r.recordId, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render);
+      saveOptimistic('updateIssue', { recordId: r.recordId, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render).then(res => {
+        if (name !== 'lessor' || !res || !res.message) return;
+        const info = document.getElementById('info');
+        info.textContent = res.message;
+        info.hidden = false;
+        clearTimeout(step.timer);
+        step.timer = setTimeout(() => { info.hidden = true; }, 15000);
+      });
     }
 
     document.getElementById('kinds').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) { kind = b.dataset.kind; filter = 'all'; removeFor = openFor = null; render(); } });
@@ -132,6 +168,7 @@
       if (e.target.closest('[data-review]')) { step(r, 'reviewed'); return; }
       const b = e.target.closest('[data-step]');
       if (b) { step(r, b.dataset.step, b.dataset.step === 'lessor' ? L.unitLessor(lists.fleetTrucks, r.unit).lessor : ''); return; }
+      if (e.target.closest('[data-mail]')) { showMail(r); return; }
       if (e.target.closest('[data-open]')) { openFor = openFor === r.id ? null : r.id; render(); return; }
       if (e.target.closest('[data-remove]')) { removeFor = r.id; render(); return; }
       if (e.target.closest('[data-remove-cancel]')) { removeFor = null; render(); return; }
@@ -141,6 +178,7 @@
     // Back: a remove box or an open write-up first; then the Fleet & Maintenance hub when the list was opened from it, else Trucks.
     const fromHub = /\/maint\.html/.test(document.referrer || '');
     window.udBack = () => {
+      if (!document.getElementById('mail-modal').hidden) { closeMail(); return true; }
       if (removeFor || openFor) { removeFor = openFor = null; render(); return true; }
       if (fromHub) { location.href = 'maint.html'; return true; }
       if (kind !== 'TRUCK') { kind = 'TRUCK'; filter = 'all'; render(); return true; }
@@ -150,6 +188,7 @@
     window.addEventListener('resize', () => render());
     requireSignIn(async (user) => {
       const { db } = await start();
+      mailDb = db;
       watchLists(user, render);
       onSnapshot(collection(db, 'maintenance'), s => { records = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the write-ups: ' + e.message));
     });

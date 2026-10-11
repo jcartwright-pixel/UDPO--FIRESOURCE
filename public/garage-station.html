@@ -11,23 +11,45 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
 </head>
-<body class="fill gs-page">
+<body class="fill phone gs-page">
   <div id="screen">
+    <!-- Joe 10/10: a tablet screen on every screen size: a slim header with Back and Home, no desktop side menu. -->
     <div class="topbar">
+      <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
+      <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
       <span class="gs-people" id="people"></span>
       <button id="gs-signout" type="button" hidden>Sign Out</button>
     </div>
     <div class="head">
-      <div class="title"><h1 id="title">Garage Station</h1><small>Technicians: tap your name, then your login ID. No email needed.</small></div>
+      <div class="title"><h1 id="title">Garage Station</h1><small>Tap a work order, then your name and login ID to start, stop or complete it. No email needed.</small></div>
     </div>
     <div class="view">
       <div class="gs">
         <p class="gs-msg" id="gs-message" role="alert" hidden></p>
 
-        <!-- Who's working? Name, then the login ID. -->
-        <section class="gs-sign" id="view-sign">
+        <!-- Work orders: the first screen, no sign-in (Joe 10/10). -->
+        <section id="view-jobs" class="gs-stack">
+          <div class="gs-bar"><h2 id="jobs-title">Work Orders</h2><button type="button" class="gs-btn red" id="to-report">+ Report a Problem</button></div>
+          <div class="gs-strip" id="strip" aria-label="Mechanics"></div>
+          <div class="gs-jobs" id="jobs"></div>
+        </section>
+
+        <!-- One work order: who is on it, each mechanic's clock, Start / Add another mechanic / Need Parts / Complete. -->
+        <section id="view-job" class="gs-stack" hidden>
+          <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="jobs">&larr; Work Orders</button><h2 id="job-unit"></h2></div>
+          <div class="gs-card"><div class="gs-label" id="job-label"></div><div class="gs-problem" id="job-problem"></div><div class="gs-now" id="job-now"></div></div>
+          <div class="gs-card gs-crew"><div class="gs-label">On this job</div><div id="crew"></div><div class="gs-label" id="crew-done"></div></div>
+          <div class="gs-two">
+            <button type="button" class="gs-btn" id="job-start">&#9654; Start work</button>
+            <button type="button" class="gs-btn gray" id="job-parts">&#9203; Need Parts</button>
+          </div>
+          <button type="button" class="gs-btn green gs-done" id="job-done">&#10004; Complete</button>
+        </section>
+
+        <!-- Who are you? Name, then the login ID, for every step. -->
+        <section class="gs-sign" id="view-sign" hidden>
           <div class="gs-card">
-            <h2 id="sign-title">Who's working?</h2>
+            <h2 id="sign-title">Who are you?</h2>
             <p class="gs-hint" id="sign-hint">Tap your name, then your login ID.</p>
             <div class="gs-names" id="names"></div>
           </div>
@@ -35,48 +57,31 @@
             <h2 id="pin-title">Tap your name</h2>
             <div class="gs-dots" id="dots"></div>
             <div class="gs-keys" id="keys"></div>
-            <button type="button" class="gs-btn dark" id="helper-cancel" hidden>Back to the job</button>
+            <button type="button" class="gs-btn dark" id="sign-cancel">Cancel</button>
           </div>
         </section>
 
-        <!-- Jobs -->
-        <section id="view-jobs" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
-          <div class="gs-bar"><h2>Jobs</h2><button type="button" class="gs-btn red" id="to-report">+ Report a Problem</button></div>
-          <div class="gs-jobs" id="jobs"></div>
-        </section>
-
-        <!-- One job -->
-        <section id="view-job" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
-          <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="jobs">&larr; Jobs</button><h2 id="job-unit"></h2></div>
-          <div class="gs-card"><div class="gs-label" id="job-label"></div><div class="gs-problem" id="job-problem"></div><div class="gs-now" id="job-now"></div></div>
-          <div class="gs-two">
-            <button type="button" class="gs-btn gray" id="job-parts">&#9203; Need Parts</button>
-            <button type="button" class="gs-btn" id="job-helper">&#128101; Add a Helper</button>
-          </div>
-          <button type="button" class="gs-btn green gs-done" id="job-done">&#10004; Done</button>
-        </section>
-
-        <!-- Done, step 1: what was fixed -->
-        <section id="view-fix" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+        <!-- Complete, step 1: what was fixed -->
+        <section id="view-fix" class="gs-stack" hidden>
           <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="job">&larr; Back</button><h2 id="fix-unit"></h2><span class="gs-progress"><i class="on"></i><i></i></span></div>
           <p class="gs-q">What did you fix?</p>
           <input class="gs-note" id="fix-note" maxlength="300" placeholder="Anything to add? (you can leave this empty)">
           <div class="gs-fixes" id="fixes"></div>
         </section>
 
-        <!-- Done, step 2: safe to drive + finger signature -->
-        <section id="view-safe" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+        <!-- Complete, step 2: safe to drive + finger signature -->
+        <section id="view-safe" class="gs-stack" hidden>
           <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="fix">&larr; Back</button><h2 id="safe-unit"></h2><span class="gs-progress"><i class="on"></i><i class="on"></i></span></div>
           <p class="gs-q" id="safe-q"></p>
           <div class="gs-yesno"><button type="button" class="gs-btn green" data-safe="yes">Yes, safe</button><button type="button" class="gs-btn line" data-safe="no">No, still down</button></div>
           <div class="gs-label" id="sign-line">Sign with your finger</div>
           <div class="gs-sigbox"><button type="button" class="gs-btn dark" id="sig-clear">Clear</button><canvas id="sig"></canvas></div>
-          <button type="button" class="gs-btn green" id="finish">&#10004; Finish Job</button>
+          <button type="button" class="gs-btn green" id="finish">&#10004; Complete Work Order</button>
         </section>
 
         <!-- Report a Problem -->
-        <section id="view-report" hidden style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
-          <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="jobs">&larr; Jobs</button><h2>Report a Problem</h2></div>
+        <section id="view-report" class="gs-stack" hidden>
+          <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="jobs">&larr; Work Orders</button><h2>Report a Problem</h2></div>
           <div class="gs-report">
             <div class="gs-card">
               <div class="gs-label">1. Truck or trailer number</div>
@@ -99,69 +104,126 @@
   </div>
 
   <script type="module">
-    import { start, escapeHtml } from './js/app.js';
+    import { start, escapeHtml, goBack } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 
-    // The current app's Garage Station (GarageStation.html, 7.0.276), with the login ID in place of the PIN (Joe 10/10).
-    const KEY = 'udGarage.tokens', IDLE_MS = 30 * 60000, MAX_TECHS = 2;
-    const store = {
-      get() { try { return JSON.parse(localStorage.getItem(KEY) || '[]').slice(0, MAX_TECHS); } catch (e) { return []; } },
-      set(v) { try { if (v.length) localStorage.setItem(KEY, JSON.stringify(v)); else localStorage.removeItem(KEY); } catch (e) {} }
-    };
+    /*
+     * The current app's Garage Station (GarageStation.html, 7.0.276), reworked the way Joe asked (10/10 evening): the open
+     * work orders come up first, with no sign-in. A mechanic taps a work order, then their name and login ID, and Starts
+     * their own clock; Add another mechanic puts a second one on the same job with their own clock. One job at a time:
+     * starting another stops the clock on the first, which stays open. Only Complete (name + login ID, what was fixed,
+     * safe to drive, signature) closes it. Fork truck and pallet jack write-ups are on the list too.
+     */
     const $ = (id) => document.getElementById(id);
-    let tokens = store.get(), techs = [], people = [], jobs = [], units = [], categories = [], fixes = [];
-    let picked = null, typed = '', helperFor = null, open = null, fixPick = '', safePick = null, inked = false;
-    let unitTyped = '', unitPick = '', catPick = '', runPick = null, busy = false, lastTouch = Date.now();
+    const READY_MS = 2 * 60000;
+    let techs = [], jobs = [], units = [], categories = [], fixes = [];
+    let open = null, want = null, picked = null, typed = '', busy = false, ready = null, finisher = null;
+    let fixPick = '', safePick = null, inked = false, lastTouch = Date.now();
+    let unitTyped = '', unitPick = '', catPick = '', runPick = null, reportDraft = null;
 
-    async function call(op, fields) {
-      const { functions } = await start();
-      try { return (await httpsCallable(functions, 'garage')(Object.assign({ op, tokens }, fields || {}))).data; }
-      catch (e) {
-        if (/GARAGE_SIGN_IN_REQUIRED/.test(e.message)) { signOutAll(true); throw new Error('You were signed out. Tap your name and enter your login ID.'); }
-        throw e;
-      }
-    }
+    const fn = async () => httpsCallable((await start()).functions, 'garage');
+    async function call(op, fields) { return (await (await fn())(Object.assign({ op }, fields || {}))).data; }
+    const signOut = (token) => { if (token) call('signOut', { tokens: [token] }).catch(() => {}); };
     function message(text, ok) { const m = $('gs-message'); m.textContent = text || ''; m.hidden = !text; m.classList.toggle('ok', !!ok); }
     const VIEWS = ['sign', 'jobs', 'job', 'fix', 'safe', 'report'];
     function view(v) { VIEWS.forEach(k => { $('view-' + k).hidden = k !== v; }); if (v === 'safe') sizeCanvas(); }
     const shownView = () => VIEWS.find(k => !$('view-' + k).hidden);
     const names = (list) => list.length > 2 ? list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1] : list.join(' and ');
-    const elapsed = (iso) => { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)); return isFinite(m) ? (m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' m' : m + ' m') : ''; };
+    const mins = (iso) => { const m = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 60000)); return isFinite(m) ? m : 0; };
+    const hm = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' m' : m + ' m';
+    const clock = (iso) => { const m = mins(iso); return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0'); };
+    const age = (iso) => { const m = mins(iso); if (!iso || !isFinite(Date.parse(iso))) return ''; return m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + (m < 2880 ? ' day ago' : ' days ago'); };
+    const TYPE = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };
     const jobKey = (j) => j.id || j.writeUp;
+    const first = (name) => { const p = String(name || '').split(/\s+/); return p.length > 1 && p[0] === p[0].toUpperCase() ? p.slice(1).join(' ') : p[0]; };
 
     async function load() {
-      const r = await call('read');
-      techs = r.techs; units = r.units; categories = r.categories; fixes = r.fixes;
-      people = r.signedIn; tokens = people.map(p => p.token); store.set(tokens);
-      jobs = r.jobs;
+      const r = await call('board');
+      techs = r.techs; units = r.units; categories = r.categories; fixes = r.fixes; jobs = r.jobs;
+      if (open) open = jobs.find(j => jobKey(j) === jobKey(open) || (open.id && j.id === open.id)) || null;
       draw();
-      if (!people.length) view('sign');
-      else if (shownView() === 'sign' && !helperFor) view('jobs');
+      if (!open && shownView() === 'job') view('jobs');
     }
-
     function draw() {
-      $('people').innerHTML = people.map(p => '<span class="p"><i>' + escapeHtml(p.name.slice(0, 1).toUpperCase()) + '</i>' + escapeHtml(p.name) + '</span>').join('');
-      $('gs-signout').hidden = !people.length;
-      drawSign(); drawJobs();
+      const on = techs.filter(t => t.on);
+      $('people').innerHTML = on.length ? '<span class="gs-onclock">On the clock:</span>' + on.map(t => '<span class="p"><i>' + escapeHtml(t.name.slice(0, 1)) + '</i>' + escapeHtml(first(t.name)) + ' <small>' + escapeHtml(t.on.unit) + '</small></span>').join('') : '';
+      drawJobs(); drawSign();
       if (open) drawJob();
     }
 
-    /* ---------- sign-in ---------- */
+    /* ---------- work orders ---------- */
+    function rowClass(j) { return j.status === 'PARTS' ? 'parts' : j.onNow.length ? 'working' : !j.canRun ? 'down' : j.source === 'OFFICE' ? 'office' : ''; }
+    function drawJobs() {
+      $('jobs-title').textContent = 'Work Orders' + (jobs.length ? ' · ' + jobs.length + ' open' : '');
+      $('strip').innerHTML = '<span class="gs-label">Mechanics:</span>' + techs.map(t => '<button type="button" class="gs-chip' + (t.on ? ' on' : '') + '" data-tech="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) +
+        '<small>' + (t.on ? escapeHtml(t.on.unit) + ' · ' + clock(t.on.since) : 'free') + '</small></button>').join('');
+      $('jobs').innerHTML = jobs.map((j, i) => {
+        const subs = ['<small>' + escapeHtml(TYPE[j.type] || 'Truck') + ' · ' + escapeHtml(j.from || '') + (j.createdAt ? ' · ' + age(j.createdAt) : '') + '</small>'];
+        if (j.onNow.length) subs.push('<small class="green">On it now: ' + escapeHtml(names(j.onNow.map(p => first(p.name) + ' ' + clock(p.since)))) + '</small>');
+        else if (j.status === 'WORKING') subs.push('<small>Started · nobody on it now</small>');
+        if (j.status === 'PARTS') subs.push('<small>WAITING ON PARTS</small>');
+        if (!j.canRun && j.status !== 'PARTS') subs.push('<small class="red">CAN\'T RUN</small>');
+        return '<div class="gs-job ' + rowClass(j) + '" data-i="' + i + '"><span class="unit">' + escapeHtml(j.unit) + '</span><span class="what">' + escapeHtml(j.problem || j.category) + subs.join('') + '</span>' +
+          '<button type="button" class="gs-btn ' + (j.onNow.length ? 'green' : j.status === 'PARTS' ? 'gray' : '') + '" data-i="' + i + '">Open</button></div>';
+      }).join('') || '<p class="gs-empty">No open work orders right now.</p>';
+    }
+    $('jobs').addEventListener('click', e => { const row = e.target.closest('[data-i]'); if (!row) return; open = jobs[Number(row.dataset.i)]; message(''); drawJob(); view('job'); });
+    // A mechanic's own name: their job, or ready to tap one.
+    $('strip').addEventListener('click', e => { const b = e.target.closest('[data-tech]'); if (b) ask('me', null, b.dataset.tech); });
+
+    function drawJob() {
+      const j = open;
+      $('job-unit').textContent = j.unit + ' · ' + (TYPE[j.type] || 'Truck');
+      $('job-label').textContent = (j.source === 'OFFICE' ? 'Sent by the office' : j.source === 'TECH' ? 'Reported at the garage' : 'From ' + (j.from || 'a write-up')) + (j.createdAt ? ' · ' + age(j.createdAt) : '') + (j.canRun ? '' : ' · CAN\'T RUN');
+      $('job-problem').textContent = j.problem || j.category;
+      $('job-now').textContent = j.status === 'PARTS' ? 'Waiting on parts' : '';
+      $('crew').innerHTML = j.onNow.map(p => '<div class="gs-clock"><i>' + escapeHtml(p.name.slice(0, 1)) + '</i><b>' + escapeHtml(p.name) + '</b><span class="t">' + clock(p.since) + '</span>' +
+        '<button type="button" class="gs-btn dark" data-stop="' + escapeHtml(p.id) + '">&#9632; Stop</button></div>').join('') || '<p class="gs-hint">Nobody is on this job right now.</p>';
+      const done = {}; (j.labor || []).forEach(s => { done[s.name] = (done[s.name] || 0) + s.minutes; });
+      const list = Object.keys(done);
+      $('crew-done').textContent = list.length ? 'Time so far: ' + list.map(n => first(n) + ' ' + hm(done[n])).join(', ') + (list.length > 1 ? ' · total ' + hm(j.laborMinutes) : '') : '';
+      $('job-start').innerHTML = j.onNow.length ? '&#128101; Add another mechanic' : '&#9654; Start work';
+      $('job-start').hidden = j.status === 'PARTS';
+      $('job-parts').innerHTML = j.status === 'PARTS' ? '&#9203; Parts are here' : '&#9203; Need Parts';
+    }
+    $('job-start').addEventListener('click', () => ask(open.onNow.length ? 'helper' : 'start', open));
+    $('job-parts').addEventListener('click', () => ask(open.status === 'PARTS' ? 'resume' : 'parts', open));
+    $('job-done').addEventListener('click', () => ask('complete', open));
+    $('crew').addEventListener('click', e => { const b = e.target.closest('[data-stop]'); if (b) ask('stop', open, b.dataset.stop); });
+    document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.go; if (v === 'jobs') { open = null; drawJobs(); } view(v); }));
+
+    /* ---------- who are you? (name + login ID for every step) ---------- */
+    const ASK = {
+      start: (j) => ['Start work on ' + j.unit, 'Tap your name, then your login ID. Your clock starts.'],
+      helper: (j) => ['Add another mechanic to ' + j.unit, 'The mechanic joining taps their name, then their login ID.'],
+      stop: (j) => ['Stop your clock on ' + j.unit, 'The job stays open. Enter your login ID.'],
+      parts: (j) => ['Need parts for ' + j.unit, 'Every clock on this job stops until the parts are here.'],
+      resume: (j) => ['Parts are here: ' + j.unit, 'Tap your name, then your login ID. Your clock starts.'],
+      complete: (j) => ['Complete ' + j.unit, 'Who completed it? Tap your name, then your login ID.'],
+      report: () => ['Report a Problem', 'Who is reporting it? Tap your name, then your login ID.'],
+      me: () => ['Who are you?', 'Tap your name, then your login ID.']
+    };
+    function ask(purpose, job, techId) {
+      message('');
+      // A mechanic who just entered their login ID on their name goes straight on.
+      if (ready && Date.now() < ready.until && job && ['start', 'helper', 'resume'].indexOf(purpose) >= 0) { const r = ready; ready = null; run(purpose, job, r); return; }
+      want = { purpose, job }; picked = techId ? techs.find(t => t.id === techId) || null : null; typed = '';
+      drawSign(); view('sign');
+    }
     function drawSign() {
-      $('sign-title').textContent = helperFor ? 'Who is helping?' : 'Who\'s working?';
-      $('sign-hint').textContent = helperFor ? 'The helper taps their name, then their login ID.' : 'Tap your name, then your login ID.';
-      $('helper-cancel').hidden = !helperFor;
-      const inIds = people.map(p => p.id);
+      const [title, hint] = want ? ASK[want.purpose](want.job || {}) : ASK.me();
+      $('sign-title').textContent = title; $('sign-hint').textContent = hint;
+      const busyHere = (t) => t.on && want && want.job && t.on.id === want.job.id;
       $('names').innerHTML = techs.map(t => {
-        const isIn = inIds.indexOf(t.id) >= 0, on = picked && picked.id === t.id;
-        return '<button type="button" class="gs-name' + (isIn ? ' in' : on ? ' on' : '') + '" data-tech="' + escapeHtml(t.id) + '"' + (isIn ? ' disabled' : '') + '>' + escapeHtml(t.name) + '<small>' + (isIn ? 'signed in' : on ? 'enter login ID' : '&nbsp;') + '</small></button>';
-      }).join('') || '<p class="gs-hint">No technicians yet. The office adds them on the GARAGE TECHNICIANS list.</p>';
+        const on = picked && picked.id === t.id;
+        return '<button type="button" class="gs-name' + (on ? ' on' : '') + '" data-who="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) + '<small>' + (on ? 'enter login ID' : busyHere(t) ? 'on this job' : t.on ? 'on ' + escapeHtml(t.on.unit) : '&nbsp;') + '</small></button>';
+      }).join('') || '<p class="gs-hint">No mechanics yet. The office adds them on the GARAGE TECHNICIANS list.</p>';
       $('pin-title').textContent = picked ? picked.name + ', your login ID' : 'Tap your name';
       $('dots').innerHTML = [0, 1, 2, 3, 4, 5].map(i => '<i class="' + (i < typed.length ? 'on' : '') + (i === 5 ? ' extra' : '') + '"></i>').join('');
       $('keys').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'go'].map(k => k === 'go' ? '<button type="button" class="go" data-key="go"' + (typed.length >= 5 && !busy ? '' : ' disabled') + '>Enter</button>' :
         k === 'del' ? '<button type="button" class="small" data-key="del" title="Hold to clear">&#9003;</button>' : '<button type="button" data-key="' + k + '">' + k + '</button>').join('');
     }
-    $('names').addEventListener('click', e => { const b = e.target.closest('[data-tech]'); if (!b || b.disabled) return; picked = techs.find(t => t.id === b.dataset.tech); typed = ''; message(''); drawSign(); });
+    $('names').addEventListener('click', e => { const b = e.target.closest('[data-who]'); if (!b) return; picked = techs.find(t => t.id === b.dataset.who); typed = ''; message(''); drawSign(); });
     let holdTimer = null;
     $('keys').addEventListener('pointerdown', e => { if (e.target.closest('[data-key="del"]')) holdTimer = setTimeout(() => { holdTimer = 'held'; typed = ''; drawSign(); }, 600); });
     $('keys').addEventListener('click', async e => {
@@ -172,81 +234,50 @@
       if (k === 'del') { if (holdTimer === 'held') { holdTimer = null; return; } clearTimeout(holdTimer); typed = typed.slice(0, -1); drawSign(); return; }
       if (k !== 'go') { if (typed.length < 6) typed += k; drawSign(); return; }
       busy = true; drawSign();
+      let who;
+      try { who = await call('signIn', { techId: picked.id, loginId: typed, tokens: [] }); }
+      catch (err) { typed = ''; message(err.message); busy = false; drawSign(); return; }
+      const w = want || { purpose: 'me' };
+      want = null; picked = null; typed = ''; busy = false;
+      await run(w.purpose, w.job, who);
+      drawSign();
+    });
+    function cancelSign() { const w = want; want = null; picked = null; typed = ''; drawSign(); view(w && w.job ? 'job' : w && w.purpose === 'report' ? 'report' : 'jobs'); }
+    $('sign-cancel').addEventListener('click', cancelSign);
+
+    // One step for the mechanic who just entered their login ID.
+    async function run(purpose, job, who) {
+      if (purpose === 'me') {
+        const t = techs.find(x => x.id === who.id), mine = t && t.on && jobs.find(j => j.id === t.on.id);
+        if (mine) { signOut(who.token); open = mine; drawJob(); view('job'); message(who.name + ': your clock is running on ' + mine.unit + '.', true); return; }
+        ready = { token: who.token, id: who.id, name: who.name, until: Date.now() + READY_MS };
+        open = null; drawJobs(); view('jobs'); message(who.name + ': tap the work order you are starting.', true); return;
+      }
+      if (purpose === 'complete') { finisher = who; startComplete(); return; }
+      if (purpose === 'report') { await sendReport(who); return; }
+      const op = { start: 'START', helper: 'HELPER', resume: 'RESUME', stop: 'STOP', parts: 'PARTS' }[purpose];
+      busy = true; message('Saving…', true);
       try {
-        const r = await call('signIn', { techId: picked.id, loginId: typed });
-        tokens = tokens.filter(t => t !== r.token).concat(r.token).slice(-MAX_TECHS); store.set(tokens);
-        people = people.filter(p => p.id !== r.id).concat({ token: r.token, id: r.id, name: r.name });
-        picked = null; typed = ''; message('');
-        if (helperFor) { const j = jobs.find(x => jobKey(x) === helperFor); helperFor = null; if (j) { addNames(j); queue('HELPER', j); open = j; view('job'); drawJob(); } else view('jobs'); }
-        else view('jobs');
+        const r = await call('step', { tokens: [who.token], step: op, id: job.id || '', writeUp: job.id ? '' : job.writeUp, requestId: rid() });
+        const moved = r.stoppedOn && r.stoppedOn.length ? ' Stopped ' + first(who.name) + '\'s clock on ' + r.stoppedOn.join(', ') + ' (still open).' : '';
+        message({ START: who.name + ' started on ' + job.unit + '.', HELPER: who.name + ' joined ' + job.unit + '.', RESUME: who.name + ' started on ' + job.unit + ' again.',
+          STOP: who.name + ' stopped. ' + job.unit + ' stays open.', PARTS: job.unit + ' is waiting on parts. Clocks stopped.' }[op] + moved, true);
+        if (r.job) open = Object.assign({}, r.job);
         await load();
-      } catch (err) { typed = ''; message(err.message); }
-      finally { busy = false; drawSign(); }
-    });
-    $('helper-cancel').addEventListener('click', () => { helperFor = null; picked = null; typed = ''; drawSign(); view(open ? 'job' : 'jobs'); });
-
-    function signOutAll(quiet) {
-      const had = tokens.slice();
-      tokens = []; people = []; store.set([]); open = null; helperFor = null; picked = null; typed = ''; jobs = [];
-      if (had.length) start().then(({ functions }) => httpsCallable(functions, 'garage')({ op: 'signOut', tokens: had })).catch(() => {});
-      draw(); view('sign');
-      if (!quiet) message('');
+        if (op === 'PARTS' || op === 'STOP') { open = null; view('jobs'); } else { view('job'); if (open) drawJob(); }
+      } catch (err) { message(err.message); view(open ? 'job' : 'jobs'); }
+      finally { busy = false; signOut(who.token); }
     }
-    $('gs-signout').addEventListener('click', () => signOutAll());
 
-    /* ---------- jobs ---------- */
-    function rowClass(j) { return j.status === 'PARTS' ? 'parts' : j.status === 'WORKING' ? 'working' : !j.canRun ? 'down' : j.source === 'OFFICE' ? 'office' : ''; }
-    function drawJobs() {
-      $('jobs').innerHTML = jobs.map((j, i) => {
-        const subs = [];
-        if (j.status === 'PARTS') subs.push('<small>WAITING ON PARTS</small>');
-        if (j.status === 'WORKING' && j.techs.length) subs.push('<small class="green">' + escapeHtml(names(j.techs)) + ' working' + (j.startedAt ? ' · ' + elapsed(j.startedAt) : '') + '</small>');
-        if (!j.canRun && j.status !== 'PARTS') subs.push('<small class="red">CAN\'T RUN</small>');
-        if (j.source === 'OFFICE' && j.status === 'NEW') subs.push('<small>From the office</small>');
-        const busyJob = j.status === 'WORKING' || j.status === 'PARTS';
-        return '<div class="gs-job ' + rowClass(j) + '" data-i="' + i + '"><span class="unit">' + escapeHtml(j.unit) + '</span><span class="what">' + escapeHtml(j.problem || j.category) + subs.join('') + '</span>' +
-          '<button type="button" class="gs-btn ' + (j.status === 'WORKING' ? 'green' : j.status === 'PARTS' ? 'gray' : '') + '" data-i="' + i + '">' + (busyJob ? 'Open' : 'Start') + '</button></div>';
-      }).join('') || '<p class="gs-empty">No jobs right now.</p>';
-    }
-    function addNames(j) { people.forEach(p => { if (j.techs.indexOf(p.name) < 0) j.techs.push(p.name); }); }
-    $('jobs').addEventListener('click', e => {
-      const b = e.target.closest('button[data-i]');
-      if (!b) return;
-      const j = jobs[Number(b.dataset.i)];
-      if (j.status !== 'WORKING' && j.status !== 'PARTS') { j.status = 'WORKING'; if (!j.startedAt) j.startedAt = new Date().toISOString(); addNames(j); queue('START', j); }
-      open = j; drawJob(); view('job'); drawJobs();
-    });
-
-    function drawJob() {
-      const j = open;
-      $('job-unit').textContent = j.unit;
-      $('job-label').textContent = j.source === 'OFFICE' ? 'Sent by the office:' : j.source === 'TECH' ? 'Reported at the garage:' : 'Driver wrote on the inspection:';
-      $('job-problem').textContent = j.problem || j.category;
-      $('job-now').textContent = j.status === 'PARTS' ? 'Waiting on parts' : j.techs.length ? 'Working now: ' + names(j.techs) + (j.startedAt ? ' · ' + elapsed(j.startedAt) : '') : '';
-      $('job-parts').innerHTML = j.status === 'PARTS' ? '&#9203; Parts are here' : '&#9203; Need Parts';
-      $('job-helper').hidden = people.length >= MAX_TECHS && people.every(p => j.techs.indexOf(p.name) >= 0);
-    }
-    $('job-parts').addEventListener('click', () => {
-      const j = open;
-      if (j.status === 'PARTS') { j.status = 'WORKING'; queue('RESUME', j); drawJob(); return; }
-      j.status = 'PARTS'; queue('PARTS', j); open = null; view('jobs'); jobs.sort((a, b) => (a.status === 'PARTS') - (b.status === 'PARTS')); drawJobs();
-    });
-    $('job-helper').addEventListener('click', () => {
-      const j = open, missing = people.filter(p => j.techs.indexOf(p.name) < 0);
-      if (missing.length) { addNames(j); queue('HELPER', j); drawJob(); return; }
-      helperFor = jobKey(j); picked = null; typed = ''; drawSign(); view('sign');
-    });
-    $('job-done').addEventListener('click', () => { fixPick = ''; $('fix-note').value = ''; $('fix-unit').textContent = open.unit + ' · Done'; drawFixes(); view('fix'); });
-    document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.go; if (v === 'jobs') { open = null; drawJobs(); } view(v); }));
-
-    /* ---------- Done ---------- */
+    /* ---------- Complete ---------- */
+    function startComplete() { fixPick = ''; $('fix-note').value = ''; $('fix-unit').textContent = open.unit + ' · Complete'; drawFixes(); view('fix'); }
     function drawFixes() { $('fixes').innerHTML = fixes.map(f => '<button type="button" class="gs-btn' + (f === fixPick ? ' pick-on' : '') + '" data-fix="' + escapeHtml(f) + '">' + escapeHtml(f) + '</button>').join(''); }
     $('fixes').addEventListener('click', e => {
       const b = e.target.closest('[data-fix]'); if (!b) return;
       fixPick = b.dataset.fix; safePick = null; clearSig();
-      $('safe-unit').textContent = open.unit + ' · Done';
-      $('safe-q').textContent = 'Is ' + open.unit + ' safe to drive?';
-      $('sign-line').textContent = people.length ? people[0].name + ', sign with your finger' : 'Sign with your finger';
+      $('safe-unit').textContent = open.unit + ' · Complete';
+      $('safe-q').textContent = 'Is ' + open.unit + ' safe to ' + (open.type === 'FORK_TRUCK' ? 'use' : 'drive') + '?';
+      $('sign-line').textContent = (finisher ? finisher.name + ', sign' : 'Sign') + ' with your finger';
       drawSafe(); view('safe');
     });
     function drawSafe() { document.querySelectorAll('[data-safe]').forEach(b => b.classList.toggle('pick-on', safePick !== null && (b.dataset.safe === 'yes') === safePick)); }
@@ -277,14 +308,20 @@
       const url = c.toDataURL('image/png');
       return url.length > 29000 && (scale || 1) > 0.2 ? smallSignature((scale || 1) / 2) : url;
     }
-    $('finish').addEventListener('click', () => {
+    $('finish').addEventListener('click', async () => {
       if (safePick === null) { message('Tap Yes or No for "Safe to drive?".'); return; }
       if (!inked) { message('Sign with your finger in the box.'); return; }
-      message('');
-      const j = open;
-      queue('DONE', j, { fixed: fixPick, note: $('fix-note').value.trim(), safe: safePick, signature: smallSignature() });
-      if (safePick) jobs = jobs.filter(x => x !== j); else { j.status = 'WORKING'; j.canRun = false; }
-      open = null; view('jobs'); drawJobs();
+      if (busy) return;
+      const j = open, who = finisher;
+      busy = true; message('Saving…', true);
+      try {
+        // A write-up nobody started becomes its work order first.
+        if (!j.id) j.id = (await call('step', { tokens: [who.token], step: 'START', writeUp: j.writeUp, requestId: rid() })).job.id;
+        await call('step', { tokens: [who.token], step: 'DONE', id: j.id, requestId: rid(), fixed: fixPick, note: $('fix-note').value.trim(), safe: safePick, signature: smallSignature() });
+        message(safePick ? j.unit + ' completed by ' + who.name + '.' : j.unit + ' stays open: not safe yet.', true);
+        open = null; finisher = null; view('jobs');
+        await load();
+      } catch (err) { message(err.message); } finally { busy = false; signOut(who && who.token); }
     });
 
     /* ---------- Report a Problem ---------- */
@@ -310,7 +347,7 @@
       $('cats').innerHTML = categories.map(c => '<button type="button" class="gs-btn' + (c === catPick ? ' pick-on' : '') + '" data-cat="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>').join('');
       document.querySelectorAll('[data-run]').forEach(b => b.classList.toggle('pick-on', runPick !== null && (b.dataset.run === 'yes') === runPick));
     }
-    $('to-report').addEventListener('click', () => { unitTyped = ''; unitPick = ''; catPick = ''; runPick = null; $('report-note').value = ''; drawReport(); view('report'); });
+    $('to-report').addEventListener('click', () => { unitTyped = ''; unitPick = ''; catPick = ''; runPick = null; $('report-note').value = ''; message(''); drawReport(); view('report'); });
     $('unit-keys').addEventListener('click', e => {
       const b = e.target.closest('[data-k]'); if (!b) return;
       const k = b.dataset.k;
@@ -326,48 +363,43 @@
       if (!unitPick) { message('Type the truck or trailer number.'); return; }
       if (!catPick) { message('Tap what\'s wrong.'); return; }
       if (runPick === null) { message('Tap Yes or No for "Can it run?".'); return; }
-      message('');
-      const note = $('report-note').value.trim();
-      const job = { id: '', unit: unitPick, type: /^T-/.test(unitPick) ? 'TRAILER' : 'TRUCK', problem: note ? catPick + ': ' + note : catPick, category: catPick, canRun: runPick, source: 'TECH', status: 'NEW', techs: [], createdAt: new Date().toISOString() };
-      jobs.unshift(job);
-      queue('REPORT', job, { unit: unitPick, category: catPick, canRun: runPick, problem: note });
-      view('jobs'); drawJobs();
+      reportDraft = { unit: unitPick, category: catPick, canRun: runPick, problem: $('report-note').value.trim() };
+      ask('report', null);
     });
-
-    /* ---------- saves: one after another, in the background ---------- */
-    let chain = Promise.resolve();
-    const rid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
-    function queue(op, job, extra) {
-      const requestId = rid();
-      chain = chain.then(async () => {
-        try {
-          const r = await call('step', Object.assign({ step: op, id: job.id, writeUp: job.id ? '' : job.writeUp, requestId }, extra || {}));
-          if (r.job && r.job.id) job.id = r.job.id;
-          if (r.warning) message(r.warning);
-        } catch (err) { message(err.message); await load().catch(() => {}); }
-      });
-      return chain;
+    async function sendReport(who) {
+      busy = true; message('Saving…', true);
+      try {
+        const r = await call('step', Object.assign({ tokens: [who.token], step: 'REPORT', requestId: rid() }, reportDraft));
+        message(r.job.unit + ' is on the work orders.', true);
+        reportDraft = null; view('jobs'); await load();
+      } catch (err) { message(err.message); view('report'); }
+      finally { busy = false; signOut(who.token); }
     }
+
+    const rid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
 
     // Back (menu): one step at a time on this screen first.
     window.udBack = () => {
       const v = shownView();
       if (v === 'safe') { view('fix'); return true; }
       if (v === 'fix') { view('job'); return true; }
+      if (v === 'sign') { cancelSign(); return true; }
       if (v === 'job' || v === 'report') { open = null; view('jobs'); drawJobs(); return true; }
-      if (v === 'sign' && helperFor) { $('helper-cancel').click(); return true; }
       return false;
     };
-    // Idle: 30 minutes with nothing touched signs everyone out and shows the names again.
+    $('go-back').addEventListener('click', goBack);
+    $('go-home').addEventListener('click', () => { location.href = 'index.html'; });
     ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { lastTouch = Date.now(); }, true));
+    // The clocks tick every 30 seconds; the list comes back fresh every 30 seconds while nobody is typing a login ID.
     setInterval(() => {
-      if (people.length && Date.now() - lastTouch > IDLE_MS) { signOutAll(true); message('You were signed out. Tap your name and enter your login ID.'); return; }
-      if (shownView() === 'jobs') drawJobs(); else if (shownView() === 'job' && open) drawJob();
-    }, 60000);
-    // The list comes back fresh every 2 minutes while the jobs show (what the office sent, the other tablet's work).
-    setInterval(() => { if (people.length && shownView() === 'jobs' && Date.now() - lastTouch > 10000) load().catch(() => {}); }, 120000);
+      if (ready && Date.now() > ready.until) { signOut(ready.token); ready = null; }
+      const v = shownView();
+      if (v === 'jobs' || v === 'job') {
+        if (Date.now() - lastTouch > 5000 && !busy) load().catch(() => {}); else { drawJobs(); if (open && v === 'job') drawJob(); }
+      }
+    }, 30000);
 
-    view('sign'); drawSign();
+    view('jobs');
     load().catch(err => message(err.message));
   </script>
 </body>

@@ -69,3 +69,11 @@ test('a driver who is off that day or a down unit needs OVR; Down Trucks takes t
   await applyAction(db(), DISPATCHER, { action: 'setUnitUp', requestId: rid(), equipmentId: 'veh_truck_900002' });
   await applyAction(db(), DISPATCHER, { action: 'assignTruck', requestId: rid(), runDocId: RUN, day: 'tue', equipmentId: 'veh_truck_900002' });
 });
+
+test('Down Trucks: the reason is optional and the reply lists the routes the unit was taken off (Joe 10/11, review item 9)', async () => {
+  const out = await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_truck_900002', reason: '', today: '2026-10-06' });
+  assert.deepEqual(out.taken.map(t => [t.route, t.date]), [['801', '2026-10-06'], ['801', '2026-10-13']]);
+  const unit = (await db().collection('equipment').doc('veh_truck_900002').get()).data();
+  assert.equal(unit.status, 'DOWN');
+  assert.equal(unit.notes, 'DOWN');
+});

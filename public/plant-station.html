@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="css/stations.css">
   <script src="js/logic.js"></script>
 </head>
-<body class="fill ps-page">
+<body class="phone ps-page">
   <div class="signin" id="signin" hidden>
     <h1>Plant Station</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -21,15 +21,17 @@
   </div>
 
   <div id="screen" hidden>
-    <div class="topbar">
-      <span class="who" id="who"></span>
-      <button id="signout" type="button">Sign out</button>
-    </div>
-    <div class="head">
-      <div class="title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
+    <!-- Joe 10/10: the Plant Station is a tablet screen, like the drivers' phone page: a slim header, no desktop menu. -->
+    <header class="topbar" id="ps-top">
+      <button type="button" id="go-back" title="Back one screen">&#8249; Back</button>
+      <button type="button" id="go-home" title="Home">Home</button>
+      <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Plant Station</strong></span>
       <span class="ps-pill" id="pill" hidden>Uniontown</span>
-      <button type="button" id="change" data-top hidden>Change Station</button>
-    </div>
+      <button type="button" id="change" hidden>Change Station</button>
+      <span class="who" id="who"></span>
+      <button type="button" id="signout">Sign out</button>
+    </header>
+    <div class="ps-title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
       <section id="pick">
@@ -39,12 +41,20 @@
       <section id="station" hidden>
         <div class="ps-tabs" id="tabs"></div>
         <p class="ps-foot" id="foot"></p>
+        <!-- Administration > Plant Station Codes: once a plant has a manager release code, Change Station asks for it. -->
+        <form class="ps-release" id="release" hidden>
+          <p>A manager must type the manager release code to change this tablet's station.</p>
+          <label>Manager release code <input id="release-code" maxlength="48" autocomplete="off" autocapitalize="characters"></label>
+          <button type="submit" id="release-go">RELEASE THIS STATION</button>
+          <button type="button" id="release-cancel">CANCEL</button>
+          <span class="ps-release-msg" id="release-msg"></span>
+        </form>
       </section>
     </div>
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, goBack, callServer } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -99,7 +109,25 @@
       if (!b) return;
       stationId = b.dataset.station; write(stationId); render();
     });
-    document.getElementById('change').addEventListener('click', () => { stationId = ''; write(''); history.replaceState(null, '', location.pathname); render(); });
+    document.getElementById('go-back').addEventListener('click', goBack);
+    document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
+    const leave = () => { stationId = ''; write(''); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true; render(); };
+    const releaseBox = document.getElementById('release'), releaseMsg = document.getElementById('release-msg');
+    document.getElementById('change').addEventListener('click', async () => {
+      let required = false;
+      try { required = (await callServer('stationRelease', { op: 'status', facilityId: 'fac_uniontown' })).required; } catch (err) { /* no answer: as before, no code */ }
+      if (!required) { leave(); return; }
+      releaseBox.hidden = false; releaseMsg.textContent = ''; document.getElementById('release-code').value = ''; document.getElementById('release-code').focus();
+    });
+    document.getElementById('release-cancel').addEventListener('click', () => { releaseBox.hidden = true; });
+    releaseBox.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      releaseMsg.textContent = 'Checking…';
+      try {
+        const out = await callServer('stationRelease', { op: 'release', facilityId: 'fac_uniontown', code: document.getElementById('release-code').value });
+        if (out.ok) leave(); else releaseMsg.textContent = out.message;
+      } catch (err) { releaseMsg.textContent = String(err.message || err); }
+    });
 
     requireSignIn(async () => {
       const { db } = await start();

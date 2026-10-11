@@ -37,6 +37,23 @@
   function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(text(p.status).toUpperCase()) < 0; }
   function pickupLine(p) { var what = [text(p.quantity), text(p.item)].filter(Boolean).join(' '); return (what + (text(p.notes) ? (what ? ' - ' : '') + text(p.notes) : '')) || 'Pickup'; }
 
+  // Joe 10/10: the Driver Room board and the phone's View Loadout show what the plant loads on this operating day (the same
+  // loads as the Loadout Center): Saturday's board is Saturday's loadout (Sunday and Monday deliveries), not Saturday's deliveries.
+  // runs = run documents of the delivery weeks (this week and next), each with its id.
+  function loadoutBoardRows(runs, pickups, loadDate) {
+    var rows = [];
+    (runs || []).forEach(function (run) {
+      if (!L.liveFlagShown(run, 'displayMobileRoute', 'mobile')) return;
+      L.loadBlocksFor(run, loadDate).forEach(function (b) {
+        boardRows([run], pickups, b.deliveryDate).forEach(function (r) { r.deliveryDate = b.deliveryDate; rows.push(r); });
+      });
+    });
+    return rows.sort(function (a, b) {
+      return (Number(a.sequence == null || a.sequence === '' ? 999999 : a.sequence) - Number(b.sequence == null || b.sequence === '' ? 999999 : b.sequence)) ||
+        a.deliveryDate.localeCompare(b.deliveryDate) || a.route.localeCompare(b.route, undefined, { numeric: true }) || a.run.localeCompare(b.run, undefined, { numeric: true });
+    });
+  }
+
   // The board for one day. runs = run documents (each with its id), pickups = the pickups list.
   function boardRows(runs, pickups, date) {
     var p = L.dayPrefix(date), week = L.weekStart(date), rows = [];
@@ -87,6 +104,6 @@
     return { weekStart: week, dates: dates, rows: list };
   }
 
-  return { calendarDay: calendarDay, boardState: boardState, STATE_TEXT: STATE_TEXT, boardRows: boardRows, remaining: remaining, weeklySchedule: weeklySchedule,
+  return { calendarDay: calendarDay, boardState: boardState, STATE_TEXT: STATE_TEXT, boardRows: boardRows, loadoutBoardRows: loadoutBoardRows, remaining: remaining, weeklySchedule: weeklySchedule,
     routeNumber: routeNumber, trailerText: trailerText, pickupOpen: pickupOpen, pickupLine: pickupLine };
 });

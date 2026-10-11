@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <!-- Joe 10/11: saved to the home screen from here, the "UD Routes" icon opens this page (the driver's name stays on the phone). -->
+  <link rel="manifest" href="route.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="UD Routes">
   <meta name="theme-color" content="#0b4f8a">
   <title>Route Check-In</title>
   <link rel="stylesheet" href="css/app.css">
@@ -23,11 +28,13 @@
   </form>
 
   <!-- 2. The driver picks their name once. -->
+  <!-- 2. Who is driving: a driver, a fill-in or carrier name on today's dispatch, or a route instead of a name; or Skip. -->
   <form class="phone-card" id="step-name" hidden>
-    <h1>Who are you?</h1>
-    <label for="name">Your name</label>
+    <h1>Who is driving?</h1>
+    <label for="name">Your name, or your route</label>
     <select id="name"></select>
     <button type="submit" class="primary">That's me</button>
+    <button type="button" id="skip">Skip</button>
   </form>
 
   <!-- 3. Today's loads (or yesterday's) and the Check-In for one. -->
@@ -41,16 +48,34 @@
 
   <form class="phone-card" id="step-form" hidden>
     <h1 id="form-title"></h1>
+    <!-- The units the driver had: fix a wrong truck or trailer (a short number finds the unit, any number is taken), the pallet jack. -->
+    <div class="ci-units">
+      <label>Truck<input name="truck" list="dl-trucks" maxlength="40" autocapitalize="characters" autocomplete="off"></label>
+      <label><span class="ci-t1">Trailer</span><input name="trailer" list="dl-trailers" maxlength="20" autocapitalize="characters" autocomplete="off"></label>
+      <label>Pallet jack<input name="palletJack" list="dl-jacks" maxlength="40" autocapitalize="characters" autocomplete="off"></label>
+    </div>
+    <div id="ci-more"></div>
+    <button type="button" id="ci-add" class="ci-link">+ Add trailer (drop and hook)</button>
+    <datalist id="dl-trucks"></datalist><datalist id="dl-trailers"></datalist><datalist id="dl-jacks"></datalist>
     <div class="phone-grid">
       <label>Cases delivered<input name="casesDelivered" inputmode="numeric" pattern="[0-9]*"></label>
       <label>Cases returned<input name="driverCaseReturn" inputmode="numeric" pattern="[0-9]*"></label>
-      <label class="wide">Refused / returned product<input name="refusedReturned" maxlength="200" placeholder="e.g. 2 cs 2% gal"></label>
-      <label class="wide">Which store<input name="refusedReturnedSource" maxlength="200"></label>
-      <label class="wide">Truck problems<input name="tractorIssues" maxlength="300"></label>
-      <label class="wide">Trailer problems<input name="trailerIssues" maxlength="300"></label>
-      <label class="wide">Pallet jack problems<input name="palletJackIssues" maxlength="300"></label>
-      <label class="check wide"><input type="checkbox" name="trailerNeedsCleaned"> Trailer needs cleaned</label>
-      <label class="wide">Notes<input name="checkinNotes" maxlength="500"></label>
+      <div class="ci-os wide">
+        <label class="check"><input type="checkbox" name="overageShortage"> Overage / shortage</label>
+        <div class="ci-os-box" hidden>
+          <div class="ci-seg" role="radiogroup" aria-label="Over or short"><label><input type="radio" name="osKind" value="SHORT" checked><span>Short</span></label><label><input type="radio" name="osKind" value="OVER"><span>Over</span></label></div>
+          <label>Cases<input name="osCases" inputmode="numeric" pattern="[0-9]*" maxlength="5"></label>
+          <label class="ci-wide">Product<input name="osProduct" maxlength="120" placeholder="e.g. 2% gallon" data-voice></label>
+          <label class="ci-wide">Which store<input name="osStore" maxlength="120" data-voice></label>
+        </div>
+      </div>
+      <label class="wide">Refused / returned product<input name="refusedReturned" maxlength="200" placeholder="e.g. 2 cs 2% gal" data-voice></label>
+      <label class="wide">Which store<input name="refusedReturnedSource" maxlength="200" data-voice></label>
+      <label class="wide">Truck problems<input name="tractorIssues" maxlength="300" data-voice></label>
+      <label class="wide"><span><span class="ci-t1">Trailer</span> problems</span><input name="trailerIssues" maxlength="300" data-voice></label>
+      <label class="wide">Pallet jack problems<input name="palletJackIssues" maxlength="300" data-voice></label>
+      <label class="check wide"><input type="checkbox" name="trailerNeedsCleaned"> <span><span class="ci-t1">Trailer</span> needs cleaned</span></label>
+      <label class="wide">Notes<input name="checkinNotes" maxlength="500" data-voice></label>
     </div>
     <div class="phone-buttons"><button type="button" id="back">Back</button><button type="submit" class="primary" id="send">Check In</button></div>
   </form>
@@ -75,13 +100,13 @@
     </div>
     <div class="drv-cols">
       <div class="drv-col truck"><h2>Truck inspection</h2><label>Truck number<input id="dv-truck" required maxlength="60" class="drv-unit"></label><div id="dv-truck-items"></div>
-        <label>Tractor write-up<textarea id="dv-tractor" rows="2" maxlength="1500" placeholder="Describe tractor defects and their location"></textarea></label></div>
+        <label>Tractor write-up<textarea id="dv-tractor" data-voice rows="2" maxlength="1500" placeholder="Describe tractor defects and their location"></textarea></label></div>
       <div class="drv-col trailer" data-trailer="1"><h2>Trailer inspection</h2><label>Trailer number<input class="dv-trailer drv-unit" maxlength="20" placeholder="T-" autocapitalize="characters"></label><div class="dv-items"></div>
-        <label>Trailer write-up<textarea class="dv-issues" rows="2" maxlength="1500" placeholder="Describe trailer defects and their location"></textarea></label></div>
+        <label>Trailer write-up<textarea class="dv-issues" data-voice rows="2" maxlength="1500" placeholder="Describe trailer defects and their location"></textarea></label></div>
     </div>
     <div id="dv-extra"></div>
     <div class="drv-add"><button type="button" id="dv-add">+ Add trailer inspection</button><p class="drv-hint">One trailer per box. Drop and hook: add an inspection for each extra trailer, in order. Each trailer is saved as its own inspection record.</p></div>
-    <label>Additional notes<textarea id="dv-notes" rows="2" maxlength="1500"></textarea></label>
+    <label>Additional notes<textarea id="dv-notes" data-voice rows="2" maxlength="1500"></textarea></label>
     <div class="drv-sign"><div class="drv-head"><h2>Driver signature</h2><button type="button" id="dv-clear">Clear signature</button></div>
       <label>Driver name<input id="dv-name" required maxlength="150"></label>
       <p class="drv-hint">Sign below with your finger, stylus or mouse.</p>
@@ -95,18 +120,21 @@
   <script type="module">
     import { start, escapeHtml, shortDate, showError } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+    import { addSpeak } from './js/speak.js';
 
     // Kept on the phone (the code and the name); the page works without it, it just asks again.
     const store = {
       get(k) { try { return localStorage.getItem('udRoute.' + k) || ''; } catch (e) { return ''; } },
       set(k, v) { try { if (v) localStorage.setItem('udRoute.' + k, v); else localStorage.removeItem('udRoute.' + k); } catch (e) {} }
     };
-    let code = store.get('code'), driverId = store.get('driverId'), driverName = store.get('driverName'), date = '', dates = [], loads = [], open = null;
+    let code = store.get('code'), driverId = store.get('driverId'), driverName = store.get('driverName'), date = '', dates = [], loads = [], open = null, units = { trucks: [], trailers: [], jacks: [] };
 
     async function call(op, fields) {
       const { functions } = await start();
       try { return (await httpsCallable(functions, 'phone')(Object.assign({ code, op }, fields || {}))).data; }
       catch (e) {
+        // A plain sentence for the driver, without the server's status number on the end.
+        e.message = String(e.message || e).replace(/\s*\[\d{3}\]\s*$/, '');
         if (/code is not right|not turned on/.test(e.message)) { code = ''; store.set('code', ''); show(); }
         if (/Pick your name/.test(e.message)) { driverId = ''; store.set('driverId', ''); show(); }
         throw e;
@@ -120,16 +148,20 @@
       document.getElementById('change').hidden = !driverId;
       if (!code) return step('step-code');
       if (!driverId) {
-        const r = await call('roster');
-        document.getElementById('name').innerHTML = '<option value="">Pick your name</option>' + r.drivers.map(d => '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(d.name) + '</option>').join('');
+        const r = await call('roster'), opt = (v, t) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>';
+        document.getElementById('name').innerHTML = '<option value="">Pick your name</option>' + r.drivers.map(d => opt(d.id, d.name)).join('') +
+          ((r.others || []).length ? '<optgroup label="Fill-in and carriers">' + r.others.map(n => opt('name:' + n, n)).join('') + '</optgroup>' : '') +
+          ((r.routes || []).length ? '<optgroup label="Or choose your route">' + r.routes.map(x => opt(x.id, 'Route ' + x.name)).join('') + '</optgroup>' : '');
         return step('step-name');
       }
       const r = await call('loads', { driverId, date });
       date = r.date; dates = r.dates; loads = r.loads; driverName = r.driver; store.set('driverName', driverName);
+      if (r.units) { const dl = (id, list) => { document.getElementById(id).innerHTML = list.map(u => '<option value="' + escapeHtml(u) + '">').join(''); }; units = r.units; dl('dl-trucks', units.trucks); dl('dl-trailers', units.trailers); dl('dl-jacks', units.jacks); }
       document.getElementById('who').textContent = driverName;
       document.getElementById('days').innerHTML = dates.map((d, i) => '<button type="button" data-date="' + d + '" class="' + (d === date ? 'on' : '') + '">' + (i ? 'Yesterday ' : 'Today ') + escapeHtml(shortDate(d)) + '</button>').join('');
-      document.getElementById('loads').innerHTML = loads.map((l, i) => '<button type="button" class="phone-load' + (l.checkinCompletedAt ? ' done' : '') + '" data-i="' + i + '"><b>' + escapeHtml(l.route) + '</b> ' + escapeHtml(l.run) +
-        '<small>' + escapeHtml([l.truck && 'Truck ' + l.truck, l.trailer && 'Trailer ' + l.trailer].filter(Boolean).join(' · ')) + '</small><span>' + (l.checkinCompletedAt ? 'Checked in' : 'Check In') + '</span></button>').join('') ||
+      const skip = driverId === 'skip';
+      document.getElementById('loads').innerHTML = (skip && loads.length ? '<p class="phone-empty">Pick your route to check in.</p>' : '') + loads.map((l, i) => '<button type="button" class="phone-load' + (l.checkinCompletedAt ? ' done' : '') + '" data-i="' + i + '"><b>' + escapeHtml(l.route) + '</b> ' + escapeHtml(l.run) +
+        '<small>' + escapeHtml([skip && l.driver, (l.checkinTruck || l.truck) && 'Truck ' + (l.checkinTruck || l.truck), (l.checkinTrailer || l.trailer) && 'Trailer ' + (l.checkinTrailer || l.trailer)].filter(Boolean).join(' · ')) + '</small><span>' + (l.checkinCompletedAt ? 'Checked in' : 'Check In') + '</span></button>').join('') ||
         '<p class="phone-empty">Dispatch has no load for you on this day.</p>';
       step(open === null ? 'step-loads' : 'step-form');
     }
@@ -139,7 +171,61 @@
       document.getElementById('form-title').textContent = l.route + ' ' + l.run;
       ['casesDelivered', 'driverCaseReturn', 'refusedReturned', 'refusedReturnedSource', 'tractorIssues', 'trailerIssues', 'palletJackIssues', 'checkinNotes'].forEach(k => { f.elements[k].value = l[k] === null || l[k] === undefined ? '' : l[k]; });
       f.elements.trailerNeedsCleaned.checked = !!l.trailerNeedsCleaned;
+      // The units: what the driver said before, else Dispatch's (a "T-101/T-102" trailer cell is two trailers).
+      const t = String(l.trailer || '').split(/[\/,;&+]+/).map(x => x.trim().toUpperCase()).filter(Boolean);
+      f.elements.truck.value = l.checkinTruck || l.truck || '';
+      f.elements.trailer.value = l.checkinTrailer || t[0] || '';
+      f.elements.palletJack.value = l.palletJack || '';
+      ciMore.innerHTML = '';
+      (l.moreTrailers && l.moreTrailers.length ? l.moreTrailers : t.slice(1, 4).map(x => ({ trailer: x }))).forEach(m => addCiTrailer(m));
+      ciLayout();
+      // Over / short: "SHORT 2 cs · 2% gallon · Store: ..." is taken apart again.
+      const os = /^(OVER|SHORT)\b(?:\s+(\d+)\s*cs)?(?:\s*·\s*(?!Store:)([^·]*?))?(?:\s*·\s*Store:\s*(.*))?$/i.exec(l.overageShortageDetails || '');
+      f.elements.overageShortage.checked = !!l.overageShortage;
+      f.querySelector('[name=osKind][value="' + (os ? os[1].toUpperCase() : 'SHORT') + '"]').checked = true;
+      f.elements.osCases.value = os && os[2] || '';
+      f.elements.osProduct.value = os ? os[3] || '' : l.overageShortageDetails || '';
+      f.elements.osStore.value = os && os[4] || '';
+      osShow();
     }
+
+    /* ---------- Check-In: units, drop and hook, over / short ---------- */
+    const ciForm = document.getElementById('step-form'), ciMore = document.getElementById('ci-more');
+    function addCiTrailer(m) {
+      if (ciMore.children.length >= 3) return null;
+      const d = document.createElement('div');
+      d.className = 'ci-trailer';
+      d.innerHTML = '<div class="ci-trailer-head"><label><span class="ci-tn"></span><input class="ci-tr" list="dl-trailers" maxlength="20" autocapitalize="characters" autocomplete="off"></label><button type="button" class="ci-remove">Remove</button></div>' +
+        '<label>Problems<input class="ci-tr-issues" maxlength="300" data-voice></label><label class="check"><input type="checkbox" class="ci-tr-clean"> Needs cleaned</label>';
+      d.querySelector('.ci-tr').value = (m && m.trailer) || '';
+      d.querySelector('.ci-tr-issues').value = (m && m.issues) || '';
+      d.querySelector('.ci-tr-clean').checked = !!(m && m.needsCleaned);
+      ciMore.appendChild(d);
+      addSpeak(d);
+      return d;
+    }
+    function ciLayout() {
+      const n = ciMore.children.length;
+      [...ciMore.children].forEach((d, i) => { d.querySelector('.ci-tn').textContent = 'Trailer ' + (i + 2) + (i === n - 1 ? ' (brought back)' : ''); });
+      ciForm.querySelectorAll('.ci-t1').forEach(x => { x.textContent = n ? 'Trailer 1' : 'Trailer'; });
+      document.getElementById('ci-add').hidden = n >= 3;
+    }
+    document.getElementById('ci-add').addEventListener('click', () => { const d = addCiTrailer(); ciLayout(); if (d) d.querySelector('.ci-tr').focus(); });
+    ciMore.addEventListener('click', e => { if (e.target.closest('.ci-remove')) { e.target.closest('.ci-trailer').remove(); ciLayout(); } });
+    // A short number finds the unit (the one unit whose number ends in it); anything else stays as typed.
+    const findUnit = (v, list) => { const t = String(v || '').trim().toUpperCase(); if (!/^\d{1,4}$/.test(t)) return t; const want = t.replace(/^0+(?=\d)/, ''); const hits = list.filter(u => { const n = u.replace(/^T\s*-?\s*/, '').replace(/^0+(?=\d)/, ''); return n === want || (n.length > want.length && n.endsWith(want.length < 3 ? want.padStart(3, '0') : want)); }); return hits.length === 1 ? hits[0] : t; };
+    ciForm.addEventListener('change', e => {
+      const el = e.target, list = el.name === 'truck' ? units.trucks : el.name === 'palletJack' ? units.jacks : el.name === 'trailer' || el.classList.contains('ci-tr') ? units.trailers : null;
+      if (list) el.value = findUnit(el.value, list);
+    });
+    function osShow() { ciForm.querySelector('.ci-os-box').hidden = !ciForm.elements.overageShortage.checked; }
+    ciForm.elements.overageShortage.addEventListener('change', () => { osShow(); if (!ciForm.elements.overageShortage.checked) ['osCases', 'osProduct', 'osStore'].forEach(k => { ciForm.elements[k].value = ''; }); });
+    function osText() {
+      const f = ciForm, cases = f.elements.osCases.value.trim(), product = f.elements.osProduct.value.trim(), storeName = f.elements.osStore.value.trim();
+      if (!f.elements.overageShortage.checked) return '';
+      return [f.querySelector('[name=osKind]:checked').value + (cases ? ' ' + cases + ' cs' : ''), product, storeName && 'Store: ' + storeName].filter(Boolean).join(' · ');
+    }
+    addSpeak(ciForm);
 
     const run = (fn) => async (e) => { if (e) e.preventDefault(); showError(''); try { await fn(e); } catch (err) { showError(err.message); } };
     document.getElementById('step-code').addEventListener('submit', run(async () => {
@@ -155,6 +241,7 @@
       store.set('driverId', driverId); store.set('driverName', driverName);
       await show();
     }));
+    document.getElementById('skip').addEventListener('click', run(async () => { driverId = 'skip'; driverName = ''; store.set('driverId', driverId); await show(); }));
     document.getElementById('change').addEventListener('click', run(async () => { driverId = ''; store.set('driverId', ''); open = null; await show(); }));
     document.getElementById('days').addEventListener('click', run(async (e) => { const b = e.target.closest('[data-date]'); if (b) { date = b.dataset.date; await show(); } }));
     document.getElementById('loads').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; open = Number(b.dataset.i); fillForm(loads[open]); step('step-form'); });
@@ -163,6 +250,9 @@
       const f = document.getElementById('step-form'), l = loads[open], fields = {};
       ['casesDelivered', 'driverCaseReturn', 'refusedReturned', 'refusedReturnedSource', 'tractorIssues', 'trailerIssues', 'palletJackIssues', 'checkinNotes'].forEach(k => { fields[k] = f.elements[k].value.trim(); });
       fields.trailerNeedsCleaned = f.elements.trailerNeedsCleaned.checked;
+      fields.overageShortage = f.elements.overageShortage.checked; fields.overageShortageDetails = osText();
+      fields.truck = f.elements.truck.value.trim(); fields.trailer = f.elements.trailer.value.trim(); fields.palletJack = f.elements.palletJack.value.trim();
+      fields.moreTrailers = [...ciMore.children].map(d => ({ trailer: d.querySelector('.ci-tr').value.trim(), issues: d.querySelector('.ci-tr-issues').value.trim(), needsCleaned: d.querySelector('.ci-tr-clean').checked }));
       const requestId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
       const btn = document.getElementById('send');
       btn.disabled = true;
@@ -210,6 +300,7 @@
     const $ = (id) => document.getElementById(id), form = $('step-dvir');
     const pick = (label) => '<label>' + escapeHtml(label) + '<select required><option value="">Select…</option>' + RESULTS.map(r => '<option>' + r + '</option>').join('') + '</select></label>';
     $('dv-truck-items').innerHTML = TRUCK_ITEMS.map(pick).join('');
+    addSpeak(form);
     form.querySelector('[data-trailer="1"] .dv-items').innerHTML = TRAILER_ITEMS.map(pick).join('');
     let dvRequest = '', reviewed = false, dvLoads = [], inked = false, saved = false;
     const sigKey = 'udRoute.signature';
@@ -217,11 +308,11 @@
       const d = document.createElement('div');
       d.className = 'drv-col trailer extra'; d.dataset.trailer = String(n);
       d.innerHTML = '<h2>Trailer ' + n + ' inspection</h2><label>Trailer number<input class="dv-trailer drv-unit" required maxlength="20" placeholder="T-" autocapitalize="characters"></label><div class="dv-items">' + TRAILER_ITEMS.map(pick).join('') + '</div>' +
-        '<label>Trailer write-up<textarea class="dv-issues" rows="2" maxlength="1500" placeholder="Describe trailer defects and their location"></textarea></label><button type="button" class="dv-remove">Remove this trailer</button>';
+        '<label>Trailer write-up<textarea class="dv-issues" data-voice rows="2" maxlength="1500" placeholder="Describe trailer defects and their location"></textarea></label><button type="button" class="dv-remove">Remove this trailer</button>';
       return d;
     }
     function renumber() { [...$('dv-extra').children].forEach((d, i) => { d.dataset.trailer = String(i + 2); d.querySelector('h2').textContent = 'Trailer ' + (i + 2) + ' inspection'; }); $('dv-add').hidden = $('dv-extra').children.length >= 3; }
-    function addTrailer(value) { if ($('dv-extra').children.length >= 3) return null; const d = extraBox($('dv-extra').children.length + 2); $('dv-extra').appendChild(d); if (value) d.querySelector('.dv-trailer').value = value; renumber(); return d; }
+    function addTrailer(value) { if ($('dv-extra').children.length >= 3) return null; const d = extraBox($('dv-extra').children.length + 2); $('dv-extra').appendChild(d); addSpeak(d); if (value) d.querySelector('.dv-trailer').value = value; renumber(); return d; }
     $('dv-add').addEventListener('click', () => addTrailer());
     $('dv-extra').addEventListener('click', e => { if (e.target.closest('.dv-remove')) { e.target.closest('.extra').remove(); renumber(); unreview(); } });
     // One trailer per box: a / , ; & + ends the trailer and moves the rest to the next box (4 trailers at most).

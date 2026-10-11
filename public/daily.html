@@ -98,10 +98,11 @@
     <h2 id="down-title">Down Trucks / Trailers</h2>
     <div class="down-add">
       <label>Truck / Trailer<input id="down-unit" list="down-units" maxlength="20" autocomplete="off" placeholder="Unit #"></label>
-      <label>Reason<input id="down-reason" maxlength="120" placeholder="Why is it down?"></label>
+      <label>Reason (optional)<input id="down-reason" maxlength="120" placeholder="Why is it down?"></label>
       <button type="button" class="warn" id="down-add">Add</button>
     </div>
     <datalist id="down-units"></datalist>
+    <div class="down-msg" id="down-message" role="status" hidden></div>
     <div class="down-list"><table><thead><tr><th>Unit</th><th>Type</th><th>Reason</th><th>Since</th><th></th></tr></thead><tbody id="down-rows"></tbody></table></div>
     <div class="modal-actions"><button type="button" data-close>Close</button></div>
   </section>
@@ -109,8 +110,10 @@
   <div id="print" aria-hidden="true"></div>
 
   <script type="module">
+    import { printSaved } from './js/print-sheet.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, canReorder, openPicker, openNote, optionsHtml, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { bindDailyKeys, keepCursor } from './js/daily-keys.js';
     forScreen('dailyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
@@ -125,21 +128,43 @@
     // Like the current Daily Dispatch: the Loadout Day list runs Saturday to Friday (the Saturday loadout delivers into the next week),
     // and Week Beginning shows that week's Sunday.
     const weekBegin = (key) => L.addDays(key, -((L.DAYS.indexOf(L.dayPrefix(key)) + 1) % 7));
+    // Joe 10/11: Delivery Day shows one day, by the plant's procedure: Saturday's loadout shows Monday, Sunday's shows Sunday,
+    // every other day the next day. The table's day bands still show each load's own delivery date.
+    const deliveryDayName = (key) => { const i = L.DAYS.indexOf(L.dayPrefix(key)); return L.DAY_NAMES[i === 6 ? 1 : i === 0 ? 0 : i + 1]; };
     const show = (v) => v === null || v === undefined ? '' : String(v);
     const departText = (r) => L.timeText(r.dispatchTime !== null && r.dispatchTime !== undefined ? r.dispatchTime : r.startTime);
     const coverageName = (r) => r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '';
+    // Carrier or a branch (Fairmont, Martins Ferry...) in the driver column: no tractor goes, so Truck shows N/A (current app).
+    const noTractor = (r) => !!coverageName(r) || (!r.driverId && !!r.driver && (/^CARRIER$/i.test(r.driver) || cvgOptions().some(o => o.text.toUpperCase() === String(r.driver).toUpperCase())));
 
     function cell(value, extra, edit) {
       const text = show(value);
-      return '<td class="' + (extra || '') + (text ? '' : ' empty') + (edit ? ' editable' : '') + '"' + (edit ? ' data-edit="' + edit + '"' : '') + ' title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</td>';
+      return '<td class="' + (extra || '') + (text ? '' : ' empty') + (edit ? ' editable' : '') + '"' + (edit ? ' data-edit="' + edit + '" tabindex="0"' : '') + ' title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</td>';
+    }
+
+    /*
+     * Current app 7.0.226 / 7.0.230: the Saturday sheet also shows the Sunday-loaded rows. Each delivery day is one block;
+     * inside a block that holds loads from both days, "LOADED SATURDAY" / "LOADED SUNDAY" lines split them.
+     */
+    const isSaturday = (key) => L.dayPrefix(key) === 'sat';
+    function sheetRows() {
+      const list = isSaturday(loadDate) ? L.dailyRows(runs, loadDate).concat(L.dailyRows(runs, L.addDays(loadDate, 1))) : L.dailyRows(runs, loadDate);
+      return list.map((r, i) => ({ r, i })).sort((a, b) => (a.r.deliveryDate < b.r.deliveryDate ? -1 : a.r.deliveryDate > b.r.deliveryDate ? 1 : 0)
+        || (a.r.loadDate < b.r.loadDate ? -1 : a.r.loadDate > b.r.loadDate ? 1 : 0) || a.i - b.i).map(x => x.r);
+    }
+    // Delivery days whose block holds loads from more than one load day.
+    function mixedLoads(list) {
+      const days = {};
+      list.forEach(r => { (days[r.deliveryDate] = days[r.deliveryDate] || new Set()).add(r.loadDate); });
+      return (d) => !!days[d] && days[d].size > 1;
     }
 
     // The day's loads, plus any switched to NO RUN in this session (shown greyed in their old place).
     function buildRows() {
-      const on = L.dailyRows(runs, loadDate), ids = new Set(on.map(r => r.id));
+      const on = sheetRows(), ids = new Set(on.map(r => r.id));
       Object.values(keptOff).forEach(k => {
         const run = runs.find(x => x.id === k.runDocId), d = run && run.days && run.days[k.day];
-        if (!d || d.runs || ids.has(k.id) || k.loadDate !== loadDate) return;
+        if (!d || d.runs || ids.has(k.id) || k.sheetDate !== loadDate) return;
         const row = Object.assign({}, k, { off: true, driverId: d.driverId, driver: d.driver, truckId: d.truckId, truck: d.truck, trailerId: d.trailerId,
           trailer: d.trailer, dispatchTime: d.dispatchTime, startTime: d.startTime, palletJack: d.palletJack, driverNotes: d.driverNotes, pickup: d.pickup, rev: run.rev || 0 });
         let at = on.findIndex(r => r.deliveryDate > row.deliveryDate || (r.deliveryDate === row.deliveryDate && Number(r.loadSequence) > Number(row.loadSequence)));
@@ -156,11 +181,18 @@
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
       ['open-down', 'open-calloff', 'open-add'].forEach(id => { document.getElementById(id).disabled = !edit; });
       const body = [];
-      let group = '';
+      let group = '', loaded = '', subs = 0;
+      const mixed = mixedLoads(rows);
       rows.forEach((r, i) => {
         if (r.deliveryDate !== group) {
           group = r.deliveryDate;
-          body.push('<tr class="group"><td colspan="11">' + escapeHtml(r.deliveryDay.toUpperCase() + ' DELIVERIES, ' + shortDate(r.deliveryDate)) + '</td></tr>');
+          loaded = '';
+          body.push('<tr class="group"><td colspan="11"><span class="gtext">' + escapeHtml(r.deliveryDay.toUpperCase() + ' DELIVERIES, ' + shortDate(r.deliveryDate)) + '</span></td></tr>');
+        }
+        if (mixed(r.deliveryDate) && r.loadDate !== loaded) {
+          loaded = r.loadDate;
+          subs++;
+          body.push('<tr class="group loaded"><td colspan="11"><span class="gtext">' + escapeHtml('LOADED ' + L.dayName(r.loadDate).toUpperCase() + ', ' + shortDate(r.loadDate)) + '</span></td></tr>');
         }
         const driver = r.driver || coverageName(r), live = edit && !r.off, needs = !r.off;
         body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (order && !r.off ? ' draggable="true"' : '') + (r.off ? ' class="off"' : '') + '>' +
@@ -169,21 +201,20 @@
           '<td><button type="button" class="toggle' + (r.off ? '' : ' on') + '" data-runs' + (edit ? '' : ' disabled') + ' aria-pressed="' + !r.off + '" title="Click to change whether this run runs">' + (r.off ? 'NO RUN' : 'RUNS') + '</button></td>' +
           cell(driver, driver || !needs ? '' : 'missing', live && 'driver') +
           '<td><input type="checkbox" class="ovr" data-ovr aria-label="Override" title="Override: choose a driver or unit that is off or down"' + (ovr[r.id] ? ' checked' : '') + (live ? '' : ' disabled') + '></td>' +
-          cell(r.truck, r.truck || !needs || coverageName(r) ? '' : 'missing', live && 'truck') +
+          cell(r.truck || (noTractor(r) ? 'N/A' : ''), r.truck || !needs || noTractor(r) ? '' : 'missing', live && 'truck') +
           cell(r.trailer, r.trailer || !needs ? '' : 'missing', live && 'trailer') +
           cell(departText(r), '', live && 'time') + cell(r.palletJack, '', live && 'jack') +
           (r.pickup ? cell('PICKUP ' + r.pickup, 'pickup') : cell(r.driverNotes, 'left', live && 'note')) +
           '<td>' + (edit ? '<button type="button" class="edit" data-open>Edit</button>' : '') + '</td></tr>');
       });
       if (!rows.length) body.push('<tr><td colspan="11" class="empty">No loads go out on this day in the copied Live weeks.</td></tr>');
-      document.getElementById('rows').innerHTML = body.join('');
+      keepCursor(document.getElementById('rows'), () => { document.getElementById('rows').innerHTML = body.join(''); });
       const running = rows.filter(r => !r.off), covered = running.filter(r => !L.needsDriver(r)).length;
       document.getElementById('coverage').firstElementChild.textContent = (running.length ? Math.round(100 * covered / running.length) : 0) + '%';
-      const days = [...new Set(rows.map(r => r.deliveryDay))];
-      document.getElementById('delivery-day').value = days.join(' / ') || '-';
+      document.getElementById('delivery-day').value = deliveryDayName(loadDate);
       const groups = new Set(rows.map(r => r.deliveryDate)).size;
       document.getElementById('count').textContent = running.length + ' loads' + (running.length - covered ? ', ' + (running.length - covered) + ' need a driver' : '');
-      fitToWindow(rows.length + groups, 5);
+      fitToWindow(rows.length + groups + subs, 5);
       if (editRow) paintEdit();
       if (!document.getElementById('down-panel').hidden) paintDown();
     }
@@ -202,7 +233,7 @@
     }
 
     function setRuns(row, on) {
-      if (!on) keptOff[row.id] = Object.assign({}, row, { loadDate });
+      if (!on) keptOff[row.id] = Object.assign({}, row, { sheetDate: loadDate });
       return saveRunChange(getRuns, row.runDocId, row.day, 'setRuns', { runs: on }, d => { d.runs = on; }, render);
     }
     const setTime = (row, text) => saveRunChange(getRuns, row.runDocId, row.day, 'setDispatchTime', { time: text }, d => { d.dispatchTime = text ? L.minutesOfDay(text) : null; }, render);
@@ -219,24 +250,59 @@
       const td = e.target.closest('td[data-edit]');
       if (!td) return;
       const kind = td.dataset.edit;
+      // Driver, Truck and Trailer: a click only selects the cell, like the current app; a double-click, F2 or typing opens the list (daily-keys.js).
+      if (kind === 'note' || kind === 'time' || kind === 'jack') editText(td, row, kind);
+    });
+
+    // Time, Jack and Notes: a box in the cell; typed = what was typed on the selected cell (it starts over, as in Sheets).
+    function editText(td, row, kind, typed) {
       editing = true;
-      const close = () => { editing = false; render(); };
-      if (kind === 'note' || kind === 'time' || kind === 'jack') {
-        const current = kind === 'note' ? row.driverNotes : kind === 'time' ? departText(row) : row.palletJack;
-        openNote(td, current, (value) => {
-          editing = false;
-          if (value === null) return render();
-          if (kind === 'note') saveAssignment(getRuns, row.runDocId, row.day, 'note', value, render);
-          else if (kind === 'time') setTime(row, value);
-          else setJack(row, value);
-        });
-        return;
-      }
-      openPicker(td, kind, kind === 'driver' ? row.driverId : kind === 'truck' ? row.truckId : row.trailerId, busyFor(kind, row), (pick) => {
-        if (pick === null) return close();
+      const current = kind === 'note' ? row.driverNotes : kind === 'time' ? departText(row) : row.palletJack;
+      openNote(td, current, (value) => {
         editing = false;
-        saveAssignment(getRuns, row.runDocId, row.day, kind, pick, render, ovr[row.id]);
-      }, pickOpts(kind, row));
+        if (value === null) return render();
+        if (kind === 'note') saveAssignment(getRuns, row.runDocId, row.day, 'note', value, render);
+        else if (kind === 'time') setTime(row, value);
+        else setJack(row, value);
+      });
+      const input = td.querySelector('input.picker');
+      if (input && typed !== null && typed !== undefined) input.value = typed;
+    }
+    /*
+     * Current app 7.0.267 (Joe 10/5): the driver's own truck (Driver Master's assigned truck) goes with him. When it is down
+     * or on the road on another run, the route's truck is kept and the line says why. Carrier or a branch takes the truck off.
+     */
+    function pickDriver(row, value) {
+      const truckNow = row.truckId;
+      saveAssignment(getRuns, row.runDocId, row.day, 'driver', { id: value, text: pickText('driver', value) }, render, ovr[row.id]);
+      const setTruck = (id) => saveAssignment(getRuns, row.runDocId, row.day, 'truck', { id, text: pickText('truck', id) }, render, ovr[row.id]);
+      if (/^__CVG__:/.test(value)) { if (truckNow) setTruck(''); return; }
+      const d = lists.allDrivers.find(x => x.id === value), own = d && d.defaultTruckId;
+      if (!own || own === truckNow) return;
+      const unit = lists.fleetTrucks.find(e => e.id === own);
+      const busy = unit && L.unitConflicts(rows, row, 'truck', rmHours)[own];
+      const why = !unit ? 'is not on Equipment Master' : L.unitOff(unit) ? 'is ' + unit.status : busy ? 'is ' + busy : '';
+      if (why) { showError(d.name + '\'s truck ' + (unit ? unit.unit : own) + ' ' + why + '; the route\'s truck was kept.'); return; }
+      setTruck(own);
+    }
+    const idOf = { driver: 'driverId', truck: 'truckId', trailer: 'trailerId' };
+    bindDailyKeys(body, {
+      rowOf: (td) => { const tr = td.closest('tr[data-index]'); return tr ? rows[Number(tr.dataset.index)] : null; },
+      current: (row, kind) => row[idOf[kind]] || (kind === 'driver' && coverageName(row) ? '__CVG__:' + coverageName(row) : ''),
+      choices: (kind, row) => pickChoices(kind, row[idOf[kind]], busyFor(kind, row), pickOpts(kind, row)),
+      text: (row, kind) => row[kind] || '',
+      pick: (row, kind, value) => kind === 'driver' ? pickDriver(row, value)
+        : saveAssignment(getRuns, row.runDocId, row.day, kind, value.unit ? { id: '', unit: value.unit, text: value.unit } : { id: value, text: pickText(kind, value) }, render, ovr[row.id]),
+      editText, setEditing: (on) => { editing = on; }, render
+    });
+
+    // Current app: a double-click on a row (not on a cell that edits, a box or a button) flips RUNS / NO RUN.
+    body.addEventListener('dblclick', e => {
+      const tr = e.target.closest('tr[data-index]');
+      if (!tr || editing || !canSave() || e.target.closest('td[data-edit], input, button, select, textarea')) return;
+      try { window.getSelection().removeAllRanges(); } catch (ignore) { /* nothing selected */ }
+      const row = rows[Number(tr.dataset.index)];
+      setRuns(row, !!row.off);
     });
 
     // Managers drag a load by its route number to a new place; the whole day's order is saved as one call.
@@ -249,12 +315,13 @@
       const to = Number(tr.dataset.index), from = dragging;
       dragging = null;
       if (to === from) return;
-      const ordered = rows.filter(r => !r.off);
+      if (rows[from].loadDate !== rows[to].loadDate) return; // the load order is per load day (Saturday's sheet holds Sunday's too)
+      const ordered = rows.filter(r => !r.off && r.loadDate === rows[from].loadDate);
       const a = ordered.indexOf(rows[from]), b = ordered.indexOf(rows[to]);
       if (a < 0 || b < 0) return;
       const [moved] = ordered.splice(a, 1);
       ordered.splice(b, 0, moved);
-      saveOrder(getRuns, loadDate, ordered, render);
+      saveOrder(getRuns, rows[from].loadDate, ordered, render);
     });
     body.addEventListener('dragend', () => { dragging = null; });
 
@@ -273,7 +340,7 @@
       for (let i = -6; i <= 13; i++) {
         if (!i) continue;
         const key = L.addDays(row.deliveryDate, i);
-        html += '<option value="' + key + '">' + escapeHtml(L.dayName(key) + ' ' + shortDate(key)) + '</option>';
+        html += '<option value="' + key + '">' + escapeHtml(L.dayName(key)) + '</option>';
       }
       return html;
     }
@@ -298,7 +365,7 @@
         '<label class="wide check"><input type="checkbox" data-field="ovr"' + (ovr[row.id] ? ' checked' : '') + '> OVR: offer drivers who are off and units that are down</label>' +
         '</div><div class="modal-actions"><button type="button" data-print-one>&#9635; Print Dispatch</button><button type="button" class="primary" data-close>Close</button></div>';
       box.querySelector('[data-close]').onclick = closeModals;
-      box.querySelector('[data-print-one]').onclick = () => printSheet([row]);
+      box.querySelector('[data-print-one]').onclick = () => printSheet(); // the current app printed the whole sheet from here
       const move = box.querySelector('[data-move]'), moveBtn = box.querySelector('[data-move-run]');
       move.onchange = () => { moveBtn.disabled = !move.value; };
       moveBtn.onclick = () => {
@@ -316,6 +383,7 @@
           if (f === 'time') return setTime(row, node.value.trim());
           if (f === 'jack') return setJack(row, node.value.trim());
           if (f === 'note') return saveAssignment(getRuns, row.runDocId, row.day, 'note', node.value.trim(), render);
+          if (f === 'driver') return pickDriver(row, node.value);
           saveAssignment(getRuns, row.runDocId, row.day, f, { id: node.value, text: pickText(f, node.value) }, render, ovr[row.id]);
         };
       });
@@ -362,7 +430,24 @@
 
     /* ---------- Down Trucks / Trailers ---------- */
     const allUnits = () => lists.fleetTrucks.concat(lists.fleetTrailers);
-    const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:\s*/i, '');
+    const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:?\s*/i, '');
+    // Like the current app: a short number finds the unit (893 finds 223893, 956 finds T-956) when only one unit ends with it.
+    const alnum = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    function findUnit(typed) {
+      const all = allUnits(), t = alnum(typed);
+      const exact = all.filter(e => String(e.unit).toUpperCase() === typed);
+      if (exact.length) return { unit: exact[0] };
+      const same = all.filter(e => alnum(e.unit) === t);
+      if (same.length === 1) return { unit: same[0] };
+      if (t.length < 2) return {};
+      const ends = all.filter(e => alnum(e.unit).length > t.length && alnum(e.unit).slice(-t.length) === t);
+      return ends.length === 1 ? { unit: ends[0] } : { many: ends.length > 1 ? ends.concat(same) : same };
+    }
+    function downMessage(text) {
+      const box = document.getElementById('down-message');
+      box.textContent = text || '';
+      box.hidden = !text;
+    }
     function paintDown() {
       const down = allUnits().filter(e => L.unitOff(e));
       document.getElementById('down-rows').innerHTML = down.map(e => '<tr><td><b>' + escapeHtml(e.unit) + '</b></td><td><span class="tag">' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</span></td>' +
@@ -376,33 +461,46 @@
         saveOptimistic('setUnitUp', { equipmentId: unit.id }, () => { unit.status = 'ACTIVE'; unit.notes = ''; }, () => Object.assign(unit, before), render);
       }; });
     }
-    document.getElementById('open-down').onclick = () => { openModal('down-panel'); paintDown(); document.getElementById('down-unit').focus(); };
-    document.getElementById('down-add').onclick = () => {
+    document.getElementById('open-down').onclick = () => { downMessage(''); openModal('down-panel'); paintDown(); document.getElementById('down-unit').focus(); };
+    document.getElementById('down-add').onclick = async () => {
       const typed = document.getElementById('down-unit').value.trim().toUpperCase(), reason = document.getElementById('down-reason').value.trim();
-      const unit = allUnits().find(e => String(e.unit).toUpperCase() === typed) || allUnits().find(e => String(e.unit).toUpperCase() === 'T-' + typed);
-      if (!unit) { showError(typed ? typed + ' is not in Equipment Master.' : 'Type the truck or trailer number.'); return; }
-      if (!reason) { showError('Say why ' + unit.unit + ' is down.'); return; }
+      const found = typed ? findUnit(typed) : {}, unit = found.unit;
+      if (!typed) { downMessage('Type the truck or trailer number.'); return; }
+      if (!unit) {
+        downMessage(found.many && found.many.length ? typed + ' matches ' + found.many.map(e => e.unit).join(', ') + '. Type more of the number.' : typed + ' is not in Equipment Master.');
+        return;
+      }
+      if (L.unitOff(unit)) { downMessage(unit.unit + ' is already on the list.'); return; }
+      downMessage('');
       document.getElementById('down-unit').value = '';
       document.getElementById('down-reason').value = '';
-      const before = { status: unit.status, notes: unit.notes, downSince: unit.downSince };
-      saveOptimistic('setUnitDown', { equipmentId: unit.id, reason, today: L.operatingDay(new Date()) },
-        () => Object.assign(unit, { status: 'DOWN', notes: 'DOWN: ' + reason, downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
+      const before = { status: unit.status, notes: unit.notes, downSince: unit.downSince }, word = (unit.type === 'TRAILER' ? 'Trailer ' : 'Truck ') + unit.unit;
+      const out = await saveOptimistic('setUnitDown', { equipmentId: unit.id, reason, today: L.operatingDay(new Date()) },
+        () => Object.assign(unit, { status: 'DOWN', notes: reason ? 'DOWN: ' + reason : 'DOWN', downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
+      if (!out) return;
+      // Like the current app: say which routes lost the unit, so the dispatcher knows what needs another one.
+      const taken = out.taken || [];
+      downMessage(taken.length ? word + ' is down. It was taken off ' + taken.map(t => 'Route ' + t.route + ' (' + L.dayName(t.date).slice(0, 3) + ' ' + shortDate(t.date) + ')').join(', ') + '.'
+        : word + ' is down. It was not on any load today or later.');
     };
 
-    /* ---------- Print: straight to the printer, the same columns as the current dispatch sheet ---------- */
+    /* ---------- Print: the same columns as the current dispatch sheet, with Print Layouts' saved setup (one landscape page, 3 copies) ---------- */
     function printSheet(only) {
       const list = (only || rows).filter(r => !r.off);
       let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(shortDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
         ' &middot; Delivery Day ' + escapeHtml(document.getElementById('delivery-day').value) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
         '<th>C/O</th><th>P/O</th><th>T/O</th><th>L/D</th><th>DR</th><th>CHECKED BY</th><th>JACK</th><th>DRIVER NOTES</th></tr></thead><tbody>';
-      let group = '';
+      let group = '', loaded = '';
+      const mixed = mixedLoads(list);
       list.forEach(r => {
         if (r.deliveryDate !== group && new Set(list.map(x => x.deliveryDate)).size > 1) html += '<tr class="pgroup"><td colspan="14">' + escapeHtml(r.deliveryDay + ' Deliveries, ' + shortDate(r.deliveryDate)) + '</td></tr>';
+        if (r.deliveryDate !== group) loaded = '';
         group = r.deliveryDate;
+        if (mixed(r.deliveryDate) && r.loadDate !== loaded) { loaded = r.loadDate; html += '<tr class="pgroup"><td colspan="14">' + escapeHtml('Loaded ' + L.dayName(r.loadDate) + ', ' + shortDate(r.loadDate)) + '</td></tr>'; }
         html += '<tr><td>' + [r.route, r.run, r.driver || coverageName(r), r.truck, r.trailer, departText(r), '', '', '', '', '', '', r.palletJack, r.pickup ? 'PICKUP ' + r.pickup : r.driverNotes].map(v => escapeHtml(show(v))).join('</td><td>') + '</td></tr>';
       });
       document.getElementById('print').innerHTML = html + '</tbody></table>';
-      window.print();
+      printSaved('daily');
     }
     document.getElementById('print-sheet').onclick = () => printSheet();
     // Print Layouts opens Daily with #print: the sheet prints once the day's runs are on screen.
@@ -416,12 +514,13 @@
       document.getElementById('week-begin').value = shortDate(L.addDays(begin, 1));
       document.getElementById('load-day').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
         const key = L.addDays(begin, i);
-        return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key) + ' ' + shortDate(key)) + '</option>';
+        return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key)) + '</option>';
       }).join('');
       document.getElementById('go-weekly').href = 'weekly.html?week=' + L.addDays(loadDate, 1) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
       history.replaceState(null, '', '?date=' + loadDate + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
       // One live query: every open screen gets each change the moment it is saved, without checking every 30 seconds.
-      const q = query(collection(db, 'runs'), where('weekStart', 'in', L.weeksForLoadDate(loadDate)));
+      const weeks = [...new Set(L.weeksForLoadDate(loadDate).concat(isSaturday(loadDate) ? L.weeksForLoadDate(L.addDays(loadDate, 1)) : []))];
+      const q = query(collection(db, 'runs'), where('weekStart', 'in', weeks));
       unsubscribeRuns = onSnapshot(q, snap => {
         runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
         render();

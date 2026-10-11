@@ -9,6 +9,7 @@
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Driver Check-ins · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
+  <style>.popover .close.secondary { background: #fff; color: var(--ud-blue); border: 1px solid var(--ud-blue); } #rows tr.editable:focus-visible { outline: 3px solid var(--ud-blue); outline-offset: -3px; }</style>
   <script src="js/logic.js"></script>
 </head>
 <body>
@@ -67,7 +68,7 @@
     const L = window.UDLogic;
     const params = new URLSearchParams(location.search);
     let date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
-    let unsubscribe = null, runs = [], rows = [], popover = null, writeBack = false;
+    let unsubscribe = null, runs = [], rows = [], popover = null, writeBack = false, loaded = false;
 
     const show = (v) => v === null || v === undefined ? '' : String(v);
     // New phone code (managers): shown once in the footer, in place of the hint; never stored in the page.
@@ -80,7 +81,7 @@
         const { functions } = await start();
         const r = (await httpsCallable(functions, 'newRouteCode')({})).data;
         document.getElementById('foot-note').innerHTML = 'Route Distribution code for the phones: <b id="phone-code">' + escapeHtml(r.code) + '</b> (the old code stops working)';
-      } catch (err) { showError(err.message); } finally { b.disabled = false; }
+      } catch (err) { showError('Could not make a new phone code (' + (err.message || err) + '). The old code still works; press New phone code again.'); } finally { b.disabled = false; }
     });
 
     function render() {
@@ -93,7 +94,7 @@
         const driver = r.driver || (r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '');
         const refused = [r.refusedReturned, r.refusedReturnedSource].filter(Boolean).join(', ');
         const at = r.checkinCompletedAt ? new Date(r.checkinCompletedAt) : null;
-        return '<tr data-index="' + i + '"' + (edit ? ' class="editable"' : '') + '>' +
+        return '<tr data-index="' + i + '"' + (edit ? ' class="editable" tabindex="0" title="Enter or fix the check-in for ' + escapeHtml(r.route) + '"' : '') + '>' +
           '<td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td>' +
           '<td class="' + (driver ? '' : 'empty') + '">' + escapeHtml(driver) + '</td>' +
           '<td>' + escapeHtml(r.truck) + '</td><td>' + escapeHtml(r.trailer) + '</td>' +
@@ -101,18 +102,22 @@
           '<td class="' + (refused ? 'issue' : 'empty') + '" title="' + escapeHtml(refused) + '">' + escapeHtml(refused) + '</td>' +
           '<td class="' + (r.issues.length ? 'issue' : 'empty') + '" title="' + escapeHtml(r.issues.join('; ')) + '">' + escapeHtml(r.issues.join('; ')) + '</td>' +
           '<td class="' + (r.checkedIn ? 'ok' : 'empty') + '">' + escapeHtml(at && !isNaN(at) ? at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : r.checkedIn ? 'Yes' : 'Not yet') + '</td></tr>';
-      }).join('') || '<tr><td colspan="11" class="empty">No deliveries on this day in the copied Live weeks.</td></tr>';
+      }).join('') || (!loaded ? '<tr><td colspan="11" class="empty">Loading the check-ins&hellip;</td></tr>' : '<tr><td colspan="11" class="empty">No deliveries on this day in the copied Live weeks.</td></tr>');
       const done = rows.filter(r => r.checkedIn).length;
-      document.getElementById('n-in').textContent = done;
-      document.getElementById('n-out').textContent = rows.length - done;
-      document.getElementById('n-issues').textContent = rows.filter(r => r.issues.length).length;
-      document.getElementById('count').textContent = rows.length + ' deliveries';
+      document.getElementById('n-in').textContent = loaded ? done : '-';
+      document.getElementById('n-out').textContent = loaded ? rows.length - done : '-';
+      document.getElementById('n-issues').textContent = loaded ? rows.filter(r => r.issues.length).length : '-';
+      document.getElementById('count').textContent = loaded ? rows.length + (rows.length === 1 ? ' delivery' : ' deliveries') : '';
       fitToWindow(rows.length);
     }
 
     function closePopover() { if (popover) { popover.remove(); popover = null; render(); } }
 
     // The check-in form: the same things the driver's phone asks for. Saved as one call.
+    // Keyboard: Enter or Space on a line opens its form, like a click.
+    document.getElementById('rows').addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr[data-index]')) { e.preventDefault(); e.target.click(); }
+    });
     document.getElementById('rows').addEventListener('click', e => {
       const tr = e.target.closest('tr[data-index]');
       if (!tr || popover || !canSave()) return;
@@ -120,7 +125,7 @@
       const run = runs.find(x => x.id === row.runDocId), d = run.days[row.day];
       popover = document.createElement('div');
       popover.className = 'popover';
-      const input = (name, label, value, type) => '<label for="ci-' + name + '">' + label + '</label><input id="ci-' + name + '" name="' + name + '"' + (type ? ' type="' + type + '" min="0" step="1"' : ' maxlength="300"') + ' value="' + escapeHtml(show(value)) + '">';
+      const input = (name, label, value, type) => '<label for="ci-' + name + '">' + label + '</label><input id="ci-' + name + '" name="' + name + '"' + (type ? ' type="' + type + '" min="0" step="1" inputmode="numeric" pattern="[0-9]*"' : ' maxlength="300"') + ' value="' + escapeHtml(show(value)) + '">';
       popover.innerHTML = '<b style="grid-column:1/3">' + escapeHtml(row.route + ' ' + row.run + ', ' + L.dayName(date) + ' ' + shortDate(date)) + '</b>' +
         input('casesDelivered', 'Cases delivered', d.casesDelivered, 'number') +
         input('driverCaseReturn', 'Cases returned', d.driverCaseReturn, 'number') +
@@ -131,12 +136,17 @@
         input('palletJackIssues', 'Jack problem', d.palletJackIssues) +
         '<label for="ci-clean">Trailer needs cleaned</label><span class="check-row"><input type="checkbox" id="ci-clean"' + (L.yes(d.trailerNeedsCleaned) ? ' checked' : '') + '></span>' +
         '<label for="ci-notes">Notes</label><textarea id="ci-notes" maxlength="500">' + escapeHtml(d.checkinNotes || '') + '</textarea>' +
-        '<button type="button" class="close" data-save>Save check-in</button>';
+        '<span class="ci-buttons" style="grid-column:1/3;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="close secondary" data-cancel>Cancel</button><button type="button" class="close" data-save>Save check-in</button></span>';
       document.body.appendChild(popover);
       const box = tr.getBoundingClientRect(), w = popover.offsetWidth, h = popover.offsetHeight;
       popover.style.left = Math.max(8, (window.innerWidth - w) / 2) + 'px';
       popover.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, box.bottom + 4)) + 'px';
-      popover.addEventListener('keydown', ev => { if (ev.key === 'Escape') closePopover(); });
+      // Esc or Cancel closes without saving (a tablet has no Esc key); Enter in a box (not Notes) saves.
+      popover.addEventListener('keydown', ev => {
+        if (ev.key === 'Escape') closePopover();
+        else if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') { ev.preventDefault(); popover.querySelector('[data-save]').click(); }
+      });
+      popover.querySelector('[data-cancel]').addEventListener('click', closePopover);
       popover.querySelector('input').focus();
       popover.querySelector('[data-save]').addEventListener('click', () => {
         const get = (name) => popover.querySelector('[name="' + name + '"]').value.trim();
@@ -164,8 +174,9 @@
       history.replaceState(null, '', '?date=' + date + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
       unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', L.weekStart(date))), snap => {
         runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        loaded = true;
         render();
-      }, e => showError('Could not read the check-ins: ' + e.message));
+      }, e => showError('Could not read the check-ins (' + e.message + '). Check the network and reload the page.'));
     }
 
     requireSignIn(async (user) => {

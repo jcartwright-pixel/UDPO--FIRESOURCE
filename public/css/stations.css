@@ -3,6 +3,10 @@
 
 /* ---------- Garage Station ---------- */
 .gs-page .view { padding: 0 16px 12px; }
+:is(.gs-page, .ds-page) .topbar { min-height: 56px; padding: 4px 14px; }
+:is(.gs-page, .ds-page) .topbar .brand img { width: auto; height: 40px; }
+:is(.gs-page, .ds-page) .topbar .brand small { display: none; }
+:is(.gs-page, .ds-page) .topbar .gs-nav { min-height: 40px; padding: 0 14px; font-size: 15px; order: -1; }
 .gs { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; font-size: 22px; color: #1b2a3a; }
 .gs [hidden] { display: none !important; }
 .gs h2 { margin: 0; font-size: 34px; color: #123f70; }
@@ -70,6 +74,29 @@
 .gs-typed small { font-size: 20px; font-weight: 700; color: #1c7c4a; } .gs-typed small.bad { color: #b42318; }
 .gs-cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; } .gs-cats .gs-btn { min-height: 64px; font-size: 24px; }
 .gs-matches { display: flex; gap: 8px; flex-wrap: wrap; } .gs-matches .gs-btn { min-height: 48px; font-size: 20px; }
+/* Joe 10/10 evening: work orders first, each mechanic's own clock on a job. */
+.gs-stack { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+.gs-strip { display: flex; align-items: center; gap: 10px; overflow-x: auto; padding-bottom: 2px; }
+.gs-strip .gs-label { flex: none; }
+.gs-chip { flex: none; display: flex; flex-direction: column; align-items: flex-start; border: 3px solid #d7e1ec; background: #fff; border-radius: 14px; padding: 6px 14px; font-size: 20px; font-weight: 800; color: #1b2a3a; min-height: 64px; cursor: pointer; touch-action: manipulation; }
+.gs-chip small { font-size: 16px; font-weight: 700; color: #6b7b8c; }
+.gs-chip.on { border-color: #1c7c4a; background: #e3f5ea; } .gs-chip.on small { color: #145c37; }
+.gs-crew { display: flex; flex-direction: column; gap: 8px; }
+.gs-clock { display: grid; grid-template-columns: 52px 1fr auto auto; align-items: center; gap: 14px; padding: 6px 0; border-top: 1px solid #e5ebf1; }
+.gs-clock:first-child { border-top: 0; }
+.gs-clock i { width: 52px; height: 52px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-style: normal; font-weight: 800; background: #1c7c4a; }
+.gs-clock:nth-child(2) i { background: #6d28d9; } .gs-clock:nth-child(3) i { background: #b45309; }
+.gs-clock b { font-size: 26px; }
+.gs-clock .t { font-size: 34px; font-weight: 800; color: #1c7c4a; font-variant-numeric: tabular-nums; }
+.gs-two .gs-btn[hidden] + .gs-btn { grid-column: 1 / -1; }
+.topbar .gs-people .p { color: #fff; }
+.gs-onclock { font-size: 16px; font-weight: 700; color: rgba(255, 255, 255, .85); }
+.gs-people .p small { font-size: 16px; font-weight: 700; color: rgba(255, 255, 255, .85); }
+#view-job { overflow: auto; }
+#view-job > * { flex: none; }
+#view-job .gs-two .gs-btn { min-height: 84px; font-size: 30px; }
+#view-job .gs-done { min-height: 80px; }
+.gs-now:empty { display: none; }
 @media (max-width: 1100px) {
   .gs-sign, .gs-report { grid-template-columns: 1fr; overflow: auto; }
   .gs-job { grid-template-columns: 120px 1fr 140px; } .gs-job .unit { font-size: 28px; }
@@ -81,6 +108,14 @@
   .gs-btn { font-size: 22px; min-height: 60px; }
   .gs-job { grid-template-columns: 1fr; } .gs-job .gs-btn { width: 100%; }
   .gs-two { grid-template-columns: 1fr; }
+  .gs-clock { grid-template-columns: 40px 1fr auto; } .gs-clock i { width: 40px; height: 40px; } .gs-clock .gs-btn { grid-column: 1 / -1; }
+  /* A phone: the names, the dots and the keypad shrink to fit the width instead of running off the right edge. */
+  .gs-page .view { padding: 0 8px 10px; }
+  .gs-card { padding: 12px; min-width: 0; }
+  .gs-names { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .gs-name { font-size: 20px; min-height: 70px; padding: 10px 6px; }
+  .gs-dots { gap: 8px; } .gs-dots i { width: 30px; height: 30px; }
+  .gs-keys { gap: 8px; } .gs-keys button { font-size: 28px; min-height: 56px; min-width: 0; } .gs-keys button.go { font-size: 22px; }
 }
 
 /* ---------- The drivers' phone page (route.html): the menu cards, View Loadout and DVIR ---------- */
@@ -145,17 +180,23 @@
 .ds-welcome { margin: 0; font-size: 16px; } .ds-welcome i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2eb872; margin-right: 6px; }
 .ds-weather { background: #fff; border-radius: 12px; padding: 14px; } .ds-weather h3 { margin: 6px 0; }
 body.ds-tv { background: #071d30; }
-body.ds-tv .sidemenu, body.ds-tv .side-flyouts, body.ds-tv .topbar, body.ds-tv .actions.in-head { display: none !important; }
+body.ds-tv .sidemenu, body.ds-tv .side-flyouts { display: none !important; }
+/* The TV itself (?tv=1): no header and no buttons, the board only. */
+body.ds-full .topbar, body.ds-full .actions.in-head { display: none !important; }
 body.ds-tv .side-main { margin-left: 0 !important; }
 body.ds-tv .head { background: linear-gradient(90deg, #073861, #126aa5, #0b4d83); color: #fff; }
 body.ds-tv .head h1 { font-size: 38px; color: #fff; } body.ds-tv .ds-day { color: #f4c542; } body.ds-tv .eyebrow { color: #cfe3f6; }
 body.ds-tv .ds-grid { grid-template-columns: 2.56fr 1fr; grid-template-rows: minmax(0, 1fr) 320px; }
-body.ds-tv .ds-board { grid-row: 1; grid-column: 1; } body.ds-tv .ds-weather { grid-row: 1 / 3; grid-column: 2; } body.ds-tv .ds-week { grid-row: 2; grid-column: 1; }
+body.ds-tv .ds-board { grid-row: 1; grid-column: 1; } body.ds-tv .ds-weather { grid-row: 1; grid-column: 2; } body.ds-tv .ds-week { grid-row: 2; grid-column: 1 / 3; }
+/* The small window on the right, as on the old Driver Room board: local weather on a blue panel. */
+body.ds-tv .ds-weather { display: flex; flex-direction: column; justify-content: center; padding: 24px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 18px; background: linear-gradient(145deg, #177ab8, #164f86); color: #fff; box-shadow: 0 10px 28px rgba(0, 0, 0, .22); }
+body.ds-tv .ds-weather .sym { font-size: 42px; line-height: 1; } body.ds-tv .ds-weather b { font-size: 14px; letter-spacing: .13em; opacity: .8; }
+body.ds-tv .ds-weather h3 { margin: 12px 0 0; font-size: 32px; } body.ds-tv .ds-weather p.now { font-size: 30px; font-weight: 800; color: #fff; } body.ds-tv .ds-weather p.next { color: #d7ebf9; font-size: 17px; } body.ds-tv .ds-weather p { margin: 12px 0 0; font-size: 19px; line-height: 1.4; color: rgba(255, 255, 255, .92); }
 body.ds-tv .ds-row { min-height: 75px; font-size: 23px; grid-template-columns: 110px minmax(180px, 1fr) minmax(246px, 1.25fr) 134px 80px 155px 85px; }
 body.ds-tv .ds-row .rt { font-size: 30px; } body.ds-tv .ds-scroll { overflow: hidden; }
 body.ds-tv .foot { color: #cfe3f6; }
 @media (max-width: 1550px) { body.ds-tv .ds-grid { grid-template-columns: 1fr 300px; } }
-@media (max-width: 1050px) { body.ds-tv .ds-grid { grid-template-columns: 1fr; } body.ds-tv .ds-weather { display: none; } }
+@media (max-width: 1050px) { body.ds-tv .ds-grid { grid-template-columns: 1fr; } body.ds-tv .ds-weather { display: none !important; } body.ds-tv .ds-week { grid-column: 1; } }
 @media (max-width: 760px) {
   .ds-row { grid-template-columns: 60px 1fr 1fr 70px; font-size: 15px; }
   .ds-row > span:nth-child(5), .ds-row > span:nth-child(7), .ds-headrow span:nth-child(5), .ds-headrow span:nth-child(7) { display: none; }
@@ -184,7 +225,7 @@ body.ds-tv .foot { color: #cfe3f6; }
 .ta-page .ta-yard h3 { margin: 12px 0 6px; font-size: 14px; text-transform: uppercase; color: #33475b; }
 .ta-page .ta-help { margin: 0; color: #0b4d83; font-weight: 700; }
 .ta-page .ta-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.ta-page .ta-chip { border-radius: 6px; padding: 6px 4px; font-weight: 700; font-size: 14px; border: 1px solid; min-height: 0; }
+.ta-page .ta-chip { border-radius: 6px; padding: 6px 4px; font-weight: 700; font-size: 14px; border: 1px solid; min-height: 40px; }
 .ta-page .ta-chip small { display: block; font-weight: 400; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ta-page .ta-chip.open { background: #eef8f0; border-color: #6bb07c; color: #1f5f30; cursor: pointer; }
 .ta-page .ta-chip.busy { background: #fff6df; border-color: #d4a121; color: #6e4800; }
@@ -202,18 +243,87 @@ body.ds-tv .foot { color: #cfe3f6; }
 }
 
 /* ---------- Plant Station (plant-station.html) ---------- */
-.ps-page .ps-pill { background: #073c6a; color: #fff; border-radius: 999px; padding: 6px 14px; font-weight: 700; white-space: nowrap; }
+/* Plant Station: a tablet screen (Joe 10/10, "basically a mobile"): slim header, no desktop menu, big touch cards. */
+.ps-page #ps-top { min-height: 56px; gap: 8px; padding: 6px 14px; position: sticky; top: 0; z-index: 5; }
+.ps-page #ps-top button { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.ps-page #ps-top .ps-brand img { width: auto; height: 38px; }
+.ps-page #ps-top .ps-brand strong { font-size: 20px; }
+.ps-page .ps-pill { background: #073c6a; color: #fff; border-radius: 999px; padding: 7px 14px; font-weight: 700; white-space: nowrap; }
 .ps-page .ps-pill::before { content: '\25CF  '; color: #f3b613; }
-.ps-page .ps-intro { margin: 0 0 12px; color: #33475b; font-size: 16px; }
-.ps-page .ps-stations { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-.ps-page .ps-station { text-align: left; background: #fff; border: 1px solid #c9d6e4; border-top: 5px solid #0b6eaa; border-radius: 10px; padding: 16px; cursor: pointer; min-height: 120px; }
-.ps-page .ps-station b { display: block; font-size: 20px; color: #0b2f55; }
-.ps-page .ps-station span { display: block; margin-top: 6px; color: #4a5b6c; font-size: 15px; }
-.ps-page .ps-station:hover { box-shadow: 0 2px 10px rgba(7, 60, 106, .18); }
-.ps-page .ps-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-.ps-page .ps-tab { display: flex; gap: 14px; align-items: center; text-decoration: none; background: var(--tone); border: 1px solid #d5dfea; border-top: 5px solid var(--accent); border-radius: 10px; padding: 18px; min-height: 110px; color: #0b2f55; }
-.ps-page .ps-tab img { width: 64px; height: 64px; object-fit: contain; }
-.ps-page .ps-tab b { display: block; font-size: 22px; }
-.ps-page .ps-tab small { display: block; font-size: 15px; color: #4a5b6c; }
-.ps-page .ps-count { display: inline-block; margin-top: 6px; font-weight: 700; color: var(--accent); font-size: 15px; }
+.ps-page .ps-title { padding: 16px 18px 4px; }
+.ps-page .ps-title .eyebrow { display: block; color: #5b6b7c; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.ps-page .ps-title h1 { margin: 2px 0 0; font-size: 28px; color: #0b2f55; }
+.ps-page .view { padding: 8px 18px 24px; }
+.ps-page .ps-intro { margin: 0 0 14px; color: #33475b; font-size: 17px; }
+.ps-page .ps-stations { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.ps-page .ps-station { text-align: left; background: #fff; border: 1px solid #c9d6e4; border-top: 6px solid #0b6eaa; border-radius: 14px; padding: 22px; cursor: pointer; min-height: 150px; font: inherit; }
+.ps-page .ps-station b { display: block; font-size: 25px; color: #0b2f55; }
+.ps-page .ps-station span { display: block; margin-top: 8px; color: #4a5b6c; font-size: 17px; }
+.ps-page .ps-station:active { transform: scale(.99); background: #f2f8ff; }
+.ps-page .ps-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.ps-page .ps-tab { display: flex; gap: 18px; align-items: center; text-decoration: none; background: var(--tone); border: 1px solid #d5dfea; border-top: 6px solid var(--accent); border-radius: 14px; padding: 24px; min-height: 160px; color: #0b2f55; }
+.ps-page .ps-tab img { width: 84px; height: 84px; object-fit: contain; }
+.ps-page .ps-tab b { display: block; font-size: 27px; }
+.ps-page .ps-tab small { display: block; font-size: 17px; color: #4a5b6c; }
+.ps-page .ps-count { display: inline-block; margin-top: 8px; font-weight: 700; color: var(--accent); font-size: 17px; }
 .ps-page .ps-foot { margin-top: 18px; color: #5b6b7c; font-size: 14px; }
+/* Change Station with a manager release code (Administration > Plant Station Codes). */
+.ps-page .ps-release { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px; border: 2px solid #f0b46a; border-radius: 12px; background: #fff8ee; font-size: 18px; }
+.ps-page .ps-release[hidden] { display: none; }
+.ps-page .ps-release p { flex-basis: 100%; margin: 0; font-weight: 700; color: #7a3d00; }
+.ps-page .ps-release input { font: inherit; min-height: 48px; padding: 0 12px; border: 1px solid #c9d5e1; border-radius: 8px; margin-left: 8px; text-transform: uppercase; }
+.ps-page .ps-release button { min-height: 48px; padding: 0 18px; border-radius: 8px; border: 1px solid #0b3d6b; background: #0b3d6b; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.ps-page .ps-release button[type=button] { background: #fff; color: #0b3d6b; }
+.ps-page .ps-release-msg { font-weight: 700; color: #b42318; }
+@media (max-width: 700px) {
+  .ps-page #ps-top { flex-wrap: wrap; padding: 6px 10px; }
+  .ps-page #ps-top .ps-brand img { display: none; }
+  .ps-page #ps-top .ps-brand strong { font-size: 17px; white-space: nowrap; }
+  .ps-page #ps-top button { min-height: 36px; padding: 0 10px; font-size: 14px; }
+  .ps-page .ps-pill { order: 9; flex-basis: 100%; text-align: center; }
+  .ps-page .ps-stations, .ps-page .ps-tabs { grid-template-columns: 1fr; }
+  .ps-page .ps-title h1 { font-size: 24px; }
+}
+
+/* ---------- Phone Screens (Administration > System Tools): every phone and tablet screen in one list ---------- */
+.pss h2 { margin: 14px 0 8px; font-size: 20px; color: #123f70; }
+.pss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.pss-card { display: grid; gap: 6px; padding: 16px; background: #fff; border: 1px solid #c9d6e4; border-top: 5px solid #0b6eaa; border-radius: 12px; text-decoration: none; color: #0b2f55; }
+.pss-card b { font-size: 19px; } .pss-card span { color: #4a5b6c; font-size: 15px; } .pss-card small { color: #6b7b8c; font-size: 13px; word-break: break-all; }
+.pss-card:hover { box-shadow: 0 2px 10px rgba(7, 60, 106, .18); }
+
+/* Joe 10/10: the drivers' phone page looks like a phone on a laptop too: one phone-width column in the middle. */
+@media (min-width: 600px) {
+  html:has(body.phone:not(.gs-page):not(.ps-page):not(.ds-page)) { background: #dfe6ee; }
+  body.phone:not(.gs-page):not(.ps-page):not(.ds-page) { max-width: 460px; margin: 0 auto; box-shadow: 0 0 24px rgba(7, 60, 106, .18); }
+}
+
+/* Table text (Joe's standing rule, 10/10): the Driver Room weekly schedule reads at the same size as the board. */
+.ds-week-table { font-size: 16px; }
+.ds-week-table th { font-size: 15px; } .ds-week-table th small { font-size: 13px; }
+
+/* Drivers' phone Check-In (Joe 10/11): the units, drop and hook, over / short, the Speak button, Skip. */
+.phone-card .ci-units { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.phone-card .ci-units input { padding: 7px 8px; font-size: 16px; }
+.phone-card button.ci-link { min-height: 0; padding: 2px 0; border: 0; background: none; text-align: left; font-size: 15px; text-decoration: underline; justify-self: start; }
+.phone-card .ci-trailer { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-left: 4px solid #8d6a2a; border-radius: 10px; background: #fbf8f1; }
+.phone-card .ci-trailer-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.phone-card .ci-trailer-head button { min-height: 38px; padding: 0 12px; font-size: 14px; }
+.phone-card .ci-trailer input { padding: 7px 9px; font-size: 16px; }
+.phone-card .ci-trailer label.check { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink); }
+.phone-card .ci-trailer label.check input { width: 22px; height: 22px; }
+.phone-card .ci-os-box { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; margin-top: 8px; padding: 10px; border-radius: 10px; background: #fff5f5; border: 1px solid #f0c7c7; }
+.phone-card .ci-os-box[hidden] { display: none; }
+.phone-card .ci-os-box .ci-wide { grid-column: 1 / 3; }
+.phone-card .ci-seg { display: grid; grid-template-columns: 1fr 1fr; align-self: end; border: 1px solid var(--ud-blue); border-radius: 8px; overflow: hidden; }
+.phone-card .ci-seg label { display: block; color: var(--ud-blue); }
+.phone-card .ci-seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.phone-card .ci-seg span { display: block; padding: 9px 0; text-align: center; font-size: 16px; }
+.phone-card .ci-seg input:checked + span { background: var(--ud-blue); color: #fff; }
+.phone-card .ci-seg input:focus-visible + span { outline: 3px solid #f2b705; outline-offset: -3px; }
+.phone-card .speak-box { position: relative; display: block; }
+.phone-card .speak-box input { padding-right: 78px; }
+.phone-card .speak-box.area textarea { padding-bottom: 40px; }
+.phone-card button.speak { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); min-height: 0; height: 30px; padding: 0 10px; font-size: 14px; border-radius: 7px; background: #eef4fa; border: 1px solid #c4d6e8; }
+.phone-card .speak-box.area button.speak { top: auto; bottom: 6px; transform: none; }
+.phone-card button.speak.on { background: #c62828; color: #fff; border-color: #c62828; }

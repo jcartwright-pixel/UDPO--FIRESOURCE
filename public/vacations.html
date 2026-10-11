@@ -40,10 +40,10 @@
 
     <section class="view" id="view-time">
       <div class="actions" data-top>
-        <div class="chips" id="filters"></div>
-        <span class="hint" id="range-hint"></span>
-        <span class="spacer"></span>
         <button type="button" class="primary" id="add">+ Add Vacation</button>
+        <button type="button" id="print-list">&#128424; Print</button>
+        <label class="vac-view">View<select id="filters" aria-label="Which time off to show"></select></label>
+        <span class="hint" id="range-hint"></span>
       </div>
       <form class="vac-form" id="form" hidden>
         <input type="hidden" name="vacationId">
@@ -60,7 +60,7 @@
         <table>
           <colgroup><col style="width:24%"><col style="width:11%"><col style="width:11%"><col style="width:7%"><col style="width:12%"><col style="width:27%"><col style="width:8%"></colgroup>
           <thead><tr><th>Driver</th><th>First day</th><th>Last day</th><th>Days</th><th>Status</th><th>Notes</th><th></th></tr></thead>
-          <tbody id="rows"></tbody>
+          <tbody id="rows"><tr><td colspan="7" class="empty" id="loading">Loading the vacation schedule&hellip;</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -94,10 +94,12 @@
   <section class="modal wide-modal" id="day-modal" role="dialog" aria-labelledby="day-title" hidden>
     <h2 id="day-title"></h2>
     <p class="modal-context" id="day-sub"></p>
+    <div class="notice error" id="day-error" hidden></div>
     <div class="day-body">
       <div><h3>Off this day</h3><div class="day-list" id="day-list"></div></div>
       <form id="day-form" novalidate>
-        <h3>Add a Day Off</h3>
+        <input type="hidden" name="vacationId">
+        <h3 id="day-form-title">Add a Day Off</h3>
         <div class="modal-grid">
           <label class="wide">Driver<select name="driverId"></select></label>
           <label>First day<input name="startDate" type="date"></label>
@@ -123,7 +125,7 @@
     const today = L.operatingDay(new Date());
     const FILTERS = [['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['upcoming', 'Upcoming'], ['all', 'All']];
     const TYPE_CLASS = { VACATION: 't-vacation', PERSONAL: 't-personal', SICK: 't-sick', BEREAVEMENT: 't-bereavement', UNPAID: 't-unpaid' };
-    let vacations = [], view = 'time', filter = 'week', month = today.slice(0, 7), dayOpen = null;
+    let vacations = [], loaded = false, view = 'time', filter = 'upcoming', month = today.slice(0, 7), dayOpen = null;
 
     const canEdit = () => canManage();
     const nameOf = (id) => { const d = lists.allDrivers.find(x => x.id === id); return d ? d.name : id; };
@@ -158,17 +160,41 @@
       if (dayOpen) paintDay();
     }
 
-    function paintTime(edit) {
-      document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + vacations.filter(v => inFilter(v, k)).length + '</b></button>').join('');
+    // Oldest first: January at the top, December at the bottom (Joe 10/10), in every view.
+    function shownList() {
+      return vacations.filter(v => inFilter(v, filter)).sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.endDate || a.startDate).localeCompare(String(b.endDate || b.startDate)) || nameOf(a.driverId).localeCompare(nameOf(b.driverId)));
+    }
+    function rangeText() {
       const r = ['today', 'week', 'month'].indexOf(filter) >= 0 ? range(filter) : null;
-      document.getElementById('range-hint').textContent = r ? (r[0] === r[1] ? shortDate(r[0]) : shortDate(r[0]) + ' – ' + shortDate(r[1])) : filter === 'upcoming' ? 'From today on' : 'Every entry';
-      const list = vacations.filter(v => inFilter(v, filter)).sort((a, b) => a.startDate.localeCompare(b.startDate) || nameOf(a.driverId).localeCompare(nameOf(b.driverId)));
+      return r ? (r[0] === r[1] ? shortDate(r[0]) : shortDate(r[0]) + ' – ' + shortDate(r[1])) : filter === 'upcoming' ? 'From today on' : 'Every entry';
+    }
+    const filterName = (k) => FILTERS.find(f => f[0] === k)[1];
+    function paintTime(edit) {
+      // One View drop-down in place of the five buttons (Joe 10/10); each choice keeps its count.
+      const pick = document.getElementById('filters');
+      pick.innerHTML = FILTERS.map(([k, label]) => '<option value="' + k + '">' + label + ' (' + vacations.filter(v => inFilter(v, k)).length + ')</option>').join('');
+      pick.value = filter;
+      document.getElementById('range-hint').textContent = rangeText();
+      if (!loaded) return;
+      const list = shownList();
       document.getElementById('rows').innerHTML = list.map(v => '<tr data-id="' + escapeHtml(v.id) + '"><td class="left"><b>' + escapeHtml(nameOf(v.driverId)) + '</b>' + typeChip(v.vacationType) + '</td>' +
         '<td>' + escapeHtml(shortDate(v.startDate)) + '</td><td>' + escapeHtml(shortDate(v.endDate || v.startDate)) + '</td><td>' + days(v.startDate, v.endDate) + '</td>' +
         '<td><span class="vstatus s-' + escapeHtml(String(v.status).toLowerCase()) + '">' + escapeHtml(v.status) + '</span></td><td class="left" title="' + escapeHtml(v.notes || '') + '">' + escapeHtml(v.notes || '') + '</td>' +
         '<td>' + (edit ? '<button type="button" class="edit" data-edit-id="' + escapeHtml(v.id) + '">Edit</button>' : '') + '</td></tr>').join('') ||
-        '<tr><td colspan="7" class="empty">No time off ' + (filter === 'all' ? 'entered yet.' : 'in ' + FILTERS.find(f => f[0] === filter)[1].toLowerCase() + '.') + '</td></tr>';
+        '<tr><td colspan="7" class="empty">No time off ' + (filter === 'all' ? 'entered yet.' : 'in ' + filterName(filter).toLowerCase() + '.') + '</td></tr>';
     }
+
+    // Print: exactly the list the screen shows for the chosen view, oldest first, with the view and its dates in the heading.
+    document.getElementById('print-list').onclick = () => {
+      const list = shownList();
+      document.getElementById('print').innerHTML = '<h2>Vacation Schedule &middot; ' + escapeHtml(filterName(filter)) + ' &middot; ' + escapeHtml(rangeText()) + '</h2>' +
+        '<p class="vac-print-sub">' + list.length + ' entr' + (list.length === 1 ? 'y' : 'ies') + ' &middot; Printed ' + escapeHtml(shortDate(today)) + '</p>' +
+        '<table class="vac-print"><thead><tr><th>Driver</th><th>Type</th><th>First day</th><th>Last day</th><th>Days</th><th>Status</th><th>Notes</th></tr></thead><tbody>' +
+        (list.map(v => '<tr><td><b>' + escapeHtml(nameOf(v.driverId)) + '</b></td><td>' + escapeHtml(L.VACATION_TYPE_NAMES[v.vacationType] || 'Vacation Day') + '</td><td>' + escapeHtml(shortDate(v.startDate)) + '</td><td>' + escapeHtml(shortDate(v.endDate || v.startDate)) + '</td>' +
+          '<td>' + days(v.startDate, v.endDate) + '</td><td>' + escapeHtml(v.status) + '</td><td>' + escapeHtml(v.notes || '') + '</td></tr>').join('') || '<tr><td colspan="7">No time off in this view.</td></tr>') +
+        '</tbody></table>';
+      window.print();
+    };
 
     // The form: Add Vacation (empty) or Edit (filled). One call saves it; the limit check is on the server.
     function openForm(v) {
@@ -184,9 +210,17 @@
       f.notes.value = v ? (v.notes || '') : '';
       f.driverId.focus();
     }
+    const live = (v) => v.status !== 'CANCELLED' && v.status !== 'DENIED';
+    const spanText = (a, b) => (!b || a === b) ? shortDate(a) : shortDate(a) + ' – ' + shortDate(b);
     function saveEntry(fields) {
       if (!fields.driverId || !fields.startDate) { showError('Driver and First day are required.'); return false; }
       if ((fields.endDate || fields.startDate) < fields.startDate) { showError('Last day cannot be before First day.'); return false; }
+      // The same driver cannot be entered twice for the same day (the current app's "already off" check); the server checks it too.
+      if (live(fields)) {
+        const end = fields.endDate || fields.startDate, clash = vacations.find(v => v.id !== fields.vacationId && live(v) && v.driverId === fields.driverId && v.startDate <= end && (v.endDate || v.startDate) >= fields.startDate);
+        if (clash) { showError(nameOf(clash.driverId) + ' is already off ' + spanText(clash.startDate, clash.endDate || clash.startDate) + '. Edit that entry instead.'); return false; }
+      }
+      showError('');
       const existing = fields.vacationId ? vacations.find(v => v.id === fields.vacationId) : null, before = existing ? Object.assign({}, existing) : null;
       const shown = existing || { id: 'new-' + Date.now(), saving: true };
       saveOptimistic('saveVacation', fields, () => {
@@ -204,7 +238,7 @@
     document.getElementById('cancel').onclick = () => { document.getElementById('form').hidden = true; };
     document.getElementById('add').onclick = () => openForm(null);
     document.getElementById('rows').addEventListener('click', e => { const b = e.target.closest('[data-edit-id]'); if (b) openForm(vacations.find(v => v.id === b.dataset.editId)); });
-    document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
+    document.getElementById('filters').addEventListener('change', e => { filter = e.target.value; render(); });
 
     /* ---------- Calendar: the month, who is off each day; a day opens the day-off box ---------- */
     function offOn(day) { return vacations.filter(v => approved(v) && v.startDate <= day && (v.endDate || v.startDate) >= day); }
@@ -221,7 +255,7 @@
       for (let i = 1; i <= count; i++) {
         const key = month + '-' + String(i).padStart(2, '0'), off = offOn(key), limit = L.dayLimit(key);
         html += '<div class="cday' + (key === today ? ' today' : '') + (off.length >= limit.maxOff ? ' full' : '') + '" data-day="' + key + '" role="button" tabindex="0" title="' + escapeHtml(off.length + ' of ' + limit.maxOff + ' off' + (limit.label ? ' (' + limit.label + ' week)' : '')) + '"><b>' + i + '</b>' +
-          off.slice(0, 3).map(v => '<span class="' + (TYPE_CLASS[v.vacationType] || 't-vacation') + '">' + escapeHtml(nameOf(v.driverId)) + '</span>').join('') + (off.length > 3 ? '<span class="more">+' + (off.length - 3) + ' more</span>' : '') + '</div>';
+          off.slice(0, 3).map(v => '<span class="' + (TYPE_CLASS[v.vacationType] || 't-vacation') + '" data-vac-id="' + escapeHtml(v.id) + '" title="' + escapeHtml(nameOf(v.driverId) + ': ' + spanText(v.startDate, v.endDate || v.startDate) + (canEdit() ? ' · click to edit or remove' : '')) + '">' + escapeHtml(nameOf(v.driverId)) + '</span>').join('') + (off.length > 3 ? '<span class="more">+' + (off.length - 3) + ' more</span>' : '') + '</div>';
       }
       const cells = lead + count, weeks = Math.ceil(cells / 7);
       document.getElementById('calendar').style.setProperty('--weeks', weeks);
@@ -231,35 +265,68 @@
     document.getElementById('cal-prev').onclick = () => shiftMonth(-1);
     document.getElementById('cal-next').onclick = () => shiftMonth(1);
     document.getElementById('cal-month').onchange = e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { month = e.target.value; render(); } };
-    document.getElementById('calendar').addEventListener('click', e => { const c = e.target.closest('[data-day]'); if (c) openDay(c.dataset.day); });
+    // A day opens the day box; a name on it opens the box with that entry ready to edit or remove.
+    document.getElementById('calendar').addEventListener('click', e => {
+      const c = e.target.closest('[data-day]'); if (!c) return;
+      openDay(c.dataset.day);
+      const chip = e.target.closest('[data-vac-id]'), v = chip && vacations.find(x => x.id === chip.dataset.vacId);
+      if (v && canEdit()) dayForm(v);
+    });
     document.getElementById('calendar').addEventListener('keydown', e => { const c = e.target.closest('[data-day]'); if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDay(c.dataset.day); } });
 
     function openDay(day) {
       dayOpen = day;
-      const f = document.getElementById('day-form');
-      f.driverId.innerHTML = driverOptions('');
-      f.startDate.value = day; f.endDate.value = day; f.type.value = 'VACATION'; f.status.value = 'APPROVED'; f.notes.value = '';
-      f.hidden = !canEdit();
+      showError('');
+      dayForm(null);
+      document.getElementById('day-form').hidden = !canEdit();
       paintDay();
       document.getElementById('modal-back').hidden = false;
       document.getElementById('day-modal').hidden = false;
+    }
+    // The day box form: Add a Day Off (empty), or Edit <driver> filled from an entry (as the current app's day card).
+    function dayForm(v) {
+      const f = document.getElementById('day-form');
+      f.vacationId.value = v ? v.id : '';
+      f.driverId.innerHTML = driverOptions(v ? v.driverId : '');
+      f.startDate.value = v ? v.startDate : dayOpen; f.endDate.value = v ? (v.endDate || v.startDate) : dayOpen;
+      f.type.value = v ? (v.vacationType || 'VACATION') : 'VACATION'; f.status.value = v && v.status === 'PENDING' ? 'PENDING' : 'APPROVED'; f.notes.value = v ? (v.notes || '') : '';
+      document.getElementById('day-form-title').textContent = v ? 'Edit ' + nameOf(v.driverId) : 'Add a Day Off';
+      document.getElementById('day-save').textContent = v ? 'Update Day Off' : 'Save Day Off';
+      document.querySelectorAll('#day-list .day-row').forEach(r => r.classList.toggle('editing', !!v && r.dataset.id === v.id));
     }
     function paintDay() {
       const off = vacations.filter(v => v.status !== 'CANCELLED' && v.status !== 'DENIED' && v.startDate <= dayOpen && (v.endDate || v.startDate) >= dayOpen), limit = L.dayLimit(dayOpen);
       document.getElementById('day-title').textContent = L.dayName(dayOpen) + ', ' + shortDate(dayOpen);
       document.getElementById('day-sub').textContent = off.filter(approved).length + ' of ' + limit.maxOff + ' drivers off' + (limit.label ? ' (' + limit.label + ' week: holiday limit ' + limit.maxOff + ')' : '');
-      document.getElementById('day-list').innerHTML = off.map(v => '<div class="day-row' + (v.status === 'PENDING' ? ' pending' : '') + '"><div><b>' + escapeHtml(nameOf(v.driverId)) + '</b>' + typeChip(v.vacationType) +
+      document.getElementById('day-list').innerHTML = off.map(v => '<div class="day-row' + (v.status === 'PENDING' ? ' pending' : '') + '" data-id="' + escapeHtml(v.id) + '"><div><b>' + escapeHtml(nameOf(v.driverId)) + '</b>' + typeChip(v.vacationType) +
         '<small>' + escapeHtml(v.startDate === (v.endDate || v.startDate) ? shortDate(v.startDate) : shortDate(v.startDate) + ' – ' + shortDate(v.endDate)) + ' &middot; ' + days(v.startDate, v.endDate) + ' day' + (days(v.startDate, v.endDate) === 1 ? '' : 's') + (v.notes ? ' &middot; ' + escapeHtml(v.notes) : '') + '</small></div>' +
-        '<span class="vstatus s-' + escapeHtml(String(v.status).toLowerCase()) + '">' + escapeHtml(v.status) + '</span></div>').join('') || '<p class="empty">Nobody is off this day.</p>';
+        '<span class="vstatus s-' + escapeHtml(String(v.status).toLowerCase()) + '">' + escapeHtml(v.status) + '</span>' +
+        (canEdit() && !v.saving ? '<span class="day-acts"><button type="button" data-day-edit="' + escapeHtml(v.id) + '">Edit</button><button type="button" class="danger" data-day-remove="' + escapeHtml(v.id) + '">Remove</button></span>' : '') + '</div>').join('') || '<p class="empty">Nobody is off this day.</p>';
+      const editing = document.getElementById('day-form').vacationId.value;
+      document.querySelectorAll('#day-list .day-row').forEach(r => r.classList.toggle('editing', r.dataset.id === editing));
     }
-    function closeDay() { dayOpen = null; document.getElementById('modal-back').hidden = true; document.getElementById('day-modal').hidden = true; }
+    // Edit loads the entry into the form; Remove asks for a second click, then cancels the entry (kept on the list as CANCELLED).
+    document.getElementById('day-list').addEventListener('click', e => {
+      const ed = e.target.closest('[data-day-edit]'), rm = e.target.closest('[data-day-remove]');
+      if (ed) { const v = vacations.find(x => x.id === ed.dataset.dayEdit); if (v) dayForm(v); return; }
+      if (!rm) return;
+      const v = vacations.find(x => x.id === rm.dataset.dayRemove);
+      if (!v) return showError('That entry is no longer on the schedule.');
+      if (!rm.classList.contains('armed')) { rm.classList.add('armed'); rm.textContent = 'Confirm remove'; return; }
+      if (saveEntry({ vacationId: v.id, driverId: v.driverId, startDate: v.startDate, endDate: v.endDate || v.startDate, type: v.vacationType || 'VACATION', status: 'CANCELLED', email: v.notificationEmail || '', notes: v.notes || '' }) && document.getElementById('day-form').vacationId.value === v.id) dayForm(null);
+    });
+    // A message from saving in the day box shows inside the box, not behind it.
+    new MutationObserver(() => { const src = document.getElementById('error'), box = document.getElementById('day-error'); box.textContent = src.textContent; box.hidden = src.hidden || !dayOpen; })
+      .observe(document.getElementById('error'), { attributes: true, childList: true, characterData: true, subtree: true });
+    function closeDay() { document.getElementById('day-error').hidden = true; dayOpen = null; document.getElementById('modal-back').hidden = true; document.getElementById('day-modal').hidden = true; }
     document.getElementById('modal-back').onclick = closeDay;
     document.querySelector('#day-modal [data-close]').onclick = closeDay;
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && dayOpen) closeDay(); });
     document.getElementById('day-form').addEventListener('submit', e => {
       e.preventDefault();
       const f = e.target;
-      if (saveEntry({ vacationId: '', driverId: f.driverId.value, startDate: f.startDate.value, endDate: f.endDate.value, type: f.type.value, status: f.status.value, email: '', notes: f.notes.value.trim() })) { f.driverId.value = ''; f.notes.value = ''; }
+      const was = f.vacationId.value ? vacations.find(v => v.id === f.vacationId.value) : null;
+      if (saveEntry({ vacationId: f.vacationId.value, driverId: f.driverId.value, startDate: f.startDate.value, endDate: f.endDate.value, type: f.type.value, status: f.status.value, email: was ? (was.notificationEmail || '') : '', notes: f.notes.value.trim() })) dayForm(null);
     });
 
     // The driver's copy: one page per driver with the whole year, their days, the limits and the memo to sign and turn in.
@@ -285,7 +352,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
-      onSnapshot(collection(db, 'vacations'), snap => { vacations = snap.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the vacation schedule: ' + e.message));
+      onSnapshot(collection(db, 'vacations'), snap => { vacations = snap.docs.map(d => Object.assign({}, d.data(), { id: d.id })); loaded = true; render(); }, e => showError('Could not read the vacation schedule: ' + e.message));
       window.addEventListener('resize', render);
     });
   </script>

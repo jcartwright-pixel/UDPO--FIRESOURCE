@@ -44,7 +44,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.match(sup.url(), /index\.html/);
     assert.deepEqual(await sup.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['distribution', 'plant', 'fleet']);
     assert.equal(await sup.$('#go-back'), null, 'nothing above the plant home');
-    assert.equal(await sup.isVisible('.sidemenu a[href="administration.html"]'), false, 'no Administration in the menu');
+    assert.equal(await sup.isVisible('#go-admin'), false, 'no Administration button');
     if (SHOTS) await sup.screenshot({ path: path.join(SHOTS, 'home-one-plant-1920.png') });
     await sup.goto(HOSTING + '/company.html?testEmail=super.test@uniteddairy.com');
     await sup.waitForSelector('.co-plant');
@@ -76,7 +76,9 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     const sizes = await adm.$$eval('.launch-card', c => c.map(x => Math.round(x.getBoundingClientRect().width) + 'x' + Math.round(x.getBoundingClientRect().height)));
     assert.equal(new Set(sizes).size, 1, 'the four cards are the same size: ' + sizes.join(' '));
     await adm.waitForSelector('#go-back');
-    assert.equal(await adm.isVisible('.sidemenu a[href="administration.html"]'), true, 'Administration is in an Administrator\'s menu');
+    // Joe 10/10 evening: Administration is a header button on the main screens, not a menu item.
+    assert.equal(await adm.isVisible('#go-admin'), true, 'Administration is in an Administrator\'s header');
+    assert.equal(await adm.$('.sidemenu a[href="administration.html"]'), null, 'Administration is not in the menu');
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-admin-uniontown-1920.png') });
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go-back')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
@@ -87,7 +89,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
     assert.deepEqual(groups, ['People & Access', 'App Links & Codes', 'Email & Schedules', 'Dispatch Administration', 'Plant Setup', 'Connections & Keys', 'Fleet & GPS Setup', 'System Tools', 'Diagnostics']);
     const all = await adm.$$eval('.adm-item', t => t.length);
-    assert.equal(all, 29, 'every item from the current app\'s Administration is in the menu');
+    assert.equal(all, 32, 'every item from the current app\'s Administration is in the menu');
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
@@ -104,18 +106,18 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await adm.getAttribute('#full', 'href').then(h => /^print\.html/.test(h)), true);
     await adm.waitForTimeout(800);
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-print-1920.png') });
-    // One still being built says so right there.
+    // Joe 10/10: every Administration item is built; none says Being built. Repair Email opens right there.
     await adm.click('.adm-item[data-key="repair-email"]');
-    await adm.waitForSelector('.adm-soon');
-    assert.match(await adm.textContent('.adm-panel-head'), /Repair Email[\s\S]*Being built/);
-    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-soon-1920.png') });
+    await adm.waitForSelector('#re-where input');
+    assert.equal(/Being built/.test(await adm.textContent('#shell')), false);
+    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-repair-email-1920.png') });
     await adm.fill('#find', 'QR');
     assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'App Links & Codes']);
     await adm.fill('#find', '');
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has a fourth same-size Administration card; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, built screens open inside the right panel and the rest say Being built there');
+    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has a fourth same-size Administration card; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');

@@ -406,6 +406,42 @@ async function saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, qu
   return result;
 }
 
+// addReturn: a return nobody noted (the current app's Plant Station "Add a return", PlantStation.html:377). The crew picks the
+// load it came back on (or Unknown), the product and the cases. It is a RETURN record like the dock's: it shows on Product
+// Returns and on that trailer, pending until RTA, and counts in the day's returns and cases.
+const UNKNOWN_ROUTE = Object.freeze({ route: 'Unknown', run: 'Route not known' });
+function validateReturn(input, SaveError) {
+  const out = { date: text(input.date), unknown: input.unknown === true, runDocId: text(input.runDocId).slice(0, 200), day: text(input.day).slice(0, 10) };
+  if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+  if (out.unknown) Object.assign(out, UNKNOWN_ROUTE, { runDocId: '', day: '' });
+  else {
+    out.route = text(input.route).slice(0, 60); out.run = text(input.run).slice(0, 120);
+    if (!out.route || !out.run) throw new SaveError('BAD_REQUEST', 'Pick the route the product came back on, or Unknown.');
+    if (out.day && L.DAYS.indexOf(out.day) < 0) throw new SaveError('BAD_REQUEST', 'day must be sun to sat');
+  }
+  out.trailer = R.trailerText(input.trailer).slice(0, 60);
+  out.product = text(input.product).slice(0, 200);
+  if (!out.product) throw new SaveError('BAD_REQUEST', 'Pick the product returned.');
+  out.sku = text(input.sku).slice(0, 40);
+  out.cases = count(input.cases, 'Cases', SaveError);
+  if (!out.cases || !Number.isInteger(out.cases)) throw new SaveError('BAD_REQUEST', 'Enter the cases returned as a whole number.');
+  return out;
+}
+
+async function saveReturn(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const runSnap = req.runDocId ? await tx.get(db.collection('runs').doc(req.runDocId)) : null;
+  const run = runSnap && runSnap.exists ? runSnap.data() : null;
+  const id = 'RETURN_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24), recordId = 'RET|' + req.date + '|' + id;
+  const payload = { route: req.route, run: req.run, routeId: (run && run.routeId) || '', runId: (run && run.runId) || '', trailer: req.trailer, casesReturned: String(req.cases),
+    product: req.product, sku: req.sku, notes: req.product, enteredAt: 'PLANT_STATION', unknownRoute: req.unknown };
+  const doc = { recordId, type: 'RETURN', date: req.date, status: 'PENDING', route: req.route, run: req.run, runId: payload.runId, runDocId: req.runDocId, day: req.day,
+    trailer: req.trailer, quantity: String(req.cases), notes: req.product, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp };
+  tx.set(db.collection('plantJournal').doc(id), doc);
+  const result = { ok: true, requestId: req.requestId, recordId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, after: payload, result });
+  return result;
+}
+
 // completeWash: a trailer was washed. Closes the wash requests picked for it (the sheet's and the app's) and records the
 // wash, which also clears the "wash after unloading" for that trailer. addWash ("+ Add Wash") is the same press for a
 // trailer typed in by hand.
@@ -481,7 +517,7 @@ function validateSchedule(input, SaveError) {
   out.pickupTime = R.time24(f.pickupTime);
   if (!out.pickupTime) throw new SaveError('BAD_REQUEST', 'Enter the pickup time.');
   out.scheduleType = text(f.scheduleType || 'ROUTE').toUpperCase();
-  if (['ROUTE', 'CARRIER'].indexOf(out.scheduleType) < 0) throw new SaveError('BAD_REQUEST', 'Schedule Type must be Plant Route or Carrier');
+  if (['ROUTE', 'CARRIER'].indexOf(out.scheduleType) < 0) throw new SaveError('BAD_REQUEST', 'Schedule Type must be Carrier or United Dairy Delivery');
   out.poNumber = text(f.poNumber).slice(0, 40);
   if (out.scheduleType === 'CARRIER' && !out.poNumber) throw new SaveError('BAD_REQUEST', 'A carrier load needs its PO number.');
   out.cases = text(f.cases);
@@ -578,8 +614,8 @@ async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const journal = db.collection('plantJournal');
   if (req.checkId && !req.departed) {
     const ref = journal.doc(req.checkId), had = await tx.get(ref), d = had.exists ? had.data() : null, p = (d && d.payload) || {};
-    if (!d || d.type !== 'YARD_CHECK' || p.status !== 'COMPLETE' || R.yardTrailer(p.trailer) !== req.trailer) throw new SaveError('NOT_FOUND', 'That yard check is no longer open. Record the trailer again.');
-    if (Date.parse(stamp) - R.when(d.recordedAt) >= R.YARD_LOCK_MINUTES * 60000) throw new SaveError('CONFLICT', 'That yard check is more than 2 hours old. Record the trailer again.');
+    if (!d || d.type !== 'YARD_CHECK' || p.status !== 'COMPLETE' || R.yardTrailer(p.trailer) !== req.trailer) throw new SaveError('NOT_FOUND', 'That yard check is no longer open. Type the temperature again to start a new check.');
+    if (Date.parse(stamp) - R.when(d.recordedAt) >= R.YARD_LOCK_MINUTES * 60000) throw new SaveError('CONFLICT', 'That yard check is more than 2 hours old. Type the temperature again to start a new check.');
     const payload = Object.assign({}, p, { temperature: req.temperature, setPoint: req.setPoint || p.setPoint || '', fuelLevel: req.fuelLevel, notes: req.notes });
     tx.update(ref, { payload, temperature: req.temperature, notes: req.notes, editedAt: stamp, editedBy: email, testEdited: true });
     const result = { ok: true, requestId: req.requestId, trailer: req.trailer, status: 'COMPLETE', checkId: req.checkId, recordedAt: d.recordedAt, message: 'Yard check updated.' };
@@ -808,6 +844,35 @@ async function saveMachineProducts(tx, db, req, email, stamp, logRef, mode, Save
   return result;
 }
 
-module.exports = { validateMachineProducts, saveMachineProducts, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
-  validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
+/* ---------- Plant Shifts ---------- */
+
+// savePlantShifts (Joe 10/10): a plant's shifts, Administration > Plant Shifts. Plant Reports count each load for the shift it
+// started loading in. Uniontown starts with 6:00 AM-2:30 PM, 2:00 PM-10:30 PM and 10:00 PM-5:30 AM (public/js/plant-reports.js).
+const SHIFT_LIMIT = 6;
+function validatePlantShifts(input, SaveError) {
+  const facilityId = text(input.facilityId);
+  if (!/^fac_[a-z0-9_]+$/.test(facilityId)) throw new SaveError('BAD_REQUEST', 'Pick a plant.');
+  if (!Array.isArray(input.shifts) || !input.shifts.length || input.shifts.length > SHIFT_LIMIT) throw new SaveError('BAD_REQUEST', 'A plant needs 1 to ' + SHIFT_LIMIT + ' shifts.');
+  const seen = {}, shifts = input.shifts.map(x => {
+    const s = x && typeof x === 'object' ? x : {}, name = text(s.name).slice(0, 40), start = text(s.start), end = text(s.end);
+    if (!name) throw new SaveError('BAD_REQUEST', 'Every shift needs a name.');
+    if (seen[name.toUpperCase()]) throw new SaveError('BAD_REQUEST', name + ' is on the list twice.');
+    seen[name.toUpperCase()] = true;
+    const ok = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+    if (!ok(start) || !ok(end)) throw new SaveError('BAD_REQUEST', name + ': enter the start and end times.');
+    if (start === end) throw new SaveError('BAD_REQUEST', name + ': the start and end cannot be the same time.');
+    return { name, start, end };
+  });
+  return { facilityId, shifts };
+}
+async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const ref = db.collection('plantShifts').doc(req.facilityId), had = await tx.get(ref);
+  tx.set(ref, { facilityId: req.facilityId, shifts: req.shifts, updatedAt: stamp, updatedBy: email });
+  const result = { ok: true, requestId: req.requestId, facilityId: req.facilityId, count: req.shifts.length, message: req.shifts.length + ' shift' + (req.shifts.length === 1 ? '' : 's') + ' saved.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId, before: had.exists ? had.data().shifts || [] : null, after: req.shifts, result });
+  return result;
+}
+
+module.exports = { validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+  validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

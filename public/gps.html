@@ -69,7 +69,8 @@
 
     let s = null, armed = null;
     const $ = (id) => document.getElementById(id);
-    const stamp = (t) => t ? shortDate(String(t).slice(0, 10)) + ' ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    // Date and time both in New York time (the stored time is UTC, so its first 10 characters are tomorrow after 8 p.m.).
+    const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '') : ''; };
     function render() {
       if (!s) return;
       const all = s.hasUser && s.hasPassword && s.hasAppId, some = s.hasUser || s.hasPassword || s.hasAppId;
@@ -79,7 +80,7 @@
       $('f-pass').placeholder = s.hasPassword ? 'saved (type to change)' : '';
       $('f-app').placeholder = s.hasAppId ? 'saved (type to change)' : '';
       if (document.activeElement !== $('f-base')) $('f-base').value = s.baseUrl || '';
-      $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + ' by ' + s.savedBy : '';
+      $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
       const t = s.lastTest;
       $('last').textContent = t ? 'Last test ' + stamp(t.at) + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
     }
@@ -87,7 +88,7 @@
       showError('');
       if (button) button.disabled = true;
       try { s = await callServer('gps', fields); render(); return s; }
-      catch (e) { showError(e.message || String(e)); return null; }
+      catch (e) { showError('Could not reach the GPS settings (' + (e.message || String(e)) + '). Check the network and try again.'); if (!s) { $('state').textContent = 'Unknown'; $('state').className = 'pill warn'; } return null; }
       finally { if (button) button.disabled = false; }
     }
     $('save').onclick = async () => {
@@ -108,6 +109,9 @@
       $('result').className = 'gps-result ' + (r.result.ok ? 'ok' : 'bad');
       $('result').innerHTML = '<b>' + (r.result.ok ? 'PASSED' : 'FAILED') + '</b> ' + escapeHtml(r.result.message);
     };
+    // Enter in a login box saves it; Enter in the vehicle box runs the test.
+    ['f-user', 'f-pass', 'f-app', 'f-base'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
+    $('f-vehicle').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('test').click(); } });
     requireSignIn(async () => { await start(); await call({ op: 'status' }); });
   </script>
 </body>

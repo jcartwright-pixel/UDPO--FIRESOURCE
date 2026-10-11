@@ -73,10 +73,11 @@
       return on;
     }
 
+    let gotRuns = false, trailersFailed = false;
     function render() {
       const rows = rowsNow(), on = dupes(rows), can = canLoad(), blank = rows.filter(r => !r.trailer).length;
       document.getElementById('dayname').textContent = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-      document.getElementById('summary').textContent = rows.length + ' routes · ' + blank + ' need a trailer' + (can ? '' : ' · View Only');
+      document.getElementById('summary').textContent = rows.length + (rows.length === 1 ? ' route · ' : ' routes · ') + blank + (blank === 1 ? ' needs a trailer' : ' need a trailer') + (can ? '' : ' · View Only');
       if (!selected || !rows.some(r => r.id === selected)) selected = (rows.find(r => !r.trailer) || rows[0] || {}).id || '';
       if (!editing) {
         document.getElementById('rows').innerHTML = rows.map(r => {
@@ -90,7 +91,7 @@
             '<span class="tr"><input type="text" maxlength="20" list="ta-units" autocomplete="off" placeholder="Trailer #" value="' + escapeHtml(r.trailer) + '" data-trailer="' + escapeHtml(r.id) + '"' +
             ' aria-label="Trailer for route ' + escapeHtml(r.route + ' ' + r.run) + '"' + (can ? '' : ' disabled') + '><small>' + escapeHtml(note) + '</small></span>' +
             '<span class="ta-depart">' + escapeHtml(P.timeOfDay(r.dispatchTime) || '—') + '</span></div>';
-        }).join('') || '<p class="empty">No loads are waiting for a trailer.</p>';
+        }).join('') || (gotRuns ? '<p class="empty">No loads are waiting for a trailer.</p>' : '<p class="empty">Loading the loads&hellip;</p>');
       }
       drawYard(rows, on, can);
     }
@@ -109,7 +110,7 @@
       const sel = rows.find(r => r.id === selected);
       const chips = (list, kind, empty) => list.length ? '<div class="ta-chips">' + list.sort(sort).map(t => '<button type="button" class="ta-chip ' + kind + '"' + (kind === 'open' && can && sel ? ' data-chip="' + escapeHtml(t.unit) + '"' : ' disabled') + '>' + escapeHtml(t.unit) + (t.sub ? '<small>' + escapeHtml(t.sub) + '</small>' : '') + '</button>').join('') + '</div>' : '<p class="empty">' + empty + '</p>';
       document.getElementById('yard').innerHTML = '<p class="ta-help">' + (sel ? 'Route ' + escapeHtml(String(sel.route).replace(/_\d+$/, '')) + ' picked. Tap an open trailer to put it on.' : 'Pick a route.') + '</p>' +
-        '<h3>Open trailers</h3>' + chips(open, 'open', 'No open trailers in Equipment Master.') + '<h3>On a route</h3>' + chips(busy, 'busy', 'None.') + '<h3>Down</h3>' + chips(down, 'down', 'None.');
+        '<h3>Open trailers</h3>' + chips(open, 'open', trailersFailed ? 'Could not read the trailer list; type trailer numbers in the boxes.' : 'No open trailers in Equipment Master.') + '<h3>On a route</h3>' + chips(busy, 'busy', 'None.') + '<h3>Down</h3>' + chips(down, 'down', 'None.');
       const list = trailers.filter(t => OFF.indexOf(String(t.status || '').trim().toUpperCase()) < 0 || DOWN.indexOf(String(t.status || '').trim().toUpperCase()) >= 0).sort(sort)
         .map(t => { const st = String(t.status || '').trim().toUpperCase(), k = key(t.unit); return '<option value="' + escapeHtml(t.unit) + '">' + (DOWN.indexOf(st) >= 0 ? 'Down' : on[k] ? 'On ' + on[k].map(x => String(x.route).replace(/_\d+$/, '')).join(', ') : 'Open') + '</option>'; }).join('');
       const dl = document.getElementById('ta-units');
@@ -131,7 +132,7 @@
           await save('savePlantLoad', { runDocId: row.runDocId, day: row.day, fields: { trailer: value }, assign: true });
           showError('');
         } catch (e) {
-          showError(row.route + ' ' + row.run + ': ' + (e.message || e));
+          showError(row.route + ' ' + row.run + ' not saved (' + (e.message || e) + '). The trailer went back to its last saved value; type it again.');
         } finally {
           delete pending[id];
           render();
@@ -153,12 +154,19 @@
       b.closest('.ta-row').classList.add('sel');
       drawYard(rowsNow(), dupes(rowsNow()), canLoad());
     });
+    // Leaving a box saves it. Moving straight to the next box (Enter, Tab) keeps the list as it is, so the cursor stays in the
+    // box it went to; the list is redrawn once the cursor leaves the boxes.
     rowsBox.addEventListener('focusout', e => {
       const b = e.target.closest('[data-trailer]');
       if (!b) return;
-      editing = false;
-      if (b.dataset.skip) { delete b.dataset.skip; render(); return; }
-      assign(b.dataset.trailer, b.value);
+      const id = b.dataset.trailer, value = b.value, skip = !!b.dataset.skip;
+      delete b.dataset.skip;
+      setTimeout(() => {
+        const a = document.activeElement;
+        editing = !!(a && a.closest && a.closest('#rows [data-trailer]'));
+        if (skip) { render(); return; }
+        assign(id, value);
+      }, 0);
     });
     rowsBox.addEventListener('keydown', e => {
       const b = e.target.closest('[data-trailer]');
@@ -188,7 +196,7 @@
       while (unsubs.length) unsubs.pop()();
       date = today();
       const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
-      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message)));
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); gotRuns = true; render(); }, e => showError('Could not read the loads (' + e.message + '). Check the network and reload the page.')));
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
@@ -196,8 +204,9 @@
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(query(collection(db, 'equipment'), where('type', '==', 'TRAILER')), s => {
         trailers = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)) && e.sourcePresent !== false);
+        trailersFailed = false;
         render();
-      }, () => {});
+      }, () => { trailersFailed = true; render(); });
       watch();
       // The day rolls at 6 AM: the list moves to the new day by itself.
       setInterval(() => { if (today() !== date) watch(); }, 60000);

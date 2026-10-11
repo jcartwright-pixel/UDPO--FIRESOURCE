@@ -79,9 +79,13 @@
     // This week = Sunday through the day shown (the current app's "Washes this week").
     const weekDays = () => { const s = L.weekStart(date), out = []; for (let d = s; d <= date; d = L.addDays(d, 1)) out.push(d); return out; };
 
+    // The requests and the day's unloads, plus trailers unloaded earlier this week and not washed since: they stay on the list
+    // until a wash is pressed for them (as the requests already do), instead of dropping off at 6 a.m.
     function items() {
-      return P.washItems(date, sheetWash, appWash, week.filter(d => d.date === date)).filter(w => !washedNow[U.unitKey(w.trailer)]);
+      const earlier = weekDays().filter(d => d < date).flatMap(d => P.washItems(d, [], [], week).filter(w => w.kind === 'UNLOAD'));
+      return P.washItems(date, sheetWash, appWash, week).concat(earlier).filter(w => !washedNow[U.unitKey(w.trailer)]);
     }
+    const got = { week: false, sheet: false, app: false };
 
     function render() {
       const list = items(), repeat = {}, ck = canSave();
@@ -97,14 +101,14 @@
       document.getElementById('hstats').innerHTML = [['To Wash', list.length, list.length ? 'wash' : ''], ['Repeat Trailers', repeats.length, repeats.length ? 'warn' : '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.getElementById('add-open').hidden = !ck;
-      document.getElementById('rows').innerHTML = list.map(w => '<tr><td class="rr"><b>' + escapeHtml(w.trailer || 'Trailer') + '</b>' + (w.route ? '<span>' + escapeHtml(w.route + ' · ' + w.run) + '</span>' : '') + '</td>' +
+      document.getElementById('rows').innerHTML = list.map(w => '<tr><td class="rr"><b>' + escapeHtml(w.trailer || 'Trailer') + '</b>' + (w.route || w.run ? '<span>' + escapeHtml([w.route, w.run].filter(Boolean).join(' · ')) + '</span>' : '') + '</td>' +
         '<td>' + escapeHtml(P.shortStamp(w.reported) || '—') + '</td><td class="detail"><b>' + escapeHtml(w.need) + '</b></td><td>' + (repeat[U.unitKey(w.trailer)] || 1) + '</td><td><span class="chk na">Not verified</span></td>' +
         '<td>' + (ck ? '<button type="button" class="wash" data-wash="' + escapeHtml(w.id) + '" title="Mark the trailer washed">Wash</button>' : '<span class="pill washp">Wash needed</span>') + '</td></tr>').join('') ||
-        '<tr><td colspan="6" class="empty">No trailers waiting to be washed.</td></tr>';
+        (got.week && got.sheet && got.app ? '<tr><td colspan="6" class="empty">No trailers waiting to be washed.</td></tr>' : '<tr><td colspan="6" class="empty">Loading the wash list&hellip;</td></tr>');
       document.getElementById('side').innerHTML = '<h2>Wash Analytics</h2><div class="line"><span>Open wash items</span><b>' + list.length + '</b></div><div class="line"><span>Washes this week</span><b>' + thisWeek + '</b></div>' +
         '<div class="line"><span>Repeat-report trailers</span><b>' + repeats.length + '</b></div><hr><h3>HIGHEST REPEAT COUNTS</h3>' +
         (Object.keys(repeat).sort((a, b) => repeat[b] - repeat[a]).slice(0, 5).map(k => '<p class="repeat"><b>' + escapeHtml(list.find(w => U.unitKey(w.trailer) === k).trailer || k) + '</b><span>' + repeat[k] + ' report' + (repeat[k] === 1 ? '' : 's') + '</span></p>').join('') || '<p class="repeat"><span>None</span></p>');
-      document.getElementById('foot').textContent = list.length + ' wash items. ' + (ck ? 'Wash marks the trailer washed and clears every report for it.' : 'View only.') + ' Requests come from the drivers\' check-ins, the email reports and unloading.';
+      document.getElementById('foot').textContent = list.length + (list.length === 1 ? ' wash item. ' : ' wash items. ') + (ck ? 'Wash marks the trailer washed and clears every report for it.' : 'View only.') + ' Requests come from the drivers\' check-ins, the email reports and unloading.';
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
@@ -120,7 +124,7 @@
         setTimeout(() => { delete washedNow[unit]; render(); }, 1500);
       } catch (e) {
         delete washedNow[unit];
-        showError('Wash ' + trailer + ': ' + (e.message || e));
+        showError('Wash ' + trailer + ' not saved (' + (e.message || e) + '). Press Wash again.');
         render();
       }
     }
@@ -133,10 +137,11 @@
     const bar = document.getElementById('add-bar'), input = document.getElementById('add-trailer');
     document.getElementById('add-open').onclick = () => { bar.hidden = !bar.hidden; if (!bar.hidden) { input.value = ''; input.focus(); } };
     document.getElementById('add-close').onclick = () => { bar.hidden = true; };
+    bar.addEventListener('keydown', e => { if (e.key === 'Escape') bar.hidden = true; });
     bar.addEventListener('submit', e => {
       e.preventDefault();
       const v = U.trailerText(input.value);
-      if (!v) { showError('Enter the trailer number.'); return; }
+      if (!v) { showError('Type the trailer number, then press Wash.'); input.focus(); return; }
       bar.hidden = true;
       washTrailer(v);
     });
@@ -155,15 +160,15 @@
     let db = null;
     function watch() {
       while (unsubs.length) unsubs.pop()();
-      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', weekDays())), s => { week = s.docs.map(d => d.data()); render(); }, e => showError('Could not read the washes: ' + e.message)));
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', weekDays())), s => { week = s.docs.map(d => d.data()); got.week = true; render(); }, e => showError('Could not read the washes (' + e.message + '). Check the network and reload the page.')));
     }
 
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
-      onSnapshot(collection(db, 'plantWash'), s => { sheetWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); render(); }, e => showError('Could not read the wash list: ' + e.message));
-      onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); render(); }, e => showError('Could not read the wash requests: ' + e.message));
+      onSnapshot(collection(db, 'plantWash'), s => { sheetWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); got.sheet = true; render(); }, e => showError('Could not read the wash list (' + e.message + '). Check the network and reload the page.'));
+      onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); got.app = true; render(); }, e => showError('Could not read the wash requests (' + e.message + '). Check the network and reload the page.'));
       watch();
       let shown = today();
       setInterval(() => { const t = today(); if (t !== shown) { if (date === shown) setDate(t); shown = t; } }, 60000);

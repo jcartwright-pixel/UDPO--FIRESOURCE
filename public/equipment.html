@@ -56,7 +56,9 @@
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
-    const today = L.operatingDay(new Date());
+    // Today follows the clock (6 a.m. roll), so a screen left open overnight marks and takes units off the right day.
+    const today = () => L.operatingDay(new Date());
+    const nyDate = (t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric' }); };
     const FILTERS = [['all', 'All'], ['TRUCK', 'Trucks'], ['TRAILER', 'Trailers'], ['down', 'Down / out']];
     let filter = 'all', search = '', downFor = null;
 
@@ -76,7 +78,7 @@
       if (syncing) return 'Syncing the fleet list...';
       if (!fleetSync || !fleetSync.at) return 'Fleet list: not synced yet';
       const when = new Date(fleetSync.at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-      if (!fleetSync.ok) return 'Fleet list sync failed ' + when + ': ' + fleetSync.error;
+      if (!fleetSync.ok) return 'Fleet list sync failed ' + when + ': ' + fleetSync.error + '. Press Sync again, or it runs again at 2 AM.';
       const n = (k) => (fleetSync[k] || []).length;
       const what = [n('added') && n('added') + ' added', n('inactive') && n('inactive') + ' off the list', n('back') && n('back') + ' back', n('changed') && n('changed') + ' updated'].filter(Boolean).join(', ');
       return 'Fleet list synced ' + when + (what ? ': ' + what : ': no changes');
@@ -97,7 +99,7 @@
 
     function render() {
       paintSync();
-      const edit = canSave(), all = units(), on = L.unitDefaultDays(routes, all), todayP = L.dayPrefix(today);
+      const edit = canSave(), all = units(), on = L.unitDefaultDays(routes, all), todayP = L.dayPrefix(today());
       document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
       document.getElementById('n-trucks').textContent = lists.allTrucks.filter(listed).length;
       document.getElementById('n-trailers').textContent = lists.allTrailers.filter(listed).length;
@@ -110,12 +112,12 @@
       document.getElementById('rows').innerHTML = list.map(e => {
         const off = L.unitOff(e), down = String(e.status).toUpperCase() === 'DOWN', days = on[e.id] || {};
         const action = !edit ? '' : downFor === e.id
-          ? '<span class="down-box"><input data-reason maxlength="120" placeholder="Why is it down?"><button type="button" class="warn" data-down-save>Down</button><button type="button" data-down-cancel>Cancel</button></span>'
+          ? '<span class="down-box"><input data-reason maxlength="120" aria-label="Why ' + escapeHtml(e.unit) + ' is down" placeholder="Why is it down?"><button type="button" class="warn" data-down-save>Down</button><button type="button" data-down-cancel>Cancel</button></span>'
           : down ? '<button type="button" data-up>Back in service</button>' : off ? '' : '<button type="button" class="warn" data-down>Put down</button>';
         return '<tr data-id="' + escapeHtml(e.id) + '"' + (off ? ' class="off"' : '') + '><td class="strong">' + escapeHtml(e.unit) + '</td><td><span class="tag">' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</span></td>' +
           '<td><span class="status' + (off ? ' off' : '') + '">' + escapeHtml(String(e.status || '').replace(/_/g, ' ') || 'ACTIVE') + '</span></td><td>' + escapeHtml(e.location || '') + '</td>' +
           L.DAYS.map(p => { const r = days[p] || []; return '<td class="eq-day' + (p === todayP ? ' today' : '') + (off && r.length ? ' issue' : '') + (r.length > 1 ? ' busy' : '') + '"' + (r.length > 1 ? ' title="Set for ' + r.length + ' runs that day"' : '') + '>' + r.map(n => '<span>' + escapeHtml(n) + '</span>').join('') + '</td>'; }).join('') +
-          '<td class="left">' + escapeHtml(downReason(e) + (down && e.downSince ? ' (since ' + shortDate(String(e.downSince).slice(0, 10)) + ')' : '')) + '</td><td>' + action + '</td></tr>';
+          '<td class="left">' + escapeHtml(downReason(e) + (down && e.downSince ? ' (since ' + nyDate(e.downSince) + ')' : '')) + '</td><td>' + action + '</td></tr>';
       }).join('') || '<tr><td colspan="13" class="empty">No units match.</td></tr>';
       const box = document.querySelector('[data-reason]');
       if (box) { box.value = typed; if (document.activeElement !== box) box.focus(); }
@@ -135,7 +137,7 @@
         downFor = null;
         const before = { status: unit.status, notes: unit.notes, downSince: unit.downSince };
         // Down takes the unit off today's and later loads (the server does it in the same call); Daily shows it at once.
-        saveOptimistic('setUnitDown', { equipmentId: unit.id, reason, today }, () => Object.assign(unit, { status: 'DOWN', notes: 'DOWN: ' + reason, downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
+        saveOptimistic('setUnitDown', { equipmentId: unit.id, reason, today: today() }, () => Object.assign(unit, { status: 'DOWN', notes: 'DOWN: ' + reason, downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
         return;
       }
       if (e.target.closest('[data-up]')) {
@@ -148,8 +150,10 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
+      let shownDay = today();
+      setInterval(() => { if (today() !== shownDay) { shownDay = today(); render(); } }, 60000);
       onSnapshot(doc(db, 'config', 'fleetSync'), s => { if (!syncing) { fleetSync = s.exists() ? s.data() : null; paintSync(); } }, () => {});
-      onSnapshot(collection(db, 'routes'), s => { routes = s.docs.map(d => d.data()); render(); }, e => showError('Could not read Route Master: ' + e.message));
+      onSnapshot(collection(db, 'routes'), s => { routes = s.docs.map(d => d.data()); render(); }, e => showError('Could not read Route Master (' + e.message + '). Check the network and reload the page.'));
     });
   </script>
 </body>

@@ -44,16 +44,20 @@ const COLUMNS = ({
   exceptions: { idColumn: 'exception_id', fields: {
     driverId: ['driver_id', 'text'], startDate: ['start_date', 'date'], endDate: ['end_date', 'date'], type: ['exception_type', 'text'],
     status: ['status', 'text'], reasonCode: ['reason_code', 'text'], notes: ['notes', 'text'], decisionNotes: ['decision_notes', 'text'], facilityId: ['facility_id', 'text'] } },
+  // Administration > People & Roles (admin.js): the Users list, found by email.
+  users: { idColumn: 'email', fields: {
+    name: ['display_name', 'text'], status: ['status', 'text'], roles: ['roles_json', 'json'], facilities: ['facility_ids_json', 'json'] } },
   vacations: { idColumn: 'id', fields: {
     driverId: ['driver_id', 'text'], startDate: ['start_date', 'date'], endDate: ['end_date', 'date'], status: ['status', 'text'],
     vacationType: ['vacation_type', 'text'], notes: ['notes', 'text'], facilityId: ['facility_id', 'text'] } }
 });
 // The maintenance queues (maintenance.js): new records only, written column for column; a column the tab lacks is skipped.
 ['maintTruck', 'maintTrailer', 'maintFork', 'maintWash', 'maintReturns'].forEach(k => { COLUMNS[k] = { idColumn: 'record_id', passThrough: true, collection: C.maintenance }; });
-const KIND_OF = { [C.drivers]: 'drivers', [C.equipment]: 'equipment', [C.routes]: 'routes', [C.exceptions]: 'exceptions', [C.vacations]: 'vacations' };
+const KIND_OF = { [C.users]: 'users', [C.drivers]: 'drivers', [C.equipment]: 'equipment', [C.routes]: 'routes', [C.exceptions]: 'exceptions', [C.vacations]: 'vacations' };
 
 function cellValue(kind, v) {
   if (v === null || v === undefined) return '';
+  if (kind === 'json') return JSON.stringify(v);
   if (kind === 'bool') return v === true ? 'TRUE' : v === false ? 'FALSE' : String(v);
   if (kind === 'time') return typeof v === 'number' ? L.timeText(v) : String(v);
   if (kind === 'number') return typeof v === 'number' ? v : String(v);
@@ -99,7 +103,7 @@ function queueMaster(tx, db, mode, requestId, part, ref, rowId, fields, create, 
  * One pass. sheets = { batchGet, batchUpdate }. targets = { drivers: {spreadsheetId, tab}, ... }: the sandbox copies of
  * the master lists (the same the copy reads). Returns counts.
  */
-async function runMasterWriteBack({ db, sheets, targets, now }) {
+async function runMasterWriteBack({ db, sheets, targets, now, only }) {
   Object.keys(targets || {}).forEach(k => assertSandboxTarget(targets[k] && targets[k].spreadsheetId));
   const stamp = (now ? now() : new Date()).toISOString();
   // Claim the oldest waiting saves first, so two passes at once (the save trigger and the minute pass) never both add
@@ -107,7 +111,8 @@ async function runMasterWriteBack({ db, sheets, targets, now }) {
   const claim = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), stale = new Date(Date.parse(stamp) - 5 * 60000).toISOString();
   const items = await db.runTransaction(async tx => {
     const q = await tx.get(db.collection(C.masterOutbox).where('status', 'in', ['pending', 'writing']).orderBy('at').orderBy('requestId').limit(BATCH));
-    const mine = q.docs.filter(d => d.data().status === 'pending' || String(d.data().claimedAt || '') < stale);
+    // only: just the lists named in targets (the Users copy while the write-back switch is off); the rest wait.
+    const mine = q.docs.filter(d => (d.data().status === 'pending' || String(d.data().claimedAt || '') < stale) && (!only || targets[d.data().list]));
     mine.forEach(d => tx.update(d.ref, { status: 'writing', claim, claimedAt: stamp }));
     return mine.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data()));
   });
