@@ -83,3 +83,17 @@ tr.rp-flag td { background: #fde8e8 !important; }
 .rp-card td small { color: var(--muted); font-weight: 600; font-size: 14px; }
 .rp-good { color: #16813b; font-weight: 800; } .rp-warn { color: #b36200; font-weight: 800; } .rp-bad { color: #c62828; font-weight: 800; }
 @media (max-width: 1500px) { .rp-days { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Shift Reports (Joe 10/11): every sent report on the left, the one picked on the right as it was emailed. */
+body.sr-page .view.sr-view:not([hidden]) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(540px, 1fr); grid-template-rows: minmax(0, 1fr); gap: 16px; min-height: 0; flex: 1; }
+.sr-list { min-height: 0; }
+.sr-table td, .sr-table th { font-size: 16px; }
+.sr-table tbody tr[data-id] { cursor: pointer; }
+.sr-table tbody tr[data-id]:hover td { background: var(--band); }
+.sr-table tbody tr.sr-on td { background: #e3eefb; box-shadow: inset 0 -1px 0 #9fb3c8; }
+.sr-table tbody tr.sr-on td:first-child { box-shadow: inset 4px 0 0 var(--ud-blue); }
+.sr-table tbody tr.sr-bad .detail { color: #b42318; font-weight: 700; }
+.sr-report { display: flex; flex-direction: column; min-height: 0; border: 1px solid #d5dee8; border-radius: 12px; background: #fff; overflow: hidden; }
+.sr-subject { padding: 12px 16px; font-size: 16px; font-weight: 800; color: var(--ud-blue-dark); border-bottom: 1px solid #e5ebf1; }
+.sr-report iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #f4f6f8; }
+@media (max-width: 1100px) { body.sr-page .view.sr-view:not([hidden]) { grid-template-columns: 1fr; } }
