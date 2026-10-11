@@ -64,7 +64,7 @@
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
     let pane = params.get('view') === 'history' ? 'history' : 'current', chosen = params.get('line') || '';
-    let setup = [], lineStatus = [], journal = [], products = {}, person = null, app = {}, shownFor = '', roundStart = '', form = null;
+    let setupRead = false, setup = [], lineStatus = [], journal = [], products = {}, person = null, app = {}, shownFor = '', roundStart = '', form = null;
     // A check being filled in box by box shows at once, over its saved copy, until the database has caught up.
     const pending = {};
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
@@ -104,7 +104,7 @@
       return '<label class="qc-product">Product being run<select class="prod-product"' + dis + '>' + opt('', cur, '') +
         list.map(p => '<option value="' + escapeHtml(p.name) + '"' + (p.name === cur ? ' selected' : '') + '>' + escapeHtml(p.name + (p.sku && p.sku !== p.name ? ' · ' + p.sku : '')) + '</option>').join('') +
         (cur && !known ? '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>' : '') + '<option value="' + OTHER + '">Other (type it)</option></select>' +
-        '<input class="prod-other" placeholder="Type the product" maxlength="120" hidden' + dis + '>' + note('prod-product') + was(old.product) + '</label>';
+        '<input class="prod-other" aria-label="Other product" placeholder="Type the product" maxlength="120" hidden' + dis + '>' + note('prod-product') + was(old.product) + '</label>';
     }
     function drawForm(line) {
       const ck = canSave(), cur = roundCheck(line), old = line.last || {}, last = cur || {}, w = last.weights || {}, ow = old.weights || {}, skip = U.qualitySkip(line.name), blow = U.isBlowMold(line.name), htst = U.isHtst(line.name), dis = ck ? '' : ' disabled';
@@ -113,15 +113,15 @@
       const note = (cls) => '<small class="as-note" data-note="' + cls + '"></small>';
       const word = (v) => CHECK[v] || v;
       const weight = blow ? '<div class="qc-heads">' + [1, 2, 3, 4, 5, 6].map(n => '<label>H' + n + '<input class="prod-head" data-head="' + n + '" inputmode="decimal" value="' + escapeHtml(w['head' + n] || '') + '"' + dis + '>' + was(ow['head' + n]) + '</label>').join('') + '</div>' + note('prod-head')
-        : '<input class="prod-weights" value="' + escapeHtml(w.result || '') + '"' + dis + '>' + note('prod-weights') + was(ow.result);
+        : '<input class="prod-weights" aria-label="Package weight" inputmode="decimal" value="' + escapeHtml(w.result || '') + '"' + dis + '>' + note('prod-weights') + was(ow.result);
       const fields = blow
         ? '<label>Jug size<select class="prod-product"' + dis + '><option value="Gallon">Gallon</option></select></label><label>Annealer temperature<input class="prod-temperature" inputmode="decimal" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' +
           '<label>Annealer speed<input class="prod-annealer-speed" inputmode="decimal" placeholder="Machine setting" value="' + escapeHtml(last.annealerSpeed || '') + '"' + dis + '>' + note('prod-annealer-speed') + was(old.annealerSpeed) + '</label><div class="qc-field wide"><span>Jug weight</span>' + weight + '</div><label>Cycle time<input class="prod-cycle" inputmode="decimal" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>'
         : productBox(line, last, old, dis, note, was) + sizeBox(line.name, last, old, dis, note, was) + (skip.weight ? '' : '<div class="qc-field"><span>Package weight</span>' + weight + '</div>') +
-          '<label>Temperature<input class="prod-temperature" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' + (skip.tip ? '' : '<label>Tip test' + pick3('prod-tip', last.tipTest).replace('<select', '<select' + dis) + note('prod-tip') + was(word(old.tipTest)) + '</label>') +
+          '<label>Temperature<input class="prod-temperature" inputmode="decimal" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' + (skip.tip ? '' : '<label>Tip test' + pick3('prod-tip', last.tipTest).replace('<select', '<select' + dis) + note('prod-tip') + was(word(old.tipTest)) + '</label>') +
           '<label>Label / date code' + pick3('prod-quality', last.qualityCheck).replace('<select', '<select' + dis) + note('prod-quality') + was(word(old.qualityCheck)) + '</label>' +
           // HTST #1 / #2 (Joe 10/11, review item 40): how much of the current run is left, as the old app.
-          (htst ? '<label>Remaining output<input class="prod-output" maxlength="80" placeholder="Left on this run" value="' + escapeHtml(last.remainingOutput || '') + '"' + dis + '>' + note('prod-output') + was(old.remainingOutput) + '</label>' : '') + (skip.cycle ? '' : '<label>Cycle time<input class="prod-cycle" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>');
+          (htst ? '<label>Remaining output<input class="prod-output" maxlength="80" placeholder="Left on this run" value="' + escapeHtml(last.remainingOutput || '') + '"' + dis + '>' + note('prod-output') + was(old.remainingOutput) + '</label>' : '') + (skip.cycle ? '' : '<label>Cycle time<input class="prod-cycle" inputmode="decimal" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>');
       document.getElementById('form-title').textContent = line.name + ' Quality Check';
       document.getElementById('form-last').textContent = cur ? 'This check ' + dateTime(cur.recordedAt) + (cur.recordedBy ? ' · ' + initials(cur.recordedBy) : '') : old.recordedAt ? 'Last check ' + dateTime(old.recordedAt) + (old.recordedBy ? ' · ' + initials(old.recordedBy) : '') + ' · ' + (RESULT[old.status] || old.status || '—') : 'No check recorded yet';
       document.getElementById('fields').innerHTML = fields + '<label>Overall result<select class="prod-status"' + dis + '>' + opt('', last.status, '') + opt('RUNNING', last.status, 'Pass') + opt('REVIEW', last.status, 'Review') + opt('DOWN', last.status, 'Fail') + (htst ? opt('CHANGEOVER', last.status, 'Changeover') : '') + opt('FINISHED', last.status, 'Finished') + '</select>' + note('prod-status') + was(RESULT[old.status] || old.status) + '</label>' +
@@ -147,10 +147,10 @@
       document.getElementById('pane-history').hidden = pane !== 'history';
       document.getElementById('lines').innerHTML = all.map(l => '<button type="button" data-line="' + escapeHtml(l.operationId) + '" class="' + (line && l.operationId === line.operationId ? 'active' : '') + '">' +
         '<i class="qc-dot st-' + String(l.last.status || 'NONE').toLowerCase() + '" title="' + escapeHtml(RESULT[l.last.status] || 'No check yet') + '"></i><span>' + escapeHtml(l.name) + '</span><b title="Checks in the last 24 hours">' + l.today + '</b>' + (U.isHtst(l.name) && l.last.status ? htstLine(l.last) : '') + '</button>').join('') ||
-        '<p class="empty">No production lines are set up for this plant.</p>';
+        '<p class="empty">' + (setupRead ? 'No production lines are set up for this plant.' : 'Loading the production lines…') + '</p>';
       // The form is redrawn when another line is picked or a newer check of this line arrives, not while someone types.
       const typing = document.getElementById('fields').contains(document.activeElement);
-      if (line && (!form || form.operationId !== line.operationId || (!typing && formKey(line) !== shownFor))) drawForm(line);
+      if (line && (!form || form.operationId !== line.operationId || (!typing && !form.busy && formKey(line) !== shownFor))) drawForm(line);
       document.getElementById('round').textContent = ck ? 'Saves as you go' + (roundStart ? ' · new round since the report at ' + clockOf(roundStart) : '') : '';
       document.getElementById('form').hidden = !line;
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td><b>' + escapeHtml(h.area) + '</b></td><td>' + escapeHtml(h.product || '') + '</td>' +
@@ -192,17 +192,26 @@
       if (!form.started) form.started = mine.recordedAt;
       pending[line.operationId] = mine;
       if (noteEl) { noteEl.textContent = 'Saving…'; noteEl.classList.remove('bad'); }
+      // While a box is saving the form is not drawn again (the check it is making can arrive first and would wipe the note).
+      const mineForm = form;
+      mineForm.busy = (mineForm.busy || 0) + 1;
       render();
       try {
         const done = await form.fill.send(fields);
         if (done && done.checkId) { mine._id = done.checkId; if (done.recordedAt) mine.recordedAt = done.recordedAt; }
         mine.saved = true;
         showError('');
-        if (noteEl) { noteEl.textContent = savedText(); form.notes[noteEl.dataset.note] = noteEl.textContent; }
+        // The new check can arrive and redraw the form before the save answers: write to the box's note as it is now.
+        const n = document.querySelector('[data-note="' + key + '"]');
+        form.notes[key] = savedText();
+        if (n) n.textContent = form.notes[key];
       } catch (err) {
-        if (noteEl) { noteEl.textContent = 'Not saved'; noteEl.classList.add('bad'); }
+        const n = document.querySelector('[data-note="' + key + '"]');
+        if (n) { n.textContent = 'Not saved'; n.classList.add('bad'); }
         showError(line.name + ': ' + (err.message || err));
       }
+      mineForm.busy--;
+      if (form === mineForm && !mineForm.busy) shownFor = formKey(line);
       render();
     });
     document.getElementById('lines').addEventListener('click', e => {
@@ -226,7 +235,7 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; shownFor = ''; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; shownFor = ''; render(); });
-      onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); render(); }, fail('the production lines'));
+      onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupRead = true; render(); }, fail('the production lines'));
       watchProducts(db, p => { products = p; shownFor = ''; render(); }, fail('the machine products'));
       watchRound(db, at => { roundStart = at; Object.keys(pending).forEach(k => delete pending[k]); render(); });
       // The first copy of the lines' last checks draws the form again (its grey "Last:" values), unless someone is typing.

@@ -96,6 +96,7 @@
     let area = P.AREAS.indexOf(String(params.get('area') || '').toUpperCase()) >= 0 ? String(params.get('area')).toUpperCase() : 'CASE';
     const today = () => L.operatingDay(new Date());
     let runs = [], pickups = [], person = null, app = {};
+    const me = () => (person && person.email) || '';
     const pending = {};           // row id -> fields shown before the server has them
     /* The current app's Plant Station SKIP (PlantStation.html:263-269, Joe 10/07: "only to be able to come back to it later"):
        it saves nothing. A load not started moves to the bottom of its group on this screen, marked SKIPPED · COME BACK, until
@@ -375,9 +376,12 @@
     // Edit box: Start Time, End Time, Notes (plus temperature and shift, kept on the Live row).
     let editing = null;
     function openModal(id) { document.getElementById('modal-back').hidden = false; document.getElementById(id).hidden = false; }
-    function closeModals() { document.getElementById('modal-back').hidden = true; document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); editing = null; }
+    // The two-press "Ended Up Not Running" starts unarmed every time the box opens or closes, so one press never marks another load.
+    function disarm() { const b = document.getElementById('edit-notrunning'); b.dataset.armed = ''; b.textContent = 'Ended Up Not Running'; }
+    function closeModals() { document.getElementById('modal-back').hidden = true; document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); editing = null; disarm(); }
     function openEdit(row) {
       editing = row;
+      disarm();
       document.getElementById('edit-sub').textContent = row.route + ' · ' + row.run;
       document.getElementById('edit-start').value = P.stampToLocal(row.startedAt);
       document.getElementById('edit-end').value = P.stampToLocal(row.completedAt);
@@ -411,11 +415,14 @@
 
     // Pickups: the list for this load, Pickup Complete on each open one, and Add Pickup.
     let puRow = null;
+    // Who and when (as the current app's pop-up): "Added by X · time" while open, "Completed time by X" once done.
+    const by = (who, at) => [who, at ? P.clock(at) : ''].filter(Boolean).join(' · ');
     function drawPickups() {
       const row = puRow, items = P.pickupsFor(row, P.withNotePickups(rowsNow(), pickups)), edit = canLoad();
       document.getElementById('pu-sub').textContent = row.route + ' · ' + row.run;
       document.getElementById('pu-list').innerHTML = items.map(p => '<div class="pu-item' + (P.pickupOpen(p) ? '' : ' done') + '"><span>' + escapeHtml(p.item) + (p.quantity ? ' · ' + escapeHtml(p.quantity) : '') +
-        '<small>' + (p.notes ? escapeHtml(p.notes) + ' · ' : '') + (P.pickupOpen(p) ? 'Not loaded · driver picks up before leaving' : 'Completed ' + P.clock(p.completedAt)) + '</small></span>' +
+        '<small>' + (p.notes ? escapeHtml(p.notes) + ' · ' : '') + (P.pickupOpen(p) ? 'Not loaded · driver picks up before leaving' + (p.createdBy || p.createdAt ? ' · Added by ' + escapeHtml(by(p.createdBy, p.createdAt)) : '')
+          : 'Completed ' + P.clock(p.completedAt) + (p.completedBy ? ' by ' + escapeHtml(p.completedBy) : '')) + '</small></span>' +
         (P.pickupOpen(p) && edit ? '<button type="button" data-done="' + escapeHtml(p.pickupId) + '">Pickup Complete</button>' : '') + '</div>').join('') || '<div class="hint">No pickups for this load.</div>';
       document.getElementById('pu-form').hidden = !edit;
       document.getElementById('pu-add').hidden = !edit;
@@ -428,14 +435,14 @@
       const note = P.withNotePickups(rowsNow(), pickups).find(p => p.pickupId === id && p.source === 'LOAD_NOTE');
       if (note) {
         // A pickup the load note asked for: completing it saves it as a pickup (the note as the item), already complete.
-        const temp = Object.assign({}, note, { source: '', quantity: 'See note', status: 'COMPLETE', completedAt: now });
+        const temp = Object.assign({}, note, { source: '', quantity: 'See note', status: 'COMPLETE', completedAt: now, completedBy: me() });
         pickups = pickups.concat([temp]);
         drawPickups(); render();
         save('completePickup', { pickupId: id, runDocId: note.runDocId, day: note.day, date: note.date })
           .catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
         return;
       }
-      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: now }) : p));
+      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: now, completedBy: me() }) : p));
       drawPickups(); render();
       save('completePickup', { pickupId: id }).catch(err => showError('Pickup: ' + (err.message || err)));
     });
@@ -443,7 +450,7 @@
       const row = puRow, item = document.getElementById('pu-item').value.trim(), quantity = document.getElementById('pu-qty').value.trim(), notes = document.getElementById('pu-note').value.trim();
       if (!item || !quantity) { showError('Enter the product and the quantity for the pickup.'); return; }
       showError('');
-      const temp = { pickupId: 'new-' + Date.now(), runDocId: row.runDocId, day: row.day, runId: row.runId, date: row.loadDate, item, quantity, notes, status: 'PENDING' };
+      const temp = { pickupId: 'new-' + Date.now(), runDocId: row.runDocId, day: row.day, runId: row.runId, date: row.loadDate, item, quantity, notes, status: 'PENDING', createdAt: new Date().toISOString(), createdBy: me() };
       pickups = pickups.concat([temp]);
       ['pu-item', 'pu-qty', 'pu-note'].forEach(k => { document.getElementById(k).value = ''; });
       drawPickups(); render();

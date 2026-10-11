@@ -65,6 +65,7 @@
     <div class="mc-dialog" role="dialog" aria-modal="true" aria-labelledby="rp-subject">
       <div class="mc-dhead"><div><span class="eyebrow">Send Current Report · To: Plant Managers group</span><h2 id="rp-subject"></h2></div>
         <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn" id="copy">&#10697; Copy</button><button type="button" class="mc-btn" id="print-report">&#9113; Print</button><button type="button" class="mc-btn send" id="send">&#9993; Send Current Report</button></div></div>
+      <div class="notice error" id="send-error" role="alert" hidden></div>
       <label class="mc-note">Note at the top of the email (optional)<textarea id="note" maxlength="1500" placeholder="Add a note to this report…"></textarea></label>
       <div class="mc-report-body" id="rp-body"></div>
     </div>
@@ -166,6 +167,9 @@
         part('Production lines', r.counts.linesDown ? r.counts.linesDown + ' down' : 'all running', r.lines.map(l => line(l.line, [l.product, l.status || 'no status', l.notChecked && l.lastCheckedAt ? 'last ' + l.lastCheckedAt : ''].filter(Boolean).join(' · '), l.flag ? 'bad' : l.notChecked ? 'warn' : '')), 'No production lines set up.', true) +
         part('Temperatures', r.counts.tempsOut ? r.counts.tempsOut + ' out' : 'all in range', r.temperatures.map(t => line(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.', true);
       ['send-card', 'send'].forEach(id => { document.getElementById(id).hidden = !canSend(); });
+      // Not before the loads and the journal are read, or the email would say "0 of 0 loaded".
+      const sb = document.getElementById('send');
+      if (sb.textContent !== 'Sending…') { sb.disabled = !ready(); sb.title = ready() ? '' : 'Loading the plant\'s data…'; }
       if (!document.getElementById('modal').hidden) drawReport();
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
@@ -194,7 +198,7 @@
         sect('Temperatures', null, '', r.temperatures.map(t => row(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : '') + (t.limit ? ' · limit ' + t.limit : '') + (t.due && t.status !== 'NO CHECK' ? ' · check due' : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.');
     }
 
-    function openReport() { document.getElementById('modal').hidden = false; document.getElementById('note').value = note; drawReport(); document.getElementById('note').focus(); }
+    function openReport() { document.getElementById('send-error').hidden = true; document.getElementById('modal').hidden = false; document.getElementById('note').value = note; drawReport(); document.getElementById('note').focus(); }
     document.querySelectorAll('[data-open-report]').forEach(b => b.addEventListener('click', openReport));
     document.getElementById('close').onclick = () => { note = document.getElementById('note').value; document.getElementById('modal').hidden = true; };
     document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') document.getElementById('close').click(); });
@@ -202,8 +206,10 @@
     // Back closes the report first.
     window.udBack = () => { if (document.getElementById('modal').hidden) return false; document.getElementById('close').click(); return true; };
     document.getElementById('note').addEventListener('input', e => { note = e.target.value; });
+    const loaded = { runs: false, journal: false }, ready = () => loaded.runs && loaded.journal;
     async function send(btn) {
-      if (!report || btn.disabled) return;
+      if (!report || btn.disabled || !ready()) return;
+      document.getElementById('send-error').hidden = true;
       const label = btn.innerHTML, ok = document.getElementById('saved');
       btn.disabled = true; btn.textContent = 'Sending…';
       try {
@@ -213,8 +219,12 @@
         showError('');
         if (res && res.sending && res.reportId && fsdb) followEmail(res.reportId, ok);
         else setTimeout(() => { ok.hidden = true; }, 8000);
-      } catch (e) { showError(e.message || String(e)); }
-      finally { btn.disabled = false; btn.innerHTML = label; }
+      } catch (e) {
+        // Shown in the report pop-up too, where the person is looking (the page's error line is behind it).
+        const m = e.message || String(e), box = document.getElementById('send-error');
+        showError(m); box.textContent = 'Not sent: ' + m; box.hidden = false;
+      }
+      finally { btn.innerHTML = label; render(); }
     }
     // The email goes out just after the save; the report's status says whether it went, and to whom.
     function followEmail(id, ok) {
@@ -272,9 +282,10 @@
       const watch = () => {
         date = today();
         unsubs.splice(0).forEach(u => u());
+        loaded.runs = loaded.journal = false;
         const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
-        unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); later(); }, fail('the loads')));
-        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); later(); }, fail('the plant journal')));
+        unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); loaded.runs = true; later(); }, fail('the loads')));
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); loaded.journal = true; later(); }, fail('the plant journal')));
         unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', [0, 1, 2, 3, 4, 5, 6, 7].map(n => L.addDays(date, -n)))), s => { data.shift = s.docs.map(d => d.data()); later(); }, fail('the shift notes')));
         unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); later(); }, fail('the pickups')));
       };
