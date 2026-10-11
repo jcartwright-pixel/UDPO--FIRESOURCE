@@ -1413,3 +1413,7 @@ table td button.warn { font-size: 15px; }
 #day-modal .day-row { flex-wrap: wrap; }
 #day-modal .day-row > div:first-child { flex: 1 1 200px; }
 #day-modal .day-row b { white-space: nowrap; margin-right: 6px; }
+
+/* Route Distribution home (review item 16): the Dispatch and Drivers cards carry the current app's quick staffing numbers,
+   Covered % and drivers Available today, as a fifth tile. */
+.card.home4 .dc-metrics.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
