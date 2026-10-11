@@ -822,6 +822,27 @@ html { background: var(--page); }
 .fleet-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .fleet-split.wide-left { grid-template-columns: 3fr 1fr; }
 .fleet-split h2 { margin: 6px 4px 8px; font-size: 17px; color: var(--ud-blue); }
+.fleet-split h2 .button.small { display: inline-block; font-size: 13px; padding: 3px 12px; margin-left: 8px; vertical-align: middle; border: 1px solid var(--ud-blue); border-radius: 6px; background: #fff; color: var(--ud-blue); text-decoration: none; }
+/* Fleet Service Setup (Joe 10/11, review items 24-26): the rules page, a unit's Edit row and the technician form. */
+.fs-edit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; background: #fff; border: 2px solid var(--ud-blue); border-radius: 10px; padding: 12px 14px; margin: 0 0 10px; }
+.fs-edit strong { font-size: 18px; color: var(--ud-blue); align-self: center; min-width: 90px; }
+.fs-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; color: #44515e; }
+.fs-edit label.wide { flex: 1; min-width: 220px; }
+.fs-edit input, .fs-edit select { font-size: 16px; padding: 6px 8px; border: 1px solid #c3cfdb; border-radius: 6px; min-width: 140px; }
+.fs-edit button { font-size: 16px; font-weight: 700; padding: 8px 18px; border-radius: 8px; border: 1px solid #c3cfdb; background: #fff; color: #1b2a3a; cursor: pointer; }
+.fs-edit button.primary { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.fs-edit-hint { flex-basis: 100%; color: #5a6b7d; font-size: 13px; }
+table.issues tr.editing td { background: #eef5fc; }
+table.issues tr.off td { color: #8a99a8; }
+.fs-rules { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-content: start; }
+.fs-rule { background: #fff; border-radius: 12px; border-top: 6px solid var(--ud-blue); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; }
+.fs-rule.dot { border-top-color: #e5891a; }
+.fs-rule h2 { margin: 0; font-size: 19px; color: var(--ud-blue); }
+.fs-rule label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 700; color: #44515e; }
+.fs-rule input { font-size: 22px; font-weight: 700; padding: 8px 10px; border: 1px solid #c3cfdb; border-radius: 8px; width: 100%; box-sizing: border-box; }
+.fs-rule input:disabled { background: #f3f6f9; color: #44515e; }
+@media (max-width: 1100px) { .fs-rules { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .fs-rules { grid-template-columns: 1fr; } }
 @media (max-width: 1200px) { .fleet-split, .fleet-split.wide-left { grid-template-columns: 1fr; } }
 
 /* Over the Road */

@@ -18,6 +18,7 @@ service cloud.firestore {
     match /config/app { allow read: if activeUser(); }
     match /config/fleetSync { allow read: if activeUser(); }
     match /config/mocreo { allow read: if activeUser(); }
+    match /config/fleetRules { allow read: if activeUser(); }
     // MOCREO cooler sensors (server only writes them).
     match /sensors/{id} { allow read: if activeUser(); }
     // Thermometer locations changed in Administration > MOCREO & Sensors (the server writes them; the key stays in private/).

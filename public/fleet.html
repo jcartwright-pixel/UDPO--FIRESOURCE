@@ -44,14 +44,17 @@
 
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Fleet Service (FleetService.html, 220_V7276_GarageFleetService.gs), Send to Garage puts a PM, reefer
-    // service or DOT inspection on the Garage Station (garage.js); the setup dates, rules and technicians are still changed in the sheet.
+    // service or DOT inspection on the Garage Station (garage.js). Joe 10/11 (review items 24-26): managers change the rules
+    // (fleet-rules.html), each unit's dates (Edit on Fleet Service Setup) and the technicians (fleet-techs.html) here (fleet.js).
     const L = window.UDLogic;
     const STATUS = { OVERDUE: ['Overdue', 'warn'], AT_GARAGE: ['At garage', 'yes'], DUE_SOON: ['Due soon', 'warn soon'], NO_MILES: ['No miles yet', 'no'], SET_UP: ['Needs start date', 'no'], OK: ['OK', 'yes'] };
     const JOB = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
-    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], orders = [], techs = [], search = '', kindFilter = '';
+    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], orders = [], techs = [], search = '', kindFilter = '', rules = Object.assign({}, L.FLEET_RULES), person = null, editing = '';
+    const MANAGERS = ['ADMINISTRATOR', 'ADMIN', 'MANAGER'];
+    const manager = () => L.hasRole(person, MANAGERS);
     const num = (n) => n === '' || n == null ? '' : Number(n).toLocaleString();
     const when = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
     const pill = (s) => '<span class="pill ' + s[1] + '">' + escapeHtml(s[0]) + '</span>';
@@ -99,8 +102,9 @@
       const now = (r) => { const i = r.c.PM; return i && i.now !== '' && i.now !== undefined && i.now !== null ? num(i.now) + (r.type === 'TRUCK' ? ' mi' : ' hrs') : ''; };
       const tip = (i) => !i ? '' : [i.what, 'Due ' + (i.key === 'PM' ? num(i.dueAt) + (i.dueAt !== '' ? ' mi' : '') : when(i.dueAt)), i.now !== '' && i.now !== undefined ? 'Now ' + num(i.now) : '', 'Left ' + (typeof i.left === 'number' ? num(i.left) + ' mi' : i.left), 'Last done ' + when(i.last), (STATUS[i.status] || [''])[0]].filter(Boolean).join(' · ');
       const box = (i) => { const x = boxText(i); return '<td class="gc ' + x.s + '" title="' + escapeHtml(tip(i)) + '"><b>' + escapeHtml(x.big) + '</b><small>' + escapeHtml(x.small) + '</small></td>'; };
-      // Send to Garage (managers): the PM / reefer service and DOT inspection due or overdue become Garage Station jobs. Plates never go.
-      const sendable = (r) => ['PM', 'DOT'].map(k => r.c[k]).filter(i => i && (i.status === 'OVERDUE' || i.status === 'DUE_SOON'));
+      // Send to Garage (managers): the PM / reefer service and DOT inspection due, overdue or with no miles yet (Joe 10/11, review item 31)
+      // become Garage Station jobs. Plates never go.
+      const sendable = (r) => ['PM', 'DOT'].map(k => r.c[k]).filter(i => i && (i.status === 'OVERDUE' || i.status === 'DUE_SOON' || i.status === 'NO_MILES'));
       const send = (r) => r.worst === 'AT_GARAGE' ? '<small>at garage</small>' : !sendable(r).length ? '' : '<button type="button" class="edit" data-send="' + escapeHtml(r.unit) + '" data-type="' + r.type + '" data-keys="' + sendable(r).map(i => i.key).join(',') + '" title="Put ' + escapeHtml(sendable(r).map(i => i.what).join(' and ')) + ' on the Garage Station">Send to Garage</button>';
       return '<div class="fs-legend"><em>' + need + ' of ' + rows.length + ' units need something</em></div>' +
         table([9, 7, 17, 17, 17, 10, 10, 13], ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status', ''],
@@ -109,7 +113,7 @@
     }
 
     function render() {
-      const t = today(), due = L.fleetDue(units(), setup, miles(), open(), null, t), month = t.slice(0, 7), weekAgo = L.addDays(t, -7);
+      const t = today(), due = L.fleetDue(units(), setup, miles(), open(), rules, t), month = t.slice(0, 7), weekAgo = L.addDays(t, -7);
       const late = due.items.filter(i => i.status === 'OVERDUE').length, soon = due.items.filter(i => i.status === 'DUE_SOON').length, week = done().filter(o => String(o.completed_at || '').slice(0, 10) >= weekAgo);
       document.getElementById('tab-due').textContent = late || '';
       document.getElementById('tab-work').textContent = open().length || '';
@@ -122,7 +126,7 @@
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="garage-station.html">Garage Station</a>';
         sheet.innerHTML = unitGrid(due, hit);
-        foot.textContent = due.units.length + ' trucks and trailers at Uniontown · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(L.FLEET_RULES.truckMiles) + ' miles, reefer every ' + L.FLEET_RULES.trailerMonths + ' months or ' + num(L.FLEET_RULES.trailerHours) + ' hours, DOT every ' + L.FLEET_RULES.dotMonths + ' months.';
+        foot.textContent = due.units.length + ' trucks and trailers at Uniontown · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules.truckMiles) + ' miles, reefer every ' + rules.trailerMonths + ' months or ' + num(rules.trailerHours) + ' hours, DOT every ' + rules.dotMonths + ' months.';
       } else if (view === 'work') {
         const o = open(), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
@@ -151,20 +155,54 @@
         foot.textContent = rows.length + ' finished jobs shown.';
       } else {
         k.innerHTML = '';
-        const R = L.FLEET_RULES;
+        const R = rules;
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span><span class="hint">Rules: PM every ' + num(R.truckMiles) + ' mi (warn ' + num(R.truckWarnMiles) + ' ahead) · Reefer every ' + R.trailerMonths + ' months or ' + num(R.trailerHours) + ' hrs · DOT every ' + R.dotMonths + ' months (warn ' + R.dotWarnDays + ' days) · Plates warn ' + R.plateWarnDays + ' days</span>' +
-          '<a class="button" href="soon.html?what=fleet-service-setup">Change the rules</a>';
-        sheet.innerHTML = '<div class="fleet-split wide-left"><div><h2>Units</h2>' + table([12, 9, 10, 13, 16, 13, 13, 14], ['Unit', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'DOT due', 'Plate expires', 'Notes'],
-          due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.tracked ? 'Yes' : 'No') + '</td><td>' + when(u.lastServiceDate) +
+          '<a class="button" href="fleet-rules.html">Change the rules</a><a class="button" href="fleet-techs.html">Technicians</a>';
+        const edit = (u) => manager() ? '<button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit</button>' : '';
+        sheet.innerHTML = '<div class="fleet-split wide-left"><div><h2>Units</h2>' + editPanel(due) + table([11, 8, 9, 12, 15, 12, 12, 14, 7], ['Unit', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'DOT due', 'Plate expires', 'Notes', ''],
+          due.units.filter(u => hit(u.unit)).map(u => '<tr' + (editing === u.unit ? ' class="editing"' : '') + '><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.tracked ? 'Yes' : 'No') + '</td><td>' + when(u.lastServiceDate) +
             (u.lastServiceMiles != null ? '<small>' + num(u.lastServiceMiles) + ' mi</small>' : u.lastServiceHours != null ? '<small>' + num(u.lastServiceHours) + ' hrs</small>' : '') + '</td><td>' +
-            (u.miles != null ? num(u.miles) + ' mi<small>' + when(u.milesDate) + '</small>' : u.currentHours != null ? num(u.currentHours) + ' hrs' : '') + '</td><td>' + when(u.dotDue) + '</td><td>' + when(u.plateExpires) + '</td><td class="wrong">' + escapeHtml(u.notes) + '</td></tr>').join(''), 'No units.') +
-          '</div><div><h2>Garage Technicians</h2>' + table([60, 40], ['Name', 'Active'], techs.map(x => '<tr><td class="strong">' + escapeHtml(x.name || '') + '</td><td>' + (L.yes(x.active === undefined ? 'TRUE' : x.active) ? pill(['Active', 'yes']) : pill(['Off', 'no'])) + '</td></tr>').join(''), 'No technicians yet.') + '</div></div>';
-        foot.textContent = 'Read only here: dates, rules and technicians are changed in the current app for now. PINs are never shown.';
+            (u.miles != null ? num(u.miles) + ' mi<small>' + when(u.milesDate) + '</small>' : u.currentHours != null ? num(u.currentHours) + ' hrs' : '') + '</td><td>' + when(u.dotDue) + '</td><td>' + when(u.plateExpires) + '</td><td class="wrong">' + escapeHtml(u.notes) + '</td><td>' + edit(u) + '</td></tr>').join(''), 'No units.') +
+          '</div><div><h2>Garage Technicians' + (manager() ? ' <a class="button small" href="fleet-techs.html">Change</a>' : '') + '</h2>' + table([60, 40], ['Name', 'Active'], techs.map(x => '<tr><td class="strong">' + escapeHtml(x.name || '') + '</td><td>' + (L.yes(x.active === undefined ? 'TRUE' : x.active) ? pill(['Active', 'yes']) : pill(['Off', 'no'])) + '</td></tr>').join(''), 'No technicians yet.') + '</div></div>';
+        foot.textContent = manager() ? 'Edit a unit to set its last service, DOT due, plate expiry and notes; due dates follow at once. Login IDs are never shown.' : 'Managers and administrators change the dates, rules and technicians. Login IDs are never shown.';
+        wireEdit();
       }
       const s = document.getElementById('search');
       if (s) s.oninput = (e) => { search = e.target.value.trim(); const at = e.target.selectionStart; render(); const n = document.getElementById('search'); n.focus(); n.setSelectionRange(at, at); };
       const p = document.getElementById('fs-print'); if (p) p.onclick = () => printReport(due, t);
       bar.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { kindFilter = b.dataset.kind; render(); }; });
+    }
+
+    // Edit one unit (the current app's Setup edit row): set the last service once; after that the garage keeps it current.
+    function editPanel(due) {
+      const u = due.units.find(x => x.unit === editing);
+      if (!u) return '';
+      const v = (x) => x === null || x === undefined ? '' : escapeHtml(String(x));
+      const truck = u.type !== 'TRAILER';
+      return '<form class="fs-edit" id="fs-edit"><strong>' + escapeHtml(u.unit) + '</strong>' +
+        '<label>Track due dates<select id="e-track"><option value="">Default (yes)</option><option value="YES"' + (u.trackSet === 'YES' ? ' selected' : '') + '>Yes</option><option value="NO"' + (u.trackSet === 'NO' ? ' selected' : '') + '>No</option></select></label>' +
+        '<label>Last service<input type="date" id="e-date" value="' + v(u.lastServiceDate) + '"></label>' +
+        (truck ? '<label>Last service miles<input id="e-miles" inputmode="numeric" value="' + v(u.lastServiceMiles) + '"></label>'
+          : '<label>Last service hours<input id="e-hours" inputmode="numeric" value="' + v(u.lastServiceHours) + '"></label><label>Reefer hours now<input id="e-now" inputmode="numeric" value="' + v(u.currentHours) + '"></label>') +
+        '<label>DOT due<input type="date" id="e-dot" value="' + v(u.dotDue) + '"></label><label>Plate expires<input type="date" id="e-plate" value="' + v(u.plateExpires) + '"></label>' +
+        '<label class="wide">Notes<input id="e-notes" maxlength="200" value="' + v(u.notes) + '"></label>' +
+        '<button type="submit" class="primary">Save</button><button type="button" id="e-cancel">Cancel</button></form>';
+    }
+    function wireEdit() {
+      const f = document.getElementById('fs-edit');
+      if (!f) return;
+      const val = (id) => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+      document.getElementById('e-cancel').onclick = () => { editing = ''; render(); };
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        const u = units().find(x => x.unit === editing), btn = f.querySelector('[type=submit]'), t = val('e-track');
+        btn.disabled = true; showError('');
+        try {
+          await save('saveFleetUnit', { unit: editing, unitType: u ? u.type : 'TRUCK', track: t === 'YES' ? true : t === 'NO' ? false : null, lastServiceDate: val('e-date'), lastServiceMiles: val('e-miles'),
+            lastServiceHours: val('e-hours'), currentHours: val('e-now'), dotDue: val('e-dot'), plateExpires: val('e-plate'), notes: val('e-notes') });
+          editing = ''; render();
+        } catch (err) { btn.disabled = false; showError(err.message); }
+      };
     }
 
     // The one-page report (the current app's Fleet Service & Compliance Report): everything overdue or due soon, then what is at the garage.
@@ -181,15 +219,17 @@
 
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; search = ''; render(); } });
     document.getElementById('sheet').addEventListener('click', async e => {
+      const ed = e.target.closest('[data-edit]');
+      if (ed) { editing = ed.dataset.edit; render(); const first = document.querySelector('#fs-edit select'); if (first) first.focus(); return; }
       const b = e.target.closest('[data-send]');
       if (!b) return;
       b.disabled = true; showError('');
       try { for (const key of b.dataset.keys.split(',')) await save('sendToGarage', { unit: b.dataset.send, unitType: b.dataset.type, serviceKey: key }); b.outerHTML = '<small>sent</small>'; }
       catch (err) { b.disabled = false; showError(err.message); }
     });
-    window.udBack = () => { if (view !== 'due' || search) { view = 'due'; search = ''; render(); return true; } return false; };
+    window.udBack = () => { if (editing) { editing = ''; render(); return true; } if (view !== 'due' || search) { view = 'due'; search = ''; render(); return true; } return false; };
 
-    requireSignIn(async () => {
+    requireSignIn(async (user) => {
       const { db } = await start();
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); render(); }, e => showError('Could not read ' + name + ': ' + e.message));
       watch('equipment', v => { equipment = v; });
@@ -197,6 +237,8 @@
       watch('odometers', v => { odometers = v; });
       watch('workOrders', v => { orders = v; });
       watch('garageTechs', v => { techs = v; });
+      onSnapshot(doc(db, 'config', 'fleetRules'), s => { rules = Object.assign({}, L.FLEET_RULES, (s.exists() && s.data().rules) || {}); render(); }, () => {});
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); }, () => {});
       render();
     });
   </script>

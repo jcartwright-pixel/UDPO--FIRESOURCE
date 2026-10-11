@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Fleet Service Rules · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill issues-page fleet-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Fleet Service Rules</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Fleet Service Rules</h1><small>When each service, inspection and plate is due. Fleet Service's due dates follow these rules the moment they are saved.</small></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="actions" data-top><a class="button" href="fleet.html?view=setup">Fleet Service Setup</a><span class="spacer"></span><span class="hint" id="saved"></span><button type="button" class="primary" id="save">Save Rules</button></div>
+      <form class="fs-rules" id="rules">
+        <section class="fs-rule"><h2>Truck PM Service</h2>
+          <label>Every (miles)<input data-rule="truckMiles" inputmode="numeric"></label>
+          <label>Warn (miles ahead)<input data-rule="truckWarnMiles" inputmode="numeric"></label></section>
+        <section class="fs-rule"><h2>Trailer Reefer Service</h2>
+          <label>Every (months)<input data-rule="trailerMonths" inputmode="numeric"></label>
+          <label>or (engine hours)<input data-rule="trailerHours" inputmode="numeric"></label>
+          <label>Warn (days ahead)<input data-rule="trailerWarnDays" inputmode="numeric"></label></section>
+        <section class="fs-rule dot"><h2>DOT Annual Inspection</h2>
+          <label>Every (months)<input data-rule="dotMonths" inputmode="numeric"></label>
+          <label>Warn (days ahead)<input data-rule="dotWarnDays" inputmode="numeric"></label></section>
+        <section class="fs-rule dot"><h2>Plates / Registration</h2>
+          <label>Warn (days ahead)<input data-rule="plateWarnDays" inputmode="numeric"></label></section>
+      </form>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, showError } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+    // The current app's Fleet Service Setup rules (FleetService.html, 220_V7276 RULES), Joe 10/11 review item 24. Kept in
+    // config/fleetRules (fleet.js); managers and administrators change them.
+    const L = window.UDLogic, MANAGERS = ['ADMINISTRATOR', 'ADMIN', 'MANAGER'];
+    let rules = Object.assign({}, L.FLEET_RULES), meta = {}, person = null, dirty = false;
+    const inputs = () => [...document.querySelectorAll('[data-rule]')];
+    function draw() {
+      const can = L.hasRole(person, MANAGERS);
+      inputs().forEach(i => { if (!dirty) i.value = rules[i.dataset.rule]; i.disabled = !can; });
+      document.getElementById('save').hidden = !can;
+      document.getElementById('saved').textContent = meta.updated_at ? 'Last changed ' + new Date(meta.updated_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' by ' + meta.updated_by : 'Standard rules (not changed yet)';
+      document.getElementById('foot').textContent = can ? 'Type a number above zero in each box, then Save Rules.' : 'Only managers and administrators change the rules.';
+    }
+    document.getElementById('rules').addEventListener('input', () => { dirty = true; });
+    async function saveRules() {
+      const b = document.getElementById('save'), given = {};
+      inputs().forEach(i => { given[i.dataset.rule] = i.value.trim(); });
+      b.disabled = true; showError('');
+      try { const r = await save('saveFleetRules', { rules: given }); rules = Object.assign({}, rules, r.rules || given); dirty = false; draw(); document.getElementById('saved').textContent = 'Saved. Due dates follow the new rules.'; }
+      catch (err) { showError(err.message); }
+      finally { b.disabled = false; }
+    }
+    document.getElementById('save').addEventListener('click', saveRules);
+    document.getElementById('rules').addEventListener('submit', e => { e.preventDefault(); saveRules(); });
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      onSnapshot(doc(db, 'config', 'fleetRules'), s => { meta = s.exists() ? s.data() : {}; rules = Object.assign({}, L.FLEET_RULES, meta.rules || {}); draw(); }, e => showError('Could not read the rules: ' + e.message));
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; draw(); }, () => {});
+      draw();
+    });
+  </script>
+</body>
+</html>

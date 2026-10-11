@@ -48,7 +48,7 @@
       'trailer-assignments': ['Trailer Assignments', 'The phone picker for which trailer goes on which load. Meanwhile trailers are set on Daily Dispatch.', 'daily.html', 'Daily Dispatch']
     };
     // Built since (10/10): an old link or QR code to these opens the screen itself.
-    const BUILT = { 'driver-dvir': 'route.html?view=dvir', 'driver-loadout': 'route.html?view=loadout', 'plant-station': 'plant-station.html', 'trailer-assignments': 'trailers.html', 'admin-driver-station': 'driver-station.html' };
+    const BUILT = { 'driver-dvir': 'route.html?view=dvir', 'driver-loadout': 'route.html?view=loadout', 'plant-station': 'plant-station.html', 'trailer-assignments': 'trailers.html', 'admin-driver-station': 'driver-station.html', 'fleet-service-setup': 'fleet-rules.html' };
     if (BUILT[new URLSearchParams(location.search).get('what')]) location.replace(BUILT[new URLSearchParams(location.search).get('what')]);
     // Administration items not built yet come back to the Administration Center.
     const key = new URLSearchParams(location.search).get('what') || '', a = /^admin-/.test(key) && adminItem(key.slice(6));
