@@ -363,7 +363,7 @@
     }
 
     // The truck and trailer boxes offer the fleet's units, as Daily Dispatch does (Joe 10/10): open ones first, then those on a
-    // route today, then those marked down. Any number can still be typed. The trailer list starts with TBA: the trailer is not
+    // route today. A unit marked down is left off the list while it is down (Joe 10/11). Any number can still be typed. The trailer list starts with TBA: the trailer is not
     // known yet (saved as plain TBA, never T-TBA).
     let units = { TRUCK: [], TRAILER: [] }, unitsShown = { TRUCK: '', TRAILER: '' };
     const unitKey = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -372,7 +372,7 @@
         const busy = new Set(rows.filter(r => !r.prior && r[k]).map(r => unitKey(r[k])));
         const word = (t) => t.down ? 'DOWN' : busy.has(unitKey(t.unit)) ? 'ON A ROUTE' : 'OPEN', rank = { OPEN: 0, 'ON A ROUTE': 1, DOWN: 2 };
         const html = (type === 'TRAILER' ? '<option value="TBA" label="Trailer not known yet">Trailer not known yet</option>' : '') +
-          units[type].map(t => ({ unit: t.unit, word: word(t) })).sort((a, b) => rank[a.word] - rank[b.word] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }))
+          units[type].filter(t => !t.down).map(t => ({ unit: t.unit, word: word(t) })).sort((a, b) => rank[a.word] - rank[b.word] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }))
             .map(t => '<option value="' + escapeHtml(t.unit) + '" label="' + t.word + '">' + t.word + '</option>').join('');
         if (html !== unitsShown[type]) { document.getElementById(id).innerHTML = html; unitsShown[type] = html; }
       });
