@@ -70,6 +70,7 @@ const ACTIONS = Object.freeze({
   // Unloading & Washing, Product Returns and Truck Washing.
   saveUnloading: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  addReturn: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   // Plant Operations Scheduler (Shipping and Receiving).
   savePlantSchedule: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveYardCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
@@ -326,6 +327,7 @@ function validate(input) {
   if (action === 'addPickup' || action === 'completePickup') return Object.assign(out, PLANT.validatePickup(action, input, SaveError));
   if (action === 'saveUnloading') return Object.assign(out, PLANT.validateUnload(input, SaveError));
   if (action === 'completeWash') return Object.assign(out, PLANT.validateWash(input, SaveError));
+  if (action === 'addReturn') return Object.assign(out, PLANT.validateReturn(input, SaveError));
   if (action === 'savePlantSchedule') return Object.assign(out, PLANT.validateSchedule(input, SaveError));
   if (action === 'saveYardCheck') return Object.assign(out, PLANT.validateYard(input, SaveError));
   if (action === 'saveQualityCheck') return Object.assign(out, PLANT.validateQuality(input, SaveError));
@@ -538,6 +540,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'addPickup' || req.action === 'completePickup') return PLANT.savePickup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveUnloading') return PLANT.saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, queueSheetCells);
     if (req.action === 'completeWash') return PLANT.saveWash(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'addReturn') return PLANT.saveReturn(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePlantSchedule') return PLANT.saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveYardCheck') return PLANT.saveYard(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveQualityCheck') return PLANT.saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError);

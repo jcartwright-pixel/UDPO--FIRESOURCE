@@ -802,3 +802,17 @@
 .temp-page .tp-pill { font-size: 14px; }
 .plant-page table.loadout td:has(> button.pu) { padding-left: 3px; padding-right: 3px; }
 .plant-page table.loadout td button { overflow-wrap: normal !important; }
+
+/* Product Returns: + Add Return (a return nobody noted). Big touch boxes for the Plant Station tablet, 16px text. */
+.returns-page .addret { flex-wrap: wrap; font-size: 16px; }
+.returns-page .addret label { font-size: 14px; font-weight: 700; }
+.returns-page .addret label.wide { flex: 1 1 280px; }
+.returns-page .addret select, .returns-page .addret input { height: 44px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; font: inherit; font-size: 16px; background: #fff; color: var(--ink); }
+.returns-page .addret select { min-width: 220px; max-width: 100%; }
+.returns-page .addret #add-other { margin-top: 6px; }
+.returns-page .addret #add-cases { width: 110px; }
+.returns-page .addret button { height: 44px; font-size: 16px; }
+@media (max-width: 700px) {
+  .returns-page .addret { margin: 0 8px; }
+  .returns-page .addret label, .returns-page .addret select { width: 100%; }
+}

@@ -51,6 +51,28 @@ test('RTA: the dock\'s returns and the driver check-in\'s return go back to the 
   assert.equal(now[DATE + '|811|UT DSD MILK'].status, 'WAITING');
 });
 
+test('Add a return nobody noted: a RETURN on the load (or Unknown) that RTA clears and the next copy keeps', async () => {
+  const add = (fields) => applyAction(db(), DISPATCHER, Object.assign({ action: 'addReturn', requestId: rid(), date: DATE }, fields));
+  await assert.rejects(add({ route: '811', run: 'UT DSD MILK', cases: '3' }), /Pick the product/);
+  await assert.rejects(add({ route: '811', run: 'UT DSD MILK', product: 'Whole Milk Gallon', cases: '' }), /Enter the cases/);
+  await assert.rejects(add({ product: 'Whole Milk Gallon', cases: '2' }), /Pick the route/);
+  const out = await add({ route: '811', run: 'UT DSD MILK', runDocId: '2026-10-04__run_p811', day: 'thu', trailer: '977', product: 'Whole Milk Gallon', sku: '1001', cases: '4' });
+  const unknown = await add({ unknown: true, product: '2% Milk Half Gallon', cases: '2' });
+  const rets = (await journal()).filter(d => d.type === 'RETURN' && d.createdInApp);
+  const mine = rets.find(d => d.recordId === out.recordId), lost = rets.find(d => d.recordId === unknown.recordId);
+  assert.equal(mine.payload.casesReturned, '4');
+  assert.equal(mine.payload.notes, 'Whole Milk Gallon');
+  assert.equal(mine.trailer, 'T-977');
+  assert.equal(lost.route, 'Unknown');
+  // RTA clears it the same way as a return the dock noted.
+  await unload('811', 'UT DSD MILK', { returnIds: [out.recordId] }, { runDocId: '2026-10-04__run_p811', day: 'thu' });
+  await unload('Unknown', 'Route not known', { returnIds: [unknown.recordId] });
+  const now = R.latestUnloads(await journal(), DATE);
+  assert.deepEqual(now[DATE + '|811|UT DSD MILK'].removed, [out.recordId]);
+  await copy();
+  assert.equal((await journal()).filter(d => d.type === 'RETURN' && d.createdInApp).length, 2, 'the copy keeps the added returns');
+});
+
 test('Wash: closes the trailer\'s requests and records the wash; another trailer\'s request is refused', async () => {
   const out = await applyAction(db(), DISPATCHER, { action: 'completeWash', requestId: rid(), date: DATE, trailer: '951', close: [{ list: 'plantWash', id: 'wash_d1' }] });
   assert.deepEqual(out.closed, ['wash_d1']);
