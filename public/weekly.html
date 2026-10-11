@@ -298,7 +298,8 @@
       document.getElementById('days-rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"><td><b>' + escapeHtml(r.route) + '</b></td><td>' + escapeHtml(r.run) + '</td>' +
         L.DAYS.map(p => '<td><button type="button" class="toggle' + (r.days[p].runs ? ' on' : '') + '" data-runday="' + p + '">' + (r.days[p].runs ? 'RUNS' : 'NO RUN') + '</button></td>').join('') + '</tr>').join('');
     }
-    document.getElementById('run-days').onclick = () => { openModal('days-modal'); paintRunDays(); };
+    // As in the current app (WeeklyDispatch.html weeklyRoutes): Route Run Days opens Route Week Override at the week shown here.
+    document.getElementById('run-days').onclick = () => { location.href = 'routeweek.html?week=' + encodeURIComponent(week); };
     document.getElementById('days-rows').addEventListener('click', e => {
       const b = e.target.closest('button[data-runday]');
       if (!b) return;
