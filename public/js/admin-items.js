@@ -46,7 +46,7 @@ export const ADMIN_GROUPS = [
   ]],
   ['Diagnostics', 'Checks and repairs for the data behind the app', [
     ['preflight', 'Run Runtime Pre-Flight', 'Checks every sheet, column and setting the app needs and lists anything missing.', '', 'check'],
-    ['update-live', 'Update Live Sheets', 'Writes the latest changes to the Live sheets (press twice).', '', 'swap'],
+    ['update-live', 'Update Live Sheets', 'Rebuilds the Current and Next weeks from Route Master and the drivers\' standard runs, and adds missing runs (press twice).', '', 'swap'],
     ['refresh-home', 'Refresh Home Summary Now', 'Rebuilds the all-plants overview numbers right away.', '', 'factory'],
     ['plant-fresh', 'Start Plant Fresh From Today', 'Starts the plant screens over from today\'s loads.', '', 'factory'],
     ['date-inventory', 'Date Inventory', 'Lists the dates each sheet holds.', '', 'day'],

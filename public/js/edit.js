@@ -244,6 +244,9 @@ export function saveRunChange(getRuns, runDocId, day, action, fields, apply, ren
   return next.catch(() => null);
 }
 
+// Resolves once every run save already sent or waiting in line has finished (Weekly's Publish waits for them).
+export function savesDone() { return Promise.all(Object.values(queues)); }
+
 export function saveAssignment(getRuns, runDocId, day, kind, pick, render, override) {
   const spec = kind === 'note' ? null : KINDS[kind];
   const fields = spec ? { [spec.field]: pick.unit ? '' : pick.id } : { note: pick };
