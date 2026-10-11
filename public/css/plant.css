@@ -140,7 +140,6 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
 .plant-page .pill.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
 .plant-page .pill.ret, .plant-page .pill.pend { background: #fde5e3; color: #b42332; border-color: #f2b8b2; }
 .plant-page .pill.washp { background: #e0f4f9; color: #006b86; border-color: #9fd6e4; }
-.plant-page .pill.out { background: #eef0f4; color: #3d4a5c; border-color: #c7cdd8; }
 .plant-page button.rta, .plant-page button.wash { min-width: 70px; height: 30px; border-radius: 8px; border: 0; color: #fff; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
 .plant-page button.rta { background: #b42332; }
 .plant-page button.wash { background: #e5891a; }

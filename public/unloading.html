@@ -87,7 +87,6 @@
     }
 
     function pill(r) {
-      if (P.notBack(r)) return '<span class="pill out">Not back ' + escapeHtml(P.timeOfDay(r.returnTime)) + '</span>';
       return '<span class="pill ' + (r.status === 'COMPLETE' ? 'done' : r.status === 'UNLOADING' ? 'run' : 'wait') + '">' + (r.status === 'COMPLETE' ? 'Done' : r.status === 'UNLOADING' ? 'Unloading' : 'Waiting') + '</span>';
     }
 

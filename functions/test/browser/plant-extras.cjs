@@ -1,8 +1,8 @@
 'use strict';
 /*
- * Browser check of the plant items from the parity list (L5) and the screen review (7-10), on the made-up plant day:
+ * Browser check of the plant items from the screen review (7-10), on the made-up plant day:
  *   Loadout: the two-press "Ended Up Not Running" never stays armed for the
- *   next load. Unloading: "Not back HH:MM" for a load not due back yet. Quality: the first box picked on a line saves and
+ *   next load. Unloading: the mode buttons say which is on. Quality: the first box picked on a line saves and
  *   says Saved even when the new check arrives before the save answers. Manager Center: Send waits for the plant's data.
  *   Pictures go to SHOTS_DIR.
  */
@@ -44,8 +44,6 @@ const until = async (fn, what) => { for (let i = 0; i < 80; i++) { const v = awa
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
-  // A load not due back for weeks.
-  await db().collection('runs').doc('2026-10-04__run_p812').update({ 'cells.thu_calculated_return_time': '11:30 PM', 'cells.thu_return_day_offset': '60' });
   const browser = await chromium.launch();
   const results = [];
   try {
@@ -64,10 +62,10 @@ const until = async (fn, what) => { for (let i = 0; i < 80; i++) { const v = awa
     assert.deepEqual(page.errors, []);
 
     const un = await openPage(browser, 1920, 1080, '/unloading.html?date=' + DATE + '&' + MANAGER);
-    await un.waitForFunction(() => /Not back 11:30 PM/.test(document.getElementById('rows').textContent));
+    await un.waitForSelector('#rows tr');
     assert.equal(await un.getAttribute('[data-mode="check"]', 'aria-pressed'), 'true');
     await shots(un, 'extras-unloading');
-    results.push('Unloading: 812 shows "Not back 11:30 PM" until it is checked in');
+    results.push('Unloading: Check Off / View Only say which is on (aria-pressed)');
 
     const q = await openPage(browser, 1920, 1080, '/quality.html?line=ut_prod_htst_1&' + MANAGER);
     await q.waitForFunction(() => document.getElementById('form-title').textContent === 'HTST #1 Quality Check');
