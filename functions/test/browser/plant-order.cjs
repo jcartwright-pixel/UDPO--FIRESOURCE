@@ -56,10 +56,9 @@ async function touchDrag(page, from, to) {
   // The finger goes down only once the screen has settled: both rows in view, the handle where it was 300 ms ago and
   // nothing over it (on a slower machine the rows were still moving when the finger went down, and nothing was dragged).
   // The row it goes to must show too, not sit under the table's fixed header (the finger would land on the header and the
-  // load would go nowhere), so the list is scrolled to the middle of the two and the spot checked for both.
-  await page.evaluate(([f, t]) => { const a = document.querySelector(f), b = document.querySelector(t), s = a.closest('.scroll-list');
-    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(), rs = s.getBoundingClientRect();
-    s.scrollTop += (Math.min(ra.top, rb.top) + Math.max(ra.bottom, rb.bottom)) / 2 - (rs.top + rs.bottom) / 2; }, [from, to]);
+  // load would go nowhere), so the list is scrolled to put that row just below the header, and the spot checked for both.
+  await page.evaluate(([f, t]) => { const b = document.querySelector(t), s = b.closest('.scroll-list');
+    s.scrollTop += b.getBoundingClientRect().top - (s.getBoundingClientRect().top + s.querySelector('thead').offsetHeight + 30); }, [from, to]);
   const hits = (sel, x, y) => page.evaluate(([s, px, py]) => { const el = document.elementFromPoint(px, py); return !!(el && el.closest(s)); }, [sel, x, y]);
   let a = null, b = null, ready = false;
   for (let i = 0; i < 40 && !ready; i++) {
