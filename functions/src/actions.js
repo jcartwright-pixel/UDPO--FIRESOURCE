@@ -313,7 +313,7 @@ function validate(input) {
     out.equipmentId = text(input.equipmentId);
     if (!out.equipmentId) throw new SaveError('BAD_REQUEST', 'Pick the truck or trailer');
     out.reason = text(input.reason, 120);
-    if (action === 'setUnitDown' && !out.reason) throw new SaveError('BAD_REQUEST', 'Say why the unit is down');
+    // Like the current app, the reason is optional.
     if (input.today !== undefined && !L.isDateKey(input.today)) throw new SaveError('BAD_REQUEST', 'today must be yyyy-mm-dd');
     out.today = input.today;
     return out;
@@ -624,7 +624,7 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
   const weeks = [L.weekStart(today), L.addDays(L.weekStart(today), 7)];
   const runs = await tx.get(db.collection(C.runs).where('weekStart', 'in', weeks));
   const idKey = unit.type === 'TRAILER' ? 'trailerId' : 'truckId', textKey = unit.type === 'TRAILER' ? 'trailer' : 'truck';
-  const removed = [];
+  const removed = [], taken = [];
   runs.docs.forEach(r => {
     const run = r.data(), update = {}, cells = {};
     L.DAYS.forEach((p, i) => {
@@ -633,15 +633,18 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
       update['days.' + p + '.' + idKey] = ''; update['days.' + p + '.' + textKey] = '';
       cells[p] = true;
       removed.push(run.route + ' ' + L.addDays(run.weekStart, i));
+      taken.push({ route: String(run.route || ''), run: String(run.run || ''), date: L.addDays(run.weekStart, i) });
     });
     if (!Object.keys(update).length) return;
     tx.update(r.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp }));
     result.runs.push({ runDocId: r.id, rev: run.rev + 1 });
     if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id.slice(-6) + p + i, run, r.id, p, { [idKey]: '', [textKey]: '' }, stamp, email));
   });
-  tx.update(ref, { status: 'DOWN', notes: 'DOWN: ' + req.reason, downSince: stamp, testEdited: true, editedAt: stamp, editedBy: email });
-  queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'DOWN', notes: 'DOWN: ' + req.reason }, false, stamp, email);
+  const downNote = req.reason ? 'DOWN: ' + req.reason : 'DOWN';
+  tx.update(ref, { status: 'DOWN', notes: downNote, downSince: stamp, testEdited: true, editedAt: stamp, editedBy: email });
+  queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'DOWN', notes: downNote }, false, stamp, email);
   result.removedFrom = removed;
+  result.taken = taken.sort((a, b) => a.date.localeCompare(b.date) || a.route.localeCompare(b.route, undefined, { numeric: true }));
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' }, after: { status: 'DOWN', reason: req.reason, removedFrom: removed }, result });
   return result;
 }

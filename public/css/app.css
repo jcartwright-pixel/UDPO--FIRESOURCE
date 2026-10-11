@@ -210,6 +210,7 @@ table.daily button.toggle, table.daily button.edit { line-height: 1; padding-top
 .modal-actions button, .down-add button, .down-list button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 .modal-actions button.primary { background: var(--ud-blue); color: #fff; border: 0; }
 .down-add { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: end; }
+.down-msg { margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: #fff4e5; color: #7a3d00; border: 1px solid #f0b46a; font-weight: 700; }
 .down-add button.warn { background: #fff4e5; color: #9a4b00; border-color: #f0b46a; }
 .down-list { margin-top: 12px; max-height: calc(100vh - 300px); overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
 .down-list table { font-size: 14px; }
