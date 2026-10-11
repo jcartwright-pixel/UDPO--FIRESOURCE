@@ -94,10 +94,37 @@ export function optionsHtml(kind, current, busy, opts) {
 
 // The same choices as optionsHtml, as a list for Daily's type-to-pick box: key is the name or unit the typing is matched against.
 export function pickChoices(kind, current, busy, opts) {
+  if (kind === 'driver') return driverChoices(current, busy, opts);
   const list = KINDS[kind].list(opts);
   if (current && kind !== 'driver' && !list.some(o => o.id === current) && pickText(kind, current)) list.unshift({ id: current, text: pickText(kind, current) });
   const item = (group) => (o) => ({ value: o.id, label: o.text + (busy && busy[o.id] && o.id !== current && !o.why ? '  (' + busy[o.id] + ')' : ''), key: pickText(kind, o.id) || o.text, group });
   return [{ value: '', label: '(none)', key: '', group: 'none' }].concat(list.map(item('list')), kind === 'driver' ? cvgOptions().map(item('cvg')) : []);
+}
+
+/*
+ * Daily's driver list, grouped like the current app (7.0.276, Joe picked list A 10/8): Relief drivers, then Regular drivers,
+ * each in seniority order and tagged "Relief" / "Seniority 2004"; then Other CVG / Carriers; then Unavailable with the reason (off, called off, vacation,
+ * on another route that day) last, which can be picked only with OVR ticked.
+ */
+export function driverChoices(current, busy, opts) {
+  opts = opts || {};
+  const relief = [], regular = [], blocked = [];
+  L.driverRosterRows(lists.allDrivers, opts.date).forEach(r => {
+    const d = lists.allDrivers.find(x => x.id === r.id) || {};
+    const off = opts.date ? L.exceptionOn(lists.exceptions, r.id, opts.date) : null;
+    const why = !L.driverActive(d) ? (d.status || 'INACTIVE') : off ? L.exceptionLabel(off) : busy && busy[r.id] ? busy[r.id].replace(/^on /, 'On ') : '';
+    const year = String(r.seniorityDate || '').slice(0, 4);
+    const c = { value: r.id, label: r.name, key: r.name };
+    if (why && r.id !== current) blocked.push(Object.assign(c, { group: 'blocked', head: 'UNAVAILABLE', reason: why, blocked: !opts.override }));
+    else if (r.reliefDriver) relief.push(Object.assign(c, { group: 'relief', head: 'RELIEF DRIVERS', note: 'Relief' }));
+    else regular.push(Object.assign(c, { group: 'regular', head: 'REGULAR DRIVERS', note: /^(19|20)\d\d$/.test(year) ? 'Seniority ' + year : '' }));
+  });
+  const cvg = cvgOptions().map(o => ({ value: o.id, label: o.text, key: o.text, group: 'cvg', head: 'OTHER CVG / CARRIERS' }));
+  const out = [{ value: '', label: '(none)', key: '', group: 'none' }].concat(relief, regular, cvg, blocked);
+  const counts = {};
+  out.forEach(c => { if (c.head) counts[c.head] = (counts[c.head] || 0) + 1; });
+  out.forEach(c => { if (c.head) c.head += ' \u00b7 ' + counts[c.head]; });
+  return out;
 }
 
 // Operational Assignments that are active, as driver choices (the current app's "Other CVG / Carriers").
