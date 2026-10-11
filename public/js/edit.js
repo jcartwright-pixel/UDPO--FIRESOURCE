@@ -5,10 +5,54 @@
  * background as one call. If the server refuses it (someone else changed that run, a unit is inactive, no
  * permission), the cell goes back to what the database holds and the reason shows as an error.
  */
-import { start, save, showError, escapeHtml } from './app.js';
+import { start, save as sendSave, showError, escapeHtml } from './app.js';
 import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const L = window.UDLogic;
+
+/*
+ * "Saving... / Saved" beside the screen's title, like the current app's Daily (7.0.2xx): every save on Daily and Weekly goes
+ * through here. A refused save shows "Not saved" (the reason is in the error line). Leaving the page while a save is still
+ * going asks first.
+ */
+let pending = 0, pillTimer = null, failed = false;
+function savePill(state) {
+  let pill = document.getElementById('save-pill');
+  if (!pill) {
+    const title = document.querySelector('.head .title h1');
+    if (!title) return;
+    pill = document.createElement('span');
+    pill.id = 'save-pill';
+    pill.setAttribute('role', 'status');
+    pill.style.cssText = 'display:inline-block;margin-left:12px;padding:2px 12px;border-radius:999px;font:800 16px/1.25 Arial,sans-serif;letter-spacing:0;vertical-align:middle;white-space:nowrap';
+    title.appendChild(pill); // on the title's line, without changing the header's height
+  }
+  const look = { saving: ['Saving\u2026', '#fff4d6', '#8a5a00'], saved: ['Saved \u2713', '#dff4e6', '#126334'], failed: ['Not saved', '#fde8e6', '#b3261e'] }[state];
+  pill.textContent = look[0];
+  pill.style.background = look[1];
+  pill.style.color = look[2];
+  pill.hidden = false;
+  clearTimeout(pillTimer);
+  if (state === 'saved') pillTimer = setTimeout(() => { pill.hidden = true; }, 4000);
+}
+async function save(action, fields) {
+  if (!pending) failed = false;
+  pending++;
+  savePill('saving');
+  try {
+    const out = await sendSave(action, fields);
+    pending--;
+    if (!pending) savePill(failed ? 'failed' : 'saved');
+    return out;
+  } catch (e) {
+    pending--;
+    failed = true;
+    savePill(pending ? 'saving' : 'failed');
+    throw e;
+  }
+}
+export function savesPending() { return pending; }
+window.addEventListener('beforeunload', e => { if (pending) { e.preventDefault(); e.returnValue = 'A change is still saving. Leave anyway?'; } });
 export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], fleetTrucks: [], fleetTrailers: [], exceptions: [], ops: L.opsAssignments([]), person: null, app: {} };
 
 // The screen's key in the per-screen switch (L.SCREENS); each page sets it once.
