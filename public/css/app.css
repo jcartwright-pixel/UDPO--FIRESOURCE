@@ -1400,3 +1400,7 @@ th.eq-day { font-size: 16px; }
 td.eq-day { font-size: 16px; }
 .equipment-page span.tag, table td span.tag { font-size: 14px; }
 table td button.warn { font-size: 15px; }
+
+/* Route Distribution home (review item 16): the Dispatch and Drivers cards carry the current app's quick staffing numbers,
+   Covered % and drivers Available today, as a fifth tile. */
+.card.home4 .dc-metrics.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
