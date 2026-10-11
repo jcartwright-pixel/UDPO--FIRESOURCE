@@ -43,7 +43,8 @@ const { safeIdPart } = require('./src/model');
 const { runFleetSync } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
 const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
-const { adminCall, stationRelease, AdminError } = require('./src/admin');
+const ADMIN = require('./src/admin');
+const { adminCall, stationRelease, AdminError } = ADMIN;
 const TOOLS = require('./src/admintools');
 const L = require('./src/logic');
 
@@ -197,8 +198,15 @@ exports.save = onCall(async (request) => {
 // workbook ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
 async function writeBackIfOn(part) {
   const config = (await db.collection('config').doc('app').get()).data() || {};
-  if (!config.writeBack || config.writeBack.enabled !== true || !process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
+  if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
   const target = JSON.parse(process.env.WRITEBACK_JSON);
+  // With the switch off, only People & Roles saves go out, and only to the sandbox's Users sheet copy (admin.js usersCopy).
+  if (!config.writeBack || config.writeBack.enabled !== true) {
+    if (part === 'live' || !ADMIN.usersCopy(process.env)) return null;
+    const users = target.masters.users, source = transferSources(process.env).masters.users;
+    if (!source || source.spreadsheetId !== users.spreadsheetId || source.tab !== users.tab) throw new Error('Write-back stopped: WRITEBACK_JSON.masters.users and SOURCES_JSON must name the same sandbox copy');
+    return { live: null, master: await runMasterWriteBack({ db, sheets: makeSheetsWriter(), targets: { users }, only: true }) };
+  }
   // The conflict check compares with what the copy last read, so the write-back must write the workbook the copy reads.
   if (target.spreadsheetId !== transferSources(process.env).live.spreadsheetId) {
     throw new Error('Write-back stopped: WRITEBACK_JSON and SOURCES_JSON must name the same sandbox Live workbook');

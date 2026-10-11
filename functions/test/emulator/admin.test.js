@@ -58,6 +58,31 @@ test('Add Person makes a new Users row; with the write-back off nothing is saved
   await assert.rejects(call({ op: 'savePerson', email: 'two@uniteddairy.com', name: 'Two', roles: ['EMPLOYEE'], status: 'ACTIVE', facilities: [], isNew: true, revision: newRev }), /write-back on/);
 });
 
+test('People & Roles on the sandbox: a save reaches the Users sheet copy with the write-back switch off', async () => {
+  await db().collection('config').doc('app').set({ writeBack: { enabled: false } });
+  const env = { WRITEBACK_JSON: JSON.stringify({ spreadsheetId: 'sandboxLive', masters: { users: { spreadsheetId: 'sandboxUsers', tab: 'USERS_MASTER' } } }) };
+  assert.equal(A.usersCopy(env), true);
+  assert.equal(A.usersCopy({}), false);
+  assert.equal(A.usersCopy(Object.assign({ DEMO_DATA: '1' }, env)), false);
+  // What the copy last read from the Users sheet copy: Joe's row with no plants listed.
+  await db().collection('users').doc('jcartwright@uniteddairy.com').set({ facilities: [], cells: { id: 'usr_joe', email: 'jcartwright@uniteddairy.com', display_name: 'jcartwright@uniteddairy.com', status: 'ACTIVE', roles_json: '["ADMINISTRATOR"]', version: '2', facility_ids_json: '[]' } }, { merge: true });
+  const joe = await person('jcartwright@uniteddairy.com');
+  const out = await call({ op: 'savePerson', email: joe.email, name: 'Joe Cartwright', roles: ['ADMINISTRATOR'], status: 'ACTIVE', facilities: ['*'], grants: [], denials: [], revision: joe.revision }, null, { env });
+  assert.equal(out.ok, true);
+  const q = (await db().collection('masterOutbox').get()).docs.map(d => d.data());
+  assert.deepEqual([q.length, q[0].list, q[0].cells.display_name, q[0].cells.facility_ids_json], [1, 'users', 'Joe Cartwright', '["*"]']);
+  // Only the Users copy goes out while the switch is off; anything else waits.
+  await db().collection('masterOutbox').doc('drv-1').set({ status: 'pending', at: '2000-01-01T00:00:00Z', requestId: 'drv-1', list: 'drivers', collection: 'drivers', docId: 'x', rowId: 'x', idColumn: 'driver_id', cells: { name: 'X' } });
+  const { runMasterWriteBack } = require('../../src/masterwrite');
+  const rows = [['id', 'email', 'display_name', 'status', 'roles_json', 'version', 'created_at', 'created_by', 'updated_at', 'updated_by', 'facility_ids_json'], ['usr_joe', 'jcartwright@uniteddairy.com', 'jcartwright@uniteddairy.com', 'ACTIVE', '["ADMINISTRATOR"]', '2', '', '', '', '', '[]']];
+  const written = [];
+  const sheets = { batchGet: async () => [rows], batchUpdate: async (id, data) => { written.push(...data); } };
+  const r = await runMasterWriteBack({ db: db(), sheets, targets: { users: { spreadsheetId: 'sandboxUsers', tab: 'USERS_MASTER' } }, only: true });
+  assert.equal(r.items, 1);
+  assert.equal((await db().collection('masterOutbox').doc('drv-1').get()).data().status, 'pending');
+  assert.ok(written.some(w => /K2$/.test(w.range) && w.values[0][0] === '["*"]'), 'All locations reaches the Users copy');
+});
+
 test('Add Role and Role Templates change what a person may save', async () => {
   await call({ op: 'addRole', name: 'Yard Lead', rights: ['plant.read', 'plant.write'] });
   const t = await call({ op: 'roleTemplates' });

@@ -27,7 +27,17 @@ export function say(box, text, kind) {
   m.className = 'ap-msg' + (kind ? ' ' + kind : '');
   m.hidden = !text;
 }
-export const errText = (err) => String(err && err.message || err).replace(/^FirebaseError:\s*/, '');
+// Plain words only: no "FirebaseError:", no [403] or (functions/...) codes.
+export const errText = (err) => String(err && err.message || err).replace(/^FirebaseError:\s*/, '').replace(/\s*[\[(](?:\d{3}|[a-z]+\/[a-z-]+)[\])]\s*$/i, '');
+// The locations a person really has, ticked (Joe 10/10): "*" is All locations; with none saved, an Administrator has
+// every plant and anyone else Uniontown (logic.js plantsFor), so the boxes show that instead of nothing.
+function shownPlants(p) {
+  const list = (p.facilities || []).map(String);
+  if (list.indexOf('*') >= 0) return ['*'];
+  const known = list.filter(f => L.PLANTS.some(x => x.id === f));
+  if (known.length) return known;
+  return (p.roles || []).some(r => /^ADMIN/.test(String(r).toUpperCase())) ? ['*'] : ['fac_uniontown'];
+}
 
 // Press twice: the first press arms the button (new label); the second runs it. Any other press disarms.
 export function twice(btn, armedLabel, run) {
@@ -146,7 +156,7 @@ export async function renderPeople(box) {
       '<label class="ap-field">Account status<select id="p-status"' + (primary ? ' disabled' : '') + '><option value="ACTIVE"' + (draft.status === 'ACTIVE' ? ' selected' : '') + '>Enabled</option><option value="INACTIVE"' + (draft.status !== 'ACTIVE' ? ' selected' : '') + '>Disabled</option></select></label></div>' +
       '<div class="ap-field"><b style="color:#0b3d6b;font-size:14px">Allowed locations</b><div class="ap-checks" id="p-plants"><label><input type="checkbox" value="*"' + (draft.facilities.indexOf('*') >= 0 ? ' checked' : '') + '> All locations</label>' +
       L.PLANTS.map(p => '<label><input type="checkbox" value="' + p.id + '"' + (draft.facilities.indexOf(p.id) >= 0 ? ' checked' : '') + '> ' + e(p.name) + (p.status !== 'ACTIVE' ? ' (being built)' : '') + '</label>').join('') +
-      '</div><span class="ap-help">No locations selected means no branch access. All locations must be selected explicitly.</span></div>' +
+      '</div><span class="ap-help">All locations covers every plant, including ones added later. With none ticked, an Administrator sees every plant and anyone else sees Uniontown.</span></div>' +
       '<div><b style="color:#0b3d6b">Effective Rights</b>' + (dirty ? ' <span class="ap-chip warn">Unsaved preview</span>' : '') +
       '<p class="ap-help" style="margin:4px 0">Use Role inherits the role template. Deny overrides Allow. Changes take effect only after Save.</p>' +
       '<table class="ap-t"><thead><tr><th>Action</th><th>Person exception</th><th>Result</th></tr></thead><tbody>' + rights + '</tbody></table></div>' +
@@ -156,7 +166,7 @@ export async function renderPeople(box) {
   function pick(person, open) {
     sel = person;
     if (!person && !open) { draft = null; dirty = false; renderList(); renderEdit(); return; }
-    draft = person ? { email: person.email, name: person.name, roles: person.roles.map(r => String(r).toUpperCase()), status: person.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE', facilities: person.facilities.slice(),
+    draft = person ? { email: person.email, name: person.name, roles: person.roles.map(r => String(r).toUpperCase()), status: person.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE', facilities: shownPlants(person),
       grants: person.grants.slice(), denials: person.denials.slice() } : { email: '', name: '', roles: ['EMPLOYEE'], status: 'ACTIVE', facilities: [], grants: [], denials: [] };
     dirty = false;
     renderList(); renderEdit();
