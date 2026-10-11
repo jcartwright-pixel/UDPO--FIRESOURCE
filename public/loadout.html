@@ -143,8 +143,9 @@
 
     // Loading order (as in the old app): today's loads of the shown department are dragged by the grab handle (a finger or
     // the mouse), or moved one place with the Up / Down arrow keys while the handle is selected; the new order is saved as today's load_sequence_override, which Driver Station, View Loadout
-    // and Plant Station follow. Only today (the operating day, rolling at 6 AM); prior-day loads keep their place on top.
-    const canOrder = () => canLoad() && date === today();
+    // and Plant Station follow. Today and the coming days (the operating day rolls at 6 AM); prior-day loads keep their place on top.
+    // Joe 10/11: the grab handle is on every loadout (Case, Totes, Boxes, Tanker), today and the coming days; a past day stays as loaded.
+    const canOrder = () => canLoad() && date >= today();
     const orderRows = (rows) => rows.filter(r => !r.prior && r.loadDate === date);
     // A skipped load waits at the bottom without arrows or handle; the others move around it (its place in the order is kept).
     const shownOrder = () => orderRows(rowsNow().filter(r => r.area === area)).filter(r => !isSkipped(r));
@@ -179,7 +180,7 @@
         '<span>' + escapeHtml(info.label) + ' <b>' + c.quantity.toLocaleString() + '</b></span>' +
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
-      const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r)) : [], ordering = movable.length > 1;
+      const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r)) : [], ordering = movable.length > 0;
       const cols = (ordering ? ORDER_COLS : COLS)[area === 'TANKER' ? 'TANKER' : 'normal'];
       document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');

@@ -549,9 +549,10 @@ async function applyAction(db, user, input, now) {
 
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderPlantLoads') {
-      // The plant changes the order of today's loads only (the operating day rolls at 6 AM).
+      // The plant changes the order of today's loads and of coming days' (Joe 10/11: the handle is on every loadout); a day
+      // already past stays as it was loaded (the operating day rolls at 6 AM).
       const today = L.operatingDay(now ? now() : new Date());
-      if (req.loadDate !== today) throw new SaveError('NOT_ALLOWED', 'The loading order can only be changed for today\'s loads');
+      if (req.loadDate < today) throw new SaveError('NOT_ALLOWED', 'The loading order can only be changed for today or a coming day');
       return reorder(tx, db, req, email, stamp, logRef, mode);
     }
     if (req.action === 'moveRun') return moveRun(tx, db, req, email, stamp, logRef, mode);
