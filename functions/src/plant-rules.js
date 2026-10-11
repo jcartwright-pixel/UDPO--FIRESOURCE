@@ -550,7 +550,7 @@
   }
 
   /* ---------- Send Current Report ---------- */
-  var REPORT_BEHIND = 30, REPORT_AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
+  var REPORT_BEHIND = 45, REPORT_AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
   function zoned(ms, opts) { return new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: YARD_ZONE }, opts)).format(new Date(ms)); }
   function clockOf(v) { var t = typeof v === 'number' ? v : Date.parse(v || ''); return isFinite(t) && t ? zoned(t, { hour: 'numeric', minute: '2-digit' }) : text(v); }
   function minutesText12(m) { if (m === null || m === undefined || m === '') return ''; var h = Math.floor(m / 60) % 24, mm = m % 60; return (h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm + ' ' + (h < 12 ? 'AM' : 'PM'); }
@@ -569,7 +569,7 @@
       areas[r.area].total++; out.total++;
       if (r.state === 'DONE') { out.loaded.push(item); return; }
       areas[r.area].left++; out.leftToLoad++;
-      if (until !== null && until <= REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); } else out.nextUp.push(item);
+      if (until !== null && until < -REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); } else out.nextUp.push(item);
     });
     var byDepart = function (a, b) { var x = a.minutesUntil === null ? 1e9 : a.minutesUntil, y = b.minutesUntil === null ? 1e9 : b.minutesUntil; return x - y || a.route.localeCompare(b.route, undefined, { numeric: true }); };
     out.behind.sort(byDepart);
@@ -606,7 +606,7 @@
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
   function reportText(r) {
     var L = [];
-    L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': every route due within ' + r.behindMinutes + ' minutes is COMPLETE'));
+    L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': no route is more than ' + r.behindMinutes + ' minutes past its depart time'));
     r.behind.forEach(function (x) { L.push('  ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.startedAt ? ' since ' + x.startedAt : '') + '  ' + x.late + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '')); });
     L.push('');
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in the Incident & Breakdown Log'));

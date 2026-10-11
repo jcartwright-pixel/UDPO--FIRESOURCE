@@ -69,10 +69,10 @@ async function openPage(browser, url, when) {
       await sunday.waitForTimeout(1500);
       assert.match(await sunday.textContent('#pv-subject'), /All routes on time/);
       await sunday.close();
-      const later = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-12T04:40:00Z');
+      const later = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-12T04:46:10Z');
       await later.waitForFunction(() => /1 route behind/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
       assert.match(await later.textContent('body'), /971[\s\S]*BEHIND/);
-      results.push('Sunday 7:00 PM none is behind; Monday 12:40 AM only 971 (departs 12:00 AM Monday) is');
+      results.push('Sunday 7:00 PM none is behind; Monday 12:46 AM only 971 (46 minutes past; 45 is not behind) (departs 12:00 AM Monday) is');
       for (const p of [early, lo, later]) assert.deepEqual(p.errors, []);
     }
   } finally {

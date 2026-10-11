@@ -57,7 +57,7 @@ export function loadOutcome(row, nowWall) {
   if (row.state === 'DONE') {
     if (done === null || depart === null) out.result = 'LOADED';
     else { out.late = done - depart; out.result = out.late <= ON_TIME_MINUTES ? 'ON TIME' : 'LATE'; }
-  } else if (depart !== null && nowWall >= depart + ON_TIME_MINUTES) out.result = 'NOT LOADED';
+  } else if (depart !== null && nowWall > depart + ON_TIME_MINUTES) out.result = 'NOT LOADED';
   else if (depart === null && nowWall >= (dayNum(row.loadDate) + 1) * 1440 + 360) out.result = 'NOT LOADED';
   else out.result = 'TO COME';
   return out;
