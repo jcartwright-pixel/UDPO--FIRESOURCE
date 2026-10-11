@@ -95,24 +95,6 @@ export function sizeFor(mfgType) {
 
 export const OTHER = '__other__';
 
-// Joe 10/11: Get from RedZone. The plant's lists as they are, with RedZone's SKU, Type and Group for each product RedZone has by
-// the same name, and RedZone's other products in a NEW PRODUCTS area to move where they belong. Nothing is removed. The rows go
-// through the same preview as an uploaded template. lists: [{area, products}] in area order; rz: [{name, sku, mfgType, productGroup}].
-// Rows come back as {Plant, Area, Product, SKU, ...} (the template headings), with every other field as the product has it.
-export const NEW_AREA = 'NEW PRODUCTS';
-export function fromRedzone(plantName, lists, rz) {
-  const key = (n) => String(n || '').trim().toUpperCase(), by = {}, used = {}, rows = [];
-  const row = (area, p) => { const r = { Plant: plantName, Area: area }; FIELDS.forEach(f => { r[f.head] = p[f.k] === undefined || p[f.k] === null ? '' : String(p[f.k]); }); return r; };
-  (rz || []).forEach(p => { if (key(p.name) && !by[key(p.name)]) by[key(p.name)] = p; });
-  (lists || []).forEach(a => (a.products || []).forEach(p => {
-    const r = by[key(p.name)];
-    used[key(p.name)] = true;
-    rows.push(row(a.area, Object.assign({}, p, r ? { sku: r.sku || p.sku, mfgType: r.mfgType || p.mfgType, productGroup: r.productGroup || p.productGroup } : {})));
-  }));
-  let added = 0;
-  Object.keys(by).forEach(k => { if (used[k]) return; added++; rows.push(row(NEW_AREA, by[k])); });
-  return { rows, added };
-}
 // Rows of cells with a heading row -> [{heading: value}] by the template's headings (any case); headings a file leaves out are not set.
 export function rowsByHeading(rows) {
   if (!rows.length) return { rows: [], has: {} };
