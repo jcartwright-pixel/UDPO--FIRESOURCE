@@ -144,12 +144,13 @@
     }
 
     /*
-     * Current app 7.0.226 / 7.0.230: the Saturday sheet also shows the Sunday-loaded rows. Each delivery day is one block;
-     * inside a block that holds loads from both days, "LOADED SATURDAY" / "LOADED SUNDAY" lines split them.
+     * Each delivery day is one block. (The current app's Saturday sheet also showed the Sunday-loaded rows; Joe 10/11: not any
+     * more. A block can still hold loads from two load days only if one ever does, and then "LOADED ..." lines split them.)
      */
     const isSaturday = (key) => L.dayPrefix(key) === 'sat';
     function sheetRows() {
-      const list = isSaturday(loadDate) ? L.dailyRows(runs, loadDate).concat(L.dailyRows(runs, L.addDays(loadDate, 1))) : L.dailyRows(runs, loadDate);
+      // Joe 10/11: a loadout day's sheet shows only the loads loaded that day; Sunday-loaded runs show when Sunday is picked.
+      const list = L.dailyRows(runs, loadDate);
       return list.map((r, i) => ({ r, i })).sort((a, b) => (a.r.deliveryDate < b.r.deliveryDate ? -1 : a.r.deliveryDate > b.r.deliveryDate ? 1 : 0)
         || (a.r.loadDate < b.r.loadDate ? -1 : a.r.loadDate > b.r.loadDate ? 1 : 0) || a.i - b.i).map(x => x.r);
     }
