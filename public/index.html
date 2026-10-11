@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Home · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="launch-page">
+  <div class="signin" id="signin" hidden>
+    <h1>New Plant Operations</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+  <div id="screen" hidden>
+    <div class="topbar"><span class="who" id="who"></span><button id="signout" type="button">Sign out</button></div>
+    <div class="launch-title"><h1 id="plant-name">Uniontown Operations</h1><p>Select the department you want to open.</p><span id="today">-</span></div>
+    <div class="notice error" id="error" hidden></div>
+    <!-- Joe 10/10: like the old app's home, one big picture per side; each opens its side, whose menu lists only its own screens. -->
+    <section class="launch-grid" id="sides"></section>
+  </div>
+  <script type="module">
+    import { start, requireSignIn, shortDate, SIDES, escapeHtml } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    const L = window.UDLogic;
+    const card = (s) => '<a class="launch-card" data-side="' + s.key + '" href="' + s.home + '">' +
+      '<span class="launch-art">' + (s.art || '<img src="img/library/' + s.pic + '" alt="">') + '</span><strong>' + escapeHtml(s.name) + '</strong><small>' + escapeHtml(s.note) + '</small>' +
+      '<b>Open ' + escapeHtml(s.short || s.name.replace(/^Route /, '').replace(/ Operations$/, '')) + ' &rarr;</b></a>';
+    // Joe 10/10: Administrators also get an Administration card, the same size, leading to everything the current app's
+    // Administration did (inside the new app).
+    const ADMIN = { key: 'admin', name: 'Administration', home: 'administration.html', short: 'Administration', note: 'People and rights, links and codes, settings, system tools and dispatch administration',
+      art: '<svg class="launch-admin" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="54" fill="#0b3d6b"/><circle cx="60" cy="60" r="47" fill="#1f6feb"/>' +
+        '<path fill="#fff" d="M60 24l6 8 10-2 2 10 9 5-4 9 4 9-9 5-2 10-10-2-6 8-6-8-10 2-2-10-9-5 4-9-4-9 9-5 2-10 10 2z"/><circle cx="60" cy="60" r="13" fill="#1f6feb"/><circle cx="60" cy="60" r="6" fill="#f2c14e"/></svg>' };
+    let admin = false;
+    const draw = () => {
+      const grid = document.getElementById('sides');
+      grid.classList.toggle('with-admin', admin);
+      grid.innerHTML = SIDES.map(card).join('') + (admin ? card(ADMIN) : '');
+    };
+    draw();
+    // The side picked here is the side its screens' menu shows.
+    document.getElementById('sides').addEventListener('click', e => { const a = e.target.closest('[data-side]'); if (a) try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ } });
+    requireSignIn(async (user) => {
+      const today = L.operatingDay(new Date());
+      document.getElementById('today').textContent = L.dayName(today) + ' ' + shortDate(today);
+      const { db } = await start();
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), snap => {
+        const person = snap.exists() ? Object.assign({ email: user.email }, snap.data()) : null, plants = L.plantsFor(person);
+        let picked = '';
+        try { picked = sessionStorage.getItem('udPlant') || ''; } catch (e) { /* no storage */ }
+        // Someone who sees more than one plant starts on the all-plants overview; a one-plant person (Joe: a supervisor
+        // such as Brian Bircher) only ever sees their plant's home.
+        if (plants.length > 1 && !picked) { location.replace('company.html' + location.search); return; }
+        const plant = L.PLANTS.find(p => p.id === (plants.indexOf(picked) >= 0 ? picked : plants[0])) || L.PLANTS[0];
+        document.getElementById('plant-name').textContent = plant.name + ' Operations';
+        if (admin !== L.isAdmin(person)) { admin = L.isAdmin(person); draw(); }
+      });
+    });
+  </script>
+</body>
+</html>

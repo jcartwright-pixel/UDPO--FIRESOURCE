@@ -1,0 +1,18 @@
+{
+  "name": "United Dairy Operations",
+  "short_name": "UD Operations",
+  "description": "United Dairy plant, distribution and fleet screens.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e138d",
+  "theme_color": "#074c84",
+  "icons": [
+    { "src": "/img/app-icon/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/img/app-icon/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/img/app-icon/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/img/app-icon/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

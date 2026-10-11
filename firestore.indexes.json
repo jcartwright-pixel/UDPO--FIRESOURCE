@@ -1,0 +1,140 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "outbox",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestId",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "conflicts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "open",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "masterOutbox",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestId",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "plantJournal",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "runs",
+      "fieldPath": "cells",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "runs",
+      "fieldPath": "days",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "drivers",
+      "fieldPath": "cells",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "equipment",
+      "fieldPath": "cells",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "routes",
+      "fieldPath": "cells",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "cells",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "weeks",
+      "fieldPath": "rowHashes",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "transfers",
+      "fieldPath": "warnings",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "meta",
+      "fieldPath": "hashes",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "actions",
+      "fieldPath": "before",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "actions",
+      "fieldPath": "after",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "outbox",
+      "fieldPath": "cells",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "masterOutbox",
+      "fieldPath": "cells",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "plantLoads",
+      "fieldPath": "cells",
+      "indexes": []
+    }
+  ]
+}

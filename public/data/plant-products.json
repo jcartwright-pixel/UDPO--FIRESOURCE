@@ -1,0 +1,3193 @@
+{
+ "source": "RedZone Configuration > Productivity > Products (Uniontown), typed from screenshots 2026-10-10",
+ "rule": "by RedZone MFG Type: Gallon->GALLON FILLER; Half Gallon->NEW and OLD 1/2 GALLON; Quart/Pint->OLD 1/2 GALLON; 5 Gallon and 2.5 Gallon bags->RAYPAK and BOXING; TOTE->TOTES; Blow Mold->BLOW MOLD; HTST #1/#2 get every product except the jug; Raw Milk only on HTST",
+ "facilityId": "UNIONTOWN",
+ "lines": [
+  {
+   "operationId": "ut_prod_boxing",
+   "line": "BOXING",
+   "products": [
+    {
+     "name": "12% Frutero",
+     "sku": "",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "8% Frutero",
+     "sku": "",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "Country Parlor 15%",
+     "sku": "5472",
+     "mfgType": "2.5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Choc 2.5 Gal single",
+     "sku": "255203",
+     "mfgType": "2.5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Choc 5 Gal Mix",
+     "sku": "255202",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Van 5 Gal Mix",
+     "sku": "255102",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% Choc 5 Gal Disp Bag",
+     "sku": "1302",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 14.5% White MX 5 Gal",
+     "sku": "5450",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 18% cream 5 Gal",
+     "sku": "1804",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% 5 Gal Disp Bag",
+     "sku": "302",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25% BM 5 Gal Bag",
+     "sku": "903",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 40% Cream 5 Gal",
+     "sku": "121802",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD HVD 5 Gal Disp Bag",
+     "sku": "202",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD LF BM 5 Gal Bag",
+     "sku": "902",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Skim 5 Gal Disp Bag",
+     "sku": "702",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD VAN 2.5 Gal DQ single",
+     "sku": "255103",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    }
+   ]
+  },
+  {
+   "operationId": "ut_prod_totes",
+   "line": "TOTES",
+   "products": [
+    {
+     "name": "VENTURA .5% 06984 BML...",
+     "sku": "401903",
+     "mfgType": "TOTE",
+     "productGroup": "Milk"
+    }
+   ]
+  },
+  {
+   "operationId": "ut_prod_raypak",
+   "line": "RAYPAK",
+   "products": [
+    {
+     "name": "12% Frutero",
+     "sku": "",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "8% Frutero",
+     "sku": "",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "Country Parlor 15%",
+     "sku": "5472",
+     "mfgType": "2.5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Choc 2.5 Gal single",
+     "sku": "255203",
+     "mfgType": "2.5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Choc 5 Gal Mix",
+     "sku": "255202",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Van 5 Gal Mix",
+     "sku": "255102",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% Choc 5 Gal Disp Bag",
+     "sku": "1302",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 14.5% White MX 5 Gal",
+     "sku": "5450",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 18% cream 5 Gal",
+     "sku": "1804",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% 5 Gal Disp Bag",
+     "sku": "302",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25% BM 5 Gal Bag",
+     "sku": "903",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 40% Cream 5 Gal",
+     "sku": "121802",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD HVD 5 Gal Disp Bag",
+     "sku": "202",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD LF BM 5 Gal Bag",
+     "sku": "902",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Skim 5 Gal Disp Bag",
+     "sku": "702",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD VAN 2.5 Gal DQ single",
+     "sku": "255103",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    }
+   ]
+  },
+  {
+   "operationId": "ut_prod_htst_1",
+   "line": "HTST #1",
+   "products": [
+    {
+     "name": "12% Frutero",
+     "sku": "",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "38% Cream",
+     "sku": "294",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "8% Frutero",
+     "sku": "",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "Broughton 2% Gallon",
+     "sku": "50305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Broughton HVD Gallon",
+     "sku": "50205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN 2% PLS HG",
+     "sku": "50308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN HVD PLS HG",
+     "sku": "50208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN RF 5% CHOC MX HGL",
+     "sku": "5008",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN RF 8% VAN MX HGL",
+     "sku": "5108",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 1% Gallon",
+     "sku": "70405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 1% PLS HG",
+     "sku": "70408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 2% Gallon",
+     "sku": "70305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 2% PLS HG",
+     "sku": "70308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms HVD Gallon",
+     "sku": "70205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms HVD PLS HG",
+     "sku": "70208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms Skim Gallon",
+     "sku": "70705",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms SKIM PLS HG",
+     "sku": "70708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "COL 3.25 BMILK QT",
+     "sku": "290910",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Country Parlor 15%",
+     "sku": "5472",
+     "mfgType": "2.5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Choc 2.5 Gal single",
+     "sku": "255203",
+     "mfgType": "2.5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Choc 5 Gal Mix",
+     "sku": "255202",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Van 5 Gal Mix",
+     "sku": "255102",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 1% CHOCOLATE ...",
+     "sku": "31208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 1% PLS HGL",
+     "sku": "30408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 2% PLS HGL",
+     "sku": "30308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY BM QT",
+     "sku": "30952",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY HVD PLS HGL",
+     "sku": "30208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY SKIM PLS HGL",
+     "sku": "30708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Friendly 1% Gallon",
+     "sku": "30405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Chocolate Gallon",
+     "sku": "281305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Chocolate PLS HG",
+     "sku": "281308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Gallon",
+     "sku": "280405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% PLS HG",
+     "sku": "280408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 2% Gallon",
+     "sku": "280305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 2% PLS HG",
+     "sku": "280308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV HVD Gallon",
+     "sku": "280205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV HVD PLS HG",
+     "sku": "280208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV Skim Gallon",
+     "sku": "280705",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV SKIM PLS HG",
+     "sku": "280708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "IW FRSH 40% HVY WHIP C...",
+     "sku": "121802",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "IW FRSH H&H PLS QT",
+     "sku": "121810",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey 1% Gallon",
+     "sku": "280405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 1% PLS HGL",
+     "sku": "280408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 1% PLS QT",
+     "sku": "280410",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey 2% Gallon",
+     "sku": "280305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 2% PLS HGL",
+     "sku": "280308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 2% PLT QT",
+     "sku": "280310",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey HVD Gallon",
+     "sku": "280205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY HVD PLS HGL",
+     "sku": "280208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY HVD PLS QT",
+     "sku": "280210",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey Skim Gallon",
+     "sku": "280705",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY SKIM PLS HGL",
+     "sku": "280708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY SKIM PLS QT",
+     "sku": "280710",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns 2% Gallon",
+     "sku": "80305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns 2% PLS HG",
+     "sku": "80308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns HVD Gallon",
+     "sku": "80205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns HVD PLS HG",
+     "sku": "80208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Raw Milk",
+     "sku": "",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "Save Today Fruit Punch Gal...",
+     "sku": "303105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Save Today Grape DRK Gall...",
+     "sku": "303205",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Save Today Orange DRK Ga...",
+     "sku": "303005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Save Today Sweet Tea Gallon",
+     "sku": "304905",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "SCHNEIDER Blue Rasb Gallon",
+     "sku": "313505",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SCHNEIDER Fruit DRK Gallon",
+     "sku": "313105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SCHNEIDER Orange DRK G...",
+     "sku": "313005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SCHNEIDER Pink Lemon Ga...",
+     "sku": "313305",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS 2% Gallon",
+     "sku": "20305",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS 2% PLS HG",
+     "sku": "20308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS HVD Gallon",
+     "sku": "20205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "SNS HVD PLS HG",
+     "sku": "20208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Tampico Citrus Gallon",
+     "sku": "6805",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Tampico Mango Gallon",
+     "sku": "6806",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Tampico Tropical Gallon",
+     "sku": "6807",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "TIPTON GROVE OJ Gallon",
+     "sku": "70500",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD 1% Choc 5 Gal Disp Bag",
+     "sku": "1302",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% Chocolate Gallon",
+     "sku": "1305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% Chocolate PLS HGL",
+     "sku": "1308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% Gallon",
+     "sku": "405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% PLS HGL",
+     "sku": "408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% PLS QT",
+     "sku": "410",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 10% Chocolate Mix Gall...",
+     "sku": "5805",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 10% VAN Mix Gallon",
+     "sku": "5505",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 14.5% White MX 5 Gal",
+     "sku": "5450",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 18% cream 5 Gal",
+     "sku": "1804",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% 5 Gal Disp Bag",
+     "sku": "302",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% Gallon",
+     "sku": "305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% PLS HGL",
+     "sku": "308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% PLS QT",
+     "sku": "310",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25 BMILK PLS HGL",
+     "sku": "908",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25 BMILK PLS QT",
+     "sku": "910",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25% BM 5 Gal Bag",
+     "sku": "903",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 40% Cream 5 Gal",
+     "sku": "121802",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD Blue Rasp Gallon",
+     "sku": "3505",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Diet Lemon Tea Gallon",
+     "sku": "4505",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD DIET LEMON TEA PLS HG",
+     "sku": "4508",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD DIET LEMON TEA PLS PT",
+     "sku": "4512",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Diet Peach Tea Gallon",
+     "sku": "4605",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD DIET PEACH TEA PLS HG",
+     "sku": "4608",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD EGG NOG PLS HG",
+     "sku": "4708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD EGG NOG PLS QT",
+     "sku": "4709",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD FRSH H&H QT",
+     "sku": "1610",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD FRSH WHP CREAM PLS QT",
+     "sku": "1810",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD Fruit PNCH Gallon",
+     "sku": "3105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Grape DRK Gallon",
+     "sku": "3205",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD HVD 5 Gal Disp Bag",
+     "sku": "202",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD HVD Gallon",
+     "sku": "205",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD HVD PLS HGL",
+     "sku": "208",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD HVD PLS QT",
+     "sku": "210",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Lem Lime DRK Gallon",
+     "sku": "4005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Lemon DRK Gallon",
+     "sku": "4105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD LEMON TEA PLS HG",
+     "sku": "3408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LEMON TEA PLS PT",
+     "sku": "3412",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LEMON TEA PLS QT",
+     "sku": "3410",
+     "mfgType": "Quart",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LF BM 5 Gal Bag",
+     "sku": "902",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD LF BMILK PLS HGL",
+     "sku": "907",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD LF BMILK PLS QT",
+     "sku": "909",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD NF Chocolate Gallon",
+     "sku": "1205",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD NF Chocolate PLS HGL",
+     "sku": "1208",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD OJ Gallon",
+     "sku": "4405",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD OJ PLS HG",
+     "sku": "4408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD ORANGE CRM PLS HGL",
+     "sku": "1508",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Orange DRK Gallon",
+     "sku": "3005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Peach Tea Gallon",
+     "sku": "3805",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD PEACH TEA PLS HG",
+     "sku": "3808",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD PEACH TEA PLS PT",
+     "sku": "3812",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Pink Lemonade",
+     "sku": "3305",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Rasp Tea Gallon",
+     "sku": "3805",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD RASP TEA PLS HG",
+     "sku": "3808",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD RASP TEA PLS PT",
+     "sku": "3812",
+     "mfgType": "Pint",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD RF 5% Chocolate Mix G...",
+     "sku": "5005",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD RF 8% VAN Mix Gallon",
+     "sku": "5105",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Shake Mix",
+     "sku": "5507",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Skim 5 Gal Disp Bag",
+     "sku": "702",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Skim Gallon",
+     "sku": "705",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD SKIM PLS HGL",
+     "sku": "708",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD SKIM PLS QT",
+     "sku": "710",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Sweet Tea Gallon",
+     "sku": "4905",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD SWEET TEA PLS HG",
+     "sku": "4908",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD SWEET TEA PLS PT",
+     "sku": "4912",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Tea Lemon Gallon",
+     "sku": "3405",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Ultra Skim Gallon",
+     "sku": "40705",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD ULTRA SKIM PLS HGL",
+     "sku": "40708",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD ULTRA SKIM PLS QT",
+     "sku": "40710",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD VAN 2.5 Gal DQ single",
+     "sku": "255103",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Water Gallon",
+     "sku": "90850",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD WHL Chocolate Gallon",
+     "sku": "1105",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD WHL Chocolate PLS HGL",
+     "sku": "1108",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD WHL Chocolate PLS QT",
+     "sku": "1110",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Whole Baking Buttermilk",
+     "sku": "949",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD Wildberry",
+     "sku": "3934",
+     "mfgType": "Quart",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "US DIET PEACH TEA PLS PT",
+     "sku": "4612",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "US OJ PLS QT",
+     "sku": "4410",
+     "mfgType": "Quart",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "VENTURA .5% 06984 BML...",
+     "sku": "401903",
+     "mfgType": "TOTE",
+     "productGroup": "Milk"
+    }
+   ]
+  },
+  {
+   "operationId": "ut_prod_htst_2",
+   "line": "HTST #2",
+   "products": [
+    {
+     "name": "12% Frutero",
+     "sku": "",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "38% Cream",
+     "sku": "294",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "8% Frutero",
+     "sku": "",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "Broughton 2% Gallon",
+     "sku": "50305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Broughton HVD Gallon",
+     "sku": "50205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN 2% PLS HG",
+     "sku": "50308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN HVD PLS HG",
+     "sku": "50208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN RF 5% CHOC MX HGL",
+     "sku": "5008",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN RF 8% VAN MX HGL",
+     "sku": "5108",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 1% Gallon",
+     "sku": "70405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 1% PLS HG",
+     "sku": "70408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 2% Gallon",
+     "sku": "70305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 2% PLS HG",
+     "sku": "70308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms HVD Gallon",
+     "sku": "70205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms HVD PLS HG",
+     "sku": "70208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms Skim Gallon",
+     "sku": "70705",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms SKIM PLS HG",
+     "sku": "70708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "COL 3.25 BMILK QT",
+     "sku": "290910",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Country Parlor 15%",
+     "sku": "5472",
+     "mfgType": "2.5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Choc 2.5 Gal single",
+     "sku": "255203",
+     "mfgType": "2.5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Choc 5 Gal Mix",
+     "sku": "255202",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "DQ Van 5 Gal Mix",
+     "sku": "255102",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 1% CHOCOLATE ...",
+     "sku": "31208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 1% PLS HGL",
+     "sku": "30408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 2% PLS HGL",
+     "sku": "30308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY BM QT",
+     "sku": "30952",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY HVD PLS HGL",
+     "sku": "30208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY SKIM PLS HGL",
+     "sku": "30708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Friendly 1% Gallon",
+     "sku": "30405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Chocolate Gallon",
+     "sku": "281305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Chocolate PLS HG",
+     "sku": "281308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Gallon",
+     "sku": "280405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% PLS HG",
+     "sku": "280408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 2% Gallon",
+     "sku": "280305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 2% PLS HG",
+     "sku": "280308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV HVD Gallon",
+     "sku": "280205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV HVD PLS HG",
+     "sku": "280208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV Skim Gallon",
+     "sku": "280705",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV SKIM PLS HG",
+     "sku": "280708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "IW FRSH 40% HVY WHIP C...",
+     "sku": "121802",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "IW FRSH H&H PLS QT",
+     "sku": "121810",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey 1% Gallon",
+     "sku": "280405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 1% PLS HGL",
+     "sku": "280408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 1% PLS QT",
+     "sku": "280410",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey 2% Gallon",
+     "sku": "280305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 2% PLS HGL",
+     "sku": "280308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 2% PLT QT",
+     "sku": "280310",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey HVD Gallon",
+     "sku": "280205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY HVD PLS HGL",
+     "sku": "280208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY HVD PLS QT",
+     "sku": "280210",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey Skim Gallon",
+     "sku": "280705",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY SKIM PLS HGL",
+     "sku": "280708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY SKIM PLS QT",
+     "sku": "280710",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns 2% Gallon",
+     "sku": "80305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns 2% PLS HG",
+     "sku": "80308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns HVD Gallon",
+     "sku": "80205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns HVD PLS HG",
+     "sku": "80208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Raw Milk",
+     "sku": "",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "Save Today Fruit Punch Gal...",
+     "sku": "303105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Save Today Grape DRK Gall...",
+     "sku": "303205",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Save Today Orange DRK Ga...",
+     "sku": "303005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Save Today Sweet Tea Gallon",
+     "sku": "304905",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "SCHNEIDER Blue Rasb Gallon",
+     "sku": "313505",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SCHNEIDER Fruit DRK Gallon",
+     "sku": "313105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SCHNEIDER Orange DRK G...",
+     "sku": "313005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SCHNEIDER Pink Lemon Ga...",
+     "sku": "313305",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS 2% Gallon",
+     "sku": "20305",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS 2% PLS HG",
+     "sku": "20308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS HVD Gallon",
+     "sku": "20205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "SNS HVD PLS HG",
+     "sku": "20208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Tampico Citrus Gallon",
+     "sku": "6805",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Tampico Mango Gallon",
+     "sku": "6806",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Tampico Tropical Gallon",
+     "sku": "6807",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "TIPTON GROVE OJ Gallon",
+     "sku": "70500",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD 1% Choc 5 Gal Disp Bag",
+     "sku": "1302",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% Chocolate Gallon",
+     "sku": "1305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% Chocolate PLS HGL",
+     "sku": "1308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% Gallon",
+     "sku": "405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% PLS HGL",
+     "sku": "408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% PLS QT",
+     "sku": "410",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 10% Chocolate Mix Gall...",
+     "sku": "5805",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 10% VAN Mix Gallon",
+     "sku": "5505",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 14.5% White MX 5 Gal",
+     "sku": "5450",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 18% cream 5 Gal",
+     "sku": "1804",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% 5 Gal Disp Bag",
+     "sku": "302",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% Gallon",
+     "sku": "305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% PLS HGL",
+     "sku": "308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% PLS QT",
+     "sku": "310",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25 BMILK PLS HGL",
+     "sku": "908",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25 BMILK PLS QT",
+     "sku": "910",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25% BM 5 Gal Bag",
+     "sku": "903",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 40% Cream 5 Gal",
+     "sku": "121802",
+     "mfgType": "5 Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD Blue Rasp Gallon",
+     "sku": "3505",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Diet Lemon Tea Gallon",
+     "sku": "4505",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD DIET LEMON TEA PLS HG",
+     "sku": "4508",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD DIET LEMON TEA PLS PT",
+     "sku": "4512",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Diet Peach Tea Gallon",
+     "sku": "4605",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD DIET PEACH TEA PLS HG",
+     "sku": "4608",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD EGG NOG PLS HG",
+     "sku": "4708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD EGG NOG PLS QT",
+     "sku": "4709",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD FRSH H&H QT",
+     "sku": "1610",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD FRSH WHP CREAM PLS QT",
+     "sku": "1810",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD Fruit PNCH Gallon",
+     "sku": "3105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Grape DRK Gallon",
+     "sku": "3205",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD HVD 5 Gal Disp Bag",
+     "sku": "202",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD HVD Gallon",
+     "sku": "205",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD HVD PLS HGL",
+     "sku": "208",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD HVD PLS QT",
+     "sku": "210",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Lem Lime DRK Gallon",
+     "sku": "4005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Lemon DRK Gallon",
+     "sku": "4105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD LEMON TEA PLS HG",
+     "sku": "3408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LEMON TEA PLS PT",
+     "sku": "3412",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LEMON TEA PLS QT",
+     "sku": "3410",
+     "mfgType": "Quart",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LF BM 5 Gal Bag",
+     "sku": "902",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD LF BMILK PLS HGL",
+     "sku": "907",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD LF BMILK PLS QT",
+     "sku": "909",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD NF Chocolate Gallon",
+     "sku": "1205",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD NF Chocolate PLS HGL",
+     "sku": "1208",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD OJ Gallon",
+     "sku": "4405",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD OJ PLS HG",
+     "sku": "4408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD ORANGE CRM PLS HGL",
+     "sku": "1508",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Orange DRK Gallon",
+     "sku": "3005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Peach Tea Gallon",
+     "sku": "3805",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD PEACH TEA PLS HG",
+     "sku": "3808",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD PEACH TEA PLS PT",
+     "sku": "3812",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Pink Lemonade",
+     "sku": "3305",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Rasp Tea Gallon",
+     "sku": "3805",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD RASP TEA PLS HG",
+     "sku": "3808",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD RASP TEA PLS PT",
+     "sku": "3812",
+     "mfgType": "Pint",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD RF 5% Chocolate Mix G...",
+     "sku": "5005",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD RF 8% VAN Mix Gallon",
+     "sku": "5105",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Shake Mix",
+     "sku": "5507",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Skim 5 Gal Disp Bag",
+     "sku": "702",
+     "mfgType": "5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Skim Gallon",
+     "sku": "705",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD SKIM PLS HGL",
+     "sku": "708",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD SKIM PLS QT",
+     "sku": "710",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Sweet Tea Gallon",
+     "sku": "4905",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD SWEET TEA PLS HG",
+     "sku": "4908",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD SWEET TEA PLS PT",
+     "sku": "4912",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Tea Lemon Gallon",
+     "sku": "3405",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Ultra Skim Gallon",
+     "sku": "40705",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD ULTRA SKIM PLS HGL",
+     "sku": "40708",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD ULTRA SKIM PLS QT",
+     "sku": "40710",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD VAN 2.5 Gal DQ single",
+     "sku": "255103",
+     "mfgType": "2.5 Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Water Gallon",
+     "sku": "90850",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD WHL Chocolate Gallon",
+     "sku": "1105",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD WHL Chocolate PLS HGL",
+     "sku": "1108",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD WHL Chocolate PLS QT",
+     "sku": "1110",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Whole Baking Buttermilk",
+     "sku": "949",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD Wildberry",
+     "sku": "3934",
+     "mfgType": "Quart",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "US DIET PEACH TEA PLS PT",
+     "sku": "4612",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "US OJ PLS QT",
+     "sku": "4410",
+     "mfgType": "Quart",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "VENTURA .5% 06984 BML...",
+     "sku": "401903",
+     "mfgType": "TOTE",
+     "productGroup": "Milk"
+    }
+   ]
+  },
+  {
+   "operationId": "ut_prod_new_half_gallon",
+   "line": "NEW 1/2 GALLON",
+   "products": [
+    {
+     "name": "38% Cream",
+     "sku": "294",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN 2% PLS HG",
+     "sku": "50308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN HVD PLS HG",
+     "sku": "50208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN RF 5% CHOC MX HGL",
+     "sku": "5008",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN RF 8% VAN MX HGL",
+     "sku": "5108",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 1% PLS HG",
+     "sku": "70408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 2% PLS HG",
+     "sku": "70308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms HVD PLS HG",
+     "sku": "70208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms SKIM PLS HG",
+     "sku": "70708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 1% CHOCOLATE ...",
+     "sku": "31208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 1% PLS HGL",
+     "sku": "30408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 2% PLS HGL",
+     "sku": "30308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY HVD PLS HGL",
+     "sku": "30208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY SKIM PLS HGL",
+     "sku": "30708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Chocolate PLS HG",
+     "sku": "281308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% PLS HG",
+     "sku": "280408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 2% PLS HG",
+     "sku": "280308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV HVD PLS HG",
+     "sku": "280208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV SKIM PLS HG",
+     "sku": "280708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 1% PLS HGL",
+     "sku": "280408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 2% PLS HGL",
+     "sku": "280308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY HVD PLS HGL",
+     "sku": "280208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY SKIM PLS HGL",
+     "sku": "280708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns 2% PLS HG",
+     "sku": "80308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns HVD PLS HG",
+     "sku": "80208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "SNS 2% PLS HG",
+     "sku": "20308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS HVD PLS HG",
+     "sku": "20208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD 1% Chocolate PLS HGL",
+     "sku": "1308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% PLS HGL",
+     "sku": "408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% PLS HGL",
+     "sku": "308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25 BMILK PLS HGL",
+     "sku": "908",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD DIET LEMON TEA PLS HG",
+     "sku": "4508",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD DIET PEACH TEA PLS HG",
+     "sku": "4608",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD EGG NOG PLS HG",
+     "sku": "4708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD HVD PLS HGL",
+     "sku": "208",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD LEMON TEA PLS HG",
+     "sku": "3408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LF BMILK PLS HGL",
+     "sku": "907",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD NF Chocolate PLS HGL",
+     "sku": "1208",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD OJ PLS HG",
+     "sku": "4408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD ORANGE CRM PLS HGL",
+     "sku": "1508",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD PEACH TEA PLS HG",
+     "sku": "3808",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD RASP TEA PLS HG",
+     "sku": "3808",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD SKIM PLS HGL",
+     "sku": "708",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD SWEET TEA PLS HG",
+     "sku": "4908",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD ULTRA SKIM PLS HGL",
+     "sku": "40708",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD WHL Chocolate PLS HGL",
+     "sku": "1108",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Whole Baking Buttermilk",
+     "sku": "949",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    }
+   ]
+  },
+  {
+   "operationId": "ut_prod_old_half_gallon",
+   "line": "OLD 1/2 GALLON",
+   "products": [
+    {
+     "name": "38% Cream",
+     "sku": "294",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN 2% PLS HG",
+     "sku": "50308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN HVD PLS HG",
+     "sku": "50208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN RF 5% CHOC MX HGL",
+     "sku": "5008",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "BRTN RF 8% VAN MX HGL",
+     "sku": "5108",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 1% PLS HG",
+     "sku": "70408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 2% PLS HG",
+     "sku": "70308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms HVD PLS HG",
+     "sku": "70208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms SKIM PLS HG",
+     "sku": "70708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "COL 3.25 BMILK QT",
+     "sku": "290910",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 1% CHOCOLATE ...",
+     "sku": "31208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 1% PLS HGL",
+     "sku": "30408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY 2% PLS HGL",
+     "sku": "30308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY BM QT",
+     "sku": "30952",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY HVD PLS HGL",
+     "sku": "30208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "FRENDLY SKIM PLS HGL",
+     "sku": "30708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Chocolate PLS HG",
+     "sku": "281308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% PLS HG",
+     "sku": "280408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 2% PLS HG",
+     "sku": "280308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV HVD PLS HG",
+     "sku": "280208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV SKIM PLS HG",
+     "sku": "280708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "IW FRSH 40% HVY WHIP C...",
+     "sku": "121802",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "IW FRSH H&H PLS QT",
+     "sku": "121810",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 1% PLS HGL",
+     "sku": "280408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 1% PLS QT",
+     "sku": "280410",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 2% PLS HGL",
+     "sku": "280308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY 2% PLT QT",
+     "sku": "280310",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY HVD PLS HGL",
+     "sku": "280208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY HVD PLS QT",
+     "sku": "280210",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY SKIM PLS HGL",
+     "sku": "280708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "JERSEY SKIM PLS QT",
+     "sku": "280710",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns 2% PLS HG",
+     "sku": "80308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns HVD PLS HG",
+     "sku": "80208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "SNS 2% PLS HG",
+     "sku": "20308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS HVD PLS HG",
+     "sku": "20208",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD 1% Chocolate PLS HGL",
+     "sku": "1308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% PLS HGL",
+     "sku": "408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% PLS QT",
+     "sku": "410",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% PLS HGL",
+     "sku": "308",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% PLS QT",
+     "sku": "310",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25 BMILK PLS HGL",
+     "sku": "908",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 3.25 BMILK PLS QT",
+     "sku": "910",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD DIET LEMON TEA PLS HG",
+     "sku": "4508",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD DIET LEMON TEA PLS PT",
+     "sku": "4512",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD DIET PEACH TEA PLS HG",
+     "sku": "4608",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD EGG NOG PLS HG",
+     "sku": "4708",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD EGG NOG PLS QT",
+     "sku": "4709",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD FRSH H&H QT",
+     "sku": "1610",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD FRSH WHP CREAM PLS QT",
+     "sku": "1810",
+     "mfgType": "Quart",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD HVD PLS HGL",
+     "sku": "208",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD HVD PLS QT",
+     "sku": "210",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD LEMON TEA PLS HG",
+     "sku": "3408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LEMON TEA PLS PT",
+     "sku": "3412",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LEMON TEA PLS QT",
+     "sku": "3410",
+     "mfgType": "Quart",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD LF BMILK PLS HGL",
+     "sku": "907",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD LF BMILK PLS QT",
+     "sku": "909",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD NF Chocolate PLS HGL",
+     "sku": "1208",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD OJ PLS HG",
+     "sku": "4408",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD ORANGE CRM PLS HGL",
+     "sku": "1508",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD PEACH TEA PLS HG",
+     "sku": "3808",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD PEACH TEA PLS PT",
+     "sku": "3812",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD RASP TEA PLS HG",
+     "sku": "3808",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD RASP TEA PLS PT",
+     "sku": "3812",
+     "mfgType": "Pint",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD SKIM PLS HGL",
+     "sku": "708",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD SKIM PLS QT",
+     "sku": "710",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD SWEET TEA PLS HG",
+     "sku": "4908",
+     "mfgType": "Half Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD SWEET TEA PLS PT",
+     "sku": "4912",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD ULTRA SKIM PLS HGL",
+     "sku": "40708",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD ULTRA SKIM PLS QT",
+     "sku": "40710",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD WHL Chocolate PLS HGL",
+     "sku": "1108",
+     "mfgType": "Half Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD WHL Chocolate PLS QT",
+     "sku": "1110",
+     "mfgType": "Quart",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Whole Baking Buttermilk",
+     "sku": "949",
+     "mfgType": "Half Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD Wildberry",
+     "sku": "3934",
+     "mfgType": "Quart",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "US DIET PEACH TEA PLS PT",
+     "sku": "4612",
+     "mfgType": "Pint",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "US OJ PLS QT",
+     "sku": "4410",
+     "mfgType": "Quart",
+     "productGroup": "Drinks"
+    }
+   ]
+  },
+  {
+   "operationId": "ut_prod_gallon_filler",
+   "line": "GALLON FILLER",
+   "products": [
+    {
+     "name": "Broughton 2% Gallon",
+     "sku": "50305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Broughton HVD Gallon",
+     "sku": "50205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 1% Gallon",
+     "sku": "70405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms 2% Gallon",
+     "sku": "70305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms HVD Gallon",
+     "sku": "70205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Coburn Farms Skim Gallon",
+     "sku": "70705",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Friendly 1% Gallon",
+     "sku": "30405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Chocolate Gallon",
+     "sku": "281305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 1% Gallon",
+     "sku": "280405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV 2% Gallon",
+     "sku": "280305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV HVD Gallon",
+     "sku": "280205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "GV Skim Gallon",
+     "sku": "280705",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey 1% Gallon",
+     "sku": "280405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey 2% Gallon",
+     "sku": "280305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey HVD Gallon",
+     "sku": "280205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Jersey Skim Gallon",
+     "sku": "280705",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns 2% Gallon",
+     "sku": "80305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Kuhns HVD Gallon",
+     "sku": "80205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Save Today Fruit Punch Gal...",
+     "sku": "303105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Save Today Grape DRK Gall...",
+     "sku": "303205",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Save Today Orange DRK Ga...",
+     "sku": "303005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Save Today Sweet Tea Gallon",
+     "sku": "304905",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "SCHNEIDER Blue Rasb Gallon",
+     "sku": "313505",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SCHNEIDER Fruit DRK Gallon",
+     "sku": "313105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SCHNEIDER Orange DRK G...",
+     "sku": "313005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SCHNEIDER Pink Lemon Ga...",
+     "sku": "313305",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS 2% Gallon",
+     "sku": "20305",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "SNS HVD Gallon",
+     "sku": "20205",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "Tampico Citrus Gallon",
+     "sku": "6805",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Tampico Mango Gallon",
+     "sku": "6806",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "Tampico Tropical Gallon",
+     "sku": "6807",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "TIPTON GROVE OJ Gallon",
+     "sku": "70500",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD 1% Chocolate Gallon",
+     "sku": "1305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 1% Gallon",
+     "sku": "405",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 10% Chocolate Mix Gall...",
+     "sku": "5805",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 10% VAN Mix Gallon",
+     "sku": "5505",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD 2% Gallon",
+     "sku": "305",
+     "mfgType": "Gallon",
+     "productGroup": "Milk"
+    },
+    {
+     "name": "UD Blue Rasp Gallon",
+     "sku": "3505",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Diet Lemon Tea Gallon",
+     "sku": "4505",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Diet Peach Tea Gallon",
+     "sku": "4605",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Fruit PNCH Gallon",
+     "sku": "3105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Grape DRK Gallon",
+     "sku": "3205",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD HVD Gallon",
+     "sku": "205",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Lem Lime DRK Gallon",
+     "sku": "4005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Lemon DRK Gallon",
+     "sku": "4105",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD NF Chocolate Gallon",
+     "sku": "1205",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD OJ Gallon",
+     "sku": "4405",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Orange DRK Gallon",
+     "sku": "3005",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Peach Tea Gallon",
+     "sku": "3805",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Pink Lemonade",
+     "sku": "3305",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Rasp Tea Gallon",
+     "sku": "3805",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD RF 5% Chocolate Mix G...",
+     "sku": "5005",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD RF 8% VAN Mix Gallon",
+     "sku": "5105",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Shake Mix",
+     "sku": "5507",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Skim Gallon",
+     "sku": "705",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    },
+    {
+     "name": "UD Sweet Tea Gallon",
+     "sku": "4905",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Tea Lemon Gallon",
+     "sku": "3405",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks, TEA"
+    },
+    {
+     "name": "UD Ultra Skim Gallon",
+     "sku": "40705",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD Water Gallon",
+     "sku": "90850",
+     "mfgType": "Gallon",
+     "productGroup": "Drinks"
+    },
+    {
+     "name": "UD WHL Chocolate Gallon",
+     "sku": "1105",
+     "mfgType": "Gallon",
+     "productGroup": ""
+    }
+   ]
+  },
+  {
+   "operationId": "ut_prod_blow_mold",
+   "line": "BLOW MOLD",
+   "products": [
+    {
+     "name": "Gallon Jug",
+     "sku": "Gallon Jug",
+     "mfgType": "Blow Mold Gall...",
+     "productGroup": ""
+    }
+   ]
+  }
+ ]
+}

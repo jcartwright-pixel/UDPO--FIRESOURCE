@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "sandbox": "ud-distribution-sandbox",
+    "production": "ud-distribution"
+  }
+}

@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Print Layouts · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+  <style>
+    /* Print Layouts (Joe 10/10): pick a sheet on the left, see only that sheet as paper pages, set it up on the right. */
+    .pl-page .head { flex-wrap: nowrap; align-items: center; }
+    .pl-page .head .title { flex: none; }
+    .pl-opts { margin-left: auto; display: flex; align-items: flex-end; gap: 10px; flex-wrap: nowrap; }
+    .pl-opts label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 700; color: var(--muted); }
+    .pl-opts select, .pl-opts input { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 700; color: var(--ud-blue-dark); background: #fff; min-width: 130px; }
+    .pl-opts .stepper input { border: 0; height: 100%; min-width: 0; width: 150px; }
+    .pl-opts .pl-week { font-size: 12px; color: var(--muted); align-self: center; white-space: nowrap; }
+    .pl-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 270px minmax(0, 1fr) 290px; gap: 14px; padding: 0 16px 14px; }
+    .pl-list, .pl-setup { background: #fff; border: 1px solid #d5e1eb; border-radius: 14px; overflow: auto; }
+    .pl-list h2, .pl-setup h2 { margin: 0; padding: 12px 14px 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    .pl-item { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 14px; border-top: 1px solid #e3ebf2; cursor: pointer; color: #123f70; }
+    .pl-item:hover { background: #f3f8fc; }
+    .pl-item.on { background: #e3eefa; box-shadow: inset 4px 0 0 #1976d2; }
+    .pl-item div { flex: 1; min-width: 0; }
+    .pl-item strong { display: block; font-size: 15.5px; }
+    .pl-item span { display: block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #60798f; line-height: 1.3; }
+    .pl-item button { flex: none; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font-size: 17px; cursor: pointer; }
+    .pl-item button:hover { background: var(--ud-blue); color: #fff; }
+    .pl-view { position: relative; min-width: 0; min-height: 0; border-radius: 14px; background: #dfe6ee; border: 1px solid #ccd8e3; overflow: hidden; }
+    .pl-view iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .pl-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(223,230,238,.85); font-size: 17px; color: var(--ud-blue-dark); }
+    .pl-setup { padding-bottom: 12px; }
+    .pl-row { padding: 8px 14px; }
+    .pl-row > b { display: block; margin-bottom: 6px; font-size: 13px; color: var(--ud-blue-dark); }
+    .pl-seg { display: flex; }
+    .pl-seg button { flex: 1; height: 38px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+    .pl-seg button + button { border-left: 0; }
+    .pl-seg button:first-child { border-radius: 8px 0 0 8px; } .pl-seg button:last-child { border-radius: 0 8px 8px 0; }
+    .pl-seg button.on { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+    .pl-setup select, .pl-setup input[type=number] { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-weight: 700; color: var(--ud-blue-dark); background: #fff; }
+    .pl-setup select { width: 100%; }
+    .pl-setup input[type=number] { width: 70px; }
+    .pl-check { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--ud-blue-dark); cursor: pointer; }
+    .pl-check input { width: 18px; height: 18px; }
+    .pl-check.pl-gap { margin-top: 10px; }
+    .pl-pages { display: grid; gap: 6px; }
+    .pl-pages label { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--ud-blue-dark); }
+    .pl-pages input[type=radio] { width: 17px; height: 17px; }
+    .pl-note { margin: 6px 14px 0; padding: 9px 11px; border-radius: 9px; background: #f3f8fc; color: #39566f; font-size: 12.5px; font-weight: 600; line-height: 1.4; }
+    .pl-saved { margin: 8px 14px 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+  </style>
+</head>
+<body class="admin-page fill pl-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Print Layouts</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Print Layouts</h1><small id="sub">Dispatch Administration &rsaquo; pick a sheet, check the pages, set it up and print</small></div>
+      <div class="actions tiles">
+        <button type="button" class="primary" id="print-now">&#128424; Print</button>
+        <button type="button" id="quick">Quick Print</button>
+        <button type="button" id="save-default">Save as Default</button>
+        <a class="button" href="admin.html">Dispatch Administration</a>
+      </div>
+      <div class="pl-opts" id="opts"></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="pl-body">
+      <nav class="pl-list" aria-label="Sheets"><h2>Sheets</h2><div id="sheets"></div></nav>
+      <div class="pl-view"><iframe id="paper" title="Print preview"></iframe><div class="pl-wait" id="wait">Getting the sheet ready&hellip;</div></div>
+      <aside class="pl-setup" aria-label="Page setup">
+        <h2>Page setup</h2>
+        <div class="pl-row"><b>Layout</b><div class="pl-seg" id="orient"><button type="button" data-v="portrait">Portrait</button><button type="button" data-v="landscape">Landscape</button></div></div>
+        <div class="pl-row"><b>Paper</b><div class="pl-seg" id="size"><button type="button" data-v="letter">Letter</button><button type="button" data-v="legal">Legal</button></div></div>
+        <div class="pl-row"><b>Margins</b><select id="margin"><option value="narrow">Narrow (1/4 inch)</option><option value="normal">Normal (0.4 inch)</option><option value="wide">Wide (3/4 inch)</option></select></div>
+        <div class="pl-row"><label class="pl-check"><input type="checkbox" id="fit"> Fit to page width</label><label class="pl-check pl-gap"><input type="checkbox" id="one-page"> Fit on one page</label></div>
+        <div class="pl-row"><b>Pages <span id="page-count"></span></b>
+          <div class="pl-pages">
+            <label><input type="radio" name="range" value="all" id="range-all" checked> All pages</label>
+            <label><input type="radio" name="range" value="some" id="range-some"> Pages <input type="number" id="from" min="1" value="1"> to <input type="number" id="to" min="1" value="1"></label>
+          </div>
+        </div>
+        <div class="pl-row"><b>Copies</b><input type="number" id="copies" min="1" max="50" value="1"></div>
+        <p class="pl-note">The pages and copies set here are what is sent. In the print window, pick the printer and press Print; leave it at 1 copy.</p>
+        <p class="pl-saved" id="saved"></p>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { DPI, styles, layout, printPages, setupFor, saveSetup, hasSaved } from './js/print-sheet.js';
+
+    // Joe 10/10: "If I say print dispatch, I should only be able to see a preview of the dispatch sheet. And to be able to set it up."
+    // Each sheet is still made by its own screen: that screen opens unseen behind this one, its Print is pressed, and what it
+    // would have printed is caught and shown here as paper pages. So the preview is exactly what those screens print today.
+    const L = window.UDLogic;
+    const $ = (id) => document.getElementById(id);
+    const params = new URLSearchParams(location.search), testEmail = params.get('testEmail');
+    const today = L.operatingDay(new Date()), thisYear = Number(today.slice(0, 4)), thisMonth = Number(today.slice(5, 7));
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const shortDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8)) + '/' + k.slice(0, 4);
+    const wait = (ms) => new Promise(r => setTimeout(r, ms));
+    const click = (w, sel) => { const b = w.document.querySelector(sel); if (!b) throw new Error('The screen has no ' + sel); b.click(); };
+    const setValue = (w, sel, v) => { const e = w.document.querySelector(sel); if (!e || e.value === String(v)) return; e.value = v; e.dispatchEvent(new w.Event('change', { bubbles: true })); };
+    const years = (back, ahead) => { const out = []; for (let y = thisYear + ahead; y >= thisYear - back; y--) out.push([String(y), String(y)]); return out; };
+
+    // Every sheet that was on this screen before. opts are the sheet's own choices (shown on the right of the top line).
+    const SHEETS = [
+      { key: 'daily', name: 'Daily Dispatch Sheet', text: 'The loadout day: route, run, driver, truck, trailer, depart time, checks, jack, notes',
+        opts: [{ id: 'date', label: 'Loadout day', type: 'day', def: () => today }],
+        url: (o) => 'daily.html?date=' + o.date, ready: (d) => d.querySelector('#rows tr'), print: (w) => click(w, '#print-sheet') },
+      { key: 'weekly', name: 'Weekly Dispatch', text: 'The Driver Assignment Board, Sunday to Saturday, on one page',
+        opts: [{ id: 'week', label: 'Week starting Sunday', type: 'week', def: () => L.weekStart(today) }],
+        url: (o) => 'weekly.html?week=' + o.week, ready: (d) => d.querySelector('#rows tr'), print: (w) => click(w, '#print-week') },
+      { key: 'vacation', name: 'Vacation Year', text: 'One driver\'s or every driver\'s time off for the year, one page each',
+        opts: [{ id: 'who', label: 'Driver', type: 'select', choices: (d) => d ? [...d.querySelectorAll('#print-who option')].map(o => [o.value, o.textContent]) : [['', 'Every driver \u00b7 one page each']], def: () => '' },
+          { id: 'year', label: 'Year', type: 'select', choices: () => years(2, 1), def: () => String(thisYear) }],
+        url: () => 'vacations.html', prep: (w) => click(w, '[data-view="calendar"]'), ready: (d) => d.querySelectorAll('#print-who option').length > 1,
+        print: async (w, o) => { setValue(w, '#cal-month', o.year + '-01'); await wait(50); setValue(w, '#print-who', o.who); click(w, '#print-year'); } },
+      { key: 'fleet', name: 'Fleet Service Report', text: 'Overdue and due soon, at the garage, DOT and plates for 90 days, the week\'s work, Reviewed by line', opts: [],
+        url: () => 'fleet.html?view=due', ready: (d) => d.querySelector('#fs-print') && d.getElementById('foot').textContent, print: (w) => click(w, '#fs-print') },
+      { key: 'otr', name: 'Over the Road Report', text: 'The year\'s OTR runs month by month against last year, with the figures',
+        opts: [{ id: 'year', label: 'Year', type: 'select', choices: () => years(2, 0), def: () => String(thisYear) }],
+        url: () => 'otr.html?view=report', ready: (d) => d.querySelector('#print-report'),
+        print: async (w, o) => { setValue(w, '#year', o.year); await wait(50); click(w, '#print-report'); } },
+      { key: 'scorecard', name: 'Driver Scorecard', text: 'The month\'s or the year\'s scorecard for every driver',
+        opts: [{ id: 'mode', label: 'Show', type: 'select', choices: () => [['month', 'One month'], ['year', 'Whole year']], def: () => 'month' },
+          { id: 'month', label: 'Month', type: 'select', choices: () => MONTHS.map((m, i) => [String(i + 1), m]), def: () => String(thisMonth), when: (o) => o.mode === 'month' },
+          { id: 'year', label: 'Year', type: 'select', choices: () => years(2, 0), def: () => String(thisYear) }],
+        url: () => 'scorecard.html', ready: (d) => d.querySelector('#sc-print'), print: scorecardPrint },
+      { key: 'scheduler', name: 'Plant Scheduler Monthly', text: 'Shipping or Receiving for the month, week or day',
+        opts: [{ id: 'lane', label: 'Lane', type: 'select', choices: () => [['shipping', 'Shipping'], ['receiving', 'Receiving']], def: () => 'shipping' },
+          { id: 'view', label: 'Print', type: 'select', choices: () => [['month', 'Month'], ['week', 'Week'], ['day', 'Day']], def: () => 'month' },
+          { id: 'date', label: 'Date', type: 'date', def: () => today }],
+        url: (o) => 'scheduler.html?view=' + o.view + '&date=' + o.date + (o.lane === 'receiving' ? '&lane=receiving' : ''),
+        ready: (d) => d.getElementById('body') && d.getElementById('body').children.length && !/Loading the schedule/.test(d.getElementById('body').textContent), print: (w) => click(w, '#print') }
+    ];
+
+    // The screen's Scorecard steps a month or a year at a time; step it to the chosen one.
+    async function scorecardPrint(w, o) {
+      const d = w.document;
+      if (d.querySelector('[data-mode="' + o.mode + '"]').getAttribute('aria-selected') !== 'true') { click(w, '[data-mode="' + o.mode + '"]'); await wait(50); }
+      const want = o.mode === 'year' ? Number(o.year) * 12 : Number(o.year) * 12 + Number(o.month) - 1;
+      for (let i = 0; i < 60; i++) {
+        const label = (d.querySelector('.sc-period') || {}).textContent || '', y = Number((label.match(/\d{4}/) || [0])[0]);
+        const m = MONTHS.findIndex(n => label.toLowerCase().startsWith(n.slice(0, 3).toLowerCase()));
+        const at = o.mode === 'year' ? y * 12 : y * 12 + Math.max(m, 0);
+        if (at === want) break;
+        click(w, at < want ? '#next' : '#prev'); await wait(30);
+      }
+      click(w, '#sc-print');
+    }
+
+    /* ---------- Saved setup (this computer) ---------- */
+    const defaultsFor = (s) => setupFor(s.key);
+
+    /* ---------- The sheet's own screen, opened unseen ---------- */
+    const frames = {};
+    function keepSide(fn) { let side = null; try { side = sessionStorage.getItem('udSide'); } catch (e) { /* no storage */ } const put = () => { try { if (side) sessionStorage.setItem('udSide', side); } catch (e) { /* no storage */ } }; return fn(put); }
+    async function source(sheet, opts) {
+      let url = sheet.url(opts);
+      if (testEmail) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + encodeURIComponent(testEmail);
+      const have = frames[sheet.key];
+      if (have && have.url === url) return have.ready;
+      if (have && have.frame) have.frame.remove();
+      const entry = { url, frame: null, ready: null };
+      frames[sheet.key] = entry;
+      entry.ready = keepSide(async (put) => {
+        // A new frame each time (never a changed src), so the browser's Back is not filled with these pages.
+        const f = document.createElement('iframe');
+        f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.className = 'pl-source';
+        f.style.cssText = 'position:fixed;left:-40000px;top:0;width:1920px;height:1080px;border:0;visibility:hidden';
+        f.src = url;
+        entry.frame = f;
+        const loaded = new Promise(r => f.addEventListener('load', r, { once: true }));
+        document.body.appendChild(f);
+        await loaded; put();
+        const w = f.contentWindow;
+        await until(() => { const s = w.document.getElementById('screen'); return s && !s.hidden; }, 20000, 'the ' + sheet.name + ' screen did not open');
+        if (sheet.prep) { sheet.prep(w); }
+        await until(() => sheet.ready(w.document), 20000, 'the ' + sheet.name + ' did not load');
+        await quiet(w.document, 500, 4000); put();
+        return w;
+      });
+      // A screen that did not open is tried again on the next choice.
+      entry.ready.catch(() => { if (frames[sheet.key] === entry) { entry.frame && entry.frame.remove(); delete frames[sheet.key]; } });
+      return entry.ready;
+    }
+    async function until(test, max, what) {
+      const t0 = Date.now();
+      for (;;) { let ok = false; try { ok = !!test(); } catch (e) { ok = false; } if (ok) return; if (Date.now() - t0 > max) throw new Error('Could not get the sheet: ' + what + '.'); await wait(100); }
+    }
+    // The screen has finished painting once nothing on it has changed for a moment.
+    function quiet(doc, ms, max) {
+      return new Promise(resolve => {
+        let t = setTimeout(done, ms); const end = setTimeout(done, max);
+        const obs = new MutationObserver(() => { clearTimeout(t); t = setTimeout(done, ms); });
+        obs.observe(doc.body, { childList: true, subtree: true, characterData: true });
+        function done() { clearTimeout(t); clearTimeout(end); obs.disconnect(); resolve(); }
+      });
+    }
+    // Press the screen's own Print and catch what it sends: either its #print box (window.print) or the page it writes into a
+    // hidden frame (Vacation Year, Plant Scheduler).
+    let line = Promise.resolve();
+    function capture(sheet, w, opts) { const run = () => captureNow(sheet, w, opts), p = line.then(run, run); line = p.catch(() => {}); return p; }
+    function captureNow(sheet, w, opts) {
+      return new Promise((resolve, reject) => {
+        const doc = w.document;
+        let settled = false;
+        const finish = (r) => { if (settled) return; settled = true; clearTimeout(timer); obs.disconnect(); w.print = old; delete w.udPrintCatch; resolve(r); };
+        const old = w.print;
+        w.print = w.udPrintCatch = () => { const box = doc.getElementById('print'); finish({ html: '<div id="print">' + (box ? box.innerHTML : '') + '</div>', css: styles(doc) }); };
+        const obs = new w.MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+          if (n.tagName !== 'IFRAME' || !n.contentWindow) return;
+          const fw = n.contentWindow;
+          fw.focus = () => {};
+          fw.print = () => { const r = { html: '<div class="pl-doc">' + fw.document.body.innerHTML + '</div>', css: styles(fw.document) }; n.remove(); finish(r); };
+        })));
+        obs.observe(doc.body, { childList: true });
+        const timer = setTimeout(() => { if (!settled) { settled = true; obs.disconnect(); w.print = old; reject(new Error('The ' + sheet.name + ' did not print.')); } }, 10000);
+        Promise.resolve().then(() => sheet.print(w, opts)).catch(e => { if (!settled) { settled = true; clearTimeout(timer); obs.disconnect(); w.print = old; reject(e); } });
+      });
+    }
+    /* ---------- Paper pages ---------- */
+    const paper = $('paper');
+    let shown = null; // { sheet, opts, result, layout }
+    function paint() {
+      if (!shown) return;
+      const st = current();
+      shown.layout = layout(paper.contentDocument, shown.result, st);
+      const { box, pages } = shown.layout, n = pages.length, sel = range(n);
+      if ($('range-all').checked) { $('from').value = '1'; $('to').value = String(n); }
+      $('page-count').textContent = '· ' + n + ' page' + (n === 1 ? '' : 's');
+      $('from').max = $('to').max = String(n);
+      const d = paper.contentDocument, view = paper.clientWidth - 40, scale = Math.min(1, view / (box.pw * DPI));
+      const holder = d.getElementById('pl-pages');
+      holder.style.zoom = String(scale);
+      holder.innerHTML = pages.map((p, i) => '<div class="pl-wrap' + (sel.indexOf(i) < 0 ? ' skip' : '') + '" style="width:' + Math.round(box.pw * DPI) + 'px"><div class="pl-paper" style="width:' + Math.round(box.pw * DPI) + 'px;height:' + Math.round(box.ph * DPI) + 'px;padding:' + Math.round(box.m * DPI) + 'px">' + p +
+        '</div><p class="pl-no">Page ' + (i + 1) + ' of ' + n + (sel.indexOf(i) < 0 ? ' &middot; <b>not printed</b>' : '') + '</p></div>').join('');
+      $('saved').textContent = describeSaved(shown.sheet);
+    }
+    function range(n) {
+      if (!$('range-some').checked) return [...Array(n).keys()];
+      const a = Math.max(1, Math.min(n, Number($('from').value) || 1)), b = Math.max(a, Math.min(n, Number($('to').value) || n));
+      return [...Array(b - a + 1).keys()].map(i => a - 1 + i);
+    }
+
+    /* ---------- Printing ---------- */
+    function sendToPrinter(st) { printPages(shown.result, shown.layout, st, range(shown.layout.pages.length)); }
+
+    /* ---------- Setup panel ---------- */
+    let st = {};
+    function current() { return Object.assign({}, st, { margin: $('margin').value, fit: $('fit').checked, onePage: $('one-page').checked, copies: Number($('copies').value) || 1 }); }
+    function showSetup(s) {
+      st = Object.assign({}, s);
+      document.querySelectorAll('#orient button').forEach(b => b.classList.toggle('on', b.dataset.v === s.orient));
+      document.querySelectorAll('#size button').forEach(b => b.classList.toggle('on', b.dataset.v === s.size));
+      $('margin').value = s.margin; $('fit').checked = !!s.fit; $('one-page').checked = !!s.onePage; $('copies').value = s.copies || 1;
+    }
+    function describeSaved(sheet) {
+      const s = defaultsFor(sheet);
+      return (hasSaved(sheet.key) ? 'Saved setup: ' : 'Standard setup: ') + (s.orient === 'landscape' ? 'Landscape' : 'Portrait') + ', ' + (s.size === 'legal' ? 'Legal' : 'Letter') + ', ' + s.margin + ' margins' + (s.onePage ? ', one page' : s.fit ? ', fit to width' : '') + ', ' + s.copies + ' cop' + (s.copies === 1 ? 'y' : 'ies') + '. Quick Print uses it.';
+    }
+    ['orient', 'size'].forEach(id => $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; showSetup(Object.assign(current(), { [id]: b.dataset.v })); paint(); }));
+    ['margin', 'fit', 'one-page'].forEach(id => $(id).addEventListener('change', paint));
+    ['range-all', 'range-some', 'from', 'to'].forEach(id => $(id).addEventListener('change', () => { if (id === 'from' || id === 'to') $('range-some').checked = true; paint(); }));
+    $('copies').addEventListener('change', () => { $('saved').textContent = describeSaved(shown.sheet); });
+
+    /* ---------- The sheet's own choices (top line, right) ---------- */
+    let opts = {};
+    function paintOpts(sheet, d) {
+      const box = $('opts');
+      box.innerHTML = sheet.opts.filter(o => !o.when || o.when(opts)).map(o => {
+        if (o.type === 'select') {
+          const ch = o.choices(d);
+          return '<label>' + escapeHtml(o.label) + '<select data-opt="' + o.id + '">' + ch.map(([v, t]) => '<option value="' + escapeHtml(v) + '"' + (v === opts[o.id] ? ' selected' : '') + '>' + escapeHtml(t) + '</option>').join('') + '</select></label>';
+        }
+        if (o.type === 'week') {
+          return '<label>' + escapeHtml(o.label) + '<div class="stepper"><button type="button" data-step="-7" data-for="' + o.id + '" aria-label="Previous week">&#9664;</button><input type="date" data-opt="' + o.id + '" value="' + opts[o.id] + '"><button type="button" data-step="7" data-for="' + o.id + '" aria-label="Next week">&#9654;</button></div></label>' +
+            '<span class="pl-week">Sun ' + shortDate(opts[o.id]) + ' to Sat ' + shortDate(L.addDays(opts[o.id], 6)) + '</span>';
+        }
+        return '<label>' + escapeHtml(o.label) + '<div class="stepper"><button type="button" data-step="-1" data-for="' + o.id + '" aria-label="Day before">&#9664;</button><input type="date" data-opt="' + o.id + '" value="' + opts[o.id] + '"><button type="button" data-step="1" data-for="' + o.id + '" aria-label="Day after">&#9654;</button></div></label>';
+      }).join('');
+    }
+    $('opts').addEventListener('change', e => {
+      const el = e.target.closest('[data-opt]'); if (!el) return;
+      const o = shown.sheet.opts.find(x => x.id === el.dataset.opt);
+      let v = el.value;
+      if (o.type !== 'select' && !L.isDateKey(v)) return;
+      if (o.type === 'week') v = L.weekStart(v);
+      opts[o.id] = v; refresh();
+    });
+    $('opts').addEventListener('click', e => {
+      const b = e.target.closest('[data-step]'); if (!b) return;
+      opts[b.dataset.for] = L.addDays(opts[b.dataset.for], Number(b.dataset.step)); refresh();
+    });
+
+    /* ---------- Picking a sheet ---------- */
+    $('sheets').innerHTML = SHEETS.map(s => '<div class="pl-item" data-sheet="' + s.key + '" role="button" tabindex="0"><div><strong>' + escapeHtml(s.name) + '</strong><span>' + escapeHtml(s.text) + '</span></div>' +
+      '<button type="button" data-quick="' + s.key + '" title="Quick Print ' + escapeHtml(s.name) + ' with its saved setup" aria-label="Quick Print ' + escapeHtml(s.name) + '">&#128424;</button></div>').join('');
+    $('sheets').addEventListener('click', e => {
+      const q = e.target.closest('[data-quick]');
+      if (q) { quickPrint(SHEETS.find(s => s.key === q.dataset.quick)); return; }
+      const it = e.target.closest('[data-sheet]'); if (it) pick(SHEETS.find(s => s.key === it.dataset.sheet));
+    });
+    $('sheets').addEventListener('keydown', e => { const it = e.target.closest('[data-sheet]'); if (it && (e.key === 'Enter' || e.key === ' ') && !e.target.closest('button')) { e.preventDefault(); pick(SHEETS.find(s => s.key === it.dataset.sheet)); } });
+
+    let job = 0;
+    async function pick(sheet, setupToo = true) {
+      opts = {}; sheet.opts.forEach(o => { opts[o.id] = o.def(); });
+      document.querySelectorAll('#sheets .pl-item').forEach(x => x.classList.toggle('on', x.dataset.sheet === sheet.key));
+      if (setupToo) showSetup(defaultsFor(sheet));
+      $('range-all').checked = true;
+      try { history.replaceState(null, '', '?sheet=' + sheet.key + (testEmail ? '&testEmail=' + encodeURIComponent(testEmail) : '')); } catch (e) { /* ignore */ }
+      shown = { sheet, result: null, layout: null };
+      paintOpts(sheet, null);
+      $('saved').textContent = describeSaved(sheet);
+      return refresh();
+    }
+    async function refresh() {
+      const sheet = shown.sheet, mine = ++job;
+      $('wait').hidden = false; $('wait').textContent = 'Getting the ' + sheet.name + ' ready…';
+      showError('');
+      try {
+        const w = await source(sheet, opts);
+        if (mine !== job) return false;
+        paintOpts(sheet, w.document);
+        // A choice the screen does not offer (a driver who left) falls back to its first one.
+        sheet.opts.forEach(o => { if (o.type === 'select') { const ch = o.choices(w.document); if (ch.length && !ch.some(([v]) => v === opts[o.id])) opts[o.id] = ch[0][0]; } });
+        paintOpts(sheet, w.document);
+        const result = await capture(sheet, w, opts);
+        if (mine !== job) return false;
+        shown.result = result;
+        paint();
+        $('wait').hidden = true;
+        return true;
+      } catch (e) {
+        if (mine !== job) return false;
+        $('wait').textContent = String(e.message || e);
+        showError(String(e.message || e));
+        return false;
+      }
+    }
+    async function quickPrint(sheet) {
+      if (!shown || shown.sheet !== sheet || !shown.layout) { if (!(await pick(sheet))) return; }
+      showSetup(defaultsFor(sheet)); $('range-all').checked = true; paint();
+      sendToPrinter(current());
+    }
+    $('print-now').onclick = () => { if (shown && shown.layout) sendToPrinter(current()); };
+    $('quick').onclick = () => { if (shown) quickPrint(shown.sheet); };
+    $('save-default').onclick = () => {
+      if (!shown) return;
+      saveSetup(shown.sheet.key, current());
+      $('saved').textContent = describeSaved(shown.sheet);
+    };
+    let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(paint, 200); });
+
+    requireSignIn(async () => {
+      if (shown) return;
+      pick(SHEETS.find(s => s.key === params.get('sheet')) || SHEETS[0]);
+    });
+  </script>
+</body>
+</html>
