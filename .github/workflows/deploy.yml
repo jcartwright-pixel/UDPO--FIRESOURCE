@@ -2,7 +2,10 @@ name: Deploy distribution app (Firebase)
 
 # Puts the new distribution app live on Firebase. Run by hand only:
 # - sandbox: after the tests pass, to try the new screens side by side with the current app;
-# - production: only after Joe's release words for the new app.
+# - production: only after Joe's release words for the new app. Production runs only by hand ("Run workflow"), only
+#   from main, only with "DEPLOY PRODUCTION" typed in the confirm box, and only once the production project's deploy
+#   key and name are saved in GitHub (PRODUCTION.md). Its settings come from production-settings.json, checked by
+#   tools/production-env.cjs: the real sheets, read only, never the sandbox copies, never a write-back.
 # Needs, per target, the repository secret FIREBASE_SERVICE_ACCOUNT_SANDBOX / FIREBASE_SERVICE_ACCOUNT_PRODUCTION
 # (a deploy key for that Firebase project) and the variable FIREBASE_PROJECT_SANDBOX / FIREBASE_PROJECT_PRODUCTION.
 # Without them it stops with a notice and deploys nothing. It never changes the current Apps Script app.
@@ -19,6 +22,11 @@ on:
         default: sandbox
         type: choice
         options: [sandbox, production]
+      confirm:
+        description: For production only, type DEPLOY PRODUCTION
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -52,9 +60,21 @@ jobs:
           PROJECT_SANDBOX: ${{ vars.FIREBASE_PROJECT_SANDBOX }}
           PROJECT_PRODUCTION: ${{ vars.FIREBASE_PROJECT_PRODUCTION }}
           TARGET: ${{ inputs.target || 'sandbox' }}
+          CONFIRM: ${{ inputs.confirm }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          PRODUCTION_ENV: ${{ vars.PRODUCTION_ENV }}
         shell: bash
         run: |
           set -euo pipefail
+          if [ "$TARGET" = production ]; then
+            # Production goes out only on purpose: by hand, from main (where the release lands), with the words typed.
+            if [ "$EVENT" != workflow_dispatch ]; then echo "::error::Production deploys only from Run workflow"; exit 1; fi
+            if [ "$REF" != refs/heads/main ]; then echo "::error::Production deploys only from main (this run is on $REF)"; exit 1; fi
+            if [ "$CONFIRM" != 'DEPLOY PRODUCTION' ]; then echo "::error::Type DEPLOY PRODUCTION in the confirm box to deploy production"; exit 1; fi
+            # The server settings are checked before anything is installed: real sheets, read only, no sandbox copies.
+            node ../tools/production-env.cjs > /dev/null
+          fi
           if [ "$TARGET" = production ]; then sa="$SA_PRODUCTION"; project="$PROJECT_PRODUCTION"; else sa="$SA_SANDBOX"; project="$PROJECT_SANDBOX"; fi
           if [ -z "$sa" ] || [ -z "$project" ]; then
             echo "::notice::The $TARGET Firebase project is not set up yet; nothing was deployed. See README.md."
@@ -84,7 +104,7 @@ jobs:
           set -euo pipefail
           node ../tools/sync-logic.cjs
           # What the copy reads (index.js transferSetup). The sandbox shows the made-up sheets until SANDBOX_SOURCES_JSON
-          # names its sheet copies; production reads nothing until PRODUCTION_ENV is set after Joe says go.
+          # names its sheet copies; production reads the real sheets, read only (production-settings.json).
           # The sandbox sheet copies can also be named in sandbox-sources.json at the repository root
           # ({"sources": SOURCES_JSON, "writeBack": WRITEBACK_JSON}); spreadsheet IDs of copies are not secrets.
           if [ "$TARGET" = sandbox ] && [ -z "$SANDBOX_SOURCES_JSON" ] && [ -f ../sandbox-sources.json ]; then
@@ -92,51 +112,58 @@ jobs:
             SANDBOX_WRITEBACK_JSON=$(node -e "const w=require('../sandbox-sources.json').writeBack; console.log(w ? JSON.stringify(w) : '')")
           fi
           if [ "$TARGET" = sandbox ]; then
-            # The copy reads the sheets through the Google Sheets API.
-            gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet
-            gcloud services enable sheets.googleapis.com --project "$PROJECT" --quiet
             if [ -n "$SANDBOX_SOURCES_JSON" ]; then
               printf 'SOURCES_JSON=%s\n' "$SANDBOX_SOURCES_JSON" > .env
               if [ -n "$SANDBOX_WRITEBACK_JSON" ]; then printf 'WRITEBACK_JSON=%s\n' "$SANDBOX_WRITEBACK_JSON" >> .env; fi
             else
               printf 'DEMO_DATA=1\nDEMO_ADMINS=%s\n' "$SANDBOX_ADMINS" > .env
             fi
-            # Send Current Report email (src/mail.js): Gmail sent as MAIL_FROM by the server account, which signs for itself
-            # through IAM Credentials (no key). The sandbox emails only the person who pressed Send (no REPORT_TO here).
+            # The sandbox emails only the person who pressed Send (no REPORT_TO here).
             printf 'MAIL_FROM=%s\n' "$SANDBOX_MAIL_FROM" >> .env
-            gcloud services enable iamcredentials.googleapis.com gmail.googleapis.com --project "$PROJECT" --quiet \
-              || echo "::warning::Could not turn on IAM Credentials and Gmail for $PROJECT; report email will fail until they are on."
-            number=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null || true)
-            runtime="${number}-compute@developer.gserviceaccount.com"
-            gcloud iam service-accounts add-iam-policy-binding "$runtime" --project "$PROJECT" \
-              --member="serviceAccount:$runtime" --role=roles/iam.serviceAccountTokenCreator --quiet >/dev/null \
-              && echo "Server account may sign for itself: yes" \
-              || echo "::warning::Could not let $runtime sign for itself (Service Account Token Creator on itself); report email will fail until it can."
-            client=$(gcloud iam service-accounts describe "$runtime" --project "$PROJECT" --format='value(oauth2ClientId)' 2>/dev/null || true)
-            {
-              echo "### Report email"
-              echo "Sent as: $SANDBOX_MAIL_FROM"
-              echo "Server account: $runtime"
-              echo "Client ID for Google Workspace domain-wide delegation: ${client:-could not read}"
-              echo "Scope: https://www.googleapis.com/auth/gmail.send"
-            } >> "$GITHUB_STEP_SUMMARY"
-            echo "Report email client ID: ${client:-could not read}"
-            # MOCREO sensors (src/mocreo.js): the server reads MOCREO_API_KEY and MOCREO_ASSET_ID from Secret Manager each run.
-            # Joe adds the two secrets himself; nothing here sees them.
-            gcloud services enable secretmanager.googleapis.com --project "$PROJECT" --quiet \
-              || echo "::warning::Could not turn on Secret Manager for $PROJECT; MOCREO sensors stay off until it is on."
-            gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$runtime" \
-              --role=roles/secretmanager.secretAccessor --condition=None --quiet >/dev/null \
-              && echo "Server account may read the MOCREO secrets: yes" \
-              || echo "::warning::Could not let $runtime read secrets (Secret Manager Secret Accessor); MOCREO sensors stay off until it can."
           else
-            printf '%s\n' "$PRODUCTION_ENV" > .env
+            # Production: the real sheets, read only (production-settings.json, plus PRODUCTION_ENV lines such as REPORT_TO).
+            # The check refuses a write-back, the made-up sheets and any sandbox copy, and stops the deploy.
+            node ../tools/production-env.cjs > .env
           fi
+          mail_from=$(sed -n 's/^MAIL_FROM=//p' .env)
+          echo "Server settings: $(cut -d= -f1 .env | tr '\n' ' ')"
+          # The same Google services and server-account permissions on both projects.
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet
+          # The copy reads the sheets through the Google Sheets API.
+          gcloud services enable sheets.googleapis.com --project "$PROJECT" --quiet
+          # Send Current Report email (src/mail.js): Gmail sent as MAIL_FROM by the server account, which signs for itself
+          # through IAM Credentials (no key).
+          gcloud services enable iamcredentials.googleapis.com gmail.googleapis.com --project "$PROJECT" --quiet \
+            || echo "::warning::Could not turn on IAM Credentials and Gmail for $PROJECT; report email will fail until they are on."
+          number=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null || true)
+          runtime="${number}-compute@developer.gserviceaccount.com"
+          gcloud iam service-accounts add-iam-policy-binding "$runtime" --project "$PROJECT" \
+            --member="serviceAccount:$runtime" --role=roles/iam.serviceAccountTokenCreator --quiet >/dev/null \
+            && echo "Server account may sign for itself: yes" \
+            || echo "::warning::Could not let $runtime sign for itself (Service Account Token Creator on itself); report email will fail until it can."
+          client=$(gcloud iam service-accounts describe "$runtime" --project "$PROJECT" --format='value(oauth2ClientId)' 2>/dev/null || true)
+          {
+            echo "### Report email"
+            echo "Sent as: ${mail_from:-not set}"
+            echo "Server account: $runtime"
+            echo "Client ID for Google Workspace domain-wide delegation: ${client:-could not read}"
+            echo "Scope: https://www.googleapis.com/auth/gmail.send"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Report email client ID: ${client:-could not read}"
+          # MOCREO sensors (src/mocreo.js): the server reads MOCREO_API_KEY and MOCREO_ASSET_ID from Secret Manager each run.
+          # Joe adds the two secrets himself; nothing here sees them.
+          gcloud services enable secretmanager.googleapis.com --project "$PROJECT" --quiet \
+            || echo "::warning::Could not turn on Secret Manager for $PROJECT; MOCREO sensors stay off until it is on."
+          gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$runtime" \
+            --role=roles/secretmanager.secretAccessor --condition=None --quiet >/dev/null \
+            && echo "Server account may read the MOCREO secrets: yes" \
+            || echo "::warning::Could not let $runtime read secrets (Secret Manager Secret Accessor); MOCREO sensors stay off until it can."
           # A new address for the styles on every deploy, so no browser or cache can pair a new page with old styles.
           cd .. && sed -i "s|css/app.css\"|css/app.css?v=${GITHUB_SHA::12}\"|" public/*.html
           # Diagnostics are sandbox only (Joe 10/10): the sandbox gets the Diagnostics screen and its probe on every screen;
           # production must have none of it, and the deploy stops if it does.
           if [ "$TARGET" = sandbox ]; then node tools/sandbox-diagnostics.cjs add public; else node tools/sandbox-diagnostics.cjs check public; fi
+          echo "Server account (share the sheets with it as Viewer): $runtime"
           npx --prefix functions firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
           {
             echo "## Distribution app ($TARGET)"
