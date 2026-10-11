@@ -908,6 +908,10 @@ async function noScroll(page) {
     await rail.waitForTimeout(400);
     const pinned = await box();
     assert.ok(pinned.menu >= 190 && pinned.main >= pinned.menu, 'pinned open beside the screen: ' + JSON.stringify(pinned));
+    // Joe 10/11: the open menu ends with the version line (the deploy stamps it; a local copy says so), in 16px text.
+    await rail.waitForFunction(() => /\S/.test((document.querySelector('.sidemenu .side-version') || {}).textContent || ''));
+    const ver = await rail.$eval('.sidemenu .side-version', el => ({ text: el.textContent, size: getComputedStyle(el).fontSize, last: el === el.parentNode.lastElementChild, seen: el.getBoundingClientRect().height > 0 }));
+    assert.deepEqual(ver, { text: 'Test copy on this computer', size: '16px', last: true, seen: true }, 'the version line closes the open menu');
     await rail.reload();
     await rail.waitForSelector('.sidemenu .side-sec');
     assert.ok((await box()).menu >= 190, 'the pin is remembered');
@@ -929,7 +933,7 @@ async function noScroll(page) {
     assert.match(tp.url(), /daily\.html/, 'the first tap only opens the menu');
     await Promise.all([tp.waitForURL(/distribution\.html/), tp.tap('.sidemenu a.side-name')]);
     await tab.close();
-    results.push('Menu: a slim icon strip that opens over the screen on hover (screen does not move), fly-outs beside it, folds when the mouse leaves; the menu button pins it open and is remembered; a tablet tap opens it before picking');
+    results.push('Menu: a slim icon strip that opens over the screen on hover (screen does not move), fly-outs beside it, folds when the mouse leaves; the menu button pins it open and is remembered and ends with the version line; a tablet tap opens it before picking');
     // Joe 10/10: a menu click always opens the screen's own first view (first tab, this week), never the last one used.
     let dv = await openPage(browser, 1920, 950, '/weekly.html?testEmail=dispatch.test@uniteddairy.com');
     await dv.waitForSelector('#rows tr');
