@@ -68,6 +68,29 @@ test('Repair Email: the Lessor button emails after the save, and says why not wh
   assert.match(sent[0].text, /Manager note:\nPlease call/);
 });
 
+test('Repair Email: the Lessor button follows the setting; Once a day puts an older write-up into that lessor\'s daily email (review item 32)', async () => {
+  // Reported before Once a day was switched on, so only the Lessor button brings it in.
+  await applyAction(db(), DISPATCHER, { action: 'saveCheckIn', requestId: rid(), runDocId: RUN, day: 'mon', tractorIssues: 'Oil leak' });
+  await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: 'repairs@penske.com', mode: 'DAILY' } }, digestHour: 15 });
+  const truck = L.issueRows(await records(), 'TRUCK')[0];
+  const input = { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'PENSKE' };
+  const sent = [];
+  const res = await T.afterSave(db(), DISPATCHER, input, await applyAction(db(), DISPATCHER, input), mailDeps(sent));
+  assert.equal(res.email, 'QUEUED');
+  assert.match(res.message, /Added to Penske's daily repair email, sent at 3 PM/);
+  assert.equal(sent.length, 0, 'nothing goes out until the daily email');
+  assert.match((await records()).find(r => r.kind === 'TRUCK').notes, /Repair email queued for the daily digest/);
+  const out = await T.repairSweep(db(), { force: true, by: ADMIN.email, mailDeps: mailDeps(sent) });
+  assert.match(out.message, /Sent 1 repair in 1 digest/);
+  assert.match(sent[0].text, /Oil leak/);
+  assert.match((await records()).find(r => r.kind === 'TRUCK').notes, /Repair email sent .* \(daily digest\)/);
+  assert.equal((await call({ op: 'sentLog' })).emails[0].status, 'SENT');
+  // Immediately: the Lessor button sends it right away.
+  await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: 'repairs@penske.com', mode: 'IMMEDIATE' } } });
+  const now = await T.sendOneRepair(db(), truck.recordId, DISPATCHER.email, '', mailDeps(sent));
+  assert.equal(now.status, 'SENT');
+});
+
 test('Driver Check-In Email: the answering-service email becomes records once; a write-up with no truck or trailer word needs review', async () => {
   await call({ op: 'saveCheckinEmail', enabled: true, sender: 'callcenter@lauttamus.com', recipient: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN' });
   const body = ['Name (UT): ADAMS', 'Route Number: 801', 'Tractor Number: 900001', 'Trailor Number: 901', 'Cases Delivered: 410', 'Cases Returned: 3',
