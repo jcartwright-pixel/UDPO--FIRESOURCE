@@ -1506,10 +1506,10 @@ span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-
 .fleet-page .head .title small { white-space: normal; display: block; }
 .fleet-page .head .title h1 { white-space: nowrap; }
 /* Polish 23: on a phone the header never squeezes the app name into a one-letter column (Phone Screens, Garage Station):
-   the logo stands alone when the row is full, and buttons keep their words on one line. */
+   with the Administration button (or on the garage tablet) the logo stands alone, and buttons keep their words on one line. */
 @media (max-width: 480px) {
-  .topbar:has(.hdr-admin, .hdr-nav) .brand > span, body.gs-page .topbar .brand > span { display: none; }
-  .topbar .brand { flex: none; }
+  body.is-admin .topbar:has(.hdr-admin) .brand > span, body.gs-page .topbar .brand > span { display: none; }
+  body.is-admin .topbar:has(.hdr-admin) .brand, body.gs-page .topbar .brand { flex: none; }
   .topbar button, .topbar .hdr-btn, .topbar a.button { white-space: nowrap; }
 }
 /* Polish 16: the no-connection bar. */
