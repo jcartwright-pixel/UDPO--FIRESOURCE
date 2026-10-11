@@ -1555,3 +1555,32 @@ body.daily-look table.daily tbody tr.group.loaded.already td { background: linea
 body.daily-look table.daily tbody tr.group.loaded.already td .gtext, body.daily-look table.daily tbody tr.group.loaded.already td { color: #fff !important; }
 body.daily-look table.daily tbody tr.already:not(.group) td { background: #f6f8fb; }
 body.daily-look table.daily tbody tr.already:not(.group) td:first-child { border-left-color: #94a3b8; }
+
+/* Joe 10/11: six cards after picking a plant, three to a row; the pictures shrink so both rows fit a 1920x1080 or 1536x864 screen. */
+.launch-grid.six { gap: 18px; }
+.launch-grid.six .launch-card { padding: 16px 18px 16px; gap: 6px; }
+.launch-grid.six .launch-art { height: clamp(110px, calc((100vh - 560px) / 2), 230px); }
+.launch-grid.six .launch-card strong { font-size: 22px; margin-top: 2px; }
+.launch-grid.six .launch-card small { min-height: 2.4em; }
+.launch-art svg.launch-icon { width: auto; height: 70%; fill: none; stroke: #0b3d6b; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.launch-art { position: relative; overflow: hidden; }
+.launch-card.building .launch-art img, .launch-card.building .launch-art svg { opacity: .55; }
+.uc-banner { position: absolute; left: -12%; right: -12%; top: 50%; transform: translateY(-50%) rotate(-9deg); padding: 9px 0; text-align: center;
+  background: #ffc61a; color: #1b1b1b; font-size: 20px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase;
+  border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+  border-image: repeating-linear-gradient(45deg, #1b1b1b 0 12px, #ffc61a 12px 24px) 7; box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
+/* Joe 10/11: the Reports module: every report as a card, grouped by where it comes from. */
+.rc-page #rc-groups { padding: 4px 24px 24px; overflow: auto; }
+.rc-group h2 { margin: 14px 0 10px; font-size: 18px; font-weight: 900; color: #0b3d6b; letter-spacing: .02em; }
+.rc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.rc-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 6px 18px rgba(11, 61, 107, .08); color: #0b3d6b; text-decoration: none; transition: transform .12s, box-shadow .12s; }
+.rc-card:hover, .rc-card:focus-visible { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(11, 61, 107, .18); border-color: #1f6feb; }
+.rc-icon { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 58px; height: 58px; border-radius: 12px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
+.rc-icon svg { width: 32px; height: 32px; fill: none; stroke: #0b3d6b; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rc-icon img { max-width: 46px; max-height: 46px; }
+.rc-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rc-text strong { font-size: 18px; font-weight: 900; }
+.rc-text small { color: #4a6b8d; font-size: 15px; }
+.rc-card > b { font-size: 20px; color: #1f6feb; }
+@media (max-width: 1100px) { .rc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .rc-grid { grid-template-columns: 1fr; } }

@@ -107,13 +107,15 @@ async function seed() {
   const browser = await chromium.launch();
   const results = [];
   try {
-    // Manager Center: the Reports button opens the Plant Scorecard (look B): seven day cards and the week, yesterday picked.
+    // Manager Center: the Reports button opens the Reports module (Joe 10/11: every report in one place); its Plant Reports
+    // card opens the Plant Scorecard (look B): seven day cards and the week, yesterday picked.
     const mc = await openPage(browser, 1920, 950, '/manager.html?' + MANAGER);
     await mc.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 10/.test(document.querySelector('[data-card="dept"]').textContent));
     const size = await mc.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight }));
     assert.ok(size.scroll <= size.inner, 'Manager Center still fits with the Reports button');
     await shots(mc, 'manager-reports-button', 1920);
-    await Promise.all([mc.waitForURL(/reports\.html/), mc.click('#reports')]);
+    await Promise.all([mc.waitForURL(/reportcenter\.html/), mc.click('#reports')]);
+    await Promise.all([mc.waitForURL(/\/reports\.html/), mc.click('.rc-card[href="reports.html"]')]);
     await mc.waitForSelector('.rp-days .rp-day.on');
     assert.equal(await mc.$$eval('.rp-day', b => b.length), 8);
     assert.equal(await mc.$eval('.rp-day.on', b => b.dataset.day), yesterday);
