@@ -266,6 +266,13 @@
     return out;
   }
   // The trailer left at its dispatch time (trailerHasDeparted, 7.0.276).
+  // When a route leaves, on the plant's wall clock (the current app's Send Current Report, 217_V7271): its departure date on the
+  // Live sheet (blank = the delivery date) at its dispatch time, never the load day. Saturday's loadout for Monday leaves Monday.
+  function departWall(x) {
+    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime;
+    if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
+    return departDay * 1440 + Number(t);
+  }
   function yardDeparted(x, date, nowMs) {
     var departDay = dayNum(x.departureDate), opDay = dayNum(date);
     if (departDay === null) return false;
@@ -543,7 +550,7 @@
   }
 
   /* ---------- Send Current Report ---------- */
-  var REPORT_BEHIND = 30, REPORT_AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
+  var REPORT_BEHIND = 45, REPORT_AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
   function zoned(ms, opts) { return new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: YARD_ZONE }, opts)).format(new Date(ms)); }
   function clockOf(v) { var t = typeof v === 'number' ? v : Date.parse(v || ''); return isFinite(t) && t ? zoned(t, { hour: 'numeric', minute: '2-digit' }) : text(v); }
   function minutesText12(m) { if (m === null || m === undefined || m === '') return ''; var h = Math.floor(m / 60) % 24, mm = m % 60; return (h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm + ' ' + (h < 12 ? 'AM' : 'PM'); }
@@ -556,13 +563,13 @@
     REPORT_AREAS.forEach(function (a) { areas[a] = { area: a, left: 0, total: 0 }; });
     (input.loads || []).forEach(function (r) {
       if (!areas[r.area]) return;
-      var depart = dayNum(r.loadDate), until = depart === null || r.dispatchTime === null || r.dispatchTime === undefined ? null : depart * 1440 + clockMinutes(r.dispatchTime) - now;
+      var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
       var item = { route: text(r.route), run: text(r.run), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
         startedAt: r.startedAt ? clockOf(r.startedAt) : '', priorDay: !!r.prior, loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
       areas[r.area].total++; out.total++;
       if (r.state === 'DONE') { out.loaded.push(item); return; }
       areas[r.area].left++; out.leftToLoad++;
-      if (until !== null && until <= REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); } else out.nextUp.push(item);
+      if (until !== null && until < -REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); } else out.nextUp.push(item);
     });
     var byDepart = function (a, b) { var x = a.minutesUntil === null ? 1e9 : a.minutesUntil, y = b.minutesUntil === null ? 1e9 : b.minutesUntil; return x - y || a.route.localeCompare(b.route, undefined, { numeric: true }); };
     out.behind.sort(byDepart);
@@ -599,7 +606,7 @@
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
   function reportText(r) {
     var L = [];
-    L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': every route due within ' + r.behindMinutes + ' minutes is COMPLETE'));
+    L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': no route is more than ' + r.behindMinutes + ' minutes past its depart time'));
     r.behind.forEach(function (x) { L.push('  ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.startedAt ? ' since ' + x.startedAt : '') + '  ' + x.late + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '')); });
     L.push('');
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in the Incident & Breakdown Log'));
@@ -679,7 +686,7 @@
   return { unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
-    YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, yardHolds: yardHolds, yardDeparted: yardDeparted,
+    YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,

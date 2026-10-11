@@ -71,10 +71,11 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
     await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
-    await adm.waitForSelector('.launch-card[data-side="admin"]');
-    assert.deepEqual(await adm.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['distribution', 'plant', 'fleet', 'admin']);
+    // Joe 10/11: the plant home shows the three sides only; Administration is the header button.
+    await adm.waitForSelector('.launch-card[data-side="fleet"]');
+    assert.deepEqual(await adm.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['distribution', 'plant', 'fleet']);
     const sizes = await adm.$$eval('.launch-card', c => c.map(x => Math.round(x.getBoundingClientRect().width) + 'x' + Math.round(x.getBoundingClientRect().height)));
-    assert.equal(new Set(sizes).size, 1, 'the four cards are the same size: ' + sizes.join(' '));
+    assert.equal(new Set(sizes).size, 1, 'the three cards are the same size: ' + sizes.join(' '));
     await adm.waitForSelector('#go-back');
     // Joe 10/10 evening: Administration is a header button on the main screens, not a menu item.
     assert.equal(await adm.isVisible('#go-admin'), true, 'Administration is in an Administrator\'s header');
@@ -83,7 +84,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go-back')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
     await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
-    await Promise.all([adm.waitForURL(/administration\.html/), adm.click('.launch-card[data-side="admin"]')]);
+    await Promise.all([adm.waitForURL(/administration\.html/), adm.click('#go-admin')]);
     // Joe 10/10: Administration like the current app's tab: every item in a menu on the left; the item opens on the right.
     await adm.waitForSelector('.adm-item.on[data-key="people"]');
     const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
@@ -117,7 +118,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has a fourth same-size Administration card; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
+    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the three side cards and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');
