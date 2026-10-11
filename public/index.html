@@ -30,9 +30,9 @@
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     const L = window.UDLogic;
     // Joe 10/11: Plant Production and Plant Maintenance carry an UNDER CONSTRUCTION banner across their picture.
-    const art = (s) => s.pic ? '<img src="img/library/' + s.pic + '" alt="">' : '<svg class="launch-icon" viewBox="0 0 24 24" aria-hidden="true">' + ICON[s.icon] + '</svg>';
-    const card = (s) => '<a class="launch-card' + (s.building ? ' building' : '') + '" data-side="' + s.key + '" href="' + s.home + '">' +
-      '<span class="launch-art">' + art(s) + (s.building ? '<span class="uc-banner">Under Construction</span>' : '') + '</span><strong>' + escapeHtml(s.name) + '</strong><small>' + escapeHtml(s.note) + '</small>' +
+    const art = (s) => s.pic ? '<img src="img/library/' + s.pic + '" alt="' + (s.bannerInPic ? 'Under Construction' : '') + '">' : '<svg class="launch-icon" viewBox="0 0 24 24" aria-hidden="true">' + ICON[s.icon] + '</svg>';
+    const card = (s) => '<a class="launch-card' + (s.building ? ' building' : '') + (s.bannerInPic ? ' banner-pic' : '') + '" data-side="' + s.key + '" href="' + s.home + '">' +
+      '<span class="launch-art">' + art(s) + (s.building && !s.bannerInPic ? '<span class="uc-banner">Under Construction</span>' : '') + '</span><strong>' + escapeHtml(s.name) + '</strong><small>' + escapeHtml(s.note) + '</small>' +
       '<b>Open ' + escapeHtml(s.short || s.name.replace(/^Route /, '').replace(/ Operations$/, '')) + ' &rarr;</b></a>';
     // Joe 10/11: six cards (the plant's three, Route Distribution, Fleet & Maintenance, Reports); Administration is the header button.
     document.getElementById('sides').innerHTML = SIDES.map(card).join('');

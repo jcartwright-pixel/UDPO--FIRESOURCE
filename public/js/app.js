@@ -95,8 +95,8 @@ export const MENU = [
 // Distribution, Fleet & Maintenance and Reports. Plant Production and Plant Maintenance are under construction.
 export const SIDES = [
   { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'] },
-  { key: 'production', name: 'Plant Production', home: 'soon.html?what=production', pic: 'production.webp', note: 'Production lines, runs and output', sections: [], building: true },
-  { key: 'pmaint', name: 'Plant Maintenance', home: 'soon.html?what=plant-maintenance', pic: 'forklift-truck-v1-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: [], building: true },
+  { key: 'production', name: 'Plant Production', home: 'soon.html?what=production', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: [], building: true, bannerInPic: true },
+  { key: 'pmaint', name: 'Plant Maintenance', home: 'soon.html?what=plant-maintenance', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: [], building: true, bannerInPic: true },
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
   { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Plant Reports', 'Distribution Reports', 'Fleet Reports'] }
