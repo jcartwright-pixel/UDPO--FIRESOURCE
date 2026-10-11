@@ -149,6 +149,11 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await ps.waitForSelector('[data-station="CASE"]');
     await ps.click('[data-station="CASE"]');
     await ps.waitForSelector('#change:not([hidden])');
+    // A link naming another station does not move a tablet that already has one (only Change Station does).
+    await ps.goto(HOSTING + '/plant-station.html' + ADMIN + '&station=TOTES');
+    await ps.waitForSelector('#change:not([hidden])');
+    assert.equal(await ps.textContent('#title'), 'Case Loadout', 'a ?station= link does not change a tablet\'s station');
+    results.push('Plant Station: a link naming another station does not move a tablet that already has one');
     await ps.click('#change');
     await ps.waitForSelector('#release:not([hidden])');
     await ps.fill('#release-code', 'WRONG999');
