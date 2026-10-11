@@ -778,3 +778,27 @@
 /* Joe 10/11: Receiving History (every past load, newest first) with a search box over the table. */
 .sched-page .sc-v-history { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .sched-page .sc-histbar input { width: 420px; max-width: 100%; height: 40px; font-size: 16px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; }
+
+/* Table text (Joe's standing rule, 10/10): the Loadout, Unloading, Returns and Washing tables keep about 16px text with their
+   buttons and pills at 15px, on the desktop and on a 1280 tablet. On a narrower screen the table keeps its columns and slides
+   sideways under the sticky header instead of squeezing; the truck box always shows the whole unit number. */
+.plant-page tr.divider td { font-size: 15px; }
+.plant-page:is(.loadout-page, .unload-page, .returns-page, .washing-page) table.loadout td { font-size: 16px; }
+.plant-page button.state, .plant-page button.clock, .plant-page button.pu, .plant-page button.edit-row,
+.plant-page button.rta, .plant-page button.wash, .plant-page .pill { font-size: 15px; }
+.plant-page button.pu i { font-size: 13px; }
+.plant-page small.next, .plant-page td.rr span { font-size: 14px; }
+.plant-page table.loadout td input { min-width: 0; padding: 0 4px; font-size: 16px; }
+.plant-page .running { white-space: nowrap; }
+@media (max-width: 1500px) {
+  .plant-page small.next { font-size: 14px; }
+  .plant-page:is(.loadout-page, .unload-page) .sheet.scroll-list { overflow-x: auto; }
+  .plant-page.loadout-page .sheet.scroll-list table.loadout { min-width: 1150px; }
+  .plant-page.unload-page .sheet.scroll-list table.loadout { min-width: 1150px; }
+}
+/* Temperatures: the range under each cooler, its status and the last reading stay readable. */
+.temp-page .tp-table small, .temp-page .tp-status, .plant-page .as-last, .plant-page .as-note { font-size: 14px; }
+.plant-page button.pu { white-space: nowrap; padding: 0 6px; max-width: 100%; }
+.temp-page .tp-pill { font-size: 14px; }
+.plant-page table.loadout td:has(> button.pu) { padding-left: 3px; padding-right: 3px; }
+.plant-page table.loadout td button { overflow-wrap: normal !important; }
