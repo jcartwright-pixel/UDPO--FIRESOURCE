@@ -923,6 +923,9 @@ async function noScroll(page) {
     await tp.waitForSelector('.sidemenu a.side-name');
     await tp.tap('.sidemenu a.side-name');
     await tp.waitForFunction(() => document.querySelector('.sidemenu').getBoundingClientRect().width >= 190);
+    // The second tap waits until the menu has finished opening (open, and the same width twice running), so it lands on the
+    // opened menu and not while the strip is still widening.
+    await tp.waitForFunction(() => { const w = Math.round(document.querySelector('.sidemenu').getBoundingClientRect().width), ok = document.body.classList.contains('side-open') && w === window.__menuW; window.__menuW = w; return ok; }, null, { polling: 150 });
     assert.match(tp.url(), /daily\.html/, 'the first tap only opens the menu');
     await Promise.all([tp.waitForURL(/distribution\.html/), tp.tap('.sidemenu a.side-name')]);
     await tab.close();
