@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Browser check of the Loadout Center loading order (npm run test:browser): on the made-up plant day, with the clock set
- * to that day, a plant employee moves a load with the arrows, drags one with the mouse and one with a finger on a tablet
+ * to that day, a plant employee moves a load with the keyboard (Up / Down on the grab handle), drags one with the mouse and one with a finger on a tablet
  * (touch events), and another open screen follows. A day that is not today shows no handles. Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -53,7 +53,17 @@ async function box(page, sel) {
 }
 async function touchDrag(page, from, to) {
   const cdp = await page.context().newCDPSession(page);
-  const a = await box(page, from), b = await box(page, to);
+  // The finger goes down only once the screen has settled: both rows in view, the handle where it was 300 ms ago and
+  // nothing over it (on a slower machine the rows were still moving when the finger went down, and nothing was dragged).
+  await page.$eval(from, el => el.scrollIntoView({ block: 'center' }));
+  let a = null, b = null;
+  for (let i = 0; i < 40; i++) {
+    const a2 = await box(page, from), b2 = await box(page, to);
+    const hit = await page.evaluate(([sel, x, y]) => { const el = document.elementFromPoint(x, y); return !!(el && el.closest(sel)); }, [from, a2.x + a2.width / 2, a2.y + a2.height / 2]);
+    if (hit && a && b && a.y === a2.y && b.y === b2.y && b2.y > 0) { a = a2; b = b2; break; }
+    a = a2; b = b2;
+    await page.waitForTimeout(300);
+  }
   const p = (x, y) => [{ x, y, id: 1 }];
   const x0 = a.x + a.width / 2, y0 = a.y + a.height / 2, y1 = b.y + 6;
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: p(x0, y0) });
@@ -73,17 +83,19 @@ async function touchDrag(page, from, to) {
     await loader.waitForSelector(row('811') + ' .lo-grip');
     assert.deepEqual((await routes(loader)).slice(0, 7), ['6303', '801', '802', '805', '808', '811', '812'], 'the route cell still reads as the route; the left-over load stays on top');
     assert.equal(await loader.$(row('6303') + ' .lo-grip'), null, 'a prior-day load has no handle');
-    assert.ok(await loader.$eval(row('801') + ' .lo-move.up', b => b.disabled), 'the first load cannot move earlier');
+    assert.equal(await loader.$('.lo-move'), null, 'Joe 10/11: no up / down arrows, the route is the grab handle');
     if (SHOTS) {
       await loader.screenshot({ path: path.join(SHOTS, '1-loadout-order-1920.png'), scale: 'css' });
       await loader.screenshot({ path: path.join(SHOTS, '2-loadout-order-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 475 }, scale: 'device' });
     }
 
-    // Arrow: 811 one place later.
-    await loader.click(row('811') + ' .lo-move.down');
+    // Keyboard: the handle of 811 selected, Down moves it one place later and keeps it selected.
+    await loader.focus(row('811') + ' .lo-grip');
+    await loader.keyboard.press('ArrowDown');
     await waitOrder(loader, ['801', '802', '805', '808', '812', '811']);
     await waitOrder(watcher, ['801', '802', '805', '808', '812', '811']);
-    results.push('Arrow: 811 moved after 812; the other open screen shows it');
+    await loader.waitForFunction(() => document.activeElement && document.activeElement.dataset.grip && /run_p811/.test(document.activeElement.dataset.grip));
+    results.push('Keyboard: Down on 811\'s handle moved it after 812 and kept it selected; the other open screen shows it');
 
     // Mouse drag: 815 by its handle onto the top half of 808 (lands before 808).
     const g = await box(loader, row('815') + ' .lo-grip'), t = await box(loader, row('808'));
@@ -102,6 +114,8 @@ async function touchDrag(page, from, to) {
     // Finger drag on a tablet: 6302 to before 805.
     const tablet = await openPage(browser, { viewport: { width: 1280, height: 800 }, hasTouch: true, isMobile: false }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
     await tablet.waitForSelector(row('6302') + ' .lo-grip');
+    // The tablet first shows the order already saved above, so the rows do not move under the finger.
+    await waitOrder(tablet, ['801', '802', '805', '815', '808', '812', '811']);
     await tablet.locator(row('6302')).scrollIntoViewIfNeeded();
     await touchDrag(tablet, row('6302') + ' .lo-grip', row('805'));
     await waitOrder(tablet, ['801', '802', '6302', '805']);
@@ -109,15 +123,16 @@ async function touchDrag(page, from, to) {
     results.push('Finger drag on a 1280 tablet: 6302 moved up before 805');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '4-loadout-order-tablet-1280.png') });
 
-    // Skip on the tablet (Plant Station): 812 waits at the bottom with no handle; 808's down arrow steps over it.
+    // Skip on the tablet (Plant Station): 812 waits at the bottom with no handle; Down on 808 steps over it.
     await tablet.click(row('812') + ' button.skip');
     await tablet.waitForSelector(row('812') + '.skipped');
     assert.equal(await tablet.$(row('812') + ' .lo-grip'), null, 'a skipped load has no handle');
-    assert.ok(await tablet.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1)), 'Start and Skip fit their cell with the order arrows shown');
-    await tablet.click(row('808') + ' .lo-move.down');
+    assert.ok(await tablet.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1)), 'Start and Skip fit their cell with the grab handles shown');
+    await tablet.focus(row('808') + ' .lo-grip');
+    await tablet.keyboard.press('ArrowDown');
     await waitOrder(tablet, ['801', '802', '6302', '805', '815', '811', '808']);
     assert.equal(await tablet.$eval('#rows tr[data-row]:last-child', t => t.dataset.row.split('|')[0]), '2026-10-04__run_p812', 'the skipped load stays at the bottom');
-    results.push('Skip with the order arrows: 812 waits at the bottom without a handle; 808 moved down past 811');
+    results.push('Skip with the grab handles: 812 waits at the bottom without a handle; 808 moved down past 811');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '5-loadout-order-skip-tablet-1280.png') });
 
     // Another day: no handles, the old widths.
