@@ -488,18 +488,20 @@
     };
 
     /* ---------- Print: the same columns as the current dispatch sheet, with Print Layouts' saved setup (one landscape page, 3 copies) ---------- */
+    // The printed sheet keeps its approved date style (10/8/2026); the screen uses the short 10-8-26.
+    const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8, 10)) + '/' + k.slice(0, 4);
     function printSheet(only) {
       const list = (only || rows).filter(r => !r.off);
-      let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(shortDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
+      let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(usDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
         ' &middot; Delivery Day ' + escapeHtml(document.getElementById('delivery-day').value) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
         '<th>C/O</th><th>P/O</th><th>T/O</th><th>L/D</th><th>DR</th><th>CHECKED BY</th><th>JACK</th><th>DRIVER NOTES</th></tr></thead><tbody>';
       let group = '', loaded = '';
       const mixed = mixedLoads(list);
       list.forEach(r => {
-        if (r.deliveryDate !== group && new Set(list.map(x => x.deliveryDate)).size > 1) html += '<tr class="pgroup"><td colspan="14">' + escapeHtml(r.deliveryDay + ' Deliveries, ' + shortDate(r.deliveryDate)) + '</td></tr>';
+        if (r.deliveryDate !== group && new Set(list.map(x => x.deliveryDate)).size > 1) html += '<tr class="pgroup"><td colspan="14">' + escapeHtml(r.deliveryDay + ' Deliveries, ' + usDate(r.deliveryDate)) + '</td></tr>';
         if (r.deliveryDate !== group) loaded = '';
         group = r.deliveryDate;
-        if (mixed(r.deliveryDate) && r.loadDate !== loaded) { loaded = r.loadDate; html += '<tr class="pgroup"><td colspan="14">' + escapeHtml('Loaded ' + L.dayName(r.loadDate) + ', ' + shortDate(r.loadDate)) + '</td></tr>'; }
+        if (mixed(r.deliveryDate) && r.loadDate !== loaded) { loaded = r.loadDate; html += '<tr class="pgroup"><td colspan="14">' + escapeHtml('Loaded ' + L.dayName(r.loadDate) + ', ' + usDate(r.loadDate)) + '</td></tr>'; }
         html += '<tr><td>' + [r.route, r.run, r.driver || coverageName(r), r.truck, r.trailer, departText(r), '', '', '', '', '', '', r.palletJack, r.pickup ? 'PICKUP ' + r.pickup : r.driverNotes].map(v => escapeHtml(show(v))).join('</td><td>') + '</td></tr>';
       });
       document.getElementById('print').innerHTML = html + '</tbody></table>';
