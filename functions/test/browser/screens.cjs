@@ -265,11 +265,11 @@ async function noScroll(page) {
     await wkMgr.click('#reset');
     assert.equal(await wkMgr.$eval('#reset', b => b.textContent), 'Click again', 'the first click only asks to confirm');
     await wkMgr.click('#reset');
-    await wkMgr.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && !/CARRIER/.test(tr.children[4].textContent) && tr.children[4].classList.contains('c-needs') && tr.children[6].classList.contains('off') && tr.children[3].classList.contains('c-vacation-needs')), null, { timeout: 8000 });
+    await wkMgr.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && !/CARRIER/.test(tr.children[4].textContent) && tr.children[4].classList.contains('c-vacation-needs') && /CASEY/.test(tr.children[4].textContent) && tr.children[6].classList.contains('off') && tr.children[3].classList.contains('c-vacation-needs')), null, { timeout: 8000 });
     const rsFit = await wkMgr.evaluate(() => ({ scroll: document.documentElement.scrollHeight, inner: window.innerHeight }));
     assert.ok(rsFit.scroll <= rsFit.inner, 'Weekly still fits after Reset Week');
     if (SHOTS) await wkMgr.screenshot({ path: path.join(SHOTS, 'weekly-after-reset-1366.png') });
-    results.push('Reset Week: a dispatcher cannot; a manager clicked twice: 802 Tuesday CARRIER went back to its standard driver CASEY, who is called off that day, so it needs a driver; Thursday off again; Monday still Vacation - Needs Driver');
+    results.push('Reset Week: a dispatcher cannot; a manager clicked twice: 802 Tuesday CARRIER went back to its standard driver CASEY, who is called off that day, so it is red as Driver Off - Needs Driver (Joe 10/11); Thursday off again; Monday still Vacation - Needs Driver');
     results.push('Weekly: 801 Thursday showed PLANT LOAD from the plant scheduler and took ADAMS (the run turned on, the mark stayed); CARRIER picked for 802 Tuesday, Route Run Days turned 802 Thursday on (Needs Driver), CASEY on vacation Monday from the Driver Assignment Board left 802 Monday as Vacation - Needs Driver, Publish recorded');
 
     // Someone with no dispatch role sees no edit controls.
