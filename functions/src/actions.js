@@ -66,6 +66,8 @@ const ACTIONS = Object.freeze({
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   addPickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   completePickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  // Loadout Center: drag a load to change today's loading order (saved as the day's load_sequence_override).
+  reorderPlantLoads: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   // Unloading & Washing, Product Returns and Truck Washing.
   saveUnloading: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
@@ -114,7 +116,7 @@ function validate(input) {
   const requestId = text(input.requestId, 80);
   if (!/^[A-Za-z0-9_-]{8,80}$/.test(requestId)) throw new SaveError('BAD_REQUEST', 'Each save needs a requestId');
   const out = { action, requestId };
-  if (action === 'reorderLoads') {
+  if (action === 'reorderLoads' || action === 'reorderPlantLoads') {
     if (!L.isDateKey(input.loadDate)) throw new SaveError('BAD_REQUEST', 'loadDate must be yyyy-mm-dd');
     if (!Array.isArray(input.order) || !input.order.length || input.order.length > 150) throw new SaveError('BAD_REQUEST', 'order must list the loads');
     out.loadDate = input.loadDate;
@@ -507,6 +509,12 @@ async function applyAction(db, user, input, now) {
     await requireSaver(tx, db, user, spec.roles, req.action);
 
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'reorderPlantLoads') {
+      // The plant changes the order of today's loads only (the operating day rolls at 6 AM).
+      const today = L.operatingDay(now ? now() : new Date());
+      if (req.loadDate !== today) throw new SaveError('NOT_ALLOWED', 'The loading order can only be changed for today\'s loads');
+      return reorder(tx, db, req, email, stamp, logRef, mode);
+    }
     if (req.action === 'moveRun') return moveRun(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setUnitDown' || req.action === 'setUnitUp') return setUnitDown(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'updateIssue') return updateIssue(tx, db, req, email, stamp, logRef, mode);

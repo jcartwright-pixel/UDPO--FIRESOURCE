@@ -54,6 +54,21 @@
 .plant-page button.pu.done { background: #e6f6ec; border-color: #a8dcb8; color: var(--runs-ink); }
 .plant-page button.pu i { font-style: normal; display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; border-radius: 9px; background: var(--pickup); color: #fff; font-size: 11px; }
 .plant-page button.edit-row { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+/* Loadout loading order: the up / down arrows stacked beside the route, and the route number itself is the drag handle (today's
+   loads only). The arrows are drawn by CSS so the cell's text stays the route. */
+.plant-page.loadout-page table.loadout td.lo-route { white-space: nowrap; padding-left: 4px; padding-right: 4px; }
+.plant-page .lo-order { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+.plant-page .lo-arrows { display: inline-flex; flex-direction: column; gap: 2px; }
+.plant-page .lo-move { width: 30px; height: 19px; padding: 0; border-radius: 5px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; }
+.plant-page .lo-move:disabled { color: #c3cdd8; cursor: default; }
+.plant-page .lo-move.up::before { content: "\25B2"; }
+.plant-page .lo-move.down::before { content: "\25BC"; }
+.plant-page .lo-grip { height: 38px; padding: 0 5px 0 3px; border-radius: 7px; border: 1px dashed #9fb3c8; background: #f5f8fb; color: var(--ink); font: inherit; font-size: 16px; font-weight: 800; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
+.plant-page .lo-grip::before { content: "\22EE"; margin-right: 3px; color: #7a8ca0; font-weight: 400; }
+.plant-page table.loadout tr.dragging td { background: #e8f1fa; }
+.plant-page table.loadout tr.drop-before td { box-shadow: inset 0 3px 0 var(--ud-blue); }
+.plant-page table.loadout tr.drop-after td { box-shadow: inset 0 -3px 0 var(--ud-blue); }
+body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select: none; }
 .plant-page .picker-pop { position: fixed; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px #0003; padding: 6px; display: grid; gap: 4px; }
 .plant-page .picker-pop button { min-width: 140px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page .picker-pop button.done { color: var(--runs-ink); }

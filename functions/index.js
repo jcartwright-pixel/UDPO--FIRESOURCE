@@ -185,7 +185,9 @@ exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
 exports.save = onCall(async (request) => {
   const user = signedIn(request);
   try {
-    const result = await applyAction(db, user, request.data);
+    // Local test database only: a browser test can set the server's clock (?testNow) to its made-up day.
+    const testNow = process.env.FUNCTIONS_EMULATOR === 'true' && request.data && request.data.testNow ? new Date(request.data.testNow) : null;
+    const result = await applyAction(db, user, request.data, testNow && !isNaN(testNow) ? () => testNow : undefined);
     // A manager's Lessor button: the repair email goes out after the save (Administration > Repair Email).
     return await TOOLS.afterSave(db, user, request.data, result);
   } catch (error) {
