@@ -91,6 +91,24 @@ async function runWriteBack({ db, sheets, target, now }) {
   items.forEach(item => {
     const values = sheet[item.tab] || [];
     const found = findRow(values, item);
+    // A run Route Master added to a Live week (actions.js addLiveRun, D6): a new row under the last one, as the current app does
+    // (udpoV7267RouteMasterToLive_). If the run is already on the sheet nothing is added.
+    if (item.append) {
+      if (found.rows.length) { ops.push({ ref: item.ref, update: { status: 'done', doneAt: stamp, note: 'the run was already on the sheet' } }); return; }
+      const r = Math.max(values.length, M.LIVE_HEADER_ROW), row = found.header.map(() => '');
+      Object.keys(item.cells).forEach(column => {
+        const c = found.header.indexOf(column), want = item.cells[column];
+        if (c < 0 || text(want) === '') return;
+        row[c] = want;
+        (updates[item.tab] = updates[item.tab] || []).push({ range: "'" + item.tab + "'!" + columnLetter(c) + (r + 1), values: [[want]] });
+        known[item.runDocId][column] = text(want);
+      });
+      while (values.length < r) values.push([]);
+      values.push(row);
+      written++;
+      ops.push({ ref: item.ref, update: { status: 'done', doneAt: stamp, sheetRow: r + 1 } });
+      return;
+    }
     if (found.rows.length !== 1) {
       conflicts++;
       ops.push({ ref: db.collection(C.conflicts).doc(item.id + '-row'), data: { open: true, at: stamp, requestId: item.requestId, by: item.by, tab: item.tab, runDocId: item.runDocId, route: item.match.route || '', run: item.match.run || '',

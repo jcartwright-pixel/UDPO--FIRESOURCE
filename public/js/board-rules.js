@@ -7,6 +7,8 @@
  *   - LOADED: the loaded tick, an End time, or a stored COMPLETE / COMPLETED / LOADED / READY; LOADING: a Start time without
  *     an End (or a stored LOADING / PAUSED); anything else WAITING;
  *   - a load with an open pickup (product that did not load) shows a red PICKUP line, "<qty> <item> - <notes>" joined by "; ";
+ *     a load note that asks for a pickup ("pickup", "pick up", "P/U", "PU") counts as an open pickup when no pickup was entered
+ *     for that load (019_V722 udpoV7268NotePickupRows_; Joe 10/11 review item 35);
  *   - sorted by load order, then route, then run; a trailing "_2" load number is not shown on the route;
  *   - the weekly schedule is Sunday to Saturday, one row per driver with a route that week: relief drivers first, then
  *     seniority date, then position order, then name.
@@ -35,6 +37,17 @@
   var STATE_TEXT = { LOADED: 'Loaded', LOADING: 'Loading', WAITING: 'Waiting' };
 
   function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(text(p.status).toUpperCase()) < 0; }
+  // A load note asking for a pickup: the plant types it into the load's note instead of pressing Add Pickup.
+  var NOTE_PICKUP = /\b(pick\s*-?\s*ups?|p\s*\/\s*u|pu)\b/i;
+  function notePickupId(runDocId, prefix, loadDate) { return 'note:' + runDocId + '|' + prefix + '|' + loadDate; }
+  // The open pickup listed for a load's note, or null: only when the note asks for one and no pickup was entered for the load
+  // (entered = any pickup on the list for that load and day, open or completed; completing the note saves one).
+  function notePickup(run, prefix, loadDate, entered) {
+    var day = run && run.days && run.days[prefix], note = text(day && day.plantNotes);
+    if (!note || !NOTE_PICKUP.test(note) || (entered && entered.length)) return null;
+    return { pickupId: notePickupId(run.id, prefix, loadDate), runDocId: run.id, day: prefix, runId: text(run.runId), route: text(run.route), run: text(run.run),
+      date: loadDate, item: note, quantity: '', notes: 'From the load note', status: 'PENDING', source: 'LOAD_NOTE', createdAt: text(day.updatedAt), createdBy: text(day.updatedBy) };
+  }
   function pickupLine(p) { var what = [text(p.quantity), text(p.item)].filter(Boolean).join(' '); return (what + (text(p.notes) ? (what ? ' - ' : '') + text(p.notes) : '')) || 'Pickup'; }
 
   // Joe 10/10: the Driver Room board and the phone's View Loadout show what the plant loads on this operating day (the same
@@ -61,11 +74,12 @@
       var day = run.days && run.days[p];
       if (run.weekStart !== week || !day || !day.runs || !L.liveFlagShown(run, 'displayMobileRoute', 'mobile')) return;
       var offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : day.loadDayOffset, loadDate = L.addDays(date, offset);
-      var mine = (pickups || []).filter(function (x) {
-        if (!pickupOpen(x)) return false;
+      var entered = (pickups || []).filter(function (x) {
         var same = x.runDocId ? x.runDocId === run.id && (!x.day || x.day === p) : (x.runId && text(x.runId) === text(run.runId)) || (!x.runId && text(x.route) === text(run.route) && text(x.run) === text(run.run));
         return same && (x.date === date || x.date === loadDate);
       });
+      var mine = entered.filter(pickupOpen), fromNote = notePickup(run, p, loadDate, entered);
+      if (fromNote) mine.push(fromNote);
       var state = boardState(day);
       rows.push({ runDocId: run.id, day: p, route: routeNumber(run.route), run: text(run.run), streamId: text(run.streamId), driver: text(day.driver), truck: text(day.truck),
         trailer: trailerText(day.trailer), cases: day.casesOut === null || day.casesOut === undefined ? '' : day.casesOut, notes: text(day.driverNotes), sequence: L.effectiveSequence(day),
@@ -105,5 +119,5 @@
   }
 
   return { calendarDay: calendarDay, boardState: boardState, STATE_TEXT: STATE_TEXT, boardRows: boardRows, loadoutBoardRows: loadoutBoardRows, remaining: remaining, weeklySchedule: weeklySchedule,
-    routeNumber: routeNumber, trailerText: trailerText, pickupOpen: pickupOpen, pickupLine: pickupLine };
+    routeNumber: routeNumber, trailerText: trailerText, pickupOpen: pickupOpen, pickupLine: pickupLine, NOTE_PICKUP: NOTE_PICKUP, notePickup: notePickup, notePickupId: notePickupId };
 });

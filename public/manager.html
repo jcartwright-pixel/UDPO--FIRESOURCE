@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page manager-page">
@@ -109,7 +110,7 @@
       const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors), T = U.managerTemps(temps, U.tempHistory(journal, now));
       // The report carries open breakdowns over from earlier shifts (a week of the log); the tile counts the last 24 hours.
       const log = U.shiftLog(journal, now), N = U.managerNotes(log), week = U.shiftLog(data.shift, now, 168);
-      const openPickups = data.pickups.filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
+      const openPickups = P.withNotePickups(loads, data.pickups).filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       // Joe 10/10: only what was checked since the last report was sent goes in; the rest is "Not checked".
       report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart }, now);
       const S = U.shiftReport(week, data.roundStart);

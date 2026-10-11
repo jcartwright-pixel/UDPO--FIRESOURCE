@@ -341,6 +341,8 @@
     return {};
   }
   function isBlowMold(line) { return lineKey(line) === 'BLOWMOLD'; }
+  // HTST #1 and #2 (the pasteurizers) also record Changeover as their status and the Remaining output of the run (old Plant.html 1057-1063).
+  function isHtst(line) { var k = lineKey(line); return k === 'HTST1' || k === 'HTST2'; }
   // The active production lines of the plant (setup = plantSetup docs), in view order.
   function productionLines(setup) {
     return (setup || []).filter(function (d) { return text(d.type).toUpperCase() === 'PRODUCTION_AREA' && text(d.status).toUpperCase() === 'ACTIVE'; })
@@ -679,7 +681,7 @@
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
-    shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, productionLines: productionLines, qualityLines: qualityLines,
+    shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,

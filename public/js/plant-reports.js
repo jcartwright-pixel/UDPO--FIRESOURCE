@@ -139,7 +139,7 @@ export function daySummary(date, runs, pickups, journal, nowMs, shifts) {
   c.shortages = loads.filter(x => x.shortage || x.refused).map(x => ({ route: x.route, run: x.run, shift: x.shift, what: [x.shortage, x.refused ? 'Refused / returned' : ''].filter(Boolean).join(' · ') }));
   // Pickups: product that did not load on one of the day's loads (or written for the day); each goes to its load's shift.
   const seen = {};
-  c.pickups = (pickups || []).filter(p => text(p.status).toUpperCase() !== 'DELETED').map(p => {
+  c.pickups = P.withNotePickups(rows, pickups || []).filter(p => text(p.status).toUpperCase() !== 'DELETED').map(p => {
     const i = rows.findIndex(r => P.pickupsFor(r, [p]).length);
     if (i < 0 && !(!p.runDocId && !p.runId && p.date === date)) return null;
     const k = p.pickupId || JSON.stringify(p);

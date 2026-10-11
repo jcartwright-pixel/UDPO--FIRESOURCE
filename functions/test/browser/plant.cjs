@@ -145,6 +145,38 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       await home.close();
     }
     results.push('Plant Distribution Departments: loads, unloading, washing and returns counted');
+
+    // Plant Station tablet (1280x800): Skip moves a waiting load to the bottom of today's loads, marked SKIPPED · COME BACK,
+    // still there after a reload; Start takes the mark off. Wednesday's open load stays on top under "finish these first".
+    {
+      const tab = await openPage(browser, 1280, 800, '/loadout.html?date=' + DATE + '&area=CASE&testEmail=viewer.test@uniteddairy.com');
+      await tab.waitForSelector('#rows tr[data-row] button.skip');
+      assert.match(await tab.textContent('.divider.prior'), /still open, finish these first/);
+      const id = await tab.$eval('#rows tr[data-row]:not(.done):not(.loading) button.skip', b => b.dataset.skip);
+      const sel = 'tr[data-row="' + id + '"]';
+      await tab.click(sel + ' button.skip');
+      await tab.waitForSelector(sel + '.skipped');
+      assert.equal(await tab.$eval('#rows tr[data-row]:last-child', t => t.dataset.row), id, 'the skipped load goes to the bottom');
+      assert.match(await tab.textContent(sel), /SKIPPED · COME BACK/);
+      assert.equal(await tab.$(sel + ' button.skip'), null, 'no second Skip on a skipped load');
+      if (SHOTS) {
+        await tab.screenshot({ path: path.join(SHOTS, 'loadout-skip-tablet-1280.png'), scale: 'css' });
+        await tab.$eval('.sheet.scroll-list', el => { el.scrollTop = el.scrollHeight; });
+        await tab.screenshot({ path: path.join(SHOTS, 'loadout-skipped-tablet-1280.png'), scale: 'css' });
+      }
+      // Start and Skip both show whole in their cell on the tablet.
+      const fit = await tab.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1));
+      assert.ok(fit, 'Start and Skip fit their cell at 1280 wide');
+      await tab.reload();
+      await tab.waitForSelector(sel + '.skipped');
+      results.push('Skip: the load went to the bottom marked SKIPPED · COME BACK and stayed skipped after a reload');
+      await tab.click(sel + ' button.clock');
+      await tab.waitForSelector(sel + '.loading', { timeout: 8000 });
+      assert.doesNotMatch(await tab.textContent(sel), /SKIPPED/);
+      results.push('Start on the skipped load takes the mark off');
+      assert.deepEqual(tab.errors, []);
+      await tab.close();
+    }
   } finally {
     await browser.close();
   }

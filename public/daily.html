@@ -30,7 +30,7 @@
     <div class="head">
       <div class="title"><h1>Daily Dispatch</h1></div>
       <div class="field">
-        <label>Week beginning</label>
+        <label for="week-begin">Week beginning</label>
         <div class="stepper">
           <button type="button" id="week-prev" aria-label="Previous week" title="Previous week">&#9664;</button>
           <input id="week-begin" readonly tabindex="-1">
@@ -45,7 +45,7 @@
           <button type="button" id="next" aria-label="Next day">&#9654;</button>
         </div>
       </div>
-      <div class="field"><label>Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
+      <div class="field"><label for="delivery-day">Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
       <div class="actions in-head">
         <a class="button" id="go-weekly" href="weekly.html">Weekly Dispatch</a>
         <button type="button" class="primary" id="print-sheet">&#9635; Print Dispatch Sheet</button>
@@ -504,7 +504,9 @@
     }
     document.getElementById('print-sheet').onclick = () => printSheet();
     // Print Layouts opens Daily with #print: the sheet prints once the day's runs are on screen.
-    if (location.hash === '#print') { const t = setInterval(() => { if (!rows.length) return; clearInterval(t); history.replaceState(null, '', location.pathname + location.search); printSheet(); }, 300); }
+    // An empty day or week still prints (a blank sheet) once the runs have been read, instead of waiting forever.
+    let runsRead = false;
+    if (location.hash === '#print') { const t = setInterval(() => { if (!runsRead) return; clearInterval(t); history.replaceState(null, '', location.pathname + location.search); printSheet(); }, 300); }
 
     /* ---------- Week and day ---------- */
     async function watchRuns() {
@@ -523,6 +525,7 @@
       const q = query(collection(db, 'runs'), where('weekStart', 'in', weeks));
       unsubscribeRuns = onSnapshot(q, snap => {
         runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        runsRead = true;
         render();
       }, e => showError('Could not read the dispatch: ' + e.message));
     }
@@ -542,7 +545,7 @@
         document.getElementById('to-conflicts').hidden = !writeBack;
         render();
         const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
-        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy from the sheets';
+        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : 'Waiting for the first copy from the sheets';
       });
       watchLists(user, render);
       document.getElementById('prev').onclick = () => move(-1);

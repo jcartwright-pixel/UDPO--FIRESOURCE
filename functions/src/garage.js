@@ -326,7 +326,7 @@ async function step(db, input, nowMs) {
     if (String(order.status || '').toUpperCase() === 'DONE') throw SaveErr('NOT_ALLOWED', 'That job is already finished.');
 
     // DONE needs the write-up (to mark it repaired), the newest odometer and Fleet Service's row, read before any write.
-    let odometer = null, setupRef = null, setup = null;
+    let odometer = null, setupRef = null, setup = null, rules = fleetRules(null);
     if (req.op === 'DONE' && req.safe) {
       if (order.source_id && !writeUp) { writeUpRef = db.collection(C.maintenance).doc(MAINT.docId(order.source_id)); const w = await tx.get(writeUpRef); writeUp = w.exists ? w.data() : null; }
       if (unitType(order.unit_type) === 'TRUCK') {
@@ -335,6 +335,7 @@ async function step(db, input, nowMs) {
         odometer = odo.length ? odo[0].miles : null;
       }
       if (G.SERVICES[order.service_key]) { setupRef = db.collection('fleetSetup').doc(docId(order.unit)); const s = await tx.get(setupRef); setup = s.exists ? s.data() : null; }
+      if (order.service_key === 'DOT') { const r = await tx.get(db.collection('config').doc(RULES_DOC)); rules = fleetRules(r.exists ? r.data() : null); }
     }
 
     // The clocks: each signed-in mechanic's own (one job at a time), and every clock still running on this job.
@@ -409,7 +410,7 @@ async function step(db, input, nowMs) {
         const today = L.operatingDay(new Date(nowMs)), move = { updated_at: stamp, updated_by: by };
         if (order.service_key === 'PM') { move.last_service_date = today; if (odometer) move.last_service_miles = String(odometer); }
         if (order.service_key === 'REEFER') { move.last_service_date = today; if (setup && String(setup.current_hours || '').trim()) move.last_service_hours = String(setup.current_hours); }
-        if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, L.FLEET_RULES.dotMonths);
+        if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, rules.dotMonths);
         if (setup) tx.update(setupRef, Object.assign({}, move, { testEdited: true, editedAt: stamp }));
         else tx.set(setupRef, Object.assign({ unit: order.unit, unit_type: order.unit_type, facility_id: FACILITY, track: 'YES', createdInApp: true }, move));
         result.service = move;
@@ -450,6 +451,131 @@ function validateSend(input, out) {
   return out;
 }
 
+/*
+ * Fleet Service Setup (the current app's FleetService.html Setup tab, 220_V7276 udpoV7276SaveRules_ / SaveUnit_ / SaveTech_),
+ * managers and administrators:
+ *   saveFleetRules  config/fleetRules: PM miles and warning, reefer months / hours / warning days, DOT months / warning, plate warning.
+ *   saveFleetUnit   fleetSetup/<unit>: track due dates (YES / NO / blank = default), last service date / miles / hours, reefer
+ *                   hours now, DOT due, plate expires, notes.
+ *   saveGarageTech  garageTechs/<id>: add a technician, rename, turn on or off, and set or reset the login ID (5 or 6 digits, kept
+ *                   only as a hash in garageLogins, never readable; two technicians cannot share one).
+ * These stay in the new app (like the work orders made here): a later change to the same row in the sheet copy replaces them.
+ */
+const RULES_DOC = 'fleetRules';
+const RULE_LIMITS = { truckMiles: [1000, 100000], truckWarnMiles: [0, 20000], trailerMonths: [1, 24], trailerHours: [50, 10000], trailerWarnDays: [0, 120],
+  dotMonths: [1, 24], dotWarnDays: [0, 180], plateWarnDays: [0, 180] };
+// The rules in force: the saved ones over the current app's defaults (L.FLEET_RULES).
+function fleetRules(saved) {
+  const out = Object.assign({}, L.FLEET_RULES);
+  Object.keys(RULE_LIMITS).forEach(k => { const n = Number(saved && saved[k]); if (saved && saved[k] !== '' && saved[k] != null && Number.isFinite(n)) out[k] = n; });
+  return out;
+}
+const loginKey = (loginId) => sha('UDPO-GARAGE-ID|' + String(loginId).trim());
+const ymdOrBlank = (v, label) => {
+  const t = text(v, 40); if (!t) return '';
+  const k = L.dateKey(t); if (!k) throw SaveErr('BAD_REQUEST', label + ' must be a date'); return k;
+};
+const numOrBlank = (v, label, max) => {
+  const t = String(v === null || v === undefined ? '' : v).replace(/[, ]+/g, '').trim(); if (!t) return '';
+  const n = Number(t); if (!Number.isFinite(n) || n < 0 || n > max) throw SaveErr('BAD_REQUEST', label + ' must be a number from 0 to ' + max.toLocaleString());
+  return String(n);
+};
+
+function validateFleet(action, input, out) {
+  input = input || {};
+  if (action === 'saveFleetRules') {
+    out.rules = {};
+    Object.keys(RULE_LIMITS).forEach(k => {
+      if (input.rules == null || input.rules[k] === undefined) return;
+      const n = Number(input.rules[k]), [lo, hi] = RULE_LIMITS[k];
+      if (!Number.isInteger(n) || n < lo || n > hi) throw SaveErr('BAD_REQUEST', 'Each rule must be a whole number (' + k + ': ' + lo + ' to ' + hi + ')');
+      out.rules[k] = n;
+    });
+    if (!Object.keys(out.rules).length) throw SaveErr('BAD_REQUEST', 'Nothing to save');
+    if (out.rules.truckWarnMiles !== undefined && out.rules.truckMiles !== undefined && out.rules.truckWarnMiles >= out.rules.truckMiles) throw SaveErr('BAD_REQUEST', 'The PM warning must be fewer miles than the PM interval');
+    return out;
+  }
+  if (action === 'saveFleetUnit') {
+    out.unit = text(input.unit, 20).toUpperCase();
+    if (!out.unit) throw SaveErr('BAD_REQUEST', 'Pick the unit');
+    out.unitType = text(input.unitType, 10).toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK';
+    const f = input.fields || {}, t = text(f.track, 10).toUpperCase();
+    out.fields = {};
+    if (f.track !== undefined) out.fields.track = t === 'YES' || t === 'NO' ? t : '';
+    [['last_service_date', 'Last service date'], ['dot_due', 'DOT due'], ['plate_expires', 'Plate expires']].forEach(([k, l]) => { if (f[k] !== undefined) out.fields[k] = ymdOrBlank(f[k], l); });
+    [['last_service_miles', 'Last service miles', 3000000], ['last_service_hours', 'Last service hours', 200000], ['current_hours', 'Reefer hours now', 200000]].forEach(([k, l, m]) => { if (f[k] !== undefined) out.fields[k] = numOrBlank(f[k], l, m); });
+    if (f.notes !== undefined) out.fields.notes = text(f.notes, 300);
+    if (!Object.keys(out.fields).length) throw SaveErr('BAD_REQUEST', 'Nothing to save');
+    return out;
+  }
+  // saveGarageTech
+  out.op = text(input.op, 10).toUpperCase();
+  if (['ADD', 'NAME', 'ACTIVE', 'LOGIN'].indexOf(out.op) < 0) throw SaveErr('BAD_REQUEST', 'Unknown technician change');
+  out.techId = text(input.techId, 80);
+  if (out.op !== 'ADD' && !out.techId) throw SaveErr('BAD_REQUEST', 'Pick the technician');
+  if (out.op === 'ADD' || out.op === 'NAME') { out.name = text(input.name, 40).toUpperCase(); if (!out.name) throw SaveErr('BAD_REQUEST', 'Type the technician\'s name'); }
+  if (out.op === 'ACTIVE') out.active = input.active === true;
+  if (out.op === 'ADD' || out.op === 'LOGIN') {
+    out.loginId = String(input.loginId == null ? '' : input.loginId).trim();
+    if (out.op === 'LOGIN' || out.loginId) { if (!/^\d{5,6}$/.test(out.loginId)) throw SaveErr('BAD_REQUEST', 'The login ID is 5 or 6 digits'); }
+  }
+  return out;
+}
+
+async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  if (req.action === 'saveFleetRules') {
+    const ref = db.collection('config').doc(RULES_DOC), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+    const merged = fleetRules(Object.assign({}, before || {}, req.rules));
+    if (merged.truckWarnMiles >= merged.truckMiles) throw SaveErr('BAD_REQUEST', 'The PM warning must be fewer miles than the PM interval');
+    tx.set(ref, Object.assign({}, req.rules, { updatedAt: stamp, updatedBy: email }), { merge: true });
+    result.rules = merged;
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: req.rules, result });
+    return result;
+  }
+  if (req.action === 'saveFleetUnit') {
+    const ref = db.collection('fleetSetup').doc(docId(req.unit)), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+    const change = Object.assign({}, req.fields, { updated_at: stamp, updated_by: email, testEdited: true, editedAt: stamp });
+    if (before) tx.update(ref, change);
+    else tx.set(ref, Object.assign({ unit: req.unit, unit_type: req.unitType, facility_id: FACILITY, createdInApp: true }, change));
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, unit: req.unit, before, after: req.fields, result });
+    return result;
+  }
+  // saveGarageTech
+  let id = req.techId, ref, before = null;
+  if (req.op === 'ADD') {
+    const all = (await tx.get(db.collection(TECHS))).docs.map(d => d.data());
+    if (all.some(t => text(t.name).toUpperCase() === req.name)) throw SaveErr('BAD_REQUEST', req.name + ' is already on the list');
+    id = 'TECH-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    ref = db.collection(TECHS).doc(docId(id));
+  } else {
+    ref = db.collection(TECHS).doc(docId(id));
+    const snap = await tx.get(ref); if (!snap.exists) throw SaveErr('NOT_FOUND', 'That technician is not on the list');
+    before = snap.data();
+  }
+  let keyRef = null, oldKeyRef = null;
+  if (req.loginId) {
+    keyRef = db.collection(LOGINS).doc('id_' + loginKey(req.loginId));
+    const [taken, mine] = await tx.getAll(keyRef, db.collection(LOGINS).doc(docId(id)));
+    if (taken.exists && taken.data().techId !== id) throw SaveErr('BAD_REQUEST', 'Another technician already uses that login ID. Pick a different number.');
+    if (mine.exists && mine.data().key && mine.data().key !== keyRef.id) oldKeyRef = db.collection(LOGINS).doc(mine.data().key);
+  }
+  if (req.op === 'ADD') tx.set(ref, { tech_id: id, name: req.name, active: 'YES', facility_id: FACILITY, created_at: stamp, created_by: email, createdInApp: true });
+  if (req.op === 'NAME') tx.update(ref, { name: req.name, updated_at: stamp, updated_by: email, testEdited: true });
+  if (req.op === 'ACTIVE') tx.update(ref, { active: req.active ? 'YES' : 'NO', updated_at: stamp, updated_by: email, testEdited: true });
+  if (keyRef) {
+    // The hash the Garage Station checks (loginHash, salted with the technician), and a marker so no one else picks the same number.
+    tx.set(db.collection(LOGINS).doc(docId(id)), { techId: id, hash: loginHash(id, req.loginId), key: keyRef.id, setAt: stamp, setBy: email });
+    tx.set(keyRef, { techId: id, setAt: stamp });
+    if (oldKeyRef) tx.delete(oldKeyRef);
+    tx.delete(db.collection(LOCKS).doc(docId(id)));
+  }
+  result.techId = id; result.loginSet = !!keyRef;
+  // The login ID itself is never logged.
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, techId: id, op: req.op, before, after: { name: req.name || null, active: req.op === 'ACTIVE' ? req.active : null, loginSet: !!keyRef }, result });
+  return result;
+}
+
 /* One Garage Station call: {op: 'read' | 'signIn' | 'signOut' | 'step', tokens, ...}. Throws SaveError. */
 async function garageCall(db, input, now) {
   input = input || {};
@@ -469,4 +595,4 @@ async function garageCall(db, input, now) {
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, LOGINS };
+module.exports = { G, fleetRules, validateFleet, saveFleet, RULES_DOC, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, LOGINS };

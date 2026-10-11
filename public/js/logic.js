@@ -72,6 +72,18 @@
     return Number(parts.hour) >= DAY_ROLL_HOUR ? key : addDays(key, -1);
   }
 
+  // The New York calendar day of a saved time ("2026-10-11T01:30:00Z" is 10/10 at 9:30 PM), or a plain yyyy-mm-dd as it is.
+  // Screens count "this week" and "this month" by this day, not by the UTC date the time is stored in.
+  function localDay(value) {
+    var s = String(value || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    var t = Date.parse(s);
+    if (!s || !isFinite(t)) return '';
+    var parts = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(t)).forEach(function (p) { parts[p.type] = p.value; });
+    return parts.year + '-' + parts.month + '-' + parts.day;
+  }
+
   // Same rule as udpoV7000ScheduledValue_: blank, FALSE, NO, N, 0, OFF and DOES NOT RUN mean "no".
   function yes(value) {
     if (value === false || value === 0 || value === null || value === undefined) return false;
@@ -859,7 +871,7 @@
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
-    DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,
+    DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,

@@ -829,6 +829,20 @@ html { background: var(--page); }
 .fleet-split.wide-left { grid-template-columns: 3fr 1fr; }
 .fleet-split h2 { margin: 6px 4px 8px; font-size: 17px; color: var(--ud-blue); }
 @media (max-width: 1200px) { .fleet-split, .fleet-split.wide-left { grid-template-columns: 1fr; } }
+.fleet-split h2 small { color: var(--muted); font-size: 13px; font-weight: 600; margin-left: 6px; }
+/* Fleet Service Setup: the service rules, Add Technician, and History's unit facts. */
+.fs-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin: 0 4px 6px; }
+.fs-rules label { display: grid; gap: 3px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.fs-rule { display: flex; align-items: center; gap: 6px; }
+.fs-rule input { width: 96px; height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px; }
+.fs-rule small { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.fs-addtech { display: flex; gap: 6px; margin: 8px 4px; }
+.fs-addtech input { flex: 1; min-width: 0; height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; }
+table.fs-facts th { text-align: left; width: 48%; color: var(--muted); font-weight: 700; }
+.fleet-page tr.clicky { cursor: pointer; }
+.fleet-page .head .tabs { flex: none; }
+.fleet-page .head .tabs button { white-space: nowrap; }
+.fleet-page tr.clicky:hover td { background: #eef5fb; }
 
 /* Over the Road */
 .otr-dash { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; padding: 4px; }
@@ -1438,38 +1452,10 @@ table td button.warn { font-size: 15px; }
 .routes-page table.routes.many select.rf { width: 100%; height: 34px; border: 1px solid #c5d3df; border-radius: 6px; font: inherit; font-weight: 700; color: var(--ink); background: #fff; }
 .routes-page table.routes.many input[type="checkbox"].rf { width: 22px; height: 22px; margin: 0; cursor: pointer; accent-color: #0e4f87; }
 .routes-page table.routes.many input[type="checkbox"].rf:disabled { cursor: default; }
-
-/* Fleet Service History: the unit panel on the left (the current app's History facts), the jobs on the right. */
-.fs-hist { display: grid; grid-template-columns: 320px 1fr; gap: 14px; align-items: start; }
-.fs-hist h2 { margin: 6px 4px 8px; font-size: 17px; color: var(--ud-blue); }
-.fs-facts { position: sticky; top: 0; z-index: 2; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
-.fs-facts small { letter-spacing: .08em; font-weight: 800; color: #5a6b7d; font-size: 12px; }
-.fs-facts h3 { margin: 2px 0 8px; font-size: 30px; color: #0b3d6b; }
-.fs-facts p { display: flex; justify-content: space-between; gap: 10px; margin: 0; padding: 6px 0; font-size: 16px; font-weight: 700; color: #5a6b7d; border-bottom: 1px solid #eef2f6; }
-.fs-facts p b { color: #0b3d6b; text-align: right; }
-.fs-facts p.hint { display: block; border: 0; font-weight: 400; line-height: 1.4; }
-.fleet-page tr[data-hist] { cursor: pointer; }
-.fleet-page tr[data-hist]:hover td { background: #eef5fc; }
-.fleet-split h2 small { font-size: 14px; color: var(--muted); font-weight: 600; margin-left: 8px; }
-@media (max-width: 900px) { .fs-hist { grid-template-columns: 1fr; } .fs-facts { position: static; } }
-/* The printed Fleet Service & Compliance Report (the current app's one-page report). */
-#print .fs-rhead { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0b4f86; padding-bottom: 6px; }
-#print .fs-rhead small { letter-spacing: .18em; font-size: 10px; font-weight: 800; color: #5a6b7d; }
-#print .fs-rhead h2 { margin: 0; font-size: 22px; color: #0b4f86; }
-#print .fs-rover { text-align: right; color: #5a6b7d; }
-#print .fs-rover b { display: block; font-size: 36px; color: #b42318; line-height: 1; }
-#print .fs-ptiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-#print .fs-ptiles div { border: 1px solid #000; border-radius: 6px; text-align: center; padding: 4px; }
-#print .fs-ptiles small { font-size: 9px; letter-spacing: .12em; font-weight: 800; }
-#print .fs-ptiles b { display: block; font-size: 22px; }
-#print .fs-report h3 { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #0b4f86; margin: 12px 0 4px; border-bottom: 1px solid #b9c7d4; padding-bottom: 2px; }
-#print .fs-report table { width: 100%; border-collapse: collapse; }
-#print .fs-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-#print td.fs-none { text-align: center; color: #555; }
-#print .fs-sign { display: flex; justify-content: space-between; margin-top: 22px; font-size: 12px; font-weight: 700; }
-#print .fs-rfoot { margin-top: 10px; border-top: 1px solid #b9c7d4; padding-top: 4px; color: #555; font-size: 9px; display: flex; justify-content: space-between; }
-#print .fs-report table { table-layout: auto; }
-#print .fs-report th { font-size: 11px; }
-#print .fs-report th, #print .fs-report td { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; }
 /* Route Week Override: Reset asks twice (the button turns orange and says Click Again). */
 .routeweek-page #reset.armed { background: #b45309; color: #fff; border-color: #b45309; }
+/* Improvements 10/10: an error stays readable above an open pop-up's dimmed backdrop. */
+.notice.error:not([hidden]) { position: relative; z-index: 30; }
+
+/* Fleet Service report: the Reviewed by / Date line under the week's work (the current app's sign-off). */
+#print .print-sign { margin: 18px 0 6px; font-weight: 700; }

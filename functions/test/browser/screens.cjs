@@ -235,11 +235,13 @@ async function noScroll(page) {
     await wkEdit.waitForSelector('.popover', { state: 'detached' });
     await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6]; return /ADAMS/.test(td.textContent) && td.classList.contains('plant-load') && !td.classList.contains('c-plant'); }, null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-plant-load-1920.png') });
-    await wkEdit.click('#run-days');
-    await wkEdit.click('xpath=//tbody[@id="days-rows"]/tr[td[1]/b[text()="802"]]/td[2+5]/button');
-    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 5000 });
+    // Route Run Days opens Route Week Override at this week (as in the current app); 802 Thursday turned on there needs a driver here.
+    await Promise.all([wkEdit.waitForURL(/routeweek\.html\?week=2026-10-04/), wkEdit.click('#run-days')]);
+    await wkEdit.click('xpath=//tbody[@id="rows"]/tr[td[1][text()="802"]]/td[2+5]/button');
+    await wkEdit.waitForFunction(() => /RUNS/.test([...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[6].textContent) && !/NOT/.test([...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[6].textContent), null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-run-days-1920.png') });
-    await wkEdit.click('#days-modal [data-close]');
+    await wkEdit.goBack();
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 8000 });
     // Joe 10/10: no tab buttons; the menu's Driver Assignment Board opens Weekly at the board (the test sign-in rides on the address).
     assert.equal(await wkEdit.$('#tab-board'), null, 'no tab buttons');
     await wkEdit.$eval('.side-flyouts a[href="weekly.html#board"]', a => { a.href = 'weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com#board'; a.click(); });

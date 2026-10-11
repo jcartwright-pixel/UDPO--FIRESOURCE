@@ -186,7 +186,7 @@
       return '<colgroup><col style="width:8%"><col style="width:15%"><col span="7" style="width:11%"></colgroup>' + head('<th>Route</th><th>Run / Destination</th>') + '<tbody>' +
         list.map((r, ri) => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r) + DAYS.map((p, di) => {
           const on = !!day(r, p).active;
-          return '<td class="' + (on ? '' : 'norun') + '"><input class="cell" data-day="' + p + '" data-r="' + ri + '" data-c="' + di + '" value="' + escapeHtml(cellValue(r, p, g.field)) + '" placeholder="' + (on ? g.ph : '') + '" autocomplete="off"' + (edit ? '' : ' readonly') + '></td>';
+          return '<td class="' + (on ? '' : 'norun') + '"><input class="cell" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(p) + ', ' + g.title) + '" data-day="' + p + '" data-r="' + ri + '" data-c="' + di + '" value="' + escapeHtml(cellValue(r, p, g.field)) + '" placeholder="' + (on ? g.ph : '') + '" autocomplete="off"' + (edit ? '' : ' readonly') + '></td>';
         }).join('') + '</tr>').join('') + '</tbody>' + (list.length ? '' : '<tbody><tr><td colspan="9" class="empty">No runs to show.</td></tr></tbody>');
     }
     function daysView(list, edit) {
@@ -197,9 +197,9 @@
           const same = prior === r.route; prior = r.route;
           return '<tr data-id="' + escapeHtml(r.id) + '">' +
             '<td class="strong">' + (same ? '<small>&#8627; same route</small>' : escapeHtml(r.route) + '<small>' + escapeHtml(r.routeName || '') + '</small>') + '</td><td class="strong">' + escapeHtml(r.run || '') + '</td>' +
-            DAYS.map(p => { const on = !!day(r, p).active; return '<td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>'; }).join('') +
+            DAYS.map(p => { const on = !!day(r, p).active; return '<td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '" aria-pressed="' + on + '" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(p)) + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>'; }).join('') +
             '<td><button type="button" class="edit edit-route" data-edit-route="' + escapeHtml(r.id) + '" title="Open the Route Editor for this run">Edit Route</button></td></tr>';
-        }).join('') + '</tbody>';
+        }).join('') + (list.length ? '' : '<tr><td colspan="10" class="empty">No runs to show.</td></tr>') + '</tbody>';
     }
     function seqList() {
       return routes.filter(r => isActive(r) && day(r, seqDay).active && (!pickRoute || r.route === pickRoute))
@@ -241,8 +241,8 @@
     function dayTable(r, edit) {
       return '<h3 class="day-title">Each day of the normal week</h3><table class="day-table"><thead><tr><th>Day</th><th>Runs?</th>' + DAY_FIELDS.map(f => '<th>' + f[1] + '</th>').join('') + '</tr></thead><tbody>' +
         DAYS.map(p => { const on = !!day(r, p).active;
-          return '<tr data-id="' + escapeHtml(r.id) + '"' + (on ? '' : ' class="off"') + '><td class="strong">' + NAME(p) + '</td><td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>' +
-            DAY_FIELDS.map(f => '<td' + (f[0] === 'notes' ? ' class="day-notes"' : '') + '><input class="dcell" data-day="' + p + '" data-field="' + f[0] + '" value="' + escapeHtml(cellValue(r, p, f[0])) + '"' + (on && UNIT_FIELDS.indexOf(f[0]) >= 0 ? ' placeholder="none set"' : '') + ' autocomplete="off"' + (edit ? '' : ' readonly') + '></td>').join('') + '</tr>';
+          return '<tr data-id="' + escapeHtml(r.id) + '"' + (on ? '' : ' class="off"') + '><td class="strong">' + NAME(p) + '</td><td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '" aria-pressed="' + on + '" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(p)) + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>' +
+            DAY_FIELDS.map(f => '<td' + (f[0] === 'notes' ? ' class="day-notes"' : '') + '><input class="dcell" aria-label="' + escapeHtml(NAME(p) + ' ' + f[1]) + '" data-day="' + p + '" data-field="' + f[0] + '" value="' + escapeHtml(cellValue(r, p, f[0])) + '"' + (on && UNIT_FIELDS.indexOf(f[0]) >= 0 ? ' placeholder="none set"' : '') + ' autocomplete="off"' + (edit ? '' : ' readonly') + '></td>').join('') + '</tr>';
         }).join('') + '</tbody></table>';
     }
     // Show / Hide Rules: every true/false the screens read, where it comes from, and what Weekly does with it this week.
@@ -278,7 +278,8 @@
         '<thead><tr><th>Route</th><th>Run / Destination</th><th>Run by</th><th>Loadout</th><th>Days</th><th>Active</th><th>Daily</th><th>Weekly</th><th>Plant</th><th>Mobile route</th><th>Sleeper</th><th>Drop &amp; hook</th></tr></thead><tbody>' +
         list.map(r => '<tr><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td><td>' + escapeHtml(r.loadType || 'None') + '</td>' +
           '<td>' + escapeHtml(DAYS.filter(p => day(r, p).active).map(p => NAME(p).slice(0, 3)).join(' ')) + '</td><td>' + yes(isActive(r)) + '</td><td>' + yes(shows(r, 'displayDaily')) + '</td><td>' + yes(shows(r, 'displayWeekly')) + '</td>' +
-          '<td>' + yes(shows(r, 'displayPlant')) + '</td><td>' + yes(shows(r, 'displayMobile')) + '</td><td>' + yes(r.sleeper) + '</td><td>' + yes(r.dropAndHook) + '</td></tr>').join('') + '</tbody>' +
+          '<td>' + yes(shows(r, 'displayPlant')) + '</td><td>' + yes(shows(r, 'displayMobile')) + '</td><td>' + yes(r.sleeper) + '</td><td>' + yes(r.dropAndHook) + '</td></tr>').join('') +
+          (list.length ? '' : '<tr><td colspan="12" class="empty">No runs to show.</td></tr>') + '</tbody>' +
         // Totals under each column: how many runs shown have each box ticked, and the running days in the week.
         (list.length ? '<tfoot><tr class="recap-sum"><td class="strong">Totals</td><td>' + list.length + (list.length === 1 ? ' run' : ' runs') + '</td><td></td><td></td><td>' + occurrences(list) + ' run days</td>' +
           [isActive, r => shows(r, 'displayDaily'), r => shows(r, 'displayWeekly'), r => shows(r, 'displayPlant'), r => shows(r, 'displayMobile'), r => !!r.sleeper, r => !!r.dropAndHook].map(f => '<td>' + list.filter(f).length + '</td>').join('') + '</tr></tfoot>' : '');
