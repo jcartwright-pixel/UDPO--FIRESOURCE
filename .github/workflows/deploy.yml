@@ -181,7 +181,13 @@ jobs:
           if echo "$init" | grep -q '"apiKey"'; then echo "Firebase web settings: found"; else echo "::error::https://$PROJECT.web.app/__/firebase/init.json has no web app settings. In the Firebase console: Project settings > General > Your apps > Add app > Web (</>), any nickname, no Hosting tick, Register app. Then deploy again."; ok=false; fi
           code=$(curl -s -o /dev/null -w '%{http_code}' "https://$PROJECT.web.app/index.html"); echo "Home page: HTTP $code"; [ "$code" = 200 ] || ok=false
           # The live home page must ask for this deploy's styles, and those styles must be the current ones.
-          page=$(curl -fsS "https://$PROJECT.web.app/index.html?check=$GITHUB_SHA") || page=''
+          # Right after a release the web cache can still hand out the old page for a few seconds, so ask again
+          # for up to a minute before calling it wrong.
+          for try in $(seq 1 12); do
+            page=$(curl -fsS -H 'Cache-Control: no-cache' "https://$PROJECT.web.app/index.html?check=$GITHUB_SHA-$try") || page=''
+            [[ "$page" == *"css/app.css?v=${GITHUB_SHA::12}"* ]] && break
+            echo "Home page still the old copy (try $try of 12), asking again in 5 seconds"; sleep 5
+          done
           if [[ "$page" == *"css/app.css?v=${GITHUB_SHA::12}"* ]]; then echo "Home page asks for this deploy's styles: yes"; else echo "::error::The live home page does not ask for this deploy's styles"; ok=false; fi
           css=$(curl -fsS "https://$PROJECT.web.app/css/app.css?v=${GITHUB_SHA::12}") || css=''
           if [[ "$css" == *'.dc-head'* ]]; then echo "Styles are current: yes"; else echo "::error::The live styles are not the current ones"; ok=false; fi
