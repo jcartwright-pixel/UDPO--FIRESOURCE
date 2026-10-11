@@ -51,8 +51,8 @@ export function rankChoices(choices, typed, unit) {
 }
 
 /*
- * h = { rowOf(td), current(row, kind), choices(kind, row) -> [{value, label, key, group, blocked, reason}],
- *       pick(row, kind, value), editText(td, row, kind, typed), setEditing(on), render() }
+ * h = { rowOf(td), current(row, kind), text(row, kind), choices(kind, row) -> [{value, label, key, group, blocked, reason}],
+ *       pick(row, kind, value or {unit}), editText(td, row, kind, typed), setEditing(on), render() }
  */
 export function bindDailyKeys(tbody, h) {
   injectStyle();
@@ -140,7 +140,7 @@ export function bindDailyKeys(tbody, h) {
         last = c.head;
         html += '<div role="option" data-i="' + i + '" class="' + (i === active ? 'active ' : '') + (c.blocked ? 'off' : '') + '">' + esc(c.label) + (c.reason ? '<em>' + esc(c.reason) + '</em>' : c.note ? '<em class="note">' + esc(c.note) + '</em>' : '') + '</div>';
       });
-      pop.innerHTML = html + (shown.length ? '' : '<p>No match. Esc keeps the old one.</p>') + '<small>Enter takes it and moves down · Tab next cell · Esc keeps the old one</small>';
+      pop.innerHTML = html + (shown.length ? '' : unit ? '<p>Not on Equipment Master. Enter keeps it as typed.</p>' : '<p>No match. Esc keeps the old one.</p>') + '<small>Enter takes it and moves down · Tab next cell · Esc keeps the old one</small>';
       place();
       const a = pop.querySelector('.active');
       if (a) a.scrollIntoView({ block: 'nearest' });
@@ -171,10 +171,12 @@ export function bindDailyKeys(tbody, h) {
       if (take) {
         if (pickable(shown[active]) && (input.value.trim() || all)) value = shown[active].value;
         else if (!input.value.trim() && !all) value = ''; // Delete / Backspace then Enter clears the cell
+        // A truck or trailer number with no match is kept as typed, like the current app (trailers as T-###).
+        else if (unit && input.value.trim()) { const t = input.value.trim().toUpperCase().replace(/\s+/g, ''); value = { unit: kind === 'trailer' ? 'T-' + t.replace(/^T-?/, '') : t }; }
       }
       want = to;
       h.setEditing(false);
-      if (value !== null && value !== current) h.pick(row, kind, value);
+      if (value !== null && value !== current && !(value.unit && value.unit === h.text(row, kind))) h.pick(row, kind, value);
       else h.render();
     }
 

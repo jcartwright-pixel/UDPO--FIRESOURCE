@@ -346,7 +346,12 @@ function validate(input) {
     out.expectedRev = Number(input.expectedRev);
   }
   if (action === 'assignDriver') out.driverId = text(input.driverId);
-  if (action === 'assignTruck' || action === 'assignTrailer') out.equipmentId = text(input.equipmentId);
+  if (action === 'assignTruck' || action === 'assignTrailer') {
+    out.equipmentId = text(input.equipmentId);
+    // A unit typed on Daily that is not on Equipment Master (the current app took any number): kept as typed, trailers as T-###.
+    const typed = text(input.unit, 20).toUpperCase().replace(/\s+/g, '');
+    if (!out.equipmentId && typed) out.unit = action === 'assignTrailer' ? 'T-' + typed.replace(/^T-?/, '') : typed;
+  }
   // OVR on Daily: a driver who is off that day, or a unit that is down, may still be picked on purpose.
   if (['assignDriver', 'assignTruck', 'assignTrailer'].indexOf(action) >= 0 && input.override === true) out.override = true;
   if (action === 'setRuns') out.runs = input.runs === true;
@@ -425,8 +430,15 @@ async function resolveAssignment(tx, db, req, stamp, run) {
   if (req.action === 'assignTruck' || req.action === 'assignTrailer') {
     const type = req.action === 'assignTruck' ? 'TRUCK' : 'TRAILER';
     const idField = type === 'TRUCK' ? 'truckId' : 'trailerId', unitField = type === 'TRUCK' ? 'truck' : 'trailer';
-    if (!req.equipmentId) return { [idField]: '', [unitField]: '' };
-    const snap = await tx.get(db.collection(C.equipment).doc(M.safeIdPart(req.equipmentId)));
+    let snap = null;
+    if (!req.equipmentId && req.unit) {
+      // A typed unit that is on Equipment Master after all is used as that unit (same checks); otherwise it is kept as typed.
+      const hit = await tx.get(db.collection(C.equipment).where('unit', '==', req.unit));
+      snap = hit.docs.find(d => d.data().type === type) || null;
+      if (!snap) return { [idField]: '', [unitField]: req.unit };
+    }
+    if (!req.equipmentId && !snap) return { [idField]: '', [unitField]: '' };
+    snap = snap || await tx.get(db.collection(C.equipment).doc(M.safeIdPart(req.equipmentId)));
     if (!snap.exists) throw new SaveError('NOT_FOUND', req.equipmentId + ' is not in Equipment Master');
     const e = snap.data();
     if (e.type !== type) throw new SaveError('BAD_REQUEST', e.unit + ' is a ' + e.type + ', not a ' + type);

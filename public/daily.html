@@ -266,7 +266,9 @@
       rowOf: (td) => { const tr = td.closest('tr[data-index]'); return tr ? rows[Number(tr.dataset.index)] : null; },
       current: (row, kind) => row[idOf[kind]] || (kind === 'driver' && coverageName(row) ? '__CVG__:' + coverageName(row) : ''),
       choices: (kind, row) => pickChoices(kind, row[idOf[kind]], busyFor(kind, row), pickOpts(kind, row)),
-      pick: (row, kind, value) => kind === 'driver' ? pickDriver(row, value) : saveAssignment(getRuns, row.runDocId, row.day, kind, { id: value, text: pickText(kind, value) }, render, ovr[row.id]),
+      text: (row, kind) => row[kind] || '',
+      pick: (row, kind, value) => kind === 'driver' ? pickDriver(row, value)
+        : saveAssignment(getRuns, row.runDocId, row.day, kind, value.unit ? { id: '', unit: value.unit, text: value.unit } : { id: value, text: pickText(kind, value) }, render, ovr[row.id]),
       editText, setEditing: (on) => { editing = on; }, render
     });
 
