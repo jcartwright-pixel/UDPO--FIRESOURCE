@@ -20,6 +20,8 @@ const SHOTS = process.env.SHOTS_DIR || '';
 const AS = 'testEmail=manager.test@uniteddairy.com';
 const START = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../public/data/plant-products.json'), 'utf8'));
 const startOf = (id) => START.lines.find(l => l.operationId === id).products;
+// The Excel reader the page loads from cdnjs; a local copy stands in where the test machine cannot reach cdnjs (XLSX_LOCAL).
+const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 
 async function openPage(browser, width, height, url) {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: SHOTS && width === 1920 ? 2 : 1 });
@@ -88,6 +90,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     assert.deepEqual(page.errors, []);
 
     const admin = await openPage(browser, 1920, 950, '/products.html?plant=fac_uniontown&line=ut_prod_totes&' + AS);
+    if (process.env.XLSX_LOCAL) await admin.route(XLSX_URL, r => r.fulfill({ path: process.env.XLSX_LOCAL, contentType: 'application/javascript' }));
     const areaCount = (id) => admin.$eval('#area option[value="' + id + '"]', o => (/\((\d+)\)$/.exec(o.textContent) || [])[1]);
     await admin.waitForFunction(() => document.getElementById('form-title').textContent === 'TOTES Products' && document.querySelectorAll('#rows input[data-k="name"]').length === 1);
     assert.equal(await admin.inputValue('#plant'), 'fac_uniontown');
@@ -106,6 +109,14 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     let doc = null;
     for (let i = 0; i < 40 && !((doc = (await db().collection('plantProducts').doc('ut_prod_totes').get()).data()) && doc.products[0].sku); i++) await admin.waitForTimeout(250);
     assert.deepEqual(doc.products.map(p => [p.name, p.sku]), [['UD Whole Milk Tote', '999001'], [startOf('ut_prod_totes')[0].name, startOf('ut_prod_totes')[0].sku]]);
+    // Joe 10/11: UPC, speeds, Target % and shelf life on the same row; numbers are kept as numbers, blanks left off.
+    assert.equal(await admin.inputValue('#rows tr:last-child input[data-k="ratePerMin"]'), String(startOf('ut_prod_totes')[0].ratePerMin), 'RedZone\'s Rate/Min is in the starting list');
+    await admin.fill('#rows tr:first-child input[data-k="upc"]', '0 70852 99900 1');
+    await admin.fill('#rows tr:first-child input[data-k="targetPct"]', '62.5');
+    await admin.fill('#rows tr:first-child input[data-k="shelfLifeDays"]', '14');
+    await admin.click('#form-title');
+    for (let i = 0; i < 40 && !((doc = (await db().collection('plantProducts').doc('ut_prod_totes').get()).data()) && doc.products[0].shelfLifeDays); i++) await admin.waitForTimeout(250);
+    assert.deepEqual([doc.products[0].upc, doc.products[0].targetPct, doc.products[0].shelfLifeDays, doc.products[0].ratePerMin], ['070852999001', 62.5, 14, undefined]);
     await admin.selectOption('#area', 'ut_prod_htst_1');
     await admin.waitForFunction(() => document.querySelectorAll('#rows tr').length > 100);
     // Group filter: only the products in that group.
@@ -124,13 +135,15 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await admin.click('#rows tr:first-child [data-remove]');
     await admin.waitForFunction(() => /removed/.test(document.getElementById('foot').textContent) && /\(1\)$/.test(document.querySelector('#area option[value="ut_prod_totes"]').textContent));
 
-    // Download Template: the plant's lists in the template columns.
+    // Download Template (Joe 10/11): one workbook, a tab per plant, every column.
     const [dl] = await Promise.all([admin.waitForEvent('download'), admin.click('#template')]);
-    assert.equal(dl.suggestedFilename(), 'Uniontown-Products-Template.csv');
-    const csv = fs.readFileSync(await dl.path(), 'utf8').replace(/^﻿/, '');
-    const lines = csv.trim().split(/\r\n/);
-    assert.equal(lines[0], 'Plant,Area,Product,SKU,Type,Group');
-    assert.ok(lines.some(l => l.startsWith('Uniontown,TOTES,')) && lines.some(l => /^Uniontown,GALLON FILLER,GV 2% Gallon,280305,Gallon,Milk$/.test(l)));
+    assert.equal(dl.suggestedFilename(), 'Products-Template.xlsx');
+    const book = await admin.evaluate((b64) => { const wb = window.XLSX.read(b64, { type: 'base64' }); return wb.SheetNames.map(n => [n, window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: '' })]); }, fs.readFileSync(await dl.path()).toString('base64'));
+    assert.deepEqual(book.map(b => b[0]), ['Uniontown'], 'a tab for each plant the person sees');
+    const tab = book[0][1];
+    assert.deepEqual(tab[0], ['Area', 'Product', 'SKU', 'UPC', 'Type', 'Group', 'Full Speed Per Min', 'Target %', 'Lowest Speed', 'Highest Speed', 'Shelf Life Days']);
+    assert.ok(tab.some(r => r[0] === 'TOTES' && r[1] === startOf('ut_prod_totes')[0].name), 'every area is in the template');
+    assert.ok(tab.some(r => r.slice(0, 8).join('|') === 'GALLON FILLER|GV 2% Gallon|280305||Gallon|Milk|74|64.37'), 'RedZone speeds are in the template');
     // Upload: a changed TOTES list, a product in CASES, a new group; the preview shows it before anything is saved.
     const file = ['Plant,Area,Product,SKU,Type,Group', 'Uniontown,TOTES,"Tote, whole",401904,TOTE,Milk', 'Uniontown,CASES,UD 2% Gallon,305,Gallon,"Milk, Case"', 'Charleston,CASES,Not here,1,Gallon,Milk'].join('\r\n');
     const toteWas = (await db().collection('plantProducts').doc('ut_prod_totes').get()).data().products;
@@ -147,6 +160,19 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     assert.deepEqual((await db().collection('plantProducts').doc('ut_prod_totes').get()).data().products.map(p => p.name), ['Tote, whole']);
     assert.deepEqual((await db().collection('plantProducts').doc('fac_uniontown_area_cases').get()).data().products.map(p => p.name), ['UD 2% Gallon']);
     await admin.waitForFunction(() => [...document.querySelectorAll('#group option')].some(o => o.value === 'Case'));
+    // A workbook in the old layout (no UPC or speed columns) changes the SKU and keeps the UPC, Target % and shelf life already saved.
+    await db().collection('plantProducts').doc('ut_prod_totes').set({ operationId: 'ut_prod_totes', facilityId: 'fac_uniontown', products: [{ name: 'Tote, whole', sku: '401904', mfgType: 'TOTE', productGroup: 'Milk', upc: '070852401904', targetPct: 60, shelfLifeDays: 10 }] }, { merge: true });
+    await admin.waitForFunction(() => /\(1\)$/.test(document.querySelector('#area option[value="ut_prod_totes"]').textContent));
+    const oldBook = await admin.evaluate(() => { const X = window.XLSX, wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Area', 'Product', 'SKU', 'Type', 'Group'], ['TOTES', 'Tote, whole', '401999', 'TOTE', 'Milk']]), 'Uniontown'); return X.write(wb, { type: 'base64', bookType: 'xlsx' }); });
+    await admin.setInputFiles('#upload-file', { name: 'old-layout.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(oldBook, 'base64') });
+    await admin.waitForSelector('#preview-pane:not([hidden])');
+    assert.match(await admin.textContent('#preview-rows'), /SKU 401904 → 401999/);
+    assert.doesNotMatch(await admin.textContent('#preview-rows'), /UPC|Target %|Shelf Life/, 'nothing about the kept fields changes');
+    await admin.click('#preview-save');
+    await admin.waitForFunction(() => document.getElementById('preview-pane').hidden);
+    let tote = null;
+    for (let i = 0; i < 40 && !((tote = (await db().collection('plantProducts').doc('ut_prod_totes').get()).data().products[0]) && tote.sku === '401999'); i++) await admin.waitForTimeout(250);
+    assert.deepEqual([tote.sku, tote.upc, tote.targetPct, tote.shelfLifeDays], ['401999', '070852401904', 60, 10]);
     // Areas & Groups: add an area, and it is in the drop-down.
     await admin.click('#edit-setup');
     await admin.waitForSelector('#setup-pane:not([hidden])');

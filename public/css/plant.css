@@ -880,3 +880,6 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
 .plant-page .stale { color: #b45309; font-weight: 800; white-space: normal; line-height: 1.15; }
 /* Polish 6: Yard Checks shows the short date under the weekday, so the top line keeps its room. */
 .yard-page .head .dayname { white-space: pre-line; text-align: center; line-height: 1.1; }
+/* Products (Joe 10/11): UPC, speeds, Target % and shelf life on the same row; numbers centred, headings may wrap. */
+.products-page .pm-table input.pm-num { padding: 0 6px; text-align: center; }
+.products-page .pm-table thead th { white-space: normal; line-height: 1.15; }

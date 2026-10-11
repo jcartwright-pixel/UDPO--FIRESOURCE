@@ -36,7 +36,7 @@
       <button type="button" id="template" data-top>Download Template</button>
       <button type="button" id="upload" data-top>Upload</button>
       <button type="button" id="redzone" data-top>Get from RedZone</button>
-      <input type="file" id="upload-file" accept=".csv,text/csv" hidden>
+      <input type="file" id="upload-file" accept=".xlsx,.xls,.csv,text/csv" hidden>
       <select id="group" class="pm-pick" aria-label="Group" title="Group" data-top></select>
       <select id="area" class="pm-pick" aria-label="Area" title="Area" data-top></select>
       <select id="plant" class="pm-pick" aria-label="Plant" title="Plant" data-top></select>
@@ -48,8 +48,8 @@
           <input type="search" id="find" placeholder="Find a product or SKU" aria-label="Find a product or SKU"></div>
         <div class="pm-scroll">
           <table class="loadout pm-table">
-            <colgroup><col style="width:40%"><col style="width:16%"><col style="width:14%"><col style="width:20%"><col style="width:10%"></colgroup>
-            <thead><tr><th>Product</th><th>SKU</th><th>Type</th><th>Group</th><th></th></tr></thead>
+            <colgroup><col style="width:20%"><col style="width:10%"><col style="width:11%"><col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:7%"></colgroup>
+            <thead><tr><th>Product</th><th>SKU</th><th>UPC</th><th>Type</th><th>Group</th><th title="Full speed per minute (RedZone Rate/Min)">Full Speed /Min</th><th>Target %</th><th title="Lowest speed per minute">Lowest Speed</th><th title="Highest speed per minute">Highest Speed</th><th title="Days from the run date to the code date">Shelf Life Days</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
         </div>
@@ -83,7 +83,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, callServer } from './js/app.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, TEMPLATE, toCsv, parseCsv, fromRedzone } from './js/products.js';
+    import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv, fromRedzone } from './js/products.js';
     import { savedText } from './js/autosave.js';
 
     // Joe 10/10: the products each machine runs are the product drop-down on the Quality check. Joe 10/11: products are plant by
@@ -101,11 +101,12 @@
     const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
     const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
-    const ownOf = () => plantSetupOf(own, plant);
+    const ownOf = (pid) => plantSetupOf(own, pid || plant);
     // The plant's areas: its machines in view order, then its own areas.
-    function areas() {
-      const machines = U.qualityLines(setup.filter(d => plantOf(d) === plant), [], [], Date.now()).map(l => ({ id: l.operationId, name: l.name, machine: true }));
-      return machines.concat(ownOf().areas.map(a => ({ id: a.id, name: a.name, machine: false })));
+    function areas(pid) {
+      const p = pid || plant;
+      const machines = U.qualityLines(setup.filter(d => plantOf(d) === p), [], [], Date.now()).map(l => ({ id: l.operationId, name: l.name, machine: true }));
+      return machines.concat(ownOf(p).areas.map(a => ({ id: a.id, name: a.name, machine: false })));
     }
     const listOf = (id) => mine[id] || products[id] || [];
     function current() { const all = areas(); return all.find(a => a.id === chosen) || all[0] || null; }
@@ -151,18 +152,20 @@
       const toCheck = Object.values(bySku).filter(x => x.size > 1).length;
       document.getElementById('hstats').innerHTML = [['Areas', all.length, ''], ['Products', total, ''], ['SKUs to check', toCheck, toCheck ? 'warn' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.getElementById('foot').textContent = (ck ? 'Each box saves as you leave it. A machine\'s list is the Product drop-down on its Quality Check, which also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
-      if (!line) { document.getElementById('form-title').textContent = plantName(plant) + ' Products'; document.getElementById('form-last').textContent = ''; document.getElementById('rows').innerHTML = '<tr><td colspan="5" class="empty">' + escapeHtml(plantName(plant)) + ' has no areas yet. Areas &amp; Groups adds one, or Upload adds them from the template.</td></tr>'; return; }
+      if (!line) { document.getElementById('form-title').textContent = plantName(plant) + ' Products'; document.getElementById('form-last').textContent = ''; document.getElementById('rows').innerHTML = '<tr><td colspan="11" class="empty">' + escapeHtml(plantName(plant)) + ' has no areas yet. Areas &amp; Groups adds one, or Upload adds them from the template.</td></tr>'; return; }
       const c = changed[line.id];
       document.getElementById('form-title').textContent = line.name + ' Products';
       document.getElementById('form-last').textContent = c ? (c.uploaded ? 'Uploaded ' : 'Changed ') + when(c.updatedAt) + (c.updatedBy ? ' by ' + c.updatedBy : '') : line.machine ? 'Starting list (10/10)' : '';
       // Not drawn again while someone types in the list.
       if (force === 'keep' || (!force && document.getElementById('rows').contains(document.activeElement))) return;
       const dis = ck ? '' : ' disabled', q = find.trim().toUpperCase();
-      const cell = (i, k, v, ph, also, extra) => '<td' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><input data-i="' + i + '" data-k="' + k + '" aria-label="' + escapeHtml(ph + (k === 'name' ? '' : ' for ' + (listOf(line.id)[i] || {}).name)) + '" value="' + escapeHtml(v || '') + '" placeholder="' + ph + '" maxlength="120"' + (extra || '') + dis + '>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
+      const cell = (i, k, v, ph, also, extra) => '<td' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><input data-i="' + i + '" data-k="' + k + '" aria-label="' + escapeHtml(ph + (k === 'name' ? '' : ' for ' + (listOf(line.id)[i] || {}).name)) + '" value="' + escapeHtml(v === undefined || v === null ? '' : String(v)) + '" placeholder="' + ph + '" maxlength="120"' + (extra || '') + dis + '>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
+      const num = ' inputmode="decimal" class="pm-num"';
       const rows = listOf(line.id).map((p, i) => [p, i]).filter(([p]) => (!q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0) && (!p.name || inGroup(p)));
-      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr>' + cell(i, 'name', p.name, 'Product name') + cell(i, 'sku', p.sku, 'SKU', shared(p)) + cell(i, 'mfgType', p.mfgType, 'Type') + cell(i, 'productGroup', p.productGroup, 'Group', null, ' list="group-list"') +
+      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr>' + cell(i, 'name', p.name, 'Product name') + cell(i, 'sku', p.sku, 'SKU', shared(p)) + cell(i, 'upc', p.upc, 'UPC', null, ' inputmode="numeric"') + cell(i, 'mfgType', p.mfgType, 'Type') + cell(i, 'productGroup', p.productGroup, 'Group', null, ' list="group-list"') +
+        cell(i, 'ratePerMin', p.ratePerMin, '', null, num) + cell(i, 'targetPct', p.targetPct, '', null, num) + cell(i, 'minSpeed', p.minSpeed, '', null, num) + cell(i, 'maxSpeed', p.maxSpeed, '', null, num) + cell(i, 'shelfLifeDays', p.shelfLifeDays, '', null, ' inputmode="numeric" class="pm-num"') +
         '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + i + '">' + (armed === line.id + '|' + i ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
-        '<tr><td colspan="5" class="empty">' + (q || group ? 'No product matches' + (q ? ' ' + escapeHtml(find) : '') + (group ? ' in ' + escapeHtml(group) : '') + '.' : 'No products in ' + escapeHtml(line.name) + '. Add Product puts one in.') + '</td></tr>';
+        '<tr><td colspan="11" class="empty">' + (q || group ? 'No product matches' + (q ? ' ' + escapeHtml(find) : '') + (group ? ' in ' + escapeHtml(group) : '') + '.' : 'No products in ' + escapeHtml(line.name) + '. Add Product puts one in.') + '</td></tr>';
     }
 
     // The area's whole list is saved each time; saves go one at a time.
@@ -171,7 +174,7 @@
       note = 'Saving…';
       // A box just left is saved without drawing the list again, so the next box being typed in stays as it is.
       render(what ? true : 'keep');
-      const run = busy.then(() => save('saveMachineProducts', { operationId: line.id, products: list.filter(p => String(p.name || '').trim()) }));
+      const run = busy.then(() => save('saveMachineProducts', { operationId: line.id, products: list.filter(p => String(p.name || '').trim()).map(cleanProduct) }));
       busy = run.catch(() => {});
       return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.id]; }).then(() => render());
     }
@@ -181,7 +184,8 @@
       const list = listOf(line.id).map(p => Object.assign({}, p));
       if (!list[box.dataset.i]) return;
       list[box.dataset.i][box.dataset.k] = box.value.trim();
-      send(line, list);
+      // Kept as the server keeps it (numbers as numbers, blanks left off), so the saved list matches what is on screen.
+      send(line, list.map(p => String(p.name || '').trim() ? cleanProduct(p) : p));
     });
     document.getElementById('rows').addEventListener('click', e => {
       const b = e.target.closest('[data-remove]'), line = current();
@@ -257,22 +261,53 @@
     });
 
     /* ---------- Template and upload ---------- */
-    // The template is the plant's lists as they are now (or one example row for a plant with none), in the TEMPLATE columns.
-    document.getElementById('template').addEventListener('click', () => {
-      const rows = [];
-      areas().forEach(a => listOf(a.id).forEach(p => rows.push([plantName(plant), a.name, p.name, p.sku, p.mfgType, p.productGroup])));
-      if (!rows.length) rows.push([plantName(plant), 'AREA NAME', 'Product name', 'SKU', 'Gallon', ownOf().groups[0] || 'Milk']);
-      const blob = new Blob(['﻿' + toCsv(rows)], { type: 'text/csv' }), a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = plantName(plant).replace(/\s+/g, '-') + '-Products-Template.csv';
-      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-      note = 'Template downloaded. Fill it in (keep the headings), save it as CSV, then Upload.'; render(true);
+    // Joe 10/11: one workbook, a tab per plant, every column (TEMPLATE without Plant: the tab is the plant). Upload takes it back the
+    // same way (a CSV with a Plant column still loads). The Excel reader is the same one Over the Road uses.
+    const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again')); document.head.appendChild(el); });
+    const COLS = TEMPLATE.filter(t => t !== 'Plant');
+    const cellOf = (p, f) => p[f.k] === undefined || p[f.k] === null ? '' : p[f.k];
+    const plantByName = (n) => { const t = String(n || '').trim().toUpperCase(); return ALL_PLANTS.find(p => p.name.toUpperCase() === t || p.id.toUpperCase() === t) || null; };
+    document.getElementById('template').addEventListener('click', async () => {
+      const b = document.getElementById('template');
+      b.disabled = true; showError('');
+      try {
+        const X = await loadXlsx(), wb = X.utils.book_new();
+        plants().forEach(pl => {
+          const rows = [COLS];
+          areas(pl.id).forEach(a => listOf(a.id).forEach(p => rows.push([a.name].concat(FIELDS.map(f => cellOf(p, f))))));
+          const ws = X.utils.aoa_to_sheet(rows);
+          ws['!cols'] = COLS.map(c => ({ wch: c === 'Product' ? 34 : c === 'Area' ? 18 : Math.max(10, c.length + 2) }));
+          X.utils.book_append_sheet(wb, ws, pl.name.slice(0, 31));
+        });
+        X.writeFile(wb, 'Products-Template.xlsx');
+        note = 'Template downloaded: a tab for each plant. Fill it in (keep the headings), then Upload.';
+      } catch (err) { showError('Template not made (' + (err.message || err) + ').'); }
+      b.disabled = false; render(true);
     });
     document.getElementById('upload').addEventListener('click', () => { const f = document.getElementById('upload-file'); f.value = ''; f.click(); });
     document.getElementById('upload-file').addEventListener('change', async e => {
       const f = e.target.files && e.target.files[0];
       if (!f) return;
-      try { upload = readUpload(f.name, await f.text()); pane = 'preview'; showError(''); }
-      catch (err) { upload = null; showError(err.message); }
+      try {
+        let rows = [], has = {};
+        if (/\.csv$/i.test(f.name) || f.type === 'text/csv') {
+          const r = rowsByHeading(parseCsv(await f.text()));
+          rows = r.rows; has = r.has;
+        } else {
+          const X = await loadXlsx(), wb = X.read(await f.arrayBuffer(), { type: 'array' });
+          wb.SheetNames.forEach(tab => {
+            const r = rowsByHeading(X.utils.sheet_to_json(wb.Sheets[tab], { header: 1, raw: false, defval: '', blankrows: false }));
+            if (!r.has.Area && !r.has.Product) return;
+            // The tab is the plant (a Plant column, when there is one, wins); a workbook with one unnamed tab is the plant shown.
+            const tp = plantByName(tab), only = wb.SheetNames.length === 1;
+            r.rows.forEach(x => { if (!x.Plant) x.Plant = tp ? tp.name : only ? plantName(plant) : tab; rows.push(x); });
+            Object.keys(r.has).forEach(k => { if (r.has[k]) has[k] = true; });
+            has.Plant = true;
+          });
+        }
+        upload = readUpload(f.name, rows, has); pane = 'preview'; showError('');
+      } catch (err) { upload = null; showError(err.message || String(err)); }
       render(true);
     });
     // Get from RedZone (Joe 10/11): RedZone's list for this plant, shown in the upload preview; nothing is saved until Save Upload.
@@ -284,83 +319,107 @@
         const res = await callServer('redzone', { op: 'products', facilityId: plant });
         const got = fromRedzone(plantName(plant), areas().map(a => ({ area: a.name, products: listOf(a.id) })), res.products || []);
         if (!got.rows.length) throw new Error('RedZone sent no products for ' + plantName(plant));
-        upload = Object.assign(readUpload('RedZone', toCsv(got.rows)), { fromRedzone: true, rzCount: (res.products || []).length });
+        const has = {}; TEMPLATE.forEach(t => { has[t] = true; });
+        upload = Object.assign(readUpload('RedZone', got.rows, has), { fromRedzone: true, rzCount: (res.products || []).length });
         pane = 'preview';
       } catch (err) { upload = null; showError('Could not get the products from RedZone (' + (err.message || err) + '). Nothing was changed.'); }
       b.textContent = 'Get from RedZone';
       render(true);
     });
-    // The file -> what it changes: {areas: [{areaId, name, products}], changes: [...], skipped, problems}.
-    function readUpload(name, txt) {
-      const rows = parseCsv(txt);
-      if (!rows.length) throw new Error(name + ' is empty. Download Template gives the layout.');
-      const head = rows[0].map(h => String(h).trim().toUpperCase()), at = {};
-      TEMPLATE.forEach(t => { at[t] = head.indexOf(t.toUpperCase()); });
-      const missing = TEMPLATE.filter(t => t !== 'Plant' && at[t] < 0);
-      if (missing.length) throw new Error(name + ' is missing the ' + missing.join(', ') + ' column' + (missing.length > 1 ? 's' : '') + '. Download Template gives the layout: ' + TEMPLATE.join(', ') + '.');
-      const get = (r, t) => at[t] < 0 ? '' : String(r[at[t]] == null ? '' : r[at[t]]).trim();
-      const me = plantName(plant).toUpperCase(), byArea = {}, order = [], problems = [];
+    // Rows [{Plant, Area, Product, ...}] -> what they change, plant by plant: {plants: [{facilityId, name, areas, newGroups}], changes, skipped, problems}.
+    // A column the file leaves out keeps what each product has; so does a blank UPC, speed, Target % or shelf life (an old-layout
+    // file never wipes them). Plants the person cannot change are left out.
+    function readUpload(name, rows, has) {
+      if (!rows.length) throw new Error(name + ' has no product rows. Download Template gives the layout.');
+      const missing = ['Area', 'Product'].filter(t => !has[t]);
+      if (missing.length) throw new Error(name + ' is missing the ' + missing.join(' and ') + ' column' + (missing.length > 1 ? 's' : '') + '. Download Template gives the layout: ' + COLS.join(', ') + '.');
+      const editable = plants().map(p => p.id), byPlant = {}, order = [], problems = [], changes = [];
       let skipped = 0;
-      rows.slice(1).forEach((r, n) => {
-        const p = get(r, 'Plant');
-        if (p && p.toUpperCase() !== me && p.toUpperCase() !== plant.toUpperCase()) { skipped++; return; }
-        const area = get(r, 'Area'), prod = get(r, 'Product');
-        if (!area || !prod) { problems.push('Row ' + (n + 2) + ': ' + (!area ? 'no Area' : 'no Product') + '.'); return; }
-        const k = area.toUpperCase();
-        if (!byArea[k]) { byArea[k] = { name: area, products: [], seen: {} }; order.push(k); }
-        if (byArea[k].seen[prod.toUpperCase()]) { problems.push('Row ' + (n + 2) + ': ' + prod + ' is in ' + area + ' twice.'); return; }
-        byArea[k].seen[prod.toUpperCase()] = true;
-        byArea[k].products.push({ name: prod, sku: get(r, 'SKU'), mfgType: get(r, 'Type'), productGroup: get(r, 'Group') });
+      rows.forEach((r, n) => {
+        const pl = r.Plant ? plantByName(r.Plant) : ALL_PLANTS.find(p => p.id === plant);
+        if (!pl || editable.indexOf(pl.id) < 0) { skipped++; return; }
+        const area = String(r.Area || '').trim(), prod = String(r.Product || '').trim();
+        if (!area && !prod) return;
+        if (!area || !prod) { problems.push(pl.name + ' row ' + (n + 2) + ': ' + (!area ? 'no Area' : 'no Product') + '.'); return; }
+        if (!byPlant[pl.id]) { byPlant[pl.id] = { pl, areas: {}, order: [] }; order.push(pl.id); }
+        const bp = byPlant[pl.id], k = area.toUpperCase();
+        if (!bp.areas[k]) { bp.areas[k] = { name: area, rows: [], seen: {} }; bp.order.push(k); }
+        if (bp.areas[k].seen[prod.toUpperCase()]) { problems.push(pl.name + ': ' + prod + ' is in ' + area + ' twice.'); return; }
+        bp.areas[k].seen[prod.toUpperCase()] = true;
+        bp.areas[k].rows.push(r);
       });
-      const known = areas(), changes = [], newGroups = new Set(), gs = ownOf().groups.map(g => g.toUpperCase());
-      const out = order.map(k => {
-        const a = byArea[k], have = known.find(x => x.name.toUpperCase() === k), was = have ? listOf(have.id) : [];
-        const wasBy = {}; was.forEach(p => { wasBy[p.name.toUpperCase()] = p; });
-        a.products.forEach(p => {
-          groupsOf(p).forEach(g => { if (gs.indexOf(g.toUpperCase()) < 0) newGroups.add(g); });
-          const w = wasBy[p.name.toUpperCase()];
-          if (!w) changes.push({ area: a.name, p, kind: 'add', newArea: !have });
-          else {
-            const diff = [['sku', 'SKU'], ['mfgType', 'Type'], ['productGroup', 'Group']].filter(([f]) => String(w[f] || '') !== String(p[f] || '')).map(([f, l]) => l + ' ' + (w[f] || 'blank') + ' → ' + (p[f] || 'blank'));
-            if (w.name !== p.name) diff.unshift('Name ' + w.name + ' → ' + p.name);
-            changes.push({ area: a.name, p, kind: diff.length ? 'change' : 'same', diff });
-          }
+      const many = order.length > 1;
+      const out = order.map(pid => {
+        const bp = byPlant[pid], known = areas(pid), gs = ownOf(pid).groups.map(g => g.toUpperCase()), newGroups = new Set();
+        const list = bp.order.map(k => {
+          const a = bp.areas[k], have = known.find(x => x.name.toUpperCase() === k), was = have ? listOf(have.id) : [];
+          const wasBy = {}; was.forEach(p => { wasBy[String(p.name).toUpperCase()] = p; });
+          const where = (many ? bp.pl.name + ' · ' : '') + (have ? have.name : a.name);
+          const products = a.rows.map(r => {
+            const w = wasBy[String(r.Product).trim().toUpperCase()] || {}, raw = {};
+            FIELDS.forEach(f => {
+              const v = has[f.head] ? String(r[f.head] == null ? '' : r[f.head]).trim() : '';
+              raw[f.k] = !has[f.head] || (v === '' && KEEP_FIELDS.indexOf(f.k) >= 0) ? (w[f.k] === undefined ? '' : w[f.k]) : v;
+            });
+            raw.name = String(r.Product).trim();
+            return cleanProduct(raw);
+          });
+          products.forEach(p => {
+            groupsOf(p).forEach(g => { if (gs.indexOf(g.toUpperCase()) < 0) newGroups.add(g); });
+            const w = wasBy[p.name.toUpperCase()];
+            if (!w) changes.push({ area: where, p, kind: 'add', newArea: !have });
+            else {
+              const diff = FIELDS.filter(f => f.k !== 'name' && String(w[f.k] === undefined ? '' : w[f.k]) !== String(p[f.k] === undefined ? '' : p[f.k]))
+                .map(f => f.head + ' ' + (w[f.k] === undefined || w[f.k] === '' ? 'blank' : w[f.k]) + ' → ' + (p[f.k] === undefined || p[f.k] === '' ? 'blank' : p[f.k]));
+              if (w.name !== p.name) diff.unshift('Name ' + w.name + ' → ' + p.name);
+              changes.push({ area: where, p, kind: diff.length ? 'change' : 'same', diff });
+            }
+          });
+          was.forEach(w => { if (!a.seen[String(w.name).toUpperCase()]) changes.push({ area: where, p: w, kind: 'remove' }); });
+          return { areaId: have ? have.id : '', name: have ? have.name : a.name, products, isNew: !have, label: where };
         });
-        was.forEach(w => { if (!a.seen[w.name.toUpperCase()]) changes.push({ area: a.name, p: w, kind: 'remove' }); });
-        return { areaId: have ? have.id : '', name: have ? have.name : a.name, products: a.products, isNew: !have };
+        return { facilityId: pid, name: bp.pl.name, areas: list, newGroups: [...newGroups] };
       });
-      if (!out.length && !problems.length) throw new Error(name + ' has no rows for ' + plantName(plant) + '.');
-      return { file: name, areas: out, changes, skipped, problems, newGroups: [...newGroups] };
+      if (!out.length && !problems.length) throw new Error(name + ' has no rows for ' + plants().map(p => p.name).join(' or ') + '.');
+      return { file: name, plants: out, changes, skipped, problems };
     }
     function drawPreview() {
-      const u = upload, c = (k) => u.changes.filter(x => x.kind === k).length, newAreas = u.areas.filter(a => a.isNew).map(a => a.name);
+      const u = upload, c = (k) => u.changes.filter(x => x.kind === k).length;
+      const allAreas = [].concat(...u.plants.map(p => p.areas)), newAreas = allAreas.filter(a => a.isNew).map(a => a.label), newGroups = [].concat(...u.plants.map(p => p.newGroups));
       document.getElementById('preview-title').textContent = u.fromRedzone ? 'From RedZone (' + u.rzCount + ' products)' : 'Upload ' + u.file;
       document.getElementById('preview-stats').innerHTML = [['Added', c('add'), c('add') ? 'good' : ''], ['Changed', c('change'), c('change') ? 'warn' : ''], ['Removed', c('remove'), c('remove') ? 'bad' : ''], ['Same', c('same'), '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.getElementById('preview-note').textContent = [u.areas.length + ' area' + (u.areas.length === 1 ? '' : 's') + ' in the file; areas not in it stay as they are.',
-        newAreas.length ? 'New areas: ' + newAreas.join(', ') + '.' : '', u.newGroups.length ? 'New groups: ' + u.newGroups.join(', ') + '.' : '',
+      document.getElementById('preview-note').textContent = [(u.plants.length > 1 ? u.plants.map(p => p.name).join(', ') + ': ' : '') + allAreas.length + ' area' + (allAreas.length === 1 ? '' : 's') + ' in the file; areas not in it stay as they are.',
+        newAreas.length ? 'New areas: ' + newAreas.join(', ') + '.' : '', newGroups.length ? 'New groups: ' + newGroups.join(', ') + '.' : '',
         u.skipped ? u.skipped + ' row' + (u.skipped === 1 ? '' : 's') + ' for other plants left out.' : ''].filter(Boolean).join(' ');
       const word = { add: 'Added', change: 'Changed', remove: 'Removed', same: 'Same' };
       const rank = { remove: 0, change: 1, add: 2, same: 3 };
       const list = u.changes.slice().sort((a, b) => rank[a.kind] - rank[b.kind]);
       document.getElementById('preview-rows').innerHTML = u.problems.map(p => '<tr class="pm-bad"><td colspan="6">' + escapeHtml(p) + ' Fix the file and upload it again.</td></tr>').join('') +
         list.map(x => '<tr class="pm-' + x.kind + '"><td>' + escapeHtml(x.area) + (x.newArea ? ' <em>new</em>' : '') + '</td><td>' + escapeHtml(x.p.name) + '</td><td>' + escapeHtml(x.p.sku || '') + '</td><td>' + escapeHtml(x.p.mfgType || '') + '</td><td>' + escapeHtml(x.p.productGroup || '') + '</td><td><b>' + word[x.kind] + '</b>' + (x.diff && x.diff.length ? '<small>' + escapeHtml(x.diff.join(' · ')) + '</small>' : '') + '</td></tr>').join('');
-      const nothing = !u.changes.some(x => x.kind !== 'same') && !newAreas.length && !u.newGroups.length;
+      const nothing = !u.changes.some(x => x.kind !== 'same') && !newAreas.length && !newGroups.length;
       const sv = document.getElementById('preview-save');
       sv.disabled = !canSave() || u.problems.length > 0 || nothing;
       sv.textContent = u.problems.length ? 'Fix the file first' : nothing ? 'Nothing to change' : 'Save Upload';
       document.getElementById('foot').textContent = u.fromRedzone ? 'Nothing is saved until Save Upload. RedZone\'s SKU, Type and Group replace this plant\'s for the same product name; RedZone products not on any list go in NEW PRODUCTS; nothing is removed.'
-        : 'Nothing is saved until Save Upload. Each area in the file gets the file\'s list; a product not in the file is removed from that area.';
+        : 'Nothing is saved until Save Upload. Each area in the file gets the file\'s list; a product not in the file is removed from that area. A blank UPC, speed, Target % or shelf life keeps what the product has.';
     }
     document.getElementById('preview-cancel').addEventListener('click', () => { pane = 'list'; upload = null; note = 'Upload cancelled; nothing was changed.'; showError(''); render(true); });
+    // One save per plant in the file, one after the other; a plant that fails says so and the plants already saved stay saved.
     document.getElementById('preview-save').addEventListener('click', async () => {
-      const b = document.getElementById('preview-save');
+      const b = document.getElementById('preview-save'), said = [];
       b.disabled = true; b.textContent = 'Saving…';
-      try {
-        const res = await save('saveProductUpload', { facilityId: plant, areas: upload.areas.map(a => ({ areaId: a.areaId, name: a.name, products: a.products })) });
-        upload.areas.forEach(a => { if (a.areaId) delete mine[a.areaId]; });
-        pane = 'list'; upload = null; note = ((res && res.message) || 'Upload saved.') + ' · ' + savedText(); showError('');
-      } catch (err) { showError('Upload not saved (' + (err.message || err) + '). Nothing was changed.'); b.disabled = false; b.textContent = 'Save Upload'; }
+      for (const pl of upload.plants) {
+        try {
+          const res = await save('saveProductUpload', { facilityId: pl.facilityId, areas: pl.areas.map(a => ({ areaId: a.areaId, name: a.name, products: a.products })) });
+          pl.areas.forEach(a => { if (a.areaId) delete mine[a.areaId]; });
+          said.push((upload.plants.length > 1 ? pl.name + ': ' : '') + ((res && res.message) || 'Upload saved.'));
+        } catch (err) {
+          showError(pl.name + ' not saved (' + (err.message || err) + ').' + (said.length ? ' Saved: ' + said.join(' ') : ' Nothing was changed.'));
+          b.disabled = false; b.textContent = 'Save Upload'; render(true); return;
+        }
+      }
+      pane = 'list'; upload = null; note = said.join(' ') + ' · ' + savedText(); showError('');
       render(true);
     });
 

@@ -20,8 +20,30 @@ export function watchProductSetup(db, cb, fail) {
 // A product's groups ("Drinks, TEA" is two).
 export const groupsOf = (p) => String((p && p.productGroup) || '').split(',').map(g => g.trim()).filter(Boolean);
 
-// The template's columns, in order; a file with these headings loads (Joe 10/11: always the same layout).
-export const TEMPLATE = ['Plant', 'Area', 'Product', 'SKU', 'Type', 'Group'];
+// Joe 10/11: one product list holds everything about each product, a tab per plant. The fields, in template order (the same
+// names as functions/src/plant.js productRows): speeds are per minute (RedZone's Rate/Min), Target % is RedZone's, and shelf life is
+// days from the run date to the code date.
+export const FIELDS = [
+  { k: 'name', head: 'Product' }, { k: 'sku', head: 'SKU' }, { k: 'upc', head: 'UPC' }, { k: 'mfgType', head: 'Type' }, { k: 'productGroup', head: 'Group' },
+  { k: 'ratePerMin', head: 'Full Speed Per Min', num: true }, { k: 'targetPct', head: 'Target %', num: true },
+  { k: 'minSpeed', head: 'Lowest Speed', num: true }, { k: 'maxSpeed', head: 'Highest Speed', num: true }, { k: 'shelfLifeDays', head: 'Shelf Life Days', num: true }
+];
+// The fields an upload never wipes: a file that leaves one blank or out keeps what the product has (Joe 10/11, targets stay put).
+export const KEEP_FIELDS = ['upc', 'ratePerMin', 'targetPct', 'minSpeed', 'maxSpeed', 'shelfLifeDays'];
+// The template's columns, in order; a file with these headings loads (Joe 10/11: always the same layout). Plant is the tab's name
+// in the workbook (or a column in a CSV); a column left out of a file keeps what each product has.
+export const TEMPLATE = ['Plant', 'Area'].concat(FIELDS.map(f => f.head));
+// A product as the server keeps it: blank fields left off, numbers as numbers (so a saved list matches what was typed).
+export function cleanProduct(p) {
+  const out = {};
+  FIELDS.forEach(f => {
+    let v = p && p[f.k] !== undefined && p[f.k] !== null ? String(p[f.k]).trim() : '';
+    if (f.k === 'upc') v = v.replace(/[\s-]/g, '');
+    if (f.num && v !== '' && isFinite(Number(v.replace(/,/g, '')))) { const n = Number(v.replace(/,/g, '')); out[f.k] = f.k === 'shelfLifeDays' ? Math.round(n) : Math.round(n * 100) / 100; return; }
+    if (v !== '' || ['name', 'sku', 'mfgType', 'productGroup'].indexOf(f.k) >= 0) out[f.k] = v;
+  });
+  return out;
+}
 const cell = (v) => { const s = String(v == null ? '' : v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
 export function toCsv(rows) { return [TEMPLATE].concat(rows).map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'; }
 // CSV text -> rows of cells (quotes, doubled quotes, commas and line breaks in quotes, a byte-order mark).
@@ -76,16 +98,25 @@ export const OTHER = '__other__';
 // Joe 10/11: Get from RedZone. The plant's lists as they are, with RedZone's SKU, Type and Group for each product RedZone has by
 // the same name, and RedZone's other products in a NEW PRODUCTS area to move where they belong. Nothing is removed. The rows go
 // through the same preview as an uploaded template. lists: [{area, products}] in area order; rz: [{name, sku, mfgType, productGroup}].
+// Rows come back as {Plant, Area, Product, SKU, ...} (the template headings), with every other field as the product has it.
 export const NEW_AREA = 'NEW PRODUCTS';
 export function fromRedzone(plantName, lists, rz) {
   const key = (n) => String(n || '').trim().toUpperCase(), by = {}, used = {}, rows = [];
+  const row = (area, p) => { const r = { Plant: plantName, Area: area }; FIELDS.forEach(f => { r[f.head] = p[f.k] === undefined || p[f.k] === null ? '' : String(p[f.k]); }); return r; };
   (rz || []).forEach(p => { if (key(p.name) && !by[key(p.name)]) by[key(p.name)] = p; });
   (lists || []).forEach(a => (a.products || []).forEach(p => {
     const r = by[key(p.name)];
     used[key(p.name)] = true;
-    rows.push([plantName, a.area, p.name, (r && r.sku) || p.sku || '', (r && r.mfgType) || p.mfgType || '', (r && r.productGroup) || p.productGroup || '']);
+    rows.push(row(a.area, Object.assign({}, p, r ? { sku: r.sku || p.sku, mfgType: r.mfgType || p.mfgType, productGroup: r.productGroup || p.productGroup } : {})));
   }));
   let added = 0;
-  Object.keys(by).forEach(k => { if (used[k]) return; const r = by[k]; added++; rows.push([plantName, NEW_AREA, r.name, r.sku || '', r.mfgType || '', r.productGroup || '']); });
+  Object.keys(by).forEach(k => { if (used[k]) return; added++; rows.push(row(NEW_AREA, by[k])); });
   return { rows, added };
+}
+// Rows of cells with a heading row -> [{heading: value}] by the template's headings (any case); headings a file leaves out are not set.
+export function rowsByHeading(rows) {
+  if (!rows.length) return { rows: [], has: {} };
+  const head = rows[0].map(h => String(h == null ? '' : h).trim().toUpperCase()), at = {}, has = {};
+  TEMPLATE.forEach(t => { at[t] = head.indexOf(t.toUpperCase()); has[t] = at[t] >= 0; });
+  return { has, rows: rows.slice(1).map(r => { const o = {}; TEMPLATE.forEach(t => { if (at[t] >= 0) o[t] = String(r[at[t]] == null ? '' : r[at[t]]).trim(); }); return o; }) };
 }
