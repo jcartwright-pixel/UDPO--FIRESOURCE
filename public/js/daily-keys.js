@@ -130,12 +130,15 @@ export function bindDailyKeys(tbody, h) {
     function paint() {
       const q = input.value.trim();
       shown = q ? rankChoices(choices, q, unit) : choices.slice();
-      active = q ? shown.findIndex(pickable) : shown.findIndex(c => c.value === current);
+      const best = q ? shown.find(pickable) : null;
+      // The best match stays highlighted wherever it sits; the list keeps its groups (Relief, Regular, ... Unavailable last).
+      if (q) shown = shown.map((c, i) => ({ c, i, g: choices.indexOf(choices.find(x => x.group === c.group)) })).sort((a, b) => a.g - b.g || a.i - b.i).map(x => x.c);
+      active = q ? shown.indexOf(best) : shown.findIndex(c => c.value === current);
       let html = '', last = null;
       shown.forEach((c, i) => {
         if (c.head && c.head !== last) html += '<h6' + (c.blocked ? ' class="off"' : '') + '>' + esc(c.head) + '</h6>';
         last = c.head;
-        html += '<div role="option" data-i="' + i + '" class="' + (i === active ? 'active ' : '') + (c.blocked ? 'off' : '') + '">' + esc(c.label) + (c.reason ? '<em>' + esc(c.reason) + '</em>' : '') + '</div>';
+        html += '<div role="option" data-i="' + i + '" class="' + (i === active ? 'active ' : '') + (c.blocked ? 'off' : '') + '">' + esc(c.label) + (c.reason ? '<em>' + esc(c.reason) + '</em>' : c.note ? '<em class="note">' + esc(c.note) + '</em>' : '') + '</div>';
       });
       pop.innerHTML = html + (shown.length ? '' : '<p>No match. Esc keeps the old one.</p>') + '<small>Enter takes it and moves down · Tab next cell · Esc keeps the old one</small>';
       place();
@@ -210,6 +213,7 @@ function injectStyle() {
     '.cell-pop [data-i].active,.cell-pop [data-i]:hover{background:#dcecff}',
     '.cell-pop [data-i].off{color:#8a97a3;cursor:not-allowed;background:#f4f6f8}',
     '.cell-pop em{margin-left:auto;font-style:normal;font-size:14px;color:#b3261e}',
+    '.cell-pop em.note{color:#60798f;font-weight:700}',
     '.cell-pop h6{margin:0;padding:6px 12px;background:#eef4fa;color:#0e3a62;font-size:13px;letter-spacing:.06em;position:sticky;top:0}',
     '.cell-pop h6.off{color:#8a5a00;background:#fff4e0}',
     '.cell-pop p{margin:0;padding:10px 12px;color:#60798f}',
