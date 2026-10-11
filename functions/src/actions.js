@@ -967,6 +967,8 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
 // A run Route Master has but the Live week does not: a new Live row from Route Master; days already loaded do not run.
 function addLiveRun(tx, db, mode, req, stamp, email, m, live, week, today, result) {
   if (!L.masterActive(m) || !m.id) return;
+  // A run with no day left to run that week (a new run with no days ticked yet) gets its Live row from the save that ticks one.
+  if (!L.DAYS.some(p => { const want = (m.days || {})[p] || {}; return want.active && loadDay(week, p, Number.isFinite(want.loadDayOffset) ? want.loadDayOffset : null) >= today; })) return;
   const run = { weekStart: week, sourceTab: live.tabs[week], sheetRow: null, addedFromRouteMaster: true, weekOrder: m.weekOrder === undefined ? null : m.weekOrder,
     weeklyShowMaster: typeof m.displayWeekly === 'boolean' ? m.displayWeekly : null, masterShow: { daily: m.displayDaily === undefined ? null : m.displayDaily, mobile: m.displayMobile === undefined ? null : m.displayMobile, loadType: m.loadType || '' },
     days: {}, cells: {}, rev: Date.parse(stamp), testEdited: true, editedAt: stamp };
