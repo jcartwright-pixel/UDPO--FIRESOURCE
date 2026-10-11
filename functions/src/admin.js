@@ -76,7 +76,14 @@ async function people(db) {
   return { people: list, catalog: R.CATALOG, roles: tpl.roles, defaults: R.DEFAULTS, templates: tpl.templates, plants: L.PLANTS, newRevision: personRevision(null, null) };
 }
 
-async function savePerson(db, email, input, stamp) {
+// The sandbox's own Users sheet copy (WRITEBACK_JSON.masters.users, a copy, never the real Users sheet): People & Roles
+// saves reach it whether or not the dispatch write-back switch is on (Joe 10/10: saving a person must just work there).
+function usersCopy(env) {
+  if (!env || !env.WRITEBACK_JSON || env.DEMO_DATA === '1') return false;
+  try { const t = JSON.parse(env.WRITEBACK_JSON).masters || {}; return !!(t.users && t.users.spreadsheetId); } catch (e) { return false; }
+}
+
+async function savePerson(db, email, input, stamp, deps) {
   const target = text(input.email, 254).toLowerCase();
   if (!EMAIL.test(target)) fail('BAD_REQUEST', 'Enter a display name and valid email.');
   if (!target.endsWith('@' + 'uniteddairy.com')) fail('BAD_REQUEST', 'Only a United Dairy email address can sign in.');
@@ -107,8 +114,8 @@ async function savePerson(db, email, input, stamp) {
     if (String(input.revision || '') !== personRevision(before, exBefore)) fail('CHANGED', 'Someone changed this person since you opened them. Reload this person before saving.');
     // The Users list is a sheet: the change must reach the sheet copy, or the next copy from the sheet would undo it.
     const c = cfg.exists ? cfg.data() : {};
-    const mode = { writeBack: !!(c.writeBack && c.writeBack.enabled === true) };
-    if (!mode.writeBack) fail('NOT_ALLOWED', 'Turn the write-back on first (Route Distribution page), so the change reaches the Users sheet copy.');
+    const mode = { writeBack: !!(c.writeBack && c.writeBack.enabled === true) || usersCopy(deps && deps.env) };
+    if (!mode.writeBack) fail('NOT_ALLOWED', 'This change was not saved: the Users sheet cannot be updated from here yet. Turn the write-back on (Route Distribution page) and save again.');
     const id = before && before.cells && before.cells.id ? before.cells.id : 'usr_' + crypto.randomBytes(10).toString('hex');
     const version = Number(before && before.cells && before.cells.version || 0) + 1;
     const fields = { name, status, roles, facilities: admin && facilities.length === 0 ? ['*'] : facilities, 'cells.version': String(version) };
@@ -388,4 +395,4 @@ async function adminCall(db, user, input, deps) {
   return fn(db, email, input, stamp, d);
 }
 
-module.exports = { adminCall, stationRelease, AdminError, savePerson, personRevision, OPS, requireAdmin, fail, text, plantName, activePlants };
+module.exports = { usersCopy, adminCall, stationRelease, AdminError, savePerson, personRevision, OPS, requireAdmin, fail, text, plantName, activePlants };

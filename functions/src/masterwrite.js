@@ -103,7 +103,7 @@ function queueMaster(tx, db, mode, requestId, part, ref, rowId, fields, create, 
  * One pass. sheets = { batchGet, batchUpdate }. targets = { drivers: {spreadsheetId, tab}, ... }: the sandbox copies of
  * the master lists (the same the copy reads). Returns counts.
  */
-async function runMasterWriteBack({ db, sheets, targets, now }) {
+async function runMasterWriteBack({ db, sheets, targets, now, only }) {
   Object.keys(targets || {}).forEach(k => assertSandboxTarget(targets[k] && targets[k].spreadsheetId));
   const stamp = (now ? now() : new Date()).toISOString();
   // Claim the oldest waiting saves first, so two passes at once (the save trigger and the minute pass) never both add
@@ -111,7 +111,8 @@ async function runMasterWriteBack({ db, sheets, targets, now }) {
   const claim = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), stale = new Date(Date.parse(stamp) - 5 * 60000).toISOString();
   const items = await db.runTransaction(async tx => {
     const q = await tx.get(db.collection(C.masterOutbox).where('status', 'in', ['pending', 'writing']).orderBy('at').orderBy('requestId').limit(BATCH));
-    const mine = q.docs.filter(d => d.data().status === 'pending' || String(d.data().claimedAt || '') < stale);
+    // only: just the lists named in targets (the Users copy while the write-back switch is off); the rest wait.
+    const mine = q.docs.filter(d => (d.data().status === 'pending' || String(d.data().claimedAt || '') < stale) && (!only || targets[d.data().list]));
     mine.forEach(d => tx.update(d.ref, { status: 'writing', claim, claimedAt: stamp }));
     return mine.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data()));
   });
