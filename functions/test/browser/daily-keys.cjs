@@ -85,6 +85,15 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await at(p), 'run_t801|tue trailer');
     results.push('typing 901 found T-901; Esc kept T-902');
 
+    // A trailer number that is not on Equipment Master is kept as typed, as T-###.
+    await p.keyboard.type('777');
+    await p.waitForSelector('.cell-pop p');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[6].textContent === 'T-777', R801, { timeout: 8000 });
+    await p.keyboard.press('ArrowUp');
+    assert.equal(await at(p), 'run_t801|tue trailer');
+    results.push('typing 777 (not on Equipment Master) and Enter kept trailer T-777');
+
     // Typing a driver name: Enter takes the best match and moves down.
     await p.keyboard.press('Shift+Tab');
     await p.keyboard.press('Shift+Tab');

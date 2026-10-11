@@ -198,10 +198,11 @@ export function saveRunChange(getRuns, runDocId, day, action, fields, apply, ren
 
 export function saveAssignment(getRuns, runDocId, day, kind, pick, render, override) {
   const spec = kind === 'note' ? null : KINDS[kind];
-  const fields = spec ? { [spec.field]: pick.id } : { note: pick };
+  const fields = spec ? { [spec.field]: pick.unit ? '' : pick.id } : { note: pick };
+  if (spec && pick.unit) fields.unit = pick.unit; // a typed unit that is not on Equipment Master (Daily)
   if (override) fields.override = true;
   return saveRunChange(getRuns, runDocId, day, spec ? spec.action : 'setDriverNote', fields,
-    (d) => { if (spec) { d[spec.idKey] = /^__CVG__:/.test(pick.id) ? '' : pick.id; d[spec.textKey] = pick.id ? pick.text : ''; } else d.driverNotes = pick; }, render);
+    (d) => { if (spec) { d[spec.idKey] = /^__CVG__:/.test(pick.id) || pick.unit ? '' : pick.id; d[spec.textKey] = pick.id ? pick.text : ''; } else d.driverNotes = pick; }, render);
 }
 
 // New load order for one load date: the rows in their new order. Shown at once, saved as one call.
