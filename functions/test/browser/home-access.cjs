@@ -75,7 +75,15 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Plant Production and Plant Maintenance carry an Under Construction banner. Administration is the header button.
     await adm.waitForSelector('.launch-card[data-side="reports"]');
     assert.deepEqual(await adm.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports']);
-    assert.deepEqual(await adm.$$eval('.launch-card .uc-banner', b => b.map(x => x.closest('.launch-card').dataset.side + ':' + x.textContent)), ['production:Under Construction', 'pmaint:Under Construction']);
+    // Joe 10/11 evening: those two cards use his own pictures with the banner painted on (the clean pictures stay in the
+    // library for later), so the banner comes from the picture and is not laid on twice.
+    await adm.waitForFunction(() => [...document.querySelectorAll('.launch-card.building img')].every(i => i.complete && i.naturalWidth > 0));
+    assert.deepEqual(await adm.$$eval('.launch-card.building', c => c.map(x => { const i = x.querySelector('img'); return x.dataset.side + ':' + i.alt + ':' + i.getAttribute('src') + ':' + i.naturalWidth; })),
+      ['production:Under Construction:img/library/plant-production-construction-560.webp:560', 'pmaint:Under Construction:img/library/plant-maintenance-construction-560.webp:560']);
+    assert.equal(await adm.$$eval('.launch-card .uc-banner', b => b.length), 0, 'the banner is not drawn twice over the pictures');
+    for (const clean of ['plant-production-v1-560.webp', 'plant-maintenance-v1-560.webp', 'plant-production-v1-full.webp', 'plant-maintenance-v1-full.webp']) {
+      assert.equal((await adm.request.get(HOSTING + '/img/library/' + clean)).status(), 200, 'the clean picture is kept in the library: ' + clean);
+    }
     const fits = await adm.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.launch-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight }));
     assert.ok(fits.bottom <= fits.inner, 'the six cards fit a 1920x1080 screen: ' + JSON.stringify(fits));
     const sizes = await adm.$$eval('.launch-card', c => c.map(x => Math.round(x.getBoundingClientRect().width) + 'x' + Math.round(x.getBoundingClientRect().height)));
