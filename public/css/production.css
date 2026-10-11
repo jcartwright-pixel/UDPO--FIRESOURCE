@@ -1,6 +1,4 @@
 /* Plant Production (Joe 10/11): Line Targets, the line tablet and Production Lines / the production TV. */
-.pd-building { margin: 40px auto; max-width: 720px; background: #fff; border: 1px solid var(--line); border-left: 8px solid var(--ud-gold); border-radius: 12px; padding: 22px 26px; font-size: 18px; color: var(--ink); }
-.pd-building b { display: block; font-size: 24px; color: var(--ud-blue-dark); margin-bottom: 6px; }
 .lt-top { display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border: 1px solid #9fb3c8; border-radius: 9px; background: #fff; color: var(--ud-blue); font-weight: 800; font-size: 16px; text-decoration: none; white-space: nowrap; }
 .lt-top:hover { background: #eef5fc; }
 .pm-pick { height: 38px; border: 2px solid #9fb3c8; border-radius: 9px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; padding: 0 8px; cursor: pointer; width: 150px; }
@@ -137,6 +135,5 @@ body.pd-tv .pd-speed.off { background: #ff4d4d; }
 body.pd-tv .pd-legend { padding: 0 40px; font-size: 24px; }
 body.pd-tv .pd-legend .g { color: #2fbf62; } body.pd-tv .pd-legend .a { color: #f2b705; } body.pd-tv .pd-legend .r, body.pd-tv .pd-legend .f { color: #ff6b6b; }
 body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
-body.pd-tv .pd-building { color: var(--ink); }
 @media (max-width: 1200px) { .pd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .pd-tiles { grid-template-columns: 1fr; } }

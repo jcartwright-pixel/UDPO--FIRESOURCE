@@ -60,12 +60,3 @@ export function shiftText(s) {
   const t = (iso) => { const d = new Date(iso); return twelve(String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')); };
   return s.name + ' ' + t(s.start) + ' to ' + t(s.end);
 }
-
-// Joe 10/11: a module still being built opens only for administrators. Plant Production is being built; when a screen is
-// ready for everyone (the line tablet and the TV for the operators, first), set it true here.
-export const OPEN_TO_EVERYONE = { production: false, line: false, linetargets: false };
-// true when this person may use the screen; otherwise the page shows the being-built note in its place.
-export function mayOpen(person, screen) { return !!OPEN_TO_EVERYONE[screen] || !!(person && window.UDLogic.isAdmin(person)); }
-export function beingBuilt(el) {
-  el.innerHTML = '<div class="pd-building"><b>Plant Production is being built.</b><span>Only administrators can open it for now. It opens for everyone when it is ready.</span></div>';
-}

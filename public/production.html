@@ -51,7 +51,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchProduction, lineView, fmt, shiftText, mayOpen, beingBuilt } from './js/production.js';
+    import { watchProduction, lineView, fmt, shiftText } from './js/production.js';
 
     // Production Lines (Joe 10/11): every line this shift, made against target, stopped or running, and the speed flag (Joe: a
     // product run under or over its allowed speed). Plant Production's first page; TV Display (?tv=1) is the same board for the
@@ -95,8 +95,6 @@
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
         person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
-        // Joe 10/11: being built, so administrators only (production.js OPEN_TO_EVERYONE).
-        if (!mayOpen(person, 'production')) { if (stop) stop(); stop = null; data = null; beingBuilt(document.getElementById('view')); return; }
         if (!plants().some(p => p.id === plant)) plant = plants()[0].id;
         if (!stop) follow(); else render();
       });

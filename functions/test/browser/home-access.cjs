@@ -46,6 +46,28 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await sup.$('#go-back'), null, 'nothing above the plant home');
     assert.equal(await sup.isVisible('#go-admin'), false, 'no Administration button');
     if (SHOTS) await sup.screenshot({ path: path.join(SHOTS, 'home-one-plant-1920.png') });
+    // Joe 10/11: Under Construction modules open only for Administrators. A supervisor sees both cards with the banner, says
+    // "Administrators only", and clicking one stays on the plant home; the menu links are locked; typing the address is refused.
+    assert.deepEqual(await sup.$$eval('.launch-card.building', c => c.map(x => x.dataset.side + ':' + x.querySelector('.uc-admin-only').innerText + ':' + getComputedStyle(x.querySelector('.open-text')).display)),
+      ['production:Administrators only while it is being built:none', 'pmaint:Administrators only while it is being built:none']);
+    await sup.click('.launch-card[data-side="production"]');
+    await sup.waitForTimeout(600);
+    assert.match(sup.url(), /index\.html/, 'a supervisor clicking Plant Production stays on the plant home');
+    assert.deepEqual(await sup.$$eval('.sidemenu a[data-building]', a => a.map(x => x.dataset.side + ':' + getComputedStyle(x).pointerEvents)), ['production:none', 'pmaint:none']);
+    // Plant Production's first page is now its Production Lines board (Joe 10/11); Plant Maintenance is still the being-built page.
+    for (const [page, name, inside] of [['production.html?', 'Plant Production', '#tiles'], ['soon.html?what=plant-maintenance&', 'Plant Maintenance', '.soon-card']]) {
+      await sup.goto(HOSTING + '/' + page + 'testEmail=super.test@uniteddairy.com');
+      await sup.waitForSelector('#uc-refused');
+      assert.equal(await sup.textContent('#uc-refused h1'), name + ' is under construction');
+      assert.match(await sup.textContent('#uc-refused p'), /Only Administrators can open/);
+      assert.equal(await sup.isVisible(inside), false, name + ' stays closed to a supervisor');
+      assert.equal(await sup.isVisible('#go-home'), true, 'the header and its Home button stay');
+      assert.equal(await sup.isVisible('#signin'), false, 'the supervisor stays signed in');
+    }
+    // Any other being-built screen still opens for everyone.
+    await sup.goto(HOSTING + '/soon.html?what=trucks-today&testEmail=super.test@uniteddairy.com');
+    await sup.waitForSelector('#screen:not([hidden]) .soon-card');
+    assert.equal(await sup.$('#uc-refused'), null);
     await sup.goto(HOSTING + '/company.html?testEmail=super.test@uniteddairy.com');
     await sup.waitForSelector('.co-plant');
     assert.deepEqual(await sup.$$eval('.co-plant', c => c.map(x => x.dataset.plant)), ['fac_uniontown'], 'the overview shows a one-plant user their plant only');
@@ -53,7 +75,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await sup.waitForFunction(() => /Administrators only/.test(document.getElementById('shell').textContent));
     assert.deepEqual(sup.errors, []);
     await sup.close();
-    results.push('A one-plant supervisor sees only Uniontown\'s home (six cards, no Administration); the overview shows them Uniontown only; Administration says Administrators only');
+    results.push('A one-plant supervisor sees only Uniontown\'s home (six cards, no Administration); Plant Production and Plant Maintenance show Administrators only and do not open, by card, menu or address; the overview shows them Uniontown only; Administration says Administrators only');
 
     // An Administrator: the all-plants overview first, then Uniontown, whose home has the Administration card.
     const adm = await openPage(browser, 1920, 1080, '/index.html?testEmail=admin.test@uniteddairy.com');
@@ -102,8 +124,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
     assert.deepEqual(groups, ['People & Access', 'Links & Codes', 'Email & Schedules', 'Dispatch Administration', 'Plant Setup', 'Connections & Keys', 'Fleet & GPS Setup', 'System Tools', 'Diagnostics']);
     const all = await adm.$$eval('.adm-item', t => t.length);
-    // 35 with Connections & Keys > RedZone (Joe 10/11).
-    assert.equal(all, 35, 'every item from the current app\'s Administration is in the menu');
+    assert.equal(all, 34, 'every item from the current app\'s Administration is in the menu');
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);

@@ -49,15 +49,17 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
   const browser = await chromium.launch();
   const results = [];
   try {
-    // Being built: administrators only.
+    // Being built: administrators only (app.js's shared Under Construction check refuses every Plant Production screen).
     const mg = await openPage(browser, 1536, 864, '/production.html?' + MANAGER);
-    await mg.waitForSelector('.pd-building');
-    assert.match(await mg.textContent('.pd-building'), /being built/);
-    await mg.goto(HOSTING + '/line.html?' + MANAGER);
-    await mg.waitForSelector('.pd-building');
+    for (const page of ['production.html', 'production.html?tv=1&', 'line.html', 'linetargets.html']) {
+      await mg.goto(HOSTING + '/' + page + (page.indexOf('?') < 0 ? '?' : '') + MANAGER);
+      await mg.waitForSelector('#uc-refused');
+      assert.equal(await mg.textContent('#uc-refused h1'), 'Plant Production is under construction', page);
+      assert.equal(await mg.$$eval('.pd-tile, .lt-table, .lb-card', x => x.filter(e => e.offsetParent).length), 0, page + ' shows nothing of the line');
+    }
     assert.deepEqual(mg.errors, []);
     await mg.close();
-    results.push('Plant Production is administrators only while it is being built (a manager sees the being-built note)');
+    results.push('Plant Production is administrators only while it is being built (a manager is refused the board, the TV, the tablet and Line Targets)');
 
     // Line Targets: RedZone's numbers to start, target per hour worked out, boxes save on the Products list.
     for (const w of [1536, 1920]) {

@@ -60,7 +60,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchProduction, fmt, mayOpen, beingBuilt } from './js/production.js';
+    import { watchProduction, fmt } from './js/production.js';
     import { savedText } from './js/autosave.js';
 
     // Line Targets (Joe 10/11, mock-up B): pick a line, see its products, and set each one's UPC, shelf life, full speed, Target %
@@ -172,8 +172,6 @@
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
         person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
-        // Joe 10/11: being built, so administrators only (production.js OPEN_TO_EVERYONE).
-        if (!mayOpen(person, 'linetargets')) { if (stop) stop(); stop = null; data = null; beingBuilt(document.querySelector('.view')); return; }
         drawTop();
         if (!stop) follow(); else if (data) render(true);
       });

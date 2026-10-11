@@ -97,7 +97,7 @@ export const MENU = [
 // Distribution, Fleet & Maintenance and Reports. Plant Production and Plant Maintenance are under construction.
 export const SIDES = [
   { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'] },
-  // Joe 10/11: still Under Construction, so its screens open only for administrators (production.js mayOpen).
+  // Joe 10/11: still Under Construction, so its screens open only for administrators (the shared buildingSideFor / mayOpenBuilding check below).
   { key: 'production', name: 'Plant Production', home: 'production.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines'], building: true, bannerInPic: true },
   { key: 'pmaint', name: 'Plant Maintenance', home: 'soon.html?what=plant-maintenance', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: [], building: true, bannerInPic: true },
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
@@ -110,6 +110,25 @@ const SIDE_PAGES = {};
 // A side's own first page; Plant Production and Plant Maintenance start on the being-built page with their own name.
 const isHome = (side, page) => page === pageOf(side.home) && (side.home.indexOf('?') < 0 || location.search.indexOf(side.home.split('?')[1]) >= 0);
 const sideHas = (side, page) => isHome(side, page) || (SIDE_PAGES[side.key] || []).indexOf(page) >= 0 || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
+// Joe 10/11: a module Under Construction (building: true) opens only for Administrators, so Joe can watch it being built;
+// everyone else sees its card with the banner but cannot open it. requireSignIn refuses every screen of such a module to
+// anyone else, so a bookmark or typed address is refused too, not just the card. Any new module marked building uses this.
+export const buildingSideFor = (page) => SIDES.find(s => s.building && sideHas(s, page)) || null;
+export const mayOpenBuilding = (person) => !!(person && window.UDLogic && window.UDLogic.isAdmin(person));
+function refuseBuilding(side) {
+  if (document.getElementById('uc-refused')) return;
+  const box = document.createElement('section');
+  box.id = 'uc-refused';
+  box.className = 'uc-refused';
+  box.setAttribute('role', 'alert');
+  box.innerHTML = '<h1></h1><p></p><a class="button" href="index.html">Plant home</a>';
+  box.querySelector('h1').textContent = side.name + ' is under construction';
+  box.querySelector('p').textContent = 'Only Administrators can open ' + side.name + ' while it is being built. It opens for everyone once it is ready.';
+  // The header (Home, Back, Sign out) stays; everything else on the screen is hidden and the screen never loads its data.
+  const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
+  document.body.classList.add('uc-locked');
+  if (bar) bar.after(box); else (screen || document.body).appendChild(box);
+}
 export function sideFor(page) {
   // Home, the all-plants overview and the Administration Center sit above the three sides: their menu lists the sides.
   if (!page || ['index.html', 'company.html', 'administration.html'].indexOf(page) >= 0) return null;
@@ -150,7 +169,7 @@ function addSideMenu() {
   // lists only the plants; each plant opens its Plant Operations, Route Distribution and Fleet & Maintenance beside it.
   // A plant's home lists its three sides; a side shows its name (back to its first page), then only its own sections.
   // A side with one section lists its screens straight in the menu. Administration is a header button, not a menu item.
-  const sideLink = (s, href) => link([s.name, href || s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ');
+  const sideLink = (s, href) => link([s.name, href || s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '"' + (s.building ? ' data-building="1"' : '') + ' ');
   const plantSec = (p) => {
     const live = p.status === 'ACTIVE', soon = 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
     return '<div class="side-sec side-plant" data-plant="' + p.id + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + p.name + '">' +
@@ -306,7 +325,7 @@ const PAGE_ICON = {
   'gps.html': 'pin', 'scorecard.html': 'star', 'reportcenter.html': 'chart',
   'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
   'garage.html': 'wrench', 'fleet.html': 'truck',
-  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'production.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'redzone.html': 'production.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
+  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'production.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
@@ -493,6 +512,10 @@ export async function requireSignIn(ready) {
   const gate = document.getElementById('signin'), screen = document.getElementById('screen');
   let known = '';
   try { known = sessionStorage.getItem('udActive') || ''; } catch (e) { /* no storage */ }
+  const building = buildingSideFor(location.pathname.split('/').pop() || 'index.html');
+  let knownAdmin = false;
+  try { knownAdmin = sessionStorage.getItem('udAdmin') === '1'; } catch (e) { /* no storage */ }
+  if (building && !knownAdmin) known = '';
   if (known) { gate.hidden = true; screen.hidden = false; }
   const { auth } = await start();
   const showWho = (user) => {
@@ -520,8 +543,19 @@ export async function requireSignIn(ready) {
     if (early) { gate.hidden = true; screen.hidden = false; showWho(user); ready(user); }
     // The database shows dispatch data only to people ACTIVE in USERS_MASTER; say so plainly instead of a blank screen.
     const { db } = await start();
-    const entry = await getDoc(doc(db, 'users', email)).catch(() => null);
-    if (!entry || !entry.exists() || entry.data().status !== 'ACTIVE') {
+    // A read that fails (the connection dropped, "the client is offline") is tried again and never signs anyone out: signing
+    // out here signs out every screen in the browser, so only a Users list that says "not active" does that.
+    let entry = null;
+    for (let tries = 0; !entry && tries < 6; tries++) {
+      entry = await getDoc(doc(db, 'users', email)).catch(() => null);
+      if (!entry) await new Promise(r => setTimeout(r, 500 * (tries + 1)));
+    }
+    if (!entry) {
+      if (!early) screen.hidden = true;
+      showError('Could not reach the Users list to check your sign-in. Check the connection and reload the page.');
+      return;
+    }
+    if (!entry.exists() || entry.data().status !== 'ACTIVE') {
       remember('');
       screen.hidden = true;
       await signOut(auth);
@@ -530,6 +564,13 @@ export async function requireSignIn(ready) {
     }
     remember(email);
     noteAccess(Object.assign({ email }, entry.data()));
+    if (building && !mayOpenBuilding(Object.assign({ email }, entry.data()))) {
+      gate.hidden = true;
+      screen.hidden = false;
+      showWho(user);
+      refuseBuilding(building);
+      return;
+    }
     if (early) return;
     gate.hidden = true;
     screen.hidden = false;

@@ -98,8 +98,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     const areaNames = await admin.$$eval('#area option', o => o.map(x => x.textContent.replace(/ \(\d+\)$/, '')));
     assert.deepEqual(areaNames.slice(-2), ['CASES', 'TANKER'], 'Uniontown\'s own areas follow its machines');
     assert.deepEqual(await admin.$$eval('#group option', o => o.map(x => x.textContent)), ['All groups', 'Milk', 'Drinks', 'TEA']);
-    // Joe 10/11: "It's just products": RedZone is named only on the Get from RedZone button (Joe 10/11, tap into RedZone).
-    assert.ok(!(await admin.$eval('#screen', el => { const c = el.cloneNode(true); c.querySelector('#redzone').remove(); return c.innerText; })).includes('RedZone'), 'no RedZone name on the screen');
+    assert.ok(!(await admin.textContent('body')).includes('RedZone'), 'no RedZone name on the screen');
     assert.equal(await admin.inputValue('#rows input[data-k="name"]'), startOf('ut_prod_totes')[0].name);
     await admin.click('#add');
     await admin.fill('#rows tr:first-child input[data-k="name"]', 'UD Whole Milk Tote');
@@ -181,20 +180,6 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await shots(admin, 'products-areas-groups', 1920);
     await admin.click('#setup-save');
     await admin.waitForFunction(() => [...document.querySelectorAll('#area option')].some(o => /^DOCK/.test(o.textContent)) && !document.getElementById('list-pane').hidden);
-    // Get from RedZone before RedZone is connected says where to connect it, and changes nothing.
-    await admin.click('#redzone');
-    await admin.waitForFunction(() => /RedZone is not connected yet/.test(document.getElementById('foot').textContent) && !document.getElementById('list-pane').hidden);
-    // Administration > Connections & Keys > RedZone: the token is saved and never shown back; only its last 4 characters.
-    const rz = await openPage(browser, 1536, 760, '/redzone.html?testEmail=admin.test@uniteddairy.com');
-    await rz.waitForFunction(() => /Not saved/.test(document.getElementById('state').textContent));
-    await rz.fill('#f-address', 'https://api.redzone.example/v1');
-    await rz.fill('#f-token', 'rz_browser_token_4321');
-    await rz.click('#save');
-    await rz.waitForFunction(() => /Saved/.test(document.getElementById('state').textContent) && /ends 4321/.test(document.getElementById('f-token').placeholder) && document.getElementById('f-token').value === '');
-    assert.ok(!(await rz.content()).includes('rz_browser_token_4321'), 'the token is not on the page');
-    await fits(rz, 'RedZone 1536');
-    await shots(rz, 'redzone', 1536);
-    assert.deepEqual(rz.errors, []);
     assert.deepEqual(admin.errors, []);
     for (const w of [1536]) {
       const narrow = await openPage(browser, w, 760, '/products.html?plant=fac_uniontown&line=ut_prod_gallon_filler&' + AS);

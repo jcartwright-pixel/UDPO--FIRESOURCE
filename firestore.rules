@@ -18,8 +18,6 @@ service cloud.firestore {
     match /config/app { allow read: if activeUser(); }
     match /config/fleetSync { allow read: if activeUser(); }
     match /config/mocreo { allow read: if activeUser(); }
-    // Whether RedZone's Test Connection passed (the sign-in itself stays in private/redzone).
-    match /config/redzone { allow read: if activeUser(); }
     // Fleet Service's service rules (Fleet Service Setup; the server writes them).
     match /config/fleetRules { allow read: if activeUser(); }
     // MOCREO cooler sensors (server only writes them).

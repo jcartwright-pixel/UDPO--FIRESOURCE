@@ -75,7 +75,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, goBack, shortDate } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchProduction, lineView, fmt, clock, shiftText, mayOpen, beingBuilt } from './js/production.js';
+    import { watchProduction, lineView, fmt, clock, shiftText } from './js/production.js';
 
     // The line tablet (Joe 10/11, mock-up A): at the line, big buttons. What is running, made vs target, the speed (Joe: it flashes
     // when the product is run under or over its allowed speed), the minutes stopped, the code date check, and "Line stopped,
@@ -232,8 +232,6 @@
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
         person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
-        // Joe 10/11: being built, so administrators only (production.js OPEN_TO_EVERYONE).
-        if (!mayOpen(person, 'line')) { if (stop) stop(); stop = null; data = null; beingBuilt(document.getElementById('view')); return; }
         if (!stop) stop = watchProduction(db, plant(), d => { data = d; render(); }, e => showError('Could not read the line (' + e.message + '). Check the network.'), now);
       });
       // The clock moves the stopped minutes and target so far.
