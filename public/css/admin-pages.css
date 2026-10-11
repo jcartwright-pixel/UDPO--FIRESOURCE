@@ -34,6 +34,10 @@
 .ap-t td small { display: block; color: #5a6b7d; font-size: 13px; }
 .ap-t tr.ap-group td { background: #eef5fc; font-weight: 900; color: #0b3d6b; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
 .ap-t select { min-height: 34px; }
+/* Refresh Rates (Joe 10/11): a drop-down never runs past its column into Last run. */
+.rr2-t select { max-width: 100%; }
+.rr2-t .ap-chip { white-space: normal; max-width: 100%; }
+.rr2-t td:nth-child(3) select + select { margin-top: 4px; }
 .ap-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 800; background: #f1f3f5; color: #6a7885; white-space: nowrap; }
 .ap-chip.good { background: #e3f3e8; color: #1c6b3a; }
 .ap-chip.bad { background: #fdecea; color: #b42318; }
