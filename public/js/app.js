@@ -515,8 +515,19 @@ export async function requireSignIn(ready) {
     if (early) { gate.hidden = true; screen.hidden = false; showWho(user); ready(user); }
     // The database shows dispatch data only to people ACTIVE in USERS_MASTER; say so plainly instead of a blank screen.
     const { db } = await start();
-    const entry = await getDoc(doc(db, 'users', email)).catch(() => null);
-    if (!entry || !entry.exists() || entry.data().status !== 'ACTIVE') {
+    // A read that fails (the connection dropped, "the client is offline") is tried again and never signs anyone out: signing
+    // out here signs out every screen in the browser, so only a Users list that says "not active" does that.
+    let entry = null;
+    for (let tries = 0; !entry && tries < 6; tries++) {
+      entry = await getDoc(doc(db, 'users', email)).catch(() => null);
+      if (!entry) await new Promise(r => setTimeout(r, 500 * (tries + 1)));
+    }
+    if (!entry) {
+      if (!early) screen.hidden = true;
+      showError('Could not reach the Users list to check your sign-in. Check the connection and reload the page.');
+      return;
+    }
+    if (!entry.exists() || entry.data().status !== 'ACTIVE') {
       remember('');
       screen.hidden = true;
       await signOut(auth);
