@@ -119,16 +119,27 @@
       });
     }
 
+    // Joe 10/11: Route 20%, Truck 10%, Trailer 10% and Cases Out 20% narrower; Driver / CVG gets all of that room so a driver's
+    // name fits on one line (a name still too long shrinks to fit, see fitDrivers).
     const COLS = {
-      normal: [['Route', 6], ['Run', 9], ['Driver / CVG', 11], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
-      TANKER: [['Route', 7], ['Run', 15], ['Driver / CVG', 15], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
+      normal: [['Route', 4.8], ['Run', 9], ['Driver / CVG', 15.6], ['Truck', 8.1], ['Trailer', 8.1], ['', 6.4], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
+      TANKER: [['Route', 5.6], ['Run', 15], ['Driver / CVG', 20], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
     // With the loading order editable (today, someone who can load), the route in the Route column becomes a grab handle
     // (Joe 10/11: a handle to grab, no up / down arrows), so the column is a little wider; Total Time gives up the room.
     const ORDER_COLS = {
-      normal: [['Route', 9], ['Run', 9], ['Driver / CVG', 10], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 5], ['P/U', 8], ['', 6]],
-      TANKER: [['Route', 8], ['Run', 14], ['Driver / CVG', 15], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
+      normal: [['Route', 7.2], ['Run', 9], ['Driver / CVG', 15.2], ['Truck', 8.1], ['Trailer', 8.1], ['', 6.4], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 5], ['P/U', 8], ['', 6]],
+      TANKER: [['Route', 6.4], ['Run', 14], ['Driver / CVG', 20.2], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
+    // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
+    function fitDrivers() {
+      document.querySelectorAll('#rows td.lo-driver').forEach(td => {
+        td.style.fontSize = '';
+        let size = parseFloat(getComputedStyle(td).fontSize);
+        while (td.scrollWidth > td.clientWidth && size > 9) { size -= 0.5; td.style.fontSize = size + 'px'; }
+      });
+    }
+    addEventListener('resize', fitDrivers);
 
     // Loading order (as in the old app): today's loads of the shown department are dragged by the grab handle (a finger or
     // the mouse), or moved one place with the Up / Down arrow keys while the handle is selected; the new order is saved as today's load_sequence_override, which Driver Station, View Loadout
@@ -200,11 +211,11 @@
         const total = mins === null ? '' : '<span class="' + (stale ? 'stale' : st === 'LOADING' ? 'running' : '') + '">' + (st === 'LOADING' ? P.runningText(r.startedAt, mins) : P.minutesText(mins)) + '</span>';
         const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (skip ? ' skipped' : '');
         if (area === 'TANKER') {
-          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.driver) + '</td>' +
+          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + escapeHtml(r.run) + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + status + '</td><td>' + escapeHtml(r.shift) + '</td><td>' + puBtn + '</td><td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         } else {
-          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + runCell + '</td><td>' + escapeHtml(r.driver) + '</td>' +
+          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + runCell + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
             '<td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
@@ -215,6 +226,7 @@
       // A selected grab handle stays selected when the list is drawn again (after an Up / Down move, or a change from another screen).
       const held = document.activeElement && document.activeElement.closest && document.activeElement.closest('#rows [data-grip]') ? document.activeElement.dataset.grip : '';
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="' + cols.length + '" class="empty">No ' + P.AREA[area].tile.toLowerCase() + ' loads for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>';
+      fitDrivers();
       if (held) { const g = document.querySelector('#rows [data-grip="' + held + '"]'); if (g) g.focus(); }
       if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
       document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Grab a route by its handle and move it up or down to change today\'s loading order (or select it and press the Up / Down arrow keys).' : '') : 'View only.') + ' Changes from the sheets show here within about a minute.';

@@ -52,6 +52,13 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       assert.match(await page.textContent('.divider.prior'), /PRIOR DAY LOADS/);
       assert.match(await page.textContent('#strip'), /Pickups 1 left of 2/);
       assert.equal(await page.textContent(row('805') + ' button.pu'), 'P/U1', 'an open pickup shows red with its count');
+      // Joe 10/11: Driver / CVG takes the room Route, Truck, Trailer and Cases Out gave up, and every driver's name sits on one line
+      // (a name still too long shrinks to fit).
+      const drivers = await page.$$eval('#rows td.lo-driver', tds => tds.map(td => ({ name: td.textContent, fits: td.scrollWidth <= td.clientWidth + 1, size: parseFloat(getComputedStyle(td).fontSize) })));
+      assert.ok(drivers.length >= 12 && drivers.every(d => d.fits), 'every driver on one line at ' + w + ': ' + JSON.stringify(drivers.filter(d => !d.fits)));
+      assert.ok(drivers.some(d => /ALESANTRINO, DAVID/.test(d.name)), 'the long name is on the list');
+      const widths = await page.$$eval('#cols col', c => c.map(x => parseFloat(x.style.width)));
+      assert.deepEqual(widths.slice(0, 6), [4.8, 9, 15.6, 8.1, 8.1, 6.4], 'Route, Truck, Trailer and Cases Out narrower; Driver wider');
       const size = await page.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight, width: document.scrollingElement.scrollWidth, innerWidth: window.innerWidth }));
       assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Loadout Center fits ' + w + 'x' + h + ' with no page scrolling: ' + JSON.stringify(size));
       if (SHOTS) {
