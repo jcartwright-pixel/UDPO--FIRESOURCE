@@ -142,6 +142,19 @@ test('Driver Check-In Email per location (Joe 10/11): each plant keeps its own s
   assert.equal(now.plant, 'fac_charleston');
 });
 
+test('Driver Check-In Email keeps the original email; Maintenance marks those write-ups From email (review item 33)', async () => {
+  await call({ op: 'saveCheckinEmail', enabled: true, sender: 'callcenter@lauttamus.com', recipient: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN' });
+  const body = ['Name (UT): ADAMS', 'Route Number: 801', 'Tractor Number: 900001', 'Write Up Defects: truck horn weak'].join('\n');
+  const msg = { id: 'mail77', internalDate: Date.parse('2026-10-05T15:00:00Z'), from: 'Lauttamus Answering Service <CallCenter@lauttamus.com>', to: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN', body };
+  await T.checkinRun(db(), { plant: 'fac_uniontown', by: ADMIN.email, readMail: async () => [msg], now: () => new Date('2026-10-05T16:00:00Z') });
+  const copy = (await db().collection('mailCopies').doc('mail77').get()).data();
+  assert.deepEqual([copy.from, copy.subject, copy.receivedAt, copy.body], [msg.from, msg.subject, '2026-10-05T15:00:00.000Z', body]);
+  const row = L.issueRows(await records(), 'TRUCK').find(r => r.recordId === 'MAIL|mail77|tractor');
+  assert.deepEqual([row.fromEmail, row.emailId], [true, 'mail77']);
+  const typed = L.issueRows([{ record_id: 'APP|x|mon|tractor', kind: 'TRUCK', issue_details: 'Flat', source_type: 'APP' }], 'TRUCK')[0];
+  assert.deepEqual([typed.fromEmail, typed.emailId], [false, '']);
+});
+
 test('Refresh Rates: a saved rate is used by the schedule; retired and fixed jobs cannot be changed; reload before saving', async () => {
   const r = await call({ op: 'refreshRates' });
   const job = r.jobs.find(j => j.key === 'checkinMail');
