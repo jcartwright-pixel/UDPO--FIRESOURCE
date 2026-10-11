@@ -29,7 +29,11 @@
   if (run && !(at < run.until)) { write(KEY_RUN, null); run = null; }
   if (rec && !(at < rec.until)) { write(KEY_REC, null); rec = null; }
   // The step is this page, or the page the step's screen sent us on to straight away (a screen that opens another).
-  var asked = run && run.queue && run.queue[0], stepping = !!asked && (asked === page || (run.navAt && at - run.navAt < 10000 && page !== 'diagnostics.html'));
+  // Only the window itself steps: a screen shown inside another (Print Layouts' preview frames) must not take the step, or it
+  // moves the check on under the page that holds it and that page waits for ever.
+  var top = true;
+  try { top = window.top === window.self; } catch (e) { top = false; }
+  var asked = run && run.queue && run.queue[0], stepping = top && !!asked && (asked === page || (run.navAt && at - run.navAt < 10000 && page !== 'diagnostics.html'));
   var errors = [], calls = [];
   function noteError(kind, text) {
     text = String(text || '').slice(0, 300);
