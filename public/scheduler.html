@@ -141,7 +141,7 @@
       document.getElementById('pick').value = date;
       document.getElementById('add').hidden = !ck;
       let tiles;
-      if (view === 'day') { const c = inRange.filter(x => x.scheduleType === 'CARRIER').length; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [c, 'Carrier'], [inRange.length - c, inRange.length - c === 1 ? 'Route' : 'Routes']]; }
+      if (view === 'day') { const c = inRange.filter(x => x.scheduleType === 'CARRIER').length; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [c, 'Carrier'], [inRange.length - c, 'United Dairy Delivery']]; }
       else { let hol = 0; for (let d = r.start; d <= r.end; d = L.addDays(d, 1)) if (R.holidayName(d)) hol++; const days = new Set(inRange.map(x => x.date)).size; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [days, 'Days booked'], [hol, hol === 1 ? 'Holiday' : 'Holidays']]; }
       document.getElementById('hstats').innerHTML = tiles.map(([n, l]) => '<div><b>' + n + '</b><span>' + l + '</span></div>').join('');
       const body = document.getElementById('body');
@@ -195,7 +195,7 @@
       const cell = (v, cls) => { v = String(v == null ? '' : v).trim(); return '<td' + (cls ? ' class="' + cls + '"' : '') + (v ? ' title="' + escapeHtml(v) + '"' : '') + '>' + (v ? escapeHtml(v) : '—') + '</td>'; };
       return '<div class="sheet scroll-list"><table class="sc-table"><colgroup><col style="width:7%"><col style="width:15%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:12%"><col style="width:15%"><col style="width:7%"></colgroup>' +
         '<thead><tr><th>' + (lane === 'RECEIVING' ? 'Code' : 'Route') + '</th><th>' + (lane === 'RECEIVING' ? 'Supplier' : 'Run') + '</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th><th></th></tr></thead><tbody>' +
-        (rows.map(x => '<tr>' + cell(x.route) + cell(runName(x), 'run') + cell(clock(x.pickupTime)) + cell(x.scheduleType === 'CARRIER' ? 'Carrier' : 'Route') + cell(x.loadDate ? md(x.loadDate) : '') + cell(x.trailer) + cell(x.poNumber) + cell(x.cases) +
+        (rows.map(x => '<tr>' + cell(x.route) + cell(runName(x), 'run') + cell(clock(x.pickupTime)) + cell(x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + cell(x.loadDate ? md(x.loadDate) : '') + cell(x.trailer) + cell(x.poNumber) + cell(x.cases) +
           cell(x.product, 'txt') + cell(x.notes, 'txt') + '<td><button type="button" class="sc-btn small" data-edit="' + escapeHtml(x.id) + '">' + (ck ? 'Edit' : 'View') + '</button></td></tr>').join('') ||
           (seen[lane] ? '<tr><td colspan="11" class="empty">No plant schedule entries for this date.</td></tr>' : '<tr><td colspan="11" class="empty">Loading the schedule&hellip;</td></tr>')) + '</tbody></table></div>' +
         (ck ? '<div class="sc-dayadd"><button type="button" class="sc-btn primary" data-new="' + date + '">＋ Add ' + (lane === 'RECEIVING' ? 'Load' : 'Route') + '</button></div>' : '');
@@ -232,7 +232,7 @@
       const options = (x && !list.some(r => r.runId === x.runId && r.routeId === x.routeId) ? [{ routeId: x.routeId, runId: x.runId, route: x.route, run: x.run, name: '(no longer on the list)' }] : []).concat(list);
       openModal('<h2 id="modal-title">' + escapeHtml(dialogTitle(x ? x.id : '', key)) + '</h2><div class="modal-grid sc-form">' +
         '<label>' + (lane === 'RECEIVING' ? 'Supplier' : 'Route / Run') + '<select id="f-route"' + dis + '>' + (sel.runId ? '' : '<option value="">Pick one…</option>') + options.map((r, i) => '<option value="' + i + '"' + (r.runId === sel.runId && r.routeId === sel.routeId ? ' selected' : '') + '>' + escapeHtml([r.route, r.run, r.name].filter(Boolean).join(' · ')) + '</option>').join('') + '</select></label>' +
-        '<label>Schedule Type<select id="f-type"' + dis + '><option value="ROUTE">Plant Route</option><option value="CARRIER"' + (x && x.scheduleType === 'CARRIER' ? ' selected' : '') + '>Carrier</option></select></label>' +
+        '<label>Schedule Type<select id="f-type"' + dis + '><option value="ROUTE">United Dairy Delivery</option><option value="CARRIER"' + (x && x.scheduleType === 'CARRIER' ? ' selected' : '') + '>Carrier</option></select></label>' +
         '<div class="wide sc-three"><label>Load Date<input id="f-load" type="date" value="' + escapeHtml(loadDate) + '"' + dis + '></label><label>Delivery Date<input id="f-date" type="date" value="' + escapeHtml(x ? x.date : key) + '"' + dis + '><small>The day you clicked</small></label>' +
         '<label>Pickup Time<input id="f-time" type="time" value="' + escapeHtml(x ? x.pickupTime : '') + '"' + dis + '></label></div>' +
         '<label>Trailer<input id="f-trailer" list="f-trailers" autocomplete="off" maxlength="24" placeholder="Pick or type a trailer" value="' + escapeHtml(x ? x.trailer : '') + '"' + dis + '><datalist id="f-trailers"></datalist><small id="f-trailer-note">Pick from the list or type one</small></label>' +
@@ -402,7 +402,7 @@
       } else {
         const r = range(), rows = list.filter(x => x.date >= r.start && x.date <= r.end);
         inner = '<table><thead><tr><th>Delivery</th><th>' + who() + '</th><th>Route · Run</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th></tr></thead><tbody>' +
-          (rows.map(x => '<tr><td>' + escapeHtml(DAYS[at(x.date).getDay()] + ' ' + md(x.date)) + '</td><td>' + escapeHtml(entryName(x)) + '</td><td>' + escapeHtml([x.route, x.run].filter(Boolean).join(' · ')) + '</td><td>' + escapeHtml(clock(x.pickupTime)) + '</td><td>' + (x.scheduleType === 'CARRIER' ? 'Carrier' : 'Route') + '</td><td>' +
+          (rows.map(x => '<tr><td>' + escapeHtml(DAYS[at(x.date).getDay()] + ' ' + md(x.date)) + '</td><td>' + escapeHtml(entryName(x)) + '</td><td>' + escapeHtml([x.route, x.run].filter(Boolean).join(' · ')) + '</td><td>' + escapeHtml(clock(x.pickupTime)) + '</td><td>' + (x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + '</td><td>' +
             escapeHtml(x.loadDate ? md(x.loadDate) : '') + '</td><td>' + escapeHtml(x.trailer) + '</td><td>' + escapeHtml(x.poNumber) + '</td><td>' + escapeHtml(x.cases) + '</td><td>' + escapeHtml(x.product) + '</td><td>' + escapeHtml(x.notes) + '</td></tr>').join('') ||
             '<tr><td colspan="11">No loads scheduled.</td></tr>') + '</tbody></table>';
       }

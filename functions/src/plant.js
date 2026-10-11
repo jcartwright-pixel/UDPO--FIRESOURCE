@@ -481,7 +481,7 @@ function validateSchedule(input, SaveError) {
   out.pickupTime = R.time24(f.pickupTime);
   if (!out.pickupTime) throw new SaveError('BAD_REQUEST', 'Enter the pickup time.');
   out.scheduleType = text(f.scheduleType || 'ROUTE').toUpperCase();
-  if (['ROUTE', 'CARRIER'].indexOf(out.scheduleType) < 0) throw new SaveError('BAD_REQUEST', 'Schedule Type must be Plant Route or Carrier');
+  if (['ROUTE', 'CARRIER'].indexOf(out.scheduleType) < 0) throw new SaveError('BAD_REQUEST', 'Schedule Type must be Carrier or United Dairy Delivery');
   out.poNumber = text(f.poNumber).slice(0, 40);
   if (out.scheduleType === 'CARRIER' && !out.poNumber) throw new SaveError('BAD_REQUEST', 'A carrier load needs its PO number.');
   out.cases = text(f.cases);
