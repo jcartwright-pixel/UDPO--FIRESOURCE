@@ -570,13 +570,16 @@
       if (!d || !d.runs) return;
       var issues = [];
       if (d.tractorIssues) issues.push('Truck: ' + d.tractorIssues);
-      if (d.trailerIssues) issues.push('Trailer: ' + d.trailerIssues);
+      var more = Array.isArray(d.moreTrailers) ? d.moreTrailers : [];
+      if (d.trailerIssues) issues.push('Trailer' + (more.length ? ' 1' : '') + ': ' + d.trailerIssues);
+      more.forEach(function (m, i) { if (m && m.issues) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + '): ' + m.issues); if (m && m.needsCleaned) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + ') needs cleaned'); });
       if (d.palletJackIssues) issues.push('Jack: ' + d.palletJackIssues);
       if (yes(d.trailerNeedsCleaned)) issues.push('Trailer needs cleaned');
       if (d.overageShortageDetails || yes(d.overageShortage)) issues.push('Over/short: ' + (d.overageShortageDetails || 'yes'));
       rows.push({
         id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, run: run.run, coverageType: run.coverageType,
-        driver: d.driver || '', truck: d.truck || '', trailer: d.trailer || '', casesOut: d.casesOut,
+        // The units the driver checked in with (a corrected truck or trailer, drop-and-hook trailers), else Dispatch's.
+        driver: d.driver || '', truck: d.checkinTruck || d.truck || '', trailer: [d.checkinTrailer || d.trailer || ''].concat(more.map(function (m) { return m && m.trailer; })).filter(Boolean).join(' / '), casesOut: d.casesOut,
         casesDelivered: d.casesDelivered, driverCaseReturn: d.driverCaseReturn,
         refusedReturned: d.refusedReturned || '', refusedReturnedSource: d.refusedReturnedSource || '',
         checkinNotes: d.checkinNotes || '', checkinCompletedAt: d.checkinCompletedAt || '',

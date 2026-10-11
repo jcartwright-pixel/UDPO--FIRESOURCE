@@ -444,7 +444,8 @@ async function resolveAssignment(tx, db, req, stamp, run) {
 // Sheet column suffix for each day field the saves change (the reverse of model.DAY_FIELDS).
 const COLUMN_FOR = {}, TIME_FIELDS = {};
 // Kept in the new app only (the Live sheet has no column for them): who a day was for before the driver went off, and why.
-const APP_ONLY = { intendedDriverId: true, intendedDriver: true, driverExceptionStatus: true };
+// checkinTruck / checkinTrailer / moreTrailers: the units the driver corrected on the phone and the drop-and-hook trailers (no Live column).
+const APP_ONLY = { intendedDriverId: true, intendedDriver: true, driverExceptionStatus: true, checkinTruck: true, checkinTrailer: true, moreTrailers: true };
 M.DAY_FIELDS.forEach(([field, suffix, kind]) => { COLUMN_FOR[field] = suffix; if (kind === 'time') TIME_FIELDS[field] = true; });
 
 /*
