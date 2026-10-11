@@ -14,9 +14,18 @@
     /* Print Layouts (Joe 10/10): pick a sheet on the left, see only that sheet as paper pages, set it up on the right. */
     .pl-page .head { flex-wrap: nowrap; align-items: center; }
     .pl-page .head .title { flex: none; }
+    /* Joe 10/11: the Driver box fits whole on the top line on his 1920 screen at 125% (about 1536 wide). The subtitle takes two
+       lines and the buttons are narrower (same size as each other, same 14px words), so everything moves left. */
+    .pl-page .head { gap: 10px; }
+    .pl-page .head .title small { display: block; white-space: normal; max-width: 290px; line-height: 1.25; }
+    .pl-page .head .actions.tiles { gap: 6px; }
+    .pl-page .head .actions.tiles > :is(button, a.button) { padding: 0 10px; }
+    /* Below 1800 wide (a 1920 screen at 125%) each button takes just its own words' width, so the sheet's boxes fit beside them. */
+    @media (max-width: 1799px) { .pl-page .head .actions.tiles > :is(button, a.button) { width: auto !important; min-width: 0 !important; } }
+    .pl-opts { gap: 8px; }
     .pl-opts { margin-left: auto; display: flex; align-items: flex-end; gap: 10px; flex-wrap: nowrap; }
     .pl-opts label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 700; color: var(--muted); }
-    .pl-opts select, .pl-opts input { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 700; color: var(--ud-blue-dark); background: #fff; min-width: 130px; }
+    .pl-opts select, .pl-opts input { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 700; color: var(--ud-blue-dark); background: #fff; min-width: 110px; }
     .pl-opts .stepper input { border: 0; height: 100%; min-width: 0; width: 150px; }
     .pl-opts .pl-week { font-size: 12px; color: var(--muted); align-self: center; white-space: nowrap; }
     .pl-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 270px minmax(0, 1fr) 290px; gap: 14px; padding: 0 16px 14px; }
