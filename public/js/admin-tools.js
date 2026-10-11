@@ -275,14 +275,14 @@ const FIELD_TEXT = { runs: 'Runs', dispatchTime: 'Depart', driver: 'Driver', tru
 const shown = (k, v) => (k === 'runs' ? (v ? 'Yes' : 'No') : k === 'dispatchTime' ? (v === null || v === undefined ? '' : window.UDLogic.timeText(v)) : String(v === null || v === undefined ? '' : v));
 export async function renderUpdateLive(box) {
   box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn" id="ul-dry">Dry Run</button><button type="button" class="ap-btn main" id="ul-go">Update Live Sheets</button>') +
-    '<p class="ap-note">Copies Route Master and the drivers\' standard runs (Driver Schedule) into the Current and Next Live weeks. Only days loading today or later; days already loaded and days changed by hand on Daily or Weekly (route override) are kept. A day with a driver, truck or trailer keeps it; only empty ones are filled. Dry Run shows every change first.</p>' +
+    '<p class="ap-note">Copies Route Master and the drivers\' standard runs (Driver Schedule) into the Current and Next Live weeks. Only days loading today or later; days already loaded and days changed by hand on Daily or Weekly (route override) are kept. A day with a driver, truck or trailer keeps it; only empty ones are filled. A Route Master run missing from either week is added to it. Weekly\'s Publish to Daily Dispatch does the same when it builds the new Next week. Dry Run shows every change first.</p>' +
     '<div class="ap-scroll"><table class="ap-t"><thead><tr><th>Week</th><th>Day</th><th>Route</th><th>Run</th><th>Change</th></tr></thead><tbody id="ul-rows"><tr><td colspan="5" class="ap-empty">Press Dry Run to see what would change.</td></tr></tbody></table><div id="ul-missing"></div></div></div>';
   const $ = (s) => box.querySelector(s);
   function draw(out) {
     $('#ul-rows').innerHTML = out.changes.map(c => '<tr><td>' + e(c.week) + '</td><td>' + e(window.UDLogic.dayName ? window.UDLogic.dayName(c.date) : c.day) + ' ' + e(c.date.slice(5)) + '</td><td><b>' + e(c.route) + '</b></td><td>' + e(c.run) + '</td><td>' +
       Object.keys(c.after).filter(k => FIELD_TEXT[k]).map(k => e(FIELD_TEXT[k]) + ': <s>' + e(shown(k, c.before[k])) + '</s> &rarr; <b>' + e(shown(k, c.after[k])) + '</b>').join(' &middot; ') + '</td></tr>').join('') ||
       '<tr><td colspan="5" class="ap-empty">Nothing to change: the Live weeks already match Route Master.</td></tr>';
-    $('#ul-missing').innerHTML = out.missing.length ? '<div class="ap-section" style="margin:10px"><h3>Route Master runs not on the Live weeks</h3>' + out.missing.map(m => '<div>' + e(m.route) + ' ' + e(m.run) + ' <small>(' + e(m.runId) + ')</small></div>').join('') + '</div>' : '';
+    $('#ul-missing').innerHTML = out.missing.length ? '<div class="ap-section" style="margin:10px"><h3>' + (out.applied && out.added ? 'Route Master runs added to the Live weeks' : out.applied ? 'Route Master runs not on the Live weeks' : 'Route Master runs to add to the Live weeks') + '</h3>' + out.missing.map(m => '<div>' + (m.week ? e(m.week) + ' &middot; ' : '') + e(m.route) + ' ' + e(m.run) + ' <small>(' + e(m.runId) + ')</small></div>').join('') + '</div>' : '';
   }
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');

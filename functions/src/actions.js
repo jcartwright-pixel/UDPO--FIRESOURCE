@@ -20,6 +20,7 @@ const SC = require('./sc-core');
 const PLANT = require('./plant');
 const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
+const ROLL = require('./weekroll');
 
 const C = M.COLLECTIONS;
 
@@ -1109,9 +1110,13 @@ async function reorderRouteDay(tx, db, req, email, stamp, logRef, mode) {
 
 /*
  * Publish to Daily Dispatch. In the new app Weekly and Daily read the same runs, so every Weekly pick is already on
- * Daily; Publish records that the week was checked and sent (who and when), which the Weekly header shows.
+ * Daily. Publishing the Live Next week moves the weeks on (weekroll.js); publishing another week records that it was
+ * checked and sent (who and when), which the Weekly header shows.
  */
 async function publishWeek(tx, db, req, email, stamp, logRef, mode) {
+  // Joe 10/11 (review item 6): publishing the Live Next week moves the weeks on and builds the new Next week, as the current app does.
+  const live = ((await tx.get(db.collection(C.config).doc('app'))).data() || {}).liveWeeks || {};
+  if (live.next && req.weekStart === live.next) return ROLL.publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveError);
   const ref = db.collection(C.weeks).doc(req.weekStart);
   const snap = await tx.get(ref);
   if (!snap.exists) throw new SaveError('NOT_FOUND', 'The week of ' + req.weekStart + ' is not one of the copied Live weeks');
