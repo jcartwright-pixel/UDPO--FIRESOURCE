@@ -20,5 +20,8 @@ test('Send Current Report: none of the Monday routes is behind on Sunday', () =>
   const loads = [load('971', 0), load('880', 120), load('844', 1080), load('845', 1260, { state: 'DONE' })];
   assert.equal(R.plantReport({ loads }, at('2026-10-11T04:27:00Z')).behind.length, 0, '12:27 AM Sunday');
   assert.equal(R.plantReport({ loads }, at('2026-10-11T23:00:00Z')).behind.length, 0, '7:00 PM Sunday');
-  assert.deepEqual(R.plantReport({ loads }, at('2026-10-12T05:00:00Z')).behind.map(x => x.route), ['971'], '1:00 AM Monday');
+  assert.equal(R.plantReport({ loads }, at('2026-10-12T04:45:00Z')).behind.length, 0, '12:45 AM Monday: 971 is 45 minutes past, not behind');
+  const r = R.plantReport({ loads }, at('2026-10-12T04:46:00Z'));
+  assert.deepEqual(r.behind.map(x => x.route), ['971'], '12:46 AM Monday: 971 is 46 minutes past');
+  assert.equal(r.behind[0].late, '46 min late');
 });

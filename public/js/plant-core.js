@@ -6,7 +6,7 @@
  *   - the Loadout Center shows the day's loads plus yesterday's loads that were not finished, prior-day first, then
  *     load order, then route (udpoV780PlantLoadingRows_ / udpoV780PlantLoadingSort_);
  *   - Done = an End time, a stored COMPLETE / READY / LOADED, or the loaded tick; Loading = a Start time without an End;
- *   - Behind = not done 30 minutes after it leaves (217_V7271_PlantCurrentReport.gs BEHIND_MINUTES);
+ *   - Behind = not done more than 45 minutes after it leaves (Joe 10/11: 45 minutes late is not behind, 46 is);
  *   - a pickup (product that did not load at loadout) is open until it is marked complete, and shows red.
  */
 const L = window.UDLogic;
@@ -18,7 +18,7 @@ export const AREA = {
   BOXING: { title: 'Daily Box Loadout', tile: 'Boxes', label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' },
   TANKER: { title: 'Daily Tanker Loadout', tile: 'Tanker', label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }
 };
-export const BEHIND_MINUTES = 30;
+export const BEHIND_MINUTES = 45;
 
 export function areaOf(loadType) {
   const t = String(loadType || '').trim().toUpperCase();
@@ -85,7 +85,7 @@ export function nowMinutes(now) {
   return Number(parts.hour) * 60 + Number(parts.minute);
 }
 
-// Behind: a load not done 30 minutes after its route leaves (departure date + dispatch time, not the load day), so a
+// Behind: a load not done more than 45 minutes after its route leaves (departure date + dispatch time, not the load day), so a
 // Saturday loadout for Monday is not behind until Monday (Joe 10/11).
 export function isBehind(row, today, now) {
   if (row.state === 'DONE') return false;
