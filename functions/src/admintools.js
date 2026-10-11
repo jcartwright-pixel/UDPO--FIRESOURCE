@@ -225,13 +225,7 @@ async function sendOneRepair(db, recordId, by, note, mailDeps) {
     return { status: 'QUEUED', message: 'Added to ' + ROUTE_LABEL[dest.route] + '\'s daily repair email, sent at ' + hourText(s.digestHour) + '.' };
   }
   const msg = repairMessage(r, note);
-  // Joe 10/11: Administration > Email Senders can have the Lessor email come from the manager who pressed it.
-  let fromPerson = null;
-  if ((await emailSettings(db)).repairFrom === 'PERSON') {
-    const p = (await read(db.collection(C.users).doc(M.safeIdPart(by)))) || {};
-    fromPerson = { email: by, name: p.name || '' };
-  }
-  const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · ' + (route.mode === 'IMMEDIATE' ? 'immediate' : 'send') + ' · ' + by, by, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations', facilityId: r.facility_id, fromPerson }, mailDeps);
+  const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · ' + (route.mode === 'IMMEDIATE' ? 'immediate' : 'send') + ' · ' + by, by, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations', facilityId: r.facility_id }, mailDeps);
   if (res.status === 'SENT') {
     await addNote(db, r.record_id, 'Repair email sent ' + at + ' to ' + route.emails.join('; ') + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
     return { status: 'SENT', message: 'Emailed to ' + ROUTE_LABEL[dest.route] + (res.testCopy ? ' (test copy to ' + res.sentTo.join(', ') + ' only)' : '') + '.' };

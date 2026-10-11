@@ -120,11 +120,11 @@ test('Sending OFF stops every email and the log says so', async () => {
   assert.equal(log.emails[0].status, 'BLOCKED');
 });
 
-test('Email Senders: each plant can send from its own United Dairy mailbox; empty keeps the standard sender', async () => {
+test('Email Senders: email comes from whoever pressed Send; no one pressed = the plant address; empty keeps the standard sender', async () => {
   const deps = { env: { MAIL_FROM: 'joe@uniteddairy.com' } };
   const first = await call({ op: 'emailSenders' }, null, deps);
   assert.deepEqual(first.plants.map(p => [p.plant, p.address]), [['Uniontown', ''], ['Charleston', ''], ['Martins Ferry', '']]);
-  assert.deepEqual([first.standard, first.repairFrom], ['joe@uniteddairy.com', 'PLANT']);
+  assert.deepEqual([first.standard, first.fromWho], ['joe@uniteddairy.com', 'PERSON']);
   await assert.rejects(call({ op: 'saveEmailSenders', senders: { fac_charleston: { address: 'ops@gmail.com' } } }), /not a United Dairy email address/);
   await assert.rejects(call({ op: 'saveEmailSenders', senders: { fac_charleston: { address: '', name: 'Charleston Ops' } } }), /type the email address/);
   const out = await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' },
@@ -132,19 +132,28 @@ test('Email Senders: each plant can send from its own United Dairy mailbox; empt
   assert.deepEqual(out.plants.map(p => [p.address, p.senderName]), [['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations'], ['charleston.operations@uniteddairy.com', ''], ['', '']]);
   const sent = [];
   const send = { env: { MAIL_FROM: 'joe@uniteddairy.com' }, sendMail: async (m) => { sent.push(m); return { to: m.to }; } };
-  await appMail(db(), { kind: 'Test', by: 'boss@uniteddairy.com', to: ['a@uniteddairy.com'], subject: 'U', text: 'x', facilityId: 'fac_uniontown' }, send);
-  await appMail(db(), { kind: 'Test', by: 'boss@uniteddairy.com', to: ['a@uniteddairy.com'], subject: 'C', text: 'x', facilityId: 'fac_charleston', fromName: 'United Dairy Plant Operations' }, send);
-  await appMail(db(), { kind: 'Test', by: 'boss@uniteddairy.com', to: ['a@uniteddairy.com'], subject: 'M', text: 'x', facilityId: 'fac_martins_ferry' }, send);
-  assert.deepEqual(sent.map(m => [m.from, m.fromName]), [['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations'],
+  const mail = (subject, fac, extra) => appMail(db(), Object.assign({ kind: 'Test', by: 'boss@uniteddairy.com', to: ['a@uniteddairy.com'], subject, text: 'x', facilityId: fac }, extra || {}), send);
+  // Someone pressed Send: from them, with their name.
+  await mail('P', 'fac_uniontown');
+  assert.deepEqual([sent[0].from, sent[0].fromName], ['boss@uniteddairy.com', 'Boss']);
+  assert.equal((await call({ op: 'sentLog' })).emails.find(m => m.subject === 'P').from, 'boss@uniteddairy.com');
+  // No one pressed it (a schedule): the plant's address, else the standard sender.
+  await mail('U', 'fac_uniontown', { by: 'SCHEDULE', testTo: 'boss@uniteddairy.com' });
+  await mail('C', 'fac_charleston', { by: '', testTo: 'boss@uniteddairy.com', fromName: 'United Dairy Plant Operations' });
+  await mail('M', 'fac_martins_ferry', { by: '', testTo: 'boss@uniteddairy.com' });
+  assert.deepEqual(sent.slice(1).map(m => [m.from, m.fromName]), [['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations'],
     ['charleston.operations@uniteddairy.com', 'United Dairy Plant Operations'], ['joe@uniteddairy.com', 'United Dairy Operations']]);
-  assert.equal((await call({ op: 'sentLog' })).emails.find(m => m.subject === 'U').from, 'uniontown.operations@uniteddairy.com');
-  // The plant report (Send Current Report) goes out from the plant mailbox too.
+  // Send Current Report comes from the person who pressed it, or the plant address when Email Senders says so.
   const { mailReport } = require('../../src/reportmail');
   const ref = db().collection('plantReports').doc('r1');
   const report = { status: 'SENDING', subject: 'Report', text: 't', by: 'boss@uniteddairy.com', mode: 'test' };
   await ref.set(report);
   assert.equal(await mailReport(ref, report, send), 'SENT');
-  assert.equal(sent[3].from, 'uniontown.operations@uniteddairy.com');
+  assert.equal(sent[4].from, 'boss@uniteddairy.com');
+  await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com' } }, fromWho: 'PLANT' });
+  await ref.set(report);
+  assert.equal(await mailReport(ref, report, send), 'SENT');
+  assert.equal(sent[5].from, 'uniontown.operations@uniteddairy.com');
 });
 
 test('Route Distribution code: new code shown to administrators, turned off and on', async () => {

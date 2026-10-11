@@ -11,7 +11,7 @@
  *   Plant Station Codes   releaseCodes, releaseCodeNew                                 private/releaseCodes
  *   Report Recipients     reportGroups, saveReportGroup                                reportGroups/{id}
  *   Sent Email Log        sentLog, setSending                                          sentEmails, private/emailSettings
- *   Email Senders         emailSenders, saveEmailSenders                               private/emailSettings (senders, repairFrom)
+ *   Email Senders         emailSenders, saveEmailSenders                               private/emailSettings (senders, fromWho)
  *   Remaining Repairs     repairItems, saveRepairItem, completeRepairItem              repairItems/{id}
  * The email, schedule and diagnostics items are in admintools.js.
  */
@@ -335,12 +335,12 @@ async function setSending(db, email, input, stamp) {
 
 /* ---------- Email Senders ---------- */
 
-// Joe 10/11: each plant's email can come from its own mailbox (e.g. "United Dairy Uniontown Operations",
-// uniontown.operations@uniteddairy.com); a plant left empty keeps the app's standard sender (MAIL_FROM). Every plant is
-// listed, planned ones too, so Charleston and Martins Ferry can be set before they go live.
+// Joe 10/11: an email someone sends comes from that person's own United Dairy mailbox (fromWho PERSON, the default).
+// An email no one pressed comes from the plant's mailbox here; a plant left empty keeps the app's standard sender
+// (MAIL_FROM). Every plant is listed, planned ones too, so Charleston and Martins Ferry can be set before they go live.
 async function emailSenders(db, deps) {
   const s = await emailSettings(db), env = (deps && deps.env) || process.env;
-  return { standard: String(env.MAIL_FROM || '').trim(), repairFrom: s.repairFrom, sending: s.sending,
+  return { standard: String(env.MAIL_FROM || '').trim(), fromWho: s.fromWho, sending: s.sending,
     plants: L.PLANTS.map(p => { const x = s.senders[p.id] || {}; return { id: p.id, plant: p.name, address: x.address || '', senderName: x.address ? x.name || '' : '', changedAt: x.changedAt || '', changedBy: x.changedBy || '' }; }) };
 }
 
@@ -355,8 +355,8 @@ async function saveEmailSenders(db, email, input, stamp, deps) {
     const same = (was.address || '') === raw && (was.name || '') === name;
     senders[p.id] = { address: raw, name, changedAt: same ? was.changedAt || '' : stamp, changedBy: same ? was.changedBy || '' : email };
   });
-  const repairFrom = input.repairFrom === 'PERSON' ? 'PERSON' : 'PLANT';
-  await db.collection('private').doc('emailSettings').set({ senders, repairFrom, sendersChangedAt: stamp, sendersChangedBy: email }, { merge: true });
+  const fromWho = input.fromWho === 'PLANT' ? 'PLANT' : 'PERSON';
+  await db.collection('private').doc('emailSettings').set({ senders, fromWho, sendersChangedAt: stamp, sendersChangedBy: email }, { merge: true });
   return Object.assign({ ok: true, message: 'Saved.' }, await emailSenders(db, deps));
 }
 

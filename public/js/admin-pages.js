@@ -527,15 +527,15 @@ export async function renderSentLog(box) {
 
 /* ---------- Email Senders ---------- */
 
-// Joe 10/11: each plant's email comes from its own mailbox (e.g. United Dairy Uniontown Operations); empty = the standard sender.
+// Joe 10/11: an email someone sends comes from their own United Dairy email; one no one pressed comes from the plant's mailbox.
 export async function renderEmailSenders(box, ctx) {
   let data = null;
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="es-save">Save</button><button type="button" class="ap-btn" id="es-reload">Refresh</button>' +
     '<div class="ap-right"><span id="es-sending"></span></div></div><div class="ap-msg" hidden></div>' +
-    '<p class="ap-note">Which mailbox each plant\'s email comes from: plant reports and truck repair emails (other app email, such as access links, uses Uniontown\'s). Leave a plant empty to keep the standard sender. The mailbox must be a real United Dairy mailbox that IT has created.</p>' +
-    '<div class="ap-scroll"><table class="ap-t"><thead><tr><th>Plant</th><th>Send emails from</th><th>Name people see</th><th>Changed</th></tr></thead><tbody id="es-rows"></tbody></table>' +
-    '<div class="ap-section" style="margin:10px"><h3>Truck repair emails a manager sends</h3><p class="ap-note">The Lessor button on a truck or trailer write-up (Equipment Issues). Automatic and daily repair emails always come from the plant mailbox.</p>' +
-    '<label class="ap-field" style="max-width:520px">Comes from<select id="es-repair"><option value="PLANT">The plant mailbox</option><option value="PERSON">The manager who presses the button (their own email)</option></select></label></div></div></div>';
+    '<div class="ap-scroll"><div class="ap-section" style="margin:10px"><h3>Emails someone sends</h3><p class="ap-note">Send Current Report, the Lessor button on a truck write-up, Send now and access links.</p>' +
+    '<label class="ap-field" style="max-width:620px">Come from<select id="es-who"><option value="PERSON">The person who presses Send (their own United Dairy email)</option><option value="PLANT">The plant\'s address below</option></select></label></div>' +
+    '<div class="ap-section" style="margin:10px"><h3>Emails no one presses</h3><p class="ap-note">Automatic and once-a-day repair emails come from each plant\'s address. Leave a plant empty to keep the standard sender.</p></div>' +
+    '<table class="ap-t"><thead><tr><th>Plant</th><th>Send emails from</th><th>Name people see</th><th>Changed</th></tr></thead><tbody id="es-rows"></tbody></table></div></div>';
   const $ = (s) => box.querySelector(s);
   function render() {
     $('#es-sending').innerHTML = data.sending ? '<span class="ap-chip good">Sending is ON</span>' : '<button type="button" class="ap-btn small" data-goto="sent-log">Sending is OFF: turn it on</button>';
@@ -544,7 +544,7 @@ export async function renderEmailSenders(box, ctx) {
       '<td><input data-addr="' + e(p.id) + '" value="' + e(p.address) + '" maxlength="120" placeholder="' + e(std || 'name@uniteddairy.com') + '" style="width:100%">' + (p.address ? '' : '<small>' + empty + '</small>') + '</td>' +
       '<td><input data-name="' + e(p.id) + '" value="' + e(p.senderName) + '" maxlength="80" placeholder="United Dairy ' + e(p.plant) + ' Operations" style="width:100%"></td>' +
       '<td>' + (p.changedAt ? e(when(p.changedAt)) + '<small>' + e(p.changedBy) + '</small>' : '') + '</td></tr>').join('');
-    $('#es-repair').value = data.repairFrom;
+    $('#es-who').value = data.fromWho;
   }
   async function load() { try { data = await call('emailSenders'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
   box.addEventListener('click', ev => {
@@ -555,7 +555,7 @@ export async function renderEmailSenders(box, ctx) {
     if (b.id === 'es-save') {
       const senders = {};
       data.plants.forEach(p => { senders[p.id] = { address: box.querySelector('[data-addr="' + p.id + '"]').value, name: box.querySelector('[data-name="' + p.id + '"]').value }; });
-      busy(box, b, async () => { await call('saveEmailSenders', { senders, repairFrom: $('#es-repair').value }); await load(); say(box, 'Saved.', 'good'); });
+      busy(box, b, async () => { await call('saveEmailSenders', { senders, fromWho: $('#es-who').value }); await load(); say(box, 'Saved.', 'good'); });
     }
   });
   await load();
