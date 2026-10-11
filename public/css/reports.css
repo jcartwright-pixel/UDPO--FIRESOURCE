@@ -60,7 +60,7 @@ tr.rp-flag td { background: #fde8e8 !important; }
 .rp-btn.primary:hover { background: var(--ud-blue-dark); }
 .rp-btn:disabled { opacity: .6; cursor: wait; }
 .sh-table { table-layout: auto; }
-.sh-table input { height: 40px; border: 2px solid #9fb3c8; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; font-weight: 700; color: var(--ud-blue-dark); }
+.sh-table input, .sh-table select { height: 40px; border: 2px solid #9fb3c8; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; font-weight: 700; color: var(--ud-blue-dark); }
 .sh-table input[data-k="name"] { width: 260px; }
 .sh-table td { height: 54px !important; }
 .sh-remove { min-width: 0; height: 38px; }
