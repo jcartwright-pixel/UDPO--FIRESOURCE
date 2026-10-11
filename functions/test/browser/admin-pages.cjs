@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Browser check of Administration's own pages (Joe 10/10: "complete this"): People & Roles with + Add Person and + Add Role
- * pop-ups, Role Templates, Access & QR Codes, App Links & Codes, Plant Station Codes, Manager Report Recipients, Sent Email
+ * pop-ups, Role Templates, Access & QR Codes, Manager Links, Plant Station Codes, Driver Station Codes, Manager Report Recipients, Sent Email
  * Log and Remaining Repair Items all open inside the panel with their buttons on one line at the top; none says "Being built"
  * or "View only". Pictures go to SHOTS_DIR.
  */
@@ -103,15 +103,22 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     assert.match(await p.textContent('.ap-reveal .ap-url'), /index\.html\?access=/);
     await shot(p, 'access-qr-1920.png');
 
+    // Joe 10/11: each link where it belongs. Manager Links keeps the manager links; the tablet links go with Plant Station
+    // Codes; the Driver Station and the drivers' phone link (with its Route Distribution code) go to Driver Station Codes.
     await open('app-links', '.ap-link');
-    assert.equal(await p.$$eval('.ap-link', l => l.length), 8);
-    await p.click('#al-new-code');
-    await p.click('#al-new-code');
-    await p.waitForSelector('.ap-code-row code');
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['company', 'phone', 'manager', 'personal']);
     await shot(p, 'app-links-1920.png');
     await shot(p, 'app-links-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
 
+    await open('driver-codes', '.ap-link');
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
+    await p.click('#al-new-code');
+    await p.click('#al-new-code');
+    await p.waitForSelector('.ap-code-row code');
+    await shot(p, 'driver-station-codes-1920.png');
+
     await open('station-codes', '#sc-list .ap-item');
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'garage']);
     await p.click('#sc-list [data-plant="fac_uniontown"]');
     await p.waitForSelector('#sc-list code');
     await shot(p, 'plant-station-codes-1920.png');
@@ -166,7 +173,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await shot(p, 'repair-items-1920.png');
     assert.ok(await noSideScroll(p));
     assert.deepEqual(p.errors, []);
-    results.push('Role Templates, Access & QR (QR drawn on screen), App Links (new Route code), Plant Station Codes, Report Recipients, Sent Email Log (Sending off and on), Email Senders (per plant) and Repair Items (header badge) all work inside the panel');
+    results.push('Role Templates, Access & QR (QR drawn on screen), Manager Links, Driver Station Codes (new Route code), Plant Station Codes (tablet links and release codes), Report Recipients, Sent Email Log (Sending off and on), Email Senders (per plant) and Repair Items (header badge) all work inside the panel');
 
     // The tablet: once Uniontown has a release code, Change Station asks for it.
     const code = (await db().collection('private').doc('releaseCodes').get()).data().fac_uniontown.code;
