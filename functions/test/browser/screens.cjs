@@ -282,7 +282,7 @@ async function noScroll(page) {
     // Vacation Schedule: Time Off, Calendar and Eligibility each fit one page; a manager adds and edits time off; the holiday limit holds.
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       const vac = await openPage(browser, w, h, '/vacations.html?testEmail=manager.test@uniteddairy.com');
-      await vac.waitForSelector('#filters option[value="all"]');
+      await vac.waitForSelector('#filters option[value="all"]', { state: 'attached' });
       await vac.selectOption('#filters', 'all');
       await vac.waitForSelector('#rows tr[data-id="vac_test_1"]');
       for (const v of ['time', 'calendar', 'eligibility']) {
@@ -295,7 +295,7 @@ async function noScroll(page) {
       await vac.close();
     }
     const vac = await openPage(browser, 1920, 950, '/vacations.html?testEmail=manager.test@uniteddairy.com');
-    await vac.waitForSelector('#filters option[value="all"]');
+    await vac.waitForSelector('#filters option[value="all"]', { state: 'attached' });
     await vac.selectOption('#filters', 'all');
     await vac.waitForSelector('#rows tr[data-id="vac_test_1"]');
     assert.match(await vac.textContent('#rows tr[data-id="vac_test_1"]'), /ADAMS, PAT.*Vacation Day.*10\/12\/2026.*10\/16\/2026.*5.*APPROVED/);
@@ -329,7 +329,7 @@ async function noScroll(page) {
     await vac.click('#save');
     await vac.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => /BROOK, SAM.*CANCELLED/.test(tr.textContent)), null, { timeout: 5000 });
     const dispatcherVac = await openPage(browser, 1366, 650, '/vacations.html?testEmail=dispatch.test@uniteddairy.com');
-    await dispatcherVac.waitForSelector('#filters option');
+    await dispatcherVac.waitForSelector('#filters option', { state: 'attached' });
     await dispatcherVac.waitForTimeout(300);
     assert.equal(await dispatcherVac.isDisabled('#add'), true, 'a dispatcher sees the schedule read only, as on the current screen');
     await Promise.all([vac.close(), dispatcherVac.close()]);
