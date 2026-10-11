@@ -168,8 +168,8 @@
         part('Temperatures', r.counts.tempsOut ? r.counts.tempsOut + ' out' : 'all in range', r.temperatures.map(t => line(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.', true);
       ['send-card', 'send'].forEach(id => { document.getElementById(id).hidden = !canSend(); });
       // Not before the loads and the journal are read, or the email would say "0 of 0 loaded".
-      const sb = document.getElementById('send');
-      if (sb.textContent !== 'Sending…') { sb.disabled = !ready(); sb.title = ready() ? '' : 'Loading the plant\'s data…'; }
+      // Both Send buttons (the card's and the pop-up's), so either works again after a send.
+      ['send-card', 'send'].forEach(id => { const sb = document.getElementById(id); if (sb.textContent !== 'Sending…') { sb.disabled = !ready(); sb.title = ready() ? '' : 'Loading the plant\'s data…'; } });
       if (!document.getElementById('modal').hidden) drawReport();
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';

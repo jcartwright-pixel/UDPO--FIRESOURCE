@@ -205,6 +205,13 @@
         const n = document.querySelector('[data-note="' + key + '"]');
         form.notes[key] = savedText();
         if (n) n.textContent = form.notes[key];
+        // A typed "Other" product shows as its own choice once saved, as when the check is opened again.
+        const sel = document.querySelector('#fields select.prod-product'), typed = fields.product;
+        if (key === 'prod-product' && sel && sel.value === OTHER && typed && sel.parentNode.querySelector('.prod-other').value.trim() === typed && document.activeElement !== sel.parentNode.querySelector('.prod-other')) {
+          const o = document.createElement('option'); o.value = o.textContent = typed;
+          sel.insertBefore(o, sel.querySelector('option[value="' + OTHER + '"]'));
+          sel.value = typed; sel.parentNode.querySelector('.prod-other').hidden = true;
+        }
       } catch (err) {
         const n = document.querySelector('[data-note="' + key + '"]');
         if (n) { n.textContent = 'Not saved'; n.classList.add('bad'); }
