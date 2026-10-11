@@ -83,6 +83,8 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
   // Administration > Refresh Rates: every minute unless an administrator chose a slower rate.
   if (!(await TOOLS.jobDue(db, 'transfer'))) return;
   await runTransfer({ db, reader: setup.reader, sources: setup.sources });
+  // Nobody pressed Publish and the calendar reached the Next week: publish it, as the current app's scheduled refresh does.
+  try { await require('./src/weekroll').autoPublish(db); } catch (e) { console.error('Automatic Publish failed: ' + (e && e.message || e)); }
 });
 
 // Sandbox only: Joe's Over the Road history (OTR Trips 2026 + the August accounting package), filled in once (src/otr-seed.js).

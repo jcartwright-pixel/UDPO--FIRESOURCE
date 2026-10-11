@@ -376,6 +376,46 @@ function fixEquipment(day, prefix, rowNumber, run, lookups, warn) {
   });
 }
 
+/*
+ * DISPATCH WEEK HISTORY (the current app's archive, 215_V7259): one row per run and day for each week that left the Live
+ * window. Those weeks are copied in as read-only weeks (Weekly opens them, the Driver Scorecard counts them). The archive has
+ * no cases or check-in columns, so those days count as worked without cases. Returns {week: {docId: run}}.
+ */
+const HISTORY_TAB = 'DISPATCH WEEK HISTORY';
+function parseHistory(values) {
+  const rows = values || [], index = headerIndex(rows[0]), weeks = {};
+  if (index.week_start === undefined || index.run_id === undefined || index.day_prefix === undefined) return weeks;
+  const get = (row, col) => (index[col] === undefined ? '' : cellText(row[index[col]]));
+  const flag = (v) => { const t = String(v || '').trim().toUpperCase(); return t === '' ? null : t === 'TRUE' || t === 'YES' || t === '1'; };
+  const blank = () => { const d = {}; M.DAY_FIELDS.forEach(([field, , kind]) => { d[field] = M.convert(kind, ''); }); return d; };
+  rows.slice(1).forEach(row => {
+    const week = L.dateKey(get(row, 'week_start')), runId = get(row, 'run_id'), p = get(row, 'day_prefix').toLowerCase();
+    if (!week || !runId || L.DAYS.indexOf(p) < 0) return;
+    const runs = weeks[L.weekStart(week)] = weeks[L.weekStart(week)] || {}, id = M.runDocId(L.weekStart(week), runId);
+    let run = runs[id];
+    if (!run) {
+      const order = L.number(get(row, 'weekly_sequence')), show = flag(get(row, 'show_weekly'));
+      run = runs[id] = { weekStart: L.weekStart(week), sourceTab: HISTORY_TAB, sheetRow: null, facilityId: get(row, 'facility_id'), streamId: get(row, 'stream_id'), routeId: get(row, 'route_id'),
+        route: get(row, 'route'), routeName: get(row, 'route_name'), runId, run: get(row, 'run'), routeRunType: '', loadType: get(row, 'loadout_type'), movementType: get(row, 'movement_type'),
+        coverageType: get(row, 'coverage_type'), coverageOwner: get(row, 'coverage_owner'), dedicatedType: '', routeStatus: get(row, 'route_status').toUpperCase(), active: null,
+        displayDaily: flag(get(row, 'show_daily')), displayWeekly: show, displayPlant: null, displayMobileRoute: null, weekOrder: order === null || order >= 999999 ? null : order,
+        weeklyShowMaster: show, masterShow: { daily: flag(get(row, 'show_daily')), mobile: null, loadType: get(row, 'loadout_type') }, days: {}, cells: {}, history: [] };
+      L.DAYS.forEach(x => { run.days[x] = blank(); });
+    }
+    const runsDay = L.yes(get(row, 'scheduled'));
+    // A run on two rows of a day: the row that runs wins.
+    if (run.days[p].runs && !runsDay) return;
+    const time = M.convert('time', get(row, 'departure_time'));
+    Object.assign(run.days[p], { runs: runsDay, loadSequence: L.number(get(row, 'load_sequence')), deliveryDate: L.dateKey(get(row, 'delivery_date')) || L.addDays(run.weekStart, L.DAYS.indexOf(p)),
+      loadDate: L.dateKey(get(row, 'load_date')) || null, loadDayOffset: L.number(get(row, 'load_day_offset')), departureDate: L.dateKey(get(row, 'departure_date')) || null,
+      dispatchTime: time, startTime: time, routeHours: L.number(get(row, 'route_hours')), miles: L.number(get(row, 'miles')), driverId: get(row, 'driver_id'), driver: get(row, 'driver'),
+      truckId: get(row, 'truck_id'), truck: get(row, 'truck'), trailerId: get(row, 'trailer_id'), trailer: get(row, 'trailer'), palletJack: get(row, 'pallet_jack'), driverNotes: get(row, 'driver_notes') });
+    run.history.push(row.map(cellText).join('|'));
+  });
+  Object.keys(weeks).forEach(w => Object.keys(weeks[w]).forEach(id => { const r = weeks[w][id]; r.fingerprint = fingerprint(r.history); delete r.history; }));
+  return weeks;
+}
+
 /* ---------- writing ---------- */
 
 async function commitInBatches(db, ops) {
@@ -513,9 +553,28 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
       publishedAt: prev.publishedAt || '', publishedBy: prev.publishedBy || '' } });
     summary.weeks[tab.weekStart] = { tab: tab.tab, rows: Object.keys(tab.runs).length, written: d.written, unchanged: d.unchanged, removed: d.removed, waitingForWriteBack: d.held };
   }
+  // 2c. Weeks the current app archived (DISPATCH WEEK HISTORY), read only. A week the app already holds from a Live tab or a
+  // Publish keeps what it has; only weeks never seen any other way are copied, and kept in step with the archive.
+  if (sources.live.weekHistory) {
+    let history = null;
+    try { history = parseHistory((await reader.batchGet(sources.live.spreadsheetId, ["'" + HISTORY_TAB + "'"]))[0]); } catch (e) { history = null; }
+    summary.history = {};
+    for (const w of Object.keys(history || {})) {
+      if (weekStarts.indexOf(w) >= 0 || Object.values(config.liveWeeks || {}).indexOf(w) >= 0) continue;
+      const weekRef = db.collection(C.weeks).doc(w), prev = (await weekRef.get()).data();
+      if (prev && prev.sourceTab !== HISTORY_TAB) continue;
+      const d = diffOps(db, C.runs, history[w], (prev && prev.rowHashes) || {}, force, { transferredAt: stamp }, revBase);
+      ops.push(...d.ops, { ref: weekRef, data: { weekStart: w, sourceTab: HISTORY_TAB, rowHashes: d.hashes, rows: Object.keys(history[w]).length, transferredAt: stamp,
+        publishedAt: (prev && prev.publishedAt) || '', publishedBy: (prev && prev.publishedBy) || '' } });
+      summary.history[w] = { rows: Object.keys(history[w]).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
+    }
+  }
   const warnings = [].concat(...Object.keys(masters).map(k => masters[k].warnings), ...Object.keys(queues).map(k => queues[k].warnings), ...tabKeys.map(k => live[k].warnings));
-  const liveWeeks = {};
+  let liveWeeks = {};
   tabKeys.forEach(k => { liveWeeks[k] = live[k].weekStart; });
+  // Weekly's Publish moved the weeks on in the new app (weekroll.js): its weeks stand until the sheet's own weeks catch up.
+  const roll = config.weekRoll;
+  if (roll && roll.current && roll.previous && roll.next && roll.current > liveWeeks.current) liveWeeks = { previous: roll.previous, current: roll.current, next: roll.next };
   const transferRef = db.collection(C.transfers).doc(stamp.replace(/[:.]/g, '-'));
   ops.push({ ref: transferRef, data: { at: stamp, force: !!force, summary, warningCount: warnings.length, warnings: warnings.slice(0, 200) } });
   await commitInBatches(db, ops);
@@ -524,4 +583,4 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   return { at: stamp, liveWeeks, summary, warnings };
 }
 
-module.exports = { parseQueue, QUEUE_KINDS, parseMaster, parseLiveTab, lookupsFrom, runTransfer, fingerprint, nameKey, MASTER_KINDS, META };
+module.exports = { parseHistory, HISTORY_TAB, parseQueue, QUEUE_KINDS, parseMaster, parseLiveTab, lookupsFrom, runTransfer, fingerprint, nameKey, MASTER_KINDS, META };
