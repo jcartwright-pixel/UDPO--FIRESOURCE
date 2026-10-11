@@ -266,6 +266,16 @@
     return out;
   }
   // The trailer left at its dispatch time (trailerHasDeparted, 7.0.276).
+  // When a load leaves, on the plant's wall clock (the current app's trailerHasDeparted, 7.0.276). The Live sheet's departure date
+  // (blank = the delivery date) is the day the route goes out; a load made on an earlier day leaves at its dispatch time on the
+  // operating day before it (an early-morning time, before 6 AM, is the next calendar morning). A Saturday loadout for Monday
+  // deliveries therefore leaves Sunday evening or early Monday, never Saturday.
+  function departWall(x) {
+    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime, load = dayNum(x.loadDate);
+    if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
+    t = Number(t);
+    return load !== null && load < departDay ? (departDay - 1) * 1440 + t + (t < 360 ? 1440 : 0) : departDay * 1440 + t;
+  }
   function yardDeparted(x, date, nowMs) {
     var departDay = dayNum(x.departureDate), opDay = dayNum(date);
     if (departDay === null) return false;
@@ -275,7 +285,7 @@
     var load = dayNum(x.loadDate), done = wallMinutes(x.completedAt), departAt;
     if (done !== null) departAt = Math.ceil((done - 360 - t) / 1440) * 1440 + t;
     // An early load (made days ahead) waits on the yard until the operating day before its departure date.
-    if (done === null || departAt < (departDay - 1) * 1440 + 360) departAt = load !== null && load < departDay ? (departDay - 1) * 1440 + t + (t < 360 ? 1440 : 0) : departDay * 1440 + t;
+    if (done === null || departAt < (departDay - 1) * 1440 + 360) departAt = departWall(x);
     return wallClock(nowMs) >= departAt;
   }
   function yardChecks(journal, date) {
@@ -556,7 +566,7 @@
     REPORT_AREAS.forEach(function (a) { areas[a] = { area: a, left: 0, total: 0 }; });
     (input.loads || []).forEach(function (r) {
       if (!areas[r.area]) return;
-      var depart = dayNum(r.loadDate), until = depart === null || r.dispatchTime === null || r.dispatchTime === undefined ? null : depart * 1440 + clockMinutes(r.dispatchTime) - now;
+      var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
       var item = { route: text(r.route), run: text(r.run), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
         startedAt: r.startedAt ? clockOf(r.startedAt) : '', priorDay: !!r.prior, loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
       areas[r.area].total++; out.total++;
@@ -679,7 +689,7 @@
   return { unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
-    YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, yardHolds: yardHolds, yardDeparted: yardDeparted,
+    YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,

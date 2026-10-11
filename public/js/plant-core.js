@@ -55,7 +55,7 @@ function rowFor(run, block, loadDate, prior) {
   return {
     id: run.id + '|' + block.prefix, runDocId: run.id, day: block.prefix, weekStart: run.weekStart, rev: run.rev || 0,
     route: run.route || '', run: run.run || '', routeId: run.routeId || '', runId: run.runId || '', area: runArea(run),
-    loadDate, deliveryDate: block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
+    loadDate, deliveryDate: block.deliveryDate, departureDate: day.departureDate || block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
     driver: day.driver || '', truck: day.truck || '', trailer: day.trailer || '', dispatchTime: day.dispatchTime,
     quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '',
     startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day)
@@ -86,11 +86,28 @@ export function nowMinutes(now) {
 }
 
 // Behind: today's load (or a prior-day load) not done 30 minutes after its depart time.
+// The moment is the route's departure (its departure date, the operating day before it for a load made earlier), not the load
+// day: a Saturday loadout for Monday is not behind on Saturday (217_V7271 / trailerHasDeparted).
 export function isBehind(row, today, now) {
   if (row.state === 'DONE') return false;
-  if (row.prior || row.loadDate < today) return true;
-  if (row.loadDate > today || row.dispatchTime === null || row.dispatchTime === undefined) return false;
-  return nowMinutes(now) > row.dispatchTime + BEHIND_MINUTES;
+  const leaves = departWall(row);
+  if (leaves === null) return false;
+  return wallNowMinutes(now) > leaves + BEHIND_MINUTES;
+}
+// Minutes since 1/1/1970 on the plant's wall clock (New York), and when a load leaves on that clock: the same rule as
+// plant-rules.js departWall (this file is also used on screens that do not load plant-rules.js).
+const dayNumber = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
+export function wallNowMinutes(now) {
+  const parts = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(now || new Date()).forEach(p => { parts[p.type] = p.value; });
+  return dayNumber(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
+}
+export function departWall(row) {
+  const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), load = dayNumber(row.loadDate), t = row.dispatchTime;
+  if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
+  const m = Number(t);
+  return load !== null && load < departDay ? (departDay - 1) * 1440 + m + (m < 360 ? 1440 : 0) : departDay * 1440 + m;
 }
 
 export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(String(p.status || '').toUpperCase()) < 0; }

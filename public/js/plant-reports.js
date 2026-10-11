@@ -38,10 +38,9 @@ export function wallNow(ms) {
     .formatToParts(new Date(ms)).forEach(p => { parts[p.type] = p.value; });
   return dayNum(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
 }
-// When the load leaves, on the wall clock: its load date plus the depart time (before 6 AM = the next morning).
+// When the load leaves, on the wall clock: the route's departure moment (plant-rules departWall), not the load day.
 export function departAt(row) {
-  const t = departMinutes(row.dispatchTime), d = dayNum(row.loadDate);
-  return t === null || d === null ? null : d * 1440 + t + (t < 360 ? 1440 : 0);
+  return U.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, dispatchTime: departMinutes(row.dispatchTime) });
 }
 export function clockText(wall) { return wall === null || wall === undefined ? '' : L.timeText(((wall % 1440) + 1440) % 1440); }
 export function minutesText(m) {
