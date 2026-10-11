@@ -123,7 +123,7 @@
       { key: 'daily', name: 'Daily Dispatch Sheet', text: 'The loadout day: route, run, driver, truck, trailer, depart time, checks, jack, notes',
         opts: [{ id: 'date', label: 'Loadout day', type: 'day', def: () => today }],
         url: (o) => 'daily.html?date=' + o.date, ready: (d) => d.querySelector('#rows tr'), print: (w) => click(w, '#print-sheet') },
-      { key: 'weekly', name: 'Weekly Dispatch', text: 'Sunday to Saturday: every run with its driver, truck and trailer',
+      { key: 'weekly', name: 'Weekly Dispatch', text: 'The Driver Assignment Board, Sunday to Saturday, on one page',
         opts: [{ id: 'week', label: 'Week starting Sunday', type: 'week', def: () => L.weekStart(today) }],
         url: (o) => 'weekly.html?week=' + o.week, ready: (d) => d.querySelector('#rows tr'), print: (w) => click(w, '#print-week') },
       { key: 'vacation', name: 'Vacation Year', text: 'One driver\'s or every driver\'s time off for the year, one page each',

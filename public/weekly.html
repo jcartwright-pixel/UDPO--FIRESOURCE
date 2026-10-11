@@ -9,6 +9,11 @@
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Weekly Dispatch · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* Joe 10/11: a run added to a driver's day outside his normal week is yellow on the Driver Assignment Board. */
+    .legend i.added { background: #ffe45c; }
+    .weekly-page .board td.b-added, .weekly-page .board tr.relief td.b-added { background: #ffe45c !important; color: #3d2f00 !important; }
+  </style>
   <script src="js/logic.js"></script>
 </head>
 <body data-view="routes" class="fill weekly-page">
@@ -51,7 +56,7 @@
       </div>
       <div class="legend" id="legend">
         <span><i class="relief"></i>Relief Driver</span><span><i class="needs"></i>Needs Driver</span>
-        <span><i class="vacation-needs"></i>Vacation &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span>
+        <span><i class="vacation-needs"></i>Vacation &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span><span><i class="added"></i>Added to Driver's Week</span>
       </div>
       <button type="button" class="override" id="override" aria-pressed="false">Override</button>
     </section>
@@ -97,6 +102,7 @@
   <div id="print" aria-hidden="true"></div>
 
   <script type="module">
+    import { printSaved } from './js/print-sheet.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
     import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
@@ -166,7 +172,7 @@
           const c = b.days[p];
           // Each run on its own line, kept whole; three or more runs get a smaller font so the day box never cuts them.
           const body = c.lines && c.lines.length ? c.lines.map(n => '<span class="run">' + escapeHtml(n) + '</span>').join('') : escapeHtml(c.text);
-          return '<td class="day b-' + c.kind + (c.extra ? ' b-extra' : '') + (c.lines && c.lines.length > 2 ? ' many' : '') + '" title="' + escapeHtml(c.text + (c.extra ? '. Changed by hand this week' : '')) + '">' + (edit ? '<button type="button" class="avail" data-date="' + c.date + '">' + body + '</button>' : body) + '</td>';
+          return '<td class="day b-' + c.kind + (c.extra ? ' b-extra' : '') + (c.added ? ' b-added' : '') + (c.lines && c.lines.length > 2 ? ' many' : '') + '" title="' + escapeHtml(c.text + (c.extra ? '. Changed by hand this week' : '') + (c.added ? '. Not in his normal week' : '')) + '">' + (edit ? '<button type="button" class="avail" data-date="' + c.date + '">' + body + '</button>' : body) + '</td>';
         }).join('') + '</tr>';
       }).join('') || '<tr><td colspan="8" class="empty">No active drivers in the Driver Master copy.</td></tr>';
 
@@ -328,11 +334,21 @@
     }
     // Print Layouts opens Weekly with #print: the week prints once its runs are on screen.
     if (location.hash === '#print') { const t = setInterval(() => { if (!rows.length) return; clearInterval(t); history.replaceState(null, '', location.pathname + location.search); document.getElementById('print-week').click(); }, 300); }
+    // Joe 10/11: the Weekly print is the Driver Assignment Board only, on one page (Print Layouts' Weekly setup), in the
+    // board's own colours; the route grid above it is not printed.
     document.getElementById('print-week').onclick = () => {
-      let html = '<h2>UNITED DAIRY &mdash; WEEKLY DISPATCH</h2><p>Week starting ' + escapeHtml(shortDate(week)) + '</p><table><thead><tr>' + headCells('<th>Route</th><th>Run</th>') + '</tr></thead><tbody>';
-      rows.forEach(r => { html += '<tr><td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td>' + L.DAYS.map(p => { const d = r.days[p]; return '<td>' + (d.runs ? escapeHtml(d.driver || 'NEEDS DRIVER') + (d.truck || d.trailer ? '<br>' + escapeHtml([d.truck, d.trailer].filter(Boolean).join(' / ')) : '') : '&mdash;') + '</td>'; }).join('') + '</tr>'; });
-      document.getElementById('print').innerHTML = html + '</tbody></table>';
-      window.print();
+      const screenTable = document.querySelector('#board-sheet table'), copy = screenTable.cloneNode(true);
+      const from = [...screenTable.querySelectorAll('th, td')], to = [...copy.querySelectorAll('th, td')];
+      to.forEach((cell, i) => {
+        const cs = getComputedStyle(from[i]);
+        cell.style.setProperty('background', cs.backgroundColor, 'important');
+        cell.style.setProperty('color', cs.color, 'important');
+        if (cs.boxShadow && cs.boxShadow !== 'none') cell.style.setProperty('box-shadow', cs.boxShadow, 'important');
+        cell.querySelectorAll('button').forEach(b => b.replaceWith(...b.childNodes));
+      });
+      copy.querySelectorAll('.run, th small').forEach(r => { r.style.display = 'block'; });
+      document.getElementById('print').innerHTML = '<h2>UNITED DAIRY &mdash; WEEKLY DISPATCH &middot; DRIVER ASSIGNMENT BOARD</h2><p>Week of Sunday ' + escapeHtml(shortDate(week)) + ' to Saturday ' + escapeHtml(shortDate(L.addDays(week, 6))) + '</p>' + copy.outerHTML;
+      printSaved('weekly');
     };
     function setTab(t) {
       // Both tables sit on one page, as on the current screen. Joe 10/10: no tab buttons; Menu > Driver Assignment Board jumps to the board.

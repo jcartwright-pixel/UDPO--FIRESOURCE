@@ -35,7 +35,7 @@ const preview = (page) => page.evaluate(() => {
 });
 // What would go to the printer: the print frame's pages, caught instead of opening the print window.
 async function printed(page, button) {
-  await page.evaluate(() => { window.__sent = null; const f = HTMLIFrameElement.prototype; if (!window.__hooked) { window.__hooked = 1; new MutationObserver(m => m.forEach(r => r.addedNodes.forEach(n => { if (n.id === 'pl-print-frame') n.contentWindow.print = () => { const d = n.contentDocument; window.__sent = { pages: d.querySelectorAll('body > .pl-paper').length, text: (d.querySelector('body > .pl-paper') || d.body).textContent, size: [...d.querySelectorAll('style')].map(s => s.textContent).join('').match(/@page\{size:([^;]+);/)[1] }; }; }))).observe(document.body, { childList: true }); } return f; });
+  await page.evaluate(() => { window.__sent = null; const f = HTMLIFrameElement.prototype; if (!window.__hooked) { window.__hooked = 1; new MutationObserver(m => m.forEach(r => r.addedNodes.forEach(n => { if (n.id === 'pl-print-frame') n.contentWindow.print = () => { const d = n.contentDocument; window.__sent = { pages: d.querySelectorAll('body > .pl-paper').length, text: (d.querySelector('body > .pl-paper') || d.body).textContent, html: d.body.innerHTML, size: [...d.querySelectorAll('style')].map(s => s.textContent).join('').match(/@page\{size:([^;]+);/)[1] }; }; }))).observe(document.body, { childList: true }); } return f; });
   await page.click(button);
   await page.waitForFunction(() => window.__sent, null, { timeout: 30000 });
   return page.evaluate(() => window.__sent);
@@ -124,6 +124,33 @@ async function printed(page, button) {
     assert.deepEqual(daily.errors, []);
     await daily.close();
     results.push('Daily Print and the edit pop-up Print: the whole sheet, one landscape page, 3 copies');
+
+    // Joe 10/11: a run added to a day outside the driver's normal week is yellow on the Driver Assignment Board, and the Weekly
+    // print is that board only, on one page, in the board's colours.
+    const wk = await openPage(browser, 1920, 1080, '/weekly.html?week=2026-10-04&testEmail=manager.test@uniteddairy.com');
+    await wk.waitForSelector('#board-rows tr:not(.relief) td.b-assigned');
+    const pickd = await wk.$eval('#board-rows tr:not(.relief) td.b-assigned', td => ({ driver: td.closest('tr').dataset.driver, col: [...td.parentNode.children].indexOf(td) }));
+    const day = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][pickd.col - 1];
+    await db().collection('drivers').doc(pickd.driver).update({ ['cells.' + day + '_assignments_json']: '[]', ['cells.' + day + '_available']: 'TRUE' });
+    await wk.reload();
+    await wk.waitForSelector('#board-rows tr[data-driver="' + pickd.driver + '"] td.b-added');
+    assert.ok(await wk.$eval('#legend', l => /Added to Driver's Week/.test(l.textContent)));
+    const yellow = await wk.$eval('#board-rows td.b-added', td => getComputedStyle(td).backgroundColor);
+    assert.equal(yellow, 'rgb(255, 228, 92)');
+    if (SHOTS) await wk.screenshot({ path: path.join(SHOTS, '5-weekly-board-added-yellow-1920.png') });
+    sent = await printed(wk, '#print-week');
+    assert.equal(sent.pages, 1, 'the board on one page');
+    assert.ok(/DRIVER ASSIGNMENT BOARD/.test(sent.text) && !/Route \/ Run/.test(sent.text), 'only the board prints');
+    assert.ok(/background: rgb\(255, 228, 92\)/.test(sent.html), 'the print keeps the yellow');
+    assert.deepEqual(wk.errors, []);
+    await wk.close();
+    const plw = await openPage(browser, 1920, 1080, '/print.html?sheet=weekly&testEmail=manager.test@uniteddairy.com');
+    await ready(plw);
+    p = await preview(plw);
+    assert.ok(p.pages === 1 && /DRIVER ASSIGNMENT BOARD/.test(p.text), 'Print Layouts shows the board on one page');
+    if (SHOTS) await plw.screenshot({ path: path.join(SHOTS, '6-print-layouts-weekly-board-1920.png') });
+    await plw.close();
+    results.push('Weekly: an added run is yellow; Print is the Driver Assignment Board only, one page, in its colours');
     console.log('Print Layouts check passed:\n - ' + results.join('\n - '));
   } finally {
     await browser.close();
