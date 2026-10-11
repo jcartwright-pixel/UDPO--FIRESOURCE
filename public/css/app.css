@@ -1360,3 +1360,25 @@ body.side-folded .sidemenu .side-toggle { align-self: center; margin: 2px 0 6px;
   body.has-side .topbar .brand { flex: 1 1 0; }
   body.has-side .topbar .hdr-nav { order: 5; flex-basis: 100%; margin: 0; }
 }
+
+/* Joe 10/11 (review item 1): Daily Dispatch on a phone. The top boxes wrap onto more lines, and the table keeps every
+   column at readable 16px text: it scrolls sideways with the Route column pinned, and a long day scrolls under a
+   sticky heading. Phones only; laptops and desk screens keep their one-line layout. */
+@media (max-width: 700px) {
+  body.daily-look .head:has(#print-sheet) { flex-wrap: wrap; row-gap: 8px; align-items: flex-end; }
+  body.daily-look .head:has(#print-sheet) .title { flex-basis: 100%; }
+  body.daily-look .head:has(#print-sheet) h1 { font-size: 24px; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head { flex-wrap: wrap; width: 100%; margin-left: 0; justify-content: flex-start; gap: 8px; }
+  body.daily-look .sheet, body.daily-look .sheet.fit-scroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  body.daily-look table.daily { min-width: 1250px; }
+  body.daily-look table.daily td, body.daily-look table.daily th { font-size: 16px !important; height: 44px; }
+  body.daily-look table.daily td.route { font-size: 18px !important; }
+  body.daily-look table.daily thead th { position: sticky; top: 0; z-index: 3; white-space: normal; line-height: 1.1; }
+  body.daily-look table.daily tbody tr:not(.group) td:first-child { position: sticky; left: 0; z-index: 1; }
+  body.daily-look table.daily thead th:first-child { left: 0; z-index: 4; }
+  body.daily-look table.daily col:first-child { width: 84px !important; }
+  body.daily-look table.daily thead th { letter-spacing: .03em; }
+  body.daily-look table.daily tbody tr.group td { overflow: visible; }
+  body.daily-look table.daily tbody tr.group td .gtext { display: inline-block; position: sticky; left: 14px; }
+  body.daily-look .footer { flex-wrap: wrap; }
+}
