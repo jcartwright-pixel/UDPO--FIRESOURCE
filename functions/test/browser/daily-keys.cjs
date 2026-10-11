@@ -167,6 +167,26 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-save-pill-failed-1920.png'), clip: { x: 0, y: 70, width: 1920, height: 300 } });
     results.push('a refused save showed "Not saved" beside the title');
 
+    // A double-click on a row (not on a cell that edits) flips RUNS / NO RUN, and back.
+    await p.dblclick(R801 + ' td:nth-child(2)');
+    await p.waitForSelector(R801 + '.off');
+    await p.dblclick(R801 + ' td:nth-child(2)');
+    await p.waitForSelector(R801 + ':not(.off)');
+    results.push('a double-click on the 801 row switched it to NO RUN, a second one back to RUNS');
+
+    // The Saturday sheet also shows Sunday's loads; Monday's block splits into LOADED SATURDAY / LOADED SUNDAY.
+    const next = (id) => db().collection('runs').doc('2026-10-11__' + id);
+    const n801 = (await next('run_t801').get()).data(), n802 = (await next('run_t802').get()).data();
+    await next('run_t801').update({ 'days.mon': Object.assign({}, n801.days.mon, { runs: true, loadDayOffset: -2 }) });
+    await next('run_t802').update({ 'days.mon': Object.assign({}, n802.days.mon, { runs: true, loadDayOffset: -1 }) });
+    const sat = await openPage(browser, 1920, 1080, '/daily.html?date=2026-10-10&testEmail=dispatch.test@uniteddairy.com');
+    await sat.waitForSelector('tr.group.loaded');
+    const bands = await sat.$$eval('#rows tr.group, #rows tr[data-id]', n => n.map(x => x.dataset.id ? x.dataset.id.split('__')[1] : x.textContent));
+    assert.deepEqual(bands.slice(bands.indexOf('MONDAY DELIVERIES, 10/12/2026')), ['MONDAY DELIVERIES, 10/12/2026', 'LOADED SATURDAY, 10/10/2026', 'run_t801|mon', 'LOADED SUNDAY, 10/11/2026', 'run_t802|mon'], bands.join(' | '));
+    if (SHOTS) await sat.screenshot({ path: path.join(SHOTS, 'daily-saturday-loaded-1920.png') });
+    assert.deepEqual(sat.errors, []);
+    results.push('Saturday 10/10: Monday deliveries show LOADED SATURDAY (801) and LOADED SUNDAY (802)');
+
     assert.deepEqual(p.errors, []);
     console.log('Daily keys:\n- ' + results.join('\n- '));
   } finally {

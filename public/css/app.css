@@ -1471,3 +1471,5 @@ table td button.warn { font-size: 15px; }
 #print .fs-report table { table-layout: auto; }
 #print .fs-report th { font-size: 11px; }
 #print .fs-report th, #print .fs-report td { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; }
+/* Route Week Override: Reset asks twice (the button turns orange and says Click Again). */
+.routeweek-page #reset.armed { background: #b45309; color: #fff; border-color: #b45309; }

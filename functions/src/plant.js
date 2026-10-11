@@ -406,6 +406,42 @@ async function saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, qu
   return result;
 }
 
+// addReturn: a return nobody noted (the current app's Plant Station "Add a return", PlantStation.html:377). The crew picks the
+// load it came back on (or Unknown), the product and the cases. It is a RETURN record like the dock's: it shows on Product
+// Returns and on that trailer, pending until RTA, and counts in the day's returns and cases.
+const UNKNOWN_ROUTE = Object.freeze({ route: 'Unknown', run: 'Route not known' });
+function validateReturn(input, SaveError) {
+  const out = { date: text(input.date), unknown: input.unknown === true, runDocId: text(input.runDocId).slice(0, 200), day: text(input.day).slice(0, 10) };
+  if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+  if (out.unknown) Object.assign(out, UNKNOWN_ROUTE, { runDocId: '', day: '' });
+  else {
+    out.route = text(input.route).slice(0, 60); out.run = text(input.run).slice(0, 120);
+    if (!out.route || !out.run) throw new SaveError('BAD_REQUEST', 'Pick the route the product came back on, or Unknown.');
+    if (out.day && L.DAYS.indexOf(out.day) < 0) throw new SaveError('BAD_REQUEST', 'day must be sun to sat');
+  }
+  out.trailer = R.trailerText(input.trailer).slice(0, 60);
+  out.product = text(input.product).slice(0, 200);
+  if (!out.product) throw new SaveError('BAD_REQUEST', 'Pick the product returned.');
+  out.sku = text(input.sku).slice(0, 40);
+  out.cases = count(input.cases, 'Cases', SaveError);
+  if (!out.cases || !Number.isInteger(out.cases)) throw new SaveError('BAD_REQUEST', 'Enter the cases returned as a whole number.');
+  return out;
+}
+
+async function saveReturn(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const runSnap = req.runDocId ? await tx.get(db.collection('runs').doc(req.runDocId)) : null;
+  const run = runSnap && runSnap.exists ? runSnap.data() : null;
+  const id = 'RETURN_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24), recordId = 'RET|' + req.date + '|' + id;
+  const payload = { route: req.route, run: req.run, routeId: (run && run.routeId) || '', runId: (run && run.runId) || '', trailer: req.trailer, casesReturned: String(req.cases),
+    product: req.product, sku: req.sku, notes: req.product, enteredAt: 'PLANT_STATION', unknownRoute: req.unknown };
+  const doc = { recordId, type: 'RETURN', date: req.date, status: 'PENDING', route: req.route, run: req.run, runId: payload.runId, runDocId: req.runDocId, day: req.day,
+    trailer: req.trailer, quantity: String(req.cases), notes: req.product, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp };
+  tx.set(db.collection('plantJournal').doc(id), doc);
+  const result = { ok: true, requestId: req.requestId, recordId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, after: payload, result });
+  return result;
+}
+
 // completeWash: a trailer was washed. Closes the wash requests picked for it (the sheet's and the app's) and records the
 // wash, which also clears the "wash after unloading" for that trailer. addWash ("+ Add Wash") is the same press for a
 // trailer typed in by hand.
@@ -838,5 +874,5 @@ async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveErro
 }
 
 module.exports = { validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
-  validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
+  validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

@@ -175,7 +175,7 @@ export function returnsFor(runs, date, journal) {
     if (String(d.type || '').toUpperCase() !== 'RETURN' || d.date !== date) return;
     const p = d.payload || {};
     out.push({ id: d.recordId, source: 'RETURN', route: txt(p.route || d.route), run: txt(p.run || d.run), trailer: txt(p.trailer || d.trailer), cases: txt(p.casesReturned || p.quantity || d.quantity),
-      refused: !!p.refusedReturned, detail: txt(p.notes || p.description || d.notes) || 'Returned product reported', recordedAt: d.recordedAt || '' });
+      refused: !!p.refusedReturned, detail: txt(p.notes || p.description || d.notes) || 'Returned product reported', recordedAt: d.recordedAt || '', added: p.enteredAt === 'PLANT_STATION' });
   });
   const prefix = L.dayPrefix(date), week = L.weekStart(date);
   (runs || []).forEach(run => {
