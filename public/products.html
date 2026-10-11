@@ -35,6 +35,7 @@
       <button type="button" id="edit-setup" data-top>Areas &amp; Groups</button>
       <button type="button" id="template" data-top>Download Template</button>
       <button type="button" id="upload" data-top>Upload</button>
+      <button type="button" id="redzone" data-top>Get from RedZone</button>
       <input type="file" id="upload-file" accept=".csv,text/csv" hidden>
       <select id="group" class="pm-pick" aria-label="Group" title="Group" data-top></select>
       <select id="area" class="pm-pick" aria-label="Area" title="Area" data-top></select>
@@ -80,9 +81,9 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, callServer } from './js/app.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, TEMPLATE, toCsv, parseCsv } from './js/products.js';
+    import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, TEMPLATE, toCsv, parseCsv, fromRedzone } from './js/products.js';
     import { savedText } from './js/autosave.js';
 
     // Joe 10/10: the products each machine runs are the product drop-down on the Quality check. Joe 10/11: products are plant by
@@ -93,7 +94,7 @@
     const params = new URLSearchParams(location.search);
     const ALL_PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
     let setup = [], products = {}, changed = {}, own = [], person = null, app = {}, plant = params.get('plant') || '', chosen = params.get('line') || '', group = '', find = '', note = '', armed = null, busy = Promise.resolve();
-    let pane = 'list', draft = null, upload = null, setupRead = false;
+    let pane = 'list', draft = null, upload = null, setupRead = false, rz = {};
     // An area being changed here shows its list as typed until the database has caught up.
     const mine = {};
     const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
@@ -129,7 +130,7 @@
       document.getElementById('add').disabled = !ck || !line || pane !== 'list';
       document.getElementById('reset').disabled = !ck || !line || !line.machine || pane !== 'list';
       document.getElementById('reset').textContent = armed === chosen ? 'Press again' : 'Starting List';
-      ['edit-setup', 'upload'].forEach(id => { document.getElementById(id).disabled = !ck || pane !== 'list'; });
+      ['edit-setup', 'upload', 'redzone'].forEach(id => { document.getElementById(id).disabled = !ck || pane !== 'list'; });
       document.getElementById('template').disabled = pane !== 'list';
       ['group', 'area', 'plant'].forEach(id => { document.getElementById(id).disabled = pane !== 'list'; });
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
@@ -274,6 +275,21 @@
       catch (err) { upload = null; showError(err.message); }
       render(true);
     });
+    // Get from RedZone (Joe 10/11): RedZone's list for this plant, shown in the upload preview; nothing is saved until Save Upload.
+    document.getElementById('redzone').addEventListener('click', async () => {
+      const b = document.getElementById('redzone');
+      if (!rz.configured) { note = 'RedZone is not connected yet. An administrator sets it up in Administration > Connections & Keys > RedZone, then presses Test Connection.'; render(true); return; }
+      b.disabled = true; b.textContent = 'Reading RedZone…'; showError('');
+      try {
+        const res = await callServer('redzone', { op: 'products', facilityId: plant });
+        const got = fromRedzone(plantName(plant), areas().map(a => ({ area: a.name, products: listOf(a.id) })), res.products || []);
+        if (!got.rows.length) throw new Error('RedZone sent no products for ' + plantName(plant));
+        upload = Object.assign(readUpload('RedZone', toCsv(got.rows)), { fromRedzone: true, rzCount: (res.products || []).length });
+        pane = 'preview';
+      } catch (err) { upload = null; showError('Could not get the products from RedZone (' + (err.message || err) + '). Nothing was changed.'); }
+      b.textContent = 'Get from RedZone';
+      render(true);
+    });
     // The file -> what it changes: {areas: [{areaId, name, products}], changes: [...], skipped, problems}.
     function readUpload(name, txt) {
       const rows = parseCsv(txt);
@@ -318,7 +334,7 @@
     }
     function drawPreview() {
       const u = upload, c = (k) => u.changes.filter(x => x.kind === k).length, newAreas = u.areas.filter(a => a.isNew).map(a => a.name);
-      document.getElementById('preview-title').textContent = 'Upload ' + u.file;
+      document.getElementById('preview-title').textContent = u.fromRedzone ? 'From RedZone (' + u.rzCount + ' products)' : 'Upload ' + u.file;
       document.getElementById('preview-stats').innerHTML = [['Added', c('add'), c('add') ? 'good' : ''], ['Changed', c('change'), c('change') ? 'warn' : ''], ['Removed', c('remove'), c('remove') ? 'bad' : ''], ['Same', c('same'), '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.getElementById('preview-note').textContent = [u.areas.length + ' area' + (u.areas.length === 1 ? '' : 's') + ' in the file; areas not in it stay as they are.',
@@ -333,7 +349,8 @@
       const sv = document.getElementById('preview-save');
       sv.disabled = !canSave() || u.problems.length > 0 || nothing;
       sv.textContent = u.problems.length ? 'Fix the file first' : nothing ? 'Nothing to change' : 'Save Upload';
-      document.getElementById('foot').textContent = 'Nothing is saved until Save Upload. Each area in the file gets the file\'s list; a product not in the file is removed from that area.';
+      document.getElementById('foot').textContent = u.fromRedzone ? 'Nothing is saved until Save Upload. RedZone\'s SKU, Type and Group replace this plant\'s for the same product name; RedZone products not on any list go in NEW PRODUCTS; nothing is removed.'
+        : 'Nothing is saved until Save Upload. Each area in the file gets the file\'s list; a product not in the file is removed from that area.';
     }
     document.getElementById('preview-cancel').addEventListener('click', () => { pane = 'list'; upload = null; note = 'Upload cancelled; nothing was changed.'; showError(''); render(true); });
     document.getElementById('preview-save').addEventListener('click', async () => {
@@ -352,6 +369,7 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(true); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(true); });
+      onSnapshot(doc(db, 'config', 'redzone'), s => { rz = s.data() || {}; }, () => {});
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupRead = true; render(true); }, fail('the machines'));
       watchProductSetup(db, s => { own = s; render(true); }, fail('the areas and groups'));
       watchProducts(db, (p, c) => {

@@ -267,7 +267,9 @@ export function evenTopButtons() {
   // Where the window is too narrow for equal buttons in one row (Weekly on a laptop), each button keeps its own width instead.
   const right = Math.min(head.getBoundingClientRect().right, document.documentElement.clientWidth) + 1;
   const tops = new Set(btns.map(b => Math.round(b.getBoundingClientRect().top)));
-  if (tops.size > 1 || btns.some(b => b.getBoundingClientRect().right > right)) head.style.removeProperty('--top-btn-w');
+  // The filters after the buttons count too: a drop-down pushed off the right edge (Products at 1536) also means own widths.
+  const row = [...head.querySelectorAll('.actions > *')].filter(el => el.getBoundingClientRect().width > 0);
+  if (tops.size > 1 || btns.concat(row).some(b => b.getBoundingClientRect().right > right)) head.style.removeProperty('--top-btn-w');
 }
 (() => {
   const head = document.querySelector('#screen .head');
@@ -291,7 +293,7 @@ const PAGE_ICON = {
   'gps.html': 'pin', 'scorecard.html': 'star',
   'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
   'garage.html': 'wrench', 'fleet.html': 'truck',
-  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
+  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'redzone.html': 'production.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };

@@ -17,6 +17,7 @@
  *   mailPlantReport       emails a plant report straight after Send Current Report saves it (reportmail.js; MAIL_FROM)
  *   mocreoEvery5Minutes   reads the MOCREO cooler sensors (read only) once a key is saved in Administration and tested
  *   mocreo                Administration > MOCREO & Sensors: save or replace the key (never shown again), test it, thermometer locations
+ *   redzone               Administration > RedZone: the RedZone API sign-in (never shown again), Test Connection; Get from RedZone on Products
  *   admin                 Administration's own pages (src/admin.js): people, role templates, links and codes, email, repairs, tools
  *   stationRelease        the Plant Station tablet's Change Station: the plant's manager release code, when one is set
  *   adminJobsEvery5Minutes  repair emails to lessors, the driver check-in mailbox and the weekly archive, each at its Refresh Rate
@@ -43,6 +44,7 @@ const { safeIdPart } = require('./src/model');
 const { runFleetSync } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
 const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
+const { redzoneCall, RedzoneError } = require('./src/redzone');
 const ADMIN = require('./src/admin');
 const { adminCall, stationRelease, AdminError } = ADMIN;
 const TOOLS = require('./src/admintools');
@@ -106,7 +108,7 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
 });
 
-const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof RedzoneError || error instanceof AdminError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
@@ -148,6 +150,12 @@ exports.gps = onCall({ timeoutSeconds: 30 }, async (request) => {
 exports.mocreo = onCall({ timeoutSeconds: 60 }, async (request) => {
   const user = signedIn(request);
   try { return await mocreoCall(db, user, request.data); } catch (error) { throw asHttps(error); }
+});
+
+// Administration > RedZone: the API sign-in (write-only) and Test Connection; Products' Get from RedZone reads the list.
+exports.redzone = onCall({ timeoutSeconds: 120 }, async (request) => {
+  const user = signedIn(request);
+  try { return await redzoneCall(db, user, request.data); } catch (error) { throw asHttps(error); }
 });
 
 // Administration (src/admin.js): Administrators only, checked inside.

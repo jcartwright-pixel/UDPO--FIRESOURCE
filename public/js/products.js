@@ -72,3 +72,20 @@ export function sizeFor(mfgType) {
 }
 
 export const OTHER = '__other__';
+
+// Joe 10/11: Get from RedZone. The plant's lists as they are, with RedZone's SKU, Type and Group for each product RedZone has by
+// the same name, and RedZone's other products in a NEW PRODUCTS area to move where they belong. Nothing is removed. The rows go
+// through the same preview as an uploaded template. lists: [{area, products}] in area order; rz: [{name, sku, mfgType, productGroup}].
+export const NEW_AREA = 'NEW PRODUCTS';
+export function fromRedzone(plantName, lists, rz) {
+  const key = (n) => String(n || '').trim().toUpperCase(), by = {}, used = {}, rows = [];
+  (rz || []).forEach(p => { if (key(p.name) && !by[key(p.name)]) by[key(p.name)] = p; });
+  (lists || []).forEach(a => (a.products || []).forEach(p => {
+    const r = by[key(p.name)];
+    used[key(p.name)] = true;
+    rows.push([plantName, a.area, p.name, (r && r.sku) || p.sku || '', (r && r.mfgType) || p.mfgType || '', (r && r.productGroup) || p.productGroup || '']);
+  }));
+  let added = 0;
+  Object.keys(by).forEach(k => { if (used[k]) return; const r = by[k]; added++; rows.push([plantName, NEW_AREA, r.name, r.sku || '', r.mfgType || '', r.productGroup || '']); });
+  return { rows, added };
+}
