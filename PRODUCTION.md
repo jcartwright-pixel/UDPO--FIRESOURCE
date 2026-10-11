@@ -28,7 +28,7 @@ Writing back to the real sheets is a later step: it needs a code change and Joe'
 |---|---|---|---|
 | 1 | Create the Firebase project. Suggested ID `ud-distribution` (if taken, `ud-distribution-prod`); its screens will be at `https://<ID>.web.app` | Joe or his tech | console.firebase.google.com > Add project (Google Analytics off) |
 | 2 | Put it on the Blaze plan with Joe's existing billing account; add a $50 a month budget alert at 50 / 90 / 100% | Joe | Firebase > Usage and billing; Google Cloud > Billing > Budgets |
-| 3 | Firestore database `(default)`, location **us-east4**, production mode | Joe's tech | Firebase > Firestore Database > Create |
+| 3 | Firestore database `(default)`, location **nam5 (United States)**, production mode (the same as the sandbox; the server still runs in us-east4) | Joe's tech | Firebase > Firestore Database > Create |
 | 4 | Register a Web app (any nickname, no Hosting tick) | Joe's tech | Firebase > Project settings > Your apps > Web |
 | 5 | Turn on Google sign-in | Joe's tech | Firebase > Authentication > Sign-in method > Google |
 | 6 | Make the deploy account `github-deploy` with only the roles in the README table (not Owner), and a JSON key | Joe's tech | Google Cloud > IAM > Service accounts |

@@ -158,7 +158,7 @@ release words for the new app; what production needs, who makes it and the safet
 `[deploy sandbox]` deploys to the sandbox. The sandbox is https://ud-distribution-sandbox.web.app. It shows the made-up
 sheets (`DEMO_DATA=1`, Joe as administrator) until `sandbox-sources.json` names its sheet copies, and the copy never
 reads the real sheets unless `READ_UNIONTOWN_SHEETS=1` is set. One-time setup in the Firebase console: Firestore
-database `(default)` in us-east4, a registered Web app (Project settings > Your apps), and Google sign-in enabled.
+database `(default)` in nam5 (United States), a registered Web app (Project settings > Your apps), and Google sign-in enabled.
 
 **Deploy keys.** `FIREBASE_SERVICE_ACCOUNT_SANDBOX` is the key of the `github-deploy` service account in the
 **ud-distribution-sandbox** project only, and must never be reused for production. Production gets its own account in
