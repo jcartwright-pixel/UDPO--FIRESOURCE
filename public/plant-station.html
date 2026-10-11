@@ -78,7 +78,11 @@
     const KEY = 'udPlantStation';
     const read = () => { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } };
     const write = (v) => { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* private window: not remembered */ } };
-    let stationId = new URLSearchParams(location.search).get('station') || read(), runs = [];
+    // A link with ?station= sets up a new tablet only. Once the tablet has a station, changing it goes through Change Station
+    // (and the manager release code, when the plant has one), as on the current app.
+    const asked = new URLSearchParams(location.search).get('station') || '';
+    let stationId = read() || (STATIONS.some(s => s.id === asked) ? asked : ''), runs = [];
+    if (stationId && !read()) write(stationId);
 
     function render() {
       const st = STATIONS.find(s => s.id === stationId);
@@ -115,7 +119,12 @@
     const releaseBox = document.getElementById('release'), releaseMsg = document.getElementById('release-msg');
     document.getElementById('change').addEventListener('click', async () => {
       let required = false;
-      try { required = (await callServer('stationRelease', { op: 'status', facilityId: 'fac_uniontown' })).required; } catch (err) { /* no answer: as before, no code */ }
+      try { required = (await callServer('stationRelease', { op: 'status', facilityId: 'fac_uniontown' })).required; } catch (err) {
+        // No answer: the station stays as it is (a code may be needed), so a dropped network cannot get past the code.
+        showError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and press Change Station again.');
+        return;
+      }
+      showError('');
       if (!required) { leave(); return; }
       releaseBox.hidden = false; releaseMsg.textContent = ''; document.getElementById('release-code').value = ''; document.getElementById('release-code').focus();
     });
