@@ -98,10 +98,11 @@
     <h2 id="down-title">Down Trucks / Trailers</h2>
     <div class="down-add">
       <label>Truck / Trailer<input id="down-unit" list="down-units" maxlength="20" autocomplete="off" placeholder="Unit #"></label>
-      <label>Reason<input id="down-reason" maxlength="120" placeholder="Why is it down?"></label>
+      <label>Reason (optional)<input id="down-reason" maxlength="120" placeholder="Why is it down?"></label>
       <button type="button" class="warn" id="down-add">Add</button>
     </div>
     <datalist id="down-units"></datalist>
+    <div class="down-msg" id="down-message" role="status" hidden></div>
     <div class="down-list"><table><thead><tr><th>Unit</th><th>Type</th><th>Reason</th><th>Since</th><th></th></tr></thead><tbody id="down-rows"></tbody></table></div>
     <div class="modal-actions"><button type="button" data-close>Close</button></div>
   </section>
@@ -365,7 +366,24 @@
 
     /* ---------- Down Trucks / Trailers ---------- */
     const allUnits = () => lists.fleetTrucks.concat(lists.fleetTrailers);
-    const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:\s*/i, '');
+    const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:?\s*/i, '');
+    // Like the current app: a short number finds the unit (893 finds 223893, 956 finds T-956) when only one unit ends with it.
+    const alnum = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    function findUnit(typed) {
+      const all = allUnits(), t = alnum(typed);
+      const exact = all.filter(e => String(e.unit).toUpperCase() === typed);
+      if (exact.length) return { unit: exact[0] };
+      const same = all.filter(e => alnum(e.unit) === t);
+      if (same.length === 1) return { unit: same[0] };
+      if (t.length < 2) return {};
+      const ends = all.filter(e => alnum(e.unit).length > t.length && alnum(e.unit).slice(-t.length) === t);
+      return ends.length === 1 ? { unit: ends[0] } : { many: ends.length > 1 ? ends.concat(same) : same };
+    }
+    function downMessage(text) {
+      const box = document.getElementById('down-message');
+      box.textContent = text || '';
+      box.hidden = !text;
+    }
     function paintDown() {
       const down = allUnits().filter(e => L.unitOff(e));
       document.getElementById('down-rows').innerHTML = down.map(e => '<tr><td><b>' + escapeHtml(e.unit) + '</b></td><td><span class="tag">' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</span></td>' +
@@ -379,17 +397,27 @@
         saveOptimistic('setUnitUp', { equipmentId: unit.id }, () => { unit.status = 'ACTIVE'; unit.notes = ''; }, () => Object.assign(unit, before), render);
       }; });
     }
-    document.getElementById('open-down').onclick = () => { openModal('down-panel'); paintDown(); document.getElementById('down-unit').focus(); };
-    document.getElementById('down-add').onclick = () => {
+    document.getElementById('open-down').onclick = () => { downMessage(''); openModal('down-panel'); paintDown(); document.getElementById('down-unit').focus(); };
+    document.getElementById('down-add').onclick = async () => {
       const typed = document.getElementById('down-unit').value.trim().toUpperCase(), reason = document.getElementById('down-reason').value.trim();
-      const unit = allUnits().find(e => String(e.unit).toUpperCase() === typed) || allUnits().find(e => String(e.unit).toUpperCase() === 'T-' + typed);
-      if (!unit) { showError(typed ? typed + ' is not in Equipment Master.' : 'Type the truck or trailer number.'); return; }
-      if (!reason) { showError('Say why ' + unit.unit + ' is down.'); return; }
+      const found = typed ? findUnit(typed) : {}, unit = found.unit;
+      if (!typed) { downMessage('Type the truck or trailer number.'); return; }
+      if (!unit) {
+        downMessage(found.many && found.many.length ? typed + ' matches ' + found.many.map(e => e.unit).join(', ') + '. Type more of the number.' : typed + ' is not in Equipment Master.');
+        return;
+      }
+      if (L.unitOff(unit)) { downMessage(unit.unit + ' is already on the list.'); return; }
+      downMessage('');
       document.getElementById('down-unit').value = '';
       document.getElementById('down-reason').value = '';
-      const before = { status: unit.status, notes: unit.notes, downSince: unit.downSince };
-      saveOptimistic('setUnitDown', { equipmentId: unit.id, reason, today: L.operatingDay(new Date()) },
-        () => Object.assign(unit, { status: 'DOWN', notes: 'DOWN: ' + reason, downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
+      const before = { status: unit.status, notes: unit.notes, downSince: unit.downSince }, word = (unit.type === 'TRAILER' ? 'Trailer ' : 'Truck ') + unit.unit;
+      const out = await saveOptimistic('setUnitDown', { equipmentId: unit.id, reason, today: L.operatingDay(new Date()) },
+        () => Object.assign(unit, { status: 'DOWN', notes: reason ? 'DOWN: ' + reason : 'DOWN', downSince: new Date().toISOString() }), () => Object.assign(unit, before), render);
+      if (!out) return;
+      // Like the current app: say which routes lost the unit, so the dispatcher knows what needs another one.
+      const taken = out.taken || [];
+      downMessage(taken.length ? word + ' is down. It was taken off ' + taken.map(t => 'Route ' + t.route + ' (' + L.dayName(t.date).slice(0, 3) + ' ' + shortDate(t.date) + ')').join(', ') + '.'
+        : word + ' is down. It was not on any load today or later.');
     };
 
     /* ---------- Print: the same columns as the current dispatch sheet, with Print Layouts' saved setup (one landscape page, 3 copies) ---------- */
