@@ -57,7 +57,7 @@ function rowFor(run, block, loadDate, prior) {
     route: run.route || '', run: run.run || '', routeId: run.routeId || '', runId: run.runId || '', area: runArea(run),
     loadDate, deliveryDate: block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
     driver: day.driver || '', truck: day.truck || '', trailer: day.trailer || '', dispatchTime: day.dispatchTime,
-    quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '',
+    quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '',
     startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day)
   };
 }
@@ -99,6 +99,23 @@ export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].index
 export function pickupsFor(row, pickups) {
   return (pickups || []).filter(p => (p.runDocId ? p.runDocId === row.runDocId && (!p.day || p.day === row.day) : String(p.runId) === String(row.runId)) &&
     (p.date === row.loadDate || p.date === row.deliveryDate));
+}
+
+// Pickups plus the open pickups that load notes ask for ("pickup", "P/U", "PU"): a load whose note asks for a pickup and that has
+// no pickup entered gets one listed, red like the others, until it is completed (board-rules.js notePickup, as the old app's
+// 019_V722 udpoV7268NotePickupRows_). rows = loadoutRows; pages that use it load js/board-rules.js.
+export function withNotePickups(rows, pickups) {
+  const B = typeof window !== 'undefined' && window.UDBoard;
+  if (!B) return pickups || [];
+  const out = (pickups || []).slice(), seen = {};
+  (rows || []).forEach(r => {
+    if (seen[r.id + '|' + r.loadDate]) return;
+    seen[r.id + '|' + r.loadDate] = true;
+    const note = B.notePickup({ id: r.runDocId, runId: r.runId, route: r.route, run: r.run, days: { [r.day]: { plantNotes: r.notes, updatedAt: r.updatedAt, updatedBy: r.updatedBy } } },
+      r.day, r.loadDate, pickupsFor(r, pickups));
+    if (note) out.push(Object.assign(note, { deliveryDate: r.deliveryDate }));
+  });
+  return out;
 }
 
 export function counts(rows) {
