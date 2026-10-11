@@ -999,20 +999,23 @@ async function saveProductUpload(tx, db, req, email, stamp, logRef, mode, SaveEr
 
 // savePlantShifts (Joe 10/10): a plant's shifts, Administration > Plant Shifts. Plant Reports count each load for the shift it
 // started loading in. Uniontown starts with 6:00 AM-2:30 PM, 2:00 PM-10:30 PM and 10:00 PM-5:30 AM (public/js/plant-reports.js).
-const SHIFT_LIMIT = 6;
+// Joe 10/11: each shift is on the Distribution side or the Plant Production side (a shift with no side is Distribution).
+const SHIFT_LIMIT = 12, SHIFT_SIDES = ['DISTRIBUTION', 'PRODUCTION'];
 function validatePlantShifts(input, SaveError) {
   const facilityId = text(input.facilityId);
   if (!/^fac_[a-z0-9_]+$/.test(facilityId)) throw new SaveError('BAD_REQUEST', 'Pick a plant.');
   if (!Array.isArray(input.shifts) || !input.shifts.length || input.shifts.length > SHIFT_LIMIT) throw new SaveError('BAD_REQUEST', 'A plant needs 1 to ' + SHIFT_LIMIT + ' shifts.');
   const seen = {}, shifts = input.shifts.map(x => {
-    const s = x && typeof x === 'object' ? x : {}, name = text(s.name).slice(0, 40), start = text(s.start), end = text(s.end);
+    const s = x && typeof x === 'object' ? x : {}, name = text(s.name).slice(0, 40), start = text(s.start), end = text(s.end), side = text(s.side).toUpperCase() || 'DISTRIBUTION';
     if (!name) throw new SaveError('BAD_REQUEST', 'Every shift needs a name.');
-    if (seen[name.toUpperCase()]) throw new SaveError('BAD_REQUEST', name + ' is on the list twice.');
-    seen[name.toUpperCase()] = true;
+    if (SHIFT_SIDES.indexOf(side) < 0) throw new SaveError('BAD_REQUEST', name + ': pick Distribution or Plant Production.');
+    const key = side + '|' + name.toUpperCase();
+    if (seen[key]) throw new SaveError('BAD_REQUEST', name + ' is on the list twice (' + (side === 'PRODUCTION' ? 'Plant Production' : 'Distribution') + ').');
+    seen[key] = true;
     const ok = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
     if (!ok(start) || !ok(end)) throw new SaveError('BAD_REQUEST', name + ': enter the start and end times.');
     if (start === end) throw new SaveError('BAD_REQUEST', name + ': the start and end cannot be the same time.');
-    return { name, start, end };
+    return { name, start, end, side };
   });
   return { facilityId, shifts };
 }

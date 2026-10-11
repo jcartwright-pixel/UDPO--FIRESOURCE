@@ -30,7 +30,7 @@ export const ADMIN_GROUPS = [
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
     ['machine-products', 'Products', "Each plant's products by area and group: the Product drop-down on Quality Checks. Add or change a product, or load the whole list from the template.", 'products.html', 'production.webp'],
-    ['plant-shifts', 'Plant Shifts', 'Each plant\'s shifts (Uniontown: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week']
+    ['plant-shifts', 'Plant Shifts', 'Each plant\'s Distribution and Plant Production shifts (Uniontown distribution: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week']
   ]],
   // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.
   ['Connections & Keys', 'The API keys the app uses: paste, replace and test them here', [

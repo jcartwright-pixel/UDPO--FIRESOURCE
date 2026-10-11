@@ -24,10 +24,19 @@ test('A manager saves Uniontown\'s three shifts and the change is logged', async
   const done = await act(MANAGER, { facilityId: 'fac_uniontown', shifts: UNIONTOWN });
   assert.equal(done.count, 3);
   const saved = (await db().collection('plantShifts').doc('fac_uniontown').get()).data();
-  assert.deepEqual(saved.shifts, UNIONTOWN);
+  // Joe 10/11: a shift sent with no side is a Distribution shift.
+  assert.deepEqual(saved.shifts, UNIONTOWN.map(x => Object.assign({}, x, { side: 'DISTRIBUTION' })));
   assert.equal(saved.updatedBy, MANAGER);
   const log = (await db().collection('actions').where('action', '==', 'savePlantShifts').get()).docs.map(d => d.data());
   assert.equal(log.length, 1);
+});
+
+test('Joe 10/11: a plant keeps Distribution and Plant Production shifts; the same name may be on both sides', async () => {
+  const both = UNIONTOWN.map(x => Object.assign({}, x, { side: 'DISTRIBUTION' })).concat([{ name: 'First Shift', start: '07:00', end: '15:30', side: 'PRODUCTION' }]);
+  const done = await act(MANAGER, { facilityId: 'fac_uniontown', shifts: both });
+  assert.equal(done.count, 4);
+  assert.deepEqual((await db().collection('plantShifts').doc('fac_uniontown').get()).data().shifts, both);
+  await assert.rejects(act(MANAGER, { facilityId: 'fac_uniontown', shifts: [Object.assign({}, UNIONTOWN[0], { side: 'NIGHTS' })] }), /Distribution or Plant Production/);
 });
 
 test('Refused: a dispatcher, no name, a missing time, a name twice, no plant', async () => {
