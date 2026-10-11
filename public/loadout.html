@@ -149,7 +149,7 @@
       document.getElementById('title').textContent = info.title;
       document.title = info.title + ' · New Plant Operations';
       document.getElementById('load-date').value = date;
-      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + (date === today() ? '' : '  ·  ' + shortDate(date));
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       document.getElementById('hstats').innerHTML = [['Runs', c.total, ''], ['Loaded', c.done, 'good'], ['Loading', c.loading, 'warn']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.getElementById('areas').innerHTML = P.AREAS.map(a => {

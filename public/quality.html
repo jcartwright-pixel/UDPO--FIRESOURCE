@@ -55,7 +55,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
     import { watchProducts, sizeFor, OTHER } from './js/products.js';
@@ -70,7 +70,7 @@
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
     const RESULT = { RUNNING: 'Pass', REVIEW: 'Review', DOWN: 'Fail', FINISHED: 'Finished', CHANGEOVER: 'Changeover' };
     const CHECK = { PASS: 'Pass', REVIEW: 'Review', FAIL: 'Fail' };
-    const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
+    const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
     const opt = (value, current, label) => '<option value="' + value + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + label + '</option>';
     // Joe 10/10: the drop-downs start blank, so nothing passes without a real check.

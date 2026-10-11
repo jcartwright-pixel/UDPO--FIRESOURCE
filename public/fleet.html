@@ -86,7 +86,7 @@
     // then Miles / hours now and Status;
     // units that need something first. Every figure the old list showed (due at, now, left, last done) is in the box or its tip.
     const RANK = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
-    const md = (k) => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(k || '')); return m ? Number(m[2]) + '/' + Number(m[3]) + '/' + m[1].slice(2) : ''; };
+    const md = (k) => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(k || '')); return m ? Number(m[2]) + '-' + Number(m[3]) + '-' + m[1].slice(2) : ''; };
     function boxText(i) {
       if (!i) return { big: '—', small: 'Not tracked', s: 'NA' };
       const days = typeof i.left === 'string' ? parseInt(i.left, 10) : null;

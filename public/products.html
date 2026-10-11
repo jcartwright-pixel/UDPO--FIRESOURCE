@@ -52,7 +52,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchProducts, startingList } from './js/products.js';
     import { savedText } from './js/autosave.js';
@@ -69,7 +69,7 @@
     const machines = () => U.qualityLines(setup, [], [], Date.now());
     const listOf = (id) => mine[id] || products[id] || [];
     function current() { const all = machines(); return all.find(l => l.operationId === chosen) || all[0] || null; }
-    const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
+    const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
 
     function render(force) {
       const all = machines(), line = current(), ck = canSave();

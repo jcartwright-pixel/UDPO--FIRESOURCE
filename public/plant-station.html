@@ -54,7 +54,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError, goBack, callServer } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -97,7 +97,7 @@
         return;
       }
       const date = L.operatingDay(new Date());
-      document.getElementById('pill').textContent = 'Uniontown · ' + new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      document.getElementById('pill').textContent = 'Uniontown · ' + shortDate(date);
       const loads = P.loadoutRows(runs, date).filter(r => r.area === st.area), left = loads.filter(r => r.state !== 'DONE').length;
       document.getElementById('tabs').innerHTML = st.views.map(v => {
         const x = VIEWS[v], pic = typeof x.pic === 'string' ? x.pic : x.pic[st.area];

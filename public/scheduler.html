@@ -57,7 +57,7 @@
   <section class="modal wide-modal sc-modal" id="modal" role="dialog" aria-labelledby="modal-title" hidden></section>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot, getDocs } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -90,15 +90,15 @@
       const d = at(monthStart(date)); d.setMonth(d.getMonth() + dir, 1);
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
     }
-    const md = (key) => { const p = String(key || '').split('-'); return p.length === 3 ? Number(p[1]) + '/' + Number(p[2]) : String(key || ''); };
+    const md = (key) => { const p = String(key || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) : String(key || ''); };
     function rangeTitle() {
       const r = range();
       if (view === 'history') return 'Receiving History';
       if (view === 'month') return at(date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      if (view === 'week') { const s = at(r.start), e = at(r.end); return s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' – ' + (s.getMonth() === e.getMonth() ? e.getDate() + ', ' + e.getFullYear() : e.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })); }
-      return at(date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      if (view === 'week') return shortDate(r.start) + ' – ' + shortDate(r.end);
+      return L.dayName(date) + ' ' + shortDate(date);
     }
-    const longDay = (key) => at(key).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric', year: 'numeric' });
+    const longDay = (key) => L.dayName(key) + ' ' + shortDate(key);
     // 06:00 shows as 6:00 AM.
     function clock(t) { const m = /^(\d{2}):(\d{2})$/.exec(t || ''); if (!m) return t || ''; const h = Number(m[1]); return (h % 12 || 12) + ':' + m[2] + (h < 12 ? ' AM' : ' PM'); }
 
@@ -246,7 +246,7 @@
         '<div class="modal-actions"><button type="button" data-close>Close</button>' + (ck ? '<button type="button" class="primary" data-new="' + key + '">＋ Add a ' + (lane === 'RECEIVING' ? 'Load' : 'Route') + '</button>' : '') + '</div>');
     }
 
-    function dialogTitle(id, key) { const d = at(key); return (id ? 'Edit' : 'Add') + ' Load · ' + (isNaN(d) ? key : d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + '/' + d.getFullYear()); }
+    function dialogTitle(id, key) { const d = at(key); return (id ? 'Edit' : 'Add') + ' Load · ' + (isNaN(d) ? key : d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + shortDate(key)); }
     // Add / Edit Load, as the current app's (Route / Run or Supplier, type, load and delivery dates, pickup time, trailer, PO, cases, product, notes).
     function openLoad(key, id, pick) {
       openDay = null;

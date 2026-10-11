@@ -71,7 +71,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError, friendlyError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, friendlyError } from './js/app.js';
     import { watchLists, lists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
     forScreen('drivers');
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
@@ -81,7 +81,7 @@
     let drivers = [], rows = [], editingId = null, panelOpen = false, typing = null, loaded = false;
     const canEdit = () => canManage();
     const truckUnit = (id) => { const t = lists.trucks.find(e => e.id === id); return t ? t.unit : ''; };
-    const us = (key) => { if (!key) return ''; const [y, m, d] = key.split('-'); return m + '/' + d + '/' + y; };
+    const us = (key) => key ? shortDate(key) : '';
     function years(key) {
       if (!key) return '-';
       const [y, m, d] = key.split('-').map(Number), [ty, tm, td] = today.split('-').map(Number);

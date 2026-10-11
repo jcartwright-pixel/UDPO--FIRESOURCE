@@ -637,9 +637,27 @@ export function escapeHtml(value) {
   return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-export function shortDate(key) {
-  const [y, m, d] = key.split('-').map(Number);
-  return m + '/' + d + '/' + y;
+// Joe 10/11 (polish 6): one short date everywhere, like 10-8-26 (month-day-two-digit year, no leading zeros, no time).
+// Takes a day key (2026-10-08), a time (ISO text, a number or a Date, read in plant time) or a sheet date (10/08/2026).
+export function shortDay(v) {
+  if (v == null || v === '') return '';
+  let m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(v));
+  if (m) return Number(m[2]) + '-' + Number(m[3]) + '-' + m[1].slice(2);
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(String(v).trim());
+  if (m) return Number(m[1]) + '-' + Number(m[2]) + '-' + m[3].slice(-2);
+  const t = v instanceof Date ? v : new Date(typeof v === 'number' ? v : String(v));
+  if (isNaN(t)) return String(v);
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: '2-digit', month: 'numeric', day: 'numeric' }).formatToParts(t);
+  const g = (k) => (p.find(x => x.type === k) || {}).value;
+  return g('month') + '-' + g('day') + '-' + g('year');
+}
+export function shortDate(key) { return shortDay(key); }
+// A date with its time, like 10-8-26 1:20 PM, for stamps where the time matters (when a check or a change was made).
+export function dateTimeText(v) { const d = shortDay(v instanceof Date || typeof v === 'number' ? v : new Date(v)), t = shortTime(v); return t ? d + ' ' + t : d; }
+// The time alone, like 1:20 PM, in plant time.
+export function shortTime(v) {
+  const t = v instanceof Date ? v : new Date(v);
+  return isNaN(t) ? '' : t.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 }
 
 // Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets a little smaller print, so names and values are

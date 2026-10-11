@@ -66,8 +66,8 @@
     if (params.get('weeks') && weeksBox.querySelector('option[value="' + params.get('weeks') + '"]')) weeksBox.value = params.get('weeks');
     let db = null, ask = 0, shifts = R.shiftsFor(null), days = [];
     const cache = { runs: {}, pickups: {}, journal: {} };
-    const fmt = (k) => { const p = k.split('-'); return Number(p[1]) + '/' + Number(p[2]); };
-    const fmtY = (k) => { const p = k.split('-'); return Number(p[1]) + '/' + Number(p[2]) + '/' + p[0]; };
+    const fmt = (k) => { const p = k.split('-'); return Number(p[1]) + '-' + Number(p[2]); };
+    const fmtY = (k) => { const p = k.split('-'); return Number(p[1]) + '-' + Number(p[2]) + '-' + p[0].slice(2); };
     const nice = (name) => String(name).charAt(0) + String(name).slice(1).toLowerCase();
     const pctClass = (p) => p === null || p === undefined ? '' : p >= 90 ? 'good' : p >= 80 ? 'warn' : 'bad';
     const n = (v) => v === null || v === undefined ? '—' : String(v);
