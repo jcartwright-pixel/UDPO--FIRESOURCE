@@ -104,7 +104,7 @@
       document.getElementById('cards').innerHTML = issueCard(KINDS[0], 0) + issueCard(KINDS[1], 1) + issueCard(KINDS[2], 2) + garage;
       const type = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };
       const latest = KINDS.flatMap(([k], i) => lists[i].map(r => Object.assign({ kind: k }, r))).sort((a, b) => b.openedMs - a.openedMs).slice(0, 11);
-      document.getElementById('latest').innerHTML = latest.map(r => '<tr data-open="issues.html?kind=' + r.kind + '"><td class="strong">' + escapeHtml(r.unit || '?') + '</td><td>' + type[r.kind] + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + escapeHtml(r.text) + '</td><td>' + dateText(r.reported) + '</td></tr>').join('') ||
+      document.getElementById('latest').innerHTML = latest.map(r => '<tr data-open="issues.html?kind=' + r.kind + (r.unit ? '&q=' + encodeURIComponent(r.unit) : '') + '"><td class="strong">' + escapeHtml(r.unit || '?') + '</td><td>' + type[r.kind] + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + escapeHtml(r.text) + '</td><td>' + dateText(r.reported) + '</td></tr>').join('') ||
         '<tr><td colspan="4" class="empty">No open write-ups.</td></tr>';
     }
 
