@@ -35,7 +35,7 @@ const preview = (page) => page.evaluate(() => {
 });
 // What would go to the printer: the print frame's pages, caught instead of opening the print window.
 async function printed(page, button) {
-  await page.evaluate(() => { window.__sent = null; const f = HTMLIFrameElement.prototype; if (!window.__hooked) { window.__hooked = 1; new MutationObserver(m => m.forEach(r => r.addedNodes.forEach(n => { if (n.id === 'pl-print-frame') n.contentWindow.print = () => { const d = n.contentDocument; window.__sent = { pages: d.querySelectorAll('body > .pl-paper').length, size: [...d.querySelectorAll('style')].map(s => s.textContent).join('').match(/@page\{size:([^;]+);/)[1] }; }; }))).observe(document.body, { childList: true }); } return f; });
+  await page.evaluate(() => { window.__sent = null; const f = HTMLIFrameElement.prototype; if (!window.__hooked) { window.__hooked = 1; new MutationObserver(m => m.forEach(r => r.addedNodes.forEach(n => { if (n.id === 'pl-print-frame') n.contentWindow.print = () => { const d = n.contentDocument; window.__sent = { pages: d.querySelectorAll('body > .pl-paper').length, text: (d.querySelector('body > .pl-paper') || d.body).textContent, size: [...d.querySelectorAll('style')].map(s => s.textContent).join('').match(/@page\{size:([^;]+);/)[1] }; }; }))).observe(document.body, { childList: true }); } return f; });
   await page.click(button);
   await page.waitForFunction(() => window.__sent, null, { timeout: 30000 });
   return page.evaluate(() => window.__sent);
@@ -61,7 +61,10 @@ async function printed(page, button) {
       await page.screenshot({ path: path.join(SHOTS, '1-print-layouts-daily-1920.png') });
       await page.screenshot({ path: path.join(SHOTS, '2-print-layouts-top-zoom-2x.png'), clip: { x: 0, y: 0, width: 960, height: 540 } });
     }
-    results.push('Daily Dispatch Sheet shows first, as landscape paper, only the dispatch sheet; fits 1920x1080');
+    // The current app's Daily print: one landscape page, 3 copies.
+    assert.equal(await page.$eval('#one-page', e => e.checked), true, 'Daily fits on one page by default');
+    assert.equal(await page.$eval('#copies', e => e.value), '3', 'Daily prints 3 copies by default');
+    results.push('Daily Dispatch Sheet shows first, as landscape paper, only the dispatch sheet; one page, 3 copies; fits 1920x1080');
 
     // Portrait turns the paper; the sheet's own choice (loadout day) re-reads the sheet.
     await page.click('#orient [data-v="portrait"]');
@@ -107,6 +110,20 @@ async function printed(page, button) {
     results.push('Weekly prints ' + sent.pages + ' page(s)');
     assert.deepEqual(page.errors, []);
     await page.close();
+
+    // Daily's own Print and the edit pop-up's Print send the whole sheet on one landscape page, 3 copies (a fresh computer).
+    const daily = await openPage(browser, 1920, 1080, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await daily.waitForSelector('#rows tr[data-id]');
+    sent = await printed(daily, '#print-sheet');
+    assert.deepEqual([sent.pages, sent.size], [3, '11in 8.5in'], 'Daily Print: one landscape page, 3 copies: ' + JSON.stringify(sent));
+    await daily.click('#rows tr[data-id] [data-open]');
+    await daily.waitForSelector('#edit-modal [data-print-one]');
+    sent = await printed(daily, '#edit-modal [data-print-one]');
+    assert.equal(sent.pages, 3);
+    assert.ok(/801[\s\S]*802/.test(sent.text), 'the pop-up prints the whole sheet, not one run');
+    assert.deepEqual(daily.errors, []);
+    await daily.close();
+    results.push('Daily Print and the edit pop-up Print: the whole sheet, one landscape page, 3 copies');
     console.log('Print Layouts check passed:\n - ' + results.join('\n - '));
   } finally {
     await browser.close();
