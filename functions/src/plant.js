@@ -851,17 +851,34 @@ async function sendReport(tx, db, req, email, stamp, logRef, mode, SaveError) {
   return result;
 }
 
-/* ---------- Machine Products ---------- */
+/* ---------- Products ---------- */
 
-// saveMachineProducts (Joe 10/10): the products one machine runs, the drop-down on the Quality check. It replaces that
-// machine's starting list (RedZone, public/data/plant-products.json), so a new SKU goes in without a code change.
-const PRODUCT_LIMIT = 400;
-function validateMachineProducts(input, SaveError) {
-  const operationId = text(input.operationId).slice(0, 120);
-  if (!/^[A-Za-z0-9_-]+$/.test(operationId)) throw new SaveError('BAD_REQUEST', 'Pick a machine.');
-  if (!Array.isArray(input.products) || input.products.length > PRODUCT_LIMIT) throw new SaveError('BAD_REQUEST', 'A machine holds up to ' + PRODUCT_LIMIT + ' products.');
+// Products (Joe 10/10, plant areas and upload 10/11): each plant's products, by area. A plant's areas are its machines
+// (PLANT_OPERATIONS_MASTER production areas, whose lists are the Product drop-down on Quality Checks) and the areas the plant
+// adds itself (Uniontown starts with CASES and TANKER); each plant keeps its own group list (Milk, Drinks, TEA) too.
+// An area's list replaces its starting list (public/data/plant-products.json), so a new SKU goes in without a code change.
+const PRODUCT_LIMIT = 400, AREA_LIMIT = 40, GROUP_LIMIT = 40;
+// The same starting areas and groups as public/js/products.js.
+const START_AREAS = { fac_uniontown: ['CASES', 'TANKER'] };
+const START_GROUPS = ['Milk', 'Drinks', 'TEA'];
+const plantIds = () => (L.PLANTS || []).map(p => p.id);
+const areaSlug = (facilityId, name) => facilityId + '_area_' + text(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
+// A plant's own areas and groups: what was saved, else the starting ones.
+async function productSetupOf(tx, db, facilityId) {
+  const ref = db.collection('productSetup').doc(facilityId), had = await tx.get(ref), d = had.exists ? had.data() : null;
+  return { ref, had: d, areas: d && Array.isArray(d.areas) ? d.areas : (START_AREAS[facilityId] || []).map(n => ({ id: areaSlug(facilityId, n), name: n })),
+    groups: d && Array.isArray(d.groups) ? d.groups : START_GROUPS.slice() };
+}
+const machinePlant = (d) => text(d.facilityId) || 'fac_uniontown';
+function validFacility(v, SaveError) {
+  const facilityId = text(v);
+  if (plantIds().indexOf(facilityId) < 0) throw new SaveError('BAD_REQUEST', 'Pick a plant.');
+  return facilityId;
+}
+function productRows(list, SaveError) {
+  if (!Array.isArray(list) || list.length > PRODUCT_LIMIT) throw new SaveError('BAD_REQUEST', 'An area holds up to ' + PRODUCT_LIMIT + ' products.');
   const seen = {}, products = [];
-  input.products.forEach(p => {
+  list.forEach(p => {
     const x = p && typeof p === 'object' ? p : {};
     const row = { name: text(x.name).slice(0, 120), sku: text(x.sku).slice(0, 40), mfgType: text(x.mfgType).slice(0, 40), productGroup: text(x.productGroup).slice(0, 60) };
     if (!row.name) return;
@@ -870,17 +887,111 @@ function validateMachineProducts(input, SaveError) {
     seen[key] = true;
     products.push(row);
   });
-  return { operationId, products };
+  return products;
+}
+// saveMachineProducts: one area's whole list (operationId = the area: a machine's operation id or a plant's own area id).
+function validateMachineProducts(input, SaveError) {
+  const operationId = text(input.areaId || input.operationId).slice(0, 120);
+  if (!/^[A-Za-z0-9_-]+$/.test(operationId)) throw new SaveError('BAD_REQUEST', 'Pick an area.');
+  return { operationId, products: productRows(input.products, SaveError) };
+}
+// The area an id names: {name, facilityId} or null.
+async function areaOf_(tx, db, id) {
+  const line = await tx.get(db.collection('plantSetup').doc(docId(id)));
+  const d = line.exists ? line.data() : null;
+  if (d && d.type === 'PRODUCTION_AREA') return { name: d.name, facilityId: machinePlant(d), machine: true };
+  const m = /^(fac_[a-z0-9_]+?)_area_/.exec(id);
+  if (!m || plantIds().indexOf(m[1]) < 0) return null;
+  const own = await productSetupOf(tx, db, m[1]), a = own.areas.find(x => x.id === id);
+  return a ? { name: a.name, facilityId: m[1], machine: false } : null;
 }
 async function saveMachineProducts(tx, db, req, email, stamp, logRef, mode, SaveError) {
-  const line = await tx.get(db.collection('plantSetup').doc(docId(req.operationId)));
-  const d = line.exists ? line.data() : null;
-  if (!d || d.type !== 'PRODUCTION_AREA') throw new SaveError('NOT_FOUND', 'That machine is not set up for this plant.');
+  const area = await areaOf_(tx, db, req.operationId);
+  if (!area) throw new SaveError('NOT_FOUND', 'That area is not set up for this plant.');
   const ref = db.collection('plantProducts').doc(docId(req.operationId)), had = await tx.get(ref);
-  const after = { operationId: req.operationId, line: d.name, facilityId: d.facilityId || 'fac_uniontown', products: req.products, updatedAt: stamp, updatedBy: email, testEdited: true };
+  const after = { operationId: req.operationId, line: area.name, facilityId: area.facilityId, products: req.products, updatedAt: stamp, updatedBy: email, testEdited: true };
   tx.set(ref, after);
-  const result = { ok: true, requestId: req.requestId, operationId: req.operationId, count: req.products.length, message: d.name + ': ' + req.products.length + ' product' + (req.products.length === 1 ? '' : 's') + ' saved.' };
+  const result = { ok: true, requestId: req.requestId, operationId: req.operationId, count: req.products.length, message: area.name + ': ' + req.products.length + ' product' + (req.products.length === 1 ? '' : 's') + ' saved.' };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, before: had.exists ? had.data().products || [] : null, after: req.products, result });
+  return result;
+}
+// saveProductSetup: a plant's own areas (machines are not in it; they come from Plant Operations) and its groups.
+function cleanNames(list, limit, what, SaveError) {
+  if (!Array.isArray(list) || list.length > limit) throw new SaveError('BAD_REQUEST', 'A plant holds up to ' + limit + ' ' + what + '.');
+  const seen = {};
+  return list.map(x => text(x && typeof x === 'object' ? x.name : x).slice(0, 60)).filter(n => {
+    if (!n) return false;
+    if (seen[n.toUpperCase()]) throw new SaveError('BAD_REQUEST', n + ' is on the list twice.');
+    return (seen[n.toUpperCase()] = true);
+  });
+}
+function validateProductSetup(input, SaveError) {
+  const facilityId = validFacility(input.facilityId, SaveError);
+  const areas = (Array.isArray(input.areas) ? input.areas : []).map(a => ({ id: text(a && a.id).slice(0, 120), name: text(a && a.name).slice(0, 60) }));
+  cleanNames(areas, AREA_LIMIT, 'areas', SaveError);
+  return { facilityId, areas: areas.filter(a => a.name), groups: cleanNames(input.groups, GROUP_LIMIT, 'groups', SaveError) };
+}
+async function saveProductSetup(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const own = await productSetupOf(tx, db, req.facilityId);
+  const machines = (await tx.get(db.collection('plantSetup').where('type', '==', 'PRODUCTION_AREA'))).docs.map(d => d.data()).filter(d => machinePlant(d) === req.facilityId);
+  const used = new Set(machines.map(m => text(m.name).toUpperCase()));
+  const areas = req.areas.map(a => {
+    if (used.has(a.name.toUpperCase())) throw new SaveError('BAD_REQUEST', a.name + ' is already a machine at this plant.');
+    const was = own.areas.find(x => x.id === a.id);
+    return { id: was ? was.id : areaSlug(req.facilityId, a.name), name: a.name };
+  });
+  if (new Set(areas.map(a => a.id)).size !== areas.length) throw new SaveError('BAD_REQUEST', 'Two areas have the same name.');
+  // An area that still has products is not removed, so no list is lost.
+  for (const gone of own.areas.filter(x => !areas.some(a => a.id === x.id))) {
+    const p = await tx.get(db.collection('plantProducts').doc(docId(gone.id)));
+    if (p.exists && (p.data().products || []).length) throw new SaveError('BAD_REQUEST', gone.name + ' still has ' + p.data().products.length + ' products. Remove them first.');
+  }
+  const after = { facilityId: req.facilityId, areas, groups: req.groups, updatedAt: stamp, updatedBy: email };
+  tx.set(own.ref, after);
+  const result = { ok: true, requestId: req.requestId, facilityId: req.facilityId, areas: areas.length, groups: req.groups.length, message: 'Areas and groups saved.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId, before: own.had, after, result });
+  return result;
+}
+// saveProductUpload: the filled-in template. Each area in the file gets the file's list (areas not in the file stay as they
+// are); an area or group the plant does not have yet is added.
+function validateProductUpload(input, SaveError) {
+  const facilityId = validFacility(input.facilityId, SaveError);
+  if (!Array.isArray(input.areas) || !input.areas.length || input.areas.length > AREA_LIMIT) throw new SaveError('BAD_REQUEST', 'The file has no areas to load.');
+  const seen = {};
+  const areas = input.areas.map(a => {
+    const x = a && typeof a === 'object' ? a : {}, name = text(x.name).slice(0, 60), id = text(x.areaId).slice(0, 120);
+    if (!name) throw new SaveError('BAD_REQUEST', 'Every row needs an Area.');
+    if (seen[name.toUpperCase()]) throw new SaveError('BAD_REQUEST', name + ' is in the upload twice.');
+    seen[name.toUpperCase()] = true;
+    return { areaId: /^[A-Za-z0-9_-]*$/.test(id) ? id : '', name, products: productRows(x.products, SaveError).map(p => Object.assign(p, {})) };
+  });
+  return { facilityId, areas };
+}
+async function saveProductUpload(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const own = await productSetupOf(tx, db, req.facilityId);
+  const machines = (await tx.get(db.collection('plantSetup').where('type', '==', 'PRODUCTION_AREA'))).docs.map(d => d.data()).filter(d => machinePlant(d) === req.facilityId);
+  const ownAreas = own.areas.slice(), groups = own.groups.slice(), addedAreas = [], addedGroups = [];
+  const targets = req.areas.map(a => {
+    const k = a.name.toUpperCase(), m = machines.find(x => text(x.name).toUpperCase() === k), o = ownAreas.find(x => x.name.toUpperCase() === k);
+    if (m) return { id: m.operationId, name: m.name, products: a.products };
+    if (o) return { id: o.id, name: o.name, products: a.products };
+    if (ownAreas.length >= AREA_LIMIT) throw new SaveError('BAD_REQUEST', 'A plant holds up to ' + AREA_LIMIT + ' areas.');
+    const add = { id: areaSlug(req.facilityId, a.name), name: a.name };
+    ownAreas.push(add); addedAreas.push(add.name);
+    return { id: add.id, name: add.name, products: a.products };
+  });
+  targets.forEach(t => t.products.forEach(p => String(p.productGroup || '').split(',').map(g => g.trim()).filter(Boolean).forEach(g => {
+    if (!groups.some(x => x.toUpperCase() === g.toUpperCase())) { groups.push(g); addedGroups.push(g); }
+  })));
+  if (groups.length > GROUP_LIMIT) throw new SaveError('BAD_REQUEST', 'A plant holds up to ' + GROUP_LIMIT + ' groups.');
+  const refs = targets.map(t => db.collection('plantProducts').doc(docId(t.id))), had = [];
+  for (const r of refs) had.push(await tx.get(r));
+  if (addedAreas.length || addedGroups.length) tx.set(own.ref, { facilityId: req.facilityId, areas: ownAreas, groups, updatedAt: stamp, updatedBy: email });
+  targets.forEach((t, i) => tx.set(refs[i], { operationId: t.id, line: t.name, facilityId: req.facilityId, products: t.products, updatedAt: stamp, updatedBy: email, testEdited: true, uploaded: true }));
+  const count = targets.reduce((n, t) => n + t.products.length, 0);
+  const result = { ok: true, requestId: req.requestId, facilityId: req.facilityId, areas: targets.length, count, addedAreas, addedGroups,
+    message: count + ' product' + (count === 1 ? '' : 's') + ' loaded in ' + targets.length + ' area' + (targets.length === 1 ? '' : 's') + '.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId, before: targets.map((t, i) => ({ area: t.id, products: had[i].exists ? had[i].data().products || [] : null })), after: targets.map(t => ({ area: t.id, products: t.products })), result });
   return result;
 }
 
@@ -913,6 +1024,6 @@ async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
-module.exports = { validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+module.exports = { validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

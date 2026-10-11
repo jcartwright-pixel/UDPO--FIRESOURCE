@@ -80,8 +80,10 @@ const ACTIONS = Object.freeze({
   saveShiftNote: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveTemperatureCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   sendPlantReport: { roles: L.SAVE_ROLES, screen: 'plant' },
-  // Administration > Machine Products: the products each machine runs.
+  // Administration > Products: each plant's products by area, its own areas and groups, and the template upload.
   saveMachineProducts: { roles: REORDER_ROLES, screen: 'plant' },
+  saveProductSetup: { roles: REORDER_ROLES, screen: 'plant' },
+  saveProductUpload: { roles: REORDER_ROLES, screen: 'plant' },
   // Administration > Plant Shifts: each plant's shifts (Plant Reports' Shift Comparison).
   savePlantShifts: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
@@ -337,6 +339,8 @@ function validate(input) {
   if (action === 'saveTemperatureCheck') return Object.assign(out, PLANT.validateTemperature(input, SaveError));
   if (action === 'sendPlantReport') return Object.assign(out, PLANT.validateReport(input, SaveError));
   if (action === 'saveMachineProducts') return Object.assign(out, PLANT.validateMachineProducts(input, SaveError));
+  if (action === 'saveProductSetup') return Object.assign(out, PLANT.validateProductSetup(input, SaveError));
+  if (action === 'saveProductUpload') return Object.assign(out, PLANT.validateProductUpload(input, SaveError));
   if (action === 'savePlantShifts') return Object.assign(out, PLANT.validatePlantShifts(input, SaveError));
   if (action === 'sendToGarage') return GARAGE.validateSend(input, out);
   if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(action) >= 0) return GARAGE.validateFleet(action, input, out);
@@ -563,6 +567,8 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveTemperatureCheck') return PLANT.saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'sendPlantReport') return PLANT.sendReport(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveMachineProducts') return PLANT.saveMachineProducts(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveProductSetup') return PLANT.saveProductSetup(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveProductUpload') return PLANT.saveProductUpload(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePlantShifts') return PLANT.savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);

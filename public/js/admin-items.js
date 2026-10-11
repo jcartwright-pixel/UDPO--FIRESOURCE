@@ -29,7 +29,7 @@ export const ADMIN_GROUPS = [
     ['switch', 'Which App Runs Each Screen', 'On the Route Distribution page, an administrator clicks a screen\'s tag twice to run it from the new app, and turns the write-back on or off.', 'distribution.html', 'swap']
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
-    ['machine-products', 'Machine Products', 'The products each machine runs (RedZone, Uniontown): the Product drop-down on Quality Checks. Add, change or remove a product and its SKU.', 'products.html', 'production.webp'],
+    ['machine-products', 'Products', "Each plant's products by area and group: the Product drop-down on Quality Checks. Add or change a product, or load the whole list from the template.", 'products.html', 'production.webp'],
     ['plant-shifts', 'Plant Shifts', 'Each plant\'s shifts (Uniontown: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week']
   ]],
   // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.

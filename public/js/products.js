@@ -1,7 +1,44 @@
 // Joe 10/10: the products each machine runs, from RedZone (Uniontown), are the product drop-downs on the plant screens. The
-// starting list is data/plant-products.json; a machine changed on Administration > Machine Products (plantProducts in the
+// starting list is data/plant-products.json; an area changed on Administration > Products (plantProducts in the
 // database) replaces its starting list, so a new SKU goes in without a code change.
+// Joe 10/11: products are plant by plant and area by area. A plant's areas are its machines plus the areas it adds itself, and
+// it keeps its own group list (productSetup in the database; the starting ones below are the same as functions/src/plant.js).
 import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+export const START_AREAS = { fac_uniontown: ['CASES', 'TANKER'] };
+export const START_GROUPS = ['Milk', 'Drinks', 'TEA'];
+export const areaSlug = (facilityId, name) => facilityId + '_area_' + String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
+// {areas: [{id, name}], groups: [name], saved}: what the plant saved, else its starting areas and groups.
+export function plantSetupOf(saved, facilityId) {
+  const d = (saved || []).find(x => x.facilityId === facilityId);
+  return { areas: d && Array.isArray(d.areas) ? d.areas : (START_AREAS[facilityId] || []).map(n => ({ id: areaSlug(facilityId, n), name: n })),
+    groups: d && Array.isArray(d.groups) ? d.groups : START_GROUPS.slice(), saved: d || null };
+}
+export function watchProductSetup(db, cb, fail) {
+  return onSnapshot(collection(db, 'productSetup'), s => cb(s.docs.map(d => d.data())), e => { cb([]); if (fail) fail(e); });
+}
+// A product's groups ("Drinks, TEA" is two).
+export const groupsOf = (p) => String((p && p.productGroup) || '').split(',').map(g => g.trim()).filter(Boolean);
+
+// The template's columns, in order; a file with these headings loads (Joe 10/11: always the same layout).
+export const TEMPLATE = ['Plant', 'Area', 'Product', 'SKU', 'Type', 'Group'];
+const cell = (v) => { const s = String(v == null ? '' : v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+export function toCsv(rows) { return [TEMPLATE].concat(rows).map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'; }
+// CSV text -> rows of cells (quotes, doubled quotes, commas and line breaks in quotes, a byte-order mark).
+export function parseCsv(textIn) {
+  const t = String(textIn || '').replace(/^\uFEFF/, ''), rows = [];
+  let row = [], cur = '', q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) { if (c === '"' && t[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false; else cur += c; continue; }
+    if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += c;
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(x => String(x).trim()));
+}
 
 let start = null;
 export function startingList() {
