@@ -91,15 +91,15 @@
           '<div class="hub-tiles4">' + tile(n.needReview, 'Need review', go('review'), 'warn') + tile(n.repeat, 'Repeat', go('repeat'), 'warn') + tile(n.atGarage, 'At garage', go('garage')) + tile(n.newWeek, 'New · 7 days', go('new')) +
           tile(n.oldestDays + ' d', 'Oldest', go('')) + tile(n.averageDays + ' d', 'Average age', go('')) + (k === 'TRUCK' ? tile(n.emailed, 'Emailed', go('')) + tile(n.notEmailed, 'Not emailed', go(''), 'warn') : '') + '</div></div>';
       };
-      const t = L.operatingDay(new Date()), month = t.slice(0, 7), weekAgo = L.addDays(t, -7);
+      const t = L.operatingDay(new Date()), month = t.slice(0, 7), weekAgo = L.weekStart(t);
       const open = data.workOrders.filter(o => String(o.status || 'NEW').toUpperCase() !== 'DONE');
-      const week = data.workOrders.filter(o => String(o.status).toUpperCase() === 'DONE' && String(o.completed_at || '').slice(0, 10) >= weekAgo);
+      const week = data.workOrders.filter(o => String(o.status).toUpperCase() === 'DONE' && L.localDay(o.completed_at) >= weekAgo);
       const due = L.fleetDue(units(), data.fleetSetup, miles(), open, rules, t);
       const hours = Math.round(week.reduce((s, x) => s + (Number(x.minutes) || 0), 0) / 6) / 10;
       const garage = '<div class="hub-card garage" data-kind="GARAGE" data-card="fleet.html?view=work"><a class="hub-card-head" href="fleet.html?view=work"><span class="hub-wrench"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></span><strong>Garage</strong><span class="hub-big"><b>' + open.length + '</b><small>Work orders</small></span></a>' +
         '<div class="hub-tiles4">' + tile(open.filter(x => String(x.status).toUpperCase() === 'WORKING').length, 'Working now', 'fleet.html?view=work') + tile(open.filter(x => String(x.status).toUpperCase() === 'PARTS').length, 'Waiting on parts', 'fleet.html?view=work', 'warn') +
         tile(due.items.filter(i => i.status === 'OVERDUE').length, 'Overdue service', 'fleet.html', 'warn') + tile(due.items.filter(i => i.status === 'DUE_SOON').length, 'Due soon', 'fleet.html', 'warn') +
-        tile(week.length, 'Finished · week', 'fleet.html?view=work', 'good') + tile(hours.toFixed(1), 'Hours · week', 'fleet.html?view=work') +
+        tile(week.length, 'Finished · this week', 'fleet.html?view=work', 'good') + tile(hours.toFixed(1), 'Hours · this week', 'fleet.html?view=work') +
         tile(due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'DOT this month', 'fleet.html') +
         tile(due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates · 30 days', 'fleet.html') + '</div></div>';
       document.getElementById('cards').innerHTML = issueCard(KINDS[0], 0) + issueCard(KINDS[1], 1) + issueCard(KINDS[2], 2) + garage;
@@ -112,7 +112,7 @@
     requireSignIn(async () => {
       const { db } = await start();
       onSnapshot(doc(db, 'config', 'fleetRules'), s => { rules = s.exists() ? s.data() : null; render(); }, () => {});
-      Object.keys(data).forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read ' + name + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
+      Object.keys(data).forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the ' + ({ maintenance: 'write-ups', workOrders: 'work orders', equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles' })[name] + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
       render();
     });
   </script>

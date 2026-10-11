@@ -78,6 +78,7 @@
       <label class="wide">Notes<input name="checkinNotes" maxlength="500" data-voice></label>
     </div>
     <div class="phone-buttons"><button type="button" id="back">Back</button><button type="submit" class="primary" id="send">Check In</button></div>
+    <p class="send-error" id="send-error" role="alert" hidden></p>
   </form>
 
   <!-- View Loadout: the Driver Room board, read only, rolling. -->
@@ -135,6 +136,10 @@
       catch (e) {
         // A plain sentence for the driver, without the server's status number on the end.
         e.message = String(e.message || e).replace(/\s*\[\d{3}\]\s*$/, '');
+        // No signal, or the server never answered: "internal" or "Failed to fetch" means nothing to a driver (improvements item 12).
+        if (/^(functions\/)?(internal|unavailable|deadline-exceeded)$/.test(String(e.code || '')) || /^internal$|failed to fetch|network|load failed/i.test(e.message)) {
+          e.message = 'No signal or the server did not answer. Your entries are still here; ' + (op === 'checkIn' ? 'press Check In again.' : op === 'dvir' ? 'press Submit again.' : 'try again in a moment.');
+        }
         if (/code is not right|not turned on/.test(e.message)) { code = ''; store.set('code', ''); show(); }
         if (/Pick your name/.test(e.message)) { driverId = ''; store.set('driverId', ''); show(); }
         throw e;
@@ -227,7 +232,9 @@
     }
     addSpeak(ciForm);
 
-    const run = (fn) => async (e) => { if (e) e.preventDefault(); showError(''); try { await fn(e); } catch (err) { showError(err.message); } };
+    // An error also shows under the Check In button when the form is open, where the driver is looking.
+    const sendError = (m) => { const p = document.getElementById('send-error'); p.textContent = m || ''; p.hidden = !m || document.getElementById('step-form').hidden; };
+    const run = (fn) => async (e) => { if (e) e.preventDefault(); showError(''); sendError(''); try { await fn(e); } catch (err) { showError(err.message); sendError(err.message); } };
     document.getElementById('step-code').addEventListener('submit', run(async () => {
       code = document.getElementById('code').value.trim().toUpperCase();
       await call('roster');

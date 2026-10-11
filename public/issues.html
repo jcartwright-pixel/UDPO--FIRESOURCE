@@ -62,6 +62,8 @@
     forScreen('checkIns');
 
     const L = window.UDLogic;
+    // A saved time as its New York day (a garage tick at 9 PM is today, not tomorrow's UTC date).
+    const localWhen = (v) => { const k = L.localDay(v); return k ? shortDate(k) : String(v || '').slice(0, 10); };
     // The current app's Truck / Trailer / Fork Truck Issues lists (Maintenance.html): the drivers' check-in write-ups, opened from
     // the Fleet & Maintenance hub. Joe 10/10: a truck write-up goes to our garage or to the company that leases the truck.
     const KINDS = [['TRUCK', 'Trucks', 'Truck #', 'Truck Issues'], ['TRAILER', 'Trailers', 'Trailer #', 'Trailer Issues'], ['FORK_TRUCK', 'Fork Truck / Pallet Jack', 'Unit', 'Fork Truck / Pallet Jack Issues']];
@@ -106,7 +108,7 @@
             '<button type="button" class="done" data-step="repaired" title="Mark Repaired"' + d + '>&#10003; Repaired</button>' +
             '<button type="button" class="ic remove" data-remove title="Remove: not a real unit, or not a write-up. The sheet keeps the row marked Removed." aria-label="Remove"' + d + '>&#10005;</button></span>';
         const reviewed = r.needsReview ? '<input type="checkbox" data-review aria-label="Mark reviewed"' + (!edit || !r.text ? ' disabled' : '') + (r.text ? '' : ' title="Add what is wrong first"') + '>' : tick(r.reviewedBy ? 'Reviewed by ' + r.reviewedBy : 'Reviewed');
-        const garage = r.atGarage ? tick('Sent to the garage ' + r.garageAt.slice(0, 10) + ' by ' + r.garageBy) : r.toLessor ? '<span class="pill yes" title="Sent ' + escapeHtml(r.lessorAt.slice(0, 10) + ' by ' + r.lessorBy) + '">' + escapeHtml(r.lessor) + '</span>' : dash;
+        const garage = r.atGarage ? tick('Sent to the garage ' + localWhen(r.garageAt) + ' by ' + r.garageBy) : r.toLessor ? '<span class="pill yes" title="Sent ' + escapeHtml(localWhen(r.lessorAt) + ' by ' + r.lessorBy) + '">' + escapeHtml(r.lessor) + '</span>' : dash;
         const more = openFor === r.id ? '<tr class="issue-more"><td colspan="' + cols + '"><b>' + escapeHtml(KINDS[i][2].replace(' #', '') + ' ' + (r.unit || '?')) + '</b>' + (r.driver ? ' · ' + escapeHtml(r.driver) : '') + (r.route ? ' · route ' + escapeHtml(r.route) : '') +
           ' · reported ' + dateText(r.reported) + ' (' + daysAgo(r.openedMs) + ' days ago)<p>' + escapeHtml(r.text) + '</p>' + (truck && who ? '<small>' + escapeHtml(who.lessor ? 'Leased from ' + who.lessor : who.why) + '</small>' : '') + '</td></tr>' : '';
         return '<tr data-id="' + escapeHtml(r.id) + '"' + (r.needsReview ? ' class="review"' : '') + '><td class="strong">' + escapeHtml(r.unit || '?') + '</td>' + (truck ? '<td>' + escapeHtml(r.driver) + '</td>' : '') +

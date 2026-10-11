@@ -53,11 +53,12 @@
     // unit's dates and the garage technicians, managers and administrators only (garage.js saveFleet).
     const L = window.UDLogic;
     const STATUS = { OVERDUE: ['Overdue', 'warn'], AT_GARAGE: ['At garage', 'yes'], DUE_SOON: ['Due soon', 'warn soon'], NO_MILES: ['No miles yet', 'no'], SET_UP: ['Needs start date', 'no'], OK: ['OK', 'yes'] };
+    const READ_NAMES = { equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', workOrders: 'work orders', garageTechs: 'technician list' };
     const JOB = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
     let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], orders = [], techs = [], search = '', kindFilter = '', savedRules = null;
     const rules = () => Object.assign({}, L.FLEET_RULES, savedRules || {});
     const num = (n) => n === '' || n == null ? '' : Number(n).toLocaleString();
-    const when = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
+    const when = (s) => { const k = L.localDay(s); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
     const pill = (s) => '<span class="pill ' + s[1] + '">' + escapeHtml(s[0]) + '</span>';
     const today = () => L.operatingDay(new Date());
 
@@ -113,8 +114,8 @@
     }
 
     function render() {
-      const t = today(), due = L.fleetDue(units(), setup, miles(), open(), savedRules, t), month = t.slice(0, 7), weekAgo = L.addDays(t, -7);
-      const late = due.items.filter(i => i.status === 'OVERDUE').length, soon = due.items.filter(i => i.status === 'DUE_SOON').length, week = done().filter(o => String(o.completed_at || '').slice(0, 10) >= weekAgo);
+      const t = today(), due = L.fleetDue(units(), setup, miles(), open(), savedRules, t), month = t.slice(0, 7), weekAgo = L.weekStart(t);
+      const late = due.items.filter(i => i.status === 'OVERDUE').length, soon = due.items.filter(i => i.status === 'DUE_SOON').length, week = done().filter(o => L.localDay(o.completed_at) >= weekAgo);
       document.getElementById('tab-due').textContent = late || '';
       document.getElementById('tab-work').textContent = open().length || '';
       document.querySelectorAll('.tabs [data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
@@ -122,7 +123,7 @@
       const q = search.toUpperCase(), hit = (u) => !q || String(u).toUpperCase().indexOf(q) >= 0;
       if (view === 'due') {
         k.innerHTML = kpis([[late, 'Overdue', late ? 'warn' : ''], [soon, 'Due soon', soon ? 'warn' : ''], [due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'DOT this month'],
-          [due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates expiring · 30 days'], [open().length, 'At the garage'], [done().filter(o => String(o.completed_at || '').slice(0, 7) === month).length, 'Done this month', 'good']]);
+          [due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates expiring · 30 days'], [open().length, 'At the garage'], [done().filter(o => L.localDay(o.completed_at).slice(0, 7) === month).length, 'Done this month', 'good']]);
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="garage-station.html">Garage Station</a>';
         sheet.innerHTML = unitGrid(due, hit);
@@ -130,15 +131,15 @@
       } else if (view === 'work') {
         const o = open().slice().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
-          [o.filter(x => String(x.source).toUpperCase() === 'OFFICE').length, 'Sent from office'], [week.length, 'Finished · last 7 days', 'good'], [Math.round(mins / 6) / 10, 'Mechanic hours · 7 days']]);
+          [o.filter(x => String(x.source).toUpperCase() === 'OFFICE').length, 'Sent from office'], [week.length, 'Finished · this week', 'good'], [Math.round(mins / 6) / 10, 'Mechanic hours · this week']]);
         bar.innerHTML = '<span class="hint">Click a row to see that unit\'s history.</span><span class="spacer"></span><a class="button" href="garage.html">Garage Work Orders</a><a class="button" href="garage-station.html">Garage Station</a>';
         // As the current app: Working, then Sent from the office, then Waiting on parts, then New; a row opens the unit's History.
         sheet.innerHTML = '<div class="fleet-split"><div><h2>Open Work Orders</h2>' + table([14, 12, 34, 14, 12, 14], ['#', 'Unit', "What's wrong", 'Came from', 'Tech', 'Status'],
           o.map(x => '<tr class="clicky" data-unit="' + escapeHtml(x.unit) + '" title="Open ' + escapeHtml(x.unit) + '\'s history"><td class="strong">' + escapeHtml(x.work_order_id) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(cameFrom(x)) +
             '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + pill(JOB[String(x.status).toUpperCase()] || [x.status, 'no']) + '</td></tr>').join(''), 'No open work orders.') +
-          '</div><div><h2>What the Mechanics Did · Last 7 Days</h2>' + table([12, 12, 22, 28, 14, 12], ['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours'],
+          '</div><div><h2>What the Mechanics Did · This Week (Sun-Sat)</h2>' + table([12, 12, 22, 28, 14, 12], ['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours'],
           week.map(x => '<tr class="clicky" data-unit="' + escapeHtml(x.unit) + '"><td>' + when(x.completed_at) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td class="wrong">' + escapeHtml(fixedText(x)) +
-            '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td></tr>').join(''), 'Nothing finished in the last 7 days.') + '</div></div>';
+            '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td></tr>').join(''), 'Nothing finished this week yet.') + '</div></div>';
         foot.textContent = orders.length + ' work orders from the garage list.';
       } else if (view === 'history') {
         k.innerHTML = '';
@@ -147,7 +148,7 @@
         const yearAgo = L.addDays(t, -365), unit = oneUnit(due);
         // Open jobs are listed too (the current app's history showed them with their status), then finished ones newest first.
         const hitUnit = (u) => unit ? String(u).toUpperCase() === String(unit.unit).toUpperCase() : hit(u);
-        const rows = open().filter(x => hitUnit(x.unit)).concat(done().filter(x => String(x.completed_at || '').slice(0, 10) >= yearAgo && hitUnit(x.unit))).map(x => {
+        const rows = open().filter(x => hitUnit(x.unit)).concat(done().filter(x => L.localDay(x.completed_at) >= yearAgo && hitUnit(x.unit))).map(x => {
           const kind = x.service_key === 'DOT' ? 'dot' : x.service_key ? 'service' : 'work';
           return { x, kind };
         }).filter(r => !kindFilter || r.kind === kindFilter);
@@ -205,7 +206,7 @@
     // The current app's unit facts beside the history (FleetService.html:132-137).
     function factsPanel(u, due, t) {
       const mine = due.items.filter(i => i.unit === u.unit), pm = mine.find(i => i.key === 'PM' || i.key === 'REEFER'), dot = mine.find(i => i.key === 'DOT');
-      const yearAgo = L.addDays(t, -365), jobs = done().filter(x => String(x.unit).toUpperCase() === String(u.unit).toUpperCase() && String(x.completed_at || '').slice(0, 10) >= yearAgo);
+      const yearAgo = L.addDays(t, -365), jobs = done().filter(x => String(x.unit).toUpperCase() === String(u.unit).toUpperCase() && L.localDay(x.completed_at) >= yearAgo);
       const eq = equipment.find(e => String(e.unit).toUpperCase() === String(u.unit).toUpperCase()) || {}, lease = (/\bLease:\s*([^|\n]+)/i.exec(String(eq.notes || '')) || [])[1];
       const model = (/External Fleet:\s*([^\n]+)/i.exec(String(eq.notes || '')) || [])[1];
       const row = (l, v) => '<tr><th>' + l + '</th><td>' + (v === '' || v == null ? '-' : v) + '</td></tr>';
@@ -262,7 +263,7 @@
     function printReport(due, t) {
       let box = document.getElementById('print');
       if (!box) { box = document.createElement('div'); box.id = 'print'; document.body.appendChild(box); }
-      const in90 = L.addDays(t, 90), weekAgo = L.addDays(t, -7), month = t.slice(0, 7);
+      const in90 = L.addDays(t, 90), weekAgo = L.weekStart(t), month = t.slice(0, 7);
       const late = due.items.filter(i => i.status === 'OVERDUE'), soon = due.items.filter(i => i.status === 'DUE_SOON');
       const tbl = (head, body) => '<table><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr>' + (body || '<tr><td colspan="' + head.length + '">Nothing</td></tr>') + '</table>';
       const kind = (i) => i.type === 'TRAILER' ? 'Trailer' : 'Truck';
@@ -270,7 +271,7 @@
         (i.key === 'PM' ? num(i.dueAt) + ' mi' : when(i.dueAt)) + '</td><td>' + (i.now !== '' && i.now != null ? num(i.now) : '') + '</td><td>' + (typeof i.left === 'number' ? num(i.left) + ' mi' : escapeHtml(i.left)) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('');
       const dated = (key) => due.items.filter(i => i.key === key && i.dueAt && i.dueAt <= in90).sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
       const plateNo = (u) => { const e = equipment.find(x => String(x.unit).toUpperCase() === String(u).toUpperCase()) || {}; return (/\bPlate:\s*([^|\n]+)/i.exec(String(e.notes || '')) || [])[1] || ''; };
-      const work = done().filter(o => String(o.completed_at || '').slice(0, 10) >= weekAgo);
+      const work = done().filter(o => L.localDay(o.completed_at) >= weekAgo);
       // The current app's report: four numbers, overdue and due soon, what is at the garage, DOT and plates for the next 90 days,
       // the week's work with the signed tick, and a footer (FleetService.html:155-167).
       box.innerHTML = '<h2>Fleet Service &amp; Compliance Report · ' + shortDate(t) + '</h2>' +
@@ -280,7 +281,7 @@
         '<p><b>At the garage</b></p>' + tbl(['Unit', 'Type', 'What', 'Due at', 'Now', 'Left', 'Status'], dueRows(due.items.filter(i => i.status === 'AT_GARAGE'))) +
         '<p><b>DOT inspections · next 90 days</b></p>' + tbl(['Unit', 'Type', 'DOT due', 'Left', 'Status'], dated('DOT').map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + when(i.dueAt) + '</td><td>' + escapeHtml(i.left) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('')) +
         '<p><b>Plates · next 90 days</b></p>' + tbl(['Unit', 'Type', 'Plate', 'Expires', 'Left'], dated('PLATE').map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + escapeHtml(plateNo(i.unit)) + '</td><td>' + when(i.dueAt) + '</td><td>' + escapeHtml(i.left) + '</td></tr>').join('')) +
-        '<p><b>Work done · last 7 days</b></p>' + tbl(['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours', 'Signed'], work.map(x => '<tr><td>' + when(x.completed_at) + '</td><td>' + escapeHtml(x.unit) + '</td><td>' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(fixedText(x)) +
+        '<p><b>Work done · this week (Sun-Sat)</b></p>' + tbl(['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours', 'Signed'], work.map(x => '<tr><td>' + when(x.completed_at) + '</td><td>' + escapeHtml(x.unit) + '</td><td>' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(fixedText(x)) +
           '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' + (x.safe === 'YES' && x.signed_by ? '&#10003;' : '') + '</td></tr>').join('')) +
         '<p class="print-foot">United Dairy · Uniontown · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · DOT every ' + rules().dotMonths + ' months · leased tractors are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
       window.print();
@@ -309,7 +310,7 @@
 
     requireSignIn(async () => {
       const { db, auth } = await start();
-      const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); render(); }, e => showError('Could not read ' + name + ': ' + e.message));
+      const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); render(); }, e => showError('Could not read the ' + (READ_NAMES[name] || 'garage list') + ' (' + e.message + '). Check the network and reload the page.'));
       watch('equipment', v => { equipment = v; });
       watch('fleetSetup', v => { setup = v; });
       watch('odometers', v => { odometers = v; });
