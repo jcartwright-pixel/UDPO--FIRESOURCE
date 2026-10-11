@@ -838,7 +838,8 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
 }
 
 /* Loadout SKIP (the current app's Plant Station): Skip beside Start; a skipped load sits at the bottom of its group, marked. */
-.plant-page .clock-cell { display: inline-flex; gap: 4px; align-items: center; }
+/* Where the tablet's font runs wider, Skip drops under Start instead of running past the cell. */
+.plant-page .clock-cell { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; align-items: center; max-width: 100%; }
 .plant-page .clock-cell button.clock { min-width: 56px; padding: 0 8px; }
 .plant-page button.skip { min-width: 48px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid #bd7a00; background: #fff6df; color: #855400; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
 .plant-page .skip-tag { display: block; width: fit-content; margin: 3px auto 0; padding: 2px 8px; border-radius: 6px; background: #fff0d2; color: #8d5d00; font-size: 12px; font-weight: 800; letter-spacing: .03em; line-height: 1.25; }

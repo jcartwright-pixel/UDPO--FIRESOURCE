@@ -846,6 +846,89 @@
     return plan;
   }
 
+  /*
+   * Publish Week builds the new Next week from the masters, as the current app's Publish does (udpoV743SeedLiveWeek_, then
+   * udpoV779MaterializeRouteWeek_, udpoV743MaterializeDriverWeek_ and udpoV744MaterializeEquipmentWeek_ on LIVE NEXT WEEK):
+   * one run per Route Master run, each day running when Route Master has it active, with its depart time, hours, miles, load
+   * order and load day; the driver whose Driver Master template lists the run that day (left as "who it was for" when that
+   * driver is off); the driver's own truck, else the run's default truck; the run's default trailer. A unit that is down, or
+   * already on another run whose hours overlap that day, is left blank. Weekly also uses this to preview weeks past Next.
+   */
+  // Route Master hours are "9:30" or "9.5".
+  function routeHours(v) {
+    var t = String(v === null || v === undefined ? '' : v).trim(), m = /^(\d{1,2}):(\d{2})$/.exec(t);
+    if (m) return Number(m[1]) + Number(m[2]) / 60;
+    return number(t);
+  }
+  // Finds a usable truck or trailer by its ID or unit number ("T-901", "901" for a trailer); null when unknown or down.
+  function unitFinder(equipment) {
+    var list = equipment || [], bare = function (v) { return String(v || '').trim().toUpperCase().replace(/^T\s*-?\s*(?=\d)/, ''); };
+    return function (value, type) {
+      var v = String(value || '').trim(), k = bare(v);
+      if (!v) return null;
+      var hit = null;
+      for (var i = 0; i < list.length && !hit; i++) {
+        var e = list[i];
+        if (type && String(e.type || '').toUpperCase() !== type) continue;
+        if (String(e.id || '').toUpperCase() === v.toUpperCase() || (k && bare(e.unit) === k)) hit = e;
+      }
+      return hit && unitUsable(hit) ? { id: hit.id, unit: hit.unit } : null;
+    };
+  }
+  // ctx: { slots: standardDrivers(drivers), exceptions, driversById, findUnit: unitFinder(equipment), booked: {} shared by every run of the week }
+  function weekBuildContext(drivers, exceptions, equipment) {
+    var byId = {};
+    (drivers || []).forEach(function (d) { if (d && d.id) byId[d.id] = d; });
+    return { slots: standardDrivers(drivers), exceptions: exceptions || [], driversById: byId, findUnit: unitFinder(equipment), booked: {} };
+  }
+  // A unit is free that day when every other run it is on that day ends before this one starts (or starts after it ends).
+  function bookUnit(ctx, prefix, kind, unitId, start, hours) {
+    var key = prefix + '|' + kind + '|' + unitId, list = ctx.booked[key] = ctx.booked[key] || [];
+    var end = start !== null && start !== undefined && hours > 0 ? start + hours * 60 : null;
+    var clash = list.some(function (w) { return w.start === null || w.end === null || start === null || start === undefined || end === null || (w.start < end && start < w.end); });
+    if (clash) return false;
+    list.push({ start: start === undefined ? null : start, end: end });
+    return true;
+  }
+  // The days of one run for one week (only the fields the masters decide; the server adds the Live sheet's other columns blank).
+  function buildRunDays(route, week, ctx) {
+    var days = {};
+    DAYS.forEach(function (p, i) {
+      var rd = (route.days && route.days[p]) || {}, date = addDays(week, i);
+      var offset = rd.loadDayOffset === null || rd.loadDayOffset === undefined || rd.loadDayOffset === '' ? -1 : Number(rd.loadDayOffset);
+      var day = { runs: !!rd.active, loadSequence: rd.loadOrder === undefined ? null : rd.loadOrder, loadSequenceOverride: null, loadDayOffset: offset,
+        deliveryDate: date, dispatchDate: date, departureDate: date, loadDate: addDays(date, offset),
+        dispatchTime: rd.dispatchTime === undefined ? null : rd.dispatchTime, startTime: rd.dispatchTime === undefined ? null : rd.dispatchTime,
+        routeHours: routeHours(rd.hours), miles: rd.miles === undefined ? null : rd.miles,
+        driverId: '', driver: '', intendedDriverId: '', intendedDriver: '', driverExceptionStatus: '', truckId: '', truck: '', trailerId: '', trailer: '' };
+      if (day.runs) {
+        var d = ctx.slots[route.id + '|' + p], off = d ? exceptionOn(ctx.exceptions, d.id, date) : null;
+        if (d && !off) { day.driverId = d.id; day.driver = d.name; }
+        if (d && off) { day.intendedDriverId = d.id; day.intendedDriver = d.name; day.driverExceptionStatus = off.reasonCode || exceptionLabel(off); }
+        var own = day.driverId && ctx.driversById[day.driverId] ? ctx.findUnit(ctx.driversById[day.driverId].defaultTruckId, 'TRUCK') : null;
+        var truck = own || ctx.findUnit(rd.tractor, 'TRUCK'), trailer = ctx.findUnit(rd.trailer, 'TRAILER');
+        if (truck && bookUnit(ctx, p, 'TRUCK', truck.id, day.dispatchTime, day.routeHours)) { day.truckId = truck.id; day.truck = truck.unit; }
+        if (trailer && bookUnit(ctx, p, 'TRAILER', trailer.id, day.dispatchTime, day.routeHours)) { day.trailerId = trailer.id; day.trailer = trailer.unit; }
+      }
+      days[p] = day;
+    });
+    return days;
+  }
+  // One whole run for one week, shaped like a run copied from a Live tab.
+  function buildWeekRun(route, week, ctx) {
+    var flag = function (v) { return v === true || v === false ? v : null; };
+    return {
+      weekStart: week, facilityId: route.facilityId || '', streamId: route.streamId || '', routeId: route.routeId || '', route: route.route || '',
+      routeName: route.routeName || '', runId: route.id, run: route.run || '', routeRunType: route.routeRunType || '', loadType: route.loadType || '',
+      movementType: route.movementType || '', coverageType: route.coverageType || '', coverageOwner: route.coverageOwner || '', dedicatedType: route.dedicatedType || '',
+      routeStatus: route.routeStatus || '', active: flag(route.active), displayDaily: flag(route.displayDaily), displayWeekly: flag(route.displayWeekly),
+      displayPlant: flag(route.displayPlant), displayMobileRoute: flag(route.displayMobile),
+      weekOrder: route.weekOrder === undefined ? null : route.weekOrder, weeklyShowMaster: flag(route.displayWeekly),
+      masterShow: { daily: route.displayDaily === undefined ? null : route.displayDaily, mobile: route.displayMobile === undefined ? null : route.displayMobile, loadType: route.loadType || '' },
+      days: buildRunDays(route, week, ctx)
+    };
+  }
+
   // A check-in or write-up answer that says nothing is wrong ("none", "ok", "no issues", "Y"): no write-up (udpoMaintenanceNoWriteUp_).
   function noWriteUp(value) {
     var t = String(value === null || value === undefined ? '' : value).toLowerCase().replace(/[^a-z0-9/+ ]+/g, ' ').replace(/\s+/g, ' ').replace(/^[/+ ]+|[/+ ]+$/g, '');
@@ -861,6 +944,7 @@
   return {
     noWriteUp: noWriteUp,
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
+    routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,

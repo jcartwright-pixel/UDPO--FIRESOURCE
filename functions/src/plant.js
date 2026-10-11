@@ -737,7 +737,8 @@ function validateShiftNote(input, SaveError) {
   if (!out.parentId && R.ENTRY_TYPES.indexOf(out.type) < 0) throw new SaveError('BAD_REQUEST', 'Type must be Breakdown, Incident, Safety, Quality, Handoff or Other.');
   out.equipment = out.parentId ? '' : text(v.Equipment).slice(0, 80);
   out.shift = text(input.shift).toUpperCase();
-  if (out.shift && R.SHIFTS.indexOf(out.shift) < 0) throw new SaveError('BAD_REQUEST', 'Shift could not be determined.');
+  // Any of the plant's shifts (Administration > Plant Setup > Plant Shifts can rename them), picked on Shift Notes.
+  if (out.shift && R.SHIFTS.indexOf(out.shift) < 0 && !/^[A-Z0-9][A-Z0-9 &'.-]{0,39}$/.test(out.shift)) throw new SaveError('BAD_REQUEST', 'Shift could not be determined.');
   out.followUpStatus = text(input.followUpStatus).toUpperCase() || 'OPEN';
   if (R.FOLLOW_UPS.indexOf(out.followUpStatus) < 0) throw new SaveError('BAD_REQUEST', 'Follow-up must be Open, Monitor or Resolved.');
   if (out.parentId && !out.entry) throw new SaveError('BAD_REQUEST', 'Enter the review note before adding it.');

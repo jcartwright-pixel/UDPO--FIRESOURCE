@@ -20,6 +20,7 @@ const SC = require('./sc-core');
 const PLANT = require('./plant');
 const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
+const ROLL = require('./weekroll');
 
 const C = M.COLLECTIONS;
 
@@ -513,7 +514,7 @@ async function applyAction(db, user, input, now) {
   const spec = ACTIONS[req.action];
   const stamp = (now ? now() : new Date()).toISOString();
   const email = String(user && user.email || '').toLowerCase();
-  return db.runTransaction(async (tx) => {
+  const out = await db.runTransaction(async (tx) => {
     const logRef = db.collection(C.actions).doc(req.requestId);
     const logSnap = await tx.get(logRef);
     if (logSnap.exists) {
@@ -598,6 +599,8 @@ async function applyAction(db, user, input, now) {
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });
     return result;
   });
+  if (req.action === 'saveRoute' && !out.repeated) await routeLiveFollow(db, req, email, stamp, out);
+  return out;
 }
 
 // Each new maintenance record also goes to its tab of the sandbox Live workbook when the write-back is on.
@@ -964,6 +967,8 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
 // A run Route Master has but the Live week does not: a new Live row from Route Master; days already loaded do not run.
 function addLiveRun(tx, db, mode, req, stamp, email, m, live, week, today, result) {
   if (!L.masterActive(m) || !m.id) return;
+  // A run with no day left to run that week (a new run with no days ticked yet) gets its Live row from the save that ticks one.
+  if (!L.DAYS.some(p => { const want = (m.days || {})[p] || {}; return want.active && loadDay(week, p, Number.isFinite(want.loadDayOffset) ? want.loadDayOffset : null) >= today; })) return;
   const run = { weekStart: week, sourceTab: live.tabs[week], sheetRow: null, addedFromRouteMaster: true, weekOrder: m.weekOrder === undefined ? null : m.weekOrder,
     weeklyShowMaster: typeof m.displayWeekly === 'boolean' ? m.displayWeekly : null, masterShow: { daily: m.displayDaily === undefined ? null : m.displayDaily, mobile: m.displayMobile === undefined ? null : m.displayMobile, loadType: m.loadType || '' },
     days: {}, cells: {}, rev: Date.parse(stamp), testEdited: true, editedAt: stamp };
@@ -1049,19 +1054,12 @@ async function saveRoute(tx, db, req, email, stamp, logRef, mode) {
   // transfer.js), so Weekly follows at once instead of after the next copy. Reads come before any write in a transaction.
   const weeklyRuns = snap.exists && typeof req.fields.displayWeekly === 'boolean'
     ? (await tx.get(db.collection(C.runs).where('runId', '==', before.id || id))).docs : [];
-  // D6: the saved run also reaches the Current and Next Live weeks (routeToLive).
-  const live = await liveRead(tx, db, (before && before.id) || id);
   const update = Object.assign({}, req.fields, { testEdited: true, editedAt: stamp, editedBy: email });
   Object.keys(req.days).forEach(p => Object.keys(req.days[p]).forEach(k => { update['days.' + p + '.' + k] = req.days[p][k]; }));
-  let merged;
   if (snap.exists) {
     tx.update(ref, update);
     weeklyRuns.forEach(d => tx.update(d.ref, { weeklyShowMaster: req.fields.displayWeekly }));
     queueMaster(tx, db, mode, req.requestId, '', ref, before.id || id, Object.assign({}, req.fields, { days: req.days }), false, stamp, email);
-    merged = JSON.parse(JSON.stringify(before));
-    Object.assign(merged, req.fields, { id: before.id || id });
-    merged.days = merged.days || {};
-    Object.keys(req.days).forEach(p => { merged.days[p] = Object.assign({}, merged.days[p], req.days[p]); });
   } else {
     const days = {};
     L.DAYS.forEach(p => { days[p] = Object.assign({ active: false, dispatchTime: null, loadOrder: null, miles: null, hours: '', loadDayOffset: null, forklift: '', tractor: '', trailer: '', notes: '' }, req.days[p] || {}); });
@@ -1070,12 +1068,31 @@ async function saveRoute(tx, db, req, email, stamp, logRef, mode) {
     tx.set(ref, made);
     const { createdInApp, createdAt, createdBy, testEdited, editedAt, editedBy, id: madeId, ...sheetFields } = made;
     queueMaster(tx, db, mode, req.requestId, '', ref, id, sheetFields, true, stamp, email);
-    merged = made;
   }
+  // D6: the Current and Next Live weeks follow in their own step once this save is in (routeLiveFollow).
   const result = { ok: true, requestId: req.requestId, runs: [], runId: id, liveWeeks: { updated: 0, added: 0, warnings: [] } };
-  routeToLive(tx, db, mode, req, stamp, email, merged, live, result);
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runId: id, before: before ? { fields: Object.keys(req.fields).reduce((o, k) => Object.assign(o, { [k]: before[k] === undefined ? null : before[k] }), {}) } : null, after: { fields: req.fields, days: req.days }, result });
   return result;
+}
+
+// D6, after a Route Master save is in: the run's Live rows of the Current and Next weeks follow, in their own transaction, so
+// several quick Route Editor saves (block fill, paste) never wait on each other's Live rows. It reads the run as saved last.
+async function routeLiveFollow(db, req, email, stamp, result) {
+  try {
+    const live = await db.runTransaction(async (tx) => {
+      const mode = await requireTestMode(tx, db, ACTIONS.saveRoute.screen);
+      const snap = await tx.get(db.collection(C.routes).doc(M.safeIdPart(result.runId)));
+      if (!snap.exists) return null;
+      const m = Object.assign({ id: result.runId }, snap.data());
+      const weeks = await liveRead(tx, db, m.id);
+      const out = { runs: [], liveWeeks: { updated: 0, added: 0, warnings: [] } };
+      routeToLive(tx, db, mode, req, stamp, email, m, weeks, out);
+      return out;
+    });
+    if (live) { result.runs = result.runs.concat(live.runs); result.liveWeeks = live.liveWeeks; }
+  } catch (e) {
+    result.liveWeeks.warnings.push('Route Master is saved, but the Current and Next weeks did not update (' + (e.message || e) + '). Save the run again to retry.');
+  }
 }
 
 // Load Order (drag) for one weekday: the runs in their new order get 10, 20, 30 ...
@@ -1095,9 +1112,13 @@ async function reorderRouteDay(tx, db, req, email, stamp, logRef, mode) {
 
 /*
  * Publish to Daily Dispatch. In the new app Weekly and Daily read the same runs, so every Weekly pick is already on
- * Daily; Publish records that the week was checked and sent (who and when), which the Weekly header shows.
+ * Daily. Publishing the Live Next week moves the weeks on (weekroll.js); publishing another week records that it was
+ * checked and sent (who and when), which the Weekly header shows.
  */
 async function publishWeek(tx, db, req, email, stamp, logRef, mode) {
+  // Joe 10/11 (review item 6): publishing the Live Next week moves the weeks on and builds the new Next week, as the current app does.
+  const live = ((await tx.get(db.collection(C.config).doc('app'))).data() || {}).liveWeeks || {};
+  if (live.next && req.weekStart === live.next) return ROLL.publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveError);
   const ref = db.collection(C.weeks).doc(req.weekStart);
   const snap = await tx.get(ref);
   if (!snap.exists) throw new SaveError('NOT_FOUND', 'The week of ' + req.weekStart + ' is not one of the copied Live weeks');
