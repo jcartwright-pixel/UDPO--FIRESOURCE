@@ -42,10 +42,10 @@
       <div class="rp-body">
         <section class="rp-card">
           <h3>Shifts<em id="last"></em></h3>
-          <table class="sh-table"><thead><tr><th>Shift</th><th>Starts</th><th>Ends</th><th>Hours</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+          <table class="sh-table"><thead><tr><th>Shift</th><th>Side</th><th>Starts</th><th>Ends</th><th>Hours</th><th></th></tr></thead><tbody id="rows"></tbody></table>
         </section>
         <!-- Joe 10/10: the rule the reports use, said on the screen. -->
-        <div class="rp-lead"><b>How Plant Reports use the shifts: </b>a load counts for the shift it started loading in. Where two shifts overlap (2:00 to 2:30 PM, 10:00 to 10:30 PM) it stays with the earlier shift. A load with no Start time counts by its End time, and a load never loaded counts for the shift on duty at its depart time. Breakdowns, temperatures and pickups go by when they were logged or by their load. A time between shifts (5:30 to 6:00 AM) belongs to the shift that just ended.</div>
+        <div class="rp-lead"><b>Side: </b>Distribution shifts are the loading shifts; Plant Reports, Shift Notes and Shift Reports go by them. Plant Production shifts are kept for the plant production side. <b>How Plant Reports use the shifts: </b>a load counts for the shift it started loading in. Where two shifts overlap (2:00 to 2:30 PM, 10:00 to 10:30 PM) it stays with the earlier shift. A load with no Start time counts by its End time, and a load never loaded counts for the shift on duty at its depart time. Breakdowns, temperatures and pickups go by when they were logged or by their load. A time between shifts (5:30 to 6:00 AM) belongs to the shift that just ended.</div>
       </div>
     </div>
   </div>
@@ -64,29 +64,32 @@
 
     function draw() {
       document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-i="' + i + '"><td><input data-k="name" maxlength="40" value="' + escapeHtml(r.name) + '" aria-label="Shift name"></td>' +
+        '<td><select data-k="side" aria-label="Side">' + R.SHIFT_SIDES.map(([v, l]) => '<option value="' + v + '"' + (r.side === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></td>' +
         '<td><input type="time" data-k="start" value="' + escapeHtml(r.start) + '" aria-label="Starts"></td><td><input type="time" data-k="end" value="' + escapeHtml(r.end) + '" aria-label="Ends"></td>' +
         '<td>' + escapeHtml(hours(r.start, r.end)) + '</td><td><button type="button" class="rp-btn sh-remove" data-remove="' + i + '">Remove</button></td></tr>').join('') ||
-        '<tr><td colspan="5">No shifts. Press + Add Shift.</td></tr>';
+        '<tr><td colspan="6">No shifts. Press + Add Shift.</td></tr>';
     }
     function watch() {
       if (unsub) unsub();
       unsub = onSnapshot(doc(db, 'plantShifts', plantBox.value), s => {
         if (dirty) return;
         const d = s.exists() ? s.data() : null;
-        rows = R.shiftsFor(d, plantBox.value).map(x => ({ name: x.name, start: x.start.padStart(5, '0'), end: x.end.padStart(5, '0') }));
+        rows = R.shiftsFor(d, plantBox.value, 'ALL').map(x => ({ name: x.name, side: x.side, start: x.start.padStart(5, '0'), end: x.end.padStart(5, '0') }));
         document.getElementById('last').textContent = d && d.updatedAt ? 'Saved ' + dateTimeText(d.updatedAt) + ' by ' + (d.updatedBy || '') : 'Starting shifts (not changed yet)';
         draw();
       }, e => showError('Could not read the shifts: ' + e.message));
     }
+    // Joe 10/11: Side is a drop-down (Distribution or Plant Production); it changes on 'change'.
+    document.getElementById('rows').addEventListener('change', e => { const tr = e.target.closest('tr[data-i]'); if (tr && e.target.dataset.k === 'side') { rows[Number(tr.dataset.i)].side = e.target.value; dirty = true; } });
     document.getElementById('rows').addEventListener('input', e => {
       const tr = e.target.closest('tr[data-i]'), k = e.target.dataset.k;
       if (!tr || !k) return;
       rows[Number(tr.dataset.i)][k] = e.target.value; dirty = true;
-      tr.children[3].textContent = hours(rows[Number(tr.dataset.i)].start, rows[Number(tr.dataset.i)].end);
+      tr.children[4].textContent = hours(rows[Number(tr.dataset.i)].start, rows[Number(tr.dataset.i)].end);
     });
     document.getElementById('rows').addEventListener('click', e => { const b = e.target.closest('[data-remove]'); if (!b) return; rows.splice(Number(b.dataset.remove), 1); dirty = true; draw(); });
-    document.getElementById('add').onclick = () => { rows.push({ name: '', start: '', end: '' }); dirty = true; draw(); document.querySelector('#rows tr:last-child input').focus(); };
-    document.getElementById('reset').onclick = () => { rows = R.shiftsFor(null, plantBox.value).map(x => ({ name: x.name, start: x.start, end: x.end })); dirty = true; draw(); };
+    document.getElementById('add').onclick = () => { rows.push({ name: '', side: 'DISTRIBUTION', start: '', end: '' }); dirty = true; draw(); document.querySelector('#rows tr:last-child input').focus(); };
+    document.getElementById('reset').onclick = () => { rows = R.shiftsFor(null, plantBox.value, 'ALL').map(x => ({ name: x.name, side: x.side, start: x.start, end: x.end })); dirty = true; draw(); };
     plantBox.onchange = () => { dirty = false; watch(); };
     document.getElementById('save').onclick = async (e) => {
       const b = e.currentTarget, ok = document.getElementById('saved');

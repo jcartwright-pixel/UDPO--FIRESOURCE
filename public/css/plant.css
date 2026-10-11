@@ -712,14 +712,44 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
 }
 .quality-page .qc-fields .prod-other[hidden] { display: none; }
 .quality-page .qc-fields .prod-other { margin-top: 2px; }
-/* Administration > Machine Products */
+/* Administration > Products (Joe 10/11: plant, area and group drop-downs on the top line; template upload with a preview) */
 .products-page .pm-form { display: flex; flex-direction: column; gap: 10px; }
 .products-page .pm-table { width: 100%; table-layout: fixed; }
 .products-page .pm-table td { padding: 4px 6px; }
 .products-page .pm-table input { width: 100%; height: 38px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--ink); background: #fff; box-sizing: border-box; }
 .products-page .pm-table input:disabled { background: transparent; border-color: transparent; }
 .products-page .pm-remove, .mocreo-page .pm-remove { height: 38px; width: 100%; border: 1px solid #e3b4b4; border-radius: 8px; background: #fff; color: #a32020; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
-.products-page #find { height: 40px; min-width: 240px; border: 1px solid #b8cadb; border-radius: 9px; padding: 0 12px; font: inherit; font-size: 16px; }
+.products-page #find { height: 40px; width: 260px; margin-left: 12px; border: 1px solid #b8cadb; border-radius: 9px; padding: 0 12px; font: inherit; font-size: 16px; }
+.products-page select.pm-pick { height: 38px; border: 2px solid #9fb3c8; border-radius: 9px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; padding: 0 8px; cursor: pointer; }
+.products-page #group { width: 140px; }
+.products-page #area { width: 210px; }
+.products-page #plant { width: 150px; }
+.products-page .view { display: flex; flex-direction: column; min-height: 0; padding: 0 16px 8px; }
+.products-page .pm-form { flex: 1 1 auto; min-height: 0; }
+.products-page .pm-form .qc-top { display: flex; align-items: center; gap: 14px; }
+.products-page .pm-form .qc-top .hstats { margin: 0; }
+.products-page .pm-form .qc-top .qc-last { margin-left: auto; }
+.products-page .pm-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.products-page .pm-table thead th { position: sticky; top: 0; z-index: 1; }
+.products-page .pm-preview td { padding: 6px 8px; font-size: 16px; }
+.products-page .pm-preview td small { display: block; font-size: 16px; color: var(--muted); }
+.products-page .pm-preview td em { font-size: 12px; font-weight: 800; color: #1d6b3a; font-style: normal; }
+.products-page tr.pm-add td:last-child b { color: #1d6b3a; }
+.products-page tr.pm-change td:last-child b { color: #9a5b00; }
+.products-page tr.pm-remove td { background: #fdeceb; }
+.products-page tr.pm-remove td:last-child b { color: #a32020; }
+.products-page tr.pm-same td { color: #6d7a86; }
+.products-page tr.pm-bad td { background: #fdeceb; color: #a32020; font-weight: 800; }
+.products-page .pm-acts { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+.products-page .pm-acts .rp-btn { min-width: 160px; }
+.products-page .pm-setup { display: grid; grid-template-columns: repeat(2, minmax(0, 520px)); gap: 28px; overflow: auto; }
+.products-page .pm-setup h3 { margin: 0 0 8px; font-size: 18px; color: var(--ud-blue-dark); }
+.products-page .pm-srow { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 8px; align-items: center; margin-bottom: 6px; }
+.products-page .pm-srow input { height: 40px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; }
+.products-page .pm-srow.machine { padding: 8px 10px; background: #f1f5f9; border-radius: 8px; font-size: 16px; font-weight: 700; }
+.products-page .pm-srow.machine em { font-style: normal; font-size: 16px; color: var(--muted); text-align: right; }
+.products-page .pm-setup .rp-btn { margin-top: 4px; }
+@media (max-width: 1100px) { .products-page .pm-setup { grid-template-columns: 1fr; } .products-page #find { width: 180px; } }
 .products-page .pm-table td:first-child input { text-align: left; }
 .products-page .pm-check input { border-color: #d99a1e; background: #fff8e6; }
 .products-page .pm-check small { display: block; margin-top: 2px; font-size: 12px; font-weight: 800; color: #9a5b00; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

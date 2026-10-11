@@ -1038,7 +1038,7 @@ async function noScroll(page) {
     await lp.waitForSelector('.sidemenu a.side-name');
     assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'plant');
     const plantMenu = await lp.$$eval('.sidemenu > a:not(.side-name), .sidemenu > .side-sec', e => e.map(x => x.matches('a') ? x.textContent.trim() : x.querySelector('.side-sec-btn').getAttribute('title')));
-    assert.deepEqual(plantMenu.filter(x => x !== 'Home'), ['Send Report', 'Reports', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'], 'the Plant side lists its own sections');
+    assert.deepEqual(plantMenu.filter(x => x !== 'Home'), ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'], 'the Plant side lists its own sections');
     assert.equal(await lp.$$eval('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]', b => b.length), 1, 'a section with several screens has a fly-out');
     assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)).then(t => t.filter(x => ['Dispatch', 'Drivers', 'Equipment', 'GPS / Fleet'].indexOf(x) >= 0)), [], 'no Dispatch, Drivers or Equipment sections on the Plant side');
     await lp.hover('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]');

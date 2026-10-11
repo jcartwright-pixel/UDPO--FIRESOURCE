@@ -107,13 +107,15 @@ async function seed() {
   const browser = await chromium.launch();
   const results = [];
   try {
-    // Manager Center: the Reports button opens the Plant Scorecard (look B): seven day cards and the week, yesterday picked.
+    // Manager Center: the Reports button opens the Reports module (Joe 10/11: every report in one place); its Plant Reports
+    // card opens the Plant Scorecard (look B): seven day cards and the week, yesterday picked.
     const mc = await openPage(browser, 1920, 950, '/manager.html?' + MANAGER);
     await mc.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 10/.test(document.querySelector('[data-card="dept"]').textContent));
     const size = await mc.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight }));
     assert.ok(size.scroll <= size.inner, 'Manager Center still fits with the Reports button');
     await shots(mc, 'manager-reports-button', 1920);
-    await Promise.all([mc.waitForURL(/reports\.html/), mc.click('#reports')]);
+    await Promise.all([mc.waitForURL(/reportcenter\.html/), mc.click('#reports')]);
+    await Promise.all([mc.waitForURL(/\/reports\.html/), mc.click('.rc-card[href="reports.html"]')]);
     await mc.waitForSelector('.rp-days .rp-day.on');
     assert.equal(await mc.$$eval('.rp-day', b => b.length), 8);
     assert.equal(await mc.$eval('.rp-day.on', b => b.dataset.day), yesterday);
@@ -177,10 +179,23 @@ async function seed() {
     await ps.waitForSelector('#rows tr[data-i]');
     assert.deepEqual(await ps.$$eval('#rows tr[data-i]', r => r.map(x => [...x.querySelectorAll('input')].map(i => i.value).join(' '))), ['First Shift 06:00 14:30', 'Second Shift 14:00 22:30', 'Third Shift 22:00 05:30']);
     assert.match(await ps.textContent('.rp-lead'), /stays with the earlier shift/);
+    // Joe 10/11: a Side column; the starting shifts are Distribution, and a Plant Production shift saves beside them.
+    assert.deepEqual(await ps.$$eval('#rows select[data-k="side"]', s => s.map(x => x.value)), ['DISTRIBUTION', 'DISTRIBUTION', 'DISTRIBUTION']);
+    await ps.click('#add');
+    const last = '#rows tr[data-i="3"] ';
+    await ps.fill(last + 'input[data-k="name"]', 'First Shift');
+    await ps.selectOption(last + 'select[data-k="side"]', 'PRODUCTION');
+    await ps.fill(last + 'input[data-k="start"]', '07:00');
+    await ps.fill(last + 'input[data-k="end"]', '15:30');
     await shots(ps, 'plant-shifts', 1920);
+    await ps.click('#save');
+    await ps.waitForFunction(() => /4 shifts saved/.test(document.getElementById('saved').textContent));
+    await ps.reload();
+    await ps.waitForFunction(() => document.querySelectorAll('#rows tr[data-i]').length === 4 && /Saved/.test(document.getElementById('last').textContent));
+    assert.deepEqual(await ps.$$eval('#rows select[data-k="side"]', s => s.map(x => x.value)), ['DISTRIBUTION', 'DISTRIBUTION', 'DISTRIBUTION', 'PRODUCTION']);
     assert.deepEqual(ps.errors, []);
     await ps.close();
-    results.push('Plant Shifts: Uniontown starts with 6:00-2:30, 2:00-10:30, 10:00-5:30');
+    results.push('Plant Shifts: Uniontown starts with 6:00-2:30, 2:00-10:30, 10:00-5:30 (Distribution); a Plant Production shift saves beside them');
 
     // Kiosk: today's loads, 4 of 10 loaded, the next to load listed; the TV hides the header.
     for (const [w, h, url, name] of [[1920, 1080, '/plant-kiosk.html?' + MANAGER, 'kiosk'], [1920, 1080, '/plant-kiosk.html?tv=1&' + MANAGER, 'kiosk-tv'], [1280, 800, '/plant-kiosk.html?' + MANAGER, 'kiosk-tablet']]) {

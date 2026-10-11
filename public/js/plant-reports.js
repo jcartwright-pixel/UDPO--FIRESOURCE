@@ -75,10 +75,16 @@ export const DEFAULT_SHIFTS = Object.freeze({
   fac_uniontown: [{ name: 'First Shift', start: '06:00', end: '14:30' }, { name: 'Second Shift', start: '14:00', end: '22:30' }, { name: 'Third Shift', start: '22:00', end: '05:30' }]
 });
 const hhmm = (v) => { const m = String(v || '').match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
-// The plant's shifts: the saved list (plantShifts/<facility>) or the starting list.
-export function shiftsFor(saved, facilityId) {
-  const id = facilityId || 'fac_uniontown', list = saved && Array.isArray(saved.shifts) && saved.shifts.length ? saved.shifts : DEFAULT_SHIFTS[id] || DEFAULT_SHIFTS.fac_uniontown;
-  return list.map(x => ({ name: text(x.name), start: text(x.start), end: text(x.end), from: hhmm(x.start), to: hhmm(x.end) })).filter(x => x.name && x.from !== null && x.to !== null);
+// Joe 10/11: each plant has Distribution shifts and Plant Production shifts. A shift saved before the Side column is Distribution.
+export const SHIFT_SIDES = Object.freeze([['DISTRIBUTION', 'Distribution'], ['PRODUCTION', 'Plant Production']]);
+export const shiftSide = (x) => (text(x && x.side).toUpperCase() === 'PRODUCTION' ? 'PRODUCTION' : 'DISTRIBUTION');
+// The plant's shifts on one side (Distribution unless asked; side 'ALL' = every shift): the saved list (plantShifts/<facility>)
+// or the starting list. Loads, Shift Notes and Shift Reports go by the Distribution shifts.
+export function shiftsFor(saved, facilityId, side) {
+  const id = facilityId || 'fac_uniontown', want = side || 'DISTRIBUTION', starting = DEFAULT_SHIFTS[id] || DEFAULT_SHIFTS.fac_uniontown;
+  let list = saved && Array.isArray(saved.shifts) && saved.shifts.length ? saved.shifts : starting;
+  if (want !== 'ALL') { list = list.filter(x => shiftSide(x) === want); if (!list.length && want === 'DISTRIBUTION') list = starting; }
+  return list.map(x => ({ name: text(x.name), start: text(x.start), end: text(x.end), side: shiftSide(x), from: hhmm(x.start), to: hhmm(x.end) })).filter(x => x.name && x.from !== null && x.to !== null);
 }
 /*
  * The shift a time of day (minutes) belongs to. Inside an overlap the earlier shift keeps it (the one that started longer
