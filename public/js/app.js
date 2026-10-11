@@ -129,6 +129,25 @@ function refuseBuilding(side) {
   document.body.classList.add('uc-locked');
   if (bar) bar.after(box); else (screen || document.body).appendChild(box);
 }
+// Joe 10/11: "how can I tell what version this is? And if this is sandbox or not." version.json is written by the deploy
+// (tools/stamp-version.cjs) and read fresh, never from a cache, so the line always names what is really on screen.
+let versionAsk = null;
+export function appVersion() {
+  if (!versionAsk) versionAsk = fetch('version.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  return versionAsk;
+}
+function showVersion() {
+  appVersion().then(v => {
+    if (!v || !v.label) return;
+    document.querySelectorAll('.side-version, #app-version').forEach(el => {
+      // In the narrow menu the release goes on one line and the date and copy on the next.
+      const parts = v.label.split(' · ');
+      if (el.classList.contains('side-version') && parts.length > 1) el.innerHTML = '<b>' + escapeHtml(parts[0]) + '</b> <span>' + escapeHtml(parts.slice(1).join(' · ')) + '</span>';
+      else el.textContent = v.label;
+      if (v.commit) el.title = v.label + ' (' + v.commit + ')';
+    });
+  });
+}
 export function sideFor(page) {
   // Home, the all-plants overview and the Administration Center sit above the three sides: their menu lists the sides.
   if (!page || ['index.html', 'company.html', 'administration.html'].indexOf(page) >= 0) return null;
@@ -184,6 +203,9 @@ function addSideMenu() {
       '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
       svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span><i aria-hidden="true">&#9656;</i></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join(''));
+  // Joe 10/11: which version this is and whether it is the test copy, at the bottom of the menu (stamped by the deploy).
+  nav.insertAdjacentHTML('beforeend', '<div class="side-version" title="The version of the app on this screen"></div>');
+  showVersion();
   // Joe 10/10: the fly-outs live in their own layer on the page, not inside the menu, so no screen, table or pop-up can draw over them.
   const layer = document.createElement('nav');
   layer.className = 'side-flyouts';

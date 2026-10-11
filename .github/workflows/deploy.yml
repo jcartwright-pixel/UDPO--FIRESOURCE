@@ -163,6 +163,9 @@ jobs:
           # Diagnostics are sandbox only (Joe 10/10): the sandbox gets the Diagnostics screen and its probe on every screen;
           # production must have none of it, and the deploy stops if it does.
           if [ "$TARGET" = sandbox ]; then node tools/sandbox-diagnostics.cjs add public; else node tools/sandbox-diagnostics.cjs check public; fi
+          # Joe 10/11: the version line at the bottom of the menu, from this commit and today ("Release 5 · 10-11-26 · Live").
+          git fetch --quiet --depth=400 origin main || echo "::warning::Could not read main for the release number"
+          node tools/stamp-version.cjs "$TARGET" public
           echo "Server account (share the sheets with it as Viewer): $runtime"
           npx --prefix functions firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
           {
