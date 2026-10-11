@@ -209,6 +209,7 @@ function injectStyle() {
   const s = document.createElement('style');
   s.id = 'daily-keys-style';
   s.textContent = [
+    'body.daily-look table.daily tbody tr.group.loaded td{background:#e3eeff!important;color:#0b4fb3!important;letter-spacing:.06em}',
     'table.daily td[data-edit]:focus{outline:3px solid #1f6feb;outline-offset:-3px;background:#eaf3ff!important}',
     '.cell-pop{position:fixed;z-index:80;overflow:auto;background:#fff;border:1px solid #9fb9cf;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.28);font:700 16px Arial,sans-serif;color:#123f70}',
     '.cell-pop [data-i]{display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-bottom:1px solid #edf2f6;cursor:pointer;white-space:nowrap}',
