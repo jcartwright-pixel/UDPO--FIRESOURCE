@@ -6,7 +6,9 @@
  *     UPC, shelf life and speed range boxes save on the plant's Products list (Joe: one list for everything about a product);
  *   - the line tablet: pick the product, type the count, Line Stopped, tap why, Running Again;
  *   - the speed flashes when the product runs over its highest speed (Joe 10/11), on the tablet and on the TV;
- *   - Production Lines and the TV show every line in green, yellow or red.
+ *   - Production Lines and the TV show every line in green, yellow or red;
+ *   - the label reader (Joe 10/11): an administrator makes the line key on Line Targets and starts the sandbox test feed, and the
+ *     tablet and TV count the pretend jugs on their own with the code date check.
  * Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -18,6 +20,7 @@ const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
 const P = require('../../src/production-rules');
+const RD = require('../../src/reader');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -175,6 +178,39 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     assert.deepEqual(tvp.errors, []);
     await tvp.close();
     results.push('Production Lines and the TV: every line green, yellow or red with made against target; the speed flag flashes there too; the TV has no app header');
+    // The label reader: the line key and the test feed's pretend jugs (Joe 10/11: watch the Gallon Filler count on its own).
+    await db().collection('productionRuns').doc(P.runId(LINE, shiftKey)).delete();
+    const lt = await openPage(browser, 1536, 864, '/linetargets.html?line=' + LINE + '&' + ADMIN);
+    await lt.waitForSelector('#reader:not([hidden]) #make-key');
+    assert.match(await lt.textContent('#reader'), /cloudfunctions\.net\/lineReads/);
+    await lt.click('#make-key');
+    await lt.waitForSelector('#reader-key');
+    const key = await lt.textContent('#reader-key');
+    assert.ok(key.length >= 24, 'a long key');
+    assert.equal(((await db().collection('private').doc('lineReaders').get()).data() || {})[LINE].hash, RD.hash(key), 'only its hash is kept');
+    await lt.click('#start-feed');
+    await lt.waitForFunction(() => /Test feed running/.test(document.getElementById('reader').textContent));
+    const feedStart = Date.now();
+    for (let m = 0; m < 5; m++) await RD.readerMinute(db(), { now: () => new Date(feedStart + m * 60000), project: 'demo-ud-distribution' });
+    await fits(lt, 'Line Targets with the reader panel');
+    await shot(lt, 'line-targets-reader-1536');
+    assert.deepEqual(lt.errors, []);
+    const rt = await openPage(browser, 1280, 800, '/line.html?line=' + LINE + '&' + ADMIN);
+    await rt.waitForFunction(() => Number((document.getElementById('made').textContent || '0').replace(/,/g, '')) > 300);
+    assert.match(await rt.textContent('#prod'), /Broughton 2% Gallon/, 'the reader picked the product by its UPC');
+    assert.match(await rt.textContent('#date-check'), /CODE DATE|jugs read/);
+    assert.match(await rt.textContent('#live'), /Label reader on/);
+    await shot(rt, 'line-tablet-reader-1280');
+    assert.deepEqual(rt.errors, []);
+    await rt.close();
+    const rtv = await openPage(browser, 1920, 1080, '/production.html?tv=1&' + ADMIN);
+    await rtv.waitForFunction((l) => { const t = document.querySelector('.pd-tile[data-line="' + l + '"] .pd-made b'); return t && Number(t.textContent.replace(/,/g, '')) > 300; }, LINE);
+    await shot(rtv, 'production-tv-reader-1920');
+    await rtv.close();
+    await lt.click('#stop-feed');
+    await lt.waitForFunction(() => /Start Test Feed/.test(document.getElementById('reader').textContent));
+    await lt.close();
+    results.push('Label reader: an administrator makes the line key (kept only as a hash) and starts the test feed; the tablet and the TV count the pretend jugs with the product from its UPC; Stop Test Feed stops it');
     console.log('Plant Production browser check passed:\n - ' + results.join('\n - '));
   } finally {
     await browser.close();

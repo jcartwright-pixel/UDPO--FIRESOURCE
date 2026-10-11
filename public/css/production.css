@@ -137,3 +137,11 @@ body.pd-tv .pd-legend .g { color: #2fbf62; } body.pd-tv .pd-legend .a { color: #
 body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 @media (max-width: 1200px) { .pd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .pd-tiles { grid-template-columns: 1fr; } }
+/* Line Targets: the label reader panel (administrators). */
+.lt-reader { margin-top: 14px; padding: 14px 18px; border: 1px solid var(--line); border-left: 6px solid var(--ud-gold); border-radius: 12px; background: #fff; font-size: 16px; }
+.lt-reader h3 { margin: 0 0 6px; font-size: 18px; color: var(--ud-blue-dark); }
+.lt-reader p { margin: 6px 0; }
+.lt-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+.lt-key { background: #fff8e1; border-radius: 8px; padding: 8px 10px; }
+.lt-reader-btns { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.lt-reader-btns button { min-height: 44px; padding: 0 18px; font-size: 16px; font-weight: 700; }

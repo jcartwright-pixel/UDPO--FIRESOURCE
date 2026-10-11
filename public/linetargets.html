@@ -51,6 +51,8 @@
               <tbody id="rows"></tbody>
             </table>
           </div>
+          <!-- Label reader (Joe 10/11): the line PC's key and the sandbox test feed; administrators only (src/reader.js). -->
+          <div class="lt-reader" id="reader" hidden></div>
         </section>
       </div>
       <div class="foot" id="foot"></div>
@@ -58,7 +60,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, save, callServer, escapeHtml, showError, dateTimeText } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchProduction, fmt } from './js/production.js';
     import { savedText } from './js/autosave.js';
@@ -88,6 +90,46 @@
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
+    // The label reader panel (administrators): the line PC's key (shown once) and, on the sandbox, the test feed of pretend jugs.
+    const SANDBOX = !/^ud-distribution\.(web\.app|firebaseapp\.com)$/.test(location.hostname);
+    const readsAddress = () => 'https://us-east4-' + (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'demo-ud-distribution' : location.hostname.split('.')[0]) + '.cloudfunctions.net/lineReads';
+    let shownKey = null, readerNote = '';
+    function drawReader(line, counter) {
+      const box = document.getElementById('reader');
+      if (counter !== 'READER' || !L.isAdmin(person)) { box.hidden = true; return; }
+      const info = data.lineInfo[line.operationId] || {}, feed = info.testFeed && Date.parse(info.testFeed.until) > Date.now() ? info.testFeed : null;
+      box.hidden = false;
+      box.innerHTML = '<h3>Label reader</h3>' +
+        '<p>The line PC sends each jug the reader sees to <b class="lt-mono">' + escapeHtml(readsAddress()) + '</b> with this line\'s key. ' +
+        (info.readerKeyAt ? 'Key made ' + escapeHtml(dateTimeText(info.readerKeyAt)) + '.' : 'No key yet.') + '</p>' +
+        (shownKey && shownKey.line === line.operationId ? '<p class="lt-key">Line key (copy it now, it is not shown again): <b class="lt-mono" id="reader-key">' + escapeHtml(shownKey.key) + '</b></p>' : '') +
+        '<div class="lt-reader-btns"><button type="button" id="make-key">' + (info.readerKeyAt ? 'Replace Line Key' : 'Make Line Key') + '</button>' +
+        (SANDBOX ? (feed ? '<button type="button" id="stop-feed" class="danger">Stop Test Feed</button>' : '<button type="button" id="start-feed">Start Test Feed (1 hour)</button>') : '') + '</div>' +
+        (SANDBOX ? '<p class="lt-note">' + (feed ? '<b>Test feed running</b> until ' + escapeHtml(dateTimeText(feed.until)) + ': about 74 pretend jugs a minute, a missing or wrong date now and then, a product change every 20 minutes and a 4-minute stop every half hour. Open the Line Tablet or the TV to watch.' : 'Test Feed sends pretend jugs (sandbox only) so the tablet and TV count on their own before the reader is bought.') + '</p>' : '') +
+        (readerNote ? '<p class="lt-note" id="reader-note">' + escapeHtml(readerNote) + '</p>' : '');
+    }
+    async function readerOp(op, extra) {
+      const line = current();
+      if (!line) return;
+      readerNote = 'Working…'; render('keep');
+      try {
+        const r = await callServer('lineReader', Object.assign({ op, operationId: line.operationId }, extra || {}));
+        if (r.key) shownKey = { line: line.operationId, key: r.key };
+        readerNote = r.message || ''; showError('');
+      } catch (err) { readerNote = ''; showError(line.name + ': ' + (err.message || err)); }
+      render('keep');
+    }
+    document.getElementById('reader').addEventListener('click', e => {
+      const line = current();
+      if (!line) return;
+      if (e.target.id === 'make-key') readerOp('makeKey');
+      if (e.target.id === 'stop-feed') readerOp('stopTest');
+      if (e.target.id === 'start-feed') {
+        // The pretend jugs are the line's first products (the first two, so the feed changes product too).
+        const products = listOf(line.operationId).filter(p => String(p.name || '').trim()).slice(0, 2).map(p => ({ name: p.name, upc: p.upc || '' }));
+        readerOp('startTest', { minutes: 60, products });
+      }
+    });
     function render(force) {
       drawTop();
       const line = current(), ck = canSave(), dis = ck ? '' : ' disabled';
@@ -109,6 +151,7 @@
       const sel = document.getElementById('counter');
       sel.innerHTML = R.COUNTERS.map(c => opt(c, counter, R.COUNTER_LABEL[c])).join('');
       sel.disabled = !ck;
+      drawReader(line, counter);
       // Not drawn again while someone types in the list.
       if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
       const cell = (i, k, v, label, cls, ph) => '<td' + (cls ? ' class="' + cls + '"' : '') + '><input data-i="' + i + '" data-k="' + k + '" value="' + escapeHtml(v === null || v === undefined ? '' : v) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' aria-label="' + escapeHtml(label) + '"' + (k === 'upc' ? ' maxlength="20" inputmode="numeric"' : ' inputmode="decimal" maxlength="8"') + dis + '></td>';
