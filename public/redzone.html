@@ -33,12 +33,12 @@
         <h2>1. RedZone API sign-in <span class="pill" id="state">-</span></h2>
         <p class="hint">Type these here only, never in a chat or email. Once saved they are locked away and never shown again; only the last 4 characters show. A box left blank keeps what is saved.</p>
         <form id="form" autocomplete="off" onsubmit="return false">
+          <label>Organization ID<input id="f-org" autocomplete="off" spellcheck="false" placeholder="RedZone organization ID"></label>
           <label>API address<input id="f-address" autocomplete="off" spellcheck="false" placeholder="https://… (from the Developer Hub)"></label>
-          <label>API token<input id="f-token" type="password" autocomplete="new-password" spellcheck="false"></label>
-          <p class="hint">Or, when RedZone gives a client ID and secret instead of a token:</p>
           <label>Client ID<input id="f-client" type="password" autocomplete="new-password" spellcheck="false"></label>
           <label>Client secret<input id="f-secret" type="password" autocomplete="new-password" spellcheck="false"></label>
-          <label>Token address<input id="f-tokenurl" autocomplete="off" spellcheck="false" placeholder="https://… (only with a client ID)"></label>
+          <label>Token address<input id="f-tokenurl" autocomplete="off" spellcheck="false" placeholder="https://… (from Create an OAuth token)"></label>
+          <label>API token (only instead of a client ID and secret)<input id="f-token" type="password" autocomplete="new-password" spellcheck="false"></label>
           <label>Products address<input id="f-path" autocomplete="off" spellcheck="false" placeholder="/products"></label>
           <div class="gps-buttons">
             <button type="button" class="primary" id="save">Save</button>
@@ -57,10 +57,11 @@
       <section class="gps-card wide">
         <h2>3. Where these come from</h2>
         <ol class="gps-steps">
-          <li>Your everyday RedZone user name and password do not go here. RedZone's API uses its own token (or a client ID and secret).</li>
-          <li>In RedZone, open the Developer Hub (or Site Admin Settings) and look for API access, API clients or tokens. If you can create one, make a read-only one for "UD Operations app".</li>
-          <li>Copy the API address, and the token (or the client ID, secret and token address), into box 1 and press <b>Save</b>. The Developer Hub also shows the products address if it is not /products.</li>
-          <li>Press <b>Test Connection</b>. Green means it works; red says what to fix. If there is no way to make a token, ask your RedZone rep for "API access for our account".</li>
+          <li>Your everyday RedZone user name and password do not go here. RedZone's API uses a client ID and secret (RedZone's help article "[Admin] REST API IDs and Secrets").</li>
+          <li>In RedZone, Manage Access &gt; Roles: create a role for "UD Operations app" with its permissions on.</li>
+          <li>Organization name drop-down &gt; Organization Settings &gt; Client Applications &gt; Create Application: name it "UD Operations app" and pick that role. RedZone shows the Client ID and Client Secret once.</li>
+          <li>Type the organization ID, client ID and client secret in box 1 and press <b>Save</b>. The app gets and renews its own tokens; you never handle one.</li>
+          <li>Press <b>Test Connection</b>. Green means it works; red says what to fix. RedZone's integrations team: integrations@rzsoftware.com.</li>
         </ol>
       </section>
     </div>
@@ -75,13 +76,13 @@
     const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
     function render() {
       if (!s) return;
-      const signIn = s.hasToken || (s.hasClient && s.hasSecret && s.tokenUrl), ready = s.address && signIn;
-      $('state').textContent = ready ? 'Saved' : s.address || s.hasToken || s.hasClient ? 'Partly saved' : 'Not saved';
-      $('state').className = 'pill ' + (ready ? 'yes' : s.address || s.hasToken || s.hasClient ? 'warn' : 'no');
+      const signIn = s.hasToken || (s.hasClient && s.hasSecret && s.tokenUrl), ready = s.address && signIn, some = s.orgId || s.address || s.hasToken || s.hasClient;
+      $('state').textContent = ready ? 'Saved' : some ? 'Partly saved' : 'Not saved';
+      $('state').className = 'pill ' + (ready ? 'yes' : some ? 'warn' : 'no');
       $('f-token').placeholder = s.hasToken ? 'saved, ends ' + s.tokenEnds + ' (paste to replace)' : '';
       $('f-client').placeholder = s.hasClient ? 'saved, ends ' + s.clientEnds + ' (paste to replace)' : '';
       $('f-secret').placeholder = s.hasSecret ? 'saved (paste to replace)' : '';
-      [['f-address', 'address'], ['f-tokenurl', 'tokenUrl'], ['f-path', 'productsPath']].forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = s[k] || ''; });
+      [['f-org', 'orgId'], ['f-address', 'address'], ['f-tokenurl', 'tokenUrl'], ['f-path', 'productsPath']].forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = s[k] || ''; });
       $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
       const t = s.lastTest;
       $('last').textContent = t ? 'Last test ' + stamp(t.at) + (t.by ? ' by ' + t.by : '') + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
@@ -94,7 +95,7 @@
       finally { if (button) button.disabled = false; }
     }
     $('save').onclick = async () => {
-      const r = await call({ op: 'save', address: $('f-address').value, token: $('f-token').value, clientId: $('f-client').value, clientSecret: $('f-secret').value, tokenUrl: $('f-tokenurl').value, productsPath: $('f-path').value }, $('save'));
+      const r = await call({ op: 'save', orgId: $('f-org').value, address: $('f-address').value, token: $('f-token').value, clientId: $('f-client').value, clientSecret: $('f-secret').value, tokenUrl: $('f-tokenurl').value, productsPath: $('f-path').value }, $('save'));
       if (r) { ['f-token', 'f-client', 'f-secret'].forEach(id => { $(id).value = ''; }); $('result').hidden = true; }
     };
     // No pop-up: the first tap arms the button, a second tap within 5 seconds removes the token, client ID and secret.
@@ -112,7 +113,7 @@
       $('result').innerHTML = '<b>' + (r.result.ok ? 'PASSED' : 'FAILED') + '</b> ' + escapeHtml(r.result.message) +
         (r.result.sample && r.result.sample.length ? '<small>For example: ' + escapeHtml(r.result.sample.join(' · ')) + '</small>' : '');
     };
-    ['f-address', 'f-token', 'f-client', 'f-secret', 'f-tokenurl', 'f-path'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
+    ['f-org', 'f-address', 'f-token', 'f-client', 'f-secret', 'f-tokenurl', 'f-path'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
     requireSignIn(async () => { await start(); await call({ op: 'status' }); });
   </script>
 </body>

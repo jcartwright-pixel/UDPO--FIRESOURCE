@@ -67,6 +67,8 @@ function normalize(p) {
   };
 }
 
+// RedZone's addresses can carry the organization ID ({org} in an address is replaced with it).
+const withOrg = (v, org) => String(v || '').replace(/\{(org|organizationId|orgId)\}/gi, encodeURIComponent(org || ''));
 function urlFor(address, path) {
   if (/^https:\/\//i.test(path)) return path;
   return String(address).replace(/\/+$/, '') + '/' + String(path || '').replace(/^\/+/, '');
@@ -82,7 +84,9 @@ async function accessToken(d, o, ref) {
   if (d.access && d.access.token && d.access.until > now + 60000) return d.access.token;
   const form = new URLSearchParams({ grant_type: 'client_credentials', client_id: d.clientId, client_secret: d.clientSecret });
   if (d.scope) form.set('scope', d.scope);
-  const res = await o.fetch(d.tokenUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json',
+  // Joe 10/11 (RedZone's "REST API IDs and Secrets"): a token is made with the organization ID plus the client ID and secret.
+  if (d.orgId && !/\{(org|organizationId|orgId)\}/i.test(d.tokenUrl)) form.set('organization_id', d.orgId);
+  const res = await o.fetch(withOrg(d.tokenUrl, d.orgId), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json',
     Authorization: 'Basic ' + Buffer.from(d.clientId + ':' + d.clientSecret).toString('base64') }, body: form.toString() });
   // The answer is never shown whole: it could echo the secret.
   if (!res.ok) throw new Error('RedZone answered ' + res.status + ' at the token address');
@@ -97,10 +101,10 @@ async function accessToken(d, o, ref) {
 // Every product, following next-page links on the same host.
 async function fetchProducts(d, o, ref) {
   if (!d.address) throw new RedzoneError('BAD_REQUEST', 'Save the RedZone API address first.');
-  const token = await accessToken(d, o, ref), out = [];
-  let url = urlFor(d.address, d.productsPath || DEFAULTS.productsPath);
+  const token = await accessToken(d, o, ref), out = [], address = withOrg(d.address, d.orgId);
+  let url = urlFor(address, withOrg(d.productsPath || DEFAULTS.productsPath, d.orgId));
   for (let page = 0; url && page < PAGE_LIMIT && out.length < PRODUCT_LIMIT; page++) {
-    if (!sameHost(url, d.address)) throw new Error('The products address must be https on the same RedZone address');
+    if (!sameHost(url, address)) throw new Error('The products address must be https on the same RedZone address');
     const res = await o.fetch(url, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
     if (!res.ok) throw new Error('RedZone answered ' + res.status + ' for the products address');
     let body; try { body = JSON.parse(await res.text()); } catch (e) { throw new Error('RedZone sent something that is not JSON for the products address'); }
@@ -108,7 +112,7 @@ async function fetchProducts(d, o, ref) {
     if (!list) throw new Error('RedZone\'s answer has no product list in it');
     list.forEach(p => { const n = normalize(p); if (n.name) out.push(n); });
     const next = nextIn(body);
-    url = next ? urlFor(d.address, next) : '';
+    url = next ? urlFor(address, next) : '';
   }
   return out;
 }
@@ -116,11 +120,11 @@ const plain = (e) => /answered 40[13]/.test(e.message) ? 'RedZone refused the si
   : /answered 404/.test(e.message) ? 'RedZone has no page at that address (404). Check the API address and products address from the Developer Hub.'
   : 'Could not read RedZone: ' + e.message;
 
-const view = (d) => ({ address: d.address || '', tokenUrl: d.tokenUrl || '', productsPath: d.productsPath || DEFAULTS.productsPath, scope: d.scope || '',
+const view = (d) => ({ orgId: d.orgId || '', address: d.address || '', tokenUrl: d.tokenUrl || '', productsPath: d.productsPath || DEFAULTS.productsPath, scope: d.scope || '',
   hasToken: !!d.token, tokenEnds: ends(d.token), hasClient: !!d.clientId, clientEnds: ends(d.clientId), hasSecret: !!d.clientSecret,
   savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastTest: d.lastTest || null });
 
-/* input.op: status | save {address, tokenUrl, productsPath, scope, token, clientId, clientSecret} | clear | test | products {facilityId} */
+/* input.op: status | save {orgId, address, tokenUrl, productsPath, scope, token, clientId, clientSecret} | clear | test | products {facilityId} */
 async function redzoneCall(db, user, input, options) {
   input = input || {};
   const o = Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date() }, options || {});
@@ -141,11 +145,13 @@ async function redzoneCall(db, user, input, options) {
     if (tokenUrl) next.tokenUrl = tokenUrl;
     if (input.productsPath !== undefined && clean(input.productsPath, 300)) next.productsPath = clean(input.productsPath, 300);
     if (input.scope !== undefined) next.scope = clean(input.scope, 200);
+    const org = clean(input.orgId, 120);
+    if (org) next.orgId = org;
     const token = clean(input.token, 4000), id = clean(input.clientId, 300), secret = clean(input.clientSecret, 600);
     if (token) next.token = token;
     if (id) next.clientId = id;
     if (secret) next.clientSecret = secret;
-    if (![address, tokenUrl, token, id, secret, clean(input.productsPath, 300)].some(Boolean) && input.scope === undefined) throw new RedzoneError('BAD_REQUEST', 'Type something to save first.');
+    if (![address, tokenUrl, token, id, secret, org, clean(input.productsPath, 300)].some(Boolean) && input.scope === undefined) throw new RedzoneError('BAD_REQUEST', 'Type something to save first.');
     delete next.access;
     Object.assign(next, { savedAt: at, savedBy: email, lastTest: null });
     await ref.set(next);
@@ -153,7 +159,7 @@ async function redzoneCall(db, user, input, options) {
     return view(next);
   }
   if (op === 'clear') {
-    const next = { address: d.address || '', tokenUrl: d.tokenUrl || '', productsPath: d.productsPath || '', scope: d.scope || '', savedAt: at, savedBy: email, lastTest: null };
+    const next = { orgId: d.orgId || '', address: d.address || '', tokenUrl: d.tokenUrl || '', productsPath: d.productsPath || '', scope: d.scope || '', savedAt: at, savedBy: email, lastTest: null };
     await ref.set(next);
     await status.set({ configured: false, message: 'No RedZone sign-in saved.', at }, { merge: true });
     return view(next);

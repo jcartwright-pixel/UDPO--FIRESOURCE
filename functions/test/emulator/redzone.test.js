@@ -64,13 +64,15 @@ test('Test Connection follows the next page, and a refused token is said in plai
   assert.ok(!everything.includes(TOKEN) && !everything.includes('wrong_token'));
 });
 
-test('a client ID and secret are traded for a token at the token address', async () => {
+test('an organization ID, client ID and secret are traded for a token at the token address', async () => {
   await people();
-  await R.redzoneCall(db(), ADMIN, { op: 'save', address: BASE, clientId: 'client-abc', clientSecret: SECRET, tokenUrl: 'https://auth.redzone.example/oauth/token' });
+  await R.redzoneCall(db(), ADMIN, { op: 'save', orgId: 'ud-org-7', address: BASE, clientId: 'client-abc', clientSecret: SECRET, tokenUrl: 'https://auth.redzone.example/oauth/token' });
   const calls = [];
   const ok = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch: fakeRedzone(calls) });
   assert.equal(ok.result.ok, true);
   assert.match(calls[0].body, /grant_type=client_credentials/);
+  assert.match(calls[0].body, /organization_id=ud-org-7/, 'the organization ID goes with the client ID and secret');
+  assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).orgId, 'ud-org-7');
   assert.equal(calls[1].auth, 'Bearer traded_token');
   assert.ok(!JSON.stringify(ok).includes(SECRET));
 });
