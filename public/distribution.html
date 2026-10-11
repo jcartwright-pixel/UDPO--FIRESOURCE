@@ -84,15 +84,15 @@
         const [a, b] = el.dataset.n.split('.');
         const v = n[a][b];
         el.textContent = v + (el.dataset.suffix || '');
-        if (el.hasAttribute('data-alert')) el.classList.toggle('alert', Number(v) > 0);
+        if (el.hasAttribute('data-alert')) el.classList.toggle('alert', parseInt(v, 10) > 0);
       });
     }
 
     document.querySelector('.cards').addEventListener('click', async (e) => {
       const tag = e.target.closest('[data-owner]');
-      if (!tag) return;
+      // Only administrators use the tag; for everyone else a click on it opens the screen like the rest of the line.
+      if (!tag || !data.admin) return;
       e.preventDefault();
-      if (!data.admin) return;
       if (!tag.classList.contains('armed')) {
         tag.classList.add('armed');
         tag.textContent = 'Click again';
@@ -103,7 +103,7 @@
       const key = tag.dataset.owner;
       const fields = key === 'writeBack' ? { writeBack: !data.writeBack } : { screen: key, owner: L.screenOwners(data.app)[key] === 'new' ? 'old' : 'new' };
       tag.textContent = '...';
-      try { showError(''); await callServer('setSwitch', fields); } catch (err) { showError(err.message || String(err)); }
+      try { showError(''); await callServer('setSwitch', fields); } catch (err) { showError(err); }
       render();
     });
 
@@ -120,13 +120,14 @@
       onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => d.data()); render(); }, fail('Route Master'));
       onSnapshot(collection(db, 'vacations'), s => { data.vacations = s.docs.map(d => d.data()); render(); }, fail('the vacation schedule'));
       onSnapshot(collection(db, 'exceptions'), s => { data.exceptions = s.docs.map(d => d.data()); render(); }, fail('the days off'));
-      onSnapshot(query(collection(db, 'conflicts'), where('open', '==', true), limit(100)), s => { data.conflicts = s.size; render(); }, fail('the conflict list'));
+      onSnapshot(query(collection(db, 'conflicts'), where('open', '==', true), limit(101)), s => { data.conflicts = s.size > 100 ? '100+' : s.size; render(); }, fail('the conflict list'));
       onSnapshot(doc(db, 'config', 'app'), snap => {
         const c = snap.data() || {};
         data.app = c;
         data.writeBack = !!(c.writeBack && c.writeBack.enabled === true);
         const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
-        document.getElementById('copied').textContent = at ? 'Last Sync: ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy';
+        const tz = { timeZone: 'America/New_York' }, sameDay = at && at.toLocaleDateString('en-US', tz) === new Date().toLocaleDateString('en-US', tz);
+        document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : at.toLocaleDateString('en-US', Object.assign({ month: 'numeric', day: 'numeric' }, tz)) + ' ') + at.toLocaleTimeString('en-US', Object.assign({ hour: 'numeric', minute: '2-digit' }, tz)) : 'Waiting for the first copy';
         render();
       });
     });

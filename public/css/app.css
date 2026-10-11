@@ -1440,3 +1440,5 @@ table td button.warn { font-size: 15px; }
 .routes-page table.routes.many input[type="checkbox"].rf:disabled { cursor: default; }
 /* Route Week Override: Reset asks twice (the button turns orange and says Click Again). */
 .routeweek-page #reset.armed { background: #b45309; color: #fff; border-color: #b45309; }
+/* Improvements 10/10: an error stays readable above an open pop-up's dimmed backdrop. */
+.notice.error:not([hidden]) { position: relative; z-index: 30; }

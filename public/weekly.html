@@ -296,7 +296,7 @@
       document.getElementById('days-week').textContent = 'Week of ' + shortDate(week);
       document.getElementById('days-heads').innerHTML = headCells('<th>Route</th><th>Run</th>');
       document.getElementById('days-rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"><td><b>' + escapeHtml(r.route) + '</b></td><td>' + escapeHtml(r.run) + '</td>' +
-        L.DAYS.map(p => '<td><button type="button" class="toggle' + (r.days[p].runs ? ' on' : '') + '" data-runday="' + p + '">' + (r.days[p].runs ? 'RUNS' : 'NO RUN') + '</button></td>').join('') + '</tr>').join('');
+        L.DAYS.map(p => '<td><button type="button" class="toggle' + (r.days[p].runs ? ' on' : '') + '" data-runday="' + p + '" aria-pressed="' + !!r.days[p].runs + '" aria-label="' + escapeHtml(r.route + ' ' + r.run + ', ' + L.DAY_NAMES[L.DAYS.indexOf(p)]) + '">' + (r.days[p].runs ? 'RUNS' : 'NO RUN') + '</button></td>').join('') + '</tr>').join('');
     }
     document.getElementById('run-days').onclick = () => { openModal('days-modal'); paintRunDays(); };
     document.getElementById('days-rows').addEventListener('click', e => {
@@ -329,11 +329,13 @@
     function showPublished() {
       const at = weekDoc && weekDoc.publishedAt ? new Date(weekDoc.publishedAt) : null;
       const el = document.getElementById('published');
-      el.textContent = at && !isNaN(at) ? 'Published ' + at.toLocaleDateString([], { month: 'numeric', day: 'numeric' }) + ' ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + (weekDoc.publishedBy ? ' by ' + weekDoc.publishedBy.split('@')[0] : '') : 'Not published yet this week';
+      el.textContent = at && !isNaN(at) ? 'Published ' + at.toLocaleDateString([], { month: 'numeric', day: 'numeric', timeZone: 'America/New_York' }) + ' ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + (weekDoc.publishedBy ? ' by ' + weekDoc.publishedBy.split('@')[0] : '') : 'Not published yet this week';
       el.title = weekDoc && weekDoc.publishedBy ? 'Published to Daily Dispatch by ' + weekDoc.publishedBy : '';
     }
     // Print Layouts opens Weekly with #print: the week prints once its runs are on screen.
-    if (location.hash === '#print') { const t = setInterval(() => { if (!rows.length) return; clearInterval(t); history.replaceState(null, '', location.pathname + location.search); document.getElementById('print-week').click(); }, 300); }
+    // An empty day or week still prints (a blank sheet) once the runs have been read, instead of waiting forever.
+    let runsRead = false;
+    if (location.hash === '#print') { const t = setInterval(() => { if (!runsRead) return; clearInterval(t); history.replaceState(null, '', location.pathname + location.search); document.getElementById('print-week').click(); }, 300); }
     // Joe 10/11: the Weekly print is the Driver Assignment Board only, on one page (Print Layouts' Weekly setup), in the
     // board's own colours; the route grid above it is not printed.
     document.getElementById('print-week').onclick = () => {
@@ -374,6 +376,7 @@
       history.replaceState(null, '', '?week=' + week + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '') + location.hash);
       unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), snap => {
         runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        runsRead = true;
         render();
         if (jumpBoard) { jumpBoard = false; setTab('board'); }
       }, e => showError('Could not read the week: ' + e.message));
@@ -396,7 +399,7 @@
         document.getElementById('to-conflicts').hidden = !writeBack;
         render();
         const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
-        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy from the sheets';
+        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : 'Waiting for the first copy from the sheets';
       });
       document.getElementById('prev').onclick = () => move(-7);
       document.getElementById('next').onclick = () => move(7);

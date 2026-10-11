@@ -71,14 +71,14 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, friendlyError } from './js/app.js';
     import { watchLists, lists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
     forScreen('drivers');
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
-    let drivers = [], rows = [], editingId = null, panelOpen = false, typing = null;
+    let drivers = [], rows = [], editingId = null, panelOpen = false, typing = null, loaded = false;
     const canEdit = () => canManage();
     const truckUnit = (id) => { const t = lists.trucks.find(e => e.id === id); return t ? t.unit : ''; };
     const us = (key) => { if (!key) return ''; const [y, m, d] = key.split('-'); return m + '/' + d + '/' + y; };
@@ -116,7 +116,7 @@
           '<td><span class="status' + (r.active ? '' : ' off') + '" title="' + escapeHtml(r.unavailableReason) + '">' + (r.active ? 'Active' : 'Inactive') + '</span></td>' +
           '<td><button type="button" class="switch' + (r.active ? ' on' : '') + '" data-toggle="' + id + '" aria-label="' + (r.active ? 'Mark not available' : 'Mark available') + '"' + dis + '></button></td>' +
           '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>&#9998; Edit</button></td></tr>';
-      }).join('') || '<tr><td colspan="10" class="empty">No drivers match.</td></tr>';
+      }).join('') || '<tr><td colspan="10" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
       const active = rows.filter(r => r.active);
       document.getElementById('n-active').textContent = active.length;
       document.getElementById('n-relief').textContent = active.filter(r => r.reliefDriver).length;
@@ -168,7 +168,11 @@
           seniorityDate: document.getElementById('d-seniority').value, truck: document.getElementById('d-truck').value.trim().toUpperCase(),
           relief: document.getElementById('d-relief').checked
         };
-        const truck = lists.trucks.find(t => t.unit.toUpperCase() === fields.truck);
+        const truck = findTruck(fields.truck);
+        // Nothing typed is lost: the panel stays open with a reason when the name is missing or the truck is not on Equipment Master.
+        if (!fields.name) { showError('Type the driver\'s name.'); document.getElementById('d-name').focus(); return; }
+        if (fields.truck && !truck) { showError(fields.truck + ' is not a truck in Equipment Master. Pick one from the list or leave it blank.'); document.getElementById('d-truck').focus(); return; }
+        showError('');
         const values = { name: fields.name.toUpperCase(), hireDate: fields.hireDate, seniorityDate: fields.seniorityDate, defaultTruckId: truck ? truck.id : '', reliefDriver: fields.relief };
         closePanel();
         if (r) return change(r.id, 'saveDriver', Object.assign({ driverId: r.id }, fields), values);
@@ -178,6 +182,8 @@
           .then(() => { drivers = drivers.filter(x => x !== temp); render(); });
       };
     }
+    // Any truck on Equipment Master that is not INACTIVE (a down truck can still be someone's assigned truck), as the server allows.
+    const findTruck = (unit) => unit ? lists.fleetTrucks.find(t => String(t.unit).toUpperCase() === unit && String(t.status).toUpperCase() !== 'INACTIVE') : null;
     function closePanel() { panelOpen = false; editingId = null; render(); }
     window.udBack = () => { if (!panelOpen) return false; closePanel(); return true; };
 
@@ -199,8 +205,9 @@
       typing = null;
       const r = rows.find(x => x.id === input.dataset.truck), unit = input.value.trim().toUpperCase();
       if (unit === truckUnit(r.defaultTruckId).toUpperCase()) return;
-      const truck = lists.trucks.find(t => t.unit.toUpperCase() === unit);
-      change(r.id, 'setDriverTruck', { driverId: r.id, equipmentId: truck ? truck.id : (unit ? unit : '') }, { defaultTruckId: truck ? truck.id : '' });
+      const truck = findTruck(unit);
+      if (unit && !truck) { showError(unit + ' is not a truck in Equipment Master; ' + r.name + '\'s truck was not changed.'); input.value = truckUnit(r.defaultTruckId); return; }
+      change(r.id, 'setDriverTruck', { driverId: r.id, equipmentId: truck ? truck.id : '' }, { defaultTruckId: truck ? truck.id : '' });
     });
     // Enter saves the truck and moves to the next driver's truck; Up and Down move between the truck boxes.
     table.addEventListener('focusin', e => { if (e.target.matches('[data-truck]')) typing = e.target.dataset.truck; });
@@ -232,7 +239,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
-      onSnapshot(collection(db, 'drivers'), snap => { drivers = snap.docs.map(d => d.data()); render(); });
+      onSnapshot(collection(db, 'drivers'), snap => { drivers = snap.docs.map(d => d.data()); loaded = true; render(); }, e => showError('Could not read the driver list: ' + friendlyError(e)));
       window.addEventListener('resize', render);
     });
   </script>

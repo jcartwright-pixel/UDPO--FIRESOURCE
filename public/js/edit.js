@@ -5,7 +5,7 @@
  * background as one call. If the server refuses it (someone else changed that run, a unit is inactive, no
  * permission), the cell goes back to what the database holds and the reason shows as an error.
  */
-import { start, save as sendSave, showError, escapeHtml } from './app.js';
+import { start, save as sendSave, showError, friendlyError, escapeHtml } from './app.js';
 import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const L = window.UDLogic;
@@ -43,6 +43,8 @@ async function save(action, fields) {
     const out = await sendSave(action, fields);
     pending--;
     if (!pending) savePill(failed ? 'failed' : 'saved');
+    // A save that worked clears an old error from an earlier one.
+    if (!pending && !failed) showError('');
     return out;
   } catch (e) {
     pending--;
@@ -185,6 +187,7 @@ export function pickText(kind, id) {
 export function openPicker(td, kind, current, busy, onPick, opts) {
   const select = document.createElement('select');
   select.className = 'picker';
+  select.setAttribute('aria-label', 'Pick the ' + kind + (td.closest('tr') && td.closest('tr').dataset.id ? ' for this run' : ''));
   select.innerHTML = optionsHtml(kind, current, busy, opts);
   td.textContent = '';
   td.appendChild(select);
@@ -199,6 +202,7 @@ export function openPicker(td, kind, current, busy, onPick, opts) {
 export function openNote(td, current, onPick) {
   const input = document.createElement('input');
   input.className = 'picker';
+  input.setAttribute('aria-label', td.dataset.edit === 'time' ? 'Depart time' : td.dataset.edit === 'jack' ? 'Jack number' : 'Driver notes');
   input.maxLength = 500;
   input.value = current || '';
   td.textContent = '';
@@ -231,7 +235,7 @@ export function saveRunChange(getRuns, runDocId, day, action, fields, apply, ren
     } catch (e) {
       // Put back what the database holds (if a live update has not already replaced this run).
       if (getRuns().indexOf(shown) >= 0) { shown.days[day] = before; render(); }
-      showError(e.message || String(e));
+      showError(friendlyError(e));
       throw e;
     }
   };
@@ -263,7 +267,7 @@ export async function saveOrder(getRuns, loadDate, orderedRows, render) {
   } catch (e) {
     previous.forEach((p, i) => { if (p.run) p.run.days[p.day].loadSequenceOverride = before[i]; });
     render();
-    showError(e.message || String(e));
+    showError(friendlyError(e));
   }
 }
 
@@ -276,7 +280,7 @@ export async function saveOptimistic(action, fields, apply, undo, render) {
   } catch (e) {
     undo();
     render();
-    showError(e.message || String(e));
+    showError(friendlyError(e));
     return null;
   }
 }

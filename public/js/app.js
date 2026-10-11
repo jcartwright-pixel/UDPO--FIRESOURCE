@@ -373,6 +373,15 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-open], [data-card]');
   if (t) location.href = t.dataset.open || t.dataset.card;
 });
+// The same from the keyboard: cards and their lines can be reached with Tab and opened with Enter.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.target.matches('a[href], button, input, select, textarea')) return;
+  const t = e.target.matches('[data-open], [data-card]') ? e.target : null;
+  if (t) { e.preventDefault(); location.href = t.dataset.open || t.dataset.card; }
+});
+let markCards = 0;
+const tabCards = () => { markCards = 0; document.querySelectorAll('[data-open]:not([tabindex]), [data-card]:not([tabindex])').forEach(el => { el.tabIndex = 0; if (!el.getAttribute('role')) el.setAttribute('role', 'link'); }); };
+new MutationObserver(() => { if (!markCards) markCards = requestAnimationFrame(tabCards); }).observe(document.documentElement, { childList: true, subtree: true });
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
 async function firebaseConfig() {
@@ -470,6 +479,17 @@ export async function save(action, fields) {
   return callServer('save', Object.assign({ action }, fields));
 }
 
+// A failed call in plain words with the next step; the server's own messages (already plain) are kept.
+export function friendlyError(e) {
+  const code = String(e && e.code || '').replace(/^functions\/|^firestore\//, ''), msg = String(e && e.message || e || '');
+  if (code === 'unavailable' || /network|Failed to fetch|offline/i.test(msg)) return 'No connection to the server. Check the network and try again; nothing was saved.';
+  if (code === 'deadline-exceeded') return 'The server took too long to answer. Try again; if it did save, the screen will show it in a moment.';
+  if (code === 'unauthenticated') return 'You are signed out. Sign in again and try once more.';
+  if (code === 'permission-denied' && /insufficient permissions/i.test(msg)) return 'You do not have access to this. Ask an administrator to add it to your role.';
+  if (code === 'internal' && /^internal$/i.test(msg)) return 'Something went wrong on the server. Try again; if it keeps happening, tell an administrator.';
+  return msg;
+}
+
 // Any other server call that changes something (the per-screen switch): also one call with its own requestId.
 export async function callServer(name, fields) {
   const { functions } = await start();
@@ -480,6 +500,7 @@ export async function callServer(name, fields) {
 
 // Errors are the only messages the screens show (no status bars).
 export function showError(text) {
+  if (text && typeof text === 'object') text = friendlyError(text);
   ['error', 'signin-error'].forEach(id => {
     const box = document.getElementById(id);
     if (!box) return;
