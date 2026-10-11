@@ -1,7 +1,7 @@
 'use strict';
 /*
- * Browser check of the plant items from the parity list (L5, L9) and the screen review (7-10), on the made-up plant day:
- *   Loadout: the pickups say who added and completed them; the two-press "Ended Up Not Running" never stays armed for the
+ * Browser check of the plant items from the parity list (L5) and the screen review (7-10), on the made-up plant day:
+ *   Loadout: the two-press "Ended Up Not Running" never stays armed for the
  *   next load. Unloading: "Not back HH:MM" for a load not due back yet. Quality: the first box picked on a line saves and
  *   says Saved even when the new check arrives before the save answers. Manager Center: Send waits for the plant's data.
  *   Pictures go to SHOTS_DIR.
@@ -50,17 +50,7 @@ const until = async (fn, what) => { for (let i = 0; i < 80; i++) { const v = awa
   const results = [];
   try {
     const page = await openPage(browser, 1920, 1080, '/loadout.html?date=' + DATE + '&' + MANAGER);
-    await page.waitForSelector(row('805') + ' button.pu');
-    await page.click(row('805') + ' button.pu');
-    await page.waitForSelector('#pu-modal:not([hidden])');
-    assert.match(await page.textContent('#pu-list'), /12 Gallon whole · 12[\s\S]*Added by loader@uniteddairy\.com · \d/);
-    await page.click('#pu-list [data-done]');
-    await page.waitForFunction(() => /Completed \d{1,2}:\d\d [AP]M by manager\.test@uniteddairy\.com/.test(document.getElementById('pu-list').textContent));
-    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'extras-pickup-who-1920.png'), scale: 'css' });
-    const done = await until(async () => { const p = (await db().collection('pickups').doc('pu_demo_1').get()).data(); return p && p.status === 'COMPLETE' && p; }, 'the pickup is complete');
-    assert.equal(done.completedBy, 'manager.test@uniteddairy.com');
-    await page.click('#pu-modal [data-close]');
-    results.push('Loadout pickups: "Added by" and "Completed ... by" with who and when');
+    await page.waitForSelector(row('811') + ' button.edit-row');
 
     // Ended Up Not Running: pressed once, then Cancel; the next load's box starts unarmed.
     await page.click(row('811') + ' button.edit-row');

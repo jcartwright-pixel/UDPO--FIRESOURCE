@@ -279,7 +279,9 @@ function assignCheck(typed, u, equipment, run, prefix, stamp, SaveError) {
 
 // Pickups: "Add Pickup" (Product / Item, Quantity / Cases, Optional Note) and "Pickup Complete".
 function validatePickup(action, input, SaveError) {
-  const out = {};
+  // A Plant Station tablet names its station (Case Loadout, ...): the pickup shows it as who added or completed it.
+  const out = {}, station = text(input.station).replace(/[^A-Za-z /&-]/g, '').slice(0, 40);
+  if (station) out.station = station;
   if (action === 'completePickup') {
     out.pickupId = text(input.pickupId).slice(0, 320);
     if (!out.pickupId) throw new SaveError('BAD_REQUEST', 'Pick the pickup');
@@ -306,7 +308,15 @@ function validatePickup(action, input, SaveError) {
   return out;
 }
 
+// Who added or completed a pickup, as the Pickups pop-up shows it: the Plant Station's name on a tablet, else the person's name.
+async function pickupWho(tx, db, req, email) {
+  if (req.station) return req.station;
+  const snap = await tx.get(db.collection('users').doc(M.safeIdPart(email)));
+  return (snap.exists && text(snap.data().name)) || email;
+}
+
 async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const who = await pickupWho(tx, db, req, email);
   if (req.action === 'completePickup' && /^note:/.test(req.pickupId)) {
     // Completing a load note's pickup saves it as a pickup record (the note is the item), complete, so the note's listing goes.
     const runSnap = await tx.get(db.collection('runs').doc(req.runDocId));
@@ -317,9 +327,11 @@ async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
     if (already.exists) return { ok: true, requestId: req.requestId, pickupId: id, already: true };
     const note = B.notePickup(run, req.day, req.date, []);
     if (!note) throw new SaveError('NOT_FOUND', 'The load note no longer asks for a pickup');
+    const noteBy = note.createdBy ? await tx.get(db.collection('users').doc(M.safeIdPart(note.createdBy))) : null;
     const p = { pickupId: id, date: req.date, routeId: run.routeId || '', runId: run.runId || '', route: run.route || '', run: run.run || '', runDocId: req.runDocId, day: req.day,
       item: note.item, quantity: 'See note', location: '', notes: 'From the load note', status: 'COMPLETE', createdAt: note.createdAt || stamp, createdBy: note.createdBy || email,
-      completedAt: stamp, completedBy: email, createdInApp: true, testEdited: true, editedAt: stamp };
+      createdByName: (noteBy && noteBy.exists && text(noteBy.data().name)) || note.createdBy || who, completedAt: stamp, completedBy: email, completedByName: who,
+      createdInApp: true, testEdited: true, editedAt: stamp };
     tx.set(ref, p);
     const result = { ok: true, requestId: req.requestId, pickupId: id };
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, pickupId: id, fromNote: req.pickupId, after: p, result });
@@ -331,7 +343,7 @@ async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
     if (!snap.exists) throw new SaveError('NOT_FOUND', 'That pickup is no longer on the list');
     const p = snap.data();
     const result = { ok: true, requestId: req.requestId, pickupId: req.pickupId, already: p.status === 'COMPLETE' };
-    if (p.status !== 'COMPLETE') tx.update(ref, { status: 'COMPLETE', completedAt: stamp, completedBy: email, testEdited: true, editedAt: stamp });
+    if (p.status !== 'COMPLETE') tx.update(ref, { status: 'COMPLETE', completedAt: stamp, completedBy: email, completedByName: who, testEdited: true, editedAt: stamp });
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, pickupId: req.pickupId, before: { status: p.status }, after: { status: 'COMPLETE' }, result });
     return result;
   }
@@ -340,7 +352,7 @@ async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const run = runSnap.data();
   const id = 'pu_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 18);
   const p = { pickupId: id, date: req.date, routeId: run.routeId || '', runId: run.runId || '', route: run.route || '', run: run.run || '', runDocId: req.runDocId, day: req.day,
-    item: req.item, quantity: String(req.quantity), location: '', notes: req.notes, status: 'PENDING', createdAt: stamp, createdBy: email, completedAt: '', completedBy: '',
+    item: req.item, quantity: String(req.quantity), location: '', notes: req.notes, status: 'PENDING', createdAt: stamp, createdBy: email, createdByName: who, completedAt: '', completedBy: '',
     createdInApp: true, testEdited: true, editedAt: stamp };
   tx.set(db.collection('pickups').doc(id), p);
   const result = { ok: true, requestId: req.requestId, pickupId: id };
