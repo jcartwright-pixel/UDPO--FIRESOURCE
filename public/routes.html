@@ -35,7 +35,7 @@
         <label>View / Edit<select id="view-select">
           <option value="times">Start Times</option><option value="miles">Mileage</option><option value="hours">Hours and Return</option><option value="offset">Load Day</option>
           <option value="truck">Default Truck</option><option value="trailer">Default Trailer</option><option value="jack">Default Pallet Jack</option>
-          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="rules">Show / Hide Rules</option><option value="details">Route Editor (one run)</option><option value="recap">Recap</option>
+          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="rules">Show / Hide Rules</option><option value="many">Route Details (many runs)</option><option value="details">Route Editor (one run)</option><option value="recap">Recap</option>
         </select></label>
       </div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Route Master is not changed yet</span></div>
@@ -50,6 +50,7 @@
       <a class="button" href="routeweek.html" id="to-holiday" title="Change which days routes run for one week only (holidays)">Holiday Week Editor</a>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <div class="recap-totals" id="recap-totals" hidden></div>
     <div class="sheet" id="sheet"><table id="table"></table></div>
     <div class="footer"><span id="count"></span><span id="work-sub"></span></div>
   </div>
@@ -80,17 +81,20 @@
     const NAME = (p) => L.DAY_NAMES[L.DAYS.indexOf(p)];
     const LOADOUT = ['None', 'Case Loadout', 'Tote', 'Boxing', 'Tanker'];
     const RUN_BY = ['Uniontown', 'Fairmont', 'Marietta', 'Charleston', 'Carrier', 'Anyone'];
+    // The old Route Editor's grid keys (RouteManagement.html bindGrid), spelled out under every grid.
+    const KEYS = 'Arrows move; Shift+arrows or Shift+click mark a block; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste it; one value pasted or typed with Ctrl+Enter fills the whole block; Ctrl+D fills down; Delete clears the block; Esc puts the box back.';
     const GRID = {
-      times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time like 5 AM or 5:30 PM, Enter or Tab. Ctrl+D fills down; Shift+click marks a block to copy; paste fills a block.', ph: 'h:mm AM' },
-      miles: { field: 'miles', title: 'Mileage', sub: 'Miles per run per day (round trip). Ctrl+D fills down.', ph: 'miles' },
-      hours: { field: 'hours', title: 'Hours and Return', sub: 'Expected route hours (hours:minutes or decimal). Ctrl+D fills down.', ph: 'h:mm' },
-      offset: { field: 'loadDayOffset', title: 'Load Day', sub: 'Days before the departure day that the load is built (0 same day, -1 the day before).', ph: '0' },
-      truck: { field: 'tractor', title: 'Default Truck', sub: 'Type a truck number. Blank clears the default.', ph: 'truck' },
-      trailer: { field: 'trailer', title: 'Default Trailer', sub: 'Type a trailer number (T- is added). Blank clears the default.', ph: 'trailer' },
-      jack: { field: 'forklift', title: 'Default Pallet Jack / Forklift', sub: 'Type the unit number. Blank clears the default.', ph: 'unit' }
+      times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time like 5 AM or 5:30 PM, Enter or Tab. ' + KEYS, ph: 'h:mm AM' },
+      miles: { field: 'miles', title: 'Mileage', sub: 'Miles per run per day (round trip). ' + KEYS, ph: 'miles' },
+      hours: { field: 'hours', title: 'Hours and Return', sub: 'Expected route hours (hours:minutes or decimal). ' + KEYS, ph: 'h:mm' },
+      offset: { field: 'loadDayOffset', title: 'Load Day', sub: 'Days before the departure day that the load is built (0 same day, -1 the day before). ' + KEYS, ph: '0' },
+      truck: { field: 'tractor', title: 'Default Truck', sub: 'Type a truck number. Blank clears the default. ' + KEYS, ph: 'truck' },
+      trailer: { field: 'trailer', title: 'Default Trailer', sub: 'Type a trailer number (T- is added). Blank clears the default. ' + KEYS, ph: 'trailer' },
+      jack: { field: 'forklift', title: 'Default Pallet Jack / Forklift', sub: 'Type the unit number. Blank clears the default. ' + KEYS, ph: 'unit' }
     };
     const OTHER = {
-      seq: ['Load Order', 'Pick a day, then drag a run by its route number to its place in the loadout.'],
+      seq: ['Load Order', 'Pick a day, then drag a run by its route number to its place in the loadout, or use the up and down arrows. Saved as you move it.'],
+      many: ['Route Details', 'Run settings for every run shown (pick a route at the top for just its runs). Each box and list saves the moment you change it.'],
       days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the normal week. Edit Route opens every setting for a run. Holidays and one-week changes: Holiday Week Editor.'],
       details: ['Route Editor', 'Every setting for one run, and its normal week day by day. Each box and list saves the moment you change it.'],
       recap: ['Route Recap', 'Current route and run summary.'],
@@ -160,15 +164,20 @@
       else if (view === 'days') t.innerHTML = daysView(list, edit);
       else if (view === 'seq') { const seq = seqList(); t.innerHTML = seqView(seq, edit); lines = seq.length; }
       else if (view === 'details') { t.innerHTML = detailsView(list, edit); lines = 12; }
+      else if (view === 'many') t.innerHTML = manyView(list, edit);
       else if (view === 'rules') t.innerHTML = rulesView(onlyHidden ? list.filter(r => !weeklyRule(r).shown) : list, edit);
       else t.innerHTML = recapView(list);
       t.className = 'routes ' + view;
+      const totals = document.getElementById('recap-totals');
+      totals.hidden = view !== 'recap';
+      if (view === 'recap') totals.innerHTML = recapTotals();
+      if (g) markBlock();
       document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : list.length + (list.length === 1 ? ' run' : ' runs')) +
         (view === 'rules' ? ' · ' + list.filter(r => !weeklyRule(r).shown).length + ' hidden on Weekly for the week of ' + shortDate(liveWeek) : '');
       // Readable rows and print: the grid scrolls inside its box under fixed headings; the page itself does not.
       const sheet = document.getElementById('sheet'), footer = document.querySelector('.footer');
       sheet.style.height = Math.max(160, window.innerHeight - sheet.getBoundingClientRect().top - (footer ? footer.offsetHeight : 0) - 8) + 'px';
-      if (focus) { const again = t.querySelector('input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]'); if (again) again.focus(); }
+      if (focus) { const again = t.querySelector('input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]'); if (again) { keepBlock = true; again.focus(); keepBlock = false; } }
     }
 
     const head = (first, last) => '<thead><tr>' + first + DAYS.map(p => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '</th>').join('') + (last || '') + '</tr></thead>';
@@ -197,12 +206,14 @@
         .sort((a, b) => (day(a, seqDay).loadOrder == null ? 999999 : day(a, seqDay).loadOrder) - (day(b, seqDay).loadOrder == null ? 999999 : day(b, seqDay).loadOrder) || byOrder(a, b));
     }
     function seqView(list, edit) {
-      return '<colgroup><col style="width:8%"><col style="width:12%"><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:22%"></colgroup>' +
-        '<thead><tr><th>Order</th><th>Route</th><th>Run / Destination</th><th>Start time</th><th>Load day</th><th>Run by</th></tr></thead><tbody>' +
+      return '<colgroup><col style="width:8%"><col style="width:11%"><col style="width:27%"><col style="width:13%"><col style="width:12%"><col style="width:17%"><col style="width:12%"></colgroup>' +
+        '<thead><tr><th>Order</th><th>Route</th><th>Run / Destination</th><th>Start time</th><th>Load day</th><th>Run by</th><th>Move</th></tr></thead><tbody>' +
         list.map((r, i) => '<tr data-id="' + escapeHtml(r.id) + '" data-i="' + i + '" draggable="true"' + (edit ? '' : ' class="no-drag"') + '><td>' + escapeHtml(cellValue(r, seqDay, 'loadOrder') || '-') + '</td>' +
           '<td class="strong' + (edit ? ' grab' : '') + '">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(cellValue(r, seqDay, 'dispatchTime')) + '</td>' +
-          '<td>' + escapeHtml(cellValue(r, seqDay, 'loadDayOffset')) + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td></tr>').join('') +
-        (list.length ? '' : '<tr><td colspan="6" class="empty">No runs on ' + NAME(seqDay) + '.</td></tr>') + '</tbody>';
+          '<td>' + escapeHtml(cellValue(r, seqDay, 'loadDayOffset')) + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td>' +
+          '<td class="move"><button type="button" class="seq-move" data-move="-1" aria-label="Move ' + escapeHtml(r.route) + ' up" title="Load earlier"' + (edit && i > 0 ? '' : ' disabled') + '>&#9650;</button>' +
+          '<button type="button" class="seq-move" data-move="1" aria-label="Move ' + escapeHtml(r.route) + ' down" title="Load later"' + (edit && i < list.length - 1 ? '' : ' disabled') + '>&#9660;</button></td></tr>').join('') +
+        (list.length ? '' : '<tr><td colspan="7" class="empty">No runs on ' + NAME(seqDay) + '.</td></tr>') + '</tbody>';
     }
     const yesNo = (name, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '><option value="true"' + (v ? ' selected' : '') + '>YES</option><option value="false"' + (v ? '' : ' selected') + '>NO</option></select>';
     const choice = (name, list, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '>' + (list.indexOf(v) < 0 && v ? '<option selected>' + escapeHtml(v) + '</option>' : '') + list.map(x => '<option' + (x === v ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select>';
@@ -267,7 +278,31 @@
         '<thead><tr><th>Route</th><th>Run / Destination</th><th>Run by</th><th>Loadout</th><th>Days</th><th>Active</th><th>Daily</th><th>Weekly</th><th>Plant</th><th>Mobile route</th><th>Sleeper</th><th>Drop &amp; hook</th></tr></thead><tbody>' +
         list.map(r => '<tr><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td><td>' + escapeHtml(r.loadType || 'None') + '</td>' +
           '<td>' + escapeHtml(DAYS.filter(p => day(r, p).active).map(p => NAME(p).slice(0, 3)).join(' ')) + '</td><td>' + yes(isActive(r)) + '</td><td>' + yes(shows(r, 'displayDaily')) + '</td><td>' + yes(shows(r, 'displayWeekly')) + '</td>' +
-          '<td>' + yes(shows(r, 'displayPlant')) + '</td><td>' + yes(shows(r, 'displayMobile')) + '</td><td>' + yes(r.sleeper) + '</td><td>' + yes(r.dropAndHook) + '</td></tr>').join('') + '</tbody>';
+          '<td>' + yes(shows(r, 'displayPlant')) + '</td><td>' + yes(shows(r, 'displayMobile')) + '</td><td>' + yes(r.sleeper) + '</td><td>' + yes(r.dropAndHook) + '</td></tr>').join('') + '</tbody>' +
+        // Totals under each column: how many runs shown have each box ticked, and the running days in the week.
+        (list.length ? '<tfoot><tr class="recap-sum"><td class="strong">Totals</td><td>' + list.length + (list.length === 1 ? ' run' : ' runs') + '</td><td></td><td></td><td>' + occurrences(list) + ' run days</td>' +
+          [isActive, r => shows(r, 'displayDaily'), r => shows(r, 'displayWeekly'), r => shows(r, 'displayPlant'), r => shows(r, 'displayMobile'), r => !!r.sleeper, r => !!r.dropAndHook].map(f => '<td>' + list.filter(f).length + '</td>').join('') + '</tr></tfoot>' : '');
+    }
+    const occurrences = (list) => list.reduce((n, r) => n + DAYS.filter(p => day(r, p).active).length, 0);
+    // The old Recap's five totals (RouteManagement.html recap): for the whole Route Master, or the route / run picked at the top.
+    function recapTotals() {
+      const base = routes.filter(r => !pickRoute || r.route === pickRoute).filter(r => !pickRun || r.id === pickRun);
+      const box = (n, label) => '<div><strong>' + n + '</strong><span>' + label + '</span></div>';
+      return box(new Set(base.map(r => r.route)).size, 'Routes') + box(base.length, 'Runs / Destinations') + box(base.filter(isActive).length, 'Active Runs') +
+        box(occurrences(base), 'Weekly Run Occurrences') + box(base.filter(r => shows(r, 'displayPlant')).length, 'Visible in Plant') +
+        '<p>' + (pickRun ? 'Totals for this run' : pickRoute ? 'Totals for route ' + escapeHtml(pickRoute) : 'Totals for all of Route Master, active and inactive') + '</p>';
+    }
+    // Route Details for many runs at once (old RouteManagement.html details): one line per run, every box saves on its own.
+    const tick = (r, f, on, label, edit) => '<td><input type="checkbox" class="rf" data-many="' + f + '"' + (on ? ' checked' : '') + (edit ? '' : ' disabled') + ' aria-label="' + label + '" title="' + label + '"></td>';
+    const pick = (f, list, v, edit, label) => '<td><select class="rf" data-many="' + f + '"' + (edit ? '' : ' disabled') + ' aria-label="' + label + '">' + (list.indexOf(v) < 0 && v ? '<option selected>' + escapeHtml(v) + '</option>' : '') + list.map(x => '<option' + (x === v ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select></td>';
+    function manyView(list, edit) {
+      return '<colgroup><col style="width:7%"><col style="width:17%"><col style="width:12%"><col style="width:12%"><col span="8" style="width:6.5%"></colgroup>' +
+        '<thead><tr><th>Route</th><th>Run</th><th>Loadout</th><th>Run by</th><th>Plant</th><th>Weekly</th><th>Daily</th><th>Mobile route</th><th>Route list</th><th>Sleeper</th><th>Drop &amp; hook</th><th>Active</th></tr></thead><tbody>' +
+        list.map(r => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r) + pick('loadType', LOADOUT, r.loadType || 'None', edit, 'Loadout type') + pick('coverageOwner', RUN_BY, r.coverageOwner || 'Uniontown', edit, 'Run by') +
+          tick(r, 'displayPlant', shows(r, 'displayPlant'), 'Show in Plant', edit) + tick(r, 'displayWeekly', shows(r, 'displayWeekly'), 'Show on Weekly Dispatch', edit) + tick(r, 'displayDaily', shows(r, 'displayDaily'), 'Show on Daily Dispatch', edit) +
+          tick(r, 'displayMobile', shows(r, 'displayMobile'), 'Show on the driver Route app', edit) + tick(r, 'displayRouteMaster', shows(r, 'displayRouteMaster'), 'Show in the Route list', edit) +
+          tick(r, 'sleeper', !!r.sleeper, 'Sleeper: leaves one day, returns the next', edit) + tick(r, 'dropAndHook', !!r.dropAndHook, 'Drop and hook', edit) + tick(r, 'active', isActive(r), 'Active', edit) + '</tr>').join('') +
+        (list.length ? '' : '<tr><td colspan="12" class="empty">No runs to show.</td></tr>') + '</tbody>';
     }
 
     /* ---------- Saves: shown at once, one call each ---------- */
@@ -304,6 +339,12 @@
         if (value === cellValue(r, p, field)) return;
         return saveRun(r, null, { [p]: { [field]: value } }, x => { x.days[p] = Object.assign({}, x.days[p], { [field]: shown(field, value) }); });
       }
+      const mf = e.target.dataset.many;
+      if (mf) {
+        const r = routes.find(x => x.id === e.target.closest('tr').dataset.id), v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+        const fields = mf === 'active' ? { active: v, routeStatus: v ? 'ACTIVE' : 'INACTIVE' } : { [mf]: v };
+        return saveRun(r, fields, null, x => Object.assign(x, fields));
+      }
       const f = e.target.dataset.f;
       if (!f) return;
       const r = routes.find(x => x.id === e.target.closest('form').dataset.id);
@@ -312,64 +353,138 @@
       if (f === 'weekOrder') v = v === '' ? null : Number(v);
       saveRun(r, { [f]: v }, null, x => { x[f] = v; if (f === 'active') x.routeStatus = v ? 'ACTIVE' : x.routeStatus; });
     });
-    table.addEventListener('keydown', e => {
-      const input = e.target.closest('input.cell');
-      if (!input) return;
-      if (e.key === 'Enter') { e.preventDefault(); const below = table.querySelector('input.cell[data-r="' + (Number(input.dataset.r) + 1) + '"][data-c="' + input.dataset.c + '"]'); (below || input).focus(); if (!below) input.blur(); }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
-        e.preventDefault();
-        const above = table.querySelector('input.cell[data-r="' + (Number(input.dataset.r) - 1) + '"][data-c="' + input.dataset.c + '"]');
-        if (above) { input.value = above.value; saveCell(input); }
-      }
-    });
     /*
-     * Block copy and paste, as in the sheet: Shift+click marks a block from the box you are in; Ctrl+C copies it
-     * (tab and line separated, so it pastes into Excel or Sheets too); Ctrl+V of several cells fills from the box you
-     * are in, right and down. Each run changed saves as one call with all its days.
+     * Spreadsheet keys and blocks, as in the old Route Editor (RouteManagement.html bindGrid) and the sheet:
+     * Enter / Down and Up move a row; Left / Right move a day when the cursor is at the edge of the text; Shift+arrows or
+     * Shift+click mark a block from the box you are in; Ctrl+C copies it (tab and line separated, so it pastes into Excel
+     * or Sheets too); Ctrl+X copies and clears it; Delete clears it; Ctrl+V of several cells fills from the box you are in,
+     * right and down; one value pasted (or typed and Ctrl+Enter) into a marked block fills every box in it; Ctrl+D fills
+     * the block down from its top row (or copies the box above); Esc puts the box back. Each run changed saves as one call.
      */
-    let anchor = null, block = null;
+    let anchor = null, block = null, keepBlock = false;
     const cellAt = (r, c) => table.querySelector('input.cell[data-r="' + r + '"][data-c="' + c + '"]');
+    const posOf = (x) => ({ r: Number(x.dataset.r), c: Number(x.dataset.c) });
+    const multi = () => !!block && (block.r2 > block.r1 || block.c2 > block.c1);
     function markBlock() {
       table.querySelectorAll('input.cell.picked').forEach(x => x.classList.remove('picked'));
       if (!block) return;
       for (let r = block.r1; r <= block.r2; r++) for (let c = block.c1; c <= block.c2; c++) { const x = cellAt(r, c); if (x) x.classList.add('picked'); }
     }
+    function blockCells() {
+      const out = [];
+      if (block) for (let r = block.r1; r <= block.r2; r++) for (let c = block.c1; c <= block.c2; c++) { const x = cellAt(r, c); if (x) out.push(x); }
+      return out;
+    }
+    function blockText() {
+      const lines = [];
+      for (let r = block.r1; r <= block.r2; r++) { const row = []; for (let c = block.c1; c <= block.c2; c++) { const x = cellAt(r, c); row.push(x ? x.value : ''); } lines.push(row.join('\t')); }
+      return lines.join('\n');
+    }
+    function stretch(to) { const a = anchor || to; block = { r1: Math.min(a.r, to.r), r2: Math.max(a.r, to.r), c1: Math.min(a.c, to.c), c2: Math.max(a.c, to.c) }; markBlock(); }
+    // Boxes given new values: the ones that changed save, one call per run with all its days.
+    function saveCells(cells) {
+      const field = GRID[view].field, perRun = {};
+      cells.forEach(x => {
+        if (x.readOnly) return;
+        const id = x.closest('tr').dataset.id, r = routes.find(y => y.id === id);
+        if (!r || x.value.trim() === cellValue(r, x.dataset.day, field)) return;
+        (perRun[id] = perRun[id] || []).push(x);
+      });
+      Object.keys(perRun).forEach(id => {
+        const r = routes.find(x => x.id === id), days = {};
+        perRun[id].forEach(x => { days[x.dataset.day] = { [field]: x.value.trim() }; });
+        saveRun(r, null, days, run => Object.keys(days).forEach(p => { run.days[p] = Object.assign({}, run.days[p], { [field]: shown(field, days[p][field]) }); }));
+      });
+    }
+    function fillBlock(value) { const cells = blockCells().filter(x => !x.readOnly); cells.forEach(x => { x.value = value; }); saveCells(cells); }
+    function moveTo(x) { if (!x) return false; anchor = posOf(x); block = null; markBlock(); keepBlock = true; x.focus(); keepBlock = false; x.select(); return true; }
+    table.addEventListener('focusin', e => {
+      const input = e.target.closest('input.cell');
+      if (!input || keepBlock) return;
+      anchor = posOf(input); block = null; markBlock();
+    });
+    table.addEventListener('keydown', e => {
+      const input = e.target.closest('input.cell');
+      if (!input) return;
+      const p = posOf(input), k = e.key, mod = e.ctrlKey || e.metaKey;
+      if (k === 'Escape') { e.preventDefault(); input.value = cellValue(routes.find(x => x.id === input.closest('tr').dataset.id), input.dataset.day, GRID[view].field); block = null; markBlock(); return; }
+      if (mod && (k === 'd' || k === 'D')) {
+        e.preventDefault();
+        if (block && block.r2 > block.r1) {
+          const cells = [];
+          for (let c = block.c1; c <= block.c2; c++) { const top = cellAt(block.r1, c); if (!top) continue; for (let r = block.r1 + 1; r <= block.r2; r++) { const x = cellAt(r, c); if (x && !x.readOnly) { x.value = top.value; cells.push(x); } } }
+          saveCells(cells);
+        } else {
+          const above = cellAt(p.r - 1, p.c);
+          if (above && !input.readOnly) { input.value = above.value; saveCells([input]); }
+        }
+        return;
+      }
+      if (mod && k === 'Enter' && multi()) { e.preventDefault(); fillBlock(input.value.trim()); return; }
+      if ((k === 'Delete' || k === 'Backspace') && multi()) { e.preventDefault(); fillBlock(''); return; }
+      if (e.shiftKey && !mod && /^Arrow(Up|Down|Left|Right)$/.test(k)) {
+        const at = block && anchor ? { r: block.r1 === anchor.r ? block.r2 : block.r1, c: block.c1 === anchor.c ? block.c2 : block.c1 } : p;
+        const to = { r: at.r + (k === 'ArrowDown' ? 1 : k === 'ArrowUp' ? -1 : 0), c: at.c + (k === 'ArrowRight' ? 1 : k === 'ArrowLeft' ? -1 : 0) };
+        if (cellAt(to.r, to.c)) { e.preventDefault(); if (!anchor) anchor = p; stretch(to); }
+        return;
+      }
+      if (mod || e.altKey) return;
+      let t = null;
+      if (k === 'Enter' || k === 'ArrowDown') t = cellAt(p.r + 1, p.c);
+      else if (k === 'ArrowUp') t = cellAt(p.r - 1, p.c);
+      else if (k === 'ArrowLeft' && input.selectionStart === 0 && input.selectionEnd === 0) t = cellAt(p.r, p.c - 1);
+      else if (k === 'ArrowRight' && input.selectionStart === input.value.length && input.selectionEnd === input.value.length) t = cellAt(p.r, p.c + 1);
+      if (t) { e.preventDefault(); moveTo(t); return; }
+      // Enter on the last row leaves the box so it saves.
+      if (k === 'Enter') { e.preventDefault(); input.blur(); }
+    });
     table.addEventListener('mousedown', e => {
       const input = e.target.closest('input.cell');
       if (!input) return;
-      const r = Number(input.dataset.r), c = Number(input.dataset.c);
-      if (e.shiftKey && anchor) { e.preventDefault(); block = { r1: Math.min(anchor.r, r), r2: Math.max(anchor.r, r), c1: Math.min(anchor.c, c), c2: Math.max(anchor.c, c) }; }
-      else { anchor = { r, c }; block = null; }
-      markBlock();
+      if (e.shiftKey && anchor) { e.preventDefault(); stretch(posOf(input)); }
+      else { anchor = posOf(input); block = null; markBlock(); }
     });
     table.addEventListener('copy', e => {
-      if (!block || !e.target.closest('input.cell')) return;
-      const lines = [];
-      for (let r = block.r1; r <= block.r2; r++) { const row = []; for (let c = block.c1; c <= block.c2; c++) { const x = cellAt(r, c); row.push(x ? x.value : ''); } lines.push(row.join('\t')); }
-      e.clipboardData.setData('text/plain', lines.join('\n'));
+      if (!multi() || !e.target.closest('input.cell')) return;
+      e.clipboardData.setData('text/plain', blockText());
       e.preventDefault();
+    });
+    table.addEventListener('cut', e => {
+      if (!multi() || !e.target.closest('input.cell')) return;
+      e.clipboardData.setData('text/plain', blockText());
+      e.preventDefault();
+      fillBlock('');
     });
     table.addEventListener('paste', e => {
       const input = e.target.closest('input.cell');
       if (!input || input.readOnly) return;
       const text = (e.clipboardData && e.clipboardData.getData('text/plain') || '').replace(/\r/g, '').replace(/\n$/, '');
-      if (!/[\t\n]/.test(text)) return; // one value: the box takes it as typed
+      if (!/[\t\n]/.test(text)) {
+        // One value: into a marked block it fills every box (block fill); into one box it is taken as typed.
+        if (multi()) { e.preventDefault(); fillBlock(text.trim()); }
+        return;
+      }
       e.preventDefault();
-      const r0 = Number(input.dataset.r), c0 = Number(input.dataset.c), field = GRID[view].field, perRun = {};
+      const r0 = Number(input.dataset.r), c0 = Number(input.dataset.c), cells = [];
       text.split('\n').forEach((line, dr) => line.split('\t').forEach((v, dc) => {
         const x = cellAt(r0 + dr, c0 + dc);
-        if (!x || x.readOnly || v.trim() === x.value) return;
+        if (!x || x.readOnly) return;
         x.value = v.trim();
-        const id = x.closest('tr').dataset.id;
-        (perRun[id] = perRun[id] || []).push(x);
+        cells.push(x);
       }));
-      Object.keys(perRun).forEach(id => {
-        const r = routes.find(x => x.id === id), days = {};
-        perRun[id].forEach(x => { days[x.dataset.day] = { [field]: x.value }; });
-        saveRun(r, null, days, run => Object.keys(days).forEach(p => { run.days[p] = Object.assign({}, run.days[p], { [field]: shown(field, days[p][field]) }); }));
-      });
+      saveCells(cells);
     });
     table.addEventListener('click', e => {
+      const mv = e.target.closest('button[data-move]');
+      if (mv) {
+        if (!canEdit()) return;
+        const list = seqList(), from = list.findIndex(r => r.id === mv.closest('tr').dataset.id), to = from + Number(mv.dataset.move);
+        if (from < 0 || to < 0 || to >= list.length) return;
+        const [moved] = list.splice(from, 1);
+        list.splice(to, 0, moved);
+        saveOrder(list);
+        return;
+      }
       const t = e.target.closest('[data-runday]');
       if (t) {
         const r = routes.find(x => x.id === t.closest('tr').dataset.id), p = t.dataset.runday, on = !day(r, p).active;
@@ -403,6 +518,10 @@
       const at = list.findIndex(r => r.id === tr.dataset.id);
       if (at < 0) return;
       list.splice(up ? at : at + 1, 0, moved);
+      saveOrder(list);
+    });
+    // The day's whole order saves as one call (dragged or moved with the arrows).
+    function saveOrder(list) {
       const before = list.map(r => day(r, seqDay).loadOrder), p = seqDay, ids = list.map(r => r.id);
       // Kept on top of any Route Master update that lands before this save, like the run saves above.
       const mine = { all: true, apply: () => ids.forEach((id, i) => { const r = routes.find(x => x.id === id); if (r) r.days[p] = Object.assign({}, r.days[p], { loadOrder: (i + 1) * 10 }); }) };
@@ -410,7 +529,7 @@
       const done = () => { const k = pending.indexOf(mine); if (k >= 0) pending.splice(k, 1); };
       saveOptimistic('reorderRouteDay', { day: p, runIds: ids }, mine.apply,
         () => { done(); list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: before[i] }); }); }, render).then(done);
-    });
+    }
     table.addEventListener('dragend', () => { dragging = null; pressing = false; if (redrawLater) render(); });
     // A row pressed to drag is not redrawn under the pointer (a copy arriving then would cancel the drag); the redraw waits for the release.
     table.addEventListener('mousedown', e => { if (e.button === 0 && view === 'seq' && e.target.closest('tr[data-i]') && !e.target.closest('input, select, button, a')) pressing = true; });
@@ -455,6 +574,7 @@
     document.getElementById('active-filter').onchange = e => { filter = e.target.value; render(); };
     document.getElementById('refresh').onclick = render;
     document.getElementById('seq-day').innerHTML = DAYS.map(p => '<option value="' + p + '">' + NAME(p) + '</option>').join('');
+    document.getElementById('seq-day').value = seqDay; // the list opens on Monday: the Day box says so
     document.getElementById('only-hidden').onchange = e => { onlyHidden = e.target.checked; render(); };
     document.getElementById('seq-day').onchange = e => { seqDay = e.target.value; render(); };
 

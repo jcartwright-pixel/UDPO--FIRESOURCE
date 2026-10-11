@@ -179,7 +179,9 @@
         text: text, status: status, needsReview: status === 'NEEDS_REVIEW' || !text, reviewed: !!reviewed, reviewedBy: reviewed ? reviewed[1] : '',
         emailed: !!sent, emailedAt: sent ? sent[1] : '', atGarage: !!garage, garageAt: garage ? garage[1] : '', garageBy: garage ? garage[2].trim() : '',
         toLessor: !!lessor, lessor: lessor ? lessor[1].trim() : '', lessorAt: lessor ? lessor[2] : '', lessorBy: lessor ? lessor[3].trim() : '',
-        done: ISSUE_DONE.test(status), occurrences: 1 };
+        done: ISSUE_DONE.test(status), occurrences: 1,
+        // From the answering-service email (Driver Check-In Email): the message id opens the stored email (mailCopies).
+        fromEmail: String(r.source_type || '').toUpperCase() === 'GMAIL', emailId: String(r.source_type || '').toUpperCase() === 'GMAIL' ? String(r.source_id || '') : '' };
     }).filter(function (r) { return r.recordId && r.status !== 'REMOVED' && !noWriteUp(r.text); });
     var seen = {};
     written.slice().sort(function (a, b) { return a.openedMs - b.openedMs; }).forEach(function (r) {
@@ -570,13 +572,16 @@
       if (!d || !d.runs) return;
       var issues = [];
       if (d.tractorIssues) issues.push('Truck: ' + d.tractorIssues);
-      if (d.trailerIssues) issues.push('Trailer: ' + d.trailerIssues);
+      var more = Array.isArray(d.moreTrailers) ? d.moreTrailers : [];
+      if (d.trailerIssues) issues.push('Trailer' + (more.length ? ' 1' : '') + ': ' + d.trailerIssues);
+      more.forEach(function (m, i) { if (m && m.issues) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + '): ' + m.issues); if (m && m.needsCleaned) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + ') needs cleaned'); });
       if (d.palletJackIssues) issues.push('Jack: ' + d.palletJackIssues);
       if (yes(d.trailerNeedsCleaned)) issues.push('Trailer needs cleaned');
       if (d.overageShortageDetails || yes(d.overageShortage)) issues.push('Over/short: ' + (d.overageShortageDetails || 'yes'));
       rows.push({
         id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, run: run.run, coverageType: run.coverageType,
-        driver: d.driver || '', truck: d.truck || '', trailer: d.trailer || '', casesOut: d.casesOut,
+        // The units the driver checked in with (a corrected truck or trailer, drop-and-hook trailers), else Dispatch's.
+        driver: d.driver || '', truck: d.checkinTruck || d.truck || '', trailer: [d.checkinTrailer || d.trailer || ''].concat(more.map(function (m) { return m && m.trailer; })).filter(Boolean).join(' / '), casesOut: d.casesOut,
         casesDelivered: d.casesDelivered, driverCaseReturn: d.driverCaseReturn,
         refusedReturned: d.refusedReturned || '', refusedReturnedSource: d.refusedReturnedSource || '',
         checkinNotes: d.checkinNotes || '', checkinCompletedAt: d.checkinCompletedAt || '',
@@ -587,8 +592,20 @@
     return rows.sort(compareRoute);
   }
 
-  // The numbers on the Route Distribution home cards. today = the operating day.
-  function homeNumbers(runs, drivers, equipment, today) {
+  // Drivers available on a day, as the current app's Dispatch Center counts them (udpoV740DriverOptions_): active, no day off
+  // or exception that day, and not marked off that weekday on Driver Master (<day>_available; blank means available).
+  function availableDrivers(drivers, exceptions, day) {
+    var p = dayPrefix(day);
+    return (drivers || []).filter(function (d) {
+      if (!driverActive(d) || exceptionOn(exceptions, d.id, day)) return false;
+      var cells = d.cells && Object.keys(d.cells).length ? d.cells : null;
+      var flag = cells ? cells[p + '_available'] : '';
+      return flag === undefined || flag === null || String(flag).trim() === '' || yes(flag);
+    });
+  }
+
+  // The numbers on the Route Distribution home cards. today = the operating day; exceptions = days off (optional).
+  function homeNumbers(runs, drivers, equipment, today, exceptions) {
     var daily = dailyRows(runs, today);
     var covered = daily.filter(function (r) { return !needsDriver(r); }).length;
     var week = weeklyRows(runs, weekStart(today));
@@ -598,7 +615,7 @@
     return {
       daily: { loads: daily.length, needsDriver: daily.length - covered, covered: daily.length ? Math.round(covered * 100 / daily.length) : 100 },
       weekly: { runs: week.length, open: week.reduce(function (n, r) { return n + DAYS.filter(function (p) { return r.days[p].runs && !r.days[p].driver; }).length; }, 0) },
-      drivers: { active: active.length, relief: active.filter(function (d) { return d.reliefDriver; }).length, inactive: (drivers || []).length - active.length },
+      drivers: { active: active.length, relief: active.filter(function (d) { return d.reliefDriver; }).length, inactive: (drivers || []).length - active.length, available: availableDrivers(drivers, exceptions, today).length },
       checkins: { deliveries: checkins.length, checkedIn: checkins.filter(function (r) { return r.checkedIn; }).length, issues: checkins.filter(function (r) { return r.issues.length; }).length },
       fleet: { trucks: units.filter(function (e) { return e.type === 'TRUCK'; }).length, trailers: units.filter(function (e) { return e.type === 'TRAILER'; }).length, inactive: (equipment || []).length - units.length }
     };
@@ -839,7 +856,7 @@
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
-    vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers,
+    vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR,

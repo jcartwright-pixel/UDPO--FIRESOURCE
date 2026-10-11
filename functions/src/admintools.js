@@ -128,7 +128,7 @@ async function repairSweep(db, opts) {
     const earliest = autos.map(k => s.routes[k].since).filter(Boolean).sort()[0] || at;
     const open = maint.docs.map(d => d.data()).filter(r => {
       const st = String(r.status || 'OPEN').toUpperCase(), notes = String(r.notes || '');
-      return DONE.indexOf(st) < 0 && st !== 'NEEDS_REVIEW' && !L.noWriteUp(r.issue_details) && !/Repair email sent|Repair email held|Sent to garage/.test(notes) && String(r.opened_at || '') >= earliest;
+      return DONE.indexOf(st) < 0 && st !== 'NEEDS_REVIEW' && !L.noWriteUp(r.issue_details) && !/Repair email sent|Repair email held|Sent to garage/.test(notes) && (String(r.opened_at || '') >= earliest || QUEUED.test(notes));
     }).sort((a, b) => String(a.opened_at).localeCompare(String(b.opened_at)));
     const out = { sent: 0, digests: 0, held: 0, failed: 0 }, digest = {};
     let immediate = 0, stop = '';
@@ -141,7 +141,7 @@ async function repairSweep(db, opts) {
         continue;
       }
       const route = s.routes[dest.route];
-      if (!AUTO(route.mode) || String(r.opened_at || '') < route.since || !route.emails.length) continue;
+      if (!AUTO(route.mode) || (String(r.opened_at || '') < route.since && !QUEUED.test(String(r.notes || ''))) || !route.emails.length) continue;
       if (!o.force && state.retryAfter[dest.route] && state.retryAfter[dest.route] > at) continue;
       if (route.mode === 'DAILY') { (digest[dest.route] = digest[dest.route] || []).push(r); continue; }
       if (immediate >= IMMEDIATE_MAX || stop) continue;
@@ -205,6 +205,9 @@ async function saveRepairEmail(db, email, input, stamp) {
 }
 
 // A manager's Lessor button on a truck write-up (mode "Only when I press Send"): after the save, the email itself.
+const QUEUED = /Repair email queued for the daily digest/;
+const hourText = (h) => (h % 12 || 12) + ' ' + (h < 12 ? 'AM' : 'PM');
+
 async function sendOneRepair(db, recordId, by, note, mailDeps) {
   const r = await read(db.collection(C.maintenance).doc(MAINT.docId(recordId)));
   if (!r) return { status: 'NOT_FOUND', message: 'That write-up is no longer on the list.' };
@@ -215,8 +218,13 @@ async function sendOneRepair(db, recordId, by, note, mailDeps) {
   if (dest.route === 'OWNED' && !route.emails.length) return { status: 'GARAGE', message: unitOf(r) + ' is ours, so this repair stays on the garage list. No email is sent.' };
   if (route.mode === 'NONE') return { status: 'OFF', message: 'Email is turned off for ' + ROUTE_LABEL[dest.route] + ' in Administration > Repair Email.' };
   if (!route.emails.length) return { status: 'NO_ADDRESS', message: ROUTE_LABEL[dest.route] + ' has no email address yet (Administration > Repair Email).' };
+  // Review item 32 (Joe 10/11): "Once a day" puts it in that lessor's daily email instead of sending it now.
+  if (route.mode === 'DAILY') {
+    if (!QUEUED.test(String(r.notes || ''))) await addNote(db, r.record_id, 'Repair email queued for the daily digest ' + at + ' (' + ROUTE_LABEL[dest.route] + ')', by, at);
+    return { status: 'QUEUED', message: 'Added to ' + ROUTE_LABEL[dest.route] + '\'s daily repair email, sent at ' + hourText(s.digestHour) + '.' };
+  }
   const msg = repairMessage(r, note);
-  const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · send · ' + by, by, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations' }, mailDeps);
+  const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · ' + (route.mode === 'IMMEDIATE' ? 'immediate' : 'send') + ' · ' + by, by, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations' }, mailDeps);
   if (res.status === 'SENT') {
     await addNote(db, r.record_id, 'Repair email sent ' + at + ' to ' + route.emails.join('; ') + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
     return { status: 'SENT', message: 'Emailed to ' + ROUTE_LABEL[dest.route] + (res.testCopy ? ' (test copy to ' + res.sentTo.join(', ') + ' only)' : '') + '.' };
@@ -356,6 +364,9 @@ async function saveMailCheckin(db, msg, c, sender, stamp) {
       }
     }
     tx.set(seenRef, { at: stamp, route: c.route, driver: c.driver, run: hit ? hit.snap.id + '|' + hit.day : '', made });
+    // Review item 33 (Joe 10/11): the original email, for Maintenance's View email (readable by signed-in users).
+    tx.set(db.collection('mailCopies').doc(M.safeIdPart(msg.id)), { id: msg.id, from: String(msg.from || sender).slice(0, 200), to: String(msg.to || '').slice(0, 300), subject: String(msg.subject || '').slice(0, 200),
+      receivedAt: Number(msg.internalDate) ? new Date(Number(msg.internalDate)).toISOString() : stamp, body: String(msg.body || '').slice(0, 20000), route: c.route, driver: c.driver, records: made, savedAt: stamp });
     return { made, review, run: !!hit };
   });
 }

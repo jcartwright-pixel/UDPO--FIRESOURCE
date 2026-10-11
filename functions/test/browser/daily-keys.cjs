@@ -69,8 +69,11 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-typing-1920.png') });
     await p.keyboard.press('Enter');
     await p.waitForFunction((s) => document.querySelector(s).children[5].textContent === '900001', R802);
+    // The Saving... / Saved sign beside the title (shared by Daily and Weekly through edit.js).
+    await p.waitForFunction(() => { const x = document.getElementById('save-pill'); return x && !x.hidden && /Saved/.test(x.textContent); });
+    assert.equal(await p.evaluate(() => { const r = document.getElementById('save-pill').getBoundingClientRect(), h = document.querySelector('.head .title h1').getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - (h.top + h.bottom) / 2) < 20; }), true, 'the sign sits beside the title');
     assert.equal(await at(p), 'run_t802|tue truck');
-    results.push('typing 1 in the Truck cell highlighted 900001; Enter saved it');
+    results.push('typing 1 in the Truck cell highlighted 900001; Enter saved it and "Saved \u2713" showed beside the title');
 
     // Esc keeps the old value.
     await p.keyboard.press('ArrowUp');
@@ -84,6 +87,15 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await text(p, R801, 6), 'T-902', 'Esc kept T-902');
     assert.equal(await at(p), 'run_t801|tue trailer');
     results.push('typing 901 found T-901; Esc kept T-902');
+
+    // A trailer number that is not on Equipment Master is kept as typed, as T-###.
+    await p.keyboard.type('777');
+    await p.waitForSelector('.cell-pop p');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[6].textContent === 'T-777', R801, { timeout: 8000 });
+    await p.keyboard.press('ArrowUp');
+    assert.equal(await at(p), 'run_t801|tue trailer');
+    results.push('typing 777 (not on Equipment Master) and Enter kept trailer T-777');
 
     // Typing a driver name: Enter takes the best match and moves down.
     await p.keyboard.press('Shift+Tab');
@@ -102,10 +114,18 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.waitForSelector('.cell-pop [data-i]');
     const names = await p.$$eval('.cell-pop [data-i]', n => n.map(x => x.textContent));
     assert.ok(names.some(t => /^CASEY, LEE/.test(t)), 'whole list: ' + names.join(' | '));
+    // Grouped like the current app: Relief, Regular (seniority, tagged), Other CVG / Carriers, then Unavailable with the reason.
+    const heads = await p.$$eval('.cell-pop h6', n => n.map(x => x.textContent));
+    assert.deepEqual(heads.map(h => h.split(' \u00b7 ')[0]), ['RELIEF DRIVERS', 'REGULAR DRIVERS', 'OTHER CVG / CARRIERS', 'UNAVAILABLE'], heads.join(' | '));
+    assert.deepEqual(await p.$$eval('.cell-pop [data-i]', n => n.slice(1, 3).map(x => x.textContent)), ['BROOK, SAMRelief', 'CASEY, LEESeniority 2025']);
+    const off = await p.$$eval('.cell-pop [data-i].off', n => n.map(x => x.textContent));
+    assert.ok(off.includes('ADAMS, PATOn 801') && off.some(t => /^DUNN, ROBININACTIVE/.test(t)), 'unavailable: ' + off.join(' | '));
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-list-1920.png') });
+    await p.click('.cell-pop [data-i]:has-text("ADAMS, PAT")');
+    assert.ok(await p.$('.cell-pop'), 'an unavailable driver cannot be clicked without OVR');
     await p.click('.cell-pop [data-i]:has-text("CASEY, LEE")');
     await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'CASEY, LEE', R802);
-    results.push('a double-click opened the whole driver list; clicking CASEY, LEE saved it');
+    results.push('a double-click opened the whole driver list grouped Relief, Regular (Seniority year), Other CVG, Unavailable (ADAMS "On 801", DUNN INACTIVE, greyed and not pickable); clicking CASEY, LEE saved it');
 
     // Time: typing on the selected cell starts over; Enter saves and moves down; Tab from Jack goes to Notes.
     await p.click(R801 + ' td[data-edit="driver"]');
@@ -122,6 +142,30 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.waitForFunction((s) => document.querySelector(s).children[8].textContent === 'PJ-3', R802);
     assert.equal(await at(p), 'run_t802|tue note');
     results.push('Time: typed 3:45 AM and Enter saved it and moved down; Jack: F2, PJ-3, Tab saved it and moved to Notes');
+
+    // The driver's own truck goes with him (Driver Master); Carrier takes the truck off and Truck shows N/A.
+    const t1 = (await db().collection('equipment').doc('veh_truck_900001').get()).data();
+    await db().collection('equipment').doc('veh_truck_900003').set(Object.assign({}, t1, { id: 'veh_truck_900003', unit: '900003' }));
+    await db().collection('drivers').doc('drv_test_brook').update({ defaultTruckId: 'veh_truck_900003' });
+    await p.waitForTimeout(500);
+    await p.click(R802 + ' td[data-edit="driver"]');
+    await p.keyboard.type('brook');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'BROOK, SAM' && document.querySelector(s).children[5].textContent === '900003', R802, { timeout: 8000 });
+    await p.click(R802 + ' td[data-edit="driver"]');
+    await p.keyboard.type('carr');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'Carrier' && document.querySelector(s).children[5].textContent === 'N/A', R802, { timeout: 8000 });
+    await p.waitForTimeout(1500);
+    assert.equal(await text(p, R802, 5), 'N/A', 'the truck stays off after the saves');
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-carrier-1920.png') });
+    results.push('picking BROOK, SAM brought his own truck 900003; picking Carrier took the truck off and Truck shows N/A');
+
+    // A refused save says Not saved, and leaving while a save is going asks first.
+    await p.evaluate(async () => { const m = await import('./js/edit.js'); try { await m.saveOptimistic('noSuchAction', {}, () => {}, () => {}, () => {}); } catch (e) { /* shown on screen */ } });
+    await p.waitForFunction(() => /Not saved/.test(document.getElementById('save-pill').textContent));
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-save-pill-failed-1920.png'), clip: { x: 0, y: 70, width: 1920, height: 300 } });
+    results.push('a refused save showed "Not saved" beside the title');
 
     assert.deepEqual(p.errors, []);
     console.log('Daily keys:\n- ' + results.join('\n- '));

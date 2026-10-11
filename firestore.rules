@@ -35,6 +35,7 @@ service cloud.firestore {
     match /vacations/{id} { allow read: if activeUser(); }
     match /plantLoads/{id} { allow read: if activeUser(); }
     match /maintenance/{id} { allow read: if activeUser(); }
+    match /mailCopies/{id} { allow read: if activeUser(); }
     match /workOrders/{id} { allow read: if activeUser(); }
     match /fleetSetup/{id} { allow read: if activeUser(); }
     match /garageTechs/{id} { allow read: if activeUser(); }

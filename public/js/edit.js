@@ -5,10 +5,54 @@
  * background as one call. If the server refuses it (someone else changed that run, a unit is inactive, no
  * permission), the cell goes back to what the database holds and the reason shows as an error.
  */
-import { start, save, showError, escapeHtml } from './app.js';
+import { start, save as sendSave, showError, escapeHtml } from './app.js';
 import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const L = window.UDLogic;
+
+/*
+ * "Saving... / Saved" beside the screen's title, like the current app's Daily (7.0.2xx): every save on Daily and Weekly goes
+ * through here. A refused save shows "Not saved" (the reason is in the error line). Leaving the page while a save is still
+ * going asks first.
+ */
+let pending = 0, pillTimer = null, failed = false;
+function savePill(state) {
+  let pill = document.getElementById('save-pill');
+  if (!pill) {
+    const title = document.querySelector('.head .title h1');
+    if (!title) return;
+    pill = document.createElement('span');
+    pill.id = 'save-pill';
+    pill.setAttribute('role', 'status');
+    pill.style.cssText = 'display:inline-block;margin-left:12px;padding:2px 12px;border-radius:999px;font:800 16px/1.25 Arial,sans-serif;letter-spacing:0;vertical-align:middle;white-space:nowrap';
+    title.appendChild(pill); // on the title's line, without changing the header's height
+  }
+  const look = { saving: ['Saving\u2026', '#fff4d6', '#8a5a00'], saved: ['Saved \u2713', '#dff4e6', '#126334'], failed: ['Not saved', '#fde8e6', '#b3261e'] }[state];
+  pill.textContent = look[0];
+  pill.style.background = look[1];
+  pill.style.color = look[2];
+  pill.hidden = false;
+  clearTimeout(pillTimer);
+  if (state === 'saved') pillTimer = setTimeout(() => { pill.hidden = true; }, 4000);
+}
+async function save(action, fields) {
+  if (!pending) failed = false;
+  pending++;
+  savePill('saving');
+  try {
+    const out = await sendSave(action, fields);
+    pending--;
+    if (!pending) savePill(failed ? 'failed' : 'saved');
+    return out;
+  } catch (e) {
+    pending--;
+    failed = true;
+    savePill(pending ? 'saving' : 'failed');
+    throw e;
+  }
+}
+export function savesPending() { return pending; }
+window.addEventListener('beforeunload', e => { if (pending) { e.preventDefault(); e.returnValue = 'A change is still saving. Leave anyway?'; } });
 export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], fleetTrucks: [], fleetTrailers: [], exceptions: [], ops: L.opsAssignments([]), person: null, app: {} };
 
 // The screen's key in the per-screen switch (L.SCREENS); each page sets it once.
@@ -94,10 +138,37 @@ export function optionsHtml(kind, current, busy, opts) {
 
 // The same choices as optionsHtml, as a list for Daily's type-to-pick box: key is the name or unit the typing is matched against.
 export function pickChoices(kind, current, busy, opts) {
+  if (kind === 'driver') return driverChoices(current, busy, opts);
   const list = KINDS[kind].list(opts);
   if (current && kind !== 'driver' && !list.some(o => o.id === current) && pickText(kind, current)) list.unshift({ id: current, text: pickText(kind, current) });
   const item = (group) => (o) => ({ value: o.id, label: o.text + (busy && busy[o.id] && o.id !== current && !o.why ? '  (' + busy[o.id] + ')' : ''), key: pickText(kind, o.id) || o.text, group });
   return [{ value: '', label: '(none)', key: '', group: 'none' }].concat(list.map(item('list')), kind === 'driver' ? cvgOptions().map(item('cvg')) : []);
+}
+
+/*
+ * Daily's driver list, grouped like the current app (7.0.276, Joe picked list A 10/8): Relief drivers, then Regular drivers,
+ * each in seniority order and tagged "Relief" / "Seniority 2004"; then Other CVG / Carriers; then Unavailable with the reason (off, called off, vacation,
+ * on another route that day) last, which can be picked only with OVR ticked.
+ */
+export function driverChoices(current, busy, opts) {
+  opts = opts || {};
+  const relief = [], regular = [], blocked = [];
+  L.driverRosterRows(lists.allDrivers, opts.date).forEach(r => {
+    const d = lists.allDrivers.find(x => x.id === r.id) || {};
+    const off = opts.date ? L.exceptionOn(lists.exceptions, r.id, opts.date) : null;
+    const why = !L.driverActive(d) ? (d.status || 'INACTIVE') : off ? L.exceptionLabel(off) : busy && busy[r.id] ? busy[r.id].replace(/^on /, 'On ') : '';
+    const year = String(r.seniorityDate || '').slice(0, 4);
+    const c = { value: r.id, label: r.name, key: r.name };
+    if (why && r.id !== current) blocked.push(Object.assign(c, { group: 'blocked', head: 'UNAVAILABLE', reason: why, blocked: !opts.override }));
+    else if (r.reliefDriver) relief.push(Object.assign(c, { group: 'relief', head: 'RELIEF DRIVERS', note: 'Relief' }));
+    else regular.push(Object.assign(c, { group: 'regular', head: 'REGULAR DRIVERS', note: /^(19|20)\d\d$/.test(year) ? 'Seniority ' + year : '' }));
+  });
+  const cvg = cvgOptions().map(o => ({ value: o.id, label: o.text, key: o.text, group: 'cvg', head: 'OTHER CVG / CARRIERS' }));
+  const out = [{ value: '', label: '(none)', key: '', group: 'none' }].concat(relief, regular, cvg, blocked);
+  const counts = {};
+  out.forEach(c => { if (c.head) counts[c.head] = (counts[c.head] || 0) + 1; });
+  out.forEach(c => { if (c.head) c.head += ' \u00b7 ' + counts[c.head]; });
+  return out;
 }
 
 // Operational Assignments that are active, as driver choices (the current app's "Other CVG / Carriers").
@@ -171,10 +242,11 @@ export function saveRunChange(getRuns, runDocId, day, action, fields, apply, ren
 
 export function saveAssignment(getRuns, runDocId, day, kind, pick, render, override) {
   const spec = kind === 'note' ? null : KINDS[kind];
-  const fields = spec ? { [spec.field]: pick.id } : { note: pick };
+  const fields = spec ? { [spec.field]: pick.unit ? '' : pick.id } : { note: pick };
+  if (spec && pick.unit) fields.unit = pick.unit; // a typed unit that is not on Equipment Master (Daily)
   if (override) fields.override = true;
   return saveRunChange(getRuns, runDocId, day, spec ? spec.action : 'setDriverNote', fields,
-    (d) => { if (spec) { d[spec.idKey] = /^__CVG__:/.test(pick.id) ? '' : pick.id; d[spec.textKey] = pick.id ? pick.text : ''; } else d.driverNotes = pick; }, render);
+    (d) => { if (spec) { d[spec.idKey] = /^__CVG__:/.test(pick.id) || pick.unit ? '' : pick.id; d[spec.textKey] = pick.id ? pick.text : ''; } else d.driverNotes = pick; }, render);
 }
 
 // New load order for one load date: the rows in their new order. Shown at once, saved as one call.
