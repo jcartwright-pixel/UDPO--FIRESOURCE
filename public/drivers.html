@@ -142,8 +142,10 @@
       if (!d) return;
       const before = {};
       Object.keys(values).forEach(k => { before[k] = d[k]; });
-      return saveOptimistic(action, fields, () => Object.assign(d, values), () => Object.assign(d, before), render);
+      return saveOptimistic(action, fields, () => Object.assign(d, values), () => Object.assign(d, before), render).then(liveWarn);
     }
+    // D6: the Live weeks take the driver's truck unless it is down or on another run that day; the screen says so (old DriverRoster.html:51).
+    function liveWarn(out) { const w = out && out.liveWeeks && out.liveWeeks.warnings; if (w && w.length) showError('Saved. ' + w.join(' ')); return out; }
 
     function openPanel(r) {
       panelOpen = true;
