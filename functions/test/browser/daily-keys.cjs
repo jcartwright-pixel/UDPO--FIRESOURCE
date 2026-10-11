@@ -131,6 +131,24 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await at(p), 'run_t802|tue note');
     results.push('Time: typed 3:45 AM and Enter saved it and moved down; Jack: F2, PJ-3, Tab saved it and moved to Notes');
 
+    // The driver's own truck goes with him (Driver Master); Carrier takes the truck off and Truck shows N/A.
+    const t1 = (await db().collection('equipment').doc('veh_truck_900001').get()).data();
+    await db().collection('equipment').doc('veh_truck_900003').set(Object.assign({}, t1, { id: 'veh_truck_900003', unit: '900003' }));
+    await db().collection('drivers').doc('drv_test_brook').update({ defaultTruckId: 'veh_truck_900003' });
+    await p.waitForTimeout(500);
+    await p.click(R802 + ' td[data-edit="driver"]');
+    await p.keyboard.type('brook');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'BROOK, SAM' && document.querySelector(s).children[5].textContent === '900003', R802, { timeout: 8000 });
+    await p.click(R802 + ' td[data-edit="driver"]');
+    await p.keyboard.type('carr');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'Carrier' && document.querySelector(s).children[5].textContent === 'N/A', R802, { timeout: 8000 });
+    await p.waitForTimeout(1500);
+    assert.equal(await text(p, R802, 5), 'N/A', 'the truck stays off after the saves');
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-carrier-1920.png') });
+    results.push('picking BROOK, SAM brought his own truck 900003; picking Carrier took the truck off and Truck shows N/A');
+
     assert.deepEqual(p.errors, []);
     console.log('Daily keys:\n- ' + results.join('\n- '));
   } finally {
