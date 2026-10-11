@@ -213,10 +213,13 @@
       const merged = imp.merged;
       imp = Object.assign({}, imp, { busy: 'Saving…' }); render();
       try {
-        const chunks = [];
-        for (let i = 0; i < merged.daily.length; i += 300) chunks.push(merged.daily.slice(i, i + 300));
-        await save('saveOtr', { op: 'import', figures: merged.figures, daily: chunks.shift() || [] });
-        for (const c of chunks) await save('saveOtr', { op: 'import', figures: [], daily: c });
+        // A long history (188 months of gallons, years of day counts) goes in several saves the server takes one at a time.
+        const batches = O.otrImportBatches_(merged);
+        for (let i = 0; i < batches.length; i++) {
+          if (batches.length > 1) { imp = Object.assign({}, imp, { busy: 'Saving ' + (i + 1) + ' of ' + batches.length + '…' }); render(); }
+          try { await save('saveOtr', Object.assign({ op: 'import' }, batches[i])); }
+          catch (e) { throw new Error((i ? 'Saved ' + i + ' of ' + batches.length + ' parts, then: ' : '') + (e.message || e)); }
+        }
         const yrs = merged.figures.map(f => f.year);
         if (yrs.length) year = Math.max(...yrs);
         imp = null; showError('');

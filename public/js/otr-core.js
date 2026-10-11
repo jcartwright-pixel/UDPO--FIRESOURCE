@@ -506,6 +506,26 @@ function otrImportSummary_(merged, savedFigures) {
   return lines;
 }
 
+/**
+ * New app only: split an import into saves the server takes in one go (up to 40 months of figures, or 300 day counts, each).
+ * Returns [{figures, daily}], figures first; every save carries at least one number.
+ */
+function otrImportBatches_(merged, monthsPer, daysPer) {
+  monthsPer = monthsPer || 40; daysPer = daysPer || 300;
+  var byMonth = {}, order = [], out = [];
+  ((merged && merged.figures) || []).forEach(function (f) {
+    var k = f.year + '-' + f.month;
+    if (!byMonth[k]) { byMonth[k] = []; order.push(k); }
+    byMonth[k].push(f);
+  });
+  for (var i = 0; i < order.length; i += monthsPer) {
+    out.push({figures: [].concat.apply([], order.slice(i, i + monthsPer).map(function (k) { return byMonth[k]; })), daily: []});
+  }
+  var daily = (merged && merged.daily) || [];
+  for (var j = 0; j < daily.length; j += daysPer) out.push({figures: [], daily: daily.slice(j, j + daysPer)});
+  return out;
+}
+
 function otrRound2_(v) { return v == null ? null : Math.round(v * 100) / 100; }
 
 function otrMonthName_(t) {
@@ -575,5 +595,5 @@ function otrGridValues_(rowData) {
   return rows.map(function (r) { while (r.length < width) r.push(''); return r; });
 }
 
-  return { OTR_CORE: OTR_CORE, otrNum_: otrNum_, otrFlagOn_: otrFlagOn_, otrNormDest_: otrNormDest_, otrDateKey_: otrDateKey_, otrParseKey_: otrParseKey_, otrAddDays_: otrAddDays_, otrWeekday_: otrWeekday_, otrShortDate_: otrShortDate_, otrRouteList_: otrRouteList_, otrCountDay_: otrCountDay_, otrScheduled_: otrScheduled_, otrMergeDaily_: otrMergeDaily_, otrMonthRuns_: otrMonthRuns_, otrFigureMap_: otrFigureMap_, otrCostPerGallon_: otrCostPerGallon_, otrSum_: otrSum_, otrYearReport_: otrYearReport_, otrDashboard_: otrDashboard_, otrDailyCountText_: otrDailyCountText_, otrParseImport_: otrParseImport_, otrMergeImport_: otrMergeImport_, otrImportSummary_: otrImportSummary_, otrRound2_: otrRound2_, otrMonthName_: otrMonthName_, otrTitleMonth_: otrTitleMonth_, otrCellDateKey_: otrCellDateKey_, otrCellMonth_: otrCellMonth_, otrGridValues_: otrGridValues_ };
+  return { OTR_CORE: OTR_CORE, otrNum_: otrNum_, otrFlagOn_: otrFlagOn_, otrNormDest_: otrNormDest_, otrDateKey_: otrDateKey_, otrParseKey_: otrParseKey_, otrAddDays_: otrAddDays_, otrWeekday_: otrWeekday_, otrShortDate_: otrShortDate_, otrRouteList_: otrRouteList_, otrCountDay_: otrCountDay_, otrScheduled_: otrScheduled_, otrMergeDaily_: otrMergeDaily_, otrMonthRuns_: otrMonthRuns_, otrFigureMap_: otrFigureMap_, otrCostPerGallon_: otrCostPerGallon_, otrSum_: otrSum_, otrYearReport_: otrYearReport_, otrDashboard_: otrDashboard_, otrDailyCountText_: otrDailyCountText_, otrParseImport_: otrParseImport_, otrMergeImport_: otrMergeImport_, otrImportSummary_: otrImportSummary_, otrRound2_: otrRound2_, otrImportBatches_: otrImportBatches_, otrMonthName_: otrMonthName_, otrTitleMonth_: otrTitleMonth_, otrCellDateKey_: otrCellDateKey_, otrCellMonth_: otrCellMonth_, otrGridValues_: otrGridValues_ };
 });
