@@ -41,7 +41,9 @@ async function checkCode(db, code, stamp) {
   return db.runTransaction(async tx => {
     const snap = await tx.get(CODE_REF(db));
     const c = snap.exists ? snap.data() : null;
-    if (!c || c.enabled !== true || !c.codeHash) throw new SaveError('NOT_ALLOWED', 'Phone Check-In is not turned on yet. A manager turns it on with the New phone code button at the bottom of Route Distribution > Overall > Driver Check-ins, then gives drivers the code it shows.');
+    // Where a manager turns it on now (Joe 10/11): Administration > Links & Codes > Driver Station Codes.
+    if (!c || !c.codeHash) throw new SaveError('NOT_ALLOWED', 'Phone Check-In is not turned on yet. A manager makes the code in Administration > Links & Codes > Driver Station Codes (Generate Code) and gives it to the drivers.');
+    if (c.enabled !== true) throw new SaveError('NOT_ALLOWED', 'Phone Check-In is turned off right now. A manager turns it back on in Administration > Links & Codes > Driver Station Codes (Turn On).');
     const failed = c.failed && c.failed.minute === minute ? c.failed.count : 0;
     if (failed >= MAX_FAILED_PER_MINUTE) throw new SaveError('NOT_ALLOWED', 'Too many wrong codes; wait a minute and try again');
     const given = Buffer.from(hashCode(code || '', c.salt), 'hex'), want = Buffer.from(c.codeHash, 'hex');
