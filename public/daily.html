@@ -142,12 +142,29 @@
       return '<td class="' + (extra || '') + (text ? '' : ' empty') + (edit ? ' editable' : '') + '"' + (edit ? ' data-edit="' + edit + '" tabindex="0"' : '') + ' title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</td>';
     }
 
+    /*
+     * Current app 7.0.226 / 7.0.230: the Saturday sheet also shows the Sunday-loaded rows. Each delivery day is one block;
+     * inside a block that holds loads from both days, "LOADED SATURDAY" / "LOADED SUNDAY" lines split them.
+     */
+    const isSaturday = (key) => L.dayPrefix(key) === 'sat';
+    function sheetRows() {
+      const list = isSaturday(loadDate) ? L.dailyRows(runs, loadDate).concat(L.dailyRows(runs, L.addDays(loadDate, 1))) : L.dailyRows(runs, loadDate);
+      return list.map((r, i) => ({ r, i })).sort((a, b) => (a.r.deliveryDate < b.r.deliveryDate ? -1 : a.r.deliveryDate > b.r.deliveryDate ? 1 : 0)
+        || (a.r.loadDate < b.r.loadDate ? -1 : a.r.loadDate > b.r.loadDate ? 1 : 0) || a.i - b.i).map(x => x.r);
+    }
+    // Delivery days whose block holds loads from more than one load day.
+    function mixedLoads(list) {
+      const days = {};
+      list.forEach(r => { (days[r.deliveryDate] = days[r.deliveryDate] || new Set()).add(r.loadDate); });
+      return (d) => !!days[d] && days[d].size > 1;
+    }
+
     // The day's loads, plus any switched to NO RUN in this session (shown greyed in their old place).
     function buildRows() {
-      const on = L.dailyRows(runs, loadDate), ids = new Set(on.map(r => r.id));
+      const on = sheetRows(), ids = new Set(on.map(r => r.id));
       Object.values(keptOff).forEach(k => {
         const run = runs.find(x => x.id === k.runDocId), d = run && run.days && run.days[k.day];
-        if (!d || d.runs || ids.has(k.id) || k.loadDate !== loadDate) return;
+        if (!d || d.runs || ids.has(k.id) || k.sheetDate !== loadDate) return;
         const row = Object.assign({}, k, { off: true, driverId: d.driverId, driver: d.driver, truckId: d.truckId, truck: d.truck, trailerId: d.trailerId,
           trailer: d.trailer, dispatchTime: d.dispatchTime, startTime: d.startTime, palletJack: d.palletJack, driverNotes: d.driverNotes, pickup: d.pickup, rev: run.rev || 0 });
         let at = on.findIndex(r => r.deliveryDate > row.deliveryDate || (r.deliveryDate === row.deliveryDate && Number(r.loadSequence) > Number(row.loadSequence)));
@@ -164,11 +181,18 @@
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
       ['open-down', 'open-calloff', 'open-add'].forEach(id => { document.getElementById(id).disabled = !edit; });
       const body = [];
-      let group = '';
+      let group = '', loaded = '', subs = 0;
+      const mixed = mixedLoads(rows);
       rows.forEach((r, i) => {
         if (r.deliveryDate !== group) {
           group = r.deliveryDate;
+          loaded = '';
           body.push('<tr class="group"><td colspan="11"><span class="gtext">' + escapeHtml(r.deliveryDay.toUpperCase() + ' DELIVERIES, ' + shortDate(r.deliveryDate)) + '</span></td></tr>');
+        }
+        if (mixed(r.deliveryDate) && r.loadDate !== loaded) {
+          loaded = r.loadDate;
+          subs++;
+          body.push('<tr class="group loaded"><td colspan="11"><span class="gtext">' + escapeHtml('LOADED ' + L.dayName(r.loadDate).toUpperCase() + ', ' + shortDate(r.loadDate)) + '</span></td></tr>');
         }
         const driver = r.driver || coverageName(r), live = edit && !r.off, needs = !r.off;
         body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (order && !r.off ? ' draggable="true"' : '') + (r.off ? ' class="off"' : '') + '>' +
@@ -190,7 +214,7 @@
       document.getElementById('delivery-day').value = deliveryDayName(loadDate);
       const groups = new Set(rows.map(r => r.deliveryDate)).size;
       document.getElementById('count').textContent = running.length + ' loads' + (running.length - covered ? ', ' + (running.length - covered) + ' need a driver' : '');
-      fitToWindow(rows.length + groups, 5);
+      fitToWindow(rows.length + groups + subs, 5);
       if (editRow) paintEdit();
       if (!document.getElementById('down-panel').hidden) paintDown();
     }
@@ -209,7 +233,7 @@
     }
 
     function setRuns(row, on) {
-      if (!on) keptOff[row.id] = Object.assign({}, row, { loadDate });
+      if (!on) keptOff[row.id] = Object.assign({}, row, { sheetDate: loadDate });
       return saveRunChange(getRuns, row.runDocId, row.day, 'setRuns', { runs: on }, d => { d.runs = on; }, render);
     }
     const setTime = (row, text) => saveRunChange(getRuns, row.runDocId, row.day, 'setDispatchTime', { time: text }, d => { d.dispatchTime = text ? L.minutesOfDay(text) : null; }, render);
@@ -272,6 +296,15 @@
       editText, setEditing: (on) => { editing = on; }, render
     });
 
+    // Current app: a double-click on a row (not on a cell that edits, a box or a button) flips RUNS / NO RUN.
+    body.addEventListener('dblclick', e => {
+      const tr = e.target.closest('tr[data-index]');
+      if (!tr || editing || !canSave() || e.target.closest('td[data-edit], input, button, select, textarea')) return;
+      try { window.getSelection().removeAllRanges(); } catch (ignore) { /* nothing selected */ }
+      const row = rows[Number(tr.dataset.index)];
+      setRuns(row, !!row.off);
+    });
+
     // Managers drag a load by its route number to a new place; the whole day's order is saved as one call.
     body.addEventListener('dragstart', e => { const tr = e.target.closest('tr[data-index]'); if (tr) { dragging = Number(tr.dataset.index); e.dataTransfer.effectAllowed = 'move'; } });
     body.addEventListener('dragover', e => { if (dragging !== null && e.target.closest('tr[data-index]')) e.preventDefault(); });
@@ -282,12 +315,13 @@
       const to = Number(tr.dataset.index), from = dragging;
       dragging = null;
       if (to === from) return;
-      const ordered = rows.filter(r => !r.off);
+      if (rows[from].loadDate !== rows[to].loadDate) return; // the load order is per load day (Saturday's sheet holds Sunday's too)
+      const ordered = rows.filter(r => !r.off && r.loadDate === rows[from].loadDate);
       const a = ordered.indexOf(rows[from]), b = ordered.indexOf(rows[to]);
       if (a < 0 || b < 0) return;
       const [moved] = ordered.splice(a, 1);
       ordered.splice(b, 0, moved);
-      saveOrder(getRuns, loadDate, ordered, render);
+      saveOrder(getRuns, rows[from].loadDate, ordered, render);
     });
     body.addEventListener('dragend', () => { dragging = null; });
 
@@ -456,10 +490,13 @@
       let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(shortDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
         ' &middot; Delivery Day ' + escapeHtml(document.getElementById('delivery-day').value) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
         '<th>C/O</th><th>P/O</th><th>T/O</th><th>L/D</th><th>DR</th><th>CHECKED BY</th><th>JACK</th><th>DRIVER NOTES</th></tr></thead><tbody>';
-      let group = '';
+      let group = '', loaded = '';
+      const mixed = mixedLoads(list);
       list.forEach(r => {
         if (r.deliveryDate !== group && new Set(list.map(x => x.deliveryDate)).size > 1) html += '<tr class="pgroup"><td colspan="14">' + escapeHtml(r.deliveryDay + ' Deliveries, ' + shortDate(r.deliveryDate)) + '</td></tr>';
+        if (r.deliveryDate !== group) loaded = '';
         group = r.deliveryDate;
+        if (mixed(r.deliveryDate) && r.loadDate !== loaded) { loaded = r.loadDate; html += '<tr class="pgroup"><td colspan="14">' + escapeHtml('Loaded ' + L.dayName(r.loadDate) + ', ' + shortDate(r.loadDate)) + '</td></tr>'; }
         html += '<tr><td>' + [r.route, r.run, r.driver || coverageName(r), r.truck, r.trailer, departText(r), '', '', '', '', '', '', r.palletJack, r.pickup ? 'PICKUP ' + r.pickup : r.driverNotes].map(v => escapeHtml(show(v))).join('</td><td>') + '</td></tr>';
       });
       document.getElementById('print').innerHTML = html + '</tbody></table>';
@@ -482,7 +519,8 @@
       document.getElementById('go-weekly').href = 'weekly.html?week=' + L.addDays(loadDate, 1) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
       history.replaceState(null, '', '?date=' + loadDate + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
       // One live query: every open screen gets each change the moment it is saved, without checking every 30 seconds.
-      const q = query(collection(db, 'runs'), where('weekStart', 'in', L.weeksForLoadDate(loadDate)));
+      const weeks = [...new Set(L.weeksForLoadDate(loadDate).concat(isSaturday(loadDate) ? L.weeksForLoadDate(L.addDays(loadDate, 1)) : []))];
+      const q = query(collection(db, 'runs'), where('weekStart', 'in', weeks));
       unsubscribeRuns = onSnapshot(q, snap => {
         runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
         render();
