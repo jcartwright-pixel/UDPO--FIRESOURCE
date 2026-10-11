@@ -92,6 +92,14 @@ export function optionsHtml(kind, current, busy, opts) {
   return '<option value="">(none)</option>' + list.map(opt).join('') + (cvg.length ? '<optgroup label="Other CVG / Carriers">' + cvg.map(opt).join('') + '</optgroup>' : '');
 }
 
+// The same choices as optionsHtml, as a list for Daily's type-to-pick box: key is the name or unit the typing is matched against.
+export function pickChoices(kind, current, busy, opts) {
+  const list = KINDS[kind].list(opts);
+  if (current && kind !== 'driver' && !list.some(o => o.id === current) && pickText(kind, current)) list.unshift({ id: current, text: pickText(kind, current) });
+  const item = (group) => (o) => ({ value: o.id, label: o.text + (busy && busy[o.id] && o.id !== current && !o.why ? '  (' + busy[o.id] + ')' : ''), key: pickText(kind, o.id) || o.text, group });
+  return [{ value: '', label: '(none)', key: '', group: 'none' }].concat(list.map(item('list')), kind === 'driver' ? cvgOptions().map(item('cvg')) : []);
+}
+
 // Operational Assignments that are active, as driver choices (the current app's "Other CVG / Carriers").
 export function cvgOptions() { return lists.ops.filter(o => o.active !== false).map(o => ({ id: '__CVG__:' + o.assignment, text: o.assignment })); }
 
