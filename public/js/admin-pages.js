@@ -365,24 +365,30 @@ export async function renderAccessCodes(box) {
   await load();
 }
 
-/* ---------- App Links & Codes ---------- */
+/* ---------- Manager Links, Plant Station Codes, Driver Station Codes (Joe 10/11: each link where it belongs) ---------- */
 
 const APP_LINKS = [
   { key: 'company', title: 'United Dairy Operations', label: 'Company link', path: 'index.html', who: 'ud', opens: 'Every screen their role allows', guard: 'UD Google account and their role', shut: 'Remove them in People & Roles' },
   { key: 'phone', title: 'Phone link', label: 'Phone link', path: 'index.html', who: 'ud', opens: 'The phone screens (managers, supervisors, plant staff)', guard: 'UD Google account and their role', shut: 'Remove them in People & Roles' },
   { key: 'manager', title: 'Manager Web App', label: 'Manager link', path: 'manager.html', who: 'ud', opens: 'Managers only. Company Google sign-in, no code.', guard: 'UD Google account (Manager role)', shut: 'Change their role in People & Roles' },
-  { key: 'plant', title: 'Plant Station (tablet)', label: 'Tablet link', path: 'plant-station.html', who: 'ud', opens: 'Plant Station only (loading tablet)', guard: 'Sign in with the tablet\'s United Dairy Google account, then pick the station. Changing station needs the manager release code once one is set (Plant Station Codes).', shut: 'Remove the tablet account in People & Roles', extra: { label: 'Tablet icon page', url: 'https://ud-plant-tablet.web.app/' } },
+  { key: 'plant', title: 'Plant Station (tablet)', label: 'Tablet link', path: 'plant-station.html', who: 'ud', opens: 'Plant Station only (loading tablet)', guard: 'Sign in with the tablet\'s United Dairy Google account, then pick the station. Changing station needs the manager release code once one is set (Manager release codes, below).', shut: 'Remove the tablet account in People & Roles', extra: { label: 'Tablet icon page', url: 'https://ud-plant-tablet.web.app/' } },
   { key: 'driver', title: 'Driver Station and TV', label: 'Tablet page', path: 'driver-station.html', who: 'ud', opens: 'Driver Room tablet or TV', guard: 'UD sign-in', shut: 'Remove the account in People & Roles' },
   { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', opens: 'Garage Station only (garage tablet)', guard: 'The technician\'s name and login ID', shut: 'Turn the technician off in Fleet Service' },
   { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', opens: 'Drivers on their own phones: View Loadout, Check-In. No company account needed.', guard: 'Anyone with the Route Distribution code', shut: 'Turn the link off or make a new code below', code: true },
   { key: 'personal', title: 'Personal phone links', label: '', path: '', who: 'ud', opens: 'One person\'s phone screens', guard: 'Their own link, plus UD sign-in', shut: 'Revoke in Access & QR Codes', goto: 'access-codes' }
 ];
 
-export async function renderAppLinks(box, ctx) {
+const MANAGER_LINKS = ['company', 'phone', 'manager', 'personal'];
+const PLANT_LINKS = ['plant', 'garage'];
+const DRIVER_LINKS = ['driver', 'route'];
+
+// The link cards for the given keys; tail is more of the page under the cards (Plant Station Codes' release codes).
+export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '') {
   let data = null;
+  const links = APP_LINKS.filter(l => keys.indexOf(l.key) >= 0);
   const sandbox = /sandbox|localhost|127\.0\.0\.1/.test(location.hostname);
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="al-reload">Refresh</button><div class="ap-right"><span class="ap-chip blue">Blue: UD Google sign-in</span><span class="ap-chip orange">Orange: anyone with the code</span></div></div>' +
-    '<div class="ap-msg" hidden></div>' + (sandbox ? '<div class="ap-msg bad">SANDBOX &mdash; TEST ONLY. Do not give these to drivers or plant staff.</div>' : '') + '<div class="ap-scroll" style="padding:10px"><div class="ap-links" id="al-list"></div></div></div>';
+    '<div class="ap-msg" hidden></div>' + (sandbox ? '<div class="ap-msg bad">SANDBOX &mdash; TEST ONLY. Do not give these to drivers or plant staff.</div>' : '') + '<div class="ap-scroll" style="padding:10px"><div class="ap-links" id="al-list"></div>' + tail + '</div></div>';
   const $ = (s) => box.querySelector(s);
   const url = (l) => location.origin + '/' + l.path;
   function codeRow() {
@@ -395,7 +401,7 @@ export async function renderAppLinks(box, ctx) {
       '<p class="ap-note" style="flex-basis:100%">Off stops the drivers\' phone link. UD sign-in links keep working. A new code makes every phone ask for it again.</p></div>';
   }
   function render() {
-    $('#al-list').innerHTML = APP_LINKS.map(l => '<div class="ap-link" data-link="' + l.key + '"><div><h4>' + e(l.title) + ' <span class="ap-chip ' + (l.who === 'ud' ? 'blue' : 'orange') + '">' + (l.who === 'ud' ? 'UD sign-in only' : 'Anyone with the code') + '</span></h4>' +
+    $('#al-list').innerHTML = links.map(l => '<div class="ap-link" data-link="' + l.key + '"><div><h4>' + e(l.title) + ' <span class="ap-chip ' + (l.who === 'ud' ? 'blue' : 'orange') + '">' + (l.who === 'ud' ? 'UD sign-in only' : 'Anyone with the code') + '</span></h4>' +
       '<p>' + e(l.opens) + '</p></div><div><p><b>Who can open it:</b> ' + e(l.guard) + '</p><p><b>Turn off or change:</b> ' + e(l.shut) + '</p>' + (l.path ? '<p class="ap-url">' + e(url(l)) + '</p>' : '') +
       (l.extra ? '<p>' + e(l.extra.label) + ': <span class="ap-url">' + e(l.extra.url) + '</span></p>' : '') + '</div><div class="ap-acts">' +
       (l.goto ? '<button type="button" class="ap-btn small main" data-goto="' + l.goto + '">Details</button>' : '<button type="button" class="ap-btn small" data-copy="' + l.key + '">Copy Link</button><button type="button" class="ap-btn small" data-qr="' + l.key + '">Print QR</button>' +
@@ -405,7 +411,7 @@ export async function renderAppLinks(box, ctx) {
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
-    const l = APP_LINKS.find(x => x.key === (b.dataset.copy || b.dataset.qr));
+    const l = links.find(x => x.key === (b.dataset.copy || b.dataset.qr));
     if (b.id === 'al-reload') load();
     if (b.dataset.goto && ctx && ctx.open) ctx.open(b.dataset.goto);
     if (b.dataset.copy) copyText(b, url(l));
@@ -420,10 +426,11 @@ export async function renderAppLinks(box, ctx) {
 
 /* ---------- Plant Station Codes (manager release code) ---------- */
 
-export async function renderStationCodes(box) {
-  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="sc-reload">Refresh</button></div><div class="ap-msg" hidden></div>' +
+export async function renderStationCodes(box, ctx) {
+  const tail = '<div class="ap-section" style="margin-top:10px"><h3>Manager release codes</h3>' +
     '<p class="ap-note">A tablet remembers its station. To move it, a manager taps Change Station on the tablet and types the release code for that plant. With no code set, anyone signed in on the tablet can change its station.</p>' +
     '<div class="ap-list" id="sc-list"></div><p class="ap-note">Five wrong release codes lock the release for ten minutes. The Plant Station tablets sign in with a United Dairy account, so there are no separate station codes.</p></div>';
+  const links = renderAppLinks(box, ctx, PLANT_LINKS, tail);
   const $ = (s) => box.querySelector(s);
   async function load() {
     try {
@@ -437,13 +444,13 @@ export async function renderStationCodes(box) {
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
-    if (b.id === 'sc-reload') load();
+    if (b.id === 'al-reload') load();
     if (b.dataset.plant) {
       const go = () => busy(box, b, async () => { const out = await call('releaseCodeNew', { facilityId: b.dataset.plant }); await load(); say(box, out.message, 'good'); });
       if (b.dataset.again) twice(b, 'Press again to replace', go); else go();
     }
   });
-  await load();
+  await Promise.all([links, load()]);
 }
 
 /* ---------- Manager Report Recipients ---------- */
@@ -602,6 +609,7 @@ export const PAGES = {
   'access-codes': renderAccessCodes,
   'app-links': renderAppLinks,
   'station-codes': renderStationCodes,
+  'driver-codes': (box, ctx) => renderAppLinks(box, ctx, DRIVER_LINKS),
   'report-recipients': renderReportRecipients,
   'sent-log': renderSentLog,
   'email-senders': renderEmailSenders,
