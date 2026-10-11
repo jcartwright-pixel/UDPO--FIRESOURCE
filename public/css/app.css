@@ -1382,3 +1382,20 @@ body.side-folded .sidemenu .side-toggle { align-self: center; margin: 2px 0 6px;
   body.daily-look table.daily tbody tr.group td .gtext { display: inline-block; position: sticky; left: 14px; }
   body.daily-look .footer { flex-wrap: wrap; }
 }
+
+/* Table text (Joe's standing rule, 10/10): tables keep about 16px text and scroll under a sticky header; they never shrink
+   text to fit. A cell whose text still does not fit at 15px wraps onto a second line instead of being cut off. */
+td.fit-wrap, td.fit-wrap * { white-space: normal !important; text-overflow: clip !important; overflow-wrap: break-word; }
+.weekly-page #routes-sheet td.day.fit-wrap .nm { line-height: 1.05; }
+.weekly-page #routes-sheet td.day:not(.off) { font-size: 16px; }
+.weekly-page .week th small { font-size: 13px; }
+.weekly-page #routes-sheet td.day .notrun { font-size: 12px; }
+.weekly-page .board td { font-size: 15px; }
+.weekly-page .board td.strong { font-size: 16px; }
+.weekly-page .board td.day.many { font-size: 14px; }
+.weekly-page #routes-sheet td.day.editable:not(.off)::after { font-size: 14px; }
+/* Equipment: the day columns show the run each unit is on at the same size as the rest of the row. */
+th.eq-day { font-size: 16px; }
+td.eq-day { font-size: 16px; }
+.equipment-page span.tag, table td span.tag { font-size: 14px; }
+table td button.warn { font-size: 15px; }

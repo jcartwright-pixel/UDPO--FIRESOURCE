@@ -297,3 +297,7 @@ body.ds-tv .foot { color: #cfe3f6; }
   html:has(body.phone:not(.gs-page):not(.ps-page):not(.ds-page)) { background: #dfe6ee; }
   body.phone:not(.gs-page):not(.ps-page):not(.ds-page) { max-width: 460px; margin: 0 auto; box-shadow: 0 0 24px rgba(7, 60, 106, .18); }
 }
+
+/* Table text (Joe's standing rule, 10/10): the Driver Room weekly schedule reads at the same size as the board. */
+.ds-week-table { font-size: 16px; }
+.ds-week-table th { font-size: 15px; } .ds-week-table th small { font-size: 13px; }
