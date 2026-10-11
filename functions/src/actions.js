@@ -1169,6 +1169,7 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
  * a driver's own other entries do not count against them. An approved entry also puts the days off on Dispatch
  * (the vsched_ exception, as udpoV7277MirrorVacationToExceptions_ does); any other status cancels that.
  */
+const usDay = (key) => { const [y, m, d] = String(key).split('-'); return Number(m) + '/' + Number(d) + '/' + y; };
 const VACATION_EXCEPTION = { VACATION: ['VACATION', 'VACATION'], SICK: ['SICK DAY', 'SICK DAY'], BEREAVEMENT: ['BEREAVEMENT', 'BEREAVEMENT'], UNPAID: ['UNPAID DAY', 'UNPAID DAY'], PERSONAL: ['UNAVAILABLE', 'PERSONAL DAY'] };
 async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
   const driver = await requireDriver(tx, db, req.driverId);
@@ -1178,6 +1179,12 @@ async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
   if (req.vacationId && !existing.exists) throw new SaveError('NOT_FOUND', 'That vacation entry no longer exists');
   const vsRef = db.collection(C.exceptions).doc(M.safeIdPart('vsched_' + id));
   const vsSnap = await tx.get(vsRef);
+  // The same driver cannot be off twice for the same day (the current app refuses it: "X is already off ... Edit that entry instead").
+  if (req.status !== 'CANCELLED' && req.status !== 'DENIED') {
+    const mine = await tx.get(db.collection(C.vacations).where('driverId', '==', driver.id));
+    const clash = mine.docs.map(d => Object.assign({ docId: d.id }, d.data())).find(v => v.docId !== ref.id && v.status !== 'CANCELLED' && v.status !== 'DENIED' && v.startDate && v.startDate <= req.endDate && (v.endDate || v.startDate) >= req.startDate);
+    if (clash) throw new SaveError('NOT_ALLOWED', (driver.name || driver.id) + ' is already off ' + usDay(clash.startDate) + (clash.endDate && clash.endDate !== clash.startDate ? ' – ' + usDay(clash.endDate) : '') + '. Edit that entry instead.');
+  }
   if (req.status === 'APPROVED') {
     const approved = await tx.get(db.collection(C.vacations).where('status', '==', 'APPROVED'));
     const others = approved.docs.map(d => Object.assign({ docId: d.id }, d.data())).filter(v => v.docId !== ref.id && v.driverId !== driver.id && v.startDate && (v.endDate || v.startDate) >= req.startDate && v.startDate <= req.endDate);

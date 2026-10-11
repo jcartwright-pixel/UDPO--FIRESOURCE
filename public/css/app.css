@@ -1400,3 +1400,16 @@ th.eq-day { font-size: 16px; }
 td.eq-day { font-size: 16px; }
 .equipment-page span.tag, table td span.tag { font-size: 14px; }
 table td button.warn { font-size: 15px; }
+/* Vacation calendar day box: Edit and Remove on each entry (Remove asks twice); a name on the calendar opens it to edit. */
+.day-row .day-acts { display: inline-flex; gap: 4px; flex: none; }
+.day-row .day-acts button { min-height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.day-row .day-acts button.danger { color: #b3261e; border-color: #e7b4b0; }
+.day-row .day-acts button.armed { background: #b3261e; color: #fff; border-color: #b3261e; }
+.day-row.editing { border-color: var(--ud-blue); box-shadow: inset 4px 0 0 var(--ud-blue); }
+.day-row > div { min-width: 0; flex: 1; }
+.calendar .cday span[data-vac-id]:hover { outline: 2px solid var(--ud-blue); outline-offset: -1px; }
+.modal.wide-modal#day-modal { width: min(1040px, calc(100vw - 32px)); }
+#day-modal .day-body { grid-template-columns: 1.15fr 1fr; }
+#day-modal .day-row { flex-wrap: wrap; }
+#day-modal .day-row > div:first-child { flex: 1 1 200px; }
+#day-modal .day-row b { white-space: nowrap; margin-right: 6px; }
