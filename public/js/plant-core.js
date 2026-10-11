@@ -300,5 +300,6 @@ export function unloadCounts(rows) {
 export function shortStamp(stamp) {
   const t = Date.parse(stamp || '');
   if (!isFinite(t)) return txt(stamp);
-  return new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(t));
+  const d = new Date(t), p = new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: '2-digit', month: 'numeric', day: 'numeric' }).formatToParts(d), g = (k) => (p.find(x => x.type === k) || {}).value;
+  return g('month') + '-' + g('day') + '-' + g('year') + ' ' + new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, hour: 'numeric', minute: '2-digit' }).format(d);
 }

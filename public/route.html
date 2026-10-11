@@ -276,7 +276,7 @@
       const btn = document.getElementById('board-refresh'); btn.disabled = true;
       try {
         const r = await call('board'); boardAt = Date.now(); showError('');
-        const day = new Date(r.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }), m = r.rows.length;
+        const day = new Date(r.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + shortDate(r.date), m = r.rows.length;
         const list = '<div class="drv-band start"><span>&#9660; Start of loadout</span><span>' + escapeHtml(day) + '</span><div><b>' + r.remaining + ' remaining</b> of ' + m + ' load' + (m === 1 ? '' : 's') + '</div></div>' +
           r.rows.map(x => '<div class="drv-row"><span class="rt"><b>' + escapeHtml(x.route) + (x.run ? ' · ' + escapeHtml(x.run) : '') + '</b> <i>' + escapeHtml(x.trailer || '—') + '</i></span><span class="pill ' + PILL[x.state] + '">' + escapeHtml(x.status) + '</span>' +
             (x.pickup ? '<span class="pu"><b>PICKUP</b>' + (x.pickupText ? ' · ' + escapeHtml(x.pickupText) : '') + '</span>' : '') + '</div>').join('') +

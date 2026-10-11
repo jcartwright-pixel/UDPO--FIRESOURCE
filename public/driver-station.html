@@ -52,7 +52,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError, goBack } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as W from './js/weather.js';
 
@@ -73,7 +73,7 @@
     let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = L.operatingDay(new Date()), updated = null;
 
     const overflows = (id) => { const el = document.getElementById(id); return el.scrollHeight > el.clientHeight + 2; };
-    const fmt = (k) => { const [y, m, d] = k.split('-'); return m + '/' + d + '/' + y; };
+    const fmt = (k) => shortDate(k);
     function render() {
       date = L.operatingDay(new Date());
       const rows = B.loadoutBoardRows(runs, pickups, date), dayName = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(date))];

@@ -130,7 +130,7 @@
         data.writeBack = !!(c.writeBack && c.writeBack.enabled === true);
         const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
         const tz = { timeZone: 'America/New_York' }, sameDay = at && at.toLocaleDateString('en-US', tz) === new Date().toLocaleDateString('en-US', tz);
-        document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : at.toLocaleDateString('en-US', Object.assign({ month: 'numeric', day: 'numeric' }, tz)) + ' ') + at.toLocaleTimeString('en-US', Object.assign({ hour: 'numeric', minute: '2-digit' }, tz)) : 'Waiting for the first copy';
+        document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : shortDate(at) + ' ') + at.toLocaleTimeString('en-US', Object.assign({ hour: 'numeric', minute: '2-digit' }, tz)) : 'Waiting for the first copy';
         render();
       });
     });

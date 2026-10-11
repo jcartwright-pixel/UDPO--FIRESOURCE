@@ -91,7 +91,7 @@
       }
       const rows = mode === 'year' ? S.scScoreYear_(months, s) : (months[0] ? months[0].rows : []);
       const minDays = mode === 'year' ? Math.round(s.monthMinDays * months.length / 2) : s.monthMinDays;
-      return { rows, summary: S.scSummary_(rows, s, minDays), through: yesterday, days: Object.keys(days).sort() };
+      return { rows, minDays, summary: S.scSummary_(rows, s, minDays), through: yesterday, days: Object.keys(days).sort() };
     }
 
     // Replacing the page can blur a typed box, whose save asks for a redraw while this one is still running: that one waits its turn.
@@ -105,7 +105,7 @@
     function paint() {
       const s = S.scSettings_(saved), edit = canManage();
       document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
-      document.getElementById('sub').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY') + ' · every driver starts at 100';
+      { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Every driver starts at 100'; }
       const k = document.getElementById('kpis'), bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
       if (mode === 'settings') {
         k.innerHTML = '';
@@ -134,7 +134,7 @@
       }
       const b = board(s), sm = b.summary, label = mode === 'year' ? String(year) : CORE.MONTHS[month - 1] + ' ' + year;
       k.innerHTML = [[sm.drivers, 'Drivers graded'], [sm.average == null ? '–' : sm.average, 'Plant average score'], [sm.missedCheckins, 'Missed check-ins', sm.missedCheckins ? 'warn' : ''],
-        [sm.lostCases, 'Cases lost on routes', sm.lostCases ? 'warn' : ''], [sm.leader || '–', mode === 'year' ? 'Leading for Driver of the Year' : 'Leading for Driver of the Month', 'good']]
+        [sm.lostCases, 'Cases lost on routes', sm.lostCases ? 'warn' : ''], [sm.leader || 'Nobody yet', (mode === 'year' ? 'Leading for Driver of the Year' : 'Leading for Driver of the Month') + (sm.leader ? '' : ', needs ' + b.minDays + ' days worked'), sm.leader ? 'good' : 'none']]
         .map(([v, l, c]) => '<div class="' + (c || '') + '"><b>' + escapeHtml(String(v)) + '</b><span>' + l + '</span></div>').join('');
       bar.innerHTML = '<button type="button" id="prev" aria-label="Earlier">◀</button><b class="sc-period">' + escapeHtml(label) + '</b><button type="button" id="next" aria-label="Later">▶</button><span class="spacer"></span><button type="button" class="primary" id="sc-print">Print</button>';
       const cell = (bad, good, text) => '<td class="' + (bad ? 'sc-bad' : good ? 'sc-ok' : '') + '">' + text + '</td>';

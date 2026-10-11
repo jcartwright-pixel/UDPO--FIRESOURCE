@@ -62,7 +62,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
 
@@ -78,7 +78,7 @@
     const drafts = {}, pending = {}, fills = {}, notes = {};
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : '—'; };
-    const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'; };
+    const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : '—'; };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
     const statusClass = (v) => { v = String(v || '').toUpperCase(); return v === 'IN RANGE' || v === 'RECORDED' ? 'ok' : v === 'HIGH' || v === 'LOW' || v === 'OFFLINE' || v === 'SENSOR ERROR' ? 'bad' : v === 'STALE' ? 'warn' : 'neutral'; };
     const ALERT = ['HIGH', 'LOW', 'STALE', 'SENSOR ERROR'];

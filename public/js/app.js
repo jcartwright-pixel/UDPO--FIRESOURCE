@@ -20,6 +20,8 @@ document.querySelectorAll('.topbar').forEach(bar => {
   brand.href = 'index.html';
   brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>New Plant Operations</strong><small>UNITED DAIRY &middot; ROUTE DISTRIBUTION</small></span>';
   bar.prepend(brand);
+  // Polish 10: one small yellow "Test copy" badge in the header on the sandbox (and a local copy); it comes off by itself at go-live.
+  if (/sandbox|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) brand.insertAdjacentHTML('afterend', '<span class="test-copy-badge" title="This is the test copy: changes stay in the new app">Test copy</span>');
 });
 
 // Joe 10/10: Administration opens a screen inside its right-hand panel; there the screen shows without its own header and menu.
@@ -88,7 +90,9 @@ export const SIDES = [
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
-const sideHas = (side, page) => page === side.home || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
+// Pages opened from inside a side (not from its menu) that still belong to it, e.g. Plant Reports from a bookmark or the TV.
+const SIDE_PAGES = { plant: ['reports.html'] };
+const sideHas = (side, page) => page === side.home || (SIDE_PAGES[side.key] || []).indexOf(page) >= 0 || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
 export function sideFor(page) {
   // Home, the all-plants overview and the Administration Center sit above the three sides: their menu lists the sides.
   if (!page || ['index.html', 'company.html', 'administration.html'].indexOf(page) >= 0) return null;
@@ -278,14 +282,14 @@ export function evenTopButtons() {
 // One look on every screen (Joe 10/10): each screen title starts with its picture from the United Dairy icon library
 // (img/library), or with its line icon in the same tile where no picture fits.
 const PAGE_ICON = {
-  // Joe 10/11: Daily Dispatch has no title picture, so its boxes sit further left.
-  'weekly.html': 'distribution-truck-v1-560.webp', 'routes.html': 'distribution-truck-v1-560.webp',
-  'routeweek.html': 'distribution-truck-v1-560.webp', 'admin.html': 'distribution-truck-v1-560.webp', 'ops.html': 'distribution-truck-v1-560.webp', 'print.html': 'distribution-truck-v1-560.webp', 'settings.html': 'distribution-truck-v1-560.webp', 'soon.html': 'plant-building-v1-560.webp', 'otr.html': 'distribution-truck-v1-560.webp',
-  'gps.html': 'distribution-truck-v1-560.webp', 'scorecard.html': 'distribution-truck-v1-560.webp',
-  'equipment.html': 'maintenance-tractor-v1-560.webp', 'maint.html': 'maintenance-tractor-v1-560.webp', 'issues.html': 'maintenance-tractor-v1-560.webp',
-  'garage.html': 'maintenance-tractor-v1-560.webp', 'fleet.html': 'maintenance-trailer-v1-560.webp',
-  'plant.html': 'plant-building-v1-560.webp', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'distribution-truck-v1-560.webp', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
-  'garage-station.html': 'maintenance-tractor-v1-560.webp', 'driver-station.html': 'distribution-truck-v1-560.webp', 'trailers.html': 'maintenance-trailer-v1-560.webp', 'plant-station.html': 'plant-building-v1-560.webp', 'phone-screens.html': 'people',
+  // Joe 10/11: Daily Dispatch has no title picture, so its boxes sit further left; Weekly matches it (polish 21). The other
+  // screens use line drawings instead of the truck, tractor and building photos, so every title reads the same way.
+  'routes.html': 'road', 'routeweek.html': 'week', 'admin.html': 'gear', 'ops.html': 'swap', 'print.html': 'day', 'settings.html': 'gear', 'soon.html': 'factory', 'otr.html': 'road',
+  'gps.html': 'pin', 'scorecard.html': 'star',
+  'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
+  'garage.html': 'wrench', 'fleet.html': 'truck',
+  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
+  'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {
@@ -305,6 +309,33 @@ document.addEventListener('click', e => {
   const a = e.target.closest && e.target.closest('a[target]');
   if (a && a.target !== '_self') a.removeAttribute('target');
 }, true);
+
+// Polish 16: when the tablet or computer loses its connection a yellow bar says so at the top, so nobody thinks a press was
+// sent. Saves go to the server, so they wait for the signal; the bar goes away by itself when it is back.
+(function connectionBar() {
+  if (EMBED) return;
+  let bar = null;
+  const show = () => {
+    if (navigator.onLine) { if (bar) bar.hidden = true; return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'offline-bar'; bar.setAttribute('role', 'status');
+      bar.textContent = 'No connection. Changes will not save until it is back; press again once this bar goes away.';
+      document.body.prepend(bar);
+    }
+    bar.hidden = false;
+  };
+  addEventListener('online', show); addEventListener('offline', show); show();
+})();
+
+// Polish 19: a line cut off with "..." shows the whole line when the pointer rests on it.
+document.addEventListener('mouseover', e => {
+  const el = e.target;
+  if (!el || el.nodeType !== 1 || el.title || el.scrollWidth <= el.clientWidth + 1) return;
+  if (getComputedStyle(el).textOverflow !== 'ellipsis') return;
+  const text = el.textContent.trim();
+  if (text) el.title = text;
+}, { passive: true });
 
 (function prerenderOnHover() {
   try {
@@ -502,8 +533,40 @@ export async function requireSignIn(ready) {
 }
 
 // Every save is one call. A fresh requestId makes a retry safe: the server saves it once.
+// "Saving... / Saved" beside the screen's title (Daily's sign), on every screen that saves (polish 15). Screens that use
+// edit.js show it from there instead, around their own saves.
+let pillTimer = null, saving = 0, saveFailed = false;
+export function savePill(state) {
+  let pill = document.getElementById('save-pill');
+  if (!pill) {
+    const title = document.querySelector('.head .title h1');
+    if (!title) return;
+    pill = document.createElement('span');
+    pill.id = 'save-pill';
+    pill.setAttribute('role', 'status');
+    pill.style.cssText = 'display:inline-block;margin-left:12px;padding:2px 12px;border-radius:999px;font:800 16px/1.25 Arial,sans-serif;letter-spacing:0;vertical-align:middle;white-space:nowrap';
+    title.appendChild(pill); // on the title's line, without changing the header's height
+  }
+  const look = { saving: ['Saving\u2026', '#fff4d6', '#8a5a00'], saved: ['Saved \u2713', '#dff4e6', '#126334'], failed: ['Not saved', '#fde8e6', '#b3261e'] }[state];
+  pill.textContent = look[0];
+  pill.style.background = look[1];
+  pill.style.color = look[2];
+  pill.hidden = false;
+  clearTimeout(pillTimer);
+  if (state === 'saved') pillTimer = setTimeout(() => { pill.hidden = true; }, 4000);
+}
 export async function save(action, fields) {
-  return callServer('save', Object.assign({ action }, fields));
+  if (window.UD_EDIT_PILL) return callServer('save', Object.assign({ action }, fields));
+  if (!saving) saveFailed = false;
+  saving++; savePill('saving');
+  try {
+    const out = await callServer('save', Object.assign({ action }, fields));
+    saving--; if (!saving) savePill(saveFailed ? 'failed' : 'saved');
+    return out;
+  } catch (e) {
+    saving--; saveFailed = true; savePill(saving ? 'saving' : 'failed');
+    throw e;
+  }
 }
 
 // A failed call in plain words with the next step; the server's own messages (already plain) are kept.
@@ -574,9 +637,27 @@ export function escapeHtml(value) {
   return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-export function shortDate(key) {
-  const [y, m, d] = key.split('-').map(Number);
-  return m + '/' + d + '/' + y;
+// Joe 10/11 (polish 6): one short date everywhere, like 10-8-26 (month-day-two-digit year, no leading zeros, no time).
+// Takes a day key (2026-10-08), a time (ISO text, a number or a Date, read in plant time) or a sheet date (10/08/2026).
+export function shortDay(v) {
+  if (v == null || v === '') return '';
+  let m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(v));
+  if (m) return Number(m[2]) + '-' + Number(m[3]) + '-' + m[1].slice(2);
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(String(v).trim());
+  if (m) return Number(m[1]) + '-' + Number(m[2]) + '-' + m[3].slice(-2);
+  const t = v instanceof Date ? v : new Date(typeof v === 'number' ? v : String(v));
+  if (isNaN(t)) return String(v);
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: '2-digit', month: 'numeric', day: 'numeric' }).formatToParts(t);
+  const g = (k) => (p.find(x => x.type === k) || {}).value;
+  return g('month') + '-' + g('day') + '-' + g('year');
+}
+export function shortDate(key) { return shortDay(key); }
+// A date with its time, like 10-8-26 1:20 PM, for stamps where the time matters (when a check or a change was made).
+export function dateTimeText(v) { const d = shortDay(v instanceof Date || typeof v === 'number' ? v : new Date(v)), t = shortTime(v); return t ? d + ' ' + t : d; }
+// The time alone, like 1:20 PM, in plant time.
+export function shortTime(v) {
+  const t = v instanceof Date ? v : new Date(v);
+  return isNaN(t) ? '' : t.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 }
 
 // Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets a little smaller print, so names and values are

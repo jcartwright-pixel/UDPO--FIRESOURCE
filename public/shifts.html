@@ -51,7 +51,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as R from './js/plant-reports.js';
 
@@ -74,7 +74,7 @@
         if (dirty) return;
         const d = s.exists() ? s.data() : null;
         rows = R.shiftsFor(d, plantBox.value).map(x => ({ name: x.name, start: x.start.padStart(5, '0'), end: x.end.padStart(5, '0') }));
-        document.getElementById('last').textContent = d && d.updatedAt ? 'Saved ' + new Date(d.updatedAt).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' by ' + (d.updatedBy || '') : 'Starting shifts (not changed yet)';
+        document.getElementById('last').textContent = d && d.updatedAt ? 'Saved ' + dateTimeText(d.updatedAt) + ' by ' + (d.updatedBy || '') : 'Starting shifts (not changed yet)';
         draw();
       }, e => showError('Could not read the shifts: ' + e.message));
     }

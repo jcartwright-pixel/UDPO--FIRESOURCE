@@ -89,7 +89,7 @@
       const cases = rows.reduce((t, x) => t + (Number(String(x.cases || '0').replace(/,/g, '')) || 0), 0), refused = rows.filter(x => x.refused).length, pend = rows.filter(x => x.pending).length;
       document.getElementById('work-date').value = date;
       document.getElementById('back-unload').href = 'unloading.html?date=' + date;
-      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + (date === today() ? '' : '  ·  ' + shortDate(date));
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       document.getElementById('hstats').innerHTML = [['Returns', rows.length, ''], ['Cases', cases.toLocaleString(), ''], ['Refused', refused, refused ? 'warn' : ''], ['Pending', pend, pend ? 'bad' : '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.querySelectorAll('[data-mode]').forEach(b => { b.setAttribute('aria-selected', String(b.dataset.mode === mode)); b.setAttribute('aria-pressed', String(b.dataset.mode === mode)); });

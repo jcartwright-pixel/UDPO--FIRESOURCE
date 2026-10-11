@@ -72,7 +72,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer, dateTimeText } from './js/app.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // Joe 10/10: "Any of the API keys that we mess with, it should be in the administration app for updating ... replace the key
@@ -81,7 +81,7 @@
     let s = null, setup = [], mine = [], sensors = [], sync = {}, armed = null, note = '', draft = null;
     const $ = (id) => document.getElementById(id);
     // Date and time both in New York time (the stored time is UTC, so its first 10 characters are tomorrow after 8 p.m.).
-    const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '') : ''; };
+    const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
     const typing = () => $('rows').contains(document.activeElement) && document.activeElement.matches('input');
 
     // Every thermometer, off ones too (removed ones are gone), in view order.

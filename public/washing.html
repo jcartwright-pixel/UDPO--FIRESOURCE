@@ -97,7 +97,7 @@
       const seen = {}, sheetDone = sheetWash.concat(appWash).filter(w => { const on = L.dateKey(w.completed_at); if (!on || days.indexOf(on) < 0 || U.washOpen(w.status) || closedByPress[w.record_id] || seen[w.record_id]) return false; seen[w.record_id] = true; return true; });
       const thisWeek = presses.length + sheetDone.length;
       document.getElementById('work-date').value = date;
-      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + (date === today() ? '' : '  ·  ' + shortDate(date));
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       document.getElementById('hstats').innerHTML = [['To Wash', list.length, list.length ? 'wash' : ''], ['Repeat Trailers', repeats.length, repeats.length ? 'warn' : '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.getElementById('add-open').hidden = !ck;

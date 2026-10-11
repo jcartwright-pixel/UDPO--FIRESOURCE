@@ -45,7 +45,7 @@
   <datalist id="ta-units"></datalist>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -76,7 +76,7 @@
     let gotRuns = false, trailersFailed = false;
     function render() {
       const rows = rowsNow(), on = dupes(rows), can = canLoad(), blank = rows.filter(r => !r.trailer).length;
-      document.getElementById('dayname').textContent = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      document.getElementById('dayname').textContent = L.dayName(date) + ' ' + shortDate(date);
       document.getElementById('summary').textContent = rows.length + (rows.length === 1 ? ' route · ' : ' routes · ') + blank + (blank === 1 ? ' needs a trailer' : ' need a trailer') + (can ? '' : ' · View Only');
       if (!selected || !rows.some(r => r.id === selected)) selected = (rows.find(r => !r.trailer) || rows[0] || {}).id || '';
       if (!editing) {
@@ -84,7 +84,7 @@
           const k = key(r.trailer), others = k && on[k] ? on[k].filter(x => x.id !== r.id) : [];
           const cls = !r.trailer ? ' blank' : others.length ? ' dup' : '';
           const note = !r.trailer ? 'Needs a trailer' : others.length ? 'Also on ' + others.map(x => String(x.route).replace(/_\d+$/, '')).join(', ') : '';
-          const sub = (AREA_SUB[r.area] ? AREA_SUB[r.area] : '') + (r.prior ? (AREA_SUB[r.area] ? ' · ' : '') + 'Still open from ' + new Date(r.loadDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '');
+          const sub = (AREA_SUB[r.area] ? AREA_SUB[r.area] : '') + (r.prior ? (AREA_SUB[r.area] ? ' · ' : '') + 'Still open from ' + shortDate(r.loadDate) : '');
           return '<div class="ta-row' + cls + (r.id === selected ? ' sel' : '') + '" role="row" data-row="' + escapeHtml(r.id) + '">' +
             '<span class="rt"><b>' + escapeHtml(String(r.route).replace(/_\d+$/, '')) + '</b>' + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span>' +
             '<span>' + escapeHtml(r.run) + '</span><span>' + escapeHtml(r.driver || '—') + '</span><span class="grey">' + escapeHtml(r.truck || '—') + '</span>' +

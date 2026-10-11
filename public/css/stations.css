@@ -329,3 +329,17 @@ body.ds-tv .foot { color: #cfe3f6; }
 .phone-card button.speak.on { background: #c62828; color: #fff; border-color: #c62828; }
 /* The phone Check-In: what went wrong, right under the Check In button (improvements item 12). */
 .phone-card .send-error { margin: 8px 2px 0; color: #a3261b; font-weight: 700; font-size: 15px; }
+/* Polish 8: Trailer Assignments lines up with Loadout and Unloading: same margins, eyebrow line and heading size, a card
+   that stops short of the window edge, and centred column headings. */
+.ta-page .head .eyebrow { display: block; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted, #5b6b7c); }
+.ta-page .view { padding: 0 16px 16px; }
+.ta-page .ta-headrow { font-size: 15px; font-weight: 800; min-height: 44px; }
+.ta-page .ta-row > span { padding: 6px 12px; }
+.ta-page .ta-row > span:not(:nth-child(3)) { text-align: center; }
+@media (min-width: 900px) { .ta-page .ta-row { grid-template-columns: 100px minmax(0, 1fr) minmax(0, 1.1fr) 110px 170px 130px; } }
+.ta-page .ta-yard { padding: 12px 16px; }
+@media (max-width: 899px) { .ta-page .view { padding: 0 8px 8px; } .ta-page .ta-row > span { padding: 6px 3px; } .ta-page .ta-headrow { font-size: 11px; } }
+/* Polish 23: Phone Screens keeps the page's side margins, and its cards fit a phone. */
+.pss { padding: 0 16px 16px; }
+.pss h2 { margin: 16px 0 8px; color: #0b2f55; }
+@media (max-width: 480px) { .pss-grid { grid-template-columns: minmax(0, 1fr); } .pss { padding: 0 8px 12px; } }

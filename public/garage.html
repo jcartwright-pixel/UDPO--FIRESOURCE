@@ -56,7 +56,7 @@
     let filter = 'open', search = '', orders = [], loaded = false;
     const isOpen = (o) => o.status !== 'DONE';
     // A stored time (UTC) shows its New York date, so a job finished after 8 p.m. is not dated tomorrow; a plain date shows as it is.
-    const when = (s) => { const v = String(s || ''); if (/T\d/.test(v) && !isNaN(new Date(v))) return new Date(v).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric' }); const k = v.slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
+    const when = (s) => { const v = String(s || ''); if (/T\d/.test(v) && !isNaN(new Date(v))) return shortDate(v); const k = v.slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
     const yes = (v) => /^(Y|YES|TRUE)$/i.test(String(v || '').trim());
     const hm = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' m' : m + ' m';
     const weekAgo = () => new Date(Date.now() - 7 * 86400000).toISOString();

@@ -94,7 +94,7 @@
       const { returns, rows: all, wash } = data(), unit = P.UNLOAD_UNIT[area], name = P.UNLOAD_TILE[area];
       const c = P.unloadCounts(all), pendingReturns = returns.filter(x => x.pending);
       document.getElementById('work-date').value = date;
-      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + (date === today() ? '' : '  ·  ' + shortDate(date));
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       document.getElementById('hstats').innerHTML = [['Trucks', c.total, ''], ['Waiting', c.waiting, ''], ['Unloading', c.unloading, 'warn'], ['Complete', c.complete, 'good'], ['Returns', pendingReturns.length, pendingReturns.length ? 'bad' : ''], ['To Wash', wash.length, wash.length ? 'wash' : '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.querySelectorAll('[data-mode]').forEach(b => { b.setAttribute('aria-selected', String(b.dataset.mode === mode)); b.setAttribute('aria-pressed', String(b.dataset.mode === mode)); });

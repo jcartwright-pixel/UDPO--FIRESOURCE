@@ -3,7 +3,7 @@
  * buttons on one line at the top. Everything goes through the server's `admin` call (functions/src/admin.js), for
  * Administrators only. A change that cannot be undone asks for a second press first.
  */
-import { escapeHtml, callServer } from './app.js';
+import { escapeHtml, callServer, dateTimeText } from './app.js';
 
 const L = window.UDLogic;
 const e = escapeHtml;
@@ -13,7 +13,7 @@ export function when(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d)) return String(iso);
-  return d.toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return dateTimeText(d);
 }
 const prettyRole = (r) => String(r).charAt(0) + String(r).slice(1).toLowerCase().replace(/_/g, ' ');
 const plantName = (id) => id === '*' ? 'All locations' : ((L.PLANTS.find(p => p.id === id) || {}).name || id);

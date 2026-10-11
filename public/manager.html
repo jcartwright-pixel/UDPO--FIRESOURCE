@@ -72,7 +72,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import { watchRound } from './js/autosave.js';
@@ -120,7 +120,7 @@
 
     function render() {
       const x = build(), r = report;
-      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase();
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       const grid = document.getElementById('grid'), put = (k, html) => { const el = grid.querySelector('[data-card="' + k + '"]'); el.innerHTML = html; const bar = el.querySelector('a.mc-bar'); if (bar) el.dataset.href = bar.getAttribute('href'); };
       put('yard', card('&#10003;', 'Yard Checks', 'Loaded trailers remaining on yard · temperature · fuel · timestamped checks', 'yard.html', [
         tile('yard.html', 'Active', x.yard.rows.length + x.yard.locked.length, '', 'on the yard'), tile('yard.html', 'Due', x.yard.rows.length, '', 'need a check', null, x.yard.rows.length ? 'warn' : ''),

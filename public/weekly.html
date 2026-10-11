@@ -104,7 +104,8 @@
 
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
-    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, shortTime, showError } from './js/app.js';
+    const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8)) + '/' + k.slice(0, 4);   // the approved print's style
     import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, saveOptimistic, savesDone, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
@@ -364,7 +365,7 @@
         return;
       }
       if (publishArmed !== target) {
-        publishArmed = target; b.textContent = 'Click Again: Push ' + Number(target.slice(5, 7)) + '/' + Number(target.slice(8)) + ' Live'; b.classList.add('armed');
+        publishArmed = target; b.textContent = 'Click Again: Push ' + shortDate(target) + ' Live'; b.classList.add('armed');
         say('This will move Current to Previous, Next to Current, and create the new Next week. Click again to confirm publication.', 'warn');
         setTimeout(() => { if (publishArmed === target && !publishBusy) { publishArmed = ''; b.classList.remove('armed'); say(''); } }, 8000);
         return;
@@ -384,7 +385,7 @@
     function showPublished() {
       const at = weekDoc && weekDoc.publishedAt ? new Date(weekDoc.publishedAt) : null;
       const el = document.getElementById('published');
-      el.textContent = at && !isNaN(at) ? 'Published ' + at.toLocaleDateString([], { month: 'numeric', day: 'numeric', timeZone: 'America/New_York' }) + ' ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + (weekDoc.publishedBy ? ' by ' + weekDoc.publishedBy.split('@')[0] : '') : 'Not published yet this week';
+      el.textContent = at && !isNaN(at) ? 'Published ' + shortDate(at) + ' ' + shortTime(at) + (weekDoc.publishedBy ? ' by ' + weekDoc.publishedBy.split('@')[0] : '') : 'Not published yet this week';
       el.title = weekDoc && weekDoc.publishedBy ? 'Published to Daily Dispatch by ' + weekDoc.publishedBy : '';
     }
     // Print Layouts opens Weekly with #print: the week prints once its runs are on screen.
@@ -404,7 +405,7 @@
         cell.querySelectorAll('button').forEach(b => b.replaceWith(...b.childNodes));
       });
       copy.querySelectorAll('.run, th small').forEach(r => { r.style.display = 'block'; });
-      document.getElementById('print').innerHTML = '<h2>UNITED DAIRY &mdash; WEEKLY DISPATCH &middot; DRIVER ASSIGNMENT BOARD</h2><p>Week of Sunday ' + escapeHtml(shortDate(week)) + ' to Saturday ' + escapeHtml(shortDate(L.addDays(week, 6))) + '</p>' + copy.outerHTML;
+      document.getElementById('print').innerHTML = '<h2>UNITED DAIRY &mdash; WEEKLY DISPATCH &middot; DRIVER ASSIGNMENT BOARD</h2><p>Week of Sunday ' + escapeHtml(usDate(week)) + ' to Saturday ' + escapeHtml(usDate(L.addDays(week, 6))) + '</p>' + copy.outerHTML;
       printSaved('weekly');
     };
     function setTab(t) {

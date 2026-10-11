@@ -66,7 +66,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { savedText, watchRound } from './js/autosave.js';
 
@@ -82,7 +82,7 @@
     const unsubs = [];
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
-    const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : String(v || ''); };
+    const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : String(v || ''); };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
     const STATUS = { COMPLETE: 'Recorded', RECORDED: 'Recorded', DEPARTED: 'Left Yard' };
 
@@ -102,9 +102,9 @@
       forgetOld();
       const q = queue(), ck = canSave(), hist = U.yardHistory(all(), date, Date.now());
       const latest = hist.find(h => h.status !== 'DEPARTED');
-      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase();
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '\n' + shortDate(date);
       document.getElementById('hstats').innerHTML = [['Active', q.rows.length + q.locked.length, ''], ['Due', q.rows.length, q.rows.length ? 'warn' : ''], ['Checked', q.locked.length, q.locked.length ? 'good' : ''],
-        ['Latest', latest ? clock(latest.recordedAt) : '—', '', latest ? '' : 'no check yet']].map(([l, n, k, why]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + l + (why ? ' · ' + why : '') + '</span></div>').join('');
+        ['Latest', latest ? clock(latest.recordedAt) : '—', '', latest ? '' : 'no check yet']].map(([l, n, k, why]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + (why || l) + '</span></div>').join('');
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
       ['current', 'history'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; }); document.getElementById('refresh').hidden = pane !== 'current'; document.getElementById('refresh-history').hidden = pane !== 'history';
       // Joe 10/10: no Record button on the desktop either. Each box saves as it is left; a trailer checked here stays on the list

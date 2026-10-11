@@ -43,7 +43,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, save, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, save, showError, dateTimeText } from './js/app.js';
     import { lists, watchLists, canManage, forScreen } from './js/edit.js';
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
@@ -51,7 +51,7 @@
     const L = window.UDLogic;
     forScreen('drivers');
     let docs = [], adding = false;
-    const when = (x) => x.updatedAt ? new Date(x.updatedAt).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' · ' + String(x.updatedBy || '').split('@')[0] : (x.builtIn ? 'Built in (the current app\'s list)' : '');
+    const when = (x) => x.updatedAt ? dateTimeText(x.updatedAt) + ' · ' + String(x.updatedBy || '').split('@')[0] : (x.builtIn ? 'Built in (the current app\'s list)' : '');
     function render() {
       // A name being typed in Add stays as it is when the list refreshes.
       const typing = document.getElementById('new-name'), typed = typing ? typing.value : '', hadFocus = typing && document.activeElement === typing;
