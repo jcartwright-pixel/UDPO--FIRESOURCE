@@ -125,6 +125,9 @@
     // Like the current Daily Dispatch: the Loadout Day list runs Saturday to Friday (the Saturday loadout delivers into the next week),
     // and Week Beginning shows that week's Sunday.
     const weekBegin = (key) => L.addDays(key, -((L.DAYS.indexOf(L.dayPrefix(key)) + 1) % 7));
+    // Joe 10/11: Delivery Day shows one day, by the plant's procedure: Saturday's loadout shows Monday, Sunday's shows Sunday,
+    // every other day the next day. The table's day bands still show each load's own delivery date.
+    const deliveryDayName = (key) => { const i = L.DAYS.indexOf(L.dayPrefix(key)); return L.DAY_NAMES[i === 6 ? 1 : i === 0 ? 0 : i + 1]; };
     const show = (v) => v === null || v === undefined ? '' : String(v);
     const departText = (r) => L.timeText(r.dispatchTime !== null && r.dispatchTime !== undefined ? r.dispatchTime : r.startTime);
     const coverageName = (r) => r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '';
@@ -179,8 +182,7 @@
       document.getElementById('rows').innerHTML = body.join('');
       const running = rows.filter(r => !r.off), covered = running.filter(r => !L.needsDriver(r)).length;
       document.getElementById('coverage').firstElementChild.textContent = (running.length ? Math.round(100 * covered / running.length) : 0) + '%';
-      const days = [...new Set(rows.map(r => r.deliveryDay))];
-      document.getElementById('delivery-day').value = days.join(' / ') || '-';
+      document.getElementById('delivery-day').value = deliveryDayName(loadDate);
       const groups = new Set(rows.map(r => r.deliveryDate)).size;
       document.getElementById('count').textContent = running.length + ' loads' + (running.length - covered ? ', ' + (running.length - covered) + ' need a driver' : '');
       fitToWindow(rows.length + groups, 5);
@@ -273,7 +275,7 @@
       for (let i = -6; i <= 13; i++) {
         if (!i) continue;
         const key = L.addDays(row.deliveryDate, i);
-        html += '<option value="' + key + '">' + escapeHtml(L.dayName(key) + ' ' + shortDate(key)) + '</option>';
+        html += '<option value="' + key + '">' + escapeHtml(L.dayName(key)) + '</option>';
       }
       return html;
     }
@@ -416,7 +418,7 @@
       document.getElementById('week-begin').value = shortDate(L.addDays(begin, 1));
       document.getElementById('load-day').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
         const key = L.addDays(begin, i);
-        return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key) + ' ' + shortDate(key)) + '</option>';
+        return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key)) + '</option>';
       }).join('');
       document.getElementById('go-weekly').href = 'weekly.html?week=' + L.addDays(loadDate, 1) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
       history.replaceState(null, '', '?date=' + loadDate + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
