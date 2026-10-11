@@ -148,7 +148,7 @@ async function repairSweep(db, opts) {
       if (immediate >= IMMEDIATE_MAX || stop) continue;
       immediate++;
       const msg = repairMessage(r);
-      const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · immediate · ' + by, by: o.by, testTo, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations' }, o.mailDeps);
+      const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · immediate · ' + by, by: o.by, testTo, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations', facilityId: r.facility_id }, o.mailDeps);
       if (res.status === 'SENT') { out.sent++; await addNote(db, r.record_id, 'Repair email sent ' + at + ' to ' + route.emails.join('; ') + ' (automatic)' + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at); }
       else if (res.status === 'FAILED') { out.failed++; state.retryAfter[dest.route] = new Date(now.getTime() + 3600000).toISOString(); }
       else stop = res.reason;
@@ -159,7 +159,7 @@ async function repairSweep(db, opts) {
       if (!o.force && (ny.hour < s.digestHour || state.lastDigest[key] === ny.date)) continue;
       const items = digest[key].slice(0, DIGEST_MAX), route = s.routes[key];
       const body = ['United Dairy Plant Operations', '', 'Repair requests for ' + ROUTE_LABEL[key] + ':', ''].concat(items.map((r, i) => (i + 1) + '. ' + kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r) + ' \u2014 ' + String(r.issue_details || '').trim() + ' (reported ' + (r.opened_at || r.service_date || '') + ', driver ' + (r.driver || '') + ')'), ['', 'Please review these repair requests.']).join('\n');
-      const res = await appMail(db, { kind: 'Repair email', label: 'Daily digest', detail: ROUTE_LABEL[key] + ' · daily · ' + by, by: o.by, testTo, to: route.emails, subject: 'United Dairy repair requests - ' + ROUTE_LABEL[key] + ' (' + items.length + ') - ' + ny.mdy, text: body, fromName: 'United Dairy Plant Operations' }, o.mailDeps);
+      const res = await appMail(db, { kind: 'Repair email', label: 'Daily digest', detail: ROUTE_LABEL[key] + ' · daily · ' + by, by: o.by, testTo, to: route.emails, subject: 'United Dairy repair requests - ' + ROUTE_LABEL[key] + ' (' + items.length + ') - ' + ny.mdy, text: body, fromName: 'United Dairy Plant Operations', facilityId: items[0].facility_id }, o.mailDeps);
       if (res.status === 'SENT') {
         out.digests++; out.sent += items.length; state.lastDigest[key] = ny.date;
         for (const r of items) await addNote(db, r.record_id, 'Repair email sent ' + at + ' to ' + route.emails.join('; ') + ' (daily digest)' + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
@@ -225,7 +225,13 @@ async function sendOneRepair(db, recordId, by, note, mailDeps) {
     return { status: 'QUEUED', message: 'Added to ' + ROUTE_LABEL[dest.route] + '\'s daily repair email, sent at ' + hourText(s.digestHour) + '.' };
   }
   const msg = repairMessage(r, note);
-  const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · ' + (route.mode === 'IMMEDIATE' ? 'immediate' : 'send') + ' · ' + by, by, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations' }, mailDeps);
+  // Joe 10/11: Administration > Email Senders can have the Lessor email come from the manager who pressed it.
+  let fromPerson = null;
+  if ((await emailSettings(db)).repairFrom === 'PERSON') {
+    const p = (await read(db.collection(C.users).doc(M.safeIdPart(by)))) || {};
+    fromPerson = { email: by, name: p.name || '' };
+  }
+  const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · ' + (route.mode === 'IMMEDIATE' ? 'immediate' : 'send') + ' · ' + by, by, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations', facilityId: r.facility_id, fromPerson }, mailDeps);
   if (res.status === 'SENT') {
     await addNote(db, r.record_id, 'Repair email sent ' + at + ' to ' + route.emails.join('; ') + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
     return { status: 'SENT', message: 'Emailed to ' + ROUTE_LABEL[dest.route] + (res.testCopy ? ' (test copy to ' + res.sentTo.join(', ') + ' only)' : '') + '.' };
@@ -656,8 +662,9 @@ async function preflight(db, deps) {
     const last = await db.collection('sentEmails').orderBy('at', 'desc').limit(1).get();
     const l = last.empty ? null : last.docs[0].data();
     if (!s.sending) return { status: 'WARN', detail: 'Sending is OFF.' };
-    if (!from) return { status: 'WARN', detail: 'No sender is set for this app.' };
-    return l && l.status === 'FAILED' ? { status: 'WARN', detail: 'The last email failed: ' + l.reason } : { detail: 'Sending is ON as ' + from + (env.LIVE_EMAIL === '1' ? '.' : ' (sandbox: test copies to the sender only).') };
+    const plants = Object.keys(s.senders).filter(k => s.senders[k].address).map(k => A.plantName(k) + ' sends as ' + s.senders[k].address);
+    if (!from && !plants.length) return { status: 'WARN', detail: 'No sender is set for this app.' };
+    return l && l.status === 'FAILED' ? { status: 'WARN', detail: 'The last email failed: ' + l.reason } : { detail: 'Sending is ON' + (from ? ' as ' + from : '') + (plants.length ? '; ' + plants.join('; ') : '') + (env.LIVE_EMAIL === '1' ? '.' : ' (sandbox: test copies to the sender only).') };
   });
   await check('Repair Email', async () => {
     const s = await repairSettings(db), bad = ROUTES.filter(k => AUTO(s.routes[k].mode) && !s.routes[k].emails.length);

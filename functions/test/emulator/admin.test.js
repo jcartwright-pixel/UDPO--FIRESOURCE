@@ -120,6 +120,33 @@ test('Sending OFF stops every email and the log says so', async () => {
   assert.equal(log.emails[0].status, 'BLOCKED');
 });
 
+test('Email Senders: each plant can send from its own United Dairy mailbox; empty keeps the standard sender', async () => {
+  const deps = { env: { MAIL_FROM: 'joe@uniteddairy.com' } };
+  const first = await call({ op: 'emailSenders' }, null, deps);
+  assert.deepEqual(first.plants.map(p => [p.plant, p.address]), [['Uniontown', ''], ['Charleston', ''], ['Martins Ferry', '']]);
+  assert.deepEqual([first.standard, first.repairFrom], ['joe@uniteddairy.com', 'PLANT']);
+  await assert.rejects(call({ op: 'saveEmailSenders', senders: { fac_charleston: { address: 'ops@gmail.com' } } }), /not a United Dairy email address/);
+  await assert.rejects(call({ op: 'saveEmailSenders', senders: { fac_charleston: { address: '', name: 'Charleston Ops' } } }), /type the email address/);
+  const out = await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' },
+    fac_charleston: { address: 'charleston.operations@uniteddairy.com', name: '' } } }, null, deps);
+  assert.deepEqual(out.plants.map(p => [p.address, p.senderName]), [['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations'], ['charleston.operations@uniteddairy.com', ''], ['', '']]);
+  const sent = [];
+  const send = { env: { MAIL_FROM: 'joe@uniteddairy.com' }, sendMail: async (m) => { sent.push(m); return { to: m.to }; } };
+  await appMail(db(), { kind: 'Test', by: 'boss@uniteddairy.com', to: ['a@uniteddairy.com'], subject: 'U', text: 'x', facilityId: 'fac_uniontown' }, send);
+  await appMail(db(), { kind: 'Test', by: 'boss@uniteddairy.com', to: ['a@uniteddairy.com'], subject: 'C', text: 'x', facilityId: 'fac_charleston', fromName: 'United Dairy Plant Operations' }, send);
+  await appMail(db(), { kind: 'Test', by: 'boss@uniteddairy.com', to: ['a@uniteddairy.com'], subject: 'M', text: 'x', facilityId: 'fac_martins_ferry' }, send);
+  assert.deepEqual(sent.map(m => [m.from, m.fromName]), [['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations'],
+    ['charleston.operations@uniteddairy.com', 'United Dairy Plant Operations'], ['joe@uniteddairy.com', 'United Dairy Operations']]);
+  assert.equal((await call({ op: 'sentLog' })).emails.find(m => m.subject === 'U').from, 'uniontown.operations@uniteddairy.com');
+  // The plant report (Send Current Report) goes out from the plant mailbox too.
+  const { mailReport } = require('../../src/reportmail');
+  const ref = db().collection('plantReports').doc('r1');
+  const report = { status: 'SENDING', subject: 'Report', text: 't', by: 'boss@uniteddairy.com', mode: 'test' };
+  await ref.set(report);
+  assert.equal(await mailReport(ref, report, send), 'SENT');
+  assert.equal(sent[3].from, 'uniontown.operations@uniteddairy.com');
+});
+
 test('Route Distribution code: new code shown to administrators, turned off and on', async () => {
   const out = await call({ op: 'routeCodeNew' });
   assert.match(out.code, /^[A-Z2-9]{6}$/);

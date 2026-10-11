@@ -130,6 +130,30 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await p.click('#sl-on'); await p.click('#sl-on');
     await p.waitForSelector('#sl-off');
 
+    // Joe 10/11: each plant's email comes from its own mailbox.
+    await open('email-senders', '#es-rows tr');
+    assert.deepEqual(await p.$$eval('#view .ap-bar > button', b => b.map(x => x.textContent)), ['Save', 'Refresh']);
+    assert.ok(await oneLine(p));
+    assert.deepEqual(await p.$$eval('#es-rows td:first-child', t => t.map(x => x.textContent)), ['Uniontown', 'Charleston', 'Martins Ferry']);
+    await shot(p, 'email-senders-before-1920.png');
+    await p.fill('[data-addr="fac_uniontown"]', 'uniontown.operations@uniteddairy.com');
+    await p.fill('[data-name="fac_uniontown"]', 'United Dairy Uniontown Operations');
+    await p.fill('[data-addr="fac_charleston"]', 'charleston.operations@uniteddairy.com');
+    await p.fill('[data-name="fac_charleston"]', 'United Dairy Charleston Operations');
+    await p.selectOption('#es-repair', 'PERSON');
+    await p.click('#es-save');
+    await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await p.waitForSelector('#es-rows td small');
+    assert.equal(await p.inputValue('[data-addr="fac_uniontown"]'), 'uniontown.operations@uniteddairy.com');
+    assert.equal(await p.inputValue('#es-repair'), 'PERSON');
+    const es = (await db().collection('private').doc('emailSettings').get()).data();
+    assert.deepEqual([es.senders.fac_charleston.address, es.repairFrom], ['charleston.operations@uniteddairy.com', 'PERSON']);
+    await shot(p, 'email-senders-1920.png');
+    await shot(p, 'email-senders-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
+    await p.fill('[data-addr="fac_martins_ferry"]', 'someone@gmail.com');
+    await p.click('#es-save');
+    await p.waitForFunction(() => /not a United Dairy email address/.test(document.querySelector('#view .ap-msg').textContent));
+
     await open('repair-items', '#ri-list');
     await p.fill('#ri-title', 'Dock door 3 sensor');
     await p.fill('#ri-notes', 'Check after the next wash');
@@ -141,7 +165,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await shot(p, 'repair-items-1920.png');
     assert.ok(await noSideScroll(p));
     assert.deepEqual(p.errors, []);
-    results.push('Role Templates, Access & QR (QR drawn on screen), App Links (new Route code), Plant Station Codes, Report Recipients, Sent Email Log (Sending off and on) and Repair Items (header badge) all work inside the panel');
+    results.push('Role Templates, Access & QR (QR drawn on screen), App Links (new Route code), Plant Station Codes, Report Recipients, Sent Email Log (Sending off and on), Email Senders (per plant) and Repair Items (header badge) all work inside the panel');
 
     // The tablet: once Uniontown has a release code, Change Station asks for it.
     const code = (await db().collection('private').doc('releaseCodes').get()).data().fac_uniontown.code;

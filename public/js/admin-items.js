@@ -13,6 +13,7 @@ export const ADMIN_GROUPS = [
   ]],
   ['Email & Schedules', 'Where email goes, how often, and how often the app refreshes', [
     ['repair-email', 'Repair Email', 'Where repair email goes (Idealease, Penske, owned units), on or off, how often for each lessor, the digest hour, and Send now.', '', 'alert'],
+    ['email-senders', 'Email Senders', 'Which mailbox each plant\'s email comes from (e.g. United Dairy Uniontown Operations), and whether a manager\'s truck repair email comes from them.', '', 'swap'],
     ['report-recipients', 'Manager Report Recipients', 'Who gets the plant report at each location: add and remove people (press twice to remove).', '', 'star'],
     ['sent-log', 'Sent Email Log', 'Every email the app sent, newest first.', '', 'day'],
     ['checkin-email', 'Driver Check-In Email', 'The mailbox check for driver check-in email: on or off, sender, recipient, subject, Check now, and Use the standard addresses.', '', 'people'],

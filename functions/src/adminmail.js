@@ -4,7 +4,9 @@
  *   - Sending OFF (private/emailSettings.sending === false): nothing goes out; the log says BLOCKED ("Stopped (off)").
  *   - Until LIVE_EMAIL=1 is set on the server (production, after Joe says go), an email goes only to the person who pressed
  *     the button, never to the addresses it was meant for; the log keeps both. The sandbox never sets LIVE_EMAIL.
- *   - MAIL_FROM unset: nothing goes out (HELD, "Email is not set up").
+ *   - MAIL_FROM unset and no plant mailbox set: nothing goes out (HELD, "Email is not set up").
+ *   - From: the plant's own mailbox when Administration > Email Senders sets one (Joe 10/11: "United Dairy Uniontown
+ *     Operations", Charleston its own), else MAIL_FROM. A Lessor email a manager sends can come from that manager instead.
  * Each email is logged in sentEmails (newest first on the screen) with what happened.
  */
 'use strict';
@@ -20,13 +22,31 @@ const REASON = {
 
 const liveEmail = (env) => String((env || process.env).LIVE_EMAIL || '') === '1';
 
+const DOMAIN = '@uniteddairy.com';
+const PLANT_NAME = 'United Dairy Plant Operations';
+// Only a United Dairy mailbox can be sent from: Google lets the app send as United Dairy accounts only.
+const ourAddress = (a) => { const x = addresses([a])[0] || ''; return x.endsWith(DOMAIN) ? x : ''; };
+
 async function emailSettings(db) {
   const d = (await db.collection('private').doc('emailSettings').get()).data() || {};
-  return { sending: d.sending !== false, changedAt: d.changedAt || '', changedBy: d.changedBy || '' };
+  const senders = {};
+  Object.keys(d.senders || {}).forEach(k => { const v = d.senders[k] || {}; senders[k] = { address: ourAddress(v.address), name: String(v.name || '').slice(0, 80), changedAt: v.changedAt || '', changedBy: v.changedBy || '' }; });
+  return { sending: d.sending !== false, changedAt: d.changedAt || '', changedBy: d.changedBy || '', senders, repairFrom: d.repairFrom === 'PERSON' ? 'PERSON' : 'PLANT' };
 }
 
 /*
- * msg: { kind, by, to: [..] or text, subject, text, html, fromName }. Returns { status: SENT|BLOCKED|HELD|FAILED, sentTo, reason, logId }.
+ * Who an email comes from. settings: emailSettings(); facilityId: the plant it is about; person: { email, name } when a
+ * Lessor email should come from the manager who pressed it. Returns { from, fromName, how }.
+ */
+function senderFor(settings, facilityId, env, fallbackName, person) {
+  if (person && ourAddress(person.email)) return { from: ourAddress(person.email), fromName: String(person.name || ''), how: 'person' };
+  const s = ((settings && settings.senders) || {})[facilityId || 'fac_uniontown'] || {};
+  if (s.address) return { from: s.address, fromName: s.name || fallbackName || PLANT_NAME, how: 'plant' };
+  return { from: String((env || {}).MAIL_FROM || '').trim(), fromName: fallbackName || PLANT_NAME, how: 'default' };
+}
+
+/*
+ * msg: { kind, by, to: [..] or text, subject, text, html, fromName, facilityId, fromPerson: { email, name } }. Returns { status: SENT|BLOCKED|HELD|FAILED, sentTo, reason, logId }.
  * deps: { env, sendMail, now } (fakes in the tests).
  */
 async function appMail(db, msg, deps) {
@@ -43,13 +63,15 @@ async function appMail(db, msg, deps) {
   const to = live ? meant : (testTo ? [testTo] : []);
   const log = { at, kind: String(msg.kind || 'Email'), label: String(msg.label || '').slice(0, 60), detail: String(msg.detail || '').slice(0, 120), by: who, meantFor: meant, subject: String(msg.subject || '').slice(0, 300), sentTo: [], status: '', reason: '', testCopy: !live };
   const settings = await emailSettings(db);
-  const from = String(env.MAIL_FROM || '').trim();
+  const sender = senderFor(settings, msg.facilityId, env, msg.fromName || 'United Dairy Operations', msg.fromPerson);
+  const from = sender.from;
+  log.from = from;
   if (!settings.sending) Object.assign(log, { status: 'BLOCKED', reason: 'Outbound email is turned off.' });
   else if (!from) Object.assign(log, { status: 'HELD', reason: 'Email is not set up in the new app yet.' });
   else if (!to.length) Object.assign(log, { status: 'FAILED', reason: 'No email address to send to.' });
   else {
     try {
-      const sent = await send({ from, fromName: msg.fromName || 'United Dairy Operations', to, subject: msg.subject, text: msg.text, html: msg.html || '' });
+      const sent = await send({ from, fromName: sender.fromName, to, subject: msg.subject, text: msg.text, html: msg.html || '' });
       Object.assign(log, { status: 'SENT', sentTo: sent.to, reason: live ? '' : 'Test copy: sent only to ' + testTo + ' (the sandbox never emails anyone else).' });
     } catch (e) {
       Object.assign(log, { status: 'FAILED', reason: REASON[e.code] || ('The email did not go out: ' + (e.message || e)) });
@@ -59,4 +81,4 @@ async function appMail(db, msg, deps) {
   return { status: log.status, sentTo: log.sentTo, reason: log.reason, logId: ref.id, testCopy: log.testCopy };
 }
 
-module.exports = { appMail, emailSettings, liveEmail, REASON };
+module.exports = { appMail, emailSettings, senderFor, ourAddress, liveEmail, REASON, DOMAIN };
