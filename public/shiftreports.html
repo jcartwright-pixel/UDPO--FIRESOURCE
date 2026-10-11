@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Shift Reports · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <link rel="stylesheet" href="css/reports.css">
+  <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page reports-page sr-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Shift Reports</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Operations · Reports</span><h1>Shift Reports</h1></div>
+      <!-- Joe 10/11: the shift reports have their own place, not inside Shift Notes. Every report sent with Send Current
+           Report, newest first, and the report itself as it was emailed. -->
+      <div class="rp-ctrl">
+        <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id='sr-print'>&#9113; Print</button></label>
+        <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="refresh">&#8635; Refresh</button></label>
+        <label class="rp-field"><span>Shift</span><select id="shift" aria-label="Shift"><option value="">All Shifts</option></select></label>
+        <label class="rp-field"><span>Report Date</span><span class="rp-step"><button type="button" id="prev" aria-label="Day before">&#9664;</button><input id="date" type="date" aria-label="Report date (blank for every date)"><button type="button" id="next" aria-label="Day after">&#9654;</button></span></label>
+        <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="all">All Dates</button></label>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view sr-view">
+      <div class="sheet scroll-list sr-list">
+        <table class="loadout sr-table">
+          <colgroup><col style="width:29%"><col style="width:19%"><col style="width:20%"><col style="width:32%"></colgroup>
+          <thead><tr><th>Sent</th><th>Shift</th><th>Sent By</th><th>Email</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="4" class="empty">Loading the reports&hellip;</td></tr></tbody>
+        </table>
+      </div>
+      <div class="sr-report">
+        <div class="sr-subject" id="subject">Pick a report on the left to see it as it was sent.</div>
+        <iframe id="frame" title="The report as it was sent"></iframe>
+      </div>
+    </div>
+    <div class="foot" id="foot"></div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
+    import { collection, doc, query, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { shiftsFor, shiftAt } from './js/plant-reports.js';
+
+    const L = window.UDLogic, U = window.UDPlant, params = new URLSearchParams(location.search);
+    let reports = null, shifts = shiftsFor(null, 'fac_uniontown'), chosen = params.get('id') || '', db = null, unsub = null;
+    const dateBox = document.getElementById('date'), shiftBox = document.getElementById('shift');
+    dateBox.value = params.get('date') || '';
+    const minutes = (v) => { const t = new Date(v); if (isNaN(t)) return null; const p = new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(t); const g = (k) => Number((p.find(x => x.type === k) || {}).value); return g('hour') * 60 + g('minute'); };
+    const shiftOf = (r) => String(shiftAt(minutes(r.at), shifts) || '');
+    const nice = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : '';
+    const who = (v) => String(v || '').split('@')[0];
+    const EMAIL = { SENT: 'Emailed', HELD: 'Saved, not emailed', FAILED: 'Not sent', SENDING: 'Sending…' };
+    function emailText(r) {
+      const to = (r.sentTo || []).map(who).join(', ');
+      return (EMAIL[r.status] || r.status || '') + (r.status === 'SENT' && to ? ' to ' + to : '') + (r.mode && r.mode !== 'live' ? ' (test)' : '');
+    }
+    function shown() {
+      const d = dateBox.value, s = shiftBox.value;
+      return (reports || []).filter(r => (!d || r.date === d) && (!s || shiftOf(r).toUpperCase() === s.toUpperCase()));
+    }
+    function fillShifts() {
+      const was = shiftBox.value;
+      shiftBox.innerHTML = '<option value="">All Shifts</option>' + shifts.map(x => '<option value="' + escapeHtml(x.name) + '">' + escapeHtml(nice(x.name)) + '</option>').join('');
+      shiftBox.value = was;
+      if (shiftBox.value !== was) shiftBox.value = '';
+    }
+    function showReport(r) {
+      const frame = document.getElementById('frame');
+      document.getElementById('subject').textContent = r ? r.subject || 'Shift report' : (reports ? 'Pick a report on the left to see it as it was sent.' : '');
+      if (!r) { frame.srcdoc = ''; return; }
+      let html = '';
+      if (r.reportJson) { try { html = U.reportHtml(JSON.parse(r.reportJson), r.note); } catch (e) { html = ''; } }
+      if (!html) html = '<!doctype html><html><head><meta charset="utf-8"></head><body><pre style="font:16px/1.4 Consolas,Menlo,monospace;white-space:pre-wrap">' + escapeHtml(r.text || '') + '</pre></body></html>';
+      frame.srcdoc = html;
+    }
+    function render() {
+      const list = shown();
+      if (!list.some(r => r.id === chosen)) chosen = list.length ? list[0].id : '';
+      document.getElementById('rows').innerHTML = list.map(r => '<tr data-id="' + escapeHtml(r.id) + '" class="' + (r.id === chosen ? 'sr-on' : '') + (r.status === 'FAILED' ? ' sr-bad' : '') + '" tabindex="0">' +
+        '<td><b>' + escapeHtml(dateTimeText(r.at)) + '</b></td><td>' + escapeHtml(nice(shiftOf(r)) || '—') + '</td><td>' + escapeHtml(who(r.by)) + '</td><td class="detail" title="' + escapeHtml((r.sentTo || []).join(', ')) + '">' + escapeHtml(emailText(r)) + '</td></tr>').join('') ||
+        '<tr><td colspan="4" class="empty">' + (reports === null ? 'Loading the reports&hellip;' : 'No reports were sent' + (dateBox.value ? ' on ' + escapeHtml(shortDate(dateBox.value)) : '') + (shiftBox.value ? ' on ' + escapeHtml(nice(shiftBox.value)) : '') + '.') + '</td></tr>';
+      showReport(list.find(r => r.id === chosen));
+      document.getElementById('foot').textContent = reports === null ? '' : list.length + (list.length === 1 ? ' report' : ' reports') + (dateBox.value ? ' on ' + shortDate(dateBox.value) : ', every date') +
+        '. Each one is kept as it was sent with Send Current Report (Manager Center).';
+      const q = new URLSearchParams();
+      if (dateBox.value) q.set('date', dateBox.value);
+      if (chosen) q.set('id', chosen);
+      history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
+    }
+    document.getElementById('rows').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) { chosen = tr.dataset.id; render(); } });
+    document.getElementById('rows').addEventListener('keydown', e => {
+      const tr = e.target.closest('tr[data-id]');
+      if (!tr) return;
+      if (e.key === 'Enter') { chosen = tr.dataset.id; render(); }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling; if (n && n.dataset.id) { chosen = n.dataset.id; render(); const m = document.querySelector('#rows tr[data-id="' + CSS.escape(chosen) + '"]'); if (m) m.focus(); } }
+    });
+    dateBox.addEventListener('change', render);
+    shiftBox.addEventListener('change', render);
+    const step = (n) => { dateBox.value = L.addDays(dateBox.value || L.operatingDay(new Date()), n); render(); };
+    document.getElementById('prev').onclick = () => step(-1);
+    document.getElementById('next').onclick = () => step(1);
+    document.getElementById('all').onclick = () => { dateBox.value = ''; render(); };
+    document.getElementById('sr-print').onclick = () => { const w = document.getElementById('frame').contentWindow; if (chosen && w) w.print(); };
+    function watch() {
+      if (unsub) unsub();
+      unsub = onSnapshot(query(collection(db, 'plantReports'), orderBy('at', 'desc'), limit(500)), s => { reports = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); },
+        e => showError('Could not read the shift reports (' + e.message + '). Check the network and reload the page.'));
+    }
+    document.getElementById('refresh').onclick = () => { if (db) watch(); };
+
+    requireSignIn(async () => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'plantShifts', 'fac_uniontown'), s => { shifts = shiftsFor(s.exists() ? s.data() : null, 'fac_uniontown'); fillShifts(); render(); }, () => {});
+      fillShifts();
+      watch();
+    });
+  </script>
+</body>
+</html>
