@@ -39,7 +39,7 @@
         <!-- Joe 10/10: the buttons first, the same size, then the filters, all in the top line (data-top). -->
         <button type="button" class="sc-btn primary" id="add">＋ Add Load</button>
         <button type="button" class="sc-btn" id="print">Print Monthly</button>
-        <div class="tabs seg" id="views" role="tablist" aria-label="Schedule view"><button type="button" data-view="day">Day</button><button type="button" data-view="week">Week</button><button type="button" data-view="month">Month</button></div>
+        <div class="tabs seg" id="views" role="tablist" aria-label="Schedule view"><button type="button" data-view="day">Day</button><button type="button" data-view="week">Week</button><button type="button" data-view="month">Month</button><button type="button" data-view="history" id="v-history" hidden>History</button></div>
         <div class="stepper">
           <button type="button" id="prev" aria-label="Previous" title="Previous">&#9664;</button>
           <button type="button" id="today" class="sc-today">This month</button>
@@ -65,7 +65,7 @@
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
     const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    let lane = R.lane(params.get('lane')), view = ['day', 'week', 'month'].indexOf(params.get('view')) >= 0 ? params.get('view') : (window.matchMedia('(max-width: 760px)').matches ? 'day' : 'month'); // a phone opens on the day: a month of boxes is too small to read
+    let lane = R.lane(params.get('lane')), view = ['day', 'week', 'month', 'history'].indexOf(params.get('view')) >= 0 ? params.get('view') : (window.matchMedia('(max-width: 760px)').matches ? 'day' : 'month'); // a phone opens on the day: a month of boxes is too small to read
     let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
     let loads = { SHIPPING: [], RECEIVING: [] }, seen = { SHIPPING: false, RECEIVING: false }, supplierDocs = [], routeDocs = [], person = null, app = {}, db = null, search = '';
     const pending = {};           // load id -> the load as saved (or {deleted: true}) while its save is on its way
@@ -78,11 +78,13 @@
     const monthStart = (key) => key.slice(0, 8) + '01';
     function monthEnd(key) { const d = at(monthStart(key)); d.setMonth(d.getMonth() + 1, 0); return key.slice(0, 8) + String(d.getDate()).padStart(2, '0'); }
     function range() {
+      if (view === 'history') return { start: '0000-01-01', end: L.addDays(today(), -1) }; // every Receiving load before today
       if (view === 'day') return { start: date, end: date };
       if (view === 'week') { const s = L.weekStart(date); return { start: s, end: L.addDays(s, 6) }; }
       return { start: monthStart(date), end: monthEnd(date) };
     }
     function step(dir) {
+      if (view === 'history') return date;
       if (view === 'day') return L.addDays(date, dir);
       if (view === 'week') return L.addDays(L.weekStart(date), 7 * dir);
       const d = at(monthStart(date)); d.setMonth(d.getMonth() + dir, 1);
@@ -91,6 +93,7 @@
     const md = (key) => { const p = String(key || '').split('-'); return p.length === 3 ? Number(p[1]) + '/' + Number(p[2]) : String(key || ''); };
     function rangeTitle() {
       const r = range();
+      if (view === 'history') return 'Receiving History';
       if (view === 'month') return at(date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       if (view === 'week') { const s = at(r.start), e = at(r.end); return s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' – ' + (s.getMonth() === e.getMonth() ? e.getDate() + ', ' + e.getFullYear() : e.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })); }
       return at(date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -127,6 +130,10 @@
 
     /* ---------- drawing ---------- */
     function render() {
+      if (view === 'history' && lane !== 'RECEIVING') view = 'month';
+      document.getElementById('v-history').hidden = lane !== 'RECEIVING';
+      document.querySelector('.sc-ctrl .stepper').hidden = view === 'history';
+      document.getElementById('pick').hidden = view === 'history';
       const ck = canSave(), r = range(), list = entries(), inRange = list.filter(x => x.date >= r.start && x.date <= r.end);
       document.body.classList.toggle('sc-recv', lane === 'RECEIVING');
       document.getElementById('lane-name').textContent = lane === 'RECEIVING' ? 'Receiving' : 'Shipping';
@@ -137,18 +144,21 @@
       // The arrows say what they step through.
       const unit = view === 'month' ? 'month' : view === 'week' ? 'week' : 'day';
       [['prev', 'Previous '], ['next', 'Next ']].forEach(([id, w]) => { const b = document.getElementById(id); b.title = w + unit; b.setAttribute('aria-label', w + unit); });
-      document.getElementById('print').textContent = 'Print ' + (view === 'week' ? 'Weekly' : view === 'day' ? 'Daily' : 'Monthly');
+      document.getElementById('print').textContent = 'Print ' + (view === 'history' ? 'History' : view === 'week' ? 'Weekly' : view === 'day' ? 'Daily' : 'Monthly');
       document.getElementById('pick').value = date;
       document.getElementById('add').hidden = !ck;
       let tiles;
-      if (view === 'day') { const c = inRange.filter(x => x.scheduleType === 'CARRIER').length; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [c, 'Carrier'], [inRange.length - c, 'United Dairy Delivery']]; }
+      if (view === 'history') { const sup = new Set(inRange.map(x => x.runId || x.run)).size, wks = new Set(inRange.map(x => L.weekStart(x.date))).size; tiles = [[inRange.length, inRange.length === 1 ? 'Past load' : 'Past loads'], [sup, sup === 1 ? 'Supplier' : 'Suppliers'], [wks, wks === 1 ? 'Week' : 'Weeks']]; }
+      else if (view === 'day') { const c = inRange.filter(x => x.scheduleType === 'CARRIER').length; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [c, 'Carrier'], [inRange.length - c, 'United Dairy Delivery']]; }
       else { let hol = 0; for (let d = r.start; d <= r.end; d = L.addDays(d, 1)) if (R.holidayName(d)) hol++; const days = new Set(inRange.map(x => x.date)).size; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [days, 'Days booked'], [hol, hol === 1 ? 'Holiday' : 'Holidays']]; }
       document.getElementById('hstats').innerHTML = tiles.map(([n, l]) => '<div><b>' + n + '</b><span>' + l + '</span></div>').join('');
       const body = document.getElementById('body');
       body.className = 'sc-body sc-v-' + view;
-      body.innerHTML = view === 'month' ? monthHtml(list) : view === 'week' ? weekHtml(list, ck) : dayHtml(list, ck);
+      body.innerHTML = view === 'history' ? historyHtml(inRange) : view === 'month' ? monthHtml(list) : view === 'week' ? weekHtml(list, ck) : dayHtml(list, ck);
       const s = body.querySelector('#who-search');
       if (s) { s.value = search; s.oninput = () => { search = s.value; filterWho(); }; filterWho(); }
+      const hs = body.querySelector('#hist-search');
+      if (hs) { hs.value = search; hs.oninput = () => { search = hs.value; filterHistory(); }; filterHistory(); }
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
       if (!document.getElementById('modal').hidden && openDay) drawDay(openDay);
@@ -156,6 +166,22 @@
     function filterWho() {
       const q = search.trim().toLowerCase();
       document.querySelectorAll('.sc-who').forEach(row => { row.hidden = !!q && String(row.dataset.text || '').indexOf(q) < 0; });
+    }
+    function filterHistory() {
+      const q = search.trim().toLowerCase();
+      document.querySelectorAll('tr[data-text]').forEach(row => { row.hidden = !!q && row.dataset.text.indexOf(q) < 0; });
+    }
+    // Joe 10/11: Receiving keeps its loads in the app (no Live sheet); History lists every past load, newest first.
+    function historyHtml(rows) {
+      rows = rows.slice().sort((a, b) => b.date.localeCompare(a.date) || sortTime(a, b));
+      const cell = (v, cls) => { v = String(v == null ? '' : v).trim(); return '<td' + (cls ? ' class="' + cls + '"' : '') + (v ? ' title="' + escapeHtml(v) + '"' : '') + '>' + (v ? escapeHtml(v) : '—') + '</td>'; };
+      return '<div class="sc-histbar"><input id="hist-search" type="search" placeholder="Search suppliers, PO, product, trailer…" aria-label="Search the history"></div>' +
+        '<div class="sheet scroll-list"><table class="sc-table"><colgroup><col style="width:8%"><col style="width:5%"><col style="width:14%"><col style="width:7%"><col style="width:11%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:5%"><col style="width:11%"><col style="width:13%"><col style="width:6%"></colgroup>' +
+        '<thead><tr><th>Delivery</th><th>Code</th><th>Supplier</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th><th></th></tr></thead><tbody>' +
+        (rows.map(x => '<tr data-text="' + escapeHtml([entryName(x), x.route, x.run, x.poNumber, x.product, x.trailer, x.notes, x.date].join(' ').toLowerCase()) + '">' + cell(DAYS[at(x.date).getDay()] + ' ' + md(x.date) + '/' + x.date.slice(2, 4)) + cell(x.route) + cell(runName(x), 'run') + cell(clock(x.pickupTime)) +
+          cell(x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + cell(x.loadDate ? md(x.loadDate) : '') + cell(x.trailer) + cell(x.poNumber) + cell(x.cases) + cell(x.product, 'txt') + cell(x.notes, 'txt') +
+          '<td><button type="button" class="sc-btn small" data-edit="' + escapeHtml(x.id) + '">' + (canSave() ? 'Edit' : 'View') + '</button></td></tr>').join('') ||
+          '<tr><td colspan="12" class="empty">' + (seen[lane] ? 'No past Receiving loads yet.' : 'Loading the schedule&hellip;') + '</td></tr>') + '</tbody></table></div>';
     }
     const sortTime = (a, b) => (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99');
     function monthHtml(list) {
@@ -193,7 +219,7 @@
     function dayHtml(list, ck) {
       const rows = list.filter(x => x.date === date).sort(sortTime);
       const cell = (v, cls) => { v = String(v == null ? '' : v).trim(); return '<td' + (cls ? ' class="' + cls + '"' : '') + (v ? ' title="' + escapeHtml(v) + '"' : '') + '>' + (v ? escapeHtml(v) : '—') + '</td>'; };
-      return '<div class="sheet scroll-list"><table class="sc-table"><colgroup><col style="width:7%"><col style="width:15%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:12%"><col style="width:15%"><col style="width:7%"></colgroup>' +
+      return '<div class="sheet scroll-list"><table class="sc-table"><colgroup><col style="width:7%"><col style="width:14%"><col style="width:7%"><col style="width:11%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:6%"><col style="width:12%"><col style="width:14%"><col style="width:7%"></colgroup>' +
         '<thead><tr><th>' + (lane === 'RECEIVING' ? 'Code' : 'Route') + '</th><th>' + (lane === 'RECEIVING' ? 'Supplier' : 'Run') + '</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th><th></th></tr></thead><tbody>' +
         (rows.map(x => '<tr>' + cell(x.route) + cell(runName(x), 'run') + cell(clock(x.pickupTime)) + cell(x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + cell(x.loadDate ? md(x.loadDate) : '') + cell(x.trailer) + cell(x.poNumber) + cell(x.cases) +
           cell(x.product, 'txt') + cell(x.notes, 'txt') + '<td><button type="button" class="sc-btn small" data-edit="' + escapeHtml(x.id) + '">' + (ck ? 'Edit' : 'View') + '</button></td></tr>').join('') ||
@@ -358,7 +384,7 @@
       }
       if (t.id === 'supplier-add') return openSupplier();
       if (t.dataset.view) { setView(t.dataset.view); return; }
-      if (t.dataset.lane) { lane = t.dataset.lane; search = ''; push(); render(); }
+      if (t.dataset.lane) { lane = t.dataset.lane; search = ''; if (view === 'history' && lane !== 'RECEIVING') view = 'month'; push(); render(); }
     });
     function push() { history.replaceState(null, '', '?' + new URLSearchParams(Object.assign({ view, date }, lane === 'RECEIVING' ? { lane: 'receiving' } : {})).toString()); }
     function setView(v) {
@@ -373,7 +399,7 @@
     document.getElementById('next').onclick = () => setDate(step(1));
     document.getElementById('today').onclick = () => setDate(today());
     document.getElementById('pick').addEventListener('change', e => setDate(e.target.value));
-    document.getElementById('add').onclick = () => { const r = range(), t = today(); openLoad(t >= r.start && t <= r.end ? t : view === 'day' ? date : r.start, ''); };
+    document.getElementById('add').onclick = () => { const r = range(), t = today(); if (view === 'history') return openLoad(t, ''); openLoad(t >= r.start && t <= r.end ? t : view === 'day' ? date : r.start, ''); };
     document.getElementById('print').onclick = printView;
 
     // Print: a landscape page in a hidden frame, so the screen stays where it is.
@@ -401,8 +427,9 @@
         inner += '</div>';
       } else {
         const r = range(), rows = list.filter(x => x.date >= r.start && x.date <= r.end);
+        if (view === 'history') rows.sort((a, b) => b.date.localeCompare(a.date) || sortTime(a, b));
         inner = '<table><thead><tr><th>Delivery</th><th>' + who() + '</th><th>Route · Run</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th></tr></thead><tbody>' +
-          (rows.map(x => '<tr><td>' + escapeHtml(DAYS[at(x.date).getDay()] + ' ' + md(x.date)) + '</td><td>' + escapeHtml(entryName(x)) + '</td><td>' + escapeHtml([x.route, x.run].filter(Boolean).join(' · ')) + '</td><td>' + escapeHtml(clock(x.pickupTime)) + '</td><td>' + (x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + '</td><td>' +
+          (rows.map(x => '<tr><td>' + escapeHtml(DAYS[at(x.date).getDay()] + ' ' + md(x.date) + (view === 'history' ? '/' + x.date.slice(2, 4) : '')) + '</td><td>' + escapeHtml(entryName(x)) + '</td><td>' + escapeHtml([x.route, x.run].filter(Boolean).join(' · ')) + '</td><td>' + escapeHtml(clock(x.pickupTime)) + '</td><td>' + (x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + '</td><td>' +
             escapeHtml(x.loadDate ? md(x.loadDate) : '') + '</td><td>' + escapeHtml(x.trailer) + '</td><td>' + escapeHtml(x.poNumber) + '</td><td>' + escapeHtml(x.cases) + '</td><td>' + escapeHtml(x.product) + '</td><td>' + escapeHtml(x.notes) + '</td></tr>').join('') ||
             '<tr><td colspan="11">No loads scheduled.</td></tr>') + '</tbody></table>';
       }
