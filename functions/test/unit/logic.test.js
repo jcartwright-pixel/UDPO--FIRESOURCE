@@ -187,3 +187,26 @@ test('Daily and the phone follow the Live flag, and a blank Live flag falls back
   assert.equal(show({ displayDaily: true, active: false }), false);
   assert.equal(show({}), true);
 });
+
+test('Joe 10/11: a driver off on a day he normally works is red whatever the reason, and his run shows it needs cover', () => {
+  const cells = (runs) => Object.fromEntries(L.DAYS.flatMap(p => [[p + '_available', p === 'sun' ? 'NO' : 'YES'], [p + '_assignments_json', JSON.stringify(runs)]]));
+  const drivers = [{ id: 'j', name: 'JONES, MICHAEL', status: 'ACTIVE', cells: cells(['812']) }, { id: 'a', name: 'ALSTON, BRANDON', status: 'ACTIVE', cells: cells(['815']) }];
+  const exceptions = [
+    { driverId: 'j', startDate: '2026-10-12', endDate: '2026-10-12', type: 'UNPAID DAY', status: 'UNAVAILABLE', reasonCode: 'UNPAID DAY' },
+    { driverId: 'a', startDate: '2026-10-11', endDate: '2026-10-11', type: 'SICK DAY', status: 'UNAVAILABLE', reasonCode: 'SICK DAY' }
+  ];
+  const day = (o) => Object.assign({ runs: true, driverId: '', driver: '', driverExceptionStatus: '' }, o);
+  const days = (mon) => Object.fromEntries(L.DAYS.map((p, i) => [p, p === 'mon' ? day(Object.assign({ date: '2026-10-12' }, mon)) : day({ runs: false, date: L.addDays('2026-10-11', i) })]));
+  const rows = [
+    { route: '812', runId: '812', coverageType: 'UNITED DAIRY', days: days({}) },
+    { route: '815', runId: '815', coverageType: 'UNITED DAIRY', days: days({}) },
+    { route: '812', runId: '812', coverageType: 'UNITED DAIRY', days: days({ driverId: 'r', driver: 'RELIEF' }) }
+  ];
+  const ctx = L.weeklyContext(rows, drivers, exceptions);
+  assert.deepEqual(rows.map(r => L.weeklyCellClass(r, 'mon', ctx)), ['vacation-needs', 'needs', 'assigned'], 'only the run whose regular driver is off is red; a covered run is not');
+  assert.deepEqual(L.offCover(rows[0], 'mon', '2026-10-12', ctx), { name: 'JONES, MICHAEL', reason: 'UNPAID DAY' });
+  const board = L.driverBoardRows(drivers, [], exceptions, '2026-10-11');
+  const jones = board.find(b => b.id === 'j'), alston = board.find(b => b.id === 'a');
+  assert.equal(jones.days.mon.kind, 'vacation', 'unpaid on a working day is red');
+  assert.equal(alston.days.sun.kind, 'unavailable', 'off on his regular day off stays as before');
+});
