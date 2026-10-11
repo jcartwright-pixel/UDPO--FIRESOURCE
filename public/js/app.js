@@ -224,6 +224,13 @@ function addSideMenu() {
   }));
 }
 addSideMenu();
+// The header's second line names the side the screen is on (just United Dairy above the sides).
+(function headerSide() {
+  const small = document.querySelector('#screen > .topbar .brand small');
+  if (!small || !document.body.classList.contains('has-side')) return;
+  const side = sideFor(location.pathname.split('/').pop() || 'index.html');
+  small.innerHTML = 'UNITED DAIRY' + (side ? ' &middot; ' + side.name.toUpperCase() : '');
+})();
 /* Joe 10/10: "move the action buttons all in a line up above". Anything a screen marks data-top (a button, or a whole action or
    filter row, even one the screen fills later) joins one row in the screen's top line: buttons first, all the same size, and
    filters (pickers, chips, search boxes) to their right. A row that belongs to one view shows only while that view does. */
