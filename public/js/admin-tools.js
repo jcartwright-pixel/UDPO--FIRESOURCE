@@ -150,6 +150,7 @@ export const WINDOWS = [
   ['Print Layouts', 'print.html', 'Live weeks'], ['Dispatch Settings', 'settings.html', 'App'], ['Machine Products', 'products.html', 'App'],
   ['MOCREO & Sensors', 'mocreo.html', 'App'], ['GPS Setup', 'gps.html', 'App'], ['Phone Screens', 'phone-screens.html', 'App'],
   ['Driver Station', 'driver-station.html', 'Live weeks'], ['Plant Station', 'plant-station.html', 'Live weeks'], ['Garage Station', 'garage-station.html', 'GARAGE TECHNICIANS'],
+  ['Plant Reports', 'reports.html', 'Live weeks, PLANT_OPERATIONS'], ['Plant Performance Kiosk', 'plant-kiosk.html', 'Live weeks, PLANT_OPERATIONS'],
   ['Mobile Route (phone)', 'route.html', 'Live weeks']
 ];
 const SIZES = [[1920, 1080, 'Desktop 1920 x 1080'], [1366, 768, 'Laptop 1366 x 768'], [412, 915, 'Phone 412 x 915']];

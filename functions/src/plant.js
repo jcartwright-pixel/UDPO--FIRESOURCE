@@ -808,6 +808,35 @@ async function saveMachineProducts(tx, db, req, email, stamp, logRef, mode, Save
   return result;
 }
 
-module.exports = { validateMachineProducts, saveMachineProducts, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+/* ---------- Plant Shifts ---------- */
+
+// savePlantShifts (Joe 10/10): a plant's shifts, Administration > Plant Shifts. Plant Reports count each load for the shift it
+// started loading in. Uniontown starts with 6:00 AM-2:30 PM, 2:00 PM-10:30 PM and 10:00 PM-5:30 AM (public/js/plant-reports.js).
+const SHIFT_LIMIT = 6;
+function validatePlantShifts(input, SaveError) {
+  const facilityId = text(input.facilityId);
+  if (!/^fac_[a-z0-9_]+$/.test(facilityId)) throw new SaveError('BAD_REQUEST', 'Pick a plant.');
+  if (!Array.isArray(input.shifts) || !input.shifts.length || input.shifts.length > SHIFT_LIMIT) throw new SaveError('BAD_REQUEST', 'A plant needs 1 to ' + SHIFT_LIMIT + ' shifts.');
+  const seen = {}, shifts = input.shifts.map(x => {
+    const s = x && typeof x === 'object' ? x : {}, name = text(s.name).slice(0, 40), start = text(s.start), end = text(s.end);
+    if (!name) throw new SaveError('BAD_REQUEST', 'Every shift needs a name.');
+    if (seen[name.toUpperCase()]) throw new SaveError('BAD_REQUEST', name + ' is on the list twice.');
+    seen[name.toUpperCase()] = true;
+    const ok = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+    if (!ok(start) || !ok(end)) throw new SaveError('BAD_REQUEST', name + ': enter the start and end times.');
+    if (start === end) throw new SaveError('BAD_REQUEST', name + ': the start and end cannot be the same time.');
+    return { name, start, end };
+  });
+  return { facilityId, shifts };
+}
+async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const ref = db.collection('plantShifts').doc(req.facilityId), had = await tx.get(ref);
+  tx.set(ref, { facilityId: req.facilityId, shifts: req.shifts, updatedAt: stamp, updatedBy: email });
+  const result = { ok: true, requestId: req.requestId, facilityId: req.facilityId, count: req.shifts.length, message: req.shifts.length + ' shift' + (req.shifts.length === 1 ? '' : 's') + ' saved.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId, before: had.exists ? had.data().shifts || [] : null, after: req.shifts, result });
+  return result;
+}
+
+module.exports = { validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

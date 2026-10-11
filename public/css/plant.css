@@ -771,3 +771,7 @@
   .plant-page.returns-page tr.needs-return > td:first-child { box-shadow: none; }
   .plant-page.returns-page table.loadout tbody tr.needs-return { box-shadow: inset 5px 0 0 #b42332; padding-left: 14px; }
 }
+
+/* Manager Center: the Reports button (Joe 10/10), opens the Plant Scorecard. */
+.manager-page .mc-repbtn { align-self: center; display: inline-flex; align-items: center; justify-content: center; height: 44px; min-width: 170px; padding: 0 18px; border-radius: 9px; border: 2px solid var(--ud-blue); background: var(--ud-blue); color: #fff; font-size: 17px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.manager-page .mc-repbtn:hover { background: var(--ud-blue-dark); }
