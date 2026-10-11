@@ -199,7 +199,8 @@
         const skip = isSkipped(r), skipBtn = edit && st !== 'DONE' && st !== 'LOADING' && !skip ? '<button type="button" class="skip" data-skip="' + r.id + '" title="Skip for now and come back to it">Skip</button>' : '';
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
         const runCell = escapeHtml(r.run) + (skip ? '<span class="skip-tag">SKIPPED · COME BACK</span>' : '');
-        const total = mins === null ? '' : '<span class="' + (st === 'LOADING' ? 'running' : '') + '">' + P.minutesText(mins) + '</span>';
+        const stale = st === 'LOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
+        const total = mins === null ? '' : '<span class="' + (stale ? 'stale' : st === 'LOADING' ? 'running' : '') + '">' + (st === 'LOADING' ? P.runningText(r.startedAt, mins) : P.minutesText(mins)) + '</span>';
         const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (skip ? ' skipped' : '');
         if (area === 'TANKER') {
           html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.driver) + '</td>' +

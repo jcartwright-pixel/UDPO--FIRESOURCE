@@ -133,7 +133,8 @@
         const washCell = washes.length ? (ck ? '<button type="button" class="wash" data-do="wash"' + k(r) + ' title="Mark the trailer washed">Wash</button>' : '<span class="pill washp">Wash needed</span>')
           : r.washed ? '<span class="chk ok">&#10003; Washed</span>' : '<span class="chk na">Not washed</span>';
         const mins = P.minutesTaken({ startedAt: r.startedAt, completedAt: r.completedAt });
-        const time = s === 'WAITING' || mins === null ? '<span class="na">—</span>' : '<span class="' + (s === 'UNLOADING' ? 'running' : '') + '">' + P.minutesText(mins) + '</span>';
+        const stale = s === 'UNLOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
+        const time = s === 'WAITING' || mins === null ? '<span class="na">—</span>' : '<span class="' + (stale ? 'stale' : s === 'UNLOADING' ? 'running' : '') + '">' + (s === 'UNLOADING' ? P.runningText(r.startedAt, mins) : P.minutesText(mins)) + '</span>';
         const clockCell = !ck ? '' : s === 'WAITING' ? '<button type="button" class="clock" data-do="start"' + k(r) + '>Start</button>' : s === 'UNLOADING' ? '<button type="button" class="clock end" data-do="end"' + k(r) + '>End</button>' : '<span class="tick">&#10003;</span>';
         html += '<tr' + k(r) + ' class="' + (r.pendingReturns.length ? 'needs-return ' : '') + (s === 'COMPLETE' ? 'done' : s === 'UNLOADING' ? 'loading' : '') + '"' + (titleRet ? ' title="Return: ' + escapeHtml(titleRet) + '"' : '') + '>' +
           '<td class="rr"><b>' + escapeHtml(r.route) + '</b><span>' + escapeHtml(r.run) + '</span></td><td class="trlcell">' + trailer + next + '</td><td>' + pill(r) + '</td><td>' + qty + '</td><td>' + rta + '</td><td>' + washCell + '</td>' +

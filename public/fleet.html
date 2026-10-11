@@ -76,7 +76,8 @@
     }
     const open = () => orders.filter(o => String(o.status || 'NEW').toUpperCase() !== 'DONE');
     const done = () => orders.filter(o => String(o.status).toUpperCase() === 'DONE').sort((a, b) => String(b.completed_at || '').localeCompare(String(a.completed_at || '')));
-    const kpis = (list) => list.map(([n, label, c]) => '<div class="' + (c || '') + '"><b>' + n + '</b><span>' + label + '</span></div>').join('');
+    // Polish item 7 (Joe 10/11): a zero is plain grey.
+    const kpis = (list) => list.map(([n, label, c]) => '<div class="' + (c && parseFloat(n) > 0 ? c : parseFloat(n) === 0 ? 'zero' : '') + '"><b>' + n + '</b><span>' + label + '</span></div>').join('');
     const table = (cols, head, rows, empty) => '<table class="issues"><colgroup>' + cols.map(w => '<col style="width:' + w + '%">').join('') + '</colgroup><thead><tr>' +
       head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (rows || '<tr><td colspan="' + head.length + '" class="empty">' + empty + '</td></tr>') + '</tbody></table>';
 

@@ -66,7 +66,7 @@
       document.getElementById('kpis').innerHTML = [
         [open.length, 'Open', ''], [orders.filter(o => o.status === 'NEW').length, 'Not started', 'warn'], [orders.filter(o => o.status === 'WORKING').length, 'Being worked', ''],
         [orders.filter(o => o.status === 'PARTS').length, 'Waiting on parts', 'warn'], [open.filter(o => !yes(o.can_run)).length, 'Cannot run', 'warn'], [done7.length, 'Done last 7 days', 'good']
-      ].map(([n, label, c]) => '<div class="' + c + '"><b>' + n + '</b><span>' + label + '</span></div>').join('');
+      ].map(([n, label, c]) => '<div class="' + (n ? c : 'zero') + '"><b>' /* polish item 7: a zero is plain grey */ + n + '</b><span>' + label + '</span></div>').join('');
       const match = (o, k) => k === 'all' || (k === 'open' ? isOpen(o) : k === 'parts' ? o.status === 'PARTS' : o.status === 'DONE');
       document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + orders.filter(o => match(o, k)).length + '</b></button>').join('');
       const q = search.toUpperCase();

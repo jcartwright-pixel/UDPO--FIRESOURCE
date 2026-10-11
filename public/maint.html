@@ -74,14 +74,15 @@
       data.odometers.forEach(o => { const u = String(o.unit || '').toUpperCase(); if (u && (!out[u] || String(o.at) > String(out[u].at))) out[u] = o; });
       return out;
     }
-    const tile = (n, label, href, cls) => '<a class="hub-tile' + (cls ? ' ' + cls : '') + '" href="' + href + '"><b>' + n + '</b><span>' + label + '</span></a>';
+    // Polish item 7 (Joe 10/11): a zero is plain grey; the warning colour shows only when there is something to look at.
+    const tile = (n, label, href, cls) => '<a class="hub-tile' + (cls && parseFloat(n) > 0 ? ' ' + cls : parseFloat(n) === 0 ? ' zero' : '') + '" href="' + href + '"><b>' + n + '</b><span>' + label + '</span></a>';
 
     function render() {
       const lists = KINDS.map(([k]) => L.issueRows(data.maintenance, k, now())), nums = lists.map(o => L.issueNumbers(o, now()));
       // Repeat units counts each unit once (the current app's repeat offenders), not each repeat write-up.
       const repeatUnits = new Set(KINDS.flatMap(([k], i) => lists[i].filter(r => r.occurrences > 1).map(r => k + '|' + (r.unitKey || r.unit)))).size;
       const all = [].concat(...lists), oldest = Math.max(0, ...nums.map(n => n.oldestDays));
-      const kpi = (n, label, cls, go) => '<div class="' + (cls || '') + '" data-open="' + (go || 'issues.html?kind=TRUCK') + '"><b>' + n + '</b><span>' + label + '</span></div>';
+      const kpi = (n, label, cls, go) => '<div class="' + (cls && parseFloat(n) > 0 ? cls : parseFloat(n) === 0 ? 'zero' : '') + '" data-open="' + (go || 'issues.html?kind=TRUCK') + '"><b>' + n + '</b><span>' + label + '</span></div>';
       document.getElementById('kpis').innerHTML = kpi(all.length, 'Open issues') + kpi(nums.reduce((a, n) => a + n.needReview, 0), 'Need review', 'warn', 'issues.html?kind=TRUCK&filter=review') +
         kpi(repeatUnits, 'Repeat units · 90 days', 'warn', 'issues.html?kind=TRUCK&filter=repeat') + kpi(nums[0].notEmailed, 'Trucks not emailed', 'warn') +
         kpi(oldest + (oldest === 1 ? ' day' : ' days'), 'Oldest open') + kpi(nums.reduce((a, n) => a + n.repaired30, 0), 'Repaired · last 30 days', 'good', 'fleet.html?view=history');

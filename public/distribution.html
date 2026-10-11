@@ -83,7 +83,10 @@
       document.querySelectorAll('[data-n]').forEach(el => {
         const [a, b] = el.dataset.n.split('.');
         const v = n[a][b];
-        el.textContent = v + (el.dataset.suffix || '');
+        // Polish item 3 (Joe 10/11): with no loads today, Covered shows a dash and "No loads", like Daily Dispatch.
+        const none = el.dataset.n === 'daily.covered' && !n.daily.loads;
+        el.textContent = none ? '—' : v + (el.dataset.suffix || '');
+        if (el.dataset.n === 'daily.covered') el.nextElementSibling.textContent = none ? 'No loads' : 'Have a driver';
         if (el.hasAttribute('data-alert')) el.classList.toggle('alert', parseInt(v, 10) > 0);
       });
     }

@@ -10,7 +10,8 @@ let NOW = new Date();
 const data = { runs: [], journal: [], wash: [], appWash: [], pickups: [] };
 const esc = escapeHtml;
 const link = (href, label, side, alert, cls) => '<a class="dc-link' + (cls ? ' ' + cls : '') + '" href="' + href + '"><span>' + escapeHtml(label) + '</span>' + (side !== undefined ? '<b class="dc-side' + (alert ? ' alert' : '') + '">' + escapeHtml(side) + '</b>' : '') + '<i class="dc-arrow">&rarr;</i></a>';
-const hm = (m) => m == null ? '-' : (m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'));
+// Polish item 5 (Joe 10/11): past a day it reads "2 days 7 h" instead of "55 h 51".
+const hm = (m) => m == null ? '-' : m < 60 ? m + ' min' : m >= 1440 ? Math.floor(m / 1440) + (m < 2880 ? ' day ' : ' days ') + Math.floor((m % 1440) / 60) + ' h' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
 const since = (stamp) => { const t = Date.parse(stamp || ''); return isFinite(t) ? Math.max(0, Math.round((NOW.getTime() - t) / 60000)) : null; };
 const avg = (a) => a.length ? Math.round(a.reduce((t, x) => t + x, 0) / a.length) : null;
 function reason(text) {
