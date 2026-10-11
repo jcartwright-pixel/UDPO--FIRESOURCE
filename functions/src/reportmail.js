@@ -2,7 +2,7 @@
  * Send Current Report, the email half: runs when a report is saved (plantReports/{id}) and emails it, outside the save.
  *
  *   MAIL_FROM    the United Dairy mailbox the report is sent from (unset: the report is kept, not emailed), unless
- *                Administration > Email Senders sets the plant's own mailbox (then that one)
+ *                it goes from the person who pressed Send (Joe 10/11), or Email Senders sets the plant's own mailbox
  *   REPORT_TO    the Plant Managers group's addresses (comma-separated), used only for a report sent in live mode
  *
  * A report sent from test mode, or from live mode before REPORT_TO is set, goes only to the person who pressed Send,
@@ -13,7 +13,7 @@
 
 const R = require('./plant-rules');
 const { sendMail, addresses } = require('./mail');
-const { emailSettings, senderFor } = require('./adminmail');
+const { emailSettings, senderFor, personFor } = require('./adminmail');
 
 const REASON = {
   NOT_DELEGATED: 'Email is waiting on one Google Workspace step (letting the app send Gmail as United Dairy).',
@@ -60,7 +60,7 @@ async function mailReport(ref, report, deps) {
   const db = d.db || (ref && ref.firestore) || null;
   if (db) {
     const s = await emailSettings(db);
-    sender = senderFor(s, report.facilityId, env, 'United Dairy Plant Operations');
+    sender = senderFor(s, report.facilityId, env, 'United Dairy Plant Operations', await personFor(db, report.by));
     if (!s.sending) {
       await ref.update({ status: 'HELD', emailed: false, reason: 'Sending is OFF (Administration > Sent Email Log).' });
       await logReport(db, report, 'BLOCKED', [], 'Outbound email is turned off.');

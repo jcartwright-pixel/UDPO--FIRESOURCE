@@ -68,29 +68,26 @@ test('Repair Email: the Lessor button emails after the save, and says why not wh
   assert.match(sent[0].text, /Manager note:\nPlease call/);
 });
 
-test('Email Senders: the Lessor email comes from the plant mailbox, or from the manager who pressed it (Joe 10/11)', async () => {
+test('Email Senders: the Lessor email comes from the person who pressed it, or the plant address when set so (Joe 10/11)', async () => {
   await applyAction(db(), DISPATCHER, { action: 'saveCheckIn', requestId: rid(), runDocId: RUN, day: 'mon', tractorIssues: 'Mirror cracked' });
   const truck = L.issueRows(await records(), 'TRUCK')[0];
   await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: 'repairs@penske.com', mode: 'SEND' } } });
+  await db().collection('users').doc(DISPATCHER.email).set({ name: 'Dee Spatch', status: 'ACTIVE', roles: ['DISPATCHER'] }, { merge: true });
   const sent = [];
   assert.equal((await T.sendOneRepair(db(), truck.recordId, DISPATCHER.email, '', mailDeps(sent))).status, 'SENT');
-  assert.equal(sent[0].from, 'joe@uniteddairy.com', 'nothing set: the standard sender');
-  await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'Uniontown.Operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' } }, repairFrom: 'PLANT' });
+  assert.deepEqual([sent[0].from, sent[0].fromName], [DISPATCHER.email, 'Dee Spatch'], 'the standard: from the person who pressed it');
+  assert.equal((await call({ op: 'sentLog' })).emails[0].from, DISPATCHER.email);
+  await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'Uniontown.Operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' } }, fromWho: 'PLANT' });
   await T.sendOneRepair(db(), truck.recordId, DISPATCHER.email, '', mailDeps(sent));
   assert.deepEqual([sent[1].from, sent[1].fromName], ['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations']);
-  await db().collection('users').doc(DISPATCHER.email).set({ name: 'Dee Spatch', status: 'ACTIVE', roles: ['DISPATCHER'] }, { merge: true });
-  await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' } }, repairFrom: 'PERSON' });
-  await T.sendOneRepair(db(), truck.recordId, DISPATCHER.email, '', mailDeps(sent));
-  assert.deepEqual([sent[2].from, sent[2].fromName], [DISPATCHER.email, 'Dee Spatch']);
-  assert.equal((await call({ op: 'sentLog' })).emails[0].from, DISPATCHER.email);
 });
 
-test('Email Senders: automatic repair emails come from the plant mailbox even when the Lessor button sends as the person', async () => {
-  await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' } }, repairFrom: 'PERSON' });
+test('Email Senders: automatic repair emails (no one pressed Send) come from the plant address', async () => {
+  await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' } } });
   await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: 'repairs@penske.com', mode: 'IMMEDIATE' } } });
   await applyAction(db(), DISPATCHER, { action: 'saveCheckIn', requestId: rid(), runDocId: RUN, day: 'mon', tractorIssues: 'Horn out' }, () => new Date(Date.now() + 60000));
   const auto = [];
-  assert.match((await T.repairSweep(db(), { force: true, by: ADMIN.email, mailDeps: mailDeps(auto) })).message, /Sent 1 repair/);
+  assert.match((await T.repairSweep(db(), { force: true, mailDeps: mailDeps(auto) })).message, /Sent 1 repair/);
   assert.equal(auto[0].from, 'uniontown.operations@uniteddairy.com');
 });
 
