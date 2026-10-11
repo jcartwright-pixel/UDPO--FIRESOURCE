@@ -24,8 +24,8 @@ function reason(text) {
 
 function model() {
   NOW = new Date();
-  const rows = P.loadoutRows(data.runs, date), all = P.counts(rows), today = rows.filter(r => !r.prior), c = P.counts(today);
-  const pu = today.flatMap(r => P.pickupsFor(r, data.pickups).map(p => Object.assign({ route: r.route }, p))), puOpen = pu.filter(P.pickupOpen);
+  const rows = P.loadoutRows(data.runs, date), all = P.counts(rows), today = rows.filter(r => !r.prior), c = P.counts(today), pickups = P.withNotePickups(rows, data.pickups);
+  const pu = today.flatMap(r => P.pickupsFor(r, pickups).map(p => Object.assign({ route: r.route }, p))), puOpen = pu.filter(P.pickupOpen);
   const load = { total: c.total + pu.length, waiting: c.waiting + puOpen.length, loading: c.loading, done: c.done + pu.length - puOpen.length };
   const returns = P.returnsFor(data.runs, date, data.journal), urows = P.unloadRows(data.runs, date, data.journal, returns, rows), uc = P.unloadCounts(urows);
   const unload = { total: uc.total, waiting: uc.waiting, unloading: uc.unloading, done: uc.complete };
@@ -38,7 +38,7 @@ function model() {
   const loadingNow = rows.filter(r => r.state === 'LOADING').map(r => ({ r, m: P.minutesTaken(r, NOW) }));
   // loads by depart hour, the loading shift's order (evening first, overnight departures, then the day)
   const hours = {};
-  today.forEach(r => { if (r.dispatchTime == null) return; const h = Math.floor(r.dispatchTime / 60); (hours[h] = hours[h] || { h, done: 0, loading: 0, waiting: 0, behind: 0, pickups: 0 }); hours[h][r.state === 'DONE' ? 'done' : r.state === 'LOADING' ? 'loading' : 'waiting']++; if (P.isBehind(r, date, NOW)) hours[h].behind++; hours[h].pickups += P.pickupsFor(r, data.pickups).filter(P.pickupOpen).length; });
+  today.forEach(r => { if (r.dispatchTime == null) return; const h = Math.floor(r.dispatchTime / 60); (hours[h] = hours[h] || { h, done: 0, loading: 0, waiting: 0, behind: 0, pickups: 0 }); hours[h][r.state === 'DONE' ? 'done' : r.state === 'LOADING' ? 'loading' : 'waiting']++; if (P.isBehind(r, date, NOW)) hours[h].behind++; hours[h].pickups += P.pickupsFor(r, pickups).filter(P.pickupOpen).length; });
   const byHour = Object.values(hours).sort((a, b) => ((a.h - 18 + 24) % 24) - ((b.h - 18 + 24) % 24));
   const hourText = (h) => (h % 12 || 12) + (h < 12 ? ' AM' : ' PM');
   // today vs yesterday (same time of day)

@@ -10,6 +10,7 @@
   <title>Operations Overview · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
 <body class="company-page">
@@ -49,7 +50,7 @@
     function uniontown() {
       const loads = P.loadoutRows(data.runs, date), c = P.counts(loads), todays = data.journal.filter(d => d.date === date);
       const returns = P.returnsFor(data.runs, date, todays), uc = P.unloadCounts(P.unloadRows(data.runs, date, todays, returns, loads));
-      const pickups = data.pickups.filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length)).length;
+      const pickups = P.withNotePickups(loads, data.pickups).filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length)).length;
       const issues = ['TRUCK', 'TRAILER', 'FORK_TRUCK'].reduce((n, k) => n + L.issueRows(data.maintenance, k, Date.now()).length, 0);
       const loading = loads.find(r => r.state === 'LOADING'), next = loads.find(r => r.state === 'WAITING');
       const last = loads.filter(r => r.state === 'DONE' && r.completedAt).sort((a, b) => String(b.completedAt).localeCompare(String(a.completedAt)))[0];

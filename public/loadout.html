@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
+  <script src="js/board-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page loadout-page">
   <div class="signin" id="signin" hidden>
@@ -157,7 +158,8 @@
           '<span class="ring" style="--p:' + pct + '"><b>' + ac.done + '/' + ac.total + '</b></span><span><strong>' + P.AREA[a].tile + '</strong><small>' + ac.done + ' loaded · ' + (ac.total - ac.done) + ' to load</small></span></button>';
       }).join('');
       drawTrailers(rows);
-      const pu = rows.flatMap(r => P.pickupsFor(r, pickups)), puOpen = pu.filter(P.pickupOpen).length;
+      const pk = P.withNotePickups(all, pickups);
+      const pu = rows.flatMap(r => P.pickupsFor(r, pk)), puOpen = pu.filter(P.pickupOpen).length;
       const behind = rows.filter(r => P.isBehind(r, today())).length, pct = c.total ? Math.round(c.done * 100 / c.total) : 0;
       document.getElementById('strip').innerHTML =
         '<span><b>' + c.done + ' of ' + c.total + '</b> loaded <span class="bar"><i style="width:' + pct + '%"></i></span></span>' +
@@ -189,7 +191,7 @@
             : (lastPrior === true ? '<tr class="divider today"><td colspan="' + cols.length + '">TODAY · ' + shortDate(date) + '</td></tr>' : '');
           lastPrior = r.prior;
         }
-        const st = r.state, items = P.pickupsFor(r, pickups), open = items.filter(P.pickupOpen).length;
+        const st = r.state, items = P.pickupsFor(r, pk), open = items.filter(P.pickupOpen).length;
         const puBtn = '<button type="button" class="pu ' + (open ? 'open' : items.length ? 'done' : '') + '" data-pu="' + r.id + '">' + (open ? 'P/U<i>' + open + '</i>' : items.length ? 'Completed' : 'P/U') + '</button>';
         const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
         const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : k === 'truck' ? ' list="lo-trucks" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
@@ -410,9 +412,9 @@
     // Pickups: the list for this load, Pickup Complete on each open one, and Add Pickup.
     let puRow = null;
     function drawPickups() {
-      const row = puRow, items = P.pickupsFor(row, pickups), edit = canLoad();
+      const row = puRow, items = P.pickupsFor(row, P.withNotePickups(rowsNow(), pickups)), edit = canLoad();
       document.getElementById('pu-sub').textContent = row.route + ' · ' + row.run;
-      document.getElementById('pu-list').innerHTML = items.map(p => '<div class="pu-item' + (P.pickupOpen(p) ? '' : ' done') + '"><span>' + escapeHtml(p.item) + ' · ' + escapeHtml(p.quantity) +
+      document.getElementById('pu-list').innerHTML = items.map(p => '<div class="pu-item' + (P.pickupOpen(p) ? '' : ' done') + '"><span>' + escapeHtml(p.item) + (p.quantity ? ' · ' + escapeHtml(p.quantity) : '') +
         '<small>' + (p.notes ? escapeHtml(p.notes) + ' · ' : '') + (P.pickupOpen(p) ? 'Not loaded · driver picks up before leaving' : 'Completed ' + P.clock(p.completedAt)) + '</small></span>' +
         (P.pickupOpen(p) && edit ? '<button type="button" data-done="' + escapeHtml(p.pickupId) + '">Pickup Complete</button>' : '') + '</div>').join('') || '<div class="hint">No pickups for this load.</div>';
       document.getElementById('pu-form').hidden = !edit;
@@ -422,8 +424,18 @@
     document.getElementById('pu-list').addEventListener('click', e => {
       const b = e.target.closest('[data-done]');
       if (!b) return;
-      const id = b.dataset.done;
-      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: new Date().toISOString() }) : p));
+      const id = b.dataset.done, now = new Date().toISOString();
+      const note = P.withNotePickups(rowsNow(), pickups).find(p => p.pickupId === id && p.source === 'LOAD_NOTE');
+      if (note) {
+        // A pickup the load note asked for: completing it saves it as a pickup (the note as the item), already complete.
+        const temp = Object.assign({}, note, { source: '', quantity: 'See note', status: 'COMPLETE', completedAt: now });
+        pickups = pickups.concat([temp]);
+        drawPickups(); render();
+        save('completePickup', { pickupId: id, runDocId: note.runDocId, day: note.day, date: note.date })
+          .catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
+        return;
+      }
+      pickups = pickups.map(p => (p.pickupId === id ? Object.assign({}, p, { status: 'COMPLETE', completedAt: now }) : p));
       drawPickups(); render();
       save('completePickup', { pickupId: id }).catch(err => showError('Pickup: ' + (err.message || err)));
     });
