@@ -1316,6 +1316,10 @@ body.embed .head > .title { display: none; }
   .brand strong { font-size: 15px; line-height: 1.15; white-space: normal; overflow-wrap: anywhere; }
   .brand small { display: none; }
   .topbar .who, .topbar #signout { flex: none; }
+  /* The title keeps room for a word per line (it never shrinks to one letter wide); the Test copy badge moves down beside
+     Back / Home so the first row is logo, title, initials and Sign out. */
+  .brand > span { min-width: 84px; }
+  .topbar .test-copy-badge { order: 5; }
 }
 
 /* Joe 10/10: a whole card opens its screen; a line or number inside opens that screen. */
@@ -1381,6 +1385,8 @@ body.side-folded .sidemenu .side-toggle { align-self: center; margin: 2px 0 6px;
   body.has-side .topbar { flex-wrap: wrap; row-gap: 4px; }
   body.has-side .topbar .brand { flex: 1 1 0; }
   body.has-side .topbar .hdr-nav { order: 5; flex-basis: 100%; margin: 0; }
+  /* With the Test copy badge, it sits at the end of that row. */
+  body.has-side .topbar:has(.test-copy-badge) .hdr-nav { flex: 1 1 calc(100% - 120px); }
 }
 
 /* Joe 10/11 (review item 1): Daily Dispatch on a phone. The top boxes wrap onto more lines, and the table keeps every
