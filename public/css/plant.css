@@ -171,6 +171,7 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
 @media (max-width: 1500px) {
   /* Smaller screens: the day is in the date box, so the big day name gives its room to the counts. */
   .unload-page .dayname, .returns-page .dayname, .washing-page .dayname { display: none; }
+  body.yard-page .head .dayname { font-size: 18px; }
   .unload-page .hstats { gap: 6px; }
   .unload-page .hstats div { min-width: 60px; padding: 3px 8px; }
   .unload-page .hstats b { font-size: 18px; }
@@ -846,3 +847,5 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
 .plant-page tr.skipped > td { background: #fffaf0 !important; }
 /* Polish item 5 (Joe 10/11): a load or unload left running past 12 hours shows its start time in orange. */
 .plant-page .stale { color: #b45309; font-weight: 800; white-space: normal; line-height: 1.15; }
+/* Polish 6: Yard Checks shows the short date under the weekday, so the top line keeps its room. */
+.yard-page .head .dayname { white-space: pre-line; text-align: center; line-height: 1.1; }
