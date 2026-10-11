@@ -43,6 +43,7 @@ export const ICON = {
   pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
   wrench: '<path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  chart: '<path d="M3 21h18"/><rect x="5" y="12" width="3" height="6"/><rect x="10.5" y="8" width="3" height="10"/><rect x="16" y="4" width="3" height="14"/>',
   star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
   road: '<path d="M8 3L4 21M16 3l4 18M12 4v3M12 10v3M12 16v3"/>',
   check: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 12l3 3 5-6"/>',
@@ -75,27 +76,37 @@ export const MENU = [
   // The plant side (Joe 10/10): Plant Operations opens the Manager Center cards; the menu lists the cards in the same order,
   // and a card with more than one area opens its screens beside it. A section with one screen is a plain link.
   ['Send Report', [['Send Current Report', 'manager.html?report=1', 'star']]],
-  // Joe 10/11: the reports have their own place, as on the current app: the shift reports sent, and the Plant Reports.
-  ['Reports', [['Shift Reports', 'shiftreports.html', 'day'], ['Plant Reports', 'reports.html', 'star']]],
   // Joe 10/11: production first, then shift notes and quality, then temperatures and yard (as the Manager Center cards).
   ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Trailer Assignments', 'trailers.html', 'load']]],
   ['Plant Operations Scheduler', [['Plant Operations Scheduler', 'scheduler.html', 'week']]],
   ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]],
   ['Quality Checks', [['Quality Checks', 'quality.html', 'production.webp']]],
   ['Cooler Temperature', [['Cooler Temperature', 'temps.html', 'temperatures.webp']]],
-  ['Yard Checks', [['Yard Checks', 'yard.html', 'yard-checks.webp']]]
+  ['Yard Checks', [['Yard Checks', 'yard.html', 'yard-checks.webp']]],
+  // Joe 10/11: Reports is its own module with every report in one place. The plant's reports moved here from Plant
+  // Operations; the Route Distribution and Fleet reports are listed here too and stay on their own sides as well.
+  ['Plant Reports', [['Plant Reports', 'reports.html', 'star'], ['Shift Reports', 'shiftreports.html', 'day'], ['Plant Performance TV', 'plant-kiosk.html', 'star']]],
+  ['Distribution Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
+  ['Fleet Reports', [['Fleet Service Report', 'fleet.html', 'truck']]]
 ];
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
 // lists only that side's screens. A screen listed on two sides stays on the side it was opened from.
+// Joe 10/11: six cards after picking a plant: the plant's own three (Operations, Production, Maintenance), then Route
+// Distribution, Fleet & Maintenance and Reports. Plant Production and Plant Maintenance are under construction.
 export const SIDES = [
+  { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'] },
+  { key: 'production', name: 'Plant Production', home: 'soon.html?what=production', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: [], building: true, bannerInPic: true },
+  { key: 'pmaint', name: 'Plant Maintenance', home: 'soon.html?what=plant-maintenance', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: [], building: true, bannerInPic: true },
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
-  { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks, shift notes and reports', sections: ['Send Report', 'Reports', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'] },
-  { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] }
+  { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
+  { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Plant Reports', 'Distribution Reports', 'Fleet Reports'] }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
 // Pages opened from inside a side (not from its menu) that still belong to it, e.g. Plant Reports from a bookmark or the TV.
-const SIDE_PAGES = { plant: ['reports.html'] };
-const sideHas = (side, page) => page === side.home || (SIDE_PAGES[side.key] || []).indexOf(page) >= 0 || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
+const SIDE_PAGES = {};
+// A side's own first page; Plant Production and Plant Maintenance start on the being-built page with their own name.
+const isHome = (side, page) => page === pageOf(side.home) && (side.home.indexOf('?') < 0 || location.search.indexOf(side.home.split('?')[1]) >= 0);
+const sideHas = (side, page) => isHome(side, page) || (SIDE_PAGES[side.key] || []).indexOf(page) >= 0 || MENU.some(([g, items]) => side.sections.indexOf(g) >= 0 && items.some(([, href]) => pageOf(href) === page));
 export function sideFor(page) {
   // Home, the all-plants overview and the Administration Center sit above the three sides: their menu lists the sides.
   if (!page || ['index.html', 'company.html', 'administration.html'].indexOf(page) >= 0) return null;
@@ -139,14 +150,13 @@ function addSideMenu() {
   const sideLink = (s, href) => link([s.name, href || s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '" ');
   const plantSec = (p) => {
     const live = p.status === 'ACTIVE', soon = 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
-    const order = ['plant', 'distribution', 'fleet'].map(k => SIDES.find(s => s.key === k));
     return '<div class="side-sec side-plant" data-plant="' + p.id + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + p.name + '">' +
       svg('plant-building-v1-560.webp') + '<span>' + p.name + '</span><i aria-hidden="true">&#9656;</i></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + p.name + '</div>' +
-      order.map(s => sideLink(s, live ? s.home : soon).replace('<a ', '<a data-plant="' + p.id + '" ')).join('') + '</div></div>';
+      SIDES.map(s => sideLink(s, live ? s.home : soon).replace('<a ', '<a data-plant="' + p.id + '" ')).join('') + '</div></div>';
   };
   const top = here === 'company.html' ? PLANT_LIST().map(plantSec).join('') : !side ? SIDES.map(s => sideLink(s)).join('') :
-    sideLink(side).replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (here === side.home ? ' on' : '') + '" ');
+    sideLink(side).replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (isHome(side, here) ? ' on' : '') + '" ');
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
     (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
       '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
@@ -290,7 +300,7 @@ const PAGE_ICON = {
   // Joe 10/11: Daily Dispatch has no title picture, so its boxes sit further left; Weekly matches it (polish 21). The other
   // screens use line drawings instead of the truck, tractor and building photos, so every title reads the same way.
   'routes.html': 'road', 'routeweek.html': 'week', 'admin.html': 'gear', 'ops.html': 'swap', 'print.html': 'day', 'settings.html': 'gear', 'soon.html': 'factory', 'otr.html': 'road',
-  'gps.html': 'pin', 'scorecard.html': 'star',
+  'gps.html': 'pin', 'scorecard.html': 'star', 'reportcenter.html': 'chart',
   'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
   'garage.html': 'wrench', 'fleet.html': 'truck',
   'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'redzone.html': 'production.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
@@ -368,8 +378,8 @@ export function goBack() {
   let fromHere = false;
   try { fromHere = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (e) { /* no referrer */ }
   // Up one level: a side's screen goes to that side's first page, and the side's first page goes Home.
-  const side = sideFor(here), up = side && here !== side.home ? side.home : here === 'index.html' && multiPlant() ? 'company.html' : 'index.html';
-  if ((here === 'company.html' || (!main && side && here !== side.home)) && fromHere && history.length > 1) history.back();
+  const side = sideFor(here), up = side && !isHome(side, here) ? side.home : here === 'index.html' && multiPlant() ? 'company.html' : 'index.html';
+  if ((here === 'company.html' || (!main && side && !isHome(side, here))) && fromHere && history.length > 1) history.back();
   else location.href = up;
 }
 // Joe 10/10: every screen has a Back button and a Home button. Joe 10/10 evening: they sit in the header beside the logo,
