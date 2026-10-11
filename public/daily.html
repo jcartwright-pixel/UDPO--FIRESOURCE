@@ -112,7 +112,7 @@
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, pickChoices, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     import { bindDailyKeys, keepCursor } from './js/daily-keys.js';
     forScreen('dailyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
@@ -134,6 +134,8 @@
     const show = (v) => v === null || v === undefined ? '' : String(v);
     const departText = (r) => L.timeText(r.dispatchTime !== null && r.dispatchTime !== undefined ? r.dispatchTime : r.startTime);
     const coverageName = (r) => r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '';
+    // Carrier or a branch (Fairmont, Martins Ferry...) in the driver column: no tractor goes, so Truck shows N/A (current app).
+    const noTractor = (r) => !!coverageName(r) || (!r.driverId && !!r.driver && (/^CARRIER$/i.test(r.driver) || cvgOptions().some(o => o.text.toUpperCase() === String(r.driver).toUpperCase())));
 
     function cell(value, extra, edit) {
       const text = show(value);
@@ -175,7 +177,7 @@
           '<td><button type="button" class="toggle' + (r.off ? '' : ' on') + '" data-runs' + (edit ? '' : ' disabled') + ' aria-pressed="' + !r.off + '" title="Click to change whether this run runs">' + (r.off ? 'NO RUN' : 'RUNS') + '</button></td>' +
           cell(driver, driver || !needs ? '' : 'missing', live && 'driver') +
           '<td><input type="checkbox" class="ovr" data-ovr aria-label="Override" title="Override: choose a driver or unit that is off or down"' + (ovr[r.id] ? ' checked' : '') + (live ? '' : ' disabled') + '></td>' +
-          cell(r.truck, r.truck || !needs || coverageName(r) ? '' : 'missing', live && 'truck') +
+          cell(r.truck || (noTractor(r) ? 'N/A' : ''), r.truck || !needs || noTractor(r) ? '' : 'missing', live && 'truck') +
           cell(r.trailer, r.trailer || !needs ? '' : 'missing', live && 'trailer') +
           cell(departText(r), '', live && 'time') + cell(r.palletJack, '', live && 'jack') +
           (r.pickup ? cell('PICKUP ' + r.pickup, 'pickup') : cell(r.driverNotes, 'left', live && 'note')) +
@@ -242,12 +244,29 @@
       const input = td.querySelector('input.picker');
       if (input && typed !== null && typed !== undefined) input.value = typed;
     }
+    /*
+     * Current app 7.0.267 (Joe 10/5): the driver's own truck (Driver Master's assigned truck) goes with him. When it is down
+     * or on the road on another run, the route's truck is kept and the line says why. Carrier or a branch takes the truck off.
+     */
+    function pickDriver(row, value) {
+      const truckNow = row.truckId;
+      saveAssignment(getRuns, row.runDocId, row.day, 'driver', { id: value, text: pickText('driver', value) }, render, ovr[row.id]);
+      const setTruck = (id) => saveAssignment(getRuns, row.runDocId, row.day, 'truck', { id, text: pickText('truck', id) }, render, ovr[row.id]);
+      if (/^__CVG__:/.test(value)) { if (truckNow) setTruck(''); return; }
+      const d = lists.allDrivers.find(x => x.id === value), own = d && d.defaultTruckId;
+      if (!own || own === truckNow) return;
+      const unit = lists.fleetTrucks.find(e => e.id === own);
+      const busy = unit && L.unitConflicts(rows, row, 'truck', rmHours)[own];
+      const why = !unit ? 'is not on Equipment Master' : L.unitOff(unit) ? 'is ' + unit.status : busy ? 'is ' + busy : '';
+      if (why) { showError(d.name + '\'s truck ' + (unit ? unit.unit : own) + ' ' + why + '; the route\'s truck was kept.'); return; }
+      setTruck(own);
+    }
     const idOf = { driver: 'driverId', truck: 'truckId', trailer: 'trailerId' };
     bindDailyKeys(body, {
       rowOf: (td) => { const tr = td.closest('tr[data-index]'); return tr ? rows[Number(tr.dataset.index)] : null; },
       current: (row, kind) => row[idOf[kind]] || (kind === 'driver' && coverageName(row) ? '__CVG__:' + coverageName(row) : ''),
       choices: (kind, row) => pickChoices(kind, row[idOf[kind]], busyFor(kind, row), pickOpts(kind, row)),
-      pick: (row, kind, value) => saveAssignment(getRuns, row.runDocId, row.day, kind, { id: value, text: pickText(kind, value) }, render, ovr[row.id]),
+      pick: (row, kind, value) => kind === 'driver' ? pickDriver(row, value) : saveAssignment(getRuns, row.runDocId, row.day, kind, { id: value, text: pickText(kind, value) }, render, ovr[row.id]),
       editText, setEditing: (on) => { editing = on; }, render
     });
 
@@ -328,6 +347,7 @@
           if (f === 'time') return setTime(row, node.value.trim());
           if (f === 'jack') return setJack(row, node.value.trim());
           if (f === 'note') return saveAssignment(getRuns, row.runDocId, row.day, 'note', node.value.trim(), render);
+          if (f === 'driver') return pickDriver(row, node.value);
           saveAssignment(getRuns, row.runDocId, row.day, f, { id: node.value, text: pickText(f, node.value) }, render, ovr[row.id]);
         };
       });
