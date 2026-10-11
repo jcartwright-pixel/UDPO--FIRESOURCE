@@ -26,7 +26,7 @@ const MODE_TEXT = { SEND: 'Only when I press Send', IMMEDIATE: 'Immediately (new
 const LEASE_HELP = { IDEALEASE: 'Fleet List Lease says "Idealease"', PENSKE: 'Fleet List Lease says "PENSKE"', OWNED: 'Fleet List Lease is blank or "OWN"' };
 export async function renderRepairEmail(box, ctx) {
   let data = null;
-  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn main" id="re-save">Save</button><button type="button" class="ap-btn" id="re-send">Send now</button><button type="button" class="ap-btn" id="re-reload">Reload</button>', '<span id="re-sending"></span>') +
+  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn main" id="re-save">Save</button><button type="button" class="ap-btn" id="re-send">Send now</button><button type="button" class="ap-btn" id="re-reload">Refresh</button>', '<span id="re-sending"></span>') +
     '<div class="ap-split"><section class="ap-card"><h3>Where Repair Emails Go</h3><p class="ap-note">The Lease column on the Fleet List decides who a truck or trailer belongs to. Each lessor gets its own address.</p><div id="re-where"></div>' +
     '<p class="ap-note">Owned units go straight to our garage list. Leave that address empty so nothing is emailed; add one only if you also want the garage emailed.</p>' +
     '<p class="ap-note">Any other Lease value, or a unit that is not on the Fleet List, is held and flagged. It is never sent to a guessed address.</p><div class="ap-tiles" id="re-open" style="grid-template-columns:repeat(4,1fr)"></div></section>' +
@@ -67,7 +67,7 @@ export async function renderRepairEmail(box, ctx) {
 // Joe 10/11: each location has its own check-in mailbox; the Location drop-down picks which one the page shows and saves.
 export async function renderCheckinEmail(box) {
   let data = null, plant = 'fac_uniontown';
-  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn main" id="ce-save">Save</button><button type="button" class="ap-btn" id="ce-now">Check now</button><button type="button" class="ap-btn" id="ce-std">Use the standard addresses</button><button type="button" class="ap-btn" id="ce-reload">Reload</button>',
+  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn main" id="ce-save">Save</button><button type="button" class="ap-btn" id="ce-now">Check now</button><button type="button" class="ap-btn" id="ce-std">Use the standard addresses</button><button type="button" class="ap-btn" id="ce-reload">Refresh</button>',
     '<b style="color:#0b3d6b">Location</b><select id="ce-plant" aria-label="Location">' + window.UDLogic.PLANTS.map(p => '<option value="' + p.id + '">' + e(p.name) + '</option>').join('') + '</select>') +
     '<p class="ap-note">The phone check-in service emails each driver check-in. This check reads that mailbox (read-only), adds equipment issues, cleaning and returns to the maintenance lists and records cases delivered and returned.</p>' +
     '<div class="ap-split"><section class="ap-card"><h3>Mailbox</h3><label class="ap-checks"><label><input type="checkbox" id="ce-on"> Check the mailbox</label></label>' +

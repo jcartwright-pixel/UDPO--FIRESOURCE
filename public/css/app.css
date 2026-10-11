@@ -1489,3 +1489,8 @@ body.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: var(-
 .wk-note { margin: 0 16px 8px; padding: 8px 14px; border-radius: 10px; font-size: 16px; font-weight: 600; }
 .wk-note.warn { background: #fff4d6; color: #6b4b00; border: 1px solid #f0d58a; }
 .wk-note.good { background: #e3f4e8; color: #1d5b2f; border: 1px solid #a9d8b6; }
+/* Polish item 2 (Joe 10/11): the screen an old-app Dispatch Administration card opens, in small grey under its words. */
+.admin-card .admin-opens { display: block; margin-top: 6px; font-style: normal; font-size: 14px; font-weight: 700; color: #6b7a89; }
+/* Polish 13: status tags read in normal case ("Approved", "Manual only"); the stored words stay as they are. */
+span.status, .vstatus, .temp-page .tp-status, .nice-case { display: inline-block; text-transform: lowercase; }
+span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-letter, .nice-case::first-letter { text-transform: uppercase; }

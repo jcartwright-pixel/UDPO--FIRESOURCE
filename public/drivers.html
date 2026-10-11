@@ -24,7 +24,6 @@
       <a href="index.html">Home</a>
       <a href="daily.html">Daily Dispatch</a>
       <a href="weekly.html">Weekly Dispatch</a>
-      <button id="refresh" type="button">&#8635; Refresh</button>
       <span class="who" id="who"></span>
       <button id="signout" type="button">Sign out</button>
     </div>
@@ -35,6 +34,7 @@
     <div class="notice error" id="error" hidden></div>
     <div class="split">
       <div class="split-main">
+        <button id="refresh" type="button" data-top>&#8635; Refresh</button>
         <div class="filters" data-top>
           <input id="search" type="search" placeholder="Search drivers or trucks...">
           <select id="status"><option value="ALL">Status: All</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>

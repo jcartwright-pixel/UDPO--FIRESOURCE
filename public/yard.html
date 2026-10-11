@@ -104,7 +104,7 @@
       const latest = hist.find(h => h.status !== 'DEPARTED');
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase();
       document.getElementById('hstats').innerHTML = [['Active', q.rows.length + q.locked.length, ''], ['Due', q.rows.length, q.rows.length ? 'warn' : ''], ['Checked', q.locked.length, q.locked.length ? 'good' : ''],
-        ['Latest', latest ? clock(latest.recordedAt) : 'None', '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + l + '</span></div>').join('');
+        ['Latest', latest ? clock(latest.recordedAt) : '—', '', latest ? '' : 'no check yet']].map(([l, n, k, why]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + l + (why ? ' · ' + why : '') + '</span></div>').join('');
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
       ['current', 'history'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; }); document.getElementById('refresh').hidden = pane !== 'current'; document.getElementById('refresh-history').hidden = pane !== 'history';
       // Joe 10/10: no Record button on the desktop either. Each box saves as it is left; a trailer checked here stays on the list

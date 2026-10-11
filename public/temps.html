@@ -40,7 +40,7 @@
         <span class="tp-sensor" id="sensor-at">Last Sensor Update: —</span>
         <!-- Joe 10/10: one line of controls, the buttons first and the filters after them. -->
         <div class="tabs seg" id="panes" data-top role="tablist" aria-label="Temperature view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
-        <button type="button" class="tp-btn" id="refresh" data-top>&#8635; Refresh Now</button>
+        <button type="button" class="tp-btn" id="refresh" data-top>&#8635; Refresh</button>
         <div class="tp-actions chips" id="filters" data-top></div>
       </div>
       <div class="sheet scroll-list" id="pane-current">
@@ -118,7 +118,7 @@
       document.getElementById('bar-title').textContent = pane === 'current' ? 'Current Temperature Readings' : '24-Hour History';
       document.getElementById('bar-text').textContent = pane === 'current' ? 'Live sensor readings and manual entries for each plant location.' : 'All temperature readings from the last 24 hours.';
       document.getElementById('filters').innerHTML = pane === 'current' ? FILTERS.map(([f, label]) => '<button type="button" class="tp-btn' + (filter === f ? ' on' : '') + (f === 'ALERTS' ? ' alert' : '') + '" data-filter="' + f + '">' + label + (f === 'ALERTS' ? ' (' + alerts + ')' : '') + '</button>').join('') : '';
-      document.getElementById('refresh').innerHTML = pane === 'current' ? '&#8635; Refresh Now' : '&#8635; Refresh History';
+      document.getElementById('refresh').innerHTML = pane === 'current' ? '&#8635; Refresh' : '&#8635; Refresh History';
       document.getElementById('rows').innerHTML = list.map(r => {
         const cur = roundReading(r), d = drafts[r.locationId] || (cur ? { manualTemperature: String(r.lastManualTemperature), notes: r.lastNotes } : {}), dis = ck && (!r.locked || cur) ? '' : ' disabled';
         const last = !cur && r.lastCheckedAt ? '<small class="as-last">Last: ' + escapeHtml(r.lastManualTemperature) + '°F · ' + escapeHtml(clockOf(r.lastCheckedAt)) + (r.lastCheckedBy ? ' · ' + escapeHtml(initials(r.lastCheckedBy)) : '') + '</small>' : '';
