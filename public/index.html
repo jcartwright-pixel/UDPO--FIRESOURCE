@@ -23,16 +23,18 @@
     <div class="launch-title"><h1 id="plant-name">Uniontown Operations</h1><p>Select the department you want to open.</p><span id="today">-</span></div>
     <div class="notice error" id="error" hidden></div>
     <!-- Joe 10/10: like the old app's home, one big picture per side; each opens its side, whose menu lists only its own screens. -->
-    <section class="launch-grid" id="sides"></section>
+    <section class="launch-grid six" id="sides"></section>
   </div>
   <script type="module">
-    import { start, requireSignIn, shortDate, SIDES, escapeHtml } from './js/app.js';
+    import { start, requireSignIn, shortDate, SIDES, ICON, escapeHtml } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     const L = window.UDLogic;
-    const card = (s) => '<a class="launch-card" data-side="' + s.key + '" href="' + s.home + '">' +
-      '<span class="launch-art">' + (s.art || '<img src="img/library/' + s.pic + '" alt="">') + '</span><strong>' + escapeHtml(s.name) + '</strong><small>' + escapeHtml(s.note) + '</small>' +
+    // Joe 10/11: Plant Production and Plant Maintenance carry an UNDER CONSTRUCTION banner across their picture.
+    const art = (s) => s.pic ? '<img src="img/library/' + s.pic + '" alt="">' : '<svg class="launch-icon" viewBox="0 0 24 24" aria-hidden="true">' + ICON[s.icon] + '</svg>';
+    const card = (s) => '<a class="launch-card' + (s.building ? ' building' : '') + '" data-side="' + s.key + '" href="' + s.home + '">' +
+      '<span class="launch-art">' + art(s) + (s.building ? '<span class="uc-banner">Under Construction</span>' : '') + '</span><strong>' + escapeHtml(s.name) + '</strong><small>' + escapeHtml(s.note) + '</small>' +
       '<b>Open ' + escapeHtml(s.short || s.name.replace(/^Route /, '').replace(/ Operations$/, '')) + ' &rarr;</b></a>';
-    // Joe 10/11: the three sides only; Administration is the header button.
+    // Joe 10/11: six cards (the plant's three, Route Distribution, Fleet & Maintenance, Reports); Administration is the header button.
     document.getElementById('sides').innerHTML = SIDES.map(card).join('');
     // The side picked here is the side its screens' menu shows.
     document.getElementById('sides').addEventListener('click', e => { const a = e.target.closest('[data-side]'); if (a) try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ } });

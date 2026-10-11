@@ -42,7 +42,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await sup.waitForFunction(() => document.getElementById('plant-name').textContent === 'Uniontown Operations');
     await sup.waitForTimeout(800);
     assert.match(sup.url(), /index\.html/);
-    assert.deepEqual(await sup.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['distribution', 'plant', 'fleet']);
+    assert.deepEqual(await sup.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports']);
     assert.equal(await sup.$('#go-back'), null, 'nothing above the plant home');
     assert.equal(await sup.isVisible('#go-admin'), false, 'no Administration button');
     if (SHOTS) await sup.screenshot({ path: path.join(SHOTS, 'home-one-plant-1920.png') });
@@ -53,7 +53,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await sup.waitForFunction(() => /Administrators only/.test(document.getElementById('shell').textContent));
     assert.deepEqual(sup.errors, []);
     await sup.close();
-    results.push('A one-plant supervisor sees only Uniontown\'s home (three cards, no Administration); the overview shows them Uniontown only; Administration says Administrators only');
+    results.push('A one-plant supervisor sees only Uniontown\'s home (six cards, no Administration); the overview shows them Uniontown only; Administration says Administrators only');
 
     // An Administrator: the all-plants overview first, then Uniontown, whose home has the Administration card.
     const adm = await openPage(browser, 1920, 1080, '/index.html?testEmail=admin.test@uniteddairy.com');
@@ -71,11 +71,15 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
     await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
-    // Joe 10/11: the plant home shows the three sides only; Administration is the header button.
-    await adm.waitForSelector('.launch-card[data-side="fleet"]');
-    assert.deepEqual(await adm.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['distribution', 'plant', 'fleet']);
+    // Joe 10/11: the plant home shows six cards (the plant's three, Route Distribution, Fleet & Maintenance, Reports);
+    // Plant Production and Plant Maintenance carry an Under Construction banner. Administration is the header button.
+    await adm.waitForSelector('.launch-card[data-side="reports"]');
+    assert.deepEqual(await adm.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports']);
+    assert.deepEqual(await adm.$$eval('.launch-card .uc-banner', b => b.map(x => x.closest('.launch-card').dataset.side + ':' + x.textContent)), ['production:Under Construction', 'pmaint:Under Construction']);
+    const fits = await adm.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.launch-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight }));
+    assert.ok(fits.bottom <= fits.inner, 'the six cards fit a 1920x1080 screen: ' + JSON.stringify(fits));
     const sizes = await adm.$$eval('.launch-card', c => c.map(x => Math.round(x.getBoundingClientRect().width) + 'x' + Math.round(x.getBoundingClientRect().height)));
-    assert.equal(new Set(sizes).size, 1, 'the three cards are the same size: ' + sizes.join(' '));
+    assert.equal(new Set(sizes).size, 1, 'the six cards are the same size: ' + sizes.join(' '));
     await adm.waitForSelector('#go-back');
     // Joe 10/10 evening: Administration is a header button on the main screens, not a menu item.
     assert.equal(await adm.isVisible('#go-admin'), true, 'Administration is in an Administrator\'s header');
@@ -118,7 +122,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the three side cards and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
+    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');
@@ -130,6 +134,36 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.deepEqual(small.errors, []);
     await small.close();
     results.push('The overview and Administration fit a 1366 window');
+
+    // Joe 10/11: the main screen's plant fly-out lists the same six as the plant home; Reports gathers every report in one
+    // place (the plant's reports moved there from Plant Operations); Plant Production opens its being-built page.
+    const mods = await openPage(browser, 1536, 864, '/company.html?testEmail=admin.test@uniteddairy.com');
+    await mods.waitForSelector('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
+    await mods.hover('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
+    await mods.waitForSelector('.side-flyouts .flyout.open a[data-plant="fac_uniontown"]', { state: 'visible' });
+    assert.deepEqual(await mods.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent)), ['Plant Operations', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports']);
+    await Promise.all([mods.waitForURL(/reportcenter\.html/), mods.click('.side-flyouts .flyout.open a[data-side="reports"]')]);
+    await mods.waitForSelector('.rc-card');
+    assert.deepEqual(await mods.$$eval('.rc-group h2', h => h.map(x => x.textContent)), ['Plant Reports', 'Distribution Reports', 'Fleet Reports']);
+    assert.deepEqual(await mods.$$eval('.rc-card', a => a.map(x => x.getAttribute('href'))), ['reports.html', 'shiftreports.html', 'plant-kiosk.html', 'scorecard.html', 'otr.html', 'soon.html?what=trucks-today', 'fleet.html']);
+    assert.equal(await mods.getAttribute('.sidemenu a.side-name', 'data-side'), 'reports');
+    assert.ok(await noSideScroll(mods));
+    await Promise.all([mods.waitForURL(/shiftreports\.html/), mods.click('.rc-card[href="shiftreports.html"]')]);
+    await mods.waitForSelector('.sidemenu a.side-name');
+    assert.equal(await mods.getAttribute('.sidemenu a.side-name', 'data-side'), 'reports', 'a report opened from Reports keeps the Reports menu');
+    await mods.evaluate(() => sessionStorage.setItem('udPlant', 'fac_uniontown'));
+    await mods.goto(HOSTING + '/index.html?testEmail=admin.test@uniteddairy.com');
+    await mods.waitForSelector('.launch-card[data-side="production"]');
+    await mods.waitForTimeout(500);
+    const fits1536 = await mods.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.launch-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight }));
+    assert.ok(fits1536.bottom <= fits1536.inner, 'the six cards fit a 1536x864 screen: ' + JSON.stringify(fits1536));
+    await Promise.all([mods.waitForURL(/soon\.html\?what=production/), mods.click('.launch-card[data-side="production"]')]);
+    await mods.waitForSelector('.soon-card');
+    assert.equal(await mods.textContent('#title'), 'Plant Production');
+    assert.equal(await mods.getAttribute('.sidemenu a.side-name', 'data-side'), 'production');
+    assert.deepEqual(mods.errors, []);
+    await mods.close();
+    results.push('Main screen fly-out and plant home list Plant Operations, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance and Reports; Reports lists every report and keeps its menu; Plant Production opens its being-built page; the six cards fit 1536x864');
 
     // Joe 10/10: anywhere on a card opens its screen's first view; one line or number inside opens that screen.
     const cards = await openPage(browser, 1920, 1080, '/company.html?testEmail=admin.test@uniteddairy.com');
