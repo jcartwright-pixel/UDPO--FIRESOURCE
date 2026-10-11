@@ -54,12 +54,13 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await sup.waitForTimeout(600);
     assert.match(sup.url(), /index\.html/, 'a supervisor clicking Plant Production stays on the plant home');
     assert.deepEqual(await sup.$$eval('.sidemenu a[data-building]', a => a.map(x => x.dataset.side + ':' + getComputedStyle(x).pointerEvents)), ['production:none', 'pmaint:none']);
-    for (const [what, name] of [['production', 'Plant Production'], ['plant-maintenance', 'Plant Maintenance']]) {
-      await sup.goto(HOSTING + '/soon.html?what=' + what + '&testEmail=super.test@uniteddairy.com');
+    // Plant Production's first page is now its Production Lines board (Joe 10/11); Plant Maintenance is still the being-built page.
+    for (const [page, name, inside] of [['production.html?', 'Plant Production', '#tiles'], ['soon.html?what=plant-maintenance&', 'Plant Maintenance', '.soon-card']]) {
+      await sup.goto(HOSTING + '/' + page + 'testEmail=super.test@uniteddairy.com');
       await sup.waitForSelector('#uc-refused');
       assert.equal(await sup.textContent('#uc-refused h1'), name + ' is under construction');
       assert.match(await sup.textContent('#uc-refused p'), /Only Administrators can open/);
-      assert.equal(await sup.isVisible('.soon-card'), false, name + ' stays closed to a supervisor');
+      assert.equal(await sup.isVisible(inside), false, name + ' stays closed to a supervisor');
       assert.equal(await sup.isVisible('#go-home'), true, 'the header and its Home button stay');
       assert.equal(await sup.isVisible('#signin'), false, 'the supervisor stays signed in');
     }
@@ -186,13 +187,14 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await mods.waitForTimeout(500);
     const fits1536 = await mods.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.launch-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight }));
     assert.ok(fits1536.bottom <= fits1536.inner, 'the six cards fit a 1536x864 screen: ' + JSON.stringify(fits1536));
-    await Promise.all([mods.waitForURL(/soon\.html\?what=production/), mods.click('.launch-card[data-side="production"]')]);
-    await mods.waitForSelector('.soon-card');
-    assert.equal(await mods.textContent('#title'), 'Plant Production');
+    // Joe 10/11: Plant Production (still Under Construction) opens its Production Lines board for an administrator.
+    await Promise.all([mods.waitForURL(/production\.html/), mods.click('.launch-card[data-side="production"]')]);
+    await mods.waitForSelector('#tiles .pd-tile, #tiles .pd-empty');
+    assert.equal(await mods.$('.pd-building'), null, 'an administrator sees the board, not the being-built note');
     assert.equal(await mods.getAttribute('.sidemenu a.side-name', 'data-side'), 'production');
     assert.deepEqual(mods.errors, []);
     await mods.close();
-    results.push('Main screen fly-out and plant home list Plant Operations, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance and Reports; Reports lists every report and keeps its menu; Plant Production opens its being-built page; the six cards fit 1536x864');
+    results.push('Main screen fly-out and plant home list Plant Operations, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance and Reports; Reports lists every report and keeps its menu; Plant Production opens its Production Lines board for an administrator; the six cards fit 1536x864');
 
     // Joe 10/10: anywhere on a card opens its screen's first view; one line or number inside opens that screen.
     const cards = await openPage(browser, 1920, 1080, '/company.html?testEmail=admin.test@uniteddairy.com');

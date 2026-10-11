@@ -139,10 +139,29 @@ async function touchDrag(page, from, to) {
     results.push('Skip with the grab handles: 812 waits at the bottom without a handle; 808 moved down past 811');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '5-loadout-order-skip-tablet-1280.png') });
 
-    // Another day: no handles, the old widths.
-    await loader.click('#next');
-    await loader.waitForFunction(() => document.querySelector('#load-date').value === '2026-10-09');
-    assert.equal(await loader.$('.lo-grip'), null, 'tomorrow shows no handles');
+    // Joe 10/11: the grab handle is on every loadout (Case, Totes, Boxes, Tanker) at 1536 and 1920: visible, inside the Route
+    // column and before the route number. Today and the coming days have it; a past day does not.
+    for (const [w, h] of [[1920, 1000], [1536, 760]]) {
+      const pg = await openPage(browser, { viewport: { width: w, height: h } }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
+      for (const a of ['CASE', 'TOTES', 'BOXING', 'TANKER']) {
+        await pg.click('[data-area="' + a + '"]');
+        await pg.waitForFunction(x => document.querySelector('[data-area="' + x + '"]').classList.contains('on') && document.querySelector('#rows .lo-grip'), a);
+        const grips = await pg.$$eval('#rows tr[data-row] .lo-grip', g => g.map(x => { const r = x.getBoundingClientRect(), td = x.closest('td').getBoundingClientRect(), dots = getComputedStyle(x, '::before').content;
+          return { route: x.textContent, seen: r.width > 0 && r.height > 0 && getComputedStyle(x).visibility !== 'hidden', inside: r.left >= td.left - 1 && r.right <= td.right + 1, dots };
+        }));
+        assert.ok(grips.length >= 1 && grips.every(g => g.seen && g.inside && /\u283F|⠿/.test(g.dots)), a + ' at ' + w + ': every load today has a visible handle before its route ' + JSON.stringify(grips));
+        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, '6-loadout-handle-' + a.toLowerCase() + '-' + w + '.png') });
+      }
+      assert.deepEqual(pg.errors, []);
+      await pg.context().close();
+    }
+    results.push('Grab handle on Case, Totes, Boxes and Tanker at 1536 and 1920, inside the Route column before the route number');
+    // A day already past has no handles (the made-up plant has loads only on its own day; a coming day's own loads get the
+    // handle by the same rule as today's, and the server takes a coming day's order: test/emulator/plant-order.test.js).
+    await loader.click('#prev');
+    await loader.waitForFunction(() => document.querySelector('#load-date').value === '2026-10-07');
+    await loader.waitForTimeout(300);
+    assert.equal(await loader.$('.lo-grip'), null, 'a past day shows no handles');
     for (const p of [loader, watcher, tablet]) assert.deepEqual(p.errors, []);
   } finally {
     await browser.close();

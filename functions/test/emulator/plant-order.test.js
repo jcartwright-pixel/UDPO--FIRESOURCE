@@ -33,8 +33,9 @@ test('A plant employee reorders today\'s loads: the loads keep their order numbe
 });
 
 test('Only today: another day is refused, and so is a load that does not load today', async () => {
-  await assert.rejects(order(['811', '808'], '2026-10-09'), /only be changed for today/);
-  await assert.rejects(order(['811', '808'], DATE, () => new Date('2026-10-09T11:00:00Z')), /only be changed for today/);
+  // Joe 10/11: a coming day may be reordered too (here 10/09 has no Friday-delivery loads for these runs); a past day may not.
+  await assert.rejects(order(['811', '808'], '2026-10-09'), /does not load on/);
+  await assert.rejects(order(['811', '808'], DATE, () => new Date('2026-10-09T11:00:00Z')), /only be changed for today or a coming day/);
   // Before 6 AM the operating day is still the day before.
   assert.equal((await order(['812', '811'], DATE, () => new Date('2026-10-09T09:30:00Z'))).ok, true);
   await assert.rejects(applyAction(db(), LOADER, { action: 'reorderPlantLoads', requestId: rid(), loadDate: DATE, order: [{ runDocId: id('811'), day: 'thu' }, { runDocId: id('808'), day: 'fri' }] }, noon), /does not load on/);

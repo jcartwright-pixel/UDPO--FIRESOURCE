@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Line Targets · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <link rel="stylesheet" href="css/production.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+  <script src="js/production-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page quality-page lt-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Line Targets</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Production</span><h1>Line Targets</h1></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <a class="lt-top" id="products-link" href="products.html" data-top>Products List</a>
+      <a class="lt-top" href="line.html" data-top>Line Tablet</a>
+      <a class="lt-top" href="production.html?tv=1" data-top>Production TV</a>
+      <select id="plant" class="pm-pick" aria-label="Plant" title="Plant" data-top></select>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="qc-split">
+        <aside class="qc-lines" aria-label="Production lines"><h2>Lines</h2><div id="lines"></div>
+          <p class="lt-note">Each line is counted one of three ways: <b>Typed by operator</b> on the line tablet, a <b>Sensor</b> (counts only), or a <b>Label reader</b> (counts, product and code date). The lines are the plant's machines in Plant Operations.</p></aside>
+        <section class="qc-form lt-form">
+          <div class="qc-top"><h2 id="form-title">Line</h2><span class="lt-pill" id="counter-pill"></span><span class="qc-last" id="form-last"></span>
+            <label class="lt-counter">Counted by <select id="counter" aria-label="How this line is counted"></select></label></div>
+          <div class="lt-scroll">
+            <table class="loadout lt-table">
+              <colgroup><col style="width:22%"><col style="width:7.5%"><col style="width:12%"><col style="width:7.5%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:10%"></colgroup>
+              <thead><tr><th>Product</th><th>SKU</th><th>UPC on label</th><th>Shelf life days</th><th class="num">Full speed / min</th><th class="num">Target %</th><th class="num">Lowest speed</th><th class="num">Highest speed</th><th class="num">Target / hour</th><th class="num" id="shift-head">Target / shift</th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { watchProduction, fmt } from './js/production.js';
+    import { savedText } from './js/autosave.js';
+
+    // Line Targets (Joe 10/11, mock-up B): pick a line, see its products, and set each one's UPC, shelf life, full speed, Target %
+    // and allowed speed range (Joe: a product run too fast or too slow flashes on the line tablet). Joe 10/11: everything about a
+    // product is on the plant's one Products list, so these boxes change that list (the same rows Administration > Products shows).
+    // Each box saves as it is left; a manager or administrator changes them.
+    const L = window.UDLogic, R = window.UDProduction;
+    const params = new URLSearchParams(location.search);
+    const ALL_PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
+    let plant = params.get('plant') || '', chosen = params.get('line') || '', person = null, app = {}, data = null, note = '', busy = Promise.resolve(), stop = null, db = null;
+    const mine = {};
+    const NUM = { shelfLifeDays: 'Shelf life days', ratePerMin: 'Full speed per minute', targetPct: 'Target %', minSpeed: 'Lowest speed', maxSpeed: 'Highest speed' };
+    const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+    const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
+    const lines = () => (data ? data.lines : []);
+    const current = () => lines().find(l => l.operationId === chosen) || lines()[0] || null;
+    const listOf = (id) => mine[id] || (data && data.products[id]) || [];
+    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const setUrl = () => history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (chosen ? '&line=' + encodeURIComponent(chosen) : ''));
+
+    function drawTop() {
+      const ps = plants();
+      if (!ps.some(p => p.id === plant)) plant = ps[0].id;
+      document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+    }
+    function render(force) {
+      drawTop();
+      const line = current(), ck = canSave(), dis = ck ? '' : ' disabled';
+      if (line) chosen = line.operationId;
+      document.getElementById('products-link').href = 'products.html?plant=' + encodeURIComponent(plant) + (line ? '&line=' + encodeURIComponent(line.operationId) : '');
+      document.getElementById('lines').innerHTML = lines().map(l => { const n = listOf(l.operationId).length, c = (data.counters[l.operationId] || 'TABLET');
+        return '<button type="button" data-line="' + escapeHtml(l.operationId) + '"' + (line && l.operationId === line.operationId ? ' class="active"' : '') + '><span>' + escapeHtml(l.name) + '<small>' + n + ' product' + (n === 1 ? '' : 's') + ' · ' + (c === 'READER' ? 'Label reader' : c === 'SENSOR' ? 'Sensor' : 'Typed') + '</small></span></button>'; }).join('') ||
+        '<p class="lt-note">' + (data && data.read.setup ? 'No production lines are set up for this plant in Plant Operations.' : 'Reading the lines…') + '</p>';
+      const hours = R.shiftHours(data ? data.shifts : []);
+      document.getElementById('shift-head').textContent = 'Target / shift';
+      document.getElementById('shift-head').title = 'For a ' + hours + '-hour shift (Plant Shifts)';
+      document.getElementById('foot').textContent = (ck ? 'Each box saves as you leave it, on the plant\'s Products list (Products List shows the same products). Target / hour = full speed × 60 × Target %. Target / shift is for a ' + hours + '-hour shift. The line tablet flashes the speed when it is under the lowest or over the highest speed. Shelf life sets the code date the label reader checks.' : 'View only. A manager or administrator changes the targets.') + (note ? ' ' + note : '');
+      if (!line) { document.getElementById('form-title').textContent = 'Line Targets'; document.getElementById('rows').innerHTML = ''; return; }
+      const counter = data.counters[line.operationId] || 'TABLET';
+      document.getElementById('form-title').textContent = line.name;
+      const pill = document.getElementById('counter-pill');
+      pill.textContent = counter === 'READER' ? 'Counts from label reader' : counter === 'SENSOR' ? 'Counts from sensor' : 'Counts typed on the tablet';
+      pill.className = 'lt-pill ' + (counter === 'TABLET' ? 'typed' : 'auto');
+      const sel = document.getElementById('counter');
+      sel.innerHTML = R.COUNTERS.map(c => opt(c, counter, R.COUNTER_LABEL[c])).join('');
+      sel.disabled = !ck;
+      // Not drawn again while someone types in the list.
+      if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
+      const cell = (i, k, v, label, cls, ph) => '<td' + (cls ? ' class="' + cls + '"' : '') + '><input data-i="' + i + '" data-k="' + k + '" value="' + escapeHtml(v === null || v === undefined ? '' : v) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' aria-label="' + escapeHtml(label) + '"' + (k === 'upc' ? ' maxlength="20" inputmode="numeric"' : ' inputmode="decimal" maxlength="8"') + dis + '></td>';
+      const ts = R.targetsFor(listOf(line.operationId));
+      document.getElementById('rows').innerHTML = listOf(line.operationId).map((p, i) => [p, i]).filter(([p]) => String(p.name || '').trim()).map(([p, i]) => {
+        const t = ts.find(x => x.name === String(p.name).trim()) || {}, nm = String(p.name);
+        return '<tr><td class="lt-name">' + escapeHtml(nm) + '</td><td>' + escapeHtml(p.sku || '') + '</td>' + cell(i, 'upc', p.upc, 'UPC for ' + nm, '', 'first scan') + cell(i, 'shelfLifeDays', p.shelfLifeDays, 'Shelf life days for ' + nm) +
+          cell(i, 'ratePerMin', p.ratePerMin, 'Full speed per minute for ' + nm, 'num') + cell(i, 'targetPct', p.targetPct, 'Target % for ' + nm, 'num') + cell(i, 'minSpeed', p.minSpeed, 'Lowest speed for ' + nm, 'num') + cell(i, 'maxSpeed', p.maxSpeed, 'Highest speed for ' + nm, 'num') +
+          '<td class="num lt-calc">' + (t.perHour ? fmt(t.perHour) : '') + '</td><td class="num lt-calc">' + (t.perHour ? fmt(Math.round(t.perHour * hours)) : '') + '</td></tr>';
+      }).join('') || '<tr><td colspan="10" class="empty">' + escapeHtml(line.name) + ' has no products yet. Products List adds them.</td></tr>';
+    }
+
+    // The line's whole Products list is saved each time (as on Products); saves go one at a time.
+    function send(line, list) {
+      mine[line.operationId] = list;
+      note = 'Saving…';
+      render('keep');
+      const run = busy.then(() => save('saveMachineProducts', { operationId: line.operationId, products: list.filter(p => String(p.name || '').trim()) }));
+      busy = run.catch(() => {});
+      return run.then(() => { note = savedText(); showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.operationId]; }).then(() => render());
+    }
+    document.getElementById('rows').addEventListener('change', e => {
+      const box = e.target.closest('[data-k]'), line = current();
+      if (!box || !line || !canSave()) return;
+      const list = listOf(line.operationId).map(p => Object.assign({}, p)), row = list[box.dataset.i], k = box.dataset.k, v = box.value.trim();
+      if (!row) return;
+      if (k === 'upc') {
+        if (v && !/^\d{6,14}$/.test(v)) { showError('A UPC is the 6 to 14 digits under the barcode. ' + row.name + ' was not changed.'); box.value = row.upc || ''; return; }
+        row.upc = v;
+      } else {
+        const n = v === '' ? '' : Number(v.replace(/[%,]/g, ''));
+        if (n !== '' && (!isFinite(n) || n < 0 || (k === 'targetPct' && n > 100))) { showError(NUM[k] + ' for ' + row.name + ' must be a number' + (k === 'targetPct' ? ' from 0 to 100' : '') + '. It was not changed.'); box.value = row[k] === undefined || row[k] === null ? '' : row[k]; return; }
+        row[k] = n;
+      }
+      const lo = Number(row.minSpeed), hi = Number(row.maxSpeed);
+      if (row.minSpeed !== '' && row.maxSpeed !== '' && row.minSpeed !== undefined && row.maxSpeed !== undefined && row.minSpeed !== null && row.maxSpeed !== null && lo > hi) { showError(row.name + ': the lowest speed is higher than the highest speed. It was not changed.'); render(true); return; }
+      send(line, list);
+    });
+    document.getElementById('counter').addEventListener('change', async e => {
+      const line = current();
+      if (!line || !canSave()) return;
+      note = 'Saving…'; render('keep');
+      try { await save('saveLineCounter', { operationId: line.operationId, counter: e.target.value }); note = savedText(); showError(''); }
+      catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
+      render(true);
+    });
+    document.getElementById('lines').addEventListener('click', e => { const b = e.target.closest('[data-line]'); if (!b) return; chosen = b.dataset.line; note = ''; setUrl(); render(true); });
+    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; chosen = ''; note = ''; setUrl(); follow(); });
+
+    function follow() {
+      if (stop) stop();
+      data = null;
+      stop = watchProduction(db, plant, d => {
+        data = d;
+        // A saved list has caught up with what was typed here.
+        Object.keys(mine).forEach(id => { if (JSON.stringify(d.products[id] || []) === JSON.stringify(mine[id].filter(x => String(x.name || '').trim()))) delete mine[id]; });
+        render();
+      }, e => showError('Could not read the lines (' + e.message + '). Check the network and reload the page.'));
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        drawTop();
+        if (!stop) follow(); else if (data) render(true);
+      });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (data) render(true); });
+    });
+  </script>
+</body>
+</html>

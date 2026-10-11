@@ -57,6 +57,8 @@
 /* Loadout loading order: the up / down arrows stacked beside the route, and the route number itself is the drag handle (today's
    loads only). The arrows are drawn by CSS so the cell's text stays the route. */
 .plant-page.loadout-page table.loadout td.lo-route { white-space: nowrap; padding-left: 4px; padding-right: 4px; }
+/* Joe 10/11: the driver stays on one line; a long name shrinks to fit (fitDrivers in loadout.html). */
+.plant-page.loadout-page table.loadout td.lo-driver { white-space: nowrap; overflow: hidden; padding-left: 4px; padding-right: 4px; }
 /* Joe 10/11: a handle to grab and move the route up or down (no arrows); the dots are drawn here so the cell reads as the route. */
 .plant-page .lo-grip { display: inline-flex; align-items: center; height: 38px; padding: 0 6px 0 4px; border-radius: 7px; border: 1px dashed #9fb3c8; background: #f5f8fb; color: var(--ink); font: inherit; font-size: 16px; font-weight: 800; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; white-space: nowrap; }
 .plant-page .lo-grip::before { content: "\283F"; margin-right: 4px; color: #7a8ca0; font-weight: 400; }
