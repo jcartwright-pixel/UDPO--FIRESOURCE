@@ -266,15 +266,12 @@
     return out;
   }
   // The trailer left at its dispatch time (trailerHasDeparted, 7.0.276).
-  // When a load leaves, on the plant's wall clock (the current app's trailerHasDeparted, 7.0.276). The Live sheet's departure date
-  // (blank = the delivery date) is the day the route goes out; a load made on an earlier day leaves at its dispatch time on the
-  // operating day before it (an early-morning time, before 6 AM, is the next calendar morning). A Saturday loadout for Monday
-  // deliveries therefore leaves Sunday evening or early Monday, never Saturday.
+  // When a route leaves, on the plant's wall clock (the current app's Send Current Report, 217_V7271): its departure date on the
+  // Live sheet (blank = the delivery date) at its dispatch time, never the load day. Saturday's loadout for Monday leaves Monday.
   function departWall(x) {
-    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime, load = dayNum(x.loadDate);
+    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime;
     if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
-    t = Number(t);
-    return load !== null && load < departDay ? (departDay - 1) * 1440 + t + (t < 360 ? 1440 : 0) : departDay * 1440 + t;
+    return departDay * 1440 + Number(t);
   }
   function yardDeparted(x, date, nowMs) {
     var departDay = dayNum(x.departureDate), opDay = dayNum(date);
@@ -285,7 +282,7 @@
     var load = dayNum(x.loadDate), done = wallMinutes(x.completedAt), departAt;
     if (done !== null) departAt = Math.ceil((done - 360 - t) / 1440) * 1440 + t;
     // An early load (made days ahead) waits on the yard until the operating day before its departure date.
-    if (done === null || departAt < (departDay - 1) * 1440 + 360) departAt = departWall(x);
+    if (done === null || departAt < (departDay - 1) * 1440 + 360) departAt = load !== null && load < departDay ? (departDay - 1) * 1440 + t + (t < 360 ? 1440 : 0) : departDay * 1440 + t;
     return wallClock(nowMs) >= departAt;
   }
   function yardChecks(journal, date) {

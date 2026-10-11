@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Behind is measured from when a route leaves, not from the loadout day (Joe 10/11). Saturday 10/10's loadout carries Monday
- * 10/12's routes; at 12:27 AM Sunday none of them is behind (they leave Sunday evening and early Monday). Manager Center's report
+ * 10/12's routes; at 12:27 AM Sunday none of them is behind (they leave Monday). Manager Center's report
  * preview and the Loadout Center's Behind count agree. Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -63,11 +63,16 @@ async function openPage(browser, url, when) {
       if (SHOTS) await lo.screenshot({ path: path.join(SHOTS, SHOT_NAME + '-loadout-1920.png'), scale: 'css' });
       assert.match(await lo.textContent('#strip'), /Behind 0/);
       results.push('12:27 AM Sunday: the Saturday loadout for Monday is on time on Manager Center and the Loadout Center');
-      // 6:40 PM Sunday: 844 (6:00 PM) is behind; the midnight and 2 AM routes are not yet.
-      const later = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-11T22:40:00Z');
+      // 7:00 PM Sunday: still none (they leave Monday). 12:40 AM Monday: 971 (12:00 AM Monday) is behind; 880 (2:00 AM) is not yet.
+      const sunday = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-11T23:00:00Z');
+      await sunday.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent));
+      await sunday.waitForTimeout(1500);
+      assert.match(await sunday.textContent('#pv-subject'), /All routes on time/);
+      await sunday.close();
+      const later = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-12T04:40:00Z');
       await later.waitForFunction(() => /1 route behind/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
-      assert.match(await later.textContent('body'), /844[\s\S]*BEHIND/);
-      results.push('6:40 PM Sunday: only 844 (departs 6:00 PM) is behind');
+      assert.match(await later.textContent('body'), /971[\s\S]*BEHIND/);
+      results.push('Sunday 7:00 PM none is behind; Monday 12:40 AM only 971 (departs 12:00 AM Monday) is');
       for (const p of [early, lo, later]) assert.deepEqual(p.errors, []);
     }
   } finally {
