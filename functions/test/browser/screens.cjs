@@ -732,10 +732,13 @@ async function noScroll(page) {
     assert.deepEqual(fsB.errors, []);
     await fsB.close();
     results.push('Fleet Service (mock-up A): one row per unit, PM / Reefer, DOT, Plates, Miles / hours now and Status, units that need something first');
-    // Over the Road: a manager marks route 801 Carrier Pickup and ticks it in OTR Routes Setup and types a month's figures; Tuesday 10/6 counts it.
+    // Over the Road: a manager marks route 801 Carrier Pickup, picks its By Date column (SAL), ticks it in OTR Routes Setup and types a
+    // month's figures on Recap; Tuesday 10/6 counts it. Then Joe's workbook tabs: By Date, Month Recap and Cost Per Gallon.
     const otr = await openPage(browser, 1920, 950, '/otr.html?view=routes&testEmail=manager.test@uniteddairy.com');
     await otr.waitForSelector('[data-by="run_t801"]');
     await otr.selectOption('[data-by="run_t801"]', 'Carrier Pickup');
+    await otr.waitForFunction(() => !document.querySelector('[data-col="run_t801"]').disabled);
+    await otr.selectOption('[data-col="run_t801"]', 'SAL');
     await otr.waitForFunction(() => !document.querySelector('[data-inc="run_t801"]').disabled);
     await otr.check('[data-inc="run_t801"]');
     await otr.waitForSelector('tr.otr-on [data-inc="run_t801"]');
@@ -754,11 +757,18 @@ async function noScroll(page) {
     });
     assert.ok(otrSaved, 'the tick and both figures saved');
     assert.equal(otrSaved[0].deliveredBy, 'Carrier Pickup');
-    assert.ok(otrSaved[0].destination, 'the run is the destination');
+    assert.equal(otrSaved[0].destination, 'SAL', 'the run counts in the By Date column picked for it');
     await otr.click('.tabs [data-view="dash"]');
     await otr.waitForSelector('.otr-week');
     await otr.click('.tabs [data-view="report"]');
     await otr.waitForSelector('#otr-report table');
+    assert.equal(await otr.$$eval('#otr-report thead tr:first-child th:not(.gap)', ths => ths.map(t => t.textContent).join(' ')), 'Trip Dec Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec', 'Month Recap: last December, then January to December');
+    await otr.click('.tabs [data-view="bydate"]');
+    await otr.waitForSelector('table.otr-bydate');
+    assert.equal(await otr.$$eval('table.otr-bydate thead th', ths => ths.length), 24, 'By Date: Date, the 21 workbook columns, Total and Comment');
+    await otr.click('.tabs [data-view="cpg"]');
+    await otr.waitForSelector('table.otr-cpg');
+    assert.match(await otr.textContent('table.otr-cpg'), /\$0\.40000/, 'Cost Per Gallon shows the month typed on Recap');
     assert.deepEqual(otr.errors, []);
     await otr.close();
     results.push('Over the Road: a manager ticked 801 (Carrier Pickup) and typed September figures (cost per gallon $0.400); Dashboard and Report open');

@@ -28,9 +28,11 @@
     <div class="head">
       <div class="title"><h1>Over the Road Runs</h1><small id="sub">OTR report and cost per gallon</small></div>
       <div class="tabs" role="tablist">
-        <button type="button" role="tab" data-view="dash" aria-selected="true">Dashboard</button>
-        <button type="button" role="tab" data-view="report" aria-selected="false">Print Report</button>
-        <button type="button" role="tab" data-view="figures" aria-selected="false">Monthly Figures</button>
+        <button type="button" role="tab" data-view="dash" aria-selected="true">Today</button>
+        <button type="button" role="tab" data-view="bydate" aria-selected="false">By Date</button>
+        <button type="button" role="tab" data-view="figures" aria-selected="false">Recap</button>
+        <button type="button" role="tab" data-view="report" aria-selected="false">Month Recap</button>
+        <button type="button" role="tab" data-view="cpg" aria-selected="false">Cost Per Gallon</button>
         <button type="button" role="tab" data-view="routes" aria-selected="false">OTR Routes Setup</button>
       </div>
     </div>
@@ -45,15 +47,18 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, save } from './js/app.js';
     import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Over the Road module (OverTheRoad.html, 221/222_V7276): every run of a route ticked for the report is one
     // mark for its destination on its delivery day. Counts come from the copied Live weeks; a count typed by hand wins.
     forScreen('otr');
     const L = window.UDLogic, O = window.UDOtr, CORE = O.OTR_CORE;
     const q = new URLSearchParams(location.search);
-    let view = ['dash', 'report', 'figures', 'routes'].indexOf(q.get('view')) >= 0 ? q.get('view') : 'dash';
-    let routes = [], picks = {}, runs = [], daily = [], monthly = [], monthRuns = [], year = Number(L.operatingDay(new Date()).slice(0, 4)), copied = '';
+    // Joe 10/11: the tabs are his OTR Trips workbook's four sheets (By Date, Recap, Month Recap, Cost Per Gallon), each laid out
+    // like the sheet, with the year-to-date answers and a trend picture on top (his pick B).
+    let view = ['dash', 'bydate', 'figures', 'report', 'cpg', 'routes'].indexOf(q.get('view')) >= 0 ? q.get('view') : 'dash';
+    let routes = [], picks = {}, runs = [], daily = [], monthly = [], monthRuns = [], comments = [], year = Number(L.operatingDay(new Date()).slice(0, 4)), copied = '';
+    let ym = L.operatingDay(new Date()).slice(0, 7);
     const money = (v) => v == null ? '' : '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
     const cents = (v) => v == null ? '–' : '$' + Number(v).toFixed(3);
     const n0 = (v) => v == null ? '' : Number(v).toLocaleString();
@@ -64,7 +69,9 @@
       return O.otrRouteList_(routes.filter(r => L.masterActive(r)).map(r => {
         const p = picks[r.id] || {}, miles = {};
         L.DAYS.forEach(d => { miles[d] = r.days && r.days[d] ? r.days[d].miles : ''; });
-        return { runId: r.id, route: r.route, run: r.run, include: p.include ? 'TRUE' : '', destination: O.otrNormDest_(r.run), miles };
+        // The By Date column the run counts in: picked in OTR Routes Setup, else the column named like the run ("PECK" counts as Peck).
+        const named = O.otrNormDest_(r.run);
+        return { runId: r.id, route: r.route, run: r.run, include: p.include ? 'TRUE' : '', destination: p.destination || (CORE.DESTINATIONS.indexOf(named) >= 0 ? named : ''), miles };
       })).map(x => Object.assign(x, { deliveredBy: (picks[x.runId] || {}).deliveredBy || '' }));
     }
     // Each date in the copied Live weeks, counted the current app's way (otrCountDay_).
@@ -82,10 +89,14 @@
 
     // Replacing the page can blur a typed box, whose save asks for a redraw while this one is still running: that one waits its turn.
     let painting = false, again = false;
+    // A box being typed in keeps its place, and its typing, when the page redraws (data-fk names it).
     function render() {
+      needDays();
       if (painting) { again = true; return; }
       painting = true;
+      const a = document.activeElement, fk = a && a.dataset && a.dataset.fk, typed = fk ? a.value : null;
       try { paint(); } finally { painting = false; }
+      if (fk) { const b = document.querySelector('[data-fk="' + CSS.escape(fk) + '"]'); if (b) { if (b.value !== typed) b.value = typed; b.focus(); } }
       if (again) { again = false; render(); }
     }
     function paint() {
@@ -100,58 +111,125 @@
       if (view === 'dash') {
         const dash = O.otrDashboard_(today, merged, todayCount, monthly), c = dash.costPerGallon;
         bar.innerHTML = '<span class="hint">' + escapeHtml(dash.todayLabel) + ' · ' + dash.monthToDate + ' OTR runs in ' + escapeHtml(dash.monthLabel) + '</span><span class="spacer"></span>' + (copied ? '<span class="hint">' + escapeHtml(copied) + '</span>' : '') +
-          '<button type="button" id="copy">Copy Daily Count</button><button type="button" class="primary" data-go="report">Print OTR Report</button><button type="button" data-go="routes">OTR Routes Setup</button>';
+          '<button type="button" id="copy">Copy Daily Count</button><button type="button" class="primary" data-go="report">Month Recap</button><button type="button" data-go="routes">OTR Routes Setup</button>';
         sheet.innerHTML = '<div class="otr-dash"><section class="otr-card"><h2>Today</h2><div class="otr-big">' + todayCount.total + '</div><p>OTR runs today</p>' +
           '<table class="issues"><thead><tr><th>Route</th><th>Run</th><th>Delivered By</th><th>Driver</th></tr></thead><tbody>' + (todayCount.runs.map(r => '<tr><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(byRun[r.route + '|' + r.run] || '') + '</td><td>' + escapeHtml(r.driver) + '</td></tr>').join('') || '<tr><td colspan="4" class="empty">No OTR runs today' + (list.some(r => r.include) ? '' : ': tick routes in OTR Routes Setup') + '.</td></tr>') + '</tbody></table></section>' +
-          '<section class="otr-card"><h2>Cost Per Gallon' + (c ? ' · ' + escapeHtml(c.label) : '') + '</h2><div class="otr-big">' + (c ? cents(c.cpg) : '–') + '</div><p>' + (c ? (c.lastYearCpg != null ? 'Last year ' + cents(c.lastYearCpg) : 'No figures for last year') + (c.employeeCpg != null ? ' · Employee ' + cents(c.employeeCpg) : '') + (c.fuelCpg != null ? ' · Fuel ' + cents(c.fuelCpg) : '') : 'Type a month\'s delivery cost and gallons in Monthly Figures') + '</p>' +
+          '<section class="otr-card"><h2>Cost Per Gallon' + (c ? ' · ' + escapeHtml(c.label) : '') + '</h2><div class="otr-big">' + (c ? cents(c.cpg) : '–') + '</div><p>' + (c ? (c.lastYearCpg != null ? 'Last year ' + cents(c.lastYearCpg) : 'No figures for last year') + (c.employeeCpg != null ? ' · Employee ' + cents(c.employeeCpg) : '') + (c.fuelCpg != null ? ' · Fuel ' + cents(c.fuelCpg) : '') : 'Type a month\'s delivery cost and gallons in Recap') + '</p>' +
           '<button type="button" data-go="figures">Enter Month Figures</button></section>' +
           '<section class="otr-card wide"><h2>This Week</h2><div class="otr-week">' + dash.week.map(d => '<div class="' + (d.today ? 'today' : '') + '"><b>' + d.day + '</b><small>' + d.label + '</small><span>' + (d.total == null ? '–' : d.total) + '</span></div>').join('') + '</div></section></div>';
         foot.textContent = list.filter(r => r.include).length + ' runs ticked for the report · counts for days outside the copied Live weeks come from typed fixes or imports.';
         document.getElementById('copy').onclick = async () => { const t = O.otrDailyCountText_(todayCount); try { await navigator.clipboard.writeText(t); copied = 'Copied: ' + t; } catch (e) { copied = t; } render(); };
+      } else if (view === 'bydate') {
+        // The By Date tab: a row a day, a column for each of the workbook's destinations, a Total and the Comment.
+        const [yy, mm] = ym.split('-').map(Number), last = new Date(yy, mm, 0).getDate(), first = firstMonth(), dis = edit ? '' : ' disabled';
+        const months = []; for (let k = today.slice(0, 7); k >= first; k = prevMonth(k)) months.push(k);
+        if (months.indexOf(ym) < 0) months.push(ym);
+        const keys = []; for (let d = 1; d <= last; d++) keys.push(O.otrDateKey_(yy, mm, d));
+        const extra = []; keys.forEach(k => Object.keys(merged[k] || {}).forEach(n => { if (CORE.DESTINATIONS.indexOf(n) < 0 && extra.indexOf(n) < 0 && merged[k][n]) extra.push(n); }));
+        const cols = CORE.DESTINATIONS.concat(extra), note = {}, tot = cols.map(() => 0);
+        comments.forEach(c => { if (c.date && c.date.slice(0, 7) === ym) note[c.date] = c.text || ''; });
+        const monthTotal = (k) => Object.keys(merged).reduce((s, d) => d.slice(0, 7) === k && d <= today ? s + O.otrSum_(Object.values(merged[d])) : s, 0);
+        const lastYear = (yy - 1) + '-' + String(mm).padStart(2, '0'), shownTotal = monthTotal(ym), lyTotal = monthTotal(lastYear);
+        bar.innerHTML = '<select id="ym" aria-label="Month">' + months.map(k => '<option value="' + k + '"' + (k === ym ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
+          '<span class="hint">Today\'s row fills from the dispatch board. Type a number to fix a day; it saves by itself.</span><span class="spacer"></span>' + importBar('Import Workbook') + '<button type="button" id="print-sheet-otr">Print</button>';
+        const rows = keys.map(k => {
+          const v = merged[k] || {}, future = k > today, sum = O.otrSum_(cols.map(n => v[n] || 0));
+          cols.forEach((n, i) => { tot[i] += v[n] || 0; });
+          const cells = cols.map(n => {
+            const x = v[n] || 0;
+            if (!edit || future || CORE.DESTINATIONS.indexOf(n) < 0) return '<td class="' + (x ? '' : 'z') + '">' + (x || '') + '</td>';
+            return '<td><input class="otr-day" inputmode="numeric" data-fk="d|' + k + '|' + escapeHtml(n) + '" data-date="' + k + '" data-dest="' + escapeHtml(n) + '" value="' + (x || '') + '" aria-label="' + escapeHtml(n + ' ' + O.otrShortDate_(k)) + '"></td>';
+          }).join('');
+          return '<tr class="' + (O.otrWeekday_(k) === 0 && k.slice(8) !== '01' ? 'wk ' : '') + (k === today ? 'today' : '') + '"><td class="l"><b>' + ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][O.otrWeekday_(k)] + '</b> ' + dash(k) + '</td>' + cells +
+            '<td class="strong">' + (future && !sum ? '' : sum) + '</td><td class="l note">' + (edit ? '<input class="otr-note" data-fk="n|' + k + '" data-date="' + k + '" value="' + escapeHtml(note[k] || '') + '" aria-label="Comment ' + O.otrShortDate_(k) + '"' + dis + '>' : escapeHtml(note[k] || '')) + '</td></tr>';
+        }).join('');
+        sheet.innerHTML = importPreview() + '<div id="otr-sheet-print">' + cardRow([
+          card(monthLabel(ym) + (ym === today.slice(0, 7) ? ' so far' : ''), n0(shownTotal), 'vs ' + n0(lyTotal) + ' in ' + monthLabel(lastYear), chg(shownTotal - lyTotal, n0, false)),
+          card('Busiest this month', (cols.map((n, i) => [n, tot[i]]).filter(x => x[1]).sort((a, b) => b[1] - a[1])[0] || ['–'])[0], '')]) +
+          '<h2 class="otr-print-title">By Date · ' + monthLabel(ym) + '</h2><table class="otr-sheet otr-bydate"><colgroup><col style="width:124px">' + cols.map(() => '<col>').join('') + '<col style="width:58px"><col style="width:190px"></colgroup><thead><tr><th class="l">Date</th>' +
+          cols.map(n => '<th class="vh-th"><span class="vh">' + escapeHtml(n) + '</span></th>').join('') + '<th>Total</th><th class="l">Comment</th></tr></thead><tbody>' + rows +
+          '<tr class="tot"><td class="l">' + escapeHtml(monthLabel(ym)) + '</td>' + tot.map(x => '<td>' + x + '</td>').join('') + '<td>' + O.otrSum_(tot) + '</td><td></td></tr></tbody></table></div>';
+        foot.textContent = 'Days in the copied Live weeks count from the dispatch board; older days come from your OTR Trips workbook. A typed number wins over both.';
+        document.getElementById('ym').onchange = (e) => { ym = e.target.value; render(); };
+        wireImport(); wirePrint();
+        sheet.querySelectorAll('.otr-day').forEach(inp => { inp.onchange = () => {
+          const date = inp.dataset.date, destination = inp.dataset.dest, raw = inp.value.trim(), n = raw === '' ? 0 : Number(raw);
+          if (!Number.isInteger(n) || n < 0 || n > 99) { showError('Type a whole number of runs for ' + destination + ' on ' + O.otrShortDate_(date) + '.'); render(); return; }
+          showError('');
+          let rec = daily.find(x => x.date === date && x.destination === destination); const before = rec ? Object.assign({}, rec) : null;
+          saveOptimistic('saveOtr', { op: 'day', date, destination, runs: n },
+            () => { if (!rec) { rec = { date, destination }; daily.push(rec); } rec.runs = n; rec.source = 'MANUAL'; },
+            () => { if (before) Object.assign(rec, before); else daily.splice(daily.indexOf(rec), 1); }, render);
+        }; });
+        sheet.querySelectorAll('.otr-note').forEach(inp => { inp.onchange = () => {
+          const date = inp.dataset.date, text = inp.value.trim().slice(0, 200);
+          let rec = comments.find(x => x.date === date); const before = rec ? Object.assign({}, rec) : null;
+          saveOptimistic('saveOtr', { op: 'comment', date, text },
+            () => { if (!rec) { rec = { date }; comments.push(rec); } rec.text = text; rec.source = 'MANUAL'; },
+            () => { if (before) Object.assign(rec, before); else comments.splice(comments.indexOf(rec), 1); }, render);
+        }; });
       } else if (view === 'report') {
-        const r = O.otrYearReport_(year, today, merged, monthRuns, monthly), M = CORE.MONTHS;
-        // The year list always runs from this year back (picking last year keeps this year on the list); buttons first, the year on the right.
-        const thisYear = Number(today.slice(0, 4)), years = [thisYear, thisYear - 1, thisYear - 2].concat([thisYear, thisYear - 1, thisYear - 2].indexOf(year) < 0 ? [year] : []);
-        bar.innerHTML = '<button type="button" class="primary" id="print-report">Print</button><span class="hint">One page, letter size, landscape.</span><span class="spacer"></span><select id="year" aria-label="Report year">' + years.map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
-        const rowsFor = (d) => '<tr><td class="strong" rowspan="2">' + escapeHtml(d.name) + (byDest[d.name] ? '<small class="otr-by">' + escapeHtml([...byDest[d.name]].join(' / ')) + '</small>' : '') + '</td><td>' + r.prior + '</td>' + d.prior.map(v => '<td>' + (v || '') + '</td>').join('') + '<td class="strong">' + (d.priorYear || '') + '</td><td rowspan="2" class="' + (d.change < 0 ? 'neg' : '') + '">' + (d.change ? (d.change > 0 ? '+' : '') + d.change : '') + '</td></tr>' +
-          '<tr><td>' + r.year + '</td>' + d.current.map(v => '<td>' + (v == null ? '' : v || '') + '</td>').join('') + '<td class="strong">' + (d.currentYear || '') + '</td></tr>';
-        const shown = r.destinations.filter(d => d.priorYear || d.currentYear);
-        const recap = (label, s, f) => '<tr><td class="strong" rowspan="2">' + label + '</td><td>' + r.prior + '</td>' + s.prior.map(v => '<td>' + f(v) + '</td>').join('') + '<td class="strong">' + f(s.ytdPrior) + '</td><td rowspan="2"></td></tr><tr><td>' + r.year + '</td>' + s.current.map(v => '<td>' + f(v) + '</td>').join('') + '<td class="strong">' + f(s.ytdCurrent) + '</td></tr>';
-        sheet.innerHTML = '<div id="otr-report"><h2>Over the Road Runs · ' + r.year + ' vs ' + r.prior + '</h2><table class="issues otr-rep"><thead><tr><th>Run</th><th>Year</th>' + M.map(m => '<th>' + m + '</th>').join('') + '<th>Total</th><th>Change</th></tr></thead><tbody>' +
-          (shown.map(rowsFor).join('') || '<tr><td colspan="16" class="empty">No OTR runs counted for ' + r.prior + ' or ' + r.year + ' yet.</td></tr>') +
-          rowsFor({ name: 'Total', prior: r.totals.prior, current: r.totals.current, priorYear: r.runsYear.prior, currentYear: r.runsYear.current, change: r.runsYear.current - r.runsYear.priorSame }) +
-          recap('Gallons sold', r.recap.gallons, n0) + recap('Delivery cost', r.recap.distribution, money) + recap('Cost per gallon', r.recap.cpg, v => v == null ? '' : '$' + v.toFixed(3)) + recap('Fuel per gallon', r.recap.fuelCpg, v => v == null ? '' : '$' + v.toFixed(3)) + '</tbody></table></div>';
-        foot.textContent = 'Through ' + (r.throughMonth ? M[r.throughMonth - 1] : 'no months') + ' ' + r.year + ' · year to date compares only months with figures in both years (' + r.figureMonths + ').';
-        document.getElementById('year').onchange = (e) => { year = Number(e.target.value); render(); };
-        document.getElementById('print-report').onclick = () => {
-          let box = document.getElementById('print'); if (!box) { box = document.createElement('div'); box.id = 'print'; document.body.appendChild(box); }
-          box.innerHTML = document.getElementById('otr-report').innerHTML; window.print();
-        };
+        // The Month Recap tab: trips per destination, last December then January to December, this year beside last year.
+        const r = O.otrMonthRecap_(year, today, merged, monthRuns, monthly), M = CORE.MONTHS;
+        bar.innerHTML = '<button type="button" class="primary" id="print-sheet-otr">Print</button><span class="hint">Counted from By Date, nothing to type. Prints on one landscape page.</span><span class="spacer"></span>' + yearPick([0, -1, -2]);
+        const pair = (p, i) => (i ? '<td class="gap"></td>' : '') + '<td class="' + (p[0] === 0 ? 'z' : '') + '">' + (p[0] == null ? '' : p[0]) + '</td><td class="ly">' + (p[1] == null ? '' : p[1]) + '</td>';
+        const head = '<tr><th class="l" rowspan="2">Trip</th>' + r.months.map((m, i) => (i ? '<th class="gap" rowspan="2"></th>' : '') + '<th colspan="2">' + m.label + '</th>').join('') + '</tr><tr class="sub">' + r.months.map(m => '<th>' + m.y + '</th><th>' + m.py + '</th>').join('') + '</tr>';
+        const body = r.rows.map(d => '<tr><td class="l">' + escapeHtml(d.name) + (byDest[d.name] ? '<small class="otr-by">' + escapeHtml([...byDest[d.name]].join(' / ')) + '</small>' : '') + '</td>' + d.cells.map(pair).join('') + '</tr>').join('') +
+          '<tr class="tot"><td class="l">Totals</td>' + r.totals.map(pair).join('') + '</tr>' +
+          '<tr class="tot"><td class="l">Difference</td>' + r.diff.map((v, i) => (i ? '<td class="gap"></td>' : '') + '<td colspan="2" class="' + (v < 0 ? 'neg' : v > 0 ? 'pos' : '') + '">' + (v == null ? '' : v) + '</td>').join('') + '</tr>' +
+          r.extra.map(x => '<tr><td class="l">' + x.name + '</td>' + x.cells.map((p, i) => (i ? '<td class="gap"></td>' : '') + '<td>' + n0(p[0]) + '</td><td class="ly">' + n0(p[1]) + '</td>').join('') + '</tr>').join('');
+        const thru = r.ytd.through ? 'Jan to ' + M[r.ytd.through - 1] + ' ' + year : 'No months yet in ' + year;
+        sheet.innerHTML = '<div id="otr-sheet-print">' + cardRow([
+          card('Trips ' + thru, n0(r.ytd.current), 'vs ' + n0(r.ytd.prior) + ' in ' + (year - 1), r.ytd.through ? chg(r.ytd.current - r.ytd.prior, n0, false) : null),
+          card(r.latest ? r.latest.label : 'Latest month', r.latest ? n0(r.latest.current) : '–', r.latest ? 'vs ' + n0(r.latest.prior) + ' in ' + (year - 1) : '', r.latest ? chg(r.latest.current - r.latest.prior, n0, false) : null),
+          card('Busiest destination ' + year, r.busiest[0] || '–', r.busiest.length > 1 ? 'then ' + r.busiest.slice(1).join(', ') : '')]) +
+          '<div id="otr-report"><h2 class="otr-print-title">Month Recap · ' + year + ' vs ' + (year - 1) + '</h2><table class="otr-sheet otr-mrecap"><colgroup><col style="width:150px">' + r.months.map((m, i) => (i ? '<col style="width:8px">' : '') + '<col><col>').join('') + '</colgroup><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></div>';
+        foot.textContent = 'Each month: ' + year + ' on the left, ' + (year - 1) + ' in gray on the right. Fuel Used, Miles Driven and Tank fills come from Recap.';
+        wireYear(); wirePrint();
+      } else if (view === 'cpg') {
+        // The Cost Per Gallon tab, from the Recap numbers, with the workbook's own signs (a saving shows positive).
+        const c = O.otrCostSheet_(year, monthly), Y = c.ytd, F = c.fuel;
+        bar.innerHTML = '<button type="button" class="primary" id="print-sheet-otr">Print</button><span class="hint">Built from Recap, nothing to type. Year to date counts the months with numbers in both years.</span><span class="spacer"></span>' + yearPick([0, -1, -2]);
+        const g = (v) => v == null ? '' : n0(Math.round(v)), pg = (v) => v == null ? '' : paren(v, x => n0(Math.round(x)));
+        const pm = (v) => v == null ? '' : paren(v, x => '$' + n0(Math.round(x))), c5 = (v) => v == null ? '' : '$' + v.toFixed(5);
+        const v5 = (v) => v == null ? '' : (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(5), f3 = (v) => v == null ? '' : v.toFixed(3), pf = (v) => v == null ? '' : paren(v, x => x.toFixed(3));
+        const neg = (v) => v != null && v < 0 ? ' class="neg"' : '';
+        const row = (label, m, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="l">' + label + '</td><td>' + g(m.gal[0]) + '</td><td>' + g(m.gal[1]) + '</td><td' + neg(m.galDiff) + '>' + pg(m.galDiff) + '</td><td class="gap"></td><td>' + g(m.cost[0]) + '</td><td>' + g(m.cost[1]) + '</td><td' + neg(m.costDiff) + '>' + pm(m.costDiff) + '</td><td class="gap"></td><td>' + c5(m.cpg[0]) + '</td><td>' + c5(m.cpg[1]) + '</td><td' + neg(m.vari) + '>' + v5(m.vari) + '</td><td' + neg(m.costDiffMoney) + '>' + pm(m.costDiffMoney) + '</td></tr>';
+        const gap = '<th class="gap" rowspan="2"></th>';
+        const main = '<table class="otr-sheet otr-cpg"><colgroup><col style="width:130px"><col><col><col><col style="width:10px"><col><col><col><col style="width:10px"><col><col><col><col></colgroup><thead><tr><th class="l" rowspan="2">Month</th><th colspan="2">Gallons Sold</th><th rowspan="2">Difference</th>' + gap + '<th colspan="2">Dist. Cost</th><th rowspan="2">Difference</th>' + gap + '<th colspan="2">Cost Per Gallon</th><th rowspan="2">Var</th><th rowspan="2">Cost Diff</th></tr><tr class="sub"><th>' + c.year + '</th><th>' + c.prior + '</th><th>' + c.year + '</th><th>' + c.prior + '</th><th>' + c.year + '</th><th>' + c.prior + '</th></tr></thead><tbody>' +
+          c.months.map(m => row(m.label, m)).join('') + (Y ? row('Year To Date', Object.assign({}, Y, { cpg: Y.cpg }), 'tot') : '<tr class="tot"><td class="l">Year To Date</td><td colspan="12"></td></tr>') + '</tbody></table>';
+        const fuel = '<table class="otr-sheet otr-fuel"><colgroup><col style="width:130px"><col><col><col></colgroup><thead><tr><th class="l" rowspan="2">Month</th><th colspan="2">Fuel Cost By Gallon</th><th rowspan="2">Difference</th></tr><tr class="sub"><th>' + c.year + '</th><th>' + c.prior + '</th></tr></thead><tbody>' +
+          c.months.map(m => '<tr><td class="l">' + m.label + '</td><td>' + f3(m.fuel[0]) + '</td><td>' + f3(m.fuel[1]) + '</td><td' + neg(m.fuelDiff) + '>' + pf(m.fuelDiff) + '</td></tr>').join('') +
+          '<tr class="tot"><td class="l">Avg</td><td>' + (F ? f3(F.avg[0]) : '') + '</td><td>' + (F ? f3(F.avg[1]) : '') + '</td><td' + (F ? neg(F.avgDiff) : '') + '>' + (F ? paren(F.avgDiff, x => x.toFixed(4)) : '') + '</td></tr>' +
+          '<tr class="tot"><td class="l">total</td><td>' + (F ? f3(F.total[0]) : '') + '</td><td>' + (F ? f3(F.total[1]) : '') + '</td><td' + (F ? neg(F.totalDiff) : '') + '>' + (F ? pf(F.totalDiff) : '') + '</td></tr></tbody></table>';
+        sheet.innerHTML = '<div id="otr-sheet-print"><div class="otr-top">' + cardRow([
+          card('Cost per gallon, year to date', Y ? c5(Y.cpg[0]) : '–', Y ? 'vs ' + c5(Y.cpg[1]) + ' in ' + c.prior : 'No months with figures in both years', Y ? chg(-Y.vari, v => '$' + v.toFixed(5), true) : null),
+          card('Cost Diff, year to date', Y ? pm(Y.costDiffMoney) : '–', Y ? (Y.costDiffMoney < 0 ? 'more' : 'less') + ' than at ' + c.prior + '\'s cost per gallon' : '', null, Y && Y.costDiffMoney < 0),
+          card('Gallons sold, year to date', Y ? g(Y.gal[0]) : '–', Y ? 'vs ' + g(Y.gal[1]) + ' in ' + c.prior : '', Y ? chg(Y.galDiff, n0, false) : null),
+          card('Fuel cost per gallon, average', F ? f3(F.avg[0]) : '–', F ? 'vs ' + f3(F.avg[1]) + ' in ' + c.prior : '', F ? chg(F.avgDiff, v => v.toFixed(3), true) : null)], 'grid') + trend(c) + '</div>' +
+          '<h2 class="otr-print-title">Cost Per Gallon Sold Comparison · ' + c.year + '</h2>' + main + fuel + '</div>';
+        foot.textContent = 'Cost per gallon = Dist. Cost ÷ Gallons Sold. Var and Cost Diff: last year minus this year, so a saving shows positive, as on your workbook.';
+        wireYear(); wirePrint();
       } else if (view === 'figures') {
+        // The Recap tab: the money sheet, a row a month. Type a number and it saves; Import From Accounting fills the month.
         const fm = O.otrFigureMap_(monthly), dis = edit ? '' : ' disabled';
-        const thisYear = Number(today.slice(0, 4)), years = [thisYear + 1, thisYear, thisYear - 1, thisYear - 2].concat([thisYear + 1, thisYear, thisYear - 1, thisYear - 2].indexOf(year) < 0 ? [year] : []);
-        bar.innerHTML = (imp && imp.merged ? '<button type="button" class="primary" id="imp-use"' + (imp.busy || !edit ? ' disabled' : '') + '>' + (imp.busy || 'Use These Numbers') + '</button><button type="button" id="imp-cancel"' + (imp.busy ? ' disabled' : '') + '>Cancel</button><span class="hint">Check the numbers found in ' + escapeHtml(imp.file) + ', then press Use These Numbers.</span>'
-          : '<button type="button" id="imp-pick"' + (edit && !(imp && imp.busy) ? '' : ' disabled') + '>' + (imp && imp.busy ? escapeHtml(imp.busy) : 'Import From Accounting') + '</button><input type="file" id="imp-file" accept=".zip,.xlsx,.xls" hidden><span class="hint">Type a month\'s total; it saves by itself. Gray = last year. Cost per gallon = delivery cost ÷ gallons sold.</span>') + '<span class="spacer"></span><select id="year" aria-label="Figures year">' + years.map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
-        const prev = imp && imp.merged ? '<div class="otr-import"><b>Found in ' + escapeHtml(imp.file) + '</b>' + (imp.merged.summary.length ? '<table><tbody>' + imp.merged.summary.map(l => '<tr><td class="strong">' + escapeHtml(l.what) + '</td><td>' + escapeHtml(l.count) + '</td><td>' + escapeHtml(l.from) + ' – ' + escapeHtml(l.to) + '</td><td>' + (l.changed ? l.changed + ' differ from what is saved' : l.total != null ? n0(l.total) + ' runs' : '') + '</td></tr>').join('') + '</tbody></table>' : '<p>No figures were found in this file. Use the accounting package zip (P&amp;L Expenses by Dept, Gallon Comparison) or the OTR Trips workbook (By Date, Recap).</p>') + '</div>' : '';
-        sheet.innerHTML = prev + '<table class="issues otr-fig"><thead><tr><th>Month</th>' + CORE.FIGURES.map(f => '<th>' + escapeHtml(f.label) + '</th>').join('') + '<th>Cost per gallon</th></tr></thead><tbody>' +
+        bar.innerHTML = importBar('Import From Accounting') + '<span class="hint">Type a month\'s number; it saves by itself. Gray = last year.</span><span class="spacer"></span>' + yearPick([1, 0, -1, -2]);
+        const COLS = [['miles', 'Miles'], ['fuel_fills', 'Fuel Fills'], ['fuel_used_gal', 'Fuel Used'], ['distribution_cost', 'Del Cost'], ['gallons_sold', 'Gallons Sold'], ['employee_cost', 'Employee Cost'], ['epg', 'Employee Cost Per Gal'], ['fuel_cost', 'FUEL COST'], ['cpg', 'Cost per gallon']];
+        const isMoney = (k) => (CORE.FIGURES.find(f => f.key === k) || {}).money;
+        sheet.innerHTML = importPreview() + '<table class="issues otr-fig"><thead><tr><th>Month</th>' + COLS.map(c => '<th>' + c[1] + '</th>').join('') + '</tr></thead><tbody>' +
           CORE.MONTHS.map((m, i) => {
             const cur = fm[year + '-' + (i + 1)] || {}, ly = fm[(year - 1) + '-' + (i + 1)] || {};
-            return '<tr><td class="strong">' + m + ' ' + year + '</td>' + CORE.FIGURES.map(f => '<td><input class="otr-in" inputmode="decimal" aria-label="' + escapeHtml(m + ' ' + year + ' ' + f.label) + '" data-m="' + (i + 1) + '" data-k="' + f.key + '" value="' + escapeHtml(cur[f.key] == null ? '' : cur[f.key]) + '"' + dis + '><small>' + (ly[f.key] == null ? '' : (f.money ? money(ly[f.key]) : n0(ly[f.key]))) + '</small></td>').join('') +
-              '<td class="strong">' + (O.otrCostPerGallon_(cur) == null ? '' : cents(O.otrCostPerGallon_(cur))) + '<small>' + (O.otrCostPerGallon_(ly) == null ? '' : cents(O.otrCostPerGallon_(ly))) + '</small></td></tr>';
+            const epg = (r) => r.employee_cost != null && r.gallons_sold ? '$' + (r.employee_cost / r.gallons_sold).toFixed(3) : '';
+            return '<tr><td class="strong">' + m + ' ' + year + '</td>' + COLS.map(([k, label]) => {
+              if (k === 'epg') return '<td class="strong">' + epg(cur) + '<small>' + epg(ly) + '</small></td>';
+              if (k === 'cpg') return '<td class="strong">' + (O.otrCostPerGallon_(cur) == null ? '' : cents(O.otrCostPerGallon_(cur))) + '<small>' + (O.otrCostPerGallon_(ly) == null ? '' : cents(O.otrCostPerGallon_(ly))) + '</small></td>';
+              return '<td><input class="otr-in" inputmode="decimal" data-fk="f|' + year + '|' + (i + 1) + '|' + k + '" aria-label="' + escapeHtml(m + ' ' + year + ' ' + label) + '" data-m="' + (i + 1) + '" data-k="' + k + '" value="' + escapeHtml(cur[k] == null ? '' : cur[k]) + '"' + dis + '><small>' + (ly[k] == null ? '' : (isMoney(k) ? money(ly[k]) : n0(ly[k]))) + '</small></td>';
+            }).join('') + '</tr>';
           }).join('') + '</tbody></table>';
-        foot.textContent = 'Gallons sold and delivery cost make the cost per gallon. Employee cost and fuel cost come from P&L Expenses by Dept.';
-        document.getElementById('year').onchange = (e) => { year = Number(e.target.value); render(); };
-        const pick = document.getElementById('imp-pick'), fileIn = document.getElementById('imp-file');
-        if (pick) pick.onclick = () => fileIn.click();
-        if (fileIn) fileIn.onchange = async () => {
-          const f = fileIn.files[0]; if (!f) return;
-          imp = { file: f.name, busy: 'Reading ' + f.name + '…' }; showError(''); render();
-          try { imp = { file: f.name, merged: await readImport(f), busy: '' }; } catch (e) { imp = null; showError('Could not read ' + f.name + ': ' + (e.message || e)); }
-          render();
-        };
-        if (document.getElementById('imp-use')) { document.getElementById('imp-use').onclick = applyImport; document.getElementById('imp-cancel').onclick = () => { imp = null; render(); }; if (imp.merged.summary.length === 0) document.getElementById('imp-use').disabled = true; }
+        foot.textContent = 'Del Cost, Employee Cost and FUEL COST come from P&L Expenses by Dept; Gallons Sold from Gallon Comparison. Cost per gallon = Del Cost ÷ Gallons Sold.';
+        wireYear(); wireImport();
         sheet.querySelectorAll('.otr-in').forEach(inp => { inp.onchange = () => {
-          const m = Number(inp.dataset.m), key = inp.dataset.k, value = inp.value.trim(), id = year + '-' + m;
+          const m = Number(inp.dataset.m), key = inp.dataset.k, value = inp.value.trim();
           let rec = monthly.find(x => Number(x.year) === year && Number(x.month) === m), made = false, before = rec ? rec[key] : undefined;
           // Kept on top of the figures until saved: a copy of an earlier figure's save can land first and must not wipe this one.
           const y = year, put = () => { let r = monthly.find(x => Number(x.year) === y && Number(x.month) === m); if (!r) { r = { year: y, month: m }; monthly.push(r); } r[key] = value === '' ? null : O.otrNum_(value); return r; };
@@ -163,22 +241,98 @@
         }; });
       } else {
         const dis = edit ? '' : ' disabled';
-        bar.innerHTML = '<span class="hint">Tick a route once and every run of it counts on the OTR report, every day. Miles come from Route Master; DRAFT miles are not confirmed and not saved.</span>';
-        sheet.innerHTML = '<table class="issues otr-setup"><colgroup><col style="width:8%"><col style="width:12%"><col style="width:28%"><col style="width:26%"><col style="width:26%"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Run</th><th>Delivered By</th><th>Round-trip miles</th></tr></thead><tbody>' +
+        bar.innerHTML = '<span class="hint">Tick a run and every day it runs counts in its By Date column. Miles come from Route Master; DRAFT miles are not confirmed and not saved.</span>';
+        sheet.innerHTML = '<table class="issues otr-setup"><colgroup><col style="width:7%"><col style="width:9%"><col style="width:24%"><col style="width:22%"><col style="width:22%"><col style="width:16%"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Run</th><th>Delivered By</th><th>By Date column</th><th>Round-trip miles</th></tr></thead><tbody>' +
           list.map(r => '<tr' + (r.include ? ' class="otr-on"' : '') + '><td><input type="checkbox" aria-label="' + escapeHtml('Include ' + r.route + ' ' + r.run) + '" data-inc="' + escapeHtml(r.runId) + '"' + (r.include ? ' checked' : '') + dis + '></td><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td><select aria-label="' + escapeHtml('Delivered by for ' + r.route + ' ' + r.run) + '" data-by="' + escapeHtml(r.runId) + '"' + dis + '><option value="">Choose who delivers</option>' +
-            DELIVERED_BY.map(d => '<option' + (d === r.deliveredBy ? ' selected' : '') + '>' + escapeHtml(d) + '</option>').join('') + '</select></td><td>' + (r.miles ? n0(r.miles) : r.draftMiles ? n0(r.draftMiles) + ' <span class="pill warn">DRAFT</span>' : '') + '</td></tr>').join('') + '</tbody></table>';
+            DELIVERED_BY.map(d => '<option' + (d === r.deliveredBy ? ' selected' : '') + '>' + escapeHtml(d) + '</option>').join('') + '</select></td><td><select aria-label="' + escapeHtml('By Date column for ' + r.route + ' ' + r.run) + '" data-col="' + escapeHtml(r.runId) + '"' + dis + '><option value="">Choose a column</option>' +
+            CORE.DESTINATIONS.concat(CORE.DESTINATIONS.indexOf(r.destination) < 0 && r.destination ? [r.destination] : []).map(d => '<option value="' + escapeHtml(d) + '"' + (d === r.destination ? ' selected' : '') + '>' + escapeHtml(d) + '</option>').join('') + '</select></td><td>' + (r.miles ? n0(r.miles) : r.draftMiles ? n0(r.draftMiles) + ' <span class="pill warn">DRAFT</span>' : '') + '</td></tr>').join('') + '</tbody></table>';
         foot.textContent = list.filter(r => r.include).length + ' of ' + list.length + ' active runs are on the OTR report.';
-        const saveRoute = (r, include, deliveredBy) => {
-          const runId = r.runId, destination = r.destination, before = picks[runId] ? Object.assign({}, picks[runId]) : null;
+        const saveRoute = (r, include, deliveredBy, column) => {
+          const runId = r.runId, destination = column || r.destination, before = picks[runId] ? Object.assign({}, picks[runId]) : null;
           saveOptimistic('saveOtr', { op: 'route', runId, include, destination, deliveredBy }, () => { picks[runId] = { include, destination, deliveredBy }; }, () => { if (before) picks[runId] = before; else delete picks[runId]; }, render);
         };
-        sheet.querySelectorAll('[data-inc]').forEach(c => { c.onchange = () => { const r = list.find(x => x.runId === c.dataset.inc); if (c.checked && !r.deliveredBy) { c.checked = false; showError('Choose who delivers ' + r.route + ' ' + r.run + ' before including it.'); return; } showError(''); saveRoute(r, c.checked, r.deliveredBy); }; });
+        sheet.querySelectorAll('[data-inc]').forEach(c => { c.onchange = () => { const r = list.find(x => x.runId === c.dataset.inc); if (c.checked && !r.deliveredBy) { c.checked = false; showError('Choose who delivers ' + r.route + ' ' + r.run + ' before including it.'); return; }
+          if (c.checked && !r.destination) { c.checked = false; showError('Choose the By Date column for ' + r.route + ' ' + r.run + ' before including it.'); return; } showError(''); saveRoute(r, c.checked, r.deliveredBy); }; });
+        // Joe 10/11: each run counts in one of the By Date columns of his workbook; the run's name picks it when it matches.
+        sheet.querySelectorAll('[data-col]').forEach(s => { s.onchange = () => { const r = list.find(x => x.runId === s.dataset.col); if (!s.value && r.include) { showError('Untick ' + r.route + ' before clearing its By Date column.'); render(); return; } showError(''); saveRoute(r, r.include, r.deliveredBy, s.value); }; });
         sheet.querySelectorAll('[data-by]').forEach(s => { s.onchange = () => { const r = list.find(x => x.runId === s.dataset.by); if (!s.value && r.include) { showError('Untick ' + r.route + ' before clearing who delivers it.'); render(); return; } saveRoute(r, r.include, s.value); }; });
       }
       bar.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { view = b.dataset.go; render(); }; });
       sheet.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { view = b.dataset.go; render(); }; });
     }
 
+    // Shared pieces of the workbook tabs.
+    const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthLabel = (k) => MONTH_NAMES[Number(k.slice(5, 7)) - 1] + ' ' + k.slice(0, 4);
+    const prevMonth = (k) => { const y = Number(k.slice(0, 4)), m = Number(k.slice(5, 7)); return m === 1 ? (y - 1) + '-12' : y + '-' + String(m - 1).padStart(2, '0'); };
+    const dash = (k) => Number(k.slice(5, 7)) + '-' + Number(k.slice(8, 10)) + '-' + k.slice(2, 4);
+    const paren = (v, f) => v < 0 ? '(' + f(-v) + ')' : f(v);
+    // The By Date month list goes back ten years (Joe's workbook starts 9/30/2016).
+    function firstMonth() { return (Number(L.operatingDay(new Date()).slice(0, 4)) - 10) + '-01'; }
+    // A change under a big number: green when it is good news, red when it is not.
+    const chg = (n, f, upIsBad) => n == null || n === 0 ? null : { text: (n > 0 ? '+' : n < 0 ? '-' : '') + f(Math.abs(n)), bad: n === 0 ? null : (n > 0) === upIsBad };
+    const card = (title, big, vs, change, bigBad) => '<div class="otr-kd"><b>' + escapeHtml(title) + '</b><span class="big' + (bigBad ? ' bad' : '') + '">' + escapeHtml(big) + '</span> <span class="vs">' + escapeHtml(vs) +
+      (change ? ' <span class="' + (change.bad == null ? '' : change.bad ? 'bad' : 'good') + '">' + escapeHtml(change.text) + '</span>' : '') + '</span></div>';
+    const cardRow = (cards, mode) => '<div class="otr-kc' + (mode ? ' ' + mode : '') + '">' + cards.join('') + '</div>';
+    function yearPick(offsets) {
+      const thisYear = Number(L.operatingDay(new Date()).slice(0, 4)), years = offsets.map(o => thisYear + o);
+      if (years.indexOf(year) < 0) years.push(year);
+      return '<select id="year" aria-label="Year">' + years.map(y => '<option' + (y === year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
+    }
+    function wireYear() { const s = document.getElementById('year'); if (s) s.onchange = (e) => { year = Number(e.target.value); render(); }; }
+    // Print: the tab as on the workbook (the big numbers and the trend picture stay on the screen), one landscape page.
+    function wirePrint() {
+      const b = document.getElementById('print-sheet-otr'); if (!b) return;
+      b.onclick = () => {
+        let box = document.getElementById('print'); if (!box) { box = document.createElement('div'); box.id = 'print'; document.body.appendChild(box); }
+        box.innerHTML = document.getElementById('otr-sheet-print').innerHTML; box.className = 'otr-print'; window.print();
+      };
+    }
+    // Cost per gallon by month, this year against last year (the trend picture on top of Cost Per Gallon).
+    function trend(c) {
+      const pts = c.months.map(m => m.cpg), vals = [].concat(...pts).filter(v => v != null);
+      if (vals.length < 2) return '<div class="otr-trend empty">The trend picture shows once Recap has gallons and delivery cost.</div>';
+      const W = 560, H = 230, lo = Math.floor(Math.min(...vals) * 100 - 1) / 100, hi = Math.ceil(Math.max(...vals) * 100 + 1) / 100;
+      const x = (i) => 56 + i * ((W - 76) / 11), y = (v) => H - 34 - (v - lo) / (hi - lo) * (H - 74);
+      const line = (k, cls) => { let d = '', dots = ''; pts.forEach((p, i) => { if (p[k] == null) return; d += (d ? ' L' : 'M') + x(i).toFixed(1) + ' ' + y(p[k]).toFixed(1); dots += '<circle class="' + cls + '" cx="' + x(i).toFixed(1) + '" cy="' + y(p[k]).toFixed(1) + '" r="5"><title>' + CORE.MONTHS[i] + ' ' + (k ? c.prior : c.year) + ': $' + p[k].toFixed(5) + '</title></circle>'; }); return '<path class="' + cls + '" d="' + d + '"/>' + dots; };
+      const ticks = []; for (let v = lo; v <= hi + 1e-9; v += Math.max(0.01, Math.round((hi - lo) / 3 * 100) / 100)) ticks.push(v);
+      return '<svg class="otr-trend" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Cost per gallon by month, ' + c.year + ' and ' + c.prior + '"><text x="14" y="24" class="t">Cost per gallon by month</text>' +
+        '<text x="' + (W - 150) + '" y="24" class="k cur">■ ' + c.year + '</text><text x="' + (W - 72) + '" y="24" class="k ly">■ ' + c.prior + '</text>' +
+        ticks.map(v => '<line x1="52" x2="' + (W - 14) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '"/><text x="4" y="' + (y(v) + 5).toFixed(1) + '" class="a">' + v.toFixed(2) + '</text>').join('') +
+        CORE.MONTHS.map((m, i) => '<text x="' + (x(i) - 14).toFixed(1) + '" y="' + (H - 8) + '" class="a">' + m + '</text>').join('') + line(1, 'ly') + line(0, 'cur') + '</svg>';
+    }
+    // Import (By Date: Import Workbook; Recap: Import From Accounting) - the same reader takes the OTR Trips workbook or the accounting zip.
+    function importBar(label) {
+      const edit = canManage();
+      return imp && imp.merged ? '<button type="button" class="primary" id="imp-use"' + (imp.busy || !edit ? ' disabled' : '') + '>' + (imp.busy || 'Use These Numbers') + '</button><button type="button" id="imp-cancel"' + (imp.busy ? ' disabled' : '') + '>Cancel</button><span class="hint">Check what was found in ' + escapeHtml(imp.file) + ', then press Use These Numbers.</span>'
+        : '<button type="button" id="imp-pick"' + (edit && !(imp && imp.busy) ? '' : ' disabled') + '>' + (imp && imp.busy ? escapeHtml(imp.busy) : label) + '</button><input type="file" id="imp-file" accept=".zip,.xlsx,.xls" hidden>';
+    }
+    function importPreview() {
+      return imp && imp.merged ? '<div class="otr-import"><b>Found in ' + escapeHtml(imp.file) + '</b>' + (imp.merged.summary.length ? '<table><tbody>' + imp.merged.summary.map(l => '<tr><td class="strong">' + escapeHtml(l.what) + '</td><td>' + escapeHtml(l.count) + '</td><td>' + escapeHtml(l.from) + ' – ' + escapeHtml(l.to) + '</td><td>' + (l.changed ? l.changed + ' differ from what is saved' : l.total != null ? n0(l.total) + ' runs' : '') + '</td></tr>').join('') + '</tbody></table>' : '<p>Nothing was found in this file. Use your OTR Trips workbook (By Date, Recap) or the accounting package zip (P&amp;L Expenses by Dept, Gallon Comparison).</p>') + '</div>' : '';
+    }
+    function wireImport() {
+      const pick = document.getElementById('imp-pick'), fileIn = document.getElementById('imp-file');
+      if (pick) pick.onclick = () => fileIn.click();
+      if (fileIn) fileIn.onchange = async () => {
+        const f = fileIn.files[0]; if (!f) return;
+        imp = { file: f.name, busy: 'Reading ' + f.name + '…' }; showError(''); render();
+        try { imp = { file: f.name, merged: await readImport(f), busy: '' }; } catch (e) { imp = null; showError('Could not read ' + f.name + ': ' + (e.message || e)); }
+        render();
+      };
+      if (document.getElementById('imp-use')) { document.getElementById('imp-use').onclick = applyImport; document.getElementById('imp-cancel').onclick = () => { imp = null; render(); }; if (imp.merged.summary.length === 0) document.getElementById('imp-use').disabled = true; }
+    }
+
+    // Day counts go back to 2016 (about 19,000): the screen reads only from the oldest day it shows (Month Recap's December two
+    // years back, or an older By Date month), and reads further back when one is picked.
+    let dbRef = null, dailyFrom = '', stopDaily = null;
+    function needDays() {
+      if (!dbRef) return;
+      const from = [(year - 2) + '-12-01', ym + '-01'].sort()[0];
+      if (dailyFrom && dailyFrom <= from) return;
+      dailyFrom = from;
+      if (stopDaily) stopDaily();
+      stopDaily = onSnapshot(query(collection(dbRef, 'otrDaily'), where('date', '>=', from)), s => { daily = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read otrDaily: ' + e.message));
+    }
     const pendingFigures = [];
     // Import From Accounting (the current app's OverTheRoad.html import card): drop the accounting package zip or an Excel workbook
     // (P&L Expenses by Dept, Gallon Comparison, OTR Trips By Date / Recap). The files are read here, checked, then saved together.
@@ -236,9 +390,10 @@
       watch('routes', v => { routes = v; });
       watch('runs', v => { runs = v; });
       watch('otrRoutes', v => { picks = {}; v.forEach(p => { picks[p.runId] = { include: p.include === true, destination: p.destination || '', deliveredBy: p.deliveredBy || '' }; }); });
-      watch('otrDaily', v => { daily = v; });
+      dbRef = db; needDays();
       watch('otrMonthly', v => { monthly = v; pendingFigures.forEach(put => put()); });
       watch('otrMonthRuns', v => { monthRuns = v; });
+      watch('otrComments', v => { comments = v; });
     });
   </script>
 </body>
