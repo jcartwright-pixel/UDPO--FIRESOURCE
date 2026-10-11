@@ -146,7 +146,7 @@
         sheet.innerHTML = importPreview() + '<div id="otr-sheet-print">' + cardRow([
           card(monthLabel(ym) + (ym === today.slice(0, 7) ? ' so far' : ''), n0(shownTotal), 'vs ' + n0(lyTotal) + ' in ' + monthLabel(lastYear), chg(shownTotal - lyTotal, n0, false)),
           card('Busiest this month', (cols.map((n, i) => [n, tot[i]]).filter(x => x[1]).sort((a, b) => b[1] - a[1])[0] || ['–'])[0], '')]) +
-          '<h2 class="otr-print-title">By Date · ' + monthLabel(ym) + '</h2><table class="otr-sheet otr-bydate"><colgroup><col style="width:124px">' + cols.map(() => '<col>').join('') + '<col style="width:58px"><col style="width:190px"></colgroup><thead><tr><th class="l">Date</th>' +
+          '<h2 class="otr-print-title">Over the Road Runs · By Date · ' + monthLabel(ym) + '</h2><table class="otr-sheet otr-bydate"><colgroup><col style="width:124px">' + cols.map(() => '<col>').join('') + '<col style="width:58px"><col style="width:190px"></colgroup><thead><tr><th class="l">Date</th>' +
           cols.map(n => '<th class="vh-th"><span class="vh">' + escapeHtml(n) + '</span></th>').join('') + '<th>Total</th><th class="l">Comment</th></tr></thead><tbody>' + rows +
           '<tr class="tot"><td class="l">' + escapeHtml(monthLabel(ym)) + '</td>' + tot.map(x => '<td>' + x + '</td>').join('') + '<td>' + O.otrSum_(tot) + '</td><td></td></tr></tbody></table></div>';
         foot.textContent = 'Days in the copied Live weeks count from the dispatch board; older days come from your OTR Trips workbook. A typed number wins over both.';
@@ -183,7 +183,7 @@
           card('Trips ' + thru, n0(r.ytd.current), 'vs ' + n0(r.ytd.prior) + ' in ' + (year - 1), r.ytd.through ? chg(r.ytd.current - r.ytd.prior, n0, false) : null),
           card(r.latest ? r.latest.label : 'Latest month', r.latest ? n0(r.latest.current) : '–', r.latest ? 'vs ' + n0(r.latest.prior) + ' in ' + (year - 1) : '', r.latest ? chg(r.latest.current - r.latest.prior, n0, false) : null),
           card('Busiest destination ' + year, r.busiest[0] || '–', r.busiest.length > 1 ? 'then ' + r.busiest.slice(1).join(', ') : '')]) +
-          '<div id="otr-report"><h2 class="otr-print-title">Month Recap · ' + year + ' vs ' + (year - 1) + '</h2><table class="otr-sheet otr-mrecap"><colgroup><col style="width:150px">' + r.months.map((m, i) => (i ? '<col style="width:8px">' : '') + '<col><col>').join('') + '</colgroup><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></div>';
+          '<div id="otr-report"><h2 class="otr-print-title">Over the Road Runs · Month Recap · ' + year + ' vs ' + (year - 1) + '</h2><table class="otr-sheet otr-mrecap"><colgroup><col style="width:150px">' + r.months.map((m, i) => (i ? '<col style="width:8px">' : '') + '<col><col>').join('') + '</colgroup><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></div>';
         foot.textContent = 'Each month: ' + year + ' on the left, ' + (year - 1) + ' in gray on the right. Fuel Used, Miles Driven and Tank fills come from Recap.';
         wireYear(); wirePrint();
       } else if (view === 'cpg') {
@@ -207,7 +207,7 @@
           card('Cost Diff, year to date', Y ? pm(Y.costDiffMoney) : '–', Y ? (Y.costDiffMoney < 0 ? 'more' : 'less') + ' than at ' + c.prior + '\'s cost per gallon' : '', null, Y && Y.costDiffMoney < 0),
           card('Gallons sold, year to date', Y ? g(Y.gal[0]) : '–', Y ? 'vs ' + g(Y.gal[1]) + ' in ' + c.prior : '', Y ? chg(Y.galDiff, n0, false) : null),
           card('Fuel cost per gallon, average', F ? f3(F.avg[0]) : '–', F ? 'vs ' + f3(F.avg[1]) + ' in ' + c.prior : '', F ? chg(F.avgDiff, v => v.toFixed(3), true) : null)], 'grid') + trend(c) + '</div>' +
-          '<h2 class="otr-print-title">Cost Per Gallon Sold Comparison · ' + c.year + '</h2>' + main + fuel + '</div>';
+          '<h2 class="otr-print-title">Over the Road Runs · Cost Per Gallon Sold Comparison · ' + c.year + '</h2>' + main + fuel + '</div>';
         foot.textContent = 'Cost per gallon = Dist. Cost ÷ Gallons Sold. Var and Cost Diff: last year minus this year, so a saving shows positive, as on your workbook.';
         wireYear(); wirePrint();
       } else if (view === 'figures') {
