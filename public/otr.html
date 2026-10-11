@@ -94,7 +94,7 @@
       const byRun = {}, byDest = {};
       list.forEach(r => { byRun[r.route + '|' + r.run] = r.deliveredBy; if (r.include && r.deliveredBy) (byDest[r.destination] = byDest[r.destination] || new Set()).add(r.deliveredBy); });
       const edit = canManage();
-      document.getElementById('sub').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY') + ' · counts from the dispatch sheet';
+      { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Counts from the dispatch sheet'; }
       document.querySelectorAll('.tabs [data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
       const bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
       if (view === 'dash') {

@@ -1494,3 +1494,24 @@ body.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: var(-
 /* Polish 13: status tags read in normal case ("Approved", "Manual only"); the stored words stay as they are. */
 span.status, .vstatus, .temp-page .tp-status, .nice-case { display: inline-block; text-transform: lowercase; }
 span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-letter, .nice-case::first-letter { text-transform: uppercase; }
+/* Polish 10: the one "Test copy" badge in the header. */
+.topbar .test-copy-badge { align-self: center; flex: none; background: var(--test-bg, #fff6d6); color: var(--test-ink, #7a5a00); border: 1px solid #e8cf73; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+@media (max-width: 700px) { .topbar .test-copy-badge { padding: 2px 8px; font-size: 12px; } }
+/* Polish 11: Fleet Service tabs even and on one line (an empty count no longer pads a tab), and the long subtitle wraps under
+   under the title. */
+.issues-page .tabs button b:empty { display: none; }
+.fleet-page .head .tabs { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.fleet-page .head .tabs button { white-space: nowrap; height: 42px; min-height: 42px; }
+.fleet-page .head .title { flex: 1 1 300px; min-width: 260px; }
+.fleet-page .head .title small { white-space: normal; display: block; }
+.fleet-page .head .title h1 { white-space: nowrap; }
+/* Polish 23: on a phone the header never squeezes the app name into a one-letter column (Phone Screens, Garage Station):
+   the logo stands alone when the row is full, and buttons keep their words on one line. */
+@media (max-width: 480px) {
+  .topbar:has(.hdr-admin, .hdr-nav) .brand > span, body.gs-page .topbar .brand > span { display: none; }
+  .topbar .brand { flex: none; }
+  .topbar button, .topbar .hdr-btn, .topbar a.button { white-space: nowrap; }
+}
+/* Polish 16: the no-connection bar. */
+.offline-bar { position: sticky; top: 0; z-index: 1000; background: #fff3c4; color: #6b4d00; border-bottom: 2px solid #e5b800; padding: 10px 16px; font-size: 16px; font-weight: 800; text-align: center; }
+.offline-bar[hidden] { display: none; }
