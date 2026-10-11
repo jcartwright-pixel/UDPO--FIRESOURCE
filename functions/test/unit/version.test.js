@@ -8,7 +8,7 @@ const V = require('../../../tools/stamp-version.cjs');
 // Joe 10/11: the line at the bottom of the menu says which release and which copy (live or the test copy).
 test('version line: Live names the release, the test copy says it is newer than the last release', () => {
   assert.equal(V.label(5, '10-11-26', true), 'Release 5 · 10-11-26 · Live');
-  assert.equal(V.label(5, '10-11-26', false), 'Release 5 + new work · 10-11-26 · Test copy');
+  assert.equal(V.label(5, '10-11-26', false), 'After Release 5 · 10-11-26 · Test copy');
   assert.equal(V.label(null, '10-11-26', true), 'Version · 10-11-26 · Live');
 });
 
