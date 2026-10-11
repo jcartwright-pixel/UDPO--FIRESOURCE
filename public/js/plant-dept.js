@@ -64,7 +64,8 @@ function model() {
     behind, avgLoad: avg(mins), loadingNow, byHour, hourText, yrows, yDoneByNow, tDoneByNow, yAvg: avg(yMins), areas,
     waitingTrailers, backWaiting, neededNext, washAges, reasons: Object.values(reasons).sort((a, b) => b.n - a.n), casesBack,
     oldestBack: backWaiting.length ? backWaiting[0].back : null,
-    loadLinks: P.AREAS.map(a => { const ac = P.counts(today.filter(r => r.area === a)); return link('loadout.html?date=' + date + '&area=' + a, P.AREA[a].title.replace('Daily ', ''), ac.done + ' / ' + ac.total); }),
+    // Polish item 4 (Joe 10/11): each department counts yesterday's leftover loads too, the same as its Loadout screen.
+    loadLinks: P.AREAS.map(a => { const ac = P.counts(rows.filter(r => r.area === a)); return link('loadout.html?date=' + date + '&area=' + a, P.AREA[a].title.replace('Daily ', ''), ac.done + ' / ' + ac.total); }),
     unloadLinks: P.AREAS.map(a => { const ac = P.unloadCounts(urows.filter(r => r.area === a)); return link('unloading.html?date=' + date + '&area=' + a, ({ CASE: 'Case', TOTES: 'Tote', BOXING: 'Box', TANKER: 'Tanker' })[a] + ' Unloading', ac.complete + ' / ' + ac.total); }),
     washLinks: openWash.slice(0, 3).map(w => link('washing.html?date=' + date, (w.trailer || 'Trailer') + ' · ' + w.need)), washMain: link('washing.html?date=' + date, 'Truck Washing', openWash.length + ' open', openWash.length > 0),
     retLinks: pend.slice(0, 3).map(x => link('returns.html?date=' + date, x.route + ' · ' + x.detail, 'Pending', true)), retMain: link('returns.html?date=' + date, 'Product Returns', pend.length + ' pending', pend.length > 0),
@@ -119,7 +120,7 @@ function card(k, inner, cls) {
 const head = (k) => '<div class="dc-head"><span class="dc-icon">' + ICON[k] + '</span><span class="dc-text"><small>' + D[k].small + '</small><strong>' + D[k].title + '</strong></span></div>';
 const met = (em, b, small, red, n) => '<span class="dc-metric"><em>' + em + '</em><b' + (n ? ' data-n="' + n + '"' : '') + (red ? ' class="red"' : '') + '>' + b + '</b><small>' + small + '</small></span>';
 function metrics(m, k) {
-  if (k === 'load') return '<div class="dc-metrics n4">' + met('Today', m.load.total, 'Loads Today', false, 'load.total') + met('Waiting', m.load.waiting, 'Waiting', false, 'load.waiting') + met('Loading', m.load.loading, 'Loading', false, 'load.loading') + met('Done', m.load.done, 'Complete', false, 'load.done') + '</div>';
+  if (k === 'load') return '<div class="dc-metrics n4">' + met('Today', m.load.total, m.pu.length ? m.c.total + ' loads · ' + m.pu.length + (m.pu.length === 1 ? ' pickup' : ' pickups') : 'Loads Today', false, 'load.total') + met('Waiting', m.load.waiting, 'Waiting', false, 'load.waiting') + met('Loading', m.load.loading, 'Loading', false, 'load.loading') + met('Done', m.load.done, 'Complete', false, 'load.done') + '</div>';
   if (k === 'unload') return '<div class="dc-metrics n4">' + met('Total', m.unload.total, 'Trailers', false, 'unload.total') + met('Waiting', m.unload.waiting, 'Waiting', false, 'unload.waiting') + met('Unloading', m.unload.unloading, 'Unloading', false, 'unload.unloading') + met('Done', m.unload.done, 'Complete', false, 'unload.done') + '</div>';
   if (k === 'wash') return met('Open', m.openWash.length, 'To wash', m.openWash.length > 0, 'wash.open') + met('Washed', m.washed, 'Today', false, 'wash.done');
   return met('Returns', m.returns.length, 'Today', false, 'ret.total') + met('Pending', m.pend.length, 'Not returned', m.pend.length > 0, 'ret.pending');
@@ -148,14 +149,14 @@ function washList(m, n) {
 }
 function reasonBars(m) {
   const max = Math.max(1, ...m.reasons.map(r => r.n));
-  return m.reasons.map(r => '<div class="hb"><span>' + esc(r.k) + '</span><div class="track"><i style="width:' + Math.round(r.n * 100 / max) + '%;background:#b42332"></i></div><b>' + r.n + (r.cases ? ' · ' + r.cases + 'c' : '') + '</b></div>').join('');
+  return m.reasons.map(r => '<div class="hb"><span>' + esc(r.k) + '</span><div class="track"><i style="width:' + Math.round(r.n * 100 / max) + '%;background:#b42332"></i></div><b>' + r.n + ' ' + (r.n === 1 ? 'return' : 'returns') + (r.cases ? ' · ' + r.cases + ' ' + (r.cases == 1 ? 'case' : 'cases') : '') + '</b></div>').join('');
 }
 /* ---------------- A: same four cards, the empty middle filled ---------------- */
 function A(m) {
   return card('load', head('load') + '<div class="dc-links two">' + m.loadLinks.join('') + '</div>' +
     '<div class="mid">' +
       '<div class="panel" style="display:flex;flex-direction:column"><div class="sec-t"><span>Loads by depart time</span><span>done / scheduled</span></div><div style="flex:1;min-height:0">' + hourBars(m, 62) + '</div>' + legend + '</div>' +
-      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, 'not done 30 min after depart', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, m.puOpen.map(p => p.route).join(', ') || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
+      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, 'all departments · 30+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, m.puOpen.map(p => p.route).join(', ') || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
     '</div>' + metrics(m, 'load') + '<div class="dc-bar"><i style="width:' + m.loadPct + '%"></i></div><div class="dc-note">' + m.loadNote + '  ·  ' + m.tDoneByNow + ' done by now, yesterday ' + m.yDoneByNow + ' at this time</div>', 'home4') +
   card('unload', head('unload') + '<div class="dc-links two">' + m.unloadLinks.join('') + '</div>' +
     '<div class="mid">' +

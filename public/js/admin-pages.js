@@ -99,7 +99,7 @@ async function copyText(btn, value) {
 export async function renderPeople(box) {
   let data = null, sel = null, draft = null, find = '', filter = 'all', dirty = false;
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="p-add">+ Add Person</button><button type="button" class="ap-btn main" id="p-add-role">+ Add Role</button>' +
-    '<button type="button" class="ap-btn" id="p-reload">Reload</button>' +
+    '<button type="button" class="ap-btn" id="p-reload">Refresh</button>' +
     '<div class="ap-right"><input type="search" id="p-find" placeholder="Search name or email" aria-label="Search name or email"><select id="p-filter" aria-label="Show"><option value="all">All people</option><option value="ACTIVE">Enabled</option><option value="INACTIVE">Disabled</option></select></div></div>' +
     '<div class="ap-msg" hidden></div>' +
     '<div class="ap-tiles"><div><b>Company sign-in</b><span>A verified United Dairy email can enter. Account roles determine access.</span></div><div><b>Administrator is assigned</b><span>A company email alone never grants administrator rights.</span></div>' +
@@ -322,7 +322,7 @@ const linkFor = (workspace, token) => location.origin + '/' + (workspace === 'ro
 
 export async function renderAccessCodes(box) {
   let data = null, reveal = null, find = '';
-  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="ac-reload">Reload</button><div class="ap-right"><input type="search" id="ac-find" placeholder="Search name or email" aria-label="Search name or email"></div></div>' +
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="ac-reload">Refresh</button><div class="ap-right"><input type="search" id="ac-find" placeholder="Search name or email" aria-label="Search name or email"></div></div>' +
     '<div class="ap-msg" hidden></div><p class="ap-note">Generate a revocable mobile link for an employee. The link never contains roles, passwords, or permanent credentials.</p><div id="ac-reveal"></div>' +
     '<div class="ap-scroll"><table class="ap-t"><thead><tr><th>Person</th><th>Role &middot; Plants</th><th>Link</th><th>Issued</th><th></th></tr></thead><tbody id="ac-rows"></tbody></table></div>' +
     '<p class="ap-note">Text delivery: texting stays off until an approved text provider is set up. Email, Copy Link, the QR on screen and Print QR work without it.</p></div>';
@@ -381,7 +381,7 @@ const APP_LINKS = [
 export async function renderAppLinks(box, ctx) {
   let data = null;
   const sandbox = /sandbox|localhost|127\.0\.0\.1/.test(location.hostname);
-  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="al-reload">Reload</button><div class="ap-right"><span class="ap-chip blue">Blue: UD Google sign-in</span><span class="ap-chip orange">Orange: anyone with the code</span></div></div>' +
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="al-reload">Refresh</button><div class="ap-right"><span class="ap-chip blue">Blue: UD Google sign-in</span><span class="ap-chip orange">Orange: anyone with the code</span></div></div>' +
     '<div class="ap-msg" hidden></div>' + (sandbox ? '<div class="ap-msg bad">SANDBOX &mdash; TEST ONLY. Do not give these to drivers or plant staff.</div>' : '') + '<div class="ap-scroll" style="padding:10px"><div class="ap-links" id="al-list"></div></div></div>';
   const $ = (s) => box.querySelector(s);
   const url = (l) => location.origin + '/' + l.path;
@@ -421,7 +421,7 @@ export async function renderAppLinks(box, ctx) {
 /* ---------- Plant Station Codes (manager release code) ---------- */
 
 export async function renderStationCodes(box) {
-  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="sc-reload">Reload</button></div><div class="ap-msg" hidden></div>' +
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="sc-reload">Refresh</button></div><div class="ap-msg" hidden></div>' +
     '<p class="ap-note">A tablet remembers its station. To move it, a manager taps Change Station on the tablet and types the release code for that plant. With no code set, anyone signed in on the tablet can change its station.</p>' +
     '<div class="ap-list" id="sc-list"></div><p class="ap-note">Five wrong release codes lock the release for ten minutes. The Plant Station tablets sign in with a United Dairy account, so there are no separate station codes.</p></div>';
   const $ = (s) => box.querySelector(s);
@@ -450,7 +450,7 @@ export async function renderStationCodes(box) {
 
 export async function renderReportRecipients(box) {
   let data = null, fac = 'fac_uniontown';
-  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="rr-save">Save</button><button type="button" class="ap-btn" id="rr-reload">Reload</button>' +
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="rr-save">Save</button><button type="button" class="ap-btn" id="rr-reload">Refresh</button>' +
     '<div class="ap-right"><label class="ap-field" style="flex-direction:row;align-items:center;gap:8px">Location <select id="rr-loc"></select></label></div></div><div class="ap-msg" hidden></div>' +
     '<p class="ap-note">The Send Current Report card in Manager Center emails one of these groups. Type the addresses separated by commas, then Save. Each location has its own groups.</p>' +
     '<div id="rr-sending"></div><div class="ap-scroll" style="padding:10px"><div class="ap-list" id="rr-list"></div>' +
@@ -495,7 +495,7 @@ export async function renderReportRecipients(box) {
 
 const STATUS = { SENT: ['Sent', 'good'], BLOCKED: ['Stopped (off)', 'bad'], FAILED: ['Failed', 'bad'], HELD: ['Held', 'warn'] };
 export async function renderSentLog(box) {
-  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="sl-reload">Reload</button><span id="sl-switch-wrap" style="display:flex;gap:8px;align-items:center"></span></div>' +
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="sl-reload">Refresh</button><span id="sl-switch-wrap" style="display:flex;gap:8px;align-items:center"></span></div>' +
     '<div class="ap-msg" hidden></div><p class="ap-note">Every email the new app sent, stopped, held, or failed. Newest first. On the sandbox an email goes only to the person who pressed the button.</p>' +
     '<div class="ap-scroll"><table class="ap-t"><thead><tr><th>When</th><th>Status</th><th>What</th><th>To</th><th>Subject</th></tr></thead><tbody id="sl-rows"></tbody></table></div></div>';
   const $ = (s) => box.querySelector(s);
@@ -528,7 +528,7 @@ export async function renderSentLog(box) {
 /* ---------- Remaining Repair Items ---------- */
 
 export async function renderRepairItems(box, ctx) {
-  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="ri-add">Add Item</button><button type="button" class="ap-btn" id="ri-reload">Reload</button>' +
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="ri-add">Add Item</button><button type="button" class="ap-btn" id="ri-reload">Refresh</button>' +
     '<div class="ap-right"><span class="ap-chip warn" id="ri-count"></span></div></div><div class="ap-msg" hidden></div>' +
     '<div class="ap-form"><label class="ap-field">Repair item<input id="ri-title" maxlength="200"></label><label class="ap-field">Notes / verification needed<input id="ri-notes" maxlength="1000"></label>' +
     '<label class="ap-field">Priority<select id="ri-priority"><option value="NORMAL">Normal</option><option value="HIGH">High</option><option value="BLOCKER">Blocker</option></select></label><span></span></div>' +

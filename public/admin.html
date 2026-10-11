@@ -53,8 +53,11 @@
       ['Print Layouts', 'print.html', 'Dispatch and weekly schedule print tools.'],
       ['Dispatch Settings', 'settings.html', 'Dispatch preferences and setup.']
     ];
+    const OPENS = {'Unit Assignments': 'Equipment', 'Route Day Setup': 'Route Editor', 'Holiday Week Editor': 'Route Week Override', 'Driver Management': 'Driver Roster', 'Schedule Template (Weekly)': 'Weekly Dispatch', 'Vacation Management': 'Vacation Schedule', 'Issue History': 'Equipment Issues', 'Data Quality': 'Sheet Conflicts', 'Unit Master': 'Equipment'};
     document.getElementById('grid').innerHTML = CARDS.map(([name, href, text]) => {
-      return '<a class="admin-card" href="' + escapeHtml(href) + '"><strong>' + escapeHtml(name) + '</strong><span>' + escapeHtml(text) + '</span></a>';
+      // Polish item 2 (Joe 10/11): a card whose old-app name differs from the screen it opens says which screen that is.
+      const opens = OPENS[name] ? '<em class="admin-opens">Opens ' + escapeHtml(OPENS[name]) + '</em>' : '';
+      return '<a class="admin-card" href="' + escapeHtml(href) + '"><strong>' + escapeHtml(name) + '</strong><span>' + escapeHtml(text) + '</span>' + opens + '</a>';
     }).join('');
     requireSignIn(async () => { await start(); });
   </script>
