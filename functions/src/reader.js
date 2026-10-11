@@ -90,7 +90,7 @@ async function applyReads(db, operationId, reads, opts) {
     let current = byName[text(run.product).toUpperCase()] || null;
     reads.forEach(r0 => {
       const r = r0 && typeof r0 === 'object' ? r0 : { upc: r0 };
-      const upc = upcOf(r.upc), named = o.test ? byName[text(r.name).toUpperCase()] || (text(r.name) ? { name: text(r.name).slice(0, 120), sku: '', shelfLifeDays: null } : null) : null;
+      const upc = upcOf(r.upc), named = o.test ? byName[text(r.name).toUpperCase()] || (text(r.name) ? { name: text(r.name).slice(0, 120), sku: '', shelfLifeDays: Number(r.shelfLifeDays) > 0 ? Number(r.shelfLifeDays) : null } : null) : null;
       const t = (upc && byUpc[upc]) || named;
       run.count = (Number(run.count) || 0) + 1;
       if (!upc && !named) { rd.unreadable++; return; }
@@ -142,12 +142,16 @@ async function handleReads(db, headers, body, opts) {
 
 function sandboxOnly(project) { return project !== 'ud-distribution'; }
 
+async function mustBeAdmin(db, email) {
+  const person = (await db.collection('users').doc(safeIdPart(email)).get()).data();
+  if (!person || person.status !== 'ACTIVE' || !L.isAdmin(person)) throw new ReaderError('NOT_ALLOWED', 'Only an administrator can set up a line\'s label reader.');
+}
+
 // Line Targets, administrators only.
 async function readerCall(db, user, input, opts) {
   const o = Object.assign({ now: () => new Date(), project: '', key: () => crypto.randomBytes(24).toString('base64url') }, opts || {});
   const i = input || {}, email = text(user && user.email).toLowerCase();
-  const person = (await db.collection('users').doc(safeIdPart(email)).get()).data();
-  if (!person || person.status !== 'ACTIVE' || !L.isAdmin(person)) throw new ReaderError('NOT_ALLOWED', 'Only an administrator can set up a line\'s label reader.');
+  await mustBeAdmin(db, email);
   const id = text(i.operationId), op = text(i.op);
   if (!/^[A-Za-z0-9_-]{1,120}$/.test(id)) throw new ReaderError('BAD_REQUEST', 'Pick a line.');
   const line = await lineOf((ref) => ref.get(), db, id), at = o.now().toISOString();
@@ -160,19 +164,66 @@ async function readerCall(db, user, input, opts) {
   }
   if (op === 'startTest' || op === 'stopTest') {
     if (!sandboxOnly(o.project)) throw new ReaderError('NOT_ALLOWED', 'The test feed runs on the sandbox only, so the real counts stay real.');
-    if (op === 'stopTest') {
-      await lineRef.set({ testFeed: null }, { merge: true });
-      return { ok: true, message: 'Test feed stopped on ' + line.name + '.' };
-    }
-    const minutes = Math.min(240, Math.max(5, Math.round(Number(i.minutes) || 60)));
-    const products = (Array.isArray(i.products) ? i.products : []).slice(0, 3).map(p => ({ name: text(p && p.name).slice(0, 120), upc: upcOf(p && p.upc) })).filter(p => p.name);
-    if (!products.length) throw new ReaderError('BAD_REQUEST', 'The line has no products to pretend with.');
-    const c = (await lineRef.get()).data() || {};
-    if (c.counter !== 'READER') throw new ReaderError('NOT_ALLOWED', 'Set Counted by to Label reader first.');
-    await lineRef.set({ testFeed: { until: new Date(o.now().getTime() + minutes * 60000).toISOString(), startedAt: at, by: email, products, perMinute: 74 } }, { merge: true });
-    return { ok: true, message: 'Test feed on ' + line.name + ' for ' + minutes + ' minutes: about 74 pretend jugs a minute.' };
+    if (op === 'stopTest') return stopFeed(lineRef, line, at, email);
+    return startFeed(lineRef, id, line, i, at, email, o);
   }
   throw new ReaderError('BAD_REQUEST', 'Unknown label reader request.');
+}
+
+// The pretend jugs are the line's own products at their own full speed (Joe 10/11: a test setup for every machine), so the
+// Boxing line sends about 8 a minute and the half gallon fillers about 100. A line counted another way switches to Label
+// reader for the test and goes back when it stops.
+function feedProducts(list) {
+  return (Array.isArray(list) ? list : []).slice(0, 3).map(p => {
+    const rate = Math.round(Number(p && p.ratePerMin)), shelf = Math.round(Number(p && p.shelfLifeDays));
+    return { name: text(p && p.name).slice(0, 120), upc: upcOf(p && p.upc), ratePerMin: rate > 0 ? Math.min(300, rate) : null, shelfLifeDays: shelf > 0 ? Math.min(365, shelf) : null };
+  }).filter(p => p.name);
+}
+async function startFeed(lineRef, id, line, i, at, email, o) {
+  const minutes = Math.min(240, Math.max(5, Math.round(Number(i.minutes) || 60)));
+  const products = feedProducts(i.products);
+  if (!products.length) throw new ReaderError('BAD_REQUEST', line.name + ' has no products to pretend with.');
+  const c = (await lineRef.get()).data() || {};
+  const was = c.testFeed && c.testFeed.counterBefore ? c.testFeed.counterBefore : c.counter !== 'READER' ? (c.counter || 'TABLET') : null;
+  const perMinute = products[0].ratePerMin || 74;
+  await lineRef.set({ operationId: id, line: line.name, facilityId: line.facilityId, counter: 'READER',
+    testFeed: { until: new Date(o.now().getTime() + minutes * 60000).toISOString(), startedAt: at, by: email, products, perMinute, counterBefore: was } }, { merge: true });
+  return { ok: true, operationId: id, message: 'Test feed on ' + line.name + ' for ' + minutes + ' minutes: about ' + perMinute + ' pretend ' + (perMinute === 1 ? 'piece' : 'pieces') + ' a minute.' };
+}
+async function stopFeed(lineRef, line, at, email) {
+  const c = (await lineRef.get()).data() || {};
+  const back = c.testFeed && c.testFeed.counterBefore;
+  await lineRef.set(Object.assign({ testFeed: null }, back ? { counter: back, updatedAt: at, updatedBy: email } : {}), { merge: true });
+  return { ok: true, message: 'Test feed stopped on ' + line.name + '.' + (back ? ' It is counted ' + (back === 'SENSOR' ? 'by a sensor' : 'by typing') + ' again.' : '') };
+}
+
+// Line Targets' Test Feed on Every Line / Stop Every Test Feed (sandbox, administrators): lines = [{operationId, products}].
+async function readerAll(db, user, input, opts) {
+  const o = Object.assign({ now: () => new Date(), project: '' }, opts || {});
+  const i = input || {}, op = text(i.op);
+  if (op !== 'startAll' && op !== 'stopAll') return readerCall(db, user, input, opts);
+  await mustBeAdmin(db, text(user && user.email).toLowerCase());
+  if (!sandboxOnly(o.project)) throw new ReaderError('NOT_ALLOWED', 'The test feed runs on the sandbox only, so the real counts stay real.');
+  const lines = (Array.isArray(i.lines) ? i.lines : []).slice(0, 40);
+  if (!lines.length) throw new ReaderError('BAD_REQUEST', 'Pick a plant with production lines.');
+  const done = [], skipped = [];
+  for (const l of lines) {
+    const id = text(l && l.operationId);
+    if (op === 'stopAll') {
+      if (!/^[A-Za-z0-9_-]{1,120}$/.test(id)) continue;
+      const c = (await db.collection('productionLines').doc(docId(id)).get()).data();
+      if (!c || !c.testFeed) continue;
+    }
+    try {
+      await readerCall(db, user, Object.assign({ op: op === 'startAll' ? 'startTest' : 'stopTest', operationId: id, minutes: i.minutes, products: l && l.products }), o);
+      done.push(id);
+    } catch (e) {
+      if (!(e instanceof ReaderError) || e.code === 'NOT_ALLOWED' && /administrator/.test(e.message)) throw e;
+      skipped.push(e.message);
+    }
+  }
+  const message = op === 'startAll' ? 'Test feed on ' + done.length + ' line' + (done.length === 1 ? '' : 's') + ' for an hour.' : 'Test feed stopped on ' + done.length + ' line' + (done.length === 1 ? '' : 's') + '.';
+  return { ok: true, lines: done, message: message + (skipped.length ? ' ' + skipped.join(' ') : '') };
 }
 
 // One minute of the test feed's pretend jugs (minute = minutes since it started): a pause every half hour so the line stops
@@ -182,11 +233,12 @@ function testReads(feed, minute, expected) {
   if (m >= 26) return [];
   const products = feed.products || [];
   const p = products[Math.floor(minute / 20) % products.length];
-  const n = Math.max(0, Math.round((feed.perMinute || 74) + (minute % 7 === 3 ? 8 : minute % 5 === 1 ? -6 : 0)));
+  const base = (p && p.ratePerMin) || feed.perMinute || 74, wobble = Math.max(1, Math.round(base / 10));
+  const n = Math.max(0, Math.round(base + (minute % 7 === 3 ? wobble : minute % 5 === 1 ? -wobble : 0)));
   const out = [];
   for (let j = 0; j < n; j++) {
     const k = minute * 1000 + j, date = k % 41 === 7 ? '' : k % 157 === 11 && expected ? 'JAN 01' : expected || '';
-    out.push(k % 97 === 5 ? { upc: '' } : { upc: p.upc, name: p.name, date });
+    out.push(k % 97 === 5 ? { upc: '' } : { upc: p.upc, name: p.name, shelfLifeDays: p.shelfLifeDays || null, date });
   }
   return out;
 }
@@ -205,7 +257,8 @@ async function readerMinute(db, opts) {
       const targets = P.targetsFor(pSnap.exists ? pSnap.data().products : []);
       const p = (feed.products || [])[Math.floor(minute / 20) % Math.max(1, (feed.products || []).length)] || {};
       const t = targets.find(x => x.name.toUpperCase() === text(p.name).toUpperCase());
-      const reads = testReads(feed, minute, t ? P.codeDate(plantShift(null, ms).date, t.shelfLifeDays) : '');
+      const shelf = t && t.shelfLifeDays ? t.shelfLifeDays : p.shelfLifeDays;
+      const reads = testReads(feed, minute, shelf ? P.codeDate(plantShift(null, ms).date, shelf) : '');
       if (reads.length) { await applyReads(db, id, reads, { now: o.now, test: true }); done.push(id + ': ' + reads.length + ' test jugs'); continue; }
     }
     // Quiet for 3 minutes on this shift: the line stopped (from its last jug).
@@ -229,4 +282,4 @@ async function readerMinute(db, opts) {
   return done;
 }
 
-module.exports = { ReaderError, applyReads, handleReads, readerCall, readerMinute, testReads, plantShift, zoneOffset, dateOf, hash, QUIET_MINUTES };
+module.exports = { ReaderError, applyReads, handleReads, readerCall, readerAll, readerMinute, testReads, plantShift, zoneOffset, dateOf, hash, QUIET_MINUTES };

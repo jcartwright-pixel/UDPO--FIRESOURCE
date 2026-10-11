@@ -134,3 +134,31 @@ test('The test feed: sandbox only, an administrator\'s, pretend jugs every minut
   await RD.readerMinute(db(), { now: at(32), project: 'ud-distribution-sandbox' });
   assert.equal((await run()).count, before);
 });
+
+test('A test setup for every machine (Joe 10/11): each line at its own full speed; a typed line switches to the reader and back', async () => {
+  const SB = { project: 'ud-distribution-sandbox', now: at(0) };
+  const lines = [
+    { operationId: LINE, products: [{ name: 'Broughton 2% Gallon', upc: '070852503050', ratePerMin: 74, shelfLifeDays: 17 }] },
+    { operationId: 'ut_prod_boxing', products: [{ name: 'UD 2% 5 Gal Disp Bag', ratePerMin: 8, shelfLifeDays: 21 }] },
+    { operationId: 'ut_prod_totes', products: [] }
+  ];
+  await assert.rejects(RD.readerAll(db(), { email: MANAGER }, { op: 'startAll', lines }, SB), /Only an administrator/);
+  await assert.rejects(RD.readerAll(db(), { email: ADMIN }, { op: 'startAll', lines }, { project: 'ud-distribution', now: at(0) }), /sandbox only/);
+  const r = await RD.readerAll(db(), { email: ADMIN }, { op: 'startAll', lines, minutes: 60 }, SB);
+  assert.deepEqual(r.lines, [LINE, 'ut_prod_boxing'], 'a line with no products is skipped');
+  assert.match(r.message, /TOTES has no products/);
+  const boxing = () => db().collection('productionLines').doc('ut_prod_boxing').get().then(s => s.data());
+  assert.equal((await boxing()).counter, 'READER');
+  assert.equal((await boxing()).testFeed.counterBefore, 'TABLET');
+  for (let m = 0; m < 3; m++) await RD.readerMinute(db(), { now: at(m), project: 'ud-distribution-sandbox' });
+  const box = (await db().collection('productionRuns').doc(P.runId('ut_prod_boxing', KEY)).get()).data();
+  assert.ok(box.count >= 20 && box.count <= 30, 'about 8 a minute on Boxing: ' + box.count);
+  assert.equal(box.product, 'UD 2% 5 Gal Disp Bag', 'a product not on the saved list still runs in the test');
+  assert.ok(box.reader.wrong + box.reader.missing >= 0);
+  assert.ok((await run()).count > 200, 'the Gallon Filler at about 74 a minute');
+  const s = await RD.readerAll(db(), { email: ADMIN }, { op: 'stopAll', lines }, SB);
+  assert.deepEqual(s.lines, [LINE, 'ut_prod_boxing']);
+  assert.equal((await boxing()).counter, 'TABLET', 'Boxing is typed again');
+  assert.equal((await boxing()).testFeed, null);
+  assert.equal((await db().collection('productionLines').doc(LINE).get()).data().counter, 'TABLET', 'a line switched for the test goes back too');
+});

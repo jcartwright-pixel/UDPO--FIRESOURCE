@@ -8,7 +8,8 @@
  *   - the speed flashes when the product runs over its highest speed (Joe 10/11), on the tablet and on the TV;
  *   - Production Lines and the TV show every line in green, yellow or red;
  *   - the label reader (Joe 10/11): an administrator makes the line key on Line Targets and starts the sandbox test feed, and the
- *     tablet and TV count the pretend jugs on their own with the code date check.
+ *     tablet and TV count the pretend jugs on their own with the code date check; Test Feed on Every Line does the same for
+ *     every machine at its own products' speed (Joe 10/11: a test setup for every machine).
  * Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -21,6 +22,7 @@ const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
 const P = require('../../src/production-rules');
 const RD = require('../../src/reader');
+const IDS = ['ut_prod_boxing', 'ut_prod_totes', 'ut_prod_htst_1', 'ut_prod_gallon_filler', 'ut_prod_blow_mold'];
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -190,13 +192,18 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     assert.equal(((await db().collection('private').doc('lineReaders').get()).data() || {})[LINE].hash, RD.hash(key), 'only its hash is kept');
     await lt.click('#start-feed');
     await lt.waitForFunction(() => /Test feed running/.test(document.getElementById('reader').textContent));
-    const feedStart = Date.now();
-    for (let m = 0; m < 5; m++) await RD.readerMinute(db(), { now: () => new Date(feedStart + m * 60000), project: 'demo-ud-distribution' });
+    // Twenty minutes of the feed, as if it had started twenty minutes ago (so the target so far and the speed read as on the line).
+    const runFeed = async (ids, minutes) => {
+      const feedStart = Date.now() - minutes * 60000;
+      for (const id of ids) await db().collection('productionLines').doc(id).set({ testFeed: { startedAt: new Date(feedStart).toISOString() } }, { merge: true });
+      for (let m = 0; m < minutes; m++) await RD.readerMinute(db(), { now: () => new Date(feedStart + m * 60000), project: 'demo-ud-distribution' });
+    };
+    await runFeed([LINE], 20);
     await fits(lt, 'Line Targets with the reader panel');
     await shot(lt, 'line-targets-reader-1536');
     assert.deepEqual(lt.errors, []);
     const rt = await openPage(browser, 1280, 800, '/line.html?line=' + LINE + '&' + ADMIN);
-    await rt.waitForFunction(() => Number((document.getElementById('made').textContent || '0').replace(/,/g, '')) > 300);
+    await rt.waitForFunction(() => Number((document.getElementById('made').textContent || '0').replace(/,/g, '')) > 1200);
     assert.match(await rt.textContent('#prod'), /Broughton 2% Gallon/, 'the reader picked the product by its UPC');
     assert.match(await rt.textContent('#date-check'), /CODE DATE|jugs read/);
     assert.match(await rt.textContent('#live'), /Label reader on/);
@@ -204,13 +211,41 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     assert.deepEqual(rt.errors, []);
     await rt.close();
     const rtv = await openPage(browser, 1920, 1080, '/production.html?tv=1&' + ADMIN);
-    await rtv.waitForFunction((l) => { const t = document.querySelector('.pd-tile[data-line="' + l + '"] .pd-made b'); return t && Number(t.textContent.replace(/,/g, '')) > 300; }, LINE);
+    await rtv.waitForFunction((l) => { const t = document.querySelector('.pd-tile[data-line="' + l + '"] .pd-made b'); return t && Number(t.textContent.replace(/,/g, '')) > 1200; }, LINE);
     await shot(rtv, 'production-tv-reader-1920');
     await rtv.close();
     await lt.click('#stop-feed');
     await lt.waitForFunction(() => /Start Test Feed/.test(document.getElementById('reader').textContent));
-    await lt.close();
     results.push('Label reader: an administrator makes the line key (kept only as a hash) and starts the test feed; the tablet and the TV count the pretend jugs with the product from its UPC; Stop Test Feed stops it');
+    // Joe 10/11: a test setup for every machine. Test Feed on Every Line counts each line at its own products' full speed; a line
+    // counted by typing switches to Label reader for the test and back when it stops.
+    for (const id of IDS) await db().collection('productionRuns').doc(P.runId(id, shiftKey)).delete();
+    await lt.click('[data-line="ut_prod_boxing"]');
+    await lt.waitForFunction(() => /counted by typing/.test(document.getElementById('reader').textContent));
+    assert.equal(await lt.$('#make-key'), null, 'no line key until the line is counted by a label reader');
+    await lt.click('#start-all');
+    await lt.waitForFunction(() => /Test feed on 5 lines/.test(document.getElementById('reader').textContent));
+    await lt.waitForSelector('#stop-all');
+    for (const id of IDS) assert.equal((await db().collection('productionLines').doc(id).get()).data().counter, 'READER', id + ' counts by the reader for the test');
+    await runFeed(IDS, 20);
+    const made = {};
+    for (const id of IDS) made[id] = (await db().collection('productionRuns').doc(P.runId(id, shiftKey)).get()).data().count;
+    assert.ok(made.ut_prod_boxing > 100 && made.ut_prod_boxing < 400, 'Boxing at its own speed (8 to 12 a minute): ' + made.ut_prod_boxing);
+    assert.ok(made.ut_prod_gallon_filler > 1200, 'the Gallon Filler at about 74 a minute: ' + made.ut_prod_gallon_filler);
+    assert.ok(made.ut_prod_totes > 0 && made.ut_prod_totes < 60, 'Totes at about 1 a minute: ' + made.ut_prod_totes);
+    await shot(lt, 'line-targets-every-line-1536');
+    const etv = await openPage(browser, 1920, 1080, '/production.html?tv=1&' + ADMIN);
+    await etv.waitForFunction((ids) => ids.every(l => { const t = document.querySelector('.pd-tile[data-line="' + l + '"] .pd-made b'); return t && Number(t.textContent.replace(/,/g, '')) > 0; }), IDS);
+    await shot(etv, 'production-tv-every-line-1920');
+    assert.deepEqual(etv.errors, []);
+    await etv.close();
+    await lt.click('#stop-all');
+    await lt.waitForFunction(() => /Test feed stopped on 5 lines/.test(document.getElementById('reader').textContent));
+    assert.equal((await db().collection('productionLines').doc('ut_prod_boxing').get()).data().counter, 'TABLET', 'Boxing is typed again');
+    assert.equal((await db().collection('productionLines').doc(LINE).get()).data().counter, 'READER', 'the Gallon Filler stays on its reader');
+    assert.deepEqual(lt.errors, []);
+    await lt.close();
+    results.push('Test Feed on Every Line: every machine counts on its own at its products\' full speed on the TV; Stop Every Test Feed puts typed lines back to typing');
     console.log('Plant Production browser check passed:\n - ' + results.join('\n - '));
   } finally {
     await browser.close();

@@ -307,7 +307,7 @@ exports.lineReads = onRequest({ maxInstances: 3, timeoutSeconds: 30 }, async (re
 });
 exports.lineReader = onCall({ timeoutSeconds: 30 }, async (request) => {
   const user = signedIn(request);
-  try { return await READER.readerCall(db, user, request.data, { project: projectId() }); } catch (error) { throw asHttps(error); }
+  try { return await READER.readerAll(db, user, request.data, { project: projectId() }); } catch (error) { throw asHttps(error); }
 });
 exports.productionEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 60, maxInstances: 1 }, async () => {
   const done = await READER.readerMinute(db, { project: projectId() });
