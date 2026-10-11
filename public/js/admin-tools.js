@@ -64,9 +64,11 @@ export async function renderRepairEmail(box, ctx) {
 
 /* ---------- Driver Check-In Email ---------- */
 
+// Joe 10/11: each location has its own check-in mailbox; the Location drop-down picks which one the page shows and saves.
 export async function renderCheckinEmail(box) {
-  let data = null;
-  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn main" id="ce-save">Save</button><button type="button" class="ap-btn" id="ce-now">Check now</button><button type="button" class="ap-btn" id="ce-std">Use the standard addresses</button><button type="button" class="ap-btn" id="ce-reload">Reload</button>') +
+  let data = null, plant = 'fac_uniontown';
+  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn main" id="ce-save">Save</button><button type="button" class="ap-btn" id="ce-now">Check now</button><button type="button" class="ap-btn" id="ce-std">Use the standard addresses</button><button type="button" class="ap-btn" id="ce-reload">Reload</button>',
+    '<b style="color:#0b3d6b">Location</b><select id="ce-plant" aria-label="Location">' + window.UDLogic.PLANTS.map(p => '<option value="' + p.id + '">' + e(p.name) + '</option>').join('') + '</select>') +
     '<p class="ap-note">The phone check-in service emails each driver check-in. This check reads that mailbox (read-only), adds equipment issues, cleaning and returns to the maintenance lists and records cases delivered and returned.</p>' +
     '<div class="ap-split"><section class="ap-card"><h3>Mailbox</h3><label class="ap-checks"><label><input type="checkbox" id="ce-on"> Check the mailbox</label></label>' +
     '<label class="ap-field">Sent by (the answering service)<input type="email" id="ce-from"></label><label class="ap-field">Sent to (our mailbox)<input type="email" id="ce-to"></label>' +
@@ -82,14 +84,15 @@ export async function renderCheckinEmail(box) {
       'Mailbox owner: ' + e(s.owner || 'set when the check is turned on (the administrator who saves it)')];
     $('#ce-status').innerHTML = lines.map(t => '<div class="ap-item"><div>' + t + '</div></div>').join('');
   }
-  async function load() { try { data = await call('checkinEmail'); if (box.isConnected) { fill(data.settings); render(); } } catch (err) { say(box, errText(err), 'bad'); } }
+  async function load() { try { data = await call('checkinEmail', { plant }); if (box.isConnected) { fill(data.settings); render(); } } catch (err) { say(box, errText(err), 'bad'); } }
+  box.addEventListener('change', ev => { if (ev.target.id === 'ce-plant') { plant = ev.target.value; say(box, ''); load(); } });
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.id === 'ce-reload') load();
     if (b.id === 'ce-std') { $('#ce-from').value = data.standard.sender; $('#ce-to').value = data.standard.recipient; $('#ce-subject').value = data.standard.subject; say(box, 'Standard values filled in. Press Save to keep them.'); }
-    if (b.id === 'ce-save') busy(box, b, async () => { data = await call('saveCheckinEmail', { enabled: $('#ce-on').checked, sender: $('#ce-from').value, recipient: $('#ce-to').value, subject: $('#ce-subject').value }); fill(data.settings); render(); say(box, data.message, 'good'); });
-    if (b.id === 'ce-now') busy(box, b, async () => { data = await call('checkinEmailNow'); render(); say(box, data.message, data.status === 'FAIL' ? 'bad' : data.status === 'OFF' ? '' : 'good'); });
+    if (b.id === 'ce-save') busy(box, b, async () => { data = await call('saveCheckinEmail', { plant, enabled: $('#ce-on').checked, sender: $('#ce-from').value, recipient: $('#ce-to').value, subject: $('#ce-subject').value }); fill(data.settings); render(); say(box, data.message, 'good'); });
+    if (b.id === 'ce-now') busy(box, b, async () => { data = await call('checkinEmailNow', { plant }); render(); say(box, data.message, data.status === 'FAIL' ? 'bad' : data.status === 'OFF' ? '' : 'good'); });
   });
   await load();
 }

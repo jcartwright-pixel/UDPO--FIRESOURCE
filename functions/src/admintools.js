@@ -236,9 +236,21 @@ async function afterSave(db, user, input, result, mailDeps) {
 const CHECKIN_STANDARD = { sender: 'callcenter@lauttamus.com', recipient: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN' };
 const LOOKBACK_DAYS = 7, MAX_MESSAGES = 500;
 
-async function checkinSettings(db) {
-  const d = (await read(priv(db, 'checkinEmail'))) || {};
-  return { enabled: d.enabled === true, sender: d.sender || CHECKIN_STANDARD.sender, recipient: d.recipient || CHECKIN_STANDARD.recipient, subject: d.subject || CHECKIN_STANDARD.subject,
+// Joe 10/11: each location has its own check-in mailbox settings. Uniontown keeps the original documents (its values
+// are the ones saved before); every other plant starts blank and off until filled in.
+const UNIONTOWN = 'fac_uniontown';
+const checkinPlant = (v) => { const id = String(v || UNIONTOWN); if (!L.PLANTS.some(p => p.id === id)) fail('BAD_REQUEST', 'Pick a location.'); return id; };
+const checkinDoc = (db, plant, status) => priv(db, (status ? 'checkinEmailStatus' : 'checkinEmail') + (plant === UNIONTOWN ? '' : '_' + plant));
+function checkinStandard(plant) {
+  if (plant === UNIONTOWN) return CHECKIN_STANDARD;
+  const name = (L.PLANTS.find(p => p.id === plant) || {}).name || '';
+  return { sender: CHECKIN_STANDARD.sender, recipient: '', subject: name.toUpperCase() + ' DRIVER CHECK IN' };
+}
+
+async function checkinSettings(db, plant) {
+  plant = plant || UNIONTOWN;
+  const d = (await read(checkinDoc(db, plant))) || {}, std = plant === UNIONTOWN ? CHECKIN_STANDARD : { sender: '', recipient: '', subject: '' };
+  return { plant, enabled: d.enabled === true, sender: d.sender || std.sender, recipient: d.recipient || std.recipient, subject: d.subject || std.subject,
     owner: d.owner || '', lastSuccessAt: d.lastSuccessAt || '', updatedAt: d.updatedAt || '', updatedBy: d.updatedBy || '' };
 }
 
@@ -353,8 +365,15 @@ async function saveMailCheckin(db, msg, c, sender, stamp) {
  * [{id, internalDate, from, to, subject, body}] (mail.js readMail; a fake in the tests).
  */
 async function checkinRun(db, opts) {
-  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
-  const s = await checkinSettings(db);
+  const o = opts || {};
+  // The scheduled job (no location named) checks every location whose check is on.
+  if (!o.plant) {
+    const out = [];
+    for (const p of L.PLANTS) out.push(Object.assign({ plant: p.id }, await checkinRun(db, Object.assign({}, o, { plant: p.id }))));
+    return { status: out.some(r => r.status === 'FAIL') ? 'FAIL' : 'SUCCESS', message: out.map(r => r.message).join(' '), plants: out };
+  }
+  const plant = checkinPlant(o.plant), now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  const s = await checkinSettings(db, plant);
   if (!s.enabled) return { status: 'OFF', message: 'The check is off, so nothing was read.' };
   const status = { at: stamp, status: 'SUCCESS', read: 0, added: 0, review: 0, seen: 0, skipped: 0, error: '', by: o.by || 'SCHEDULE' };
   try {
@@ -373,35 +392,39 @@ async function checkinRun(db, opts) {
       status.added += r.made.length; status.review += r.review;
     }
     if (status.review) status.status = 'NEEDS_REVIEW';
-    await priv(db, 'checkinEmail').set({ lastSuccessAt: stamp }, { merge: true });
+    await checkinDoc(db, plant).set({ lastSuccessAt: stamp }, { merge: true });
   } catch (e) {
     status.status = 'FAIL';
     status.error = e.code === 'NOT_DELEGATED'
       ? 'Google Workspace has not yet let the app read this mailbox. IT adds the scope https://www.googleapis.com/auth/gmail.readonly to the app\'s domain-wide delegation (same Client ID as email sending).'
       : String(e.message || e).slice(0, 300);
   }
-  await priv(db, 'checkinEmailStatus').set(status);
+  await checkinDoc(db, plant, true).set(status);
   const message = status.status === 'FAIL' ? 'The check did not finish: ' + status.error : 'Checked: ' + status.read + ' check-in' + (status.read === 1 ? '' : 's') + ' read, ' + status.added + ' record' + (status.added === 1 ? '' : 's') + ' added, ' + status.review + ' need review' + (status.seen ? ', ' + status.seen + ' already seen' : '') + '.';
   return { status: status.status, message, run: status };
 }
 
-async function checkinEmail(db) {
-  const [s, last, rates] = await Promise.all([checkinSettings(db), read(priv(db, 'checkinEmailStatus')), rateSettings(db)]);
-  return { settings: s, standard: CHECKIN_STANDARD, last: last || null, every: rates.jobs.checkinMail.minutes };
+async function checkinEmail(db, input) {
+  const plant = checkinPlant(input && input.plant);
+  const [s, last, rates] = await Promise.all([checkinSettings(db, plant), read(checkinDoc(db, plant, true)), rateSettings(db)]);
+  return { plant, plants: L.PLANTS.map(p => ({ id: p.id, name: p.name })), settings: s, standard: checkinStandard(plant), last: last || null, every: rates.jobs.checkinMail.minutes };
 }
 
 async function saveCheckinEmail(db, email, input, stamp) {
-  const before = await checkinSettings(db);
+  const plant = checkinPlant(input.plant), before = await checkinSettings(db, plant);
   const sender = text(input.sender, 120).toLowerCase(), recipient = text(input.recipient, 120).toLowerCase();
-  if (!addresses([sender]).length || !addresses([recipient]).length) fail('BAD_REQUEST', 'Enter the sender and our mailbox as email addresses.');
   const subject = text(input.subject, 120).replace(/[\r\n"]+/g, ' ').trim();
-  if (!subject) fail('BAD_REQUEST', 'Enter the subject line it looks for.');
   if (typeof input.enabled !== 'boolean') fail('BAD_REQUEST', 'Say whether to check the mailbox.');
+  // A location that is off may stay blank; once on, it needs all three.
+  if ((input.enabled || sender) && !addresses([sender]).length) fail('BAD_REQUEST', 'Enter the sender as an email address.');
+  if ((input.enabled || recipient) && !addresses([recipient]).length) fail('BAD_REQUEST', 'Enter our mailbox as an email address.');
+  if (input.enabled && !subject) fail('BAD_REQUEST', 'Enter the subject line it looks for.');
   const changed = sender !== before.sender || recipient !== before.recipient || subject !== before.subject;
   // The mailbox is read as the administrator who turned the check on (a United Dairy account), as the current app did.
   const owner = input.enabled ? before.owner || email : before.owner;
-  await priv(db, 'checkinEmail').set({ enabled: input.enabled, sender, recipient, subject, owner, updatedAt: stamp, updatedBy: email, lastSuccessAt: changed ? '' : before.lastSuccessAt });
-  return Object.assign({ ok: true, message: 'Saved.' + (input.enabled ? ' The mailbox is checked every ' + (await rateSettings(db)).jobs.checkinMail.minutes + ' minutes.' : ' The mailbox is not being checked.') }, await checkinEmail(db));
+  await checkinDoc(db, plant).set({ enabled: input.enabled, sender, recipient, subject, owner, updatedAt: stamp, updatedBy: email, lastSuccessAt: changed ? '' : before.lastSuccessAt });
+  const name = (L.PLANTS.find(p => p.id === plant) || {}).name;
+  return Object.assign({ ok: true, message: 'Saved for ' + name + '.' + (input.enabled ? ' The mailbox is checked every ' + (await rateSettings(db)).jobs.checkinMail.minutes + ' minutes.' : ' The mailbox is not being checked.') }, await checkinEmail(db, { plant }));
 }
 
 /* ---------- Refresh Rates ---------- */
@@ -901,8 +924,8 @@ async function dateConvert(db, email, input, stamp, deps) {
 const OPS = {
   repairEmail: (db, email, input, stamp, d) => repairEmail(db, d), saveRepairEmail,
   repairEmailSendNow: (db, email, input, stamp, d) => repairSweep(db, { force: true, by: email, mailDeps: d.mailDeps }),
-  checkinEmail: (db) => checkinEmail(db), saveCheckinEmail,
-  checkinEmailNow: async (db, email, input, stamp, d) => Object.assign(await checkinRun(db, { by: email, readMail: d.readMail }), await checkinEmail(db)),
+  checkinEmail: (db, email, input) => checkinEmail(db, input), saveCheckinEmail,
+  checkinEmailNow: async (db, email, input, stamp, d) => { const plant = checkinPlant(input.plant); return Object.assign(await checkinRun(db, { by: email, readMail: d.readMail, plant }), await checkinEmail(db, { plant })); },
   refreshRates: (db) => refreshRates(db), saveRefreshRate,
   archiveNow: (db, email, input, stamp, d) => archiveCompleted(db, email, { sheets: d.sheets && d.sheets(), liveId: d.liveId }),
   windowTests: (db) => windowTests(db), windowTestLog,
