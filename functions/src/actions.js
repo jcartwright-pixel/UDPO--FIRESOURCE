@@ -84,7 +84,11 @@ const ACTIONS = Object.freeze({
   // Administration > Plant Shifts: each plant's shifts (Plant Reports' Shift Comparison).
   savePlantShifts: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
-  sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' }
+  sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
+  // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js).
+  saveFleetRules: { roles: REORDER_ROLES, screen: 'checkIns' },
+  saveFleetUnit: { roles: REORDER_ROLES, screen: 'checkIns' },
+  saveGarageTech: { roles: REORDER_ROLES, screen: 'checkIns' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -334,6 +338,7 @@ function validate(input) {
   if (action === 'saveMachineProducts') return Object.assign(out, PLANT.validateMachineProducts(input, SaveError));
   if (action === 'savePlantShifts') return Object.assign(out, PLANT.validatePlantShifts(input, SaveError));
   if (action === 'sendToGarage') return GARAGE.validateSend(input, out);
+  if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(action) >= 0) return GARAGE.validateFleet(action, input, out);
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
     if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
@@ -519,6 +524,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'setUnitDown' || req.action === 'setUnitUp') return setUnitDown(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'updateIssue') return updateIssue(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'sendToGarage') return GARAGE.sendToGarage(tx, db, req, email, stamp, logRef, mode);
+    if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(req.action) >= 0) return GARAGE.saveFleet(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'clearConflict') return clearConflict(tx, db, req, email, stamp, logRef, mode);
     if (DRIVER_ACTIONS.indexOf(req.action) >= 0) return editDriver(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriver') return saveDriver(tx, db, req, email, stamp, logRef, mode);
