@@ -41,3 +41,26 @@ test('Over the Road import: the accounting numbers fill their months, a typed da
   assert.equal(sal.runs, 3);
   assert.equal(sal.source, 'IMPORT');
 });
+
+test('Over the Road import: a 188-month accounting file saves every month in batches the server accepts', async () => {
+  const O = require('../../src/otr-core');
+  const figures = [];
+  for (let i = 0; i < 188; i++) {
+    const year = 2011 + Math.floor(i / 12), month = (i % 12) + 1;
+    figures.push({ year, month, key: 'gallons_sold', value: 2000000 + i });
+    if (year >= 2024) ['distribution_cost', 'employee_cost', 'fuel_cost'].forEach(key => figures.push({ year, month, key, value: 1000 + i }));
+  }
+  await db().collection('otrDaily').doc('2026-08-03__Jersey').set({ date: '2026-08-03', destination: 'Jersey', runs: 5, source: 'MANUAL' });
+  const daily = [];
+  for (let d = 1; d <= 400; d++) daily.push({ date: '2025-' + String(Math.ceil(d / 31) % 12 + 1).padStart(2, '0') + '-' + String((d % 28) + 1).padStart(2, '0'), destination: d % 2 ? 'SAL' : 'Jersey', runs: 1 });
+  daily.push({ date: '2026-08-03', destination: 'Jersey', runs: 2 });
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveOtr', requestId: rid(), op: 'import', figures, daily: [] }, now), /Too many months/, 'one save of 188 months is still refused');
+  const batches = O.otrImportBatches_({ figures, daily });
+  assert.ok(batches.length >= 5);
+  for (const b of batches) await applyAction(db(), MANAGER, Object.assign({ action: 'saveOtr', requestId: rid(), op: 'import' }, b), now);
+  const months = await db().collection('otrMonthly').get();
+  assert.equal(months.size, 188);
+  assert.equal((await db().collection('otrMonthly').doc('2011-01').get()).data().gallons_sold, 2000000);
+  assert.equal((await db().collection('otrMonthly').doc('2026-08').get()).data().fuel_cost, 1187);
+  assert.equal((await db().collection('otrDaily').doc('2026-08-03__Jersey').get()).data().runs, 5, 'a typed day count is never replaced');
+});
