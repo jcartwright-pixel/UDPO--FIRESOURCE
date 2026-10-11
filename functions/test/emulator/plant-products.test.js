@@ -78,3 +78,20 @@ test('Upload: each area in the file gets the file\'s list, other areas stay, new
   await assert.rejects(up(MANAGER, { facilityId: 'fac_uniontown', areas: [{ name: 'X', products: [{ name: 'A' }, { name: 'a' }] }] }), /on the list twice/);
   await assert.rejects(up(MANAGER, { facilityId: 'fac_uniontown', areas: [] }), /no areas/);
 });
+
+// Joe 10/11: one product list holds everything: UPC, full speed (RedZone Rate/Min), Target %, lowest and highest speed, shelf life.
+test('Product details: kept as numbers, checked, and an upload that leaves them blank or out keeps them', async () => {
+  await act(MANAGER, { operationId: 'ut_prod_gallon_filler', products: [{ name: 'GV 2% Gallon', sku: '280305', upc: '0 78742 37112 6', ratePerMin: '74', targetPct: '64.37', minSpeed: '40', maxSpeed: '80', shelfLifeDays: '14.2' }, { name: 'Plain', ratePerMin: '' }] });
+  const get = async (id) => (await db().collection('plantProducts').doc(id).get()).data();
+  const gv = (await get('ut_prod_gallon_filler')).products;
+  assert.deepEqual(gv[0], { name: 'GV 2% Gallon', sku: '280305', mfgType: '', productGroup: '', upc: '078742371126', ratePerMin: 74, targetPct: 64.37, minSpeed: 40, maxSpeed: 80, shelfLifeDays: 14 });
+  assert.deepEqual(gv[1], { name: 'Plain', sku: '', mfgType: '', productGroup: '' }, 'blank details are left off');
+  await assert.rejects(act(MANAGER, { operationId: 'ut_prod_totes', products: [{ name: 'T', upc: 'abc' }] }), /UPC is 6 to 14 digits/);
+  await assert.rejects(act(MANAGER, { operationId: 'ut_prod_totes', products: [{ name: 'T', targetPct: '120' }] }), /Target % must be a number from 0 to 100/);
+  await assert.rejects(act(MANAGER, { operationId: 'ut_prod_totes', products: [{ name: 'T', minSpeed: '90', maxSpeed: '80' }] }), /Lowest Speed is above Highest Speed/);
+  // An old-layout file: the SKU changes, the details stay.
+  await up(MANAGER, { facilityId: 'fac_uniontown', areas: [{ areaId: 'ut_prod_gallon_filler', name: 'GALLON FILLER', products: [{ name: 'GV 2% Gallon', sku: '280399', mfgType: 'Gallon', productGroup: 'Milk' }, { name: 'New one', sku: '5' }] }] });
+  const after = (await get('ut_prod_gallon_filler')).products;
+  assert.deepEqual([after[0].sku, after[0].upc, after[0].ratePerMin, after[0].targetPct, after[0].shelfLifeDays], ['280399', '078742371126', 74, 64.37, 14]);
+  assert.deepEqual(after.map(p => p.name), ['GV 2% Gallon', 'New one']);
+});

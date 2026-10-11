@@ -20,8 +20,30 @@ export function watchProductSetup(db, cb, fail) {
 // A product's groups ("Drinks, TEA" is two).
 export const groupsOf = (p) => String((p && p.productGroup) || '').split(',').map(g => g.trim()).filter(Boolean);
 
-// The template's columns, in order; a file with these headings loads (Joe 10/11: always the same layout).
-export const TEMPLATE = ['Plant', 'Area', 'Product', 'SKU', 'Type', 'Group'];
+// Joe 10/11: one product list holds everything about each product, a tab per plant. The fields, in template order (the same
+// names as functions/src/plant.js productRows): speeds are per minute (RedZone's Rate/Min), Target % is RedZone's, and shelf life is
+// days from the run date to the code date.
+export const FIELDS = [
+  { k: 'name', head: 'Product' }, { k: 'sku', head: 'SKU' }, { k: 'upc', head: 'UPC' }, { k: 'mfgType', head: 'Type' }, { k: 'productGroup', head: 'Group' },
+  { k: 'ratePerMin', head: 'Full Speed Per Min', num: true }, { k: 'targetPct', head: 'Target %', num: true },
+  { k: 'minSpeed', head: 'Lowest Speed', num: true }, { k: 'maxSpeed', head: 'Highest Speed', num: true }, { k: 'shelfLifeDays', head: 'Shelf Life Days', num: true }
+];
+// The fields an upload never wipes: a file that leaves one blank or out keeps what the product has (Joe 10/11, targets stay put).
+export const KEEP_FIELDS = ['upc', 'ratePerMin', 'targetPct', 'minSpeed', 'maxSpeed', 'shelfLifeDays'];
+// The template's columns, in order; a file with these headings loads (Joe 10/11: always the same layout). Plant is the tab's name
+// in the workbook (or a column in a CSV); a column left out of a file keeps what each product has.
+export const TEMPLATE = ['Plant', 'Area'].concat(FIELDS.map(f => f.head));
+// A product as the server keeps it: blank fields left off, numbers as numbers (so a saved list matches what was typed).
+export function cleanProduct(p) {
+  const out = {};
+  FIELDS.forEach(f => {
+    let v = p && p[f.k] !== undefined && p[f.k] !== null ? String(p[f.k]).trim() : '';
+    if (f.k === 'upc') v = v.replace(/[\s-]/g, '');
+    if (f.num && v !== '' && isFinite(Number(v.replace(/,/g, '')))) { const n = Number(v.replace(/,/g, '')); out[f.k] = f.k === 'shelfLifeDays' ? Math.round(n) : Math.round(n * 100) / 100; return; }
+    if (v !== '' || ['name', 'sku', 'mfgType', 'productGroup'].indexOf(f.k) >= 0) out[f.k] = v;
+  });
+  return out;
+}
 const cell = (v) => { const s = String(v == null ? '' : v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
 export function toCsv(rows) { return [TEMPLATE].concat(rows).map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'; }
 // CSV text -> rows of cells (quotes, doubled quotes, commas and line breaks in quotes, a byte-order mark).
@@ -72,3 +94,11 @@ export function sizeFor(mfgType) {
 }
 
 export const OTHER = '__other__';
+
+// Rows of cells with a heading row -> [{heading: value}] by the template's headings (any case); headings a file leaves out are not set.
+export function rowsByHeading(rows) {
+  if (!rows.length) return { rows: [], has: {} };
+  const head = rows[0].map(h => String(h == null ? '' : h).trim().toUpperCase()), at = {}, has = {};
+  TEMPLATE.forEach(t => { at[t] = head.indexOf(t.toUpperCase()); has[t] = at[t] >= 0; });
+  return { has, rows: rows.slice(1).map(r => { const o = {}; TEMPLATE.forEach(t => { if (at[t] >= 0) o[t] = String(r[at[t]] == null ? '' : r[at[t]]).trim(); }); return o; }) };
+}

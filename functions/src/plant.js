@@ -875,6 +875,12 @@ function validFacility(v, SaveError) {
   if (plantIds().indexOf(facilityId) < 0) throw new SaveError('BAD_REQUEST', 'Pick a plant.');
   return facilityId;
 }
+// Joe 10/11: one product list holds everything about each product: UPC, full speed per minute (RedZone's Rate/Min), Target %
+// (RedZone's), the allowed speed range per minute, and shelf life (days from the run date to the code date). The same names are in
+// public/js/products.js (FIELDS) and are read by the Line Targets, line tablet and TV screens; blank ones are left off.
+const PRODUCT_NUMBERS = [['ratePerMin', 'Full Speed Per Min', 100000], ['targetPct', 'Target %', 100], ['minSpeed', 'Lowest Speed', 100000], ['maxSpeed', 'Highest Speed', 100000], ['shelfLifeDays', 'Shelf Life Days', 3650]];
+// An upload never wipes these: a file that leaves one blank or out keeps what the product has.
+const PRODUCT_KEEP = ['upc'].concat(PRODUCT_NUMBERS.map(x => x[0]));
 function productRows(list, SaveError) {
   if (!Array.isArray(list) || list.length > PRODUCT_LIMIT) throw new SaveError('BAD_REQUEST', 'An area holds up to ' + PRODUCT_LIMIT + ' products.');
   const seen = {}, products = [];
@@ -882,6 +888,16 @@ function productRows(list, SaveError) {
     const x = p && typeof p === 'object' ? p : {};
     const row = { name: text(x.name).slice(0, 120), sku: text(x.sku).slice(0, 40), mfgType: text(x.mfgType).slice(0, 40), productGroup: text(x.productGroup).slice(0, 60) };
     if (!row.name) return;
+    const upc = text(x.upc).replace(/[\s-]/g, '');
+    if (upc) { if (!/^\d{6,14}$/.test(upc)) throw new SaveError('BAD_REQUEST', row.name + ': the UPC is 6 to 14 digits.'); row.upc = upc; }
+    PRODUCT_NUMBERS.forEach(([k, label, max]) => {
+      const t = text(x[k]);
+      if (t === '') return;
+      const n = Number(t.replace(/,/g, ''));
+      if (!isFinite(n) || n < 0 || n > max) throw new SaveError('BAD_REQUEST', row.name + ': ' + label + ' must be a number from 0 to ' + max + '.');
+      row[k] = k === 'shelfLifeDays' ? Math.round(n) : Math.round(n * 100) / 100;
+    });
+    if (row.minSpeed !== undefined && row.maxSpeed !== undefined && row.minSpeed > row.maxSpeed) throw new SaveError('BAD_REQUEST', row.name + ': Lowest Speed is above Highest Speed.');
     const key = row.name.toUpperCase();
     if (seen[key]) throw new SaveError('BAD_REQUEST', row.name + ' is on the list twice. Each product needs its own name.');
     seen[key] = true;
@@ -986,6 +1002,12 @@ async function saveProductUpload(tx, db, req, email, stamp, logRef, mode, SaveEr
   if (groups.length > GROUP_LIMIT) throw new SaveError('BAD_REQUEST', 'A plant holds up to ' + GROUP_LIMIT + ' groups.');
   const refs = targets.map(t => db.collection('plantProducts').doc(docId(t.id))), had = [];
   for (const r of refs) had.push(await tx.get(r));
+  // UPC, speeds, Target % and shelf life the file leaves blank or out keep what the same product has in that area.
+  targets.forEach((t, i) => {
+    const was = {};
+    (had[i].exists ? had[i].data().products || [] : []).forEach(p => { if (p && p.name) was[text(p.name).toUpperCase()] = p; });
+    t.products = t.products.map(p => { const w = was[p.name.toUpperCase()], out = Object.assign({}, p); if (w) PRODUCT_KEEP.forEach(k => { if (out[k] === undefined && w[k] !== undefined && w[k] !== '') out[k] = w[k]; }); return out; });
+  });
   if (addedAreas.length || addedGroups.length) tx.set(own.ref, { facilityId: req.facilityId, areas: ownAreas, groups, updatedAt: stamp, updatedBy: email });
   targets.forEach((t, i) => tx.set(refs[i], { operationId: t.id, line: t.name, facilityId: req.facilityId, products: t.products, updatedAt: stamp, updatedBy: email, testEdited: true, uploaded: true }));
   const count = targets.reduce((n, t) => n + t.products.length, 0);
