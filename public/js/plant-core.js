@@ -6,7 +6,7 @@
  *   - the Loadout Center shows the day's loads plus yesterday's loads that were not finished, prior-day first, then
  *     load order, then route (udpoV780PlantLoadingRows_ / udpoV780PlantLoadingSort_);
  *   - Done = an End time, a stored COMPLETE / READY / LOADED, or the loaded tick; Loading = a Start time without an End;
- *   - Behind = not done 30 minutes after its depart time (217_V7271_PlantCurrentReport.gs BEHIND_MINUTES);
+ *   - Behind = not done more than 45 minutes after it leaves (Joe 10/11: 45 minutes late is not behind, 46 is);
  *   - a pickup (product that did not load at loadout) is open until it is marked complete, and shows red.
  */
 const L = window.UDLogic;
@@ -18,7 +18,7 @@ export const AREA = {
   BOXING: { title: 'Daily Box Loadout', tile: 'Boxes', label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' },
   TANKER: { title: 'Daily Tanker Loadout', tile: 'Tanker', label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }
 };
-export const BEHIND_MINUTES = 30;
+export const BEHIND_MINUTES = 45;
 
 export function areaOf(loadType) {
   const t = String(loadType || '').trim().toUpperCase();
@@ -85,9 +85,8 @@ export function nowMinutes(now) {
   return Number(parts.hour) * 60 + Number(parts.minute);
 }
 
-// Behind: today's load (or a prior-day load) not done 30 minutes after its depart time.
-// The moment is the route's departure (its departure date, the operating day before it for a load made earlier), not the load
-// day: a Saturday loadout for Monday is not behind on Saturday (217_V7271 / trailerHasDeparted).
+// Behind: a load not done more than 45 minutes after its route leaves (departure date + dispatch time, not the load day), so a
+// Saturday loadout for Monday is not behind until Monday (Joe 10/11).
 export function isBehind(row, today, now) {
   if (row.state === 'DONE') return false;
   const leaves = departWall(row);
@@ -95,7 +94,8 @@ export function isBehind(row, today, now) {
   return wallNowMinutes(now) > leaves + BEHIND_MINUTES;
 }
 // Minutes since 1/1/1970 on the plant's wall clock (New York), and when a load leaves on that clock: the same rule as
-// plant-rules.js departWall (this file is also used on screens that do not load plant-rules.js).
+// plant-rules.js departWall: the departure date (blank = delivery date) at the dispatch time (this file is also used on screens that
+// do not load plant-rules.js).
 const dayNumber = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
 export function wallNowMinutes(now) {
   const parts = {};
@@ -104,10 +104,9 @@ export function wallNowMinutes(now) {
   return dayNumber(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
 }
 export function departWall(row) {
-  const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), load = dayNumber(row.loadDate), t = row.dispatchTime;
+  const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), t = row.dispatchTime;
   if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
-  const m = Number(t);
-  return load !== null && load < departDay ? (departDay - 1) * 1440 + m + (m < 360 ? 1440 : 0) : departDay * 1440 + m;
+  return departDay * 1440 + Number(t);
 }
 
 export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(String(p.status || '').toUpperCase()) < 0; }

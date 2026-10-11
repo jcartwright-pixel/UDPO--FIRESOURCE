@@ -266,15 +266,12 @@
     return out;
   }
   // The trailer left at its dispatch time (trailerHasDeparted, 7.0.276).
-  // When a load leaves, on the plant's wall clock (the current app's trailerHasDeparted, 7.0.276). The Live sheet's departure date
-  // (blank = the delivery date) is the day the route goes out; a load made on an earlier day leaves at its dispatch time on the
-  // operating day before it (an early-morning time, before 6 AM, is the next calendar morning). A Saturday loadout for Monday
-  // deliveries therefore leaves Sunday evening or early Monday, never Saturday.
+  // When a route leaves, on the plant's wall clock (the current app's Send Current Report, 217_V7271): its departure date on the
+  // Live sheet (blank = the delivery date) at its dispatch time, never the load day. Saturday's loadout for Monday leaves Monday.
   function departWall(x) {
-    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime, load = dayNum(x.loadDate);
+    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime;
     if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
-    t = Number(t);
-    return load !== null && load < departDay ? (departDay - 1) * 1440 + t + (t < 360 ? 1440 : 0) : departDay * 1440 + t;
+    return departDay * 1440 + Number(t);
   }
   function yardDeparted(x, date, nowMs) {
     var departDay = dayNum(x.departureDate), opDay = dayNum(date);
@@ -285,7 +282,7 @@
     var load = dayNum(x.loadDate), done = wallMinutes(x.completedAt), departAt;
     if (done !== null) departAt = Math.ceil((done - 360 - t) / 1440) * 1440 + t;
     // An early load (made days ahead) waits on the yard until the operating day before its departure date.
-    if (done === null || departAt < (departDay - 1) * 1440 + 360) departAt = departWall(x);
+    if (done === null || departAt < (departDay - 1) * 1440 + 360) departAt = load !== null && load < departDay ? (departDay - 1) * 1440 + t + (t < 360 ? 1440 : 0) : departDay * 1440 + t;
     return wallClock(nowMs) >= departAt;
   }
   function yardChecks(journal, date) {
@@ -553,7 +550,7 @@
   }
 
   /* ---------- Send Current Report ---------- */
-  var REPORT_BEHIND = 30, REPORT_AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
+  var REPORT_BEHIND = 45, REPORT_AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
   function zoned(ms, opts) { return new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: YARD_ZONE }, opts)).format(new Date(ms)); }
   function clockOf(v) { var t = typeof v === 'number' ? v : Date.parse(v || ''); return isFinite(t) && t ? zoned(t, { hour: 'numeric', minute: '2-digit' }) : text(v); }
   function minutesText12(m) { if (m === null || m === undefined || m === '') return ''; var h = Math.floor(m / 60) % 24, mm = m % 60; return (h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm + ' ' + (h < 12 ? 'AM' : 'PM'); }
@@ -572,7 +569,7 @@
       areas[r.area].total++; out.total++;
       if (r.state === 'DONE') { out.loaded.push(item); return; }
       areas[r.area].left++; out.leftToLoad++;
-      if (until !== null && until <= REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); } else out.nextUp.push(item);
+      if (until !== null && until < -REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); } else out.nextUp.push(item);
     });
     var byDepart = function (a, b) { var x = a.minutesUntil === null ? 1e9 : a.minutesUntil, y = b.minutesUntil === null ? 1e9 : b.minutesUntil; return x - y || a.route.localeCompare(b.route, undefined, { numeric: true }); };
     out.behind.sort(byDepart);
@@ -609,7 +606,7 @@
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
   function reportText(r) {
     var L = [];
-    L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': every route due within ' + r.behindMinutes + ' minutes is COMPLETE'));
+    L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': no route is more than ' + r.behindMinutes + ' minutes past its depart time'));
     r.behind.forEach(function (x) { L.push('  ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.startedAt ? ' since ' + x.startedAt : '') + '  ' + x.late + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '')); });
     L.push('');
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in the Incident & Breakdown Log'));
