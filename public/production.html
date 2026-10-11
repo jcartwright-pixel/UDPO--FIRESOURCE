@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Production Lines · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <link rel="stylesheet" href="css/production.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+  <script src="js/production-rules.js"></script>
+</head>
+<body class="fill plant-page pd-page">
+  <!-- The TV has no desktop menu (like the Plant Performance kiosk): set before app.js builds the menu. -->
+  <script>if (new URLSearchParams(location.search).get('tv') === '1') document.body.classList.add('pd-tv', 'phone');</script>
+  <div class="signin" id="signin" hidden>
+    <h1>Production Lines</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Production</span><h1>Production Lines</h1></div>
+      <div class="hstats" id="hstats"></div>
+      <a class="lt-top" id="tv" href="production.html?tv=1" data-top>TV Display</a>
+      <a class="lt-top" href="line.html" data-top>Line Tablet</a>
+      <a class="lt-top" href="linetargets.html" data-top>Line Targets</a>
+      <select id="plant" class="pm-pick" aria-label="Plant" title="Plant" data-top></select>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view" id="view">
+      <!-- ?tv=1: the TV itself (Joe 10/11, mock-up B): no app header or menu, every line in green, yellow or red. -->
+      <div class="pd-tvh"><img src="img/ud-logo.webp" alt="United Dairy"><div><b id="tv-plant">PRODUCTION</b><span id="tv-shift"></span></div><div class="pd-clock" id="tv-clock"></div></div>
+      <div class="pd-sub" id="sub"></div>
+      <div class="pd-tiles" id="tiles"></div>
+      <div class="pd-legend"><span class="g">&#9679; At or ahead</span><span class="a">&#9679; Up to 10% behind</span><span class="r">&#9679; More than 10% behind or stopped</span><span class="f">&#9679; Speed outside its range</span></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { watchProduction, lineView, fmt, shiftText } from './js/production.js';
+
+    // Production Lines (Joe 10/11): every line this shift, made against target, stopped or running, and the speed flag (Joe: a
+    // product run under or over its allowed speed). Plant Production's first page; TV Display (?tv=1) is the same board for the
+    // TV on the floor, mock-up B. Read only: the line tablets enter everything.
+    const L = window.UDLogic, params = new URLSearchParams(location.search), tv = params.get('tv') === '1';
+    const ALL_PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
+    const testNow = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && Date.parse(params.get('now') || '') ? Date.parse(params.get('now')) : 0;
+    const started = Date.now(), now = () => testNow ? testNow + (Date.now() - started) : Date.now();
+    window.udBack = () => { if (tv) { location.search = ''; return true; } return false; };
+    let person = null, data = null, stop = null, db = null, plant = params.get('plant') || '';
+    const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
+    const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
+
+    function render() {
+      if (!data) return;
+      const t = now(), s = data.shift, views = data.lines.map(l => lineView(data, l, t));
+      document.getElementById('plant').innerHTML = plants().map(p => '<option value="' + p.id + '"' + (p.id === plant ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('');
+      document.getElementById('tv').href = 'production.html?tv=1&plant=' + encodeURIComponent(plant);
+      document.getElementById('tv-plant').textContent = plantName(plant).toUpperCase() + ' PRODUCTION';
+      document.getElementById('tv-shift').textContent = shiftText(s) + ' · ' + shortDate(s.date);
+      document.getElementById('tv-clock').textContent = new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      document.getElementById('sub').textContent = plantName(plant) + ' · ' + shiftText(s) + ' · ' + shortDate(s.date);
+      const running = views.filter(v => v.state === 'RUNNING').length, stopped = views.filter(v => v.state === 'STOPPED').length, flagged = views.filter(v => v.speedFlag === 'OVER' || v.speedFlag === 'UNDER').length;
+      document.getElementById('hstats').innerHTML = [['Lines', views.length, ''], ['Running', running, 'good'], ['Stopped', stopped, stopped ? 'bad' : ''], ['Speed off', flagged, flagged ? 'bad' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('tiles').innerHTML = views.map(v => {
+        const word = v.state === 'IDLE' ? 'NOT STARTED' : v.state === 'STOPPED' ? 'STOPPED ' + v.stoppedMin + ' MIN' : 'RUNNING';
+        const sp = v.speedFlag === 'OVER' ? 'TOO FAST ' + v.speed + '/MIN' : v.speedFlag === 'UNDER' ? 'TOO SLOW ' + v.speed + '/MIN' : v.speed !== null && v.state === 'RUNNING' ? v.speed + '/MIN' : '';
+        const off = v.speedFlag === 'OVER' || v.speedFlag === 'UNDER';
+        return '<div class="pd-tile ' + v.color + (off ? ' flash' : '') + '" data-line="' + escapeHtml(v.line.operationId) + '"><div class="pd-name">' + escapeHtml(v.line.name) + '</div><div class="pd-prod">' + escapeHtml(v.product || (v.state === 'IDLE' ? 'Nothing entered this shift' : 'No product picked')) + '</div>' +
+          '<div class="pd-made"><b>' + fmt(v.made) + '</b><span>of ' + fmt(v.soFar) + '</span></div>' +
+          '<div class="pd-foot"><span class="pd-pct">' + (v.pct === null ? '–' : v.pct + '%') + '</span>' + (sp ? '<span class="pd-speed' + (off ? ' off' : '') + '">' + sp + '</span>' : '') + '<span>' + word + '</span></div></div>';
+      }).join('') || '<p class="pd-empty">' + (data.read.setup ? 'No production lines are set up for ' + escapeHtml(plantName(plant)) + '.' : 'Reading the lines…') + '</p>';
+    }
+    function follow() {
+      if (stop) stop();
+      data = null;
+      stop = watchProduction(db, plant, d => { data = d; render(); }, e => showError('Could not read the lines (' + e.message + '). Check the network.'), now);
+    }
+    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; history.replaceState(null, '', '?plant=' + encodeURIComponent(plant)); follow(); });
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        if (!plants().some(p => p.id === plant)) plant = plants()[0].id;
+        if (!stop) follow(); else render();
+      });
+      setInterval(render, 15000);
+    });
+  </script>
+</body>
+</html>
