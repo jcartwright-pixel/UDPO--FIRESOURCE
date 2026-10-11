@@ -58,10 +58,82 @@ function allowedDates(stamp) { const today = L.operatingDay(new Date(stamp)); re
 
 function loadOf(run, runDocId, p) {
   const d = run.days[p];
-  return { runDocId, day: p, rev: run.rev || 0, route: run.route, run: run.run, truck: d.truck || '', trailer: d.trailer || '', casesOut: d.casesOut === undefined ? null : d.casesOut,
+  return { runDocId, day: p, rev: run.rev || 0, route: run.route, run: run.run, driver: d.driver || coverageName(run), truck: d.truck || '', trailer: d.trailer || '', casesOut: d.casesOut === undefined ? null : d.casesOut,
     casesDelivered: d.casesDelivered === undefined ? null : d.casesDelivered, driverCaseReturn: d.driverCaseReturn === undefined ? null : d.driverCaseReturn,
     refusedReturned: d.refusedReturned || '', refusedReturnedSource: d.refusedReturnedSource || '', tractorIssues: d.tractorIssues || '', trailerIssues: d.trailerIssues || '',
-    palletJackIssues: d.palletJackIssues || '', trailerNeedsCleaned: L.yes(d.trailerNeedsCleaned), checkinNotes: d.checkinNotes || '', checkinCompletedAt: d.checkinCompletedAt || '' };
+    palletJackIssues: d.palletJackIssues || '', trailerNeedsCleaned: L.yes(d.trailerNeedsCleaned), checkinNotes: d.checkinNotes || '', checkinCompletedAt: d.checkinCompletedAt || '',
+    // What the driver said at an earlier check-in: the unit numbers they corrected, drop-and-hook trailers, the jack, over / short.
+    palletJack: d.palletJackUnit || d.palletJack || '', checkinTruck: d.checkinTruck || '', checkinTrailer: d.checkinTrailer || '', moreTrailers: Array.isArray(d.moreTrailers) ? d.moreTrailers : [],
+    overageShortage: L.yes(d.overageShortage), overageShortageDetails: d.overageShortageDetails || '' };
+}
+
+// Who is checking in (Joe 10/11, as the old "Who is driving?"): a roster driver (their id), a fill-in or carrier name that is on
+// today's dispatch but not the roster ("name:NAME"), one route picked instead of a name ("route:runDocId|day"), or Skip ("skip":
+// every route of the day, the driver picks theirs). The phone keeps it like the name.
+const nameKey = (v) => String(v === null || v === undefined ? '' : v).toUpperCase().replace(/\b(JR|SR|II|III|IV)\b/g, ' ').replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+const coverageName = (run) => { const t = String(run.coverageType || '').trim().toUpperCase(); return t && t !== 'UNITED DAIRY' ? t : ''; };
+async function whoFor(db, raw) {
+  raw = String(raw || '').slice(0, 200);
+  if (raw === 'skip') return { kind: 'skip', id: '', name: '', by: 'skip', mine: () => true };
+  if (/^name:/.test(raw)) {
+    const name = raw.slice(5).trim().toUpperCase().slice(0, 120), k = nameKey(name);
+    if (!k) throw new SaveError('NOT_FOUND', 'Pick your name again');
+    return { kind: 'name', id: '', name, by: 'name:' + name, mine: (run, id, p, d) => nameKey(d.driver) === k || (!d.driver && nameKey(coverageName(run)) === k) };
+  }
+  if (/^route:/.test(raw)) {
+    const [runDocId, day] = raw.slice(6).split('|');
+    if (!runDocId || L.DAYS.indexOf(day) < 0) throw new SaveError('NOT_FOUND', 'Pick your name again');
+    return { kind: 'route', id: '', name: '', by: 'route:' + runDocId + '|' + day, mine: (run, id, p) => id === runDocId && p === day };
+  }
+  const driver = raw ? await db.collection(C.drivers).doc(M.safeIdPart(raw)).get() : null;
+  if (!driver || !driver.exists || (driver.data().status || 'ACTIVE') !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Pick your name again');
+  return { kind: 'driver', id: raw, name: driver.data().name, by: raw, mine: (run, id, p, d) => d.driverId === raw };
+}
+
+// The day's loads the phone may show (the Daily's runs that the Live sheet shows on the phone).
+async function dayLoads(db, date) {
+  const p = L.dayPrefix(date), snap = await db.collection(C.runs).where('weekStart', '==', L.weekStart(date)).get();
+  return snap.docs.filter(s => { const d = s.data().days && s.data().days[p]; return d && d.runs && L.liveFlagShown(s.data(), 'displayMobileRoute', 'mobile'); }).map(s => ({ run: s.data(), id: s.id, p, d: s.data().days[p] }));
+}
+const byRoute = (a, b) => String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run), undefined, { numeric: true });
+
+// The unit lists the Check-In boxes offer (a short number finds the unit; any number is still taken).
+async function unitLists(db) {
+  const all = (await db.collection(C.equipment).get()).docs.map(d => d.data()).filter(e => e.unit && (!e.status || e.status === 'ACTIVE'));
+  const of = (t) => [...new Set(all.filter(e => e.type === t).map(e => String(e.unit).trim().toUpperCase()))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return { trucks: of('TRUCK'), trailers: of('TRAILER'), jacks: of('FORK_TRUCK') };
+}
+
+// The units a driver typed at check-in: a short number becomes the unit it finds, anything else is kept as typed.
+const unitText = (v, max) => String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, ' ').slice(0, max || 40);
+function checkinExtras(f, d, equipment) {
+  const bad = (m) => { throw new SaveError('BAD_REQUEST', m); };
+  const out = {};
+  if (f.overageShortage !== undefined || f.overageShortageDetails !== undefined) {
+    out.overageShortageDetails = String(f.overageShortageDetails || '').trim().slice(0, 300);
+    out.overageShortage = f.overageShortage === true || !!out.overageShortageDetails ? 'TRUE' : '';
+    if (!out.overageShortage) out.overageShortageDetails = '';
+  }
+  const find = (raw, kind) => { const t = unitText(raw); if (!t || /^(N\/A|NA|TBA|NONE)$/.test(t)) return t === 'NA' ? 'N/A' : t; const u = MAINT.resolveUnit(t, kind, equipment); return u.resolved ? String(u.unit).trim().toUpperCase() : t; };
+  if (f.palletJack !== undefined) out.palletJackUnit = find(f.palletJack, 'FORK_TRUCK');
+  if (f.truck !== undefined) { const t = find(f.truck, 'TRUCK'); out.checkinTruck = t && t !== unitText(d.truck) ? t : ''; }
+  if (f.trailer !== undefined || f.moreTrailers !== undefined) {
+    const more = Array.isArray(f.moreTrailers) ? f.moreTrailers : [];
+    if (more.length > DVIR.MAX_TRAILERS - 1) bad('A run can have at most 4 trailers.');
+    const list = [dvirTrailer(f.trailer)].concat(more.map(m => dvirTrailer(m && m.trailer))), seen = {};
+    list.forEach((t, i) => {
+      if (i && !t) bad('Trailer ' + (i + 1) + ': enter the trailer number, or remove the box.');
+      if (!i && !t && list.length > 1) bad('Trailer 1: enter the trailer number before adding another trailer.');
+      if (t && t !== 'N/A' && !/^[A-Z0-9][A-Z0-9-]{0,19}$/.test(t)) bad('Trailer ' + (i + 1) + ': enter one trailer number per box (letters, numbers and dashes). Use Add trailer for another trailer.');
+      if (t && seen[t]) bad('Trailer ' + t + ' is entered twice. Enter each trailer once, one per box.');
+      seen[t] = true;
+    });
+    const named = list.map((t, i) => t && t !== 'N/A' ? find(t, 'TRAILER') : t);
+    out.checkinTrailer = named[0] && named[0] !== unitText(d.trailer) ? named[0] : '';
+    out.moreTrailers = more.map((m, i) => ({ trailer: named[i + 1], issues: String(m.issues || '').trim().slice(0, 300), needsCleaned: m.needsCleaned === true }));
+  }
+  [out.overageShortageDetails].concat((out.moreTrailers || []).map(m => m.issues)).forEach(v => { if (/^=/.test(v || '')) bad('Formula-style text is blocked. Enter plain text only.'); });
+  return out;
 }
 
 /*
@@ -75,7 +147,18 @@ async function phoneCall(db, input, now) {
   const op = String(input.op || '');
   if (op === 'roster') {
     const drivers = (await db.collection(C.drivers).get()).docs.map(d => d.data()).filter(d => d.name && L.driverActive(d));
-    return { drivers: drivers.map(d => ({ id: d.id, name: d.name })).sort((a, b) => a.name.localeCompare(b.name)), dates: allowedDates(stamp) };
+    // Also the fill-in and carrier names on today's or yesterday's dispatch that are not on the roster, and the routes to pick instead of a name.
+    const dates = allowedDates(stamp), roster = {}, others = {}, routes = [];
+    drivers.forEach(d => { roster[nameKey(d.name)] = true; });
+    for (const date of dates) {
+      (await dayLoads(db, date)).forEach(x => {
+        const name = String(x.d.driver || coverageName(x.run)).trim().toUpperCase();
+        if (name && !roster[nameKey(name)] && !(x.d.driverId && drivers.some(d => d.id === x.d.driverId))) others[nameKey(name)] = name;
+        if (date === dates[0]) routes.push({ id: 'route:' + x.id + '|' + x.p, route: x.run.route, run: x.run.run });
+      });
+    }
+    return { drivers: drivers.map(d => ({ id: d.id, name: d.name })).sort((a, b) => a.name.localeCompare(b.name)), dates,
+      others: Object.keys(others).map(k => others[k]).sort(), routes: routes.sort(byRoute).map(r => ({ id: r.id, name: String(r.route).replace(/_\d+$/, '') + ' · ' + r.run })) };
   }
   // View Loadout (Joe 10/10): the Driver Room board on the phone, read only, today's routes and their pickups.
   if (op === 'board') {
@@ -86,17 +169,15 @@ async function phoneCall(db, input, now) {
     const rows = B.loadoutBoardRows(runs, pickups, date).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText }));
     return { date, rows, remaining: rows.filter(r => r.state !== 'LOADED').length, at: stamp };
   }
-  const driverId = String(input.driverId || '').slice(0, 120);
-  const driver = driverId ? await db.collection(C.drivers).doc(M.safeIdPart(driverId)).get() : null;
-  if (!driver || !driver.exists || (driver.data().status || 'ACTIVE') !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Pick your name again');
+  const who = await whoFor(db, input.driverId);
   const dates = allowedDates(stamp);
   if (op === 'loads') {
-    const date = dates.indexOf(input.date) >= 0 ? input.date : dates[0], p = L.dayPrefix(date);
-    const snap = await db.collection(C.runs).where('weekStart', '==', L.weekStart(date)).get();
-    const loads = snap.docs.filter(s => { const d = s.data().days && s.data().days[p]; return d && d.runs && d.driverId === driverId && L.liveFlagShown(s.data(), 'displayMobileRoute', 'mobile'); }).map(s => loadOf(s.data(), s.id, p));
-    return { date, dates, driver: driver.data().name, loads };
+    const date = dates.indexOf(input.date) >= 0 ? input.date : dates[0];
+    const loads = (await dayLoads(db, date)).filter(x => who.mine(x.run, x.id, x.p, x.d)).map(x => loadOf(x.run, x.id, x.p)).sort(byRoute);
+    const label = who.kind === 'route' ? (loads[0] ? 'Route ' + String(loads[0].route).replace(/_\d+$/, '') + ' · ' + loads[0].run : 'Your route') : who.kind === 'skip' ? 'Driver not chosen' : who.name;
+    return { date, dates, driver: label, loads, units: await unitLists(db) };
   }
-  if (op === 'dvir') return saveDvir(db, input, driver.data(), dates, stamp);
+  if (op === 'dvir') return saveDvir(db, input, who, dates, stamp);
   if (op !== 'checkIn') throw new SaveError('BAD_REQUEST', 'Unknown request');
   const req = A.validate(Object.assign({}, input.fields || {}, { action: 'saveCheckIn', requestId: input.requestId, runDocId: input.runDocId, day: input.day }));
   return db.runTransaction(async tx => {
@@ -108,10 +189,16 @@ async function phoneCall(db, input, now) {
     const run = runSnap.exists ? runSnap.data() : null, d = run && run.days && run.days[req.day];
     const date = run ? L.addDays(run.weekStart, L.DAYS.indexOf(req.day)) : '';
     // Only a load Dispatch gave this driver, for today or yesterday.
-    if (!d || !d.runs || d.driverId !== driverId || dates.indexOf(date) < 0) throw new SaveError('NOT_ALLOWED', 'That load is not yours today; ask Dispatch');
-    const after = Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });
-    const by = 'phone:' + driverId;
-    const writeMaint = await MAINT.prepareMaintenance(tx, db, run, req.runDocId, req.day, date, Object.assign({}, d, after), { by: 'PUBLIC ROUTE · ' + driver.data().name, driver: driver.data().name }, stamp);
+    if (!d || !d.runs || !who.mine(run, req.runDocId, req.day, d) || dates.indexOf(date) < 0) throw new SaveError('NOT_ALLOWED', 'That load is not yours today; ask Dispatch');
+    const equipment = (await tx.get(db.collection(C.equipment))).docs.map(x => x.data());
+    const after = Object.assign({}, req.checkIn, checkinExtras(input.fields || {}, d, equipment), { checkinCompletedAt: stamp });
+    const by = 'phone:' + who.by, name = who.name || d.driver || coverageName(run);
+    // The write-ups go on the units the driver says they had (a corrected truck or trailer, the jack, each drop-and-hook trailer).
+    const units = Object.assign({}, d, after);
+    if (after.checkinTruck) Object.assign(units, { truck: after.checkinTruck, truckId: '' });
+    if (after.checkinTrailer) Object.assign(units, { trailer: after.checkinTrailer, trailerId: '' });
+    if (after.palletJackUnit) units.palletJack = after.palletJackUnit;
+    const writeMaint = await MAINT.prepareMaintenance(tx, db, run, req.runDocId, req.day, date, units, { by: 'PUBLIC ROUTE · ' + name, driver: name }, stamp);
     const before = {}, update = { rev: run.rev + 1, testEdited: true, editedAt: stamp };
     Object.keys(after).forEach(k => { before[k] = d[k] === undefined ? null : d[k]; update['days.' + req.day + '.' + k] = after[k]; });
     update['days.' + req.day + '.updatedAt'] = stamp;
@@ -120,7 +207,7 @@ async function phoneCall(db, input, now) {
     if (mode.writeBack) A.queueSheetCells(tx, db, req.requestId, '', run, req.runDocId, req.day, after, stamp, by);
     const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }] };
     result.maintenance = writeMaint(A.maintQueue(tx, db, mode, req.requestId, stamp, by));
-    tx.set(logRef, { action: 'phoneCheckIn', by, driver: driver.data().name, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });
+    tx.set(logRef, { action: 'phoneCheckIn', by, driver: name, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });
     return result;
   });
 }
@@ -183,8 +270,8 @@ function validateDvir(input) {
   return out;
 }
 
-async function saveDvir(db, input, driver, dates, stamp) {
-  const req = validateDvir(input), by = 'phone:' + driver.id;
+async function saveDvir(db, input, who, dates, stamp) {
+  const req = validateDvir(input), by = 'phone:' + who.by, driver = { id: who.id, name: who.name || req.signatureName };
   const ids = req.trailers.map((t, i) => 'DVIR_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 32) + '_' + (i + 1));
   return db.runTransaction(async tx => {
     const refs = ids.map(id => db.collection('dvirs').doc(id)), had = await tx.getAll(...refs);
@@ -192,7 +279,7 @@ async function saveDvir(db, input, driver, dates, stamp) {
     const mode = await A.requireTestMode(tx, db, 'checkIns');
     const runSnap = await tx.get(db.collection(C.runs).doc(req.runDocId)), run = runSnap.exists ? runSnap.data() : null, d = run && run.days && run.days[req.day];
     const date = run ? L.addDays(run.weekStart, L.DAYS.indexOf(req.day)) : '';
-    if (!d || !d.runs || d.driverId !== driver.id || dates.indexOf(date) < 0) throw new SaveError('NOT_ALLOWED', 'This route is not assigned to you for that day; ask Dispatch');
+    if (!d || !d.runs || !who.mine(run, req.runDocId, req.day, d) || dates.indexOf(date) < 0) throw new SaveError('NOT_ALLOWED', 'This route is not assigned to you for that day; ask Dispatch');
     const equipment = (await tx.get(db.collection(C.equipment))).docs.map(x => x.data());
     // The write-ups: the tractor's with the first trailer, each trailer's with its own record (numbered when there are several).
     const records = [];
