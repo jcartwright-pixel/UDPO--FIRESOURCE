@@ -1542,3 +1542,10 @@ table.old-issues th { padding-left: 4px; padding-right: 4px; }
    words come from data-cover so the cell itself stays empty for typing a driver. */
 body.daily-look table.daily td.missing.offcover, table.daily td.missing.offcover { background: #f5c6c8 !important; color: #9b1c3a; box-shadow: inset 0 0 0 2px #ee3e3e; font-weight: 800; }
 table.daily td.offcover::before { content: attr(data-cover); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+/* Daily Dispatch, Sunday: the Sunday deliveries already loaded Saturday are shown for reference, a little quieter than
+   what is loading today. */
+body.daily-look table.daily tbody tr.group.loaded.already td { background: linear-gradient(90deg, #64748b, #94a3b8) !important; }
+body.daily-look table.daily tbody tr.group.loaded.already td .gtext, body.daily-look table.daily tbody tr.group.loaded.already td { color: #fff !important; }
+body.daily-look table.daily tbody tr.already:not(.group) td { background: #f6f8fb; }
+body.daily-look table.daily tbody tr.already:not(.group) td:first-child { border-left-color: #94a3b8; }
