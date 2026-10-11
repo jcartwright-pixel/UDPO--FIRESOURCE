@@ -284,7 +284,8 @@ test('Manager Center: scheduler, quality, temperature and shift-note numbers, an
   assert.deepEqual(R.managerTemps([{ status: 'MANUAL ONLY', lastStatus: 'HIGH', lastCheckedAt: '2026-10-08T10:00:00Z', sensorId: 'x' }, { status: 'MANUAL ONLY', lastStatus: 'RECORDED', lastCheckedAt: '2026-10-08T12:00:00Z' }], [1, 2]),
     { sensors: 1, offline: 0, alerts: 1, lastManual: '2026-10-08T12:00:00Z', history: 2 });
   assert.deepEqual(R.managerNotes([{ type: 'Handoff', status: 'RESOLVED' }, { type: 'Breakdown', status: 'OPEN' }, { type: 'Safety', status: 'MONITOR' }]), { handoff: 1, issues: 2, open: 2, history: 3 });
-  // 10:00 AM in New York: 801 (depart 10:15, not loaded) is behind; 803 (depart noon) is next; 802 is loaded.
+  // 10:00 AM in New York: 799 (yesterday, not loaded) is behind; 801 (depart 10:15) is inside the 45-minute grace, so next with 803
+  // (depart noon); 802 is loaded.
   const now = Date.parse('2026-10-08T14:00:00Z');
   const load = (route, state, dispatchTime, seq, extra) => Object.assign({ route, run: route, area: 'CASE', state, dispatchTime, loadDate: '2026-10-08', loadSequence: seq, truck: '', trailer: '' }, extra);
   const r = R.plantReport({
@@ -294,11 +295,11 @@ test('Manager Center: scheduler, quality, temperature and shift-note numbers, an
     lines: [{ name: 'BOXING', last: { status: 'DOWN', product: 'Skim', notes: 'Belt' } }],
     temps: [{ location: 'Cooler North', status: 'MANUAL ONLY', lastManualTemperature: 44.5, lastStatus: 'HIGH', lowLimit: 33, highLimit: 41, sensorTemp: '', locked: true }, { location: 'Cooler Middle', status: 'MANUAL ONLY', lastManualTemperature: '', lastStatus: '', lowLimit: '', highLimit: '', sensorTemp: '', locked: false }]
   }, now);
-  assert.equal(r.subject, 'Plant Update 10/8 10:00 AM: 2 routes behind');
-  assert.deepEqual(r.behind.map(x => [x.route, x.late]), [['799', '24 h 0 min late'], ['801', 'departs in 15 min']]);
-  assert.deepEqual([r.nextUp.map(x => x.route), r.loaded.map(x => x.route), r.leftToLoad, r.totalLoads], [['803'], ['802'], 3, 4]);
-  assert.deepEqual(r.counts, { behind: 2, leftToLoad: 3, pickups: 1, down: 1, linesDown: 1, tempsOut: 1 });
-  assert.match(r.text, /ROUTES BEHIND \(2\)\n {2}799 {2}depart 10:00 AM {2}NOT LOADED {2}24 h 0 min late/);
+  assert.equal(r.subject, 'Plant Update 10/8 10:00 AM: 1 route behind');
+  assert.deepEqual(r.behind.map(x => [x.route, x.late]), [['799', '24 h 0 min late']]);
+  assert.deepEqual([r.nextUp.map(x => x.route), r.loaded.map(x => x.route), r.leftToLoad, r.totalLoads], [['801', '803'], ['802'], 3, 4]);
+  assert.deepEqual(r.counts, { behind: 1, leftToLoad: 3, pickups: 1, down: 1, linesDown: 1, tempsOut: 1 });
+  assert.match(r.text, /ROUTES BEHIND \(1\)\n {2}799 {2}depart 10:00 AM {2}NOT LOADED {2}24 h 0 min late/);
   assert.match(r.text, /PLANT BREAKDOWNS \(1\)\n {2}Palletizer {2}Jammed {2}logged 9:00 AM first shift {2}OPEN/);
   assert.match(r.text, /STILL TO LOAD: 3 of 4 {3}Case 2 of 3 · Totes 1 of 1/);
   assert.match(r.text, /TEMPERATURES\n {2}Cooler North {2}44\.5°F {2}HIGH \(limit 33–41\)\n {2}Cooler Middle {2}- {2}NO CHECK {2}check due/);

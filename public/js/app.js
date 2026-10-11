@@ -75,6 +75,8 @@ export const MENU = [
   // The plant side (Joe 10/10): Plant Operations opens the Manager Center cards; the menu lists the cards in the same order,
   // and a card with more than one area opens its screens beside it. A section with one screen is a plain link.
   ['Send Report', [['Send Current Report', 'manager.html?report=1', 'star']]],
+  // Joe 10/11: the reports have their own place, as on the current app: the shift reports sent, and the Plant Reports.
+  ['Reports', [['Shift Reports', 'shiftreports.html', 'day'], ['Plant Reports', 'reports.html', 'star']]],
   ['Yard Checks', [['Yard Checks', 'yard.html', 'yard-checks.webp']]],
   ['Plant Operations Scheduler', [['Plant Operations Scheduler', 'scheduler.html', 'week']]],
   ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Trailer Assignments', 'trailers.html', 'load']]],
@@ -86,7 +88,7 @@ export const MENU = [
 // lists only that side's screens. A screen listed on two sides stays on the side it was opened from.
 export const SIDES = [
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
-  { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks, shift notes and reports', sections: ['Send Report', 'Yard Checks', 'Plant Operations Scheduler', 'Plant Distribution Departments', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'] },
+  { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks, shift notes and reports', sections: ['Send Report', 'Reports', 'Yard Checks', 'Plant Operations Scheduler', 'Plant Distribution Departments', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'] },
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
@@ -288,7 +290,7 @@ const PAGE_ICON = {
   'gps.html': 'pin', 'scorecard.html': 'star',
   'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
   'garage.html': 'wrench', 'fleet.html': 'truck',
-  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
+  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
@@ -408,7 +410,8 @@ try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add
   const nav = document.createElement('div');
   nav.className = 'hdr-nav';
   const h = headerButton('go-home', 'home', 'Home', 'Home');
-  h.onclick = () => { location.href = 'index.html'; };
+  // Joe 10/11: someone who sees several plants goes Home to the all-plants overview directly (no plant page first).
+  h.onclick = () => { location.href = multiPlant() ? 'company.html' : 'index.html'; };
   // The main screen (all plants) and a plant's home are the top: no Back there (a plant's home gets Back to the overview below).
   if (['index.html', 'company.html'].indexOf(here) < 0) nav.append(backButton());
   nav.append(h);

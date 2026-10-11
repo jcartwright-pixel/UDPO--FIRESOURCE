@@ -100,9 +100,10 @@
         '<td>' + (ck && x.pending ? '<button type="button" class="rta" data-rta="' + escapeHtml(x.id) + '" title="Return to the cooler (RTA)">RTA</button>' : '') + '</td></tr>').join('') ||
         (got.runs && got.journal ? '<tr><td colspan="8" class="empty">No product returns reported for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>' : '<tr><td colspan="8" class="empty">Loading the returns&hellip;</td></tr>');
       document.getElementById('foot').textContent = rows.length + (rows.length === 1 ? ' return. ' : ' returns. ') + (ck ? 'RTA = put back in the cooler.' : canSave() ? 'View Only: press Check Off to mark returns.' : 'View only.') + ' Returns come from the drivers\' check-ins and the dock' + (ck ? '; + Add Return records one nobody noted.' : '.');
-      document.getElementById('add-open').hidden = !ck;
+      // + Add Return shows once the day's loads are read, so its route list is never empty for a moment.
+      document.getElementById('add-open').hidden = !ck || !(got.runs && got.journal);
       if (!ck) bar.hidden = true;
-      else if (!bar.hidden && got.runs && document.activeElement !== loadBox) fillLoads();
+      else if (!bar.hidden && got.runs && (document.activeElement !== loadBox || loadBox.value === '')) fillLoads();
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }

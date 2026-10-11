@@ -6,7 +6,7 @@
  *   - the Loadout Center shows the day's loads plus yesterday's loads that were not finished, prior-day first, then
  *     load order, then route (udpoV780PlantLoadingRows_ / udpoV780PlantLoadingSort_);
  *   - Done = an End time, a stored COMPLETE / READY / LOADED, or the loaded tick; Loading = a Start time without an End;
- *   - Behind = not done 30 minutes after its depart time (217_V7271_PlantCurrentReport.gs BEHIND_MINUTES);
+ *   - Behind = not done more than 45 minutes after it leaves (Joe 10/11: 45 minutes late is not behind, 46 is);
  *   - a pickup (product that did not load at loadout) is open until it is marked complete, and shows red.
  */
 const L = window.UDLogic;
@@ -18,7 +18,7 @@ export const AREA = {
   BOXING: { title: 'Daily Box Loadout', tile: 'Boxes', label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' },
   TANKER: { title: 'Daily Tanker Loadout', tile: 'Tanker', label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }
 };
-export const BEHIND_MINUTES = 30;
+export const BEHIND_MINUTES = 45;
 
 export function areaOf(loadType) {
   const t = String(loadType || '').trim().toUpperCase();
@@ -55,7 +55,7 @@ function rowFor(run, block, loadDate, prior) {
   return {
     id: run.id + '|' + block.prefix, runDocId: run.id, day: block.prefix, weekStart: run.weekStart, rev: run.rev || 0,
     route: run.route || '', run: run.run || '', routeId: run.routeId || '', runId: run.runId || '', area: runArea(run),
-    loadDate, deliveryDate: block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
+    loadDate, deliveryDate: block.deliveryDate, departureDate: day.departureDate || block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
     driver: day.driver || '', truck: day.truck || '', trailer: day.trailer || '', dispatchTime: day.dispatchTime,
     quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '',
     startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day)
@@ -85,12 +85,28 @@ export function nowMinutes(now) {
   return Number(parts.hour) * 60 + Number(parts.minute);
 }
 
-// Behind: today's load (or a prior-day load) not done 30 minutes after its depart time.
+// Behind: a load not done more than 45 minutes after its route leaves (departure date + dispatch time, not the load day), so a
+// Saturday loadout for Monday is not behind until Monday (Joe 10/11).
 export function isBehind(row, today, now) {
   if (row.state === 'DONE') return false;
-  if (row.prior || row.loadDate < today) return true;
-  if (row.loadDate > today || row.dispatchTime === null || row.dispatchTime === undefined) return false;
-  return nowMinutes(now) > row.dispatchTime + BEHIND_MINUTES;
+  const leaves = departWall(row);
+  if (leaves === null) return false;
+  return wallNowMinutes(now) > leaves + BEHIND_MINUTES;
+}
+// Minutes since 1/1/1970 on the plant's wall clock (New York), and when a load leaves on that clock: the same rule as
+// plant-rules.js departWall: the departure date (blank = delivery date) at the dispatch time (this file is also used on screens that
+// do not load plant-rules.js).
+const dayNumber = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
+export function wallNowMinutes(now) {
+  const parts = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(now || new Date()).forEach(p => { parts[p.type] = p.value; });
+  return dayNumber(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
+}
+export function departWall(row) {
+  const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), t = row.dispatchTime;
+  if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
+  return departDay * 1440 + Number(t);
 }
 
 export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(String(p.status || '').toUpperCase()) < 0; }

@@ -38,10 +38,9 @@ export function wallNow(ms) {
     .formatToParts(new Date(ms)).forEach(p => { parts[p.type] = p.value; });
   return dayNum(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
 }
-// When the load leaves, on the wall clock: its load date plus the depart time (before 6 AM = the next morning).
+// When the load leaves, on the wall clock: the route's departure moment (plant-rules departWall), not the load day.
 export function departAt(row) {
-  const t = departMinutes(row.dispatchTime), d = dayNum(row.loadDate);
-  return t === null || d === null ? null : d * 1440 + t + (t < 360 ? 1440 : 0);
+  return U.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, dispatchTime: departMinutes(row.dispatchTime) });
 }
 export function clockText(wall) { return wall === null || wall === undefined ? '' : L.timeText(((wall % 1440) + 1440) % 1440); }
 export function minutesText(m) {
@@ -58,7 +57,7 @@ export function loadOutcome(row, nowWall) {
   if (row.state === 'DONE') {
     if (done === null || depart === null) out.result = 'LOADED';
     else { out.late = done - depart; out.result = out.late <= ON_TIME_MINUTES ? 'ON TIME' : 'LATE'; }
-  } else if (depart !== null && nowWall >= depart + ON_TIME_MINUTES) out.result = 'NOT LOADED';
+  } else if (depart !== null && nowWall > depart + ON_TIME_MINUTES) out.result = 'NOT LOADED';
   else if (depart === null && nowWall >= (dayNum(row.loadDate) + 1) * 1440 + 360) out.result = 'NOT LOADED';
   else out.result = 'TO COME';
   return out;

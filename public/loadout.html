@@ -123,15 +123,15 @@
       normal: [['Route', 6], ['Run', 9], ['Driver / CVG', 11], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
       TANKER: [['Route', 7], ['Run', 15], ['Driver / CVG', 15], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
-    // With the loading order editable (today, someone who can load), the Route column also holds the up / down arrows and
-    // the route becomes the drag handle, so it is wider; Driver, Depart and Edit give up the room (Truck and Trailer keep theirs).
+    // With the loading order editable (today, someone who can load), the route in the Route column becomes a grab handle
+    // (Joe 10/11: a handle to grab, no up / down arrows), so the column is a little wider; Total Time gives up the room.
     const ORDER_COLS = {
-      normal: [['Route', 11], ['Run', 9], ['Driver / CVG', 9], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 6], ['Status', 9], ['', 11], ['Total Time', 5], ['P/U', 8], ['', 6]],
-      TANKER: [['Route', 11], ['Run', 13], ['Driver / CVG', 13], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
+      normal: [['Route', 9], ['Run', 9], ['Driver / CVG', 10], ['Truck', 9], ['Trailer', 9], ['', 8], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 5], ['P/U', 8], ['', 6]],
+      TANKER: [['Route', 8], ['Run', 14], ['Driver / CVG', 15], ['Truck', 9], ['Trailer', 9], ['Quantity Out', 9], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
 
-    // Loading order (as in the old app): today's loads of the shown department can be dragged by the handle, or moved one
-    // place with the arrows; the new order is saved as today's load_sequence_override, which Driver Station, View Loadout
+    // Loading order (as in the old app): today's loads of the shown department are dragged by the grab handle (a finger or
+    // the mouse), or moved one place with the Up / Down arrow keys while the handle is selected; the new order is saved as today's load_sequence_override, which Driver Station, View Loadout
     // and Plant Station follow. Only today (the operating day, rolling at 6 AM); prior-day loads keep their place on top.
     const canOrder = () => canLoad() && date === today();
     const orderRows = (rows) => rows.filter(r => !r.prior && r.loadDate === date);
@@ -174,15 +174,12 @@
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
       const edit = canLoad(), dis = edit ? '' : ' disabled';
       const orderIds = ordering ? movable.map(r => r.id) : [];
-      // The arrows have no text of their own (drawn by CSS) and the handle is the route number, so the cell's text stays the route.
+      // The handle's dots are drawn by CSS, so the cell's text stays the route.
       const routeCell = (r) => {
         const i = orderIds.indexOf(r.id);
         if (i < 0) return '<td class="strong">' + escapeHtml(r.route) + '</td>';
         const name = escapeHtml(r.route + ' ' + r.run);
-        return '<td class="strong lo-route"><span class="lo-order"><span class="lo-arrows">' +
-          '<button type="button" class="lo-move up" data-move="-1" data-id-move="' + r.id + '" aria-label="Load ' + name + ' earlier" title="Load earlier"' + (i === 0 ? ' disabled' : '') + '></button>' +
-          '<button type="button" class="lo-move down" data-move="1" data-id-move="' + r.id + '" aria-label="Load ' + name + ' later" title="Load later"' + (i === orderIds.length - 1 ? ' disabled' : '') + '></button></span>' +
-          '<button type="button" class="lo-grip" data-grip="' + r.id + '" aria-label="Drag ' + name + ' to a new place in the loading order" title="Drag to change the loading order">' + escapeHtml(r.route) + '</button></span></td>';
+        return '<td class="strong lo-route"><button type="button" class="lo-grip" data-grip="' + r.id + '" aria-label="Move ' + name + ' in the loading order: drag it, or press the Up or Down arrow key" title="Grab to move up or down">' + escapeHtml(r.route) + '</button></td>';
       };
       let html = '', lastPrior = null;
       rows.forEach(r => {
@@ -215,9 +212,12 @@
       });
       // Keep the cursor where it is when a redraw lands while someone types.
       const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.id ? [document.activeElement.dataset.id, document.activeElement.dataset.k, document.activeElement.value] : null;
+      // A selected grab handle stays selected when the list is drawn again (after an Up / Down move, or a change from another screen).
+      const held = document.activeElement && document.activeElement.closest && document.activeElement.closest('#rows [data-grip]') ? document.activeElement.dataset.grip : '';
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="' + cols.length + '" class="empty">No ' + P.AREA[area].tile.toLowerCase() + ' loads for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>';
+      if (held) { const g = document.querySelector('#rows [data-grip="' + held + '"]'); if (g) g.focus(); }
       if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
-      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Drag a route by its number (or use the arrows) to change today\'s loading order.' : '') : 'View only.') + ' Changes from the sheets show here within about a minute.';
+      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Grab a route by its handle and move it up or down to change today\'s loading order (or select it and press the Up / Down arrow keys).' : '') : 'View only.') + ' Changes from the sheets show here within about a minute.';
       const s = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = s.live ? (s.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
@@ -326,6 +326,17 @@
     });
     rowsEl0().addEventListener('pointerup', () => endDrag(true));
     rowsEl0().addEventListener('pointercancel', () => endDrag(false));
+    // The keyboard way: with a handle selected, Up / Down move that load one place (a skipped load at the bottom is stepped
+    // over) and the handle stays selected.
+    rowsEl0().addEventListener('keydown', e => {
+      const g = e.target.closest('[data-grip]');
+      if (!g || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !canOrder()) return;
+      e.preventDefault();
+      const shown = shownOrder(), i = shown.findIndex(r => r.id === g.dataset.grip), next = shown[i + (e.key === 'ArrowUp' ? -1 : 1)];
+      const full = orderRows(rowsNow().filter(r => r.area === area));
+      if (i < 0 || !next) return;
+      moveLoad(g.dataset.grip, full.findIndex(r => r.id === next.id));
+    });
     function rowsEl0() { return document.getElementById('rows'); }
 
     // One save, shown at once; if the server refuses it the row goes back and the reason shows. What was shown is kept
@@ -497,13 +508,6 @@
         if (skipped[date] && skipped[date][r.id]) { delete skipped[date][r.id]; keepSkips(); }
         if (r.state === 'LOADING') saveLoad(r, { completedAt: now }, { completedAt: now, state: 'DONE' });
         else saveLoad(r, { startedAt: now, completedAt: '' }, { startedAt: now, completedAt: '', state: 'LOADING' });
-        return;
-      }
-      if (t.dataset.idMove) {
-        // One place up or down among the loads shown (a skipped load at the bottom is stepped over).
-        const shown = shownOrder(), i = shown.findIndex(r => r.id === t.dataset.idMove), next = shown[i + Number(t.dataset.move)];
-        const full = orderRows(rowsNow().filter(r => r.area === area));
-        if (i >= 0 && next && canOrder()) moveLoad(t.dataset.idMove, full.findIndex(r => r.id === next.id));
         return;
       }
       if (t.dataset.pu) { const r = rowById(t.dataset.pu); if (r) openPickups(r); return; }

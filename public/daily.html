@@ -133,6 +133,7 @@
     const deliveryDayName = (key) => { const i = L.DAYS.indexOf(L.dayPrefix(key)); return L.DAY_NAMES[i === 6 ? 1 : i === 0 ? 0 : i + 1]; };
     const show = (v) => v === null || v === undefined ? '' : String(v);
     const departText = (r) => L.timeText(r.dispatchTime !== null && r.dispatchTime !== undefined ? r.dispatchTime : r.startTime);
+    const coverLabel = (c) => String(c.reason || 'OFF').toUpperCase() + (c.name ? ': ' + c.name : '');
     const coverageName = (r) => r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '';
     // Carrier or a branch (Fairmont, Martins Ferry...) in the driver column: no tractor goes, so Truck shows N/A (current app).
     const noTractor = (r) => !!coverageName(r) || (!r.driverId && !!r.driver && (/^CARRIER$/i.test(r.driver) || cvgOptions().some(o => o.text.toUpperCase() === String(r.driver).toUpperCase())));
@@ -143,12 +144,13 @@
     }
 
     /*
-     * Current app 7.0.226 / 7.0.230: the Saturday sheet also shows the Sunday-loaded rows. Each delivery day is one block;
-     * inside a block that holds loads from both days, "LOADED SATURDAY" / "LOADED SUNDAY" lines split them.
+     * Each delivery day is one block. (The current app's Saturday sheet also showed the Sunday-loaded rows; Joe 10/11: not any
+     * more. A block can still hold loads from two load days only if one ever does, and then "LOADED ..." lines split them.)
      */
     const isSaturday = (key) => L.dayPrefix(key) === 'sat';
     function sheetRows() {
-      const list = isSaturday(loadDate) ? L.dailyRows(runs, loadDate).concat(L.dailyRows(runs, L.addDays(loadDate, 1))) : L.dailyRows(runs, loadDate);
+      // Joe 10/11: a loadout day's sheet shows only the loads loaded that day; Sunday-loaded runs show when Sunday is picked.
+      const list = L.dailyRows(runs, loadDate);
       return list.map((r, i) => ({ r, i })).sort((a, b) => (a.r.deliveryDate < b.r.deliveryDate ? -1 : a.r.deliveryDate > b.r.deliveryDate ? 1 : 0)
         || (a.r.loadDate < b.r.loadDate ? -1 : a.r.loadDate > b.r.loadDate ? 1 : 0) || a.i - b.i).map(x => x.r);
     }
@@ -176,6 +178,7 @@
 
     function render() {
       if (editing) return; // a picker is open; the next render happens when it closes
+      if (dragging) { dragging.held = true; return; } // a load is being moved; the screen redraws when it is let go
       rows = buildRows();
       const edit = canSave(), order = canReorder();
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
@@ -183,6 +186,9 @@
       const body = [];
       let group = '', loaded = '', subs = 0;
       const mixed = mixedLoads(rows);
+      // Joe 10/11: a load with no driver because its regular driver is off that day (any reason) shows red with who and why.
+      const offCtx = L.offCoverContext(lists.allDrivers, lists.exceptions), cover = {};
+      rows.forEach(r => { if (!r.driver && !r.off) cover[r.id] = L.offCover(r, r.day, r.deliveryDate, offCtx); });
       rows.forEach((r, i) => {
         if (r.deliveryDate !== group) {
           group = r.deliveryDate;
@@ -196,10 +202,14 @@
         }
         const driver = r.driver || coverageName(r), live = edit && !r.off, needs = !r.off;
         body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (order && !r.off ? ' draggable="true"' : '') + (r.off ? ' class="off"' : '') + '>' +
-          '<td class="route' + (order && !r.off ? ' grab' : '') + '" title="' + (order ? 'Drag to change the load order' : '') + '">' + escapeHtml(r.route) + '</td>' +
+          (order && !r.off
+            ? '<td class="route"><button type="button" class="dd-grip" data-grip aria-label="Drag ' + escapeHtml(r.route + ' ' + r.run) + ' to a new place in the load order" title="Drag to change the load order">' + escapeHtml(r.route) + '</button></td>'
+            : '<td class="route">' + escapeHtml(r.route) + '</td>') +
           cell(r.run, 'strong') +
           '<td><button type="button" class="toggle' + (r.off ? '' : ' on') + '" data-runs' + (edit ? '' : ' disabled') + ' aria-pressed="' + !r.off + '" title="Click to change whether this run runs">' + (r.off ? 'NO RUN' : 'RUNS') + '</button></td>' +
-          cell(driver, driver || !needs ? '' : 'missing', live && 'driver') +
+          (!driver && needs && cover[r.id]
+            ? cell('', 'missing offcover', live && 'driver').replace('<td ', '<td data-cover="' + escapeHtml(coverLabel(cover[r.id])) + '" ').replace('title=""', 'title="' + escapeHtml(coverLabel(cover[r.id]) + ': needs a driver') + '"')
+            : cell(driver, driver || !needs ? '' : 'missing', live && 'driver')) +
           '<td><input type="checkbox" class="ovr" data-ovr aria-label="Override" title="Override: choose a driver or unit that is off or down"' + (ovr[r.id] ? ' checked' : '') + (live ? '' : ' disabled') + '></td>' +
           cell(r.truck || (noTractor(r) ? 'N/A' : ''), r.truck || !needs || noTractor(r) ? '' : 'missing', live && 'truck') +
           cell(r.trailer, r.trailer || !needs ? '' : 'missing', live && 'trailer') +
@@ -308,25 +318,83 @@
       setRuns(row, !!row.off);
     });
 
-    // Managers drag a load by its route number to a new place; the whole day's order is saved as one call.
-    body.addEventListener('dragstart', e => { const tr = e.target.closest('tr[data-index]'); if (tr) { dragging = Number(tr.dataset.index); e.dataTransfer.effectAllowed = 'move'; } });
-    body.addEventListener('dragover', e => { if (dragging !== null && e.target.closest('tr[data-index]')) e.preventDefault(); });
-    body.addEventListener('drop', e => {
-      const tr = e.target.closest('tr[data-index]');
-      if (!tr || dragging === null) return;
-      e.preventDefault();
-      const to = Number(tr.dataset.index), from = dragging;
+    // Managers grab a load by the handle on its route number and move it up or down; the whole day's order is saved as one
+    // call. Pointer events, not the browser's drag and drop, so a finger on a tablet works as well as a mouse (Joe 10/11,
+    // the same handle as Daily Case Loadout). The row being moved is shaded and a blue line shows where it lands.
+    body.addEventListener('dragstart', e => { if (e.target.closest && e.target.closest('tr[data-index]')) e.preventDefault(); });
+    function scrollerOf(el) {
+      for (let n = el && el.parentElement; n && n !== document.body; n = n.parentElement) {
+        const o = getComputedStyle(n).overflowY;
+        if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+      }
+      return document.scrollingElement;
+    }
+    function dropTarget(x, y) {
+      const el = document.elementFromPoint(x, y), tr = el && el.closest && el.closest('#rows tr[data-index]');
+      const ids = dragging.ids;
+      if (!tr || ids.indexOf(Number(tr.dataset.index)) < 0) {
+        // Past the first or last of this load day's loads: the ends of the list.
+        const first = body.querySelector('tr[data-index="' + ids[0] + '"]'), last = body.querySelector('tr[data-index="' + ids[ids.length - 1] + '"]');
+        if (first && y < first.getBoundingClientRect().top) return { index: ids[0], after: false };
+        if (last && y > last.getBoundingClientRect().bottom) return { index: ids[ids.length - 1], after: true };
+        return null;
+      }
+      const box = tr.getBoundingClientRect();
+      return { index: Number(tr.dataset.index), after: y > box.top + box.height / 2 };
+    }
+    function markDrop(t) {
+      body.querySelectorAll('tr.drop-before, tr.drop-after').forEach(tr => tr.classList.remove('drop-before', 'drop-after'));
+      const tr = t && body.querySelector('tr[data-index="' + t.index + '"]');
+      if (tr) tr.classList.add(t.after ? 'drop-after' : 'drop-before');
+    }
+    function endDrag(apply) {
+      const d = dragging;
+      if (!d) return;
       dragging = null;
-      if (to === from) return;
-      if (rows[from].loadDate !== rows[to].loadDate) return; // the load order is per load day (Saturday's sheet holds Sunday's too)
-      const ordered = rows.filter(r => !r.off && r.loadDate === rows[from].loadDate);
-      const a = ordered.indexOf(rows[from]), b = ordered.indexOf(rows[to]);
-      if (a < 0 || b < 0) return;
-      const [moved] = ordered.splice(a, 1);
-      ordered.splice(b, 0, moved);
-      saveOrder(getRuns, rows[from].loadDate, ordered, render);
+      clearInterval(d.scroller);
+      markDrop(null);
+      d.row.classList.remove('dragging');
+      document.body.classList.remove('dd-dragging');
+      const again = () => { if (d.held) render(); };
+      if (!apply || !d.target) return again();
+      const moving = rows[d.index], ordered = rows.filter(r => !r.off && r.loadDate === moving.loadDate);
+      const from = ordered.indexOf(moving);
+      let to = ordered.indexOf(rows[d.target.index]) + (d.target.after ? 1 : 0);
+      if (to > from) to--;
+      if (from < 0 || to < 0 || to === from) return again();
+      ordered.splice(from, 1);
+      ordered.splice(to, 0, moving);
+      saveOrder(getRuns, moving.loadDate, ordered, render);
+    }
+    body.addEventListener('pointerdown', e => {
+      const g = e.target.closest('[data-grip]');
+      if (!g || dragging || editing || !canReorder() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      e.preventDefault();
+      const tr = g.closest('tr[data-index]'), index = Number(tr.dataset.index), row = rows[index];
+      // The load order is per load day (Saturday's sheet holds Sunday's too), so a load moves only among its own day's loads.
+      const ids = rows.map((r, i) => (!r.off && r.loadDate === row.loadDate ? i : -1)).filter(i => i >= 0);
+      dragging = { index, ids, row: tr, target: null, x: e.clientX, y: e.clientY, scroller: null };
+      tr.classList.add('dragging');
+      document.body.classList.add('dd-dragging');
+      try { g.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+      // Near the top or bottom of the window the list scrolls by itself, so a load can be moved past what is on screen.
+      const box = scrollerOf(tr);
+      dragging.scroller = setInterval(() => {
+        if (!dragging) return;
+        const r = box === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : box.getBoundingClientRect(), edge = 48;
+        const step = dragging.y < r.top + edge ? -12 : dragging.y > r.bottom - edge ? 12 : 0;
+        if (step) { box.scrollTop += step; dragging.target = dropTarget(dragging.x, dragging.y); markDrop(dragging.target); }
+      }, 30);
     });
-    body.addEventListener('dragend', () => { dragging = null; });
+    body.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      e.preventDefault();
+      dragging.x = e.clientX; dragging.y = e.clientY;
+      dragging.target = dropTarget(e.clientX, e.clientY);
+      markDrop(dragging.target);
+    });
+    body.addEventListener('pointerup', () => endDrag(true));
+    body.addEventListener('pointercancel', () => endDrag(false));
 
     /* ---------- Edit box: the same fields as the current screen; each change saves the moment it is made ---------- */
     const modals = ['edit-modal', 'calloff-panel', 'add-panel', 'down-panel'];

@@ -19,6 +19,7 @@ const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR || '';
 const DATE = PD.PLANT_DATE;
 const MANAGER = '&testEmail=manager.test@uniteddairy.com';
+const NOW = '2026-10-08T14:00:00Z';
 
 async function openPage(browser, width, height, url) {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: SHOTS && width === 1920 ? 2 : 1 });
@@ -26,6 +27,9 @@ async function openPage(browser, width, height, url) {
     const file = route.request().url().split('/').pop();
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, file)) });
   });
+  // The screen's clock reads the same day as the made-up plant week, so "today" does not move with the real date
+  // (leaving the month that holds today for Week shows today's week).
+  await page.clock.setFixedTime(new Date(NOW));
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(HOSTING + url);
@@ -44,7 +48,7 @@ async function shots(page, name, w) {
 
 (async () => {
   await clear();
-  await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
+  await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date(NOW) });
   const browser = await chromium.launch();
   const results = [];
   try {

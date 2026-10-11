@@ -56,7 +56,7 @@
       </div>
       <div class="legend" id="legend">
         <span><i class="relief"></i>Relief Driver</span><span><i class="needs"></i>Needs Driver</span>
-        <span><i class="vacation-needs"></i>Vacation &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span><span><i class="added"></i>Added to Driver's Week</span>
+        <span><i class="vacation-needs"></i>Driver Off &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span><span><i class="added"></i>Added to Driver's Week</span>
       </div>
       <button type="button" class="override" id="override" aria-pressed="false">Override</button>
     </section>
@@ -109,6 +109,8 @@
     import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, saveOptimistic, savesDone, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    // A run whose regular driver is off that day: the reason and who it is for, as "SICK DAY: ALSTON, BRANDON".
+    const coverText = (c) => c ? String(c.reason || 'OFF').toUpperCase() + (c.name ? ': ' + c.name : '') : '\u2014 NEEDS DRIVER \u2014';
 
     const L = window.UDLogic;
     const params = new URLSearchParams(location.search);
@@ -172,7 +174,7 @@
           if (cls === 'off') return '<td class="day off' + (can ? ' editable' : '') + '" data-day="' + p + '" title="Does not run' + (can ? ': click to assign a driver or carrier' : '') + '"></td>';
           if (cls === 'coverage' && !override) return '<td class="day off c-coverage" data-day="' + p + '" title="' + escapeHtml(String(r.coverageType || 'Covered') + ' covers this run') + '"></td>';
           const units = [d.truck, d.trailer].filter(Boolean).join(' / '), plant = L.plantFor(ctx, r, p);
-          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? 'VACATION: ' + d.intendedDriver : cls === 'plant' ? 'PLANT LOAD' : '\u2014 NEEDS DRIVER \u2014');
+          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? coverText(L.offCover(r, p, d.date, ctx)) : cls === 'plant' ? 'PLANT LOAD' : '\u2014 NEEDS DRIVER \u2014');
           const full = name + (units ? ', ' + units : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
           return '<td class="day c-' + cls + (plant ? ' plant-load' : '') + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(full) + '"><b class="nm">' + escapeHtml(name) + '</b>' +
             (units ? '<span class="unit">' + escapeHtml(units) + '</span>' : '') + '</td>';

@@ -262,7 +262,7 @@
           loadDayOffset: block.loadDayOffset,
           loadSequence: effectiveSequence(day),
           dispatchTime: day.dispatchTime, startTime: day.startTime, routeHours: day.routeHours, miles: day.miles,
-          driverId: day.driverId, driver: day.driver,
+          driverId: day.driverId, driver: day.driver, intendedDriverId: day.intendedDriverId || '', intendedDriver: day.intendedDriver || '', driverExceptionStatus: day.driverExceptionStatus || '',
           truckId: day.truckId, truck: day.truck, trailerId: day.trailerId, trailer: day.trailer,
           forkliftId: day.forkliftId, palletJack: day.palletJack,
           casesOut: day.casesOut, pickup: day.pickup, driverNotes: day.driverNotes,
@@ -727,7 +727,8 @@
     // A plant load on the Plant Operations Scheduler for a day the run does not run: it needs a driver (current Weekly).
     if (!d.runs) return plantFor(ctx, row, prefix) && !coveredRoute(row) ? 'plant' : 'off';
     if (coveredRoute(row)) return 'coverage';
-    if (!who) return /VACATION/i.test(d.driverExceptionStatus) ? 'vacation-needs' : 'needs';
+    // Joe 10/11: a run with no driver because its regular driver is off that day (any reason) is red, so the cover shows.
+    if (!who) return offCover(row, prefix, d.date, ctx) ? 'vacation-needs' : 'needs';
     if (who === 'CARRIER') return 'carrier';
     if (who === 'OPEN') return 'open';
     if (d.driverId && exceptionOn(ctx.exceptions, d.driverId, d.date)) return 'conflict';
@@ -760,7 +761,37 @@
     });
     var plant = {};
     (plantLoads || []).forEach(function (e) { if (e.runId && e.date) (plant[e.runId + '|' + e.date] = plant[e.runId + '|' + e.date] || []).push(e); });
-    return { dup: dup, relief: relief, exceptions: exceptions || [], plant: plant };
+    return Object.assign(offCoverContext(drivers, exceptions), { dup: dup, relief: relief, plant: plant });
+  }
+
+  /*
+   * Joe 10/11: a driver off on a day he normally works (vacation, sick, personal, bereavement, unpaid or any other exception)
+   * leaves his regular run needing cover. The run knows it when Reset Week or the sheet wrote who it was for (intendedDriver,
+   * driverExceptionStatus); otherwise Driver Master's <day>_assignments_json names its regular driver, who has an exception
+   * that day. offCover returns { name, reason } for such a run day, else null.
+   */
+  function offCoverContext(drivers, exceptions) {
+    var normal = {}, names = {};
+    (drivers || []).forEach(function (d) {
+      if (!d || !d.id || !driverActive(d) || !d.cells) return;
+      names[d.id] = d.name || '';
+      DAYS.forEach(function (p) {
+        if (!((p + '_available') in d.cells) || !yes(d.cells[p + '_available'])) return;
+        normalRuns(d.cells[p + '_assignments_json']).forEach(function (id) { (normal[p + '|' + id] = normal[p + '|' + id] || []).push(d.id); });
+      });
+    });
+    return { exceptions: exceptions || [], normal: normal, names: names };
+  }
+  function offCover(row, prefix, date, ctx) {
+    var d = row.days ? row.days[prefix] : row;
+    if (d.intendedDriver || d.driverExceptionStatus) return { name: d.intendedDriver || '', reason: d.driverExceptionStatus || 'OFF' };
+    if (!ctx || !ctx.normal) return null;
+    var ids = ctx.normal[prefix + '|' + String(row.runId || '').trim()] || [];
+    for (var i = 0; i < ids.length; i++) {
+      var off = exceptionOn(ctx.exceptions, ids[i], date);
+      if (off) return { name: ctx.names[ids[i]] || '', reason: exceptionLabel(off) };
+    }
+    return null;
   }
 
   // One line per active driver (relief drivers first, then seniority): each day shows the routes they have, else why
@@ -789,7 +820,10 @@
         var off = exceptionOn(exceptions, driver.id, date);
         // OFF: Driver Master does not have the driver available that day (<day>_available), as on the current board.
         var dayOff = !!driver.cells && !yes(driver.cells[p + '_available']);
-        var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (/VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : dayOff ? 'off' : 'available';
+        // Joe 10/11: off on a day he normally works is red whatever the reason (vacation, sick, unpaid...); off on his regular day
+        // off stays as before (red only for vacation).
+        var scheduled = !!driver.cells && (p + '_available') in driver.cells && !dayOff;
+        var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (scheduled || /VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : dayOff ? 'off' : 'available';
         // extra: a day someone changed by hand (the run's route_override), light blue on the board as in the current app.
         // Joe 10/10: one run name once (8303 twice reads 8303 ×2), each on its own line, so nothing is cut or left with a stray slash.
         // Joe 10/11: a run that is not part of the driver's normal week that day is "added" (yellow on the board): his Driver
@@ -959,7 +993,7 @@
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
-    loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows,
+    loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
   };
 });

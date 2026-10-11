@@ -57,14 +57,12 @@
 /* Loadout loading order: the up / down arrows stacked beside the route, and the route number itself is the drag handle (today's
    loads only). The arrows are drawn by CSS so the cell's text stays the route. */
 .plant-page.loadout-page table.loadout td.lo-route { white-space: nowrap; padding-left: 4px; padding-right: 4px; }
-.plant-page .lo-order { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
-.plant-page .lo-arrows { display: inline-flex; flex-direction: column; gap: 2px; }
-.plant-page .lo-move { width: 30px; height: 19px; padding: 0; border-radius: 5px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; }
-.plant-page .lo-move:disabled { color: #c3cdd8; cursor: default; }
-.plant-page .lo-move.up::before { content: "\25B2"; }
-.plant-page .lo-move.down::before { content: "\25BC"; }
-.plant-page .lo-grip { height: 38px; padding: 0 5px 0 3px; border-radius: 7px; border: 1px dashed #9fb3c8; background: #f5f8fb; color: var(--ink); font: inherit; font-size: 16px; font-weight: 800; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
-.plant-page .lo-grip::before { content: "\22EE"; margin-right: 3px; color: #7a8ca0; font-weight: 400; }
+/* Joe 10/11: a handle to grab and move the route up or down (no arrows); the dots are drawn here so the cell reads as the route. */
+.plant-page .lo-grip { display: inline-flex; align-items: center; height: 38px; padding: 0 6px 0 4px; border-radius: 7px; border: 1px dashed #9fb3c8; background: #f5f8fb; color: var(--ink); font: inherit; font-size: 16px; font-weight: 800; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; white-space: nowrap; }
+.plant-page .lo-grip::before { content: "\283F"; margin-right: 4px; color: #7a8ca0; font-weight: 400; }
+.plant-page .lo-grip:hover { border-color: #1f6feb; background: #eaf2ff; }
+.plant-page .lo-grip:focus-visible { outline: 3px solid var(--ud-blue); outline-offset: 1px; }
+.plant-page .lo-grip:active { cursor: grabbing; }
 .plant-page table.loadout tr.dragging td { background: #e8f1fa; }
 .plant-page table.loadout tr.drop-before td { box-shadow: inset 0 3px 0 var(--ud-blue); }
 .plant-page table.loadout tr.drop-after td { box-shadow: inset 0 -3px 0 var(--ud-blue); }

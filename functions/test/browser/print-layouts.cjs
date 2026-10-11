@@ -93,6 +93,17 @@ async function printed(page, button) {
 
     // Every other sheet previews from its own screen.
     for (const [key, words, shot] of [['weekly', 'WEEKLY DISPATCH', ''], ['vacation', 'VACATION', '3-vacation-year-landscape-1920.png'], ['fleet', 'Fleet Service', ''], ['otr', 'Over the Road Runs', ''], ['scorecard', 'Driver Scorecard', ''], ['scheduler', 'Plant Operations Schedule', '']]) {
+      // If the item cannot be seen, say what the page looks like before failing (the test runner's pictures are not readable here).
+      await page.waitForSelector('#sheets [data-sheet="' + key + '"] strong', { state: 'visible', timeout: 20000 }).catch(async (e) => {
+        console.error('PRINT-DEBUG ' + key + ' ' + JSON.stringify(await page.evaluate((k) => {
+          const r = (el) => el ? Object.assign({ hidden: !!el.closest('[hidden]'), disp: getComputedStyle(el).display, vis: getComputedStyle(el).visibility }, JSON.parse(JSON.stringify(el.getBoundingClientRect()))) : null;
+          return { url: location.href, body: document.body.className, screen: r(document.getElementById('screen')), sheets: r(document.getElementById('sheets')),
+            item: r(document.querySelector('#sheets [data-sheet="' + k + '"]')), strong: r(document.querySelector('#sheets [data-sheet="' + k + '"] strong')),
+            wait: (document.getElementById('wait') || {}).textContent, error: (document.getElementById('error') || {}).textContent,
+            dialogs: [...document.querySelectorAll('dialog[open], .modal:not([hidden]), .overlay:not([hidden])')].map(d => d.id || d.className), text: document.body.innerText.slice(0, 600) };
+        }, key)));
+        throw e;
+      });
       await page.click('#sheets [data-sheet="' + key + '"] strong');
       await page.waitForFunction((k) => document.querySelector('#sheets .pl-item.on').dataset.sheet === k, key);
       await ready(page);
