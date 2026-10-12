@@ -154,11 +154,14 @@
       if (r.needCode) {
         kiosk = null; document.getElementById('change').hidden = true; show(true);
         kiosk = await askCode(document.getElementById('code-box'), { kind: 'KIOSK', storeKey: CODE_KEY, call: stationCall, title: 'Enter this station\'s code',
-          hint: 'A manager gives each Driver Room tablet, TV and kiosk its code (Administration > Driver Station Codes). It remembers it after this.', message: r.message });
+          hint: 'Type the Driver Room TV\'s code (Administration > Driver Station Codes). A Driver Room Check-In tablet\'s code opens the drivers\' Check-In page instead. It remembers it after this.', message: r.message });
       } else kiosk = r.station || null;
       // Joe 10/12: one Driver Station link; the code decides the screen. A TV's code opens the TV display (no buttons, both
       // lists rolling), also when the TV reopens the plain link later.
       if (kiosk && kiosk.type === 'TV' && !full) { location.replace(location.pathname + '?tv=1'); return; }
+      // Joe 10/12 "I didn't want the Driver Room TV, it is showing the kiosk": the Driver Room tablet's code (a Driver Room
+      // Check-In station) opens the drivers' Check-In page, not the board. That page keeps the code from here on.
+      if (kiosk && kiosk.type === 'DRIVER') { remember('udRoomStation', kiosk); remember(CODE_KEY, null); location.replace('driver-room.html'); return; }
       show(false);
       document.getElementById('change').hidden = !kiosk || full;
       document.getElementById('eyebrow').textContent = kiosk ? kiosk.name + ' · ' + kiosk.plant : eyebrow;

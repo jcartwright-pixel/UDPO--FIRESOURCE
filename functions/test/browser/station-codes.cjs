@@ -165,12 +165,17 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await ds.waitForSelector('#code-box form.st-code');
     await shot(ds, '7-driver-kiosk-code-screen-1536.png');
     await ds.fill('#code-box input', codes.kiosk);
-    await ds.click('#code-box button');
-    await ds.waitForSelector('#eyebrow:text("Driver Room kiosk · Uniontown")');
-    assert.equal(await ds.isVisible('#ds-grid'), true);
+    // Joe 10/12 "I didn't want the Driver Room TV, it is showing the kiosk": the Driver Room tablet's code typed on the
+    // Driver Station link opens the drivers' Check-In page (View Loadout, DVIR, Check-In), which keeps the code.
+    await Promise.all([ds.waitForURL(/driver-room\.html$/), ds.click('#code-box button')]);
+    await ds.waitForSelector('#menu:not([hidden]) #go-checkin');
+    assert.match(await ds.textContent('#plant'), /Uniontown Driver Room/);
+    assert.equal(await ds.evaluate(() => localStorage.getItem('udKioskCode')), null, 'the Driver Station link does not keep it');
     await shot(ds, '8-driver-kiosk-opened-1536.png');
+    await ds.goto(HOSTING + '/driver-room.html');
+    await ds.waitForSelector('#menu:not([hidden]) #go-checkin');
     assert.deepEqual(ds.errors, []);
-    results.push('Driver Room kiosk: asks for its code, then the board');
+    results.push('Driver Room kiosk: its code on the Driver Station link opens the Driver Room Check-In page, which keeps it');
     // A TV's code typed on the tablet link opens the TV display (no header).
     const tv = await openPage(browser, 1536, 864, '/driver-station.html' + ADMIN);
     await tv.waitForSelector('#code-box form.st-code');
@@ -206,18 +211,18 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await tv.isVisible('#tv-exit'), false);
     results.push('Driver Room TV: Exit asks for the manager release code (Cancel and a wrong code keep the TV), the right code unattaches it to the code screen with Back and Home');
 
-    // The Driver Room kiosk tablet: Home asks for the release code too; Cancel keeps the kiosk.
-    await ds.click('#go-home');
+    // The Driver Room kiosk tablet: Change Station asks for the release code; Cancel keeps it, the right code frees it.
+    await ds.click('#change');
     await ds.waitForSelector('#release-box form');
     await ds.click('#release-box [data-cancel]');
-    assert.match(ds.url(), /driver-station\.html/);
-    assert.equal(await ds.isVisible('#ds-grid'), true);
-    await ds.click('#go-home');
+    assert.equal(await ds.isVisible('#go-checkin'), true);
+    await ds.click('#change');
     await ds.fill('#release-box input', release);
-    await Promise.all([ds.waitForURL(/index\.html/), ds.click('#release-box button[type=submit]')]);
-    assert.equal(await ds.evaluate(() => localStorage.getItem('udKioskCode')), null);
+    await ds.click('#release-box button[type=submit]');
+    await ds.waitForSelector('#code-box form.st-code');
+    assert.equal(await ds.evaluate(() => localStorage.getItem('udRoomStation')), null);
     assert.deepEqual(tv.errors, []);
-    results.push('Driver Room kiosk: Back and Home ask for the manager release code before leaving, then the kiosk forgets its code');
+    results.push('Driver Room kiosk: Change Station asks for the manager release code (Cancel keeps it), then the tablet forgets its code');
   } finally {
     await browser.close();
   }
