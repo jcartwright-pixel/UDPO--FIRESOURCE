@@ -184,12 +184,12 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     await db().collection('productionRuns').doc(P.runId(LINE, shiftKey)).delete();
     const lt = await openPage(browser, 1536, 864, '/linetargets.html?line=' + LINE + '&' + ADMIN);
     await lt.waitForSelector('#reader:not([hidden]) #make-key');
-    assert.match(await lt.textContent('#reader'), /cloudfunctions\.net\/lineReads/);
+    assert.match(await lt.textContent('#reader'), /cloudfunctions\.net\/deviceReads/);
     await lt.click('#make-key');
     await lt.waitForSelector('#reader-key');
     const key = await lt.textContent('#reader-key');
     assert.ok(key.length >= 24, 'a long key');
-    assert.equal(((await db().collection('private').doc('lineReaders').get()).data() || {})[LINE].hash, RD.hash(key), 'only its hash is kept');
+    assert.equal(((await db().collection('private').doc('readDevices').get()).data() || {})[LINE].hash, RD.hash(key), 'only its hash is kept');
     await lt.click('#start-feed');
     await lt.waitForFunction(() => /Test feed running/.test(document.getElementById('reader').textContent));
     // Twenty minutes of the feed, as if it had started twenty minutes ago (so the target so far and the speed read as on the line).

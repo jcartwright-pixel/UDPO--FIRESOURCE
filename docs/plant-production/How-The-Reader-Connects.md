@@ -32,3 +32,14 @@ When the reader arrives, the last steps are:
 2. Point the program at it.
 3. Scan a few jugs to fill in their UPCs on Line Targets.
 4. Switch "Counted by" to Label reader.
+
+## Room to grow: Receiving
+
+Joe, 10/11/2026: a Receiving side is coming, for raw milk and for products from outside suppliers checked in with a barcode scanner. It may not work like RedZone, with an operator reading and writing at a line. The reader setup is built so Receiving plugs in without redoing anything:
+
+- **One door for every device.** The line PC sends to `deviceReads`, not to something only for lines. A receiving scanner will send to the same address, the same way.
+- **Every device is tagged.** Each key belongs to one device, and the app keeps (with only the key's fingerprint, never the key) its **plant**, its **area** (Production now, Receiving later), its **kind** (line reader, camera or handheld scanner), **what it reads** (UPC, UPC and date, or a count) and **where it is** (the line, or later the receiving station).
+- **Each area decides what reads mean.** Production counts jugs on the line's shift. Receiving will check items in against the load or the supplier. Until Receiving is built, a Receiving device's reads are turned away with "being built", so nothing lands in the wrong place.
+- **The same PC program.** `tools/device-bridge` works with a fixed reader on the network or a USB handheld scanner that types into the PC.
+
+What is not built yet: the Receiving screens and what a receiving scan should do. They start with lettered mock-ups when Joe asks.

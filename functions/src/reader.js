@@ -6,8 +6,12 @@
  *                  and the TV read), finds the product by its UPC on the plant's Products list, starts a new product run when
  *                  the UPC changes, checks each code date against the shift's day + the product's shelf life, and ends a stop
  *                  (jugs are moving again). run.reader keeps the shift's tallies for the tablet's code date bar.
- *   handleReads    the line PC's door (index.js lineReads): {line, reads: [{upc, date}]} with the line's key as a Bearer token.
- *                  The key is made on Line Targets by an administrator, shown once, and kept only as a hash (private/lineReaders).
+ *   handleReads    the one door for every reading device (index.js deviceReads): {device, reads: [{upc, date}]} with the
+ *                  device's key as a Bearer token. Joe 10/11: room to grow, a Receiving side with a handheld scanner comes later.
+ *                  Each device is registered in private/readDevices, kept by its id with only its key's hash and its tags:
+ *                  facilityId, area (PRODUCTION now; RECEIVING later), kind (LINE_READER, CAMERA, HANDHELD), reads (UPC,
+ *                  UPC_DATE, COUNT) and target (the line, or later the receiving station). AREAS says what each area does with
+ *                  the reads, so Receiving plugs in as one more entry. A line reader's id is its line's id.
  *   readerCall     Line Targets, administrators only: make or replace a line's key; start or stop the test feed (sandbox only).
  *   readerMinute   every minute: the test feed's pretend jugs, and a stop when a reader line has sent nothing for 3 minutes.
  * Reads count only on a line whose Counted by (Line Targets) is Label reader.
@@ -122,18 +126,28 @@ async function applyReads(db, operationId, reads, opts) {
   });
 }
 
-// The line PC's call. Returns [status, body].
+// What each area does with a device's reads. RECEIVING (raw milk and outside products, by handheld scanner) is being built:
+// its entry takes the reads the same way when its screens exist.
+const AREAS = {
+  PRODUCTION: (db, dev, reads, opts) => applyReads(db, dev.target, reads, opts),
+  RECEIVING: null
+};
+const KINDS = ['LINE_READER', 'CAMERA', 'HANDHELD'], READS = ['UPC', 'UPC_DATE', 'COUNT'];
+
+// A device's call (the line PC, later a receiving station). Returns [status, body]. {line} is the same as {device}.
 async function handleReads(db, headers, body, opts) {
   const auth = text(headers && (headers.authorization || headers.Authorization));
   const m = /^Bearer\s+(\S+)$/i.exec(auth);
-  if (!m) return [401, { ok: false, error: 'Send the line key as Authorization: Bearer <key>.' }];
+  if (!m) return [401, { ok: false, error: 'Send the device key as Authorization: Bearer <key>.' }];
   const b = body && typeof body === 'object' ? body : {};
-  const id = text(b.line);
-  const keys = (await db.collection('private').doc('lineReaders').get()).data() || {};
-  const k = keys[docId(id)];
-  if (!k || !k.hash || k.hash !== hash(m[1])) return [403, { ok: false, error: 'That key is not this line\'s key. Make a new one on Line Targets.' }];
+  const id = text(b.device || b.line);
+  const devices = (await db.collection('private').doc('readDevices').get()).data() || {};
+  const dev = devices[docId(id)];
+  if (!id || !dev || !dev.hash || dev.hash !== hash(m[1])) return [403, { ok: false, error: 'That key is not this device\'s key. Make a new one on Line Targets.' }];
+  const area = AREAS[dev.area];
+  if (!area) return [501, { ok: false, error: (text(dev.area) || 'That area') + ' is being built: its reads are not taken yet.' }];
   try {
-    return [200, await applyReads(db, id, b.reads, opts)];
+    return [200, Object.assign({ device: id, area: dev.area }, await area(db, dev, b.reads, opts))];
   } catch (e) {
     if (e instanceof ReaderError) return [e.code === 'NOT_FOUND' ? 404 : e.code === 'NOT_ALLOWED' ? 409 : 400, { ok: false, error: e.message }];
     throw e;
@@ -155,10 +169,13 @@ async function readerCall(db, user, input, opts) {
   const id = text(i.operationId), op = text(i.op);
   if (!/^[A-Za-z0-9_-]{1,120}$/.test(id)) throw new ReaderError('BAD_REQUEST', 'Pick a line.');
   const line = await lineOf((ref) => ref.get(), db, id), at = o.now().toISOString();
-  const keysRef = db.collection('private').doc('lineReaders'), lineRef = db.collection('productionLines').doc(docId(id));
+  const keysRef = db.collection('private').doc('readDevices'), lineRef = db.collection('productionLines').doc(docId(id));
   if (op === 'makeKey') {
     const key = o.key();
-    await keysRef.set({ [docId(id)]: { hash: hash(key), at, by: email } }, { merge: true });
+    // A line's reader: Production, at this line. kind and reads say what is plugged in (a camera also reads the code date).
+    const kind = KINDS.indexOf(text(i.kind).toUpperCase()) >= 0 ? text(i.kind).toUpperCase() : 'LINE_READER';
+    const reads = READS.indexOf(text(i.reads).toUpperCase()) >= 0 ? text(i.reads).toUpperCase() : 'UPC_DATE';
+    await keysRef.set({ [docId(id)]: { hash: hash(key), at, by: email, facilityId: line.facilityId, area: 'PRODUCTION', kind, reads, target: id, name: line.name } }, { merge: true });
     await lineRef.set({ operationId: id, line: line.name, facilityId: line.facilityId, readerKeyAt: at, readerKeyBy: email }, { merge: true });
     return { ok: true, key, message: 'New key for ' + line.name + '. Copy it into the line PC now: it is not shown again, and the old key stops working.' };
   }
@@ -282,4 +299,4 @@ async function readerMinute(db, opts) {
   return done;
 }
 
-module.exports = { ReaderError, applyReads, handleReads, readerCall, readerAll, readerMinute, testReads, plantShift, zoneOffset, dateOf, hash, QUIET_MINUTES };
+module.exports = { ReaderError, AREAS, applyReads, handleReads, readerCall, readerAll, readerMinute, testReads, plantShift, zoneOffset, dateOf, hash, QUIET_MINUTES };

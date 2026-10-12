@@ -25,7 +25,7 @@ Prices are typical list prices, not quotes. Speeds are RedZone's full speeds for
 
 1. Buy the reader for that line (the table above).
 2. Mount it and plug it into a line PC. One small PC can serve two lines that are close together.
-3. Run the line PC program from [tools/line-reader](../../tools/line-reader/README.md) with that line's key from Line Targets (**Make Line Key**).
+3. Run the line PC program from [tools/device-bridge](../../tools/device-bridge/README.md) with that line's key from Line Targets (**Make Line Key**).
 4. Scan a few of each product to fill in the **UPC on label** column on Line Targets.
 5. Set **Counted by** to **Label reader**.
 

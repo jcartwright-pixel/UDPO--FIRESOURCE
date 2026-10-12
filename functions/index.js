@@ -20,7 +20,7 @@
  *   admin                 Administration's own pages (src/admin.js): people, role templates, links and codes, email, repairs, tools
  *   stationRelease        the Plant Station tablet's Change Station: the plant's manager release code, when one is set
  *   adminJobsEvery5Minutes  repair emails to lessors, the driver check-in mailbox and the weekly archive, each at its Refresh Rate
- *   lineReads             a production line's label reader (its line PC) sends the jugs it read, with the line's key (src/reader.js)
+ *   deviceReads           the one door for every reading device: a line's label reader (its line PC) now, a receiving scanner later (src/reader.js)
  *   lineReader            Line Targets, administrators: make a line's reader key; start or stop the sandbox test feed
  *   productionEveryMinute the sandbox test feed's pretend jugs, and a stop when a label reader line goes quiet
  */
@@ -293,15 +293,15 @@ exports.fleetSyncNow = onCall({ timeoutSeconds: 120, maxInstances: 1 }, async (r
   return runFleetSync({ db, reader: sheets, sheets, target, by: user.email });
 });
 
-// Plant Production's label readers (src/reader.js). The line PC posts {line, reads: [{upc, date}]} with the line's key.
+// Reading devices (src/reader.js): a line PC posts {device, reads: [{upc, date}]} with the device's key; Receiving plugs in later.
 const projectId = () => process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
-exports.lineReads = onRequest({ maxInstances: 3, timeoutSeconds: 30 }, async (req, res) => {
+exports.deviceReads = onRequest({ maxInstances: 3, timeoutSeconds: 30 }, async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST the reads.' }); return; }
   try {
     const [status, body] = await READER.handleReads(db, req.headers, req.body);
     res.status(status).json(body);
   } catch (error) {
-    console.error('lineReads', error);
+    console.error('deviceReads', error);
     res.status(500).json({ ok: false, error: 'The server could not count those jugs. Send them again.' });
   }
 });

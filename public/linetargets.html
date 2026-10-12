@@ -92,7 +92,7 @@
     }
     // The label reader panel (administrators): the line PC's key (shown once) and, on the sandbox, the test feed of pretend jugs.
     const SANDBOX = !/^ud-distribution\.(web\.app|firebaseapp\.com)$/.test(location.hostname);
-    const readsAddress = () => 'https://us-east4-' + (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'demo-ud-distribution' : location.hostname.split('.')[0]) + '.cloudfunctions.net/lineReads';
+    const readsAddress = () => 'https://us-east4-' + (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'demo-ud-distribution' : location.hostname.split('.')[0]) + '.cloudfunctions.net/deviceReads';
     let shownKey = null, readerNote = '';
     function drawReader(line, counter) {
       const box = document.getElementById('reader');

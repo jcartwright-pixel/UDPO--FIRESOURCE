@@ -95,17 +95,25 @@ test('The line PC needs the line key; only an administrator makes it; the old ke
   await assert.rejects(RD.readerCall(db(), { email: MANAGER }, { op: 'makeKey', operationId: LINE }), /Only an administrator/);
   const first = await RD.readerCall(db(), { email: ADMIN }, { op: 'makeKey', operationId: LINE }, { key: () => 'key-one-1234567890' });
   assert.equal(first.key, 'key-one-1234567890');
-  const keys = (await db().collection('private').doc('lineReaders').get()).data();
+  const keys = (await db().collection('private').doc('readDevices').get()).data();
   assert.equal(keys[LINE].hash, RD.hash('key-one-1234567890'), 'only the hash is kept');
-  const body = { line: LINE, reads: [{ upc: '070852503050', date: 'OCT 25' }] };
+  // Joe 10/11, room to grow: every device is tagged by plant, area and what it reads, so a Receiving scanner plugs in later.
+  assert.deepEqual([keys[LINE].facilityId, keys[LINE].area, keys[LINE].kind, keys[LINE].reads, keys[LINE].target], ['fac_uniontown', 'PRODUCTION', 'LINE_READER', 'UPC_DATE', LINE]);
+  await db().collection('private').doc('readDevices').set({ ut_recv_dock: { hash: RD.hash('dock-key-1234567890'), area: 'RECEIVING', kind: 'HANDHELD', reads: 'UPC', facilityId: 'fac_uniontown', target: 'ut_recv_dock' } }, { merge: true });
+  const dock = await RD.handleReads(db(), { authorization: 'Bearer dock-key-1234567890' }, { device: 'ut_recv_dock', reads: [{ upc: '070852503050' }] });
+  assert.equal(dock[0], 501, 'Receiving is being built: its reads are not taken yet');
+  assert.match(dock[1].error, /RECEIVING is being built/);
+  const body = { device: LINE, reads: [{ upc: '070852503050', date: 'OCT 25' }] };
   assert.equal((await RD.handleReads(db(), {}, body))[0], 401);
   assert.equal((await RD.handleReads(db(), { authorization: 'Bearer wrong' }, body))[0], 403);
   const ok = await RD.handleReads(db(), { authorization: 'Bearer key-one-1234567890' }, body, { now: at(0) });
   assert.equal(ok[0], 200);
   assert.equal(ok[1].count, 1);
+  assert.equal(ok[1].area, 'PRODUCTION');
+  assert.equal((await RD.handleReads(db(), { authorization: 'Bearer key-one-1234567890' }, { line: LINE, reads: body.reads }, { now: at(0) }))[0], 200, 'a line PC may still name its line');
   await RD.readerCall(db(), { email: ADMIN }, { op: 'makeKey', operationId: LINE }, { key: () => 'key-two-1234567890' });
   assert.equal((await RD.handleReads(db(), { authorization: 'Bearer key-one-1234567890' }, body))[0], 403, 'the old key stops working');
-  assert.equal((await RD.handleReads(db(), { authorization: 'Bearer key-two-1234567890' }, { line: 'ut_prod_totes', reads: body.reads }))[0], 403, 'a key is for its own line');
+  assert.equal((await RD.handleReads(db(), { authorization: 'Bearer key-two-1234567890' }, { device: 'ut_prod_totes', reads: body.reads }))[0], 403, 'a key is for its own line');
 });
 
 test('The test feed: sandbox only, an administrator\'s, pretend jugs every minute with a pause that stops the line', async () => {
