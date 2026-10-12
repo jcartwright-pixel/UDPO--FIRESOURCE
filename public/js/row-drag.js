@@ -5,30 +5,33 @@
 // Dispatch), and anywhere else after holding it still for a moment (a quick swipe there still scrolls the page). While it moves, the row is lifted and a blue line shows where it will land. Letting go calls
 // onMove(id, toIndex), toIndex being its new place among the data-drag rows. Keyboard: the row takes focus (Tab) and
 // Alt+Up / Alt+Down move it one place. Rows without data-drag (loaded, skipped) stay where they are and take no drop.
+// Rows with data-drag-group move only among rows of the same group (Location Areas: areas among areas, a sub-area within
+// its area). handle(td) says which boxes a finger drags from at once; by default the first two (Route and Run).
 
 const SKIP = 'input, button, select, textarea, a, label, [contenteditable]';
 const HOLD_MS = 350, MOUSE_PX = 6;
 
-export function mountRowDrag({ box, canDrag, onMove }) {
+export function mountRowDrag({ box, canDrag, onMove, handle = (td) => td.cellIndex < 2 }) {
   let press = null, drag = null;
-  const rows = () => [...box.querySelectorAll('tr[data-drag]')];
+  const group = (r) => r.dataset.dragGroup || '';
+  const rows = (g) => [...box.querySelectorAll('tr[data-drag]')].filter(r => group(r) === g);
 
   const line = document.createElement('div');
   line.className = 'row-drop-line';
   line.hidden = true;
   document.body.appendChild(line);
 
-  function slotAt(y, from) {
+  function slotAt(y, from, g) {
     // The place among the other movable rows the pointer is over: above a row's middle lands before it. Rows are matched by
     // id, not by element: the list can be drawn again mid-drag (another screen's save lands), and the dragged load's new
     // line must not count as one of the others.
-    const list = rows().filter(r => r.dataset.drag !== from);
+    const list = rows(g).filter(r => r.dataset.drag !== from);
     let i = 0;
     for (; i < list.length; i++) { const b = list[i].getBoundingClientRect(); if (y < b.top + b.height / 2) break; }
     return { i, list };
   }
   function showLine(y) {
-    const { i, list } = slotAt(y, drag.id);
+    const { i, list } = slotAt(y, drag.id, drag.group);
     const ref = list[i] || list[list.length - 1];
     if (!ref) { line.hidden = true; return i; }
     const b = ref.getBoundingClientRect(), t = box.closest('table').getBoundingClientRect();
@@ -39,7 +42,8 @@ export function mountRowDrag({ box, canDrag, onMove }) {
     return i;
   }
   function begin() {
-    drag = { row: press.row, id: press.row.dataset.drag, from: rows().indexOf(press.row), to: rows().indexOf(press.row) };
+    const g = group(press.row), at = rows(g).indexOf(press.row);
+    drag = { row: press.row, id: press.row.dataset.drag, group: g, from: at, to: at };
     drag.row.classList.add('row-dragging');
     document.body.classList.add('row-drag-on');
     try { box.setPointerCapture(press.pointerId); } catch (e) { /* the pointer is gone */ }
@@ -61,9 +65,9 @@ export function mountRowDrag({ box, canDrag, onMove }) {
     const row = e.target.closest('tr[data-drag]');
     if (!row || !box.contains(row) || e.target.closest(SKIP)) return;
     const touch = e.pointerType !== 'mouse';
-    // The Route and Run boxes (the first two) are the handle for a finger, as on Weekly Dispatch: it drags straight away.
-    const handle = !!e.target.closest('td') && e.target.closest('td').cellIndex < 2;
-    press = { row, x: e.clientX, y: e.clientY, pointerId: e.pointerId, touch: touch && !handle };
+    // The handle boxes (Route and Run on the loadout) drag straight away for a finger, as on Weekly Dispatch.
+    const td = e.target.closest('td'), onHandle = !!td && handle(td);
+    press = { row, x: e.clientX, y: e.clientY, pointerId: e.pointerId, touch: touch && !onHandle };
     // Elsewhere on the line a finger holds still to pick the row up; moving first is a scroll.
     if (press.touch) press.timer = setTimeout(() => { if (press && !drag) begin(); }, HOLD_MS);
   });
@@ -90,7 +94,7 @@ export function mountRowDrag({ box, canDrag, onMove }) {
     const row = e.target.closest && e.target.closest('tr[data-drag]');
     if (!row || e.target !== row || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !canDrag()) return;
     e.preventDefault();
-    const list = rows(), i = list.indexOf(row), to = i + (e.key === 'ArrowUp' ? -1 : 1);
+    const list = rows(group(row)), i = list.indexOf(row), to = i + (e.key === 'ArrowUp' ? -1 : 1);
     if (to < 0 || to >= list.length) return;
     onMove(row.dataset.drag, to, true);
   });

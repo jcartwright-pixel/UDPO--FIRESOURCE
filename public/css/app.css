@@ -1700,6 +1700,6 @@ tr[data-drag] > td button { cursor: pointer; }
 tr[data-drag]:focus-visible { outline: 3px solid var(--ud-blue, #0b4f86); outline-offset: -3px; }
 tr.row-dragging > td { background: #e8f1fa !important; }
 /* Same as Weekly Dispatch: a finger drags straight from the Route or Run box; elsewhere it holds a moment first, so the page scrolls. */
-tr[data-drag] > td:nth-child(-n+2) { touch-action: none; }
+tr[data-drag]:not([data-drag-group]) > td:nth-child(-n+2), tr[data-drag] > td[data-drag-handle] { touch-action: none; }
 body.row-drag-on, body.row-drag-on * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
 .row-drop-line { position: absolute; height: 3px; background: #1f6feb; z-index: 60; pointer-events: none; }
