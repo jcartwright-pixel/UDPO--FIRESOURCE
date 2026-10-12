@@ -173,7 +173,7 @@
     $('main').addEventListener('click', e => { if (mode === 'loadout' && e.target.closest('.dr-board')) setMode('menu'); });
     $('change').addEventListener('click', async () => {
       const fac = station ? station.facilityId : 'fac_uniontown';
-      const ok = await askRelease($('release-box'), { status: () => phone('roomStatus', { facilityId: fac }), release: (code) => phone('roomRelease', { facilityId: fac, code }), onError: showError });
+      const ok = await askRelease($('release-box'), { status: () => phone('roomStatus', { facilityId: fac }), release: (code) => phone('roomRelease', { facilityId: fac, code }), onError: showError, mustHave: true });
       if (!ok) return;
       remember(KEY, null); session.set(''); mode = 'menu'; gate().catch(err => showError(err.message));
     });

@@ -174,8 +174,15 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await shot(ds, '8-driver-kiosk-opened-1536.png');
     await ds.goto(HOSTING + '/driver-room.html');
     await ds.waitForSelector('#menu:not([hidden]) #go-checkin');
+    // Joe 10/12: a driver must never get from the Driver Room into the app. With no manager release code set yet, Change
+    // Station refuses (it used to let anyone through) and the tablet stays on its screen.
+    await ds.click('#change');
+    await ds.waitForSelector('#error:not([hidden])');
+    assert.match(await ds.textContent('#error'), /stays here until the plant has a manager release code/);
+    assert.equal(await ds.isVisible('#go-checkin'), true);
+    await shot(ds, '8b-driver-room-no-release-code-1536.png');
     assert.deepEqual(ds.errors, []);
-    results.push('Driver Room kiosk: its code on the Driver Station link opens the Driver Room Check-In page, which keeps it');
+    results.push('Driver Room kiosk: its code on the Driver Station link opens the Driver Room Check-In page, which keeps it; with no manager release code set, Change Station refuses');
     // A TV's code typed on the tablet link opens the TV display (no header).
     const tv = await openPage(browser, 1536, 864, '/driver-station.html' + ADMIN);
     await tv.waitForSelector('#code-box form.st-code');
@@ -183,11 +190,17 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([tv.waitForURL(/tv=1/), tv.click('#code-box button')]);
     await tv.waitForSelector('#eyebrow:text("Driver Room TV · Uniontown")');
     await shot(tv, '9-driver-room-tv-1536.png');
+    // No release code yet: the TV's Exit refuses too, and the TV has no Sign out.
+    assert.equal(await tv.isVisible('#signout'), false);
+    await tv.click('#tv-exit');
+    await tv.waitForSelector('#error:not([hidden])');
+    assert.match(await tv.textContent('#error'), /stays here/);
+    assert.match(tv.url(), /tv=1/);
     // The TV keeps its code: opening the one Driver Station link again goes straight to the TV board.
     await tv.goto(HOSTING + '/driver-station.html' + ADMIN);
     await tv.waitForURL(/tv=1/);
     await tv.waitForSelector('#eyebrow:text("Driver Room TV · Uniontown")');
-    results.push('Driver Room TV: its code on the one Driver Station link opens the full-screen TV board, also when reopened');
+    results.push('Driver Room TV: its code on the one Driver Station link opens the full-screen TV board, also when reopened; no Sign out, and Exit refuses until a manager release code is set');
 
     // Joe 10/12: the TV has a small Exit; with the plant's manager release code it unattaches the TV and goes to the code
     // screen (with Back and Home). A wrong code keeps the TV board; Cancel keeps it too.

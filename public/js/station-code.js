@@ -49,13 +49,16 @@ export function askCode(box, { kind, storeKey, call, title, hint, message }) {
  * Change Station: once the plant has a manager release code (Administration > Manager Links), a manager types it
  * first. Resolves true when the tablet may leave its station, false on Cancel or when the check could not be made.
  */
-export async function askRelease(box, { status, release, onError, why }) {
+export async function askRelease(box, { status, release, onError, why, mustHave }) {
   let required = false;
   try { required = (await status()).required; } catch (err) {
     // No answer: the station stays as it is, so a dropped network cannot get past the code.
     onError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and try again.');
     return false;
   }
+  // Joe 10/12: a driver must never get from the Driver Room tablet or TV into the app. Those screens (mustHave) stay put until
+  // the plant has a manager release code.
+  if (!required && mustHave) { onError('This screen stays here until the plant has a manager release code (Administration > Manager Links).'); return false; }
   if (!required) return true;
   return new Promise(resolve => {
     box.hidden = false;

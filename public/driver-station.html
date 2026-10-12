@@ -163,12 +163,14 @@
       // Check-In station) opens the drivers' Check-In page, not the board. That page keeps the code from here on.
       if (kiosk && kiosk.type === 'DRIVER') { remember('udRoomStation', kiosk); remember(CODE_KEY, null); location.replace('driver-room.html'); return; }
       show(false);
+      // A coded Driver Room screen has no Sign out: it leaves only with the manager release code.
+      document.body.classList.toggle('kiosk-locked', !!kiosk);
       document.getElementById('change').hidden = !kiosk || full;
       document.getElementById('eyebrow').textContent = kiosk ? kiosk.name + ' · ' + kiosk.plant : eyebrow;
       sig = ''; weekSig = ''; render();
     }
     const release = (why) => askRelease(document.getElementById('release-box'), { why, status: () => stationCall('status', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown' }),
-      release: (code) => stationCall('release', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown', code }), onError: showError });
+      release: (code) => stationCall('release', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown', code }), onError: showError, mustHave: true });
     // Leaving a coded kiosk unattaches it: the manager release code (when the plant has one), then the code is forgotten.
     async function leave() {
       if (!kiosk) return true;

@@ -487,3 +487,6 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
   .sw-list { padding: 8px; }
   .sw-step { flex-wrap: wrap; }
 }
+
+/* Joe 10/12: a Driver Room screen with its station code cannot be signed out of; it leaves only with the manager release code. */
+body.kiosk-locked #signout, body.kiosk-locked .who { display: none !important; }
