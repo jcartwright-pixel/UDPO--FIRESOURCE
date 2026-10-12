@@ -224,6 +224,11 @@ function fakeWritableSheets(tabs) {
         while (rows[r].length <= c) rows[r].push('');
         rows[r][c] = values[0][0];
       });
+    },
+    // Only what the write-back uses: a new tab (LOADOUT HISTORY on the first Done load).
+    async structure(spreadsheetId, requests) {
+      writes.push({ spreadsheetId, requests });
+      requests.forEach(q => { if (q.addSheet) { const t = "'" + q.addSheet.properties.title + "'"; if (tabs[t]) throw new Error('tab exists ' + t); tabs[t] = []; } });
     }
   };
 }

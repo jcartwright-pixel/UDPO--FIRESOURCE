@@ -8,12 +8,16 @@
  *   - the Not good shows on Open Issues and at the top of the next walk to review;
  *   - Fire Extinguishers: the empty row adds one; Check opens the big-button check; all Good makes the month GOOD;
  *   - every screen fits 1536 and 1920 with no sideways scrolling and 16px text; the walk works on a tablet (one column).
+ *   - Joe 10/12: photos on any item (up to three) from the tablet camera; they show on the item, Open Issues and Past Walks.
+ *   - Joe 10/12: iPad (Safari) and Android (Chrome) tablets in both directions and an Android phone: every safety screen
+ *     fits with big buttons and 16px text; with no internet, taps, notes and photos are held on the device (also across a
+ *     reload with no signal, the screens coming from the device) and sent by themselves when the connection is back.
  * Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
+const { chromium, devices } = require('playwright');
 const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
@@ -28,7 +32,8 @@ const ADMIN = 'testEmail=admin.test@uniteddairy.com', MANAGER = 'testEmail=manag
 const UT = 'fac_uniontown';
 
 async function openPage(browser, width, height, url) {
-  const page = await browser.newPage({ viewport: { width, height }, timezoneId: 'America/New_York' });
+  // The offline screen cache (sw.js) is checked on its own below, on tablets and a phone.
+  const page = await browser.newPage({ viewport: { width, height }, timezoneId: 'America/New_York', serviceWorkers: 'block' });
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
@@ -40,13 +45,49 @@ async function openPage(browser, width, height, url) {
 }
 async function shot(page, name) { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') }); }
 async function fits(page, what) {
-  // The screen's own area ends inside the window; its list scrolls inside it.
+  // The screen's own area ends inside the window; its list scrolls inside it. On a phone the whole page scrolls instead.
+  if (page.viewportSize().width <= 600) {
+    const w = await page.evaluate(() => ({ scroll: document.scrollingElement.scrollWidth, inner: window.innerWidth, wide: [...document.querySelectorAll('#screen *')].filter(e => e.offsetParent && e.getBoundingClientRect().right > window.innerWidth + 1 && !e.closest('.sw-areas')).map(e => e.tagName + '.' + e.className).slice(0, 5) }));
+    assert.ok(w.scroll <= w.inner && !w.wide.length, what + ' has no sideways scrolling: ' + JSON.stringify(w));
+    return;
+  }
   const size = await page.evaluate(() => ({ scroll: document.scrollingElement.scrollWidth, inner: window.innerWidth, bottom: Math.max(...[...document.querySelectorAll('#screen .view:not([hidden])')].map(v => v.getBoundingClientRect().bottom)), height: window.innerHeight }));
   assert.ok(size.scroll <= size.inner, what + ' has no sideways scrolling: ' + JSON.stringify(size));
   assert.ok(size.bottom <= size.height, what + ' fits one page (its list scrolls inside): ' + JSON.stringify(size));
 }
 async function smallest(page, sel) { return page.$$eval(sel, e => Math.min(...e.filter(x => x.offsetParent && x.textContent.trim()).map(x => parseFloat(getComputedStyle(x).fontSize)))); }
+// The text below 16px, to name it when a check fails.
+async function tiny(page, sel) { return page.$$eval(sel, e => e.filter(x => x.offsetParent && x.textContent.trim() && parseFloat(getComputedStyle(x).fontSize) < 16).map(x => x.tagName + '.' + x.className + ' ' + getComputedStyle(x).fontSize + ' "' + x.textContent.trim().slice(0, 30) + '"').slice(0, 6)); }
 const row = (id) => '#list tr[data-row="' + id + '"]';
+// + Photo on a row opens the device camera (one camera box for the whole list); the test hands it a picture.
+async function takePhoto(page, itemId, color) {
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('#list [data-cam="' + itemId + '"]')]);
+  await chooser.setFiles(await cameraShot(page, color));
+}
+// A device the way Joe carries it round the plant (Playwright's iPad Safari / Android Chrome viewport and user agent), with
+// the offline screen cache on. Routing on the context also serves the Firebase code to the service worker.
+async function openDevice(browser, name, url) {
+  const ctx = await browser.newContext(Object.assign({}, devices[name], { timezoneId: 'America/New_York', serviceWorkers: 'allow' }));
+  await ctx.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
+    // gstatic allows any site to read the Firebase code (the screen cache keeps a copy), so the stand-in does too.
+    route.fulfill({ contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
+  });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(HOSTING + url);
+  // The first visit keeps the screens and the Firebase code on the device; later screens and visits with no signal use them.
+  await page.waitForFunction(async () => { if (!navigator.serviceWorker.controller) return false; const c = await caches.open('ud-offline-v1'); return !!(await c.match('safety-issues.html')) && !!(await c.match('js/offline-saves.js')) && (await Promise.all(['app', 'auth', 'firestore', 'functions'].map(n => c.match('https://www.gstatic.com/firebasejs/12.18.0/firebase-' + n + '.js')))).every(Boolean); }, null, { timeout: 20000 });
+  page.errors = errors;
+  page.ctx = ctx;
+  return page;
+}
+// A small real JPEG, as the camera would give.
+async function cameraShot(page, color) {
+  const data = await page.evaluate((c) => { const k = document.createElement('canvas'); k.width = 320; k.height = 240; const g = k.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 320, 240); g.fillStyle = '#fff'; g.fillRect(40, 40, 120, 80); return k.toDataURL('image/jpeg', 0.8); }, color);
+  return { name: 'photo.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(data.split(',')[1], 'base64') };
+}
+
 
 (async () => {
   await clear();
@@ -91,28 +132,66 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
 
     // The walk.
     const wk = await openPage(browser, 1920, 1080, '/safety.html?' + ADMIN);
+    // Joe 10/12 (mock-up A): Plant, Garage and Office fold open like folders; the walk starts at the first sub-area.
+    await wk.waitForSelector(row('dock_chocks'));
+    const tree = () => wk.$$eval('#areas button', b => b.map(x => x.firstChild.textContent));
+    const P = S.places(S.checklist(null));
+    assert.deepEqual(await tree(), ['Open issues from earlier walks', 'Plant'].concat(P[0].areas.map(a => a.name), ['Garage', 'Office', 'Yard', 'Walk notes']), 'Plant is open with its sub-areas; Garage, Office and Yard are folded');
+    assert.match(await wk.textContent('#areas [data-place="Garage"] small'), /^0 of \d+ · Show$/);
+    assert.equal(await wk.textContent('#list section h2'), 'Plant \u203a Receiving & Docks');
+    await wk.click('#areas [data-place="Garage"]');
+    assert.deepEqual((await tree()).slice(-9), ['Garage'].concat(P[1].areas.map(a => a.name), ['Office', 'Yard', 'Walk notes']), 'Show opens Garage');
+    await wk.click('#areas [data-place="Garage"]');
+    // The earlier issue (floors) shows in the sub-area where it was found; Next goes on in walking order.
+    await wk.click('#areas [data-area="processing"]');
+    await wk.waitForSelector('#list .sw-here + table tr[data-issue-row="old_issue"]');
+    assert.equal(await wk.textContent('#list .sw-next'), 'Next: Plant \u203a Ammonia Room \u2192');
+    await wk.click('#list .sw-next');
+    assert.equal(await wk.textContent('#list section h2'), 'Plant \u203a Ammonia Room');
+    await shot(wk, 'safety-walk-subarea-1920');
+    // All in order: every sub-area in one long list (kept on this device).
+    await wk.click('#list [data-mode="all"]');
     await wk.waitForSelector(row('exit_routes'));
-    await wk.waitForSelector('#list tr[data-issue-row="old_issue"]');
+    await wk.waitForSelector('#list section[data-sec="issues"] tr[data-issue-row="old_issue"]');
     assert.equal(await wk.textContent('#title'), 'Weekly Walk ' + Number(today.slice(5, 7)) + '-' + Number(today.slice(8)) + '-' + today.slice(2, 4));
     assert.ok(await wk.$(row('ext_monthly')), 'the month\'s first walk has the monthly items');
     assert.equal(await wk.textContent(row('exit_routes') + ' .sw-state'), 'Not checked');
-    assert.deepEqual(await wk.$$eval('#areas button', b => b.map(x => x.firstChild.textContent)), ['Open issues from earlier walks'].concat(S.checklist(null).map(a => a.name)));
+    // Joe 10/12: every row has a note box, marked or not.
+    assert.equal(await wk.$$eval('#list tr[data-row]', r => r.filter(x => !x.querySelector('input[data-note]')).length), 0, 'every row has a note box');
     await wk.click(row('exit_routes') + ' .sw-btn.good');
     await wk.waitForFunction(() => document.querySelector('#save-pill') && /Saved/.test(document.querySelector('#save-pill').textContent));
     await wk.click(row('panel_labels') + ' .sw-btn.bad');
-    await wk.waitForSelector('#list textarea[data-note="panel_labels"]');
-    await wk.fill('#list textarea[data-note="panel_labels"]', 'LP-3 missing breaker labels');
+    await wk.waitForSelector('#list tr[data-more="panel_labels"]');
+    assert.equal(await wk.getAttribute('#list input[data-note="panel_labels"]', 'placeholder'), 'What is wrong');
+    await wk.fill('#list input[data-note="panel_labels"]', 'LP-3 missing breaker labels');
     await wk.click('#title');
+    await wk.fill('#list input[data-note="exit_routes"]', 'Door 4 sticks but opens');
+    await wk.click('#title');
+    await wk.fill('#list input[data-rnote="old_issue"]', 'Drain cleaned, still slow');
+    await wk.click('#title');
+    await wk.click('#areas button[data-area="notes"]');
+    await wk.fill('#walk-note', 'Walked with the new second-shift lead.');
+    await wk.click('#title');
+    // Joe 10/12: photos on any item from the camera: a Good item and a Not good item.
+    assert.equal(await wk.$$eval('#list tr[data-row]', r => r.filter(x => !x.querySelector('button[data-cam]')).length), 0, 'every row has + Photo');
+    assert.equal(await wk.getAttribute('#camera', 'capture'), 'environment', '+ Photo opens the back camera');
+    await takePhoto(wk, 'exit_routes', '#1d7a3e');
+    await wk.waitForSelector(row('exit_routes') + ' .sw-thumbs img');
+    await takePhoto(wk, 'panel_labels', '#c62828');
+    await wk.waitForSelector(row('panel_labels') + ' .sw-thumbs img');
     await wk.check('#list input[data-maint="panel_labels"]');
-    await wk.click('#list tr[data-issue-row="old_issue"] .sw-btn.open');
+    await wk.click('#list section[data-sec="issues"] tr[data-issue-row="old_issue"] .sw-btn.open');
     const saved = async () => (await db().collection('safetyWalks').doc(S.walkId(UT, today)).get()).data();
-    for (let i = 0; i < 40; i++) { const w = await saved(); if (w && w.items.panel_labels && w.items.panel_labels.maint && w.reviews && w.reviews.old_issue) break; await wk.waitForTimeout(250); }
+    for (let i = 0; i < 40; i++) { const w = await saved(); if (w && w.items.panel_labels && w.items.panel_labels.maint && w.reviews && w.reviews.old_issue && w.reviews.old_issue.status && w.note && (w.items.exit_routes.photoIds || []).length && (w.items.panel_labels.photoIds || []).length) break; await wk.waitForTimeout(250); }
     const w = await saved();
     assert.deepEqual([w.items.exit_routes.status, w.items.panel_labels.status, w.items.panel_labels.note, w.items.panel_labels.maint, w.reviews.old_issue.status], ['GOOD', 'NOT_GOOD', 'LP-3 missing breaker labels', true, 'OPEN']);
+    assert.deepEqual([w.items.exit_routes.note, w.reviews.old_issue.note, w.note], ['Door 4 sticks but opens', 'Drain cleaned, still slow', 'Walked with the new second-shift lead.'], 'the row, review and walk notes saved');
+    assert.deepEqual([w.items.exit_routes.photoIds.length, w.items.panel_labels.photoIds.length], [1, 1], 'a photo on a Good item and on a Not good item');
+    assert.match((await db().collection('safetyPhotos').doc(w.items.exit_routes.photoIds[0]).get()).data().data, /^data:image\/jpeg;base64,/);
     assert.match(await wk.textContent('#counts'), /^1 Good · 1 Not good · \d+ Not checked/);
-    assert.equal(await wk.getAttribute('#list tr[data-issue-row="old_issue"] .sw-btn.open', 'aria-pressed'), 'true');
+    assert.equal(await wk.getAttribute('#list section[data-sec="issues"] tr[data-issue-row="old_issue"] .sw-btn.open', 'aria-pressed'), 'true');
     await fits(wk, 'The walk at 1920');
-    assert.ok(await smallest(wk, '#list td, #list .sw-btn, #areas button, #list textarea') >= 15, 'walk text stays readable');
+    assert.ok(await smallest(wk, '#list td, #list .sw-btn, #areas button, #list textarea, #list input[type="text"]') >= 15, 'walk text stays readable');
     await shot(wk, 'safety-walk-1920');
     await wk.setViewportSize({ width: 1536, height: 864 });
     await wk.waitForTimeout(300);
@@ -127,7 +206,7 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
     await shot(wk, 'safety-walk-tablet-1024');
     assert.deepEqual(wk.errors, []);
     await wk.close();
-    results.push('The walk: Good and Not good save on a tap, the note and Send to Plant Maintenance save as they are left, an earlier issue is reviewed Still open; counts follow; fits 1536, 1920 and a tablet');
+    results.push('The walk: Good and Not good save on a tap, every row has a note box (a Good row, a Not good row and an earlier issue each got one), Walk notes saves for the whole walk, Send to Plant Maintenance saves as it is left, an earlier issue is reviewed Still open; counts follow; fits 1536, 1920 and a tablet');
 
     // Open Issues lists the new Not good and the older one.
     const oi = await openPage(browser, 1536, 864, '/safety-issues.html?' + ADMIN);
@@ -135,6 +214,8 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
     assert.match(await oi.textContent('#rows'), /Breakers labeled, no open holes in panels/);
     assert.match(await oi.textContent('#rows'), /Waiting for Plant Maintenance/);
     assert.match(await oi.textContent('#rows'), /7 DAYS/);
+    await oi.waitForSelector('#rows tr[data-id$="panel_labels"] .sw-thumbs img');
+    assert.match(await oi.textContent('#rows tr[data-id="old_issue"]'), /Latest note \d+-\d+-\d+, Test Admin: Drain cleaned, still slow/);
     await fits(oi, 'Open Issues at 1536');
     await shot(oi, 'safety-issues-1536');
     const fixBtn = '#rows tr[data-id="old_issue"] [data-op="fixed"]';
@@ -142,7 +223,10 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
     assert.equal(await oi.textContent(fixBtn), 'Press again');
     await oi.click(fixBtn);
     await oi.waitForFunction(() => document.querySelectorAll('#rows tr[data-id]').length === 1);
-    assert.equal((await db().collection('safetyIssues').doc('old_issue').get()).data().status, 'FIXED');
+    // The screen shows it Fixed at once (it is also held on the device with no signal); the server has it a moment later.
+    const fixedNow = async () => (await db().collection('safetyIssues').doc('old_issue').get()).data().status;
+    for (let i = 0; i < 40 && await fixedNow() !== 'FIXED'; i++) await oi.waitForTimeout(250);
+    assert.equal(await fixedNow(), 'FIXED');
     assert.deepEqual(oi.errors, []);
     await oi.close();
     results.push('Open Issues: the walk\'s Not good shows with Waiting for Plant Maintenance and the older one with its days open; Mark Fixed (pressed twice) takes it off the open list');
@@ -176,12 +260,154 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
     for (const page of ['safety-walks.html', 'safety-setup.html']) {
       const p = await openPage(browser, 1536, 864, '/' + page + '?' + ADMIN);
       await p.waitForSelector('#rows tr td:not(.sw-empty)');
+      if (page === 'safety-walks.html') assert.match(await p.textContent('#rows'), /Walked with the new second-shift lead\.\s*3 row notes · 2 photos/, 'Past Walks shows the walk notes and how many rows have notes and photos');
       await fits(p, page + ' at 1536');
       await shot(p, page.replace('.html', '') + '-1536');
       assert.deepEqual(p.errors, []);
       await p.close();
     }
-    results.push('Past Walks lists today\'s walk; Checklist Setup shows the starting list; both fit 1536');
+    results.push('Past Walks lists today\'s walk with its notes and photos; Checklist Setup shows the starting list; both fit 1536');
+
+    // Joe 10/12 (Location Areas, Administration > Plant Setup): rename a sub-area, add one, turn one off, put it in order.
+    const la = await openPage(browser, 1536, 864, '/location-areas.html?' + ADMIN);
+    await la.waitForSelector('#rows tr.sw-place-row');
+    assert.deepEqual(await la.$$eval('#rows tr.sw-place-row input[data-k="name"]', i => i.map(x => x.value)), ['Plant', 'Garage', 'Office', 'Yard']);
+    assert.match(await la.textContent('#counts'), /4 areas · 21 sub-areas · the starting list/);
+    const locsNow = async () => S.locations((await db().collection('locationAreas').doc(UT).get()).data() || null);
+    const laUntil = async (ok, what) => { for (let i = 0; i < 40; i++) { if (ok(await locsNow())) return; await la.waitForTimeout(250); } assert.fail(what); };
+    await la.fill('#rows tr.sw-sub-row input[value="Wash Bay"]', 'Truck Wash');
+    await la.press('#rows tr.sw-sub-row input[value="Wash Bay"]', 'Tab');
+    await laUntil(l => l[1].subs.some(x => x.key === 'g_wash' && x.name === 'Truck Wash'), 'the sub-area is renamed');
+    await la.fill('#rows tr[data-newsub][data-a="2"] input', 'Conference Room');
+    await la.press('#rows tr[data-newsub][data-a="2"] input', 'Tab');
+    await laUntil(l => l[2].subs[l[2].subs.length - 1].name === 'Conference Room', 'a sub-area is added at the end of Office');
+    await la.waitForSelector('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-la-up]');
+    await la.click('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-la-up]');
+    await laUntil(l => { const o = l[2].subs.map(x => x.name); return o[o.length - 1] === 'Stairs & Exits' && o[o.length - 2] === 'Conference Room'; }, 'Move up changes the walking order');
+    await la.waitForSelector('#rows tr.sw-sub-row:has(input[value="Ammonia Room"]) input[data-k="on"]');
+    await la.uncheck('#rows tr.sw-sub-row:has(input[value="Ammonia Room"]) input[data-k="on"]');
+    await laUntil(l => l[0].subs.find(x => x.key === 'ammonia').off, 'a sub-area is turned off');
+    await la.waitForFunction(() => !/the starting list/.test(document.getElementById('counts').textContent));
+    await fits(la, 'Location Areas at 1536');
+    await shot(la, 'location-areas-1536');
+    await la.setViewportSize({ width: 1920, height: 1080 });
+    await fits(la, 'Location Areas at 1920');
+    await shot(la, 'location-areas-1920');
+    assert.deepEqual(la.errors, []);
+    await la.close();
+    results.push('Location Areas (Plant, Garage, Office, Yard): a sub-area renamed by typing over it, + Add sub-area, Move up and turning one off all save; it fits 1536 and 1920');
+
+    // Checklist Setup follows Location Areas (names, order, turned off) and Move to puts an item in another sub-area.
+    const cs = await openPage(browser, 1536, 864, '/safety-setup.html?' + ADMIN);
+    await cs.waitForSelector('#rows tr.sw-place-row');
+    assert.deepEqual(await cs.$$eval('#rows tr.sw-place-row b', i => i.map(x => x.textContent)), ['Plant', 'Garage', 'Office', 'Yard']);
+    assert.equal(await cs.$$eval('#rows input[data-k="place"], #rows [data-sub-up]', i => i.length), 0, 'areas are changed on Location Areas, not here');
+    await cs.waitForSelector('#rows tr.sw-sub-row b:text-is("Truck Wash")');
+    assert.match(await cs.textContent('#rows tr.sw-sub-row:has(b:text-is("Ammonia Room"))'), /Turned off in Location Areas/);
+    assert.match(await cs.getAttribute('#areas-link', 'href'), /^location-areas\.html\?plant=/);
+    const setupNow = async () => S.checklist(Object.assign({}, (await db().collection('safetySetup').doc(UT).get()).data() || {}, { locations: (await db().collection('locationAreas').doc(UT).get()).data() }), true);
+    const until = async (ok, what) => { for (let i = 0; i < 40; i++) { if (ok(await setupNow())) return; await cs.waitForTimeout(250); } assert.fail(what); };
+    const cleanRow = '#rows tr:has(input[value="Microwave and fridge area clean"])';
+    await cs.selectOption(cleanRow + ' select[data-k="move"]', { label: 'Conference Room' });
+    await until(l => (l.find(a => a.name === 'Conference Room') || { items: [] }).items.some(i => i.id === 'o_clean') && !l.find(a => a.key === 'o_break').items.some(i => i.id === 'o_clean'), 'Move to moves the item');
+    await fits(cs, 'Checklist Setup at 1536');
+    await shot(cs, 'safety-setup-areas-1536');
+    assert.deepEqual(cs.errors, []);
+    await cs.close();
+    results.push('Checklist Setup follows Location Areas: renamed and added sub-areas show, a turned-off one says so, and Move to puts an item in another sub-area');
+
+    // The walk follows Location Areas: the new sub-area with its item, the renamed one, and no Ammonia Room.
+    const lw = await openPage(browser, 1536, 864, '/safety.html?' + ADMIN);
+    await lw.waitForSelector('#areas [data-place="Office"]');
+    for (const place of ['Plant', 'Garage', 'Office', 'Yard']) {
+      if (await lw.getAttribute('#areas [data-place="' + place + '"]', 'aria-expanded') !== 'true') await lw.click('#areas [data-place="' + place + '"]');
+      await lw.waitForSelector('#areas [data-place="' + place + '"][aria-expanded="true"]');
+    }
+    await lw.waitForFunction(() => /Truck Wash/.test(document.getElementById('areas').textContent));
+    const subs = await lw.$$eval('#areas [data-area].sub', b => b.map(x => x.textContent));
+    assert.ok(subs.some(t => /Conference Room/.test(t)) && subs.some(t => /Truck Wash/.test(t)) && !subs.some(t => /Ammonia Room/.test(t)), 'the walk follows Location Areas: ' + JSON.stringify(subs));
+    assert.deepEqual(await lw.$$eval('#areas [data-place]', b => [...new Set(b.map(x => x.dataset.place))]), ['Plant', 'Garage', 'Office', 'Yard']);
+    await shot(lw, 'safety-walk-location-areas-1536');
+    assert.deepEqual(lw.errors, []);
+    await lw.close();
+    results.push('The walk follows Location Areas: renamed and added sub-areas show in order, a turned-off one is left off');
+
+    // Joe 10/12: iPad and Android, tablets both ways and a phone. Every safety screen fits the device with big buttons.
+    const DEVICES = [['iPad (gen 7)', 'ipad-portrait'], ['iPad (gen 7) landscape', 'ipad-landscape'], ['Galaxy Tab S4', 'android-tablet-portrait'], ['Galaxy Tab S4 landscape', 'android-tablet-landscape'], ['Pixel 7', 'android-phone']];
+    for (const [name, tag] of DEVICES) {
+      const d = await openDevice(browser, name, '/safety.html?' + ADMIN);
+      await d.waitForSelector('#areas [data-place="Plant"]');
+      await shot(d, 'safety-walk-tree-' + tag);
+      await d.click('#list [data-mode="all"]');
+      await d.waitForSelector(row('floors'));
+      await d.waitForFunction(() => document.querySelector('#list .sw-btn.good').getBoundingClientRect().height > 0);
+      await fits(d, 'The walk on ' + name);
+      const tall = (sel) => d.evaluate(q => document.querySelector(q).getBoundingClientRect().height, sel); // read at once, never a row just redrawn
+      const big = await tall(row('floors') + ' .sw-btn.good');
+      assert.ok(big >= 44, name + ': Good / Not good are big enough for a finger: ' + big);
+      assert.ok(await tall(row('floors') + ' .sw-cam') >= 44, name + ': + Photo is big enough for a finger');
+      const WALK_TEXT = '#list td, #list .sw-btn, #list .sw-cam, #areas button, #list input[type="text"], .head a, .head button';
+      assert.ok(await smallest(d, WALK_TEXT) >= 16, name + ': walk text is 16px or more: ' + JSON.stringify(await tiny(d, WALK_TEXT)));
+      await shot(d, 'safety-walk-' + tag);
+      for (const page of ['safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']) {
+        await d.goto(HOSTING + '/' + page + '?' + ADMIN);
+        await d.waitForSelector('#rows tr td:not(.sw-empty)');
+        await fits(d, page + ' on ' + name);
+        assert.ok(await smallest(d, '#rows td, .head a, .head button') >= 16, name + ': ' + page + ' text is 16px or more: ' + JSON.stringify(await tiny(d, '#rows td, .head a, .head button')));
+        await shot(d, page.replace('.html', '') + '-' + tag);
+      }
+      await d.goto(HOSTING + '/extinguishers.html?' + ADMIN);
+      await d.click('#rows tr[data-id="' + S.extId(UT, '02') + '"] [data-check]');
+      await d.waitForSelector('#check .sw-bi');
+      await fits(d, 'The extinguisher check on ' + name);
+      assert.ok(await tall('#check .sw-btn') >= 44, name + ': check buttons are big');
+      await shot(d, 'safety-extinguisher-check-' + tag);
+      assert.deepEqual(d.errors, []);
+      await d.ctx.close();
+    }
+    results.push('iPad (Safari) and Android (Chrome) tablets, portrait and landscape, and an Android phone: the walk, Open Issues, Fire Extinguishers and its check, Past Walks and Checklist Setup each fit with no sideways scrolling, 16px text and finger-sized buttons');
+
+    // Joe 10/12: no internet on the walk. An iPad and an Android tablet each: taps, a note and a camera photo are held on the
+    // device, survive a reload with no signal (the screens come from the device), and are sent once the connection is back.
+    const items = S.checklist(null).flatMap(a => a.items.map(i => i.id)).filter(id => ['exit_routes', 'panel_labels', 'floors', 'ext_monthly'].indexOf(id) < 0);
+    for (const [name, tag, [tapId, noteId, photoId]] of [['iPad (gen 7)', 'ipad', items.slice(0, 3)], ['Galaxy Tab S4', 'android', items.slice(3, 6)]]) {
+      const d = await openDevice(browser, name, '/safety.html?' + ADMIN);
+      await d.click('#list [data-mode="all"]');
+      await d.waitForSelector(row(tapId));
+      // The screens and the Firebase code are kept on the device, and the screen cache is in charge of the page.
+      await d.waitForFunction(async () => { if (!navigator.serviceWorker.controller) return false; const c = await caches.open('ud-offline-v1'); return !!(await c.match('safety.html')) && !!(await c.match('js/offline-saves.js')) && !!(await c.match('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js')); }, null, { timeout: 20000 });
+      // The walk has been read once with signal (it is then kept on the device too).
+      await d.waitForFunction(() => /^1 Good|Good · 1 Not good/.test(document.getElementById('counts').textContent) && !/Reading/.test(document.getElementById('foot').textContent));
+      const wasGood = await d.evaluate(() => (document.getElementById('counts').textContent.match(/^(\d+) Good/) || [])[1]);
+      await d.ctx.setOffline(true);
+      await d.waitForFunction(() => /No internet/.test(document.getElementById('offline-line').textContent));
+      await d.click(row(tapId) + ' .sw-btn.good');
+      await d.fill('#list input[data-note="' + noteId + '"]', 'Held on the ' + tag);
+      await d.click('#title');
+      await takePhoto(d, photoId, '#0b5394');
+      await d.waitForFunction(() => document.getElementById('offline-line').textContent === 'Saved on this device, sends when online: 3');
+      assert.equal(await d.$eval('#offline-line', b => getComputedStyle(b).display !== 'none' && !b.hidden), true, 'the line shows');
+      await shot(d, 'safety-offline-held-' + tag);
+      // Closed and opened again with no signal: the page comes from the device and still shows what was done.
+      await d.reload();
+      await d.waitForSelector(row(tapId) + ' .sw-btn.good[aria-pressed="true"]', { timeout: 20000 });
+      assert.equal(await d.inputValue('#list input[data-note="' + noteId + '"]'), 'Held on the ' + tag);
+      await d.waitForSelector(row(photoId) + ' .sw-thumbs img');
+      await d.waitForFunction(() => document.getElementById('offline-line').textContent === 'Saved on this device, sends when online: 3');
+      assert.match(await d.textContent('#counts'), new RegExp('^' + (Number(wasGood) + 1) + ' Good · 1 Not good'), 'after the reload with no signal the walk shows what was saved before and what is held');
+      const before = (await db().collection('safetyWalks').doc(S.walkId(UT, today)).get()).data();
+      assert.ok(!before.items[tapId] && !(before.items[noteId] || {}).note, 'nothing reached the server with no signal');
+      // Signal back: the held saves send by themselves and the line goes away.
+      await d.ctx.setOffline(false);
+      let after = null;
+      for (let i = 0; i < 80; i++) { after = (await db().collection('safetyWalks').doc(S.walkId(UT, today)).get()).data(); if (after.items[tapId] && after.items[noteId] && after.items[photoId] && (after.items[photoId].photoIds || []).length) break; await d.waitForTimeout(250); }
+      assert.deepEqual([after.items[tapId].status, after.items[noteId].note, after.items[photoId].photoIds.length], ['GOOD', 'Held on the ' + tag, 1], name + ': the held tap, note and photo reached the server');
+      await d.waitForFunction(() => document.getElementById('offline-line').hidden, null, { timeout: 20000 });
+      await shot(d, 'safety-offline-sent-' + tag);
+      assert.deepEqual(d.errors, []);
+      await d.ctx.close();
+    }
+    results.push('No internet on an iPad and an Android tablet: a tap, a note and a camera photo show "Saved on this device, sends when online: 3", are still there after a reload with no signal (the screen comes from the device), reach the server by themselves when the signal is back, and the line goes away');
 
     // Joe 10/12: inside a plant there is no plant drop-down; every page uses the plant he came in through and names it in the header.
     const cp = await openPage(browser, 1536, 864, '/index.html?' + ADMIN);

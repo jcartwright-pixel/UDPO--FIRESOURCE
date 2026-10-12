@@ -3,6 +3,17 @@ import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.c
 import { escapeHtml, shortDate } from './app.js';
 
 const L = window.UDLogic, S = window.UDSafety;
+
+// Joe 10/12: on a tablet standing up or a phone the tables show as cards (css/safety.css); each cell carries its column's
+// name so the card can show it. Kept up as the screens redraw their rows.
+function labelCells(table) {
+  const names = [...table.querySelectorAll('thead th')].map(th => th.textContent.trim());
+  table.querySelectorAll('tbody tr').forEach(tr => { let i = 0; [...tr.children].forEach(td => { if (names[i] && !td.hasAttribute('colspan')) td.setAttribute('data-label', names[i]); else td.removeAttribute('data-label'); i += td.colSpan || 1; }); });
+}
+document.querySelectorAll('table.sw-grid').forEach(table => {
+  labelCells(table);
+  new MutationObserver(() => labelCells(table)).observe(table, { childList: true, subtree: true });
+});
 export const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
 export const today = () => L.localDay(new Date().toISOString());
 export const thisMonth = () => today().slice(0, 7);
@@ -53,8 +64,13 @@ export function watchOpenIssues(db, plant, cb, fail) {
 export function watchIssues(db, plant, cb, fail) {
   return onSnapshot(query(collection(db, 'safetyIssues'), where('facilityId', '==', plant)), s => cb(s.docs.map(d => Object.assign({ id: d.id }, d.data()))), fail);
 }
+// The plant's checklist with its Location Areas (Joe 10/12) as setup.locations; cb once both have been read, then on each change.
 export function watchSetup(db, plant, cb) {
-  return onSnapshot(doc(db, 'safetySetup', plant), s => cb(s.exists() ? s.data() : null), () => cb(null));
+  let setup, locs;
+  const send = () => { if (setup !== undefined && locs !== undefined) cb(setup || locs ? Object.assign({}, setup || {}, { locations: locs }) : null); };
+  const a = onSnapshot(doc(db, 'safetySetup', plant), s => { setup = s.exists() ? s.data() : null; send(); }, () => { setup = null; send(); });
+  const b = onSnapshot(doc(db, 'locationAreas', plant), s => { locs = s.exists() ? s.data() : null; send(); }, () => { locs = null; send(); });
+  return () => { a(); b(); };
 }
 export function watchExtinguishers(db, plant, cb, fail) {
   return onSnapshot(query(collection(db, 'extinguishers'), where('facilityId', '==', plant)), s => cb(s.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(e => e.status !== 'RETIRED')

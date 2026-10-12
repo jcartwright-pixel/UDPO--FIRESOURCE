@@ -45,6 +45,9 @@ const trailers = (page) => page.$$eval('#rows tr[data-trailer]', r => r.map(x =>
 
 async function seed() {
   const date = L.operatingDay(new Date()), week = L.weekStart(date), p = L.dayPrefix(L.addDays(date, 2)), d = db();
+  // Only these four loads: the made-up plant's own runs fall in some weeks of the real calendar (on 10/12/26 its T-902 load
+  // showed on the yard too and the check failed), as plant-manager.cjs does.
+  for (const r of (await d.collection('runs').get()).docs) await r.ref.delete();
   const loads = [['701', '849', 'SUN VALLEY'], ['702', '852', 'JERSEY 1'], ['703', '855', 'SUNSHINE'], ['704', '907_1', 'FAIRMONT TRANSFER']];
   for (const [i, [t, route, run]] of loads.entries()) {
     // Loaded today for two days from now, leaving at 10 AM tomorrow: on the yard all of today's operating day.

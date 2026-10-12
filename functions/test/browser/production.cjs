@@ -193,8 +193,10 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     await lt.click('#start-feed');
     await lt.waitForFunction(() => /Test feed running/.test(document.getElementById('reader').textContent));
     // Twenty minutes of the feed, as if it had started twenty minutes ago (so the target so far and the speed read as on the line).
+    // The tablet shows only the current shift, so the feed never starts before the shift did: in a shift's first twenty minutes
+    // part of it runs ahead of the clock, still on this shift (a shift lasts hours).
     const runFeed = async (ids, minutes) => {
-      const feedStart = Date.now() - minutes * 60000;
+      const feedStart = Math.max(Date.now() - minutes * 60000, Date.parse(RD.plantShift(null, Date.now()).start));
       for (const id of ids) await db().collection('productionLines').doc(id).set({ testFeed: { startedAt: new Date(feedStart).toISOString() } }, { merge: true });
       for (let m = 0; m < minutes; m++) await RD.readerMinute(db(), { now: () => new Date(feedStart + m * 60000), project: 'demo-ud-distribution' });
     };

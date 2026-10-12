@@ -5,9 +5,9 @@
  */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import {
-  getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signOut, GoogleAuthProvider, connectAuthEmulator
+  getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signInWithCustomToken, signOut, GoogleAuthProvider, connectAuthEmulator
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { getFirestore, connectFirestoreEmulator, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 
 export const DOMAIN = 'uniteddairy.com';
@@ -367,7 +367,7 @@ const PAGE_ICON = {
   'garage.html': 'wrench', 'fleet.html': 'truck',
   'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'production.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
-  'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear',
+  'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear', 'location-areas.html': 'map',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {
@@ -391,7 +391,8 @@ document.addEventListener('click', e => {
 // Polish 16: when the tablet or computer loses its connection a yellow bar says so at the top, so nobody thinks a press was
 // sent. Saves go to the server, so they wait for the signal; the bar goes away by itself when it is back.
 (function connectionBar() {
-  if (EMBED) return;
+  // Screens that keep saves on the device with no signal (window.UD_OFFLINE) show their own line instead.
+  if (EMBED || window.UD_OFFLINE) return;
   let bar = null;
   const show = () => {
     if (navigator.onLine) { if (bar) bar.hidden = true; return; }
@@ -532,7 +533,13 @@ let services;
 export async function start() {
   if (services) return services;
   const app = initializeApp(await firebaseConfig());
-  const auth = getAuth(app), db = getFirestore(app), functions = getFunctions(app, 'us-east4');
+  // Joe 10/12: screens carried round the plant on an iPad (window.UD_OFFLINE, the Safety Walkthrough) keep what they read on
+  // the iPad, so they open and show the last data with no signal; every other screen reads live as before.
+  let db;
+  if (window.UD_OFFLINE) {
+    try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch (e) { db = getFirestore(app); }
+  } else db = getFirestore(app);
+  const auth = getAuth(app), functions = getFunctions(app, 'us-east4');
   if (LOCAL) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
@@ -545,6 +552,29 @@ export async function start() {
 export function isUnitedDairy(user) {
   return !!(user && user.emailVerified && String(user.email || '').toLowerCase().endsWith('@' + DOMAIN));
 }
+
+// The screens a Plant Station signed in by its code alone may open (Joe 10/12): the Plant Station and the screens it opens.
+export const STATION_PAGES = ['plant-station.html', 'loadout.html', 'unloading.html', 'washing.html', 'returns.html'];
+async function stationOf(user) {
+  try {
+    const c = (await user.getIdTokenResult()).claims || {};
+    return c.udStation ? { key: c.udStation, version: c.udVersion || '', type: c.udType || '', facilityId: c.udPlant || '', name: c.udName || 'Plant Station', plant: ((window.UDLogic && window.UDLogic.PLANTS || []).find(p => p.id === c.udPlant) || {}).name || String(c.udPlant || '') } : null;
+  } catch (e) { return null; }
+}
+// The person a screen shows buttons for: the Users list entry, or a code-signed Plant Station as a plant employee.
+export function watchPerson(db, user, done) {
+  if (user.station) { done({ status: 'ACTIVE', roles: ['PLANT_EMPLOYEE'], name: user.station.name, email: '' }); return () => {}; }
+  return onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => done(s.exists() ? s.data() : null));
+}
+// The Plant Station with no UD account: the station code signs this tablet in as that station only.
+export async function stationCodeSignIn(code) {
+  const { auth } = await start();
+  const out = await callServer('stationSignIn', { op: 'enter', code });
+  if (!out.ok) return out;
+  await signInWithCustomToken(auth, out.token);
+  return out;
+}
+export async function signOutHere() { const { auth } = await start(); await signOut(auth); }
 
 // Shows the sign-in card until a United Dairy account is signed in, then calls ready(user).
 export async function requireSignIn(ready) {
@@ -569,6 +599,28 @@ export async function requireSignIn(ready) {
   };
   const remember = (email) => { try { if (email) sessionStorage.setItem('udActive', email); else sessionStorage.removeItem('udActive'); } catch (e) { /* no storage */ } };
   onAuthStateChanged(auth, async (user) => {
+    // A Plant Station signed in by its code alone (stationSignIn): only the screens a Plant Station opens.
+    const station = user && !isUnitedDairy(user) ? await stationOf(user) : null;
+    if (station) {
+      remember('');
+      user.station = station;
+      gate.hidden = true;
+      screen.hidden = false;
+      // It leaves only through the Plant Station's Change Station (and the manager release code), not Sign out.
+      const out = document.getElementById('signout');
+      if (out) out.hidden = true;
+      const who = document.getElementById('who');
+      if (who) { who.textContent = station.name; who.title = station.name + ' · ' + station.plant + ' (no UD account)'; }
+      if (STATION_PAGES.indexOf(location.pathname.split('/').pop() || 'index.html') < 0) {
+        screen.hidden = true;
+        gate.hidden = false;
+        showError('This tablet is signed in as the ' + station.name + ' Plant Station (no UD account). Only the Plant Station screens open on it; sign in with a United Dairy account for this screen.');
+        return;
+      }
+      if (!window.UDPlantStartWatch) { window.UDPlantStartWatch = true; start().then(({ db }) => onSnapshot(doc(db, 'config', 'app'), s => { window.UDPlantStart = ((s.data() || {}).plantStart || {}).date || ''; }, () => { window.UDPlantStartWatch = false; })); }
+      ready(user);
+      return;
+    }
     if (user && !isUnitedDairy(user)) {
       remember('');
       await signOut(auth);
@@ -627,6 +679,7 @@ export async function requireSignIn(ready) {
   if (out) out.addEventListener('click', () => signOut(auth));
   // Local testing only: the test database accepts a made-up Google sign-in (?testEmail=someone@uniteddairy.com).
   const testEmail = LOCAL && new URLSearchParams(location.search).get('testEmail');
+  if (testEmail) await auth.authStateReady(); // signed in already (also with no signal): kept, not signed in again
   if (testEmail && !auth.currentUser) {
     const token = JSON.stringify({ sub: 'test-' + testEmail, email: testEmail, email_verified: true });
     await signInWithCredential(auth, GoogleAuthProvider.credential(token)).catch(e => showError(String(e.message || e)));

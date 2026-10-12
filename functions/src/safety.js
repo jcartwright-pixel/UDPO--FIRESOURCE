@@ -5,13 +5,16 @@
  * saveSafetyWalk: one tap on today's walk (safetyWalks/{facilityId}__{date}); the walk is made by its first tap.
  *   op item    an item is GOOD, NOT_GOOD or '' (Not checked again). NOT_GOOD opens an issue, or adds this walk to the item's
  *              issue that is still open (a repeat); taking a Not good back removes what it added.
- *   op note    what is wrong (a Not good item);  op photo  its photo (a small JPEG, or '' to remove);
+ *   op note    a note on any item (what is wrong, on a Not good item);
+ *   op photo   a photo of any item (Joe 10/12: up to three, slot 1-3; a small JPEG, or '' to remove that slot);
  *   op maint   send it to Plant Maintenance (true/false);
  *   op review  an earlier walk's open issue is Still open (OPEN) or FIXED;   op finish  the walk is done.
  * saveSafetyIssue: Open Issues' Mark Fixed, Reopen, what is wrong and Send to Plant Maintenance.
  * saveExtinguisher: add or change a plant's extinguisher (tag, location, type, size, service dates) or take it off the list.
  * saveExtinguisherCheck: one item of this month's check of an extinguisher; a Not good opens (or updates) an issue.
- * saveSafetyChecklist: a plant's own checklist (Checklist Setup).
+ * saveSafetyChecklist: a plant's own checklist (Checklist Setup): Plant, Garage and Office (each sub-area's place), sub-areas
+ *   in walking order, their items.
+ * saveLocationAreas: a plant's Location Areas (Administration > Plant Setup): areas and sub-areas, the walk's order.
  *
  * Plant Maintenance (being built in its own thread) picks up issues with sendToMaint true and no workOrderId, and fills in
  * workOrderId and maintStatus; until then they show "Waiting for Plant Maintenance". Nothing here writes Google Sheets.
@@ -23,9 +26,14 @@ const S = require('./safety-rules');
 
 const text = (v, max) => String(v === null || v === undefined ? '' : v).trim().slice(0, max || 200);
 const docId = (id) => String(id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 300);
-const WALK_OPS = ['item', 'note', 'photo', 'maint', 'review', 'finish'];
+const WALK_OPS = ['item', 'note', 'photo', 'maint', 'review', 'reviewnote', 'walknote', 'finish'];
 const ISSUE_OPS = ['fixed', 'reopen', 'note', 'maint'];
 const PHOTO_LIMIT = 700000;
+const PHOTO_SLOTS = 3;
+// Where a walk item's photos are kept: slot 1 has the same id as the issue a Not good on this walk opens, so that issue
+// shows it; slots 2 and 3 sit next to it.
+const photoIdOf = (walkId, itemId, slot) => docId(walkId + '__' + itemId) + (slot > 1 ? '__p' + slot : '');
+const photoIdsOf = (it) => (it && Array.isArray(it.photoIds) ? it.photoIds : it && it.photo && it.photoId ? [it.photoId] : []);
 const PLANT_IDS = () => L.PLANTS.map(p => p.id);
 
 function plantOf(v, SaveError) {
@@ -43,9 +51,11 @@ function walkDay(date, stamp, SaveError) {
   const today = L.localDay(stamp);
   if (date !== today && date !== L.addDays(today, -1)) throw new SaveError('BAD_REQUEST', 'A walk is saved on the day it is walked. Reload the page.');
 }
+// The plant's checklist (Checklist Setup) and its Location Areas (the walk's areas, sub-areas and their order).
 async function setupOf(tx, db, facilityId) {
   const s = await tx.get(db.collection('safetySetup').doc(facilityId));
-  return s.exists ? s.data() : null;
+  const l = await tx.get(db.collection('locationAreas').doc(facilityId));
+  return Object.assign({}, s.exists ? s.data() : {}, { locations: l.exists ? l.data() : null });
 }
 // The saver's name from the Users list, so the screens show "Joe Cartwright", not an email.
 async function whoIs(tx, db, email) {
@@ -68,8 +78,16 @@ function validateWalk(input, SaveError) {
   if (op === 'photo') {
     out.photo = String(input.photo || '');
     if (!photoOk(out.photo)) throw new SaveError('BAD_REQUEST', 'The photo is too big or not a picture. Take it again.');
+    out.slot = input.slot === undefined || input.slot === null || input.slot === '' ? 1 : Number(input.slot);
+    if (!(Number.isInteger(out.slot) && out.slot >= 1 && out.slot <= PHOTO_SLOTS)) throw new SaveError('BAD_REQUEST', 'An item keeps up to ' + PHOTO_SLOTS + ' photos.');
   }
   if (op === 'maint') out.maint = input.maint === true;
+  if (op === 'walknote') out.note = text(input.note, 1000);
+  if (op === 'reviewnote') {
+    out.issueId = text(input.issueId, 300);
+    out.note = text(input.note, 500);
+    if (!out.issueId) throw new SaveError('BAD_REQUEST', 'Pick the issue.');
+  }
   if (op === 'review') {
     out.issueId = text(input.issueId, 300);
     out.status = text(input.status, 10).toUpperCase();
@@ -114,13 +132,13 @@ async function saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError) {
       const open = await openIssueFor(tx, db, req.facilityId, req.itemId);
       if (open) {
         const iss = open.data(), walks = (iss.walks || []).filter(w => w !== id).concat([id]);
-        writes.push(() => tx.update(open.ref, { walks, lastSeenOn: req.date, updatedAt: stamp, updatedBy: email }));
+        writes.push(() => tx.update(open.ref, Object.assign({ walks, lastSeenOn: req.date, updatedAt: stamp, updatedBy: email }, next.note ? { lastNote: text(next.note, 500), lastNoteOn: req.date, lastNoteByName: name } : {})));
         next.issueId = open.id;
         next.repeat = true;
         message = item.text + ': Not good again (still open from ' + iss.foundOn + ').';
       } else {
         const issueRef = db.collection('safetyIssues').doc(docId(id + '__' + req.itemId));
-        writes.push(() => tx.set(issueRef, { facilityId: req.facilityId, itemId: req.itemId, area: item.area, item: item.text, note: text(next.note, 500), photo: !!next.photo,
+        writes.push(() => tx.set(issueRef, { facilityId: req.facilityId, itemId: req.itemId, area: item.area, item: item.text, note: text(next.note, 500), photo: photoIdsOf(next).length > 0, photoIds: photoIdsOf(next),
           sendToMaint: next.maint === true, maintStatus: next.maint === true ? 'WAITING' : '', workOrderId: '', status: 'OPEN', foundOn: req.date, foundWalk: id, foundBy: email, foundByName: name, foundAt: stamp,
           walks: [id], lastSeenOn: req.date, source: 'WALK', updatedAt: stamp, updatedBy: email }));
         next.issueId = issueRef.id;
@@ -133,31 +151,43 @@ async function saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError) {
       if (is.exists) {
         const iss = is.data();
         if (iss.foundWalk === id && iss.status === 'OPEN') {
-          writes.push(() => tx.delete(iref));
-          writes.push(() => tx.delete(db.collection('safetyPhotos').doc(cur.issueId)));
+          writes.push(() => tx.delete(iref)); // its photos stay on the item (Joe 10/12: any item keeps photos)
         } else writes.push(() => tx.update(iref, { walks: (iss.walks || []).filter(w => w !== id), updatedAt: stamp, updatedBy: email }));
       }
-      delete next.issueId; delete next.repeat; delete next.note; delete next.photo; delete next.maint;
+      delete next.issueId; delete next.repeat; delete next.maint;
       message = item.text + ': ' + (req.status === 'GOOD' ? 'Good.' : 'Not checked.');
     } else message = item.text + ': ' + (req.status === 'GOOD' ? 'Good.' : req.status === 'NOT_GOOD' ? 'Not good.' : 'Not checked.');
     if (!req.status) { delete next.by; delete next.byName; delete next.at; next.status = ''; }
     walk.items[req.itemId] = next;
-  } else if (['note', 'photo', 'maint'].indexOf(req.op) >= 0) {
+  } else if (req.op === 'photo') {
+    // Joe 10/12: every item can have photos, whatever it was marked (or not marked yet).
+    cur = Object.assign({ status: '' }, cur || {});
+    const pid = photoIdOf(id, req.itemId, req.slot), ids = photoIdsOf(cur).filter(p => p !== pid);
+    if (req.photo) ids.push(pid);
+    ids.sort();
+    cur.photoIds = ids; cur.photo = ids.length > 0; cur.photoId = ids[0] || '';
+    writes.push(() => req.photo ? tx.set(db.collection('safetyPhotos').doc(pid), { facilityId: req.facilityId, data: req.photo, at: stamp, by: email }) : tx.delete(db.collection('safetyPhotos').doc(pid)));
+    // A Not good this walk opened shows the item's photos on Open Issues; an older issue keeps its own.
+    if (cur.status === 'NOT_GOOD' && cur.issueId) {
+      const iref = db.collection('safetyIssues').doc(cur.issueId), is = await tx.get(iref);
+      if (is.exists && is.data().foundWalk === id) writes.push(() => tx.update(iref, { photo: ids.length > 0, photoIds: ids, updatedAt: stamp, updatedBy: email }));
+      else if (is.exists) writes.push(() => tx.update(iref, { lastPhotoIds: ids, updatedAt: stamp, updatedBy: email }));
+    }
+    walk.items[req.itemId] = cur;
+    message = req.photo ? 'Photo saved.' : 'Photo removed.';
+  } else if (req.op === 'note' && !(cur && cur.status === 'NOT_GOOD' && cur.issueId)) {
+    // Joe 10/12: every item has a note, whatever it was marked (or not marked yet).
+    cur = Object.assign({ status: '' }, cur || {}, { note: req.note });
+    walk.items[req.itemId] = cur;
+    message = req.note ? 'Note saved.' : 'Note cleared.';
+  } else if (['note', 'maint'].indexOf(req.op) >= 0) {
     if (!cur || cur.status !== 'NOT_GOOD' || !cur.issueId) throw new SaveError('BAD_REQUEST', 'Mark the item Not good first.');
     const iref = db.collection('safetyIssues').doc(cur.issueId), is = await tx.get(iref);
     const own = is.exists && is.data().foundWalk === id;
     if (req.op === 'note') {
       cur.note = req.note;
-      if (is.exists) writes.push(() => tx.update(iref, own ? { note: req.note, updatedAt: stamp, updatedBy: email } : { lastNote: req.note, updatedAt: stamp, updatedBy: email }));
+      if (is.exists) writes.push(() => tx.update(iref, own ? { note: req.note, updatedAt: stamp, updatedBy: email } : { lastNote: req.note, lastNoteOn: req.date, lastNoteByName: name, updatedAt: stamp, updatedBy: email }));
       message = 'Note saved.';
-    } else if (req.op === 'photo') {
-      cur.photo = !!req.photo;
-      // An older issue keeps its own photo; this walk's photo of a repeat is kept on the walk's own photo record.
-      const pid = own ? cur.issueId : docId(id + '__' + req.itemId);
-      cur.photoId = req.photo ? pid : '';
-      writes.push(() => req.photo ? tx.set(db.collection('safetyPhotos').doc(pid), { facilityId: req.facilityId, data: req.photo, at: stamp, by: email }) : tx.delete(db.collection('safetyPhotos').doc(pid)));
-      if (own && is.exists) writes.push(() => tx.update(iref, { photo: !!req.photo, updatedAt: stamp, updatedBy: email }));
-      message = req.photo ? 'Photo saved.' : 'Photo removed.';
     } else {
       cur.maint = req.maint;
       if (is.exists) {
@@ -182,7 +212,17 @@ async function saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError) {
       writes.push(() => tx.update(iref, Object.assign({ lastReviewedOn: req.date, lastReviewedBy: email, lastReviewedByName: name, updatedAt: stamp, updatedBy: email }, reopen ? { status: 'OPEN', fixedOn: '', fixedAt: '', fixedBy: '', fixedByName: '', fixedWalk: '' } : {})));
       message = iss.item + ': Still open.';
     }
-    walk.reviews[docId(req.issueId)] = { status: req.status, by: email, byName: name, at: stamp };
+    walk.reviews[docId(req.issueId)] = Object.assign({}, walk.reviews[docId(req.issueId)] || {}, { status: req.status, by: email, byName: name, at: stamp });
+  } else if (req.op === 'reviewnote') {
+    // A note on an earlier issue while reviewing it ("waiting on parts"): kept on this walk and shown on the issue as its latest note.
+    const iref = db.collection('safetyIssues').doc(docId(req.issueId)), is = await tx.get(iref);
+    if (!is.exists || is.data().facilityId !== req.facilityId) throw new SaveError('NOT_FOUND', 'That issue is not on this plant\'s list.');
+    walk.reviews[docId(req.issueId)] = Object.assign({}, walk.reviews[docId(req.issueId)] || {}, { note: req.note });
+    writes.push(() => tx.update(iref, { lastNote: req.note, lastNoteOn: req.note ? req.date : '', lastNoteByName: req.note ? name : '', updatedAt: stamp, updatedBy: email }));
+    message = req.note ? 'Note saved.' : 'Note cleared.';
+  } else if (req.op === 'walknote') {
+    walk.note = req.note; walk.noteByName = name; walk.noteAt = stamp;
+    message = req.note ? 'Walk notes saved.' : 'Walk notes cleared.';
   } else {
     walk.finishedAt = stamp; walk.finishedBy = email; walk.finishedByName = name;
     message = 'Walk finished.';
@@ -298,11 +338,11 @@ async function saveExtCheck(tx, db, req, email, stamp, logRef, mode, SaveError) 
 
 function validateChecklist(input, SaveError) {
   const facilityId = plantOf(input.facilityId, SaveError);
-  if (!Array.isArray(input.areas) || !input.areas.length || input.areas.length > 30) throw new SaveError('BAD_REQUEST', 'The checklist needs at least one area.');
-  const seen = {};
+  if (!Array.isArray(input.areas) || !input.areas.length || input.areas.length > 80) throw new SaveError('BAD_REQUEST', 'The checklist needs at least one area.');
+  const seen = {}, areaSeen = {};
   const areas = input.areas.map((a, n) => {
-    const name = text(a && a.name, 60), key = text(a && a.key, 40) || 'area' + (n + 1);
-    if (!name) throw new SaveError('BAD_REQUEST', 'Every area needs a name.');
+    // Joe 10/12: names and places come from Location Areas; a sub-area added here before that keeps its own.
+    const key = text(a && a.key, 40) || 'area' + (n + 1), name = text(a && a.name, 60) || key, place = text(a && a.place, 40) || 'Plant';
     if (!/^[A-Za-z0-9_-]+$/.test(key)) throw new SaveError('BAD_REQUEST', 'Bad area.');
     const items = (Array.isArray(a.items) ? a.items : []).slice(0, 60).map(i => {
       const id = text(i && i.id, 60), t = text(i && i.text, 160), freq = text(i && i.freq, 10).toUpperCase() || 'WEEKLY';
@@ -313,7 +353,9 @@ function validateChecklist(input, SaveError) {
       seen[id] = true;
       return { id, text: t, freq, off: i.off === true };
     });
-    return { key, name, items };
+    if (areaSeen[key]) throw new SaveError('BAD_REQUEST', 'A sub-area is listed twice.');
+    areaSeen[key] = true;
+    return { place, key, name, items };
   });
   return { facilityId, areas };
 }
@@ -327,7 +369,7 @@ async function saveChecklist(tx, db, req, email, stamp, logRef, mode) {
   keep.forEach(a => a.items.forEach(i => {
     if (now[i.id]) return;
     let to = areas.find(x => x.key === a.key);
-    if (!to) { to = { key: a.key, name: a.name, items: [] }; areas.push(to); }
+    if (!to) { to = { place: a.place, key: a.key, name: a.name, items: [] }; areas.push(to); }
     to.items.push({ id: i.id, text: i.text, freq: i.freq, off: true });
   }));
   tx.set(ref, { facilityId: req.facilityId, areas, updatedAt: stamp, updatedBy: email });
@@ -336,4 +378,46 @@ async function saveChecklist(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { validateWalk, saveWalk, validateIssue, saveIssue, validateExtinguisher, saveExtinguisher, validateExtCheck, saveExtCheck, validateChecklist, saveChecklist };
+// saveLocationAreas (Joe 10/12, Administration > Plant Setup > Location Areas): a plant's areas and their sub-areas, in order.
+// Names can change and anything can be turned off; nothing is ever taken off the list, so old walks and issues still read.
+function validateLocations(input, SaveError) {
+  const facilityId = plantOf(input.facilityId, SaveError);
+  if (!Array.isArray(input.areas) || !input.areas.length || input.areas.length > 30) throw new SaveError('BAD_REQUEST', 'A plant needs at least one area.');
+  const seen = {};
+  const keyOf = (v) => {
+    const k = text(v, 40);
+    if (!/^[A-Za-z0-9_-]+$/.test(k)) throw new SaveError('BAD_REQUEST', 'Bad area.');
+    if (seen[k]) throw new SaveError('BAD_REQUEST', 'An area is listed twice.');
+    seen[k] = true;
+    return k;
+  };
+  const areas = input.areas.map(a => {
+    const key = keyOf(a && a.key), name = text(a && a.name, 40);
+    if (!name) throw new SaveError('BAD_REQUEST', 'Every area needs a name.');
+    const subs = (Array.isArray(a.subs) ? a.subs : []).slice(0, 60).map(x => {
+      const k = keyOf(x && x.key), n = text(x && x.name, 60);
+      if (!n) throw new SaveError('BAD_REQUEST', 'Every sub-area needs a name (' + name + ').');
+      return { key: k, name: n, off: x.off === true };
+    });
+    return { key, name, off: a.off === true, subs };
+  });
+  return { facilityId, areas };
+}
+async function saveLocations(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('locationAreas').doc(req.facilityId), had = await tx.get(ref);
+  const before = S.locations(had.exists ? had.data() : null);
+  const areas = req.areas.map(a => Object.assign({}, a, { subs: a.subs.slice() }));
+  const now = {};
+  areas.forEach(a => { now[a.key] = true; a.subs.forEach(x => { now[x.key] = true; }); });
+  before.forEach(a => {
+    let to = areas.find(x => x.key === a.key);
+    if (!to) { to = { key: a.key, name: a.name, off: true, subs: [] }; areas.push(to); now[a.key] = true; }
+    a.subs.forEach(x => { if (!now[x.key]) { to.subs.push({ key: x.key, name: x.name, off: true }); now[x.key] = true; } });
+  });
+  tx.set(ref, { facilityId: req.facilityId, areas, updatedAt: stamp, updatedBy: email });
+  const result = { ok: true, requestId: req.requestId, facilityId: req.facilityId, message: 'Location Areas saved.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId, before: had.exists ? { areas: before.length } : null, after: { areas: areas.length }, result });
+  return result;
+}
+
+module.exports = { validateWalk, saveWalk, validateIssue, saveIssue, validateExtinguisher, saveExtinguisher, validateExtCheck, saveExtCheck, validateChecklist, saveChecklist, validateLocations, saveLocations };

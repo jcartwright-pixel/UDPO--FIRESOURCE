@@ -129,3 +129,53 @@ test('the production server may write the real Uniontown Live workbook, and no o
   assert.throws(() => assertLiveTarget('1UrAzrPIe4x6jcNBCjCJUIE8mjvJAniZMoONRGK8GJmw', true), /production sheet/);
   assert.doesNotThrow(() => assertLiveTarget(SANDBOX.spreadsheetId, false));
 });
+
+// Joe 10/12: "Let the new app write plant loading to the real Live sheet." A load saved Done at the dock goes to its row (found by
+// run_id) with the cells the current app's plant save writes, the hand-typed truck is marked changed by hand, and the load gets
+// its LOADOUT HISTORY row (the tab is made the first time); a correction updates the same history row.
+test('plant loading: the load, its marks and its LOADOUT HISTORY row are written; a correction updates the same row', async () => {
+  delete tabs["'LOADOUT HISTORY'"];
+  const RUN = '2026-10-04__run_t802';
+  await applyAction(db(), MANAGER, { action: 'savePlantLoad', requestId: rid(), runDocId: RUN, day: 'tue', fields: { status: 'COMPLETE', quantity: 612, temperature: 36, truck: '214', shift: 'FIRST SHIFT', notes: 'Short 2 cases chocolate' } }, tick);
+  const out = await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
+  assert.equal(out.conflicts, 0);
+  assert.equal(cellOf('run_t802', 'tue_load_status'), 'COMPLETE');
+  assert.equal(cellOf('run_t802', 'tue_cases_out'), 612);
+  assert.equal(cellOf('run_t802', 'tue_load_temperature'), 36);
+  assert.match(String(cellOf('run_t802', 'tue_complete_time')), /^2026-10-09T/);
+  assert.equal(cellOf('run_t802', 'tue_extension_05'), cellOf('run_t802', 'tue_complete_time'), 'a load marked Done with no Start gets its End time as Start');
+  assert.equal(cellOf('run_t802', 'tue_extension_04'), 'FIRST SHIFT');
+  assert.equal(cellOf('run_t802', 'tue_extension_03'), 'Short 2 cases chocolate');
+  assert.equal(cellOf('run_t802', 'tue_truck'), '214');
+  assert.equal(cellOf('run_t802', 'tue_equipment_override'), 'TRUE', 'a truck typed at the dock is marked changed by hand');
+  assert.equal(cellOf('run_t802', 'tue_updated_by'), MANAGER.email);
+  const hist = tabs["'LOADOUT HISTORY'"];
+  assert.deepEqual(hist[0], require('../../src/writeback').HISTORY_HEADERS.slice(), 'the tab is made with the current app\'s headers');
+  assert.equal(hist.length, 2);
+  const h = hist[0], row = (k) => hist[1][h.indexOf(k)];
+  assert.deepEqual([row('route'), row('run_id'), row('load_date'), row('delivery_date'), row('cases_out'), row('load_status'), row('load_temperature'), row('history_key'), row('reason'), row('written_by')],
+    ['802', 'run_t802', '2026-10-05', '2026-10-06', '612', 'COMPLETE', '36', 'run_t802|2026-10-05', 'Loadout completed', MANAGER.email]);
+  // A correction to the Done load: the week tab and the same history row change; no second history row.
+  await applyAction(db(), MANAGER, { action: 'savePlantLoad', requestId: rid(), runDocId: RUN, day: 'tue', fields: { quantity: 610 } }, tick);
+  await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
+  assert.equal(cellOf('run_t802', 'tue_cases_out'), 610);
+  assert.equal(tabs["'LOADOUT HISTORY'"].length, 2, 'one row per run and load day');
+  assert.equal(tabs["'LOADOUT HISTORY'"][1][h.indexOf('cases_out')], '610');
+  // A load only started (not Done) writes no history.
+  await applyAction(db(), MANAGER, { action: 'savePlantLoad', requestId: rid(), runDocId: '2026-10-04__run_t801', day: 'tue', fields: { status: 'LOADING' } }, tick);
+  await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
+  assert.equal(cellOf('run_t801', 'tue_load_status'), 'LOADING');
+  assert.equal(tabs["'LOADOUT HISTORY'"].length, 2);
+  assert.equal((await db().collection('outbox').where('status', '==', 'pending').get()).size, 0);
+});
+
+test('plant loading: a LOADOUT HISTORY tab with other headers is never written over; the row goes on the conflicts list', async () => {
+  tabs["'LOADOUT HISTORY'"] = [['when', 'what']];
+  await applyAction(db(), MANAGER, { action: 'savePlantLoad', requestId: rid(), runDocId: '2026-10-04__run_t802', day: 'tue', fields: { status: 'COMPLETE' } }, tick);
+  const out = await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
+  assert.equal(out.conflicts, 1);
+  assert.deepEqual(tabs["'LOADOUT HISTORY'"], [['when', 'what']]);
+  assert.equal(cellOf('run_t802', 'tue_load_status'), 'COMPLETE', 'the load itself still reaches the week tab');
+  const c = (await db().collection('conflicts').get()).docs.map(d => d.data());
+  assert.match(c[0].problem, /other headers/);
+});

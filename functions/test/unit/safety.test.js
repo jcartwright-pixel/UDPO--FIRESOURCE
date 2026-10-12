@@ -11,15 +11,44 @@ test('The screens and the server use the same Safety Walkthrough rules', () => {
   assert.equal(fs.readFileSync(path.join(__dirname, '../../src/safety-rules.js'), 'utf8'), fs.readFileSync(path.join(__dirname, '../../../public/js/safety-rules.js'), 'utf8'));
 });
 
-test('The starting checklist covers the researched areas, and monthly items are on the month\'s first walk only', () => {
-  const names = S.checklist(null).map(a => a.name);
-  assert.deepEqual(names, ['Fire & Exits', 'Eyewash & First Aid', 'Ammonia Room', 'Forklifts & Docks', 'Lockout & Guarding', 'Chemicals & Cylinders', 'Electrical', 'Housekeeping & Floors', 'PPE', 'Coolers & Yard']);
+test('The starting checklist: Plant, Garage, Office and Yard with their sub-areas in walking order; monthly items on the month\'s first walk only', () => {
+  // Joe 10/12 (mock-up A): places, then sub-areas; the researched items keep their ids.
+  const P = S.places(S.checklist(null));
+  // Joe 10/12 (Location Areas): the outside walk moved from Plant to its own Yard area.
+  assert.deepEqual(P.map(p => p.name), ['Plant', 'Garage', 'Office', 'Yard']);
+  assert.deepEqual(P[0].areas.map(a => a.name), ['Receiving & Docks', 'Processing & Filler Rooms', 'Ammonia Room', 'Chemical Room', 'Coolers', 'Forklifts & Charging', 'Electrical Rooms', 'Stairs, Aisles & PPE', 'Exits & Fire']);
+  assert.deepEqual(P[1].areas.map(a => a.name), ['Repair Bays', 'Fuel Island', 'Wash Bay', 'Parts & Tires', 'Garage Exits & Eyewash']);
+  assert.deepEqual(P[2].areas.map(a => a.name), ['Front Office', 'Break Room', 'Locker Rooms', 'Stairs & Exits']);
+  assert.deepEqual(P[3].areas.map(a => a.name), ['Parking Lot & Walkways'], 'yard sub-areas with no items stay off the walk');
+  assert.equal(S.findItem(null, 'floors').area, 'Plant \u203a Processing & Filler Rooms');
+  assert.equal(S.checklist({ areas: [{ key: 'x', name: 'Old area', items: [{ id: 'a', text: 'A' }] }] })[0].place, 'Plant', 'a checklist saved before places is under Plant');
   const ids = S.checklist(null).flatMap(a => a.items.map(i => i.id));
   assert.equal(new Set(ids).size, ids.length, 'every item has its own id');
   const all = S.walkList(null, true).flatMap(a => a.items.map(i => i.id)), weekly = S.walkList(null, false).flatMap(a => a.items.map(i => i.id));
   assert.ok(all.indexOf('ext_monthly') >= 0 && weekly.indexOf('ext_monthly') < 0, 'the extinguisher item is monthly');
   assert.ok(weekly.indexOf('eyewash_run') >= 0, 'eyewash is weekly (ANSI Z358.1)');
-  assert.equal(all.length - weekly.length, 5, "extinguishers, emergency lights, first aid, AED and SCBA");
+  assert.equal(all.length - weekly.length, 8, 'extinguishers, emergency lights, first aid, AED and SCBA; office first aid, emergency light and evacuation map');
+});
+
+test('Location Areas: the starting list, and the walk follows its order, names and what is turned off', () => {
+  const L = S.locations(null);
+  assert.deepEqual(L.map(a => a.name), ['Plant', 'Garage', 'Office', 'Yard']);
+  assert.deepEqual(L[3].subs.map(x => x.name), ['Parking Lot & Walkways', 'Truck Yard', 'Outside Storage']);
+  assert.equal(S.checklist(null, true).length, 21, 'setup screens show every sub-area, empty ones too');
+  // Rename a sub-area, turn one off, turn the Garage off, put Office first.
+  const locs = S.locations(null);
+  locs[0].subs[0].name = 'Docks';
+  locs[0].subs[2].off = true;
+  locs[1].off = true;
+  const saved = [locs[2], locs[0], locs[1], locs[3]];
+  const P = S.places(S.checklist({ locations: { areas: saved } }));
+  assert.deepEqual(P.map(p => p.name), ['Office', 'Plant', 'Yard']);
+  assert.equal(P[1].areas[0].name, 'Docks');
+  assert.ok(!P[1].areas.some(a => a.key === 'ammonia'), 'a sub-area turned off is left off the walk');
+  assert.equal(S.findItem({ locations: { areas: saved } }, 'g_lifts').area, 'Garage \u203a Repair Bays', 'items under a turned-off area are still found for old walks');
+  // Items Checklist Setup moved to a yard sub-area put it on the walk.
+  const setup = { locations: { areas: saved }, areas: [{ key: 'yard_truck', items: [{ id: 'yt', text: 'Trailers chocked', freq: 'WEEKLY' }] }] };
+  assert.equal(S.findItem(setup, 'yt').area, 'Yard \u203a Truck Yard');
 });
 
 test('A plant\'s own checklist: items turned off are left off the walk but still found for old walks', () => {

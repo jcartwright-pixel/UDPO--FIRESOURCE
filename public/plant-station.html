@@ -15,7 +15,14 @@
 <body class="phone ps-page">
   <div class="signin" id="signin" hidden>
     <h1>Plant Station</h1>
-    <p>Sign in with your United Dairy Google account.</p>
+    <p id="signin-text">Sign in with your United Dairy Google account.</p>
+    <!-- Joe 10/12: the Plant Station with no UD account (the link with ?noaccount=1): the station's code alone, while the
+         plant's switch is On (Administration > Plant Station Codes). -->
+    <form class="st-code" id="noacct" hidden>
+      <label>Station code <input id="noacct-code" maxlength="12" autocomplete="off" autocapitalize="characters" inputmode="text"></label>
+      <button type="submit">OPEN STATION</button>
+      <span class="st-code-msg" id="noacct-msg"></span>
+    </form>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
   </div>
@@ -56,7 +63,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer, stationCodeSignIn, signOutHere } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import { resolveStation, askCode, remember } from './js/station-code.js';
@@ -88,8 +95,26 @@
     if (stationId && !read()) write(stationId);
     // The station from its code (Administration > Plant Station Codes): its own name, one of the five station types.
     const CODE_KEY = 'udPlantStationCode', stationCall = (op, f) => callServer('stationRelease', Object.assign({ op }, f));
-    let mode = 'wait', named = null;
+    let mode = 'wait', named = null, signedAs = null;
+    // The Plant Station with no UD account: this tablet came from that link (?noaccount=1), so it asks for the station code
+    // instead of a Google sign-in (a United Dairy account can still sign in below it).
+    const NA_KEY = 'udPlantNoAccount';
+    let noAccount = new URLSearchParams(location.search).get('noaccount') === '1';
+    try { if (noAccount) localStorage.setItem(NA_KEY, '1'); else noAccount = localStorage.getItem(NA_KEY) === '1'; } catch (e) { /* private window */ }
+    if (noAccount) {
+      document.getElementById('noacct').hidden = false;
+      document.getElementById('signin-text').textContent = 'Type this tablet\'s station code. A manager gives each station its code. No United Dairy account is needed.';
+      document.getElementById('signin-button').textContent = 'Or sign in with a United Dairy account';
+      document.getElementById('noacct').addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const msg = document.getElementById('noacct-msg');
+        msg.textContent = 'Checking…';
+        try { const out = await stationCodeSignIn(document.getElementById('noacct-code').value); msg.textContent = out.ok ? '' : out.message; } catch (err) { msg.textContent = String(err.message || err); }
+      });
+    }
     async function decide(message) {
+      // Signed in by its code alone: the station is the one the code named; nothing to pick.
+      if (signedAs) { mode = 'code'; named = signedAs; stationId = signedAs.type; write(stationId); render(); return; }
       const r = message !== undefined ? { needCode: true, message } : await resolveStation('PLANT', CODE_KEY, stationCall);
       if (r.station) { mode = 'code'; named = r.station; stationId = r.station.type; }
       else if (r.needCode) {
@@ -134,11 +159,16 @@
     });
     document.getElementById('go-back').addEventListener('click', goBack);
     document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
-    const leave = () => { stationId = ''; write(''); remember(CODE_KEY, null); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true; decide().catch(err => showError(err.message)); };
+    const leave = () => {
+      stationId = ''; write(''); remember(CODE_KEY, null); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true;
+      if (signedAs) { signedAs = null; signOutHere(); return; } // back to the station code screen
+      decide().catch(err => showError(err.message));
+    };
+    const releaseCall = (f) => callServer(signedAs ? 'stationSignIn' : 'stationRelease', f);
     const releaseBox = document.getElementById('release'), releaseMsg = document.getElementById('release-msg');
     document.getElementById('change').addEventListener('click', async () => {
       let required = false;
-      try { required = (await callServer('stationRelease', { op: 'status', facilityId: 'fac_uniontown' })).required; } catch (err) {
+      try { required = (await releaseCall({ op: 'status', facilityId: signedAs ? signedAs.facilityId : 'fac_uniontown' })).required; } catch (err) {
         // No answer: the station stays as it is (a code may be needed), so a dropped network cannot get past the code.
         showError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and press Change Station again.');
         return;
@@ -152,13 +182,20 @@
       ev.preventDefault();
       releaseMsg.textContent = 'Checking…';
       try {
-        const out = await callServer('stationRelease', { op: 'release', facilityId: 'fac_uniontown', code: document.getElementById('release-code').value });
+        const out = await releaseCall({ op: 'release', facilityId: signedAs ? signedAs.facilityId : 'fac_uniontown', code: document.getElementById('release-code').value });
         if (out.ok) leave(); else releaseMsg.textContent = out.message;
       } catch (err) { releaseMsg.textContent = String(err.message || err); }
     });
 
-    requireSignIn(async () => {
+    requireSignIn(async (user) => {
       const { db } = await start();
+      signedAs = user.station || null;
+      // A tablet signed in by its code alone leaves only through Change Station (and the manager release code).
+      document.getElementById('signout').hidden = !!signedAs;
+      // Still On, and still on this code? (Checked again every 5 minutes below.)
+      if (signedAs) {
+        try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { signedAs = null; write(''); await signOutHere(); showError(r.message); return; } } catch (e) { /* offline: keep the station */ }
+      }
       // Read again when the day rolls at 6 AM (Saturday to Sunday is a new week), so the counts never show last week.
       let date = '', stop = null;
       const watch = () => {
@@ -173,7 +210,12 @@
       setInterval(async () => {
         if (L.operatingDay(new Date()) !== date) watch();
         if (mode === 'code' && named && Date.now() % 300000 < 60000) {
-          try { const r = await stationCall('check', { kind: 'PLANT', key: named.key, version: named.version }); if (!r.ok) { remember(CODE_KEY, null); return decide(r.message); } } catch (e) { /* offline: keep the station */ }
+          if (signedAs) {
+            // Off, New code or Remove: the tablet goes back to the code screen (the database already refuses it).
+            try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { signedAs = null; write(''); await signOutHere(); showError(r.message); return; } } catch (e) { /* offline: keep the station */ }
+          } else {
+            try { const r = await stationCall('check', { kind: 'PLANT', key: named.key, version: named.version }); if (!r.ok) { remember(CODE_KEY, null); return decide(r.message); } } catch (e) { /* offline: keep the station */ }
+          }
         }
         render();
       }, 60000);

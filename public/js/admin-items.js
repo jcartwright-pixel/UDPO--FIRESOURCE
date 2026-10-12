@@ -11,7 +11,7 @@ export const ADMIN_GROUPS = [
     ['app-links', 'Manager Links', 'The links for managers and office staff: United Dairy Operations, the phone link, Manager Web App, personal phone links and Phone Screens (try every screen): copy, print a QR, Launch (opens in a new window).', '', 'swap'],
     ['station-codes', 'Plant Station Codes', 'The one Plant Station link (copy, print a QR, open), then the stations: + Add Station, each station\'s code (typed on the tablet to open that station), New code, Remove; and each plant\'s manager release code to move a tablet.', '', 'factory'],
     ['garage-codes', 'Garage Station Codes', 'The Garage Station and Maintenance Station links (copy, print a QR, Launch in a new window), then the garage stations: + Add Station, each station\'s code, New code, Remove.', '', 'gear'],
-    ['driver-codes', 'Driver Station Codes', 'The Driver Station and Driver Room TV links (copy, print a QR, open) with their kiosks (+ Add Kiosk, a code for each Driver Room tablet or TV), and the drivers\' phone link with its Route Distribution code: new code, turn it off (press twice).', '', 'people']
+    ['driver-codes', 'Driver Station Codes', 'The one Driver Station link (copy, print a QR, open), then the stations: + Add Station, each Driver Room tablet, TV or kiosk\'s code (typed on it to open that board), New code, Remove; and the drivers\' phone link with its Route Distribution code: new code, turn it off (press twice).', '', 'people']
   ]],
   ['Email & Schedules', 'Where email goes, how often, and how often the app refreshes', [
     ['repair-email', 'Repair Email', 'Where repair email goes (Idealease, Penske, owned units), on or off, how often for each lessor, the digest hour, and Send now.', '', 'alert'],
@@ -27,11 +27,14 @@ export const ADMIN_GROUPS = [
     ['print', 'Print Layouts', 'How the dispatch sheets print.', 'print.html', 'day'],
     ['settings', 'Dispatch Settings', 'Dispatch defaults and options.', 'settings.html', 'gear'],
     ['routes', 'Route Editor', 'Routes, runs, times and which days each run goes.', 'routes.html', 'map'],
-    ['switch', 'Which App Runs Each Screen', 'On the Route Distribution page, an administrator clicks a screen\'s tag twice to run it from the new app, and turns the write-back on or off.', 'distribution.html', 'swap']
+    // Joe 10/12: switching screens lives here, not on the cards' tags (they can no longer be clicked).
+    ['switch', 'Go-Live Switches', 'Which app runs each screen, the write-back to the Live sheet, Mark fully live (the tag comes off the cards), and one button to turn on everything that is ready.', '', 'swap']
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
     ['machine-products', 'Product Sheet', "Each plant's product sheet by area and group: every detail of each product, and the Product drop-down on Quality Checks. Add or edit a product, or load the whole list from the template.", 'products.html', 'production.webp'],
-    ['plant-shifts', 'Plant Shifts', 'Each plant\'s Distribution and Plant Production shifts (Uniontown distribution: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week']
+    ['plant-shifts', 'Plant Shifts', 'Each plant\'s Distribution and Plant Production shifts (Uniontown distribution: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week'],
+    // Joe 10/12: one list of each plant's areas and sub-areas; the Safety Walkthrough walks it, other screens can use it later.
+    ['location-areas', 'Location Areas', "Each plant's areas (Plant, Garage, Office, Yard) and their sub-areas: add, rename, reorder, turn off. The Safety Walkthrough walks them in this order; other screens can use them later.", 'location-areas.html', 'map']
   ]],
   // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.
   ['Connections & Keys', 'The API keys the app uses: paste, replace and test them here', [

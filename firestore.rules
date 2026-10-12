@@ -15,7 +15,16 @@ service cloud.firestore {
       return unitedDairy()
         && get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('status', '') == 'ACTIVE';
     }
-    match /config/app { allow read: if activeUser(); }
+    // A Plant Station signed in by its code alone (Joe 10/12; index.js stationSignIn): only while its plant's switch is On and
+    // its station still has the same code (stationAccess, which the server keeps in step), and only the plant-floor screens'
+    // lists below. Never a person's entry, dispatch weeks or any other list.
+    function plantStation() {
+      return request.auth != null && request.auth.token.get('udStation', '') != ''
+        && get(/databases/$(database)/documents/stationAccess/$(request.auth.token.get('udPlant', 'none'))).data.get('on', false) == true
+        && get(/databases/$(database)/documents/stationAccess/$(request.auth.token.get('udPlant', 'none'))).data.get('keys', {}).get(request.auth.token.udStation, '') == request.auth.token.get('udVersion', 'none');
+    }
+    function activeUserOrStation() { return activeUser() || plantStation(); }
+    match /config/app { allow read: if activeUserOrStation(); }
     match /config/fleetSync { allow read: if activeUser(); }
     match /config/mocreo { allow read: if activeUser(); }
     // Fleet Service's service rules (Fleet Service Setup; the server writes them).
@@ -25,9 +34,9 @@ service cloud.firestore {
     // Thermometer locations changed in Administration > MOCREO & Sensors (the server writes them; the key stays in private/).
     match /tempLocations/{id} { allow read: if activeUser(); }
     match /weeks/{id} { allow read: if activeUser(); }
-    match /runs/{id} { allow read: if activeUser(); }
+    match /runs/{id} { allow read: if activeUserOrStation(); }
     match /drivers/{id} { allow read: if activeUser(); }
-    match /equipment/{id} { allow read: if activeUser(); }
+    match /equipment/{id} { allow read: if activeUserOrStation(); }
     match /routes/{id} { allow read: if activeUser(); }
     // Each person may read their own entry (to know which buttons to show, or that they are not on the list), not everyone's.
     match /users/{email} { allow read: if unitedDairy() && request.auth.token.email.lower() == email; }
@@ -35,7 +44,7 @@ service cloud.firestore {
     match /exceptions/{id} { allow read: if activeUser(); }
     match /vacations/{id} { allow read: if activeUser(); }
     match /plantLoads/{id} { allow read: if activeUser(); }
-    match /maintenance/{id} { allow read: if activeUser(); }
+    match /maintenance/{id} { allow read: if activeUserOrStation(); }
     match /mailCopies/{id} { allow read: if activeUser(); }
     match /workOrders/{id} { allow read: if activeUser(); }
     match /fleetSetup/{id} { allow read: if activeUser(); }
@@ -52,15 +61,15 @@ service cloud.firestore {
     match /scorecard/{id} { allow read: if activeUser(); }
     match /opsAssignments/{id} { allow read: if activeUser(); }
     // The plant side: the plant journal, pickups, and the wash and returns lists.
-    match /plantJournal/{id} { allow read: if activeUser(); }
-    match /pickups/{id} { allow read: if activeUser(); }
-    match /plantWash/{id} { allow read: if activeUser(); }
+    match /plantJournal/{id} { allow read: if activeUserOrStation(); }
+    match /pickups/{id} { allow read: if activeUserOrStation(); }
+    match /plantWash/{id} { allow read: if activeUserOrStation(); }
     match /plantReturns/{id} { allow read: if activeUser(); }
     // The production lines, temperature locations and the lines' last checks.
     match /plantSetup/{id} { allow read: if activeUser(); }
-    match /plantProducts/{id} { allow read: if activeUser(); }
+    match /plantProducts/{id} { allow read: if activeUserOrStation(); }
     // Each plant's own product areas and groups (Administration > Products).
-    match /productSetup/{id} { allow read: if activeUser(); }
+    match /productSetup/{id} { allow read: if activeUserOrStation(); }
     match /plantShifts/{id} { allow read: if activeUser(); }
     // Plant Production: each line's shift on the tablet, and how each line is counted (saved only through save).
     match /productionRuns/{id} { allow read: if activeUser(); }
@@ -72,6 +81,7 @@ service cloud.firestore {
     match /safetyPhotos/{id} { allow read: if activeUser(); }
     match /extinguishers/{id} { allow read: if activeUser(); }
     match /safetySetup/{id} { allow read: if activeUser(); }
+    match /locationAreas/{id} { allow read: if activeUser(); }
     // Plant Maintenance: machinery, work orders and PM tasks (saved only through the server).
     match /plantMachines/{id} { allow read: if activeUser(); }
     match /plantWorkOrders/{id} { allow read: if activeUser(); }

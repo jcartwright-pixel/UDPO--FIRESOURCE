@@ -38,7 +38,7 @@ test('A walk: Good and Not good, a note and a photo, the next walk reviews it, a
   let list = await issues();
   assert.equal(list.length, 1);
   assert.deepEqual([list[0].item, list[0].area, list[0].note, list[0].photo, list[0].sendToMaint, list[0].maintStatus, list[0].status, list[0].foundOn, list[0].foundByName],
-    ['Breakers labeled, no open holes in panels', 'Electrical', 'LP-3 missing labels', true, true, 'WAITING', 'OPEN', '2026-10-05', 'Test Viewer']);
+    ['Breakers labeled, no open holes in panels', 'Plant \u203a Electrical Rooms', 'LP-3 missing labels', true, true, 'WAITING', 'OPEN', '2026-10-05', 'Test Viewer']);
   assert.equal((await db().collection('safetyPhotos').doc(list[0].id).get()).data().data, 'data:image/jpeg;base64,AAAA');
   // Next week: not the month's first walk; the same item Not good again joins the open issue (a repeat), then it is fixed.
   await walkTap('2026-10-12', 'review', { issueId: list[0].id, status: 'OPEN' }, NEXT);
@@ -72,12 +72,47 @@ test('Taking a Not good back removes the issue it opened; a repeat taken back le
   assert.equal((await walk('2026-10-12')).items.floors.status, '');
 });
 
-test('Refused: another day, an item not on the checklist, a note before Not good, a big photo, a made-up status', async () => {
+test('Refused: another day, an item not on the checklist, Plant Maintenance before Not good, a fourth photo, a big photo, a made-up status', async () => {
   await assert.rejects(walkTap('2026-10-01', 'item', { itemId: 'floors', status: 'GOOD' }, MON), /on the day it is walked/);
   await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'nope', status: 'GOOD' }, MON), /not on this plant's checklist/);
-  await assert.rejects(walkTap('2026-10-05', 'note', { itemId: 'floors', note: 'x' }, MON), /Not good first/);
+  // Joe 10/12: a note and photos are fine on any row now; Send to Plant Maintenance still needs Not good first.
+  await assert.rejects(walkTap('2026-10-05', 'photo', { itemId: 'floors', slot: 4, photo: 'data:image/jpeg;base64,AAAA' }, MON), /up to 3 photos/);
+  await assert.rejects(walkTap('2026-10-05', 'maint', { itemId: 'floors', maint: true }, MON), /Not good first/);
   await assert.rejects(walkTap('2026-10-05', 'photo', { itemId: 'floors', photo: 'data:image/png;base64,AAAA' }, MON), /too big or not a picture/);
   await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'floors', status: 'MAYBE' }, MON), /Good or Not good/);
+});
+
+test('Photos on any item (Joe 10/12): up to three, kept when a Not good is taken back, and carried onto the issue', async () => {
+  const pic = 'data:image/jpeg;base64,AAAA';
+  // An item not marked yet and a Good item both take photos.
+  await walkTap('2026-10-05', 'photo', { itemId: 'floors', photo: pic }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_routes', status: 'GOOD' }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'photo', { itemId: 'exit_routes', slot: 1, photo: pic }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'photo', { itemId: 'exit_routes', slot: 2, photo: pic }, MON, PLANT_PERSON);
+  let w = await walk('2026-10-05');
+  assert.deepEqual([w.items.floors.status, w.items.floors.photo, w.items.floors.photoIds.length], ['', true, 1]);
+  assert.deepEqual([w.items.exit_routes.status, w.items.exit_routes.photoIds.length], ['GOOD', 2]);
+  const ids = w.items.exit_routes.photoIds;
+  for (const id of ids) assert.equal((await db().collection('safetyPhotos').doc(id).get()).data().data, pic);
+  // The same request sent twice (a tablet resending a held save) is saved once.
+  const again = { action: 'saveSafetyWalk', requestId: 'held-photo-1', facilityId: UT, date: '2026-10-05', op: 'photo', itemId: 'exit_routes', slot: 3, photo: pic };
+  await applyAction(db(), { email: PLANT_PERSON }, again, at(MON));
+  await applyAction(db(), { email: PLANT_PERSON }, again, at(MON));
+  assert.equal((await walk('2026-10-05')).items.exit_routes.photoIds.length, 3);
+  // Removing one photo keeps the others.
+  await walkTap('2026-10-05', 'photo', { itemId: 'exit_routes', slot: 2, photo: '' }, MON, PLANT_PERSON);
+  w = await walk('2026-10-05');
+  assert.deepEqual(w.items.exit_routes.photoIds, [ids[0], ids[0] + '__p3']);
+  assert.equal((await db().collection('safetyPhotos').doc(ids[1]).get()).exists, false);
+  // Marked Not good afterwards: the new issue has the item's photos; taking it back keeps them on the item.
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_routes', status: 'NOT_GOOD' }, MON, PLANT_PERSON);
+  let list = await issues();
+  assert.deepEqual([list[0].photo, list[0].photoIds], [true, [ids[0], ids[0] + '__p3']]);
+  assert.equal(list[0].id, ids[0], 'slot 1 is the issue\'s own photo');
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_routes', status: 'GOOD' }, MON, PLANT_PERSON);
+  assert.equal((await issues()).length, 0);
+  assert.deepEqual((await walk('2026-10-05')).items.exit_routes.photoIds, [ids[0], ids[0] + '__p3']);
+  assert.equal((await db().collection('safetyPhotos').doc(ids[0]).get()).exists, true);
 });
 
 test('Open Issues: Mark Fixed, Reopen and Send to Plant Maintenance', async () => {
@@ -121,9 +156,61 @@ test('Checklist Setup: a manager changes the plant\'s list; an item left out sta
   await applyAction(db(), { email: MANAGER }, { action: 'saveSafetyChecklist', requestId: rid(), facilityId: UT, areas }, at(MON));
   const setup = (await db().collection('safetySetup').doc(UT).get()).data();
   const on = S.walkList(setup, true).flatMap(a => a.items.map(i => i.id));
-  assert.deepEqual(on, ['exit_routes', 'exit_signs', 'fire_new']);
+  const first = S.checklist(null)[0];
+  assert.deepEqual(on, [first.items[0].id, first.items[1].id, 'fire_new']);
+  assert.equal(setup.areas[0].place, 'Plant', 'each sub-area keeps its place (Plant, Garage or Office)');
   assert.equal(S.findItem(setup, 'floors').text, 'Floors free of standing water, milk and oil; drains open', 'items left out are kept, turned off');
   await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'floors', status: 'GOOD' }, MON), /not on this plant's checklist/, 'an item turned off is not walked');
   await walkTap('2026-10-05', 'item', { itemId: 'fire_new', status: 'GOOD' }, MON, DISPATCHER);
   await assert.rejects(applyAction(db(), { email: PLANT_PERSON }, { action: 'saveSafetyChecklist', requestId: rid(), facilityId: UT, areas }, at(MON)), /permission|not allowed|role/i);
+});
+
+test('Location Areas (Joe 10/12): rename, reorder and turn off; nothing is ever dropped; the walk follows them', async () => {
+  const L = S.locations(null);
+  assert.deepEqual(L.map(a => a.name), ['Plant', 'Garage', 'Office', 'Yard']);
+  const next = JSON.parse(JSON.stringify(L));
+  next[0].subs[0].name = 'Docks';
+  next[0].subs.find(x => x.key === 'ammonia').off = true;
+  next[3].subs.push({ key: 'yard_scale', name: 'Truck Scale' });
+  next.splice(1, 1); // the Garage left out of what is sent
+  await applyAction(db(), { email: MANAGER }, { action: 'saveLocationAreas', requestId: rid(), facilityId: UT, areas: next.reverse() }, at(MON));
+  const saved = (await db().collection('locationAreas').doc(UT).get()).data();
+  assert.deepEqual(saved.areas.map(a => [a.name, a.off]), [['Yard', false], ['Office', false], ['Plant', false], ['Garage', true]], 'an area left out stays, turned off');
+  const setup = { locations: saved };
+  const P = S.places(S.walkList(setup, true));
+  assert.deepEqual(P.map(p => p.name), ['Yard', 'Office', 'Plant'], 'the walk follows their order and leaves turned-off areas off');
+  assert.equal(P[2].areas[0].name, 'Docks');
+  assert.ok(!P[2].areas.some(a => a.key === 'ammonia'));
+  await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'nh3_leaks', status: 'GOOD' }, MON), /not on this plant's checklist/, 'a turned-off sub-area is not walked');
+  await assert.rejects(applyAction(db(), { email: MANAGER }, { action: 'saveLocationAreas', requestId: rid(), facilityId: UT, areas: [{ key: 'plant', name: '', subs: [] }] }, at(MON)), /needs a name/);
+  await assert.rejects(applyAction(db(), { email: PLANT_PERSON }, { action: 'saveLocationAreas', requestId: rid(), facilityId: UT, areas: next }, at(MON)), /permission|not allowed|role/i);
+});
+
+test('Notes (Joe 10/12): a note on any row, kept when the row changes; a note on an earlier issue; notes for the whole walk', async () => {
+  await walkTap('2026-10-05', 'note', { itemId: 'exit_signs', note: 'Bulb dim by dock 3' }, MON, PLANT_PERSON);
+  let w = await walk('2026-10-05');
+  assert.deepEqual([w.items.exit_signs.note, w.items.exit_signs.status], ['Bulb dim by dock 3', ''], 'a note before the row is marked');
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_signs', status: 'GOOD' }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_signs', status: 'NOT_GOOD' }, MON, PLANT_PERSON);
+  let list = await issues();
+  assert.equal(list[0].note, 'Bulb dim by dock 3', 'the row note becomes the issue note');
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_signs', status: 'GOOD' }, MON, PLANT_PERSON);
+  w = await walk('2026-10-05');
+  assert.deepEqual([w.items.exit_signs.status, w.items.exit_signs.note], ['GOOD', 'Bulb dim by dock 3'], 'the note stays when Not good is taken back');
+  assert.equal((await issues()).length, 0);
+  await walkTap('2026-10-05', 'item', { itemId: 'guards', status: 'NOT_GOOD' }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'walknote', { note: 'Walked with the new supervisor.' }, MON, PLANT_PERSON);
+  w = await walk('2026-10-05');
+  assert.deepEqual([w.note, w.noteByName], ['Walked with the new supervisor.', 'Test Viewer']);
+  // Next week: a note on the earlier issue while reviewing it shows on the issue as its latest note; it is not a review by itself.
+  const id = (await issues())[0].id;
+  await walkTap('2026-10-12', 'reviewnote', { issueId: id, note: 'Guard ordered, due Friday' }, NEXT);
+  w = await walk('2026-10-12');
+  assert.deepEqual(w.reviews[id], { note: 'Guard ordered, due Friday' });
+  list = await issues();
+  assert.deepEqual([list[0].lastNote, list[0].lastNoteOn, list[0].lastNoteByName, list[0].status], ['Guard ordered, due Friday', '2026-10-12', 'Test Manager', 'OPEN']);
+  await walkTap('2026-10-12', 'review', { issueId: id, status: 'OPEN' }, NEXT);
+  w = await walk('2026-10-12');
+  assert.deepEqual([w.reviews[id].status, w.reviews[id].note], ['OPEN', 'Guard ordered, due Friday'], 'the review keeps its note');
+  await assert.rejects(walkTap('2026-10-12', 'reviewnote', { issueId: 'nope', note: 'x' }, NEXT), /not on this plant's list/);
 });
