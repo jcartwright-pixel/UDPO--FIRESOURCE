@@ -352,6 +352,23 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 @media (min-width: 900px) { .ta-page .ta-row { grid-template-columns: 100px minmax(0, 1fr) minmax(0, 1.1fr) 110px 170px 130px; } }
 .ta-page .ta-yard { padding: 12px 16px; }
 @media (max-width: 899px) { .ta-page .view { padding: 0 8px 8px; } .ta-page .ta-row > span { padding: 6px 3px; } .ta-page .ta-headrow { font-size: 11px; } }
+/* Joe 10/12 (tablets): Run and Driver never shrink to a letter or two. On a 1024 tablet the yard is narrower, the fixed columns
+   give up width, and a long run or driver name wraps instead of being cut. The yard and the notes are 16px or more. */
+.ta-page .ta-row > span:nth-child(2), .ta-page .ta-row > span:nth-child(3) { white-space: normal; overflow-wrap: break-word; text-overflow: clip; }
+.ta-page .ta-row small, .ta-page .ta-row .tr small { font-size: 16px; }
+.ta-page .ta-yard h3 { font-size: 16px; }
+.ta-page .ta-chip { font-size: 18px; }
+.ta-page .ta-chip small { font-size: 16px; }
+@media (min-width: 900px) and (max-width: 1300px) {
+  .ta-page .ta-wrap { grid-template-columns: minmax(0, 1fr) 260px; }
+  .ta-page .ta-row { grid-template-columns: 80px minmax(0, 1fr) minmax(0, 1.1fr) 92px 140px 100px; }
+  .ta-page .ta-row > span { padding: 6px 6px; }
+  .ta-page .ta-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 600px) and (max-width: 899px) {
+  .ta-page .ta-row { grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1fr) 84px 120px; font-size: 16px; }
+  .ta-page .ta-headrow { font-size: 14px; }
+}
 /* Polish 23: Phone Screens keeps the page's side margins, and its cards fit a phone. */
 .pss { padding: 0 16px 16px; }
 .pss h2 { margin: 16px 0 8px; color: #0b2f55; }
@@ -500,3 +517,18 @@ body.station-locked:not(.fill) { padding-bottom: 56px; box-sizing: border-box; }
 body.station-locked.fill #screen:not([hidden]) { height: calc(100vh - 56px); }
 body.ds-full .station-release { background: #071a2c; color: rgba(255,255,255,.75); border-top-color: rgba(255,255,255,.2); }
 body.ds-full .station-release:hover, body.ds-full .station-release:focus-visible { background: #0d2a44; color: #fff; }
+
+/* Boxing (Joe 10/12): Shipping / Loadout colored by who takes the load, as the Scheduler's legend: blue Uniontown truck,
+   green branch, purple carrier. */
+.sw-legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 0 0 10px; font-size: 16px; font-weight: 700; color: #0b2f55; }
+.sw-legend i { display: inline-block; width: 18px; height: 18px; border-radius: 4px; vertical-align: -3px; margin-right: 6px; }
+.sw-legend i.ut { background: #0b5596; } .sw-legend i.branch { background: #15803d; } .sw-legend i.carrier { background: #7e3fbf; }
+.sw-card.by-ut { border-left-color: #0b5596; }
+.sw-card.by-branch { border-left-color: #15803d; } .sw-card.by-branch:not(.done) { background: #f1f9f3; }
+.sw-card.by-carrier { border-left-color: #7e3fbf; } .sw-card.by-carrier:not(.done) { background: #f7f2fd; }
+.sw-who { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; font-size: 16px; font-weight: 800; vertical-align: 1px; }
+.sw-who.ut { background: #e8f0f8; color: #0b5596; } .sw-who.branch { background: #e8f5ec; color: #15803d; } .sw-who.carrier { background: #f2ebfa; color: #6a2fb0; }
+.sw-po { margin: 0; align-self: end; } .sw-po span { display: block; color: #4a5b6c; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.sw-po b { display: block; margin-top: 5px; min-height: 52px; line-height: 52px; font-size: 21px; color: #0b2f55; }
+/* Yard Services (Joe 10/12): Trailer Assignments and Yard Checks shown inside the station, without their header and menu. */
+.sw-frame { display: block; width: 100%; height: calc(100dvh - 130px); min-height: 560px; border: 1px solid #d5dfea; border-radius: 12px; background: #f3f6f9; }

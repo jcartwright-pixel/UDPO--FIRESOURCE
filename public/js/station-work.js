@@ -18,10 +18,13 @@ const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
 const SKIP_KEY = 'udLoadoutSkipped';
 const readSkips = () => { try { return JSON.parse(sessionStorage.getItem(SKIP_KEY) || '{}') || {}; } catch (e) { return {}; } };
 
-export function mountStationWork({ db, box, person }) {
+export function mountStationWork({ db, box, person, onDraw }) {
   let station = null, view = '', date = today();
   let runs = [], pickups = [], week = [], queue = [], sheetWash = [], appWash = [], app = {}, products = [];
-  const got = { runs: false, week: false };
+  // Boxing: the Plant Operations Scheduler's Shipping and Receiving loads (read only while a Boxing station is open).
+  const sched = { SHIPPING: [], RECEIVING: [] };
+  let routeDocs = [];   // Route Master (coverage_type), for a United Dairy account; a station-code tablet cannot read it
+  const got = { runs: false, week: false, SHIPPING: false, RECEIVING: false };
   const pending = {};       // card id -> what is shown before the server has it
   const drafts = {};        // card id -> { field: typed value } until it is saved
   const opened = {}, closed = {}, puForm = {};
@@ -32,15 +35,17 @@ export function mountStationWork({ db, box, person }) {
   let unsubs = [];
 
   // The role, or what Administration > People & Roles allows this person (asked of the server once per person).
-  const VIEW_SAVE = { loading: 'savePlantLoad', unloading: 'saveUnloading', washing: 'completeWash', returns: 'addReturn' };
+  const VIEW_SAVE = { loading: 'savePlantLoad', unloading: 'saveUnloading', washing: 'completeWash', returns: 'addReturn', receiving: 'savePlantSchedule' };
   let allowed = {}, askedFor = null;
   const askRights = () => {
     const p = person(), key = p ? (p.email || p.name || '') + '|' + (p.roles || []).join(',') : null;
     if (!p || key === askedFor) return;
     askedFor = key;
-    allowedSaves(Object.values(VIEW_SAVE).concat(['addPickup', 'completePickup'])).then(a => { allowed = a; render(); });
+    allowedSaves(Object.values(VIEW_SAVE).concat(['addPickup', 'completePickup', 'savePlantSchedule'])).then(a => { allowed = a; render(); });
   };
-  const canSave = () => (L.hasRole(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed[VIEW_SAVE[view] || 'savePlantLoad'] === true) && L.screenState(app, 'plantLoading').open;
+  const canSave = () => (L.hasRole(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed[VIEW_SAVE[view] || 'savePlantLoad'] === true) && L.screenState(app, view === 'receiving' ? 'plant' : 'plantLoading').open;
+  // A scheduled load saves through the Scheduler's save, which follows the Plant Operations switch (not Plant Loading).
+  const canSched = () => (L.hasRole(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.savePlantSchedule === true) && L.screenState(app, 'plant').open;
   const myName = () => (station && station.name) || '';
   const weekDays = () => { const s = L.weekStart(date), out = []; for (let d = s; d <= date; d = L.addDays(d, 1)) out.push(d); return out; };
   const dayJournal = () => week.filter(d => d.date === date);
@@ -63,6 +68,33 @@ export function mountStationWork({ db, box, person }) {
     return P.washItems(date, sheetWash, appWash, week).concat(earlier).filter(w => !washedNow[U.unitKey(w.trailer)]);
   }
 
+  // Boxing (Joe 10/12): the Scheduler's loads for today. Shipping is loaded on its load day (blank = the pickup day);
+  // Receiving arrives on its day. A shipment that is also one of the box loads is worked on the box load's card.
+  const boxing = () => !!station && station.id === 'BOXING';
+  function shipments() {
+    if (!boxing()) return [];
+    const box = loads();
+    return U.scheduleEntries(sched.SHIPPING, 'SHIPPING').filter(x => (x.loadDate || x.date) === date && !box.some(r => sameRun(r, x))).map(withShown);
+  }
+  // The same customer run: its run ID, or the same route number and run name.
+  const up = (v) => String(v || '').trim().toUpperCase();
+  const sameRun = (a, b) => (a.runId && a.runId === b.runId) || (!!up(a.route) && up(a.route) === up(b.route) && up(a.run) === up(b.run));
+  function deliveries() {
+    return boxing() ? U.scheduleEntries(sched.RECEIVING, 'RECEIVING').filter(x => x.date === date).map(withShown) : [];
+  }
+  const withShown = (x) => { const k = 'sch:' + x.id, p = pending[k]; return p ? Object.assign({}, x, { trailer: p.trailer !== undefined ? p.trailer : x.trailer, work: Object.assign({}, x.work, p.work) }) : x; };
+  // Who takes the load (the Scheduler's legend): Carrier on the load itself, otherwise the run's Route Master coverage_type.
+  const HAULER = { ut: 'UNIONTOWN', branch: 'BRANCH', carrier: 'CARRIER' };
+  function hauler(x, carrier) {
+    if (carrier) return 'carrier';
+    const route = routeDocs.find(r => x.runId && r.runId === x.runId) || routeDocs.find(r => up(r.routeCode || r.route) === up(x.route)) || {};
+    const run = runs.find(r => x.runDocId && r.id === x.runDocId) || runs.find(r => x.runId && r.runId === x.runId) || {};
+    const t = up(route.coverageType || run.coverageType);
+    return t === 'BRANCH' ? 'branch' : t && t !== 'UNITED DAIRY' ? 'carrier' : 'ut';
+  }
+  const minutesOf = (hhmm) => { const m = /^(\d{2}):(\d{2})$/.exec(hhmm || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const clock = (hhmm) => { const m = minutesOf(hhmm); return m === null ? (hhmm || '') : P.timeOfDay(m); };
+
   // ---- drawing
   const val = (id, k, v) => (drafts[id] && drafts[id][k] !== undefined ? drafts[id][k] : v);
   function field(id, k, label, v, opts) {
@@ -83,11 +115,25 @@ export function mountStationWork({ db, box, person }) {
     const all = loads(), ck = canSave(), unit = P.AREA[area() || 'CASE'];
     const order = (r) => (r.prior ? 0 : 2) + (isSkipped(r) ? 1 : 0);
     const rows = all.map((r, i) => ({ r, i })).sort((a, b) => order(a.r) - order(b.r) || a.i - b.i).map(x => x.r);
-    const left = rows.filter(r => r.state !== 'DONE').length, pk = P.withNotePickups(all, pickups);
-    let html = '<div class="sw-band start"><b>&#9660; START</b><span>Loading today · ' + escapeHtml(L.dayName(date).slice(0, 3) + ', ' + shortDate(date)) + '</span><i>' + left + ' remaining of ' + plural(rows.length, 'load') + '</i></div>';
-    html += '<div class="sw-cols" aria-hidden="true"><span>Route</span><span>Run</span><span class="truck">Truck</span><span>Trailer</span><span>Status</span></div>';
-    let lastPrior = null;
+    const pk = P.withNotePickups(all, pickups), ships = shipments(), box = boxing();
+    // A box load the Scheduler marks Carrier is a carrier's load (the Scheduler's line itself is worked on this card).
+    const carried = box ? U.scheduleEntries(sched.SHIPPING, 'SHIPPING').filter(x => (x.loadDate || x.date) === date && x.scheduleType === 'CARRIER') : [];
+    // Boxing: each scheduled shipment goes in among today's box loads by its pickup time; the box loads keep their order.
+    const list = [];
+    let si = 0;
+    const ship = ships.slice().sort((a, b) => (minutesOf(a.pickupTime) ?? 9999) - (minutesOf(b.pickupTime) ?? 9999));
     rows.forEach(r => {
+      const t = r.prior ? -1 : Number(r.dispatchTime);
+      while (!r.prior && isFinite(t) && si < ship.length && minutesOf(ship[si].pickupTime) !== null && minutesOf(ship[si].pickupTime) < t) list.push({ s: ship[si++] });
+      list.push({ r });
+    });
+    while (si < ship.length) list.push({ s: ship[si++] });
+    const total = rows.length + ships.length, left = rows.filter(r => r.state !== 'DONE').length + ships.filter(x => x.work.state !== 'COMPLETE').length;
+    let html = (box ? LEGEND : '') + '<div class="sw-band start"><b>&#9660; START</b><span>' + (box ? 'Shipping' : 'Loading') + ' today · ' + escapeHtml(L.dayName(date).slice(0, 3) + ', ' + shortDate(date)) + '</span><i>' + left + ' remaining of ' + plural(total, 'load') + '</i></div>';
+    html += '<div class="sw-cols" aria-hidden="true"><span>Route</span><span>' + (box ? 'Run / customer' : 'Run') + '</span><span class="truck">' + (box ? 'Truck / pickup' : 'Truck') + '</span><span>Trailer</span><span>Status</span></div>';
+    let lastPrior = null;
+    list.forEach(({ r, s }) => {
+      if (s) { html += shipCard(s); return; }
       if (r.prior && lastPrior !== true) html += '<p class="sw-group prior">Still open from ' + escapeHtml(L.dayName(r.loadDate) + ' ' + shortDate(r.loadDate)) + ': finish these first</p>';
       if (!r.prior && lastPrior === true) html += '<p class="sw-group">Today</p>';
       lastPrior = r.prior;
@@ -95,9 +141,10 @@ export function mountStationWork({ db, box, person }) {
       const isOpen = st === 'LOADING' ? !closed[r.id] : !!opened[r.id], done = st === 'DONE';
       const status = done ? badge('COMPLETE', 'done') : st === 'LOADING' ? badge('LOADING', 'going') : badge('WAITING');
       const quick = ck && st === 'WAITING' && !isOpen ? '<span class="sw-quick">' + (skip ? '' : btn('SKIP', 'skip', r.id, 'warn')) + btn('START LOADING', 'start', r.id, 'primary') + '</span>' : '';
-      html += '<article class="sw-card ' + (done ? 'done' : st === 'LOADING' ? 'run' : '') + (skip ? ' skipped' : '') + (isOpen ? ' open' : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
+      const by = box ? hauler(r, carried.some(x => sameRun(r, x))) : '';
+      html += '<article class="sw-card ' + (done ? 'done' : st === 'LOADING' ? 'run' : '') + (skip ? ' skipped' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
         '<div class="sw-head" data-toggle="' + escapeHtml(r.id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '">' +
-        '<b class="route">' + escapeHtml(r.route) + '</b><b class="run">' + escapeHtml(r.run) + '</b><span class="truck">' + escapeHtml(r.truck || '—') + '</span><span class="trailer">' + escapeHtml(r.trailer || '—') + '</span>' +
+        '<b class="route">' + escapeHtml(r.route) + '</b><b class="run">' + escapeHtml(r.run) + (by ? who(by) : '') + '</b><span class="truck">' + escapeHtml(r.truck || '—') + '</span><span class="trailer">' + escapeHtml(r.trailer || '—') + '</span>' +
         '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (skip ? '<i class="sw-flag skip">SKIPPED · COME BACK</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>';
       if (isOpen) {
         const dis = !ck || done;
@@ -109,9 +156,51 @@ export function mountStationWork({ db, box, person }) {
       }
       html += '</article>';
     });
-    if (!rows.length) html += '<p class="sw-empty">' + (got.runs ? 'No ' + unit.tile.toLowerCase() + ' loads today.' : 'Reading today\'s loads&hellip;') + '</p>';
-    html += '<div class="sw-band end"><b>&#9632; END</b><span>of today\'s loadout</span></div>';
-    return panel('Loading', plural(rows.length, 'item'), '<div class="sw-list">' + html + '</div>');
+    if (!list.length) html += '<p class="sw-empty">' + (got.runs ? 'No ' + unit.tile.toLowerCase() + ' loads ' + (box ? 'or shipments ' : '') + 'today.' : 'Reading today\'s loads&hellip;') + '</p>';
+    html += '<div class="sw-band end"><b>&#9632; END</b><span>of today\'s ' + (box ? 'shipping' : 'loadout') + '</span></div>';
+    return panel(box ? 'Shipping / Loadout' : 'Loading', plural(total, 'item'), '<div class="sw-list">' + html + '</div>');
+  }
+  const LEGEND = '<div class="sw-legend" aria-label="Who takes the load"><span><i class="ut"></i>Uniontown truck</span><span><i class="branch"></i>Branch</span><span><i class="carrier"></i>Carrier</span></div>';
+  const who = (by) => '<span class="sw-who ' + by + '">' + HAULER[by] + '</span>';
+
+  // A scheduled load's card (Shipping on the Shipping / Loadout tab, Receiving on Receiving): start, the boxes typed, complete.
+  function schedCard(x, lane) {
+    const id = 'sch:' + x.id, st = x.work.state, done = st === 'COMPLETE', going = st === 'WORKING', ck = canSched(), recv = lane === 'RECEIVING';
+    const isOpen = going ? !closed[id] : !!opened[id], by = recv ? '' : hauler(x, x.scheduleType === 'CARRIER');
+    const name = x.run || x.route || 'Plant pickup', status = done ? badge(recv ? 'RECEIVED' : 'COMPLETE', 'done') : going ? badge(recv ? 'RECEIVING' : 'LOADING', 'going') : badge('WAITING');
+    const startLabel = recv ? 'START RECEIVING' : 'START LOADING';
+    const quick = ck && st === 'WAITING' && !isOpen ? '<span class="sw-quick">' + btn(startLabel, 'sstart', id, 'primary') + '</span>' : '';
+    const detail = [x.pickupTime ? clock(x.pickupTime) : '', x.poNumber ? 'PO ' + x.poNumber : '', x.trailer || 'Trailer not typed yet', x.product, x.cases ? x.cases + ' cases' : ''].filter(Boolean).join(' · ');
+    let html = '<article class="sw-card sched ' + (done ? 'done' : going ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(id) + '">';
+    html += recv ? '<div class="sw-head tall" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title"><b>' + escapeHtml(x.route + ' · ' + name) + '</b><small>' + escapeHtml(detail) + '</small></span>'
+      : '<div class="sw-head" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><b class="route">' + escapeHtml(x.route) + '</b><b class="run">' + escapeHtml(name) + who(by) + '</b><span class="truck">' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="trailer">' + escapeHtml(x.trailer || '—') + '</span>';
+    html += '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>';
+    if (isOpen) {
+      const dis = !ck || done;
+      html += '<div class="sw-body"><div class="sw-fields">' + field(id, 'count', recv ? 'Cases / pallets in' : 'Boxes', x.work.count, { mode: 'numeric', disabled: dis }) + field(id, 'trailer', 'Trailer', x.trailer, { disabled: dis }) +
+        field(id, 'temperature', 'Temperature', x.work.temperature, { mode: 'decimal', disabled: dis }) + '<p class="sw-po"><span>PO</span><b>' + escapeHtml(x.poNumber || '—') + '</b></p></div>' +
+        field(id, 'notes', 'Notes', x.work.notes || '', { wide: true, disabled: dis }) +
+        (ck ? '<div class="sw-actions">' + (st === 'WAITING' ? btn(startLabel, 'sstart', id, 'primary') : going ? btn(recv ? 'SAVE RECEIVING' : 'SAVE LOADING', 'ssave', id, 'primary') + btn(recv ? 'RECEIVED' : 'COMPLETE', 'sdone', id, 'good') : badge(recv ? 'RECEIVED' : 'COMPLETE', 'done')) + '</div>' : '') + '</div>';
+    }
+    return html + '</article>';
+  }
+  const shipCard = (x) => schedCard(x, 'SHIPPING');
+
+  function receivingView() {
+    const list = deliveries(), left = list.filter(x => x.work.state !== 'COMPLETE').length;
+    let html = list.map(x => schedCard(x, 'RECEIVING')).join('');
+    if (!list.length) html = '<p class="sw-empty">' + (got.RECEIVING ? 'No deliveries on the Receiving schedule today.' : 'Reading today\'s deliveries&hellip;') + '</p>';
+    return panel('Receiving', left + ' to receive of ' + plural(list.length, 'delivery').replace('deliverys', 'deliveries'), '<div class="sw-list">' + html + '</div>');
+  }
+
+  // Yard Services (Joe 10/12): the plant's own Trailer Assignments and Yard Checks screens, unchanged, inside the station.
+  // In a frame each screen hides the app's header and menu by itself (app.js EMBED).
+  const FRAME = { trailers: 'trailers.html', yardchecks: 'yard.html' };
+  function frameView() {
+    const test = new URLSearchParams(location.search).get('testEmail'), src = FRAME[view] + (test ? '?testEmail=' + encodeURIComponent(test) : '');
+    const have = box.querySelector('iframe.sw-frame');
+    if (have && have.dataset.src === src) return;
+    box.innerHTML = '<iframe class="sw-frame" data-src="' + escapeHtml(src) + '" src="' + escapeHtml(src) + '" title="' + (view === 'trailers' ? 'Trailer Assignments' : 'Yard Checks') + '"></iframe>';
   }
   function pickupBox(r, items, ck) {
     const list = items.map(p => '<div class="sw-pu' + (P.pickupOpen(p) ? '' : ' done') + '"><span><b>' + escapeHtml(p.item) + (p.quantity ? ' · ' + escapeHtml(p.quantity) : '') + '</b>' +
@@ -185,6 +274,7 @@ export function mountStationWork({ db, box, person }) {
   function render() {
     askRights();
     if (!station || !view) { box.innerHTML = ''; return; }
+    if (FRAME[view]) { frameView(); if (onDraw) onDraw(); return; }
     // Keep the box being typed in (and what is typed) when a change from another screen redraws the list.
     const a = document.activeElement, keep = a && box.contains(a) && a.dataset && a.dataset.k ? [a.dataset.id, a.dataset.k, a.selectionStart] : null;
     const s = L.screenState(app, 'plantLoading');
@@ -193,11 +283,12 @@ export function mountStationWork({ db, box, person }) {
     const p = person() || {}, who = (p.email || (p.cells && p.cells.email) || '') + (p.name ? ' (' + p.name + ')' : '') || 'This account';
     const why = s.why || (!s.open ? '' : who + ' is not allowed to save this. In Administration > People & Roles give it the Plant Employee role or allow this work, or sign this tablet in with its station code');
     const note = person() && !canSave() ? '<p class="sw-note">View only' + (why ? ': ' + escapeHtml(why) : '') + '.</p>' : '';
-    box.innerHTML = note + (view === 'loading' ? loadingView() : view === 'unloading' ? unloadingView() : view === 'washing' ? washingView() : returnsView());
+    box.innerHTML = note + (view === 'loading' ? loadingView() : view === 'unloading' ? unloadingView() : view === 'washing' ? washingView() : view === 'receiving' ? receivingView() : returnsView());
     if (keep) {
       const el = box.querySelector('[data-id="' + CSS.escape(keep[0]) + '"][data-k="' + keep[1] + '"]');
       if (el) { el.focus(); try { if (keep[2] !== null && keep[2] !== undefined) el.setSelectionRange(keep[2], keep[2]); } catch (e) { /* not a text box */ } }
     }
+    if (onDraw) onDraw();
   }
 
   // ---- saving
@@ -239,6 +330,31 @@ export function mountStationWork({ db, box, person }) {
       render();
     }
   }
+  // A scheduled load: start, save what was typed, or complete (the Scheduler's save, op progress).
+  async function saveSched(x, lane, step) {
+    const id = 'sch:' + x.id, d = drafts[id] || {}, fields = {};
+    [['count', x.work.count], ['trailer', x.trailer], ['temperature', x.work.temperature], ['notes', x.work.notes]].forEach(([k, was]) => {
+      if (d[k] !== undefined && String(d[k]).trim() !== String(was || '').trim()) fields[k] = k === 'trailer' ? String(d[k]).trim().toUpperCase() : String(d[k]).trim();
+    });
+    if (fields.count !== undefined) fields.count = fields.count.replace(/,/g, '');
+    if (fields.count && !/^\d+$/.test(fields.count)) { showError('Type a whole number for ' + (lane === 'RECEIVING' ? 'cases / pallets in' : 'boxes') + '.'); return; }
+    if (step === 'save' && !Object.keys(fields).length) { showError('Nothing changed on ' + x.route + ' ' + (x.run || '') + '.'); return; }
+    const work = Object.assign({}, fields, { state: step === 'complete' ? 'COMPLETE' : 'WORKING' });
+    delete work.trailer;
+    const shown = { work };
+    if (fields.trailer !== undefined) shown.trailer = fields.trailer;
+    if (step === 'start') delete closed[id];
+    if (step === 'complete') delete opened[id];
+    const done = show(id, shown);
+    // Only what this save sent is cleared: a box typed while it was on its way stays typed.
+    const sent = Object.assign({}, d);
+    try {
+      await save('savePlantSchedule', { lane, op: 'progress', id: x.id, date: x.date, step, fields }); showError('');
+      if (drafts[id]) Object.keys(fields).forEach(k => { if (drafts[id][k] === sent[k]) delete drafts[id][k]; });
+    } catch (e) { showError(x.route + ' ' + (x.run || '') + ': ' + (e.message || e)); }
+    done();
+  }
+
   // What was typed on a load's card and differs from the load.
   function typedLoad(r) {
     const d = drafts[r.id] || {}, fields = {}, shown = {};
@@ -253,6 +369,13 @@ export function mountStationWork({ db, box, person }) {
 
   function act(b) {
     const a = b.dataset.act, id = b.dataset.id, now = new Date().toISOString();
+    if (['sstart', 'ssave', 'sdone'].indexOf(a) >= 0) {
+      const lane = view === 'receiving' ? 'RECEIVING' : 'SHIPPING', x = (lane === 'RECEIVING' ? deliveries() : shipments()).find(y => 'sch:' + y.id === id);
+      if (!x) return;
+      if (a === 'sdone' && x.work.state !== 'WORKING') { showError('Tap ' + (lane === 'RECEIVING' ? 'START RECEIVING' : 'START LOADING') + ' first.'); return; }
+      saveSched(x, lane, a === 'sstart' ? 'start' : a === 'ssave' ? 'save' : 'complete');
+      return;
+    }
     if (['skip', 'start', 'saveload', 'complete', 'pickup', 'puadd', 'pucancel', 'pudone'].indexOf(a) >= 0) {
       const r = loads().find(x => x.id === id);
       if (!r) return;
@@ -396,7 +519,17 @@ export function mountStationWork({ db, box, person }) {
   // ---- reading
   // stop(): the tablet is leaving (turned off, new code, signed out). Every read ends, and a read refused in flight says
   // nothing, so the code screen's own message is the one left showing.
-  let stopped = false, always = [], tick = null;
+  let stopped = false, always = [], tick = null, schedUnsubs = [];
+  function watchSched() {
+    const want = boxing() && !stopped;
+    if (want === !!schedUnsubs.length) return;
+    schedUnsubs.forEach(u => u()); schedUnsubs = [];
+    if (!want) return;
+    const fail = (what) => (e) => { if (!stopped) showError('Could not read ' + what + ': ' + e.message); };
+    schedUnsubs = ['SHIPPING', 'RECEIVING'].map(lane => onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.LOAD_TYPE[lane])),
+      s => { sched[lane] = s.docs.map(d => d.data()); got[lane] = true; render(); }, fail('the ' + (lane === 'SHIPPING' ? 'Shipping' : 'Receiving') + ' schedule')));
+    schedUnsubs.push(onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; }));
+  }
   function watch() {
     if (stopped) return;
     unsubs.forEach(u => u());
@@ -429,8 +562,15 @@ export function mountStationWork({ db, box, person }) {
   }, 60000);
 
   return {
-    set(st, v) { const changed = !station || !st || station.id !== st.id; station = st; view = v; if (changed) Object.keys(drafts).forEach(k => delete drafts[k]); render(); },
+    set(st, v) { const changed = !station || !st || station.id !== st.id; station = st; view = v; if (changed) Object.keys(drafts).forEach(k => delete drafts[k]); watchSched(); render(); },
     render,
-    stop() { stopped = true; unsubs.concat(always).forEach(u => u()); unsubs = []; always = []; clearInterval(tick); }
+    // The loads left on a tab (for the count under it), or null for a tab with no count.
+    count(v) {
+      if (!station) return null;
+      if (v === 'loading') { const r = loads(), s = shipments(); return { total: r.length + s.length, left: r.filter(x => x.state !== 'DONE').length + s.filter(x => x.work.state !== 'COMPLETE').length }; }
+      if (v === 'receiving') { const d = deliveries(); return { total: d.length, left: d.filter(x => x.work.state !== 'COMPLETE').length }; }
+      return null;
+    },
+    stop() { stopped = true; unsubs.concat(always, schedUnsubs).forEach(u => u()); unsubs = []; always = []; schedUnsubs = []; clearInterval(tick); }
   };
 }
