@@ -3,8 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="manifest" href="manifest.webmanifest">
+  <!-- Joe 10/12: the plant tablets install this page as its own "Plant Station" icon that opens full screen straight to the
+       station (not the UD Operations launcher). Opened from the no-account link, the icon keeps that link, so the tablet asks
+       for its station code (an iPad's home-screen icon does not share what Safari remembered). -->
+  <link rel="manifest" id="manifest" href="plant-station.webmanifest">
+  <script>if (new URLSearchParams(location.search).get('noaccount') === '1') document.getElementById('manifest').href = 'plant-station-noaccount.webmanifest';</script>
   <meta name="theme-color" content="#074c84">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Plant Station">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Plant Station · New Plant Operations</title>
