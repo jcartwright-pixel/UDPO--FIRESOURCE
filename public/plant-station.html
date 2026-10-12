@@ -110,7 +110,8 @@
     if (stationId && !read()) write(stationId);
     // The station from its code (Administration > Plant Station Codes): its own name, one of the five station types.
     const CODE_KEY = 'udPlantStationCode', stationCall = (op, f) => callServer('stationRelease', Object.assign({ op }, f));
-    let mode = 'wait', named = null, signedAs = null;
+    // away: this tablet is leaving its station; reads refused on the way out stay quiet.
+    let mode = 'wait', named = null, signedAs = null, away = false;
     // The Plant Station with no UD account: this tablet came from that link (?noaccount=1), so it asks for the station code
     // instead of a Google sign-in (a United Dairy account can still sign in below it).
     const NA_KEY = 'udPlantNoAccount';
@@ -189,7 +190,7 @@
     document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
     const leave = () => {
       stationId = ''; write(''); remember(CODE_KEY, null); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true;
-      if (signedAs) { signedAs = null; signOutHere(); return; } // back to the station code screen
+      if (signedAs) { signedAs = null; away = true; if (work) work.stop(); signOutHere(); return; } // back to the station code screen (reads stopped first)
       decide().catch(err => showError(err.message));
     };
     const releaseCall = (f) => callServer(signedAs ? 'stationSignIn' : 'stationRelease', f);
@@ -217,22 +218,31 @@
 
     requireSignIn(async (user) => {
       const { db } = await start();
-      signedAs = user.station || null;
-      work = mountStationWork({ db, box: document.getElementById('work'), person: () => person });
-      watchPerson(db, user, p => { person = p; work.render(); });
-      // A tablet signed in by its code alone leaves only through Change Station (and the manager release code).
-      document.getElementById('signout').hidden = !!signedAs;
-      // Still On, and still on this code? (Checked again every 5 minutes below.)
-      if (signedAs) {
-        try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { signedAs = null; write(''); await signOutHere(); showError(r.message); return; } } catch (e) { /* offline: keep the station */ }
-      }
+      signedAs = user.station || null; away = false;
       // Read again when the day rolls at 6 AM (Saturday to Sunday is a new week), so the counts never show last week.
       let date = '', stop = null;
+      // Turned off, a new code or a removed station: every read stops first, so a read the database refuses on the way out
+      // never covers the code screen's message (Off shows "turned off", not a read error).
+      const turnedAway = async (message) => {
+        away = true; signedAs = null; write('');
+        if (stop) { stop(); stop = null; }
+        if (work) work.stop();
+        await signOutHere();
+        showError(message);
+      };
+      // A tablet signed in by its code alone leaves only through Change Station (and the manager release code).
+      document.getElementById('signout').hidden = !!signedAs;
+      // Still On, and still on this code? Checked before anything is read (and again every 5 minutes below).
+      if (signedAs) {
+        try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { await turnedAway(r.message); return; } } catch (e) { /* offline: keep the station */ }
+      }
+      work = mountStationWork({ db, box: document.getElementById('work'), person: () => person });
+      watchPerson(db, user, p => { person = p; if (work) work.render(); });
       const watch = () => {
         date = L.operatingDay(new Date());
         if (stop) stop();
         const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
-        stop = onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message));
+        stop = onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => { if (!away) showError('Could not read the loads: ' + e.message); });
       };
       watch();
       await decide().catch(err => showError('Could not check this tablet\'s station code: ' + (err.message || err)));
@@ -242,7 +252,7 @@
         if (mode === 'code' && named && Date.now() % 300000 < 60000) {
           if (signedAs) {
             // Off, New code or Remove: the tablet goes back to the code screen (the database already refuses it).
-            try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { signedAs = null; write(''); await signOutHere(); showError(r.message); return; } } catch (e) { /* offline: keep the station */ }
+            try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { await turnedAway(r.message); return; } } catch (e) { /* offline: keep the station */ }
           } else {
             try { const r = await stationCall('check', { kind: 'PLANT', key: named.key, version: named.version }); if (!r.ok) { remember(CODE_KEY, null); return decide(r.message); } } catch (e) { /* offline: keep the station */ }
           }

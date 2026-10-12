@@ -380,11 +380,15 @@ export function mountStationWork({ db, box, person }) {
   });
 
   // ---- reading
+  // stop(): the tablet is leaving (turned off, new code, signed out). Every read ends, and a read refused in flight says
+  // nothing, so the code screen's own message is the one left showing.
+  let stopped = false, always = [], tick = null;
   function watch() {
+    if (stopped) return;
     unsubs.forEach(u => u());
     date = today();
     const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
-    const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+    const fail = (what) => (e) => { if (!stopped) showError('Could not read ' + what + ': ' + e.message); };
     unsubs = [
       onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); got.runs = true; render(); }, fail('the loads')),
       onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [-1, 0, 1, 2].map(n => L.addDays(date, n)))), s => { pickups = s.docs.map(d => d.data()); render(); }, fail('the pickups')),
@@ -393,18 +397,18 @@ export function mountStationWork({ db, box, person }) {
       onSnapshot(query(collection(db, 'plantReturns'), where('date', '==', date)), s => { queue = s.docs.map(d => d.data()); render(); }, () => { queue = []; render(); })
     ];
   }
-  onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); }, () => {});
-  onSnapshot(collection(db, 'plantWash'), s => { sheetWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); render(); }, () => {});
-  onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); render(); }, () => {});
+  always = [onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); }, () => {}),
+  onSnapshot(collection(db, 'plantWash'), s => { sheetWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); render(); }, () => {}),
+  onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); render(); }, () => {}),
   watchProducts(db, lists => {
     const seen = {};
     Object.keys(lists).forEach(k => (lists[k] || []).forEach(x => { const n = String(x.name || '').trim(); if (n && !seen[n]) seen[n] = { name: n, sku: String(x.sku || '').trim() }; }));
     products = Object.values(seen).sort((a, b) => a.name.localeCompare(b.name));
     if (view === 'returns') render();
-  }, () => {});
+  }, () => {})];
   watch();
   // The day rolls at 6 AM; a running load's state is drawn again each minute (not while someone is typing).
-  setInterval(() => {
+  tick = setInterval(() => {
     if (today() !== date) { Object.keys(drafts).forEach(k => delete drafts[k]); watch(); }
     const a = document.activeElement;
     if (!(a && box.contains(a) && a.dataset && a.dataset.k)) render();
@@ -412,6 +416,7 @@ export function mountStationWork({ db, box, person }) {
 
   return {
     set(st, v) { const changed = !station || !st || station.id !== st.id; station = st; view = v; if (changed) Object.keys(drafts).forEach(k => delete drafts[k]); render(); },
-    render
+    render,
+    stop() { stopped = true; unsubs.concat(always).forEach(u => u()); unsubs = []; always = []; clearInterval(tick); }
   };
 }
