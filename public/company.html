@@ -57,8 +57,10 @@
       return { total: c.total, done: c.done, loading: c.loading, unloaded: uc.complete, waiting: uc.waiting, pickups, issues, loadingRow: loading, lastRow: last, nextRow: next };
     }
     const unit = (r) => [r.truck, r.trailer].filter(Boolean).join(' / ') || 'No truck yet';
-    const act = (label, r, time) => '<div class="co-act" data-open="loadout.html"><span>' + label + '</span>' + (r ? '<b>' + escapeHtml([r.route, r.run].filter(Boolean).join(' · ')) + '</b><i>' + escapeHtml(unit(r)) + '</i><time>' + escapeHtml(time || '') + '</time>' : '<b class="none">None</b>') + '</div>';
-    const cell = (label, value, cls, go) => '<div class="co-cell' + (cls ? ' ' + cls : '') + '" data-open="' + go + '"><span>' + label + '</span><b>' + value + '</b></div>';
+    const act = (label, r, time) => '<div class="co-act"><span>' + label + '</span>' + (r ? '<b>' + escapeHtml([r.route, r.run].filter(Boolean).join(' · ')) + '</b><i>' + escapeHtml(unit(r)) + '</i><time>' + escapeHtml(time || '') + '</time>' : '<b class="none">None</b>') + '</div>';
+    // Joe 10/12: a click anywhere on a plant's tile (its numbers and lines too) opens that plant's home, so the numbers no
+    // longer open their own screens here.
+    const cell = (label, value, cls) => '<div class="co-cell' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span><b>' + value + '</b></div>';
 
     function render() {
       if (!ready) return;
@@ -70,23 +72,24 @@
         kpi('Loads Completed', u ? u.done : 0, 'Connected plants (Uniontown)', '#5b7fa6') + kpi('Currently Loading', u ? u.loading : 0, 'Active work', '#7a3ff2') +
         kpi('Unloaded', u ? u.unloaded : 0, 'Completed returns', '#f38a00') + kpi('Waiting to Unload', u ? u.waiting : 0, 'Open arrivals', '#0b8fae');
       document.getElementById('plants').innerHTML = L.PLANTS.filter(p => plants.indexOf(p.id) >= 0).map(p => {
-        // Joe 10/12: picking a plant opens its Plant Distribution (the Manager Center) first; Back from there is the plant's six-card home.
-        const live = p.id === 'fac_uniontown' && u, href = live ? 'manager.html' : 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
+        // Joe 10/12: picking a plant opens its home with all its cards (Plant Distribution, Plant Production, ...); the
+        // Plant Distribution card there opens the Manager Center.
+        const live = p.id === 'fac_uniontown' && u, href = live ? 'index.html' : 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
         const head = '<header><i class="dot"></i><a href="' + href + '"><strong>' + escapeHtml(p.name) + '</strong></a><em class="' + (p.status === 'ACTIVE' ? 'on' : '') + '">' + p.status + '</em><span aria-hidden="true">&rarr;</span></header>';
         if (!live) {
           return '<div class="co-plant planned" data-plant="' + p.id + '" data-card="' + href + '">' + head + '<div class="co-soon"><b>Being built</b><span>' + escapeHtml(p.name) + ' is not connected to the new app yet. Its numbers show here once its sheets are added.</span></div>' +
             '<footer><span>Next Loadout</span><b>--:--</b><a href="' + href + '">View Details &rarr;</a></footer></div>';
         }
         return '<div class="co-plant" data-plant="' + p.id + '" data-card="' + href + '">' + head + '<div class="co-grid">' +
-          cell('Scheduled', u.total, '', 'loadout.html') + cell('Completed', u.done, 'good', 'loadout.html') + cell('Unloaded', u.unloaded, '', 'unloading.html') + cell('Loaded', u.done + ' / ' + u.total, '', 'loadout.html') +
-          cell('Loading', u.loading, '', 'loadout.html') + cell('Waiting', u.waiting, '', 'unloading.html') + cell('Pickups', u.pickups, u.pickups ? 'bad' : '', 'loadout.html') + cell('Maintenance', u.issues, u.issues ? 'warn' : '', 'maint.html') + '</div>' +
+          cell('Scheduled', u.total, '') + cell('Completed', u.done, 'good') + cell('Unloaded', u.unloaded, '') + cell('Loaded', u.done + ' / ' + u.total, '') +
+          cell('Loading', u.loading, '') + cell('Waiting', u.waiting, '') + cell('Pickups', u.pickups, u.pickups ? 'bad' : '') + cell('Maintenance', u.issues, u.issues ? 'warn' : '') + '</div>' +
           '<div class="co-recent"><h3>Recent Activity</h3>' + act('Route Being Loaded', u.loadingRow, u.loadingRow && P.clock(u.loadingRow.startedAt)) +
           act('Last Route Loaded', u.lastRow, u.lastRow && P.clock(u.lastRow.completedAt)) + act('Next in Line', u.nextRow, u.nextRow && P.timeOfDay(u.nextRow.dispatchTime)) + '</div>' +
-          '<footer><span data-open="loadout.html">&#128666; Next Loadout <b>' + escapeHtml(u.nextRow ? P.timeOfDay(u.nextRow.dispatchTime) || '--:--' : '--:--') + '</b></span><a href="' + href + '">View Details &rarr;</a></footer></div>';
+          '<footer><span>&#128666; Next Loadout <b>' + escapeHtml(u.nextRow ? P.timeOfDay(u.nextRow.dispatchTime) || '--:--' : '--:--') + '</b></span><a href="' + href + '">View Details &rarr;</a></footer></div>';
       }).join('');
     }
-    // Picking a plant opens that plant's Plant Distribution; its home (all six cards) is one Back away.
-    document.getElementById('plants').addEventListener('click', e => { const a = e.target.closest('[data-plant]'); if (a) try { sessionStorage.setItem('udPlant', a.dataset.plant); sessionStorage.setItem('udSide', 'plant'); } catch (x) { /* no storage */ } });
+    // Picking a plant opens that plant's home (all its cards).
+    document.getElementById('plants').addEventListener('click', e => { const a = e.target.closest('[data-plant]'); if (a) try { sessionStorage.setItem('udPlant', a.dataset.plant); } catch (x) { /* no storage */ } });
     try { sessionStorage.removeItem('udPlant'); } catch (e) { /* no storage */ }
 
     requireSignIn(async (user) => {

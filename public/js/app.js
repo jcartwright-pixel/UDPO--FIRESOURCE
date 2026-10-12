@@ -201,7 +201,8 @@ function addSideMenu() {
   const sideLink = (s, href) => link([s.name, href || s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '"' + (s.building ? ' data-building="1"' : '') + ' ');
   const plantSec = (p) => {
     const live = p.status === 'ACTIVE', soon = 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
-    return '<div class="side-sec side-plant" data-plant="' + p.id + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + p.name + '">' +
+    // Joe 10/12: clicking the plant's name (a second tap on a tablet) opens that plant's home; hovering shows its sides.
+    return '<div class="side-sec side-plant" data-plant="' + p.id + '" data-home="' + (live ? 'index.html' : soon) + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + p.name + '">' +
       svg('plant-building-v1-560.webp') + '<span>' + p.name + '</span><i aria-hidden="true">&#9656;</i></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + p.name + '</div>' +
       SIDES.map(s => sideLink(s, live ? s.home : soon).replace('<a ', '<a data-plant="' + p.id + '" ')).join('') + '</div></div>';
@@ -250,7 +251,14 @@ function addSideMenu() {
     sec.addEventListener('mouseleave', later);
     flyOf(sec).addEventListener('mouseenter', () => clearTimeout(timer));
     flyOf(sec).addEventListener('mouseleave', later);
-    sec.querySelector('.side-sec-btn').addEventListener('click', e => { e.stopPropagation(); if (sec.classList.contains('open') && Date.now() - hoverAt > 400) close(); else openSec(sec); });
+    sec.querySelector('.side-sec-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      if (sec.classList.contains('open') && Date.now() - hoverAt > 400) {
+        if (!sec.dataset.home) { close(); return; }
+        try { sessionStorage.setItem('udPlant', sec.dataset.plant); } catch (x) { /* no storage */ }
+        location.href = sec.dataset.home;
+      } else openSec(sec);
+    });
   });
   document.addEventListener('click', e => { if (!e.target.closest('.side-sec, .side-flyouts')) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
