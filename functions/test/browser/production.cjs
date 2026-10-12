@@ -85,16 +85,24 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
         await lt.press(box('shelfLifeDays'), 'Tab');
         await lt.fill(box('minSpeed'), '60');
         await lt.press(box('minSpeed'), 'Tab');
+        // The highest speed's save is held back, so the refusal below lands while it is still going.
+        let release; const held = new Promise(r => { release = r; });
+        const hold = async r => { if (/saveMachineProducts/.test(r.request().postData() || '')) await held; await r.continue(); };
+        await lt.route('**/save', hold);
         await lt.fill(box('maxSpeed'), '70');
         await lt.press(box('maxSpeed'), 'Tab');
-        await lt.waitForFunction(() => /Saved/.test(document.getElementById('foot').textContent));
-        for (let i = 0; i < 40; i++) { const p = (await gallon())[0] || {}; if (p.maxSpeed === 70) break; await lt.waitForTimeout(250); }
-        const p = (await gallon())[0];
-        assert.deepEqual([p.name, p.upc, p.shelfLifeDays, p.minSpeed, p.maxSpeed, p.ratePerMin, p.targetPct], ['Broughton 2% Gallon', '070852503050', 14, 60, 70, 74, 57.3], 'saved on the Gallon Filler\'s Products list');
         // A lowest speed above the highest is refused before it is sent.
         await lt.fill(box('minSpeed'), '90');
         await lt.press(box('minSpeed'), 'Tab');
         await lt.waitForFunction(() => /lowest speed is higher/.test(document.getElementById('error').textContent));
+        release();
+        await lt.waitForFunction(() => /Saved/.test(document.getElementById('foot').textContent));
+        await lt.unroute('**/save', hold);
+        for (let i = 0; i < 40; i++) { const p = (await gallon())[0] || {}; if (p.maxSpeed === 70) break; await lt.waitForTimeout(250); }
+        const p = (await gallon())[0];
+        assert.deepEqual([p.name, p.upc, p.shelfLifeDays, p.minSpeed, p.maxSpeed, p.ratePerMin, p.targetPct], ['Broughton 2% Gallon', '070852503050', 14, 60, 70, 74, 57.3], 'saved on the Gallon Filler\'s Products list');
+        // The earlier save finishing does not wipe the message.
+        assert.match(await lt.textContent('#error'), /lowest speed is higher/, 'the refusal stays on screen after the earlier save finishes');
         await lt.reload();
         await lt.waitForFunction(() => document.querySelectorAll('#rows tr').length > 5);
         assert.equal(await lt.inputValue(box('minSpeed')), '60');
