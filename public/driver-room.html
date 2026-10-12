@@ -12,14 +12,17 @@
   <link rel="stylesheet" href="css/driver-room.css">
 </head>
 <!--
-  Joe 10/12 (layout A): the Driver Room tablet. Today's loadout on the left; on the right a driver taps his name, then
-  Check-In or DVIR (the drivers' phone screens, route.html?room=1). No United Dairy account: the tablet types its own
-  station code once (Administration > Links & Codes > Driver Station Codes, a Driver Room kiosk station). The Driver Room
-  TV keeps the Driver Station link.
+  Joe 10/12 (layout A): the Driver Room tablet. Today's loadout on the left; on the right three big choices, View Loadout,
+  Check-In and DVIR. Check-In and DVIR ask the driver to tap his name, then open the drivers' phone screens
+  (route.html?room=1). Five minutes with no taps signs the driver out and goes back to the scrolling View Loadout. No United
+  Dairy account: the tablet types its own station code once (Administration > Links & Codes > Driver Station Codes, a
+  Driver Room kiosk station). The Driver Room TV keeps the Driver Station link.
 -->
 <body class="dr-page">
   <header class="dr-top">
     <h1><span id="plant">Driver Room</span> <span class="dr-day" id="day"></span></h1>
+    <button type="button" id="h-checkin" class="dr-hbtn" hidden>Check-In</button>
+    <button type="button" id="h-dvir" class="dr-hbtn" hidden>DVIR</button>
     <button type="button" id="change" hidden>Change Station</button>
   </header>
   <div class="notice error" id="error" hidden></div>
@@ -32,10 +35,18 @@
       <p class="dr-foot" id="updated"></p>
     </section>
     <aside class="dr-side" id="side">
-      <div id="pick">
-        <h2>Driver Sign In</h2>
-        <p>Tap your name to do your Check-In or DVIR.</p>
+      <div id="menu">
+        <h2>Driver Room</h2>
+        <p>Pick one. Check-In and DVIR ask for your name.</p>
+        <button type="button" class="dr-card blue" id="go-board">View Loadout<small>Today's routes and load status</small></button>
+        <button type="button" class="dr-card gold" id="go-dvir">DVIR<small>Pre-trip / post-trip inspection</small></button>
+        <button type="button" class="dr-card go" id="go-checkin">Check-In<small>Cases, returns, truck and trailer issues</small></button>
+      </div>
+      <div id="pick" hidden>
+        <h2 id="pick-title">Check-In</h2>
+        <p>Tap your name.</p>
         <div id="names"></div>
+        <button type="button" class="dr-out" id="pick-cancel">Cancel</button>
       </div>
       <div id="me" hidden>
         <h2 id="me-name"></h2>
@@ -43,7 +54,7 @@
         <button type="button" class="dr-card go" id="to-checkin">Check-In<small>Cases, returns, truck and trailer issues</small></button>
         <button type="button" class="dr-card gold" id="to-dvir">DVIR<small>Pre-trip / post-trip inspection</small></button>
         <button type="button" class="dr-out" id="sign-out">Sign Out</button>
-        <p class="dr-note">Signs out by itself after 2 minutes with no taps.</p>
+        <p class="dr-note">Signs out by itself after 5 minutes with no taps.</p>
       </div>
     </aside>
   </main>
@@ -78,10 +89,13 @@
         station = await askCode($('code-box'), { kind: 'KIOSK', storeKey: KEY, call: stationCall, title: 'Enter the Driver Room station code',
           hint: 'A manager makes it in Administration > Links & Codes > Driver Station Codes (the Driver Room kiosk station, Create code). The tablet remembers it after this.', message: r.message });
       } else station = r.station;
-      $('code-box').hidden = true; $('main').hidden = false; $('change').hidden = false;
+      $('code-box').hidden = true; $('change').hidden = false;
       $('plant').textContent = station.plant + ' Driver Room';
       roster = null;
-      await readBoard(); await drawSide();
+      await readBoard();
+      // The screen shows once its side is drawn, so a quick tap cannot be undone by the first drawing.
+      await setMode(new URLSearchParams(location.search).get('view') === 'loadout' && !session.get().id ? 'loadout' : 'menu');
+      $('main').hidden = false;
     }
 
     async function readBoard() {
@@ -98,15 +112,27 @@
       } catch (e) { stationGone(e) || showError('Could not read the loadout: ' + e.message); }
     }
 
+    // What the right side shows: the three choices, the names (for Check-In or DVIR), or the signed-in driver. 'loadout'
+    // is the resting screen: the loadout full width, scrolling by itself, with Check-In and DVIR at the top.
+    let mode = 'menu', want = 'checkin';
+    function setMode(m) {
+      mode = m;
+      document.body.classList.toggle('dr-loadout', m === 'loadout');
+      $('h-checkin').hidden = $('h-dvir').hidden = m !== 'loadout' || !station;
+      return drawSide();
+    }
     async function drawSide() {
       const me = session.get();
-      $('pick').hidden = !!me.id; $('me').hidden = !me.id;
-      if (me.id) {
+      if (me.id && mode !== 'loadout') mode = 'me';
+      $('menu').hidden = mode !== 'menu'; $('pick').hidden = mode !== 'names'; $('me').hidden = mode !== 'me';
+      if (mode === 'me') {
         $('me-name').textContent = me.name;
         const mine = rows.filter(x => String(x.driver || '').toUpperCase() === me.name.toUpperCase());
         $('me-load').textContent = mine.map(x => 'Route ' + x.route + (x.trailer ? ' · Trailer ' + x.trailer : '')).join('  ·  ');
         return;
       }
+      if (mode !== 'names') return;
+      $('pick-title').textContent = want === 'dvir' ? 'DVIR' : 'Check-In';
       if (!roster) roster = await withStation('roster').catch(e => { stationGone(e) || showError('Could not read the driver list: ' + e.message); return null; });
       if (!roster) return;
       const btn = (id, name) => '<button type="button" data-id="' + escapeHtml(id) + '" data-name="' + escapeHtml(name) + '">' + escapeHtml(name) + '</button>';
@@ -115,11 +141,15 @@
         group('RELIEF DRIVERS', roster.drivers.filter(d => d.relief).map(d => btn(d.id, d.name))) +
         group('FILL-IN AND CARRIERS', (roster.others || []).map(n => btn('name:' + n, n)));
     }
+    const goCheckIn = () => { location.href = 'route.html?room=1'; };
+    const goDvir = () => { location.href = 'route.html?room=1&view=dvir'; };
+    // Check-In or DVIR: the signed-in driver goes straight there; anyone else taps his name first.
+    function choose(what) { want = what; if (session.get().id) return what === 'dvir' ? goDvir() : goCheckIn(); setMode('names'); }
 
     // A station removed, or given a new code, sends the tablet back to the code screen.
     function stationGone(e) {
       if (!/station (was removed|has a new code)|\(station code\)|That is the code of|has no code yet/.test(e.message)) return false;
-      remember(KEY, null); session.set('');
+      remember(KEY, null); session.set(''); mode = 'menu';
       gate(e.message.replace(/\s*\(station code\)$/, '')).catch(x => showError(x.message));
       return true;
     }
@@ -127,22 +157,41 @@
     $('names').addEventListener('click', e => {
       const b = e.target.closest('button[data-id]');
       if (!b) return;
-      session.set(b.dataset.id, b.dataset.name); idle = Date.now(); drawSide();
+      session.set(b.dataset.id, b.dataset.name);
+      if (want === 'dvir') goDvir(); else goCheckIn();
     });
-    $('sign-out').addEventListener('click', () => { session.set(''); drawSide(); });
-    $('to-checkin').addEventListener('click', () => { location.href = 'route.html?room=1'; });
-    $('to-dvir').addEventListener('click', () => { location.href = 'route.html?room=1&view=dvir'; });
+    $('go-board').addEventListener('click', () => setMode('loadout'));
+    $('go-checkin').addEventListener('click', () => choose('checkin'));
+    $('go-dvir').addEventListener('click', () => choose('dvir'));
+    $('h-checkin').addEventListener('click', () => choose('checkin'));
+    $('h-dvir').addEventListener('click', () => choose('dvir'));
+    $('pick-cancel').addEventListener('click', () => setMode('menu'));
+    $('sign-out').addEventListener('click', () => { session.set(''); setMode('menu'); });
+    $('to-checkin').addEventListener('click', goCheckIn);
+    $('to-dvir').addEventListener('click', goDvir);
+    // The loadout full width: a tap on it brings back the three choices.
+    $('main').addEventListener('click', e => { if (mode === 'loadout' && e.target.closest('.dr-board')) setMode('menu'); });
     $('change').addEventListener('click', async () => {
       const fac = station ? station.facilityId : 'fac_uniontown';
       const ok = await askRelease($('release-box'), { status: () => phone('roomStatus', { facilityId: fac }), release: (code) => phone('roomRelease', { facilityId: fac, code }), onError: showError });
       if (!ok) return;
-      remember(KEY, null); session.set(''); gate().catch(err => showError(err.message));
+      remember(KEY, null); session.set(''); mode = 'menu'; gate().catch(err => showError(err.message));
     });
 
-    // 2 minutes with no taps signs the driver out, so the next driver cannot act under his name.
+    // Joe 10/12: 5 minutes with no taps signs the driver out and goes back to the scrolling View Loadout.
+    const IDLE = 300000;
     let idle = Date.now();
     ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { idle = Date.now(); }, true));
-    setInterval(() => { if (session.get().id && Date.now() - idle > 120000) { session.set(''); drawSide(); } }, 5000);
+    setInterval(() => { if (station && mode !== 'loadout' && Date.now() - idle > IDLE) { session.set(''); setMode('loadout'); } }, 5000);
+    // View Loadout scrolls by itself (a touch holds it for 20 seconds); at the end it waits, then starts over at the top.
+    let held = 0, endAt = 0;
+    $('main').addEventListener('pointerdown', () => { held = Date.now(); }, true);
+    setInterval(() => {
+      const box = document.querySelector('.dr-scroll');
+      if (mode !== 'loadout' || document.hidden || Date.now() - held < 20000 || box.scrollHeight <= box.clientHeight + 2) return;
+      if (box.scrollTop + box.clientHeight >= box.scrollHeight - 2) { if (!endAt) endAt = Date.now(); else if (Date.now() - endAt > 4000) { box.scrollTop = 0; endAt = 0; held = Date.now() - 16000; } return; }
+      box.scrollTop += 1;
+    }, 50);
     setInterval(() => { if (station && !document.hidden) readBoard(); }, 60000);
     // A new code or a removed station (checked every 5 minutes).
     setInterval(async () => {

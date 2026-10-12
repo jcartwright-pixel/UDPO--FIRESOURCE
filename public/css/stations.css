@@ -123,6 +123,11 @@
 .phone-card .drv-card { display: grid; gap: 2px; text-align: left; padding: 12px; min-height: 76px; border-left: 5px solid #236b9a; background: linear-gradient(90deg, #fff, #e4eff9); }
 .phone-card .drv-card.gold { border-left-color: #8d6a2a; background: linear-gradient(90deg, #fff, #f8f1df); }
 .drv-card b { font-size: 18px; color: #193e66; } .drv-card small { font-size: 13px; color: #647b8e; font-weight: 600; }
+/* Joe 10/12: the three choices first (View Loadout, DVIR, Check-In), big enough for a thumb or a glove. */
+.drv-choices { display: grid; gap: 12px; }
+.phone-card .drv-choices .drv-card { min-height: 96px; padding: 16px 18px; }
+.drv-choices .drv-card b { font-size: 24px; } .drv-choices .drv-card small { font-size: 16px; }
+.phone-card .drv-card.green { border-left-color: #1b7f3b; background: linear-gradient(90deg, #fff, #e3f3e8); }
 .drv-head { display: flex; align-items: center; gap: 8px; } .drv-head h1, .drv-head h2 { flex: 1; margin: 0; }
 .drv-head button { min-height: 44px; padding: 0 12px; }
 .drv-hint { margin: 0; font-size: 14px; color: #647b8e; }

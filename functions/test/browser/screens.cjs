@@ -479,6 +479,9 @@ async function noScroll(page) {
     const phone = await openPage(browser, 390, 844, '/route.html');
     await phone.fill('#code', phoneCode.toLowerCase());
     await phone.click('#step-code button[type=submit]');
+    // Joe 10/12: the three choices first; Check-In asks for the name.
+    await phone.waitForSelector('#step-menu:not([hidden])', { timeout: 8000 });
+    await phone.click('#m-checkin');
     await phone.waitForSelector('#step-name:not([hidden])', { timeout: 8000 });
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'phone-name-390.png') });
     await phone.selectOption('#name', 'drv_test_casey');
@@ -498,8 +501,11 @@ async function noScroll(page) {
       await ciMgr.goto(HOSTING + '/checkins.html?date=' + phoneLoad + '&testEmail=manager.test@uniteddairy.com');
       await ciMgr.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && /400/.test(tr.textContent) && /Check engine light/.test(tr.textContent)), null, { timeout: 8000 });
     }
-    // The name and the code stay on the phone.
+    // The name and the code stay on the phone: it opens on the three choices, and Check-In needs no name again.
     await phone.reload();
+    await phone.waitForSelector('#step-menu:not([hidden])', { timeout: 8000 });
+    assert.match(await phone.textContent('#m-who'), /CASEY, LEE/);
+    await phone.click('#m-checkin');
     await phone.waitForSelector('#step-loads:not([hidden])', { timeout: 8000 });
     assert.deepEqual([...ciMgr.errors, ...phone.errors], []);
     await Promise.all([ciMgr.close(), phone.close()]);

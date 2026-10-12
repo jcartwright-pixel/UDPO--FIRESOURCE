@@ -27,6 +27,17 @@
     <button type="submit" class="primary">Continue</button>
   </form>
 
+  <!-- Joe 10/12: the three choices first. View Loadout needs no name; DVIR and Check-In ask for it once (the phone keeps it). -->
+  <section class="phone-card" id="step-menu" hidden>
+    <h1>Route Distribution</h1>
+    <div class="drv-choices">
+      <button type="button" id="m-board" class="drv-card blue"><b>View Loadout</b><small>Route list and loadout status</small></button>
+      <button type="button" id="m-dvir" class="drv-card gold"><b>DVIR</b><small>Driver vehicle inspection report</small></button>
+      <button type="button" id="m-checkin" class="drv-card green"><b>Check-In</b><small>Cases, returns, truck and trailer issues</small></button>
+    </div>
+    <p class="drv-hint" id="m-who"></p>
+  </section>
+
   <!-- 2. The driver picks their name once. -->
   <!-- 2. Who is driving: a driver, a fill-in or carrier name on today's dispatch, or a route instead of a name; or Skip. -->
   <form class="phone-card" id="step-name" hidden>
@@ -125,18 +136,22 @@
 
     // Joe 10/12: the Driver Room Check-In tablet (driver-room.html) opens these same Check-In and DVIR screens with ?room=1.
     // There the tablet's station code stands in for the phones' code, the driver's name is kept only until he is done (or
-    // 2 minutes with no taps), and Done goes back to the Driver Room.
+    // 5 minutes with no taps), and Done goes back to the Driver Room. The phone never signs the driver out by itself.
     const room = new URLSearchParams(location.search).get('room') === '1';
     let station = null;
     try { station = room ? JSON.parse(localStorage.getItem('udRoomStation') || 'null') : null; } catch (e) { station = null; }
     if (room && !station) location.replace('driver-room.html');
-    const roomBack = () => { try { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); } catch (e) {} location.replace('driver-room.html'); };
+    // Done (signed out, back to the three choices), Back (still signed in), or 5 minutes idle (signed out, View Loadout).
+    const roomBack = (how) => { if (how !== 'keep') try { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); } catch (e) {} location.replace('driver-room.html' + (how === 'idle' ? '?view=loadout' : '')); };
     // Kept on the phone (the code and the name); the page works without it, it just asks again.
     const keep = () => room ? sessionStorage : localStorage, prefix = room ? 'udRoom.' : 'udRoute.';
     const store = {
       get(k) { try { return keep().getItem(prefix + k) || ''; } catch (e) { return ''; } },
       set(k, v) { try { if (v) keep().setItem(prefix + k, v); else keep().removeItem(prefix + k); } catch (e) {} }
     };
+    // want: what the driver picked on the three choices ('board', 'dvir', 'checkin'; '' shows the choices).
+    const view = new URLSearchParams(location.search).get('view');
+    let want = view === 'dvir' ? 'dvir' : view === 'loadout' ? 'board' : room ? 'checkin' : '';
     let code = room ? 'room' : store.get('code'), driverId = store.get('driverId'), driverName = store.get('driverName'), date = '', dates = [], loads = [], open = null, units = { trucks: [], trailers: [], jacks: [] };
 
     async function call(op, fields) {
@@ -155,13 +170,15 @@
         throw e;
       }
     }
-    const steps = ['step-code', 'step-name', 'step-loads', 'step-form', 'step-board', 'step-dvir'];
+    const steps = ['step-code', 'step-menu', 'step-name', 'step-loads', 'step-form', 'step-board', 'step-dvir'];
     function step(id) { steps.forEach(s => { document.getElementById(s).hidden = s !== id; }); }
 
     async function show() {
       document.getElementById('who').textContent = driverId ? driverName : '';
       document.getElementById('change').hidden = !driverId;
       if (!code) return step('step-code');
+      if (!want) { document.getElementById('m-who').textContent = driverId && driverId !== 'skip' ? 'Signed in as ' + driverName + '. Change it with Change at the top.' : ''; return step('step-menu'); }
+      if (want === 'board') return openBoard();
       if (!driverId) {
         const r = await call('roster'), opt = (v, t) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>';
         document.getElementById('name').innerHTML = '<option value="">Pick your name</option>' + r.drivers.map(d => opt(d.id, d.name)).join('') +
@@ -169,6 +186,7 @@
           ((r.routes || []).length ? '<optgroup label="Or choose your route">' + r.routes.map(x => opt(x.id, 'Route ' + x.name)).join('') + '</optgroup>' : '');
         return step('step-name');
       }
+      if (want === 'dvir') return openDvir();
       const r = await call('loads', { driverId, date });
       date = r.date; dates = r.dates; loads = r.loads; driverName = r.driver; store.set('driverName', driverName);
       if (r.units) { const dl = (id, list) => { document.getElementById(id).innerHTML = list.map(u => '<option value="' + escapeHtml(u) + '">').join(''); }; units = r.units; dl('dl-trucks', units.trucks); dl('dl-trailers', units.trailers); dl('dl-jacks', units.jacks); }
@@ -268,7 +286,7 @@
       if (!driverId) roomBack();
       let idle = Date.now();
       ['pointerdown', 'keydown', 'input'].forEach(t => document.addEventListener(t, () => { idle = Date.now(); }, true));
-      setInterval(() => { if (Date.now() - idle > 120000) roomBack(); }, 5000);
+      setInterval(() => { if (Date.now() - idle > 300000) roomBack('idle'); }, 5000);
     }
     document.getElementById('days').addEventListener('click', run(async (e) => { const b = e.target.closest('[data-date]'); if (b) { date = b.dataset.date; await show(); } }));
     document.getElementById('loads').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; open = Number(b.dataset.i); fillForm(loads[open]); step('step-form'); });
@@ -287,7 +305,10 @@
       open = null;
       await show();
     }));
-    show().then(() => { const v = new URLSearchParams(location.search).get('view'); if (driverId && v === 'loadout') openBoard(); if (driverId && v === 'dvir') openDvir(); }).catch(err => showError(err.message));
+    document.getElementById('m-board').addEventListener('click', () => { want = 'board'; show().catch(err => showError(err.message)); });
+    document.getElementById('m-dvir').addEventListener('click', run(async () => { want = 'dvir'; await show(); }));
+    document.getElementById('m-checkin').addEventListener('click', run(async () => { want = 'checkin'; await show(); }));
+    Promise.resolve().then(show).catch(err => showError(err.message));
 
     /* ---------- View Loadout (the Driver Room board on the phone) ---------- */
     let boardTimer = null, boardPaused = window.matchMedia('(prefers-reduced-motion: reduce)').matches, boardAt = 0;
@@ -314,11 +335,12 @@
       } catch (e) { showError(e.message); } finally { btn.disabled = false; }
     }
     function openBoard() { step('step-board'); readBoard(); clearInterval(boardTimer); boardTimer = setInterval(() => { if (!document.hidden && !document.getElementById('step-board').hidden && Date.now() - boardAt > 120000) readBoard(); }, 30000); }
-    document.getElementById('to-board').addEventListener('click', openBoard);
+    document.getElementById('to-board').addEventListener('click', () => { want = 'board'; openBoard(); });
     document.getElementById('board-refresh').addEventListener('click', readBoard);
     document.getElementById('board-pause').addEventListener('click', e => { boardPaused = !boardPaused; document.getElementById('board-track').classList.toggle('paused', boardPaused); e.target.textContent = boardPaused ? 'Resume scrolling' : 'Pause scrolling'; });
     document.addEventListener('visibilitychange', () => document.getElementById('board-track').classList.toggle('paused', boardPaused || document.hidden));
-    document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => { clearInterval(boardTimer); open = null; show().catch(err => showError(err.message)); }));
+    // Back: the three choices (the Driver Room: back to its screen, still signed in).
+    document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => { clearInterval(boardTimer); open = null; if (room) return roomBack('keep'); want = ''; show().catch(err => showError(err.message)); }));
 
     /* ---------- DVIR ---------- */
     const TRUCK_ITEMS = ['Brakes', 'Steering', 'Lights and reflectors', 'Tires and wheels', 'Mirrors and visibility', 'Horn and wipers', 'Emergency equipment'];
@@ -382,7 +404,7 @@
       clearCanvas(false);
       if (!room) try { const s = JSON.parse(localStorage.getItem(sigKey) || 'null'); if (s && s.driver === driverName && s.image) { const img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); inked = true; sigStatus('Saved signature'); }; img.src = s.image; } } catch (e) {}
     }
-    $('to-dvir').addEventListener('click', () => openDvir().catch(err => showError(err.message)));
+    $('to-dvir').addEventListener('click', () => { want = 'dvir'; openDvir().catch(err => showError(err.message)); });
 
     const canvas = $('dv-sig'), ctx = canvas.getContext('2d');
     ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#193e66';
