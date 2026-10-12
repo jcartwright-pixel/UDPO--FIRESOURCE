@@ -113,7 +113,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await shot(p, 'app-links-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
 
     await open('driver-codes', '#st-list .ap-item');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'tv', 'route']);
     await p.click('#al-new-code');
     await p.click('#al-new-code');
     await p.waitForSelector('.ap-code-row code');

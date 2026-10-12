@@ -75,11 +75,13 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     results.push('Garage Station Codes: its own page with the Garage Station link and its stations');
 
     await open('driver-codes');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'tv', 'route']);
     await p.fill('#st-name', 'Plant kiosk');
     await p.click('#st-add');
     await p.waitForSelector('#st-list .ap-item b:text-is("Plant kiosk")');
     codes.kiosk = await makeCode('Driver Room kiosk');
+    codes.tv = await makeCode('Driver Room TV');
+    assert.equal(await p.isVisible('#view .ap-msg.good'), false, 'no green status bar (errors only)');
     assert.deepEqual(await p.$$eval('#st-list .ap-item b', b => b.map(x => x.textContent)), ['Driver Room kiosk', 'Driver Room TV', 'Plant kiosk']);
     await twoShots(p, '3-driver-station-codes');
     assert.deepEqual(p.errors, []);
@@ -127,6 +129,14 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await shot(ds, '8-driver-kiosk-opened-1536.png');
     assert.deepEqual(ds.errors, []);
     results.push('Driver Room kiosk: asks for its code, then the board');
+    // A TV's code typed on the tablet link opens the TV display (no header).
+    const tv = await openPage(browser, 1536, 864, '/driver-station.html' + ADMIN);
+    await tv.waitForSelector('#code-box form.st-code');
+    await tv.fill('#code-box input', codes.tv);
+    await Promise.all([tv.waitForURL(/tv=1/), tv.click('#code-box button')]);
+    await tv.waitForSelector('#eyebrow:text("Driver Room TV · Uniontown")');
+    await shot(tv, '9-driver-room-tv-1536.png');
+    results.push('Driver Room TV: its code opens the full-screen TV board');
   } finally {
     await browser.close();
   }

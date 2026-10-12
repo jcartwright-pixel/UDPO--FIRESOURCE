@@ -11,7 +11,7 @@ export const ADMIN_GROUPS = [
     ['app-links', 'Manager Links', 'The links for managers and office staff: United Dairy Operations, the phone link, Manager Web App and personal phone links: copy, print a QR, open.', '', 'swap'],
     ['station-codes', 'Plant Station Codes', 'The one Plant Station link (copy, print a QR, open), then the stations: + Add Station, each station\'s code (typed on the tablet to open that station), New code, Remove; and each plant\'s manager release code to move a tablet.', '', 'factory'],
     ['garage-codes', 'Garage Station Codes', 'The one Garage Station link (copy, print a QR, open), then the garage stations: + Add Station, each station\'s code, New code, Remove.', '', 'gear'],
-    ['driver-codes', 'Driver Station Codes', 'The Driver Station and TV link (copy, print a QR, open) with its kiosks (+ Add Kiosk, a code for each Driver Room tablet or TV), and the drivers\' phone link with its Route Distribution code: new code, turn it off (press twice).', '', 'people']
+    ['driver-codes', 'Driver Station Codes', 'The Driver Station and Driver Room TV links (copy, print a QR, open) with their kiosks (+ Add Kiosk, a code for each Driver Room tablet or TV), and the drivers\' phone link with its Route Distribution code: new code, turn it off (press twice).', '', 'people']
   ]],
   ['Email & Schedules', 'Where email goes, how often, and how often the app refreshes', [
     ['repair-email', 'Repair Email', 'Where repair email goes (Idealease, Penske, owned units), on or off, how often for each lessor, the digest hour, and Send now.', '', 'alert'],
