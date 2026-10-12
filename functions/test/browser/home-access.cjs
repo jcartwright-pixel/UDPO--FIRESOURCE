@@ -12,12 +12,14 @@ const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 
+const localCalls = require('./local-calls.cjs');
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR;
 
 async function openPage(browser, width, height, url) {
   const page = await browser.newPage({ viewport: { width, height } });
+  await localCalls(page);
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
@@ -134,7 +136,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
     assert.deepEqual(groups, ['People & Access', 'Links & Codes', 'Email & Schedules', 'Dispatch Administration', 'Plant Setup', 'Connections & Keys', 'Fleet & GPS Setup', 'System Tools', 'Diagnostics']);
     const all = await adm.$$eval('.adm-item', t => t.length);
-    assert.equal(all, 34, 'every item from the current app\'s Administration is in the menu');
+    assert.equal(all, 35, 'every item from the current app\'s Administration is in the menu, plus Garage Station Codes (Joe 10/12)');
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
@@ -157,7 +159,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(/Being built/.test(await adm.textContent('#shell')), false);
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-repair-email-1920.png') });
     await adm.fill('#find', 'QR');
-    assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'Manager Links', 'Plant Station Codes', 'Driver Station Codes']);
+    assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'Manager Links', 'Plant Station Codes', 'Garage Station Codes', 'Driver Station Codes']);
     await adm.fill('#find', '');
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
