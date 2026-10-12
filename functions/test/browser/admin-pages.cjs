@@ -116,7 +116,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
 
     await open('driver-codes', '#st-list .ap-item');
     // Joe 10/12: one Driver Station link (the code decides tablet, TV or kiosk), then the drivers' phone link.
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driverroom', 'driver', 'route']);
     await p.click('#al-new-code');
     await p.click('#al-new-code');
     await p.waitForSelector('.ap-code-row code');

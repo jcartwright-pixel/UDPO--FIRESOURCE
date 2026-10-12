@@ -116,9 +116,15 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
 
 const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
-// Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
+// Open to phones without a United Dairy account: every call is checked against the Route Distribution code (or, from the
+// Driver Room Check-In tablet, its Driver Room kiosk station code).
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
-  try { return await phoneCall(db, request.data); } catch (error) { throw asHttps(error); }
+  const input = request.data || {};
+  try {
+    // The Driver Room Check-In tablet's Change Station: the plant's manager release code (as the no-account Plant Station).
+    if (input.op === 'roomStatus' || input.op === 'roomRelease') return await ADMIN.releaseCheck(db, { op: input.op === 'roomStatus' ? 'status' : 'release', facilityId: input.facilityId, code: input.code });
+    return await phoneCall(db, input);
+  } catch (error) { throw asHttps(error); }
 });
 
 // Open to the garage tablet without a United Dairy account: every step is checked against a technician's sign-in.

@@ -28,7 +28,7 @@ const FAILS = (db) => db.collection('private').doc('stationFails');
 const KINDS = Object.freeze({
   PLANT: { label: 'Plant Station', types: { CASE: 'Case Loadout', CASE_UNLOADING: 'Case Unloading', TOTES: 'Tote Loadout', BOXING: 'Boxing Loadout', YARD_SERVICES: 'Yard Services' } },
   GARAGE: { label: 'Garage Station', types: { GARAGE: 'Garage' } },
-  KIOSK: { label: 'Kiosk', types: { DRIVER: 'Driver Station (tablet)', TV: 'TV display' } }
+  KIOSK: { label: 'Kiosk', types: { DRIVER: 'Driver Room Check-In (tablet)', TV: 'TV display' } }
 });
 // What each plant starts with: the current app's five stations, its garage, and the Driver Room tablet and TV.
 const STARTERS = [

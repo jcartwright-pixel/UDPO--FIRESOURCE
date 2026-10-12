@@ -123,16 +123,25 @@
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
     import { addSpeak } from './js/speak.js';
 
+    // Joe 10/12: the Driver Room Check-In tablet (driver-room.html) opens these same Check-In and DVIR screens with ?room=1.
+    // There the tablet's station code stands in for the phones' code, the driver's name is kept only until he is done (or
+    // 2 minutes with no taps), and Done goes back to the Driver Room.
+    const room = new URLSearchParams(location.search).get('room') === '1';
+    let station = null;
+    try { station = room ? JSON.parse(localStorage.getItem('udRoomStation') || 'null') : null; } catch (e) { station = null; }
+    if (room && !station) location.replace('driver-room.html');
+    const roomBack = () => { try { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); } catch (e) {} location.replace('driver-room.html'); };
     // Kept on the phone (the code and the name); the page works without it, it just asks again.
+    const keep = () => room ? sessionStorage : localStorage, prefix = room ? 'udRoom.' : 'udRoute.';
     const store = {
-      get(k) { try { return localStorage.getItem('udRoute.' + k) || ''; } catch (e) { return ''; } },
-      set(k, v) { try { if (v) localStorage.setItem('udRoute.' + k, v); else localStorage.removeItem('udRoute.' + k); } catch (e) {} }
+      get(k) { try { return keep().getItem(prefix + k) || ''; } catch (e) { return ''; } },
+      set(k, v) { try { if (v) keep().setItem(prefix + k, v); else keep().removeItem(prefix + k); } catch (e) {} }
     };
-    let code = store.get('code'), driverId = store.get('driverId'), driverName = store.get('driverName'), date = '', dates = [], loads = [], open = null, units = { trucks: [], trailers: [], jacks: [] };
+    let code = room ? 'room' : store.get('code'), driverId = store.get('driverId'), driverName = store.get('driverName'), date = '', dates = [], loads = [], open = null, units = { trucks: [], trailers: [], jacks: [] };
 
     async function call(op, fields) {
       const { functions } = await start();
-      try { return (await httpsCallable(functions, 'phone')(Object.assign({ code, op }, fields || {}))).data; }
+      try { return (await httpsCallable(functions, 'phone')(Object.assign(room ? { station } : { code }, { op }, fields || {}))).data; }
       catch (e) {
         // A plain sentence for the driver, without the server's status number on the end.
         e.message = String(e.message || e).replace(/\s*\[\d{3}\]\s*$/, '');
@@ -140,6 +149,7 @@
         if (/^(functions\/)?(internal|unavailable|deadline-exceeded)$/.test(String(e.code || '')) || /^internal$|failed to fetch|network|load failed/i.test(e.message)) {
           e.message = 'No signal or the server did not answer. Your entries are still here; ' + (op === 'checkIn' ? 'press Check In again.' : op === 'dvir' ? 'press Submit again.' : 'try again in a moment.');
         }
+        if (room && /\(station code\)/.test(e.message)) { try { localStorage.removeItem('udRoomStation'); } catch (x) {} roomBack(); }
         if (/code is not right|not turned on/.test(e.message)) { code = ''; store.set('code', ''); show(); }
         if (/Pick your name/.test(e.message)) { driverId = ''; store.set('driverId', ''); show(); }
         throw e;
@@ -249,7 +259,17 @@
       await show();
     }));
     document.getElementById('skip').addEventListener('click', run(async () => { driverId = 'skip'; driverName = ''; store.set('driverId', driverId); await show(); }));
-    document.getElementById('change').addEventListener('click', run(async () => { driverId = ''; store.set('driverId', ''); open = null; await show(); }));
+    document.getElementById('change').addEventListener('click', run(async () => { if (room) return roomBack(); driverId = ''; store.set('driverId', ''); open = null; await show(); }));
+    if (room) {
+      document.body.classList.add('room');
+      document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="css/driver-room.css">');
+      // The Driver Room: Done (instead of Change) signs the driver out; 2 minutes with no taps does too.
+      document.getElementById('change').textContent = 'Done';
+      if (!driverId) roomBack();
+      let idle = Date.now();
+      ['pointerdown', 'keydown', 'input'].forEach(t => document.addEventListener(t, () => { idle = Date.now(); }, true));
+      setInterval(() => { if (Date.now() - idle > 120000) roomBack(); }, 5000);
+    }
     document.getElementById('days').addEventListener('click', run(async (e) => { const b = e.target.closest('[data-date]'); if (b) { date = b.dataset.date; await show(); } }));
     document.getElementById('loads').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; open = Number(b.dataset.i); fillForm(loads[open]); step('step-form'); });
     document.getElementById('back').addEventListener('click', () => { open = null; step('step-loads'); });
@@ -360,7 +380,7 @@
       if (!dvLoads.length) $('dv-msg').textContent = 'Dispatch has no route for you today, so there is nothing to inspect yet.';
       $('dv-name').value = driverName;
       clearCanvas(false);
-      try { const s = JSON.parse(localStorage.getItem(sigKey) || 'null'); if (s && s.driver === driverName && s.image) { const img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); inked = true; sigStatus('Saved signature'); }; img.src = s.image; } } catch (e) {}
+      if (!room) try { const s = JSON.parse(localStorage.getItem(sigKey) || 'null'); if (s && s.driver === driverName && s.image) { const img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); inked = true; sigStatus('Saved signature'); }; img.src = s.image; } } catch (e) {}
     }
     $('to-dvir').addEventListener('click', () => openDvir().catch(err => showError(err.message)));
 
@@ -372,7 +392,7 @@
     const at = (e) => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) * canvas.width / r.width, (e.clientY - r.top) * canvas.height / r.height]; };
     canvas.addEventListener('pointerdown', e => { if ($('dv-typed').checked) return; drawing = true; canvas.setPointerCapture(e.pointerId); const [x, y] = at(e); ctx.beginPath(); ctx.moveTo(x, y); });
     canvas.addEventListener('pointermove', e => { if (!drawing) return; const [x, y] = at(e); ctx.lineTo(x, y); ctx.stroke(); inked = true; sigStatus('Signature entered'); });
-    ['pointerup', 'pointercancel'].forEach(t => canvas.addEventListener(t, () => { if (!drawing) return; drawing = false; unreview(); try { localStorage.setItem(sigKey, JSON.stringify({ driver: driverName, image: canvas.toDataURL('image/png') })); } catch (e) {} }));
+    ['pointerup', 'pointercancel'].forEach(t => canvas.addEventListener(t, () => { if (!drawing) return; drawing = false; unreview(); if (!room) try { localStorage.setItem(sigKey, JSON.stringify({ driver: driverName, image: canvas.toDataURL('image/png') })); } catch (e) {} }));
     $('dv-clear').addEventListener('click', () => { clearCanvas(true); unreview(); });
     $('dv-typed').addEventListener('change', e => sigStatus(e.target.checked ? 'Typed name will be used as your signature' : inked ? 'Drawn signature entered' : 'No signature entered'));
     function smallSig() {

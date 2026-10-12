@@ -76,8 +76,9 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     results.push('Garage Station Codes: its own page with the Garage Station link and its stations');
 
     await open('driver-codes');
-    // Joe 10/12: like Plant Station Codes: one Driver Station link, its stations right under it, then the drivers' phone link.
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
+    // Joe 10/12: like Plant Station Codes: the Driver Room Check-In link (Joe 10/12 evening), the Driver Station link, its stations
+    // right under it, then the drivers' phone link.
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driverroom', 'driver', 'route']);
     assert.deepEqual(await p.$$eval('.ap-link[data-link="driver"], #st-list, .ap-link[data-link="route"]', l => l.map(x => x.dataset.link || x.id)), ['driver', 'st-list', 'route'], 'the stations sit under the Driver Station link');
     assert.equal((await p.textContent('#st-add')).trim(), '+ Add Station');
     await p.fill('#st-name', 'Plant kiosk');
