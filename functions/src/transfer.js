@@ -579,7 +579,13 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   ops.push({ ref: transferRef, data: { at: stamp, force: !!force, summary, warningCount: warnings.length, warnings: warnings.slice(0, 200) } });
   await commitInBatches(db, ops);
   const lastTransfer = { at: stamp, id: transferRef.id, warningCount: warnings.length };
-  await configRef.set({ mode: moved.length ? 'live' : 'test', screenOwners: Object.assign({ dailyDispatch: 'old', weeklyDispatch: 'old' }, owners), liveWeeks, lastTransfer, liveSourceId }, { merge: true });
+  // Read the switch again in a transaction: an administrator may have moved a screen while this copy was reading the sheets,
+  // and writing back the owners read at the start would quietly undo that move (Joe 10/12: Daily Dispatch flipped back).
+  await db.runTransaction(async (tx) => {
+    const current = ((await tx.get(configRef)).data() || {}).screenOwners || {};
+    const anyNew = Object.keys(current).some(k => current[k] === 'new');
+    tx.set(configRef, { mode: anyNew ? 'live' : 'test', screenOwners: Object.assign({ dailyDispatch: 'old', weeklyDispatch: 'old' }, current), liveWeeks, lastTransfer, liveSourceId }, { merge: true });
+  });
   return { at: stamp, liveWeeks, summary, warnings };
 }
 

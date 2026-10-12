@@ -11,15 +11,21 @@ test('The screens and the server use the same Safety Walkthrough rules', () => {
   assert.equal(fs.readFileSync(path.join(__dirname, '../../src/safety-rules.js'), 'utf8'), fs.readFileSync(path.join(__dirname, '../../../public/js/safety-rules.js'), 'utf8'));
 });
 
-test('The starting checklist covers the researched areas, and monthly items are on the month\'s first walk only', () => {
-  const names = S.checklist(null).map(a => a.name);
-  assert.deepEqual(names, ['Fire & Exits', 'Eyewash & First Aid', 'Ammonia Room', 'Forklifts & Docks', 'Lockout & Guarding', 'Chemicals & Cylinders', 'Electrical', 'Housekeeping & Floors', 'PPE', 'Coolers & Yard']);
+test('The starting checklist: Plant, Garage and Office with their sub-areas in walking order; monthly items on the month\'s first walk only', () => {
+  // Joe 10/12 (mock-up A): places, then sub-areas; the researched items keep their ids.
+  const P = S.places(S.checklist(null));
+  assert.deepEqual(P.map(p => p.name), ['Plant', 'Garage', 'Office']);
+  assert.deepEqual(P[0].areas.map(a => a.name), ['Receiving & Docks', 'Processing & Filler Rooms', 'Ammonia Room', 'Chemical Room', 'Coolers', 'Forklifts & Charging', 'Electrical Rooms', 'Stairs, Aisles & PPE', 'Exits & Fire', 'Outside']);
+  assert.deepEqual(P[1].areas.map(a => a.name), ['Repair Bays', 'Fuel Island', 'Wash Bay', 'Parts & Tires', 'Garage Exits & Eyewash']);
+  assert.deepEqual(P[2].areas.map(a => a.name), ['Front Office', 'Break Room', 'Locker Rooms', 'Stairs & Exits']);
+  assert.equal(S.findItem(null, 'floors').area, 'Plant \u203a Processing & Filler Rooms');
+  assert.equal(S.checklist({ areas: [{ key: 'x', name: 'Old area', items: [{ id: 'a', text: 'A' }] }] })[0].place, 'Plant', 'a checklist saved before places is under Plant');
   const ids = S.checklist(null).flatMap(a => a.items.map(i => i.id));
   assert.equal(new Set(ids).size, ids.length, 'every item has its own id');
   const all = S.walkList(null, true).flatMap(a => a.items.map(i => i.id)), weekly = S.walkList(null, false).flatMap(a => a.items.map(i => i.id));
   assert.ok(all.indexOf('ext_monthly') >= 0 && weekly.indexOf('ext_monthly') < 0, 'the extinguisher item is monthly');
   assert.ok(weekly.indexOf('eyewash_run') >= 0, 'eyewash is weekly (ANSI Z358.1)');
-  assert.equal(all.length - weekly.length, 5, "extinguishers, emergency lights, first aid, AED and SCBA");
+  assert.equal(all.length - weekly.length, 8, 'extinguishers, emergency lights, first aid, AED and SCBA; office first aid, emergency light and evacuation map');
 });
 
 test('A plant\'s own checklist: items turned off are left off the walk but still found for old walks', () => {

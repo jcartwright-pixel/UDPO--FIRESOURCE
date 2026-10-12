@@ -27,7 +27,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1 id="title">Weekly Walk</h1><span class="sw-counts" id="counts"></span></div>
+      <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1 id="title"><span id="title-words">Weekly Walk</span></h1><span class="sw-counts" id="counts"></span></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <a class="sw-top" href="safety-issues.html" data-top>Open Issues</a>
       <a class="sw-top" href="extinguishers.html" data-top>Fire Extinguishers</a>
@@ -36,43 +36,69 @@
       <button type="button" class="sw-top pri" id="finish" data-top>Finish Walk</button>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <div class="notice warning" id="offline-line" role="status" hidden></div>
     <div class="view">
       <div class="sw-split">
         <nav class="sw-areas" id="areas" aria-label="Areas"></nav>
         <div class="sw-list" id="list" aria-label="Checklist"></div>
       </div>
       <div class="sw-foot" id="foot"></div>
+      <input type="file" id="camera" class="sw-camera-input" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
     </div>
   </div>
 
+  <script>window.UD_OFFLINE = true;</script>
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
+    import { offlineSave, startOffline, waiting, onWaitingChange } from './js/offline-saves.js';
+    import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
     import { doc, getDoc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { today, pickPlant, plantName, canWalk, modeText, shrinkPhoto, watchOpenIssues, watchSetup, watchExtinguishers, agePill, maintText, foundLine, thisMonth } from './js/safety.js';
 
-    // The weekly walk (Joe 10/12, mock-up B): every area on one screen, each item Good or Not good. A Not good opens a note,
-    // a photo and Send to Plant Maintenance, and becomes an open issue that the next walk reviews until it is fixed. The
-    // month's first walk carries the monthly items. Every tap and every box saves as it is left (no Save button).
+    // The weekly walk (Joe 10/12, mock-ups B and A): Plant, Garage and Office with their sub-areas on the left; each item Good
+    // or Not good, with a note and up to three photos. A Not good also offers Send to Plant Maintenance, and becomes an open
+    // issue that the next walk reviews until it is fixed (shown in the sub-area where it was found too). The month's first
+    // walk carries the monthly items. Every tap and every box saves as it is left (no Save button).
     const S = window.UDSafety, L = window.UDLogic;
     const params = new URLSearchParams(location.search);
     let db = null, person = null, app = {}, plant = '', walk = null, walkSeen = false, monthWalks = [], setup = null, setupSeen = false, open = [], fixedHere = [], exts = [];
     let date = today(), viewing = '', area = '', armFinish = false, stops = [];
+    // Joe 10/12 (mock-up A): Plant, Garage and Office fold open like folders; one sub-area at a time, or All in order (kept on
+    // this device). Places opened or closed here stay that way until the page is left.
+    let mode = 'one';
+    try { if (localStorage.getItem('udSafetyMode') === 'all') mode = 'all'; } catch (e) { /* no storage */ }
+    const shut = new Set(), opened = new Set();
     const mine = {}, reviewMine = {}, photos = {};
+    // Joe 10/12: photos on any item (up to three). photoMine: photos taken or removed here that the saved walk does not show
+    // yet (still sending, or held on this tablet with no signal): photo id -> { itemId, data ('' = removed) }.
+    const photoMine = {}, PHOTO_SLOTS = 3;
+    const photoIdOf = (itemId, slot) => wid() + '__' + itemId + (slot > 1 ? '__p' + slot : '');
+    const slotOf = (pid) => { const m = /__p(\d)$/.exec(pid); return m ? +m[1] : 1; };
+    const savedPhotoIds = (it) => Array.isArray(it.photoIds) ? it.photoIds : it.photo && it.photoId ? [it.photoId] : [];
     let chain = Promise.resolve();
     const wid = () => S.walkId(plant, date);
     // Today's walk saves; a past walk (Past Walks) is shown as it was.
     const editable = () => !viewing && canWalk(person, app);
     const monthly = () => walk ? walk.monthly === true : !monthWalks.some(w => w.id !== wid());
     const list = () => S.walkList(setup, monthly());
-    const itemOf = (id) => Object.assign({}, (walk && walk.items && walk.items[id]) || {}, mine[id] || {});
-    const reviews = () => Object.assign({}, (walk && walk.reviews) || {}, reviewMine);
+    function itemOf(id) {
+      const it = Object.assign({}, (walk && walk.items && walk.items[id]) || {}, mine[id] || {});
+      let ids = savedPhotoIds(it);
+      Object.keys(photoMine).filter(pid => photoMine[pid].itemId === id).forEach(pid => { ids = ids.filter(x => x !== pid); if (photoMine[pid].data) ids.push(pid); });
+      it.photoIds = ids.sort();
+      return it;
+    }
+    const reviews = () => { const out = JSON.parse(JSON.stringify((walk && walk.reviews) || {})); Object.keys(reviewMine).forEach(k => { out[k] = Object.assign(out[k] || {}, reviewMine[k]); }); return out; };
+    const reviewed = (id) => !!(reviews()[id] && reviews()[id].status);
+    let walkNoteMine = null;
+    const walkNote = () => walkNoteMine !== null ? walkNoteMine : (walk && walk.note) || '';
     const toReview = () => open.concat(fixedHere.filter(f => !open.some(o => o.id === f.id))).filter(i => i.foundWalk !== wid());
 
     function counts() { return S.walkCounts({ items: Object.fromEntries(list().flatMap(a => a.items.map(i => [i.id, itemOf(i.id)]))) }, list()); }
     function drawHead() {
       document.getElementById('mode-text').textContent = modeText(app);
       document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
-      document.getElementById('title').textContent = (viewing ? 'Walk ' : 'Weekly Walk ') + shortDate(date);
+      // Only the title's words change, so the Saving / Saved sign beside it stays.
+      document.getElementById('title-words').textContent = (viewing ? 'Walk ' : 'Weekly Walk ') + shortDate(date);
       const c = counts();
       document.getElementById('counts').innerHTML = '<b class="g">' + c.good + ' Good</b> · <b class="r">' + c.notGood + ' Not good</b> · ' + c.notChecked + ' Not checked' + (monthly() ? ' · monthly items on this walk' : '');
       const fin = document.getElementById('finish');
@@ -80,20 +106,42 @@
       fin.disabled = !editable() || !walk;
       fin.textContent = walk && walk.finishedAt && !armFinish ? 'Walk Finished' : armFinish ? 'Press again: ' + c.notChecked + ' not checked' : 'Finish Walk';
     }
+    const done = (a) => a.items.filter(i => itemOf(i.id).status).length;
+    const placeOf = (key) => (list().find(a => a.key === key) || {}).place || '';
+    // Open issues from earlier walks found in a sub-area (they show there too, where they were found).
+    const issueArea = (i) => { const f = S.findItem(setup, i.itemId); return f ? f.areaKey : ''; };
+    const isOpen = (p) => opened.has(p) || (!shut.has(p) && placeOf(area) === p);
     function drawAreas() {
-      const n = toReview().filter(i => !reviews()[i.id]).length;
+      const n = toReview().filter(i => !reviewed(i.id)).length;
       document.getElementById('areas').innerHTML = '<button type="button" class="issues' + (area === 'issues' ? ' on' : '') + '" data-area="issues">Open issues from earlier walks<small>' + (toReview().length ? n + ' to review' : 'none') + '</small></button>' +
-        list().map(a => { const done = a.items.filter(i => itemOf(i.id).status).length;
-          return '<button type="button" data-area="' + escapeHtml(a.key) + '" class="' + (area === a.key ? 'on' : '') + (done === a.items.length ? ' done' : '') + '">' + escapeHtml(a.name) + '<small>' + done + ' of ' + a.items.length + '</small></button>'; }).join('');
+        S.places(list()).map(p => {
+          const d = p.areas.reduce((x, a) => x + done(a), 0), t = p.areas.reduce((x, a) => x + a.items.length, 0), on = isOpen(p.name);
+          return '<button type="button" class="sw-place' + (on ? ' open' : '') + (d === t ? ' done' : '') + '" data-place="' + escapeHtml(p.name) + '" aria-expanded="' + on + '">' + escapeHtml(p.name) + '<small>' + d + ' of ' + t + (on ? '' : ' · Show') + '</small></button>' +
+            (on ? p.areas.map(a => '<button type="button" data-area="' + escapeHtml(a.key) + '" class="sub' + (area === a.key ? ' on' : '') + (done(a) === a.items.length ? ' done' : '') + '">' + escapeHtml(a.name) + '<small>' + done(a) + ' of ' + a.items.length + '</small></button>').join('') : '');
+        }).join('') +
+        '<button type="button" data-area="notes" class="' + (area === 'notes' ? 'on' : '') + (walkNote() ? ' done' : '') + '">Walk notes<small>' + (walkNote() ? 'written' : 'none') + '</small></button>';
+    }
+    const noteBox = (attr, val, label, ph, extra) => '<td class="sw-note"><div class="sw-notecell">' + (editable() ? '<input type="text" ' + attr + ' value="' + escapeHtml(val || '') + '" maxlength="500" placeholder="' + ph + '" aria-label="Note: ' + escapeHtml(label) + '">' : (val ? '<span>' + escapeHtml(val) + '</span>' : '')) + (extra || '') + '</div></td>';
+    // The tablet's camera (Android Chrome and iPad Safari open it straight away); hidden once the item has three photos.
+    // One camera box outside the list, so the list redrawing while the camera is open never loses the photo.
+    const camera = (id, it) => editable() && it.photoIds.length < PHOTO_SLOTS ? '<button type="button" class="sw-cam" data-cam="' + escapeHtml(id) + '">+ Photo</button>' : '';
+    let camFor = '';
+    function thumbs(id, it) {
+      if (!it.photoIds.length) return '';
+      return '<span class="sw-thumbs">' + it.photoIds.map(pid => {
+        const pm = photoMine[pid], src = pm && pm.data ? pm.data : photos[pid];
+        if (src === undefined) loadPhoto(pid);
+        return src ? '<img src="' + src + '" alt="Photo" data-big data-pid="' + escapeHtml(pid) + '" data-pitem="' + escapeHtml(id) + '">' : '<span class="sw-thumb-wait">Photo</span>';
+      }).join('') + '</span>';
     }
     const btns = (attrs, pressed, choices) => choices.map(([v, label, cls]) => '<button type="button" class="sw-btn ' + cls + '" ' + attrs + ' data-v="' + v + '" aria-pressed="' + (pressed === v) + '"' + (editable() ? '' : ' disabled') + '>' + label + '</button>').join('');
-    function reviewRows() {
-      const rs = toReview();
+    function reviewRows(only) {
+      const rs = only || toReview();
       if (!rs.length) return '<div class="sw-empty">No open issues from earlier walks.</div>';
       return '<table class="sw-table"><tbody>' + rs.map(i => {
-        const r = reviews()[i.id], st = r ? r.status : (i.status === 'FIXED' ? 'FIXED' : '');
+        const r = reviews()[i.id], st = r && r.status ? r.status : (i.status === 'FIXED' ? 'FIXED' : '');
         return '<tr data-issue-row="' + escapeHtml(i.id) + '"><td><b>' + escapeHtml(i.item) + '</b>' + (i.walks && i.walks.length > 1 ? ' <span class="sw-pill red">REPEAT · ' + i.walks.length + '</span>' : '') +
-          '<span class="sw-how">' + foundLine(i) + (i.note ? ' · ' + escapeHtml(i.note) : '') + '</span></td><td class="sw-state">' + agePill(i) + '</td><td class="sw-state">' + maintText(i) + '</td>' +
+          '<span class="sw-how">' + foundLine(i) + (i.note ? ' · ' + escapeHtml(i.note) : '') + '</span></td>' + noteBox('data-rnote="' + escapeHtml(i.id) + '"', r ? r.note : '', i.item, 'Note') + '<td class="sw-state">' + agePill(i) + '</td><td class="sw-state">' + maintText(i) + '</td>' +
           '<td class="sw-do">' + btns('data-issue="' + escapeHtml(i.id) + '"', st, [['OPEN', 'Still open', 'open'], ['FIXED', 'Fixed', 'good']]) + '</td></tr>';
       }).join('') + '</tbody></table>';
     }
@@ -106,30 +154,44 @@
       return a.items.map(i => {
         const it = itemOf(i.id), st = it.status || '';
         let row = '<tr data-row="' + escapeHtml(i.id) + '"><td>' + escapeHtml(i.text) + (i.freq === 'MONTHLY' ? ' <span class="sw-pill blue">MONTHLY</span>' : '') +
-          (i.id === 'ext_monthly' ? '<span class="sw-how">' + extHint() + '</span>' : '') + (it.repeat ? '<span class="sw-how">Not good again: still open from an earlier walk</span>' : '') + '</td>' +
+          (i.id === 'ext_monthly' ? '<span class="sw-how">' + extHint() + '</span>' : '') + (it.repeat ? '<span class="sw-how">Not good again: still open from an earlier walk</span>' : '') + thumbs(i.id, it) + '</td>' +
+          noteBox('data-note="' + escapeHtml(i.id) + '"', it.note, i.text, st === 'NOT_GOOD' ? 'What is wrong' : 'Note', camera(i.id, it)) +
           '<td class="sw-do">' + btns('data-item="' + escapeHtml(i.id) + '"', st, [['GOOD', 'Good', 'good'], ['NOT_GOOD', 'Not good', 'bad']]) + '</td>' +
           '<td class="sw-state">' + (st ? '' : '<span class="sw-nc">Not checked</span>') + '</td></tr>';
         if (st === 'NOT_GOOD') {
-          const dis = editable() ? '' : ' disabled', ph = it.photoId && photos[it.photoId];
-          row += '<tr class="sw-more" data-more="' + escapeHtml(i.id) + '"><td colspan="3"><div class="sw-more-grid">' +
-            '<div><span class="sw-label">What is wrong</span><textarea data-note="' + escapeHtml(i.id) + '" maxlength="500" aria-label="What is wrong: ' + escapeHtml(i.text) + '"' + dis + '>' + escapeHtml(it.note || '') + '</textarea></div>' +
-            '<div><span class="sw-label">Photo</span><div class="sw-photo">' + (ph ? '<img src="' + ph + '" alt="Photo" data-big>' : '') +
-              (editable() ? (it.photo ? '<button type="button" data-unphoto="' + escapeHtml(i.id) + '">Remove</button>' : '<label>+ Add photo<input type="file" accept="image/*" capture="environment" data-photo="' + escapeHtml(i.id) + '"></label>') : (it.photo ? '' : '<span class="sw-nc">No photo</span>')) + '</div></div>' +
+          const dis = editable() ? '' : ' disabled';
+          row += '<tr class="sw-more" data-more="' + escapeHtml(i.id) + '"><td colspan="4"><div class="sw-more-grid">' +
             '<div><span class="sw-label">Plant Maintenance</span><label class="sw-check"><input type="checkbox" data-maint="' + escapeHtml(i.id) + '"' + (it.maint ? ' checked' : '') + dis + '>Send to Plant Maintenance as a work order</label>' +
               '<span class="sw-how">Saved as an open issue. It comes back on the next walk until it is marked Fixed.' + (it.maint ? ' Plant Maintenance picks it up once that module is ready.' : '') + '</span></div>' +
             '</div></td></tr>';
-          if (it.photoId && photos[it.photoId] === undefined) loadPhoto(it.photoId);
         }
         return row;
       }).join('');
     }
+    const started = () => walk ? '<span>Started by ' + escapeHtml(walk.startedByName || walk.startedBy || '') + ' ' + dateTimeText(walk.startedAt).replace(/^\S+ /, '') + (walk.finishedAt ? ' · finished ' + dateTimeText(walk.finishedAt).replace(/^\S+ /, '') : '') + '</span>' : '';
+    const issuesSec = () => '<section data-sec="issues"><div class="sw-sec"><h2>Open issues from earlier walks</h2><span>' + (viewing ? 'As they were reviewed on this walk.' : 'Mark each one Still open or Fixed.') + '</span></div>' + reviewRows() + '</section>';
+    const notesSec = () => '<section data-sec="notes"><div class="sw-sec"><h2>Walk notes</h2><span>Anything about the whole walk.' + (walk && walk.noteByName && walkNote() ? ' Last written by ' + escapeHtml(walk.noteByName) + '.' : '') + '</span></div>' +
+      '<div class="sw-walknote">' + (editable() ? '<textarea id="walk-note" maxlength="1000" aria-label="Walk notes" placeholder="Walk notes">' + escapeHtml(walkNote()) + '</textarea>' : '<p>' + (walkNote() ? escapeHtml(walkNote()) : '<span class="sw-nc">No walk notes</span>') + '</p>') + '</div></section>';
+    const areaSec = (a, here) => '<section data-sec="' + escapeHtml(a.key) + '"><div class="sw-sec"><h2>' + escapeHtml(S.areaName(a)) + '</h2><span>' + done(a) + ' of ' + a.items.length + ' checked</span>' + (a === list()[0] ? started() : '') + '</div>' +
+      (here && here.length ? '<div class="sw-here">Still open from earlier walks, found here</div>' + reviewRows(here) : '') +
+      '<table class="sw-table"><tbody>' + itemRows(a) + '</tbody></table></section>';
+    // After a sub-area: the next one in walking order (then Walk notes).
+    function nextOf(key) {
+      const l = list(), at = l.findIndex(a => a.key === key), nx = l[at + 1];
+      return nx ? '<button type="button" class="sw-next" data-go="' + escapeHtml(nx.key) + '">Next: ' + escapeHtml(S.areaName(nx)) + ' &rarr;</button>' : '<button type="button" class="sw-next" data-go="notes">Next: Walk notes &rarr;</button>';
+    }
     function drawList(force) {
       const box = document.getElementById('list');
-      if (force !== true && box.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA') return;
-      const top = box.scrollTop;
-      box.innerHTML = '<section data-sec="issues"><div class="sw-sec"><h2>Open issues from earlier walks</h2><span>' + (viewing ? 'As they were reviewed on this walk.' : 'Mark each one Still open or Fixed.') + '</span></div>' + reviewRows() + '</section>' +
-        list().map(a => '<section data-sec="' + escapeHtml(a.key) + '"><div class="sw-sec"><h2>' + escapeHtml(a.name) + '</h2>' + (a === list()[0] && walk ? '<span>Started by ' + escapeHtml(walk.startedByName || walk.startedBy || '') + ' ' + dateTimeText(walk.startedAt).replace(/^\S+ /, '') + (walk.finishedAt ? ' · finished ' + dateTimeText(walk.finishedAt).replace(/^\S+ /, '') : '') + '</span>' : '') + '</div>' +
-          '<table class="sw-table"><tbody>' + itemRows(a) + '</tbody></table></section>').join('');
+      if (force !== true && box.contains(document.activeElement) && ['TEXTAREA', 'INPUT'].indexOf(document.activeElement.tagName) >= 0) return;
+      const top = box.scrollTop, l = list();
+      if (!area || (area !== 'issues' && area !== 'notes' && !l.some(a => a.key === area))) area = (l.find(a => done(a) < a.items.length) || l[0] || { key: 'issues' }).key;
+      const bar = '<div class="sw-mode" role="group" aria-label="Show"><button type="button" data-mode="one" aria-pressed="' + (mode === 'one') + '">This sub-area</button><button type="button" data-mode="all" aria-pressed="' + (mode === 'all') + '">All in order</button></div>';
+      let body;
+      if (mode === 'all') body = issuesSec() + l.map(a => areaSec(a)).join('') + notesSec();
+      else if (area === 'issues') body = issuesSec();
+      else if (area === 'notes') body = notesSec();
+      else { const a = l.find(x => x.key === area); body = areaSec(a, toReview().filter(i => issueArea(i) === a.key)) + '<div class="sw-nextrow">' + nextOf(a.key) + '</div>'; }
+      box.innerHTML = bar + body;
       box.scrollTop = top;
     }
     function render(force) {
@@ -143,18 +205,43 @@
       try { const s = await getDoc(doc(db, 'safetyPhotos', id)); photos[id] = s.exists() ? s.data().data : null; } catch (e) { photos[id] = null; }
       if (photos[id]) render();
     }
+    // Saves held on this tablet (no signal) are shown as made: after a reload, or the page closed and opened again.
+    function applyHeld(list) {
+      list.filter(e => e.action === 'saveSafetyWalk' && e.fields.facilityId === plant && e.fields.date === date).forEach(e => {
+        const f = e.fields;
+        if (f.op === 'item') mine[f.itemId] = Object.assign({}, mine[f.itemId] || {}, { status: f.status });
+        else if (f.op === 'note') mine[f.itemId] = Object.assign({}, mine[f.itemId] || {}, { note: f.note });
+        else if (f.op === 'maint') mine[f.itemId] = Object.assign({}, mine[f.itemId] || {}, { maint: f.maint });
+        else if (f.op === 'photo') photoMine[photoIdOf(f.itemId, f.slot || 1)] = { itemId: f.itemId, data: f.photo || '' };
+        else if (f.op === 'review') reviewMine[f.issueId] = Object.assign({}, reviewMine[f.issueId] || {}, { status: f.status });
+        else if (f.op === 'reviewnote') reviewMine[f.issueId] = Object.assign({}, reviewMine[f.issueId] || {}, { note: f.note });
+        else if (f.op === 'walknote') walkNoteMine = f.note;
+      });
+      render(true);
+    }
 
-    // Saves go one at a time, in the order they were made.
+    // Saves go one at a time, in the order they were made. With no signal they are held on this tablet and sent later
+    // (js/offline-saves.js); only a save the server refuses is taken back.
     function send(fields, undo) {
-      const run = chain.then(() => save('saveSafetyWalk', Object.assign({ facilityId: plant, date }, fields)));
+      const run = chain.then(() => offlineSave('saveSafetyWalk', Object.assign({ facilityId: plant, date }, fields)));
       chain = run.catch(() => {});
       return run.then(() => showError(''), err => { if (undo) undo(); showError(err); render(true); });
     }
     const list$ = document.getElementById('list');
     list$.addEventListener('click', e => {
       const big = e.target.closest('[data-big]');
-      if (big) { const d = document.createElement('div'); d.className = 'sw-bigphoto'; d.innerHTML = '<img alt="Photo">'; d.firstChild.src = big.src; d.addEventListener('click', () => d.remove()); document.body.appendChild(d); return; }
+      if (big) {
+        const d = document.createElement('div'); d.className = 'sw-bigphoto'; d.innerHTML = '<img alt="Photo">'; d.firstChild.src = big.src;
+        if (editable() && big.dataset.pid) {
+          const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'sw-top'; rm.textContent = 'Remove photo';
+          rm.addEventListener('click', ev => { ev.stopPropagation(); d.remove(); removePhoto(big.dataset.pitem, big.dataset.pid); });
+          d.appendChild(rm);
+        }
+        d.addEventListener('click', () => d.remove()); document.body.appendChild(d); return;
+      }
       if (!editable()) return;
+      const cam = e.target.closest('[data-cam]');
+      if (cam) { camFor = cam.dataset.cam; const box = document.getElementById('camera'); box.value = ''; box.click(); return; }
       const b = e.target.closest('.sw-btn');
       if (b && b.dataset.item) {
         const id = b.dataset.item, status = b.getAttribute('aria-pressed') === 'true' ? '' : b.dataset.v, prev = mine[id];
@@ -166,42 +253,66 @@
       if (b && b.dataset.issue) {
         const id = b.dataset.issue, status = b.dataset.v;
         if (b.getAttribute('aria-pressed') === 'true') return;
-        reviewMine[id] = { status };
+        reviewMine[id] = Object.assign({}, reviewMine[id] || {}, { status });
         render(true);
-        send({ op: 'review', issueId: id, status }, () => { delete reviewMine[id]; });
+        send({ op: 'review', issueId: id, status }, () => { delete reviewMine[id].status; });
         return;
       }
-      const un = e.target.closest('[data-unphoto]');
-      if (un) { const id = un.dataset.unphoto; mine[id] = Object.assign({}, mine[id] || {}, { photo: false, photoId: '' }); render(true); send({ op: 'photo', itemId: id, photo: '' }, () => { delete mine[id].photo; delete mine[id].photoId; }); }
     });
+    function removePhoto(id, pid) {
+      const prev = photoMine[pid];
+      photoMine[pid] = { itemId: id, data: '' }; render(true);
+      send({ op: 'photo', itemId: id, slot: slotOf(pid), photo: '' }, () => { if (prev) photoMine[pid] = prev; else delete photoMine[pid]; });
+    }
     list$.addEventListener('change', async e => {
       if (!editable()) return;
       const t = e.target;
-      if (t.dataset.note) { const id = t.dataset.note; mine[id] = Object.assign({}, mine[id] || {}, { note: t.value.trim() }); send({ op: 'note', itemId: id, note: t.value.trim() }); return; }
+      if (t.dataset.note) { const id = t.dataset.note, prev = itemOf(id).note || ''; mine[id] = Object.assign({}, mine[id] || {}, { note: t.value.trim() }); send({ op: 'note', itemId: id, note: t.value.trim() }, () => { mine[id].note = prev; }); return; }
+      if (t.dataset.rnote) { const id = t.dataset.rnote; reviewMine[id] = Object.assign({}, reviewMine[id] || {}, { note: t.value.trim() }); send({ op: 'reviewnote', issueId: id, note: t.value.trim() }, () => { delete reviewMine[id].note; }); return; }
+      if (t.id === 'walk-note') { const prev = walkNoteMine; walkNoteMine = t.value.trim(); drawAreas(); send({ op: 'walknote', note: t.value.trim() }, () => { walkNoteMine = prev; }); return; }
       if (t.dataset.maint) { const id = t.dataset.maint; mine[id] = Object.assign({}, mine[id] || {}, { maint: t.checked }); render(true); send({ op: 'maint', itemId: id, maint: t.checked }, () => { delete mine[id].maint; }); return; }
-      if (t.dataset.photo && t.files && t.files[0]) {
-        const id = t.dataset.photo;
+    });
+    document.getElementById('camera').addEventListener('change', async e => {
+      const t = e.target;
+      if (editable() && camFor && t.files && t.files[0]) {
+        const id = camFor;
         try {
-          const data = await shrinkPhoto(t.files[0]), pid = itemOf(id).photoId || ((itemOf(id).repeat ? wid() + '__' + id : itemOf(id).issueId) || '');
-          if (pid) photos[pid] = data;
-          mine[id] = Object.assign({}, mine[id] || {}, { photo: true, photoId: pid });
+          const data = await shrinkPhoto(t.files[0]), have = itemOf(id).photoIds;
+          let slot = 1;
+          while (slot <= PHOTO_SLOTS && have.indexOf(photoIdOf(id, slot)) >= 0) slot++;
+          if (slot > PHOTO_SLOTS) { showError('An item keeps up to ' + PHOTO_SLOTS + ' photos. Remove one first (tap it).'); return; }
+          const pid = photoIdOf(id, slot);
+          photoMine[pid] = { itemId: id, data }; photos[pid] = data;
           render(true);
-          send({ op: 'photo', itemId: id, photo: data }, () => { delete mine[id].photo; delete mine[id].photoId; });
+          send({ op: 'photo', itemId: id, slot, photo: data }, () => { delete photoMine[pid]; });
         } catch (err) { showError(err.message || String(err)); }
       }
     });
     list$.addEventListener('focusout', () => setTimeout(() => { if (!list$.contains(document.activeElement)) render(); }, 0));
     list$.addEventListener('scroll', () => {
+      if (mode !== 'all') return;
       const secs = [...list$.querySelectorAll('section[data-sec]')], top = list$.getBoundingClientRect().top;
       const cur = secs.filter(s => s.getBoundingClientRect().top - top < 60).pop() || secs[0];
       if (cur && cur.dataset.sec !== area) { area = cur.dataset.sec; drawAreas(); }
     }, { passive: true });
+    // Show a sub-area: on its own, or scrolled to in All in order.
+    function go(key) {
+      area = key; drawAreas();
+      if (mode !== 'all') { drawList(true); list$.scrollTop = 0; return; }
+      const sec = list$.querySelector('section[data-sec="' + CSS.escape(area) + '"]'), bar = list$.querySelector('.sw-mode');
+      if (sec) list$.scrollTop = sec.offsetTop - list$.offsetTop - (bar ? bar.offsetHeight : 0);
+    }
     document.getElementById('areas').addEventListener('click', e => {
+      const p = e.target.closest('[data-place]');
+      if (p) { const name = p.dataset.place; if (isOpen(name)) { opened.delete(name); shut.add(name); } else { shut.delete(name); opened.add(name); } drawAreas(); return; }
       const b = e.target.closest('[data-area]');
-      if (!b) return;
-      area = b.dataset.area; drawAreas();
-      const sec = list$.querySelector('section[data-sec="' + CSS.escape(area) + '"]');
-      if (sec) list$.scrollTop = sec.offsetTop - list$.offsetTop - (list$.firstElementChild ? list$.firstElementChild.offsetTop - list$.offsetTop : 0);
+      if (b) go(b.dataset.area);
+    });
+    list$.addEventListener('click', e => {
+      const m = e.target.closest('[data-mode]');
+      if (m) { mode = m.dataset.mode; try { localStorage.setItem('udSafetyMode', mode); } catch (err) { /* no storage */ } drawList(true); go(area); return; }
+      const g = e.target.closest('[data-go]');
+      if (g) { const pl = placeOf(g.dataset.go); if (pl) { shut.delete(pl); } go(g.dataset.go); }
     });
     // Finish Walk: pressed twice when items are still Not checked (no pop-ups).
     document.getElementById('finish').addEventListener('click', () => {
@@ -214,14 +325,16 @@
     function follow() {
       stops.forEach(s => s()); stops = [];
       walk = null; walkSeen = false; setupSeen = false; open = []; fixedHere = []; exts = [];
-      Object.keys(mine).forEach(k => delete mine[k]); Object.keys(reviewMine).forEach(k => delete reviewMine[k]);
+      Object.keys(mine).forEach(k => delete mine[k]); Object.keys(reviewMine).forEach(k => delete reviewMine[k]); Object.keys(photoMine).forEach(k => delete photoMine[k]);
+      waiting('saveSafetyWalk').then(applyHeld);
       const fail = (e) => showError('Could not read the walk (' + e.message + '). Check the network and reload the page.');
       stops.push(watchSetup(db, plant, s => { setup = s; setupSeen = true; render(); }));
       stops.push(onSnapshot(doc(db, 'safetyWalks', wid()), s => {
-        walk = s.exists() ? s.data() : null; walkSeen = true;
+        walk = s.exists() ? s.data() : null; walkSeen = true; if (walkNoteMine !== null && walk && (walk.note || '') === walkNoteMine) walkNoteMine = null;
         // What was tapped here has reached the saved walk.
         Object.keys(mine).forEach(id => { const w = walk && walk.items && walk.items[id]; if (w && Object.keys(mine[id]).every(k => (w[k] || '') === (mine[id][k] || ''))) delete mine[id]; });
-        Object.keys(reviewMine).forEach(id => { const r = walk && walk.reviews && walk.reviews[id]; if (r && r.status === reviewMine[id].status) delete reviewMine[id]; });
+        Object.keys(reviewMine).forEach(id => { const r = walk && walk.reviews && walk.reviews[id]; if (r && Object.keys(reviewMine[id]).every(k => (r[k] || '') === (reviewMine[id][k] || ''))) delete reviewMine[id]; });
+        Object.keys(photoMine).forEach(pid => { const w = walk && walk.items && walk.items[photoMine[pid].itemId], has = !!w && savedPhotoIds(w).indexOf(pid) >= 0; if (has === !!photoMine[pid].data) { if (photoMine[pid].data) photos[pid] = photoMine[pid].data; delete photoMine[pid]; } });
         render();
       }, fail));
       stops.push(onSnapshot(query(collection(db, 'safetyWalks'), where('facilityId', '==', plant), where('month', '==', date.slice(0, 7))), s => { monthWalks = s.docs.map(d => ({ id: d.id })); render(); }, fail));
@@ -229,6 +342,7 @@
       stops.push(onSnapshot(query(collection(db, 'safetyIssues'), where('facilityId', '==', plant), where('fixedWalk', '==', wid())), s => { fixedHere = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail));
       stops.push(watchExtinguishers(db, plant, list => { exts = list; render(); }, fail));
     }
+    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), async s => {

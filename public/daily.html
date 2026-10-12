@@ -112,7 +112,7 @@
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, driverOptionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     import { bindDailyKeys, keepCursor } from './js/daily-keys.js';
     forScreen('dailyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
@@ -245,12 +245,31 @@
     // unless OVR is ticked; with OVR they show why. Route Master's hours stand in when the Live row has none.
     let routeHours = {};
     const rmHours = (r) => { const d = routeHours[r.runId]; return d && d[r.day]; };
-    const pickOpts = (kind, row) => ({ override: !!ovr[row.id], date: row.deliveryDate, conflicts: kind === 'truck' || kind === 'trailer' ? L.unitConflicts(rows, row, kind, rmHours) : null });
+    // Every load delivered the same day as this row, whichever day it loaded (the sheet shows only the loadout day's loads,
+    // but a unit out on a load from the day before is still in use).
+    function dayRowsFor(row) {
+      const out = [row];
+      for (let k = 0; k <= 3; k++) {
+        L.dailyRows(runs, L.addDays(row.deliveryDate, -k)).forEach(r => {
+          if (r.deliveryDate !== row.deliveryDate || r.id === row.id || out.some(x => x.id === r.id)) return;
+          out.push(rows.find(x => x.id === r.id) || r);
+        });
+      }
+      return out;
+    }
+    // Joe 10/12: without OVR the truck and trailer lists offer only free units. A unit on another load that day, down, or
+    // on the road over this load's time is left out; OVR shows every unit with why it is normally left out.
+    function unitBlocks(kind, row) {
+      const day = dayRowsFor(row), out = {}, key = kind === 'truck' ? 'truckId' : 'trailerId';
+      day.forEach(r => { if (r !== row && !r.off && r[key] && !out[r[key]]) out[r[key]] = 'ON ' + r.route; });
+      return Object.assign(out, L.unitConflicts(day, row, kind, rmHours));
+    }
+    const pickOpts = (kind, row) => ({ override: !!ovr[row.id], date: row.deliveryDate, conflicts: kind === 'truck' || kind === 'trailer' ? unitBlocks(kind, row) : null });
 
     // Drivers and units already used on this delivery day, so the list can show "(on 802)".
     function busyFor(kind, row) {
       const key = kind === 'driver' ? 'driverId' : kind === 'truck' ? 'truckId' : 'trailerId', busy = {};
-      rows.forEach(r => { if (r !== row && !r.off && r.deliveryDate === row.deliveryDate && r[key]) busy[r[key]] = 'on ' + r.route; });
+      dayRowsFor(row).forEach(r => { if (r !== row && !r.off && r[key]) busy[r[key]] = 'on ' + r.route; });
       return busy;
     }
 
@@ -302,7 +321,7 @@
       const d = lists.allDrivers.find(x => x.id === value), own = d && d.defaultTruckId;
       if (!own || own === truckNow) return;
       const unit = lists.fleetTrucks.find(e => e.id === own);
-      const busy = unit && L.unitConflicts(rows, row, 'truck', rmHours)[own];
+      const busy = unit && unitBlocks('truck', row)[own];
       const why = !unit ? 'is not on Equipment Master' : L.unitOff(unit) ? 'is ' + unit.status : busy ? 'is ' + busy : '';
       if (why) { showError(d.name + '\'s truck ' + (unit ? unit.unit : own) + ' ' + why + '; the route\'s truck was kept.'); return; }
       setTruck(own);
@@ -430,7 +449,8 @@
       const row = rows.find(r => r.id === editRow.id);
       if (!row) { closeModals(); return; }
       if (!first && box.contains(document.activeElement) && document.activeElement.matches('input, textarea, select')) return; // do not wipe typing or an open list
-      const select = (kind, current) => '<select data-field="' + kind + '"' + (row.off ? ' disabled' : '') + '>' + optionsHtml(kind, current, busyFor(kind, row), pickOpts(kind, row)) + '</select>';
+      const select = (kind, current) => '<select data-field="' + kind + '"' + (row.off ? ' disabled' : '') + '>' +
+        (kind === 'driver' ? driverOptionsHtml(current || (coverageName(row) ? '__CVG__:' + coverageName(row) : ''), busyFor(kind, row), pickOpts(kind, row)) : optionsHtml(kind, current, busyFor(kind, row), pickOpts(kind, row))) + '</select>';
       box.innerHTML = '<h2 id="edit-title">' + escapeHtml(row.route + ' ' + row.run) + ' <small>' + escapeHtml(row.deliveryDay + ' ' + shortDate(row.deliveryDate)) + '</small></h2>' +
         '<div class="modal-grid">' +
         '<label>Route<input value="' + escapeHtml(row.route) + '" disabled></label><label>Run<input value="' + escapeHtml(row.run) + '" disabled></label>' +
@@ -458,6 +478,8 @@
       box.querySelectorAll('[data-field]').forEach(node => {
         node.onchange = () => {
           const f = node.dataset.field;
+          // A picked list lets go of the focus, so the box redraws with what the pick changed (a new driver's own truck).
+          if (node.tagName === 'SELECT') node.blur();
           if (f === 'ovr') { ovr[row.id] = node.checked; paintEdit(true); render(); return; }
           if (f === 'runs') return setRuns(row, node.value === 'true');
           if (f === 'time') return setTime(row, node.value.trim());

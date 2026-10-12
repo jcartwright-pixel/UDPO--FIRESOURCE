@@ -7,7 +7,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/fireba
 import {
   getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signInWithCustomToken, signOut, GoogleAuthProvider, connectAuthEmulator
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { getFirestore, connectFirestoreEmulator, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 
 export const DOMAIN = 'uniteddairy.com';
@@ -391,7 +391,8 @@ document.addEventListener('click', e => {
 // Polish 16: when the tablet or computer loses its connection a yellow bar says so at the top, so nobody thinks a press was
 // sent. Saves go to the server, so they wait for the signal; the bar goes away by itself when it is back.
 (function connectionBar() {
-  if (EMBED) return;
+  // Screens that keep saves on the device with no signal (window.UD_OFFLINE) show their own line instead.
+  if (EMBED || window.UD_OFFLINE) return;
   let bar = null;
   const show = () => {
     if (navigator.onLine) { if (bar) bar.hidden = true; return; }
@@ -532,7 +533,13 @@ let services;
 export async function start() {
   if (services) return services;
   const app = initializeApp(await firebaseConfig());
-  const auth = getAuth(app), db = getFirestore(app), functions = getFunctions(app, 'us-east4');
+  // Joe 10/12: screens carried round the plant on an iPad (window.UD_OFFLINE, the Safety Walkthrough) keep what they read on
+  // the iPad, so they open and show the last data with no signal; every other screen reads live as before.
+  let db;
+  if (window.UD_OFFLINE) {
+    try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch (e) { db = getFirestore(app); }
+  } else db = getFirestore(app);
+  const auth = getAuth(app), functions = getFunctions(app, 'us-east4');
   if (LOCAL) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
@@ -672,6 +679,7 @@ export async function requireSignIn(ready) {
   if (out) out.addEventListener('click', () => signOut(auth));
   // Local testing only: the test database accepts a made-up Google sign-in (?testEmail=someone@uniteddairy.com).
   const testEmail = LOCAL && new URLSearchParams(location.search).get('testEmail');
+  if (testEmail) await auth.authStateReady(); // signed in already (also with no signal): kept, not signed in again
   if (testEmail && !auth.currentUser) {
     const token = JSON.stringify({ sub: 'test-' + testEmail, email: testEmail, email_verified: true });
     await signInWithCredential(auth, GoogleAuthProvider.credential(token)).catch(e => showError(String(e.message || e)));
