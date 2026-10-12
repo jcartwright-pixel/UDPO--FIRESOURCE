@@ -68,7 +68,7 @@
       const dis = editable() ? '' : ' disabled';
       document.getElementById('rows').innerHTML = rows.map(i => {
         const fixed = i.status === 'FIXED', walks = (i.walks || []).length;
-        return '<tr' + (fixed ? ' class="fixed"' : '') + ' data-id="' + escapeHtml(i.id) + '"><td class="nw">' + shortDate(i.foundOn) + '</td><td>' + escapeHtml(i.area) + '</td><td><b>' + escapeHtml(i.item) + '</b>' + (i.note ? '<span class="sw-how">' + escapeHtml(i.note) + '</span>' : '') + (i.lastNote ? '<span class="sw-how">Last walk: ' + escapeHtml(i.lastNote) + '</span>' : '') + '</td>' +
+        return '<tr' + (fixed ? ' class="fixed"' : '') + ' data-id="' + escapeHtml(i.id) + '"><td class="nw">' + shortDate(i.foundOn) + '</td><td>' + escapeHtml(i.area) + '</td><td><b>' + escapeHtml(i.item) + '</b>' + (i.note ? '<span class="sw-how">' + escapeHtml(i.note) + '</span>' : '') + (i.lastNote ? '<span class="sw-how">Latest note' + (i.lastNoteOn ? ' ' + shortDate(i.lastNoteOn) : '') + (i.lastNoteByName ? ', ' + escapeHtml(i.lastNoteByName) : '') + ': ' + escapeHtml(i.lastNote) + '</span>' : '') + '</td>' +
           '<td class="nw">' + escapeHtml(i.foundByName || i.foundBy || '') + '</td><td class="nw">' + agePill(i) + '</td><td class="nw">' + (walks > 1 ? '<span class="sw-pill red">REPEAT · ' + walks + '</span>' : walks || '') + '</td>' +
           '<td>' + (i.photo ? '<button type="button" class="sw-btn sw-small" data-photo="' + escapeHtml(i.id) + '">Photo</button>' : '') + '</td>' +
           '<td><label class="sw-check"><input type="checkbox" data-maint="' + escapeHtml(i.id) + '"' + (i.sendToMaint ? ' checked' : '') + (fixed ? ' disabled' : dis) + '>' + maintText(i) + '</label></td>' +

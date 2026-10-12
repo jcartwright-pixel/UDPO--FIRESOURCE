@@ -23,7 +23,7 @@ const S = require('./safety-rules');
 
 const text = (v, max) => String(v === null || v === undefined ? '' : v).trim().slice(0, max || 200);
 const docId = (id) => String(id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 300);
-const WALK_OPS = ['item', 'note', 'photo', 'maint', 'review', 'finish'];
+const WALK_OPS = ['item', 'note', 'photo', 'maint', 'review', 'reviewnote', 'walknote', 'finish'];
 const ISSUE_OPS = ['fixed', 'reopen', 'note', 'maint'];
 const PHOTO_LIMIT = 700000;
 const PLANT_IDS = () => L.PLANTS.map(p => p.id);
@@ -70,6 +70,12 @@ function validateWalk(input, SaveError) {
     if (!photoOk(out.photo)) throw new SaveError('BAD_REQUEST', 'The photo is too big or not a picture. Take it again.');
   }
   if (op === 'maint') out.maint = input.maint === true;
+  if (op === 'walknote') out.note = text(input.note, 1000);
+  if (op === 'reviewnote') {
+    out.issueId = text(input.issueId, 300);
+    out.note = text(input.note, 500);
+    if (!out.issueId) throw new SaveError('BAD_REQUEST', 'Pick the issue.');
+  }
   if (op === 'review') {
     out.issueId = text(input.issueId, 300);
     out.status = text(input.status, 10).toUpperCase();
@@ -114,7 +120,7 @@ async function saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError) {
       const open = await openIssueFor(tx, db, req.facilityId, req.itemId);
       if (open) {
         const iss = open.data(), walks = (iss.walks || []).filter(w => w !== id).concat([id]);
-        writes.push(() => tx.update(open.ref, { walks, lastSeenOn: req.date, updatedAt: stamp, updatedBy: email }));
+        writes.push(() => tx.update(open.ref, Object.assign({ walks, lastSeenOn: req.date, updatedAt: stamp, updatedBy: email }, next.note ? { lastNote: text(next.note, 500), lastNoteOn: req.date, lastNoteByName: name } : {})));
         next.issueId = open.id;
         next.repeat = true;
         message = item.text + ': Not good again (still open from ' + iss.foundOn + ').';
@@ -137,18 +143,23 @@ async function saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError) {
           writes.push(() => tx.delete(db.collection('safetyPhotos').doc(cur.issueId)));
         } else writes.push(() => tx.update(iref, { walks: (iss.walks || []).filter(w => w !== id), updatedAt: stamp, updatedBy: email }));
       }
-      delete next.issueId; delete next.repeat; delete next.note; delete next.photo; delete next.maint;
+      delete next.issueId; delete next.repeat; delete next.photo; delete next.maint;
       message = item.text + ': ' + (req.status === 'GOOD' ? 'Good.' : 'Not checked.');
     } else message = item.text + ': ' + (req.status === 'GOOD' ? 'Good.' : req.status === 'NOT_GOOD' ? 'Not good.' : 'Not checked.');
     if (!req.status) { delete next.by; delete next.byName; delete next.at; next.status = ''; }
     walk.items[req.itemId] = next;
+  } else if (req.op === 'note' && !(cur && cur.status === 'NOT_GOOD' && cur.issueId)) {
+    // Joe 10/12: every item has a note, whatever it was marked (or not marked yet).
+    cur = Object.assign({ status: '' }, cur || {}, { note: req.note });
+    walk.items[req.itemId] = cur;
+    message = req.note ? 'Note saved.' : 'Note cleared.';
   } else if (['note', 'photo', 'maint'].indexOf(req.op) >= 0) {
     if (!cur || cur.status !== 'NOT_GOOD' || !cur.issueId) throw new SaveError('BAD_REQUEST', 'Mark the item Not good first.');
     const iref = db.collection('safetyIssues').doc(cur.issueId), is = await tx.get(iref);
     const own = is.exists && is.data().foundWalk === id;
     if (req.op === 'note') {
       cur.note = req.note;
-      if (is.exists) writes.push(() => tx.update(iref, own ? { note: req.note, updatedAt: stamp, updatedBy: email } : { lastNote: req.note, updatedAt: stamp, updatedBy: email }));
+      if (is.exists) writes.push(() => tx.update(iref, own ? { note: req.note, updatedAt: stamp, updatedBy: email } : { lastNote: req.note, lastNoteOn: req.date, lastNoteByName: name, updatedAt: stamp, updatedBy: email }));
       message = 'Note saved.';
     } else if (req.op === 'photo') {
       cur.photo = !!req.photo;
@@ -182,7 +193,17 @@ async function saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError) {
       writes.push(() => tx.update(iref, Object.assign({ lastReviewedOn: req.date, lastReviewedBy: email, lastReviewedByName: name, updatedAt: stamp, updatedBy: email }, reopen ? { status: 'OPEN', fixedOn: '', fixedAt: '', fixedBy: '', fixedByName: '', fixedWalk: '' } : {})));
       message = iss.item + ': Still open.';
     }
-    walk.reviews[docId(req.issueId)] = { status: req.status, by: email, byName: name, at: stamp };
+    walk.reviews[docId(req.issueId)] = Object.assign({}, walk.reviews[docId(req.issueId)] || {}, { status: req.status, by: email, byName: name, at: stamp });
+  } else if (req.op === 'reviewnote') {
+    // A note on an earlier issue while reviewing it ("waiting on parts"): kept on this walk and shown on the issue as its latest note.
+    const iref = db.collection('safetyIssues').doc(docId(req.issueId)), is = await tx.get(iref);
+    if (!is.exists || is.data().facilityId !== req.facilityId) throw new SaveError('NOT_FOUND', 'That issue is not on this plant\'s list.');
+    walk.reviews[docId(req.issueId)] = Object.assign({}, walk.reviews[docId(req.issueId)] || {}, { note: req.note });
+    writes.push(() => tx.update(iref, { lastNote: req.note, lastNoteOn: req.note ? req.date : '', lastNoteByName: req.note ? name : '', updatedAt: stamp, updatedBy: email }));
+    message = req.note ? 'Note saved.' : 'Note cleared.';
+  } else if (req.op === 'walknote') {
+    walk.note = req.note; walk.noteByName = name; walk.noteAt = stamp;
+    message = req.note ? 'Walk notes saved.' : 'Walk notes cleared.';
   } else {
     walk.finishedAt = stamp; walk.finishedBy = email; walk.finishedByName = name;
     message = 'Walk finished.';

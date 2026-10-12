@@ -96,23 +96,34 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
     assert.equal(await wk.textContent('#title'), 'Weekly Walk ' + Number(today.slice(5, 7)) + '-' + Number(today.slice(8)) + '-' + today.slice(2, 4));
     assert.ok(await wk.$(row('ext_monthly')), 'the month\'s first walk has the monthly items');
     assert.equal(await wk.textContent(row('exit_routes') + ' .sw-state'), 'Not checked');
-    assert.deepEqual(await wk.$$eval('#areas button', b => b.map(x => x.firstChild.textContent)), ['Open issues from earlier walks'].concat(S.checklist(null).map(a => a.name)));
+    assert.deepEqual(await wk.$$eval('#areas button', b => b.map(x => x.firstChild.textContent)), ['Open issues from earlier walks'].concat(S.checklist(null).map(a => a.name), ['Walk notes']));
+    // Joe 10/12: every row has a note box, marked or not.
+    assert.equal(await wk.$$eval('#list tr[data-row]', r => r.filter(x => !x.querySelector('input[data-note]')).length), 0, 'every row has a note box');
     await wk.click(row('exit_routes') + ' .sw-btn.good');
     await wk.waitForFunction(() => document.querySelector('#save-pill') && /Saved/.test(document.querySelector('#save-pill').textContent));
     await wk.click(row('panel_labels') + ' .sw-btn.bad');
-    await wk.waitForSelector('#list textarea[data-note="panel_labels"]');
-    await wk.fill('#list textarea[data-note="panel_labels"]', 'LP-3 missing breaker labels');
+    await wk.waitForSelector('#list tr[data-more="panel_labels"]');
+    assert.equal(await wk.getAttribute('#list input[data-note="panel_labels"]', 'placeholder'), 'What is wrong');
+    await wk.fill('#list input[data-note="panel_labels"]', 'LP-3 missing breaker labels');
+    await wk.click('#title');
+    await wk.fill('#list input[data-note="exit_routes"]', 'Door 4 sticks but opens');
+    await wk.click('#title');
+    await wk.fill('#list input[data-rnote="old_issue"]', 'Drain cleaned, still slow');
+    await wk.click('#title');
+    await wk.click('#areas button[data-area="notes"]');
+    await wk.fill('#walk-note', 'Walked with the new second-shift lead.');
     await wk.click('#title');
     await wk.check('#list input[data-maint="panel_labels"]');
     await wk.click('#list tr[data-issue-row="old_issue"] .sw-btn.open');
     const saved = async () => (await db().collection('safetyWalks').doc(S.walkId(UT, today)).get()).data();
-    for (let i = 0; i < 40; i++) { const w = await saved(); if (w && w.items.panel_labels && w.items.panel_labels.maint && w.reviews && w.reviews.old_issue) break; await wk.waitForTimeout(250); }
+    for (let i = 0; i < 40; i++) { const w = await saved(); if (w && w.items.panel_labels && w.items.panel_labels.maint && w.reviews && w.reviews.old_issue && w.reviews.old_issue.status && w.note) break; await wk.waitForTimeout(250); }
     const w = await saved();
     assert.deepEqual([w.items.exit_routes.status, w.items.panel_labels.status, w.items.panel_labels.note, w.items.panel_labels.maint, w.reviews.old_issue.status], ['GOOD', 'NOT_GOOD', 'LP-3 missing breaker labels', true, 'OPEN']);
+    assert.deepEqual([w.items.exit_routes.note, w.reviews.old_issue.note, w.note], ['Door 4 sticks but opens', 'Drain cleaned, still slow', 'Walked with the new second-shift lead.'], 'the row, review and walk notes saved');
     assert.match(await wk.textContent('#counts'), /^1 Good · 1 Not good · \d+ Not checked/);
     assert.equal(await wk.getAttribute('#list tr[data-issue-row="old_issue"] .sw-btn.open', 'aria-pressed'), 'true');
     await fits(wk, 'The walk at 1920');
-    assert.ok(await smallest(wk, '#list td, #list .sw-btn, #areas button, #list textarea') >= 15, 'walk text stays readable');
+    assert.ok(await smallest(wk, '#list td, #list .sw-btn, #areas button, #list textarea, #list input[type="text"]') >= 15, 'walk text stays readable');
     await shot(wk, 'safety-walk-1920');
     await wk.setViewportSize({ width: 1536, height: 864 });
     await wk.waitForTimeout(300);
@@ -127,7 +138,7 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
     await shot(wk, 'safety-walk-tablet-1024');
     assert.deepEqual(wk.errors, []);
     await wk.close();
-    results.push('The walk: Good and Not good save on a tap, the note and Send to Plant Maintenance save as they are left, an earlier issue is reviewed Still open; counts follow; fits 1536, 1920 and a tablet');
+    results.push('The walk: Good and Not good save on a tap, every row has a note box (a Good row, a Not good row and an earlier issue each got one), Walk notes saves for the whole walk, Send to Plant Maintenance saves as it is left, an earlier issue is reviewed Still open; counts follow; fits 1536, 1920 and a tablet');
 
     // Open Issues lists the new Not good and the older one.
     const oi = await openPage(browser, 1536, 864, '/safety-issues.html?' + ADMIN);
@@ -135,6 +146,7 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
     assert.match(await oi.textContent('#rows'), /Breakers labeled, no open holes in panels/);
     assert.match(await oi.textContent('#rows'), /Waiting for Plant Maintenance/);
     assert.match(await oi.textContent('#rows'), /7 DAYS/);
+    assert.match(await oi.textContent('#rows tr[data-id="old_issue"]'), /Latest note \d+-\d+-\d+, Test Admin: Drain cleaned, still slow/);
     await fits(oi, 'Open Issues at 1536');
     await shot(oi, 'safety-issues-1536');
     const fixBtn = '#rows tr[data-id="old_issue"] [data-op="fixed"]';
@@ -176,12 +188,13 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
     for (const page of ['safety-walks.html', 'safety-setup.html']) {
       const p = await openPage(browser, 1536, 864, '/' + page + '?' + ADMIN);
       await p.waitForSelector('#rows tr td:not(.sw-empty)');
+      if (page === 'safety-walks.html') assert.match(await p.textContent('#rows'), /Walked with the new second-shift lead\.\s*3 row notes/, 'Past Walks shows the walk notes and how many rows have notes');
       await fits(p, page + ' at 1536');
       await shot(p, page.replace('.html', '') + '-1536');
       assert.deepEqual(p.errors, []);
       await p.close();
     }
-    results.push('Past Walks lists today\'s walk; Checklist Setup shows the starting list; both fit 1536');
+    results.push('Past Walks lists today\'s walk with its notes; Checklist Setup shows the starting list; both fit 1536');
 
     // Joe 10/12: inside a plant there is no plant drop-down; every page uses the plant he came in through and names it in the header.
     const cp = await openPage(browser, 1536, 864, '/index.html?' + ADMIN);

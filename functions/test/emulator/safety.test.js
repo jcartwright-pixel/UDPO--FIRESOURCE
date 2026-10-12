@@ -72,10 +72,12 @@ test('Taking a Not good back removes the issue it opened; a repeat taken back le
   assert.equal((await walk('2026-10-12')).items.floors.status, '');
 });
 
-test('Refused: another day, an item not on the checklist, a note before Not good, a big photo, a made-up status', async () => {
+test('Refused: another day, an item not on the checklist, a photo before Not good, a big photo, a made-up status', async () => {
   await assert.rejects(walkTap('2026-10-01', 'item', { itemId: 'floors', status: 'GOOD' }, MON), /on the day it is walked/);
   await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'nope', status: 'GOOD' }, MON), /not on this plant's checklist/);
-  await assert.rejects(walkTap('2026-10-05', 'note', { itemId: 'floors', note: 'x' }, MON), /Not good first/);
+  // Joe 10/12: a note is fine on any row now; a photo and Send to Plant Maintenance still need Not good first.
+  await assert.rejects(walkTap('2026-10-05', 'photo', { itemId: 'floors', photo: 'data:image/jpeg;base64,AAAA' }, MON), /Not good first/);
+  await assert.rejects(walkTap('2026-10-05', 'maint', { itemId: 'floors', maint: true }, MON), /Not good first/);
   await assert.rejects(walkTap('2026-10-05', 'photo', { itemId: 'floors', photo: 'data:image/png;base64,AAAA' }, MON), /too big or not a picture/);
   await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'floors', status: 'MAYBE' }, MON), /Good or Not good/);
 });
@@ -126,4 +128,33 @@ test('Checklist Setup: a manager changes the plant\'s list; an item left out sta
   await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'floors', status: 'GOOD' }, MON), /not on this plant's checklist/, 'an item turned off is not walked');
   await walkTap('2026-10-05', 'item', { itemId: 'fire_new', status: 'GOOD' }, MON, DISPATCHER);
   await assert.rejects(applyAction(db(), { email: PLANT_PERSON }, { action: 'saveSafetyChecklist', requestId: rid(), facilityId: UT, areas }, at(MON)), /permission|not allowed|role/i);
+});
+
+test('Notes (Joe 10/12): a note on any row, kept when the row changes; a note on an earlier issue; notes for the whole walk', async () => {
+  await walkTap('2026-10-05', 'note', { itemId: 'exit_signs', note: 'Bulb dim by dock 3' }, MON, PLANT_PERSON);
+  let w = await walk('2026-10-05');
+  assert.deepEqual([w.items.exit_signs.note, w.items.exit_signs.status], ['Bulb dim by dock 3', ''], 'a note before the row is marked');
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_signs', status: 'GOOD' }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_signs', status: 'NOT_GOOD' }, MON, PLANT_PERSON);
+  let list = await issues();
+  assert.equal(list[0].note, 'Bulb dim by dock 3', 'the row note becomes the issue note');
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_signs', status: 'GOOD' }, MON, PLANT_PERSON);
+  w = await walk('2026-10-05');
+  assert.deepEqual([w.items.exit_signs.status, w.items.exit_signs.note], ['GOOD', 'Bulb dim by dock 3'], 'the note stays when Not good is taken back');
+  assert.equal((await issues()).length, 0);
+  await walkTap('2026-10-05', 'item', { itemId: 'guards', status: 'NOT_GOOD' }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'walknote', { note: 'Walked with the new supervisor.' }, MON, PLANT_PERSON);
+  w = await walk('2026-10-05');
+  assert.deepEqual([w.note, w.noteByName], ['Walked with the new supervisor.', 'Test Viewer']);
+  // Next week: a note on the earlier issue while reviewing it shows on the issue as its latest note; it is not a review by itself.
+  const id = (await issues())[0].id;
+  await walkTap('2026-10-12', 'reviewnote', { issueId: id, note: 'Guard ordered, due Friday' }, NEXT);
+  w = await walk('2026-10-12');
+  assert.deepEqual(w.reviews[id], { note: 'Guard ordered, due Friday' });
+  list = await issues();
+  assert.deepEqual([list[0].lastNote, list[0].lastNoteOn, list[0].lastNoteByName, list[0].status], ['Guard ordered, due Friday', '2026-10-12', 'Test Manager', 'OPEN']);
+  await walkTap('2026-10-12', 'review', { issueId: id, status: 'OPEN' }, NEXT);
+  w = await walk('2026-10-12');
+  assert.deepEqual([w.reviews[id].status, w.reviews[id].note], ['OPEN', 'Guard ordered, due Friday'], 'the review keeps its note');
+  await assert.rejects(walkTap('2026-10-12', 'reviewnote', { issueId: 'nope', note: 'x' }, NEXT), /not on this plant's list/);
 });

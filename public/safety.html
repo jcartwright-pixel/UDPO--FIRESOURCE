@@ -65,7 +65,10 @@
     const monthly = () => walk ? walk.monthly === true : !monthWalks.some(w => w.id !== wid());
     const list = () => S.walkList(setup, monthly());
     const itemOf = (id) => Object.assign({}, (walk && walk.items && walk.items[id]) || {}, mine[id] || {});
-    const reviews = () => Object.assign({}, (walk && walk.reviews) || {}, reviewMine);
+    const reviews = () => { const out = JSON.parse(JSON.stringify((walk && walk.reviews) || {})); Object.keys(reviewMine).forEach(k => { out[k] = Object.assign(out[k] || {}, reviewMine[k]); }); return out; };
+    const reviewed = (id) => !!(reviews()[id] && reviews()[id].status);
+    let walkNoteMine = null;
+    const walkNote = () => walkNoteMine !== null ? walkNoteMine : (walk && walk.note) || '';
     const toReview = () => open.concat(fixedHere.filter(f => !open.some(o => o.id === f.id))).filter(i => i.foundWalk !== wid());
 
     function counts() { return S.walkCounts({ items: Object.fromEntries(list().flatMap(a => a.items.map(i => [i.id, itemOf(i.id)]))) }, list()); }
@@ -81,19 +84,22 @@
       fin.textContent = walk && walk.finishedAt && !armFinish ? 'Walk Finished' : armFinish ? 'Press again: ' + c.notChecked + ' not checked' : 'Finish Walk';
     }
     function drawAreas() {
-      const n = toReview().filter(i => !reviews()[i.id]).length;
+      const n = toReview().filter(i => !reviewed(i.id)).length;
       document.getElementById('areas').innerHTML = '<button type="button" class="issues' + (area === 'issues' ? ' on' : '') + '" data-area="issues">Open issues from earlier walks<small>' + (toReview().length ? n + ' to review' : 'none') + '</small></button>' +
         list().map(a => { const done = a.items.filter(i => itemOf(i.id).status).length;
-          return '<button type="button" data-area="' + escapeHtml(a.key) + '" class="' + (area === a.key ? 'on' : '') + (done === a.items.length ? ' done' : '') + '">' + escapeHtml(a.name) + '<small>' + done + ' of ' + a.items.length + '</small></button>'; }).join('');
+          return '<button type="button" data-area="' + escapeHtml(a.key) + '" class="' + (area === a.key ? 'on' : '') + (done === a.items.length ? ' done' : '') + '">' + escapeHtml(a.name) + '<small>' + done + ' of ' + a.items.length + '</small></button>'; }).join('') +
+        '<button type="button" data-area="notes" class="' + (area === 'notes' ? 'on' : '') + (walkNote() ? ' done' : '') + '">Walk notes<small>' + (walkNote() ? 'written' : 'none') + '</small></button>';
     }
+    // Joe 10/12: a note box on every row (whatever it was marked) and one for the whole walk; each saves as it is left.
+    const noteBox = (attr, val, label, ph) => '<td class="sw-note">' + (editable() ? '<input type="text" ' + attr + ' value="' + escapeHtml(val || '') + '" maxlength="500" placeholder="' + ph + '" aria-label="Note: ' + escapeHtml(label) + '">' : (val ? escapeHtml(val) : '')) + '</td>';
     const btns = (attrs, pressed, choices) => choices.map(([v, label, cls]) => '<button type="button" class="sw-btn ' + cls + '" ' + attrs + ' data-v="' + v + '" aria-pressed="' + (pressed === v) + '"' + (editable() ? '' : ' disabled') + '>' + label + '</button>').join('');
     function reviewRows() {
       const rs = toReview();
       if (!rs.length) return '<div class="sw-empty">No open issues from earlier walks.</div>';
       return '<table class="sw-table"><tbody>' + rs.map(i => {
-        const r = reviews()[i.id], st = r ? r.status : (i.status === 'FIXED' ? 'FIXED' : '');
+        const r = reviews()[i.id], st = r && r.status ? r.status : (i.status === 'FIXED' ? 'FIXED' : '');
         return '<tr data-issue-row="' + escapeHtml(i.id) + '"><td><b>' + escapeHtml(i.item) + '</b>' + (i.walks && i.walks.length > 1 ? ' <span class="sw-pill red">REPEAT · ' + i.walks.length + '</span>' : '') +
-          '<span class="sw-how">' + foundLine(i) + (i.note ? ' · ' + escapeHtml(i.note) : '') + '</span></td><td class="sw-state">' + agePill(i) + '</td><td class="sw-state">' + maintText(i) + '</td>' +
+          '<span class="sw-how">' + foundLine(i) + (i.note ? ' · ' + escapeHtml(i.note) : '') + '</span></td>' + noteBox('data-rnote="' + escapeHtml(i.id) + '"', r ? r.note : '', i.item, 'Note') + '<td class="sw-state">' + agePill(i) + '</td><td class="sw-state">' + maintText(i) + '</td>' +
           '<td class="sw-do">' + btns('data-issue="' + escapeHtml(i.id) + '"', st, [['OPEN', 'Still open', 'open'], ['FIXED', 'Fixed', 'good']]) + '</td></tr>';
       }).join('') + '</tbody></table>';
     }
@@ -107,12 +113,12 @@
         const it = itemOf(i.id), st = it.status || '';
         let row = '<tr data-row="' + escapeHtml(i.id) + '"><td>' + escapeHtml(i.text) + (i.freq === 'MONTHLY' ? ' <span class="sw-pill blue">MONTHLY</span>' : '') +
           (i.id === 'ext_monthly' ? '<span class="sw-how">' + extHint() + '</span>' : '') + (it.repeat ? '<span class="sw-how">Not good again: still open from an earlier walk</span>' : '') + '</td>' +
+          noteBox('data-note="' + escapeHtml(i.id) + '"', it.note, i.text, st === 'NOT_GOOD' ? 'What is wrong' : 'Note') +
           '<td class="sw-do">' + btns('data-item="' + escapeHtml(i.id) + '"', st, [['GOOD', 'Good', 'good'], ['NOT_GOOD', 'Not good', 'bad']]) + '</td>' +
           '<td class="sw-state">' + (st ? '' : '<span class="sw-nc">Not checked</span>') + '</td></tr>';
         if (st === 'NOT_GOOD') {
           const dis = editable() ? '' : ' disabled', ph = it.photoId && photos[it.photoId];
-          row += '<tr class="sw-more" data-more="' + escapeHtml(i.id) + '"><td colspan="3"><div class="sw-more-grid">' +
-            '<div><span class="sw-label">What is wrong</span><textarea data-note="' + escapeHtml(i.id) + '" maxlength="500" aria-label="What is wrong: ' + escapeHtml(i.text) + '"' + dis + '>' + escapeHtml(it.note || '') + '</textarea></div>' +
+          row += '<tr class="sw-more" data-more="' + escapeHtml(i.id) + '"><td colspan="4"><div class="sw-more-grid">' +
             '<div><span class="sw-label">Photo</span><div class="sw-photo">' + (ph ? '<img src="' + ph + '" alt="Photo" data-big>' : '') +
               (editable() ? (it.photo ? '<button type="button" data-unphoto="' + escapeHtml(i.id) + '">Remove</button>' : '<label>+ Add photo<input type="file" accept="image/*" capture="environment" data-photo="' + escapeHtml(i.id) + '"></label>') : (it.photo ? '' : '<span class="sw-nc">No photo</span>')) + '</div></div>' +
             '<div><span class="sw-label">Plant Maintenance</span><label class="sw-check"><input type="checkbox" data-maint="' + escapeHtml(i.id) + '"' + (it.maint ? ' checked' : '') + dis + '>Send to Plant Maintenance as a work order</label>' +
@@ -125,11 +131,13 @@
     }
     function drawList(force) {
       const box = document.getElementById('list');
-      if (force !== true && box.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA') return;
+      if (force !== true && box.contains(document.activeElement) && ['TEXTAREA', 'INPUT'].indexOf(document.activeElement.tagName) >= 0) return;
       const top = box.scrollTop;
       box.innerHTML = '<section data-sec="issues"><div class="sw-sec"><h2>Open issues from earlier walks</h2><span>' + (viewing ? 'As they were reviewed on this walk.' : 'Mark each one Still open or Fixed.') + '</span></div>' + reviewRows() + '</section>' +
         list().map(a => '<section data-sec="' + escapeHtml(a.key) + '"><div class="sw-sec"><h2>' + escapeHtml(a.name) + '</h2>' + (a === list()[0] && walk ? '<span>Started by ' + escapeHtml(walk.startedByName || walk.startedBy || '') + ' ' + dateTimeText(walk.startedAt).replace(/^\S+ /, '') + (walk.finishedAt ? ' · finished ' + dateTimeText(walk.finishedAt).replace(/^\S+ /, '') : '') + '</span>' : '') + '</div>' +
-          '<table class="sw-table"><tbody>' + itemRows(a) + '</tbody></table></section>').join('');
+          '<table class="sw-table"><tbody>' + itemRows(a) + '</tbody></table></section>').join('') +
+        '<section data-sec="notes"><div class="sw-sec"><h2>Walk notes</h2><span>Anything about the whole walk.' + (walk && walk.noteByName && walkNote() ? ' Last written by ' + escapeHtml(walk.noteByName) + '.' : '') + '</span></div>' +
+          '<div class="sw-walknote">' + (editable() ? '<textarea id="walk-note" maxlength="1000" aria-label="Walk notes" placeholder="Walk notes">' + escapeHtml(walkNote()) + '</textarea>' : '<p>' + (walkNote() ? escapeHtml(walkNote()) : '<span class="sw-nc">No walk notes</span>') + '</p>') + '</div></section>';
       box.scrollTop = top;
     }
     function render(force) {
@@ -166,9 +174,9 @@
       if (b && b.dataset.issue) {
         const id = b.dataset.issue, status = b.dataset.v;
         if (b.getAttribute('aria-pressed') === 'true') return;
-        reviewMine[id] = { status };
+        reviewMine[id] = Object.assign({}, reviewMine[id] || {}, { status });
         render(true);
-        send({ op: 'review', issueId: id, status }, () => { delete reviewMine[id]; });
+        send({ op: 'review', issueId: id, status }, () => { delete reviewMine[id].status; });
         return;
       }
       const un = e.target.closest('[data-unphoto]');
@@ -177,7 +185,9 @@
     list$.addEventListener('change', async e => {
       if (!editable()) return;
       const t = e.target;
-      if (t.dataset.note) { const id = t.dataset.note; mine[id] = Object.assign({}, mine[id] || {}, { note: t.value.trim() }); send({ op: 'note', itemId: id, note: t.value.trim() }); return; }
+      if (t.dataset.note) { const id = t.dataset.note, prev = itemOf(id).note || ''; mine[id] = Object.assign({}, mine[id] || {}, { note: t.value.trim() }); send({ op: 'note', itemId: id, note: t.value.trim() }, () => { mine[id].note = prev; }); return; }
+      if (t.dataset.rnote) { const id = t.dataset.rnote; reviewMine[id] = Object.assign({}, reviewMine[id] || {}, { note: t.value.trim() }); send({ op: 'reviewnote', issueId: id, note: t.value.trim() }, () => { delete reviewMine[id].note; }); return; }
+      if (t.id === 'walk-note') { const prev = walkNoteMine; walkNoteMine = t.value.trim(); drawAreas(); send({ op: 'walknote', note: t.value.trim() }, () => { walkNoteMine = prev; }); return; }
       if (t.dataset.maint) { const id = t.dataset.maint; mine[id] = Object.assign({}, mine[id] || {}, { maint: t.checked }); render(true); send({ op: 'maint', itemId: id, maint: t.checked }, () => { delete mine[id].maint; }); return; }
       if (t.dataset.photo && t.files && t.files[0]) {
         const id = t.dataset.photo;
@@ -218,10 +228,10 @@
       const fail = (e) => showError('Could not read the walk (' + e.message + '). Check the network and reload the page.');
       stops.push(watchSetup(db, plant, s => { setup = s; setupSeen = true; render(); }));
       stops.push(onSnapshot(doc(db, 'safetyWalks', wid()), s => {
-        walk = s.exists() ? s.data() : null; walkSeen = true;
+        walk = s.exists() ? s.data() : null; walkSeen = true; if (walkNoteMine !== null && walk && (walk.note || '') === walkNoteMine) walkNoteMine = null;
         // What was tapped here has reached the saved walk.
         Object.keys(mine).forEach(id => { const w = walk && walk.items && walk.items[id]; if (w && Object.keys(mine[id]).every(k => (w[k] || '') === (mine[id][k] || ''))) delete mine[id]; });
-        Object.keys(reviewMine).forEach(id => { const r = walk && walk.reviews && walk.reviews[id]; if (r && r.status === reviewMine[id].status) delete reviewMine[id]; });
+        Object.keys(reviewMine).forEach(id => { const r = walk && walk.reviews && walk.reviews[id]; if (r && Object.keys(reviewMine[id]).every(k => (r[k] || '') === (reviewMine[id][k] || ''))) delete reviewMine[id]; });
         render();
       }, fail));
       stops.push(onSnapshot(query(collection(db, 'safetyWalks'), where('facilityId', '==', plant), where('month', '==', date.slice(0, 7))), s => { monthWalks = s.docs.map(d => ({ id: d.id })); render(); }, fail));
