@@ -136,6 +136,27 @@ test('Scheduler: Receiving adds a supplier (next S code), refuses a repeat, and 
   assert.equal((await lanes('SHIPPING')).some(e => e.id === load.id), false);
 });
 
+test('Scheduler: a station loads a Shipping load and receives a Receiving load (Joe 10/12, Boxing); a finished one stays finished', async () => {
+  const work = async (lane, id) => (await lanes(lane)).find(e => e.id === id).work;
+  assert.equal((await work('SHIPPING', 'SCHED-s1')).state, 'WAITING');
+  await schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'start' });
+  assert.equal((await work('SHIPPING', 'SCHED-s1')).state, 'WORKING');
+  await schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'save', fields: { count: '412', temperature: '34', trailer: 'T-970' } });
+  await schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'complete' });
+  const done = (await lanes('SHIPPING')).find(e => e.id === 'SCHED-s1');
+  assert.deepEqual([done.work.state, done.work.count, done.work.temperature, done.trailer, done.work.completedBy], ['COMPLETE', '412', '34', 'T-970', 'dispatch.test@uniteddairy.com']);
+  assert.equal(done.poNumber, '4471', 'the rest of the load is kept');
+  await assert.rejects(schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'save', fields: { count: '1' } }), /already complete/);
+  await assert.rejects(schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-a1', date: '2026-10-09', step: 'save', fields: { count: 'ten' } }), /Boxes must be a whole number/);
+  await schedule({ lane: 'RECEIVING', op: 'progress', id: 'RECV-k1', date: '2026-10-09', step: 'complete', fields: { count: '38', notes: 'Two pallets short' } });
+  const got = (await lanes('RECEIVING')).find(e => e.id === 'RECV-k1');
+  assert.deepEqual([got.work.state, got.work.count, got.work.notes], ['COMPLETE', '38', 'Two pallets short']);
+  await assert.rejects(schedule({ lane: 'RECEIVING', op: 'progress', id: 'RECV-k1', date: '2026-10-09', step: 'complete' }), /already received/);
+  // The next copy from the sheets keeps the station's work.
+  await copy();
+  assert.equal((await work('SHIPPING', 'SCHED-s1')).state, 'COMPLETE');
+});
+
 /* ---------- Yard Checks ---------- */
 const yard = (fields) => applyAction(db(), DISPATCHER, Object.assign({ action: 'saveYardCheck', requestId: rid() }, fields));
 

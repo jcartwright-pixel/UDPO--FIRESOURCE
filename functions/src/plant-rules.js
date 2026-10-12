@@ -124,6 +124,14 @@
   }
 
   // The loads on the schedule (not deleted), as the current app lists them.
+  // A scheduled load's station work (Boxing: Shipping / Loadout and Receiving): WAITING until a station starts it.
+  function workOf(w) {
+    w = w || {};
+    var st = text(w.state).toUpperCase();
+    return { state: st === 'COMPLETE' ? 'COMPLETE' : st === 'WORKING' ? 'WORKING' : 'WAITING', count: text(w.count), temperature: text(w.temperature), notes: text(w.notes),
+      startedAt: text(w.startedAt), startedBy: text(w.startedBy), completedAt: text(w.completedAt), completedBy: text(w.completedBy) };
+  }
+
   function scheduleEntries(docs, laneName) {
     var all = newestRecords(docs, [LOAD_TYPE[lane(laneName)]]), out = [];
     Object.keys(all).forEach(function (id) {
@@ -132,7 +140,7 @@
       out.push({ id: id, date: d.date, routeId: d.routeId || '', runId: d.runId || '', route: d.route || '', run: d.run || '', pickupTime: time24(p.pickupTime) || text(p.pickupTime),
         scheduleType: text(p.scheduleType).toUpperCase() === 'CARRIER' || p.carrier === true ? 'CARRIER' : 'ROUTE', loadDate: text(p.loadDate), trailer: text(p.trailer),
         poNumber: text(p.poNumber), cases: text(p.cases), product: text(p.product), notes: text(p.notes || d.notes), status: text(d.status).toUpperCase() || 'SCHEDULED',
-        inApp: !!d.createdInApp });
+        inApp: !!d.createdInApp, work: workOf(p.work) });
     });
     return out.sort(function (a, b) { return a.date.localeCompare(b.date) || (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99'); });
   }

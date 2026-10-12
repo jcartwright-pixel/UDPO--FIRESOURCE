@@ -550,7 +550,7 @@ async function saveWash(tx, db, req, email, stamp, logRef, mode, SaveError) {
 const appScheduleId = (type, id) => docId(type + '_app_' + id);
 function validateSchedule(input, SaveError) {
   const out = { lane: R.lane(input.lane), op: text(input.op) || 'save' };
-  if (['save', 'remove', 'addSupplier'].indexOf(out.op) < 0) throw new SaveError('BAD_REQUEST', 'op must be save, remove or addSupplier');
+  if (['save', 'remove', 'addSupplier', 'progress'].indexOf(out.op) < 0) throw new SaveError('BAD_REQUEST', 'op must be save, remove, addSupplier or progress');
   if (out.op === 'addSupplier') {
     if (out.lane !== 'RECEIVING') throw new SaveError('BAD_REQUEST', 'Suppliers are on Receiving');
     out.name = text(input.name).replace(/\s+/g, ' ').toUpperCase();
@@ -566,6 +566,20 @@ function validateSchedule(input, SaveError) {
   if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'Pick the delivery date.');
   if (out.op === 'remove') {
     if (!out.id) throw new SaveError('BAD_REQUEST', 'Pick the load to delete');
+    return out;
+  }
+  // Joe 10/12 (Boxing station): Shipping / Loadout loads a scheduled load and Receiving receives one. step start, save
+  // (the boxes typed so far) or complete; the count, trailer, temperature and notes are the station's boxes.
+  if (out.op === 'progress') {
+    if (!out.id) throw new SaveError('BAD_REQUEST', 'Pick the load');
+    out.step = text(input.step);
+    if (['start', 'save', 'complete'].indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'step must be start, save or complete');
+    const f = input.fields || {};
+    out.work = {};
+    if (f.count !== undefined) { const c = text(f.count); if (c && !/^[0-9]{1,6}$/.test(c)) throw new SaveError('BAD_REQUEST', (out.lane === 'RECEIVING' ? 'Cases / pallets' : 'Boxes') + ' must be a whole number.'); out.work.count = c; }
+    if (f.temperature !== undefined) { const t = text(f.temperature); if (t && !/^-?[0-9]{1,3}(\.[0-9])?$/.test(t)) throw new SaveError('BAD_REQUEST', 'Check the temperature.'); out.work.temperature = t; }
+    if (f.notes !== undefined) out.work.notes = text(f.notes).slice(0, 1200);
+    if (f.trailer !== undefined) { const t = text(f.trailer).toUpperCase(); if (t.length > 24 || /[^A-Z0-9 _\-/.#]/.test(t)) throw new SaveError('BAD_REQUEST', 'Check the trailer number.'); out.work.trailer = t; }
     return out;
   }
   const f = input.fields || {};
@@ -590,6 +604,26 @@ function validateSchedule(input, SaveError) {
   return out;
 }
 
+// A station loading or receiving a scheduled load: the load's work (state, count, temperature, notes, trailer) on the same
+// record, so the scheduler and every station see it. A finished load is not changed again.
+function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mode, SaveError) {
+  if (!had) throw new SaveError('NOT_FOUND', 'That load is no longer on the schedule.');
+  const before = R.scheduleEntries([had], req.lane)[0] || null, was = (had.payload && had.payload.work) || {};
+  if (was.state === 'COMPLETE') throw new SaveError('CONFLICT', 'That load is already ' + (req.lane === 'RECEIVING' ? 'received' : 'complete') + '.');
+  const work = Object.assign({}, was, req.work, { state: req.step === 'complete' ? 'COMPLETE' : 'WORKING' });
+  if (req.step === 'start' || !was.startedAt) Object.assign(work, { startedAt: was.startedAt || stamp, startedBy: was.startedBy || email });
+  if (req.step === 'complete') Object.assign(work, { completedAt: stamp, completedBy: email });
+  const payload = Object.assign({}, had.payload || {}, { work });
+  if (req.work.trailer !== undefined) payload.trailer = req.work.trailer;
+  const rec = Object.assign({}, had, { payload, trailer: payload.trailer || had.trailer || '', recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  delete rec.sheetRow; delete rec.cells;
+  tx.set(db.collection('plantJournal').doc(appScheduleId(type, req.id)), rec);
+  const after = R.scheduleEntries([rec], req.lane)[0];
+  const result = { ok: true, requestId: req.requestId, id: req.id, state: work.state, date: rec.date };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, lane: req.lane, op: req.op, step: req.step, scheduleId: req.id, before, after, result });
+  return result;
+}
+
 async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const type = R.LOAD_TYPE[req.lane], journal = db.collection('plantJournal');
   if (req.op === 'addSupplier') {
@@ -610,6 +644,7 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
   // Reads: the record now (an edit or delete), the customer or supplier list, and the trailers when one was typed.
   const had = req.id ? R.newestRecords((await tx.get(journal.where('recordId', '==', req.id))).docs.map(d => d.data()), [type])[req.id] : null;
   if (req.id && (!had || (had.type !== type))) throw new SaveError('NOT_FOUND', 'That load is no longer on the ' + (req.lane === 'RECEIVING' ? 'Receiving' : 'Shipping') + ' schedule.');
+  if (req.op === 'progress') return progressSchedule(tx, db, req, had, type, email, stamp, logRef, mode, SaveError);
   let choices = [], equipment = [];
   if (req.op === 'save') {
     if (req.lane === 'RECEIVING') choices = R.scheduleSuppliers((await tx.get(journal.where('type', '==', R.SUPPLIER_TYPE))).docs.map(d => d.data()));
