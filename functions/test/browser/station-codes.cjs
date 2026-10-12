@@ -182,6 +182,41 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await tv.waitForURL(/tv=1/);
     await tv.waitForSelector('#eyebrow:text("Driver Room TV · Uniontown")');
     results.push('Driver Room TV: its code on the one Driver Station link opens the full-screen TV board, also when reopened');
+
+    // Joe 10/12: the TV has a small Exit; with the plant's manager release code it unattaches the TV and goes to the code
+    // screen (with Back and Home). A wrong code keeps the TV board; Cancel keeps it too.
+    const release = (await require('../../src/admin').adminCall(db(), { email: 'admin.test@uniteddairy.com' }, { op: 'releaseCodeNew', facilityId: 'fac_uniontown' })).code;
+    assert.equal(await tv.isVisible('#tv-exit'), true);
+    assert.equal(await tv.isVisible('.topbar'), false);
+    await tv.click('#tv-exit');
+    await tv.waitForSelector('#release-box form');
+    await tv.click('#release-box [data-cancel]');
+    assert.equal(await tv.isVisible('#release-box form'), false);
+    await tv.click('#tv-exit');
+    await tv.fill('#release-box input', 'WRONG1');
+    await tv.click('#release-box button[type=submit]');
+    await tv.waitForFunction(() => /\S/.test(document.querySelector('.ps-release-msg').textContent) && !/Checking/.test(document.querySelector('.ps-release-msg').textContent));
+    assert.match(tv.url(), /tv=1/);
+    await tv.fill('#release-box input', release);
+    await Promise.all([tv.waitForURL(u => !/tv=1/.test(String(u))), tv.click('#release-box button[type=submit]')]);
+    await tv.waitForSelector('#code-box form.st-code');
+    assert.equal(await tv.isVisible('#go-back'), true);
+    assert.equal(await tv.isVisible('#go-home'), true);
+    assert.equal(await tv.isVisible('#tv-exit'), false);
+    results.push('Driver Room TV: Exit asks for the manager release code (Cancel and a wrong code keep the TV), the right code unattaches it to the code screen with Back and Home');
+
+    // The Driver Room kiosk tablet: Home asks for the release code too; Cancel keeps the kiosk.
+    await ds.click('#go-home');
+    await ds.waitForSelector('#release-box form');
+    await ds.click('#release-box [data-cancel]');
+    assert.match(ds.url(), /driver-station\.html/);
+    assert.equal(await ds.isVisible('#ds-grid'), true);
+    await ds.click('#go-home');
+    await ds.fill('#release-box input', release);
+    await Promise.all([ds.waitForURL(/index\.html/), ds.click('#release-box button[type=submit]')]);
+    assert.equal(await ds.evaluate(() => localStorage.getItem('udKioskCode')), null);
+    assert.deepEqual(tv.errors, []);
+    results.push('Driver Room kiosk: Back and Home ask for the manager release code before leaving, then the kiosk forgets its code');
   } finally {
     await browser.close();
   }
