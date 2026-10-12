@@ -52,7 +52,7 @@ async function shots(page, name, w) {
   const browser = await chromium.launch();
   const results = [];
   try {
-    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+    for (const [w, h] of [[1920, 950], [1536, 760], [1366, 650]]) {
       // Month: October 2026 starts on Thursday; Sunday is the first column.
       const page = await openPage(browser, w, h, '/scheduler.html?view=month&date=' + DATE + MANAGER);
       await page.waitForFunction(() => /3 loads/.test((document.querySelector('[data-day="2026-10-08"]') || {}).textContent || ''));
@@ -60,13 +60,29 @@ async function shots(page, name, w) {
       assert.equal(await page.getAttribute('.sc-day', 'data-day'), '2026-09-27');
       assert.match(await page.textContent('#range'), /October 2026/);
       assert.match(await page.textContent('#hstats'), /6Loads4Days booked0Holidays/);
+      // Joe 10/12: a legend at the top, and each load colored by who delivers it (Uniontown truck, Branch, Carrier).
+      assert.deepEqual(await page.$$eval('#legend .sc-by', s => s.map(x => x.textContent)), ['Uniontown truck', 'Branch', 'Carrier']);
+      const by = (sel) => page.$$eval(sel, els => els.map(e => (e.className.match(/by-(\w+)/) || [])[1] + ':' + e.textContent.split(' · ')[0].trim()));
+      assert.deepEqual(await by('[data-day="2026-10-08"] small[class*="by-"]'), ['ut:Walmart DC', 'ut:Garber Farms', 'carrier:Sun Valley'], 'our own runs blue, the carrier load purple');
+      assert.deepEqual(await by('[data-day="2026-10-09"] small[class*="by-"]'), ['branch:Aldi Charleston'], 'a branch run (Route Master coverage BRANCH) green');
+      assert.ok(await page.$eval('.sc-by', e => parseFloat(getComputedStyle(e).fontSize) >= 16), 'the legend reads at 16px or more');
       await fits(page, 'Scheduler month ' + w + 'x' + h);
+      if (w === 1920) {
+        // Print Monthly carries the same legend and colors.
+        await page.click('#print');
+        await page.waitForFunction(() => { const f = document.getElementById('print-frame'); return f && f.contentDocument && f.contentDocument.querySelector('.legend'); });
+        const printed = await page.evaluate(() => { const d = document.getElementById('print-frame').contentDocument; return { legend: d.querySelector('.legend').textContent, by: [...d.querySelectorAll('small[class^="by-"]')].map(x => x.className + ':' + x.textContent.split(' · ')[0]), html: d.documentElement.outerHTML }; });
+        assert.equal(printed.legend, 'Uniontown truckBranchCarrier');
+        assert.deepEqual(printed.by.sort(), ['by-branch:Aldi Charleston', 'by-carrier:Sun Valley', 'by-ut:Garber Farms', 'by-ut:Garber Farms', 'by-ut:Walmart DC', 'by-ut:Walmart DC'], 'Print Monthly colors each load by who delivers it');
+        if (SHOTS) { const pp = await browser.newPage({ viewport: { width: 1056, height: 816 } }); await pp.setContent(printed.html); await pp.emulateMedia({ media: 'print' }); await pp.screenshot({ path: path.join(SHOTS, 'sched-print-monthly.png') }); await pp.close(); }
+      }
       await shots(page, 'sched-month', w);
       // Week: the customers list and Sunday to Saturday.
       await page.click('[data-view="week"]');
       await page.waitForSelector('.sc-weekgrid');
       assert.deepEqual(await page.$$eval('.sc-count span', s => s.map(x => x.textContent)), ['SUN 10-4', 'MON 10-5', 'TUE 10-6', 'WED 10-7', 'THU 10-8', 'FRI 10-9', 'SAT 10-10']);
       assert.deepEqual(await page.$$eval('.sc-who strong', s => s.map(x => x.textContent)), ['Sun Valley', 'Garber Farms', 'Aldi Charleston', 'Fairmont', 'Walmart DC']);
+      assert.deepEqual([...new Set(await page.$$eval('.sc-load', els => els.map(e => (e.className.match(/by-(\w+)/) || [])[1])))].sort(), ['branch', 'carrier', 'ut'], 'the week colors each load by who delivers it');
       await fits(page, 'Scheduler week ' + w + 'x' + h);
       await shots(page, 'sched-week', w);
       // Day.
@@ -77,6 +93,7 @@ async function shots(page, name, w) {
       await page.dispatchEvent('#pick', 'change');
       await page.waitForFunction(() => /Thursday 10-8-26/.test(document.getElementById('range').textContent));
       assert.deepEqual(await page.$$eval('table.sc-table tbody tr td:nth-child(3)', t => t.map(x => x.textContent)), ['6:30 AM', '7:00 AM', '1:00 PM']);
+      assert.deepEqual(await page.$$eval('table.sc-table tbody tr', t => t.map(x => x.className)), ['by-ut', 'by-ut', 'by-carrier'], 'the day colors each load by who delivers it');
       await fits(page, 'Scheduler day ' + w + 'x' + h);
       await shots(page, 'sched-day', w);
       // Receiving: the same screen with the suppliers.
@@ -84,6 +101,7 @@ async function shots(page, name, w) {
       await page.waitForFunction(() => /Valley Farms/.test(document.getElementById('body').textContent));
       await page.click('[data-view="week"]');
       await page.waitForFunction(() => document.querySelectorAll('.sc-who').length === 6);
+      assert.deepEqual([...new Set(await page.$$eval('.sc-load', els => els.map(e => (e.className.match(/by-(\w+)/) || [])[1])))].sort(), ['carrier', 'ut'], 'Receiving: the carrier load purple, our own truck blue');
       await fits(page, 'Scheduler receiving ' + w + 'x' + h);
       await shots(page, 'sched-receiving', w);
       assert.deepEqual(page.errors, []);
