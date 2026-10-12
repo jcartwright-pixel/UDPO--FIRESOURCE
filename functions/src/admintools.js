@@ -263,12 +263,25 @@ async function checkinSettings(db, plant) {
     owner: d.owner || '', lastSuccessAt: d.lastSuccessAt || '', updatedAt: d.updatedAt || '', updatedBy: d.updatedBy || '' };
 }
 
+// The day the answering service took the report ("Sat 10-Oct-26 02:38p TAKEN", Joe 10/12), on the same 6 a.m. operating
+// day as the rest of the app; '' when the email has no TAKEN line (then the email's own time is used).
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+function takenDay(body) {
+  const m = /\b(\d{1,2})-([A-Za-z]{3})-(\d{2})\s+(\d{1,2}):(\d{2})\s*([ap])m?\s+TAKEN\b/i.exec(String(body || ''));
+  const mon = m ? MONTHS.indexOf(m[2].toLowerCase()) : -1;
+  if (mon < 0) return '';
+  const key = '20' + m[3] + '-' + String(mon + 1).padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  const hour = (Number(m[4]) % 12) + (m[6].toLowerCase() === 'p' ? 12 : 0);
+  return L.isDateKey(key) ? (hour >= 6 ? key : L.addDays(key, -1)) : '';
+}
+
 // One answering-service email to the check-in fields (054_InboundMaintenanceEmail.gs). Returns null for a digest or no driver / route.
 function parseCheckinEmail(body) {
   const fields = {}, order = [];
   let last = null, names = 0;
   String(body || '').replace(/\r/g, '').split('\n').forEach(raw => {
-    const m = /^\s*([A-Za-z][A-Za-z0-9 ()/#'?.&-]{0,70}?)\s*:\s*(.*)$/.exec(raw);
+    // "Name +(UT):" is how the answering service writes the driver's name (Joe 10/12 emails), so + is allowed.
+    const m = /^\s*([A-Za-z][A-Za-z0-9 ()/#'?.&+-]{0,70}?)\s*:\s*(.*)$/.exec(raw);
     if (m) {
       const k = m[1].toLowerCase().replace(/[^a-z0-9]/g, '');
       if (k === 'name' || k === 'nameut') names++;
@@ -297,7 +310,7 @@ function parseCheckinEmail(body) {
   const wash = pick(['needcleaned', 'needscleaned', 'trailerneedscleaned', 'trailercondition']);
   const refused = pick(['refusedreturned', 'refused']);
   return {
-    driver, route, truck: pick(['tractornumber', 'tractor', 'trucknumber', 'truck']), trailer: pick(['trailornumber', 'trailor', 'trailernumber', 'trailer']),
+    driver, route, taken: takenDay(body), truck: pick(['tractornumber', 'tractor', 'trucknumber', 'truck']), trailer: pick(['trailornumber', 'trailor', 'trailernumber', 'trailer']),
     palletJack: pick(['palletjackunit', 'palletjacknumber', 'palletjack', 'forkliftnumber']),
     casesDelivered: num(pick(['casesdelivered', 'howmanycases'])), driverCaseReturn: num(pick(['casesreturned', 'howmanyreturned'])),
     tractorIssues: issues.TRUCK.join('; '), trailerIssues: issues.TRAILER.join('; '), palletJackIssues: issues.FORK_TRUCK.join('; '),
@@ -320,7 +333,7 @@ async function findRun(db, route, driver, date) {
 }
 
 async function saveMailCheckin(db, msg, c, sender, stamp) {
-  const date = L.operatingDay(new Date(Number(msg.internalDate) || Date.parse(stamp)));
+  const date = c.taken || L.operatingDay(new Date(Number(msg.internalDate) || Date.parse(stamp)));
   const hit = await findRun(db, c.route, c.driver, date);
   const by = 'EMAIL · ' + c.driver;
   return db.runTransaction(async tx => {
