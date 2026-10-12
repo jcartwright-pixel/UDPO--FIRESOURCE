@@ -257,6 +257,24 @@ test('Pre-Flight, Update Live Sheets and Start Plant Fresh', async () => {
   assert.equal((await db().collection('config').doc('app').get()).data().plantStart.date, '2026-10-09');
 });
 
+test('Pre-Flight: on live, names each real master sheet the server account cannot edit', async () => {
+  const live = { READ_UNIONTOWN_SHEETS: '1' };
+  const name = (pf) => pf.checks.find(c => c.name === 'Edit access to the master sheets');
+  const asked = [];
+  const access = (editable) => async (ids) => { asked.push(ids); const canEdit = {}; ids.forEach(id => { canEdit[id] = editable.indexOf(id) >= 0; }); return { account: 'runtime@example', canEdit }; };
+  const S = require('../../src/sources').UNIONTOWN.masters;
+  const sandbox = await call({ op: 'preflight' }, { sheetAccess: access([]) });
+  assert.equal(name(sandbox).status, 'PASS');
+  assert.equal(asked.length, 0, 'the sandbox does not ask about the real sheets');
+  const some = await call({ op: 'preflight' }, { env: live, sheetAccess: access([S.routes.spreadsheetId, S.equipment.spreadsheetId, S.users.spreadsheetId, S.exceptions.spreadsheetId]) });
+  assert.deepEqual(asked[0], ['routes', 'drivers', 'equipment', 'users', 'exceptions', 'vacations'].map(k => S[k].spreadsheetId));
+  assert.equal(name(some).status, 'FAIL');
+  assert.equal(name(some).detail, 'Share as Editor with runtime@example: Driver Master, Vacations.');
+  const all = await call({ op: 'preflight' }, { env: live, sheetAccess: access(Object.values(S).map(x => x.spreadsheetId)) });
+  assert.equal(name(all).status, 'PASS');
+  assert.match(name(all).detail, /can edit Route Master, Driver Master, Equipment Master, Users, Exceptions, Vacations/);
+});
+
 test('Date Inventory, Dry Run and Convert (sandbox copy only, read back)', async () => {
   const tab = [['driver_id', 'hire_date', 'name'], ['d1', '10/9/2026', 'A'], ['d2', '2026-01-05', 'B'], ['d3', '', 'C']];
   const book = fakeBook({ DRIVERS_MASTER: tab });
