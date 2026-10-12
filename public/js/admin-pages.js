@@ -374,8 +374,7 @@ const APP_LINKS = [
   { key: 'manager', title: 'Manager Web App', label: 'Manager link', path: 'manager.html', who: 'ud', short: 'Managers (UD account)', opens: 'The manager screens. Company Google sign-in, no code.', shut: 'Change their role in People & Roles.' },
   { key: 'plant', title: 'Plant Station', label: 'Tablet link', path: 'plant-station.html', who: 'ud', short: 'A tablet with a UD account, then the station\'s code', opens: 'One link for every plant station. The tablet types its station\'s code (Stations, below), opens that station and keeps it. Moving it to another station needs the plant\'s manager release code.', shut: 'New code or Remove on the station, below.' },
   { key: 'public', title: 'Plant Station with no UD account', label: '', path: '', who: 'code', short: 'Nobody yet: it needs a Google permission IT turns on', opens: 'A plant station on a tablet or phone with no United Dairy account, by its station code, with an On / Off switch for every plant station. It needs a Google sign-in permission IT turns on; until then plant tablets sign in with a UD account.', shut: 'On / Off here, once it is built.', soon: true },
-  { key: 'driver', title: 'Driver Station (Driver Room tablet)', label: 'Tablet link', path: 'driver-station.html', who: 'ud', short: 'The tablet\'s UD account, then its kiosk code', opens: 'The Driver Room loadout board and weekly schedule with the weather. Once a kiosk has a code (Kiosks, below), the tablet types it once.', shut: 'New code or Remove on the kiosk, below.' },
-  { key: 'tv', title: 'Driver Room TV', label: 'TV link', path: 'driver-station.html?tv=1', who: 'ud', short: 'The TV\'s UD account, then its kiosk code', opens: 'The same board full screen with no buttons, both lists rolling, for the TV on the wall.', shut: 'New code or Remove on the TV, below.' },
+  { key: 'driver', title: 'Driver Station', label: 'Driver Station link', path: 'driver-station.html', who: 'ud', short: 'A Driver Room tablet, TV or kiosk with a UD account, then its station code', opens: 'One link for every driver station (Joe 10/12, like the Plant Station). The tablet, TV or kiosk types its station\'s code (Stations, below) once: a Driver Station code opens the loadout board and weekly schedule with the weather; a TV code opens the same board full screen with no buttons, both lists rolling.', shut: 'New code or Remove on the station, below.' },
   { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', short: 'The station\'s code, then each mechanic\'s login ID', opens: 'One link for every garage station. Once a garage station has a code (Stations, below), the tablet types it once; mechanics then tap their name and type their login ID.', shut: 'New code or Remove on the station; turn a mechanic off in Fleet Service.' },
   { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', short: 'Anyone with the Route Distribution code', opens: 'Drivers on their own phones: View Loadout, Check-In and DVIR. No company account needed.', shut: 'Turn Off stops the drivers\' phone link (UD sign-in links keep working). A new code makes every phone ask for it again.', code: true },
   { key: 'maint', title: 'Maintenance Station (plant machinery)', label: 'Maintenance tablet', path: 'maint-station.html', who: 'code', short: 'Each mechanic\'s name and login ID (Plant Maintenance is under construction)', opens: 'The plant machinery work orders and PMs, like the Garage Station: tap a work order, then your name and login ID.', shut: 'Turn a mechanic off in Fleet Service > Garage Technicians.' },
@@ -386,12 +385,16 @@ const APP_LINKS = [
 const MANAGER_LINKS = ['company', 'phone', 'manager', 'personal', 'screens'];
 const PLANT_LINKS = ['plant', 'public'];
 const GARAGE_LINKS = ['garage', 'maint'];
-const DRIVER_LINKS = ['driver', 'tv', 'route'];
+// Joe 10/12: the drivers like the plant: one Driver Station link, its stations right under it, then the drivers' phone link.
+const DRIVER_LINKS = ['driver'];
+const DRIVER_MORE = ['route'];
 
 // The link cards for the given keys; tail is more of the page under the cards (Plant Station Codes' release codes).
-export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '') {
+export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', more = []) {
   let data = null;
-  const links = APP_LINKS.filter(l => keys.indexOf(l.key) >= 0);
+  const pick = (list) => list.map(k => APP_LINKS.find(l => l.key === k)).filter(Boolean);
+  // more: link cards under the tail (Driver Station Codes: the drivers' phone link below the stations).
+  const first = pick(keys), after = pick(more), links = first.concat(after);
   const sandbox = /sandbox|localhost|127\.0\.0\.1/.test(location.hostname);
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="al-reload">Refresh</button><div class="ap-right"><span class="ap-chip blue">Blue: UD Google sign-in</span><span class="ap-chip orange">Orange: anyone with the code</span></div></div>' +
     '<div class="ap-msg" hidden></div>' + (sandbox ? '<div class="ap-msg bad">SANDBOX &mdash; TEST ONLY. Do not give these to drivers or plant staff.</div>' : '') + '<div class="ap-scroll" style="padding:10px"><div class="ap-links" id="al-list"></div>' + tail + '</div></div>';
@@ -406,12 +409,14 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '') 
       (c.state === 'ACTIVE' ? '<button type="button" class="ap-btn small" id="al-off">Turn Off</button>' : c.state === 'DISABLED' ? '<button type="button" class="ap-btn small main" id="al-on">Turn On</button>' : '') + '</span></div>';
   }
   function render() {
-    $('#al-list').innerHTML = links.map(l => '<div class="ap-link" data-link="' + l.key + '"><div class="ap-link-name"><h4>' + e(l.title) + '</h4><span class="ap-chip ' + (l.soon ? '' : l.who === 'ud' ? 'blue' : 'orange') + '">' + (l.soon ? 'Being built' : l.who === 'ud' ? 'UD sign-in' : 'Code, no account') + '</span></div>' +
+    const card = l => '<div class="ap-link" data-link="' + l.key + '"><div class="ap-link-name"><h4>' + e(l.title) + '</h4><span class="ap-chip ' + (l.soon ? '' : l.who === 'ud' ? 'blue' : 'orange') + '">' + (l.soon ? 'Being built' : l.who === 'ud' ? 'UD sign-in' : 'Code, no account') + '</span></div>' +
       '<p class="ap-link-who"><b>Who can open it:</b> ' + e(l.short) + '</p><div class="ap-acts">' +
       (l.soon ? '' : l.goto ? '<button type="button" class="ap-btn small main" data-goto="' + l.goto + '">Details</button>' : '<button type="button" class="ap-btn small" data-copy="' + l.key + '">Copy Link</button><button type="button" class="ap-btn small" data-qr="' + l.key + '">Print QR</button>' +
         '<a class="ap-btn small main" href="' + e(l.path) + '" data-launch target="_blank" rel="noopener" title="Opens in a new window; Administration stays open here">Launch</a>') + '</div>' + (l.code ? codeRow() : '') +
       '<details class="ap-how"><summary>How it works</summary><p>' + e(l.opens) + '</p><p><b>Turn off or change:</b> ' + e(l.shut) + '</p>' + (l.path ? '<p class="ap-url">' + e(url(l)) + '</p>' : '') +
-      (l.extra ? '<p>' + e(l.extra.label) + ': <span class="ap-url">' + e(l.extra.url) + '</span></p>' : '') + '</details></div>').join('');
+      (l.extra ? '<p>' + e(l.extra.label) + ': <span class="ap-url">' + e(l.extra.url) + '</span></p>' : '') + '</details></div>';
+    $('#al-list').innerHTML = first.map(card).join('');
+    if (after.length) $('#al-list2').innerHTML = after.map(card).join('');
   }
   async function load() { try { data = await call('appLinks'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
   box.addEventListener('click', ev => {
@@ -435,7 +440,7 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '') 
 const STATION_PAGES = {
   PLANT: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each station has its own code. On the tablet, open the Plant Station link and type the station\'s code: the tablet opens that station and keeps it. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (below). Until a plant has a station code, its tablets pick their station from the list.' },
   GARAGE: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each garage station has its own code. On the garage tablet, open the Garage Station link and type the code. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (Plant Station Codes). Until a plant has a garage code, its garage tablet opens straight away.' },
-  KIOSK: { title: 'Kiosks', add: '+ Add Kiosk', what: 'kiosk', help: 'A kiosk is a Driver Room tablet or a TV, and a plant can have more than one (for example a kiosk in the plant too). Open the Driver Station link (or the Driver Room TV link) on it and type its code; a TV\'s code opens the full-screen TV board. To move it, a manager taps Change and types the plant\'s manager release code (Plant Station Codes). Until a plant has a kiosk code, its kiosks open straight away.' }
+  KIOSK: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each driver station (the Driver Room tablet, the Driver Room TV, a kiosk in the plant) has its own code, and a plant can have more than one. Open the Driver Station link on it and type its code: a Driver Station code opens the loadout board, a TV code opens the full-screen TV board. It keeps it after that. To move it, a manager taps Change and types the plant\'s manager release code (Plant Station Codes). Until a plant has a driver station code, its tablets and TVs open straight away.' }
 };
 
 // The station list for one kind under a page's link cards: name, type, plant, code; New code, Remove, and Add.
@@ -512,9 +517,9 @@ export async function renderStationCodes(box, ctx) {
   await Promise.all([links, load(), bindStations(box, 'PLANT')]);
 }
 
-// Garage Station Codes and Driver Station Codes: the links, then the stations (kiosks) with their codes.
+// Garage Station Codes and Driver Station Codes: the link, then the stations with their codes (drivers: then the phone link).
 export async function renderGarageCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, GARAGE_LINKS, stationSection('GARAGE')), bindStations(box, 'GARAGE')]); }
-export async function renderDriverCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, DRIVER_LINKS, stationSection('KIOSK')), bindStations(box, 'KIOSK')]); }
+export async function renderDriverCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, DRIVER_LINKS, stationSection('KIOSK'), DRIVER_MORE), bindStations(box, 'KIOSK')]); }
 
 /* ---------- Manager Report Recipients ---------- */
 

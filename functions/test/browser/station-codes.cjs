@@ -75,7 +75,10 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     results.push('Garage Station Codes: its own page with the Garage Station link and its stations');
 
     await open('driver-codes');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'tv', 'route']);
+    // Joe 10/12: like Plant Station Codes: one Driver Station link, its stations right under it, then the drivers' phone link.
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
+    assert.deepEqual(await p.$$eval('.ap-link[data-link="driver"], #st-list, .ap-link[data-link="route"]', l => l.map(x => x.dataset.link || x.id)), ['driver', 'st-list', 'route'], 'the stations sit under the Driver Station link');
+    assert.equal((await p.textContent('#st-add')).trim(), '+ Add Station');
     await p.fill('#st-name', 'Plant kiosk');
     await p.click('#st-add');
     await p.waitForSelector('#st-list .ap-item b:text-is("Plant kiosk")');
@@ -85,7 +88,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.deepEqual(await p.$$eval('#st-list .ap-item b', b => b.map(x => x.textContent)), ['Driver Room kiosk', 'Driver Room TV', 'Plant kiosk']);
     await twoShots(p, '3-driver-station-codes');
     assert.deepEqual(p.errors, []);
-    results.push('Driver Station Codes: the Driver Station link, the drivers\' phone link, and more than one kiosk per plant');
+    results.push('Driver Station Codes: one Driver Station link, its stations under it (+ Add Station, more than one per plant), then the drivers\' phone link');
 
     // The Plant Station tablet: the code screen, a wrong code, the right one opens Case Loadout; Change Station goes back.
     const ps = await openPage(browser, 1536, 864, '/plant-station.html' + ADMIN);
@@ -136,7 +139,11 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([tv.waitForURL(/tv=1/), tv.click('#code-box button')]);
     await tv.waitForSelector('#eyebrow:text("Driver Room TV · Uniontown")');
     await shot(tv, '9-driver-room-tv-1536.png');
-    results.push('Driver Room TV: its code opens the full-screen TV board');
+    // The TV keeps its code: opening the one Driver Station link again goes straight to the TV board.
+    await tv.goto(HOSTING + '/driver-station.html' + ADMIN);
+    await tv.waitForURL(/tv=1/);
+    await tv.waitForSelector('#eyebrow:text("Driver Room TV · Uniontown")');
+    results.push('Driver Room TV: its code on the one Driver Station link opens the full-screen TV board, also when reopened');
   } finally {
     await browser.close();
   }
