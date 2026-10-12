@@ -117,14 +117,23 @@ async function noScroll(page) {
     await editor.keyboard.press('Enter');
     await watcher.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[9].textContent === 'Call store on arrival', null, { timeout: 5000 });
 
-    // Joe 10/12: no grab dots. A dispatcher has no move arrows; a manager's up arrow moves 802 above 801 and the order saves as one call.
-    assert.equal(await editor.$('#rows button[data-move]'), null, 'a dispatcher has no move arrows');
-    assert.equal(await watcher.$('#rows [data-grip], #rows .dd-grip'), null, 'no grab handle');
-    await watcher.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"] button[data-move="-1"]:not([disabled])');
-    assert.equal(await watcher.$('tr[data-id="2026-10-04__run_t801|tue"] button[data-move="-1"]:not([disabled])'), null, 'the first load cannot go higher');
-    await watcher.click('tr[data-id="2026-10-04__run_t802|tue"] button[data-move="-1"]');
+    // Joe 10/12: no grab dots and no arrows. A dispatcher cannot move lines; a manager grabs 802's line and drags it above 801,
+    // and the order saves as one call.
+    assert.equal(await editor.$('#rows tr.mover'), null, 'a dispatcher cannot move lines');
+    assert.equal(await watcher.$('#rows [data-grip], #rows .dd-grip, #rows button[data-move]'), null, 'no grab dots and no arrows');
+    await watcher.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"].mover');
+    assert.equal(await watcher.$eval('tr[data-id="2026-10-04__run_t802|tue"] td.route', td => getComputedStyle(td).cursor), 'grab', 'the line shows the hand');
+    {
+      const from = await watcher.$eval('tr[data-id="2026-10-04__run_t802|tue"] td:nth-child(2)', td => { const b = td.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; });
+      const to = await watcher.$eval('tr[data-id="2026-10-04__run_t801|tue"] td:nth-child(2)', td => { const b = td.getBoundingClientRect(); return [b.left + b.width / 2, b.top + 4]; });
+      await watcher.mouse.move(from[0], from[1]);
+      await watcher.mouse.down();
+      await watcher.mouse.move(from[0], from[1] - 10, { steps: 3 });
+      await watcher.mouse.move(to[0], to[1], { steps: 8 });
+      await watcher.mouse.up();
+    }
     await editor.waitForFunction(() => [...document.querySelectorAll('#rows tr[data-id] td:first-child')].map(td => td.textContent).join(',') === '802,801', null, { timeout: 5000 });
-    results.push('a manager moved 802 above 801 with its up arrow and the dispatcher\'s screen showed the new order without reloading');
+    results.push('a manager dragged 802\'s line above 801 (hand cursor, no dots or arrows) and the dispatcher\'s screen showed the new order without reloading');
 
     // The current Daily Dispatch buttons: RUNS / NO RUN, Edit box (depart time, jack), Add Route / Run, Down Trucks / Trailers, Driver Call-Off, OVR.
     const r801 = 'tr[data-id="2026-10-04__run_t801|tue"]', r802 = 'tr[data-id="2026-10-04__run_t802|tue"]';
@@ -152,8 +161,8 @@ async function noScroll(page) {
     await watcher.selectOption('#add-where', 'first');
     await watcher.click('#add-save');
     await editor.waitForFunction(() => [...document.querySelectorAll('#rows tr[data-id] td:first-child')].map(td => td.textContent).join(',') === '801,802', null, { timeout: 5000 });
-    assert.equal(await watcher.$eval(r801 + ' button[data-move="1"]', b => b.disabled), false, 'the added route has its own move arrows');
-    results.push('Daily: a manager added 801 back as the first load, and it has move arrows like the rest');
+    assert.ok(await watcher.$(r801 + '.mover'), 'the added route can be dragged like the rest');
+    results.push('Daily: a manager added 801 back as the first load, and its line can be dragged like the rest');
 
     await editor.click(r802 + ' button[data-open]');
     await editor.fill('#edit-modal input[data-field="time"]', '4:15 AM');

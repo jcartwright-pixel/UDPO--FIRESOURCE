@@ -128,7 +128,7 @@
     const L = window.UDLogic;
     const params = new URLSearchParams(location.search);
     let loadDate = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
-    let unsubscribeRuns = null, runs = [], rows = [], editing = false, writeBack = false, editRow = null;
+    let unsubscribeRuns = null, runs = [], rows = [], editing = false, dragging = null, writeBack = false, editRow = null;
     const getRuns = () => runs;
     // Session-only screen state, like the current screen: rows switched to NO RUN stay in view, and OVR ticks per row.
     const keptOff = {}, ovr = {};
@@ -225,6 +225,7 @@
 
     function render() {
       if (editing) return; // a picker is open; the next render happens when it closes
+      if (dragging) { dragging.held = true; return; } // a load is being moved; the screen redraws when it is let go
       rows = buildRows();
       const edit = canSave(), order = canReorder();
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
@@ -250,13 +251,10 @@
           body.push('<tr class="group loaded' + (r.already ? ' already' : '') + '"><td colspan="11"><span class="gtext">' + escapeHtml(line) + '</span></td></tr>');
         }
         const driver = r.driver || coverageName(r), live = edit && !r.off, needs = !r.off;
-        // Joe 10/12: no grab dots; a manager moves a load with the up and down arrows beside its route number.
-        const mover = order && !r.off && !r.already, sameDay = mover ? rows.filter(x => !x.off && !x.already && x.loadDate === r.loadDate) : [], at = sameDay.indexOf(r);
-        body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (r.off ? ' class="off"' : r.already ? ' class="already"' : '') + '>' +
-          (mover
-            ? '<td class="route"><span class="dd-route">' + escapeHtml(r.route) + '</span><span class="dd-move"><button type="button" class="seq-move" data-move="-1" aria-label="Move ' + escapeHtml(r.route + ' ' + r.run) + ' up" title="Load earlier"' + (at > 0 ? '' : ' disabled') + '></button>' +
-              '<button type="button" class="seq-move" data-move="1" aria-label="Move ' + escapeHtml(r.route + ' ' + r.run) + ' down" title="Load later"' + (at < sameDay.length - 1 ? '' : ' disabled') + '></button></span></td>'
-            : '<td class="route">' + escapeHtml(r.route) + '</td>') +
+        // Joe 10/12: a manager grabs the line itself (hand cursor) and drags it up or down; no grab dots, no arrows.
+        const mover = order && !r.off && !r.already;
+        body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (r.off ? ' class="off"' : r.already ? ' class="already"' : mover ? ' class="mover" title="Drag the line up or down to change the load order (Alt+Up / Alt+Down from the keyboard)"' : '') + '>' +
+          '<td class="route">' + escapeHtml(r.route) + '</td>' +
           cell(r.run, 'strong') +
           '<td><button type="button" class="toggle' + (r.off ? '' : ' on') + '" data-runs' + (edit ? '' : ' disabled') + ' aria-pressed="' + !r.off + '" title="Click to change whether this run runs">' + (r.off ? 'NO RUN' : 'RUNS') + '</button></td>' +
           (!driver && needs && cover[r.id]
@@ -392,8 +390,10 @@
       setRuns(row, !!row.off);
     });
 
-    // Joe 10/12: the up and down arrows move a load one place among its own load day's loads (Saturday's sheet holds Sunday's
-    // too); the whole day's order is saved as one call.
+    // Joe 10/12: a manager grabs a load's line anywhere (not on a button or box) and drags it up or down among its own load
+    // day's loads (Saturday's sheet holds Sunday's too); the whole day's order is saved as one call. Pointer events, so a finger
+    // on a tablet works as well as a mouse. The drag starts once the pointer has moved a few pixels, so a click still picks a
+    // cell; the row being moved is shaded and a blue line shows where it lands. Alt+Up / Alt+Down move the selected line.
     function moveLoad(index, step) {
       const moving = rows[index], ordered = rows.filter(r => !r.off && !r.already && r.loadDate === moving.loadDate);
       const from = ordered.indexOf(moving), to = from + step;
@@ -402,13 +402,90 @@
       ordered.splice(to, 0, moving);
       return saveOrder(getRuns, moving.loadDate, ordered, render);
     }
-    body.addEventListener('click', e => {
-      const b = e.target.closest('button[data-move]');
-      if (!b || b.disabled || editing || !canReorder()) return;
-      e.stopPropagation();
-      const tr = b.closest('tr[data-index]');
-      moveLoad(Number(tr.dataset.index), Number(b.dataset.move));
+    body.addEventListener('dragstart', e => { if (e.target.closest && e.target.closest('tr[data-index]')) e.preventDefault(); });
+    function scrollerOf(el) {
+      for (let n = el && el.parentElement; n && n !== document.body; n = n.parentElement) {
+        const o = getComputedStyle(n).overflowY;
+        if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+      }
+      return document.scrollingElement;
+    }
+    function dropTarget(x, y) {
+      const el = document.elementFromPoint(x, y), tr = el && el.closest && el.closest('#rows tr[data-index]');
+      const ids = dragging.ids;
+      if (!tr || ids.indexOf(Number(tr.dataset.index)) < 0) {
+        const first = body.querySelector('tr[data-index="' + ids[0] + '"]'), last = body.querySelector('tr[data-index="' + ids[ids.length - 1] + '"]');
+        if (first && y < first.getBoundingClientRect().top) return { index: ids[0], after: false };
+        if (last && y > last.getBoundingClientRect().bottom) return { index: ids[ids.length - 1], after: true };
+        return null;
+      }
+      const box = tr.getBoundingClientRect();
+      return { index: Number(tr.dataset.index), after: y > box.top + box.height / 2 };
+    }
+    function markDrop(t) {
+      body.querySelectorAll('tr.drop-before, tr.drop-after').forEach(tr => tr.classList.remove('drop-before', 'drop-after'));
+      const tr = t && body.querySelector('tr[data-index="' + t.index + '"]');
+      if (tr) tr.classList.add(t.after ? 'drop-after' : 'drop-before');
+    }
+    let pressed = null;
+    function endDrag(apply) {
+      pressed = null;
+      const d = dragging;
+      if (!d) return;
+      dragging = null;
+      clearInterval(d.scroller);
+      markDrop(null);
+      d.row.classList.remove('dragging');
+      document.body.classList.remove('dd-dragging');
+      const again = () => { if (d.held) render(); };
+      if (!apply || !d.target) return again();
+      const moving = rows[d.index], ordered = rows.filter(r => !r.off && !r.already && r.loadDate === moving.loadDate);
+      const from = ordered.indexOf(moving);
+      let to = ordered.indexOf(rows[d.target.index]) + (d.target.after ? 1 : 0);
+      if (to > from) to--;
+      if (from < 0 || to < 0 || to === from) return again();
+      ordered.splice(from, 1);
+      ordered.splice(to, 0, moving);
+      saveOrder(getRuns, moving.loadDate, ordered, render);
+    }
+    body.addEventListener('pointerdown', e => {
+      const tr = e.target.closest('tr.mover[data-index]');
+      if (!tr || dragging || editing || !canReorder() || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest('button, input, select, textarea, a')) return;
+      pressed = { tr, x: e.clientX, y: e.clientY, id: e.pointerId };
     });
+    body.addEventListener('pointermove', e => {
+      if (!dragging && pressed && Math.abs(e.clientY - pressed.y) > 6 && !editing) {
+        const tr = pressed.tr, index = Number(tr.dataset.index), row = rows[index];
+        const ids = rows.map((r, i) => (!r.off && !r.already && r.loadDate === row.loadDate ? i : -1)).filter(i => i >= 0);
+        dragging = { index, ids, row: tr, target: null, x: e.clientX, y: e.clientY, scroller: null };
+        pressed = null;
+        tr.classList.add('dragging');
+        document.body.classList.add('dd-dragging');
+        try { tr.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+        // Near the top or bottom of the window the list scrolls by itself, so a load can be moved past what is on screen.
+        const box = scrollerOf(tr);
+        dragging.scroller = setInterval(() => {
+          if (!dragging) return;
+          const r = box === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : box.getBoundingClientRect(), edge = 48;
+          const step = dragging.y < r.top + edge ? -12 : dragging.y > r.bottom - edge ? 12 : 0;
+          if (step) { box.scrollTop += step; dragging.target = dropTarget(dragging.x, dragging.y); markDrop(dragging.target); }
+        }, 30);
+      }
+      if (!dragging) return;
+      e.preventDefault();
+      dragging.x = e.clientX; dragging.y = e.clientY;
+      dragging.target = dropTarget(e.clientX, e.clientY);
+      markDrop(dragging.target);
+    });
+    document.addEventListener('pointerup', () => endDrag(true));
+    document.addEventListener('pointercancel', () => endDrag(false));
+    document.addEventListener('keydown', e => {
+      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || editing || dragging || !canReorder()) return;
+      const tr = document.activeElement && document.activeElement.closest && document.activeElement.closest('#rows tr.mover[data-index]');
+      if (!tr) return;
+      e.preventDefault(); e.stopPropagation();
+      moveLoad(Number(tr.dataset.index), e.key === 'ArrowUp' ? -1 : 1);
+    }, true);
 
     /* ---------- Edit box: the same fields as the current screen; each change saves the moment it is made ---------- */
     const modals = ['edit-modal', 'calloff-panel', 'add-panel', 'down-panel', 'week-panel'];

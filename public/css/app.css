@@ -1592,17 +1592,10 @@ span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-
 /* Joe 10/11: the plant home stays blank for the moment it takes to know whether this person starts on the all-plants overview. */
 body.deciding #screen { visibility: hidden; }
 
-/* Daily Dispatch: a manager grabs a load by the handle on its route number and moves it up or down, with a mouse or a
-   finger (Joe 10/11, the same handle as Daily Case Loadout). The row being moved is shaded; a blue line shows where it lands. */
-/* Joe 10/12: no grab dots; up and down arrows beside the route number move a load (the Route Master load-order arrows' look). */
-body.daily-look table.daily td.route { white-space: nowrap; }
-body.daily-look table.daily .dd-route { display: inline-block; min-width: 3ch; vertical-align: middle; }
-body.daily-look table.daily .dd-move { display: inline-flex; flex-direction: column; gap: 2px; margin-left: 6px; vertical-align: middle; }
-body.daily-look table.daily button.seq-move { width: 30px; height: 18px; padding: 0; border: 1px solid #9dc2df; border-radius: 5px; background: #edf7ff; color: #0a5e9d; font-size: 11px; line-height: 1; cursor: pointer; }
-body.daily-look table.daily button.seq-move[data-move="-1"]::before { content: "\25B2"; }
-body.daily-look table.daily button.seq-move[data-move="1"]::before { content: "\25BC"; }
-body.daily-look table.daily button.seq-move:hover:not(:disabled) { border-color: #1f6feb; background: #dcebff; }
-body.daily-look table.daily button.seq-move:disabled { opacity: .3; cursor: default; }
+/* Daily Dispatch (Joe 10/12): a manager grabs the line itself with the hand and drags it up or down; no grab dots, no arrows.
+   The row being moved is shaded; a blue line shows where it lands. */
+body.daily-look table.daily tr.mover td { cursor: grab; }
+body.daily-look table.daily tr.mover td button, body.daily-look table.daily tr.mover td input, body.daily-look table.daily tr.mover td select { cursor: pointer; }
 body.daily-look table.daily tr.dragging td { background: #e8f1fa !important; }
 body.daily-look table.daily tr.drop-before td { box-shadow: inset 0 3px 0 #1f6feb; }
 body.daily-look table.daily tr.drop-after td { box-shadow: inset 0 -3px 0 #1f6feb; }
