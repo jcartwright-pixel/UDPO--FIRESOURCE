@@ -34,7 +34,6 @@
       <a class="sw-top" href="safety-walks.html" data-top>Past Walks</a>
       <a class="sw-top" href="safety-setup.html" data-top>Checklist Setup</a>
       <button type="button" class="sw-top pri" id="finish" data-top>Finish Walk</button>
-      <select id="plant" class="sw-plant" aria-label="Plant" title="Plant" data-top hidden></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -49,7 +48,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
     import { doc, getDoc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { today, pickPlant, plantName, drawPlantPicker, canWalk, modeText, shrinkPhoto, watchOpenIssues, watchSetup, watchExtinguishers, agePill, maintText, foundLine, thisMonth } from './js/safety.js';
+    import { today, pickPlant, plantName, canWalk, modeText, shrinkPhoto, watchOpenIssues, watchSetup, watchExtinguishers, agePill, maintText, foundLine, thisMonth } from './js/safety.js';
 
     // The weekly walk (Joe 10/12, mock-up B): every area on one screen, each item Good or Not good. A Not good opens a note,
     // a photo and Send to Plant Maintenance, and becomes an open issue that the next walk reviews until it is fixed. The
@@ -80,8 +79,6 @@
       fin.hidden = !!viewing;
       fin.disabled = !editable() || !walk;
       fin.textContent = walk && walk.finishedAt && !armFinish ? 'Walk Finished' : armFinish ? 'Press again: ' + c.notChecked + ' not checked' : 'Finish Walk';
-      drawPlantPicker(document.getElementById('plant'), person, plant);
-      document.getElementById('plant').hidden = document.getElementById('plant').hidden || !!viewing;
     }
     function drawAreas() {
       const n = toReview().filter(i => !reviews()[i.id]).length;
@@ -213,7 +210,6 @@
       armFinish = false;
       send({ op: 'finish' });
     });
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; try { sessionStorage.setItem('udPlant', plant); } catch (x) { /* no storage */ } follow(); });
 
     function follow() {
       stops.forEach(s => s()); stops = [];
