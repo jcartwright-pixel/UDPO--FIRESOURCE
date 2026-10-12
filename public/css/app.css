@@ -1686,3 +1686,12 @@ body.uc-locked #screen > :not(.topbar):not(.uc-refused) { display: none !importa
 .day-pin #go-today { height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid #e5891a; background: #fff4e5; color: #8a4b00; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .day-pin[hidden] { display: none !important; }
 #week-panel .week-warn { font-size: 16px; line-height: 1.45; margin: 4px 0 14px; color: #8a4b00; font-weight: 700; }
+
+/* Joe 10/12: drag a line up or down by grabbing it (js/row-drag.js); no grab dots, no arrows. */
+tr[data-drag] > td { cursor: grab; }
+tr[data-drag] > td input, tr[data-drag] > td button, tr[data-drag] > td select { cursor: auto; }
+tr[data-drag] > td button { cursor: pointer; }
+tr[data-drag]:focus-visible { outline: 3px solid var(--ud-blue, #0b4f86); outline-offset: -3px; }
+tr.row-dragging > td { background: #e6f0fb !important; opacity: .75; }
+body.row-drag-on, body.row-drag-on * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+.row-drop-line { position: absolute; height: 4px; border-radius: 2px; background: var(--ud-blue, #0b4f86); box-shadow: 0 0 0 2px #fff; z-index: 60; pointer-events: none; }
