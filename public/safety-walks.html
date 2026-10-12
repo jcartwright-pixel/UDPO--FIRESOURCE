@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Past Walks · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/safety.css">
+  <script src="js/logic.js"></script>
+  <script src="js/safety-rules.js"></script>
+</head>
+<body class="fill safety-page walks-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Past Walks</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1>Past Walks</h1><span class="sw-counts" id="counts"></span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <a class="sw-top pri" href="safety.html" data-top>Weekly Walk</a>
+      <a class="sw-top" href="safety-issues.html" data-top>Open Issues</a>
+      <select id="plant" class="sw-plant" aria-label="Plant" title="Plant" data-top hidden></select>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="sw-sheet">
+        <table class="sw-grid">
+          <thead><tr><th>Walked</th><th>Started by</th><th>Good</th><th>Not good</th><th>Not checked</th><th>Issues reviewed</th><th>Monthly items</th><th>Finished</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="sw-foot">Open shows the walk as it was saved. The plant is walked once a week; the first walk of each month also has the monthly items.</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
+    import { doc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { pickPlant, plantName, drawPlantPicker, modeText, watchSetup } from './js/safety.js';
+
+    // Past Walks (Joe 10/12): every walk of the plant, newest first, with its counts; Open shows it on the walk screen.
+    const S = window.UDSafety;
+    const params = new URLSearchParams(location.search);
+    let db = null, person = null, app = {}, plant = '', walks = null, setup = null, stops = [];
+    function render() {
+      document.getElementById('mode-text').textContent = modeText(app);
+      document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
+      drawPlantPicker(document.getElementById('plant'), person, plant);
+      if (!walks) { document.getElementById('rows').innerHTML = '<tr><td colspan="9" class="sw-empty">Reading the walks…</td></tr>'; return; }
+      document.getElementById('counts').textContent = walks.length + ' walk' + (walks.length === 1 ? '' : 's');
+      document.getElementById('rows').innerHTML = walks.map(w => {
+        const c = S.walkCounts(w, S.walkList(setup, w.monthly === true)), rv = Object.keys(w.reviews || {}).length;
+        return '<tr><td class="nw"><b>' + window.UDLogic.dayName(w.date) + ' ' + shortDate(w.date) + '</b></td><td>' + escapeHtml(w.startedByName || w.startedBy || '') + '</td>' +
+          '<td><span class="sw-pill green">' + c.good + '</span></td><td>' + (c.notGood ? '<span class="sw-pill red">' + c.notGood + '</span>' : '0') + '</td><td>' + c.notChecked + '</td><td>' + rv + '</td><td>' + (w.monthly ? 'Yes' : '') + '</td>' +
+          '<td class="nw">' + (w.finishedAt ? dateTimeText(w.finishedAt) + (w.finishedByName ? ' · ' + escapeHtml(w.finishedByName) : '') : '<span class="sw-nc">Not finished</span>') + '</td>' +
+          '<td><a class="sw-btn sw-small" href="safety.html?walk=' + encodeURIComponent(S.walkId(w.facilityId, w.date)) + '">Open</a></td></tr>';
+      }).join('') || '<tr><td colspan="9" class="sw-empty">No walks yet. Weekly Walk starts the first one.</td></tr>';
+    }
+    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; try { sessionStorage.setItem('udPlant', plant); } catch (x) { /* no storage */ } follow(); });
+    function follow() {
+      stops.forEach(s => s()); stops = [];
+      walks = null; render();
+      stops.push(watchSetup(db, plant, s => { setup = s; render(); }));
+      stops.push(onSnapshot(query(collection(db, 'safetyWalks'), where('facilityId', '==', plant)), s => { walks = s.docs.map(d => d.data()).sort((a, b) => String(b.date).localeCompare(String(a.date))); render(); },
+        e => showError('Could not read the walks (' + e.message + '). Check the network and reload the page.')));
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render();
+      });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(); });
+    });
+  </script>
+</body>
+</html>

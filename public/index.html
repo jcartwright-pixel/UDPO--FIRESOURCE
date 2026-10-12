@@ -37,6 +37,8 @@
       (s.building ? '<b class="uc-admin-only">Administrators only while it is being built</b>' : '') + '</a>';
     // Joe 10/11: six cards (the plant's three, Route Distribution, Fleet & Maintenance, Reports); Administration is the header button.
     document.getElementById('sides').innerHTML = SIDES.map(card).join('');
+    // Joe 10/12: a seventh card (Safety Walkthrough) next to Reports; four cards a row so all seven fit one screen (mock-up A).
+    document.getElementById('sides').classList.toggle('seven', SIDES.length > 6);
     // The side picked here is the side its screens' menu shows.
     // Joe 10/11: an Under Construction card opens only for an Administrator; anyone else stays on this page.
     document.getElementById('sides').addEventListener('click', e => {

@@ -55,6 +55,8 @@ export const ICON = {
   unload: '<path d="M2 6h11v10H2zM13 9h5l3 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M10 11H4M6 9l-2 2 2 2"/>',
   wash: '<path d="M12 3s-6 7-6 11a6 6 0 0012 0c0-4-6-11-6-11z"/><path d="M9.5 15a2.5 2.5 0 002.5 2.5"/>',
   returns: '<path d="M4 7h11a5 5 0 010 10H9"/><path d="M8 3L4 7l4 4"/>',
+  // Joe 10/12: Safety Walkthrough, a clipboard with checks.
+  safety: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 4h6v2.5H9z"/><path d="M8 11.5l1.5 1.5 3-3M8 17l1.5 1.5 3-3"/><path d="M15 12h1.5M15 17.5h1.5"/>',
 };
 export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
@@ -88,6 +90,8 @@ export const MENU = [
   ['Plant Reports', [['Plant Reports', 'reports.html', 'star'], ['Shift Reports', 'shiftreports.html', 'day'], ['Plant Performance TV', 'plant-kiosk.html', 'star']]],
   ['Distribution Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
   ['Fleet Reports', [['Fleet Service Report', 'fleet.html', 'truck']]],
+  // Joe 10/12: the Safety Walkthrough, a card of its own next to Reports: the weekly walk, its open issues, the extinguishers.
+  ['Safety Walkthrough', [['Weekly Walk', 'safety.html', 'safety'], ['Open Issues', 'safety-issues.html', 'alert'], ['Fire Extinguishers', 'extinguishers.html', 'safety'], ['Past Walks', 'safety-walks.html', 'day'], ['Checklist Setup', 'safety-setup.html', 'gear']]],
   // Joe 10/11: Plant Production, our own RedZone: every line this shift, the line tablet, each product's targets and the TV.
   ['Production Lines', [['Production Lines', 'production.html', 'production.webp'], ['Line Tablet', 'line.html', 'production.webp'], ['Line Targets', 'linetargets.html', 'production.webp'], ['Production TV', 'production.html?tv=1', 'production.webp']]],
   // Joe 10/12: Plant Maintenance, like the garage work orders but for the plant's machinery: requests from the plant, work orders,
@@ -106,7 +110,9 @@ export const SIDES = [
   { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance'], building: true, bannerInPic: true },
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
-  { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Plant Reports', 'Distribution Reports', 'Fleet Reports'] }
+  { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Plant Reports', 'Distribution Reports', 'Fleet Reports'] },
+  // Joe 10/12: a Safety Walkthrough card next to Reports (mock-up A). Under Construction (administrators only) while it is built.
+  { key: 'safety', name: 'Safety Walkthrough', short: 'Safety Walkthrough', home: 'safety.html', icon: 'safety', note: 'Weekly walk, open issues and fire extinguisher checks', sections: ['Safety Walkthrough'], building: true }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
 // Pages opened from inside a side (not from its menu) that still belong to it, e.g. Plant Reports from a bookmark or the TV.
@@ -353,6 +359,7 @@ const PAGE_ICON = {
   'garage.html': 'wrench', 'fleet.html': 'truck',
   'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'production.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
+  'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {

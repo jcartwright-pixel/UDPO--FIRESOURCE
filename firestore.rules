@@ -66,6 +66,12 @@ service cloud.firestore {
     match /productionRuns/{id} { allow read: if activeUser(); }
     match /productionLines/{id} { allow read: if activeUser(); }
     match /plantLineStatus/{id} { allow read: if activeUser(); }
+    // Safety Walkthrough: the weekly walks, their open issues and photos, each plant's extinguishers and checklist (saved only through save).
+    match /safetyWalks/{id} { allow read: if activeUser(); }
+    match /safetyIssues/{id} { allow read: if activeUser(); }
+    match /safetyPhotos/{id} { allow read: if activeUser(); }
+    match /extinguishers/{id} { allow read: if activeUser(); }
+    match /safetySetup/{id} { allow read: if activeUser(); }
     // Plant Maintenance: machinery, work orders and PM tasks (saved only through the server).
     match /plantMachines/{id} { allow read: if activeUser(); }
     match /plantWorkOrders/{id} { allow read: if activeUser(); }
