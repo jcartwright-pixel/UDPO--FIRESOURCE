@@ -189,6 +189,29 @@ async function touchPage(browser, width, height, url, mobile) {
       results.push('Driver Room: 5 minutes with no taps signs the driver out and shows the rolling View Loadout; a tap brings back the three choices');
     }
 
+    // Joe 10/12 (as the old page): View Loadout on the Driver Room Check-In Station updates the moment a load changes, with
+    // no Refresh press and well before the 2-minute fallback.
+    {
+      const L = require('../../src/logic');
+      // Loaded today for tomorrow's delivery (the board shows today's loading).
+      const deliver = L.addDays(L.operatingDay(new Date()), 1), p = L.dayPrefix(deliver), id = L.weekStart(deliver) + '__run_live805';
+      await db().collection('runs').doc(id).set({ weekStart: L.weekStart(deliver), route: '805', run: 'LIVE TEST', routeId: 'rte_t805', runId: 'run_live805', rev: 0,
+        days: { [p]: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', truck: '900002', trailer: 'T-905' } } });
+      const lv = await openPage(browser, 1024, 768, '/driver-station.html' + SIGNED);
+      await lv.waitForSelector('#code-box form.st-code');
+      await lv.fill('#code-box input', kiosk);
+      await lv.click('#code-box button');
+      await lv.waitForURL(/route\.html\?room=1$/);
+      await lv.click('#m-board');
+      await lv.waitForSelector('#board-track :text("T-905")');
+      await lv.waitForTimeout(1500);
+      await db().collection('runs').doc(id).update({ ['days.' + p + '.trailer']: 'T-977' });
+      await lv.waitForSelector('#board-track :text("T-977")', { timeout: 10000 });
+      assert.deepEqual(lv.errors, []);
+      await lv.close();
+      results.push('Driver Room: View Loadout updates by itself the moment a load changes (no Refresh, well before the 2-minute fallback)');
+    }
+
     // Joe 10/12 "it does not let you scroll the list": the Check-In and DVIR screens scroll by finger on a phone and on
     // tablets (600, 800, 1024 wide), from the drivers' phone link and from the Driver Room tablet.
     const route = (await A.adminCall(db(), BOSS, { op: 'routeCodeNew' })).code;

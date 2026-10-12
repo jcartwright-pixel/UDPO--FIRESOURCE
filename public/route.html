@@ -381,7 +381,30 @@
         document.getElementById('board-updated').textContent = 'View only · Updated ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
       } catch (e) { showError(e.message); } finally { btn.disabled = false; }
     }
-    function openBoard() { step('step-board'); readBoard(); clearInterval(boardTimer); boardTimer = setInterval(() => { if (!document.hidden && !document.getElementById('step-board').hidden && Date.now() - boardAt > 120000) readBoard(); }, 30000); }
+    // Joe 10/12 (as the old page): View Loadout updates the moment Dispatch or the plant changes a load. The Driver Room
+    // Check-In Station (signed in with United Dairy) listens to the loads and pickups; a driver's phone (code only, no
+    // account to listen with) reads again every 30 seconds while the list is open. The 2-minute read stays as the fallback,
+    // and with no signal the last list is shown.
+    let boardWatch = null, boardSoon = null;
+    async function watchBoard() {
+      if (boardWatch || !room) return;
+      const { db } = await start();
+      const { collection, query, where, onSnapshot } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      const day = new Date(Date.now() - 6 * 3600000), sun = new Date(day.getFullYear(), day.getMonth(), day.getDate() - day.getDay());
+      const weeks = [-7, 0, 7].map(n => iso(new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + n)));
+      let first = 2;
+      const changed = () => {
+        if (first > 0) { first--; return; }
+        clearTimeout(boardSoon);
+        boardSoon = setTimeout(() => { if (!document.getElementById('step-board').hidden) readBoard(); else boardAt = 0; }, 800);
+      };
+      boardWatch = [onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), changed, () => {}), onSnapshot(collection(db, 'pickups'), changed, () => {})];
+    }
+    function openBoard() {
+      step('step-board'); readBoard(); watchBoard().catch(() => {}); clearInterval(boardTimer);
+      boardTimer = setInterval(() => { if (!document.hidden && !document.getElementById('step-board').hidden && Date.now() - boardAt > (room ? 120000 : 30000)) readBoard(); }, room ? 30000 : 10000);
+    }
     document.getElementById('to-board').addEventListener('click', () => { want = 'board'; openBoard(); });
     document.getElementById('board-refresh').addEventListener('click', readBoard);
     document.getElementById('board-pause').addEventListener('click', e => { boardPaused = !boardPaused; document.getElementById('board-track').classList.toggle('paused', boardPaused); e.target.textContent = boardPaused ? 'Resume scrolling' : 'Pause scrolling'; });
