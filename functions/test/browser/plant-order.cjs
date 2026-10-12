@@ -49,16 +49,24 @@ const waitOrder = (page, list) => page.waitForFunction(want => [...document.quer
 
 // Where to let go: just above or just below the middle of another load's line.
 async function spot(page, route, where) {
-  await page.locator(row(route)).scrollIntoViewIfNeeded();
-  const b = await page.locator(row(route) + ' td:nth-child(2)').boundingBox();
+  // The list is drawn again when another screen's save lands: measure the line as it is now, again if it was just replaced.
+  let b = null;
+  for (let tries = 0; !b && tries < 10; tries++) {
+    await page.locator(row(route)).scrollIntoViewIfNeeded().catch(() => {});
+    b = await page.locator(row(route) + ' td:nth-child(2)').boundingBox().catch(() => null);
+    if (!b) await page.waitForTimeout(100);
+  }
+  if (!b) throw new Error('No line for ' + route + ': ' + (await routes(page)).join(','));
   return { x: b.x + b.width / 2, y: where === 'above' ? b.y + b.height * 0.25 : b.y + b.height * 0.75 };
 }
 // A mouse grabs a load's line (its Run cell) and lets go above or below another load.
-async function mouseDrag(page, route, onto, where) {
+async function mouseDrag(page, route, onto, where, picture) {
   const from = await spot(page, route, 'mid'), to = await spot(page, onto, where);
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   for (let i = 1; i <= 8; i++) await page.mouse.move(from.x, from.y + (to.y - from.y) * i / 8);
+  // The line lifted and the blue line where it will land, before letting go.
+  if (SHOTS && picture) await page.screenshot({ path: path.join(SHOTS, picture), scale: 'css' });
   await page.mouse.up();
 }
 // A finger holds a load's line still for a moment, then slides it above or below another load.
@@ -106,7 +114,7 @@ async function keyMove(page, route, dir) {
     }
 
     // The mouse drags 811 below 812; the other open screen shows it.
-    await mouseDrag(loader, '811', '812', 'below');
+    await mouseDrag(loader, '811', '812', 'below', '3-loadout-dragging-1920.png');
     await waitOrder(loader, ['801', '802', '805', '808', '812', '811']);
     await waitOrder(watcher, ['801', '802', '805', '808', '812', '811']);
     results.push('Loaded loads (801, 802, 805) do not move; 808 is the first line that can be dragged; the hand shows over a line');
