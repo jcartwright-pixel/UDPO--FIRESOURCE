@@ -58,7 +58,9 @@ async function seed() {
   const loads = [['501', 'AKRON', at(-120), { loadStatus: 'COMPLETE', completeTime: new Date(Date.now() - 3 * 3600000).toISOString(), truck: '214', trailer: 'T-11' }],
     ['502', 'CANTON', at(-60), { truck: '220', trailer: 'T-12' }], ['503', 'MASSILLON', at(240), {}], ['504', 'WOOSTER', at(300), {}]];
   for (const [i, [route, run, time, extra]] of loads.entries()) {
-    if (!extra.loadStatus && time <= nowRel + 30) seed.behind++;
+    // Same rule as the report (plant-rules.js plantReport): behind once more than 45 minutes past its depart time. Late in the
+    // evening the later loads are held at 11:59 PM, which is not behind yet.
+    if (!extra.loadStatus && time < nowRel - 45) seed.behind++;
     await d.collection('runs').doc(week + '__mc' + route).set({ weekStart: week, sheetRow: 950 + i, route, run, routeId: 'rte_mc' + route, runId: 'run_mc' + route, active: true, loadType: 'CASE LOADOUT',
       days: { [p]: Object.assign({ runs: true, loadDayOffset: 0, loadDate: date, deliveryDate: date, dispatchTime: time, loadSequence: i + 1 }, extra) } });
   }
