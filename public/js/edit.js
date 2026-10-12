@@ -111,10 +111,23 @@ const KINDS = {
   trailer: { action: 'assignTrailer', field: 'equipmentId', idKey: 'trailerId', textKey: 'trailer', list: (opts) => units(lists.allTrailers, opts).map(e => ({ id: e.id, text: e.unit + (unitWhy(e, opts) ? '  [' + unitWhy(e, opts) + ']' : ''), why: !!unitWhy(e, opts) })) }
 };
 
+// The unit already on the run, when the list leaves it out. Joe 10/12 ("why does it show available"): a down unit is never
+// offered as if free: the type-to-pick list leaves it out unless OVR is ticked (then marked with why); the Edit box's
+// drop-down still shows what is on the run, marked [DOWN].
+function keepCurrent(kind, current, list, opts, editBox) {
+  if (!current || kind === 'driver' || list.some(o => o.id === current) || !pickText(kind, current)) return;
+  const e = (kind === 'truck' ? lists.fleetTrucks : lists.fleetTrailers).find(x => x.id === current);
+  if (e && L.unitOff(e)) {
+    if (editBox || (opts && opts.override)) list.unshift({ id: current, text: e.unit + '  [' + e.status + ']', why: true });
+    return;
+  }
+  list.unshift({ id: current, text: pickText(kind, current) });
+}
+
 export function optionsHtml(kind, current, busy, opts) {
   const list = KINDS[kind].list(opts);
-  // A unit already on the run stays shown even when it is kept at another branch.
-  if (current && kind !== 'driver' && !list.some(o => o.id === current) && pickText(kind, current)) list.unshift({ id: current, text: pickText(kind, current) });
+  // A unit already on the run stays shown even when it is kept at another branch (marked when it is down: Joe 10/12).
+  keepCurrent(kind, current, list, opts, true);
   const opt = (o) => '<option value="' + escapeHtml(o.id) + '"' + (o.id === current ? ' selected' : '') + '>' + escapeHtml(o.text + (busy && busy[o.id] && o.id !== current && !o.why ? '  (' + busy[o.id] + ')' : '')) + '</option>';
   const cvg = kind === 'driver' ? cvgOptions() : [];
   return '<option value="">(none)</option>' + list.map(opt).join('') + (cvg.length ? '<optgroup label="Other CVG / Carriers">' + cvg.map(opt).join('') + '</optgroup>' : '');
@@ -124,7 +137,7 @@ export function optionsHtml(kind, current, busy, opts) {
 export function pickChoices(kind, current, busy, opts) {
   if (kind === 'driver') return driverChoices(current, busy, opts);
   const list = KINDS[kind].list(opts);
-  if (current && kind !== 'driver' && !list.some(o => o.id === current) && pickText(kind, current)) list.unshift({ id: current, text: pickText(kind, current) });
+  keepCurrent(kind, current, list, opts, false);
   const item = (group) => (o) => ({ value: o.id, label: o.text + (busy && busy[o.id] && o.id !== current && !o.why ? '  (' + busy[o.id] + ')' : ''), key: pickText(kind, o.id) || o.text, group });
   return [{ value: '', label: '(none)', key: '', group: 'none' }].concat(list.map(item('list')), kind === 'driver' ? cvgOptions().map(item('cvg')) : []);
 }

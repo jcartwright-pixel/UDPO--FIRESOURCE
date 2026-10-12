@@ -290,8 +290,11 @@
     const rmHours = (r) => { const d = routeHours[r.runId]; return d && d[r.day]; };
     // Every load delivered the same day as this row, whichever day it loaded (the sheet shows only the loadout day's loads,
     // but a unit out on a load from the day before is still in use).
-    function dayRowsFor(row) {
+    // Joe 10/12: "that day" is the loadout day too: a unit on any load on this loadout sheet (855 / 856 deliver Monday but load
+    // Monday, like 812 for Tuesday) is taken, as well as one on another load delivering the same day.
+    function dayRowsFor(row, deliveryOnly) {
       const out = [row];
+      if (!deliveryOnly) L.dailyRows(runs, row.loadDate).forEach(r => { if (r.id !== row.id && !out.some(x => x.id === r.id)) out.push(rows.find(x => x.id === r.id) || r); });
       for (let k = 0; k <= 3; k++) {
         L.dailyRows(runs, L.addDays(row.deliveryDate, -k)).forEach(r => {
           if (r.deliveryDate !== row.deliveryDate || r.id === row.id || out.some(x => x.id === r.id)) return;
@@ -312,7 +315,7 @@
     // Drivers and units already used on this delivery day, so the list can show "(on 802)".
     function busyFor(kind, row) {
       const key = kind === 'driver' ? 'driverId' : kind === 'truck' ? 'truckId' : 'trailerId', busy = {};
-      dayRowsFor(row).forEach(r => { if (r !== row && !r.off && r[key]) busy[r[key]] = 'on ' + r.route; });
+      dayRowsFor(row, kind === 'driver').forEach(r => { if (r !== row && !r.off && r[key]) busy[r[key]] = 'on ' + r.route; });
       return busy;
     }
 
