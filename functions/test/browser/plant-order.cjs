@@ -135,6 +135,22 @@ async function press(page, route, dir) {
       await pg.context().close();
     }
     results.push('Up / down arrows on Case, Totes, Boxes and Tanker at 1536 and 1920, inside the Route column before the route number, no grab dots');
+    // Joe 10/12 ("mobile looks wrong and I can't edit"): on a phone each load is a card with its boxes named, big enough to type in,
+    // the page scrolls as a whole (no strip a few rows high) and nothing slides sideways.
+    const phone = await openPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
+    await phone.waitForSelector(row('811') + ' .lo-move.down');
+    const card = await phone.$eval(row('811'), tr => {
+      const box = tr.getBoundingClientRect(), input = tr.querySelector('input[data-k="truck"]').getBoundingClientRect();
+      return { display: getComputedStyle(tr).display, width: box.width, height: box.height, input: input.height, label: getComputedStyle(tr.querySelector('input[data-k="truck"]').closest('td'), '::before').content };
+    });
+    assert.equal(card.display, 'grid', 'a load is a card on a phone ' + JSON.stringify(card));
+    assert.ok(card.input >= 44 && card.label === '"Truck"', 'the truck box is named and big enough for a thumb ' + JSON.stringify(card));
+    assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'nothing slides sideways on a phone');
+    assert.ok(await phone.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight * 2), 'the whole page scrolls through the loads');
+    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, '7-loadout-phone-390.png'), fullPage: true });
+    assert.deepEqual(phone.errors, []);
+    await phone.context().close();
+    results.push('Phone: each load is a card with named boxes big enough to type in; the page scrolls, nothing slides sideways');
     // A day already past has no arrows (a coming day's own loads get them by the same rule as today's, and the server takes a
     // coming day's order: test/emulator/plant-order.test.js).
     await loader.click('#prev');

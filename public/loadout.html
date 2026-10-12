@@ -238,6 +238,9 @@
       // The arrow just pressed stays selected when the list is drawn again, so it can be pressed again.
       const a = document.activeElement, held = a && a.dataset && a.dataset.idMove ? [a.dataset.idMove, a.dataset.move] : heldMove;
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="' + cols.length + '" class="empty">No ' + P.AREA[area].tile.toLowerCase() + ' loads for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>';
+      // Phones (Joe 10/12 "mobile looks wrong"): each load is a card, so every box is named on the card itself.
+      const heads = cols.map(([h], i) => (area !== 'TANKER' && i === 5 ? info.label : h));
+      document.querySelectorAll('#rows tr[data-row]').forEach(tr => [...tr.children].forEach((td, i) => { if (heads[i]) td.dataset.l = heads[i]; }));
       fitDrivers();
       if (held) { const g = document.querySelector('#rows [data-id-move="' + held[0] + '"][data-move="' + held[1] + '"]'); if (g && !g.disabled) g.focus(); }
       heldMove = null;
