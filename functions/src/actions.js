@@ -1012,7 +1012,7 @@ function writeLive(tx, db, mode, req, stamp, email, snap, run, ch, result) {
   const ps = Object.keys(ch.days).filter(p => Object.keys(ch.days[p]).length);
   if (!ps.length && !Object.keys(ch.run).length) return;
   const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp }, cells = {};
-  Object.keys(ch.run).forEach(k => { update[k] = ch.run[k]; cells[LIVE_RUN_COLUMNS[k]] = String(ch.run[k]); });
+  Object.keys(ch.run).forEach(k => { const v = ch.run[k]; update[k] = v; cells[LIVE_RUN_COLUMNS[k]] = typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v); });
   ps.forEach(p => {
     Object.keys(ch.days[p]).forEach(k => { update['days.' + p + '.' + k] = ch.days[p][k]; });
     update['days.' + p + '.updatedAt'] = stamp; update['days.' + p + '.updatedBy'] = email;
@@ -1036,6 +1036,9 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
     rows.forEach((s, i) => { const run = s.data();
       // 7.0.272: who runs it follows Route Master too (route name, run, Run By).
       ['routeName', 'run', 'coverageType', 'coverageOwner'].forEach(f => { const v = String(m[f] || '').trim(); if (v && String(run[f] || '').trim() !== v) changes[i].run[f] = v; });
+      // Joe 10/12 (907 / 950): Show on Daily Dispatch switched in the Route Editor reaches the Current and Next weeks' rows too,
+      // since Daily reads the week's own flag (a FALSE there hides the run whatever Route Master says).
+      if (req && req.fields && typeof req.fields.displayDaily === 'boolean' && run.displayDaily !== req.fields.displayDaily) changes[i].run.displayDaily = req.fields.displayDaily;
     });
     L.DAYS.forEach(p => {
       // A run on two rows (one per set of days): the day belongs to the row that runs it, else the first row.

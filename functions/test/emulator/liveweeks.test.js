@@ -109,3 +109,24 @@ test('a truck picked by hand marks equipment_override in the Live sheet, as the 
   const v = tabs["'LIVE NEXT WEEK'"], h = v[5], row = v.find((r, i) => i > 5 && r[h.indexOf('run_id')] === 'run_t802');
   assert.deepEqual(['mon_tractor_id', 'mon_equipment_override'].map(c => row[h.indexOf(c)]), ['veh_truck_900002', 'TRUE']);
 });
+
+test('Show on Daily Dispatch switched in the Route Editor reaches the Current and Next weeks, and the write-back writes it (Joe 10/12, 907 / 950)', async () => {
+  await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+  // The Live rows were copied while the run was off Daily (as 907_1 and 950_1 were on 10/12).
+  for (const id of ['2026-09-27__run_t801', '2026-10-04__run_t801', '2026-10-11__run_t801']) await db().collection('runs').doc(id).update({ displayDaily: false });
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { displayDaily: true }, days: {} });
+  assert.equal((await run('2026-10-04__run_t801')).displayDaily, true, 'the Current week shows it on Daily');
+  assert.equal((await run('2026-10-11__run_t801')).displayDaily, true, 'the Next week shows it on Daily');
+  assert.equal((await run('2026-09-27__run_t801')).displayDaily, false, 'the Previous week is never touched');
+  await runWriteBack({ db: db(), sheets, target: { spreadsheetId: 'fake-live' }, now: NOW });
+  for (const tab of ["'LIVE CURRENT WEEK'", "'LIVE NEXT WEEK'"]) {
+    const v = tabs[tab], h = v[5], row = v.find((r, i) => i > 5 && r[h.indexOf('run_id')] === 'run_t801');
+    assert.equal(row[h.indexOf('display_daily_dispatch')], 'TRUE', tab + ' says TRUE');
+  }
+  // Switched off again: both weeks follow. A save that does not touch the switch leaves the weeks' flags alone.
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { displayDaily: false }, days: {} });
+  assert.equal((await run('2026-10-11__run_t801')).displayDaily, false);
+  await db().collection('runs').doc('2026-10-11__run_t801').update({ displayDaily: true });
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { routeNotes: 'note' }, days: {} });
+  assert.equal((await run('2026-10-11__run_t801')).displayDaily, true);
+});
