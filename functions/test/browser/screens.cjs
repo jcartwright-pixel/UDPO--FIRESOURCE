@@ -1252,7 +1252,12 @@ async function noScroll(page) {
     await loNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'LIVE');
     assert.deepEqual(loNew.errors, []);
     await loNew.close();
-    // A screen not switched on is view only and says where to switch it on.
+    // A screen not switched on is view only and says where to switch it on. Every screen is ready now (Joe 10/12), so Driver
+    // Check-ins is moved back to the current app first (pressed twice).
+    await gl.click('#gl-rows tr[data-row="checkIns"] [data-act="old"]');
+    await gl.click('#gl-rows tr[data-row="checkIns"] [data-act="old"]');
+    for (let i = 0; i < 50 && (await db().collection('config').doc('app').get()).data().screenOwners.checkIns !== 'old'; i++) await gl.waitForTimeout(100);
+    assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.checkIns, 'old', 'Driver Check-ins moved back');
     const onOld = await openPage(browser, 1366, 650, '/checkins.html?testEmail=dispatch.test@uniteddairy.com');
     await onOld.waitForFunction(() => document.getElementById('mode-text').textContent === 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES');
     assert.equal(await onOld.textContent('#golive-note'), 'View only until switched on in Go-Live Switches.', 'the screen itself says it is not switched on');
