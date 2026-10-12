@@ -290,6 +290,9 @@ async function cameraShot(page, color) {
       await d.waitForSelector(row(tapId));
       // The screens and the Firebase code are kept on the device, and the screen cache is in charge of the page.
       await d.waitForFunction(async () => { if (!navigator.serviceWorker.controller) return false; const c = await caches.open('ud-offline-v1'); return !!(await c.match('safety.html')) && !!(await c.match('js/offline-saves.js')) && !!(await c.match('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js')); }, null, { timeout: 20000 });
+      // The walk has been read once with signal (it is then kept on the device too).
+      await d.waitForFunction(() => /^1 Good|Good · 1 Not good/.test(document.getElementById('counts').textContent) && !/Reading/.test(document.getElementById('foot').textContent));
+      const wasGood = await d.evaluate(() => (document.getElementById('counts').textContent.match(/^(\d+) Good/) || [])[1]);
       await d.ctx.setOffline(true);
       await d.waitForFunction(() => /No internet/.test(document.getElementById('offline-line').textContent));
       await d.click(row(tapId) + ' .sw-btn.good');
@@ -305,6 +308,7 @@ async function cameraShot(page, color) {
       assert.equal(await d.inputValue('#list input[data-note="' + noteId + '"]'), 'Held on the ' + tag);
       await d.waitForSelector(row(photoId) + ' .sw-thumbs img');
       await d.waitForFunction(() => document.getElementById('offline-line').textContent === 'Saved on this device, sends when online: 3');
+      assert.match(await d.textContent('#counts'), new RegExp('^' + (Number(wasGood) + 1) + ' Good · 1 Not good'), 'after the reload with no signal the walk shows what was saved before and what is held');
       const before = (await db().collection('safetyWalks').doc(S.walkId(UT, today)).get()).data();
       assert.ok(!before.items[tapId] && !(before.items[noteId] || {}).note, 'nothing reached the server with no signal');
       // Signal back: the held saves send by themselves and the line goes away.
