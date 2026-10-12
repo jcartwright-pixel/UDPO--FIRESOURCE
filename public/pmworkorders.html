@@ -28,10 +28,9 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Plant Maintenance</span><h1>Work Orders</h1></div>
+      <div class="title"><span class="eyebrow">Plant Maintenance · <span id="plant-name"></span></span><h1>Work Orders</h1></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Mechanics work them on the Maintenance Station</span></div>
       <div class="actions in-head">
-        <select id="plant" class="pm-pick" aria-label="Plant"></select>
       </div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -55,7 +54,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchMaint, plantsOf } from './js/pmaint.js';
+    import { watchMaint, plantFor } from './js/pmaint.js';
 
     // Plant Work Orders (Joe 10/12: like the Garage Work Orders, for the plant's machinery). Made from a Maintenance Request on
     // the Maintenance Center, from a PM sent to maintenance, or by a mechanic on the Maintenance Station; worked and finished on
@@ -66,15 +65,14 @@
     const FROM = { SHIFT_NOTES: 'Request', PM: 'PM', MAINTENANCE: 'Maintenance' };
     const FILTERS = [['open', 'Open'], ['parts', 'Waiting on parts'], ['done', 'Done'], ['all', 'All']];
     let plant = params.get('plant') || '', filter = 'open', search = '', person = null, app = {}, data = null, db = null, stop = null;
-    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
     const when = (s) => { const t = Date.parse(s || ''); return isFinite(t) ? shortDate(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })) : ''; };
     const hm = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' m' : m + ' m';
     const weekAgo = () => new Date(Date.now() - 7 * 86400000).toISOString();
 
     function render() {
-      const ps = plantsOf(person);
-      if (!ps.some(p => p.id === plant)) plant = ps[0].id;
-      document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
+      const pl = plantFor(person, plant);
+      if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
+      document.getElementById('plant-name').textContent = pl.name;
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? 'NEW APP' : 'TEST COPY';
       const orders = data ? data.workOrders : [], open = orders.filter(o => R.isOpen(o));
@@ -103,7 +101,6 @@
 
     document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
     document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; history.replaceState(null, '', '?plant=' + encodeURIComponent(plant)); follow(); });
     window.udBack = () => { if (filter !== 'open' || search) { filter = 'open'; search = ''; document.getElementById('search').value = ''; render(); return true; } return false; };
 
     function follow() {

@@ -388,7 +388,7 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
   .quality-page .qc-heads { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* ---------- Incident & Breakdown Log (shiftnotes.html); it borrows the quality form styles ---------- */
+/* ---------- Shift Notes (shiftnotes.html); it borrows the quality form styles ---------- */
 .shift-page .sn-form { margin: 0; flex: 1 1 auto; min-height: 0; }
 /* Option A (Joe 10/10): kinds of entry on the left, open items carried over on top, the new entry below; no shift to pick. */
 .shift-page .sn-since { display: inline-flex; align-items: center; gap: 6px; height: 44px; border: 1px solid #b8cadb; border-radius: 9px; padding: 0 12px; font-size: 15px; font-weight: 700; color: var(--ink); background: #fff; white-space: nowrap; }

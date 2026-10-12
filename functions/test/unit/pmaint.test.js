@@ -37,6 +37,9 @@ test('a breakdown\'s Equipment box finds its machine by name, any case and spaci
   assert.equal(R.findMachine(list, ' gallon  filler ').id, 'ut_prod_gallon_filler');
   assert.equal(R.findMachine(list, 'Dock 3 door'), null);
   assert.equal(R.findMachine(list, ''), null);
+  // Joe 10/12 types what broke in his own words: a machine named inside them still finds it, whole words only.
+  assert.equal(R.findMachine(list, 'Gallon filler bowl leaking').id, 'ut_prod_gallon_filler');
+  assert.equal(R.findMachine(list, 'gallon fillers'), null);
 });
 
 test('work orders are M-1001 on; NEW, WORKING and PARTS are open', () => {

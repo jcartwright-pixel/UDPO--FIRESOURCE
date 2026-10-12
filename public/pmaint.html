@@ -28,14 +28,13 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Plant Maintenance</span><h1>Maintenance Center</h1></div>
+      <div class="title"><span class="eyebrow">Plant Maintenance · <span id="plant-name"></span></span><h1>Maintenance Center</h1></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <div class="actions in-head">
         <a class="pm-btn" href="machinery.html">Machinery</a>
         <a class="pm-btn" href="pmworkorders.html">Work Orders</a>
         <a class="pm-btn" href="pmschedule.html">PM Schedule</a>
         <a class="pm-btn" href="maint-station.html">Maintenance Station</a>
-        <select id="plant" class="pm-pick" aria-label="Plant"></select>
       </div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -57,7 +56,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchMaint, plantsOf } from './js/pmaint.js';
+    import { watchMaint, plantFor } from './js/pmaint.js';
 
     // Maintenance Center (Joe 10/12, mock-up A): what the plant asked for (Shift Notes' Maintenance Requests), each made into a
     // work order or marked already fixed; the breakdowns recorded today (fixed on the spot, not requested); the open work orders;
@@ -68,7 +67,6 @@
     const doing = new Set();
     const canSave = () => L.hasRole(person, L.SAVE_ROLES) && L.screenState(app, 'plant').open;
     const canPm = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
-    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
     const day = (k) => (/^\d{4}-\d\d-\d\d/.test(String(k || '')) ? shortDate(String(k).slice(0, 10)) : '');
     const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
     const hm = (n) => n === null || n === undefined ? '' : n >= 60 ? Math.floor(n / 60) + ' h ' + (n % 60) + ' m' : n + ' min';
@@ -77,9 +75,9 @@
     const WO_CLASS = { NEW: 'amber', WORKING: 'blue', PARTS: 'amber', DONE: 'green' };
 
     function render() {
-      const ps = plantsOf(person);
-      if (!ps.some(p => p.id === plant)) plant = ps[0].id;
-      document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
+      const pl = plantFor(person, plant);
+      if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
+      document.getElementById('plant-name').textContent = pl.name;
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
       if (!data) return;
@@ -127,7 +125,6 @@
       else if (b.dataset.fixed) act(b.dataset.fixed, 'saveShiftNote', { values: { Entry: 'Already fixed (maintenance)', Type: 'REVIEW', ParentId: b.dataset.fixed }, notes: '', followUpStatus: 'RESOLVED' }, 'Marked fixed.');
       else if (b.dataset.pm) act(b.dataset.pm, 'sendPmToMaintenance', { taskId: b.dataset.pm }, 'Sent to maintenance.');
     });
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; history.replaceState(null, '', '?plant=' + encodeURIComponent(plant)); follow(); });
 
     function follow() {
       if (stop) stop();

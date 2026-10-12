@@ -28,12 +28,11 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Plant Maintenance</span><h1>Machinery</h1></div>
+      <div class="title"><span class="eyebrow">Plant Maintenance · <span id="plant-name"></span></span><h1>Machinery</h1></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <div class="actions in-head">
         <button type="button" class="pm-btn pri" id="add">+ Add Machine</button>
         <select id="area" class="pm-pick" aria-label="Area"></select>
-        <select id="plant" class="pm-pick" aria-label="Plant"></select>
       </div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -56,7 +55,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchMaint, plantsOf } from './js/pmaint.js';
+    import { watchMaint, plantFor } from './js/pmaint.js';
     import { savedText } from './js/autosave.js';
 
     // Machinery (Joe 10/12, mock-up C): every machine of the plant, its production lines first coming in by themselves, and
@@ -76,9 +75,9 @@
     const nextPm = (m) => !m.nextPm ? '' : m.nextPm.state === 'LATE' ? '<span class="pm-late">' + m.nextPm.late + ' day' + (m.nextPm.late === 1 ? '' : 's') + ' late</span>' : day(m.nextPm.due);
 
     function drawTop() {
-      const ps = plantsOf(person);
-      if (!ps.some(p => p.id === plant)) plant = ps[0].id;
-      document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
+      const pl = plantFor(person, plant);
+      if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
+      document.getElementById('plant-name').textContent = pl.name;
       const areas = data ? [...new Set(data.machines.map(m => m.area).filter(Boolean))].sort() : [];
       if (area && areas.indexOf(area) < 0) area = '';
       document.getElementById('area').innerHTML = opt('', area, 'All Areas') + areas.map(a => opt(a, area, a)).join('') + opt('-', area, 'No area yet');
@@ -169,7 +168,6 @@
     document.getElementById('rows').addEventListener('click', e => { const r = e.target.closest('[data-id]'); if (!r) return; adding = false; chosen = r.dataset.id; note = ''; setUrl(); render(true); });
     document.getElementById('add').addEventListener('click', () => { if (!canSave()) return; adding = true; note = ''; render(true); });
     document.getElementById('area').addEventListener('change', e => { area = e.target.value; render(); });
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; chosen = ''; adding = false; setUrl(); follow(); });
     window.udBack = () => { if (adding) { adding = false; render(true); return true; } return false; };
 
     function follow() {

@@ -25,9 +25,11 @@ const SIZES = [[1536, 730], [1920, 950]];
 let n = 0;
 const act = (email, action, fields) => applyAction(db(), { email }, Object.assign({ action, requestId: 'pmaint-browser-' + (++n) + '-' + Date.now() }, fields));
 
-async function openPage(browser, width, height, url, touch) {
+async function openPage(browser, width, height, url, touch, plantHome) {
   const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: !!touch });
   const page = await ctx.newPage();
+  // The plant home he came in through (company.html keeps it in sessionStorage udPlant).
+  if (plantHome) await page.addInitScript(p => sessionStorage.setItem('udPlant', p), plantHome);
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
@@ -45,6 +47,12 @@ async function smallest(page, what) {
   const small = await page.evaluate(() => [...document.querySelectorAll('#screen .view *')].filter(e => e.offsetParent && [...e.childNodes].some(c => c.nodeType === 3 && c.textContent.trim()))
     .map(e => [parseFloat(getComputedStyle(e).fontSize), e.className, e.textContent.trim().slice(0, 30)]).filter(x => x[0] < 15));
   assert.deepEqual(small, [], what + ': no words on the screen itself smaller than 15px (the header is the app\'s own)');
+}
+// Joe 10/12: "Once I'm in Uniontown I shouldn't need to select": no plant picker, the plant's name is in the header.
+async function plantInHeader(page, what, name) {
+  assert.equal(await page.$('#plant'), null, what + ': no plant picker');
+  await page.waitForFunction(n => document.getElementById('plant-name').textContent === n, name || 'Uniontown');
+  assert.match(await page.textContent('.head .eyebrow'), new RegExp('Plant Maintenance · ' + (name || 'Uniontown')));
 }
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') }); };
 
@@ -73,6 +81,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       assert.match(await page.textContent('#requests'), /GALLON FILLER[\s\S]*Water leak under the pasteurizer[\s\S]*can wait: this week/);
       assert.match(await page.textContent('#kpis'), /Requests waiting[\s\S]*PMs overdue/);
       assert.match(await page.textContent('#pms'), /Grease filler bowl bearings[\s\S]*late/);
+      await plantInHeader(page, 'Maintenance Center ' + w);
       await fits(page, 'Maintenance Center ' + w);
       await smallest(page, 'Maintenance Center ' + w);
       await shot(page, 'pmaint-center-' + w);
@@ -95,6 +104,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       const page = await openPage(browser, w, h, '/machinery.html?plant=fac_uniontown&machine=ut_prod_gallon_filler&' + ADMIN);
       await page.waitForSelector('#rows tr.on');
       assert.match(await page.textContent('#card'), /GALLON FILLER[\s\S]*From your Production Lines list[\s\S]*Grease filler bowl bearings[\s\S]*History[\s\S]*Valve 14 blew a seal/);
+      await plantInHeader(page, 'Machinery ' + w);
       await fits(page, 'Machinery ' + w);
       await smallest(page, 'Machinery ' + w);
       await shot(page, 'pmaint-machinery-' + w);
@@ -118,6 +128,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       const page = await openPage(browser, w, h, '/pmschedule.html?plant=fac_uniontown&' + ADMIN);
       await page.waitForSelector('#rows tr[data-id]');
       assert.match(await page.innerHTML('#rows'), /Overdue \(1\)[\s\S]*Grease filler bowl bearings[\s\S]*Sent · M-1002[\s\S]*Later \(1\)[\s\S]*Blow down/);
+      await plantInHeader(page, 'PM Schedule ' + w);
       await fits(page, 'PM Schedule ' + w);
       await smallest(page, 'PM Schedule ' + w);
       await shot(page, 'pmaint-pmschedule-' + w);
@@ -142,6 +153,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       const page = await openPage(browser, w, h, '/pmworkorders.html?plant=fac_uniontown&' + ADMIN);
       await page.waitForFunction(() => document.querySelectorAll('#rows tr').length === 2 && /M-1001/.test(document.getElementById('rows').textContent));
       assert.match(await page.textContent('#rows'), /M-1002[\s\S]*PM[\s\S]*M-1001[\s\S]*Request[\s\S]*This week/);
+      await plantInHeader(page, 'Work Orders ' + w);
       await fits(page, 'Work Orders ' + w);
       await smallest(page, 'Work Orders ' + w);
       await shot(page, 'pmaint-workorders-' + w);
@@ -150,11 +162,27 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
     }
     results.push('Work Orders: M-1001 (request) and M-1002 (PM) listed');
 
+    // The plant comes from the plant home he opened, not a picker: Charleston's home opens Charleston's pages and station.
+    for (const url of ['/pmaint.html?', '/machinery.html?', '/pmschedule.html?', '/pmworkorders.html?']) {
+      const page = await openPage(browser, 1536, 730, url + ADMIN, false, 'fac_charleston');
+      await plantInHeader(page, url, 'Charleston');
+      assert.match(page.url(), /plant=fac_charleston/);
+      assert.deepEqual(page.errors, []);
+      await page.context().close();
+    }
+    const chs = await openPage(browser, 1280, 800, '/maint-station.html', true, 'fac_charleston');
+    await chs.waitForSelector('#jobs .gs-empty');
+    assert.match(await chs.textContent('#title'), /Maintenance Station · Charleston/);
+    assert.doesNotMatch(await chs.textContent('#jobs'), /M-1001/, 'Charleston\'s station shows only Charleston\'s work orders');
+    await chs.context().close();
+    results.push('Plant comes from the plant home opened: no plant picker; Charleston\'s home opens Charleston\'s pages and station');
+
     // Maintenance Station: no sign-in to see the work orders; name + login ID to start; Complete with a signature.
     for (const [w, h] of [[1280, 800], [1920, 1080]]) {
       const page = await openPage(browser, w, h, '/maint-station.html', true);
       await page.waitForSelector('#jobs .gs-job');
       assert.match(await page.textContent('#jobs'), /GALLON FILLER[\s\S]*M-1001/);
+      assert.match(await page.textContent('#title'), /Maintenance Station · Uniontown/);
       await fits(page, 'Maintenance Station ' + w);
       await shot(page, 'pmaint-station-' + w);
       assert.deepEqual(page.errors, []);
