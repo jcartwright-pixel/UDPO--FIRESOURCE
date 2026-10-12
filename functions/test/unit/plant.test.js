@@ -28,7 +28,7 @@ test('Start, End and the status picker follow the current app\'s rule', async ()
   // Waiting clears both times.
   assert.deepEqual(await values({ plantStartedAt: 'x', completeTime: 'y' }, { status: 'NOT_STARTED' }), { completeTime: '', plantStartedAt: '', loadStatus: 'NOT_STARTED' });
   assert.throws(() => P.validateLoad({ fields: { startedAt: '2026-10-08T10:00:00Z', completedAt: '2026-10-08T09:00:00Z' } }, SaveError), /End Time cannot be before Start Time/);
-  assert.throws(() => P.validateLoad({ fields: { status: 'MAYBE' } }, SaveError), /Waiting, Loading or Done/);
+  assert.throws(() => P.validateLoad({ fields: { status: 'MAYBE' } }, SaveError), /Waiting, Loading, Paused or Done/);
   assert.throws(() => P.validateLoad({ fields: {} }, SaveError), /Nothing to save/);
 });
 
