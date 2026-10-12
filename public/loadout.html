@@ -116,6 +116,13 @@
 
     // The role, or what Administration > People & Roles allows this person (Joe 10/12: allowed but shown View only).
     let allowed = {};
+    // Joe 10/12 (a bare "View only."): say why, and which account this is.
+    let signedEmail = '';
+    const viewOnlyWhy = () => {
+      const s = L.screenState(app, 'plantLoading');
+      if (!s.open) return 'View only: ' + s.why + '.';
+      return 'View only: ' + (signedEmail || 'this account') + ' is not allowed to save Case Loadout. In Administration > People & Roles give it the Plant Employee role or allow Update route loading.';
+    };
     const canLoad = () => (L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.savePlantLoad === true) && L.screenState(app, 'plantLoading').open;
     const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 
@@ -247,7 +254,7 @@
       if (held) { const g = document.querySelector('#rows [data-id-move="' + held[0] + '"][data-move="' + held[1] + '"]'); if (g && !g.disabled) g.focus(); }
       heldMove = null;
       if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
-      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Use the up and down arrows beside a route to change this day\'s loading order.' : '') : 'View only.') + ' Changes from the sheets show here within about a minute.';
+      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Use the up and down arrows beside a route to change this day\'s loading order.' : '') : viewOnlyWhy()) + ' Changes from the sheets show here within about a minute.';
       const s = L.screenState(app, 'plantLoading');
       document.getElementById('mode-text').textContent = s.live ? (s.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
@@ -547,6 +554,7 @@
       if (box && !box.disabled && box.showPicker) { try { box.showPicker(); } catch (err) { /* not allowed here */ } }
     });
     requireSignIn(async (user) => {
+      signedEmail = user.email || '';
       ({ db } = await start());
       let askedRights = '';
       watchPerson(db, user, p => {

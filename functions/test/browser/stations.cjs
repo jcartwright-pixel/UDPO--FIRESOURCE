@@ -278,7 +278,10 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
       return pg;
     };
     const noGrant = await asRights();
-    await noGrant.waitForSelector('#work .sw-note:has-text("View only")');
+    await noGrant.waitForSelector('#work .sw-note:has-text("View only: rights.test@uniteddairy.com")');
+    const loNo = await openPage(browser, 1536, 864, '/loadout.html?testEmail=' + RIGHTS, clock);
+    await loNo.waitForSelector('#foot:has-text("View only: rights.test@uniteddairy.com is not allowed")');
+    await loNo.close();
     assert.equal(await noGrant.$('#work .sw-card:not(.done) [data-act="start"]:not([disabled])'), null, 'no Start without the role or the right');
     await noGrant.close();
     await db().collection('personRights').doc(RIGHTS).set({ grants: ['plant.loading.write'], denials: [] });
@@ -291,7 +294,11 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await granted.waitForSelector('#work .sw-card[data-sw="' + gid + '"].run .sw-badge:text-is("LOADING")', { timeout: 10000 });
     assert.deepEqual(granted.errors, []);
     await granted.close();
-    results.push('Plant Station: an account allowed "Update route loading" in People & Roles can Start a load though its role alone cannot; without it, View only says why');
+    const loYes = await openPage(browser, 1536, 864, '/loadout.html?testEmail=' + RIGHTS, clock);
+    await loYes.waitForSelector('#foot:has-text("Type a truck")', { timeout: 10000 });
+    assert.deepEqual(loYes.errors, []);
+    await loYes.close();
+    results.push('Plant Station: an account allowed "Update route loading" in People & Roles can Start a load and edit Case Loadout though its role alone cannot; without it, View only names the account and says why');
     const stPhone = await openPage(browser, 390, 844, '/plant-station.html' + MANAGER, clock);
     await stPhone.click('[data-station="CASE"]');
     await stPhone.waitForSelector('#work .sw-card');

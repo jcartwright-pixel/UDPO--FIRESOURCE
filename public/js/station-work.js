@@ -190,7 +190,7 @@ export function mountStationWork({ db, box, person }) {
     const s = L.screenState(app, 'plantLoading');
     // Joe 10/12 photo ("I can't edit", a bare "View only."): say why. Either the screen is not open, or the account signed in
     // on this tablet has no plant role in the Users list.
-    const p = person() || {}, who = p.name || p.email || 'This account';
+    const p = person() || {}, who = (p.email || (p.cells && p.cells.email) || '') + (p.name ? ' (' + p.name + ')' : '') || 'This account';
     const why = s.why || (!s.open ? '' : who + ' is not allowed to save this. In Administration > People & Roles give it the Plant Employee role or allow this work, or sign this tablet in with its station code');
     const note = person() && !canSave() ? '<p class="sw-note">View only' + (why ? ': ' + escapeHtml(why) : '') + '.</p>' : '';
     box.innerHTML = note + (view === 'loading' ? loadingView() : view === 'unloading' ? unloadingView() : view === 'washing' ? washingView() : returnsView());
