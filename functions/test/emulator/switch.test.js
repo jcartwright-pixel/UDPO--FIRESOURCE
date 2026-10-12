@@ -42,7 +42,7 @@ test('only an administrator flips the switch, and a screen needs the write-back 
   assert.equal(out.screenOwners.dailyDispatch, 'new');
   assert.equal((await config()).writeBack.enabled, true);
   // The write-back stays on while any screen belongs to the new app.
-  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), writeBack: false }, true), /back to the current app/);
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), writeBack: false }, true), /Switch every screen off/);
   const log = await db().collection('actions').where('action', '==', 'switchScreen').get();
   assert.equal(log.size, 1);
   assert.equal(log.docs[0].data().before.screenOwners.dailyDispatch, 'old');
@@ -54,7 +54,7 @@ test('once a screen is on the new app, only that screen saves there; the others 
   const ok = await applyAction(db(), DISPATCHER, assign('drv_test_adams'), tick);
   assert.equal(ok.ok, true);
   assert.equal((await db().collection('actions').doc(ok.requestId).get()).data().mode, 'live');
-  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-04' }, tick), /Weekly Dispatch is still run from the current app/);
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-04' }, tick), /Weekly Dispatch is view only until it is switched on in Administration > Go-Live Switches/);
   // Moving it back makes every screen a test copy again.
   await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'old' }, true);
   await applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-04' }, tick);
@@ -120,7 +120,7 @@ test('Plant Loading moves on its own: refused while on the current app, saved an
   await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
   await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'new' }, true);
   const load = () => ({ action: 'savePlantLoad', requestId: rid(), runDocId: '2026-10-04__run_t802', day: 'tue', fields: { status: 'LOADING' } });
-  await assert.rejects(applyAction(db(), MANAGER, load(), tick), /Plant Loading is still run from the current app/);
+  await assert.rejects(applyAction(db(), MANAGER, load(), tick), /Plant Loading is view only until it is switched on/);
   await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'plantLoading', owner: 'new' }, true);
   await applyAction(db(), MANAGER, load(), tick);
   await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
@@ -128,5 +128,5 @@ test('Plant Loading moves on its own: refused while on the current app, saved an
   assert.equal(v.find((r, i) => i > 5 && r[h.indexOf('run_id')] === 'run_t802')[h.indexOf('tue_load_status')], 'LOADING');
   // The write-back cannot be turned off while Plant Loading is on the new app.
   await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'old' }, true);
-  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), writeBack: false }, true), /Move every screen back/);
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), writeBack: false }, true), /Switch every screen off/);
 });

@@ -93,7 +93,7 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -256,7 +256,9 @@
       if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
       document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Use the up and down arrows beside a route to change this day\'s loading order.' : '') : viewOnlyWhy()) + ' Changes from the sheets show here within about a minute.';
       const s = L.screenState(app, 'plantLoading');
-      document.getElementById('mode-text').textContent = s.live ? (s.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      goLiveNote(s.live && s.owner !== 'new');
+      // Joe 10/12: no "new app" words; not switched on says where to switch it.
+      document.getElementById('mode-text').textContent = s.live ? (s.open ? 'LIVE' : s.owner === 'new' ? 'VIEW ONLY: WRITE-BACK TO THE SHEET IS OFF' : 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES') : 'TEST COPY';
     }
 
     function rowById(id) { return rowsNow().find(r => r.id === id); }

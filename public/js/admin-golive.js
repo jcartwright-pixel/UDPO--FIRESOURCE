@@ -1,7 +1,7 @@
 /*
- * Administration > Go-Live Switches (Joe 10/12, mock-up A): the one place to move screens between the current app and the
- * new app, instead of the tags on the Route Distribution cards (which can no longer be clicked). One row per screen: which
- * app runs it, whether it is ready and why, Move to new app / Move back, and Mark fully live (its tag comes off the cards).
+ * Administration > Go-Live Switches (Joe 10/12, mock-up A): the one place to see and change which screens are switched on
+ * (Joe 10/12 later: the cards carry no tags at all). One row per screen: On / Off / Fully live, whether it is ready and why,
+ * Switch on / Switch off, and Mark fully live.
  * "Turn on everything that is ready" turns the write-back on and moves every ready screen. Every button is pressed twice.
  * The server (functions/src/switch.js) checks the same rules (logic.js GO_LIVE).
  */
@@ -17,8 +17,8 @@ export async function renderGoLive(box) {
   box.innerHTML = '<div class="ap gl">' +
     '<div class="ap-bar"><button type="button" class="ap-btn gl-all" id="gl-all">Turn on everything that is ready</button><span class="gl-sum" id="gl-sum"></span>' +
     '<div class="ap-right"><span class="gl-wb" id="gl-wb"></span><button type="button" class="ap-btn" id="gl-wb-btn"></button></div></div><div class="ap-msg" hidden></div>' +
-    '<div class="ap-scroll gl-scroll"><table class="gl-t"><thead><tr><th class="gl-c-name">Screen</th><th class="gl-c-own">Runs from</th><th class="gl-c-ready">Ready?</th><th>Why</th><th class="gl-c-acts">Change (press twice)</th></tr></thead><tbody id="gl-rows"></tbody></table></div>' +
-    '<p class="ap-note">Every button here is pressed twice. "Fully live" takes the screen\'s tag off the cards; Move back still works from here in an emergency. The tags on the cards can no longer be clicked.</p></div>';
+    '<div class="ap-scroll gl-scroll"><table class="gl-t"><thead><tr><th class="gl-c-name">Screen</th><th class="gl-c-own">Switched on?</th><th class="gl-c-ready">Ready?</th><th>Why</th><th class="gl-c-acts">Change (press twice)</th></tr></thead><tbody id="gl-rows"></tbody></table></div>' +
+    '<p class="ap-note">Every button here is pressed twice. A screen that is not switched on is view only and says so on the screen. Switch off still works from here in an emergency.</p></div>';
   const $ = (s) => box.querySelector(s);
   let config = null;
 
@@ -38,12 +38,12 @@ export async function renderGoLive(box) {
     const rows = keys.map(k => Object.assign({ key: k, name: L.SCREENS[k] }, L.GO_LIVE[k])).concat(L.GO_LIVE_LATER.map(x => Object.assign({ key: '', ready: false }, x)));
     $('#gl-rows').innerHTML = rows.map(r => {
       const own = r.key && owners[r.key] === 'new' ? (L.fullyLive(config, r.key) ? 'live' : 'new') : 'old';
-      const chip = own === 'live' ? '<span class="gl-chip live">Fully live</span>' : own === 'new' ? '<span class="gl-chip new">New app</span>' : '<span class="gl-chip old">Current app</span>';
+      const chip = own === 'live' ? '<span class="gl-chip live">Fully live</span>' : own === 'new' ? '<span class="gl-chip new">On</span>' : '<span class="gl-chip old">Off</span>';
       const b = (act, label, main, off) => '<button type="button" class="ap-btn small' + (main ? ' main' : '') + '" data-act="' + act + '" data-key="' + r.key + '"' + (off ? ' disabled' : '') + '>' + label + '</button>';
-      const acts = !r.ready ? b('new', 'Move to new app', false, true) + b('live', 'Mark fully live', false, true)
-        : own === 'live' ? b('old', 'Move back') + b('unlive', 'Show tag again')
-        : own === 'new' ? b('old', 'Move back') + b('live', 'Mark fully live', true)
-        : b('new', 'Move to new app', true) + b('live', 'Mark fully live', false, true);
+      const acts = !r.ready ? b('new', 'Switch on', false, true) + b('live', 'Mark fully live', false, true)
+        : own === 'live' ? b('old', 'Switch off') + b('unlive', 'Undo fully live')
+        : own === 'new' ? b('old', 'Switch off') + b('live', 'Mark fully live', true)
+        : b('new', 'Switch on', true) + b('live', 'Mark fully live', false, true);
       const head = r.area !== area ? '<tr class="gl-grp"><td colspan="5">' + e(area = r.area) + '</td></tr>' : '';
       return head + '<tr data-row="' + e(r.key || r.name) + '"><td class="gl-name">' + e(r.name) + '</td><td>' + chip + '</td><td>' + (r.ready ? '<span class="gl-chip ready">Ready</span>' : '<span class="gl-chip not">Not ready</span>') +
         '</td><td class="gl-why">' + e(r.why) + '</td><td><div class="gl-acts">' + acts + '</div></td></tr>';

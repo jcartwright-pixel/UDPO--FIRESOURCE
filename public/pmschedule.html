@@ -87,7 +87,7 @@
       document.getElementById('add').disabled = !canSave();
       document.getElementById('add').textContent = adding ? 'Close' : '+ Add PM Task';
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       const form = document.getElementById('form');
       form.hidden = !adding;
       const fm = document.getElementById('f-machine');

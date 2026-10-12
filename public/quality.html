@@ -160,7 +160,7 @@
         '<tr><td colspan="7" class="empty">No quality checks have been recorded during this operational day.</td></tr>';
       document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Each box saves as you leave it, with the time and who entered it; the check is the line\'s status now. After Send Current Report the boxes start empty for the next round.' : 'View only.') : hist.length + ' check' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours, all production lines.';
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
     function readForm(line) {

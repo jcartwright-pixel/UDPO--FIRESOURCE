@@ -88,7 +88,7 @@
       if (!ps.some(p => p.id === plant)) plant = ps[0].id;
       document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
     // The label reader panel (administrators): the line PC's key (shown once) and, on the sandbox, the test feed of pretend jugs.
     const SANDBOX = !/^ud-distribution\.(web\.app|firebaseapp\.com)$/.test(location.hostname);

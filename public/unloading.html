@@ -155,7 +155,7 @@
       document.getElementById('foot').textContent = mine.length + ' ' + name.toLowerCase() + ' loads back ' + (date === today() ? 'today' : 'on ' + shortDate(date)) + '. ' +
         (ck ? 'Start, type the count, then End. One unload at a time.' : canSave() ? 'View Only: press Check Off to work the list.' : 'View only.') + ' Changes show on every screen at once.';
       const st = L.screenState(app, 'plantLoading');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
     const rowByKey = (key) => data().rows.find(r => r.key === key);

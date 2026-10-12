@@ -139,7 +139,7 @@
       if (!ck) bar.hidden = true;
       else if (!bar.hidden && got.runs && (document.activeElement !== loadBox || loadBox.value === '')) fillLoads();
       const st = L.screenState(app, 'plantLoading');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
     // Details: the whole write-up of one return (who, when, route, driver, truck, trailer, store, product, cases, notes, source).

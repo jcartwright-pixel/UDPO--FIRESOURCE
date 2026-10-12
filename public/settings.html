@@ -50,7 +50,7 @@
         row('Operating day', 'Starts at ' + L.DAY_ROLL_HOUR + ':00 AM New York time; before that it is still the day before') +
         row('Load order', 'The Live sheet\'s load order change first, then Route Master\'s load order') + row('Route Master times', 'Kept in GMT, shown in New York time');
       document.getElementById('owners').innerHTML = Object.keys(L.SCREENS).map(k => { const s = L.screenState(app, k);
-        return '<tr><td>' + escapeHtml(L.SCREENS[k]) + '</td><td>' + (s.owner === 'new' ? 'New app' : 'Current app') + '</td><td>' + (app.mode !== 'live' ? 'Test copy only' : s.open ? 'Saved here' : 'View only here') + '</td></tr>'; }).join('');
+        return '<tr><td>' + escapeHtml(L.SCREENS[k]) + '</td><td>' + (s.owner === 'new' ? 'Switched on' : 'Not switched on') + '</td><td>' + (app.mode !== 'live' ? 'Test copy only' : s.open ? 'Saved here' : 'View only here') + '</td></tr>'; }).join('');
       const cvg = (lists.ops || []).filter(o => o.active !== false).map(o => o.assignment).join(', ');
       document.getElementById('lists').innerHTML = row('Drivers offered', lists.drivers.length + ' active drivers; days off and inactive drivers only with OVR') +
         row('Trucks / trailers offered', lists.trucks.length + ' trucks and ' + lists.trailers.length + ' trailers at Uniontown that are not down; a unit on the road on another run is marked') +

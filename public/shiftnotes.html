@@ -232,7 +232,7 @@
       if (!busy(hist)) hist.innerHTML = rows.map(r => card(r, ck)).join('') || '<div class="empty">No entries in the last 24 hours.</div>';
       document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Every box saves by itself when you leave it. Send Current Report sends what is new since the last report and empties the entry boxes; anything not resolved stays here until it is.' : 'View only.') : rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' in the last 24 hours.';
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
     const record = (values, extra) => ({ type: U.SHIFT_TYPE, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, area: 'HANDOFF', payload: Object.assign({ section: 'HANDOFF', values }, extra) });

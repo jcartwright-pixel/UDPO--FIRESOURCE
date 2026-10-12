@@ -1693,3 +1693,7 @@ body.uc-locked #screen > :not(.topbar):not(.uc-refused) { display: none !importa
 .day-pin #go-today { height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid #e5891a; background: #fff4e5; color: #8a4b00; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .day-pin[hidden] { display: none !important; }
 #week-panel .week-warn { font-size: 16px; line-height: 1.45; margin: 4px 0 14px; color: #8a4b00; font-weight: 700; }
+
+/* Joe 10/12: a screen not switched on in Go-Live Switches says so in one line under its title. */
+.golive-note { margin: 0 16px 8px; padding: 8px 14px; border-radius: 8px; background: #fff4e5; color: #8a4b00; border: 1px solid #f0d48a; font-size: 16px; font-weight: 700; }
+.golive-note[hidden] { display: none; }

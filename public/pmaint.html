@@ -79,7 +79,7 @@
       if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
       document.getElementById('plant-name').textContent = pl.name;
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       if (!data) return;
       const today = data.today, ck = canSave(), ckPm = canPm();
       const waiting = data.requests.filter(r => !r.workOrder && r.status !== 'RESOLVED');

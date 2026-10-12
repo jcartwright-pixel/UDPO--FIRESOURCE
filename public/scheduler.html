@@ -160,7 +160,7 @@
       const hs = body.querySelector('#hist-search');
       if (hs) { hs.value = search; hs.oninput = () => { search = hs.value; filterHistory(); }; filterHistory(); }
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       if (!document.getElementById('modal').hidden && openDay) drawDay(openDay);
     }
     function filterWho() {

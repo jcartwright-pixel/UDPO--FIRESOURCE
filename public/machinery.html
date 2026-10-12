@@ -83,7 +83,7 @@
       document.getElementById('area').innerHTML = opt('', area, 'All Areas') + areas.map(a => opt(a, area, a)).join('') + opt('-', area, 'No area yet');
       document.getElementById('add').disabled = !canSave();
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
     function drawList() {

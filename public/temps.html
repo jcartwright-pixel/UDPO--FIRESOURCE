@@ -149,7 +149,7 @@
       // Joe 10/10: when MOCREO was last read (the footer has the details).
       document.getElementById('sensor-at').textContent = 'Last Sensor Update: ' + (mocreo.configured && mocreo.lastSuccess ? clock(mocreo.lastSuccess) : '—');
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
     const rowsEl = document.getElementById('rows');

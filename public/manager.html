@@ -173,7 +173,7 @@
       ['send-card', 'send'].forEach(id => { const sb = document.getElementById(id); if (sb.textContent !== 'Sending…') { sb.disabled = !ready(); sb.title = ready() ? '' : 'Loading the plant\'s data…'; } });
       if (!document.getElementById('modal').hidden) drawReport();
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       // Send Current Report from the Plant menu (manager.html?report=1): open the full report once it is ready.
       if (askReport) { askReport = false; openReport(); }
     }

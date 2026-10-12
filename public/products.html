@@ -143,7 +143,7 @@
       ['edit-setup', 'upload'].forEach(id => { document.getElementById(id).disabled = !ck || pane !== 'list'; });
       document.getElementById('template').disabled = pane !== 'list';
       ['group', 'area', 'plant'].forEach(id => { document.getElementById(id).disabled = pane !== 'list'; });
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       ['list', 'setup', 'preview'].forEach(p => { document.getElementById(p + '-pane').hidden = pane !== p; });
     }
 
