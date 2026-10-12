@@ -5,7 +5,7 @@ name: Deploy distribution app (Firebase)
 # - production: only after Joe's release words for the new app. Production runs only by hand ("Run workflow"), only
 #   from main, only with "DEPLOY PRODUCTION" typed in the confirm box, and only once the production project's deploy
 #   key and name are saved in GitHub (PRODUCTION.md). Its settings come from production-settings.json, checked by
-#   tools/production-env.cjs: the real sheets, read only, never the sandbox copies, never a write-back.
+#   tools/production-env.cjs: the real sheets, never the sandbox copies; writes only dispatch changes to the real Live sheet.
 # Needs, per target, the repository secret FIREBASE_SERVICE_ACCOUNT_SANDBOX / FIREBASE_SERVICE_ACCOUNT_PRODUCTION
 # (a deploy key for that Firebase project) and the variable FIREBASE_PROJECT_SANDBOX / FIREBASE_PROJECT_PRODUCTION.
 # Without them it stops with a notice and deploys nothing. It never changes the current Apps Script app.
@@ -72,7 +72,7 @@ jobs:
             if [ "$EVENT" != workflow_dispatch ]; then echo "::error::Production deploys only from Run workflow"; exit 1; fi
             if [ "$REF" != refs/heads/main ]; then echo "::error::Production deploys only from main (this run is on $REF)"; exit 1; fi
             if [ "$CONFIRM" != 'DEPLOY PRODUCTION' ]; then echo "::error::Type DEPLOY PRODUCTION in the confirm box to deploy production"; exit 1; fi
-            # The server settings are checked before anything is installed: real sheets, read only, no sandbox copies.
+            # The server settings are checked before anything is installed: real sheets, no sandbox copies, writes to the real Live sheet only.
             node ../tools/production-env.cjs > /dev/null
           fi
           if [ "$TARGET" = production ]; then sa="$SA_PRODUCTION"; project="$PROJECT_PRODUCTION"; else sa="$SA_SANDBOX"; project="$PROJECT_SANDBOX"; fi
@@ -121,7 +121,7 @@ jobs:
             # The sandbox emails only the person who pressed Send (no REPORT_TO here).
             printf 'MAIL_FROM=%s\n' "$SANDBOX_MAIL_FROM" >> .env
           else
-            # Production: the real sheets, read only (production-settings.json, plus PRODUCTION_ENV lines such as REPORT_TO).
+            # Production: the real sheets; dispatch changes written to the real Live sheet only (production-settings.json, plus PRODUCTION_ENV lines such as REPORT_TO).
             # The check refuses a write-back, the made-up sheets and any sandbox copy, and stops the deploy.
             node ../tools/production-env.cjs > .env
           fi
