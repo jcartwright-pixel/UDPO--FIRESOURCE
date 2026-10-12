@@ -57,6 +57,7 @@
       <div class="badge-test" id="mode"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <div class="notice warning down-loads" id="down-loads" hidden><span id="down-loads-text"></span> <button type="button" id="down-loads-clear">Take them off these loads</button></div>
     <div class="sheet">
       <table class="daily">
         <colgroup>
@@ -182,6 +183,39 @@
       return on;
     }
 
+    // Joe 10/12 ("537 is on the list being down but shows on dispatch"): a down truck or trailer still on a load shows red with DOWN,
+    // so it is plain that the load needs another unit.
+    const unitById = (id) => id ? lists.fleetTrucks.concat(lists.fleetTrailers).find(e => String(e.id).toUpperCase() === String(id).toUpperCase()) : null;
+    function unitCell(r, kind, live, needs) {
+      const text = kind === 'truck' ? r.truck || (noTractor(r) ? 'N/A' : '') : r.trailer, unit = unitById(kind === 'truck' ? r.truckId : r.trailerId);
+      if (!r.off && unit && L.unitOff(unit)) {
+        const why = String(unit.status).toUpperCase() === 'DOWN' ? 'DOWN' : String(unit.status).replace(/_/g, ' ').toUpperCase();
+        const reason = String(unit.notes || '').replace(/^DOWN:?\s*/i, '').split('|')[0].trim();
+        return cell(text + ' ' + why, 'missing offcover unit-down', live && kind).replace(/title="[^"]*"/, () => 'title="' + escapeHtml(text + ' is ' + why.toLowerCase() + (reason && !/^down\b/i.test(reason) ? ' (' + reason + ')' : '') + '. Pick another ' + kind + '.') + '"');
+      }
+      return kind === 'truck' ? cell(text, r.truck || !needs || noTractor(r) ? '' : 'missing', live && 'truck') : cell(text, r.trailer || !needs ? '' : 'missing', live && 'trailer');
+    }
+    // Every load from today on (in the weeks on screen) that still has a down unit, with one button to take those units off.
+    function paintDownLoads(edit) {
+      const box = document.getElementById('down-loads'), list = L.offUnitLoads(runs, lists.fleetTrucks.concat(lists.fleetTrailers), L.operatingDay(new Date()));
+      box.hidden = !list.length;
+      if (!list.length) return;
+      const units = [...new Set(list.map(x => x.unit))];
+      document.getElementById('down-loads-text').textContent = (units.length === 1 ? units[0] + ' is on the down list but is still on ' : 'On the down list but still on loads: ') +
+        list.map(x => (units.length === 1 ? '' : x.unit + ' on ') + 'Route ' + x.route + ' (' + L.dayName(x.date).slice(0, 3) + ' ' + shortDate(x.date) + ')').join(', ') + '.';
+      const btn = document.getElementById('down-loads-clear');
+      btn.hidden = !edit;
+      btn.textContent = units.length === 1 ? 'Take ' + units[0] + ' off these loads' : 'Take them off these loads';
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try {
+          for (const id of [...new Set(list.map(x => x.unitId))]) {
+            await saveOptimistic('setUnitDown', { equipmentId: id, clearOnly: true, today: L.operatingDay(new Date()) }, () => {}, () => {}, render);
+          }
+        } finally { btn.disabled = false; }
+      };
+    }
+
     function render() {
       if (editing) return; // a picker is open; the next render happens when it closes
       if (dragging) { dragging.held = true; return; } // a load is being moved; the screen redraws when it is let go
@@ -220,8 +254,7 @@
             ? cell('', 'missing offcover', live && 'driver').replace('<td ', '<td data-cover="' + escapeHtml(coverLabel(cover[r.id])) + '" ').replace('title=""', 'title="' + escapeHtml(coverLabel(cover[r.id]) + ': needs a driver') + '"')
             : cell(driver, driver || !needs ? '' : 'missing', live && 'driver')) +
           '<td><input type="checkbox" class="ovr" data-ovr aria-label="Override" title="Override: choose a driver or unit that is off or down"' + (ovr[r.id] ? ' checked' : '') + (live ? '' : ' disabled') + '></td>' +
-          cell(r.truck || (noTractor(r) ? 'N/A' : ''), r.truck || !needs || noTractor(r) ? '' : 'missing', live && 'truck') +
-          cell(r.trailer, r.trailer || !needs ? '' : 'missing', live && 'trailer') +
+          unitCell(r, 'truck', live, needs) + unitCell(r, 'trailer', live, needs) +
           cell(departText(r), '', live && 'time') + cell(r.palletJack, '', live && 'jack') +
           (r.pickup ? cell('PICKUP ' + r.pickup, 'pickup') : cell(r.driverNotes, 'left', live && 'note')) +
           '<td>' + (edit ? '<button type="button" class="edit" data-open>Edit</button>' : '') + '</td></tr>');
@@ -229,6 +262,7 @@
       // Polish item 17 (Joe 10/11): a plain line that names the day and says what to do.
       if (!rows.length) body.push('<tr><td colspan="11" class="empty">No loads on ' + L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(loadDate))] + ' ' + shortDate(loadDate) + '. Use the arrows to pick another day.</td></tr>');
       keepCursor(document.getElementById('rows'), () => { document.getElementById('rows').innerHTML = body.join(''); });
+      paintDownLoads(edit);
       const running = rows.filter(r => !r.off && !r.already), covered = running.filter(r => !L.needsDriver(r)).length;
       // Polish item 3 (Joe 10/11): a day with no loads says so instead of showing 0% covered.
       document.getElementById('coverage').firstElementChild.textContent = running.length ? Math.round(100 * covered / running.length) + '%' : '—';

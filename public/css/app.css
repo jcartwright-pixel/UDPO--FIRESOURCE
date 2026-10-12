@@ -1674,3 +1674,9 @@ body.uc-locked #screen > :not(.topbar):not(.uc-refused) { display: none !importa
 .launch-grid.six.seven .launch-card strong { font-size: 21px; }
 @media (max-width: 1200px) { .launch-grid.six.seven { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .launch-grid.six.seven { grid-template-columns: 1fr; } }
+
+/* Joe 10/12: a down truck or trailer still on a load (Daily Dispatch banner; Weekly unit text). */
+.notice.warning.down-loads { margin: 0 16px 8px; background: #fde8e8; color: #9b1c1c; border: 2px solid #ee3e3e; border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.notice.warning.down-loads[hidden] { display: none; }
+.notice.warning.down-loads button { background: #b3261e; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.week td.day .unit .unit-down { color: #b3261e; font-weight: 800; }

@@ -77,3 +77,19 @@ test('Down Trucks: the reason is optional and the reply lists the routes the uni
   assert.equal(unit.status, 'DOWN');
   assert.equal(unit.notes, 'DOWN');
 });
+
+test('Down Trucks: a unit already down but still on loads (the current app put it back) is taken off them, its reason kept (Joe 10/12)', async () => {
+  // The unit is down in Equipment Master, yet Tuesday 801 this week and next still carry it.
+  await db().collection('equipment').doc('veh_truck_900002').update({ status: 'DOWN', notes: 'DOWN: Brakes' });
+  const equipment = (await db().collection('equipment').get()).docs.map(s => s.data());
+  assert.deepEqual(L.offUnitLoads(await runs(), equipment, '2026-10-06').filter(x => x.unitId === 'veh_truck_900002').map(x => [x.route, x.date]), [['801', '2026-10-06'], ['801', '2026-10-13']]);
+  const out = await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_truck_900002', clearOnly: true, today: '2026-10-06' });
+  assert.deepEqual(out.taken.map(t => [t.route, t.date]), [['801', '2026-10-06'], ['801', '2026-10-13']]);
+  const unit = (await db().collection('equipment').doc('veh_truck_900002').get()).data();
+  assert.equal(unit.status, 'DOWN');
+  assert.equal(unit.notes, 'DOWN: Brakes', 'the reason stays');
+  assert.equal((await run('2026-10-04__run_t801')).days.tue.truckId, '');
+  // A unit that is back in service is not taken off anything.
+  await applyAction(db(), DISPATCHER, { action: 'setUnitUp', requestId: rid(), equipmentId: 'veh_truck_900002' });
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_truck_900002', clearOnly: true, today: '2026-10-06' }), /not on the down list/);
+});
