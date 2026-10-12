@@ -597,6 +597,20 @@ export async function requireSignIn(ready) {
     who.textContent = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || user.email || '?').slice(0, 2)).toUpperCase();
     who.title = user.email || '';
     who.classList.add('initials');
+    // Joe 10/12 ("tapping does nothing"): a tap on the circle shows the signed-in account for a few seconds.
+    who.dataset.initials = who.textContent; who.dataset.email = user.email || '';
+    who.setAttribute('role', 'button'); who.tabIndex = 0;
+    if (!who.dataset.tap) {
+      who.dataset.tap = '1';
+      let back = null;
+      const show = () => {
+        if (!who.dataset.email || !who.classList.contains('initials')) return;
+        who.textContent = who.dataset.email; who.classList.add('open');
+        clearTimeout(back); back = setTimeout(() => { who.textContent = who.dataset.initials; who.classList.remove('open'); }, 6000);
+      };
+      who.addEventListener('click', show);
+      who.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(); } });
+    }
   };
   const remember = (email) => { try { if (email) sessionStorage.setItem('udActive', email); else sessionStorage.removeItem('udActive'); } catch (e) { /* no storage */ } };
   onAuthStateChanged(auth, async (user) => {

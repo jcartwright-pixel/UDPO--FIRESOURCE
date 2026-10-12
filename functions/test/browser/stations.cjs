@@ -250,6 +250,10 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.deepEqual(clash, [], 'nothing overlaps on a card on a ' + w + ' wide tablet');
     assert.ok(await fits(upright), 'the station work fits a ' + w + ' wide tablet');
     await shot(upright, 'plant-station-case-tablet-' + w + '.png');
+    // Joe 10/12 "tapping does nothing": a tap on the account circle shows which account the tablet is signed in as.
+    await upright.tap('#who');
+    await upright.waitForSelector('#who.open:has-text("manager.test@uniteddairy.com")');
+    assert.ok(await upright.evaluate(() => { const r = document.getElementById('who').getBoundingClientRect(); return r.right <= innerWidth && parseFloat(getComputedStyle(document.getElementById('who')).fontSize) >= 16; }), 'the account shows on screen at 16px on a ' + w + ' wide tablet');
     // Joe 10/12: "it won't even let me scroll." A finger swipe up on the touch tablet must move the page.
     assert.ok(await upright.evaluate(() => document.scrollingElement.scrollHeight > innerHeight + 50), 'the station work is taller than a ' + w + ' wide tablet');
     const cdp = await upright.context().newCDPSession(upright);
@@ -294,7 +298,7 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.ok(await fits(stPhone), 'the station work fits a phone');
     await shot(stPhone, 'plant-station-case-phone-390.png');
     assert.deepEqual(stPhone.errors, []);
-    results.push('Plant Station: the employee view on the station page (today, its area, cards; Start, cases, Complete); no Back, Home, dates, Edit or links to the manager screens; nothing overlaps on a tablet 600, 800 or 1024 wide, and a finger swipe scrolls it');
+    results.push('Plant Station: the employee view on the station page (today, its area, cards; Start, cases, Complete); no Back, Home, dates, Edit or links to the manager screens; nothing overlaps on a tablet 600, 800 or 1024 wide, a finger swipe scrolls it, and a tap on the circle shows the account');
   } finally {
     await browser.close();
   }
