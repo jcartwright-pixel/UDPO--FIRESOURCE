@@ -809,6 +809,24 @@ export function fitToWindow(lineCount, gap) {
 }
 const FIT_ROW_MIN = 32, FIT_FONT_MIN = 16;
 
+// Joe 10/12: a screen not switched on in Administration > Go-Live Switches says so on the screen itself, in one short line
+// under the title (the cards carry no tags, and the TEST COPY box is hidden). show = false takes the line away.
+export function goLiveNote(show) {
+  let el = document.getElementById('golive-note');
+  if (!show) { if (el) el.hidden = true; return; }
+  if (!el) {
+    const badge = document.getElementById('mode-text');
+    const after = badge && badge.closest('.badge-test') ? badge.closest('.badge-test').parentElement : document.querySelector('main > *');
+    if (!after) return;
+    el = document.createElement('div');
+    el.id = 'golive-note';
+    el.className = 'golive-note';
+    el.textContent = 'View only until switched on in Go-Live Switches.';
+    after.insertAdjacentElement('afterend', el);
+  }
+  el.hidden = false;
+}
+
 export function escapeHtml(value) {
   return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

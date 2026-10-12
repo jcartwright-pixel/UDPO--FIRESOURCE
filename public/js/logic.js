@@ -374,9 +374,9 @@
     var owners = screenOwners(config), owner = owners[screen] || 'old', name = SCREENS[screen] || screen;
     var writeBack = !!(config && config.writeBack && config.writeBack.enabled === true);
     var anyNew = Object.keys(owners).some(function (k) { return owners[k] === 'new'; });
-    if (owner === 'new') return { owner: owner, live: true, open: writeBack, why: writeBack ? '' : name + ' belongs to the new app but the write-back is off; ask an administrator' };
+    if (owner === 'new') return { owner: owner, live: true, open: writeBack, why: writeBack ? '' : name + ' is switched on but the write-back is off; ask an administrator' };
     if (config && config.mode === 'live' && !anyNew) return { owner: owner, live: false, open: false, why: 'The app is marked live but no screen belongs to the new app; saves stay in test mode only' };
-    if (anyNew) return { owner: owner, live: true, open: false, why: name + ' is still run from the current app; save it there' };
+    if (anyNew) return { owner: owner, live: true, open: false, why: name + ' is view only until it is switched on in Administration > Go-Live Switches' };
     return { owner: owner, live: false, open: true, why: '' };
   }
 
@@ -397,7 +397,7 @@
   };
   // Shown on Go-Live Switches but not a switch yet. (Plant Loading became a switch on 10/12.)
   var GO_LIVE_LATER = [];
-  // "Fully live": the screen is on the new app for good, so its tag comes off the cards. Moving it back clears it.
+  // "Fully live": the screen is switched on for good. Switching it off clears it.
   function fullyLive(config, screen) {
     return screenOwners(config)[screen] === 'new' && !!(config && config.fullyLive && config.fullyLive[screen] === true);
   }

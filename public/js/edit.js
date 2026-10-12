@@ -5,7 +5,7 @@
  * background as one call. If the server refuses it (someone else changed that run, a unit is inactive, no
  * permission), the cell goes back to what the database holds and the reason shows as an error.
  */
-import { start, save as sendSave, savePill, showError, friendlyError, escapeHtml } from './app.js';
+import { start, save as sendSave, savePill, showError, friendlyError, escapeHtml, goLiveNote } from './app.js';
 import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const L = window.UDLogic;
@@ -82,12 +82,14 @@ export function canSave() { return L.hasRole(lists.person, L.SAVE_ROLES) && scre
 export function canReorder() { return L.hasRole(lists.person, L.REORDER_ROLES) && screenOpen(); }
 export function canManage() { return L.hasRole(lists.person, L.DRIVER_ROLES) && screenOpen(); }
 
-// The badge at the top right: the test copy's own words, or which app runs this screen once one has moved.
+// The badge at the top right: the test copy's own words, or whether this screen is switched on once one has been.
+// Joe 10/12: no "new app" / "current app" words; a screen not switched on says where to switch it.
 export function modeLabel(testText) {
   const s = L.screenState(lists.app, screenKey);
+  goLiveNote(s.live && s.owner !== 'new');
   if (!s.live) return testText;
-  if (s.owner === 'new') return s.open ? 'NEW APP: SAVES GO TO THE SHEET' : 'NEW APP: WRITE-BACK OFF, VIEW ONLY';
-  return 'RUN FROM THE CURRENT APP: VIEW ONLY';
+  if (s.owner === 'new') return s.open ? 'LIVE: SAVES GO TO THE SHEET' : 'VIEW ONLY: WRITE-BACK TO THE SHEET IS OFF';
+  return 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES';
 }
 
 // Checked when the list opens, so a unit put down a moment ago on this screen is already left out.

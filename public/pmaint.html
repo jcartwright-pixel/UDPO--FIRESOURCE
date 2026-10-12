@@ -54,7 +54,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchMaint, plantFor } from './js/pmaint.js';
 
@@ -79,7 +79,8 @@
       if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
       document.getElementById('plant-name').textContent = pl.name;
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      goLiveNote(st.live && st.owner !== 'new');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       if (!data) return;
       const today = data.today, ck = canSave(), ckPm = canPm();
       const waiting = data.requests.filter(r => !r.workOrder && r.status !== 'RESOLVED');
