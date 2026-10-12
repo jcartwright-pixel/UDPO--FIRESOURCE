@@ -235,6 +235,12 @@
 
     // Each box of the new entry saves as it is left, once the entry has some words: the first save puts the entry on the log,
     // later boxes fill it in.
+    // Joe 10/12: the Type drop-down and the buttons on the left stay in step; the boxes keep what is typed.
+    document.getElementById('fields').addEventListener('change', (e) => {
+      if (!e.target.matches('.sn-type') || !KINDS.some(x => x[0] === e.target.value) || e.target.value === kind) return;
+      kind = e.target.value;
+      render();
+    });
     document.getElementById('fields').addEventListener('change', async (e) => {
       if (!canSave() || !entry) return;
       if (e && e.target && e.target.matches('.sn-shift')) entry.shiftPicked = true;
@@ -271,6 +277,11 @@
       if (!b) return;
       kind = b.dataset.kind;
       if (formEmpty()) drawForm();
+      else {
+        // Something is typed: keep it and change its Type (a saved entry saves the new Type).
+        const t = document.querySelector('#fields .sn-type');
+        if (t && t.value !== kind) { t.value = kind; t.dispatchEvent(new Event('change', { bubbles: true })); }
+      }
       render();
     });
     document.getElementById('panes').addEventListener('click', e => {
