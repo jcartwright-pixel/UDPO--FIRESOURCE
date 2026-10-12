@@ -99,6 +99,23 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await at(p), 'run_t801|tue trailer');
     results.push('typing 777 (not on Equipment Master) and Enter kept trailer T-777');
 
+    // Joe 10/12 ("891 now won't show whole number"): the short number of a truck taken on another load finds it, greyed with
+    // why, and Enter does not save the short number as typed; the old truck stays.
+    await p.keyboard.press('Shift+Tab');
+    assert.equal(await at(p), 'run_t801|tue truck');
+    const truckBefore = await text(p, R801, 5);
+    await p.keyboard.type('0001');
+    await p.waitForSelector('.cell-pop [data-i].off');
+    assert.match(await p.textContent('.cell-pop [data-i].off'), /^900001.*802/);
+    assert.match(await p.textContent('.cell-pop p'), /Tick OVR/);
+    await p.keyboard.press('Enter');
+    await p.waitForTimeout(500);
+    assert.equal(await text(p, R801, 5), truckBefore, 'the short number was not saved as typed');
+    await p.keyboard.press('ArrowUp');
+    await p.keyboard.press('Tab');
+    assert.equal(await at(p), 'run_t801|tue trailer');
+    results.push('typing 0001 on 801 found 900001 greyed "on 802" with "Tick OVR"; Enter kept ' + truckBefore + ' instead of saving 0001');
+
     // Typing a driver name: Enter takes the best match and moves down.
     await p.keyboard.press('Shift+Tab');
     await p.keyboard.press('Shift+Tab');

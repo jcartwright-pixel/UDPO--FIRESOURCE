@@ -208,7 +208,7 @@
       box.hidden = !list.length;
       if (!list.length) return;
       const units = [...new Set(list.map(x => x.unit))];
-      document.getElementById('down-loads-text').textContent = (units.length === 1 ? units[0] + ' is on the down list but is still on ' : 'On the down list but still on loads: ') +
+      document.getElementById('down-loads-text').textContent = (units.length === 1 ? units[0] + (String(list[0].status).toUpperCase() === 'DOWN' ? ' is on the down list' : ' is ' + String(list[0].status || 'not usable').replace(/_/g, ' ').toUpperCase() + ' (not usable)') + ' but is still on ' : 'Down or not usable but still on loads: ') +
         list.map(x => (units.length === 1 ? '' : x.unit + ' on ') + 'Route ' + x.route + ' (' + L.dayName(x.date).slice(0, 3) + ' ' + shortDate(x.date) + ')').join(', ') + '.';
       const btn = document.getElementById('down-loads-clear');
       btn.hidden = !edit;

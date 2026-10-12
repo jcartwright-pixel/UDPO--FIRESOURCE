@@ -139,7 +139,12 @@ export function pickChoices(kind, current, busy, opts) {
   const list = KINDS[kind].list(opts);
   keepCurrent(kind, current, list, opts, false);
   const item = (group) => (o) => ({ value: o.id, label: o.text + (busy && busy[o.id] && o.id !== current && !o.why ? '  (' + busy[o.id] + ')' : ''), key: pickText(kind, o.id) || o.text, group });
-  return [{ value: '', label: '(none)', key: '', group: 'none' }].concat(list.map(item('list')), kind === 'driver' ? cvgOptions().map(item('cvg')) : []);
+  // Joe 10/12 ("891 now won't show whole number"): a unit left out (taken on another load, down, inactive) is still listed,
+  // greyed with why, so typing its short number finds it instead of saving the short number as typed; OVR makes it pickable.
+  const left = (opts && opts.override) ? [] : (kind === 'truck' ? lists.allTrucks : lists.allTrailers)
+    .filter(e => e.id !== current && !list.some(o => o.id === e.id))
+    .map(e => ({ value: e.id, label: e.unit, key: e.unit, group: 'blocked', head: 'UNAVAILABLE', reason: unitWhy(e, opts) || 'not usable', blocked: true }));
+  return [{ value: '', label: '(none)', key: '', group: 'none' }].concat(list.map(item('list')), kind === 'driver' ? cvgOptions().map(item('cvg')) : [], left);
 }
 
 /*
