@@ -305,7 +305,8 @@
     // on the road over this load's time is left out; OVR shows every unit with why it is normally left out.
     function unitBlocks(kind, row) {
       const day = dayRowsFor(row), out = {}, key = kind === 'truck' ? 'truckId' : 'trailerId';
-      day.forEach(r => { if (r !== row && !r.off && r[key] && !out[r[key]]) out[r[key]] = 'ON ' + r.route; });
+      // Joe 10/12: a driver on two loads that day keeps his truck on both, so his own other loads do not block it.
+      day.forEach(r => { if (r !== row && !r.off && r[key] && !out[r[key]] && !(kind === 'truck' && r.driverId && r.driverId === row.driverId)) out[r[key]] = 'ON ' + r.route; });
       return Object.assign(out, L.unitConflicts(day, row, kind, rmHours));
     }
     const pickOpts = (kind, row) => ({ override: !!ovr[row.id], date: row.deliveryDate, conflicts: kind === 'truck' || kind === 'trailer' ? unitBlocks(kind, row) : null });
@@ -355,20 +356,14 @@
     }
     /*
      * Current app 7.0.267 (Joe 10/5): the driver's own truck (Driver Master's assigned truck) goes with him. When it is down
-     * or on the road on another run, the route's truck is kept and the line says why. Carrier or a branch takes the truck off.
+     * or on another driver's load that day, the route's truck is kept and the line says why. Carrier or a branch takes the truck off.
      */
     function pickDriver(row, value) {
       const truckNow = row.truckId;
-      saveAssignment(getRuns, row.runDocId, row.day, 'driver', { id: value, text: pickText('driver', value) }, render, ovr[row.id]);
-      const setTruck = (id) => saveAssignment(getRuns, row.runDocId, row.day, 'truck', { id, text: pickText('truck', id) }, render, ovr[row.id]);
-      if (/^__CVG__:/.test(value)) { if (truckNow) setTruck(''); return; }
-      const d = lists.allDrivers.find(x => x.id === value), own = d && d.defaultTruckId;
-      if (!own || own === truckNow) return;
-      const unit = lists.fleetTrucks.find(e => e.id === own);
-      const busy = unit && unitBlocks('truck', row)[own];
-      const why = !unit ? 'is not on Equipment Master' : L.unitOff(unit) ? 'is ' + L.unitOffWhy(unit) : busy ? 'is ' + busy : '';
-      if (why) { showError(d.name + '\'s truck ' + (unit ? unit.unit : own) + ' ' + why + '; the route\'s truck was kept.'); return; }
-      setTruck(own);
+      // The driver's own truck goes on with him on the server (Joe 10/12, the same from Weekly); it says when it was kept off.
+      saveAssignment(getRuns, row.runDocId, row.day, 'driver', { id: value, text: pickText('driver', value) }, render, ovr[row.id])
+        .then(out => { if (out && out.warnings && out.warnings.length) showError(out.warnings.join(' ')); });
+      if (/^__CVG__:/.test(value) && truckNow) saveAssignment(getRuns, row.runDocId, row.day, 'truck', { id: '', text: '' }, render, ovr[row.id]);
     }
     const idOf = { driver: 'driverId', truck: 'truckId', trailer: 'trailerId' };
     bindDailyKeys(body, {

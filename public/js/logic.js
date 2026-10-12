@@ -497,6 +497,7 @@
     var key = kind === 'truck' ? 'truckId' : 'trailerId', out = {}, mine = runWindow(target, hoursFor), tol = 15;
     rows.forEach(function (r) {
       if (r === target || r.off || r.deliveryDate !== target.deliveryDate || !r[key] || out[r[key]]) return;
+      if (kind === 'truck' && r.driverId && r.driverId === target.driverId) return; // his own other load that day (Joe 10/12)
       var w = runWindow(r, hoursFor), busy;
       if (w.start === null || w.end === null) busy = w.start === null || mine.end === null || mine.end > w.start;
       else busy = mine.start !== null && mine.end !== null && w.start < mine.end - tol && mine.start < w.end - tol;
