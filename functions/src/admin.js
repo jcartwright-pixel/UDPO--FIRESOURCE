@@ -412,7 +412,7 @@ const OPS = {
   emailSenders: (db, email, input, stamp, d) => emailSenders(db, d), saveEmailSenders,
   repairItems: (db) => repairItems(db), saveRepairItem, completeRepairItem,
   // Station codes (stations.js): Plant Station, Garage Station and kiosk codes.
-  stations: STATIONS.stations, stationAdd: STATIONS.stationAdd, stationCode: STATIONS.stationCode, stationRemove: STATIONS.stationRemove
+  stations: STATIONS.stations, stationAdd: STATIONS.stationAdd, stationCode: STATIONS.stationCode, stationRemove: STATIONS.stationRemove, noAccountSet: STATIONS.noAccountSet
 };
 
 async function adminCall(db, user, input, deps) {

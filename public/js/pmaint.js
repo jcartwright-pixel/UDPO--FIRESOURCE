@@ -63,3 +63,16 @@ export function plantsOf(person) {
   const list = all.filter(p => ids.indexOf(p.id) >= 0);
   return list.length ? list : all.slice(0, 1);
 }
+
+/*
+ * The plant these pages work on (Joe 10/12: "whatever plant I went to is where it should go"): the ?plant= of a deep link,
+ * else the plant home he came in through (sessionStorage udPlant), else his first plant. Only ever one of his own plants.
+ */
+export function plantFor(person, urlPlant) {
+  const ps = plantsOf(person);
+  let came = '';
+  try { came = sessionStorage.getItem('udPlant') || ''; } catch (e) { /* no storage */ }
+  const pl = ps.find(p => p.id === urlPlant) || ps.find(p => p.id === came) || ps[0];
+  try { sessionStorage.setItem('udPlant', pl.id); } catch (e) { /* no storage */ }
+  return pl;
+}

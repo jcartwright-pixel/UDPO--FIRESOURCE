@@ -727,7 +727,7 @@ async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
   return result;
 }
 
-/* ---------- Shift Notes (Incident & Breakdown Log) ---------- */
+/* ---------- Shift Notes ---------- */
 
 // saveShiftNote: a timestamped entry or a review note under one, as desktopUiSavePlantShiftReportV5008 (section handoff).
 function validateShiftNote(input, SaveError) {

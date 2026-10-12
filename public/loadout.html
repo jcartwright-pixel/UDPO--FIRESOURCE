@@ -86,7 +86,7 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -581,7 +581,7 @@
     });
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
+      watchPerson(db, user, p => { person = p; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
         const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));

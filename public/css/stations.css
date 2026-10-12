@@ -352,3 +352,6 @@ body.ds-tv .foot { color: #cfe3f6; }
 .st-code input { font: inherit; font-size: 28px; letter-spacing: 4px; text-transform: uppercase; min-height: 60px; padding: 0 14px; border: 2px solid #9fb6cc; border-radius: 10px; }
 .st-code button { min-height: 58px; border: 0; border-radius: 10px; background: #0b3d6b; color: #fff; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
 .st-code .st-code-msg { min-height: 1.4em; color: #b3261e; font-weight: 700; }
+/* The Plant Station with no UD account: the station code form inside the sign-in card (Joe 10/12). */
+.signin .st-code { margin: 16px 0; padding: 18px; box-sizing: border-box; width: 100%; border-top-width: 1px; }
+.signin .st-code input, .signin .st-code button { width: 100%; box-sizing: border-box; }

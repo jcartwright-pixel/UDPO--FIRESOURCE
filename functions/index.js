@@ -19,6 +19,8 @@
  *   mocreo                Administration > MOCREO & Sensors: save or replace the key (never shown again), test it, thermometer locations
  *   admin                 Administration's own pages (src/admin.js): people, role templates, links and codes, email, repairs, tools
  *   stationRelease        the Plant Station tablet's Change Station: the plant's manager release code, when one is set
+ *   stationSignIn         the Plant Station with no UD account: a plant station's code signs the tablet in as that station
+ *                         only, while the plant's switch is On (Administration > Plant Station Codes)
  *   adminJobsEvery5Minutes  repair emails to lessors, the driver check-in mailbox and the weekly archive, each at its Refresh Rate
  *   deviceReads           the one door for every reading device: a line's label reader (its line PC) now, a receiving scanner later (src/reader.js)
  *   lineReader            Line Targets, administrators: make a line's reader key; start or stop the sandbox test feed
@@ -48,7 +50,8 @@ const { mailReport } = require('./src/reportmail');
 const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
 const ADMIN = require('./src/admin');
 const { adminCall, stationRelease, AdminError } = ADMIN;
-const { StationError } = require('./src/stations');
+const STATIONS = require('./src/stations');
+const { StationError } = STATIONS;
 const TOOLS = require('./src/admintools');
 const READER = require('./src/reader');
 const L = require('./src/logic');
@@ -159,7 +162,8 @@ exports.mocreo = onCall({ timeoutSeconds: 60 }, async (request) => {
 // The sandbox sheet copies the Administration tools may read (Date Inventory) and change (Archive now, Date Convert, both
 // refused on a production sheet by writeback.js), and a copy from the sheets on request (Refresh Home Summary Now).
 function adminDeps() {
-  const setup = transferSetup(), live = process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1' ? JSON.parse(process.env.WRITEBACK_JSON).spreadsheetId : '';
+  // Production writes only dispatch changes to the real Live sheet, so its Administration tools keep no Live workbook to change.
+  const setup = transferSetup(), live = process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1' && !realLive() ? JSON.parse(process.env.WRITEBACK_JSON).spreadsheetId : '';
   return {
     env: process.env,
     sources: setup && process.env.DEMO_DATA !== '1' ? setup.sources : null,
@@ -189,8 +193,31 @@ exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
   try { return await stationRelease(db, user, request.data || {}); } catch (error) { throw asHttps(error); }
 });
 
+// Open to tablets with no United Dairy account (Joe 10/12, the old app's public Plant Station): a plant station's code, only
+// while that plant's switch is On. The token names the station and its code's version; the database rules and save check
+// both against stationAccess / private/stations each time, so Off, New code and Remove shut the tablet out at once.
+exports.stationSignIn = onCall({ maxInstances: 3 }, async (request) => {
+  const input = request.data || {};
+  try {
+    if (input.op === 'status' || input.op === 'release') return await ADMIN.releaseCheck(db, input);
+    const r = await STATIONS.signIn(db, input);
+    if (!r.ok || input.op !== 'enter') return r;
+    const token = await admin.auth().createCustomToken('station-' + r.station.key, { udStation: r.station.key, udVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name, udType: r.station.type });
+    return Object.assign({ token }, r);
+  } catch (error) { throw asHttps(error); }
+});
+
+// A save from a United Dairy account, or from a Plant Station signed in by its code alone (only the plant-floor saves).
+async function saver(request) {
+  const user = unitedDairyUser(request.auth);
+  if (user) return user;
+  const station = request.auth ? await STATIONS.stationSaver(db, request.auth.token) : null;
+  if (!station) return signedIn(request);
+  return { uid: request.auth.uid, email: 'station:' + station.key, station };
+}
+
 exports.save = onCall(async (request) => {
-  const user = signedIn(request);
+  const user = await saver(request);
   try {
     // Local test database only: a browser test can set the server's clock (?testNow) to its made-up day.
     const testNow = process.env.FUNCTIONS_EMULATOR === 'true' && request.data && request.data.testNow ? new Date(request.data.testNow) : null;
@@ -203,15 +230,22 @@ exports.save = onCall(async (request) => {
   }
 });
 
-// The write-back runs only when config/app.writeBack.enabled is true and WRITEBACK_JSON names the sandbox Live
-// workbook ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
+// The production server: it reads the real Uniontown sheets (no SOURCES_JSON copies), so its write-back target is the real
+// Live workbook (Joe 10/12: "Let the new app write dispatch changes to the real Live sheet."; production-env.cjs allows
+// no other target there).
+function realLive() {
+  return process.env.READ_UNIONTOWN_SHEETS === '1' && !process.env.SOURCES_JSON && process.env.DEMO_DATA !== '1';
+}
+
+// The write-back runs only when config/app.writeBack.enabled is true and WRITEBACK_JSON names the Live workbook the
+// copy reads ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
 async function writeBackIfOn(part) {
   const config = (await db.collection('config').doc('app').get()).data() || {};
   if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
   const target = JSON.parse(process.env.WRITEBACK_JSON);
   // With the switch off, only People & Roles saves go out, and only to the sandbox's Users sheet copy (admin.js usersCopy).
   if (!config.writeBack || config.writeBack.enabled !== true) {
-    if (part === 'live' || !ADMIN.usersCopy(process.env)) return null;
+    if (part === 'live' || realLive() || !ADMIN.usersCopy(process.env)) return null;
     const users = target.masters.users, source = transferSources(process.env).masters.users;
     if (!source || source.spreadsheetId !== users.spreadsheetId || source.tab !== users.tab) throw new Error('Write-back stopped: WRITEBACK_JSON.masters.users and SOURCES_JSON must name the same sandbox copy');
     return { live: null, master: await runMasterWriteBack({ db, sheets: makeSheetsWriter(), targets: { users }, only: true }) };
@@ -221,7 +255,9 @@ async function writeBackIfOn(part) {
     throw new Error('Write-back stopped: WRITEBACK_JSON and SOURCES_JSON must name the same sandbox Live workbook');
   }
   const sheets = makeSheetsWriter();
-  const live = part === 'master' ? null : await runWriteBack({ db, sheets, target });
+  const live = part === 'master' ? null : await runWriteBack({ db, sheets, target, allowRealLive: realLive() });
+  // Production: dispatch changes to the Live tabs only; no master lists and no maintenance queues are written.
+  if (realLive()) return { live, master: null };
   // Master lists: only those WRITEBACK_JSON.masters names ({"drivers": {"spreadsheetId", "tab"}, ...}), each the same copy the
   // transfer reads (SOURCES_JSON), for the same reason as above.
   const masters = Object.assign({}, target.masters || {}), sources = transferSources(process.env).masters;

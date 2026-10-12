@@ -65,11 +65,18 @@
       return (a.area || 'ZZZ').localeCompare(b.area || 'ZZZ') || (b.line - a.line) || (a.order - b.order) || a.name.localeCompare(b.name);
     });
   }
-  // The machine an entry's Equipment / area box names (same name, any case), or null.
+  // The machine an entry's "What broke" box names, or null. Joe 10/12 types what broke in his own words ("all kind of little
+  // things. Not a list"), so the same name (any case) wins, else the longest machine name found in the words as whole words
+  // ("gallon filler bowl leaking" is the GALLON FILLER); anything else is just saved as typed.
   function findMachine(list, words) {
     var k = upper(words).replace(/\s+/g, ' ');
     if (!k) return null;
-    return (list || []).filter(function (m) { return upper(m.name).replace(/\s+/g, ' ') === k; })[0] || null;
+    var key = function (m) { return upper(m.name).replace(/\s+/g, ' '); };
+    var same = (list || []).filter(function (m) { return key(m) === k; })[0];
+    if (same) return same;
+    var padded = ' ' + k.replace(/[^A-Z0-9#]+/g, ' ') + ' ';
+    return (list || []).filter(function (m) { var n = key(m).replace(/[^A-Z0-9#]+/g, ' ').trim(); return n.length > 2 && padded.indexOf(' ' + n + ' ') >= 0; })
+      .sort(function (a, b) { return key(b).length - key(a).length; })[0] || null;
   }
 
   function woNumber(n) { return 'M-' + n; }

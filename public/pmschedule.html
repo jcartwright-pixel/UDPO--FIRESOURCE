@@ -28,12 +28,11 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Plant Maintenance</span><h1>PM Schedule</h1></div>
+      <div class="title"><span class="eyebrow">Plant Maintenance · <span id="plant-name"></span></span><h1>PM Schedule</h1></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <div class="actions in-head">
         <button type="button" class="pm-btn pri" id="add">+ Add PM Task</button>
         <select id="machine" class="pm-pick" aria-label="Machine"></select>
-        <select id="plant" class="pm-pick" aria-label="Plant"></select>
       </div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -62,7 +61,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchMaint, plantsOf } from './js/pmaint.js';
+    import { watchMaint, plantFor } from './js/pmaint.js';
 
     // PM Schedule (Joe 10/12, mock-up D): every PM task of the plant, Overdue first, then this week (Sunday to Saturday), the
     // next 30 days and later. Each box saves when it is left; the next due day comes from the day last done. Send to Maintenance
@@ -79,9 +78,9 @@
     const SECTIONS = [['LATE', 'Overdue'], ['WEEK', 'This week'], ['SOON', 'Next 30 days'], ['LATER', 'Later'], ['NEW', 'Never done (type its Last done day)']];
 
     function drawTop() {
-      const ps = plantsOf(person);
-      if (!ps.some(p => p.id === plant)) plant = ps[0].id;
-      document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
+      const pl = plantFor(person, plant);
+      if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
+      document.getElementById('plant-name').textContent = pl.name;
       const ms = data ? data.machines : [];
       if (data && only && !ms.some(m => m.id === only)) only = '';
       document.getElementById('machine').innerHTML = opt('', only, 'All Machines') + ms.map(m => opt(m.id, only, m.name)).join('');
@@ -162,7 +161,6 @@
     document.querySelector('.pm-page').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) e.target.blur(); });
     document.getElementById('add').addEventListener('click', () => { if (!canSave()) return; adding = !adding; render(); if (adding) document.getElementById(only ? 'f-task' : 'f-machine').focus(); });
     document.getElementById('machine').addEventListener('change', e => { only = e.target.value; setUrl(); render(); });
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; only = ''; setUrl(); follow(); });
     window.udBack = () => { if (adding) { adding = false; render(); return true; } return false; };
 
     function follow() {

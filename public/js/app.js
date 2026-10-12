@@ -5,7 +5,7 @@
  */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import {
-  getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signOut, GoogleAuthProvider, connectAuthEmulator
+  getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signInWithCustomToken, signOut, GoogleAuthProvider, connectAuthEmulator
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
@@ -553,6 +553,29 @@ export function isUnitedDairy(user) {
   return !!(user && user.emailVerified && String(user.email || '').toLowerCase().endsWith('@' + DOMAIN));
 }
 
+// The screens a Plant Station signed in by its code alone may open (Joe 10/12): the Plant Station and the screens it opens.
+export const STATION_PAGES = ['plant-station.html', 'loadout.html', 'unloading.html', 'washing.html', 'returns.html'];
+async function stationOf(user) {
+  try {
+    const c = (await user.getIdTokenResult()).claims || {};
+    return c.udStation ? { key: c.udStation, version: c.udVersion || '', type: c.udType || '', facilityId: c.udPlant || '', name: c.udName || 'Plant Station', plant: ((window.UDLogic && window.UDLogic.PLANTS || []).find(p => p.id === c.udPlant) || {}).name || String(c.udPlant || '') } : null;
+  } catch (e) { return null; }
+}
+// The person a screen shows buttons for: the Users list entry, or a code-signed Plant Station as a plant employee.
+export function watchPerson(db, user, done) {
+  if (user.station) { done({ status: 'ACTIVE', roles: ['PLANT_EMPLOYEE'], name: user.station.name, email: '' }); return () => {}; }
+  return onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => done(s.exists() ? s.data() : null));
+}
+// The Plant Station with no UD account: the station code signs this tablet in as that station only.
+export async function stationCodeSignIn(code) {
+  const { auth } = await start();
+  const out = await callServer('stationSignIn', { op: 'enter', code });
+  if (!out.ok) return out;
+  await signInWithCustomToken(auth, out.token);
+  return out;
+}
+export async function signOutHere() { const { auth } = await start(); await signOut(auth); }
+
 // Shows the sign-in card until a United Dairy account is signed in, then calls ready(user).
 export async function requireSignIn(ready) {
   // Moving between screens (Joe 10/9): someone already checked in this tab sees the screen at once, not a blank page while
@@ -576,6 +599,28 @@ export async function requireSignIn(ready) {
   };
   const remember = (email) => { try { if (email) sessionStorage.setItem('udActive', email); else sessionStorage.removeItem('udActive'); } catch (e) { /* no storage */ } };
   onAuthStateChanged(auth, async (user) => {
+    // A Plant Station signed in by its code alone (stationSignIn): only the screens a Plant Station opens.
+    const station = user && !isUnitedDairy(user) ? await stationOf(user) : null;
+    if (station) {
+      remember('');
+      user.station = station;
+      gate.hidden = true;
+      screen.hidden = false;
+      // It leaves only through the Plant Station's Change Station (and the manager release code), not Sign out.
+      const out = document.getElementById('signout');
+      if (out) out.hidden = true;
+      const who = document.getElementById('who');
+      if (who) { who.textContent = station.name; who.title = station.name + ' · ' + station.plant + ' (no UD account)'; }
+      if (STATION_PAGES.indexOf(location.pathname.split('/').pop() || 'index.html') < 0) {
+        screen.hidden = true;
+        gate.hidden = false;
+        showError('This tablet is signed in as the ' + station.name + ' Plant Station (no UD account). Only the Plant Station screens open on it; sign in with a United Dairy account for this screen.');
+        return;
+      }
+      if (!window.UDPlantStartWatch) { window.UDPlantStartWatch = true; start().then(({ db }) => onSnapshot(doc(db, 'config', 'app'), s => { window.UDPlantStart = ((s.data() || {}).plantStart || {}).date || ''; }, () => { window.UDPlantStartWatch = false; })); }
+      ready(user);
+      return;
+    }
     if (user && !isUnitedDairy(user)) {
       remember('');
       await signOut(auth);
