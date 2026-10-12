@@ -31,7 +31,14 @@ const shot = async (p, name, clip) => { if (SHOTS) await p.screenshot(Object.ass
 const fits = (p) => p.evaluate(() => document.scrollingElement.scrollHeight <= innerHeight && document.scrollingElement.scrollWidth <= innerWidth);
 const cell = (run, d) => 'tr[data-id="' + run + '"] input.cell[data-day="' + d + '"]';
 const focused = (p) => p.evaluate(() => [document.activeElement.closest('tr').dataset.id, document.activeElement.dataset.day]);
+// The screen's own saves finish first (edit.js savesPending, the count behind "Saving..."): on a slow emulator a save can
+// take well over 10 seconds, so the stored value is checked only once the screen says nothing is still saving.
+let screen = null;
+async function settled() {
+  if (screen) await screen.evaluate(async () => { const m = await import('./js/edit.js'); while (m.savesPending()) await new Promise(r => setTimeout(r, 100)); });
+}
 async function stored(run, d, field, want) {
+  await settled();
   for (let i = 0; i < 40; i++) {
     const v = ((await db().collection('routes').doc(run).get()).data().days[d] || {})[field];
     if (v === want) return v;
@@ -53,6 +60,7 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
   const results = [];
   try {
     const p = await openPage(browser, 1920, 1080, '/routes.html?testEmail=manager.test@uniteddairy.com');
+    screen = p;
     await p.waitForSelector('table.routes tr[data-id="run_t801"]');
     await p.selectOption('#view-select', 'times');
     await p.waitForSelector(cell('run_t801', 'mon'));
@@ -152,6 +160,7 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     await p.selectOption('table.routes.many tr[data-id="run_t802"] select[data-many="loadType"]', 'Boxing');
     await p.selectOption('table.routes.many tr[data-id="run_t801"] select[data-many="coverageOwner"]', 'Fairmont');
     await p.click('table.routes.many tr[data-id="run_t801"] input[data-many="dropAndHook"]');
+    await settled();
     for (let i = 0; i < 40; i++) {
       const a = (await db().collection('routes').doc('run_t801').get()).data(), b = (await db().collection('routes').doc('run_t802').get()).data();
       if (a.coverageOwner === 'Fairmont' && a.dropAndHook === true && b.loadType === 'Boxing') break;
