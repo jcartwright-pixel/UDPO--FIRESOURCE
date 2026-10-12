@@ -92,7 +92,14 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.waitForFunction(() => /Charleston is not connected/.test(document.getElementById('why').textContent));
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
-    await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
+    // Joe 10/12: picking a plant opens its Plant Operations (the Manager Center) first, wherever on the card it is clicked;
+    // Back from there is the plant's home with all six cards, and Back again is this overview.
+    await Promise.all([adm.waitForURL(/manager\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
+    await adm.waitForSelector('#screen .head h1');
+    assert.equal(await adm.textContent('#screen .head h1'), 'Manager Center');
+    assert.equal(await adm.$eval('.sidemenu a.side-name', a => a.textContent.trim() + ':' + a.classList.contains('on')), 'Plant Operations:true', 'the menu shows Plant Operations as the page open');
+    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-uniontown-opens-plant-operations-1920.png') });
+    await Promise.all([adm.waitForURL(/index\.html/), adm.click('#go-back')]);
     // Joe 10/11: the plant home shows six cards (the plant's three, Route Distribution, Fleet & Maintenance, Reports);
     // Plant Production and Plant Maintenance carry an Under Construction banner. Administration is the header button.
     await adm.waitForSelector('.launch-card[data-side="reports"]');
@@ -117,7 +124,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-admin-uniontown-1920.png') });
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go-back')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
-    await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
+    await Promise.all([adm.waitForURL(/manager\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] header strong')]);
     await Promise.all([adm.waitForURL(/administration\.html/), adm.click('#go-admin')]);
     // Joe 10/10: Administration like the current app's tab: every item in a menu on the left; the item opens on the right.
     await adm.waitForSelector('.adm-item.on[data-key="people"]');
@@ -152,7 +159,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
+    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, which opens its Plant Operations first (Back is its home with the six cards) and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');
