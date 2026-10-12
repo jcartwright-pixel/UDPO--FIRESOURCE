@@ -85,3 +85,54 @@ test('Garage Station: once the garage has a code, every call carries the station
   assert.equal((await garageCall(db(), { op: 'release', step: 'release', code: 'WRONG123' })).ok, false);
   assert.equal((await garageCall(db(), { op: 'release', step: 'release', code: rel })).ok, true);
 });
+
+// Joe 10/12: the Plant Station with no UD account, with an On / Off switch per plant (Off: nobody gets in on a code alone).
+test('no-account Plant Station: Off refuses every code; On opens only a plant station\'s code; Off, New code and Remove shut it out', async () => {
+  const code = (await admin({ op: 'stationCode', key: 'fac_uniontown_plant_case' })).code;
+  const kiosk = (await admin({ op: 'stationCode', key: 'fac_uniontown_kiosk_driver' })).code;
+  let r = await ST.signIn(db(), { op: 'enter', code });
+  assert.equal(r.ok, false);
+  assert.equal(r.off, true, 'Off by default');
+  const on = await admin({ op: 'noAccountSet', facilityId: 'fac_uniontown', on: true });
+  assert.deepEqual(on.noAccount, [{ id: 'fac_uniontown', name: 'Uniontown', on: true }]);
+  r = await ST.signIn(db(), { op: 'enter', code: code.toLowerCase() });
+  assert.equal(r.ok, true);
+  assert.equal(r.station.name, 'Case Loadout');
+  assert.equal(r.station.code, undefined, 'the code never goes back to the tablet');
+  assert.equal((await ST.signIn(db(), { op: 'enter', code: kiosk })).ok, false, 'a kiosk code does not open a plant station');
+  // The database rules' copy follows the switch and the code's version.
+  let access = (await db().collection('stationAccess').doc('fac_uniontown').get()).data();
+  assert.equal(access.on, true);
+  assert.equal(access.keys.fac_uniontown_plant_case, r.station.version);
+  const claims = { udStation: r.station.key, udVersion: r.station.version, udPlant: 'fac_uniontown' };
+  assert.equal((await ST.stationSaver(db(), claims)).name, 'Case Loadout');
+  assert.equal((await ST.signIn(db(), { op: 'check', key: r.station.key, version: r.station.version })).ok, true);
+  // Off: the saver check, the tablet check and the rules' copy all refuse it.
+  await admin({ op: 'noAccountSet', facilityId: 'fac_uniontown', on: false });
+  assert.equal(await ST.stationSaver(db(), claims), null);
+  assert.equal((await ST.signIn(db(), { op: 'check', key: r.station.key, version: r.station.version })).off, true);
+  assert.equal((await db().collection('stationAccess').doc('fac_uniontown').get()).data().on, false);
+  // On again, then a new code: the old token is refused.
+  await admin({ op: 'noAccountSet', facilityId: 'fac_uniontown', on: true });
+  assert.ok(await ST.stationSaver(db(), claims));
+  await admin({ op: 'stationCode', key: 'fac_uniontown_plant_case' });
+  assert.equal(await ST.stationSaver(db(), claims), null);
+  access = (await db().collection('stationAccess').doc('fac_uniontown').get()).data();
+  assert.notEqual(access.keys.fac_uniontown_plant_case, r.station.version);
+  // Remove: gone from the rules' copy.
+  await admin({ op: 'stationRemove', key: 'fac_uniontown_plant_case' });
+  assert.equal((await db().collection('stationAccess').doc('fac_uniontown').get()).data().keys.fac_uniontown_plant_case, undefined);
+  await assert.rejects(A.adminCall(db(), TABLET, { op: 'noAccountSet', facilityId: 'fac_uniontown', on: true }), /Only an administrator/);
+});
+
+test('a no-account Plant Station may make only the plant-floor saves', async () => {
+  const { applyAction } = require('../../src/actions');
+  const station = { uid: 'station-x', email: 'station:x', station: { key: 'x', name: 'Case Loadout', facilityId: 'fac_uniontown' } };
+  // Any other save is refused before it looks at anything else.
+  await assert.rejects(applyAction(db(), station, { action: 'publishWeek', requestId: 'r-station-1', weekStart: '2026-10-04' }), /no UD account cannot make this save/);
+  // A plant-floor save goes through, recorded as the station.
+  const out = await applyAction(db(), station, { action: 'completeWash', requestId: 'r-station-2', date: '2026-10-09', trailer: 'T-993' });
+  assert.equal(out.ok, true);
+  assert.equal((await db().collection('actions').doc('r-station-2').get()).data().by, 'station:x');
+  assert.deepEqual(ST.STATION_ACTIONS, ['savePlantLoad', 'addPickup', 'completePickup', 'reorderPlantLoads', 'saveUnloading', 'completeWash', 'addReturn']);
+});

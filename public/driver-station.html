@@ -150,11 +150,12 @@
       const show = (asking) => { document.getElementById('code-box').hidden = !asking; document.getElementById('ds-grid').hidden = asking; document.getElementById('foot').hidden = asking; };
       if (r.needCode) {
         kiosk = null; document.getElementById('change').hidden = true; show(true);
-        kiosk = await askCode(document.getElementById('code-box'), { kind: 'KIOSK', storeKey: CODE_KEY, call: stationCall, title: 'Enter this kiosk\'s code',
-          hint: 'A manager gives each Driver Room kiosk and TV its code (Administration > Driver Station Codes). The kiosk remembers it after this.', message: r.message });
-        // A TV's code typed on the tablet link opens the TV display (no buttons, both lists rolling).
-        if (kiosk.type === 'TV' && !full) { location.replace(location.pathname + '?tv=1'); return; }
+        kiosk = await askCode(document.getElementById('code-box'), { kind: 'KIOSK', storeKey: CODE_KEY, call: stationCall, title: 'Enter this station\'s code',
+          hint: 'A manager gives each Driver Room tablet, TV and kiosk its code (Administration > Driver Station Codes). It remembers it after this.', message: r.message });
       } else kiosk = r.station || null;
+      // Joe 10/12: one Driver Station link; the code decides the screen. A TV's code opens the TV display (no buttons, both
+      // lists rolling), also when the TV reopens the plain link later.
+      if (kiosk && kiosk.type === 'TV' && !full) { location.replace(location.pathname + '?tv=1'); return; }
       show(false);
       document.getElementById('change').hidden = !kiosk || full;
       document.getElementById('eyebrow').textContent = kiosk ? kiosk.name + ' · ' + kiosk.plant : eyebrow;

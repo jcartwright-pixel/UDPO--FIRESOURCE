@@ -61,3 +61,25 @@ test('a United Dairy account that is not ACTIVE in the Users list sees no dispat
   await assertFails(getDocs(collection(stranger, 'drivers')));
   await assertFails(getDoc(doc(stranger, 'conflicts/c1')));
 });
+
+// Joe 10/12: a Plant Station signed in by its code alone (index.js stationSignIn) reads only the plant-floor lists, and only
+// while its plant's switch is On and its code is current (stationAccess, kept by the server).
+test('a no-account Plant Station reads only the plant-floor lists, while On and on its current code', async () => {
+  const station = (version) => env.authenticatedContext('station-case', { udStation: 'case', udVersion: version, udPlant: 'fac_uniontown', udName: 'Case Loadout' }).firestore();
+  const setAccess = (data) => env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), 'stationAccess/fac_uniontown'), data));
+  await assertFails(getDoc(doc(station('v1'), 'runs/2026-10-04__run_t801')), 'no stationAccess yet');
+  await setAccess({ on: true, keys: { case: 'v1' } });
+  await assertSucceeds(getDoc(doc(station('v1'), 'runs/2026-10-04__run_t801')));
+  await assertSucceeds(getDocs(collection(station('v1'), 'pickups')));
+  await assertSucceeds(getDoc(doc(station('v1'), 'config/app')));
+  // Never a person's entry, the dispatch weeks, drivers or anything else.
+  await assertFails(getDoc(doc(station('v1'), 'users/joe@uniteddairy.com')));
+  await assertFails(getDocs(collection(station('v1'), 'weeks')));
+  await assertFails(getDocs(collection(station('v1'), 'drivers')));
+  await assertFails(getDoc(doc(station('v1'), 'stationAccess/fac_uniontown')));
+  await assertFails(setDoc(doc(station('v1'), 'runs/x'), { route: '1' }));
+  // An old code's token, or the switch Off, is refused.
+  await assertFails(getDoc(doc(station('v0'), 'runs/2026-10-04__run_t801')));
+  await setAccess({ on: false, keys: { case: 'v1' } });
+  await assertFails(getDoc(doc(station('v1'), 'runs/2026-10-04__run_t801')));
+});

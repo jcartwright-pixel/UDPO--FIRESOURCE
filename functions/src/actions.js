@@ -24,6 +24,7 @@ const PMAINT = require('./plantmaint');
 const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
 const ROLL = require('./weekroll');
+const STATIONS = require('./stations');
 
 const C = M.COLLECTIONS;
 
@@ -434,6 +435,11 @@ function validate(input) {
 }
 
 async function requireSaver(tx, db, user, roles, action) {
+  // A Plant Station signed in by its code alone (index.js checked its station): only the plant-floor saves.
+  if (user && user.station) {
+    if (STATIONS.STATION_ACTIONS.indexOf(action) < 0) throw new SaveError('NOT_ALLOWED', 'A Plant Station with no UD account cannot make this save. Sign in with a United Dairy account.');
+    return { email: user.email, name: user.station.name, status: 'ACTIVE', roles: ['PLANT_EMPLOYEE'] };
+  }
   const email = String(user && user.email || '').toLowerCase();
   const snap = await tx.get(db.collection(C.users).doc(M.safeIdPart(email)));
   const person = snap.exists ? snap.data() : null;
