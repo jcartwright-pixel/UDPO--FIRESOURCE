@@ -25,6 +25,10 @@
       "exceptions": { "spreadsheetId": "1ihDrBpGfMgdB27zmn0TF3UZNBKPrHAayh1qGxKV0YV0", "tab": "DRIVER_EXCEPTIONS" },
       "vacations": { "spreadsheetId": "1uv5lTlvP20EF8Z9_r2ejU5YSd84OmHddoDkPNgoex2A", "tab": "DRIVER_VACATIONS" },
       "users": { "spreadsheetId": "1kfk1iMBf_nBmWqGmFHh_e98mefmbolzZQzAj3Xr7Pcc", "tab": "USERS_MASTER" }
+    },
+    "plant": {
+      "_about": "Joe 10/12 'turn all 8 sheets on': pickups made in the sandbox go to this copy's LIVE PLANT OPERATIONS tab. It must be shared with the sandbox server as Editor; until then those writes wait and the other copies are still written.",
+      "pickups": { "spreadsheetId": "1QDxI4X_xK3Jwn2X6m5MfawgMXkq6a7FurxbXcHMAbgI", "tab": "LIVE PLANT OPERATIONS" }
     }
   }
 }

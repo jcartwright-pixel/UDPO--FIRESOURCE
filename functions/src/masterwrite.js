@@ -54,6 +54,8 @@ const COLUMNS = ({
 });
 // The maintenance queues (maintenance.js): new records only, written column for column; a column the tab lacks is skipped.
 ['maintTruck', 'maintTrailer', 'maintFork', 'maintWash', 'maintReturns'].forEach(k => { COLUMNS[k] = { idColumn: 'record_id', passThrough: true, collection: C.maintenance }; });
+// Pickups (plant.js): the Plant Operations workbook's LIVE PLANT OPERATIONS tab, by pickup_id; a pickup made in the new app is a new row.
+COLUMNS.pickups = { idColumn: 'pickup_id', passThrough: true, collection: 'pickups' };
 const KIND_OF = { [C.users]: 'users', [C.drivers]: 'drivers', [C.equipment]: 'equipment', [C.routes]: 'routes', [C.exceptions]: 'exceptions', [C.vacations]: 'vacations' };
 
 function cellValue(kind, v) {
@@ -179,13 +181,23 @@ async function runMasterWriteBack({ db, sheets, targets, now, only, allowReal, s
     ops.push({ ref: item.ref, update: { status: itemConflicts ? 'conflict' : 'done', doneAt: stamp, sheetRow: r + 1 } });
   });
 
-  // Sheet first, then mark the queue: if a sheet write fails nothing is marked and the next pass retries.
-  for (const list of Object.keys(updates)) await sheets.batchUpdate(targets[list].spreadsheetId, updates[list]);
+  // Sheet first, then mark the queue: if a sheet write fails, that sheet's saves are not marked and the next pass retries
+  // them. Each sheet stands alone, so one copy the server cannot write (not shared as Editor) does not hold up the others.
+  const failed = {};
+  for (const list of Object.keys(updates)) {
+    try { await sheets.batchUpdate(targets[list].spreadsheetId, updates[list]); } catch (e) { failed[list] = String(e && e.message || e).slice(0, 300); }
+  }
+  const mine = (ref) => { const it = items.find(i => i.ref.path === ref.path); return !it || !failed[it.list]; };
   const batch = db.batch();
-  ops.forEach(op => (op.update ? batch.update(op.ref, op.update) : batch.set(op.ref, op.data)));
-  items.forEach((i, n) => { if (docSnaps[n].exists) batch.update(docRefs[n], { cells: known[i.list + '/' + i.docId] }); });
+  ops.forEach(op => { if (op.update ? mine(op.ref) : !failed[op.data.list]) (op.update ? batch.update(op.ref, op.update) : batch.set(op.ref, op.data)); });
+  items.forEach((i, n) => {
+    if (failed[i.list]) { batch.update(i.ref, { status: 'pending', lastError: failed[i.list], lastTriedAt: stamp }); return; }
+    if (docSnaps[n].exists) batch.update(docRefs[n], { cells: known[i.list + '/' + i.docId] });
+  });
   await batch.commit();
-  return { written, conflicts, items: items.length, added };
+  const notWritten = Object.keys(failed);
+  if (notWritten.length && notWritten.length === Object.keys(updates).length) throw new Error('Write-back could not write ' + notWritten.map(l => targets[l].tab + ': ' + failed[l]).join('; '));
+  return Object.assign({ written, conflicts, items: items.length, added }, notWritten.length ? { failed } : {});
 }
 
 module.exports = { COLUMNS, masterCells, queueMaster, runMasterWriteBack };
