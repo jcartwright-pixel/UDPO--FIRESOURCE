@@ -93,7 +93,7 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -114,7 +114,16 @@
     const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state !== 'DONE' && r.state !== 'LOADING';
     const unsubs = [];
 
-    const canLoad = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
+    // The role, or what Administration > People & Roles allows this person (Joe 10/12: allowed but shown View only).
+    let allowed = {};
+    // Joe 10/12 (a bare "View only."): say why, and which account this is.
+    let signedEmail = '';
+    const viewOnlyWhy = () => {
+      const s = L.screenState(app, 'plantLoading');
+      if (!s.open) return 'View only: ' + s.why + '.';
+      return 'View only: ' + (signedEmail || 'this account') + ' is not allowed to save Case Loadout. In Administration > People & Roles give it the Plant Employee role or allow Update route loading.';
+    };
+    const canLoad = () => (L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.savePlantLoad === true) && L.screenState(app, 'plantLoading').open;
     const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 
     function rowsNow() {
@@ -238,11 +247,14 @@
       // The arrow just pressed stays selected when the list is drawn again, so it can be pressed again.
       const a = document.activeElement, held = a && a.dataset && a.dataset.idMove ? [a.dataset.idMove, a.dataset.move] : heldMove;
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="' + cols.length + '" class="empty">No ' + P.AREA[area].tile.toLowerCase() + ' loads for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>';
+      // Phones (Joe 10/12 "mobile looks wrong"): each load is a card, so every box is named on the card itself.
+      const heads = cols.map(([h], i) => (area !== 'TANKER' && i === 5 ? info.label : h));
+      document.querySelectorAll('#rows tr[data-row]').forEach(tr => [...tr.children].forEach((td, i) => { if (heads[i]) td.dataset.l = heads[i]; }));
       fitDrivers();
       if (held) { const g = document.querySelector('#rows [data-id-move="' + held[0] + '"][data-move="' + held[1] + '"]'); if (g && !g.disabled) g.focus(); }
       heldMove = null;
       if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
-      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Use the up and down arrows beside a route to change this day\'s loading order.' : '') : 'View only.') + ' Changes from the sheets show here within about a minute.';
+      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Use the up and down arrows beside a route to change this day\'s loading order.' : '') : viewOnlyWhy()) + ' Changes from the sheets show here within about a minute.';
       const s = L.screenState(app, 'plantLoading');
       document.getElementById('mode-text').textContent = s.live ? (s.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
@@ -542,8 +554,14 @@
       if (box && !box.disabled && box.showPicker) { try { box.showPicker(); } catch (err) { /* not allowed here */ } }
     });
     requireSignIn(async (user) => {
+      signedEmail = user.email || '';
       ({ db } = await start());
-      watchPerson(db, user, p => { person = p; render(); });
+      let askedRights = '';
+      watchPerson(db, user, p => {
+        person = p; render();
+        const key = JSON.stringify([p && p.roles, p && p.email]);
+        if (key !== askedRights) { askedRights = key; allowedSaves(['savePlantLoad']).then(a => { allowed = a; render(); }); }
+      });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
         const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));

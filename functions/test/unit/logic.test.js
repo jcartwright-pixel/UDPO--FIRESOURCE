@@ -210,3 +210,15 @@ test('Joe 10/11: a driver off on a day he normally works is red whatever the rea
   assert.equal(jones.days.mon.kind, 'vacation', 'unpaid on a working day is red');
   assert.equal(alston.days.sun.kind, 'unavailable', 'off on his regular day off stays as before');
 });
+
+// Joe 10/12: the plant email showed "Plant employee" in People & Roles but the tablet stayed View only. A role written
+// with a space, a dash or in lower case is the same role, as People & Roles and rights.js already read it.
+test('hasRole reads a role however the Users sheet spells it', () => {
+  const plant = (roles, status) => ({ status: status || 'ACTIVE', roles });
+  const PLANT = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
+  for (const r of ['PLANT_EMPLOYEE', 'Plant Employee', 'plant employee', 'plant-employee', ' PLANT_EMPLOYEE ']) assert.equal(L.hasRole(plant([r]), PLANT), true, r);
+  assert.equal(L.hasRole(plant(['Plant Employee'], 'Active'), PLANT), true, 'status Active');
+  assert.equal(L.hasRole(plant(['MECHANIC']), PLANT), false);
+  assert.equal(L.hasRole(plant(['Plant Employee'], 'INACTIVE'), PLANT), false);
+  assert.equal(L.hasRole(null, PLANT), false);
+});
