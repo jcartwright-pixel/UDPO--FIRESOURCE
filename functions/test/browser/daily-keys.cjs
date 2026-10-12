@@ -114,10 +114,11 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.waitForSelector('.cell-pop [data-i]');
     const names = await p.$$eval('.cell-pop [data-i]', n => n.map(x => x.textContent));
     assert.ok(names.some(t => /^CASEY, LEE/.test(t)), 'whole list: ' + names.join(' | '));
-    // Grouped like the current app: Relief, Regular (seniority, tagged), Other CVG / Carriers, then Unavailable with the reason.
+    // Joe 10/12: Regular drivers (seniority order) first, then Relief drivers on their own, names only; then Other CVG /
+    // Carriers, then Unavailable with the reason.
     const heads = await p.$$eval('.cell-pop h6', n => n.map(x => x.textContent));
-    assert.deepEqual(heads.map(h => h.split(' \u00b7 ')[0]), ['RELIEF DRIVERS', 'REGULAR DRIVERS', 'OTHER CVG / CARRIERS', 'UNAVAILABLE'], heads.join(' | '));
-    assert.deepEqual(await p.$$eval('.cell-pop [data-i]', n => n.slice(1, 3).map(x => x.textContent)), ['BROOK, SAMRelief', 'CASEY, LEESeniority 2025']);
+    assert.deepEqual(heads.map(h => h.split(' \u00b7 ')[0]), ['REGULAR DRIVERS', 'RELIEF DRIVERS', 'OTHER CVG / CARRIERS', 'UNAVAILABLE'], heads.join(' | '));
+    assert.deepEqual(await p.$$eval('.cell-pop [data-i]', n => n.slice(1, 3).map(x => x.textContent)), ['CASEY, LEE', 'BROOK, SAM']);
     const off = await p.$$eval('.cell-pop [data-i].off', n => n.map(x => x.textContent));
     assert.ok(off.includes('ADAMS, PATOn 801') && off.some(t => /^DUNN, ROBININACTIVE/.test(t)), 'unavailable: ' + off.join(' | '));
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-list-1920.png') });
@@ -125,7 +126,7 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.ok(await p.$('.cell-pop'), 'an unavailable driver cannot be clicked without OVR');
     await p.click('.cell-pop [data-i]:has-text("CASEY, LEE")');
     await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'CASEY, LEE', R802);
-    results.push('a double-click opened the whole driver list grouped Relief, Regular (Seniority year), Other CVG, Unavailable (ADAMS "On 801", DUNN INACTIVE, greyed and not pickable); clicking CASEY, LEE saved it');
+    results.push('a double-click opened the whole driver list grouped Regular (seniority order), Relief, Other CVG, Unavailable (ADAMS "On 801", DUNN INACTIVE, greyed and not pickable); clicking CASEY, LEE saved it');
 
     // Time: typing on the selected cell starts over; Enter saves and moves down; Tab from Jack goes to Notes.
     await p.click(R801 + ' td[data-edit="driver"]');
@@ -160,6 +161,20 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await text(p, R802, 5), 'N/A', 'the truck stays off after the saves');
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-carrier-1920.png') });
     results.push('picking BROOK, SAM brought his own truck 900003; picking Carrier took the truck off and Truck shows N/A');
+
+    // Joe 10/12: the Edit box lists the drivers (Regular by seniority, then Relief), and a driver picked there brings his own
+    // truck into the box and the row.
+    await db().collection('drivers').doc('drv_test_casey').update({ defaultTruckId: 'veh_truck_900003' });
+    await p.waitForTimeout(500);
+    await p.click(R802 + ' button:has-text("Edit")');
+    await p.waitForSelector('#edit-modal select[data-field="driver"]');
+    assert.deepEqual(await p.$$eval('#edit-modal select[data-field="driver"] optgroup', g => g.map(x => x.label)).then(l => l.slice(0, 2)), ['Regular Drivers \u2014 Seniority Order', 'Relief Drivers']);
+    await p.selectOption('#edit-modal select[data-field="driver"]', 'drv_test_casey');
+    await p.waitForFunction(() => { const t = document.querySelector('#edit-modal select[data-field="truck"]'); return t && t.selectedOptions[0] && t.selectedOptions[0].textContent.startsWith('900003'); }, null, { timeout: 8000 });
+    await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'CASEY, LEE' && document.querySelector(s).children[5].textContent === '900003', R802, { timeout: 8000 });
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-edit-driver-truck-1920.png') });
+    await p.click('#edit-modal [data-close]');
+    results.push('the Edit box lists Regular then Relief drivers; picking CASEY, LEE there brought his truck 900003 into the box and the row');
 
     // A refused save says Not saved, and leaving while a save is going asks first.
     await p.evaluate(async () => { const m = await import('./js/edit.js'); try { await m.saveOptimistic('noSuchAction', {}, () => {}, () => {}, () => {}); } catch (e) { /* shown on screen */ } });
