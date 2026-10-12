@@ -204,6 +204,27 @@ jobs:
             echo "Save without sign-in: $reply"
           } >> "$GITHUB_STEP_SUMMARY"
           $ok
+      - name: Check every server step answers the browser
+        # A callable function without its public "may be called" setting (allUsers Cloud Run Invoker) answers the browser
+        # with Google's bare 403, which the screens show as "internal" (live Administration, 10/11: the first deploy created
+        # admin only on its retry, which never set it). Each one must answer a signed-out call with its own refusal; one
+        # that does not fails the deploy with the line an Owner pastes in Cloud Shell.
+        if: steps.settings.outputs.ready == 'true'
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          set -uo pipefail
+          names=$(grep -oE '^exports\.[A-Za-z0-9]+ = onCall' index.js | sed -E 's/^exports\.([A-Za-z0-9]+).*/\1/')
+          [ -n "$names" ] || { echo "::error::Found no callable functions in functions/index.js"; exit 1; }
+          bad=0
+          for f in $names; do
+            body=$(curl -s -m 30 -X POST -H 'Content-Type: application/json' -d '{"data":{}}' "https://us-east4-$PROJECT.cloudfunctions.net/$f")
+            if echo "$body" | grep -qE '^\{"(error|result)"'; then echo "$f: answers"; continue; fi
+            bad=1
+            echo "::error::$f cannot be called from the screens (Google's 403). An Owner pastes in Cloud Shell: gcloud run services add-iam-policy-binding $(echo "$f" | tr 'A-Z' 'a-z') --region=us-east4 --member=allUsers --role=roles/run.invoker --project=$PROJECT"
+          done
+          echo "Callable server steps checked: $(echo $names | wc -w), all answer: $( [ $bad = 0 ] && echo yes || echo NO )" >> "$GITHUB_STEP_SUMMARY"
+          exit $bad
       - name: Open the live home page in a browser and check its styles applied
         if: steps.settings.outputs.ready == 'true'
         env:
