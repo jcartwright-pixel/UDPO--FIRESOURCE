@@ -1145,8 +1145,10 @@ async function noScroll(page) {
     await gl.click('.adm-item[data-key="switch"]');
     await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"]');
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="drivers"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
-    assert.match(await gl.textContent('#gl-rows tr[data-row="Plant Loading"]'), /Let the new app write plant loading to the real Live sheet/);
-    // Turn on everything that is ready: pressed twice; Daily and Weekly Dispatch go to the new app, nothing else.
+    // Joe 10/12 ("Let the new app write plant loading to the real Live sheet."): Plant Loading is a switch of its own, ready.
+    assert.match(await gl.textContent('#gl-rows tr[data-row="plantLoading"]'), /Plant Loading[\s\S]*Current app[\s\S]*Ready[\s\S]*Loadout History/);
+    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="plantLoading"] [data-act="new"]'), false);
+    // Turn on everything that is ready: pressed twice; Daily and Weekly Dispatch and Plant Loading go to the new app, nothing else.
     await gl.click('#gl-all');
     assert.match(await gl.textContent('#gl-all'), /Press again/);
     assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'old', 'one press does nothing');
@@ -1155,11 +1157,17 @@ async function noScroll(page) {
     let cfg = (await db().collection('config').doc('app').get()).data();
     assert.equal(cfg.screenOwners.dailyDispatch, 'new');
     assert.equal(cfg.screenOwners.weeklyDispatch, 'new');
+    assert.equal(cfg.screenOwners.plantLoading, 'new');
     assert.equal(cfg.screenOwners.drivers, 'old');
     if (SHOTS) await gl.screenshot({ path: path.join(SHOTS, 'go-live-switches-1536.png') });
     const onNew = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await onNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'NEW APP: SAVES GO TO THE SHEET');
     await onNew.close();
+    // Plant Loading moved with them: the Loadout Center saves in the new app (and its loads go to the Live sheet).
+    const loNew = await openPage(browser, 1366, 650, '/loadout.html?date=2026-10-05&testEmail=manager.test@uniteddairy.com');
+    await loNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'NEW APP');
+    assert.deepEqual(loNew.errors, []);
+    await loNew.close();
     // A screen that stayed on the current app is view only in the new app.
     const onOld = await openPage(browser, 1366, 650, '/checkins.html?testEmail=dispatch.test@uniteddairy.com');
     await onOld.waitForFunction(() => document.getElementById('mode-text').textContent === 'RUN FROM THE CURRENT APP: VIEW ONLY');
@@ -1180,8 +1188,8 @@ async function noScroll(page) {
     await gl.click('#gl-wb-btn');
     await gl.waitForSelector('#view .ap-msg.bad:not([hidden])');
     assert.match(await gl.textContent('#view .ap-msg'), /back to the current app/);
-    // Move back clears fully live; with both back, every screen is a test copy again.
-    for (const k of ['dailyDispatch', 'weeklyDispatch']) {
+    // Move back clears fully live; with all three back, every screen is a test copy again.
+    for (const k of ['dailyDispatch', 'weeklyDispatch', 'plantLoading']) {
       await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
       await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
       await gl.waitForSelector('#gl-rows tr[data-row="' + k + '"] .gl-chip.old');

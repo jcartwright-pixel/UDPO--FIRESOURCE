@@ -107,7 +107,7 @@
     const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state !== 'DONE' && r.state !== 'LOADING';
     const unsubs = [];
 
-    const canLoad = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const canLoad = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
     const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 
     function rowsNow() {
@@ -231,7 +231,7 @@
       if (held) { const g = document.querySelector('#rows [data-grip="' + held + '"]'); if (g) g.focus(); }
       if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
       document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Grab a route by its handle and move it up or down to change this day\'s loading order (or select it and press the Up / Down arrow keys).' : '') : 'View only.') + ' Changes from the sheets show here within about a minute.';
-      const s = L.screenState(app, 'plant');
+      const s = L.screenState(app, 'plantLoading');
       document.getElementById('mode-text').textContent = s.live ? (s.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
 

@@ -352,7 +352,10 @@
   // "new" = the new app saves and the write-back puts each save in the sheet. While every screen is "old" the new
   // app is a test copy and every screen may save; once one is "new", only "new" screens save in the new app.
   var SCREENS = { dailyDispatch: 'Daily Dispatch', weeklyDispatch: 'Weekly Dispatch', checkIns: 'Driver Check-ins',
-    drivers: 'Drivers', vacations: 'Vacation Schedule', routes: 'Route Editor' };
+    drivers: 'Drivers', vacations: 'Vacation Schedule', routes: 'Route Editor',
+    // Joe 10/12: "Let the new app write plant loading to the real Live sheet." The Plant Distribution screens (Loadout Center,
+    // Trailer Assignments, Unloading, Truck Washing, Product Returns): a load, its order and its case returns go to the Live week tabs.
+    plantLoading: 'Plant Loading' };
   function screenOwners(config) {
     var out = {}, set = (config && config.screenOwners) || {};
     Object.keys(SCREENS).forEach(function (k) { out[k] = 'old'; });
@@ -380,10 +383,11 @@
     checkIns: { area: 'Route Distribution', ready: false, why: 'Truck problems it files cannot reach the current app yet.' },
     drivers: { area: 'Route Distribution', ready: false, why: 'Would write Driver Master. Needs your OK.' },
     vacations: { area: 'Route Distribution', ready: false, why: 'Would write the Vacations sheet. Needs your OK.' },
-    routes: { area: 'Route Distribution', ready: false, why: 'Would write Route Master. Needs your OK.' }
+    routes: { area: 'Route Distribution', ready: false, why: 'Would write Route Master. Needs your OK.' },
+    plantLoading: { area: 'Plant Distribution', ready: true, why: 'Writes loads, loading order and case returns to the Live sheet week tabs, and Loadout History when a load is Done. You OK\'d it 10/12.' }
   };
-  // Shown on Go-Live Switches but not a switch yet (the plant saves have no write-back to the real sheet).
-  var GO_LIVE_LATER = [{ name: 'Plant Loading', area: 'Plant Distribution', why: 'Needs your words: "Let the new app write plant loading to the real Live sheet."' }];
+  // Shown on Go-Live Switches but not a switch yet. (Plant Loading became a switch on 10/12.)
+  var GO_LIVE_LATER = [];
   // "Fully live": the screen is on the new app for good, so its tag comes off the cards. Moving it back clears it.
   function fullyLive(config, screen) {
     return screenOwners(config)[screen] === 'new' && !!(config && config.fullyLive && config.fullyLive[screen] === true);
