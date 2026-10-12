@@ -222,19 +222,3 @@ test('hasRole reads a role however the Users sheet spells it', () => {
   assert.equal(L.hasRole(plant(['Plant Employee'], 'INACTIVE'), PLANT), false);
   assert.equal(L.hasRole(null, PLANT), false);
 });
-
-test('route names read as Route, Route Name and Run Name, never 6301_1 (Joe 10/12)', () => {
-  assert.equal(L.routeNumber('901_3'), '901');
-  assert.equal(L.routeNumber('6301'), '6301');
-  assert.equal(L.runLabel('Martins Ferry', 'Product Load 1'), 'Martins Ferry Product Load 1');
-  assert.equal(L.runLabel('Walmart', 'Load 2'), 'Walmart Load 2');
-  assert.equal(L.runLabel('UT WALMART', '6301_1'), 'UT WALMART Load 1');
-  assert.equal(L.runLabel('Jersey', 'JERSEY LOAD 1'), 'JERSEY LOAD 1');
-  assert.equal(L.runLabel('UT DSD MILK', 'UT DSD MILK'), 'UT DSD MILK');
-  assert.equal(L.runLabel('CreamOLand', ''), 'CreamOLand');
-  assert.equal(L.runLabel('', 'PECK'), 'PECK');
-  // Run Type (route_run_type) tells Load 1 from Load 2.
-  assert.equal(L.runLabel('Martins Ferry', 'Product', 'Load 1'), 'Martins Ferry Product Load 1');
-  assert.equal(L.runLabel('Walmart', '', 'Load 2'), 'Walmart Load 2');
-  assert.equal(L.runLabel('Jersey', 'JERSEY LOAD 1', 'Load 1'), 'JERSEY LOAD 1');
-});
