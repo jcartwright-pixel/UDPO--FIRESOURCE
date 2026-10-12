@@ -154,6 +154,7 @@ test('Show on the driver Route app switched in the Route Editor reaches the Curr
   await db().collection('runs').doc('2026-10-11__run_t801').update({ displayMobileRoute: false });
   await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { routeNotes: 'note' }, days: {} });
   assert.equal((await run('2026-10-11__run_t801')).displayMobileRoute, false);
+});
 
 test('Route names (Joe 10/12): Route Name and Run reach the Current and Next weeks; with routeNamesLive on, stream_id, route and route_run_type too, and the Previous week', async () => {
   await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
