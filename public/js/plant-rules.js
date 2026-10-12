@@ -28,7 +28,7 @@
  *   - Boxing records no cycle time; Raypak no cycle time or weight; Totes and HTST #1 and #2 no cycle time, weight or tip test;
  *   - the overall result is Pass (RUNNING), Review, Fail (DOWN) or Finished; the 24-hour history lists every line's checks.
  *
- * And Shift Notes' (the page was the Incident & Breakdown Log until Joe 10/12; desktopUiSavePlantShiftReportV5008 / handoffLogHtmlV7250):
+ * And Shift Notes' (the Shift Report Log page, the Incident & Breakdown Log until Joe 10/12; desktopUiSavePlantShiftReportV5008 / handoffLogHtmlV7250):
  *   - an entry has a type, equipment / area, shift, reading time, what happened, next steps and a follow-up status;
  *   - a review note hangs under its entry and the entry's status is its newest review's; the log shows the last 24 hours;
  *   - the shift by the hour: 6 AM to 2:59 PM first, 3 PM to 11:59 PM second, midnight to 5:59 AM third.

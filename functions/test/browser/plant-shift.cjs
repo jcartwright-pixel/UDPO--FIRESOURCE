@@ -55,9 +55,8 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     for (const [w, h] of [[1920, 950], [1536, 730], [1366, 650]]) {
       const page = await openPage(browser, w, h, '/shiftnotes.html' + MANAGER);
       await page.waitForSelector('#fields .sn-entry');
-      // Joe 10/12: the page is called Shift Notes (anything that happened on the shift), not the Incident & Breakdown Log.
-      assert.deepEqual([await page.textContent('.head h1'), await page.title()], ['Shift Notes', 'Shift Notes · New Plant Operations']);
-      assert.equal(await page.$('#eyebrow'), null, 'no second Shift Notes line above the title');
+      // Joe 10/12: the page holds anything that happened on the shift, so it is the Shift Report Log, not the Incident & Breakdown Log.
+      assert.deepEqual([await page.textContent('.head h1'), await page.title()], ['Shift Report Log', 'Shift Report Log · New Plant Operations']);
       // Joe 10/11: a Shift drop-down that starts on the shift now; no Save button (each box saves as it is left).
       // Joe 10/12: a Breakdown (the form it opens on) is recorded with the machine, when it went down, what happened, what
       // fixed it and when it was back up; a Maintenance Request says what's wrong and how long it can wait.

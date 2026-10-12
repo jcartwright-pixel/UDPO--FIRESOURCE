@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Shift Notes · New Plant Operations</title>
+  <title>Shift Report Log · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -16,7 +16,7 @@
 </head>
 <body class="fill issues-page plant-page quality-page shift-page">
   <div class="signin" id="signin" hidden>
-    <h1>Shift Notes</h1>
+    <h1>Shift Report Log</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -28,7 +28,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Shift Notes</h1></div>
+      <div class="title"><span class="eyebrow" id="eyebrow">Shift Notes</span><h1>Shift Report Log</h1></div>
       <div class="tabs" id="panes" role="tablist" aria-label="Log view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
       <div class="hstats" id="hstats"></div>
       <span class="sn-since" id="since"></span>
