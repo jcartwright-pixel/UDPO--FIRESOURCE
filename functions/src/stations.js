@@ -1,7 +1,7 @@
 /*
  * Station codes (Joe 10/12, as the current app's Plant Station kiosk 057_V774 and its App Links): every tablet station has
  * its own code. Typing the code on a tablet opens that station, and the tablet keeps it until a manager types the plant's
- * release code (Administration > Plant Station Codes). Three kinds, each on its own Administration page:
+ * release code (Administration > Manager Links). Three kinds, each on its own Administration page:
  *
  *   PLANT   Plant Station tablets (plant-station.html): Case Loadout, Case Unloading, Tote, Boxing, Yard Services
  *   GARAGE  Garage Station tablets (garage-station.html)

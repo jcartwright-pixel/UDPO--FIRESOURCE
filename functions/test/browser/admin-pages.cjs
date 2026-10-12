@@ -113,6 +113,11 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     assert.deepEqual(await p.$$eval('.ap-link a.ap-btn', a => [...new Set(a.map(x => x.target))]), ['_blank']);
     await shot(p, 'app-links-1920.png');
     await shot(p, 'app-links-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
+    // Joe 10/12: each plant's manager release code is on Manager Links (it was on Plant Station Codes).
+    await p.waitForSelector('#sc-list .ap-item');
+    await p.click('#sc-list [data-plant="fac_uniontown"]');
+    await p.waitForSelector('#sc-list code');
+    await shot(p, 'manager-release-codes-1920.png');
 
     await open('driver-codes', '#st-list .ap-item');
     // Joe 10/12: one Driver Station link (the code decides tablet, TV or kiosk), then the drivers' phone link.
@@ -124,13 +129,15 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
 
     // Joe 10/12: one Plant Station link and the no-account phone app link, then the stations with their own codes; the
     // Garage Station has its own page, and Driver Station Codes lists the kiosks (station-codes.cjs types the codes).
-    await open('station-codes', '#sc-list .ap-item');
+    await open('station-codes', '#st-list .ap-item');
     assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'public']);
-    await p.waitForSelector('#st-list .ap-item');
     assert.equal(await p.$$eval('#st-list .ap-item', l => l.length), 5);
-    await p.click('#sc-list [data-plant="fac_uniontown"]');
-    await p.waitForSelector('#sc-list code');
+    // The release codes moved to Manager Links: one line here points there.
+    assert.equal(await p.$('#sc-list'), null);
     await shot(p, 'plant-station-codes-1920.png');
+    await p.click('#release-moved a');
+    await p.waitForSelector('.adm-item.on[data-key="app-links"]');
+    await p.waitForSelector('#sc-list .ap-item');
     await open('garage-codes', '#st-list .ap-item');
     assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['garage', 'maint']);
     await shot(p, 'garage-station-codes-1920.png');
@@ -185,7 +192,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await shot(p, 'repair-items-1920.png');
     assert.ok(await noSideScroll(p));
     assert.deepEqual(p.errors, []);
-    results.push('Role Templates, Access & QR (QR drawn on screen), Manager Links, Driver Station Codes (new Route code), Plant Station Codes (tablet links and release codes), Report Recipients, Sent Email Log (Sending off and on), Email Senders (per plant) and Repair Items (header badge) all work inside the panel');
+    results.push('Role Templates, Access & QR (QR drawn on screen), Manager Links (with the release codes), Driver Station Codes (new Route code), Plant Station Codes (tablet links, pointer to the release codes), Report Recipients, Sent Email Log (Sending off and on), Email Senders (per plant) and Repair Items (header badge) all work inside the panel');
 
     // The tablet: once Uniontown has a release code, Change Station asks for it.
     const code = (await db().collection('private').doc('releaseCodes').get()).data().fac_uniontown.code;

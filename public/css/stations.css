@@ -275,7 +275,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .ps-page .ps-tab small { display: block; font-size: 17px; color: #4a5b6c; }
 .ps-page .ps-count { display: inline-block; margin-top: 8px; font-weight: 700; color: var(--accent); font-size: 17px; }
 .ps-page .ps-foot { margin-top: 18px; color: #5b6b7c; font-size: 14px; }
-/* Change Station with a manager release code (Administration > Plant Station Codes). */
+/* Change Station with a manager release code (Administration > Manager Links). */
 .ps-release { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px; border: 2px solid #f0b46a; border-radius: 12px; background: #fff8ee; font-size: 18px; }
 .ps-release[hidden] { display: none; }
 .ps-release p { flex-basis: 100%; margin: 0; font-weight: 700; color: #7a3d00; }

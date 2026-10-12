@@ -8,7 +8,7 @@
  *   Role Templates        roleTemplates, saveRoleTemplate private/roleTemplates
  *   Access & QR Codes     accessLinks, accessGenerate, accessRevoke, accessEmail      personAccess/{email}
  *   Driver Station Codes  appLinks, routeCodeNew, routeCodeOnOff                       config/routePhone (phone.js)
- *   Plant Station Codes   releaseCodes, releaseCodeNew                                 private/releaseCodes
+ *   Manager Links         releaseCodes, releaseCodeNew                                 private/releaseCodes
  *   Report Recipients     reportGroups, saveReportGroup                                reportGroups/{id}
  *   Sent Email Log        sentLog, setSending                                          sentEmails, private/emailSettings
  *   Email Senders         emailSenders, saveEmailSenders                               private/emailSettings (senders, fromWho)
@@ -248,7 +248,7 @@ async function routeCodeOnOff(db, email, input, stamp) {
   return { ok: true, message: input.open === true ? 'The Route Distribution phone link is on.' : 'The Route Distribution phone link is off. Phones cannot open it until it is turned on.' };
 }
 
-/* ---------- Plant Station Codes: the manager release code ---------- */
+/* ---------- Manager Links: the manager release code (Joe 10/12: moved from Plant Station Codes) ---------- */
 
 async function releaseCodes(db) {
   const d = (await db.collection('private').doc('releaseCodes').get()).data() || {};
