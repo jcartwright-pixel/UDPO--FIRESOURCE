@@ -370,6 +370,25 @@
     return { owner: owner, live: false, open: true, why: '' };
   }
 
+  // Administration > Go-Live Switches (Joe 10/12): which screens may move to the new app. A screen is ready only when the
+  // sheet it writes is built and Joe has OK'd writing it; "Turn on everything that is ready" moves only these. The rest show
+  // "Not ready" with the reason, and the server refuses to move them.
+  var DISPATCH_OK = 'Writes the Live sheet week tabs. You OK\'d it 10/12.';
+  var GO_LIVE = {
+    dailyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
+    weeklyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
+    checkIns: { area: 'Route Distribution', ready: false, why: 'Truck problems it files cannot reach the current app yet.' },
+    drivers: { area: 'Route Distribution', ready: false, why: 'Would write Driver Master. Needs your OK.' },
+    vacations: { area: 'Route Distribution', ready: false, why: 'Would write the Vacations sheet. Needs your OK.' },
+    routes: { area: 'Route Distribution', ready: false, why: 'Would write Route Master. Needs your OK.' }
+  };
+  // Shown on Go-Live Switches but not a switch yet (the plant saves have no write-back to the real sheet).
+  var GO_LIVE_LATER = [{ name: 'Plant Loading', area: 'Plant Distribution', why: 'Needs your words: "Let the new app write plant loading to the real Live sheet."' }];
+  // "Fully live": the screen is on the new app for good, so its tag comes off the cards. Moving it back clears it.
+  function fullyLive(config, screen) {
+    return screenOwners(config)[screen] === 'new' && !!(config && config.fullyLive && config.fullyLive[screen] === true);
+  }
+
   // Same rule as desktopVacationWeeksV0310_: completed years since hire -> 0, 1, 2, 3, 4 or 5 weeks.
   function vacationWeeks(hireDate, asOf) {
     var h = dateKey(hireDate), a = dateKey(asOf);
@@ -983,7 +1002,7 @@
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
-    SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState,
+    SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
