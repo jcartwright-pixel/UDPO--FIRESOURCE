@@ -52,7 +52,12 @@
 .ap-reveal code, .ap code { font-size: 18px; font-weight: 900; letter-spacing: .08em; background: #f1f5fa; padding: 2px 8px; border-radius: 6px; }
 .ap-url { font-family: Consolas, Menlo, monospace; font-size: 14px; color: #34495e; word-break: break-all; }
 .ap-links { display: flex; flex-direction: column; gap: 10px; }
-.ap-link { display: grid; grid-template-columns: 1.1fr 1.6fr auto; gap: 12px; align-items: center; border: 1px solid #e6ecf2; border-radius: 12px; padding: 10px 12px; background: #fff; }
+.ap-link { display: grid; grid-template-columns: minmax(240px, 1.2fr) 2fr auto; gap: 8px 16px; align-items: center; border: 2px solid #c9d6e4; border-left: 6px solid #0b6eaa; border-radius: 12px; padding: 12px 14px; background: #fff; }
+.ap-link-name { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ap-link .ap-link-who { margin: 0; color: #22384d; font-size: 16px; }
+.ap-how { grid-column: 1 / -1; color: #4a6b8d; font-size: 14px; }
+.ap-how summary { cursor: pointer; color: #0b6eaa; font-weight: 700; font-size: 14px; }
+.ap-how p { margin: 4px 0 0; }
 .ap-link h4 { margin: 0; font-size: 17px; color: #0b3d6b; }
 .ap-link p { margin: 2px 0 0; color: #4a6b8d; font-size: 14px; }
 .ap-link .ap-acts { display: flex; gap: 6px; flex-wrap: nowrap; }

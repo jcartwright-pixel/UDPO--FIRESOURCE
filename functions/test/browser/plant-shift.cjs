@@ -56,7 +56,17 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
       const page = await openPage(browser, w, h, '/shiftnotes.html' + MANAGER);
       await page.waitForSelector('#fields .sn-entry');
       // Joe 10/11: a Shift drop-down that starts on the shift now; no Save button (each box saves as it is left).
-      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'Shift', 'Reading Time', 'Entry / Measurements', 'Notes / Follow-up', 'Follow-up']);
+      // Joe 10/12: a Breakdown (the form it opens on) is recorded with the machine, when it went down, what happened, what
+      // fixed it and when it was back up; a Maintenance Request says what's wrong and how long it can wait.
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Machine', 'Shift', 'Down at', 'What happened?', 'What fixed it', 'Back up at', 'Notes / Follow-up', 'Follow-up']);
+      await page.selectOption('.sn-type', 'Maintenance Request');
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Machine', 'Shift', 'Can it wait?', 'What\'s wrong?', 'Notes / Follow-up', 'Follow-up']);
+      assert.equal(await page.inputValue('.sn-urgency'), '', 'Can it wait starts blank');
+      await fits(page, 'Shift Notes Maintenance Request ' + w + 'x' + h);
+      await shots(page, 'shiftnotes-request', w);
+      await page.selectOption('.sn-type', 'Handoff');
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'Shift', 'Reading Time', 'Entry / Measurements', 'Notes / Follow-up', 'Follow-up'], 'the other kinds keep the form they had');
+      await page.selectOption('.sn-type', 'Breakdown');
       assert.equal(await page.$('#record'), null, 'Shift Notes has no Save button');
       assert.match(await page.inputValue('#shift-now'), /^(FIRST|SECOND|THIRD) SHIFT$/);
       await fits(page, 'Shift Notes ' + w + 'x' + h);
@@ -123,7 +133,11 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     if (SHOTS) await watcher.screenshot({ path: path.join(SHOTS, 'shiftnotes-reviewed-1920.png'), scale: 'css' });
     const phone = await openPage(browser, 412, 860, '/shiftnotes.html' + MANAGER);
     await phone.waitForSelector('#fields .sn-entry');
+    // Joe 10/12: the phone's Breakdown form has the machine, down at, back up at and what fixed it too; other kinds keep theirs.
+    assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'Machine', 'Down at', 'Back up at', 'What happened?', 'What fixed it', 'Follow-up']);
+    await phone.selectOption('.sn-type', 'Handoff');
     assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'Equipment / area', 'What happened?', 'Next steps Optional', 'Follow-up']);
+    await phone.selectOption('.sn-type', 'Breakdown');
     assert.equal(await phone.$('#record'), null, 'no Save button on the phone');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'shiftnotes-phone-412.png'), scale: 'css' });
     assert.equal(await phone.isVisible('[data-pane="history"]'), false, 'no log tab on the phone');

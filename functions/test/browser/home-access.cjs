@@ -57,8 +57,10 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await sup.waitForTimeout(600);
     assert.match(sup.url(), /index\.html/, 'a supervisor clicking Plant Production stays on the plant home');
     assert.deepEqual(await sup.$$eval('.sidemenu a[data-building]', a => a.map(x => x.dataset.side + ':' + getComputedStyle(x).pointerEvents)), ['production:none', 'pmaint:none', 'safety:none']);
-    // Plant Production's first page is now its Production Lines board (Joe 10/11); Plant Maintenance is still the being-built page.
-    for (const [page, name, inside] of [['production.html?', 'Plant Production', '#tiles'], ['soon.html?what=plant-maintenance&', 'Plant Maintenance', '.soon-card']]) {
+    // Plant Production's first page is its Production Lines board (Joe 10/11); Plant Maintenance's is its Maintenance Center (Joe 10/12),
+    // and every Plant Maintenance screen stays closed to a supervisor while it is being built.
+    for (const [page, name, inside] of [['production.html?', 'Plant Production', '#tiles'], ['pmaint.html?', 'Plant Maintenance', '#cols'], ['machinery.html?', 'Plant Maintenance', '#rows'],
+      ['pmschedule.html?', 'Plant Maintenance', '#rows'], ['pmworkorders.html?', 'Plant Maintenance', '#rows']]) {
       await sup.goto(HOSTING + '/' + page + 'testEmail=super.test@uniteddairy.com');
       await sup.waitForSelector('#uc-refused');
       assert.equal(await sup.textContent('#uc-refused h1'), name + ' is under construction');
@@ -95,12 +97,12 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.waitForFunction(() => /Charleston is not connected/.test(document.getElementById('why').textContent));
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
-    // Joe 10/12: picking a plant opens its Plant Operations (the Manager Center) first, wherever on the card it is clicked;
+    // Joe 10/12: picking a plant opens its Plant Distribution (the Manager Center) first, wherever on the card it is clicked;
     // Back from there is the plant's home with all six cards, and Back again is this overview.
     await Promise.all([adm.waitForURL(/manager\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
     await adm.waitForSelector('#screen .head h1');
     assert.equal(await adm.textContent('#screen .head h1'), 'Manager Center');
-    assert.equal(await adm.$eval('.sidemenu a.side-name', a => a.textContent.trim() + ':' + a.classList.contains('on')), 'Plant Operations:true', 'the menu shows Plant Operations as the page open');
+    assert.equal(await adm.$eval('.sidemenu a.side-name', a => a.textContent.trim() + ':' + a.classList.contains('on')), 'Plant Distribution:true', 'the menu shows Plant Distribution as the page open');
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-uniontown-opens-plant-operations-1920.png') });
     await Promise.all([adm.waitForURL(/index\.html/), adm.click('#go-back')]);
     // Joe 10/11: the plant home shows the plant's three cards, Route Distribution, Fleet & Maintenance, Reports and (Joe 10/12) Safety Walkthrough;
@@ -164,7 +166,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, which opens its Plant Operations first (Back is its home with the six cards) and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
+    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, which opens its Plant Distribution first (Back is its home with the six cards) and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');
@@ -178,12 +180,12 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     results.push('The overview and Administration fit a 1366 window');
 
     // Joe 10/11: the main screen's plant fly-out lists the same six as the plant home; Reports gathers every report in one
-    // place (the plant's reports moved there from Plant Operations); Plant Production opens its being-built page.
+    // place (the plant's reports moved there from Plant Distribution); Plant Production opens its being-built page.
     const mods = await openPage(browser, 1536, 864, '/company.html?testEmail=admin.test@uniteddairy.com');
     await mods.waitForSelector('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
     await mods.hover('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
     await mods.waitForSelector('.side-flyouts .flyout.open a[data-plant="fac_uniontown"]', { state: 'visible' });
-    assert.deepEqual(await mods.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent)), ['Plant Operations', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports', 'Safety Walkthrough']);
+    assert.deepEqual(await mods.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent)), ['Plant Distribution', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports', 'Safety Walkthrough']);
     await Promise.all([mods.waitForURL(/reportcenter\.html/), mods.click('.side-flyouts .flyout.open a[data-side="reports"]')]);
     await mods.waitForSelector('.rc-card');
     assert.deepEqual(await mods.$$eval('.rc-group h2', h => h.map(x => x.textContent)), ['Plant Reports', 'Distribution Reports', 'Fleet Reports']);
@@ -206,7 +208,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await mods.getAttribute('.sidemenu a.side-name', 'data-side'), 'production');
     assert.deepEqual(mods.errors, []);
     await mods.close();
-    results.push('Main screen fly-out and plant home list Plant Operations, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance and Reports; Reports lists every report and keeps its menu; Plant Production opens its Production Lines board for an administrator; the six cards fit 1536x864');
+    results.push('Main screen fly-out and plant home list Plant Distribution, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance and Reports; Reports lists every report and keeps its menu; Plant Production opens its Production Lines board for an administrator; the six cards fit 1536x864');
 
     // Joe 10/10: anywhere on a card opens its screen's first view; one line or number inside opens that screen.
     const cards = await openPage(browser, 1920, 1080, '/company.html?testEmail=admin.test@uniteddairy.com');

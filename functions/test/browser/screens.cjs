@@ -1032,10 +1032,10 @@ async function noScroll(page) {
     }
     results.push('Route Days: Refresh, Add Route, Add Run and Holiday Week Editor sit together in one even row at both sizes');
     // Joe 10/10: Home is the old app's launcher, one big picture per side; each side's menu lists only its own screens.
-    // Joe 10/11: six cards after picking a plant: Plant Operations, Plant Production and Plant Maintenance (both Under
+    // Joe 10/11: six cards after picking a plant: Plant Distribution, Plant Production and Plant Maintenance (both Under
     // Construction), Route Distribution, Fleet & Maintenance and Reports. Five carry pictures; Reports has a drawn icon.
     // Joe 10/12: a seventh, Safety Walkthrough, next to Reports, with a drawn icon too.
-    const SIX = ['Plant Operations', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports', 'Safety Walkthrough'];
+    const SIX = ['Plant Distribution', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports', 'Safety Walkthrough'];
     const lp = await openPage(browser, 1920, 950, '/index.html?testEmail=manager.test@uniteddairy.com');
     await lp.waitForSelector('.launch-card');
     assert.deepEqual(await lp.$$eval('.launch-card strong', s => s.map(x => x.textContent)), SIX);
@@ -1044,7 +1044,7 @@ async function noScroll(page) {
     assert.equal(await lp.$('.sidemenu .side-sec'), null, 'Home lists the sides, not every screen');
     assert.deepEqual(await lp.$$eval('.sidemenu a[data-side]', a => a.map(x => x.textContent.trim())), SIX);
     if (SHOTS) await lp.screenshot({ path: path.join(SHOTS, 'home-launcher-1920.png') });
-    // Joe 10/10: the Plant Operations picture opens Manager Center; the Plant side shows its sections (Manager Center's cards)
+    // Joe 10/10: the Plant Distribution picture opens Manager Center; the Plant side shows its sections (Manager Center's cards)
     // with fly-outs, and Back from a plant screen goes up to Manager Center.
     await Promise.all([lp.waitForURL(/manager\.html/), lp.click('.launch-card[data-side="plant"]')]);
     await lp.waitForSelector('.sidemenu a.side-name');
@@ -1071,7 +1071,7 @@ async function noScroll(page) {
     assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'distribution');
     assert.deepEqual(lp.errors, []);
     await lp.close();
-    results.push('Home: seven cards (Plant Operations, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance, Reports, Safety Walkthrough); each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
+    results.push('Home: seven cards (Plant Distribution, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance, Reports, Safety Walkthrough); each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
     // Joe 10/10: an Administration section holds Dispatch Administration; Driver Weekly Template is under Drivers only.
     const mp = await openPage(browser, 1920, 950, '/daily.html?testEmail=manager.test@uniteddairy.com');
     await mp.waitForSelector('.side-flyouts .flyout', { state: 'attached' });

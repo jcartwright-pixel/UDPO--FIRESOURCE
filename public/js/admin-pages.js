@@ -367,22 +367,24 @@ export async function renderAccessCodes(box) {
 
 /* ---------- Manager Links, Plant Station Codes, Driver Station Codes (Joe 10/11: each link where it belongs) ---------- */
 
+// Joe 10/12: each link reads at a glance (name, who can open it, the buttons); the rest is under "How it works".
 const APP_LINKS = [
-  { key: 'company', title: 'United Dairy Operations', label: 'Company link', path: 'index.html', who: 'ud', opens: 'Every screen their role allows', guard: 'UD Google account and their role', shut: 'Remove them in People & Roles' },
-  { key: 'phone', title: 'Phone link', label: 'Phone link', path: 'index.html', who: 'ud', opens: 'The phone screens (managers, supervisors, plant staff)', guard: 'UD Google account and their role', shut: 'Remove them in People & Roles' },
-  { key: 'manager', title: 'Manager Web App', label: 'Manager link', path: 'manager.html', who: 'ud', opens: 'Managers only. Company Google sign-in, no code.', guard: 'UD Google account (Manager role)', shut: 'Change their role in People & Roles' },
-  { key: 'plant', title: 'Plant Station (tablet)', label: 'Tablet link', path: 'plant-station.html', who: 'ud', opens: 'Every plant station from one link. The tablet types its station\'s code (Stations, below) and opens that station.', guard: 'The tablet\'s United Dairy Google account, then the station code. Moving the tablet to another station needs the plant\'s manager release code.', shut: 'New code or Remove on the station, below', extra: { label: 'Tablet icon page', url: 'https://ud-plant-tablet.web.app/' } },
-  { key: 'public', title: 'Plant Station without a UD account (phone app)', label: '', path: '', who: 'code', opens: 'A plant station on a tablet or phone with no United Dairy account, by its station code. On or off for every plant station.', guard: 'Being built: it needs a Google sign-in permission IT turns on. Until then, plant tablets sign in with a UD account.', shut: 'On / Off here, once it is built', soon: true },
-  { key: 'driver', title: 'Driver Station and TV', label: 'Tablet page', path: 'driver-station.html', who: 'ud', opens: 'Every Driver Room kiosk and TV from one link. Once a kiosk has a code (Kiosks, below), the tablet types it.', guard: 'UD sign-in, then the kiosk code', shut: 'Remove the account in People & Roles' },
-  { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', opens: 'Every garage station from one link. Once a garage station has a code (Stations, below), the tablet types it.', guard: 'The station code, then the technician\'s name and login ID', shut: 'Turn the technician off in Fleet Service' },
-  { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', opens: 'Drivers on their own phones: View Loadout, Check-In. No company account needed.', guard: 'Anyone with the Route Distribution code', shut: 'Turn the link off or make a new code below', code: true },
-  { key: 'personal', title: 'Personal phone links', label: '', path: '', who: 'ud', opens: 'One person\'s phone screens', guard: 'Their own link, plus UD sign-in', shut: 'Revoke in Access & QR Codes', goto: 'access-codes' }
+  { key: 'company', title: 'United Dairy Operations', label: 'Company link', path: 'index.html', who: 'ud', short: 'Anyone with a UD account; their role decides what they see', opens: 'Every screen their role allows.', shut: 'Remove them in People & Roles.' },
+  { key: 'phone', title: 'Phone link', label: 'Phone link', path: 'index.html', who: 'ud', short: 'Anyone with a UD account', opens: 'The phone screens for managers, supervisors and plant staff.', shut: 'Remove them in People & Roles.' },
+  { key: 'manager', title: 'Manager Web App', label: 'Manager link', path: 'manager.html', who: 'ud', short: 'Managers (UD account)', opens: 'The manager screens. Company Google sign-in, no code.', shut: 'Change their role in People & Roles.' },
+  { key: 'plant', title: 'Plant Station', label: 'Tablet link', path: 'plant-station.html', who: 'ud', short: 'A tablet with a UD account, then the station\'s code', opens: 'One link for every plant station. The tablet types its station\'s code (Stations, below), opens that station and keeps it. Moving it to another station needs the plant\'s manager release code.', shut: 'New code or Remove on the station, below.' },
+  { key: 'public', title: 'Plant Station with no UD account', label: '', path: '', who: 'code', short: 'Nobody yet: it needs a Google permission IT turns on', opens: 'A plant station on a tablet or phone with no United Dairy account, by its station code, with an On / Off switch for every plant station. It needs a Google sign-in permission IT turns on; until then plant tablets sign in with a UD account.', shut: 'On / Off here, once it is built.', soon: true },
+  { key: 'driver', title: 'Driver Station (Driver Room tablet)', label: 'Tablet link', path: 'driver-station.html', who: 'ud', short: 'The tablet\'s UD account, then its kiosk code', opens: 'The Driver Room loadout board and weekly schedule with the weather. Once a kiosk has a code (Kiosks, below), the tablet types it once.', shut: 'New code or Remove on the kiosk, below.' },
+  { key: 'tv', title: 'Driver Room TV', label: 'TV link', path: 'driver-station.html?tv=1', who: 'ud', short: 'The TV\'s UD account, then its kiosk code', opens: 'The same board full screen with no buttons, both lists rolling, for the TV on the wall.', shut: 'New code or Remove on the TV, below.' },
+  { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', short: 'The station\'s code, then each mechanic\'s login ID', opens: 'One link for every garage station. Once a garage station has a code (Stations, below), the tablet types it once; mechanics then tap their name and type their login ID.', shut: 'New code or Remove on the station; turn a mechanic off in Fleet Service.' },
+  { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', short: 'Anyone with the Route Distribution code', opens: 'Drivers on their own phones: View Loadout, Check-In and DVIR. No company account needed.', shut: 'Turn Off stops the drivers\' phone link (UD sign-in links keep working). A new code makes every phone ask for it again.', code: true },
+  { key: 'personal', title: 'Personal phone links', label: '', path: '', who: 'ud', short: 'One person, with their own link and UD sign-in', opens: 'One person\'s phone screens.', shut: 'Revoke in Access & QR Codes.', goto: 'access-codes' }
 ];
 
 const MANAGER_LINKS = ['company', 'phone', 'manager', 'personal'];
 const PLANT_LINKS = ['plant', 'public'];
 const GARAGE_LINKS = ['garage'];
-const DRIVER_LINKS = ['driver', 'route'];
+const DRIVER_LINKS = ['driver', 'tv', 'route'];
 
 // The link cards for the given keys; tail is more of the page under the cards (Plant Station Codes' release codes).
 export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '') {
@@ -396,18 +398,18 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '') 
   function codeRow() {
     const c = data.routeCode;
     const codeText = c.code ? '<code>' + e(c.code) + '</code> <button type="button" class="ap-btn small" id="al-copy-code">Copy Code</button>' : c.state === 'NOT SET' ? 'No code yet' : 'Make a new code once to show it here';
-    return '<div class="ap-code-row"><b>Route Distribution code:</b> ' + codeText + ' <span class="ap-chip ' + (c.state === 'ACTIVE' ? 'good' : c.state === 'DISABLED' ? 'bad' : '') + '">' + (c.state === 'ACTIVE' ? 'ON' : c.state === 'DISABLED' ? 'OFF' : 'NOT SET') + '</span>' +
-      (c.setAt ? '<small class="ap-help">changed ' + e(when(c.setAt)) + ' by ' + e(c.setBy) + '</small>' : '') +
+    return '<div class="ap-code-row"><b>Code:</b> ' + codeText + ' <span class="ap-chip ' + (c.state === 'ACTIVE' ? 'good' : c.state === 'DISABLED' ? 'bad' : '') + '">' + (c.state === 'ACTIVE' ? 'ON' : c.state === 'DISABLED' ? 'OFF' : 'NOT SET') + '</span>' +
+      (c.setAt ? '<small class="ap-help">changed ' + e(when(c.setAt)) + '</small>' : '') +
       '<span style="margin-left:auto;display:flex;gap:6px"><button type="button" class="ap-btn small warn" id="al-new-code">' + (c.state === 'NOT SET' ? 'Generate Code' : 'Rotate Code') + '</button>' +
-      (c.state === 'ACTIVE' ? '<button type="button" class="ap-btn small" id="al-off">Turn Off</button>' : c.state === 'DISABLED' ? '<button type="button" class="ap-btn small main" id="al-on">Turn On</button>' : '') + '</span>' +
-      '<p class="ap-note" style="flex-basis:100%">Off stops the drivers\' phone link. UD sign-in links keep working. A new code makes every phone ask for it again.</p></div>';
+      (c.state === 'ACTIVE' ? '<button type="button" class="ap-btn small" id="al-off">Turn Off</button>' : c.state === 'DISABLED' ? '<button type="button" class="ap-btn small main" id="al-on">Turn On</button>' : '') + '</span></div>';
   }
   function render() {
-    $('#al-list').innerHTML = links.map(l => '<div class="ap-link" data-link="' + l.key + '"><div><h4>' + e(l.title) + ' <span class="ap-chip ' + (l.who === 'ud' ? 'blue' : 'orange') + '">' + (l.who === 'ud' ? 'UD sign-in only' : 'Anyone with the code') + '</span></h4>' +
-      '<p>' + e(l.opens) + '</p></div><div><p><b>Who can open it:</b> ' + e(l.guard) + '</p><p><b>Turn off or change:</b> ' + e(l.shut) + '</p>' + (l.path ? '<p class="ap-url">' + e(url(l)) + '</p>' : '') +
-      (l.extra ? '<p>' + e(l.extra.label) + ': <span class="ap-url">' + e(l.extra.url) + '</span></p>' : '') + '</div><div class="ap-acts">' +
-      (l.soon ? '<span class="ap-chip">Being built</span>' : l.goto ? '<button type="button" class="ap-btn small main" data-goto="' + l.goto + '">Details</button>' : '<button type="button" class="ap-btn small" data-copy="' + l.key + '">Copy Link</button><button type="button" class="ap-btn small" data-qr="' + l.key + '">Print QR</button>' +
-        '<a class="ap-btn small main" href="' + e(l.path) + '">Launch</a>') + '</div>' + (l.code ? codeRow() : '') + '</div>').join('');
+    $('#al-list').innerHTML = links.map(l => '<div class="ap-link" data-link="' + l.key + '"><div class="ap-link-name"><h4>' + e(l.title) + '</h4><span class="ap-chip ' + (l.soon ? '' : l.who === 'ud' ? 'blue' : 'orange') + '">' + (l.soon ? 'Being built' : l.who === 'ud' ? 'UD sign-in' : 'Code, no account') + '</span></div>' +
+      '<p class="ap-link-who"><b>Who can open it:</b> ' + e(l.short) + '</p><div class="ap-acts">' +
+      (l.soon ? '' : l.goto ? '<button type="button" class="ap-btn small main" data-goto="' + l.goto + '">Details</button>' : '<button type="button" class="ap-btn small" data-copy="' + l.key + '">Copy Link</button><button type="button" class="ap-btn small" data-qr="' + l.key + '">Print QR</button>' +
+        '<a class="ap-btn small main" href="' + e(l.path) + '">Launch</a>') + '</div>' + (l.code ? codeRow() : '') +
+      '<details class="ap-how"><summary>How it works</summary><p>' + e(l.opens) + '</p><p><b>Turn off or change:</b> ' + e(l.shut) + '</p>' + (l.path ? '<p class="ap-url">' + e(url(l)) + '</p>' : '') +
+      (l.extra ? '<p>' + e(l.extra.label) + ': <span class="ap-url">' + e(l.extra.url) + '</span></p>' : '') + '</details></div>').join('');
   }
   async function load() { try { data = await call('appLinks'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
   box.addEventListener('click', ev => {
@@ -417,11 +419,11 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '') 
     if (b.id === 'al-reload') load();
     if (b.dataset.goto && ctx && ctx.open) ctx.open(b.dataset.goto);
     if (b.dataset.copy) copyText(b, url(l));
-    if (b.dataset.qr) printQr(l.title, l.label, url(l), l.code ? (data.routeCode.code ? 'Code: <b>' + e(data.routeCode.code) + '</b>' : 'Enter the code your supervisor gives you.') : l.who === 'code' ? e(l.guard) + '.' : 'Sign in with your United Dairy Google account.');
+    if (b.dataset.qr) printQr(l.title, l.label, url(l), l.code ? (data.routeCode.code ? 'Code: <b>' + e(data.routeCode.code) + '</b>' : 'Enter the code your supervisor gives you.') : l.who === 'code' ? e(l.short) + '.' : 'Sign in with your United Dairy Google account.');
     if (b.id === 'al-copy-code') copyText(b, data.routeCode.code);
-    if (b.id === 'al-new-code') twice(b, 'Click Again to Confirm', () => busy(box, b, async () => { const out = await call('routeCodeNew'); await load(); say(box, out.message, 'good'); }));
-    if (b.id === 'al-off') twice(b, 'Click Again to Turn Off', () => busy(box, b, async () => { const out = await call('routeCodeOnOff', { open: false }); await load(); say(box, out.message, 'good'); }));
-    if (b.id === 'al-on') busy(box, b, async () => { const out = await call('routeCodeOnOff', { open: true }); await load(); say(box, out.message, 'good'); });
+    if (b.id === 'al-new-code') twice(b, 'Click Again to Confirm', () => busy(box, b, async () => { const out = await call('routeCodeNew'); await load(); say(box, ''); }));
+    if (b.id === 'al-off') twice(b, 'Click Again to Turn Off', () => busy(box, b, async () => { const out = await call('routeCodeOnOff', { open: false }); await load(); say(box, ''); }));
+    if (b.id === 'al-on') busy(box, b, async () => { const out = await call('routeCodeOnOff', { open: true }); await load(); say(box, ''); });
   });
   await load();
 }
@@ -431,13 +433,13 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '') 
 const STATION_PAGES = {
   PLANT: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each station has its own code. On the tablet, open the Plant Station link and type the station\'s code: the tablet opens that station and keeps it. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (below). Until a plant has a station code, its tablets pick their station from the list.' },
   GARAGE: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each garage station has its own code. On the garage tablet, open the Garage Station link and type the code. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (Plant Station Codes). Until a plant has a garage code, its garage tablet opens straight away.' },
-  KIOSK: { title: 'Kiosks', add: '+ Add Kiosk', what: 'kiosk', help: 'A kiosk is a Driver Room tablet or a TV, and a plant can have more than one (for example a kiosk in the plant too). Open the Driver Station link on it and type its code; a TV display opens the scrolling board. To move it, a manager taps Change and types the plant\'s manager release code (Plant Station Codes). Until a plant has a kiosk code, its kiosks open straight away.' }
+  KIOSK: { title: 'Kiosks', add: '+ Add Kiosk', what: 'kiosk', help: 'A kiosk is a Driver Room tablet or a TV, and a plant can have more than one (for example a kiosk in the plant too). Open the Driver Station link (or the Driver Room TV link) on it and type its code; a TV\'s code opens the full-screen TV board. To move it, a manager taps Change and types the plant\'s manager release code (Plant Station Codes). Until a plant has a kiosk code, its kiosks open straight away.' }
 };
 
 // The station list for one kind under a page's link cards: name, type, plant, code; New code, Remove, and Add.
 function stationSection(kind) {
   const p = STATION_PAGES[kind];
-  return '<div class="ap-section" style="margin-top:10px" data-kind="' + kind + '"><h3>' + p.title + '</h3><p class="ap-note">' + e(p.help) + '</p><div class="ap-list" id="st-list"></div>' +
+  return '<div class="ap-section" style="margin-top:10px" data-kind="' + kind + '"><h3>' + p.title + '</h3><details class="ap-how"><summary>How it works</summary><p>' + e(p.help) + '</p></details><div class="ap-list" id="st-list"></div>' +
     '<div class="ap-form" style="margin-top:8px"><label class="ap-field">New ' + p.what + ' name<input id="st-name" maxlength="60" placeholder="For example ' + (kind === 'KIOSK' ? 'Plant kiosk' : kind === 'GARAGE' ? 'Garage bay 2' : 'Case Loadout dock 2') + '"></label>' +
     '<label class="ap-field">Type<select id="st-type"></select></label><label class="ap-field">Plant<select id="st-plant"></select></label>' +
     '<div><button type="button" class="ap-btn main" id="st-add">' + p.add + '</button></div></div></div>';
@@ -466,14 +468,14 @@ function bindStations(box, kind) {
     if (b.id === 'al-reload') load();
     if (b.dataset.stCopy) copyText(b, b.dataset.stCopy);
     if (b.dataset.stCode) {
-      const go = () => busy(box, b, async () => { const out = await call('stationCode', { key: b.dataset.stCode }); await load(out); say(box, out.message, 'good'); });
+      const go = () => busy(box, b, async () => { const out = await call('stationCode', { key: b.dataset.stCode }); await load(out); say(box, ''); });
       if (b.dataset.again) twice(b, 'Press again to replace', go); else go();
     }
-    if (b.dataset.stRemove) twice(b, 'Press again to remove', () => busy(box, b, async () => { const out = await call('stationRemove', { key: b.dataset.stRemove }); await load(out); say(box, out.message, 'good'); }));
+    if (b.dataset.stRemove) twice(b, 'Press again to remove', () => busy(box, b, async () => { const out = await call('stationRemove', { key: b.dataset.stRemove }); await load(out); say(box, ''); }));
     if (b.id === 'st-add') busy(box, b, async () => {
       const out = await call('stationAdd', { kind, type: $('#st-type').value, facilityId: $('#st-plant').value, name: $('#st-name').value });
       $('#st-name').value = '';
-      await load(out); say(box, out.message, 'good');
+      await load(out); say(box, '');
     });
   });
   return load();
@@ -483,8 +485,8 @@ function bindStations(box, kind) {
 
 export async function renderStationCodes(box, ctx) {
   const tail = stationSection('PLANT') + '<div class="ap-section" style="margin-top:10px"><h3>Manager release codes</h3>' +
-    '<p class="ap-note">A tablet keeps its station. To move it (Plant Station, Garage Station or a kiosk), a manager taps Change Station on the tablet and types the release code for that plant. With no release code set, anyone signed in on the tablet can move it.</p>' +
-    '<div class="ap-list" id="sc-list"></div><p class="ap-note">Five wrong release codes lock the release for ten minutes.</p></div>';
+    '<details class="ap-how"><summary>How it works</summary><p>A tablet keeps its station. To move it (Plant Station, Garage Station or a kiosk), a manager taps Change Station on the tablet and types the release code for that plant. With no release code set, anyone signed in on the tablet can move it. Five wrong release codes lock the release for ten minutes.</p></details>' +
+    '<div class="ap-list" id="sc-list"></div></div>';
   const links = renderAppLinks(box, ctx, PLANT_LINKS, tail);
   const $ = (s) => box.querySelector(s);
   async function load() {
@@ -501,7 +503,7 @@ export async function renderStationCodes(box, ctx) {
     if (!b) return;
     if (b.id === 'al-reload') load();
     if (b.dataset.plant) {
-      const go = () => busy(box, b, async () => { const out = await call('releaseCodeNew', { facilityId: b.dataset.plant }); await load(); say(box, out.message, 'good'); });
+      const go = () => busy(box, b, async () => { const out = await call('releaseCodeNew', { facilityId: b.dataset.plant }); await load(); say(box, ''); });
       if (b.dataset.again) twice(b, 'Press again to replace', go); else go();
     }
   });

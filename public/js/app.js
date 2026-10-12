@@ -75,7 +75,7 @@ export const MENU = [
   ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Driver Station', 'driver-station.html', 'people'], ['Sheet Conflicts', 'conflicts.html', 'alert']]],
   // Joe 10/10: Dispatch Administration has its own Administration section (out of the Dispatch menu).
   ['Administration', [['Dispatch Administration', 'admin.html', 'gear'], ['Operational Assignments', 'ops.html', 'people'], ['Print Layouts', 'print.html', 'day'], ['Dispatch Settings', 'settings.html', 'gear']]],
-  // The plant side (Joe 10/10): Plant Operations opens the Manager Center cards; the menu lists the cards in the same order,
+  // The plant side (Joe 10/10): Plant Distribution opens the Manager Center cards; the menu lists the cards in the same order,
   // and a card with more than one area opens its screens beside it. A section with one screen is a plain link.
   ['Send Report', [['Send Current Report', 'manager.html?report=1', 'star']]],
   // Joe 10/11: production first, then shift notes and quality, then temperatures and yard (as the Manager Center cards).
@@ -90,20 +90,24 @@ export const MENU = [
   ['Plant Reports', [['Plant Reports', 'reports.html', 'star'], ['Shift Reports', 'shiftreports.html', 'day'], ['Plant Performance TV', 'plant-kiosk.html', 'star']]],
   ['Distribution Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
   ['Fleet Reports', [['Fleet Service Report', 'fleet.html', 'truck']]],
-  // Joe 10/11: Plant Production, our own RedZone: every line this shift, the line tablet, each product's targets and the TV.
   // Joe 10/12: the Safety Walkthrough, a card of its own next to Reports: the weekly walk, its open issues, the extinguishers.
   ['Safety Walkthrough', [['Weekly Walk', 'safety.html', 'safety'], ['Open Issues', 'safety-issues.html', 'alert'], ['Fire Extinguishers', 'extinguishers.html', 'safety'], ['Past Walks', 'safety-walks.html', 'day'], ['Checklist Setup', 'safety-setup.html', 'gear']]],
-  ['Production Lines', [['Production Lines', 'production.html', 'production.webp'], ['Line Tablet', 'line.html', 'production.webp'], ['Line Targets', 'linetargets.html', 'production.webp'], ['Production TV', 'production.html?tv=1', 'production.webp']]]
+  // Joe 10/11: Plant Production, our own RedZone: every line this shift, the line tablet, each product's targets and the TV.
+  ['Production Lines', [['Production Lines', 'production.html', 'production.webp'], ['Line Tablet', 'line.html', 'production.webp'], ['Line Targets', 'linetargets.html', 'production.webp'], ['Production TV', 'production.html?tv=1', 'production.webp']]],
+  // Joe 10/12: Plant Maintenance, like the garage work orders but for the plant's machinery: requests from the plant, work orders,
+  // the PM schedule and the mechanics' tablet.
+  ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]]
 ];
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
 // lists only that side's screens. A screen listed on two sides stays on the side it was opened from.
-// Joe 10/11: six cards after picking a plant: the plant's own three (Operations, Production, Maintenance), then Route
+// Joe 10/11: six cards after picking a plant: the plant's own three (Distribution, Production, Maintenance), then Route
 // Distribution, Fleet & Maintenance and Reports. Plant Production and Plant Maintenance are under construction.
+// Joe 10/12: the plant side is Plant Distribution (it was Plant Operations, which covers all three plant sides).
 export const SIDES = [
-  { key: 'plant', name: 'Plant Operations', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'] },
+  { key: 'plant', name: 'Plant Distribution', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'] },
   // Joe 10/11: still Under Construction, so its screens open only for administrators (the shared buildingSideFor / mayOpenBuilding check below).
   { key: 'production', name: 'Plant Production', home: 'production.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines'], building: true, bannerInPic: true },
-  { key: 'pmaint', name: 'Plant Maintenance', home: 'soon.html?what=plant-maintenance', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: [], building: true, bannerInPic: true },
+  { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance'], building: true, bannerInPic: true },
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
   { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Plant Reports', 'Distribution Reports', 'Fleet Reports'] },
@@ -191,7 +195,7 @@ function addSideMenu() {
   };
   const side = sideFor(here), groups = side ? MENU.filter(([g]) => side.sections.indexOf(g) >= 0) : [];
   // Joe 10/10 evening: Back and Home sit in the header, not in the menu. The main screen (the all-plants Operations Overview)
-  // lists only the plants; each plant opens its Plant Operations, Route Distribution and Fleet & Maintenance beside it.
+  // lists only the plants; each plant opens its Plant Distribution, Route Distribution and Fleet & Maintenance beside it.
   // A plant's home lists its three sides; a side shows its name (back to its first page), then only its own sections.
   // A side with one section lists its screens straight in the menu. Administration is a header button, not a menu item.
   const sideLink = (s, href) => link([s.name, href || s.home, s.pic]).replace('<a ', '<a data-side="' + s.key + '"' + (s.building ? ' data-building="1"' : '') + ' ');
