@@ -133,6 +133,26 @@ async function press(page, route, dir) {
     await loader.waitForFunction(() => document.querySelector('#load-date').value === '2026-10-07');
     await loader.waitForTimeout(300);
     assert.equal(await loader.$('.lo-move'), null, 'a past day shows no arrows');
+    // Joe 10/12: the day picked stays picked after leaving and coming back (Go to today shows), and a move into another week
+    // asks first: Cancel stays, Continue moves.
+    assert.equal(await loader.isVisible('#go-today'), true, 'Go to today shows on a day that is not today');
+    await loader.goto(HOSTING + '/loadout.html?testEmail=viewer.test@uniteddairy.com');
+    await loader.waitForFunction(() => document.querySelector('#load-date').value === '2026-10-07');
+    for (const d of ['2026-10-08', '2026-10-09', '2026-10-10']) { await loader.click('#next'); await loader.waitForFunction(x => document.querySelector('#load-date').value === x, d); }
+    assert.equal(await loader.isVisible('#week-panel'), false, 'no warning inside the week');
+    await loader.click('#next');
+    await loader.waitForSelector('#week-panel:not([hidden])');
+    assert.match(await loader.textContent('#week-text'), /week beginning 10-4-26 to the week beginning 10-11-26/);
+    await loader.click('#week-panel [data-close]');
+    assert.equal(await loader.inputValue('#load-date'), '2026-10-10', 'Cancel keeps the day');
+    await loader.click('#next');
+    await loader.click('#week-go');
+    await loader.waitForFunction(() => document.querySelector('#load-date').value === '2026-10-11');
+    await loader.click('#go-today');
+    await loader.click('#week-go');
+    await loader.waitForFunction(() => document.querySelector('#load-date').value === '2026-10-08');
+    assert.equal(await loader.isVisible('#go-today'), false, 'no Go to today on today');
+    results.push('The Loadout Day picked stays picked after coming back; a move into another week asks first (Cancel stays, Continue moves)');
     for (const p of [loader, watcher, tablet]) assert.deepEqual(p.errors, []);
   } finally {
     await browser.close();

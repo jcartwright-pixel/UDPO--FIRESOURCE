@@ -36,6 +36,7 @@
           <button type="button" id="next" aria-label="Next day" title="Next day">&#9654;</button>
         </div>
       </div>
+      <div class="field day-pin" id="day-pin" hidden><label>&nbsp;</label><button type="button" id="go-today" title="The screen stays on the day you picked until you change it">Go to today</button></div>
       <div class="dayname" id="dayname"></div>
       <div class="hstats" id="hstats"></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span id="copied">Saves stay in the new app's test copy</span></div>
@@ -71,6 +72,12 @@
       <button type="button" data-close>Cancel</button>
       <button type="button" class="primary" id="edit-save">Save Times &amp; Notes</button>
     </div>
+  </section>
+
+  <section class="modal" id="week-panel" role="alertdialog" aria-labelledby="week-title" hidden>
+    <h2 id="week-title">Change the week?</h2>
+    <p id="week-text" class="week-warn"></p>
+    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="week-go">Continue</button></div>
   </section>
 
   <section class="modal" id="pu-modal" role="dialog" aria-labelledby="pu-title" hidden>
@@ -160,6 +167,7 @@
       document.getElementById('title').textContent = info.title;
       document.title = info.title + ' · New Plant Operations';
       document.getElementById('load-date').value = date;
+      document.getElementById('day-pin').hidden = date === today();
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       document.getElementById('hstats').innerHTML = [['Runs', c.total, ''], ['Loaded', c.done, 'good'], ['Loading', c.loading, 'warn']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
@@ -478,16 +486,30 @@
       history.replaceState(null, '', '?date=' + date + '&area=' + area);
       render();
     });
+    // Joe 10/12: the Loadout Day picked stays picked (per person, on this computer) after leaving the page and coming back, until
+    // it is changed; Go to today shows while it is not today. A move into another week asks first (Continue or Cancel).
+    let dayKey = '';
     function setDate(d) {
       if (!L.isDateKey(d) || d === date) return;
       date = d;
+      try { if (dayKey) { if (date === today()) localStorage.removeItem(dayKey); else localStorage.setItem(dayKey, date); } } catch (e) { /* storage off */ }
       history.replaceState(null, '', '?date=' + date + '&area=' + area);
       watchRuns();
       render();
     }
-    document.getElementById('prev').onclick = () => setDate(L.addDays(date, -1));
-    document.getElementById('next').onclick = () => setDate(L.addDays(date, 1));
-    document.getElementById('load-date').addEventListener('change', e => setDate(e.target.value));
+    function goTo(d) {
+      if (!L.isDateKey(d) || d === date) { document.getElementById('load-date').value = date; return; }
+      if (L.weekStart(d) === L.weekStart(date)) { setDate(d); return; }
+      document.getElementById('week-text').textContent = 'This moves the ' + P.AREA[area].title + ' from the week beginning ' + shortDate(L.weekStart(date)) +
+        ' to the week beginning ' + shortDate(L.weekStart(d)) + ' (' + L.dayName(d) + ' ' + shortDate(d) + ').';
+      document.getElementById('week-go').onclick = () => { closeModals(); setDate(d); };
+      openModal('week-panel');
+      document.getElementById('week-go').focus();
+    }
+    document.getElementById('prev').onclick = () => goTo(L.addDays(date, -1));
+    document.getElementById('next').onclick = () => goTo(L.addDays(date, 1));
+    document.getElementById('load-date').addEventListener('change', e => goTo(e.target.value));
+    document.getElementById('go-today').onclick = () => goTo(today());
 
     let db = null;
     function watchRuns() {
@@ -527,6 +549,8 @@
         ['TRUCK', 'TRAILER'].forEach(t => { units[t] = all.filter(e => e.type === t).map(e => ({ unit: e.unit, down: !!e.status && String(e.status).toUpperCase() !== 'ACTIVE' })); });
         render();
       }, () => {});
+      dayKey = 'ud.loadout.day.' + String(params.get('testEmail') || (user && user.email) || (user && user.station ? 'station' : '')).toLowerCase();
+      if (!L.isDateKey(params.get('date'))) { try { const kept = localStorage.getItem(dayKey); if (L.isDateKey(kept)) { date = kept; history.replaceState(null, '', '?date=' + date + '&area=' + area); } } catch (e) { /* storage off */ } }
       watchRuns();
       // The day rolls at 6 AM: the screen moves to the new day by itself when it was showing today.
       let shown = today();
