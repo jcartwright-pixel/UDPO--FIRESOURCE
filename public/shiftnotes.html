@@ -110,8 +110,8 @@
       if (current && names.indexOf(current) < 0) names.push(current);
       return names.map(n => opt(n, current, shiftWord(n))).join('');
     };
-    // The new entry: the type picked on the left, the shift starting on the shift now. A breakdown and a maintenance request name
-    // the machine (picked from the plant's machinery, or typed); a breakdown has its down and back up times and what fixed it, a
+    // The new entry: the type picked on the left, the shift starting on the shift now. A breakdown and a maintenance request say
+    // what broke, typed (Joe 10/12: "all kind of little things. Not a list"; a machine named in it goes on its history); a breakdown has its down and back up times and what fixed it, a
     // request how long it can wait. keep: the boxes change with the Type, and what is typed stays (the same entry keeps saving).
     const layout = () => kind === 'Breakdown' ? 'B' : kind === 'Maintenance Request' ? 'R' : 'N';
     const hm = (n) => n === null || n === undefined ? '' : n >= 60 ? Math.floor(n / 60) + ' h ' + (n % 60) + ' min' : n + ' min';
@@ -121,13 +121,12 @@
       if (keep) f0.querySelectorAll('input,select,textarea').forEach(x => { was[x.className.split(' ')[0]] = x.value; });
       const types = '<label>Type<select class="sn-type">' + U.ENTRY_TYPES.map(t => opt(t, kind)).join('') + '</select></label>';
       const equip = lay === 'N' ? '<label' + (m ? ' class="wide"' : '') + '>Equipment / area<input class="sn-equip" maxlength="80" placeholder="Dock 3 door, Palletizer, Truck 214…"></label>'
-        : '<label' + (m ? ' class="wide"' : '') + '>Machine<input class="sn-equip" maxlength="80" list="sn-machines" placeholder="Pick from the list, or type it"></label>';
+        : '<label' + (m ? ' class="wide"' : '') + '>What broke<input class="sn-equip" maxlength="80" placeholder="Filler 4, a leaky valve…"></label>';
       const shiftBox = '<label>Shift<select class="sn-shift" id="shift-now">' + shiftOptions(shift) + '</select></label>';
       const follow = '<label>Follow-up<select class="sn-follow">' + U.FOLLOW_UPS.map(f => opt(f, 'OPEN', FOLLOW[f])).join('') + '</select></label>';
       const downAt = '<label>Down at<input class="sn-time" type="time" value="' + clockNow() + '"></label>', upAt = '<label>Back up at<input class="sn-up" type="time"></label>';
       const urgency = '<label>Can it wait?<select class="sn-urgency">' + opt('', '', '') + U.URGENCIES.map(u => opt(u, '', u)).join('') + '</select></label>';
       const area = (cls, label, max, ph, wide) => '<label class="' + (wide || 'wide') + '">' + label + '<textarea class="' + cls + '" maxlength="' + max + '" placeholder="' + ph + '"></textarea></label>';
-      const list = '<datalist id="sn-machines">' + (maint ? maint.machines : []).map(x => '<option value="' + escapeHtml(x.name) + '">').join('') + '</datalist>';
       let html;
       if (lay === 'B') html = m
         ? types + shiftBox + equip + downAt + upAt + area('sn-entry', 'What happened?', 4000, 'What broke down, and why.') + area('sn-fix', 'What fixed it', 1000, 'Fill in when it is back up.') + follow
@@ -143,7 +142,7 @@
         : types + equip + shiftBox + '<label>Reading Time<input class="sn-time" type="time" value="' + clockNow() + '"></label>' +
           '<label class="wide">Entry / Measurements<textarea class="sn-entry" maxlength="4000" placeholder="Enter readings, production status, outage details, quality results, or handoff information."></textarea></label>' +
           '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500" placeholder="What the next shift needs to know or do"></textarea></label>' + follow;
-      f0.innerHTML = html + list;
+      f0.innerHTML = html;
       if (keep) Object.keys(was).forEach(c => { const x = f0.querySelector('.' + c); if (x && !x.matches('.sn-type') && was[c] !== '') x.value = was[c]; });
       f0.querySelectorAll('input,select,textarea').forEach(x => { x.disabled = !ck; });
       drawnFor = (m ? 'phone' : 'desk') + '|' + ck + '|' + lay;
@@ -353,14 +352,8 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
-      // The plant's machinery (for the Machine list) and maintenance's work orders (what became of each request).
-      watchMaint(db, 'fac_uniontown', d => {
-        const had = maint ? maint.machines.map(x => x.name).join('|') : '';
-        maint = d;
-        const list = document.getElementById('sn-machines');
-        if (list && had !== d.machines.map(x => x.name).join('|')) list.innerHTML = d.machines.map(x => '<option value="' + escapeHtml(x.name) + '">').join('');
-        render();
-      }, () => {}, { noJournal: true });
+      // The plant's machinery (a machine named in What broke) and maintenance's work orders (what became of each request).
+      watchMaint(db, 'fac_uniontown', d => { maint = d; render(); }, () => {}, { noJournal: true });
       // A new report empties the entry boxes for the next round; open items stay on the list.
       watchRound(db, (at, data) => { const first = roundStart === null; roundStart = at; lastReport = data; if (!first && entry && entry.round !== at) drawForm(); render(); });
       // A week of the log, so a breakdown still open from earlier shifts stays on the list until it is resolved.

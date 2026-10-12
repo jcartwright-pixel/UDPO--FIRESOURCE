@@ -52,15 +52,18 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
   const browser = await chromium.launch();
   const results = [];
   try {
-    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+    for (const [w, h] of [[1920, 950], [1536, 730], [1366, 650]]) {
       const page = await openPage(browser, w, h, '/shiftnotes.html' + MANAGER);
       await page.waitForSelector('#fields .sn-entry');
       // Joe 10/11: a Shift drop-down that starts on the shift now; no Save button (each box saves as it is left).
       // Joe 10/12: a Breakdown (the form it opens on) is recorded with the machine, when it went down, what happened, what
       // fixed it and when it was back up; a Maintenance Request says what's wrong and how long it can wait.
-      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Machine', 'Shift', 'Down at', 'What happened?', 'What fixed it', 'Back up at', 'Notes / Follow-up', 'Follow-up']);
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'What broke', 'Shift', 'Down at', 'What happened?', 'What fixed it', 'Back up at', 'Notes / Follow-up', 'Follow-up']);
+      // Joe 10/12: "We should just be able to type in what's broke ... Not a list": a plain box, no machine list under it.
+      assert.equal(await page.$eval('.sn-equip', x => x.getAttribute('list')), null, 'What broke is a plain typing box');
+      assert.equal(await page.$('datalist'), null, 'no machine list');
       await page.selectOption('.sn-type', 'Maintenance Request');
-      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Machine', 'Shift', 'Can it wait?', 'What\'s wrong?', 'Notes / Follow-up', 'Follow-up']);
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'What broke', 'Shift', 'Can it wait?', 'What\'s wrong?', 'Notes / Follow-up', 'Follow-up']);
       assert.equal(await page.inputValue('.sn-urgency'), '', 'Can it wait starts blank');
       await fits(page, 'Shift Notes Maintenance Request ' + w + 'x' + h);
       await shots(page, 'shiftnotes-request', w);
@@ -134,7 +137,7 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     const phone = await openPage(browser, 412, 860, '/shiftnotes.html' + MANAGER);
     await phone.waitForSelector('#fields .sn-entry');
     // Joe 10/12: the phone's Breakdown form has the machine, down at, back up at and what fixed it too; other kinds keep theirs.
-    assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'Machine', 'Down at', 'Back up at', 'What happened?', 'What fixed it', 'Follow-up']);
+    assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'What broke', 'Down at', 'Back up at', 'What happened?', 'What fixed it', 'Follow-up']);
     await phone.selectOption('.sn-type', 'Handoff');
     assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'Equipment / area', 'What happened?', 'Next steps Optional', 'Follow-up']);
     await phone.selectOption('.sn-type', 'Breakdown');
