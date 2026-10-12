@@ -5,7 +5,8 @@
  * saveSafetyWalk: one tap on today's walk (safetyWalks/{facilityId}__{date}); the walk is made by its first tap.
  *   op item    an item is GOOD, NOT_GOOD or '' (Not checked again). NOT_GOOD opens an issue, or adds this walk to the item's
  *              issue that is still open (a repeat); taking a Not good back removes what it added.
- *   op note    what is wrong (a Not good item);  op photo  its photo (a small JPEG, or '' to remove);
+ *   op note    a note on any item (what is wrong, on a Not good item);
+ *   op photo   a photo of any item (Joe 10/12: up to three, slot 1-3; a small JPEG, or '' to remove that slot);
  *   op maint   send it to Plant Maintenance (true/false);
  *   op review  an earlier walk's open issue is Still open (OPEN) or FIXED;   op finish  the walk is done.
  * saveSafetyIssue: Open Issues' Mark Fixed, Reopen, what is wrong and Send to Plant Maintenance.
@@ -26,6 +27,11 @@ const docId = (id) => String(id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 300);
 const WALK_OPS = ['item', 'note', 'photo', 'maint', 'review', 'reviewnote', 'walknote', 'finish'];
 const ISSUE_OPS = ['fixed', 'reopen', 'note', 'maint'];
 const PHOTO_LIMIT = 700000;
+const PHOTO_SLOTS = 3;
+// Where a walk item's photos are kept: slot 1 has the same id as the issue a Not good on this walk opens, so that issue
+// shows it; slots 2 and 3 sit next to it.
+const photoIdOf = (walkId, itemId, slot) => docId(walkId + '__' + itemId) + (slot > 1 ? '__p' + slot : '');
+const photoIdsOf = (it) => (it && Array.isArray(it.photoIds) ? it.photoIds : it && it.photo && it.photoId ? [it.photoId] : []);
 const PLANT_IDS = () => L.PLANTS.map(p => p.id);
 
 function plantOf(v, SaveError) {
@@ -68,6 +74,8 @@ function validateWalk(input, SaveError) {
   if (op === 'photo') {
     out.photo = String(input.photo || '');
     if (!photoOk(out.photo)) throw new SaveError('BAD_REQUEST', 'The photo is too big or not a picture. Take it again.');
+    out.slot = input.slot === undefined || input.slot === null || input.slot === '' ? 1 : Number(input.slot);
+    if (!(Number.isInteger(out.slot) && out.slot >= 1 && out.slot <= PHOTO_SLOTS)) throw new SaveError('BAD_REQUEST', 'An item keeps up to ' + PHOTO_SLOTS + ' photos.');
   }
   if (op === 'maint') out.maint = input.maint === true;
   if (op === 'walknote') out.note = text(input.note, 1000);
@@ -126,7 +134,7 @@ async function saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError) {
         message = item.text + ': Not good again (still open from ' + iss.foundOn + ').';
       } else {
         const issueRef = db.collection('safetyIssues').doc(docId(id + '__' + req.itemId));
-        writes.push(() => tx.set(issueRef, { facilityId: req.facilityId, itemId: req.itemId, area: item.area, item: item.text, note: text(next.note, 500), photo: !!next.photo,
+        writes.push(() => tx.set(issueRef, { facilityId: req.facilityId, itemId: req.itemId, area: item.area, item: item.text, note: text(next.note, 500), photo: photoIdsOf(next).length > 0, photoIds: photoIdsOf(next),
           sendToMaint: next.maint === true, maintStatus: next.maint === true ? 'WAITING' : '', workOrderId: '', status: 'OPEN', foundOn: req.date, foundWalk: id, foundBy: email, foundByName: name, foundAt: stamp,
           walks: [id], lastSeenOn: req.date, source: 'WALK', updatedAt: stamp, updatedBy: email }));
         next.issueId = issueRef.id;
@@ -139,21 +147,36 @@ async function saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError) {
       if (is.exists) {
         const iss = is.data();
         if (iss.foundWalk === id && iss.status === 'OPEN') {
-          writes.push(() => tx.delete(iref));
-          writes.push(() => tx.delete(db.collection('safetyPhotos').doc(cur.issueId)));
+          writes.push(() => tx.delete(iref)); // its photos stay on the item (Joe 10/12: any item keeps photos)
         } else writes.push(() => tx.update(iref, { walks: (iss.walks || []).filter(w => w !== id), updatedAt: stamp, updatedBy: email }));
       }
-      delete next.issueId; delete next.repeat; delete next.photo; delete next.maint;
+      delete next.issueId; delete next.repeat; delete next.maint;
       message = item.text + ': ' + (req.status === 'GOOD' ? 'Good.' : 'Not checked.');
     } else message = item.text + ': ' + (req.status === 'GOOD' ? 'Good.' : req.status === 'NOT_GOOD' ? 'Not good.' : 'Not checked.');
     if (!req.status) { delete next.by; delete next.byName; delete next.at; next.status = ''; }
     walk.items[req.itemId] = next;
+  } else if (req.op === 'photo') {
+    // Joe 10/12: every item can have photos, whatever it was marked (or not marked yet).
+    cur = Object.assign({ status: '' }, cur || {});
+    const pid = photoIdOf(id, req.itemId, req.slot), ids = photoIdsOf(cur).filter(p => p !== pid);
+    if (req.photo) ids.push(pid);
+    ids.sort();
+    cur.photoIds = ids; cur.photo = ids.length > 0; cur.photoId = ids[0] || '';
+    writes.push(() => req.photo ? tx.set(db.collection('safetyPhotos').doc(pid), { facilityId: req.facilityId, data: req.photo, at: stamp, by: email }) : tx.delete(db.collection('safetyPhotos').doc(pid)));
+    // A Not good this walk opened shows the item's photos on Open Issues; an older issue keeps its own.
+    if (cur.status === 'NOT_GOOD' && cur.issueId) {
+      const iref = db.collection('safetyIssues').doc(cur.issueId), is = await tx.get(iref);
+      if (is.exists && is.data().foundWalk === id) writes.push(() => tx.update(iref, { photo: ids.length > 0, photoIds: ids, updatedAt: stamp, updatedBy: email }));
+      else if (is.exists) writes.push(() => tx.update(iref, { lastPhotoIds: ids, updatedAt: stamp, updatedBy: email }));
+    }
+    walk.items[req.itemId] = cur;
+    message = req.photo ? 'Photo saved.' : 'Photo removed.';
   } else if (req.op === 'note' && !(cur && cur.status === 'NOT_GOOD' && cur.issueId)) {
     // Joe 10/12: every item has a note, whatever it was marked (or not marked yet).
     cur = Object.assign({ status: '' }, cur || {}, { note: req.note });
     walk.items[req.itemId] = cur;
     message = req.note ? 'Note saved.' : 'Note cleared.';
-  } else if (['note', 'photo', 'maint'].indexOf(req.op) >= 0) {
+  } else if (['note', 'maint'].indexOf(req.op) >= 0) {
     if (!cur || cur.status !== 'NOT_GOOD' || !cur.issueId) throw new SaveError('BAD_REQUEST', 'Mark the item Not good first.');
     const iref = db.collection('safetyIssues').doc(cur.issueId), is = await tx.get(iref);
     const own = is.exists && is.data().foundWalk === id;
@@ -161,14 +184,6 @@ async function saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError) {
       cur.note = req.note;
       if (is.exists) writes.push(() => tx.update(iref, own ? { note: req.note, updatedAt: stamp, updatedBy: email } : { lastNote: req.note, lastNoteOn: req.date, lastNoteByName: name, updatedAt: stamp, updatedBy: email }));
       message = 'Note saved.';
-    } else if (req.op === 'photo') {
-      cur.photo = !!req.photo;
-      // An older issue keeps its own photo; this walk's photo of a repeat is kept on the walk's own photo record.
-      const pid = own ? cur.issueId : docId(id + '__' + req.itemId);
-      cur.photoId = req.photo ? pid : '';
-      writes.push(() => req.photo ? tx.set(db.collection('safetyPhotos').doc(pid), { facilityId: req.facilityId, data: req.photo, at: stamp, by: email }) : tx.delete(db.collection('safetyPhotos').doc(pid)));
-      if (own && is.exists) writes.push(() => tx.update(iref, { photo: !!req.photo, updatedAt: stamp, updatedBy: email }));
-      message = req.photo ? 'Photo saved.' : 'Photo removed.';
     } else {
       cur.maint = req.maint;
       if (is.exists) {

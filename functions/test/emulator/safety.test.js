@@ -72,14 +72,47 @@ test('Taking a Not good back removes the issue it opened; a repeat taken back le
   assert.equal((await walk('2026-10-12')).items.floors.status, '');
 });
 
-test('Refused: another day, an item not on the checklist, a photo before Not good, a big photo, a made-up status', async () => {
+test('Refused: another day, an item not on the checklist, Plant Maintenance before Not good, a fourth photo, a big photo, a made-up status', async () => {
   await assert.rejects(walkTap('2026-10-01', 'item', { itemId: 'floors', status: 'GOOD' }, MON), /on the day it is walked/);
   await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'nope', status: 'GOOD' }, MON), /not on this plant's checklist/);
-  // Joe 10/12: a note is fine on any row now; a photo and Send to Plant Maintenance still need Not good first.
-  await assert.rejects(walkTap('2026-10-05', 'photo', { itemId: 'floors', photo: 'data:image/jpeg;base64,AAAA' }, MON), /Not good first/);
+  // Joe 10/12: a note and photos are fine on any row now; Send to Plant Maintenance still needs Not good first.
+  await assert.rejects(walkTap('2026-10-05', 'photo', { itemId: 'floors', slot: 4, photo: 'data:image/jpeg;base64,AAAA' }, MON), /up to 3 photos/);
   await assert.rejects(walkTap('2026-10-05', 'maint', { itemId: 'floors', maint: true }, MON), /Not good first/);
   await assert.rejects(walkTap('2026-10-05', 'photo', { itemId: 'floors', photo: 'data:image/png;base64,AAAA' }, MON), /too big or not a picture/);
   await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'floors', status: 'MAYBE' }, MON), /Good or Not good/);
+});
+
+test('Photos on any item (Joe 10/12): up to three, kept when a Not good is taken back, and carried onto the issue', async () => {
+  const pic = 'data:image/jpeg;base64,AAAA';
+  // An item not marked yet and a Good item both take photos.
+  await walkTap('2026-10-05', 'photo', { itemId: 'floors', photo: pic }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_routes', status: 'GOOD' }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'photo', { itemId: 'exit_routes', slot: 1, photo: pic }, MON, PLANT_PERSON);
+  await walkTap('2026-10-05', 'photo', { itemId: 'exit_routes', slot: 2, photo: pic }, MON, PLANT_PERSON);
+  let w = await walk('2026-10-05');
+  assert.deepEqual([w.items.floors.status, w.items.floors.photo, w.items.floors.photoIds.length], ['', true, 1]);
+  assert.deepEqual([w.items.exit_routes.status, w.items.exit_routes.photoIds.length], ['GOOD', 2]);
+  const ids = w.items.exit_routes.photoIds;
+  for (const id of ids) assert.equal((await db().collection('safetyPhotos').doc(id).get()).data().data, pic);
+  // The same request sent twice (a tablet resending a held save) is saved once.
+  const again = { action: 'saveSafetyWalk', requestId: 'held-photo-1', facilityId: UT, date: '2026-10-05', op: 'photo', itemId: 'exit_routes', slot: 3, photo: pic };
+  await applyAction(db(), { email: PLANT_PERSON }, again, at(MON));
+  await applyAction(db(), { email: PLANT_PERSON }, again, at(MON));
+  assert.equal((await walk('2026-10-05')).items.exit_routes.photoIds.length, 3);
+  // Removing one photo keeps the others.
+  await walkTap('2026-10-05', 'photo', { itemId: 'exit_routes', slot: 2, photo: '' }, MON, PLANT_PERSON);
+  w = await walk('2026-10-05');
+  assert.deepEqual(w.items.exit_routes.photoIds, [ids[0], ids[0] + '__p3']);
+  assert.equal((await db().collection('safetyPhotos').doc(ids[1]).get()).exists, false);
+  // Marked Not good afterwards: the new issue has the item's photos; taking it back keeps them on the item.
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_routes', status: 'NOT_GOOD' }, MON, PLANT_PERSON);
+  let list = await issues();
+  assert.deepEqual([list[0].photo, list[0].photoIds], [true, [ids[0], ids[0] + '__p3']]);
+  assert.equal(list[0].id, ids[0], 'slot 1 is the issue\'s own photo');
+  await walkTap('2026-10-05', 'item', { itemId: 'exit_routes', status: 'GOOD' }, MON, PLANT_PERSON);
+  assert.equal((await issues()).length, 0);
+  assert.deepEqual((await walk('2026-10-05')).items.exit_routes.photoIds, [ids[0], ids[0] + '__p3']);
+  assert.equal((await db().collection('safetyPhotos').doc(ids[0]).get()).exists, true);
 });
 
 test('Open Issues: Mark Fixed, Reopen and Send to Plant Maintenance', async () => {
