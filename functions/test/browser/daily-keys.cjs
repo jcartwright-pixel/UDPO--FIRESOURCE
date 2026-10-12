@@ -178,7 +178,10 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.click('#edit-modal [data-close]');
     results.push('the Edit box lists Regular then Relief drivers; picking CASEY, LEE there brought his truck 900003 into the box and the row');
 
-    // A refused save says Not saved, and leaving while a save is going asks first.
+    // A refused save says Not saved, and leaving while a save is going asks first. The Edit box's driver and truck saves finish
+    // first: a save still waiting in line would start after the refused one and turn the sign back to Saved.
+    await p.evaluate(async () => { window.__udEdit = await import('./js/edit.js'); });
+    await p.waitForFunction(() => window.__udEdit.savesPending() === 0, null, { timeout: 8000 });
     await p.evaluate(async () => { const m = await import('./js/edit.js'); try { await m.saveOptimistic('noSuchAction', {}, () => {}, () => {}, () => {}); } catch (e) { /* shown on screen */ } });
     await p.waitForFunction(() => /Not saved/.test(document.getElementById('save-pill').textContent));
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-save-pill-failed-1920.png'), clip: { x: 0, y: 70, width: 1920, height: 300 } });

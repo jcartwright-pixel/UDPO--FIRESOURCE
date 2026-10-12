@@ -120,7 +120,7 @@
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
-    import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, driverOptionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, driverOptionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, withUnsaved, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     import { bindDailyKeys, keepCursor } from './js/daily-keys.js';
     forScreen('dailyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
@@ -635,7 +635,7 @@
       const weeks = [...new Set(L.weeksForLoadDate(loadDate).concat(isSaturday(loadDate) ? L.weeksForLoadDate(L.addDays(loadDate, 1)) : []))];
       const q = query(collection(db, 'runs'), where('weekStart', 'in', weeks));
       unsubscribeRuns = onSnapshot(q, snap => {
-        runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        runs = withUnsaved(snap.docs.map(d => Object.assign({ id: d.id }, d.data())));
         runsRead = true;
         render();
       }, e => showError('Could not read the dispatch: ' + e.message));
