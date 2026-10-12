@@ -31,7 +31,6 @@
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <a class="sw-top pri" href="safety.html" data-top>Weekly Walk</a>
       <a class="sw-top" href="safety-issues.html" data-top>Open Issues</a>
-      <select id="plant" class="sw-plant" aria-label="Plant" title="Plant" data-top hidden></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -48,7 +47,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
     import { doc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { pickPlant, plantName, drawPlantPicker, modeText, watchSetup } from './js/safety.js';
+    import { pickPlant, plantName, modeText, watchSetup } from './js/safety.js';
 
     // Past Walks (Joe 10/12): every walk of the plant, newest first, with its counts; Open shows it on the walk screen.
     const S = window.UDSafety;
@@ -57,7 +56,6 @@
     function render() {
       document.getElementById('mode-text').textContent = modeText(app);
       document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
-      drawPlantPicker(document.getElementById('plant'), person, plant);
       if (!walks) { document.getElementById('rows').innerHTML = '<tr><td colspan="9" class="sw-empty">Reading the walks…</td></tr>'; return; }
       document.getElementById('counts').textContent = walks.length + ' walk' + (walks.length === 1 ? '' : 's');
       document.getElementById('rows').innerHTML = walks.map(w => {
@@ -68,7 +66,6 @@
           '<td><a class="sw-btn sw-small" href="safety.html?walk=' + encodeURIComponent(S.walkId(w.facilityId, w.date)) + '">Open</a></td></tr>';
       }).join('') || '<tr><td colspan="9" class="sw-empty">No walks yet. Weekly Walk starts the first one.</td></tr>';
     }
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; try { sessionStorage.setItem('udPlant', plant); } catch (x) { /* no storage */ } follow(); });
     function follow() {
       stops.forEach(s => s()); stops = [];
       walks = null; render();

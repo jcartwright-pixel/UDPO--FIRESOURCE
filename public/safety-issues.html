@@ -32,7 +32,6 @@
       <a class="sw-top pri" href="safety.html" data-top>Start Walk</a>
       <a class="sw-top" href="extinguishers.html" data-top>Fire Extinguishers</a>
       <div class="sw-filter" id="filter" data-top><button type="button" data-f="OPEN" aria-pressed="true">Open</button><button type="button" data-f="FIXED" aria-pressed="false">Fixed</button><button type="button" data-f="ALL" aria-pressed="false">All</button></div>
-      <select id="plant" class="sw-plant" aria-label="Plant" title="Plant" data-top hidden></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -49,7 +48,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
     import { doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { today, pickPlant, plantName, drawPlantPicker, canWalk, modeText, watchIssues, agePill, maintText } from './js/safety.js';
+    import { today, pickPlant, plantName, canWalk, modeText, watchIssues, agePill, maintText } from './js/safety.js';
 
     // Open Issues (Joe 10/12, mock-up D): every Not good from the walks and the extinguisher checks, carried over until fixed.
     // Mark Fixed (who and when are saved) and Reopen; Send to Plant Maintenance is a box that saves when it changes.
@@ -61,7 +60,6 @@
     function render() {
       document.getElementById('mode-text').textContent = modeText(app);
       document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
-      drawPlantPicker(document.getElementById('plant'), person, plant);
       document.querySelectorAll('#filter [data-f]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === filter)));
       if (!issues) { document.getElementById('rows').innerHTML = '<tr><td colspan="10" class="sw-empty">Reading the issues…</td></tr>'; return; }
       const openList = issues.filter(i => i.status === 'OPEN'), long = openList.filter(i => S.daysOpen(i, today()) > S.LONG_OPEN_DAYS).length, maint = openList.filter(i => i.sendToMaint).length;
@@ -101,7 +99,6 @@
     });
     document.getElementById('rows').addEventListener('change', e => { const t = e.target; if (t.dataset.maint && editable()) send({ op: 'maint', issueId: t.dataset.maint, maint: t.checked }); });
     document.getElementById('filter').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filter = b.dataset.f; render(); } });
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; try { sessionStorage.setItem('udPlant', plant); } catch (x) { /* no storage */ } follow(); });
     function follow() {
       if (stop) stop();
       issues = null; render();

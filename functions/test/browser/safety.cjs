@@ -182,6 +182,18 @@ const row = (id) => '#list tr[data-row="' + id + '"]';
       await p.close();
     }
     results.push('Past Walks lists today\'s walk; Checklist Setup shows the starting list; both fit 1536');
+
+    // Joe 10/12: inside a plant there is no plant drop-down; every page uses the plant he came in through and names it in the header.
+    const cp = await openPage(browser, 1536, 864, '/index.html?' + ADMIN);
+    await cp.evaluate(() => sessionStorage.setItem('udPlant', 'fac_charleston'));
+    for (const page of ['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']) {
+      await cp.goto(HOSTING + '/' + page + '?' + ADMIN);
+      await cp.waitForFunction(() => /Charleston/.test(document.getElementById('eyebrow').textContent));
+      assert.equal(await cp.$$eval('#screen select', s => s.filter(x => /plant/i.test(x.id + ' ' + (x.getAttribute('aria-label') || ''))).length), 0, page + ' has no plant drop-down');
+    }
+    assert.deepEqual(cp.errors, []);
+    await cp.close();
+    results.push('No plant drop-down: coming in through Charleston, all five screens use Charleston and name it in the header');
     console.log('Safety Walkthrough browser check passed:\n - ' + results.join('\n - '));
   } finally {
     await browser.close();

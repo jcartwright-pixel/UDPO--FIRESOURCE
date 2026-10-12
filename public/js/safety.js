@@ -21,12 +21,6 @@ export function pickPlant(person, wanted) {
   return (list.find(p => p.id === picked) || list[0]).id;
 }
 export const plantName = (id) => (L.PLANTS.find(p => p.id === id) || { name: id }).name;
-// The plant picker shows only for someone who sees more than one plant.
-export function drawPlantPicker(sel, person, plant) {
-  const list = plantsOf(person);
-  sel.hidden = list.length < 2;
-  sel.innerHTML = list.map(p => '<option value="' + p.id + '"' + (p.id === plant ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('');
-}
 export const canWalk = (person, app) => L.hasRole(person, PLANT_ROLES) && L.screenState(app, 'plant').open;
 export const canSetUp = (person, app) => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
 export const modeText = (app) => { const st = L.screenState(app, 'plant'); return st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY'; };

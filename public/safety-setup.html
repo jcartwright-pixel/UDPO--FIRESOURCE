@@ -30,7 +30,6 @@
       <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1>Checklist Setup</h1><span class="sw-counts" id="counts"></span></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <a class="sw-top pri" href="safety.html" data-top>Weekly Walk</a>
-      <select id="plant" class="sw-plant" aria-label="Plant" title="Plant" data-top hidden></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -48,7 +47,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { pickPlant, plantName, drawPlantPicker, canSetUp, modeText, watchSetup } from './js/safety.js';
+    import { pickPlant, plantName, canSetUp, modeText, watchSetup } from './js/safety.js';
 
     // Checklist Setup (Joe 10/12): the plant's own checklist. It starts from the researched list (safety-rules.js). Each box
     // saves as it is left: change the words, Weekly or Monthly, take an item off the walk, or type a new one in an area's empty
@@ -60,7 +59,6 @@
     function render(force) {
       document.getElementById('mode-text').textContent = modeText(app);
       document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
-      drawPlantPicker(document.getElementById('plant'), person, plant);
       const set = canSetUp(person, app), dis = set ? '' : ' disabled', list = areas();
       const on = list.reduce((n, a) => n + a.items.filter(i => !i.off).length, 0);
       document.getElementById('counts').textContent = on + ' items on the walk in ' + list.length + ' areas' + (setup ? '' : ' · the starting list');
@@ -98,7 +96,6 @@
       send(list).then(() => render(true));
       render(true);
     });
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; try { sessionStorage.setItem('udPlant', plant); } catch (x) { /* no storage */ } follow(); });
     function follow() {
       if (stop) stop();
       seen = false; setup = null; pending = null; render(true);
