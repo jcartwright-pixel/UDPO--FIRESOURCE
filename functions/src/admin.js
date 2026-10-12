@@ -24,6 +24,7 @@ const R = require('./rights');
 const { queueMaster } = require('./masterwrite');
 const { appMail, emailSettings, ourAddress, DOMAIN } = require('./adminmail');
 const { addresses } = require('./mail');
+const STATIONS = require('./stations');
 
 class AdminError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -271,6 +272,13 @@ async function stationRelease(db, user, input, now) {
   const email = String(user && user.email || '').toLowerCase();
   const p = await personOf(db, email);
   if (!p || p.status !== 'ACTIVE') fail('NOT_ALLOWED', 'Sign in with an active United Dairy account.');
+  // A tablet's station code (stations.js): has / enter / check.
+  if (['has', 'enter', 'check'].indexOf(input.op) >= 0) return STATIONS.tabletCall(db, input, now);
+  return releaseCheck(db, input, now);
+}
+
+// The plant's manager release code: 'status' (is one set?) or a typed code. Also the Garage Station's (garage.js), which has no sign-in.
+async function releaseCheck(db, input, now) {
   const fac = text(input.facilityId || 'fac_uniontown', 60);
   const codes = (await db.collection('private').doc('releaseCodes').get()).data() || {}, c = codes[fac];
   if (input.op === 'status') return { required: !!(c && c.hash) };
@@ -402,7 +410,9 @@ const OPS = {
   reportGroups: (db, email, input) => reportGroups(db, input), saveReportGroup,
   sentLog: (db) => sentLog(db), setSending,
   emailSenders: (db, email, input, stamp, d) => emailSenders(db, d), saveEmailSenders,
-  repairItems: (db) => repairItems(db), saveRepairItem, completeRepairItem
+  repairItems: (db) => repairItems(db), saveRepairItem, completeRepairItem,
+  // Station codes (stations.js): Plant Station, Garage Station and kiosk codes.
+  stations: STATIONS.stations, stationAdd: STATIONS.stationAdd, stationCode: STATIONS.stationCode, stationRemove: STATIONS.stationRemove
 };
 
 async function adminCall(db, user, input, deps) {
@@ -424,4 +434,4 @@ async function adminCall(db, user, input, deps) {
   return fn(db, email, input, stamp, d);
 }
 
-module.exports = { usersCopy, adminCall, stationRelease, AdminError, savePerson, personRevision, OPS, requireAdmin, fail, text, plantName, activePlants };
+module.exports = { usersCopy, adminCall, stationRelease, releaseCheck, AdminError, savePerson, personRevision, OPS, requireAdmin, fail, text, plantName, activePlants };
