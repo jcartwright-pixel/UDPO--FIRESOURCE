@@ -391,7 +391,8 @@ document.addEventListener('click', e => {
 // Polish 16: when the tablet or computer loses its connection a yellow bar says so at the top, so nobody thinks a press was
 // sent. Saves go to the server, so they wait for the signal; the bar goes away by itself when it is back.
 (function connectionBar() {
-  if (EMBED) return;
+  // Screens that keep saves on the device with no signal (window.UD_OFFLINE) show their own line instead.
+  if (EMBED || window.UD_OFFLINE) return;
   let bar = null;
   const show = () => {
     if (navigator.onLine) { if (bar) bar.hidden = true; return; }
@@ -633,6 +634,7 @@ export async function requireSignIn(ready) {
   if (out) out.addEventListener('click', () => signOut(auth));
   // Local testing only: the test database accepts a made-up Google sign-in (?testEmail=someone@uniteddairy.com).
   const testEmail = LOCAL && new URLSearchParams(location.search).get('testEmail');
+  if (testEmail) await auth.authStateReady(); // signed in already (also with no signal): kept, not signed in again
   if (testEmail && !auth.currentUser) {
     const token = JSON.stringify({ sub: 'test-' + testEmail, email: testEmail, email_verified: true });
     await signInWithCredential(auth, GoogleAuthProvider.credential(token)).catch(e => showError(String(e.message || e)));

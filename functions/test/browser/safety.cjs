@@ -255,10 +255,12 @@ async function cameraShot(page, color) {
     for (const [name, tag] of DEVICES) {
       const d = await openDevice(browser, name, '/safety.html?' + ADMIN);
       await d.waitForSelector(row('floors'));
+      await d.waitForFunction(() => document.querySelector('#list .sw-btn.good').getBoundingClientRect().height > 0);
       await fits(d, 'The walk on ' + name);
-      const big = await d.$eval(row('floors') + ' .sw-btn.good', b => b.getBoundingClientRect().height);
+      const tall = (sel) => d.evaluate(q => document.querySelector(q).getBoundingClientRect().height, sel); // read at once, never a row just redrawn
+      const big = await tall(row('floors') + ' .sw-btn.good');
       assert.ok(big >= 44, name + ': Good / Not good are big enough for a finger: ' + big);
-      assert.ok(await d.$eval(row('floors') + ' .sw-cam', b => b.getBoundingClientRect().height) >= 44, name + ': + Photo is big enough for a finger');
+      assert.ok(await tall(row('floors') + ' .sw-cam') >= 44, name + ': + Photo is big enough for a finger');
       const WALK_TEXT = '#list td, #list .sw-btn, #list .sw-cam, #areas button, #list input[type="text"], .head a, .head button';
       assert.ok(await smallest(d, WALK_TEXT) >= 16, name + ': walk text is 16px or more: ' + JSON.stringify(await tiny(d, WALK_TEXT)));
       await shot(d, 'safety-walk-' + tag);
@@ -273,7 +275,7 @@ async function cameraShot(page, color) {
       await d.click('#rows tr[data-id="' + S.extId(UT, '02') + '"] [data-check]');
       await d.waitForSelector('#check .sw-bi');
       await fits(d, 'The extinguisher check on ' + name);
-      assert.ok(await d.$eval('#check .sw-btn', b => b.getBoundingClientRect().height) >= 44, name + ': check buttons are big');
+      assert.ok(await tall('#check .sw-btn') >= 44, name + ': check buttons are big');
       await shot(d, 'safety-extinguisher-check-' + tag);
       assert.deepEqual(d.errors, []);
       await d.ctx.close();
