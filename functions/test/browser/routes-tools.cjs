@@ -156,7 +156,7 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     await p.selectOption('#view-select', 'many');
     await p.waitForSelector('table.routes.many tr[data-id="run_t802"] select[data-many="loadType"]');
     assert.ok(await p.$$eval('table.routes.many tbody tr[data-id]', t => t.length) >= 4, 'every run shown on one page');
-    assert.deepEqual(await p.$$eval('table.routes.many thead th', t => t.map(x => x.textContent)), ['Route', 'Run', 'Loadout', 'Run by', 'Plant', 'Weekly', 'Daily', 'Mobile route', 'Route list', 'Sleeper', 'Drop & hook', 'Active']);
+    assert.deepEqual(await p.$$eval('table.routes.many thead th', t => t.map(x => x.textContent)), ['Stream ID', 'Route', 'Route Name', 'Run', 'Run Type', 'Loadout', 'Run by', 'Plant', 'Weekly', 'Daily', 'Mobile route', 'Route list', 'Sleeper', 'Drop & hook', 'Active']);
     await p.selectOption('table.routes.many tr[data-id="run_t802"] select[data-many="loadType"]', 'Boxing');
     await p.selectOption('table.routes.many tr[data-id="run_t801"] select[data-many="coverageOwner"]', 'Fairmont');
     await p.click('table.routes.many tr[data-id="run_t801"] input[data-many="dropAndHook"]');
@@ -171,6 +171,34 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     assert.ok(await fits(p), 'Route Details (many runs) fits 1920x1080');
     await shot(p, 'routes-many-1920.png');
     results.push('Route Details for many runs: 802 set to Boxing, 801 to Fairmont with drop and hook, each saved on its own');
+
+    // Route names (Joe 10/12): Stream ID, Route, Route Name, Run and Run Type are typed over right in the list. Run and Run Type
+    // save on that run; Route Name saves on every run of the route and no other; the run id never changes.
+    assert.match(await p.textContent('#name-help'), /Route Name every run of the route/);
+    const nm = (run, f) => 'table.routes tr[data-id="' + run + '"] input.nm[data-name="' + f + '"]';
+    await p.fill(nm('run_t801', 'run'), 'Load 1');
+    await p.press(nm('run_t801', 'run'), 'Enter');
+    await p.fill(nm('run_t801', 'routeName'), 'DSD');
+    await p.press(nm('run_t801', 'routeName'), 'Enter');
+    await p.fill(nm('run_t801', 'routeRunType'), 'Load 2');
+    await p.press(nm('run_t801', 'routeRunType'), 'Enter');
+    await settled();
+    for (let i = 0; i < 40; i++) {
+      const a = (await db().collection('routes').doc('run_t801').get()).data(), b = (await db().collection('routes').doc('run_t802').get()).data();
+      if (a.run === 'Load 1' && a.routeName === 'DSD' && a.routeRunType === 'Load 2' && b.routeName === 'UT DSD MILK') break;
+      if (i === 39) assert.fail('Route names: ' + JSON.stringify({ a: [a.run, a.routeName, a.routeRunType], b: b.routeName }));
+      await new Promise(r => setTimeout(r, 250));
+    }
+    await p.selectOption('#view-select', 'miles');
+    await p.waitForSelector(nm('run_t801', 'run'));
+    assert.equal(await p.inputValue(nm('run_t801', 'run')), 'Load 1');
+    assert.equal(await p.inputValue(nm('run_t801', 'routeName')), 'DSD');
+    assert.equal(await p.$eval(nm('run_t801', 'run'), x => getComputedStyle(x).fontSize), '16px');
+    assert.ok(await fits(p), 'Mileage with the three name columns fits 1920x1080');
+    await shot(p, 'routes-names-miles-1920.png');
+    await p.selectOption('#view-select', 'many');
+    await p.waitForSelector('table.routes.many tr[data-id="run_t802"] select[data-many="loadType"]');
+    results.push('Route names: 801 Run typed to Load 1, Route Name to DSD and Run Type to Load 2, saved; 802 kept its own Route Name');
 
     // Recap: the old five totals above the list, and a totals line under each column.
     await p.selectOption('#view-select', 'recap');

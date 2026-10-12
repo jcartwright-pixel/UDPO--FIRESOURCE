@@ -239,6 +239,26 @@
     return day.loadSequenceOverride !== null && day.loadSequenceOverride !== undefined ? day.loadSequenceOverride : day.loadSequence;
   }
 
+  // Route names (Joe 10/12): a run reads as its parts, "901 Martins Ferry Product Load 1", never "901_1". routeNumber drops a
+  // trailing _1 / _2 from the route; runLabel joins Route Name, Run and Run Type (route_run_type: Load 1, Load 2), skipping a
+  // part another part already says (JERSEY LOAD 1 on Jersey), and an old "6301_1" run name reads as "Load 1".
+  function routeNumber(route) { return String(route == null ? '' : route).trim().replace(/_\d+$/, ''); }
+  function runLabel(routeName, run, runType) {
+    var r = String(run == null ? '' : run).trim(), m = r.match(/^\d+_(\d+)$/), out = [];
+    if (m) r = 'Load ' + m[1];
+    [String(routeName == null ? '' : routeName).trim(), r, String(runType == null ? '' : runType).trim()].forEach(function (part) {
+      if (!part) return;
+      var up = part.toUpperCase();
+      for (var i = 0; i < out.length; i++) {
+        var had = out[i].toUpperCase();
+        if (had.indexOf(up) >= 0) return;
+        if (up.indexOf(had) >= 0) { out.splice(i, 1); i--; }
+      }
+      out.push(part);
+    });
+    return out.join(' ');
+  }
+
   function compareRoute(a, b) {
     return String(a.route || '').localeCompare(String(b.route || ''), undefined, { numeric: true, sensitivity: 'base' }) ||
       String(a.run || '').localeCompare(String(b.run || ''));
@@ -256,7 +276,7 @@
           runDocId: run.id,
           day: block.prefix,
           weekStart: run.weekStart,
-          routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run,
+          routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run, routeRunType: run.routeRunType || '',
           loadType: run.loadType, movementType: run.movementType, coverageType: run.coverageType,
           loadDate: loadDate, deliveryDate: block.deliveryDate, deliveryDay: DAY_NAMES[DAYS.indexOf(block.prefix)],
           loadDayOffset: block.loadDayOffset,
@@ -699,7 +719,7 @@
         var offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : day.loadDayOffset;
         var deliveryDate = addDays(loadDate, -offset);
         if (dayPrefix(deliveryDate) !== prefix || weekStart(deliveryDate) !== run.weekStart) return;
-        rows.push({ id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, run: run.run, deliveryDate: deliveryDate, rev: run.rev || 0 });
+        rows.push({ id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, routeName: run.routeName || '', run: run.run, routeRunType: run.routeRunType || '', deliveryDate: deliveryDate, rev: run.rev || 0 });
       });
     });
     return rows.sort(compareRoute);
@@ -1042,6 +1062,7 @@
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
+    routeNumber: routeNumber, runLabel: runLabel,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
   };
