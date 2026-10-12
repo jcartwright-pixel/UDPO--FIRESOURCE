@@ -38,6 +38,10 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
       route.fulfill({ contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
     });
     await localCalls(ctx);
+    // With no signal the phone calls fail as on a real phone (the local answers above would otherwise still reply).
+    let offline = false;
+    await ctx.route(/:5001\//, (route) => (offline ? route.abort('internetdisconnected') : route.fallback()));
+    const setOffline = async (on) => { offline = on; await ctx.setOffline(on); };
     const ph = await ctx.newPage();
     const errors = [];
     ph.on('pageerror', e => errors.push(e.message));
@@ -54,7 +58,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
       .catch(async () => { await ph.reload(); await ph.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 20000 }); });
 
     // No signal: the Check-In is kept on the phone, the load says Saved on phone, and the line says one waits.
-    await ctx.setOffline(true);
+    await setOffline(true);
     await ph.click('.phone-load');
     await ph.waitForSelector('#step-form:not([hidden])');
     await ph.fill('#step-form input[name=casesDelivered]', '377');
@@ -75,7 +79,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     results.push('No signal: the Route page opens from the phone, a Check-In is kept on the phone (also after closing the page), the load shows Saved on phone and the line counts what waits');
 
     // The signal is back: it is sent by itself, once, and the load shows Checked in.
-    await ctx.setOffline(false);
+    await setOffline(false);
     await ph.waitForSelector('#offline-line.ok', { timeout: 30000 });
     assert.match(await ph.textContent('#offline-line'), /Sent/);
     await ph.waitForSelector('.phone-load.done span:text-is("Checked in")', { timeout: 15000 });

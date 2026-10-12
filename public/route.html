@@ -175,6 +175,8 @@
       try {
         const out = await rawCall(op, withWho(op, fields));
         if (READ_OPS.indexOf(op) >= 0) keepRead(readKey(op, fields), out);
+        // The first read of the day asks with no date; with no signal the screen asks again with the date it was given.
+        if (READ_OPS.indexOf(op) >= 0 && fields && 'date' in fields && out && out.date && fields.date !== out.date) keepRead(readKey(op, Object.assign({}, fields, { date: out.date })), out);
         return out;
       }
       catch (e) {
