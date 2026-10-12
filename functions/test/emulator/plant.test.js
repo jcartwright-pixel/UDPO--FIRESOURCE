@@ -136,6 +136,84 @@ test('Scheduler: Receiving adds a supplier (next S code), refuses a repeat, and 
   assert.equal((await lanes('SHIPPING')).some(e => e.id === load.id), false);
 });
 
+test('Scheduler: a station loads a Shipping load and receives a Receiving load (Joe 10/12, Boxing); a finished one stays finished', async () => {
+  const work = async (lane, id) => (await lanes(lane)).find(e => e.id === id).work;
+  assert.equal((await work('SHIPPING', 'SCHED-s1')).state, 'WAITING');
+  await schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'start' });
+  assert.equal((await work('SHIPPING', 'SCHED-s1')).state, 'WORKING');
+  await schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'save', fields: { count: '412', temperature: '34', trailer: 'T-970' } });
+  await schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'complete' });
+  const done = (await lanes('SHIPPING')).find(e => e.id === 'SCHED-s1');
+  assert.deepEqual([done.work.state, done.work.count, done.work.temperature, done.trailer, done.work.completedBy], ['COMPLETE', '412', '34', 'T-970', 'dispatch.test@uniteddairy.com']);
+  assert.equal(done.poNumber, '4471', 'the rest of the load is kept');
+  await assert.rejects(schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'save', fields: { count: '1' } }), /already complete/);
+  await assert.rejects(schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-a1', date: '2026-10-09', step: 'save', fields: { count: 'ten' } }), /Boxes must be a whole number/);
+  await schedule({ lane: 'RECEIVING', op: 'progress', id: 'RECV-k1', date: '2026-10-09', step: 'complete', fields: { count: '38', notes: 'Two pallets short' } });
+  const got = (await lanes('RECEIVING')).find(e => e.id === 'RECV-k1');
+  assert.deepEqual([got.work.state, got.work.count, got.work.notes], ['COMPLETE', '38', 'Two pallets short']);
+  await assert.rejects(schedule({ lane: 'RECEIVING', op: 'progress', id: 'RECV-k1', date: '2026-10-09', step: 'complete' }), /already received/);
+  // The next copy from the sheets keeps the station's work.
+  await copy();
+  assert.equal((await work('SHIPPING', 'SCHED-s1')).state, 'COMPLETE');
+});
+
+/* ---------- Loading limit (Joe 10/12) ---------- */
+// Case Loadout loads at most 2 at the same time and Boxing at most 3 (its Scheduler shipments too). A paused load does not
+// count; resuming one needs room under the limit.
+const plantLoad = (runDocId, day, fields) => applyAction(db(), DISPATCHER, { action: 'savePlantLoad', requestId: rid(), runDocId, day, fields }, tick);
+const PLANT = require('../../src/plant');
+async function areaLoads(area) {
+  const L = require('../../src/logic'), out = [];
+  (await db().collection('runs').get()).docs.forEach(d => {
+    const run = d.data(), a = PLANT.areaOf(run.loadType || (run.masterShow && run.masterShow.loadType));
+    // Today's loads and yesterday's still open (the station lists both).
+    if (a === area) [DATE, L.addDays(DATE, -1)].forEach(day => L.loadBlocksFor(run, day).forEach(b => { if (day === DATE || !run.days[b.prefix].completeTime) out.push({ runDocId: d.id, day: b.prefix, d: run.days[b.prefix] }); }));
+  });
+  return out;
+}
+const isLoading = (d) => !d.completeTime && String(d.loadStatus || '').toUpperCase() !== 'PAUSED' && (!!d.plantStartedAt || String(d.loadStatus || '').toUpperCase() === 'LOADING');
+const isWaiting = (d) => !d.completeTime && !d.plantStartedAt && ['LOADING', 'PAUSED'].indexOf(String(d.loadStatus || '').toUpperCase()) < 0;
+test('Loading limit: Case Loadout loads 2 at a time; a paused one does not count; resuming needs room', async () => {
+  // The made-up day has two case loads loading (808 today, 6303 still open from yesterday).
+  const all = await areaLoads('CASE'), going = all.filter(x => isLoading(x.d)), [a, c] = all.filter(x => isWaiting(x.d));
+  assert.equal(going.length, 2);
+  const p808 = going.find(x => x.runDocId.endsWith('p808'));
+  await assert.rejects(plantLoad(a.runDocId, a.day, { startedAt: '2026-10-08T15:00:00.000Z' }), /2 loads are already loading\. Finish or pause one first\./);
+  await assert.rejects(plantLoad(a.runDocId, a.day, { status: 'LOADING' }), /2 loads are already loading/);
+  await assert.rejects(plantLoad(p808.runDocId, p808.day, { status: 'PAUSED' }), /A pause reason is required/);
+  await plantLoad(p808.runDocId, p808.day, { status: 'PAUSED', pauseReason: 'Waiting on product' });
+  const paused = (await db().collection('runs').doc(p808.runDocId).get()).data().days[p808.day];
+  assert.equal(paused.loadStatus, 'PAUSED');
+  assert.match(paused.plantNotes, /Paused .*: Waiting on product$/);
+  await plantLoad(a.runDocId, a.day, { startedAt: '2026-10-08T15:00:00.000Z' });
+  await assert.rejects(plantLoad(p808.runDocId, p808.day, { status: 'LOADING' }), /2 loads are already loading/, 'resuming needs room');
+  await assert.rejects(plantLoad(c.runDocId, c.day, { status: 'LOADING' }), /2 loads are already loading/);
+  await plantLoad(a.runDocId, a.day, { quantity: 40 }); // saving the cases on a running load is not a start
+  await plantLoad(a.runDocId, a.day, { status: 'COMPLETE' });
+  await plantLoad(p808.runDocId, p808.day, { status: 'LOADING' });
+  const resumed = (await db().collection('runs').doc(p808.runDocId).get()).data().days[p808.day];
+  assert.deepEqual([resumed.loadStatus, resumed.plantStartedAt], ['LOADING', '2026-10-08T05:27:00.000Z'], 'resuming keeps the start time');
+});
+
+test('Loading limit: Boxing loads 3 at a time, its Scheduler shipments included; a paused shipment does not count', async () => {
+  const box = await areaLoads('BOXING');
+  const loading = box.filter(x => isLoading(x.d)).length, waiting = box.filter(x => isWaiting(x.d));
+  // Fill Boxing to 2 with box loads, then the Aldi shipment makes 3.
+  for (const x of waiting.slice(0, Math.max(0, 2 - loading))) await plantLoad(x.runDocId, x.day, { status: 'LOADING' });
+  const ship = (step, extra) => applyAction(db(), DISPATCHER, Object.assign({ action: 'savePlantSchedule', requestId: rid(), lane: 'SHIPPING', op: 'progress', id: 'SCHED-a1', date: '2026-10-09', step }, extra || {}), tick);
+  await ship('start');
+  const more = (await areaLoads('BOXING')).find(x => isWaiting(x.d));
+  if (more) await assert.rejects(plantLoad(more.runDocId, more.day, { status: 'LOADING' }), /3 loads are already loading/);
+  await assert.rejects(ship('pause'), /A pause reason is required/);
+  await ship('pause', { pauseReason: 'Carrier late' });
+  assert.equal((await lanes('SHIPPING')).find(e => e.id === 'SCHED-a1').work.state, 'PAUSED');
+  assert.match((await lanes('SHIPPING')).find(e => e.id === 'SCHED-a1').work.notes, /Paused .*: Carrier late/);
+  if (more) {
+    await plantLoad(more.runDocId, more.day, { status: 'LOADING' });
+    await assert.rejects(ship('start'), /3 loads are already loading/, 'resuming the shipment needs room');
+  }
+});
+
 /* ---------- Yard Checks ---------- */
 const yard = (fields) => applyAction(db(), DISPATCHER, Object.assign({ action: 'saveYardCheck', requestId: rid() }, fields));
 

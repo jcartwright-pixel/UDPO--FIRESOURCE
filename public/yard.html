@@ -66,7 +66,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { savedText, watchRound } from './js/autosave.js';
 
@@ -80,7 +80,9 @@
     const pending = [];         // checks pressed and not back from the database yet (shown at once)
     const armed = {};           // trailer -> Left Yard pressed once, waiting for Confirm Left
     const unsubs = [];
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    // A station tablet (Plant Station > Yard Services) may save by what Administration > People & Roles allows its account.
+    let allowed = {};
+    const canSave = () => (L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.saveYardCheck === true) && L.screenState(app, 'plant').open;
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
     const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : String(v || ''); };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
@@ -295,7 +297,8 @@
 
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); }, () => {});
+      allowedSaves(['saveYardCheck']).then(a => { allowed = a; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       // Joe 10/10: after each Send Current Report the yard starts empty too: trailers finished here leave the screen, typed boxes clear.
       let round = null;
