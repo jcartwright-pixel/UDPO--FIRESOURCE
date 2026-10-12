@@ -225,3 +225,6 @@ table.sw-grid tr.sw-add input[data-k="newsub"], table.sw-grid tr.sw-add input[da
 .la-page .sw-grid td .sw-btn + .sw-btn { margin-left: 8px; }
 .la-page .sw-grid input[type=text] { width: 100%; max-width: 420px; }
 .la-page select#plant { font-size: 16px; min-height: 40px; padding: 6px 10px; }
+/* Location Areas: the place number is the box a finger drags a line from; the lifted line matches the loadout's. */
+.la-page td.la-order { font-weight: 700; color: var(--ud-blue-dark); }
+table.sw-grid tr.row-dragging td { background: #e8f1fa !important; }

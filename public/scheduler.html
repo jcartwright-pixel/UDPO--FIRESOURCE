@@ -48,7 +48,7 @@
       </div>
       <!-- Joe 10/10: the counts and the holiday colour key sit in a slim strip under the top line, so the month title and the
            buttons keep their room. -->
-      <div class="sc-strip"><div class="hstats" id="hstats"></div><span class="sc-grow"></span><span class="sc-key"><i></i>Holiday</span></div>
+      <div class="sc-strip"><div class="hstats" id="hstats"></div><span class="sc-grow"></span><span class="sc-legend" id="legend" aria-label="Who delivers the load"><span class="sc-by ut"><i></i>Uniontown truck</span><span class="sc-by branch"><i></i>Branch</span><span class="sc-by carrier"><i></i>Carrier</span></span><span class="sc-key"><i></i>Holiday</span></div>
       <div class="sc-body" id="body"></div>
     </div>
   </div>
@@ -126,6 +126,17 @@
       const rest = run.split(/[\s-]+/).filter(w => { const u = w.toUpperCase(); return u && !words.some(s => s.indexOf(u) === 0 || u.indexOf(s) === 0); }).join(' ');
       return rest ? short + ' ' + titleCase(rest) : short;
     }
+    // Joe 10/12: each load is colored by who delivers it. A load marked Carrier on the load itself is a carrier; otherwise the
+    // run's Route Master coverage_type says it: BRANCH is a branch, OUTSIDE CARRIER (or another outside name) a carrier, and
+    // UNITED DAIRY or blank our own Uniontown truck. Receiving's suppliers have no Route Master line: the load's type decides.
+    const HAULERS = { ut: 'Uniontown truck', branch: 'Branch', carrier: 'Carrier' };
+    function hauler(x) {
+      if (x.scheduleType === 'CARRIER') return 'carrier';
+      if (lane === 'RECEIVING') return 'ut';
+      const r = routeDocs.find(d => d.runId === x.runId) || routeDocs.find(d => x.routeId && d.routeId === x.routeId) || {};
+      const t = String(r.coverageType || '').trim().toUpperCase();
+      return t === 'BRANCH' ? 'branch' : t && t !== 'UNITED DAIRY' ? 'carrier' : 'ut';
+    }
     const byDate = (list) => { const m = {}; list.forEach(x => { (m[x.date] = m[x.date] || []).push(x); }); return m; };
 
     /* ---------- drawing ---------- */
@@ -193,7 +204,7 @@
         const key = L.addDays(start, i), items = (map[key] || []).slice().sort(sortTime), hol = R.holidayName(key);
         h += '<button type="button" class="sc-day' + (key.slice(0, 7) !== month ? ' other' : '') + (key === t ? ' today' : '') + (hol ? ' holiday' : '') + '" data-day="' + key + '"' + (hol ? ' title="' + escapeHtml(hol) + '"' : '') + '>' +
           '<span class="sc-dn"><b>' + Number(key.slice(8)) + '</b>' + (hol ? '<em class="sc-hol">' + escapeHtml(hol) + '</em>' : '') + (items.length ? '<em class="sc-badge">' + items.length + ' load' + (items.length === 1 ? '' : 's') + '</em>' : '') + '</span>' +
-          items.slice(0, 3).map(x => '<small class="' + (x.scheduleType === 'CARRIER' ? 'car' : '') + '"><strong>' + escapeHtml(entryName(x)) + (x.pickupTime ? ' · ' + escapeHtml(clock(x.pickupTime)) : '') + '</strong></small>').join('') +
+          items.slice(0, 3).map(x => '<small class="by-' + hauler(x) + (x.scheduleType === 'CARRIER' ? ' car' : '') + '" title="' + HAULERS[hauler(x)] + '"><strong>' + escapeHtml(entryName(x)) + (x.pickupTime ? ' · ' + escapeHtml(clock(x.pickupTime)) : '') + '</strong></small>').join('') +
           (items.length > 3 ? '<small class="sc-more">+' + (items.length - 3) + ' more</small>' : '') + '</button>';
       }
       return h + '</div>';
@@ -211,7 +222,7 @@
         const items = (map[d] || []).slice().sort(sortTime);
         return '<div class="sc-col' + (d === t ? ' today' : '') + '">' + (items.length ? items.map(x => {
           const moved = x.loadDate && x.loadDate !== x.date;
-          return '<button type="button" class="sc-load' + (x.scheduleType === 'CARRIER' ? ' car' : '') + '" data-edit="' + escapeHtml(x.id) + '"><strong>' + escapeHtml(entryName(x)) + '</strong><span>' +
+          return '<button type="button" class="sc-load by-' + hauler(x) + (x.scheduleType === 'CARRIER' ? ' car' : '') + '" title="' + HAULERS[hauler(x)] + '" data-edit="' + escapeHtml(x.id) + '"><strong>' + escapeHtml(entryName(x)) + '</strong><span>' +
             escapeHtml([clock(x.pickupTime), x.poNumber ? 'PO ' + x.poNumber : '', x.trailer].filter(Boolean).join(' · ')) + '</span>' + (moved ? '<small>Load ' + escapeHtml(md(x.loadDate)) + ' → Deliver ' + escapeHtml(md(x.date)) + '</small>' : '') + '</button>';
         }).join('') : '<p class="sc-none">No loads</p>') + (ck ? '<button type="button" class="sc-add" data-new="' + d + '">＋ Add</button>' : '') + '</div>';
       }).join('');
@@ -222,7 +233,7 @@
       const cell = (v, cls) => { v = String(v == null ? '' : v).trim(); return '<td' + (cls ? ' class="' + cls + '"' : '') + (v ? ' title="' + escapeHtml(v) + '"' : '') + '>' + (v ? escapeHtml(v) : '—') + '</td>'; };
       return '<div class="sheet scroll-list"><table class="sc-table"><colgroup><col style="width:7%"><col style="width:14%"><col style="width:7%"><col style="width:11%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:6%"><col style="width:12%"><col style="width:14%"><col style="width:7%"></colgroup>' +
         '<thead><tr><th>' + (lane === 'RECEIVING' ? 'Code' : 'Route') + '</th><th>' + (lane === 'RECEIVING' ? 'Supplier' : 'Run') + '</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th><th></th></tr></thead><tbody>' +
-        (rows.map(x => '<tr>' + cell(x.route) + cell(runName(x), 'run') + cell(clock(x.pickupTime)) + cell(x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + cell(x.loadDate ? md(x.loadDate) : '') + cell(x.trailer) + cell(x.poNumber) + cell(x.cases) +
+        (rows.map(x => '<tr class="by-' + hauler(x) + '" title="' + HAULERS[hauler(x)] + '">' + cell(x.route) + cell(runName(x), 'run') + cell(clock(x.pickupTime)) + cell(x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + cell(x.loadDate ? md(x.loadDate) : '') + cell(x.trailer) + cell(x.poNumber) + cell(x.cases) +
           cell(x.product, 'txt') + cell(x.notes, 'txt') + '<td><button type="button" class="sc-btn small" data-edit="' + escapeHtml(x.id) + '">' + (ck ? 'Edit' : 'View') + '</button></td></tr>').join('') ||
           (seen[lane] ? '<tr><td colspan="11" class="empty">No plant schedule entries for this date.</td></tr>' : '<tr><td colspan="11" class="empty">Loading the schedule&hellip;</td></tr>')) + '</tbody></table></div>' +
         (ck ? '<div class="sc-dayadd"><button type="button" class="sc-btn primary" data-new="' + date + '">＋ Add ' + (lane === 'RECEIVING' ? 'Load' : 'Route') + '</button></div>' : '');
@@ -242,7 +253,7 @@
       const rows = entries().filter(x => x.date === key).sort(sortTime), hol = R.holidayName(key), ck = canSave();
       openModal('<h2 id="modal-title">' + escapeHtml(longDay(key)) + '</h2>' + (hol ? '<p class="sc-holnote">' + escapeHtml(hol) + '</p>' : '') +
         '<div class="sc-daylist">' + (rows.length ? '<div class="sc-dayhead"><span>Run</span><span>Time</span><span>Product</span><span>Cases</span><span></span></div>' + rows.map(x =>
-          '<div class="sc-dayrow"><span class="run" title="' + escapeHtml(runName(x)) + '">' + escapeHtml(runName(x)) + '</span><span>' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span title="' + escapeHtml(x.product) + '">' + escapeHtml(x.product || '—') + '</span><span>' + escapeHtml(x.cases || '—') + '</span>' +
+          '<div class="sc-dayrow by-' + hauler(x) + '"><span class="run" title="' + escapeHtml(runName(x)) + '">' + escapeHtml(runName(x)) + '</span><span>' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span title="' + escapeHtml(x.product) + '">' + escapeHtml(x.product || '—') + '</span><span>' + escapeHtml(x.cases || '—') + '</span>' +
           '<button type="button" class="sc-btn small" data-edit="' + escapeHtml(x.id) + '">' + (ck ? 'Edit' : 'View') + '</button></div>').join('') : '<p class="sc-none">No ' + (lane === 'RECEIVING' ? 'loads' : 'routes') + ' scheduled for this day.</p>') + '</div>' +
         '<div class="modal-actions"><button type="button" data-close>Close</button>' + (ck ? '<button type="button" class="primary" data-new="' + key + '">＋ Add a ' + (lane === 'RECEIVING' ? 'Load' : 'Route') + '</button>' : '') + '</div>');
     }
@@ -417,6 +428,8 @@
       const css = '@page{size:landscape;margin:.25in}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#112f53}.top{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 10px}h1{margin:0;font-size:22px}.sub{font-size:13px}' +
         '.cal{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid #7890a8}.wd{background:#0b5596;color:#fff;padding:6px;text-align:center;font-size:10px;font-weight:800}.d{min-height:1.05in;padding:5px;border-right:1px solid #b9c7d4;border-top:1px solid #b9c7d4;font-size:12px}' +
         '.d:nth-child(7n){border-right:0}.d.other{background:#f3f5f7;color:#6e7f8e}.d.hol{background:#fff1d6}.d b{display:block;font-size:12px;margin-bottom:4px}.d b i{font-style:normal;color:#8a4b00;font-size:9px;margin-left:4px}.d small{display:block;font-size:11.5px;line-height:1.25;margin-top:3px;color:#1d4468}' +
+        '.d small{border-left:4px solid #0b5596;padding-left:4px}.by-branch{border-left-color:#15803d!important}.by-carrier{border-left-color:#7e3fbf!important}tr.by-ut td:first-child{border-left:5px solid #0b5596}tr.by-branch td:first-child{border-left:5px solid #15803d}tr.by-carrier td:first-child{border-left:5px solid #7e3fbf}' +
+        '.legend{display:flex;gap:14px;font-size:12px;font-weight:700;margin:0 0 8px}.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}' +
         'table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #9fb3c6;padding:4px 6px;text-align:left}th{background:#0b5596;color:#fff}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}';
       const detail = (x) => [entryName(x), clock(x.pickupTime), x.scheduleType === 'CARRIER' ? 'CARRIER' : '', x.poNumber ? 'PO ' + x.poNumber : '', x.cases ? x.cases + ' cases' : '', x.product, x.trailer ? 'Trailer ' + x.trailer : '',
         x.loadDate && x.loadDate !== x.date ? 'Load ' + md(x.loadDate) : ''].filter(Boolean).join(' · ') + (x.notes ? ' — ' + x.notes : '');
@@ -424,17 +437,18 @@
       if (view === 'month') {
         const first = at(monthStart(date)), start = L.addDays(monthStart(date), -first.getDay()), map = byDate(list), weeks = Math.ceil((first.getDay() + Number(monthEnd(date).slice(8))) / 7);
         inner = '<div class="cal">' + DAYS.map(d => '<div class="wd">' + d + '</div>').join('');
-        for (let i = 0; i < weeks * 7; i++) { const k = L.addDays(start, i), hol = R.holidayName(k); inner += '<section class="d' + (k.slice(0, 7) !== date.slice(0, 7) ? ' other' : '') + (hol ? ' hol' : '') + '"><b>' + Number(k.slice(8)) + (hol ? ' <i>' + escapeHtml(hol) + '</i>' : '') + '</b>' + (map[k] || []).slice().sort(sortTime).map(x => '<small>' + escapeHtml(detail(x)) + '</small>').join('') + '</section>'; }
+        for (let i = 0; i < weeks * 7; i++) { const k = L.addDays(start, i), hol = R.holidayName(k); inner += '<section class="d' + (k.slice(0, 7) !== date.slice(0, 7) ? ' other' : '') + (hol ? ' hol' : '') + '"><b>' + Number(k.slice(8)) + (hol ? ' <i>' + escapeHtml(hol) + '</i>' : '') + '</b>' + (map[k] || []).slice().sort(sortTime).map(x => '<small class="by-' + hauler(x) + '">' + escapeHtml(detail(x)) + '</small>').join('') + '</section>'; }
         inner += '</div>';
       } else {
         const r = range(), rows = list.filter(x => x.date >= r.start && x.date <= r.end);
         if (view === 'history') rows.sort((a, b) => b.date.localeCompare(a.date) || sortTime(a, b));
         inner = '<table><thead><tr><th>Delivery</th><th>' + who() + '</th><th>Route · Run</th><th>Time</th><th>Type</th><th>Load Date</th><th>Trailer</th><th>PO</th><th>Cases</th><th>Product</th><th>Notes</th></tr></thead><tbody>' +
-          (rows.map(x => '<tr><td>' + escapeHtml(DAYS[at(x.date).getDay()] + ' ' + md(x.date) + (view === 'history' ? '/' + x.date.slice(2, 4) : '')) + '</td><td>' + escapeHtml(entryName(x)) + '</td><td>' + escapeHtml([x.route, x.run].filter(Boolean).join(' · ')) + '</td><td>' + escapeHtml(clock(x.pickupTime)) + '</td><td>' + (x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + '</td><td>' +
+          (rows.map(x => '<tr class="by-' + hauler(x) + '"><td>' + escapeHtml(DAYS[at(x.date).getDay()] + ' ' + md(x.date) + (view === 'history' ? '/' + x.date.slice(2, 4) : '')) + '</td><td>' + escapeHtml(entryName(x)) + '</td><td>' + escapeHtml([x.route, x.run].filter(Boolean).join(' · ')) + '</td><td>' + escapeHtml(clock(x.pickupTime)) + '</td><td>' + (x.scheduleType === 'CARRIER' ? 'Carrier' : 'United Dairy Delivery') + '</td><td>' +
             escapeHtml(x.loadDate ? md(x.loadDate) : '') + '</td><td>' + escapeHtml(x.trailer) + '</td><td>' + escapeHtml(x.poNumber) + '</td><td>' + escapeHtml(x.cases) + '</td><td>' + escapeHtml(x.product) + '</td><td>' + escapeHtml(x.notes) + '</td></tr>').join('') ||
             '<tr><td colspan="11">No loads scheduled.</td></tr>') + '</tbody></table>';
       }
-      printHtml('<!doctype html><html><head><title>Plant Schedule · ' + escapeHtml(rangeTitle()) + '</title><style>' + css + '</style></head><body><div class="top"><h1>' + escapeHtml(head) + '</h1><div class="sub">' + escapeHtml(rangeTitle()) + '</div></div>' + inner + '</body></html>');
+      printHtml('<!doctype html><html><head><title>Plant Schedule · ' + escapeHtml(rangeTitle()) + '</title><style>' + css + '</style></head><body><div class="top"><h1>' + escapeHtml(head) + '</h1><div class="sub">' + escapeHtml(rangeTitle()) + '</div></div>' +
+        '<div class="legend"><span><i style="background:#0b5596"></i>Uniontown truck</span><span><i style="background:#15803d"></i>Branch</span><span><i style="background:#7e3fbf"></i>Carrier</span></div>' + inner + '</body></html>');
     }
 
     requireSignIn(async (user) => {

@@ -169,6 +169,20 @@ async function keyMove(page, route, dir) {
       await pg.context().close();
     }
     results.push('Case, Totes, Boxes and Tanker at 1536 and 1920: every load today is dragged by its line (the hand shows); no arrows, no grab dots');
+    // As on Daily Dispatch: holding a dragged line near the bottom edge scrolls the list by itself, so a load can go past what
+    // is on screen. (The page is closed without letting go, so nothing is saved.)
+    const short = await openPage(browser, { viewport: { width: 1536, height: 420 } }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
+    await short.waitForSelector(row('811') + '[data-drag]');
+    const scrolled = () => short.evaluate(() => { let n = document.querySelector('#rows').parentElement; for (; n && n !== document.body; n = n.parentElement) { const o = getComputedStyle(n).overflowY; if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) return n.scrollTop; } return document.scrollingElement.scrollTop; });
+    const top0 = await scrolled(), grab = await spot(short, '811', 'mid');
+    await short.mouse.move(grab.x, grab.y);
+    await short.mouse.down();
+    await short.mouse.move(grab.x, grab.y + 10);
+    await short.mouse.move(grab.x, 412);
+    await short.waitForTimeout(800);
+    assert.ok(await scrolled() > top0, 'the list scrolls by itself while a line is held near the bottom edge');
+    await short.context().close();
+    results.push('Holding a dragged line near the bottom edge scrolls the list by itself (as on Daily Dispatch)');
     // Joe 10/12 ("mobile looks wrong and I can't edit"): on a phone each load is a card with its boxes named, big enough to type in,
     // the page scrolls as a whole (no strip a few rows high) and nothing slides sideways.
     const phone = await openPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
