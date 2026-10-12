@@ -621,7 +621,7 @@ export async function requireSignIn(ready) {
       user.station = station;
       gate.hidden = true;
       screen.hidden = false;
-      // It leaves only through the Plant Station's Change Station (and the manager release code), not Sign out.
+      // It leaves only through the Plant Station's Release (and the manager release code), not Sign out.
       const out = document.getElementById('signout');
       if (out) out.hidden = true;
       const who = document.getElementById('who');

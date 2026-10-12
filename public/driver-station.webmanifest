@@ -1,0 +1,42 @@
+{
+  "name": "UD Driver Station",
+  "short_name": "Driver Station",
+  "description": "Driver Room station: the Driver Room Check-In tablet and the Driver Station (TV loadout). Opens full screen; Release (manager code) is the only way out.",
+  "id": "/driver-station.html",
+  "start_url": "/driver-station.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "any",
+  "background_color": "#0e138d",
+  "theme_color": "#074c84",
+  "icons": [
+    {
+      "src": "/img/app-icon/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/app-icon/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/app-icon/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/img/app-icon/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

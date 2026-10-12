@@ -7,6 +7,8 @@
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <!-- Joe 10/11: saved to the home screen from here, the "UD Routes" icon opens this page (the driver's name stays on the phone). -->
   <link rel="manifest" href="route.webmanifest">
+  <!-- Joe 10/12: on the Driver Room tablet, installing opens the Driver Station link full screen (its own window). -->
+  <script>if (new URLSearchParams(location.search).get('room') === '1') document.querySelector('link[rel="manifest"]').href = 'driver-station.webmanifest';</script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="UD Routes">
@@ -36,7 +38,7 @@
       <button type="button" id="m-checkin" class="drv-card green"><b>Check-In</b><small>Cases, returns, truck and trailer issues</small></button>
     </div>
     <p class="drv-hint" id="m-who"></p>
-    <button type="button" id="m-station" hidden>Change Station</button>
+    <button type="button" id="m-station" hidden>Release</button>
     <div id="release-box" hidden></div>
   </section>
 
@@ -135,7 +137,7 @@
     import { start, escapeHtml, shortDate, showError } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
     import { addSpeak } from './js/speak.js';
-    import { askRelease } from './js/station-code.js';
+    import { askRelease, lockStation } from './js/station-code.js';
 
     // Joe 10/12: the Driver Room Check-In tablet is this same page with ?room=1 ("the driver's phone is exactly how this should
     // look"). The tablet's Driver Room kiosk code (typed on the Driver Station link or driver-room.html) stands in for the
@@ -290,16 +292,19 @@
       document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="css/driver-room.css">');
       document.querySelector('.phone-top b').textContent = (station.plant || 'United Dairy') + ' Driver Room';
       document.getElementById('change').textContent = 'Done';
-      document.getElementById('m-station').hidden = false;
+      // Joe 10/12 "Station": no Back, Home or Sign out; Release at the very bottom (manager release code) is the only way out.
+      lockStation(document.getElementById('m-station'), true);
       // Joe 10/12: 5 minutes with no taps signs the driver out and shows the rolling View Loadout; a tap on it brings back
       // the three choices.
       let idle = Date.now();
       ['pointerdown', 'keydown', 'input'].forEach(t => document.addEventListener(t, () => { idle = Date.now(); }, true));
       setInterval(() => { if (Date.now() - idle > 300000 && (want !== 'board' || driverId)) { idle = Date.now(); signOut(); want = 'board'; show().catch(err => showError(err.message)); } }, 5000);
       document.getElementById('step-board').addEventListener('click', e => { if (e.target.closest('button')) return; clearInterval(boardTimer); want = ''; show().catch(err => showError(err.message)); });
-      // Change Station: only with the plant's manager release code (none set: the tablet stays here).
+      // Release: only with the plant's manager release code (none set: the tablet stays here).
       document.getElementById('m-station').addEventListener('click', async () => {
         const fac = station.facilityId || 'fac_uniontown';
+        // The release box sits under the three choices: the driver is signed out and the choices come back first.
+        if (document.getElementById('step-menu').hidden) { signOut(); want = ''; clearInterval(boardTimer); await show(); }
         const ok = await askRelease(document.getElementById('release-box'), { status: () => call('roomStatus', { facilityId: fac }), release: (c) => call('roomRelease', { facilityId: fac, code: c }), onError: showError, mustHave: true });
         if (ok) roomBack();
       });

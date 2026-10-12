@@ -4,7 +4,7 @@
  * Room kiosk station's code (a TV's code is refused), then shows the drivers' phone screens in Driver Room mode (Joe 10/12:
  * "the driver's phone is exactly how this should look"): View Loadout, DVIR, Check-In; Done signs out, and 5 minutes with no
  * taps signs out and shows the rolling View Loadout.
- * Change Station asks for the manager release code. Pictures at 1920 and tablet 1024 go to SHOTS_DIR.
+ * No Back, Home or Sign out: Release at the very bottom asks for the manager release code (Joe 10/12 "Station"). Pictures at 1920 and tablet 1024 go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -121,14 +121,27 @@ async function touchPage(browser, width, height, url, mobile) {
       await p.click('#board-track');
       await p.waitForSelector('#step-menu:not([hidden])');
       results.push('Driver Room ' + tag + ': a TV code is refused; the kiosk code opens the phone screens (View Loadout, DVIR, Check-In) with no Back, Home or Sign out; Check-In and DVIR ask the name; Done signs out, Back keeps him; View Loadout needs no name and a tap brings back the choices');
+      // Release is a bar along the very bottom on every Driver Room screen, the rolling View Loadout too; from there it brings
+      // back the three choices with the release code box (Cancel keeps the tablet).
+      assert.equal((await p.textContent('#m-station')).trim(), 'Release');
+      await p.click('#m-board');
+      await p.waitForSelector('#step-board:not([hidden])');
+      const bar = await p.$eval('#m-station', el => el.getBoundingClientRect().bottom);
+      assert.ok(Math.abs(bar - p.viewportSize().height) < 1, 'Release sits at the very bottom');
+      await p.click('#m-station');
+      await p.waitForSelector('#step-menu:not([hidden]) #release-box form');
+      await shot(p, 'driver-room-9-release-' + tag + '.png');
+      await p.click('#release-box [data-cancel]');
+      assert.equal(await p.isVisible('#m-checkin'), true);
+      results.push('Driver Room ' + tag + ': Release sits at the very bottom on every screen; from View Loadout it brings back the choices and asks for the release code; Cancel keeps the tablet');
       if (tag === '1920') {
-        // Change Station with the manager release code.
+        // Release with the manager release code.
         await p.click('#m-station');
         await p.fill('#release-box input', release);
         await Promise.all([p.waitForURL(/driver-room\.html$/), p.click('#release-box button[type=submit]')]);
         await p.waitForSelector('#code-box form.st-code');
         assert.equal(await p.evaluate(() => localStorage.getItem('udRoomStation')), null);
-        results.push('Driver Room: Change Station asks for the manager release code, then back to the code screen');
+        results.push('Driver Room: Release asks for the manager release code, then back to the code screen');
       }
       assert.deepEqual(p.errors, []);
       await p.close();

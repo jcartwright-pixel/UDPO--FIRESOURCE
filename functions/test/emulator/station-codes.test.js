@@ -79,7 +79,7 @@ test('Garage Station: once the garage has a code, every call carries the station
   assert.ok(Array.isArray((await garageCall(db(), { op: 'board', station: { key: st.key, version: st.version } })).jobs));
   await admin({ op: 'stationCode', key });
   await assert.rejects(garageCall(db(), { op: 'board', station: { key: st.key, version: st.version } }), /STATION_CODE: This garage tablet has a new code/);
-  // Change Station uses the plant's manager release code.
+  // Release uses the plant's manager release code.
   assert.deepEqual(await garageCall(db(), { op: 'release', step: 'status' }), { required: false });
   const rel = (await admin({ op: 'releaseCodeNew', facilityId: 'fac_uniontown' })).code;
   assert.equal((await garageCall(db(), { op: 'release', step: 'release', code: 'WRONG123' })).ok, false);

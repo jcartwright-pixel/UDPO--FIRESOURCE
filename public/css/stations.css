@@ -488,5 +488,15 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
   .sw-step { flex-wrap: wrap; }
 }
 
-/* Joe 10/12: a Driver Room screen with its station code cannot be signed out of; it leaves only with the manager release code. */
-body.kiosk-locked #signout, body.kiosk-locked .who { display: none !important; }
+/* Joe 10/12: a coded station (Plant, Garage, Driver Room Check-In, Driver Station TV) has no Back, Home or Sign out. The only
+   way out is the Release bar at the very bottom (manager release code). station-code.js lockStation() sets this up. */
+body.station-locked #go-back, body.station-locked #go-home, body.station-locked #signout, body.station-locked .topbar .who,
+body.station-locked .ds-exit { display: none !important; }
+.station-release { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; height: 56px; margin: 0; border: 0; border-top: 1px solid #b9c7d3; border-radius: 0;
+  background: #e8edf3; color: #33475b; font: inherit; font-size: 18px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.station-release:hover, .station-release:focus-visible { background: #d9e2ec; color: #0b2f55; }
+.station-release[hidden] { display: none; }
+body.station-locked:not(.fill) { padding-bottom: 56px; box-sizing: border-box; }
+body.station-locked.fill #screen:not([hidden]) { height: calc(100vh - 56px); }
+body.ds-full .station-release { background: #071a2c; color: rgba(255,255,255,.75); border-top-color: rgba(255,255,255,.2); }
+body.ds-full .station-release:hover, body.ds-full .station-release:focus-visible { background: #0d2a44; color: #fff; }

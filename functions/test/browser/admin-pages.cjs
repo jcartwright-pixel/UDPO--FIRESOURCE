@@ -194,13 +194,13 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     assert.deepEqual(p.errors, []);
     results.push('Role Templates, Access & QR (QR drawn on screen), Manager Links (with the release codes), Driver Station Codes (new Route code), Plant Station Codes (tablet links, pointer to the release codes), Report Recipients, Sent Email Log (Sending off and on), Email Senders (per plant) and Repair Items (header badge) all work inside the panel');
 
-    // The tablet: once Uniontown has a release code, Change Station asks for it.
+    // The tablet: once Uniontown has a release code, Release asks for it.
     const code = (await db().collection('private').doc('releaseCodes').get()).data().fac_uniontown.code;
     const ps = await openPage(browser, 1280, 800, '/plant-station.html' + ADMIN);
     await ps.waitForSelector('[data-station="CASE"]');
     await ps.click('[data-station="CASE"]');
     await ps.waitForSelector('#change:not([hidden])');
-    // A link naming another station does not move a tablet that already has one (only Change Station does).
+    // A link naming another station does not move a tablet that already has one (only Release does).
     await ps.goto(HOSTING + '/plant-station.html' + ADMIN + '&station=TOTES');
     await ps.waitForSelector('#change:not([hidden])');
     assert.equal(await ps.textContent('#title'), 'Case Loadout', 'a ?station= link does not change a tablet\'s station');
@@ -215,7 +215,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await ps.click('#release-go');
     await ps.waitForSelector('[data-station="CASE_UNLOADING"]');
     assert.deepEqual(ps.errors, []);
-    results.push('Plant Station: with a release code set, Change Station asks for it; a wrong code is refused, the right one frees the tablet');
+    results.push('Plant Station: with a release code set, Release asks for it; a wrong code is refused, the right one frees the tablet');
 
     // Batch 2: email, schedules and diagnostics (js/admin-tools.js).
     await open('repair-email', '#re-where input');

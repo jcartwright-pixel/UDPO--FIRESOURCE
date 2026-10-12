@@ -42,7 +42,7 @@
       <button type="button" id="go-home" title="Home">Home</button>
       <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Plant Station</strong></span>
       <span class="ps-pill" id="pill" hidden>Uniontown</span>
-      <button type="button" id="change" hidden>Change Station</button>
+      <button type="button" id="change" hidden>Release</button>
       <span class="who" id="who"></span>
       <button type="button" id="signout">Sign out</button>
     </header>
@@ -60,7 +60,7 @@
         <!-- Joe 10/12: the station's work shows here, the employee view only (js/station-work.js); no manager screen opens from a station. -->
         <div class="sw" id="work"></div>
         <p class="ps-foot" id="foot"></p>
-        <!-- Administration > Manager Links: once a plant has a manager release code, Change Station asks for it. -->
+        <!-- Administration > Manager Links: once a plant has a manager release code, Release asks for it. -->
         <form class="ps-release" id="release" hidden>
           <p>A manager must type the manager release code to change this tablet's station.</p>
           <label>Manager release code <input id="release-code" maxlength="48" autocomplete="off" autocapitalize="characters"></label>
@@ -76,7 +76,7 @@
     import { start, requireSignIn, watchPerson, escapeHtml, shortDate, showError, goBack, callServer, stationCodeSignIn, signOutHere } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
-    import { resolveStation, askCode, remember } from './js/station-code.js';
+    import { resolveStation, askCode, remember, lockStation } from './js/station-code.js';
     import { mountStationWork } from './js/station-work.js';
 
     // The current app's Plant Station tablet (PlantStation.html, 057_V774): one station, only its work areas. In the new app
@@ -103,7 +103,7 @@
     const KEY = 'udPlantStation';
     const read = () => { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } };
     const write = (v) => { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* private window: not remembered */ } };
-    // A link with ?station= sets up a new tablet only. Once the tablet has a station, changing it goes through Change Station
+    // A link with ?station= sets up a new tablet only. Once the tablet has a station, changing it goes through Release
     // (and the manager release code, when the plant has one), as on the current app.
     const asked = new URLSearchParams(location.search).get('station') || '';
     let stationId = read() || (STATIONS.some(s => s.id === asked) ? asked : ''), runs = [];
@@ -152,7 +152,8 @@
       document.getElementById('code-box').hidden = mode !== 'ask';
       document.getElementById('pick').hidden = !!st || mode !== 'free';
       document.getElementById('station').hidden = !st;
-      document.getElementById('change').hidden = !st;
+      // Joe 10/12: a station has no Back, Home or Sign out; Release at the very bottom (manager release code) is the only way out.
+      lockStation(document.getElementById('change'), !!st);
       document.getElementById('pill').hidden = !st;
       document.getElementById('eyebrow').textContent = st ? 'Assigned Plant Station' : 'Plant Station';
       document.getElementById('title').textContent = st ? (named ? named.name : st.label) : mode === 'ask' ? 'Station code' : 'Pick this tablet\'s station';
@@ -170,7 +171,7 @@
         return '<button type="button" role="tab" class="ps-tab" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + x.accent + ';--tone:' + x.tone + '"><img src="img/library/' + pic + '" alt=""><span><b>' + x.label + '</b><small>' + x.what + '</small>' + count + '</span></button>';
       }).join('');
       document.getElementById('tabs').classList.toggle('one', st.views.length === 1);
-      document.getElementById('foot').textContent = st.what + '. This tablet opens this station each time; use Change Station to move it.';
+      document.getElementById('foot').textContent = st.what + '. This tablet opens this station each time; a manager uses Release at the bottom to move it.';
     }
 
     document.getElementById('tabs').addEventListener('click', e => {
@@ -199,12 +200,15 @@
       let required = false;
       try { required = (await releaseCall({ op: 'status', facilityId: signedAs ? signedAs.facilityId : 'fac_uniontown' })).required; } catch (err) {
         // No answer: the station stays as it is (a code may be needed), so a dropped network cannot get past the code.
-        showError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and press Change Station again.');
+        showError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and press Release again.');
         return;
       }
+      // Joe 10/12: a station opened with its code stays put until the plant has a manager release code (no code, no way out).
+      // A plant with no station codes yet still picks from the list.
+      if (!required && mode === 'code') { showError('This screen stays here until the plant has a manager release code (Administration > Manager Links).'); return; }
+      if (!required) { showError(''); leave(); return; }
       showError('');
-      if (!required) { leave(); return; }
-      releaseBox.hidden = false; releaseMsg.textContent = ''; document.getElementById('release-code').value = ''; document.getElementById('release-code').focus();
+      releaseBox.hidden = false; releaseBox.scrollIntoView({ block: 'end' }); releaseMsg.textContent = ''; document.getElementById('release-code').value = ''; document.getElementById('release-code').focus();
     });
     document.getElementById('release-cancel').addEventListener('click', () => { releaseBox.hidden = true; });
     releaseBox.addEventListener('submit', async (ev) => {
@@ -230,7 +234,7 @@
         await signOutHere();
         showError(message);
       };
-      // A tablet signed in by its code alone leaves only through Change Station (and the manager release code).
+      // A tablet signed in by its code alone leaves only through Release (and the manager release code).
       document.getElementById('signout').hidden = !!signedAs;
       // Still On, and still on this code? Checked before anything is read (and again every 5 minutes below).
       if (signedAs) {
