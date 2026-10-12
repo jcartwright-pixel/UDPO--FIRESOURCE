@@ -517,7 +517,7 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     if (!snap.exists) throw new SaveError('NOT_FOUND', req.equipmentId + ' is not in Equipment Master');
     const e = snap.data();
     if (e.type !== type) throw new SaveError('BAD_REQUEST', e.unit + ' is a ' + e.type + ', not a ' + type);
-    if (!req.override && L.unitOff(e)) throw new SaveError('NOT_ALLOWED', e.unit + ' is ' + e.status + ' in Equipment Master (tick OVR to use it anyway)');
+    if (!req.override && L.unitOff(e)) throw new SaveError('NOT_ALLOWED', e.unit + ' is ' + L.unitOffWhy(e) + ' in Equipment Master (tick OVR to use it anyway)');
     return { [idField]: e.id, [unitField]: e.unit };
   }
   if (req.action === 'setRuns') return { runs: req.runs };
@@ -1136,7 +1136,7 @@ function driverToLive(tx, db, mode, req, stamp, email, d, truckId, live, result)
     if (d.name && day.driver !== d.name) ch.driver = d.name;
     if (truckId && day.runs && !byHand(x.run, p, 'equipment_override') && day.truckId !== truckId) {
       if (!truck) warn(d.name + "'s truck " + truckId + ' is not in Equipment Master; the route\'s truck was kept.');
-      else if (L.unitOff(truck)) warn(d.name + "'s truck " + truck.unit + ' is ' + (truck.status || 'not usable') + '; the route\'s truck was kept.');
+      else if (L.unitOff(truck)) warn(d.name + "'s truck " + truck.unit + ' is ' + L.unitOffWhy(truck) + '; the route\'s truck was kept.');
       else {
         const on = (o) => { const od = Object.assign({}, (o.run.days || {})[p], o.ch.days[p]); return od.runs && (od.truckId === truck.id || (!!truck.unit && od.truck === truck.unit)); };
         const other = rows.find(o => o !== x && o.run.weekStart === x.run.weekStart && on(o));

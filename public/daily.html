@@ -196,7 +196,7 @@
     function unitCell(r, kind, live, needs) {
       const text = kind === 'truck' ? r.truck || (noTractor(r) ? 'N/A' : '') : r.trailer, unit = unitById(kind === 'truck' ? r.truckId : r.trailerId);
       if (!r.off && unit && L.unitOff(unit)) {
-        const why = String(unit.status).toUpperCase() === 'DOWN' ? 'DOWN' : String(unit.status).replace(/_/g, ' ').toUpperCase();
+        const why = L.unitOffWhy(unit);
         const reason = String(unit.notes || '').replace(/^DOWN:?\s*/i, '').split('|')[0].trim();
         return cell(text + ' ' + why, 'missing offcover unit-down', live && kind).replace(/title="[^"]*"/, () => 'title="' + escapeHtml(text + ' is ' + why.toLowerCase() + (reason && !/^down\b/i.test(reason) ? ' (' + reason + ')' : '') + '. Pick another ' + kind + '.') + '"');
       }
@@ -208,7 +208,7 @@
       box.hidden = !list.length;
       if (!list.length) return;
       const units = [...new Set(list.map(x => x.unit))];
-      document.getElementById('down-loads-text').textContent = (units.length === 1 ? units[0] + (String(list[0].status).toUpperCase() === 'DOWN' ? ' is on the down list' : ' is ' + String(list[0].status || 'not usable').replace(/_/g, ' ').toUpperCase() + ' (not usable)') + ' but is still on ' : 'Down or not usable but still on loads: ') +
+      document.getElementById('down-loads-text').textContent = (units.length === 1 ? units[0] + (String(list[0].status).toUpperCase() === 'DOWN' ? ' is on the down list' : ' is ' + list[0].why + ' (not usable)') + ' but is still on ' : 'Down or not usable but still on loads: ') +
         list.map(x => (units.length === 1 ? '' : x.unit + ' on ') + 'Route ' + x.route + ' (' + L.dayName(x.date).slice(0, 3) + ' ' + shortDate(x.date) + ')').join(', ') + '.';
       const btn = document.getElementById('down-loads-clear');
       btn.hidden = !edit;
@@ -366,7 +366,7 @@
       if (!own || own === truckNow) return;
       const unit = lists.fleetTrucks.find(e => e.id === own);
       const busy = unit && unitBlocks('truck', row)[own];
-      const why = !unit ? 'is not on Equipment Master' : L.unitOff(unit) ? 'is ' + unit.status : busy ? 'is ' + busy : '';
+      const why = !unit ? 'is not on Equipment Master' : L.unitOff(unit) ? 'is ' + L.unitOffWhy(unit) : busy ? 'is ' + busy : '';
       if (why) { showError(d.name + '\'s truck ' + (unit ? unit.unit : own) + ' ' + why + '; the route\'s truck was kept.'); return; }
       setTruck(own);
     }
