@@ -15,6 +15,7 @@ const { garageCall } = require('../../src/garage');
 const F = require('../fixtures/fake-sheets');
 const G = require('../fixtures/garage-demo');
 const PD = require('../fixtures/plant-demo');
+const localCalls = require('./local-calls.cjs');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -24,6 +25,7 @@ const SHOTS = process.env.SHOTS || '';
 async function openPage(browser, width, height, url, clock) {
   const page = await browser.newPage({ viewport: { width, height } });
   if (clock) await page.clock.setFixedTime(new Date(clock));
+  await localCalls(page);
   // The public callables answer straight from the server code when no functions emulator runs (LOCAL_CALLS=1).
   if (process.env.LOCAL_CALLS) {
     await page.route(/:5001\/[^/]+\/[^/]+\/(garage|phone)$/, async (route) => {
