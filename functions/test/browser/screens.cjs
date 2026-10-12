@@ -436,6 +436,15 @@ async function noScroll(page) {
     await rt.selectOption('#view-select', 'seq');
     // The Load Order list is drawn and the saves above have settled, so no copy redraws the rows in the middle of the drag.
     await rt.waitForFunction(() => document.querySelector('table.routes thead th') && document.querySelector('table.routes thead th').textContent === 'Order' && document.querySelector('table.routes tr[data-i="1"]'), null, { timeout: 5000 });
+    // On a slow runner a save takes several seconds: wait until 802's Tote and the WHEELING run are stored, so their
+    // Route Master updates do not redraw the list in the middle of the drag.
+    await rt.waitForFunction(async () => {
+      const { start } = await import('./js/app.js');
+      const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { db } = await start();
+      const all = (await getDocs(collection(db, 'routes'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
+      return all.some(r => r.run === 'WHEELING') && all.some(r => r.id === 'run_t802' && r.loadType === 'Tote');
+    }, null, { timeout: 20000, polling: 250 });
     await rt.waitForTimeout(600);
     const orderShown = () => rt.evaluate(() => [...document.querySelectorAll('table.routes tbody tr[data-i]')].map(tr => tr.children[1].textContent).join(','));
     const beforeDrag = await orderShown();
@@ -446,7 +455,7 @@ async function noScroll(page) {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
       const { db } = await start();
-      for (let i = 0; i < 20; i++) { const d = (await getDoc(doc(db, 'routes', 'run_t801'))).data(); if (d.days.mon.loadOrder === 10 && d.days.mon.dispatchTime === 300) return d.days.mon; await new Promise(r => setTimeout(r, 250)); }
+      for (let i = 0; i < 80; i++) { const d = (await getDoc(doc(db, 'routes', 'run_t801'))).data(); if (d.days.mon.loadOrder === 10 && d.days.mon.dispatchTime === 300) return d.days.mon; await new Promise(r => setTimeout(r, 250)); }
       return null;
     });
     assert.ok(saved801, 'Monday start time 5:00 AM and load order 10 saved for 801');

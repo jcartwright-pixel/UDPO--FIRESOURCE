@@ -35,7 +35,7 @@
         <label>View / Edit<select id="view-select">
           <option value="times">Start Times</option><option value="miles">Mileage</option><option value="hours">Hours and Return</option><option value="offset">Load Day</option>
           <option value="truck">Default Truck</option><option value="trailer">Default Trailer</option><option value="jack">Default Pallet Jack</option>
-          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="rules">Show / Hide Rules</option><option value="many">Route Details (many runs)</option><option value="details">Route Editor (one run)</option><option value="recap">Recap</option>
+          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="rules">Show / Hide Rules</option><option value="names">Route Names</option><option value="many">Route Details (many runs)</option><option value="details">Route Editor (one run)</option><option value="recap">Recap</option>
         </select></label>
       </div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Route Master is not changed yet</span></div>
@@ -94,6 +94,7 @@
     };
     const OTHER = {
       seq: ['Load Order', 'Pick a day, then drag a run by its route number to its place in the loadout, or use the up and down arrows. Saved as you move it.'],
+      names: ['Route Names', 'Every name a run has in Route Master. The route number is locked; click any white box, type, then press Enter or click away to save.'],
       many: ['Route Details', 'Run settings for every run shown (pick a route at the top for just its runs). Each box and list saves the moment you change it.'],
       days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the normal week. Edit Route opens every setting for a run. Holidays and one-week changes: Holiday Week Editor.'],
       details: ['Route Editor', 'Every setting for one run, and its normal week day by day. Each box and list saves the moment you change it.'],
@@ -164,6 +165,7 @@
       else if (view === 'days') t.innerHTML = daysView(list, edit);
       else if (view === 'seq') { const seq = seqList(); t.innerHTML = seqView(seq, edit); lines = seq.length; }
       else if (view === 'details') { t.innerHTML = detailsView(list, edit); lines = 12; }
+      else if (view === 'names') t.innerHTML = namesView(list, edit);
       else if (view === 'many') t.innerHTML = manyView(list, edit);
       else if (view === 'rules') t.innerHTML = rulesView(onlyHidden ? list.filter(r => !weeklyRule(r).shown) : list, edit);
       else t.innerHTML = recapView(list);
@@ -306,6 +308,28 @@
         (list.length ? '' : '<tr><td colspan="12" class="empty">No runs to show.</td></tr>') + '</tbody>';
     }
 
+    // Route Names (Joe 10/12): the route number first and locked; every other Route Master name typed over in place.
+    // Route Name saves on every run of the route. Screens show = the name Daily Dispatch and the other screens print.
+    const NAME_FIELDS = [['routeCode', 'Run Code', 'which run of the route (6301_1); weeks and history follow the run\'s hidden ID, so this is safe to change', 40],
+      ['streamId', 'Stream ID', 'the name on the Driver Room board (kiosk) and driver schedule; a check-in email may use it too', 80],
+      ['routeName', 'Route Name', 'every run of the route (Martins Ferry)', 80], ['run', 'Run', 'this run (Product)', 80], ['routeRunType', 'Run Type', 'Load 1, Load 2', 40]];
+    const screenName = (r) => (L.routeNumber(r.route) + ' ' + L.runLabel(r.routeName, r.run, r.routeRunType)).trim();
+    function namesView(list, edit) {
+      return '<caption class="name-help"><b>Route</b> the route number (locked) &middot; ' + NAME_FIELDS.map(f => '<b>' + f[1] + '</b> ' + escapeHtml(f[2])).join(' &middot; ') + '. Example: Route Name Walmart, Run blank, Run Type Load 1 shows 6301 Walmart Load 1.</caption>' +
+        '<colgroup><col style="width:7%"><col style="width:9%"><col style="width:15%"><col style="width:14%"><col style="width:16%"><col style="width:9%"><col style="width:30%"></colgroup>' +
+        '<thead><tr><th>Route</th>' + NAME_FIELDS.map(f => '<th title="' + escapeHtml(f[2]) + '">' + f[1] + '</th>').join('') + '<th>Screens show</th></tr></thead><tbody>' +
+        list.map(r => '<tr data-id="' + escapeHtml(r.id) + '"><td class="strong locked" title="The route number cannot be changed">' + escapeHtml(r.route) + '</td>' +
+          NAME_FIELDS.map(f => '<td class="name-cell"><input class="nm" data-name="' + f[0] + '" value="' + escapeHtml(r[f[0]] == null ? '' : r[f[0]]) + '" maxlength="' + f[3] + '" aria-label="' + f[1] + ' of ' + escapeHtml(r.route) + '"' + (edit ? '' : ' readonly') + '></td>').join('') +
+          '<td class="strong screen-name">' + escapeHtml(screenName(r)) + '</td></tr>').join('') +
+        (list.length ? '' : '<tr><td colspan="7" class="empty">No runs to show.</td></tr>') + '</tbody>';
+    }
+    function saveName(r, f, raw) {
+      const v = String(raw == null ? '' : raw).trim();
+      if (!r || v === String(r[f] == null ? '' : r[f]).trim()) return;
+      const runs = f === 'routeName' ? routes.filter(x => x.route === r.route) : [r];
+      runs.forEach(x => saveRun(x, { [f]: v }, null, y => { y[f] = v; }));
+    }
+
     /* ---------- Saves: shown at once, one call each ---------- */
     // The redraw waits a moment so Tab / Enter has already moved to the next box (render keeps the focus there).
     const renderSoon = () => setTimeout(render, 0);
@@ -332,9 +356,15 @@
     }
     const table = document.getElementById('table');
     // A Route Master update that arrived while a box was being typed in is drawn once the box is left (after its own save).
+    table.addEventListener('keydown', e => {
+      if (!e.target.matches('input.nm')) return;
+      if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+      if (e.key === 'Escape') { e.target.value = e.target.defaultValue; e.target.blur(); }
+    });
     table.addEventListener('focusout', () => { if (redrawLater) { redrawLater = false; renderSoon(); } });
     table.addEventListener('change', e => {
       if (e.target.matches('input.cell')) return saveCell(e.target);
+      if (e.target.matches('input.nm')) return saveName(routes.find(x => x.id === e.target.closest('tr').dataset.id), e.target.dataset.name, e.target.value);
       if (e.target.matches('input.dcell')) {
         const r = routes.find(x => x.id === e.target.closest('tr').dataset.id), p = e.target.dataset.day, field = e.target.dataset.field, value = e.target.value.trim();
         if (value === cellValue(r, p, field)) return;
