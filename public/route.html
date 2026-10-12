@@ -14,12 +14,16 @@
   <meta name="apple-mobile-web-app-title" content="UD Routes">
   <meta name="theme-color" content="#0b4f8a">
   <title>Route Check-In</title>
+  <!-- Joe 10/12: entries made with no signal are kept on the phone (js/phone-queue.js), so the app's "will not save" bar is not shown. -->
+  <script>window.UD_PHONE_QUEUE = true;</script>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
 </head>
 <body class="phone">
   <header class="phone-top"><b>United Dairy</b><span id="who"></span><button type="button" id="change" hidden>Change</button></header>
   <div class="notice error" id="error" hidden></div>
+  <!-- Joe 10/12: no signal: what the driver enters is saved on the phone and sent when the signal is back (js/phone-queue.js). -->
+  <p class="offline-line" id="offline-line" role="status" hidden></p>
 
   <!-- 1. The plant's Route Distribution code, asked once and kept on the phone. -->
   <form class="phone-card" id="step-code" hidden>
@@ -138,6 +142,7 @@
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
     import { addSpeak } from './js/speak.js';
     import { askRelease, lockStation } from './js/station-code.js';
+    import { startQueue, send, waiting, onChange, keepRead, lastRead, isNoSignal } from './js/phone-queue.js';
 
     // Joe 10/12: the Driver Room Check-In tablet is this same page with ?room=1 ("the driver's phone is exactly how this should
     // look"). The tablet's Driver Room kiosk code (typed on the Driver Station link or driver-room.html) stands in for the
@@ -161,10 +166,20 @@
     let want = view === 'dvir' ? 'dvir' : view === 'loadout' ? 'board' : view === 'checkin' ? 'checkin' : '';
     let code = room ? 'room' : store.get('code'), driverId = store.get('driverId'), driverName = store.get('driverName'), date = '', dates = [], loads = [], open = null, units = { trucks: [], trailers: [], jacks: [] };
 
+    // One call as it goes to the server: the phone's code (or the Driver Room station) goes with every call.
+    const withWho = (op, fields) => Object.assign(room ? { station } : { code }, { op }, fields || {});
+    const rawCall = async (op, input) => { const { functions } = await start(); return (await httpsCallable(functions, 'phone')(input)).data; };
+    // Joe 10/12 (no signal): the last roster, loads and board are kept on the phone and shown when there is no signal.
+    const READ_OPS = ['roster', 'loads', 'board'], readKey = (op, fields) => op + '|' + (room ? 'room:' + (station && station.key) : code) + '|' + JSON.stringify(fields || {});
     async function call(op, fields) {
-      const { functions } = await start();
-      try { return (await httpsCallable(functions, 'phone')(Object.assign(room ? { station } : { code }, { op }, fields || {}))).data; }
+      try {
+        const out = await rawCall(op, withWho(op, fields));
+        if (READ_OPS.indexOf(op) >= 0) keepRead(readKey(op, fields), out);
+        return out;
+      }
       catch (e) {
+        const kept = READ_OPS.indexOf(op) >= 0 && isNoSignal(e) ? lastRead(readKey(op, fields)) : null;
+        if (kept) return kept;
         // A plain sentence for the driver, without the server's status number on the end.
         e.message = String(e.message || e).replace(/\s*\[\d{3}\]\s*$/, '');
         // No signal, or the server never answered: "internal" or "Failed to fetch" means nothing to a driver (improvements item 12).
@@ -200,8 +215,11 @@
       document.getElementById('who').textContent = driverName;
       document.getElementById('days').innerHTML = dates.map((d, i) => '<button type="button" data-date="' + d + '" class="' + (d === date ? 'on' : '') + '">' + (i ? 'Yesterday ' : 'Today ') + escapeHtml(shortDate(d)) + '</button>').join('');
       const skip = driverId === 'skip';
-      document.getElementById('loads').innerHTML = (skip && loads.length ? '<p class="phone-empty">Pick your route to check in.</p>' : '') + loads.map((l, i) => '<button type="button" class="phone-load' + (l.checkinCompletedAt ? ' done' : '') + '" data-i="' + i + '"><b>' + escapeHtml(l.route) + '</b> ' + escapeHtml(l.run) +
-        '<small>' + escapeHtml([skip && l.driver, (l.checkinTruck || l.truck) && 'Truck ' + (l.checkinTruck || l.truck), (l.checkinTrailer || l.trailer) && 'Trailer ' + (l.checkinTrailer || l.trailer)].filter(Boolean).join(' · ')) + '</small><span>' + (l.checkinCompletedAt ? 'Checked in' : 'Check In') + '</span></button>').join('') ||
+      // A Check-In saved on this phone with no signal shows as saved here until it is sent.
+      const onPhone = new Set((await waiting()).filter(e => e.op === 'checkIn' && !e.refused).map(e => e.input.runDocId + '|' + e.input.day));
+      const state = (l) => onPhone.has(l.runDocId + '|' + l.day) ? ['queued', 'Saved on phone'] : l.checkinCompletedAt ? ['done', 'Checked in'] : ['', 'Check In'];
+      document.getElementById('loads').innerHTML = (skip && loads.length ? '<p class="phone-empty">Pick your route to check in.</p>' : '') + loads.map((l, i) => '<button type="button" class="phone-load ' + state(l)[0] + '" data-i="' + i + '"><b>' + escapeHtml(l.route) + '</b> ' + escapeHtml(l.run) +
+        '<small>' + escapeHtml([skip && l.driver, (l.checkinTruck || l.truck) && 'Truck ' + (l.checkinTruck || l.truck), (l.checkinTrailer || l.trailer) && 'Trailer ' + (l.checkinTrailer || l.trailer)].filter(Boolean).join(' · ')) + '</small><span>' + state(l)[1] + '</span></button>').join('') ||
         '<p class="phone-empty">Dispatch has no load for you on this day.</p>';
       step(open === null ? 'step-loads' : 'step-form');
     }
@@ -322,7 +340,8 @@
       const requestId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
       const btn = document.getElementById('send');
       btn.disabled = true;
-      try { await call('checkIn', { driverId, runDocId: l.runDocId, day: l.day, requestId, fields }); } finally { btn.disabled = false; }
+      // No signal: kept on the phone and sent when the signal is back (the same requestId, so it is saved once).
+      try { await send('checkIn', withWho('checkIn', { driverId, runDocId: l.runDocId, day: l.day, requestId, fields }), 'Check-In ' + l.route + ' ' + l.run); } finally { btn.disabled = false; }
       open = null;
       await show();
     }));
@@ -332,6 +351,10 @@
     // Joe 10/12 "these will still also need to have a United Dairy email address to log in first": the Driver Room tablet is
     // signed in with a United Dairy Google account on the Driver Station link; without it, back there to sign in.
     const signedIn = room ? start().then(async ({ auth }) => { await auth.authStateReady(); if (isUnitedDairy(auth.currentUser)) return true; location.replace('driver-station.html'); return false; }) : Promise.resolve(true);
+    // Joe 10/12 (no signal): Check-Ins and DVIRs made with no signal wait on this phone and go when the signal is back; the
+    // list of loads redraws when they have gone.
+    startQueue(rawCall);
+    onChange(() => { if (!document.getElementById('step-loads').hidden) show().catch(() => {}); });
     signedIn.then(ok => ok && show()).catch(err => showError(err.message));
 
     /* ---------- View Loadout (the Driver Room board on the phone) ---------- */
@@ -482,9 +505,9 @@
         tractorIssues: $('dv-tractor').value.trim(), trailerIssues: t1Issues, notes: $('dv-notes').value.trim(), signatureName: $('dv-name').value.trim(), signature };
       $('dv-send').disabled = true; bad('Saving inspection…');
       try {
-        const r = await call('dvir', { driverId, runDocId: l.runDocId, day: l.day, requestId: dvRequest, fields });
+        const r = await send('dvir', withWho('dvir', { driverId, runDocId: l.runDocId, day: l.day, requestId: dvRequest, fields }), 'DVIR ' + l.route + ' ' + l.run);
         saved = true; [...form.elements].forEach(el => { if (!el.matches('[data-back]')) el.disabled = true; });
-        bad('Inspection saved' + (r.trailers > 1 ? ' · ' + r.trailers + ' trailers' : '') + ' · ' + r.recordId);
+        bad(r.queued ? 'Saved on this phone. It will send when you have signal.' : 'Inspection saved' + (r.trailers > 1 ? ' · ' + r.trailers + ' trailers' : '') + ' · ' + r.recordId);
       } catch (err) { $('dv-send').disabled = false; bad(err.message); }
     });
   </script>

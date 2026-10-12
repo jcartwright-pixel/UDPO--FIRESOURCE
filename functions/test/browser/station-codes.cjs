@@ -21,7 +21,7 @@ const SHOTS = process.env.SHOTS_DIR;
 const ADMIN = '?testEmail=admin.test@uniteddairy.com';
 
 async function openPage(browser, width, height, url) {
-  const page = await browser.newPage({ viewport: { width, height } });
+  const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });

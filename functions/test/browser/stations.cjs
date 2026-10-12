@@ -23,7 +23,7 @@ const MANAGER = '?testEmail=manager.test@uniteddairy.com';
 const SHOTS = process.env.SHOTS || '';
 
 async function openPage(browser, width, height, url, clock, touch) {
-  const page = await browser.newPage(touch ? { viewport: { width, height }, hasTouch: true, isMobile: true } : { viewport: { width, height } });
+  const page = await browser.newPage(Object.assign(touch ? { viewport: { width, height }, hasTouch: true, isMobile: true } : { viewport: { width, height } }, { serviceWorkers: 'block' }));
   if (clock) await page.clock.setFixedTime(new Date(clock));
   await localCalls(page);
   // The public callables answer straight from the server code when no functions emulator runs (LOCAL_CALLS=1).

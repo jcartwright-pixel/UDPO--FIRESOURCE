@@ -391,8 +391,9 @@ document.addEventListener('click', e => {
 // Polish 16: when the tablet or computer loses its connection a yellow bar says so at the top, so nobody thinks a press was
 // sent. Saves go to the server, so they wait for the signal; the bar goes away by itself when it is back.
 (function connectionBar() {
-  // Screens that keep saves on the device with no signal (window.UD_OFFLINE) show their own line instead.
-  if (EMBED || window.UD_OFFLINE) return;
+  // Screens that keep saves on the device with no signal (window.UD_OFFLINE, and the drivers' Route page with
+  // window.UD_PHONE_QUEUE, Joe 10/12) show their own line instead.
+  if (EMBED || window.UD_OFFLINE || window.UD_PHONE_QUEUE) return;
   let bar = null;
   const show = () => {
     if (navigator.onLine) { if (bar) bar.hidden = true; return; }

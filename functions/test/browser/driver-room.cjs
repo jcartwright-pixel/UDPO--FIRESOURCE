@@ -22,7 +22,7 @@ const SHOTS = process.env.SHOTS_DIR;
 const BOSS = { email: 'admin.test@uniteddairy.com' }, SIGNED = '?testEmail=admin.test@uniteddairy.com';
 
 async function openPage(browser, width, height, url) {
-  const page = await browser.newPage({ viewport: { width, height } });
+  const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
@@ -46,7 +46,7 @@ async function swipe(p) {
   return (await at()) - before;
 }
 async function touchPage(browser, width, height, url, mobile) {
-  const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: !!mobile });
+  const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: !!mobile, serviceWorkers: 'block' });
   const page = await ctx.newPage();
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
@@ -157,7 +157,7 @@ async function touchPage(browser, width, height, url, mobile) {
     // Joe 10/12: 5 minutes with no taps signs the driver out and shows the rolling View Loadout; the phone link never signs
     // out by itself.
     {
-      const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+      const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, serviceWorkers: 'block' });
       const q = await ctx.newPage();
       await q.clock.install();
       await q.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
