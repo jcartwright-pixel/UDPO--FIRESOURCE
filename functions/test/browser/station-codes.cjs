@@ -69,7 +69,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     results.push('Plant Station Codes: the Plant Station link, the no-account link (being built), the stations; + Add Station and Create code work');
 
     await open('garage-codes');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['garage']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['garage', 'maint']);
     codes.garage = await makeCode('Garage');
     await twoShots(p, '2-garage-station-codes');
     results.push('Garage Station Codes: its own page with the Garage Station link and its stations');

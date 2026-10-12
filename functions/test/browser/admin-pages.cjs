@@ -108,7 +108,9 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     // Joe 10/11: each link where it belongs. Manager Links keeps the manager links; the tablet links go with Plant Station
     // Codes; the Driver Station and the drivers' phone link (with its Route Distribution code) go to Driver Station Codes.
     await open('app-links', '.ap-link');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['company', 'phone', 'manager', 'personal']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['company', 'phone', 'manager', 'screens', 'personal']);
+    // Joe 10/12: Launch opens the screen in a new window, so Administration stays where it was.
+    assert.deepEqual(await p.$$eval('.ap-link a.ap-btn', a => [...new Set(a.map(x => x.target))]), ['_blank']);
     await shot(p, 'app-links-1920.png');
     await shot(p, 'app-links-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
 
@@ -129,7 +131,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await p.waitForSelector('#sc-list code');
     await shot(p, 'plant-station-codes-1920.png');
     await open('garage-codes', '#st-list .ap-item');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['garage']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['garage', 'maint']);
     await shot(p, 'garage-station-codes-1920.png');
 
     await open('report-recipients', '#rr-list');
