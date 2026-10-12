@@ -1129,44 +1129,70 @@ async function noScroll(page) {
     results.push('Menu: Administration holds Dispatch Administration; Driver Weekly Template is under Drivers only. Template: relief first, + Add Run and Copy / Paste / Paste + Add on every day');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
-    // The per-screen switch: an administrator moves Daily Dispatch to the new app from the home page (two clicks).
+    // The per-screen switch (Joe 10/12): Administration > Go-Live Switches is the only place to move a screen. The tags on
+    // the Route Distribution cards are plain labels that cannot be clicked, and a screen marked fully live has no tag.
     const adminHome = await openPage(browser, 1366, 650, '/distribution.html?testEmail=admin.test@uniteddairy.com');
-    await adminHome.waitForSelector('[data-owner="dailyDispatch"].can');
-    await adminHome.waitForSelector('[data-owner="writeBack"].new');
-    await adminHome.click('[data-owner="dailyDispatch"]');
-    assert.equal(await adminHome.textContent('[data-owner="dailyDispatch"]'), 'Click again');
-    assert.match(adminHome.url(), /distribution\.html/, 'the tag does not open the screen');
-    await adminHome.click('[data-owner="dailyDispatch"]');
-    await adminHome.waitForSelector('[data-owner="dailyDispatch"].new');
-    assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'new');
-    const homeSize = await noScroll(adminHome);
-    assert.ok(homeSize.scroll <= homeSize.inner && homeSize.width <= homeSize.innerWidth, 'home with the switch fits 1366x650');
-    if (SHOTS) await adminHome.screenshot({ path: path.join(SHOTS, 'home-switch-1366.png') });
+    await adminHome.waitForSelector('[data-owner="dailyDispatch"]:not(.new)');
+    assert.equal(await adminHome.$('[data-owner="writeBack"]'), null, 'the write-back has no tag on the cards');
+    await Promise.all([adminHome.waitForNavigation(), adminHome.click('[data-owner="dailyDispatch"]')]);
+    assert.match(adminHome.url(), /daily\.html/, 'a click on the tag opens the screen like the rest of the line');
+    assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'old', 'the tag does not switch anything');
+    const gl = await openPage(browser, 1536, 730, '/administration.html?testEmail=admin.test@uniteddairy.com');
+    await gl.waitForSelector('.adm-item[data-key="switch"]');
+    assert.equal(await gl.textContent('.adm-item[data-key="switch"] .adm-name'), 'Go-Live Switches');
+    await gl.click('.adm-item[data-key="switch"]');
+    await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"]');
+    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="drivers"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
+    assert.match(await gl.textContent('#gl-rows tr[data-row="Plant Loading"]'), /Let the new app write plant loading to the real Live sheet/);
+    // Turn on everything that is ready: pressed twice; Daily and Weekly Dispatch go to the new app, nothing else.
+    await gl.click('#gl-all');
+    assert.match(await gl.textContent('#gl-all'), /Press again/);
+    assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'old', 'one press does nothing');
+    await gl.click('#gl-all');
+    await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"] .gl-chip.new');
+    let cfg = (await db().collection('config').doc('app').get()).data();
+    assert.equal(cfg.screenOwners.dailyDispatch, 'new');
+    assert.equal(cfg.screenOwners.weeklyDispatch, 'new');
+    assert.equal(cfg.screenOwners.drivers, 'old');
+    if (SHOTS) await gl.screenshot({ path: path.join(SHOTS, 'go-live-switches-1536.png') });
     const onNew = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await onNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'NEW APP: SAVES GO TO THE SHEET');
     await onNew.close();
-    const onOld = await openPage(browser, 1366, 650, '/weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com');
+    // A screen that stayed on the current app is view only in the new app.
+    const onOld = await openPage(browser, 1366, 650, '/checkins.html?testEmail=dispatch.test@uniteddairy.com');
     await onOld.waitForFunction(() => document.getElementById('mode-text').textContent === 'RUN FROM THE CURRENT APP: VIEW ONLY');
-    assert.equal(await onOld.isDisabled('#publish'), true, 'Weekly is view only while it is run from the current app');
-    if (SHOTS) await onOld.screenshot({ path: path.join(SHOTS, 'weekly-view-only-1366.png') });
+    if (SHOTS) await onOld.screenshot({ path: path.join(SHOTS, 'checkins-view-only-1366.png') });
     await onOld.close();
-    // A manager sees which app runs each screen but cannot move one.
-    const mgrHome = await openPage(browser, 1366, 650, '/distribution.html?testEmail=manager.test@uniteddairy.com');
-    await mgrHome.waitForSelector('[data-owner="dailyDispatch"].new');
-    assert.equal(await mgrHome.$('[data-owner].can'), null);
-    await mgrHome.close();
-    // The write-back cannot go off while a screen is on the new app; moving Daily back makes every screen a test copy again.
-    await adminHome.click('[data-owner="writeBack"]');
-    await adminHome.click('[data-owner="writeBack"]');
-    await adminHome.waitForSelector('#error:not([hidden])');
-    assert.match(await adminHome.textContent('#error'), /back to the current app/);
-    await adminHome.click('[data-owner="dailyDispatch"]');
-    await adminHome.click('[data-owner="dailyDispatch"]');
-    await adminHome.waitForSelector('[data-owner="dailyDispatch"]:not(.new):not(.armed)');
-    assert.equal((await db().collection('config').doc('app').get()).data().mode, 'test');
+    // Mark fully live: the tag comes off the card.
+    await gl.click('#gl-rows tr[data-row="dailyDispatch"] [data-act="live"]');
+    await gl.click('#gl-rows tr[data-row="dailyDispatch"] [data-act="live"]');
+    await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"] .gl-chip.live');
+    await adminHome.goto(adminHome.url().replace(/daily\.html.*$/, 'distribution.html?testEmail=admin.test@uniteddairy.com'));
+    await adminHome.waitForSelector('[data-owner="weeklyDispatch"].new');
+    await adminHome.waitForSelector('[data-owner="dailyDispatch"]', { state: 'hidden' });
+    const homeSize = await noScroll(adminHome);
+    assert.ok(homeSize.scroll <= homeSize.inner && homeSize.width <= homeSize.innerWidth, 'home fits 1366x650');
+    if (SHOTS) await adminHome.screenshot({ path: path.join(SHOTS, 'home-switch-1366.png') });
+    // The write-back cannot go off while a screen is on the new app.
+    await gl.click('#gl-wb-btn');
+    await gl.click('#gl-wb-btn');
+    await gl.waitForSelector('#view .ap-msg.bad:not([hidden])');
+    assert.match(await gl.textContent('#view .ap-msg'), /back to the current app/);
+    // Move back clears fully live; with both back, every screen is a test copy again.
+    for (const k of ['dailyDispatch', 'weeklyDispatch']) {
+      await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
+      await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
+      await gl.waitForSelector('#gl-rows tr[data-row="' + k + '"] .gl-chip.old');
+    }
+    cfg = (await db().collection('config').doc('app').get()).data();
+    assert.equal(cfg.mode, 'test');
+    assert.deepEqual(cfg.fullyLive, {});
+    await adminHome.waitForSelector('[data-owner="dailyDispatch"]:not(.new)');
     assert.deepEqual(adminHome.errors, []);
+    assert.deepEqual(gl.errors, []);
     await adminHome.close();
-    results.push('per-screen switch: an administrator moves Daily Dispatch to the new app and back from the home page; other screens turn view only; a manager cannot switch');
+    await gl.close();
+    results.push('Go-Live Switches: Turn on everything that is ready (pressed twice) moves Daily and Weekly Dispatch only; Mark fully live takes the tag off the card; card tags are plain labels; the write-back stays on while a screen is on the new app');
 
     // Someone outside United Dairy is signed straight back out.
     const outsider = await openPage(browser, 1366, 650, '/daily.html?testEmail=someone@gmail.com');

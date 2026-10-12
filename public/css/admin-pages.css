@@ -89,3 +89,28 @@
 .ap-modal[hidden] { display: none; }
 .ap-modal-box { width: min(980px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; gap: 8px; background: #fff; border-radius: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, .3); padding: 14px; }
 .ap-modal-box .ap-card { flex: 1; min-height: 0; border: 0; padding: 0; background: #fff; }
+/* Go-Live Switches (Joe 10/12, mock-up A). */
+.gl { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+.ap button.ap-btn.gl-all { min-height: 48px; padding: 0 22px; background: #1c6b3a; border-color: #1c6b3a; color: #fff; font-size: 17px; font-weight: 900; white-space: nowrap; }
+.ap button.ap-btn.gl-all:disabled { background: #e3f3e8; border-color: #9fd3ae; color: #1c6b3a; }
+.ap button.ap-btn.gl-all.armed { background: var(--ud-gold, #ffd200); border-color: var(--ud-gold, #ffd200); color: #3b2a00; }
+.gl-sum { font-size: 16px; color: #33495f; white-space: nowrap; }
+.gl-sum b { color: #0b3d6b; }
+.gl-wb { white-space: nowrap; padding: 6px 12px; border: 1px solid #9fd3ae; background: #e3f3e8; border-radius: 10px; color: #1c6b3a; font-size: 16px; font-weight: 800; }
+.gl-wb.off { border-color: #d5dde6; background: #eef2f6; color: #5a6b7d; }
+.gl-scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid #e6ecf2; border-radius: 10px; }
+table.gl-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+.gl-t th { position: sticky; top: 0; z-index: 1; background: #0b3d6b; color: #fff; text-align: left; padding: 10px 12px; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; }
+.gl-t th.gl-c-name { width: 16%; } .gl-t th.gl-c-own { width: 14%; } .gl-t th.gl-c-ready { width: 12%; } .gl-t th.gl-c-acts { width: 330px; text-align: right; }
+.gl-t td { padding: 7px 12px; border-bottom: 1px solid #e6ecf2; vertical-align: middle; text-align: left; }
+.gl-t tr.gl-grp td { background: #f2f6fa; color: #0b3d6b; font-weight: 900; font-size: 15px; text-transform: uppercase; letter-spacing: .05em; }
+.gl-t td.gl-name { font-weight: 800; color: #0b3d6b; }
+.gl-t td.gl-why { color: #4a5b6c; }
+.gl-chip { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 15px; font-weight: 800; white-space: nowrap; }
+.gl-chip.old { background: #eef2f6; color: #5a6b7d; border: 1px solid #d5dde6; }
+.gl-chip.new { background: #e3f4e8; color: #1d6b35; border: 1px solid #9fd3ae; }
+.gl-chip.live { background: #0b3d6b; color: #fff; }
+.gl-chip.ready { background: #e3f3e8; color: #1c6b3a; }
+.gl-chip.not { background: #fff4e5; color: #9a4b00; }
+.gl-acts { display: flex; gap: 8px; justify-content: flex-end; }
+.gl-acts .ap-btn { white-space: nowrap; font-size: 15px; }

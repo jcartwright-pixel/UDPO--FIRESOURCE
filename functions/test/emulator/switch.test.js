@@ -82,3 +82,33 @@ test('with the write-back off the copy still refuses to run over a screen on the
   await assert.rejects(runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick }), /write-back is off/);
   await assert.rejects(applyAction(db(), DISPATCHER, assign('drv_test_adams'), tick), /write-back is off/);
 });
+
+// Administration > Go-Live Switches (Joe 10/12).
+test('Turn on everything that is ready turns the write-back on and moves only the ready screens', async () => {
+  const out = await setSwitch(db(), ADMIN, { requestId: rid(), allReady: true }, true);
+  assert.equal(out.writeBack, true);
+  assert.equal(out.screenOwners.dailyDispatch, 'new');
+  assert.equal(out.screenOwners.weeklyDispatch, 'new');
+  ['checkIns', 'drivers', 'vacations', 'routes'].forEach(k => assert.equal(out.screenOwners[k], 'old', k + ' is not ready'));
+  const c = await config();
+  assert.equal(c.mode, 'live');
+  assert.equal(c.writeBack.enabled, true);
+  assert.equal((await db().collection('actions').where('action', '==', 'turnOnAllReady').get()).size, 1);
+});
+
+test('a screen that is not ready cannot move to the new app', async () => {
+  await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), screen: 'drivers', owner: 'new' }, true), /Driver Master/);
+  assert.equal((await config()).screenOwners.drivers, 'old');
+});
+
+test('Fully live needs the new app, and moving a screen back clears it', async () => {
+  await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', fullyLive: true }, true), /before marking it fully live/);
+  await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'new' }, true);
+  await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', fullyLive: true }, true);
+  assert.deepEqual((await config()).fullyLive, { dailyDispatch: true });
+  await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'old' }, true);
+  assert.deepEqual((await config()).fullyLive, {});
+  assert.equal((await config()).writeBack.enabled, true, 'the rest of the write-back setting is kept');
+});
