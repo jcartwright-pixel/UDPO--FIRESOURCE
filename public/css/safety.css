@@ -1,0 +1,102 @@
+/* Safety Walkthrough (Joe 10/12, mock-ups B, D, E and F): the weekly walk, open issues, fire extinguishers, past walks and
+   the checklist. Text stays 16px or more; each screen fits one page at 1536 and 1920 and scrolls inside its list. */
+.safety-page { --sw-green: #1d7a3e; --sw-red: #c62828; --sw-amber: #b86e00; }
+.safety-page .head .title h1 { white-space: nowrap; }
+.sw-counts { display: block; margin-top: 4px; font-size: 17px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.sw-counts b.g { color: var(--sw-green); } .sw-counts b.r { color: var(--sw-red); } .sw-counts b.a { color: var(--sw-amber); }
+.safety-page .head .actions.in-head.top-row a.button, .safety-page .head .actions.in-head.top-row button { white-space: nowrap; }
+.sw-top { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font-weight: 700; font-size: 16px; line-height: 1.2; font-family: inherit; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.sw-top.pri { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.sw-top:disabled { opacity: .5; cursor: default; }
+
+/* The walk: areas on the left, the list on the right. */
+.sw-split { flex: 1; min-height: 0; display: grid; grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 14px; padding: 0 16px; }
+.sw-split > * { min-height: 0; }
+.sw-areas { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px; overflow: auto; }
+.sw-areas button { display: flex; width: 100%; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font-weight: 700; font-size: 16px; line-height: 1.2; font-family: inherit; text-align: left; cursor: pointer; }
+.sw-areas button small { color: var(--muted); font-size: 15px; font-weight: 600; white-space: nowrap; }
+.sw-areas button.on { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.sw-areas button.on small { color: #d5e6f5; }
+.sw-areas button.done small { color: var(--sw-green); }
+.sw-areas button.on.done small { color: #c9f1d6; }
+.sw-areas button.issues { border-left: 6px solid var(--sw-red); }
+.sw-list { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: auto; scroll-padding-top: 56px; }
+.sw-sec { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; padding: 10px 14px; background: var(--band); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
+.sw-sec h2 { margin: 0; font-size: 20px; color: var(--ud-blue-dark); }
+.sw-sec span { color: var(--muted); font-size: 16px; font-weight: 600; }
+table.sw-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+table.sw-table td { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; padding: 8px 12px; border-bottom: 1px solid #e3eaf1; font-size: 16px; vertical-align: middle; }
+table.sw-table td.sw-do { width: 1%; white-space: nowrap; text-align: right; }
+table.sw-table td.sw-state { width: 130px; white-space: nowrap; }
+.sw-how { display: block; color: var(--muted); font-size: 15px; font-weight: 600; margin-top: 2px; }
+.sw-how a { color: var(--ud-blue); }
+.sw-nc { color: var(--muted); font-style: italic; font-weight: 600; }
+.sw-btn { display: inline-block; min-width: 104px; margin-left: 8px; padding: 8px 16px; border: 2px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted); font-weight: 800; font-size: 16px; line-height: 1.2; font-family: inherit; cursor: pointer; text-align: center; }
+.sw-btn:disabled { cursor: default; opacity: .7; }
+.sw-btn.good[aria-pressed="true"] { background: var(--sw-green); border-color: var(--sw-green); color: #fff; opacity: 1; }
+.sw-btn.bad[aria-pressed="true"] { background: var(--sw-red); border-color: var(--sw-red); color: #fff; opacity: 1; }
+.sw-btn.open[aria-pressed="true"] { background: var(--sw-amber); border-color: var(--sw-amber); color: #fff; opacity: 1; }
+tr.sw-more td { background: #fff6f6; border-left: 6px solid var(--sw-red); }
+.sw-more-grid { display: grid; grid-template-columns: minmax(0, 1fr) 200px minmax(0, 300px); gap: 14px; align-items: start; }
+.sw-label { display: block; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.sw-more textarea { width: 100%; min-height: 54px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-weight: 600; font-size: 16px; line-height: 1.3; font-family: inherit; color: var(--ink); background: #fff; }
+.sw-photo { display: flex; align-items: center; gap: 8px; }
+.sw-photo label, .sw-photo button { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 6px 14px; border: 2px dashed var(--line); border-radius: 8px; color: var(--ud-blue); background: #fff; font-weight: 700; font-size: 16px; line-height: 1.2; font-family: inherit; cursor: pointer; }
+.sw-photo button { border-style: solid; min-height: 40px; }
+.sw-photo img { width: 72px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); cursor: zoom-in; }
+.sw-photo input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.sw-check { display: flex; gap: 8px; align-items: flex-start; font-size: 16px; cursor: pointer; }
+.sw-check input { width: 22px; height: 22px; margin: 0; flex: none; }
+.sw-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 15px; font-weight: 800; letter-spacing: .03em; white-space: nowrap; }
+.sw-pill.green { background: #e7f6ec; color: var(--sw-green); } .sw-pill.red { background: #fde8e8; color: var(--sw-red); }
+.sw-pill.amber { background: #fff1dc; color: var(--sw-amber); } .sw-pill.blue { background: var(--band); color: var(--ud-blue); }
+.sw-empty { padding: 14px; color: var(--muted); font-size: 16px; }
+.sw-foot { padding: 8px 16px 0; color: var(--muted); font-size: 16px; }
+.sw-bigphoto { position: fixed; inset: 0; z-index: 900; background: rgba(0, 0, 0, .8); display: grid; place-items: center; cursor: zoom-out; }
+.sw-bigphoto img { max-width: 92vw; max-height: 90vh; border-radius: 8px; }
+
+/* Open Issues, Fire Extinguishers and Past Walks: one table that scrolls under a sticky header. */
+.sw-sheet { flex: 1; min-height: 0; overflow: auto; margin: 0 16px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+table.sw-grid { width: 100%; border-collapse: collapse; }
+table.sw-grid:not(:has(colgroup)) { table-layout: auto; }
+table.sw-grid th { position: sticky; top: 0; z-index: 1; background: var(--band); color: var(--ud-blue-dark); text-align: left; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.sw-grid td { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; padding: 8px 10px; border-bottom: 1px solid #e3eaf1; font-size: 16px; vertical-align: middle; }
+table.sw-grid td.nw { white-space: nowrap; }
+table.sw-grid tr.fixed td { color: var(--muted); }
+table.sw-grid input, table.sw-grid select { width: 100%; min-width: 0; font-weight: 600; font-size: 16px; line-height: 1.2; font-family: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
+table.sw-grid tr.sw-add td { background: #f7fafd; }
+.sw-small { min-width: 0; padding: 6px 12px; margin: 0; border-width: 1px; color: var(--ud-blue); }
+.sw-filter { display: flex; gap: 6px; }
+.sw-filter button { min-height: 40px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font-weight: 700; font-size: 16px; line-height: 1.2; font-family: inherit; cursor: pointer; white-space: nowrap; }
+.sw-filter button[aria-pressed="true"] { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+
+/* The monthly check of one extinguisher (mock-up F): big buttons, tag order, works on a tablet. */
+.sw-ext { max-width: 1100px; width: 100%; margin: 0 auto; padding: 0 16px; overflow: auto; }
+.sw-ext h2 { margin: 4px 0 2px; font-size: 30px; color: var(--ud-blue-dark); }
+.sw-ext .sw-how { font-size: 17px; }
+.sw-bi { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-top: 10px; }
+.sw-bi > span { flex: 1; font-size: 19px; }
+.sw-bi .sw-btn { min-width: 150px; padding: 13px 20px; font-size: 19px; }
+.sw-nav { display: flex; gap: 12px; margin: 14px 0 10px; }
+.sw-nav .sw-top { font-size: 19px; padding: 12px 24px; }
+.sw-nav .sw-top.pri { margin-left: auto; }
+
+/* Checklist Setup. */
+.sw-setup td input[type="text"] { width: 100%; }
+.sw-setup td.area { font-weight: 800; color: var(--ud-blue-dark); }
+
+/* Tablet and narrow windows: one column, the areas become a row of buttons, rows stack with big buttons. */
+@media (max-width: 1100px) {
+  .sw-split { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .sw-areas { display: flex; gap: 6px; overflow-x: auto; padding: 6px; }
+  .sw-areas button { width: auto; flex: none; margin: 0; }
+  table.sw-table tr:not(.sw-more) td { display: block; border-bottom: 0; }
+  table.sw-table tr:not(.sw-more) { display: block; border-bottom: 1px solid #e3eaf1; padding: 4px 0; }
+  table.sw-table td.sw-do { text-align: left; width: auto; }
+  table.sw-table td.sw-state { width: auto; }
+  .sw-btn { min-width: 46%; margin: 4px 1% 0 0; padding: 12px; font-size: 18px; }
+  .sw-more-grid { grid-template-columns: 1fr; }
+  .sw-bi { flex-wrap: wrap; }
+  .sw-bi > span { flex-basis: 100%; }
+  .sw-bi .sw-btn { flex: 1; }
+}

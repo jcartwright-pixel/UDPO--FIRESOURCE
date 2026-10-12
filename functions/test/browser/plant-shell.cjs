@@ -1,6 +1,6 @@
 'use strict';
 /*
- * Browser check of the plant screens in the new shell (Joe 10/10): the Plant Operations side reaches all 11 plant screens,
+ * Browser check of the plant screens in the new shell (Joe 10/10): the Plant Distribution side reaches all 11 plant screens,
  * every plant screen has Back and Home, and each screen's buttons and filters sit on one line at the top (the buttons the same
  * height). Runs on the made-up plant at 1920 and 1366 wide.
  */
@@ -51,16 +51,16 @@ const SCREENS = [
   const browser = await chromium.launch();
   const results = [];
   try {
-    // The Plant Operations side (Joe 10/10): its name opens the Manager Center cards; the menu lists the cards in the same
+    // The Plant Distribution side (Joe 10/10): its name opens the Manager Center cards; the menu lists the cards in the same
     // order, a card with more than one area opens its screens beside it, and together they reach all 11 plant screens.
     const side = await openPage(browser, 1920, 950, '/manager.html' + MANAGER);
     await side.waitForSelector('#screen:not([hidden])');
-    assert.equal(await side.getAttribute('.sidemenu a.side-name', 'href'), 'manager.html', 'Plant Operations opens Manager Center');
-    assert.ok(await side.$('.sidemenu a.side-name.on'), 'Manager Center is the Plant Operations screen');
+    assert.equal(await side.getAttribute('.sidemenu a.side-name', 'href'), 'manager.html', 'Plant Distribution opens Manager Center');
+    assert.ok(await side.$('.sidemenu a.side-name.on'), 'Manager Center is the Plant Distribution screen');
     assert.deepEqual(await side.$$eval('.sidemenu > a:not(.side-name):not(#go-home), .sidemenu > .side-sec > .side-sec-btn', x => x.map(e => e.textContent.replace(/[\u25b8]/g, '').trim())),
       ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks']);
     const hrefs = await side.$$eval('.sidemenu a[href], .side-flyouts a[href]', a => a.map(x => x.getAttribute('href').split(/[?#]/)[0]));
-    for (const [page] of SCREENS) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Operations side menu: ' + JSON.stringify(hrefs));
+    for (const [page] of SCREENS) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Distribution side menu: ' + JSON.stringify(hrefs));
     assert.equal(await side.$('.mc-menu, aside'), null, 'Manager Center has no menu of its own');
     const grid = await side.$eval('#grid', g => g.getBoundingClientRect().left - document.querySelector('.sidemenu').getBoundingClientRect().right);
     assert.ok(grid < 40, 'the Manager Center cards start right beside the side menu: ' + grid);
@@ -99,7 +99,7 @@ const SCREENS = [
     await unl.goto(HOSTING + '/unloading.html' + MANAGER);
     await unl.waitForSelector('[data-mode="check"][aria-selected="true"]', { timeout: 8000 }); // Check Off again, not the mode last used
     await unl.close();
-    results.push('Plant Operations side reaches all 11 plant screens, Manager Center included; a menu click opens each screen\'s default view');
+    results.push('Plant Distribution side reaches all 11 plant screens, Manager Center included; a menu click opens each screen\'s default view');
 
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       for (const [page, line, parts] of SCREENS) {

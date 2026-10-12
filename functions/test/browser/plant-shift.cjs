@@ -1,6 +1,6 @@
 'use strict';
 /*
- * Browser check of Shift Notes (Incident & Breakdown Log) on the made-up plant: the desktop form as the current app, an entry
+ * Browser check of Shift Notes on the made-up plant: the desktop form as the current app, an entry
  * saved box by box (no Save button, the shift from the time) on another open screen's 24-hour log at once, a review note and
  * status that save as they are changed, and the phone form.
  * One entry from earlier in the day is seeded with the real clock, since the log keeps the last 24 hours. Pictures go to SHOTS_DIR.
@@ -52,11 +52,26 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
   const browser = await chromium.launch();
   const results = [];
   try {
-    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+    for (const [w, h] of [[1920, 950], [1536, 730], [1366, 650]]) {
       const page = await openPage(browser, w, h, '/shiftnotes.html' + MANAGER);
       await page.waitForSelector('#fields .sn-entry');
+      // Joe 10/12: the page holds anything that happened on the shift, so it is the Shift Report Log, not the Incident & Breakdown Log.
+      assert.deepEqual([await page.textContent('.head h1'), await page.title()], ['Shift Report Log', 'Shift Report Log · New Plant Operations']);
       // Joe 10/11: a Shift drop-down that starts on the shift now; no Save button (each box saves as it is left).
-      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'Shift', 'Reading Time', 'Entry / Measurements', 'Notes / Follow-up', 'Follow-up']);
+      // Joe 10/12: a Breakdown (the form it opens on) is recorded with the machine, when it went down, what happened, what
+      // fixed it and when it was back up; a Maintenance Request says what's wrong and how long it can wait.
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'What broke', 'Shift', 'Down at', 'What happened?', 'What fixed it', 'Back up at', 'Notes / Follow-up', 'Follow-up']);
+      // Joe 10/12: "We should just be able to type in what's broke ... Not a list": a plain box, no machine list under it.
+      assert.equal(await page.$eval('.sn-equip', x => x.getAttribute('list')), null, 'What broke is a plain typing box');
+      assert.equal(await page.$('datalist'), null, 'no machine list');
+      await page.selectOption('.sn-type', 'Maintenance Request');
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'What broke', 'Shift', 'Can it wait?', 'What\'s wrong?', 'Notes / Follow-up', 'Follow-up']);
+      assert.equal(await page.inputValue('.sn-urgency'), '', 'Can it wait starts blank');
+      await fits(page, 'Shift Notes Maintenance Request ' + w + 'x' + h);
+      await shots(page, 'shiftnotes-request', w);
+      await page.selectOption('.sn-type', 'Handoff');
+      assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'Shift', 'Reading Time', 'Entry / Measurements', 'Notes / Follow-up', 'Follow-up'], 'the other kinds keep the form they had');
+      await page.selectOption('.sn-type', 'Breakdown');
       assert.equal(await page.$('#record'), null, 'Shift Notes has no Save button');
       assert.match(await page.inputValue('#shift-now'), /^(FIRST|SECOND|THIRD) SHIFT$/);
       await fits(page, 'Shift Notes ' + w + 'x' + h);
@@ -73,6 +88,24 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     const desk = await openPage(browser, 1920, 950, '/shiftnotes.html' + MANAGER);
     await watcher.waitForFunction(() => document.querySelectorAll('#history .sn-card').length === 1);
     await desk.waitForSelector('#fields .sn-entry');
+    // Joe 10/12: the Type drop-down and the left buttons stay in step both ways, heading and counts follow, typed words stay.
+    const side = () => desk.evaluate(() => ({ active: [...document.querySelectorAll('#lines .active')].map(x => x.dataset.kind), title: document.getElementById('kind-title').textContent, count: document.getElementById('kind-count').textContent, fresh: document.getElementById('new-title').textContent, type: document.querySelector('.sn-type').value, equip: document.querySelector('.sn-equip').value }));
+    await desk.selectOption('.sn-type', 'Incident');
+    let now = await side();
+    assert.deepEqual(now.active, ['Incident'], 'changing Type moves the highlight on the left');
+    assert.equal(now.title, 'Incidents');
+    assert.match(now.count, /^\d+ in the last 24 hours · \d+ still open$/);
+    assert.match(now.fresh, /^New incident/);
+    await desk.fill('.sn-equip', 'Filler 4');
+    await desk.click('#lines [data-kind="Quality"]');
+    now = await side();
+    assert.deepEqual([now.active, now.title, now.type, now.equip], [['Quality'], 'Quality', 'Quality', 'Filler 4'], 'a left button sets the Type and keeps what is typed');
+    assert.match(now.fresh, /^New quality note/);
+    await desk.selectOption('.sn-type', 'Handoff');
+    now = await side();
+    assert.deepEqual([now.active, now.title, now.equip], [['Handoff'], 'Handoff', 'Filler 4']);
+    assert.match(now.count, /^\d+ in the last 24 hours$/);
+    results.push('Type drop-down and left buttons stay in step both ways; heading and counts follow; typed words kept');
     await desk.selectOption('.sn-type', 'Safety');
     await desk.fill('.sn-equip', 'Cooler 2 floor');
     await desk.press('.sn-equip', 'Tab');
@@ -105,7 +138,11 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     if (SHOTS) await watcher.screenshot({ path: path.join(SHOTS, 'shiftnotes-reviewed-1920.png'), scale: 'css' });
     const phone = await openPage(browser, 412, 860, '/shiftnotes.html' + MANAGER);
     await phone.waitForSelector('#fields .sn-entry');
+    // Joe 10/12: the phone's Breakdown form has the machine, down at, back up at and what fixed it too; other kinds keep theirs.
+    assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'What broke', 'Down at', 'Back up at', 'What happened?', 'What fixed it', 'Follow-up']);
+    await phone.selectOption('.sn-type', 'Handoff');
     assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'Equipment / area', 'What happened?', 'Next steps Optional', 'Follow-up']);
+    await phone.selectOption('.sn-type', 'Breakdown');
     assert.equal(await phone.$('#record'), null, 'no Save button on the phone');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'shiftnotes-phone-412.png'), scale: 'css' });
     assert.equal(await phone.isVisible('[data-pane="history"]'), false, 'no log tab on the phone');

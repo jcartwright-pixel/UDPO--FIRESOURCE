@@ -175,7 +175,7 @@ test('Quality: the copy brings the lines and their last checks; Record Quality C
   assert.deepEqual([totes.product, totes.status, totes.qualityCheck, totes.notes], ['Orange drink', 'REVIEW', 'PASS', 'Cap torque low']);
 });
 
-/* ---------- Shift Notes (Incident & Breakdown Log) ---------- */
+/* ---------- Shift Notes ---------- */
 test('Shift Notes: an entry and a review note under it are saved, kept by the next copy, and show on the 24-hour log', async () => {
   const s = (fields) => applyAction(db(), DISPATCHER, Object.assign({ action: 'saveShiftNote', requestId: rid() }, fields));
   await assert.rejects(s({ values: { Type: 'Breakdown' } }), /Enter report information before saving/);

@@ -26,6 +26,7 @@
     <div class="topbar">
       <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
       <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
+      <button type="button" class="gs-nav" id="change" hidden>Change Station</button>
       <span class="who" id="who"></span>
       <button id="signout" type="button">Sign out</button>
     </div>
@@ -36,7 +37,10 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="ds-grid">
+      <!-- Joe 10/12: once Administration > Driver Station Codes has kiosk codes, the kiosk types its code once. -->
+      <div id="release-box" hidden></div>
+      <section id="code-box" hidden></section>
+      <div class="ds-grid" id="ds-grid">
         <section class="ds-board" aria-label="Today's loadout">
           <div class="ds-row ds-headrow"><span>ROUTE</span><span>RUN</span><span>DRIVER</span><span>TRAILER</span><span>CASES</span><span>LOAD STATUS</span><span>PICKUP</span></div>
           <div class="ds-scroll" id="board-scroll"><div id="board"></div></div>
@@ -52,9 +56,10 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as W from './js/weather.js';
+    import { resolveStation, askCode, askRelease, remember } from './js/station-code.js';
 
     // The current app's Driver Room board and TV (DriverLoadoutPickup.html, 052_V749). Read only. In the new app it opens with a
     // United Dairy sign-in (no branch code); "Driver Room TV" is the old DISPLAY mode: dark, no menu, notes shown, both lists roll.
@@ -136,8 +141,40 @@
     document.getElementById('refresh').addEventListener('click', () => { sig = ''; weekSig = ''; render(); });
     window.udBack = () => { if (full) { location.search = ''; return true; } return false; };
 
+    // The kiosk from its code (Administration > Driver Station Codes): a plant can have more than one kiosk and TV.
+    const CODE_KEY = 'udKioskCode', stationCall = (op, f) => callServer('stationRelease', Object.assign({ op }, f));
+    const eyebrow = document.getElementById('eyebrow').textContent;
+    let kiosk = null;
+    async function gate(msg) {
+      const r = msg !== undefined ? { needCode: true, message: msg } : await resolveStation('KIOSK', CODE_KEY, stationCall);
+      const show = (asking) => { document.getElementById('code-box').hidden = !asking; document.getElementById('ds-grid').hidden = asking; document.getElementById('foot').hidden = asking; };
+      if (r.needCode) {
+        kiosk = null; document.getElementById('change').hidden = true; show(true);
+        kiosk = await askCode(document.getElementById('code-box'), { kind: 'KIOSK', storeKey: CODE_KEY, call: stationCall, title: 'Enter this kiosk\'s code',
+          hint: 'A manager gives each Driver Room kiosk and TV its code (Administration > Driver Station Codes). The kiosk remembers it after this.', message: r.message });
+        // A TV's code typed on the tablet link opens the TV display (no buttons, both lists rolling).
+        if (kiosk.type === 'TV' && !full) { location.replace(location.pathname + '?tv=1'); return; }
+      } else kiosk = r.station || null;
+      show(false);
+      document.getElementById('change').hidden = !kiosk || full;
+      document.getElementById('eyebrow').textContent = kiosk ? kiosk.name + ' · ' + kiosk.plant : eyebrow;
+      sig = ''; weekSig = ''; render();
+    }
+    document.getElementById('change').addEventListener('click', async () => {
+      const ok = await askRelease(document.getElementById('release-box'), { status: () => stationCall('status', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown' }),
+        release: (code) => stationCall('release', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown', code }), onError: showError });
+      if (!ok) return;
+      kiosk = null; remember(CODE_KEY, null); gate().catch(err => showError(err.message));
+    });
+
     requireSignIn(async () => {
       const { db } = await start();
+      await gate().catch(err => showError('Could not check this kiosk\'s code: ' + (err.message || err)));
+      // A new code or a removed kiosk sends it back to the code screen (checked every 5 minutes).
+      setInterval(async () => {
+        if (!kiosk) return;
+        try { const r = await stationCall('check', { kind: 'KIOSK', key: kiosk.key, version: kiosk.version }); if (!r.ok) { remember(CODE_KEY, null); gate(r.message).catch(() => {}); } } catch (e) { /* offline: keep the kiosk */ }
+      }, 300000);
       const week = L.weekStart(date), err = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       // The board updates the moment Dispatch or the plant saves (no 10-minute wait).
       onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', [week, L.addDays(week, 7)])), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); updated = new Date(); render(); }, err('the loads'));

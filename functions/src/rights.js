@@ -113,7 +113,8 @@ const ACTION_RIGHT = Object.freeze({
   setWeekReason: 'dispatch.write', saveDriverTemplate: 'drivers.write', saveOtr: 'otr.write', saveScorecard: 'drivers.write', saveOpsAssignment: 'drivers.write',
   savePlantLoad: 'plant.loading.write', reorderPlantLoads: 'plant.loading.write', addPickup: 'customerPickup.write', completePickup: 'customerPickup.write', saveUnloading: 'plant.unloading.write', addReturn: 'plant.unloading.write',
   completeWash: 'plant.washing.complete', savePlantSchedule: 'operations.write', saveYardCheck: 'plant.write', saveQualityCheck: 'plant.write', saveShiftNote: 'plant.write',
-  saveTemperatureCheck: 'plant.write', sendPlantReport: 'plant.report.send', saveMachineProducts: 'plant.settings.write', saveProductSetup: 'plant.settings.write', saveProductUpload: 'plant.settings.write', savePlantShifts: 'plant.settings.write', sendToGarage: 'issues.write'
+  saveTemperatureCheck: 'plant.write', sendPlantReport: 'plant.report.send', saveMachineProducts: 'plant.settings.write', saveProductSetup: 'plant.settings.write', saveProductUpload: 'plant.settings.write', savePlantShifts: 'plant.settings.write', sendToGarage: 'issues.write',
+  saveSafetyWalk: 'plant.write', saveSafetyIssue: 'plant.write', saveExtinguisherCheck: 'plant.write', saveExtinguisher: 'plant.settings.write', saveSafetyChecklist: 'plant.settings.write'
 });
 
 // templates: { ROLE: [codes] } saved in Role Templates (a role not there keeps its defaults).

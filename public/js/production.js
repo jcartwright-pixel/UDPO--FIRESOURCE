@@ -11,7 +11,7 @@ const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
 // shift changes (checked each minute). nowFn lets a test set the clock.
 export function watchProduction(db, facilityId, cb, fail, nowFn) {
   const now = nowFn || (() => Date.now());
-  const data = { setup: [], products: {}, counters: {}, shifts: [], runs: {}, shift: null, read: { setup: false, products: false } };
+  const data = { setup: [], products: {}, counters: {}, lineInfo: {}, shifts: [], runs: {}, shift: null, read: { setup: false, products: false } };
   const send = () => {
     const lines = U().productionLines(data.setup.filter(d => plantOf(d) === facilityId));
     cb(Object.assign({}, data, { lines }));
@@ -33,7 +33,7 @@ export function watchProduction(db, facilityId, cb, fail, nowFn) {
   const subs = [
     onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); data.read.setup = true; send(); }, fail),
     watchProducts(db, p => { data.products = p; data.read.products = true; send(); }, fail),
-    onSnapshot(collection(db, 'productionLines'), s => { data.counters = {}; s.docs.forEach(d => { const v = d.data(); data.counters[v.operationId] = v.counter; }); send(); }, () => {}),
+    onSnapshot(collection(db, 'productionLines'), s => { data.counters = {}; data.lineInfo = {}; s.docs.forEach(d => { const v = d.data(); data.counters[v.operationId] = v.counter; data.lineInfo[v.operationId] = v; }); send(); }, () => {}),
     onSnapshot(doc(db, 'plantShifts', facilityId), s => { data.shifts = s.exists() ? s.data().shifts || [] : []; watchRuns(); send(); }, () => {})
   ];
   const tick = setInterval(() => { watchRuns(); send(); }, 30000);

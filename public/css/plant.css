@@ -388,7 +388,7 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
   .quality-page .qc-heads { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* ---------- Incident & Breakdown Log (shiftnotes.html); it borrows the quality form styles ---------- */
+/* ---------- Shift Notes (shiftnotes.html); it borrows the quality form styles ---------- */
 .shift-page .sn-form { margin: 0; flex: 1 1 auto; min-height: 0; }
 /* Option A (Joe 10/10): kinds of entry on the left, open items carried over on top, the new entry below; no shift to pick. */
 .shift-page .sn-since { display: inline-flex; align-items: center; gap: 6px; height: 44px; border: 1px solid #b8cadb; border-radius: 9px; padding: 0 12px; font-size: 15px; font-weight: 700; color: var(--ink); background: #fff; white-space: nowrap; }
@@ -885,3 +885,40 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
 /* Products (Joe 10/11): UPC, speeds, Target % and shelf life on the same row; numbers centred, headings may wrap. */
 .products-page .pm-table input.pm-num { padding: 0 6px; text-align: center; }
 .products-page .pm-table thead th { white-space: normal; line-height: 1.15; }
+/* Joe 10/12: Product Sheet rows are for reading; the ⋮ before a product opens its Edit panel. */
+.products-page .pm-table td { height: 46px; font-size: 16px; color: var(--ink); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.products-page .pm-table td.pm-namecell { text-align: left; font-weight: 700; }
+.products-page .pm-table tbody tr[data-row] { cursor: default; }
+.products-page .pm-table tbody tr[data-row]:hover td { background: #f1f6fb; }
+.products-page .pm-dots { width: 34px; height: 34px; margin-right: 8px; vertical-align: middle; border: 1px solid #9fb3c8; border-radius: 8px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 22px; font-weight: 900; line-height: 1; cursor: pointer; }
+.products-page .pm-dots:hover, .products-page .pm-dots:focus-visible { background: var(--ud-blue-dark); color: #fff; }
+.products-page .pm-name em { font-style: normal; color: var(--muted); }
+.products-page .pm-check .pm-val { color: #9a5b00; font-weight: 800; }
+.products-page .pm-edit-back { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(7, 32, 58, .45); }
+.products-page .pm-edit-back[hidden] { display: none; }
+.products-page .pm-edit { width: min(860px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, .3); padding: 18px 22px 16px; box-sizing: border-box; }
+.products-page .pm-edit-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.products-page .pm-edit-head h2 { margin: 2px 0 0; font-size: 24px; color: var(--ud-blue-dark); }
+.products-page .pm-edit-head .eyebrow { font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.products-page .pm-edit-head .rp-btn { min-width: 120px; }
+.products-page .pm-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
+.products-page .pm-field { display: flex; flex-direction: column; gap: 4px; font-size: 16px; font-weight: 800; color: var(--ud-blue-dark); }
+.products-page .pm-field.wide { grid-column: 1 / -1; }
+.products-page .pm-field small { font-size: 14px; font-weight: 600; color: var(--muted); }
+.products-page .pm-field input, .products-page .pm-field select { height: 42px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; font-weight: 600; color: var(--ink); background: #fff; box-sizing: border-box; width: 100%; }
+.products-page .pm-field .pm-other { margin-top: 6px; }
+.products-page .pm-edit-note { margin: 12px 0 0; min-height: 20px; font-size: 16px; color: #1d6b3a; font-weight: 700; }
+.products-page .pm-edit-note.bad { color: #a32020; }
+@media (max-width: 700px) { .products-page .pm-edit-grid { grid-template-columns: 1fr; } }
+
+/* Shift Notes (Joe 10/12): a breakdown's down and back up times, and what maintenance did with a request. */
+.shift-page .qc-fields .half { grid-column: span 2; }
+.shift-page .qc-fields .half textarea { min-height: 70px; }
+.shift-page .sn-down { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 6px 0; padding: 7px 10px; border-radius: 8px; background: #f6f9fc; font-size: 16px; }
+.shift-page .sn-down label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--muted); }
+.shift-page .sn-down input { height: 38px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; }
+.shift-page .sn-down .sn-fixbox { flex: 1 1 260px; min-width: 0; }
+.shift-page .sn-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.shift-page .sn-pill.red { background: #fde8e8; color: #b42318; } .shift-page .sn-pill.green { background: #e3f4e8; color: #1d6b37; }
+.shift-page .sn-pill.amber { background: #fff1dc; color: #8a5200; } .shift-page .sn-pill.blue { background: #e8f0f8; color: var(--ud-blue); }
+@media (max-width: 1400px) { .shift-page .qc-fields .half { grid-column: span 1; } }

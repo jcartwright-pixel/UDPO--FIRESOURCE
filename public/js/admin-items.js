@@ -8,9 +8,10 @@ export const ADMIN_GROUPS = [
     ['access-codes', 'Access & QR Codes', 'A revocable phone link and QR code for each employee: Generate, Regenerate (press twice) and Text the link (texting is off).', '', 'pin']
   ]],
   ['Links & Codes', 'Every link and code people use to reach the app, each where it belongs', [
-    ['app-links', 'Manager Links', 'The links for managers and office staff: United Dairy Operations, the phone link, Manager Web App and personal phone links: copy, print a QR, open.', '', 'swap'],
-    ['station-codes', 'Plant Station Codes', 'The Plant Station and Garage Station tablet links (copy, print a QR, open) and each plant\'s manager release code: New code (press twice to replace).', '', 'factory'],
-    ['driver-codes', 'Driver Station Codes', 'The Driver Station and TV link and the drivers\' phone link with its Route Distribution code: copy, print a QR, open, new code, and turn the phone link off (press twice).', '', 'people']
+    ['app-links', 'Manager Links', 'The links for managers and office staff: United Dairy Operations, the phone link, Manager Web App, personal phone links and Phone Screens (try every screen): copy, print a QR, Launch (opens in a new window).', '', 'swap'],
+    ['station-codes', 'Plant Station Codes', 'The one Plant Station link (copy, print a QR, open), then the stations: + Add Station, each station\'s code (typed on the tablet to open that station), New code, Remove; and each plant\'s manager release code to move a tablet.', '', 'factory'],
+    ['garage-codes', 'Garage Station Codes', 'The Garage Station and Maintenance Station links (copy, print a QR, Launch in a new window), then the garage stations: + Add Station, each station\'s code, New code, Remove.', '', 'gear'],
+    ['driver-codes', 'Driver Station Codes', 'The Driver Station and Driver Room TV links (copy, print a QR, open) with their kiosks (+ Add Kiosk, a code for each Driver Room tablet or TV), and the drivers\' phone link with its Route Distribution code: new code, turn it off (press twice).', '', 'people']
   ]],
   ['Email & Schedules', 'Where email goes, how often, and how often the app refreshes', [
     ['repair-email', 'Repair Email', 'Where repair email goes (Idealease, Penske, owned units), on or off, how often for each lessor, the digest hour, and Send now.', '', 'alert'],
@@ -29,7 +30,7 @@ export const ADMIN_GROUPS = [
     ['switch', 'Which App Runs Each Screen', 'On the Route Distribution page, an administrator clicks a screen\'s tag twice to run it from the new app, and turns the write-back on or off.', 'distribution.html', 'swap']
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
-    ['machine-products', 'Products', "Each plant's products by area and group: the Product drop-down on Quality Checks. Add or change a product, or load the whole list from the template.", 'products.html', 'production.webp'],
+    ['machine-products', 'Product Sheet', "Each plant's product sheet by area and group: every detail of each product, and the Product drop-down on Quality Checks. Add or edit a product, or load the whole list from the template.", 'products.html', 'production.webp'],
     ['plant-shifts', 'Plant Shifts', 'Each plant\'s Distribution and Plant Production shifts (Uniontown distribution: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week']
   ]],
   // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.
@@ -40,11 +41,9 @@ export const ADMIN_GROUPS = [
     ['gps', 'GPS Setup', 'The Verizon Connect sign-in and a plain pass or fail test.', 'gps.html', 'pin'],
     ['fleet-setup', 'Fleet Service Setup', 'Service rules: PM miles, reefer months, DOT and plate warnings.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp']
   ]],
-  ['System Tools', 'Stations and checks', [
-    ['window-test', 'Window Test Center', 'Opens every screen at each window size to check nothing is cut off.', '', 'check'],
-    ['driver-station', 'Driver Station', 'The driver board and check-in station.', 'driver-station.html', 'distribution-truck-v1-560.webp'],
-    ['plant-station', 'Plant Station', 'The plant floor tablet: pick its station, then Loading, Unloading, Washing and Returns.', 'plant-station.html', 'plant-building-v1-560.webp'],
-    ['phone-screens', 'Phone Screens', 'Every phone, tablet and kiosk screen with its link (Driver Check-In, Garage and Plant Station, Driver Room kiosk and TV), to try from this computer.', 'phone-screens.html', 'people']
+  ['System Tools', 'Checks', [
+    // Joe 10/12: Driver Station, Plant Station and Phone Screens moved to Links & Codes, where Launch opens them in a new window.
+    ['window-test', 'Window Test Center', 'Opens every screen at each window size to check nothing is cut off.', '', 'check']
   ]],
   ['Diagnostics', 'Checks and repairs for the data behind the app', [
     ['preflight', 'Run Runtime Pre-Flight', 'Checks every sheet, column and setting the app needs and lists anything missing.', '', 'check'],

@@ -28,7 +28,7 @@
  *   - Boxing records no cycle time; Raypak no cycle time or weight; Totes and HTST #1 and #2 no cycle time, weight or tip test;
  *   - the overall result is Pass (RUNNING), Review, Fail (DOWN) or Finished; the 24-hour history lists every line's checks.
  *
- * And Shift Notes' (the Incident & Breakdown Log, desktopUiSavePlantShiftReportV5008 / handoffLogHtmlV7250):
+ * And Shift Notes' (the Shift Report Log page, the Incident & Breakdown Log until Joe 10/12; desktopUiSavePlantShiftReportV5008 / handoffLogHtmlV7250):
  *   - an entry has a type, equipment / area, shift, reading time, what happened, next steps and a follow-up status;
  *   - a review note hangs under its entry and the entry's status is its newest review's; the log shows the last 24 hours;
  *   - the shift by the hour: 6 AM to 2:59 PM first, 3 PM to 11:59 PM second, midnight to 5:59 AM third.
@@ -47,7 +47,7 @@
  *   - Quality: lines, lines down (DOWN or a FAIL label check), tip tests and fails in 24 hours, the last weight, checks in 24 hours;
  *   - Shift Notes: handoff entries, other issues, entries not resolved, all entries in 24 hours;
  *   - the report: a load not done whose depart time is 30 minutes away or past is behind; breakdowns are Breakdown entries of the
- *     Incident & Breakdown Log not resolved; the subject is "Plant Update <time>: N routes behind" or "All routes on time".
+ *     Shift Notes not resolved; the subject is "Plant Update <time>: N routes behind" or "All routes on time".
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -390,9 +390,13 @@
   }
 
 
-  /* ---------- Shift Notes (Incident & Breakdown Log) ---------- */
-  var SHIFT_TYPE = 'SHIFT_REPORT', SHIFTS = ['FIRST SHIFT', 'SECOND SHIFT', 'THIRD SHIFT'], ENTRY_TYPES = ['Breakdown', 'Incident', 'Safety', 'Quality', 'Handoff', 'Other'],
+  /* ---------- Shift Notes ---------- */
+  var SHIFT_TYPE = 'SHIFT_REPORT', SHIFTS = ['FIRST SHIFT', 'SECOND SHIFT', 'THIRD SHIFT'], ENTRY_TYPES = ['Breakdown', 'Maintenance Request', 'Incident', 'Safety', 'Quality', 'Handoff', 'Other'],
     FOLLOW_UPS = ['OPEN', 'MONITOR', 'RESOLVED'];
+  // Joe 10/12: a big breakdown is fixed on the spot (maintenance called in person) and only recorded: the machine, when it went down
+  // (the entry's time), when it was back up and what fixed it. An issue that can wait is a Maintenance Request, which goes on
+  // maintenance's list; how long it can wait is one of URGENCIES.
+  var URGENCIES = ['This shift', 'This week', 'When you can'];
   function shiftAt(ms) { var h = Math.floor(((wallClock(ms) % 1440) + 1440) % 1440 / 60); return h >= 6 && h <= 14 ? 'FIRST SHIFT' : h >= 15 ? 'SECOND SHIFT' : 'THIRD SHIFT'; }
   function followLabel(v) { v = text(v).toUpperCase() || 'OPEN'; return v === 'RESOLVED' ? 'Resolved' : v === 'MONITOR' ? 'Monitor' : 'Needs attention'; }
   // One shift report record, whether the sheet's journal wrote it or the app did.
@@ -400,7 +404,22 @@
     var p = payloadOf(d), v = p.values || {};
     return { entryId: text(p.entryId || d.recordId), section: text(p.section || d.area).toUpperCase(), shift: text(p.shift || d.shift).toUpperCase(), readingTime: text(p.readingTime),
       type: text(v.Type), equipment: text(v.Equipment), entry: text(v.Entry), parentId: text(v.ParentId), notes: text(p.notes !== undefined ? p.notes : d.notes),
-      followUpStatus: text(p.followUpStatus || 'OPEN').toUpperCase(), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), inApp: !!d.createdInApp };
+      followUpStatus: text(p.followUpStatus || 'OPEN').toUpperCase(), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), inApp: !!d.createdInApp,
+      upAt: text(v.UpAt), fix: text(v.Fix), urgency: text(v.Urgency) };
+  }
+  // Minutes a breakdown was down: from its down time (the entry's time) to back up (same day, or the next if earlier), or to
+  // nowMs while it is still down. null without a down time.
+  function minutesOfDay(hhmm) { var m = /^(\d{1,2}):(\d\d)$/.exec(text(hhmm)); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+  function downMinutes(r, nowMs) {
+    var down = minutesOfDay(r && r.readingTime);
+    if (down === null) return null;
+    var up = minutesOfDay(r.upAt);
+    if (up !== null) return (up - down + 1440) % 1440;
+    var at = when(r.recordedAt);
+    if (!at || !nowMs) return null;
+    var atWall = wallClock(at), downWall = atWall - atWall % 1440 + down;
+    if (downWall > atWall + 1) downWall -= 1440;
+    return Math.max(0, wallClock(nowMs) - downWall);
   }
   // The log of the last 24 hours, newest first; each entry with its reviews (oldest first) and its status now.
   // hours: how far back (24 by default); Shift Notes and the report look back further for open items carried over.
@@ -415,13 +434,15 @@
     all.forEach(function (r) { if (r.parentId && ids[r.parentId]) (kids[r.parentId] = kids[r.parentId] || []).push(r); else parents.push(r); });
     return parents.map(function (r) {
       var reviews = (kids[r.entryId] || []).slice().reverse();
-      return Object.assign({}, r, { reviews: reviews, status: (reviews.length ? reviews[reviews.length - 1] : r).followUpStatus });
+      // A review that says when the machine was back up (and what fixed it) closes the breakdown's down time.
+      var up = reviews.filter(function (x) { return x.upAt; }).pop();
+      return Object.assign({}, r, { reviews: reviews, status: (reviews.length ? reviews[reviews.length - 1] : r).followUpStatus, upAt: up ? up.upAt : r.upAt, fix: up && up.fix ? up.fix : r.fix });
     });
   }
 
   // Shift Notes option A (Joe 10/10) in the report: open breakdowns every time until resolved (carried over when logged before
   // the last report), the breakdowns fixed since the last report, the shift handoff and the other entries since then.
-  var OTHER_TYPES = ['INCIDENT', 'SAFETY', 'QUALITY', 'OTHER'];
+  var OTHER_TYPES = ['MAINTENANCE REQUEST', 'INCIDENT', 'SAFETY', 'QUALITY', 'OTHER'];
   function shiftReport(log, roundStart) {
     var since = when(roundStart) || 0, fresh = function (at) { return !since || when(at) > since; };
     var kind = function (r) { return text(r.type).toUpperCase(); };
@@ -609,7 +630,7 @@
     L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': no route is more than ' + r.behindMinutes + ' minutes past its depart time'));
     r.behind.forEach(function (x) { L.push('  ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.startedAt ? ' since ' + x.startedAt : '') + '  ' + x.late + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '')); });
     L.push('');
-    L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in the Incident & Breakdown Log'));
+    L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in Shift Notes'));
     r.down.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + (d.at ? '  logged ' + d.at : '') + (d.shift ? ' ' + d.shift.toLowerCase() : '') + '  ' + d.status + (d.carried ? '  (carried over)' : '') + (d.review ? '  review ' + d.reviewAt + ': ' + d.review : '')); });
     if ((r.fixed || []).length) { L.push(''); L.push('FIXED SINCE LAST REPORT (' + r.fixed.length + ')'); r.fixed.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + '  RESOLVED' + (d.reviewAt ? ' ' + d.reviewAt : '') + (d.review ? ': ' + d.review : '')); }); }
     if ((r.handoff || []).length) { L.push(''); L.push('SHIFT HANDOFF (' + r.handoff.length + ')'); r.handoff.forEach(function (d) { L.push('  ' + (d.shift ? d.shift.toLowerCase() + ' ' : '') + (d.at || '') + ': ' + [d.entry, d.notes].filter(Boolean).join(' · ')); }); }
@@ -690,7 +711,7 @@
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
-    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
+    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
     REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, reportText: reportText, reportHtml: reportHtml };

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Fire Extinguishers · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/safety.css">
+  <script src="js/logic.js"></script>
+  <script src="js/safety-rules.js"></script>
+</head>
+<body class="fill safety-page ext-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Fire Extinguishers</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1 id="title">Fire Extinguishers</h1><span class="sw-counts" id="counts"></span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <button type="button" class="sw-top pri" id="start-check" data-top>Start Monthly Check</button>
+      <a class="sw-top" href="safety.html" data-top>Weekly Walk</a>
+      <a class="sw-top" href="safety-issues.html" data-top>Open Issues</a>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view" id="list-view">
+      <div class="sw-sheet">
+        <table class="sw-grid">
+          <colgroup><col style="width:6%"><col style="width:21%"><col style="width:9%"><col style="width:7%"><col style="width:14%"><col style="width:12%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:6%"></colgroup>
+          <thead><tr><th>Tag</th><th>Location</th><th>Type</th><th>Size</th><th>This month</th><th>Checked</th><th>Annual service</th><th>6-year</th><th>Hydro test</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="sw-foot" id="foot"></div>
+    </div>
+    <div class="view" id="check-view" hidden>
+      <div class="sw-ext" id="check"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { today, thisMonth, monthName, pickPlant, plantName, canWalk, canSetUp, modeText, watchExtinguishers } from './js/safety.js';
+
+    // Fire Extinguishers (Joe 10/12, mock-ups E and F): each plant's extinguishers with this month's check (OSHA asks for a
+    // monthly look at every one) and the annual service, 6-year and hydrostatic test dates, which turn amber 30 days out and
+    // red when past. Check opens the big-button check of one extinguisher; Next goes to the next tag. A manager or
+    // administrator keeps the list: each box saves as it is left; the empty row at the bottom adds one.
+    const S = window.UDSafety;
+    const params = new URLSearchParams(location.search);
+    let db = null, person = null, app = {}, plant = '', exts = null, stop = null, checking = params.get('tag') || '', chain = Promise.resolve();
+    const mine = {}, armed = {};
+    const month = thisMonth();
+    const DATES = [['annualDue', 'Annual service'], ['sixYearDue', '6-year'], ['hydroDue', 'Hydro test']];
+    const extOf = (id) => (exts || []).find(e => e.id === id);
+    const stateOf = (e) => S.extMonth({ checks: Object.assign({}, e.checks || {}, mine[e.id] ? { [month]: { items: Object.assign({}, ((e.checks || {})[month] || {}).items || {}, mine[e.id]) } } : {}) }, month);
+    const duePill = (key) => { const st = S.dueState(key, today()); return !key ? '' : st === 'PAST' ? '<span class="sw-pill red">' + shortDate(key) + '</span>' : st === 'SOON' ? '<span class="sw-pill amber">' + shortDate(key) + '</span>' : shortDate(key); };
+    const statePill = (m) => m.state === 'GOOD' ? '<span class="sw-pill green">GOOD</span>' : m.state === 'NOT_GOOD' ? '<span class="sw-pill red">NOT GOOD</span> <span class="sw-how">' + escapeHtml(m.bad.join('; ')) + '</span>' : '<span class="sw-pill amber">DUE</span>';
+    const typeSel = (k, v, dis) => '<select data-k="' + k + '" aria-label="Type"' + dis + '><option value=""></option>' + S.EXT_TYPES.map(t => '<option' + (t === v ? ' selected' : '') + '>' + escapeHtml(t) + '</option>').join('') + '</select>';
+
+    function drawHead() {
+      document.getElementById('mode-text').textContent = modeText(app);
+      document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
+      document.getElementById('title').textContent = 'Fire Extinguishers · ' + monthName(month);
+      const list = exts || [], st = list.map(stateOf);
+      document.getElementById('counts').innerHTML = list.length + ' on the list · <b class="g">' + st.filter(m => m.state === 'GOOD').length + ' Good</b> · <b class="a">' + st.filter(m => m.state === 'DUE').length + ' Due</b> · <b class="r">' + st.filter(m => m.state === 'NOT_GOOD').length + ' Not good</b>';
+      document.getElementById('start-check').hidden = !!checking || !list.length || !canWalk(person, app);
+    }
+    function drawList(force) {
+      if (force !== true && document.getElementById('rows').contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+      if (!exts) { document.getElementById('rows').innerHTML = '<tr><td colspan="10" class="sw-empty">Reading the extinguishers…</td></tr>'; return; }
+      const set = canSetUp(person, app), dis = set ? '' : ' disabled';
+      const box = (e, k, v, ph, label) => set ? '<input data-k="' + k + '" value="' + escapeHtml(v || '') + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' aria-label="' + label + '">' : escapeHtml(v || '');
+      const dateBox = (e, k, label) => set ? '<input data-k="' + k + '" value="' + escapeHtml(e[k] ? shortDate(e[k]) : '') + '" placeholder="3-15-27" aria-label="' + label + ' for tag ' + escapeHtml(e.tag) + '">' + (S.dueState(e[k], today()) === 'PAST' ? '<span class="sw-pill red">PAST DUE</span>' : S.dueState(e[k], today()) === 'SOON' ? '<span class="sw-pill amber">DUE SOON</span>' : '') : duePill(e[k]);
+      document.getElementById('rows').innerHTML = exts.map(e => {
+        const m = stateOf(e);
+        return '<tr data-id="' + escapeHtml(e.id) + '"><td><b>' + escapeHtml(e.tag) + '</b></td><td>' + box(e, 'location', e.location, '', 'Location of tag ' + escapeHtml(e.tag)) + '</td><td>' + (set ? typeSel('type', e.type, dis) : escapeHtml(e.type || '')) + '</td>' +
+          '<td>' + box(e, 'size', e.size, '10 lb', 'Size of tag ' + escapeHtml(e.tag)) + '</td><td>' + statePill(m) + '</td><td class="nw">' + (m.at ? shortDate(m.at) + (m.byName ? ' · ' + escapeHtml(m.byName) : '') : '<span class="sw-nc">Not checked</span>') + '</td>' +
+          DATES.map(([k, l]) => '<td>' + dateBox(e, k, l) + '</td>').join('') +
+          '<td class="nw">' + (canWalk(person, app) ? '<button type="button" class="sw-btn sw-small" data-check="' + escapeHtml(e.id) + '">Check</button>' : '') + (set ? ' <button type="button" class="sw-btn sw-small" data-retire="' + escapeHtml(e.id) + '" title="Take tag ' + escapeHtml(e.tag) + ' off the list">' + (armed[e.id] ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>';
+      }).join('') + (set ? '<tr class="sw-add" data-new="1"><td><input data-k="tag" placeholder="Tag" aria-label="New tag number" maxlength="12"></td><td><input data-k="location" placeholder="Where it hangs" aria-label="New location"></td><td>' + typeSel('type', '', '') + '</td><td><input data-k="size" placeholder="10 lb" aria-label="New size"></td><td colspan="2" class="sw-how">Type a tag and where it hangs to add it.</td>' +
+        DATES.map(([k, l]) => '<td><input data-k="' + k + '" placeholder="3-15-27" aria-label="New ' + l + '"></td>').join('') + '<td></td></tr>' : '') +
+        (!exts.length && !set ? '<tr><td colspan="10" class="sw-empty">No extinguishers on the list yet. A manager or administrator adds them here.</td></tr>' : '');
+      document.getElementById('foot').textContent = (set ? 'Each box saves as you leave it. ' : '') + 'This month: Good when all five items are Good. A Not good stays on Open Issues until it is fixed. Dates turn amber 30 days before they are due and red when past.';
+    }
+    function drawCheck() {
+      const list = exts || [], i = list.findIndex(e => e.id === checking), e = list[i];
+      if (!e) { checking = ''; return false; }
+      const m = stateOf(e), done = list.filter(x => stateOf(x).state === 'GOOD').length, ed = canWalk(person, app), prev = list[i - 1], next = list[i + 1];
+      const last = Object.keys(e.checks || {}).filter(k => k < month).sort().pop(), lc = last && e.checks[last];
+      document.getElementById('check').innerHTML = '<span class="eyebrow">Monthly extinguisher check · ' + done + ' of ' + list.length + ' done</span>' +
+        '<h2>Tag ' + escapeHtml(e.tag) + ' · ' + escapeHtml(e.location) + '</h2><span class="sw-how">' + escapeHtml([e.type, e.size].filter(Boolean).join(' · ')) + (e.annualDue ? ' · annual service due ' + shortDate(e.annualDue) : '') + (lc ? ' · last checked ' + shortDate(lc.at) + (lc.byName ? ' by ' + escapeHtml(lc.byName) : '') : '') + '</span>' +
+        S.EXT_ITEMS.map(([k, t]) => { const v = m.items[k] || '';
+          return '<div class="sw-bi"><span>' + escapeHtml(t) + (v ? '' : '<span class="sw-how sw-nc">Not checked</span>') + '</span>' +
+            [['GOOD', '&#10003; Good', 'good'], ['NOT_GOOD', '&#10007; Not good', 'bad']].map(([s, l, c]) => '<button type="button" class="sw-btn ' + c + '" data-item="' + k + '" data-v="' + s + '" aria-pressed="' + (v === s) + '"' + (ed ? '' : ' disabled') + '>' + l + '</button>').join('') + '</div>'; }).join('') +
+        (m.state === 'NOT_GOOD' ? '<div class="sw-bi"><span><span class="sw-label">What is wrong</span><textarea class="sw-ext-note" data-note="1" maxlength="300" aria-label="What is wrong with tag ' + escapeHtml(e.tag) + '"' + (ed ? '' : ' disabled') + ' style="width:100%;min-height:54px;font-weight:600;font-size:17px;line-height:1.3;font-family:inherit;border:1px solid var(--line);border-radius:8px;padding:8px">' + escapeHtml(m.note) + '</textarea></span></div>' : '') +
+        '<div class="sw-nav">' + (prev ? '<button type="button" class="sw-top" data-go="' + escapeHtml(prev.id) + '">&larr; Tag ' + escapeHtml(prev.tag) + '</button>' : '') + '<button type="button" class="sw-top" data-go="">Back to the list</button>' +
+        (next ? '<button type="button" class="sw-top pri" data-go="' + escapeHtml(next.id) + '">Next: Tag ' + escapeHtml(next.tag) + ' ' + escapeHtml(next.location) + ' &rarr;</button>' : '') + '</div>';
+      return true;
+    }
+    function render(force) {
+      if (!plant) return;
+      const showCheck = !!checking && exts && drawCheck();
+      document.getElementById('list-view').hidden = !!showCheck;
+      document.getElementById('check-view').hidden = !showCheck;
+      drawHead();
+      if (!showCheck) drawList(force);
+    }
+    function send(action, fields, undo) {
+      const run = chain.then(() => save(action, fields));
+      chain = run.catch(() => {});
+      return run.then(() => showError(''), err => { if (undo) undo(); showError(err); render(); });
+    }
+    const rowFields = (e) => ({ facilityId: plant, tag: e.tag, location: e.location || '', type: e.type || '', size: e.size || '', annualDue: e.annualDue || '', sixYearDue: e.sixYearDue || '', hydroDue: e.hydroDue || '' });
+    document.getElementById('rows').addEventListener('change', e => {
+      const t = e.target, tr = t.closest('tr');
+      if (!tr || !canSetUp(person, app) || !t.dataset.k) return;
+      if (tr.dataset.new) {
+        const v = (k) => (tr.querySelector('[data-k="' + k + '"]') || {}).value || '';
+        if (!v('tag').trim() || !v('location').trim()) return;
+        send('saveExtinguisher', { isNew: true, facilityId: plant, tag: v('tag').trim(), location: v('location').trim(), type: v('type'), size: v('size').trim(), annualDue: v('annualDue').trim(), sixYearDue: v('sixYearDue').trim(), hydroDue: v('hydroDue').trim() })
+          .then(() => {
+            // Added: the list shows it at once and the empty row is ready for the next one.
+            render(true);
+            const tag = document.querySelector('#rows tr[data-new] input[data-k="tag"]');
+            if (tag) tag.focus();
+          });
+        return;
+      }
+      const ext = extOf(tr.dataset.id);
+      if (!ext) return;
+      send('saveExtinguisher', Object.assign(rowFields(ext), { [t.dataset.k]: t.value.trim() }));
+    });
+    document.getElementById('rows').addEventListener('click', e => {
+      const c = e.target.closest('[data-check]');
+      if (c) { checking = c.dataset.check; history.replaceState(null, '', '?tag=' + encodeURIComponent(checking)); render(); return; }
+      const r = e.target.closest('[data-retire]');
+      if (!r) return;
+      const id = r.dataset.retire, ext = extOf(id);
+      if (!armed[id]) { armed[id] = true; render(); setTimeout(() => { delete armed[id]; render(); }, 4000); return; }
+      delete armed[id];
+      if (ext) send('saveExtinguisher', Object.assign(rowFields(ext), { retired: true }));
+    });
+    document.getElementById('check').addEventListener('click', e => {
+      const g = e.target.closest('[data-go]');
+      if (g) { checking = g.dataset.go; history.replaceState(null, '', checking ? '?tag=' + encodeURIComponent(checking) : location.pathname); render(); document.getElementById('check').scrollTop = 0; return; }
+      const b = e.target.closest('.sw-btn[data-item]');
+      if (!b || !canWalk(person, app)) return;
+      const id = checking, k = b.dataset.item, status = b.getAttribute('aria-pressed') === 'true' ? '' : b.dataset.v;
+      mine[id] = Object.assign({}, mine[id] || {}, { [k]: status });
+      render();
+      send('saveExtinguisherCheck', { extinguisherId: id, month, item: k, status }, () => { delete mine[id][k]; });
+    });
+    document.getElementById('check').addEventListener('change', e => { if (e.target.dataset.note && canWalk(person, app)) send('saveExtinguisherCheck', { extinguisherId: checking, month, note: e.target.value.trim() }); });
+    document.getElementById('start-check').addEventListener('click', () => {
+      const list = exts || [], first = list.find(x => stateOf(x).state !== 'GOOD') || list[0];
+      if (first) { checking = first.id; history.replaceState(null, '', '?tag=' + encodeURIComponent(checking)); render(); }
+    });
+    function follow() {
+      if (stop) stop();
+      exts = null; render();
+      stop = watchExtinguishers(db, plant, list => {
+        exts = list;
+        // Taps that have reached the saved check.
+        Object.keys(mine).forEach(id => { const e = list.find(x => x.id === id), saved = e && e.checks && e.checks[month] && e.checks[month].items || {}; Object.keys(mine[id]).forEach(k => { if ((saved[k] || '') === mine[id][k]) delete mine[id][k]; }); });
+        render();
+      }, e => showError('Could not read the extinguishers (' + e.message + '). Check the network and reload the page.'));
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        if (!plant) { plant = pickPlant(person, params.get('plant') || (checking.split('__')[0] || '')); follow(); } else render();
+      });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(); });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Open Issues · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/safety.css">
+  <script src="js/logic.js"></script>
+  <script src="js/safety-rules.js"></script>
+</head>
+<body class="fill safety-page issues-list-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Open Issues</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1>Open Issues</h1><span class="sw-counts" id="counts"></span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <a class="sw-top pri" href="safety.html" data-top>Start Walk</a>
+      <a class="sw-top" href="extinguishers.html" data-top>Fire Extinguishers</a>
+      <div class="sw-filter" id="filter" data-top><button type="button" data-f="OPEN" aria-pressed="true">Open</button><button type="button" data-f="FIXED" aria-pressed="false">Fixed</button><button type="button" data-f="ALL" aria-pressed="false">All</button></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="sw-sheet">
+        <table class="sw-grid">
+          <thead><tr><th>Found</th><th>Area</th><th>What is wrong</th><th>Found by</th><th>Open</th><th>Walks</th><th>Photo</th><th>Plant Maintenance</th><th>Status</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="sw-foot" id="foot">Every Not good lands here and comes back at the top of the next walk until someone marks it Fixed. Over 30 days turns red. The same item Not good on more than one walk shows REPEAT. Plant Maintenance picks up the ones marked to go once that module is ready.</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
+    import { doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { today, pickPlant, plantName, canWalk, modeText, watchIssues, agePill, maintText } from './js/safety.js';
+
+    // Open Issues (Joe 10/12, mock-up D): every Not good from the walks and the extinguisher checks, carried over until fixed.
+    // Mark Fixed (who and when are saved) and Reopen; Send to Plant Maintenance is a box that saves when it changes.
+    const S = window.UDSafety;
+    const params = new URLSearchParams(location.search);
+    let db = null, person = null, app = {}, plant = '', issues = null, filter = 'OPEN', stop = null, chain = Promise.resolve();
+    const armed = {};
+    const editable = () => canWalk(person, app);
+    function render() {
+      document.getElementById('mode-text').textContent = modeText(app);
+      document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
+      document.querySelectorAll('#filter [data-f]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === filter)));
+      if (!issues) { document.getElementById('rows').innerHTML = '<tr><td colspan="10" class="sw-empty">Reading the issues…</td></tr>'; return; }
+      const openList = issues.filter(i => i.status === 'OPEN'), long = openList.filter(i => S.daysOpen(i, today()) > S.LONG_OPEN_DAYS).length, maint = openList.filter(i => i.sendToMaint).length;
+      document.getElementById('counts').innerHTML = '<b class="r">' + openList.length + ' open</b> · <b class="r">' + long + ' over 30 days</b> · ' + maint + ' marked for Plant Maintenance';
+      const rows = issues.filter(i => filter === 'ALL' || i.status === filter).sort((a, b) => (a.status === b.status ? 0 : a.status === 'OPEN' ? -1 : 1) || String(b.foundOn).localeCompare(String(a.foundOn)));
+      const dis = editable() ? '' : ' disabled';
+      document.getElementById('rows').innerHTML = rows.map(i => {
+        const fixed = i.status === 'FIXED', walks = (i.walks || []).length;
+        return '<tr' + (fixed ? ' class="fixed"' : '') + ' data-id="' + escapeHtml(i.id) + '"><td class="nw">' + shortDate(i.foundOn) + '</td><td>' + escapeHtml(i.area) + '</td><td><b>' + escapeHtml(i.item) + '</b>' + (i.note ? '<span class="sw-how">' + escapeHtml(i.note) + '</span>' : '') + (i.lastNote ? '<span class="sw-how">Last walk: ' + escapeHtml(i.lastNote) + '</span>' : '') + '</td>' +
+          '<td class="nw">' + escapeHtml(i.foundByName || i.foundBy || '') + '</td><td class="nw">' + agePill(i) + '</td><td class="nw">' + (walks > 1 ? '<span class="sw-pill red">REPEAT · ' + walks + '</span>' : walks || '') + '</td>' +
+          '<td>' + (i.photo ? '<button type="button" class="sw-btn sw-small" data-photo="' + escapeHtml(i.id) + '">Photo</button>' : '') + '</td>' +
+          '<td><label class="sw-check"><input type="checkbox" data-maint="' + escapeHtml(i.id) + '"' + (i.sendToMaint ? ' checked' : '') + (fixed ? ' disabled' : dis) + '>' + maintText(i) + '</label></td>' +
+          '<td class="nw">' + (fixed ? '<span class="sw-pill green">FIXED ' + shortDate(i.fixedOn) + (i.fixedByName ? ' · ' + escapeHtml(i.fixedByName) : '') + '</span>' : '<span class="sw-pill red">OPEN</span>') + '</td>' +
+          '<td class="nw">' + (editable() ? '<button type="button" class="sw-btn sw-small" data-op="' + (fixed ? 'reopen' : 'fixed') + '" data-id="' + escapeHtml(i.id) + '">' + (armed[i.id] ? 'Press again' : fixed ? 'Reopen' : 'Mark Fixed') + '</button>' : '') + '</td></tr>';
+      }).join('') || '<tr><td colspan="10" class="sw-empty">' + (filter === 'OPEN' ? 'No open issues. Everything found on the walks has been fixed.' : 'Nothing here yet.') + '</td></tr>';
+    }
+    function send(fields) {
+      const run = chain.then(() => save('saveSafetyIssue', fields));
+      chain = run.catch(() => {});
+      return run.then(() => showError(''), err => { showError(err); render(); });
+    }
+    document.getElementById('rows').addEventListener('click', async e => {
+      const p = e.target.closest('[data-photo]');
+      if (p) {
+        const s = await getDoc(doc(db, 'safetyPhotos', p.dataset.photo)).catch(() => null);
+        if (!s || !s.exists()) { showError('That photo could not be read.'); return; }
+        const d = document.createElement('div'); d.className = 'sw-bigphoto'; d.innerHTML = '<img alt="Photo">'; d.firstChild.src = s.data().data; d.addEventListener('click', () => d.remove()); document.body.appendChild(d);
+        return;
+      }
+      const b = e.target.closest('[data-op]');
+      if (!b || !editable()) return;
+      // Mark Fixed and Reopen are pressed twice (no pop-ups), so a stray tap changes nothing.
+      const id = b.dataset.id;
+      if (!armed[id]) { armed[id] = true; render(); setTimeout(() => { delete armed[id]; render(); }, 4000); return; }
+      delete armed[id];
+      send({ op: b.dataset.op, issueId: id });
+    });
+    document.getElementById('rows').addEventListener('change', e => { const t = e.target; if (t.dataset.maint && editable()) send({ op: 'maint', issueId: t.dataset.maint, maint: t.checked }); });
+    document.getElementById('filter').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filter = b.dataset.f; render(); } });
+    function follow() {
+      if (stop) stop();
+      issues = null; render();
+      stop = watchIssues(db, plant, list => { issues = list; render(); }, e => showError('Could not read the issues (' + e.message + '). Check the network and reload the page.'));
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render();
+      });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(); });
+    });
+  </script>
+</body>
+</html>

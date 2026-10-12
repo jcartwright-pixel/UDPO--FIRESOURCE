@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>PM Schedule · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/pmaint.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+  <script src="js/pmaint-rules.js"></script>
+</head>
+<body class="fill pm-page pms-page">
+  <div class="signin" id="signin" hidden>
+    <h1>PM Schedule</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Maintenance · <span id="plant-name"></span></span><h1>PM Schedule</h1></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <div class="actions in-head">
+        <button type="button" class="pm-btn pri" id="add">+ Add PM Task</button>
+        <select id="machine" class="pm-pick" aria-label="Machine"></select>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="notice ok" id="saved" hidden></div>
+    <div class="view">
+      <div class="pm-kpis" id="kpis"></div>
+      <section class="pm-panel" aria-label="PM schedule">
+        <div class="pm-add" id="form" hidden>
+          <label>Machine<select class="pm-input" id="f-machine"></select></label>
+          <label>Every<input class="pm-input" id="f-every" type="number" min="1" max="999" value="1"></label>
+          <label>&nbsp;<select class="pm-input" id="f-unit"><option value="DAYS">days</option><option value="WEEKS">weeks</option><option value="MONTHS" selected>months</option></select></label>
+          <label>Last done<input class="pm-input" id="f-last" type="date"></label>
+          <label>What is the PM? (saves when you leave it)<input class="pm-input" id="f-task" maxlength="120" placeholder="Grease the bearings"></label>
+        </div>
+        <div class="pm-scroll">
+          <table class="pm-table">
+            <thead><tr><th>Machine</th><th>PM</th><th>How often</th><th>Last done</th><th>Next due</th><th>Maintenance</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { watchMaint, plantFor } from './js/pmaint.js';
+
+    // PM Schedule (Joe 10/12, mock-up D): every PM task of the plant, Overdue first, then this week (Sunday to Saturday), the
+    // next 30 days and later. Each box saves when it is left; the next due day comes from the day last done. Send to Maintenance
+    // puts a PM on the Maintenance Station as a work order; when the mechanic finishes it, Last done moves to that day.
+    const L = window.UDLogic, R = window.UDPlantMaint;
+    const params = new URLSearchParams(location.search);
+    let plant = params.get('plant') || '', only = params.get('machine') || '', person = null, app = {}, data = null, db = null, stop = null, adding = false, pending = false;
+    let busy = Promise.resolve();
+    const doing = new Set();
+    const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const day = (k) => (/^\d{4}-\d\d-\d\d/.test(String(k || '')) ? shortDate(String(k).slice(0, 10)) : '');
+    const setUrl = () => history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (only ? '&machine=' + encodeURIComponent(only) : ''));
+    const SECTIONS = [['LATE', 'Overdue'], ['WEEK', 'This week'], ['SOON', 'Next 30 days'], ['LATER', 'Later'], ['NEW', 'Never done (type its Last done day)']];
+
+    function drawTop() {
+      const pl = plantFor(person, plant);
+      if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
+      document.getElementById('plant-name').textContent = pl.name;
+      const ms = data ? data.machines : [];
+      if (data && only && !ms.some(m => m.id === only)) only = '';
+      document.getElementById('machine').innerHTML = opt('', only, 'All Machines') + ms.map(m => opt(m.id, only, m.name)).join('');
+      document.getElementById('add').disabled = !canSave();
+      document.getElementById('add').textContent = adding ? 'Close' : '+ Add PM Task';
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      const form = document.getElementById('form');
+      form.hidden = !adding;
+      const fm = document.getElementById('f-machine');
+      if (!form.contains(document.activeElement)) fm.innerHTML = opt('', '', '') + ms.map(m => opt(m.id, fm.value || only, m.name)).join('');
+    }
+
+    function drawList() {
+      // A box being typed in is never redrawn under the typing (it redraws when it is left); a box only tabbed into keeps its focus.
+      const tbody = document.getElementById('rows'), act = document.activeElement;
+      const inRows = tbody.contains(act) && act.matches('input, select'), was = inRows && act.closest('[data-id]');
+      if (inRows && act.matches('input') && act.value !== act.defaultValue) { pending = true; return; }
+      const keep = was ? [was.dataset.id, act.dataset.k] : null;
+      pending = false;
+      const ck = canSave(), dis = ck ? '' : ' disabled';
+      const tasks = (data ? data.tasks : []).filter(t => !only || t.machineId === only);
+      const kpi = (n, label, c) => '<div class="' + (n ? c : 'zero') + '"><b>' + n + '</b><span>' + label + '</span></div>';
+      const n = (s) => tasks.filter(t => t.state === s).length;
+      document.getElementById('kpis').innerHTML = kpi(n('LATE'), 'Overdue', 'red') + kpi(n('WEEK'), 'Due this week', 'amber') + kpi(n('SOON'), 'Next 30 days', '') + kpi(tasks.filter(t => t.sent).length, 'With maintenance', '') + kpi(tasks.length, 'PM tasks', '');
+      const row = (t) => {
+        const id = escapeHtml(t.id);
+        const due = t.state === 'LATE' ? '<span class="pm-pill red">' + day(t.due) + ' · ' + t.late + ' day' + (t.late === 1 ? '' : 's') + ' late</span>' : t.state === 'WEEK' ? '<span class="pm-pill amber">' + day(t.due) + '</span>' : day(t.due);
+        const send = t.sent ? '<span class="pm-pill blue">Sent · ' + escapeHtml(t.sent.woNumber) + '</span>' : ck && t.due ? '<button type="button" class="pm-btn" data-send="' + id + '"' + (doing.has(t.id) ? ' disabled' : '') + '>Send to Maintenance</button>' : '';
+        return '<tr data-id="' + id + '"><td><b>' + escapeHtml(t.machine) + '</b>' + (t.area ? '<small>' + escapeHtml(t.area) + '</small>' : '') + '</td>' +
+          '<td><input class="pm-input" data-k="task" maxlength="120" value="' + escapeHtml(t.task || '') + '"' + dis + '></td>' +
+          '<td class="every"><input class="pm-input" data-k="every" type="number" min="1" max="999" value="' + escapeHtml(t.every || 1) + '"' + dis + '> <select class="pm-input" data-k="unit"' + dis + '>' +
+          R.UNITS.map(u => opt(u, t.unit, u.toLowerCase())).join('') + '</select></td>' +
+          '<td><input class="pm-input" data-k="lastDone" type="date" value="' + escapeHtml(t.lastDone || '') + '"' + dis + '></td>' +
+          '<td class="nowrap">' + due + '</td><td class="nowrap">' + send + '</td></tr>';
+      };
+      tbody.innerHTML = SECTIONS.map(([s, word]) => {
+        const mine = tasks.filter(t => t.state === s);
+        return mine.length ? '<tr class="sec"><td colspan="6">' + word + ' (' + mine.length + ')</td></tr>' + mine.map(row).join('') : '';
+      }).join('') || '<tr><td colspan="6" class="empty">' + (!data || !data.read.tasks ? 'Reading the PM schedule…' : 'No PM tasks yet. + Add PM Task puts one on the schedule.') + '</td></tr>';
+      const back = keep && tbody.querySelector('tr[data-id="' + CSS.escape(keep[0]) + '"] [data-k="' + keep[1] + '"]');
+      if (back) back.focus();
+    }
+    function render() {
+      drawTop(); drawList();
+      document.getElementById('foot').textContent = (canSave() ? 'Each box saves when you leave it. ' : 'View only: a manager or administrator changes the PM schedule. ') + 'Next due counts from Last done. When the Maintenance Station finishes a PM work order, Last done moves to that day.';
+    }
+    function flash(text) { const ok = document.getElementById('saved'); ok.textContent = text; ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 3000); }
+    function send(action, fields, key) {
+      if (key) doing.add(key);
+      const run = busy.then(() => save(action, fields));
+      busy = run.catch(() => {});
+      return run.then(r => { showError(''); flash((r && r.message) || 'Saved.'); return r; }, e => { showError((e.message || String(e)) + ' Change the box again to retry.'); return null; })
+        .finally(() => { if (key) doing.delete(key); render(); });
+    }
+
+    // A new task is made once it has a machine and what the PM is; the other boxes go with it.
+    document.getElementById('form').addEventListener('change', () => {
+      if (!canSave()) return;
+      const fields = { machineId: document.getElementById('f-machine').value, task: document.getElementById('f-task').value.trim(), every: Number(document.getElementById('f-every').value) || 1, unit: document.getElementById('f-unit').value };
+      const last = document.getElementById('f-last').value;
+      if (last) fields.lastDone = last;
+      if (!fields.machineId || !fields.task) return;
+      send('savePmTask', { facilityId: plant, fields }).then(r => { if (r) { adding = false; document.getElementById('f-task').value = ''; document.getElementById('f-last').value = ''; render(); } });
+    });
+    document.getElementById('rows').addEventListener('change', e => {
+      const t = e.target, tr = t.closest('[data-id]');
+      if (!tr || !t.dataset.k || !canSave()) return;
+      const v = t.dataset.k === 'every' ? Number(t.value) : t.value.trim();
+      send('savePmTask', { facilityId: plant, taskId: tr.dataset.id, fields: { [t.dataset.k]: v } });
+    });
+    document.getElementById('rows').addEventListener('focusout', () => { if (pending) setTimeout(() => { if (pending) render(); }, 0); });
+    document.getElementById('rows').addEventListener('click', e => {
+      const b = e.target.closest('[data-send]');
+      if (!b || b.disabled) return;
+      send('sendPmToMaintenance', { taskId: b.dataset.send }, b.dataset.send);
+    });
+    document.querySelector('.pm-page').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) e.target.blur(); });
+    document.getElementById('add').addEventListener('click', () => { if (!canSave()) return; adding = !adding; render(); if (adding) document.getElementById(only ? 'f-task' : 'f-machine').focus(); });
+    document.getElementById('machine').addEventListener('change', e => { only = e.target.value; setUrl(); render(); });
+    window.udBack = () => { if (adding) { adding = false; render(); return true; } return false; };
+
+    function follow() {
+      if (stop) stop();
+      data = null;
+      render();
+      stop = watchMaint(db, plant, d => { data = d; render(); }, e => showError('Could not read the PM schedule (' + e.message + '). Check the network and reload the page.'), { noJournal: true });
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; if (!stop) follow(); else render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+    });
+  </script>
+</body>
+</html>

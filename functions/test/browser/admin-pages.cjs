@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Browser check of Administration's own pages (Joe 10/10: "complete this"): People & Roles with + Add Person and + Add Role
- * pop-ups, Role Templates, Access & QR Codes, Manager Links, Plant Station Codes, Driver Station Codes, Manager Report Recipients, Sent Email
+ * pop-ups, Role Templates, Access & QR Codes, Manager Links, Plant Station Codes, Garage Station Codes, Driver Station Codes, Manager Report Recipients, Sent Email
  * Log and Remaining Repair Items all open inside the panel with their buttons on one line at the top; none says "Being built"
  * or "View only". Pictures go to SHOTS_DIR.
  */
@@ -12,6 +12,7 @@ const { chromium } = require('playwright');
 const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
+const localCalls = require('./local-calls.cjs');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -23,6 +24,7 @@ async function openPage(browser, width, height, url) {
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
+  await localCalls(page);
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(HOSTING + url);
@@ -106,22 +108,31 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     // Joe 10/11: each link where it belongs. Manager Links keeps the manager links; the tablet links go with Plant Station
     // Codes; the Driver Station and the drivers' phone link (with its Route Distribution code) go to Driver Station Codes.
     await open('app-links', '.ap-link');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['company', 'phone', 'manager', 'personal']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['company', 'phone', 'manager', 'screens', 'personal']);
+    // Joe 10/12: Launch opens the screen in a new window, so Administration stays where it was.
+    assert.deepEqual(await p.$$eval('.ap-link a.ap-btn', a => [...new Set(a.map(x => x.target))]), ['_blank']);
     await shot(p, 'app-links-1920.png');
     await shot(p, 'app-links-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
 
-    await open('driver-codes', '.ap-link');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
+    await open('driver-codes', '#st-list .ap-item');
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'tv', 'route']);
     await p.click('#al-new-code');
     await p.click('#al-new-code');
     await p.waitForSelector('.ap-code-row code');
     await shot(p, 'driver-station-codes-1920.png');
 
+    // Joe 10/12: one Plant Station link and the no-account phone app link, then the stations with their own codes; the
+    // Garage Station has its own page, and Driver Station Codes lists the kiosks (station-codes.cjs types the codes).
     await open('station-codes', '#sc-list .ap-item');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'garage']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'public']);
+    await p.waitForSelector('#st-list .ap-item');
+    assert.equal(await p.$$eval('#st-list .ap-item', l => l.length), 5);
     await p.click('#sc-list [data-plant="fac_uniontown"]');
     await p.waitForSelector('#sc-list code');
     await shot(p, 'plant-station-codes-1920.png');
+    await open('garage-codes', '#st-list .ap-item');
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['garage', 'maint']);
+    await shot(p, 'garage-station-codes-1920.png');
 
     await open('report-recipients', '#rr-list');
     await p.fill('#rr-new-name', 'Plant Management');

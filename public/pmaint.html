@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Maintenance Center · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/pmaint.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+  <script src="js/pmaint-rules.js"></script>
+</head>
+<body class="fill pm-page pmc-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Maintenance Center</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Maintenance · <span id="plant-name"></span></span><h1>Maintenance Center</h1></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <div class="actions in-head">
+        <a class="pm-btn" href="machinery.html">Machinery</a>
+        <a class="pm-btn" href="pmworkorders.html">Work Orders</a>
+        <a class="pm-btn" href="pmschedule.html">PM Schedule</a>
+        <a class="pm-btn" href="maint-station.html">Maintenance Station</a>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="notice ok" id="saved" hidden></div>
+    <div class="view">
+      <div class="pm-kpis" id="kpis"></div>
+      <div class="pmc-cols" id="cols">
+        <div class="pmc-left">
+          <section class="pm-panel"><h2>Requests <span class="n" id="n-req">0</span><small>issues that can wait</small></h2><div class="pm-scroll" id="requests"></div></section>
+          <section class="pm-panel"><h2>Breakdowns Today <span class="n" id="n-brk">0</span><small>recorded, not requested</small></h2><div class="pm-scroll" id="breakdowns"></div></section>
+        </div>
+        <section class="pm-panel"><h2>Open Work Orders <span class="n" id="n-wo">0</span><small>oldest first</small></h2><div class="pm-scroll" id="orders"></div></section>
+        <section class="pm-panel"><h2>PMs Due <span class="n" id="n-pm">0</span><small>overdue, then this week</small></h2><div class="pm-scroll" id="pms"></div></section>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { watchMaint, plantFor } from './js/pmaint.js';
+
+    // Maintenance Center (Joe 10/12, mock-up A): what the plant asked for (Shift Notes' Maintenance Requests), each made into a
+    // work order or marked already fixed; the breakdowns recorded today (fixed on the spot, not requested); the open work orders;
+    // and the PMs overdue or due this week, each sent to the Maintenance Station as a work order.
+    const L = window.UDLogic, R = window.UDPlantMaint, U = window.UDPlant;
+    const params = new URLSearchParams(location.search);
+    let plant = params.get('plant') || '', person = null, app = {}, data = null, db = null, stop = null;
+    const doing = new Set();
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES) && L.screenState(app, 'plant').open;
+    const canPm = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+    const day = (k) => (/^\d{4}-\d\d-\d\d/.test(String(k || '')) ? shortDate(String(k).slice(0, 10)) : '');
+    const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
+    const hm = (n) => n === null || n === undefined ? '' : n >= 60 ? Math.floor(n / 60) + ' h ' + (n % 60) + ' m' : n + ' min';
+    const who = (e) => String(e || '').split('@')[0];
+    const pill = (word, c) => '<span class="pm-pill ' + c + '">' + escapeHtml(word) + '</span>';
+    const WO_CLASS = { NEW: 'amber', WORKING: 'blue', PARTS: 'amber', DONE: 'green' };
+
+    function render() {
+      const pl = plantFor(person, plant);
+      if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
+      document.getElementById('plant-name').textContent = pl.name;
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      if (!data) return;
+      const today = data.today, ck = canSave(), ckPm = canPm();
+      const waiting = data.requests.filter(r => !r.workOrder && r.status !== 'RESOLVED');
+      const brToday = data.breakdowns.filter(b => b.stillDown || new Date(Date.parse(b.recordedAt)).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) === today);
+      const open = data.workOrders.filter(w => R.isOpen(w)).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+      const due = data.tasks.filter(t => t.state === 'LATE' || t.state === 'WEEK');
+      const downToday = brToday.reduce((n, b) => n + (b.down || 0), 0);
+      const kpi = (n, label, c) => '<div class="' + (n ? c : 'zero') + '"><b>' + n + '</b><span>' + label + '</span></div>';
+      document.getElementById('kpis').innerHTML = kpi(data.machines.filter(m => m.down).length, 'Machines down', 'red') + kpi(waiting.length, 'Requests waiting', 'amber') + kpi(open.length, 'Open work orders', '') +
+        kpi(open.filter(w => w.status === 'PARTS').length, 'Waiting on parts', 'amber') + kpi(due.filter(t => t.state === 'LATE').length, 'PMs overdue', 'red') + kpi(due.filter(t => t.state === 'WEEK').length, 'PMs due this week', '') +
+        '<div class="' + (downToday ? 'red' : 'zero') + '"><b>' + (downToday ? hm(downToday) : '0') + '</b><span>Down time today</span></div>';
+      document.getElementById('n-req').textContent = waiting.length;
+      document.getElementById('requests').innerHTML = waiting.map(r => '<div class="pmc-item amber"><b>' + escapeHtml(r.machine || 'Plant') + '</b> ' + pill('Request', 'amber') +
+        '<p>' + escapeHtml(r.entry) + '</p><small>' + escapeHtml([stamp(r.recordedAt), r.shift ? r.shift.toLowerCase() : '', who(r.recordedBy), r.urgency ? 'can wait: ' + r.urgency.toLowerCase() : ''].filter(Boolean).join(' · ')) + '</small>' +
+        (ck ? '<div class="row"><button type="button" class="pm-btn pri" data-make="' + escapeHtml(r.entryId) + '"' + (doing.has(r.entryId) ? ' disabled' : '') + '>Make Work Order</button><button type="button" class="pm-btn" data-fixed="' + escapeHtml(r.entryId) + '"' + (doing.has(r.entryId) ? ' disabled' : '') + '>Already Fixed</button></div>' : '') + '</div>').join('') ||
+        '<div class="pmc-empty">' + (data.read.journal ? 'No requests waiting. Shift Notes\' Maintenance Requests show here.' : 'Reading the requests…') + '</div>';
+      document.getElementById('n-brk').textContent = brToday.length;
+      document.getElementById('breakdowns').innerHTML = brToday.map(b => '<div class="pmc-item ' + (b.stillDown ? 'red' : '') + '"><b>' + escapeHtml(b.machine || 'Plant') + '</b> ' + pill('Breakdown', 'red') +
+        '<p>' + escapeHtml(b.entry) + (b.fix ? ' Fix: ' + escapeHtml(b.fix) : '') + '</p><small>' + (b.readingTime ? 'Down ' + escapeHtml(b.readingTime) + ' · ' : '') + (b.stillDown ? '<b class="pm-late">still down</b>' + (b.down !== null ? ' · ' + hm(b.down) + ' so far' : '') : (b.upAt ? 'back up ' + escapeHtml(b.upAt) + ' · ' : '') + (b.down !== null ? hm(b.down) : 'resolved')) + '</small></div>').join('') ||
+        '<div class="pmc-empty">No breakdowns recorded today.</div>';
+      document.getElementById('n-wo').textContent = open.length;
+      document.getElementById('orders').innerHTML = open.map(w => '<div class="pmc-item ' + (w.lineDown === 'YES' ? 'red' : w.status === 'PARTS' ? 'amber' : '') + '"><b>' + escapeHtml(w.woNumber + ' · ' + (w.machine || 'Plant')) + '</b> ' + pill(R.statusWord(w.status), WO_CLASS[w.status] || 'gray') +
+        '<p>' + escapeHtml(w.problem || '') + '</p><small>' + escapeHtml([w.source === 'PM' ? 'PM' : w.source === 'SHIFT_NOTES' ? 'Request' : 'Maintenance', stamp(w.createdAt), w.onNow ? w.onNow + ' on it' : w.status === 'NEW' ? 'not started' : ''].filter(Boolean).join(' · ')) + '</small></div>').join('') ||
+        '<div class="pmc-empty">No open work orders.</div>';
+      document.getElementById('n-pm').textContent = due.length;
+      document.getElementById('pms').innerHTML = due.map(t => '<div class="pmc-item ' + (t.state === 'LATE' ? 'red' : '') + '"><b>' + escapeHtml(t.machine) + '</b><p>' + escapeHtml(t.task) + '</p><small>' + escapeHtml(R.everyText(t.every, t.unit)) + ' · due ' + day(t.due) +
+        (t.state === 'LATE' ? ' · <b class="pm-late">' + t.late + ' day' + (t.late === 1 ? '' : 's') + ' late</b>' : '') + '</small><div class="row">' +
+        (t.sent ? pill('Sent · ' + t.sent.woNumber, 'blue') : ckPm ? '<button type="button" class="pm-btn" data-pm="' + escapeHtml(t.id) + '"' + (doing.has(t.id) ? ' disabled' : '') + '>Send to Maintenance</button>' : '') + '</div></div>').join('') ||
+        '<div class="pmc-empty">' + (data.tasks.length ? 'Nothing due this week.' : 'No PM tasks yet. PM Schedule adds them.') + '</div>';
+      document.getElementById('foot').textContent = 'Big breakdowns are fixed on the spot and recorded on Shift Notes; issues that can wait come in as Maintenance Requests. ' + (ck ? 'Make Work Order puts a request on the Maintenance Station.' : 'View only.');
+    }
+
+    async function act(key, action, fields, done) {
+      doing.add(key); render();
+      try { const r = await save(action, fields); showError(''); const ok = document.getElementById('saved'); ok.textContent = (r && r.message) || done; ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 3000); }
+      catch (e) { showError(e.message || String(e)); }
+      doing.delete(key); render();
+    }
+    document.getElementById('cols').addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b || b.disabled) return;
+      if (b.dataset.make) act(b.dataset.make, 'makeWorkOrder', { entryId: b.dataset.make }, 'Work order made.');
+      else if (b.dataset.fixed) act(b.dataset.fixed, 'saveShiftNote', { values: { Entry: 'Already fixed (maintenance)', Type: 'REVIEW', ParentId: b.dataset.fixed }, notes: '', followUpStatus: 'RESOLVED' }, 'Marked fixed.');
+      else if (b.dataset.pm) act(b.dataset.pm, 'sendPmToMaintenance', { taskId: b.dataset.pm }, 'Sent to maintenance.');
+    });
+
+    function follow() {
+      if (stop) stop();
+      data = null;
+      render();
+      stop = watchMaint(db, plant, d => { data = d; render(); }, e => showError('Could not read Plant Maintenance (' + e.message + '). Check the network and reload the page.'));
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; if (!stop) follow(); else render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+    });
+  </script>
+</body>
+</html>

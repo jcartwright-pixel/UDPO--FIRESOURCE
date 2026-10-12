@@ -163,6 +163,9 @@ jobs:
           # Diagnostics are sandbox only (Joe 10/10): the sandbox gets the Diagnostics screen and its probe on every screen;
           # production must have none of it, and the deploy stops if it does.
           if [ "$TARGET" = sandbox ]; then node tools/sandbox-diagnostics.cjs add public; else node tools/sandbox-diagnostics.cjs check public; fi
+          # Joe 10/11: the version line at the bottom of the menu, from this commit and today ("Release 5 · 10-11-26 · Live").
+          git fetch --quiet --depth=400 origin main || echo "::warning::Could not read main for the release number"
+          node tools/stamp-version.cjs "$TARGET" public
           echo "Server account (share the sheets with it as Viewer): $runtime"
           npx --prefix functions firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
           {
@@ -181,7 +184,13 @@ jobs:
           if echo "$init" | grep -q '"apiKey"'; then echo "Firebase web settings: found"; else echo "::error::https://$PROJECT.web.app/__/firebase/init.json has no web app settings. In the Firebase console: Project settings > General > Your apps > Add app > Web (</>), any nickname, no Hosting tick, Register app. Then deploy again."; ok=false; fi
           code=$(curl -s -o /dev/null -w '%{http_code}' "https://$PROJECT.web.app/index.html"); echo "Home page: HTTP $code"; [ "$code" = 200 ] || ok=false
           # The live home page must ask for this deploy's styles, and those styles must be the current ones.
-          page=$(curl -fsS "https://$PROJECT.web.app/index.html?check=$GITHUB_SHA") || page=''
+          # Right after a release the web cache can still hand out the old page for a few seconds, so ask again
+          # for up to a minute before calling it wrong.
+          for try in $(seq 1 12); do
+            page=$(curl -fsS -H 'Cache-Control: no-cache' "https://$PROJECT.web.app/index.html?check=$GITHUB_SHA-$try") || page=''
+            [[ "$page" == *"css/app.css?v=${GITHUB_SHA::12}"* ]] && break
+            echo "Home page still the old copy (try $try of 12), asking again in 5 seconds"; sleep 5
+          done
           if [[ "$page" == *"css/app.css?v=${GITHUB_SHA::12}"* ]]; then echo "Home page asks for this deploy's styles: yes"; else echo "::error::The live home page does not ask for this deploy's styles"; ok=false; fi
           css=$(curl -fsS "https://$PROJECT.web.app/css/app.css?v=${GITHUB_SHA::12}") || css=''
           if [[ "$css" == *'.dc-head'* ]]; then echo "Styles are current: yes"; else echo "::error::The live styles are not the current ones"; ok=false; fi
@@ -195,6 +204,27 @@ jobs:
             echo "Save without sign-in: $reply"
           } >> "$GITHUB_STEP_SUMMARY"
           $ok
+      - name: Check every server step answers the browser
+        # A callable function without its public "may be called" setting (allUsers Cloud Run Invoker) answers the browser
+        # with Google's bare 403, which the screens show as "internal" (live Administration, 10/11: the first deploy created
+        # admin only on its retry, which never set it). Each one must answer a signed-out call with its own refusal; one
+        # that does not fails the deploy with the line an Owner pastes in Cloud Shell.
+        if: steps.settings.outputs.ready == 'true'
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          set -uo pipefail
+          names=$(grep -oE '^exports\.[A-Za-z0-9]+ = onCall' index.js | sed -E 's/^exports\.([A-Za-z0-9]+).*/\1/')
+          [ -n "$names" ] || { echo "::error::Found no callable functions in functions/index.js"; exit 1; }
+          bad=0
+          for f in $names; do
+            body=$(curl -s -m 30 -X POST -H 'Content-Type: application/json' -d '{"data":{}}' "https://us-east4-$PROJECT.cloudfunctions.net/$f")
+            if echo "$body" | grep -qE '^\{"(error|result)"'; then echo "$f: answers"; continue; fi
+            bad=1
+            echo "::error::$f cannot be called from the screens (Google's 403). An Owner pastes in Cloud Shell: gcloud run services add-iam-policy-binding $(echo "$f" | tr 'A-Z' 'a-z') --region=us-east4 --member=allUsers --role=roles/run.invoker --project=$PROJECT"
+          done
+          echo "Callable server steps checked: $(echo $names | wc -w), all answer: $( [ $bad = 0 ] && echo yes || echo NO )" >> "$GITHUB_STEP_SUMMARY"
+          exit $bad
       - name: Open the live home page in a browser and check its styles applied
         if: steps.settings.outputs.ready == 'true'
         env:

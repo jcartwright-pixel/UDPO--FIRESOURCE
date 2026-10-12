@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Checklist Setup · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/safety.css">
+  <script src="js/logic.js"></script>
+  <script src="js/safety-rules.js"></script>
+</head>
+<body class="fill safety-page setup-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Checklist Setup</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1>Checklist Setup</h1><span class="sw-counts" id="counts"></span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <a class="sw-top pri" href="safety.html" data-top>Weekly Walk</a>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="sw-sheet">
+        <table class="sw-grid sw-setup">
+          <colgroup><col style="width:18%"><col style="width:60%"><col style="width:12%"><col style="width:10%"></colgroup>
+          <thead><tr><th>Area</th><th>What to look at</th><th>How often</th><th>On the walk</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="sw-foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { pickPlant, plantName, canSetUp, modeText, watchSetup } from './js/safety.js';
+
+    // Checklist Setup (Joe 10/12): the plant's own checklist. It starts from the researched list (safety-rules.js). Each box
+    // saves as it is left: change the words, Weekly or Monthly, take an item off the walk, or type a new one in an area's empty
+    // row. An item once used is never deleted, only taken off the walk, so old walks still read. A manager or administrator.
+    const S = window.UDSafety;
+    const params = new URLSearchParams(location.search);
+    let db = null, person = null, app = {}, plant = '', setup = null, seen = false, stop = null, chain = Promise.resolve(), pending = null;
+    const areas = () => pending || S.checklist(setup, true);
+    function render(force) {
+      document.getElementById('mode-text').textContent = modeText(app);
+      document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
+      const set = canSetUp(person, app), dis = set ? '' : ' disabled', list = areas();
+      const on = list.reduce((n, a) => n + a.items.filter(i => !i.off).length, 0);
+      document.getElementById('counts').textContent = on + ' items on the walk in ' + list.length + ' areas' + (setup ? '' : ' · the starting list');
+      document.getElementById('foot').textContent = set ? 'Each box saves as you leave it. Monthly items are on the first walk of each month. Type in an area\'s empty row to add an item.' : 'View only. A manager or administrator changes the checklist.';
+      if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
+      document.getElementById('rows').innerHTML = !seen ? '<tr><td colspan="4" class="sw-empty">Reading the checklist…</td></tr>' : list.map((a, ai) =>
+        a.items.map((i, ii) => '<tr data-a="' + ai + '" data-i="' + ii + '"><td class="area">' + (ii ? '' : escapeHtml(a.name)) + '</td>' +
+          '<td>' + (set ? '<input type="text" data-k="text" value="' + escapeHtml(i.text) + '" maxlength="160" aria-label="Item">' : escapeHtml(i.text)) + '</td>' +
+          '<td><select data-k="freq" aria-label="How often"' + dis + '>' + S.FREQS.map(f => '<option value="' + f + '"' + (f === i.freq ? ' selected' : '') + '>' + (f === 'WEEKLY' ? 'Weekly' : 'Monthly') + '</option>').join('') + '</select></td>' +
+          '<td><label class="sw-check"><input type="checkbox" data-k="on"' + (i.off ? '' : ' checked') + dis + '>' + (i.off ? 'Off' : 'On') + '</label></td></tr>').join('') +
+        (set ? '<tr class="sw-add" data-a="' + ai + '" data-new="1"><td class="area">' + (a.items.length ? '' : escapeHtml(a.name)) + '</td><td><input type="text" data-k="text" placeholder="Add an item to ' + escapeHtml(a.name) + '" maxlength="160" aria-label="New item in ' + escapeHtml(a.name) + '"></td><td></td><td></td></tr>' : '')).join('');
+    }
+    function send(list) {
+      pending = list;
+      const run = chain.then(() => save('saveSafetyChecklist', { facilityId: plant, areas: list }));
+      chain = run.catch(() => {});
+      return run.then(() => showError(''), err => { pending = null; showError(err); render(true); });
+    }
+    document.getElementById('rows').addEventListener('change', e => {
+      const t = e.target, tr = t.closest('tr');
+      if (!tr || !canSetUp(person, app)) return;
+      const list = JSON.parse(JSON.stringify(areas())), a = list[+tr.dataset.a];
+      if (!a) return;
+      if (tr.dataset.new) {
+        const words = t.value.trim();
+        if (!words) return;
+        a.items.push({ id: a.key + '_' + Date.now().toString(36), text: words, freq: 'WEEKLY', off: false });
+        t.value = '';
+      } else {
+        const i = a.items[+tr.dataset.i];
+        if (t.dataset.k === 'text') { if (!t.value.trim()) { showError('An item needs words. To take it off the walk, untick On.'); t.value = i.text; return; } i.text = t.value.trim(); }
+        if (t.dataset.k === 'freq') i.freq = t.value;
+        if (t.dataset.k === 'on') i.off = !t.checked;
+      }
+      send(list).then(() => render(true));
+      render(true);
+    });
+    function follow() {
+      if (stop) stop();
+      seen = false; setup = null; pending = null; render(true);
+      stop = watchSetup(db, plant, s => { setup = s; seen = true; if (pending && s && JSON.stringify(S.checklist(s, true)) === JSON.stringify(S.checklist({ areas: pending }, true))) pending = null; render(); });
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render(true);
+      });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(true); });
+    });
+  </script>
+</body>
+</html>

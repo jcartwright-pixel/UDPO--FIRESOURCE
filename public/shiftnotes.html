@@ -7,15 +7,16 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Incident &amp; Breakdown Log · New Plant Operations</title>
+  <title>Shift Report Log · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
+  <script src="js/pmaint-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page quality-page shift-page">
   <div class="signin" id="signin" hidden>
-    <h1>Incident &amp; Breakdown Log</h1>
+    <h1>Shift Report Log</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -27,7 +28,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow" id="eyebrow">Shift Notes</span><h1>Incident &amp; Breakdown Log</h1></div>
+      <div class="title"><span class="eyebrow" id="eyebrow">Shift Notes</span><h1>Shift Report Log</h1></div>
       <div class="tabs" id="panes" role="tablist" aria-label="Log view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
       <div class="hstats" id="hstats"></div>
       <span class="sn-since" id="since"></span>
@@ -64,6 +65,7 @@
     import { fillIn, savedText, watchRound, clockOf } from './js/autosave.js';
     import { shiftsFor, shiftAt } from './js/plant-reports.js';
     import { nowMinutes } from './js/plant-core.js';
+    import { watchMaint } from './js/pmaint.js';
 
     // Shift Notes, option A (Joe 10/10): the kinds of entry down the left with their counts; open breakdowns carry over at the
     // top until someone marks them Resolved; the new entry below them saves box by box. Send Current Report empties the entry
@@ -74,9 +76,14 @@
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
     const phone = window.matchMedia('(max-width: 760px)');
-    const KINDS = [['Handoff', 'Handoff', 'Shift to shift'], ['Breakdown', 'Breakdowns'], ['Incident', 'Incidents'], ['Safety', 'Safety'], ['Quality', 'Quality'], ['Other', 'Other']];
-    const NEW_WORD = { Handoff: 'New handoff note', Breakdown: 'New breakdown', Incident: 'New incident', Safety: 'New safety note', Quality: 'New quality note', Other: 'New entry' };
+    // Joe 10/12: a big breakdown is fixed on the spot and only recorded here (the machine, down at, back up at, what fixed it), so it
+    // goes on the machine's history and down time; an issue that can wait is a Maintenance Request, which goes on maintenance's list
+    // (Plant Maintenance) and shows here what maintenance did with it.
+    const KINDS = [['Handoff', 'Handoff', 'Shift to shift'], ['Breakdown', 'Breakdowns'], ['Maintenance Request', 'Maintenance Requests', 'Sent to maintenance'], ['Incident', 'Incidents'], ['Safety', 'Safety'], ['Quality', 'Quality'], ['Other', 'Other']];
+    const NEW_WORD = { Handoff: 'New handoff note', Breakdown: 'New breakdown', 'Maintenance Request': 'New maintenance request', Incident: 'New incident', Safety: 'New safety note', Quality: 'New quality note', Other: 'New entry' };
+    const WHY_WORD = { Breakdown: 'recorded on the machine\'s history and down time; maintenance is called in person', 'Maintenance Request': 'goes on maintenance\'s list as soon as it has words' };
     let pane = params.get('view') === 'history' ? 'history' : 'current', kind = 'Breakdown';
+    let maint = null;
     let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null, shifts = shiftsFor(null, 'fac_uniontown');
     const pending = [];
     const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
@@ -103,28 +110,50 @@
       if (current && names.indexOf(current) < 0) names.push(current);
       return names.map(n => opt(n, current, shiftWord(n))).join('');
     };
-    // The new entry: the type picked on the left, the shift starting on the shift now.
-    function drawForm() {
-      const ck = canSave(), m = phone.matches, shift = shiftNow();
+    // The new entry: the type picked on the left, the shift starting on the shift now. A breakdown and a maintenance request say
+    // what broke, typed (Joe 10/12: "all kind of little things. Not a list"; a machine named in it goes on its history); a breakdown has its down and back up times and what fixed it, a
+    // request how long it can wait. keep: the boxes change with the Type, and what is typed stays (the same entry keeps saving).
+    const layout = () => kind === 'Breakdown' ? 'B' : kind === 'Maintenance Request' ? 'R' : 'N';
+    const hm = (n) => n === null || n === undefined ? '' : n >= 60 ? Math.floor(n / 60) + ' h ' + (n % 60) + ' min' : n + ' min';
+    function drawForm(keep) {
+      const ck = canSave(), m = phone.matches, shift = shiftNow(), lay = layout();
+      const f0 = document.getElementById('fields'), was = {};
+      if (keep) f0.querySelectorAll('input,select,textarea').forEach(x => { was[x.className.split(' ')[0]] = x.value; });
       const types = '<label>Type<select class="sn-type">' + U.ENTRY_TYPES.map(t => opt(t, kind)).join('') + '</select></label>';
-      const equip = '<label' + (m ? ' class="wide"' : '') + '>Equipment / area<input class="sn-equip" maxlength="80" placeholder="Dock 3 door, Palletizer, Truck 214…"></label>';
+      const equip = lay === 'N' ? '<label' + (m ? ' class="wide"' : '') + '>Equipment / area<input class="sn-equip" maxlength="80" placeholder="Dock 3 door, Palletizer, Truck 214…"></label>'
+        : '<label' + (m ? ' class="wide"' : '') + '>What broke<input class="sn-equip" maxlength="80" placeholder="Filler 4, a leaky valve…"></label>';
       const shiftBox = '<label>Shift<select class="sn-shift" id="shift-now">' + shiftOptions(shift) + '</select></label>';
       const follow = '<label>Follow-up<select class="sn-follow">' + U.FOLLOW_UPS.map(f => opt(f, 'OPEN', FOLLOW[f])).join('') + '</select></label>';
-      document.getElementById('fields').innerHTML = m
+      const downAt = '<label>Down at<input class="sn-time" type="time" value="' + clockNow() + '"></label>', upAt = '<label>Back up at<input class="sn-up" type="time"></label>';
+      const urgency = '<label>Can it wait?<select class="sn-urgency">' + opt('', '', '') + U.URGENCIES.map(u => opt(u, '', u)).join('') + '</select></label>';
+      const area = (cls, label, max, ph, wide) => '<label class="' + (wide || 'wide') + '">' + label + '<textarea class="' + cls + '" maxlength="' + max + '" placeholder="' + ph + '"></textarea></label>';
+      let html;
+      if (lay === 'B') html = m
+        ? types + shiftBox + equip + downAt + upAt + area('sn-entry', 'What happened?', 4000, 'What broke down, and why.') + area('sn-fix', 'What fixed it', 1000, 'Fill in when it is back up.') + follow
+        : types + equip + shiftBox + downAt + area('sn-entry', 'What happened?', 4000, 'What broke down, and why.', 'half') + area('sn-fix', 'What fixed it', 1000, 'Fill in when it is back up.', 'half') +
+          upAt + area('sn-notes', 'Notes / Follow-up', 1500, 'What the next shift needs to know or do', 'half') + follow;
+      else if (lay === 'R') html = m
+        ? types + shiftBox + equip + urgency + area('sn-entry', 'What\'s wrong?', 4000, 'What needs fixing, and where.') + '<label class="wide"><span>Next steps <i class="sn-opt">Optional</i></span><textarea class="sn-notes" maxlength="1500" placeholder="Anything else maintenance should know"></textarea></label>' + follow
+        : types + equip + shiftBox + urgency + area('sn-entry', 'What\'s wrong?', 4000, 'What needs fixing, and where.') +
+          '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500" placeholder="Anything else maintenance should know"></textarea></label>' + follow;
+      else html = m
         ? types + shiftBox + equip + '<label class="wide">What happened?<textarea class="sn-entry" maxlength="4000" placeholder="What happened, and what has been done."></textarea></label>' +
           '<label class="wide"><span>Next steps <i class="sn-opt">Optional</i></span><textarea class="sn-notes" maxlength="1500" placeholder="What needs attention or follow-up from the next shift?"></textarea></label>' + follow
         : types + equip + shiftBox + '<label>Reading Time<input class="sn-time" type="time" value="' + clockNow() + '"></label>' +
           '<label class="wide">Entry / Measurements<textarea class="sn-entry" maxlength="4000" placeholder="Enter readings, production status, outage details, quality results, or handoff information."></textarea></label>' +
           '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500" placeholder="What the next shift needs to know or do"></textarea></label>' + follow;
-      document.getElementById('fields').querySelectorAll('input,select,textarea').forEach(x => { x.disabled = !ck; });
+      f0.innerHTML = html;
+      if (keep) Object.keys(was).forEach(c => { const x = f0.querySelector('.' + c); if (x && !x.matches('.sn-type') && was[c] !== '') x.value = was[c]; });
+      f0.querySelectorAll('input,select,textarea').forEach(x => { x.disabled = !ck; });
+      drawnFor = (m ? 'phone' : 'desk') + '|' + ck + '|' + lay;
+      if (keep && entry) return;
       // No Save button: the entry saves to the log as each box is left; Start Another Entry empties the form for the next one.
       entry = { fill: fillIn('saveShiftNote', save), mine: null, round: roundStart, shiftPicked: false };
       const last = document.getElementById('form-last');
       last.textContent = ck ? 'Every box saves when you leave it' : ''; last.classList.remove('bad', 'done');
       document.getElementById('another').hidden = true;
-      drawnFor = (m ? 'phone' : 'desk') + '|' + ck;
     }
-    const formEmpty = () => !entry || (!entry.mine && ![...document.querySelectorAll('#fields .sn-entry, #fields .sn-notes, #fields .sn-equip')].some(x => x.value.trim()));
+    const formEmpty = () => !entry || (!entry.mine && ![...document.querySelectorAll('#fields .sn-entry, #fields .sn-notes, #fields .sn-equip, #fields .sn-fix')].some(x => x.value.trim()));
 
     // One entry on the list: open items carry their status drop-down and a review box, both saving as they are changed or left.
     function card(x, ck, tag) {
@@ -135,10 +164,26 @@
         : '<span class="sn-status s-' + st.toLowerCase() + '">' + escapeHtml(U.followLabel(st)) + '</span>';
       return '<article class="sn-card" data-entry="' + id + '" style="border-left-color:' + edge + '"><div class="sn-card-head"><strong>' + escapeHtml([stamp(x.recordedAt) || x.readingTime, tag ? '' : (x.type || 'Note'), x.equipment, x.shift].filter(Boolean).join(' · ')) + '</strong>' +
         (tag || '') + status + '</div>' +
-        (x.entry ? '<p>' + escapeHtml(x.entry) + '</p>' : '') + (x.notes ? '<p class="sn-next"><b>Notes / Follow-up:</b> ' + escapeHtml(x.notes) + '</p>' : '') +
+        (x.entry ? '<p>' + escapeHtml(x.entry) + '</p>' : '') + downLine(x, ck && saved) + requestLine(x) + (x.notes ? '<p class="sn-next"><b>Notes / Follow-up:</b> ' + escapeHtml(x.notes) + '</p>' : '') +
         x.reviews.map(r => '<div class="sn-review"><b>Review ' + escapeHtml(stamp(r.recordedAt)) + '</b> · ' + escapeHtml(U.followLabel(r.followUpStatus)) + ' · ' + escapeHtml(r.entry) + '<small>' + escapeHtml(r.recordedBy) + '</small></div>').join('') +
         (ck && saved ? '<div class="sn-addreview"><input data-review="' + id + '" aria-label="Review note for ' + escapeHtml(x.equipment || x.type || 'this entry') + '" maxlength="500" placeholder="Add a review note (saves when you leave the box)"></div>' : '') +
         '<small class="sn-by">' + escapeHtml(x.recordedBy) + (saved ? '' : ' · saving…') + '</small></article>';
+    }
+    // A breakdown: down at, back up at, how long it was down and what fixed it; still down, the boxes to say when it was back up.
+    function downLine(x, ck) {
+      if (!isKind(x, 'Breakdown') || !x.readingTime) return '';
+      const id = escapeHtml(x.entryId), n = U.downMinutes(x, Date.now());
+      if (x.upAt) return '<div class="sn-down up"><span>Down at <b>' + escapeHtml(x.readingTime) + '</b></span><span>Back up at <b>' + escapeHtml(x.upAt) + '</b></span><span class="sn-pill green">' + hm(n) + ' down</span>' + (x.fix ? '<span>Fix: <b>' + escapeHtml(x.fix) + '</b></span>' : '') + '</div>';
+      return '<div class="sn-down"><span>Down at <b>' + escapeHtml(x.readingTime) + '</b></span><span class="sn-pill red">Still down' + (n !== null ? ' · ' + hm(n) : '') + '</span>' +
+        (ck ? '<label>Back up at<input type="time" data-up="' + id + '" aria-label="Back up at"></label><input class="sn-fixbox" data-fix="' + id + '" maxlength="1000" placeholder="What fixed it (saves when you leave the box)" aria-label="What fixed it">' : '') + '</div>';
+    }
+    // A maintenance request: how long it can wait, and what maintenance has done with it (its work order).
+    function requestLine(x) {
+      if (!isKind(x, 'Maintenance Request')) return '';
+      const wo = maint ? maint.workOrders.find(w => w.sourceEntryId === x.entryId) : null, M = window.UDPlantMaint;
+      const state = !wo ? '<span class="sn-pill amber">Waiting for maintenance</span>' : '<span class="sn-pill blue">Work order ' + escapeHtml(wo.woNumber) + '</span>' +
+        (M.isOpen(wo) ? '<span class="sn-pill ' + (wo.status === 'PARTS' ? 'amber' : 'green') + '">' + escapeHtml(M.statusWord(wo.status)) + '</span>' : '<span class="sn-pill green">Done' + (wo.completedAt ? ' ' + escapeHtml(stamp(wo.completedAt)) : '') + '</span>' + (wo.fixedNote ? ' Fixed: ' + escapeHtml(wo.fixedNote) : ''));
+      return '<div class="sn-down req">' + state + (x.urgency ? '<span>Can wait: <b>' + escapeHtml(x.urgency.toLowerCase()) + '</b></span>' : '') + '</div>';
     }
     const tagOf = (x) => since(x.recordedAt) ? '<span class="tag new">NEW SINCE REPORT</span>' : '<span class="tag carry">CARRIED OVER' + (hoursAgo(x.recordedAt) ? ' · ' + hoursAgo(x.recordedAt) + ' h' : '') + '</span>';
     const busy = (box) => box.contains(document.activeElement) && document.activeElement.matches('input') && document.activeElement.value;
@@ -152,13 +197,13 @@
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
       document.getElementById('pane-current').hidden = pane !== 'current';
       document.getElementById('pane-history').hidden = pane !== 'history';
-      if (drawnFor !== (phone.matches ? 'phone' : 'desk') + '|' + ck) drawForm();
+      if (drawnFor !== (phone.matches ? 'phone' : 'desk') + '|' + ck + '|' + layout()) drawForm(true);
 
       // The tiles: entries of each kind in the last 24 hours, and what is still open of it.
       const tally = (k) => { const of = all.filter(r => isKind(r, k)); return { n: rows.filter(r => isKind(r, k)).length, open: of.filter(r => r.status === 'OPEN').length, mon: of.filter(r => r.status === 'MONITOR').length }; };
       document.getElementById('lines').innerHTML = KINDS.map(([k, name, sub]) => {
         const t = tally(k), hand = k === 'Handoff';
-        const words = hand ? sub : t.open ? t.open + (k === 'Breakdown' ? ' still open' : ' open') : t.mon ? t.mon + ' monitor' : t.n ? 'resolved' : '';
+        const words = hand ? sub : t.open ? t.open + (k === 'Breakdown' ? ' still open' : k === 'Maintenance Request' ? ' waiting' : ' open') : t.mon ? t.mon + ' monitor' : t.n ? 'resolved' : sub || '';
         const dot = hand ? '' : t.open ? 'st-down' : t.mon ? 'st-review' : t.n ? 'st-running' : '';
         const badge = hand ? '' : t.open ? 'red' : t.mon ? 'amber' : t.n ? 'green' : '';
         return '<button type="button" data-kind="' + k + '"' + (k === kind ? ' class="active"' : '') + '><span class="qc-dot ' + dot + '"></span><span>' + name + (words ? '<small>' + escapeHtml(words) + '</small>' : '') + '</span><b class="' + badge + '">' + t.n + '</b></button>';
@@ -176,7 +221,7 @@
       const open = all.filter(r => isKind(r, kind) && (hand ? since(r.recordedAt) : r.status !== 'RESOLVED') && r.entryId !== mineId);
       document.getElementById('kind-title').textContent = name;
       document.getElementById('kind-count').textContent = rows.filter(r => isKind(r, kind)).length + ' in the last 24 hours' + (hand ? '' : ' · ' + all.filter(r => isKind(r, kind) && r.status !== 'RESOLVED').length + ' still open');
-      document.getElementById('new-title').innerHTML = escapeHtml(NEW_WORD[kind]) + ' <span class="why">fills in as you type; Start Another Entry empties the boxes</span>';
+      document.getElementById('new-title').innerHTML = escapeHtml(NEW_WORD[kind]) + ' <span class="why">' + escapeHtml(WHY_WORD[kind] || 'fills in as you type; Start Another Entry empties the boxes') + '</span>';
       const box = document.getElementById('open-box');
       if (!busy(box)) box.innerHTML = open.length
         ? '<div class="sn-sec' + (hand ? '' : ' red') + '">' + (hand ? 'Since last report' : 'Still open') + ' <span class="n">' + open.length + '</span><span class="why">' + (hand ? 'goes in the next report' : 'carried over until resolved') + '</span></div><div class="sn-open">' + open.map(r => card(r, ck, tagOf(r))).join('') + '</div>'
@@ -193,8 +238,8 @@
     const record = (values, extra) => ({ type: U.SHIFT_TYPE, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, area: 'HANDOFF', payload: Object.assign({ section: 'HANDOFF', values }, extra) });
 
     // A review under an entry (a new status, a note, or both): shown at once, taken off again if the save fails.
-    async function review(id, note, status) {
-      const values = { Entry: note, Type: 'REVIEW', ParentId: id }, mine = record(values, { followUpStatus: status });
+    async function review(id, note, status, up) {
+      const values = Object.assign({ Entry: note, Type: 'REVIEW', ParentId: id }, up || {}), mine = record(values, { followUpStatus: status });
       pending.push(mine);
       render();
       const ok = document.getElementById('saved');
@@ -216,6 +261,15 @@
     function onCards(box) {
       box.addEventListener('change', e => {
         const t = e.target, all = week();
+        if (t.matches('[data-up], [data-fix]')) {
+          // Back up: the time (now when only the fix is typed) and what fixed it close the breakdown's down time.
+          const id = t.dataset.up || t.dataset.fix, upBox = box.querySelector('[data-up="' + CSS.escape(id) + '"]'), fixBox = box.querySelector('[data-fix="' + CSS.escape(id) + '"]');
+          const up = (upBox && upBox.value) || (t.matches('[data-fix]') && t.value.trim() ? clockNow() : ''), fix = fixBox ? fixBox.value.trim() : '';
+          if (!up) return;
+          if (upBox) upBox.value = ''; if (fixBox) fixBox.value = '';
+          review(id, fix || 'Back up at ' + up, 'RESOLVED', Object.assign({ UpAt: up }, fix ? { Fix: fix } : {}));
+          return;
+        }
         if (t.matches('[data-status]')) {
           const id = t.dataset.status, note = (box.querySelector('[data-review="' + CSS.escape(id) + '"]') || {}).value || '';
           const text = note.trim() || 'Marked ' + FOLLOW[t.value];
@@ -228,20 +282,26 @@
           review(id, note, sel ? sel.value : (x && x.status) || 'OPEN');
         }
       });
-      box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-review]')) e.target.blur(); });
+      box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-review], [data-fix]')) e.target.blur(); });
     }
     onCards(document.getElementById('open-box'));
     onCards(document.getElementById('history'));
 
     // Each box of the new entry saves as it is left, once the entry has some words: the first save puts the entry on the log,
     // later boxes fill it in.
+    // Joe 10/12: the Type drop-down and the buttons on the left stay in step; the boxes keep what is typed.
+    document.getElementById('fields').addEventListener('change', (e) => {
+      if (!e.target.matches('.sn-type') || !KINDS.some(x => x[0] === e.target.value) || e.target.value === kind) return;
+      kind = e.target.value;
+      render();
+    });
     document.getElementById('fields').addEventListener('change', async (e) => {
       if (!canSave() || !entry) return;
       if (e && e.target && e.target.matches('.sn-shift')) entry.shiftPicked = true;
       const f = document.getElementById('fields'), v = (c) => { const n = f.querySelector('.' + c); return n ? n.value.trim() : ''; };
-      const text = v('sn-entry'), notes = v('sn-notes'), mine0 = entry.mine, cur = entry;
+      const text = v('sn-entry') || (v('sn-fix') ? 'Breakdown' : ''), notes = v('sn-notes'), mine0 = entry.mine, cur = entry;
       if (!text && !notes) return;
-      const values = { Entry: text, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') };
+      const values = Object.assign({ Entry: text, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') }, v('sn-up') ? { UpAt: v('sn-up') } : {}, v('sn-fix') ? { Fix: v('sn-fix') } : {}, v('sn-urgency') ? { Urgency: v('sn-urgency') } : {});
       const fields = { values, notes, shift: v('sn-shift') || shiftNow(), readingTime: v('sn-time') || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
       const mine = mine0 || record(values, { entryId: 'pending-' + Date.now(), shift: fields.shift });
       Object.assign(mine.payload, { values, shift: fields.shift, readingTime: fields.readingTime, notes, followUpStatus: fields.followUpStatus });
@@ -271,6 +331,11 @@
       if (!b) return;
       kind = b.dataset.kind;
       if (formEmpty()) drawForm();
+      else {
+        // Something is typed: keep it and change its Type (a saved entry saves the new Type).
+        const t = document.querySelector('#fields .sn-type');
+        if (t && t.value !== kind) { t.value = kind; t.dispatchEvent(new Event('change', { bubbles: true })); }
+      }
       render();
     });
     document.getElementById('panes').addEventListener('click', e => {
@@ -287,6 +352,8 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      // The plant's machinery (a machine named in What broke) and maintenance's work orders (what became of each request).
+      watchMaint(db, 'fac_uniontown', d => { maint = d; render(); }, () => {}, { noJournal: true });
       // A new report empties the entry boxes for the next round; open items stay on the list.
       watchRound(db, (at, data) => { const first = roundStart === null; roundStart = at; lastReport = data; if (!first && entry && entry.round !== at) drawForm(); render(); });
       // A week of the log, so a breakdown still open from earlier shifts stays on the list until it is resolved.

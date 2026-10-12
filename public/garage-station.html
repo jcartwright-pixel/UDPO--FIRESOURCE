@@ -17,6 +17,7 @@
     <div class="topbar">
       <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
       <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
+      <button type="button" class="gs-nav" id="gs-change" hidden>Change Station</button>
       <span class="gs-people" id="people"></span>
       <button id="gs-signout" type="button" hidden>Sign Out</button>
     </div>
@@ -26,6 +27,9 @@
     <div class="view">
       <div class="gs">
         <p class="gs-msg" id="gs-message" role="alert" hidden></p>
+        <!-- Joe 10/12: once Administration > Garage Station Codes has a code, the tablet types its station's code once. -->
+        <div id="gs-release" hidden></div>
+        <section id="view-code" hidden></section>
 
         <!-- Work orders: the first screen, no sign-in (Joe 10/10). -->
         <section id="view-jobs" class="gs-stack">
@@ -106,6 +110,7 @@
   <script type="module">
     import { start, escapeHtml, goBack } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+    import { resolveStation, askCode, askRelease, remember } from './js/station-code.js';
 
     /*
      * The current app's Garage Station (GarageStation.html, 7.0.276), reworked the way Joe asked (10/10 evening): the open
@@ -122,10 +127,41 @@
     let unitTyped = '', unitPick = '', catPick = '', runPick = null, reportDraft = null;
 
     const fn = async () => httpsCallable((await start()).functions, 'garage');
-    async function call(op, fields) { return (await (await fn())(Object.assign({ op }, fields || {}))).data; }
+    // The garage station this tablet opened with its code (Administration > Garage Station Codes) goes with every call; a new
+    // code or a removed station sends the tablet back to the code screen.
+    const CODE_KEY = 'udGarageStationCode';
+    let station = null;
+    async function call(op, fields) {
+      try { return (await (await fn())(Object.assign({ op }, fields || {}, station ? { station: { key: station.key, version: station.version } } : {}))).data; } catch (err) {
+        const m = /STATION_CODE: (.*)$/.exec(String(err.message || ''));
+        if (!m) throw err;
+        station = null; remember(CODE_KEY, null); if (shownView() !== 'code') gate(m[1].replace(/\s*\[\d{3}\]\s*$/, '')).catch(() => {});
+        throw new Error('');
+      }
+    }
+    const stationCall = (step, f) => call('station', Object.assign({ step }, f));
+    // Which station this tablet is: its code's station, the code screen, or (no garage codes yet) open straight away.
+    async function gate(msg) {
+      const r = msg !== undefined ? { needCode: true, message: msg } : await resolveStation('GARAGE', CODE_KEY, stationCall);
+      if (r.needCode) {
+        station = null; $('gs-change').hidden = true; $('title').textContent = 'Garage Station'; view('code');
+        station = await askCode($('view-code'), { kind: 'GARAGE', storeKey: CODE_KEY, call: stationCall, title: 'Enter this tablet\'s station code',
+          hint: 'A manager gives each garage station its code (Administration > Garage Station Codes). The tablet remembers its station after this.', message: r.message });
+        view('jobs');
+      } else station = r.station || null;
+      $('gs-change').hidden = !station;
+      if (station) $('title').textContent = station.name + ' · ' + station.plant;
+      message('');
+      return load();
+    }
+    $('gs-change').addEventListener('click', async () => {
+      const ok = await askRelease($('gs-release'), { status: () => call('release', { step: 'status' }), release: (code) => call('release', { step: 'release', code }), onError: message });
+      if (!ok) return;
+      station = null; remember(CODE_KEY, null); gate().catch(err => message(err.message));
+    });
     const signOut = (token) => { if (token) call('signOut', { tokens: [token] }).catch(() => {}); };
     function message(text, ok) { const m = $('gs-message'); m.textContent = text || ''; m.hidden = !text; m.classList.toggle('ok', !!ok); }
-    const VIEWS = ['sign', 'jobs', 'job', 'fix', 'safe', 'report'];
+    const VIEWS = ['code', 'sign', 'jobs', 'job', 'fix', 'safe', 'report'];
     function view(v) { VIEWS.forEach(k => { $('view-' + k).hidden = k !== v; }); if (v === 'safe') sizeCanvas(); }
     const shownView = () => VIEWS.find(k => !$('view-' + k).hidden);
     const names = (list) => list.length > 2 ? list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1] : list.join(' and ');
@@ -400,7 +436,7 @@
     }, 30000);
 
     view('jobs');
-    load().catch(err => message(err.message));
+    gate().catch(err => message(err.message));
   </script>
 </body>
 </html>

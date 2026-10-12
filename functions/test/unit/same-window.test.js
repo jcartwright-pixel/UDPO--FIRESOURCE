@@ -11,7 +11,9 @@ const files = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e =>
 test('no screen or link opens a new tab or window', () => {
   const bad = [];
   files(PUBLIC).filter(f => /\.(html|js)$/.test(f)).forEach(f => {
-    const text = fs.readFileSync(f, 'utf8');
+    // Joe 10/12: the one exception is Launch on Administration > Links & Codes (marked data-launch), which tests a station,
+    // phone, TV or kiosk screen in a new window so Administration stays where it was.
+    const text = fs.readFileSync(f, 'utf8').split('\n').filter(l => !/data-launch/.test(l)).join('\n');
     if (/target\s*=\s*["']?_blank/i.test(text) || /\.target\s*=\s*['"]_blank/.test(text)) bad.push(path.relative(PUBLIC, f) + ': target _blank');
     if (/window\.open\s*\(/.test(text)) bad.push(path.relative(PUBLIC, f) + ': window.open');
   });
