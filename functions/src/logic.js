@@ -385,9 +385,10 @@
     dailyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
     weeklyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
     checkIns: { area: 'Route Distribution', ready: false, why: 'Truck problems it files cannot reach the current app yet.' },
-    drivers: { area: 'Route Distribution', ready: false, why: 'Would write Driver Master. Needs your OK.' },
-    vacations: { area: 'Route Distribution', ready: false, why: 'Would write the Vacations sheet. Needs your OK.' },
-    routes: { area: 'Route Distribution', ready: false, why: 'Would write Route Master. Needs your OK.' },
+    // Joe 10/12: "Let the new app write Route Master, Driver Master, Equipment Master, Users, Exceptions and Vacations to the real sheets."
+    drivers: { area: 'Route Distribution', ready: true, why: 'Writes Driver Master, and days off to the Exceptions sheet. You OK\'d it 10/12.' },
+    vacations: { area: 'Route Distribution', ready: true, why: 'Writes the Vacations sheet. You OK\'d it 10/12.' },
+    routes: { area: 'Route Distribution', ready: true, why: 'Writes Route Master. You OK\'d it 10/12.' },
     plantLoading: { area: 'Plant Distribution', ready: true, why: 'Writes loads, loading order and case returns to the Live sheet week tabs, and Loadout History when a load is Done. You OK\'d it 10/12.' }
   };
   // Shown on Go-Live Switches but not a switch yet. (Plant Loading became a switch on 10/12.)

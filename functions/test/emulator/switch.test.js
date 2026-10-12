@@ -90,7 +90,10 @@ test('Turn on everything that is ready turns the write-back on and moves only th
   assert.equal(out.screenOwners.dailyDispatch, 'new');
   assert.equal(out.screenOwners.weeklyDispatch, 'new');
   assert.equal(out.screenOwners.plantLoading, 'new', 'Plant Loading is ready (Joe 10/12)');
-  ['checkIns', 'drivers', 'vacations', 'routes'].forEach(k => assert.equal(out.screenOwners[k], 'old', k + ' is not ready'));
+  // Joe 10/12 ("Let the new app write Route Master, Driver Master, ... and Vacations to the real sheets."): Drivers, Vacation
+  // Schedule and Route Editor are ready too; Driver Check-ins is not.
+  ['drivers', 'vacations', 'routes'].forEach(k => assert.equal(out.screenOwners[k], 'new', k + ' is ready (Joe 10/12)'));
+  assert.equal(out.screenOwners.checkIns, 'old', 'checkIns is not ready');
   const c = await config();
   assert.equal(c.mode, 'live');
   assert.equal(c.writeBack.enabled, true);
@@ -99,8 +102,8 @@ test('Turn on everything that is ready turns the write-back on and moves only th
 
 test('a screen that is not ready cannot move to the new app', async () => {
   await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
-  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), screen: 'drivers', owner: 'new' }, true), /Driver Master/);
-  assert.equal((await config()).screenOwners.drivers, 'old');
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), screen: 'checkIns', owner: 'new' }, true), /Driver Check-ins is not ready/);
+  assert.equal((await config()).screenOwners.checkIns, 'old');
 });
 
 test('Fully live needs the new app, and moving a screen back clears it', async () => {

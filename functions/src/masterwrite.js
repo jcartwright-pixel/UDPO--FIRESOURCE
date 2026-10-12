@@ -9,13 +9,14 @@
  *
  * Same conflict rule as the Live write-back: a cell is written only if the sheet still holds what the new app last
  * read for it (or already holds the new value); anything else goes on the Sheet Conflicts list with both values.
- * Only sandbox copies can be written: every production spreadsheet is refused here, whatever the settings say.
+ * Only sandbox copies can be written, except (Joe 10/12) the six real master lists the production server names in
+ * allowReal (writeback.js assertMasterTarget); every other production spreadsheet is refused here, whatever the settings say.
  */
 'use strict';
 
 const L = require('./logic');
 const M = require('./model');
-const { assertSandboxTarget, columnLetter } = require('./writeback');
+const { assertMasterTarget, columnLetter } = require('./writeback');
 
 const C = M.COLLECTIONS;
 const BATCH = 50;
@@ -103,8 +104,10 @@ function queueMaster(tx, db, mode, requestId, part, ref, rowId, fields, create, 
  * One pass. sheets = { batchGet, batchUpdate }. targets = { drivers: {spreadsheetId, tab}, ... }: the sandbox copies of
  * the master lists (the same the copy reads). Returns counts.
  */
-async function runMasterWriteBack({ db, sheets, targets, now, only }) {
-  Object.keys(targets || {}).forEach(k => assertSandboxTarget(targets[k] && targets[k].spreadsheetId));
+// allowReal: the lists whose real sheet may be written (production only). since: with allowReal, saves queued before the real
+// sheets were turned on are held, not written (status "held", kept for review), so an old backlog never lands in them.
+async function runMasterWriteBack({ db, sheets, targets, now, only, allowReal, since }) {
+  Object.keys(targets || {}).forEach(k => assertMasterTarget(k, targets[k] && targets[k].spreadsheetId, allowReal));
   const stamp = (now ? now() : new Date()).toISOString();
   // Claim the oldest waiting saves first, so two passes at once (the save trigger and the minute pass) never both add
   // the same new row. A claim older than five minutes (a pass that died) is taken over.
@@ -113,8 +116,11 @@ async function runMasterWriteBack({ db, sheets, targets, now, only }) {
     const q = await tx.get(db.collection(C.masterOutbox).where('status', 'in', ['pending', 'writing']).orderBy('at').orderBy('requestId').limit(BATCH));
     // only: just the lists named in targets (the Users copy while the write-back switch is off); the rest wait.
     const mine = q.docs.filter(d => (d.data().status === 'pending' || String(d.data().claimedAt || '') < stale) && (!only || targets[d.data().list]));
-    mine.forEach(d => tx.update(d.ref, { status: 'writing', claim, claimedAt: stamp }));
-    return mine.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data()));
+    const old = since ? mine.filter(d => String(d.data().at || '') < since) : [];
+    old.forEach(d => tx.update(d.ref, { status: 'held', heldAt: stamp, heldWhy: 'queued before the real sheets were turned on (' + since + '); not written' }));
+    const take = mine.filter(d => old.indexOf(d) < 0);
+    take.forEach(d => tx.update(d.ref, { status: 'writing', claim, claimedAt: stamp }));
+    return take.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data()));
   });
   if (!items.length) return { written: 0, conflicts: 0, items: 0, added: 0 };
   const lists = [...new Set(items.map(i => i.list))];

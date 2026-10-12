@@ -1169,11 +1169,13 @@ async function noScroll(page) {
     assert.equal(await gl.textContent('.adm-item[data-key="switch"] .adm-name'), 'Go-Live Switches');
     await gl.click('.adm-item[data-key="switch"]');
     await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"]');
-    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="drivers"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
+    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
+    // Joe 10/12: Drivers, Vacation Schedule and Route Editor are ready (they write Driver Master, Vacations, Route Master).
+    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="drivers"] [data-act="new"]'), false);
     // Joe 10/12 ("Let the new app write plant loading to the real Live sheet."): Plant Loading is a switch of its own, ready.
     assert.match(await gl.textContent('#gl-rows tr[data-row="plantLoading"]'), /Plant Loading[\s\S]*Current app[\s\S]*Ready[\s\S]*Loadout History/);
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="plantLoading"] [data-act="new"]'), false);
-    // Turn on everything that is ready: pressed twice; Daily and Weekly Dispatch and Plant Loading go to the new app, nothing else.
+    // Turn on everything that is ready: pressed twice; every ready screen goes to the new app, Driver Check-ins stays.
     await gl.click('#gl-all');
     assert.match(await gl.textContent('#gl-all'), /Press again/);
     assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'old', 'one press does nothing');
@@ -1183,7 +1185,8 @@ async function noScroll(page) {
     assert.equal(cfg.screenOwners.dailyDispatch, 'new');
     assert.equal(cfg.screenOwners.weeklyDispatch, 'new');
     assert.equal(cfg.screenOwners.plantLoading, 'new');
-    assert.equal(cfg.screenOwners.drivers, 'old');
+    assert.equal(cfg.screenOwners.drivers, 'new');
+    assert.equal(cfg.screenOwners.checkIns, 'old');
     if (SHOTS) await gl.screenshot({ path: path.join(SHOTS, 'go-live-switches-1536.png') });
     const onNew = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await onNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'NEW APP: SAVES GO TO THE SHEET');

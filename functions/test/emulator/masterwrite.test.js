@@ -91,6 +91,33 @@ test('production master sheets are refused', async () => {
   await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { drivers: { spreadsheetId: '1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU', tab: 'DRIVERS_MASTER' } }, now: tick }), /production sheet/);
 });
 
+// Joe 10/12 ("Let the new app write Route Master, Driver Master, Equipment Master, Users, Exceptions and Vacations to the real
+// sheets"): a real master sheet is written only when its list is named in allowReal and the ID is that list's own real sheet.
+test('allowReal lets a named list write its own real sheet, and nothing else', async () => {
+  const REAL_DRIVERS = { drivers: { spreadsheetId: '1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU', tab: 'DRIVERS_MASTER' } };
+  await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_casey', name: 'CASEY, LEE R', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false });
+  const out = await runMasterWriteBack({ db: db(), sheets, targets: REAL_DRIVERS, now: tick, only: true, allowReal: ['drivers'] });
+  assert.equal(out.items, 1);
+  assert.equal(cell('DRIVERS_MASTER', 'driver_id', 'drv_test_casey', 'name'), 'CASEY, LEE R');
+  // Not named in allowReal, a list pointed at another list's real sheet, or the real Live sheet: still refused.
+  await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: REAL_DRIVERS, now: tick, allowReal: ['routes'] }), /production sheet/);
+  await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { routes: REAL_DRIVERS.drivers }, now: tick, allowReal: ['routes', 'drivers'] }), /production sheet/);
+  await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { drivers: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'DRIVERS_MASTER' } }, now: tick, allowReal: ['drivers'] }), /production sheet/);
+});
+
+test('saves queued before the real sheets were turned on are held, not written', async () => {
+  await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_casey', name: 'CASEY, OLD', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false }, tick);
+  const since = tick().toISOString();
+  await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_brook', name: 'BROOK, NEW', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false }, tick);
+  const out = await runMasterWriteBack({ db: db(), sheets, targets: TARGETS, now: tick, since });
+  assert.equal(out.items, 1);
+  assert.equal(cell('DRIVERS_MASTER', 'driver_id', 'drv_test_brook', 'name'), 'BROOK, NEW');
+  assert.notEqual(cell('DRIVERS_MASTER', 'driver_id', 'drv_test_casey', 'name'), 'CASEY, OLD');
+  const held = (await db().collection('masterOutbox').where('status', '==', 'held').get()).docs.map(d => d.data());
+  assert.equal(held.length, 1);
+  assert.equal(held[0].docId, 'drv_test_casey');
+});
+
 test('with the write-back off, master saves queue nothing', async () => {
   await db().collection('config').doc('app').set({ writeBack: { enabled: false } }, { merge: true });
   await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_casey', name: 'CASEY, LEE B', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false });

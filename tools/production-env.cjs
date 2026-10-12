@@ -5,8 +5,9 @@
  * production deploy. The deploy stops if the settings would do anything Joe has not allowed:
  *   - production must read the real Uniontown sheets (READ_UNIONTOWN_SHEETS=1), never the made-up ones (DEMO_DATA) and
  *     never the sandbox copies (SOURCES_JSON or any sandbox copy ID);
- *   - production writes only dispatch changes to the real Uniontown Live workbook (Joe 10/12: "Let the new app write
- *     dispatch changes to the real Live sheet."): WRITEBACK_JSON may name that workbook and nothing else (no master lists);
+ *   - production writes dispatch changes to the real Uniontown Live workbook (Joe 10/12: "Let the new app write
+ *     dispatch changes to the real Live sheet."): WRITEBACK_JSON may name that workbook and nothing else. The six real
+ *     master lists Joe OK'd on 10/12 are fixed in code (writeback.js REAL_MASTER_LISTS), never named here;
  *   - email only from and to United Dairy addresses.
  *
  *   node tools/production-env.cjs [settings.json]   prints the .env text; PRODUCTION_ENV (KEY=value lines, a GitHub
