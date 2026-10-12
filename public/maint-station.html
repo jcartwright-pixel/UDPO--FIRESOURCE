@@ -137,7 +137,9 @@
      */
     const $ = (id) => document.getElementById(id);
     const READY_MS = 2 * 60000;
-    const PLANT = new URLSearchParams(location.search).get('plant') || 'fac_uniontown';
+    const PLANT = new URLSearchParams(location.search).get('plant') || (() => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } })() || 'fac_uniontown';
+    // No plant picker: the plant shows in the title (Joe 10/12).
+    document.getElementById('title').textContent = 'Maintenance Station · ' + ({ fac_uniontown: 'Uniontown', fac_charleston: 'Charleston', fac_martins_ferry: 'Martins Ferry' }[PLANT] || PLANT);
     let techs = [], jobs = [], machines = [], fixes = [];
     let open = null, want = null, picked = null, typed = '', busy = false, ready = null, finisher = null;
     let fixPick = '', safePick = null, inked = false, lastTouch = Date.now();
