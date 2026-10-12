@@ -15,43 +15,13 @@
   <link rel="stylesheet" href="css/driver-room.css">
 </head>
 <!--
-  Joe 10/12: the Driver Room tablet looks exactly like the drivers' phone (route.html?room=1): View Loadout, DVIR and
-  Check-In. This page only takes the tablet's Driver Room kiosk code once (no United Dairy account), then sends it there.
-  The Driver Station link does the same with that code, so the tablet can stay on its existing link. A TV's code is refused
-  here: the TV keeps the Driver's Kiosk Station board.
+  Joe 10/12: a Driver Room station signs in with a United Dairy account first, on the one Driver Station link; then its code
+  decides the page (a Driver Room Check-In Station code opens the drivers' Check-In, a Driver's Kiosk Station code the TV).
+  This older tablet link goes there.
 -->
 <body class="dr-page">
-  <header class="dr-top">
-    <h1><span id="plant">Driver Room</span></h1>
-  </header>
-  <div class="notice error" id="error" hidden></div>
-  <section id="code-box" class="dr-code" hidden></section>
-
-  <script type="module">
-    import { start, showError } from './js/app.js';
-    import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
-    import { resolveStation, askCode } from './js/station-code.js';
-
-    const KEY = 'udRoomStation', $ = (id) => document.getElementById(id);
-    async function phone(op, fields) {
-      const { functions } = await start();
-      try { return (await httpsCallable(functions, 'phone')(Object.assign({ op }, fields || {}))).data; }
-      catch (e) { e.message = String(e.message || e).replace(/\s*\[\d{3}\]\s*$/, ''); throw e; }
-    }
-    // The station steps of station-code.js, answered by the phone call (a Driver Room station always has a code).
-    const stationCall = (op, f) => op === 'enter' ? phone('roomEnter', { code: f.code }) : op === 'check' ? phone('roomCheck', { station: { key: f.key, version: f.version } }) : Promise.resolve({ required: true });
-    // The phone screens in Driver Room mode; ?view= carries through (loadout, dvir, checkin).
-    const go = () => { const v = new URLSearchParams(location.search).get('view'); location.replace('route.html?room=1' + (v ? '&view=' + encodeURIComponent(v) : '')); };
-
-    async function gate() {
-      const r = await resolveStation('KIOSK', KEY, stationCall);
-      if (!r.needCode && r.station) return go();
-      $('code-box').hidden = false;
-      await askCode($('code-box'), { kind: 'KIOSK', storeKey: KEY, call: stationCall, title: 'Enter the Driver Room station code',
-        hint: 'A manager makes it in Administration > Links & Codes > Driver Station Codes (the Driver Room Check-In Station, Create code). The tablet remembers it after this.', message: r.message });
-      go();
-    }
-    gate().catch(err => showError('Could not check this tablet\'s station code: ' + err.message));
-  </script>
+  <header class="dr-top"><h1><span id="plant">Driver Room</span></h1></header>
+  <p class="dr-code">Opening the Driver Station…</p>
+  <script>location.replace('driver-station.html');</script>
 </body>
 </html>

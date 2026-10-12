@@ -19,7 +19,7 @@ const localCalls = require('./local-calls.cjs');
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR;
-const BOSS = { email: 'admin.test@uniteddairy.com' };
+const BOSS = { email: 'admin.test@uniteddairy.com' }, SIGNED = '?testEmail=admin.test@uniteddairy.com';
 
 async function openPage(browser, width, height, url) {
   const page = await browser.newPage({ viewport: { width, height } });
@@ -68,13 +68,20 @@ async function touchPage(browser, width, height, url, mobile) {
   const results = [];
   try {
     for (const [w, h, tag] of [[1920, 1080, '1920'], [1024, 768, 'tablet']]) {
+      // Joe 10/12 "these will still also need to have a United Dairy email address to log in first": the old tablet link
+      // and the Check-In screens with no United Dairy sign-in go to the Driver Station link's Google sign-in.
       const p = await openPage(browser, w, h, '/driver-room.html');
+      await p.waitForURL(/driver-station\.html$/);
+      await p.waitForSelector('#signin:not([hidden]) #signin-button');
+      await p.evaluate(() => localStorage.setItem('udRoomStation', JSON.stringify({ key: 'fac_uniontown_kiosk_driver', version: 'x', plant: 'Uniontown' })));
+      await p.goto(HOSTING + '/route.html?room=1');
+      await p.waitForURL(/driver-station\.html$/);
+      await p.waitForSelector('#signin:not([hidden]) #signin-button');
+      await shot(p, 'driver-room-0-signin-' + tag + '.png');
+      // Signed in with a United Dairy account, the Driver Station link asks for the station code.
+      await p.goto(HOSTING + '/driver-station.html' + SIGNED);
       await p.waitForSelector('#code-box form.st-code');
       await shot(p, 'driver-room-1-code-' + tag + '.png');
-      // The TV's code is refused here: the TV keeps the Driver Station link.
-      await p.fill('#code-box input', tv);
-      await p.click('#code-box button');
-      await p.waitForSelector('.st-code-msg:text("Driver\'s Kiosk Station")');
       await p.fill('#code-box input', kiosk);
       await p.click('#code-box button');
       // Joe 10/12 "the driver's phone is exactly how this should look": the phone screens in Driver Room mode, three choices.
@@ -120,7 +127,7 @@ async function touchPage(browser, width, height, url, mobile) {
       await shot(p, 'driver-room-7-view-loadout-' + tag + '.png');
       await p.click('#board-track');
       await p.waitForSelector('#step-menu:not([hidden])');
-      results.push('Driver Room ' + tag + ': a TV code is refused; the kiosk code opens the phone screens (View Loadout, DVIR, Check-In) with no Back, Home or Sign out; Check-In and DVIR ask the name; Done signs out, Back keeps him; View Loadout needs no name and a tap brings back the choices');
+      results.push('Driver Room ' + tag + ': with no United Dairy sign-in the tablet goes to the Driver Station Google sign-in; signed in, the Check-In Station code opens the phone screens (View Loadout, DVIR, Check-In) with no Back, Home or Sign out; Check-In and DVIR ask the name; Done signs out, Back keeps him; View Loadout needs no name and a tap brings back the choices');
       // Release is a bar along the very bottom on every Driver Room screen, the rolling View Loadout too; from there it brings
       // back the three choices with the release code box (Cancel keeps the tablet).
       assert.equal((await p.textContent('#m-station')).trim(), 'Release');
@@ -138,10 +145,10 @@ async function touchPage(browser, width, height, url, mobile) {
         // Release with the manager release code.
         await p.click('#m-station');
         await p.fill('#release-box input', release);
-        await Promise.all([p.waitForURL(/driver-room\.html$/), p.click('#release-box button[type=submit]')]);
+        await Promise.all([p.waitForURL(/driver-station\.html$/), p.click('#release-box button[type=submit]')]);
         await p.waitForSelector('#code-box form.st-code');
         assert.equal(await p.evaluate(() => localStorage.getItem('udRoomStation')), null);
-        results.push('Driver Room: Release asks for the manager release code, then back to the code screen');
+        results.push('Driver Room: Release asks for the manager release code, then back to the Driver Station code screen (still signed in)');
       }
       assert.deepEqual(p.errors, []);
       await p.close();
@@ -155,7 +162,7 @@ async function touchPage(browser, width, height, url, mobile) {
       await q.clock.install();
       await q.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
       await localCalls(q);
-      await q.goto(HOSTING + '/driver-room.html');
+      await q.goto(HOSTING + '/driver-station.html' + SIGNED);
       await q.waitForSelector('#code-box form.st-code');
       await q.fill('#code-box input', kiosk);
       await q.click('#code-box button');
@@ -201,7 +208,7 @@ async function touchPage(browser, width, height, url, mobile) {
       assert.deepEqual(ph.errors, []);
       await ph.context().close();
 
-      const tab = await touchPage(browser, w, h, '/driver-room.html', mobile);
+      const tab = await touchPage(browser, w, h, '/driver-station.html' + SIGNED, mobile);
       await tab.waitForSelector('#code-box form.st-code');
       await tab.fill('#code-box input', kiosk);
       await tab.click('#code-box button');

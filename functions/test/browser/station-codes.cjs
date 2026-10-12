@@ -196,7 +196,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await ds.$('#go-back, #go-home, #signout'), null, 'no Back, Home or Sign out into the app');
     assert.ok(await ds.evaluate(() => localStorage.getItem('udKioskCode')), 'the existing link keeps it too');
     await shot(ds, '8-driver-kiosk-opened-1536.png');
-    // Reopening the existing link (or driver-room.html) goes straight back to the drivers' Check-In.
+    // Reopening the existing link (or the old driver-room.html, via the Driver Station link) goes straight back to the drivers' Check-In.
     await ds.goto(HOSTING + '/driver-station.html' + ADMIN);
     await ds.waitForURL(/route\.html\?room=1$/);
     await ds.goto(HOSTING + '/driver-room.html');
@@ -261,7 +261,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await ds.isVisible('#m-checkin'), true);
     await ds.click('#m-station');
     await ds.fill('#release-box input', release);
-    await Promise.all([ds.waitForURL(/driver-room\.html$/), ds.click('#release-box button[type=submit]')]);
+    await Promise.all([ds.waitForURL(/driver-station\.html$/), ds.click('#release-box button[type=submit]')]);
     await ds.waitForSelector('#code-box form.st-code');
     assert.equal(await ds.evaluate(() => localStorage.getItem('udRoomStation')), null);
     assert.equal(await ds.evaluate(() => localStorage.getItem('udKioskCode')), null, 'the existing link forgets it too');

@@ -134,7 +134,7 @@
   </form>
 
   <script type="module">
-    import { start, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, escapeHtml, shortDate, showError, isUnitedDairy } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
     import { addSpeak } from './js/speak.js';
     import { askRelease, lockStation } from './js/station-code.js';
@@ -146,10 +146,10 @@
     const room = new URLSearchParams(location.search).get('room') === '1';
     let station = null;
     try { station = room ? JSON.parse(localStorage.getItem('udRoomStation') || 'null') : null; } catch (e) { station = null; }
-    if (room && !station) location.replace('driver-room.html');
+    if (room && !station) location.replace('driver-station.html');
     // Done (signed out, back to the three choices), Back (still signed in), or 5 minutes idle (signed out, View Loadout).
     // The tablet lost its station (a new code, removed): back to the code screen.
-    const roomBack = () => { try { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); localStorage.removeItem('udRoomStation'); localStorage.removeItem('udKioskCode'); } catch (e) {} location.replace('driver-room.html'); };
+    const roomBack = () => { try { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); localStorage.removeItem('udRoomStation'); localStorage.removeItem('udKioskCode'); } catch (e) {} location.replace('driver-station.html'); };
     // Kept on the phone (the code and the name); the page works without it, it just asks again.
     const keep = () => room ? sessionStorage : localStorage, prefix = room ? 'udRoom.' : 'udRoute.';
     const store = {
@@ -329,7 +329,10 @@
     document.getElementById('m-board').addEventListener('click', () => { want = 'board'; show().catch(err => showError(err.message)); });
     document.getElementById('m-dvir').addEventListener('click', run(async () => { want = 'dvir'; await show(); }));
     document.getElementById('m-checkin').addEventListener('click', run(async () => { want = 'checkin'; await show(); }));
-    Promise.resolve().then(show).catch(err => showError(err.message));
+    // Joe 10/12 "these will still also need to have a United Dairy email address to log in first": the Driver Room tablet is
+    // signed in with a United Dairy Google account on the Driver Station link; without it, back there to sign in.
+    const signedIn = room ? start().then(async ({ auth }) => { await auth.authStateReady(); if (isUnitedDairy(auth.currentUser)) return true; location.replace('driver-station.html'); return false; }) : Promise.resolve(true);
+    signedIn.then(ok => ok && show()).catch(err => showError(err.message));
 
     /* ---------- View Loadout (the Driver Room board on the phone) ---------- */
     let boardTimer = null, boardPaused = window.matchMedia('(prefers-reduced-motion: reduce)').matches, boardAt = 0;
