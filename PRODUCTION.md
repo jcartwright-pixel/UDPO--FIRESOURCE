@@ -37,6 +37,12 @@ the new app (the other screens then show the board without saving).
 To turn it off: move those screens back to the current app, then turn the write-back off (the app refuses the other
 order). To be sure nothing more can be written, set the server account's share on the Live workbook back to Viewer.
 
+Turned on and checked on live, 10/12 (Release 6.1, `main` 0f37e9d): Joe set the server account to Editor on the Live
+workbook, turned the write-back on, and moved Daily Dispatch and Weekly Dispatch to the new app. His test save (driver
+note "Checked 10-11" on 836 PECK, Sunday 10-11-26) reached LIVE CURRENT WEEK row 20: `sun_driver_notes` (column BC),
+`sun_updated_at` 2026-10-12T03:10:01.107Z and `sun_updated_by` jcartwright@uniteddairy.com (columns CT and CU). The
+tab's top-left "Week Start" label (B2) is the old app's and can be stale; the rows' `week_start_date` is what counts.
+
 ## The steps
 
 | # | Step | Who | Where |
