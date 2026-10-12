@@ -1594,9 +1594,15 @@ body.deciding #screen { visibility: hidden; }
 
 /* Daily Dispatch: a manager grabs a load by the handle on its route number and moves it up or down, with a mouse or a
    finger (Joe 10/11, the same handle as Daily Case Loadout). The row being moved is shaded; a blue line shows where it lands. */
-body.daily-look table.daily .dd-grip { height: 34px; padding: 0 6px 0 4px; border-radius: 7px; border: 1px dashed #9fb3c8; background: #f5f8fb; color: inherit; font: inherit; font-weight: 900; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
-body.daily-look table.daily .dd-grip::before { content: "\283F"; margin-right: 4px; color: #7a8ca0; font-weight: 400; }
-body.daily-look table.daily .dd-grip:hover { border-color: #1f6feb; background: #eaf2ff; }
+/* Joe 10/12: no grab dots; up and down arrows beside the route number move a load (the Route Master load-order arrows' look). */
+body.daily-look table.daily td.route { white-space: nowrap; }
+body.daily-look table.daily .dd-route { display: inline-block; min-width: 3ch; vertical-align: middle; }
+body.daily-look table.daily .dd-move { display: inline-flex; flex-direction: column; gap: 2px; margin-left: 6px; vertical-align: middle; }
+body.daily-look table.daily button.seq-move { width: 30px; height: 18px; padding: 0; border: 1px solid #9dc2df; border-radius: 5px; background: #edf7ff; color: #0a5e9d; font-size: 11px; line-height: 1; cursor: pointer; }
+body.daily-look table.daily button.seq-move[data-move="-1"]::before { content: "\25B2"; }
+body.daily-look table.daily button.seq-move[data-move="1"]::before { content: "\25BC"; }
+body.daily-look table.daily button.seq-move:hover:not(:disabled) { border-color: #1f6feb; background: #dcebff; }
+body.daily-look table.daily button.seq-move:disabled { opacity: .3; cursor: default; }
 body.daily-look table.daily tr.dragging td { background: #e8f1fa !important; }
 body.daily-look table.daily tr.drop-before td { box-shadow: inset 0 3px 0 #1f6feb; }
 body.daily-look table.daily tr.drop-after td { box-shadow: inset 0 -3px 0 #1f6feb; }
@@ -1674,3 +1680,14 @@ body.uc-locked #screen > :not(.topbar):not(.uc-refused) { display: none !importa
 .launch-grid.six.seven .launch-card strong { font-size: 21px; }
 @media (max-width: 1200px) { .launch-grid.six.seven { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .launch-grid.six.seven { grid-template-columns: 1fr; } }
+
+/* Joe 10/12: a down truck or trailer still on a load (Daily Dispatch banner; Weekly unit text). */
+.notice.warning.down-loads { margin: 0 16px 8px; background: #fde8e8; color: #9b1c1c; border: 2px solid #ee3e3e; border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.notice.warning.down-loads[hidden] { display: none; }
+.notice.warning.down-loads button { background: #b3261e; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.week td.day .unit .unit-down { color: #b3261e; font-weight: 800; }
+
+/* Joe 10/12: Daily Dispatch keeps the picked day; "Go to today" shows when it is not today. The week-change warning. */
+.day-pin #go-today { height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid #e5891a; background: #fff4e5; color: #8a4b00; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.day-pin[hidden] { display: none !important; }
+#week-panel .week-warn { font-size: 16px; line-height: 1.45; margin: 4px 0 14px; color: #8a4b00; font-weight: 700; }

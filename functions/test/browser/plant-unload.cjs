@@ -122,17 +122,45 @@ async function shots(page, name, w) {
     assert.deepEqual(watcher.errors, []);
     await watcher.close(); await dock.close();
 
-    // Product Returns: 805's dock return is still pending; RTA it here.
-    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+    // Joe 10/12: 808's driver checked in "Cases Delivered 659, Cases Returned 566" (empty cases) and refused nothing: not a return.
+    {
+      const snap = (await db().collection('runs').where('weekStart', '==', '2026-10-04').get()).docs.find(d => d.data().route === '808');
+      await snap.ref.update({ 'days.thu.casesDelivered': 659, 'days.thu.driverCaseReturn': 566, 'days.thu.checkinCompletedAt': '2026-10-08T17:40:00Z' });
+    }
+    // Product Returns: 811's check-in refusal (RTA'd above), 805's dock return still pending, and 802's refusal called in by
+    // email (REFUSALS / RETURNS LIVE, no RTA here). 811's 4 cases back are empty cases, so no cases count.
+    for (const [w, h] of [[1920, 950], [1536, 730], [1366, 650]]) {
       const page = await openPage(browser, w, h, '/returns.html?date=' + DATE + WORKER);
-      await page.waitForFunction(() => document.querySelectorAll('#rows tr').length === 2 && /Pending/.test(document.getElementById('rows').textContent));
-      assert.match(await page.textContent('#hstats'), /2Returns7Cases1Refused1Pending/);
+      await page.waitForFunction(() => document.querySelectorAll('#rows tr[data-ret]').length === 3 && /Pending/.test(document.getElementById('rows').textContent));
+      assert.match(await page.textContent('#hstats'), /3Returns3Cases2Refused2Pending/);
+      const text = await page.textContent('#rows');
+      assert.match(text, /Driver call-in.*3 cases chocolate refused/s);
+      assert.doesNotMatch(text, /808|566/, 'empty cases brought back are not a product return');
+      assert.equal(await page.$$eval('#rows tr', trs => trs.filter(t => /Driver call-in/.test(t.textContent) && t.querySelector('button.rta')).length), 0, 'a call-in has no RTA here');
       await fits(page, 'Product Returns ' + w + 'x' + h);
       await shots(page, 'returns', w);
+      // Press a return: its whole write-up opens in the same window, and Close puts it away.
+      await page.click('#rows tr[data-ret^="CHECKIN|"] td.detail');
+      await page.waitForSelector('#rt-modal:not([hidden])');
+      const box = await page.textContent('#rt-modal');
+      assert.match(box, /Driver check-in/);
+      assert.match(box, /2 gallons 2% refused/);
+      assert.match(box, /StoreKroger Uniontown/);
+      assert.match(box, /Empty cases brought back4 \(empty cases, not product\)/);
+      assert.match(box, /Trailer.*T-/s);
+      await shots(page, 'returns-details', w);
+      await page.click('#rt-close');
+      assert.ok(await page.isHidden('#rt-modal'));
+      await page.click('#rows tr[data-ret^="QUEUE|"] button.see');
+      await page.waitForSelector('#rt-modal:not([hidden])');
+      assert.match(await page.textContent('#rt-modal'), /call-in email.*3 cases chocolate refused.*Pending until it is closed on that sheet/s);
+      await shots(page, 'returns-details-callin', w);
+      await page.keyboard.press('Escape');
+      assert.ok(await page.isHidden('#rt-modal'));
       if (w === 1366) {
         await page.click('button.rta');
-        await page.waitForFunction(() => /0Pending/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
-        results.push('Product Returns: RTA on 805 leaves 0 pending');
+        await page.waitForFunction(() => /1Pending/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
+        results.push('Product Returns: RTA on 805 leaves only the call-in pending');
       }
       assert.deepEqual(page.errors, []);
       await page.close();
@@ -141,7 +169,7 @@ async function shots(page, name, w) {
     // + Add Return on the Plant Station tablet: a return nobody noted, on 811 (RedZone product, cases), then RTA.
     {
       const page = await openPage(browser, 1280, 800, '/returns.html?date=' + DATE + WORKER);
-      await page.waitForFunction(() => /0Pending/.test(document.getElementById('hstats').textContent) && !document.getElementById('add-open').hidden);
+      await page.waitForFunction(() => /1Pending/.test(document.getElementById('hstats').textContent) && !document.getElementById('add-open').hidden);
       await page.click('#add-open');
       await page.waitForFunction(() => document.querySelectorAll('#add-product option').length > 10);
       const load = await page.$$eval('#add-load option', os => os.find(o => /^811 · UT DSD MILK/.test(o.textContent)).value);
@@ -151,13 +179,13 @@ async function shots(page, name, w) {
       await page.fill('#add-cases', '4');
       await shots(page, 'returns-add-tablet', 1280);
       await page.click('#add-save');
-      await page.waitForFunction(() => /3Returns11Cases1Refused1Pending/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
+      await page.waitForFunction(() => /4Returns7Cases2Refused2Pending/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
       assert.match(await page.textContent('#rows'), /Added at plant/);
       assert.ok(await page.isHidden('#add-bar'), 'the form closes once the return is added');
       await fits(page, 'Product Returns with + Add Return 1280x800');
       await shots(page, 'returns-added-tablet', 1280);
       await page.click('button.rta');
-      await page.waitForFunction(() => /0Pending/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
+      await page.waitForFunction(() => /1Pending/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
       results.push('Product Returns: + Add Return records a return nobody noted on 811 (4 cases), and RTA clears it');
       assert.deepEqual(page.errors, []);
       await page.close();

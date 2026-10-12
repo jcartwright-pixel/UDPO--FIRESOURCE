@@ -3,14 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="manifest" href="manifest.webmanifest">
+  <!-- Joe 10/12: the plant tablets install this page as its own "Plant Station" icon that opens full screen straight to the
+       station (not the UD Operations launcher). Opened from the no-account link, the icon keeps that link, so the tablet asks
+       for its station code (an iPad's home-screen icon does not share what Safari remembered). -->
+  <link rel="manifest" id="manifest" href="plant-station.webmanifest">
+  <script>if (new URLSearchParams(location.search).get('noaccount') === '1') document.getElementById('manifest').href = 'plant-station-noaccount.webmanifest';</script>
   <meta name="theme-color" content="#074c84">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Plant Station">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Plant Station · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
   <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
 </head>
 <body class="phone ps-page">
   <div class="signin" id="signin" hidden>
@@ -48,7 +56,9 @@
         <div class="ps-stations" id="stations"></div>
       </section>
       <section id="station" hidden>
-        <div class="ps-tabs" id="tabs"></div>
+        <div class="ps-tabs" id="tabs" role="tablist"></div>
+        <!-- Joe 10/12: the station's work shows here, the employee view only (js/station-work.js); no manager screen opens from a station. -->
+        <div class="sw" id="work"></div>
         <p class="ps-foot" id="foot"></p>
         <!-- Administration > Plant Station Codes: once a plant has a manager release code, Change Station asks for it. -->
         <form class="ps-release" id="release" hidden>
@@ -63,14 +73,16 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer, stationCodeSignIn, signOutHere } from './js/app.js';
+    import { start, requireSignIn, watchPerson, escapeHtml, shortDate, showError, goBack, callServer, stationCodeSignIn, signOutHere } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import { resolveStation, askCode, remember } from './js/station-code.js';
+    import { mountStationWork } from './js/station-work.js';
 
     // The current app's Plant Station tablet (PlantStation.html, 057_V774): one station, only its work areas. In the new app
     // the tablet signs in with a United Dairy account (no station code) and picks its station once; it is remembered on the
-    // tablet. Each work area opens the plant's own screen for that area (Loadout Center, Unloading & Washing, ...).
+    // tablet. Joe 10/12: each work area is a tab on this page with the employee view of that work (js/station-work.js), never
+    // the manager screens (Loadout Center, Unloading & Washing, ...), which showed every column, Edit and the Administration header.
     const L = window.UDLogic;
     const STATIONS = [
       { id: 'CASE', label: 'Case Loadout', what: 'Case loading only (unloading is the Case Unloading station)', area: 'CASE', views: ['loading'] },
@@ -80,11 +92,14 @@
       { id: 'YARD_SERVICES', label: 'Yard Services', what: 'Unloading, washing, and product returns', area: '', views: ['unloading', 'washing', 'returns'] }
     ];
     const VIEWS = {
-      loading: { label: 'Loading', what: 'Assigned loadout work', accent: '#1976d2', tone: '#e8f3ff', page: 'loadout.html', pic: { CASE: 'case-v1.webp', TOTES: 'tote-v1.webp', BOXING: 'box-v1.webp' } },
-      unloading: { label: 'Unloading', what: 'Assigned unloading work', accent: '#168a55', tone: '#e8f8ef', page: 'unloading.html', pic: 'tanker-v1.webp' },
-      washing: { label: 'Washing', what: 'Assigned trailer washing', accent: '#0b8da5', tone: '#e7f8fb', page: 'washing.html', pic: 'maintenance-trailer-v1-560.webp' },
-      returns: { label: 'Returns', what: 'Return product to the cooler', accent: '#bd7400', tone: '#fff4db', page: 'returns.html', pic: 'box-v1.webp' }
+      loading: { label: 'Loading', what: 'Assigned loadout work', accent: '#1976d2', tone: '#e8f3ff', pic: { CASE: 'case-v1.webp', TOTES: 'tote-v1.webp', BOXING: 'box-v1.webp' } },
+      unloading: { label: 'Unloading', what: 'Assigned unloading work', accent: '#168a55', tone: '#e8f8ef', pic: 'tanker-v1.webp' },
+      washing: { label: 'Washing', what: 'Assigned trailer washing', accent: '#0b8da5', tone: '#e7f8fb', pic: 'maintenance-trailer-v1-560.webp' },
+      returns: { label: 'Returns', what: 'Return product to the cooler', accent: '#bd7400', tone: '#fff4db', pic: 'box-v1.webp' }
     };
+    // The tab shown (remembered on this tablet for the visit), and the station's work under the tabs.
+    const VIEW_KEY = 'udPlantStationView';
+    let view = (() => { try { return sessionStorage.getItem(VIEW_KEY) || ''; } catch (e) { return ''; } })(), work = null, person = null;
     const KEY = 'udPlantStation';
     const read = () => { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } };
     const write = (v) => { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* private window: not remembered */ } };
@@ -95,7 +110,8 @@
     if (stationId && !read()) write(stationId);
     // The station from its code (Administration > Plant Station Codes): its own name, one of the five station types.
     const CODE_KEY = 'udPlantStationCode', stationCall = (op, f) => callServer('stationRelease', Object.assign({ op }, f));
-    let mode = 'wait', named = null, signedAs = null;
+    // away: this tablet is leaving its station; reads refused on the way out stay quiet.
+    let mode = 'wait', named = null, signedAs = null, away = false;
     // The Plant Station with no UD account: this tablet came from that link (?noaccount=1), so it asks for the station code
     // instead of a Google sign-in (a United Dairy account can still sign in below it).
     const NA_KEY = 'udPlantNoAccount';
@@ -128,6 +144,11 @@
 
     function render() {
       const st = STATIONS.find(s => s.id === stationId);
+      if (st && st.views.indexOf(view) < 0) view = st.views[0];
+      if (work) work.set(st ? { id: st.id, area: st.area, name: named ? named.name : st.label } : null, st ? view : '');
+      // A station's tablet is locked to the station: Back and Home (into the rest of the app) show only while picking a station.
+      document.getElementById('go-back').hidden = !!st;
+      document.getElementById('go-home').hidden = !!st;
       document.getElementById('code-box').hidden = mode !== 'ask';
       document.getElementById('pick').hidden = !!st || mode !== 'free';
       document.getElementById('station').hidden = !st;
@@ -145,13 +166,21 @@
       const loads = P.loadoutRows(runs, date).filter(r => r.area === st.area), left = loads.filter(r => r.state !== 'DONE').length;
       document.getElementById('tabs').innerHTML = st.views.map(v => {
         const x = VIEWS[v], pic = typeof x.pic === 'string' ? x.pic : x.pic[st.area];
-        const href = x.page + (st.area && (v === 'loading' || v === 'unloading') ? '?area=' + st.area : '');
         const count = v === 'loading' ? '<span class="ps-count">' + left + ' remaining of ' + loads.length + ' load' + (loads.length === 1 ? '' : 's') + '</span>' : '';
-        return '<a class="ps-tab" href="' + href + '" style="--accent:' + x.accent + ';--tone:' + x.tone + '"><img src="img/library/' + pic + '" alt=""><span><b>' + x.label + '</b><small>' + x.what + '</small>' + count + '</span></a>';
+        return '<button type="button" role="tab" class="ps-tab" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + x.accent + ';--tone:' + x.tone + '"><img src="img/library/' + pic + '" alt=""><span><b>' + x.label + '</b><small>' + x.what + '</small>' + count + '</span></button>';
       }).join('');
+      document.getElementById('tabs').classList.toggle('one', st.views.length === 1);
       document.getElementById('foot').textContent = st.what + '. This tablet opens this station each time; use Change Station to move it.';
     }
 
+    document.getElementById('tabs').addEventListener('click', e => {
+      const b = e.target.closest('[data-view]');
+      if (!b) return;
+      view = b.dataset.view;
+      try { sessionStorage.setItem(VIEW_KEY, view); } catch (err) { /* private window */ }
+      showError('');
+      render();
+    });
     document.getElementById('stations').addEventListener('click', e => {
       const b = e.target.closest('[data-station]');
       if (!b) return;
@@ -161,7 +190,7 @@
     document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
     const leave = () => {
       stationId = ''; write(''); remember(CODE_KEY, null); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true;
-      if (signedAs) { signedAs = null; signOutHere(); return; } // back to the station code screen
+      if (signedAs) { signedAs = null; away = true; if (work) work.stop(); signOutHere(); return; } // back to the station code screen (reads stopped first)
       decide().catch(err => showError(err.message));
     };
     const releaseCall = (f) => callServer(signedAs ? 'stationSignIn' : 'stationRelease', f);
@@ -189,20 +218,31 @@
 
     requireSignIn(async (user) => {
       const { db } = await start();
-      signedAs = user.station || null;
-      // A tablet signed in by its code alone leaves only through Change Station (and the manager release code).
-      document.getElementById('signout').hidden = !!signedAs;
-      // Still On, and still on this code? (Checked again every 5 minutes below.)
-      if (signedAs) {
-        try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { signedAs = null; write(''); await signOutHere(); showError(r.message); return; } } catch (e) { /* offline: keep the station */ }
-      }
+      signedAs = user.station || null; away = false;
       // Read again when the day rolls at 6 AM (Saturday to Sunday is a new week), so the counts never show last week.
       let date = '', stop = null;
+      // Turned off, a new code or a removed station: every read stops first, so a read the database refuses on the way out
+      // never covers the code screen's message (Off shows "turned off", not a read error).
+      const turnedAway = async (message) => {
+        away = true; signedAs = null; write('');
+        if (stop) { stop(); stop = null; }
+        if (work) work.stop();
+        await signOutHere();
+        showError(message);
+      };
+      // A tablet signed in by its code alone leaves only through Change Station (and the manager release code).
+      document.getElementById('signout').hidden = !!signedAs;
+      // Still On, and still on this code? Checked before anything is read (and again every 5 minutes below).
+      if (signedAs) {
+        try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { await turnedAway(r.message); return; } } catch (e) { /* offline: keep the station */ }
+      }
+      work = mountStationWork({ db, box: document.getElementById('work'), person: () => person });
+      watchPerson(db, user, p => { person = p; if (work) work.render(); });
       const watch = () => {
         date = L.operatingDay(new Date());
         if (stop) stop();
         const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
-        stop = onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message));
+        stop = onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => { if (!away) showError('Could not read the loads: ' + e.message); });
       };
       watch();
       await decide().catch(err => showError('Could not check this tablet\'s station code: ' + (err.message || err)));
@@ -212,7 +252,7 @@
         if (mode === 'code' && named && Date.now() % 300000 < 60000) {
           if (signedAs) {
             // Off, New code or Remove: the tablet goes back to the code screen (the database already refuses it).
-            try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { signedAs = null; write(''); await signOutHere(); showError(r.message); return; } } catch (e) { /* offline: keep the station */ }
+            try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { await turnedAway(r.message); return; } } catch (e) { /* offline: keep the station */ }
           } else {
             try { const r = await stationCall('check', { kind: 'PLANT', key: named.key, version: named.version }); if (!r.ok) { remember(CODE_KEY, null); return decide(r.message); } } catch (e) { /* offline: keep the station */ }
           }

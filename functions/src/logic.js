@@ -661,6 +661,23 @@
   // Off = not usable by the current app's rule (unitUsable below): a status outside AVAILABLE / ACTIVE / IN SERVICE / READY, or a truck
   // or trailer no longer on the fleet list import.
   function unitOff(unit) { return !unitUsable(unit); }
+  // Joe 10/12 ("537 is on the list being down but shows on dispatch"): running loads from fromDate on that still carry a down,
+  // inactive or out-of-service truck or trailer (the current app's week roll can put a down unit back on a route).
+  function offUnitLoads(runs, equipment, fromDate) {
+    var byId = {}, out = [];
+    (equipment || []).forEach(function (e) { if (e && e.id) byId[String(e.id).toUpperCase()] = e; });
+    (runs || []).forEach(function (run) {
+      DAYS.forEach(function (p, i) {
+        var d = run.days && run.days[p], date = addDays(run.weekStart, i);
+        if (!d || !d.runs || (fromDate && date < fromDate)) return;
+        [['truckId', 'truck'], ['trailerId', 'trailer']].forEach(function (k) {
+          var e = d[k[0]] && byId[String(d[k[0]]).toUpperCase()];
+          if (e && unitOff(e)) out.push({ unitId: e.id, unit: e.unit, type: e.type, status: String(e.status || ''), notes: String(e.notes || ''), route: String(run.route || ''), run: String(run.run || ''), date: date, runDocId: run.id, day: p });
+        });
+      });
+    });
+    return out.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : a.route.localeCompare(b.route, undefined, { numeric: true }); });
+  }
 
   // Runs that do not run on a load date's delivery day, for + Add Route / Run (blank load-day offset = -1).
   function notRunningRows(runs, loadDate) {
@@ -1003,7 +1020,7 @@
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
-    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
+    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, offUnitLoads: offUnitLoads, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,

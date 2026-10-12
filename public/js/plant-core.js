@@ -208,28 +208,49 @@ const txt = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const reported = (v) => !!txt(v) && !L.noWriteUp(v);
 
 /*
- * Product returns for one date (getDesktopUiProductReturnsCurrent): the plant journal's RETURN records, plus every driver
- * check-in that reported cases back or refused / returned product. Pending until RTA (put back in the cooler, never dumped).
+ * Product returns for one date (getDesktopUiProductReturnsCurrent): the plant journal's RETURN records, every driver check-in
+ * that reported refused / returned product, and the refusals drivers called in (REFUSALS / RETURNS LIVE, queue = the
+ * plantReturns docs). Pending until RTA (put back in the cooler, never dumped).
+ * Joe 10/12: a check-in's "Cases Returned" / "How Many Returned" is the EMPTY cases the driver brought back, never product,
+ * so it no longer makes a return on its own. Each return carries its write-up (info) for the details box.
  */
-export function returnsFor(runs, date, journal) {
+const QUEUE_DONE = /CLOSED|DONE|COMPLETE|RESOLVED|CANCEL|RTA|RETURNED/;
+export function returnsFor(runs, date, journal, queue) {
   const removed = {}, unloads = U.latestUnloads(journal, date), out = [];
   Object.keys(unloads).forEach(k => unloads[k].removed.forEach(id => { removed[id] = true; }));
   (journal || []).forEach(d => {
     if (String(d.type || '').toUpperCase() !== 'RETURN' || d.date !== date) return;
-    const p = d.payload || {};
+    const p = d.payload || {}, added = p.enteredAt === 'PLANT_STATION';
     out.push({ id: d.recordId, source: 'RETURN', route: txt(p.route || d.route), run: txt(p.run || d.run), trailer: txt(p.trailer || d.trailer), cases: txt(p.casesReturned || p.quantity || d.quantity),
-      refused: !!p.refusedReturned, detail: txt(p.notes || p.description || d.notes) || 'Returned product reported', recordedAt: d.recordedAt || '', added: p.enteredAt === 'PLANT_STATION' });
+      refused: !!p.refusedReturned, detail: txt(p.notes || p.description || d.notes) || 'Returned product reported', recordedAt: d.recordedAt || '', added,
+      info: { from: added ? 'Added at the plant (+ Add Return)' : 'Unloading (dock)', by: txt(d.recordedBy), at: d.recordedAt || '', product: txt(p.product), sku: txt(p.sku),
+        cases: txt(p.casesReturned || p.quantity || d.quantity), notes: txt(p.notes || p.description || d.notes), store: txt(p.refusedReturnedSource), unknownRoute: !!p.unknownRoute } });
   });
-  const prefix = L.dayPrefix(date), week = L.weekStart(date);
+  const prefix = L.dayPrefix(date), week = L.weekStart(date), shown = {};
   (runs || []).forEach(run => {
     const d = run.weekStart === week && run.days && run.days[prefix];
-    if (!d || !d.runs) return;
-    const cases = Number(String(d.driverCaseReturn == null ? '' : d.driverCaseReturn).replace(/,/g, '')) || 0, refused = reported(d.refusedReturned);
-    if (cases <= 0 && !refused) return;
-    out.push({ id: 'CHECKIN|' + run.id + '|' + prefix, source: 'DRIVER CHECK-IN', runDocId: run.id, day: prefix, route: txt(run.route), run: txt(run.run), trailer: txt(d.trailer), cases: cases ? String(cases) : '',
-      refused, detail: [txt(d.refusedReturned), txt(d.refusedReturnedSource)].filter(Boolean).join(' · ') || txt(d.checkinNotes) || 'Returned product reported at driver check-in', recordedAt: d.checkinCompletedAt || '' });
+    if (!d || !d.runs || !reported(d.refusedReturned)) return;
+    shown[run.id] = true;
+    out.push({ id: 'CHECKIN|' + run.id + '|' + prefix, source: 'DRIVER CHECK-IN', runDocId: run.id, day: prefix, route: txt(run.route), run: txt(run.run), trailer: txt(d.trailer), cases: '',
+      refused: true, detail: [txt(d.refusedReturned), txt(d.refusedReturnedSource)].filter(Boolean).join(' · '), recordedAt: d.checkinCompletedAt || '',
+      info: { from: /^EMAIL/i.test(txt(d.updatedBy)) ? 'Driver check-in (call-in email)' : 'Driver check-in', by: txt(d.updatedBy), at: d.checkinCompletedAt || '', driver: txt(d.driver), truck: txt(d.truck),
+        reported: txt(d.refusedReturned), store: txt(d.refusedReturnedSource), notes: txt(d.checkinNotes), casesDelivered: txt(d.casesDelivered), emptyCases: txt(d.driverCaseReturn) } });
   });
-  out.forEach(x => { x.pending = !removed[x.id]; });
+  // Refusals called in to the answering service (the old app's email reader), on the day they were reported. The new app's
+  // own check-ins (ROUTE_APP / APP|...) are already shown from the run above.
+  (queue || []).forEach(q => {
+    if (String(q.kind || 'RETURN').toUpperCase() !== 'RETURN' || q.date !== date) return;
+    const rid = txt(q.record_id);
+    if (!rid || /^APP\|/.test(rid) || String(q.source_type || '').toUpperCase() === 'ROUTE_APP') return;
+    const want = [txt(q.run_id), txt(q.route_id)].filter(Boolean), run = (runs || []).find(r => r.weekStart === week && (want.indexOf(txt(r.runId)) >= 0 || (!txt(q.run_id) && want.some(w => w === txt(r.routeId) || w === txt(r.route)))));
+    if (run && shown[run.id]) return;
+    const d = (run && run.days && run.days[prefix]) || {}, what = txt(q.reason_details || q.issue_details || q.notes) || 'Refused / returned product reported';
+    out.push({ id: 'QUEUE|' + rid, source: 'CALL-IN', readOnly: true, route: run ? txt(run.route) : txt(q.route_id).replace(/^rte_.*/, '') || 'Route?', run: run ? txt(run.run) : '', trailer: txt(d.trailer),
+      cases: '', refused: true, detail: what, recordedAt: q.opened_at || '', queueStatus: txt(q.status).toUpperCase(),
+      info: { from: 'Driver check-in (call-in email)', by: txt(q.opened_by), at: q.opened_at || '', driver: txt(q.driver) || txt(d.driver), truck: txt(d.truck), reported: what,
+        store: txt(q.store_name || q.store_id), notes: txt(q.disposition) ? 'Sheet status: ' + [txt(q.status), txt(q.disposition)].filter(Boolean).join(' · ') : '', email: txt(q.source_id) } });
+  });
+  out.forEach(x => { x.pending = x.source === 'CALL-IN' ? !QUEUE_DONE.test(x.queueStatus || '') : !removed[x.id]; });
   return out.sort((a, b) => String(b.recordedAt).localeCompare(String(a.recordedAt)) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
 }
 

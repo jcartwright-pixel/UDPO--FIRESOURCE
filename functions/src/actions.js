@@ -358,6 +358,8 @@ function validate(input) {
     // Like the current app, the reason is optional.
     if (input.today !== undefined && !L.isDateKey(input.today)) throw new SaveError('BAD_REQUEST', 'today must be yyyy-mm-dd');
     out.today = input.today;
+    // Joe 10/12: a unit already down can be taken off the loads it is still on (its status and reason stay as they are).
+    out.clearOnly = input.clearOnly === true;
     return out;
   }
   if (action === 'addPickup' || action === 'completePickup') return Object.assign(out, PLANT.validatePickup(action, input, SaveError));
@@ -759,6 +761,7 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' }, after: { status: 'ACTIVE' }, result });
     return result;
   }
+  if (req.clearOnly && !L.unitOff(unit)) throw new SaveError('CHANGED', unit.unit + ' is not on the down list any more');
   const today = req.today || L.operatingDay(new Date(stamp));
   const weeks = [L.weekStart(today), L.addDays(L.weekStart(today), 7)];
   const runs = await tx.get(db.collection(C.runs).where('weekStart', 'in', weeks));
@@ -780,11 +783,14 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
     if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id.slice(-6) + p + i, run, r.id, p, { [idKey]: '', [textKey]: '' }, stamp, email));
   });
   const downNote = req.reason ? 'DOWN: ' + req.reason : 'DOWN';
-  tx.update(ref, { status: 'DOWN', notes: downNote, downSince: stamp, testEdited: true, editedAt: stamp, editedBy: email });
-  queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'DOWN', notes: downNote }, false, stamp, email);
+  if (!req.clearOnly) {
+    tx.update(ref, { status: 'DOWN', notes: downNote, downSince: stamp, testEdited: true, editedAt: stamp, editedBy: email });
+    queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'DOWN', notes: downNote }, false, stamp, email);
+  }
   result.removedFrom = removed;
   result.taken = taken.sort((a, b) => a.date.localeCompare(b.date) || a.route.localeCompare(b.route, undefined, { numeric: true }));
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' }, after: { status: 'DOWN', reason: req.reason, removedFrom: removed }, result });
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' },
+    after: req.clearOnly ? { status: unit.status, clearOnly: true, removedFrom: removed } : { status: 'DOWN', reason: req.reason, removedFrom: removed }, result });
   return result;
 }
 

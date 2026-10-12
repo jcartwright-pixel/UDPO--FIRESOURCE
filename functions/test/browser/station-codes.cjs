@@ -101,11 +101,11 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await ps.waitForSelector('.st-code-msg:text("not recognized")');
     await ps.fill('#code-box input', codes.plant.toLowerCase());
     await ps.click('#code-box button');
-    await ps.waitForSelector('.ps-tab');
+    await ps.waitForSelector('#work .sw-panel');
     assert.equal(await ps.textContent('#title'), 'Case Loadout');
     await shot(ps, '5-plant-station-opened-1536.png');
     await ps.reload();
-    await ps.waitForSelector('.ps-tab');
+    await ps.waitForSelector('#work .sw-panel');
     assert.equal(await ps.textContent('#title'), 'Case Loadout', 'the tablet remembers its station');
     await ps.click('#change');
     await ps.waitForSelector('#code-box form.st-code');
@@ -126,19 +126,19 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await p.click('[data-na-on]');
     await p.waitForSelector('#na-row .ap-chip:text-is("ON")', { timeout: 10000 }).catch(async e => { throw new Error('Turn On: ' + await p.textContent('#view').catch(() => '') + ' ' + e.message); });
     await na.click('#noacct button');
-    await na.waitForSelector('.ps-tab');
+    await na.waitForSelector('#work .sw-panel');
     assert.equal(await na.textContent('#title'), 'Case Loadout');
     assert.equal(await na.isVisible('#signout'), false, 'a no-account tablet leaves only through Change Station');
     await shot(na, '11-no-account-station-opened-1536.png');
-    // Its Loading screen reads the loads with no UD account.
-    await Promise.all([na.waitForURL(/loadout\.html/), na.click('.ps-tab')]);
-    await na.waitForSelector('#screen:not([hidden])');
+    // Its Loading list (on the Plant Station page itself, Joe 10/12) reads the loads with no UD account.
     await na.waitForTimeout(1500);
-    assert.equal(await na.isVisible('#error'), false, 'no read error on the loadout with no UD account: ' + await na.textContent('#error'));
+    assert.equal(await na.isVisible('#error'), false, 'no read error on the station\'s loads with no UD account: ' + await na.textContent('#error'));
     await shot(na, '12-no-account-loadout-1536.png');
-    // Any other screen says it needs a UD account.
-    await na.goto(HOSTING + '/daily.html');
-    await na.waitForSelector('#signin-error:text("Only the Plant Station screens")');
+    // Any other screen says it needs a UD account, the manager's Loadout Center too (Joe 10/12: the station is for the employees).
+    for (const other of ['/daily.html', '/loadout.html?area=CASE', '/unloading.html']) {
+      await na.goto(HOSTING + other);
+      await na.waitForSelector('#signin-error:text("Only the Plant Station screens")');
+    }
     // Turn Off (press twice): back on the Plant Station, the tablet is sent to the code screen.
     await p.click('[data-na-off]');
     await p.click('[data-na-off]');

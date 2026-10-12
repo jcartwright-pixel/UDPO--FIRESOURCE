@@ -45,6 +45,7 @@
           <button type="button" id="next" aria-label="Next day">&#9654;</button>
         </div>
       </div>
+      <div class="field day-pin" id="day-pin" hidden><label>&nbsp;</label><button type="button" id="go-today" title="The screen stays on the day you picked until you change it">Go to today</button></div>
       <div class="field"><label for="delivery-day">Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
       <div class="actions in-head">
         <a class="button" id="go-weekly" href="weekly.html">Weekly Dispatch</a>
@@ -57,11 +58,12 @@
       <div class="badge-test" id="mode"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <div class="notice warning down-loads" id="down-loads" hidden><span id="down-loads-text"></span> <button type="button" id="down-loads-clear">Take them off these loads</button></div>
     <div class="sheet">
       <table class="daily">
         <colgroup>
-          <col style="width:5%"><col style="width:13%"><col style="width:7%"><col style="width:15%"><col style="width:4%"><col style="width:7%">
-          <col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:22%"><col style="width:7%">
+          <col style="width:7%"><col style="width:13%"><col style="width:7%"><col style="width:15%"><col style="width:4%"><col style="width:7%">
+          <col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:20%"><col style="width:7%">
         </colgroup>
         <thead><tr>
           <th>Route</th><th>Run</th><th>Runs?</th><th>Driver / CVG</th><th>OVR</th><th>Truck</th><th>Trailer</th><th>Depart time</th><th>Jack</th><th>Driver notes</th><th>Action</th>
@@ -88,9 +90,15 @@
     <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="off-save">Save Driver Status</button></div>
   </section>
 
+  <section class="modal" id="week-panel" role="alertdialog" aria-labelledby="week-title" hidden>
+    <h2 id="week-title">Change the week?</h2>
+    <p id="week-text" class="week-warn"></p>
+    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="week-go">Continue</button></div>
+  </section>
+
   <section class="modal" id="add-panel" role="dialog" aria-labelledby="add-title" hidden>
     <h2 id="add-title">Add Route / Run</h2>
-    <div class="modal-grid"><label class="wide">Route / Run<select id="add-pick"></select></label></div>
+    <div class="modal-grid"><label class="wide">Route / Run<select id="add-pick"></select></label><label class="wide" id="add-where-box">Place in the load order<select id="add-where"></select></label></div>
     <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="add-save">Add to This Day</button></div>
   </section>
 
@@ -120,7 +128,7 @@
     const L = window.UDLogic;
     const params = new URLSearchParams(location.search);
     let loadDate = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
-    let unsubscribeRuns = null, runs = [], rows = [], editing = false, dragging = null, writeBack = false, editRow = null;
+    let unsubscribeRuns = null, runs = [], rows = [], editing = false, writeBack = false, editRow = null;
     const getRuns = () => runs;
     // Session-only screen state, like the current screen: rows switched to NO RUN stay in view, and OVR ticks per row.
     const keptOff = {}, ovr = {};
@@ -182,9 +190,41 @@
       return on;
     }
 
+    // Joe 10/12 ("537 is on the list being down but shows on dispatch"): a down truck or trailer still on a load shows red with DOWN,
+    // so it is plain that the load needs another unit.
+    const unitById = (id) => id ? lists.fleetTrucks.concat(lists.fleetTrailers).find(e => String(e.id).toUpperCase() === String(id).toUpperCase()) : null;
+    function unitCell(r, kind, live, needs) {
+      const text = kind === 'truck' ? r.truck || (noTractor(r) ? 'N/A' : '') : r.trailer, unit = unitById(kind === 'truck' ? r.truckId : r.trailerId);
+      if (!r.off && unit && L.unitOff(unit)) {
+        const why = String(unit.status).toUpperCase() === 'DOWN' ? 'DOWN' : String(unit.status).replace(/_/g, ' ').toUpperCase();
+        const reason = String(unit.notes || '').replace(/^DOWN:?\s*/i, '').split('|')[0].trim();
+        return cell(text + ' ' + why, 'missing offcover unit-down', live && kind).replace(/title="[^"]*"/, () => 'title="' + escapeHtml(text + ' is ' + why.toLowerCase() + (reason && !/^down\b/i.test(reason) ? ' (' + reason + ')' : '') + '. Pick another ' + kind + '.') + '"');
+      }
+      return kind === 'truck' ? cell(text, r.truck || !needs || noTractor(r) ? '' : 'missing', live && 'truck') : cell(text, r.trailer || !needs ? '' : 'missing', live && 'trailer');
+    }
+    // Every load from today on (in the weeks on screen) that still has a down unit, with one button to take those units off.
+    function paintDownLoads(edit) {
+      const box = document.getElementById('down-loads'), list = L.offUnitLoads(runs, lists.fleetTrucks.concat(lists.fleetTrailers), L.operatingDay(new Date()));
+      box.hidden = !list.length;
+      if (!list.length) return;
+      const units = [...new Set(list.map(x => x.unit))];
+      document.getElementById('down-loads-text').textContent = (units.length === 1 ? units[0] + ' is on the down list but is still on ' : 'On the down list but still on loads: ') +
+        list.map(x => (units.length === 1 ? '' : x.unit + ' on ') + 'Route ' + x.route + ' (' + L.dayName(x.date).slice(0, 3) + ' ' + shortDate(x.date) + ')').join(', ') + '.';
+      const btn = document.getElementById('down-loads-clear');
+      btn.hidden = !edit;
+      btn.textContent = units.length === 1 ? 'Take ' + units[0] + ' off these loads' : 'Take them off these loads';
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try {
+          for (const id of [...new Set(list.map(x => x.unitId))]) {
+            await saveOptimistic('setUnitDown', { equipmentId: id, clearOnly: true, today: L.operatingDay(new Date()) }, () => {}, () => {}, render);
+          }
+        } finally { btn.disabled = false; }
+      };
+    }
+
     function render() {
       if (editing) return; // a picker is open; the next render happens when it closes
-      if (dragging) { dragging.held = true; return; } // a load is being moved; the screen redraws when it is let go
       rows = buildRows();
       const edit = canSave(), order = canReorder();
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
@@ -210,9 +250,12 @@
           body.push('<tr class="group loaded' + (r.already ? ' already' : '') + '"><td colspan="11"><span class="gtext">' + escapeHtml(line) + '</span></td></tr>');
         }
         const driver = r.driver || coverageName(r), live = edit && !r.off, needs = !r.off;
-        body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (order && !r.off && !r.already ? ' draggable="true"' : '') + (r.off ? ' class="off"' : r.already ? ' class="already"' : '') + '>' +
-          (order && !r.off && !r.already
-            ? '<td class="route"><button type="button" class="dd-grip" data-grip aria-label="Drag ' + escapeHtml(r.route + ' ' + r.run) + ' to a new place in the load order" title="Drag to change the load order">' + escapeHtml(r.route) + '</button></td>'
+        // Joe 10/12: no grab dots; a manager moves a load with the up and down arrows beside its route number.
+        const mover = order && !r.off && !r.already, sameDay = mover ? rows.filter(x => !x.off && !x.already && x.loadDate === r.loadDate) : [], at = sameDay.indexOf(r);
+        body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (r.off ? ' class="off"' : r.already ? ' class="already"' : '') + '>' +
+          (mover
+            ? '<td class="route"><span class="dd-route">' + escapeHtml(r.route) + '</span><span class="dd-move"><button type="button" class="seq-move" data-move="-1" aria-label="Move ' + escapeHtml(r.route + ' ' + r.run) + ' up" title="Load earlier"' + (at > 0 ? '' : ' disabled') + '></button>' +
+              '<button type="button" class="seq-move" data-move="1" aria-label="Move ' + escapeHtml(r.route + ' ' + r.run) + ' down" title="Load later"' + (at < sameDay.length - 1 ? '' : ' disabled') + '></button></span></td>'
             : '<td class="route">' + escapeHtml(r.route) + '</td>') +
           cell(r.run, 'strong') +
           '<td><button type="button" class="toggle' + (r.off ? '' : ' on') + '" data-runs' + (edit ? '' : ' disabled') + ' aria-pressed="' + !r.off + '" title="Click to change whether this run runs">' + (r.off ? 'NO RUN' : 'RUNS') + '</button></td>' +
@@ -220,8 +263,7 @@
             ? cell('', 'missing offcover', live && 'driver').replace('<td ', '<td data-cover="' + escapeHtml(coverLabel(cover[r.id])) + '" ').replace('title=""', 'title="' + escapeHtml(coverLabel(cover[r.id]) + ': needs a driver') + '"')
             : cell(driver, driver || !needs ? '' : 'missing', live && 'driver')) +
           '<td><input type="checkbox" class="ovr" data-ovr aria-label="Override" title="Override: choose a driver or unit that is off or down"' + (ovr[r.id] ? ' checked' : '') + (live ? '' : ' disabled') + '></td>' +
-          cell(r.truck || (noTractor(r) ? 'N/A' : ''), r.truck || !needs || noTractor(r) ? '' : 'missing', live && 'truck') +
-          cell(r.trailer, r.trailer || !needs ? '' : 'missing', live && 'trailer') +
+          unitCell(r, 'truck', live, needs) + unitCell(r, 'trailer', live, needs) +
           cell(departText(r), '', live && 'time') + cell(r.palletJack, '', live && 'jack') +
           (r.pickup ? cell('PICKUP ' + r.pickup, 'pickup') : cell(r.driverNotes, 'left', live && 'note')) +
           '<td>' + (edit ? '<button type="button" class="edit" data-open>Edit</button>' : '') + '</td></tr>');
@@ -229,6 +271,7 @@
       // Polish item 17 (Joe 10/11): a plain line that names the day and says what to do.
       if (!rows.length) body.push('<tr><td colspan="11" class="empty">No loads on ' + L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(loadDate))] + ' ' + shortDate(loadDate) + '. Use the arrows to pick another day.</td></tr>');
       keepCursor(document.getElementById('rows'), () => { document.getElementById('rows').innerHTML = body.join(''); });
+      paintDownLoads(edit);
       const running = rows.filter(r => !r.off && !r.already), covered = running.filter(r => !L.needsDriver(r)).length;
       // Polish item 3 (Joe 10/11): a day with no loads says so instead of showing 0% covered.
       document.getElementById('coverage').firstElementChild.textContent = running.length ? Math.round(100 * covered / running.length) + '%' : '—';
@@ -247,8 +290,11 @@
     const rmHours = (r) => { const d = routeHours[r.runId]; return d && d[r.day]; };
     // Every load delivered the same day as this row, whichever day it loaded (the sheet shows only the loadout day's loads,
     // but a unit out on a load from the day before is still in use).
-    function dayRowsFor(row) {
+    // Joe 10/12: "that day" is the loadout day too: a unit on any load on this loadout sheet (855 / 856 deliver Monday but load
+    // Monday, like 812 for Tuesday) is taken, as well as one on another load delivering the same day.
+    function dayRowsFor(row, deliveryOnly) {
       const out = [row];
+      if (!deliveryOnly) L.dailyRows(runs, row.loadDate).forEach(r => { if (r.id !== row.id && !out.some(x => x.id === r.id)) out.push(rows.find(x => x.id === r.id) || r); });
       for (let k = 0; k <= 3; k++) {
         L.dailyRows(runs, L.addDays(row.deliveryDate, -k)).forEach(r => {
           if (r.deliveryDate !== row.deliveryDate || r.id === row.id || out.some(x => x.id === r.id)) return;
@@ -269,7 +315,7 @@
     // Drivers and units already used on this delivery day, so the list can show "(on 802)".
     function busyFor(kind, row) {
       const key = kind === 'driver' ? 'driverId' : kind === 'truck' ? 'truckId' : 'trailerId', busy = {};
-      dayRowsFor(row).forEach(r => { if (r !== row && !r.off && r[key]) busy[r[key]] = 'on ' + r.route; });
+      dayRowsFor(row, kind === 'driver').forEach(r => { if (r !== row && !r.off && r[key]) busy[r[key]] = 'on ' + r.route; });
       return busy;
     }
 
@@ -346,86 +392,26 @@
       setRuns(row, !!row.off);
     });
 
-    // Managers grab a load by the handle on its route number and move it up or down; the whole day's order is saved as one
-    // call. Pointer events, not the browser's drag and drop, so a finger on a tablet works as well as a mouse (Joe 10/11,
-    // the same handle as Daily Case Loadout). The row being moved is shaded and a blue line shows where it lands.
-    body.addEventListener('dragstart', e => { if (e.target.closest && e.target.closest('tr[data-index]')) e.preventDefault(); });
-    function scrollerOf(el) {
-      for (let n = el && el.parentElement; n && n !== document.body; n = n.parentElement) {
-        const o = getComputedStyle(n).overflowY;
-        if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) return n;
-      }
-      return document.scrollingElement;
-    }
-    function dropTarget(x, y) {
-      const el = document.elementFromPoint(x, y), tr = el && el.closest && el.closest('#rows tr[data-index]');
-      const ids = dragging.ids;
-      if (!tr || ids.indexOf(Number(tr.dataset.index)) < 0) {
-        // Past the first or last of this load day's loads: the ends of the list.
-        const first = body.querySelector('tr[data-index="' + ids[0] + '"]'), last = body.querySelector('tr[data-index="' + ids[ids.length - 1] + '"]');
-        if (first && y < first.getBoundingClientRect().top) return { index: ids[0], after: false };
-        if (last && y > last.getBoundingClientRect().bottom) return { index: ids[ids.length - 1], after: true };
-        return null;
-      }
-      const box = tr.getBoundingClientRect();
-      return { index: Number(tr.dataset.index), after: y > box.top + box.height / 2 };
-    }
-    function markDrop(t) {
-      body.querySelectorAll('tr.drop-before, tr.drop-after').forEach(tr => tr.classList.remove('drop-before', 'drop-after'));
-      const tr = t && body.querySelector('tr[data-index="' + t.index + '"]');
-      if (tr) tr.classList.add(t.after ? 'drop-after' : 'drop-before');
-    }
-    function endDrag(apply) {
-      const d = dragging;
-      if (!d) return;
-      dragging = null;
-      clearInterval(d.scroller);
-      markDrop(null);
-      d.row.classList.remove('dragging');
-      document.body.classList.remove('dd-dragging');
-      const again = () => { if (d.held) render(); };
-      if (!apply || !d.target) return again();
-      const moving = rows[d.index], ordered = rows.filter(r => !r.off && r.loadDate === moving.loadDate);
-      const from = ordered.indexOf(moving);
-      let to = ordered.indexOf(rows[d.target.index]) + (d.target.after ? 1 : 0);
-      if (to > from) to--;
-      if (from < 0 || to < 0 || to === from) return again();
+    // Joe 10/12: the up and down arrows move a load one place among its own load day's loads (Saturday's sheet holds Sunday's
+    // too); the whole day's order is saved as one call.
+    function moveLoad(index, step) {
+      const moving = rows[index], ordered = rows.filter(r => !r.off && !r.already && r.loadDate === moving.loadDate);
+      const from = ordered.indexOf(moving), to = from + step;
+      if (from < 0 || to < 0 || to >= ordered.length) return;
       ordered.splice(from, 1);
       ordered.splice(to, 0, moving);
-      saveOrder(getRuns, moving.loadDate, ordered, render);
+      return saveOrder(getRuns, moving.loadDate, ordered, render);
     }
-    body.addEventListener('pointerdown', e => {
-      const g = e.target.closest('[data-grip]');
-      if (!g || dragging || editing || !canReorder() || (e.pointerType === 'mouse' && e.button !== 0)) return;
-      e.preventDefault();
-      const tr = g.closest('tr[data-index]'), index = Number(tr.dataset.index), row = rows[index];
-      // The load order is per load day (Saturday's sheet holds Sunday's too), so a load moves only among its own day's loads.
-      const ids = rows.map((r, i) => (!r.off && r.loadDate === row.loadDate ? i : -1)).filter(i => i >= 0);
-      dragging = { index, ids, row: tr, target: null, x: e.clientX, y: e.clientY, scroller: null };
-      tr.classList.add('dragging');
-      document.body.classList.add('dd-dragging');
-      try { g.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
-      // Near the top or bottom of the window the list scrolls by itself, so a load can be moved past what is on screen.
-      const box = scrollerOf(tr);
-      dragging.scroller = setInterval(() => {
-        if (!dragging) return;
-        const r = box === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : box.getBoundingClientRect(), edge = 48;
-        const step = dragging.y < r.top + edge ? -12 : dragging.y > r.bottom - edge ? 12 : 0;
-        if (step) { box.scrollTop += step; dragging.target = dropTarget(dragging.x, dragging.y); markDrop(dragging.target); }
-      }, 30);
+    body.addEventListener('click', e => {
+      const b = e.target.closest('button[data-move]');
+      if (!b || b.disabled || editing || !canReorder()) return;
+      e.stopPropagation();
+      const tr = b.closest('tr[data-index]');
+      moveLoad(Number(tr.dataset.index), Number(b.dataset.move));
     });
-    body.addEventListener('pointermove', e => {
-      if (!dragging) return;
-      e.preventDefault();
-      dragging.x = e.clientX; dragging.y = e.clientY;
-      dragging.target = dropTarget(e.clientX, e.clientY);
-      markDrop(dragging.target);
-    });
-    body.addEventListener('pointerup', () => endDrag(true));
-    body.addEventListener('pointercancel', () => endDrag(false));
 
     /* ---------- Edit box: the same fields as the current screen; each change saves the moment it is made ---------- */
-    const modals = ['edit-modal', 'calloff-panel', 'add-panel', 'down-panel'];
+    const modals = ['edit-modal', 'calloff-panel', 'add-panel', 'down-panel', 'week-panel'];
     function openModal(id) { modals.forEach(m => { document.getElementById(m).hidden = m !== id; }); document.getElementById('modal-back').hidden = false; }
     function closeModals() { modals.forEach(m => { document.getElementById(m).hidden = true; }); document.getElementById('modal-back').hidden = true; editRow = null; }
     document.getElementById('modal-back').onclick = closeModals;
@@ -520,14 +506,34 @@
       document.getElementById('add-pick').innerHTML = addable.length
         ? '<option value="">Select a route / run</option>' + addable.map((r, i) => '<option value="' + i + '">' + escapeHtml(r.route + ' ' + r.run + ', ' + L.dayName(r.deliveryDate) + ' ' + shortDate(r.deliveryDate)) + '</option>').join('')
         : '<option value="">Every route already runs on this day</option>';
+      paintAddWhere();
       openModal('add-panel');
     };
+    // Joe 10/12: an added route can be placed where it loads (and moved later with the arrows like any other load).
+    function paintAddWhere() {
+      const r = addable[Number(document.getElementById('add-pick').value)], box = document.getElementById('add-where-box');
+      const day = r && document.getElementById('add-pick').value !== '' ? rows.filter(x => !x.off && !x.already && x.loadDate === loadDate) : [];
+      box.hidden = !canReorder() || !day.length;
+      document.getElementById('add-where').innerHTML = '<option value="">At the end</option><option value="first">First, before Route ' + escapeHtml(day.length ? day[0].route : '') + '</option>' +
+        day.map(x => '<option value="' + escapeHtml(x.id) + '">After Route ' + escapeHtml(x.route + ' ' + x.run) + '</option>').join('');
+    }
+    document.getElementById('add-pick').onchange = paintAddWhere;
     document.getElementById('add-save').onclick = () => {
       const r = addable[Number(document.getElementById('add-pick').value)];
       if (!r || document.getElementById('add-pick').value === '') { showError('Select a route / run to add.'); return; }
+      const where = document.getElementById('add-where-box').hidden ? '' : document.getElementById('add-where').value;
       closeModals();
       delete keptOff[r.id];
-      saveRunChange(getRuns, r.runDocId, r.day, 'setRuns', { runs: true }, d => { d.runs = true; }, render);
+      saveRunChange(getRuns, r.runDocId, r.day, 'setRuns', { runs: true }, d => { d.runs = true; }, render).then(out => {
+        if (!out || !where) return;
+        const added = rows.find(x => x.runDocId === r.runDocId && x.day === r.day && !x.off);
+        if (!added) return;
+        const ordered = rows.filter(x => !x.off && !x.already && x.loadDate === added.loadDate && x !== added);
+        const after = where === 'first' ? -1 : ordered.findIndex(x => x.id === where);
+        if (where !== 'first' && after < 0) return;
+        ordered.splice(after + 1, 0, added);
+        saveOrder(getRuns, added.loadDate, ordered, render);
+      });
     };
 
     /* ---------- Down Trucks / Trailers ---------- */
@@ -618,6 +624,7 @@
       if (unsubscribeRuns) unsubscribeRuns();
       const begin = weekBegin(loadDate);
       document.getElementById('week-begin').value = shortDate(L.addDays(begin, 1));
+      document.getElementById('day-pin').hidden = loadDate === L.operatingDay(new Date());
       document.getElementById('load-day').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
         const key = L.addDays(begin, i);
         return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key)) + '</option>';
@@ -634,7 +641,20 @@
       }, e => showError('Could not read the dispatch: ' + e.message));
     }
 
-    function move(days) { closeModals(); loadDate = L.addDays(loadDate, days); watchRuns(); }
+    // Joe 10/12: the day picked stays picked (per person, on this computer) after leaving the page and coming back, until he
+    // changes it; a move into another week asks first (Continue or Cancel).
+    let dayKey = '';
+    function goTo(key) {
+      if (!L.isDateKey(key) || key === loadDate) return;
+      const go = () => { closeModals(); loadDate = key; try { if (dayKey) localStorage.setItem(dayKey, key); } catch (e) { /* storage off */ } watchRuns(); };
+      if (weekBegin(key) === weekBegin(loadDate)) return go();
+      document.getElementById('week-text').textContent = 'This moves Daily Dispatch from the week beginning ' + shortDate(L.addDays(weekBegin(loadDate), 1)) +
+        ' to the week beginning ' + shortDate(L.addDays(weekBegin(key), 1)) + ' (' + L.dayName(key) + ' ' + shortDate(key) + ').';
+      document.getElementById('week-go').onclick = go;
+      openModal('week-panel');
+      document.getElementById('week-go').focus();
+    }
+    function move(days) { goTo(L.addDays(loadDate, days)); }
 
     requireSignIn(async (user) => {
       const { db } = await start();
@@ -656,7 +676,10 @@
       document.getElementById('next').onclick = () => move(1);
       document.getElementById('week-prev').onclick = () => move(-7);
       document.getElementById('week-next').onclick = () => move(7);
-      document.getElementById('load-day').onchange = e => { if (L.isDateKey(e.target.value)) { closeModals(); loadDate = e.target.value; watchRuns(); } };
+      document.getElementById('load-day').onchange = e => goTo(e.target.value);
+      document.getElementById('go-today').onclick = () => goTo(L.operatingDay(new Date()));
+      dayKey = 'ud.daily.day.' + String(params.get('testEmail') || (user && user.email) || '').toLowerCase();
+      if (!L.isDateKey(params.get('date'))) { try { const kept = localStorage.getItem(dayKey); if (L.isDateKey(kept)) loadDate = kept; } catch (e) { /* storage off */ } }
       window.addEventListener('resize', render);
       watchRuns();
     });

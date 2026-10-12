@@ -1,0 +1,19 @@
+{
+  "name": "UD Plant Station",
+  "short_name": "Plant Station",
+  "description": "Plant Station tablets: case loading, unloading, washing and returns.",
+  "id": "/plant-station.html",
+  "start_url": "/plant-station.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#0e138d",
+  "theme_color": "#074c84",
+  "icons": [
+    { "src": "/img/app-icon/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/img/app-icon/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/img/app-icon/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/img/app-icon/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

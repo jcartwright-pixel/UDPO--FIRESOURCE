@@ -160,6 +160,11 @@
       ob.classList.toggle('on', override);
       ob.setAttribute('aria-pressed', String(override));
       rows = L.weeklyRows(preview ? previewRuns() : runs, week);
+      // Joe 10/12 ("537 is on the list being down but shows on dispatch"): a down truck or trailer still on a run says DOWN in red.
+      const fleet = lists.fleetTrucks.concat(lists.fleetTrailers), offOf = (id) => { const e = id && fleet.find(x => String(x.id).toUpperCase() === String(id).toUpperCase()); return e && L.unitOff(e) ? (String(e.status).toUpperCase() === 'DOWN' ? 'DOWN' : String(e.status).replace(/_/g, ' ').toUpperCase()) : ''; };
+      const unitParts = (d) => [[d.truck, d.truckId], [d.trailer, d.trailerId]].filter(x => x[0]).map(x => ({ text: x[0], off: offOf(x[1]) }));
+      const unitsText = (d) => unitParts(d).map(u => u.text + (u.off ? ' (' + u.off + ')' : '')).join(' / ');
+      const unitsHtml = (d) => unitParts(d).map(u => escapeHtml(u.text) + (u.off ? ' <b class="unit-down">' + escapeHtml(u.off) + '</b>' : '')).join(' / ');
       const ctx = L.weeklyContext(rows, lists.allDrivers, lists.exceptions, plantLoads);
       plantCtx = ctx;
       document.getElementById('heads').innerHTML = headCells('<th>Route</th><th>Run / Destination</th>');
@@ -175,9 +180,9 @@
           if (cls === 'coverage' && !override) return '<td class="day off c-coverage" data-day="' + p + '" title="' + escapeHtml(String(r.coverageType || 'Covered') + ' covers this run') + '"></td>';
           const units = [d.truck, d.trailer].filter(Boolean).join(' / '), plant = L.plantFor(ctx, r, p);
           const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? coverText(L.offCover(r, p, d.date, ctx)) : cls === 'plant' ? 'PLANT LOAD' : '\u2014 NEEDS DRIVER \u2014');
-          const full = name + (units ? ', ' + units : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
+          const full = name + (units ? ', ' + unitsText(d) : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
           return '<td class="day c-' + cls + (plant ? ' plant-load' : '') + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(full) + '"><b class="nm">' + escapeHtml(name) + '</b>' +
-            (units ? '<span class="unit">' + escapeHtml(units) + '</span>' : '') + '</td>';
+            (units ? '<span class="unit">' + unitsHtml(d) + '</span>' : '') + '</td>';
         }).join('') + '</tr>').join('') || '<tr><td colspan="9" class="empty">' + (kind === 'old' ? 'This older week was not kept in the new app.' : kind === 'future' ? 'Loading Route Master to preview this week.' : 'This week is not one of the copied Live weeks.') + '</td></tr>';
 
       const board = L.driverBoardRows(lists.allDrivers, rows, lists.exceptions, week);

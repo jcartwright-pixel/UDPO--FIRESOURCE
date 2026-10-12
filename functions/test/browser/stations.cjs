@@ -175,11 +175,11 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await ps.waitForSelector('[data-station="CASE_UNLOADING"]');
     await shot(ps, 'plant-station-pick-1920.png');
     await ps.click('[data-station="CASE"]');
-    await ps.waitForSelector('.ps-tab');
+    await ps.waitForSelector('#work .sw-card');
     await shot(ps, 'plant-station-case-1920.png');
     assert.deepEqual(await ps.$$eval('.ps-tab b', b => b.map(x => x.textContent)), ['Loading']);
     await ps.reload();
-    await ps.waitForSelector('.ps-tab');
+    await ps.waitForSelector('#work .sw-card');
     assert.equal(await ps.textContent('#title'), 'Case Loadout', 'the tablet remembers its station');
     await ps.click('#change');
     await ps.click('[data-station="CASE_UNLOADING"]');
@@ -190,14 +190,52 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     const tab = await openPage(browser, 1280, 800, '/plant-station.html' + MANAGER, clock);
     await tab.waitForSelector('[data-station="CASE_UNLOADING"]');
     assert.equal(await tab.$('.sidemenu'), null, 'no desktop side menu on the Plant Station');
-    assert.ok(await tab.isVisible('#go-back') && await tab.isVisible('#go-home'), 'Back and Home in the slim header');
+    assert.ok(await tab.isVisible('#go-back') && await tab.isVisible('#go-home'), 'Back and Home in the slim header while picking the station');
     assert.ok(await fits(tab), 'the Plant Station fits a tablet');
     await shot(tab, 'plant-station-tablet-pick-1280.png');
     await tab.click('[data-station="CASE_UNLOADING"]');
-    await tab.waitForSelector('.ps-tab');
+    await tab.waitForSelector('#work .sw-panel');
     await shot(tab, 'plant-station-tablet-unloading-1280.png');
     assert.deepEqual(tab.errors, []);
     results.push('Plant Station: tablet layout with a slim header (Back, Home) and no desktop menu');
+
+    // Joe 10/12: "This should only be a mobile view. and not be able to see all the information. This is for the employees."
+    // A station shows its own work on this page (today, its area, cards), with no way into the manager screens.
+    const managerPages = (page) => page.$$eval('a[href]', a => a.map(x => x.getAttribute('href')).filter(h => /loadout|unloading|washing|returns|index|administration|manager/.test(h)));
+    assert.deepEqual(await managerPages(tab), [], 'no link to a manager screen from Case Unloading');
+    assert.equal(await tab.isVisible('#go-back') || await tab.isVisible('#go-home'), false, 'a station has no Back or Home into the rest of the app');
+    for (const v of ['washing', 'returns', 'unloading']) {
+      await tab.click('[data-view="' + v + '"]');
+      await tab.waitForSelector('#work .sw-panel-head h2:text-is("' + v[0].toUpperCase() + v.slice(1) + '")');
+      assert.equal(tab.url().split('/').pop().split('?')[0], 'plant-station.html', 'the ' + v + ' tab stays on the Plant Station');
+    }
+    assert.ok(await fits(tab), 'the station work fits a tablet');
+    await tab.click('#change');
+    await tab.click('[data-station="CASE"]');
+    await tab.waitForSelector('#work .sw-card');
+    assert.equal(await tab.isVisible('#tabs'), false, 'one work area: no tabs, the loads straight away');
+    assert.deepEqual(await managerPages(tab), [], 'no link to a manager screen from Case Loadout');
+    for (const gone of ['#load-date', '.areas', 'table', '[data-edit]', '.hdr-admin', '#go-admin']) assert.equal(await tab.$(gone), null, gone + ' is not on the station');
+    // Start a waiting load, type its cases, Complete: the card shows each step.
+    const card = '#work .sw-card:not(.done):not(.run) >> nth=0';
+    const id = await tab.getAttribute(card, 'data-sw');
+    const at = '#work .sw-card[data-sw="' + id + '"]';
+    await tab.click(at + ' [data-act="start"]');
+    await tab.waitForSelector(at + '.run.open .sw-badge:text-is("LOADING")', { timeout: 10000 });
+    await tab.fill(at + ' [data-k="quantity"]', '412');
+    await tab.click(at + ' [data-act="complete"]');
+    await tab.waitForSelector(at + '.done .sw-badge:text-is("COMPLETE")', { timeout: 10000 });
+    await tab.click(at + ' .sw-head');
+    assert.equal(await tab.inputValue(at + ' [data-k="quantity"]'), '412');
+    assert.equal(await tab.isDisabled(at + ' [data-k="quantity"]'), true, 'a finished load is read only on the station');
+    assert.deepEqual(tab.errors, []);
+    const stPhone = await openPage(browser, 390, 844, '/plant-station.html' + MANAGER, clock);
+    await stPhone.click('[data-station="CASE"]');
+    await stPhone.waitForSelector('#work .sw-card');
+    assert.ok(await fits(stPhone), 'the station work fits a phone');
+    await shot(stPhone, 'plant-station-case-phone-390.png');
+    assert.deepEqual(stPhone.errors, []);
+    results.push('Plant Station: the employee view on the station page (today, its area, cards; Start, cases, Complete); no Back, Home, dates, Edit or links to the manager screens');
   } finally {
     await browser.close();
   }

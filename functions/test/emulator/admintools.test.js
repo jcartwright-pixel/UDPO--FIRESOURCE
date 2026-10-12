@@ -137,6 +137,11 @@ test('Driver Check-In Email: the answering-service email becomes records once; a
   assert.equal(failed.status, 'FAIL');
   assert.match(failed.message, /gmail.readonly/);
   assert.deepEqual(T.parseCheckinEmail('Name: A\nRoute: 1\nName: B\nRoute: 2'), { digest: true });
+  // Joe 10/12: a report is dated by its TAKEN line (a resent Saturday report stays on Saturday), with the 6 a.m. day roll.
+  const chad = T.parseCheckinEmail('Sat 10-Oct-26 02:38p TAKEN\nName +(UT): Chad Herman\nRoute Number: 812\nHow Many Returned: 566\nRefused/Returned: NO');
+  assert.deepEqual([chad.driver, chad.route, chad.taken, chad.driverCaseReturn, chad.refusedReturned], ['Chad Herman', '812', '2026-10-10', 566, '']);
+  assert.equal(T.parseCheckinEmail('Sun 11-Oct-26 03:10a TAKEN\nName: A\nRoute: 1').taken, '2026-10-10');
+  assert.equal(T.parseCheckinEmail('Name: A\nRoute: 1').taken, '');
 });
 
 test('Driver Check-In Email per location (Joe 10/11): each plant keeps its own settings; Uniontown keeps the saved ones', async () => {
