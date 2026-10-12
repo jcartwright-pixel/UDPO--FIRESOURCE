@@ -1,8 +1,8 @@
 // Drag a table row up or down to change the order (Joe 10/12: "grab the line with the hand and drag it", no dots, no arrows).
 //
 // mountRowDrag({ box, canDrag, onMove }) on a <tbody>: every row with data-drag="<id>" can be picked up anywhere except on a
-// box, button or link. A mouse picks it up after it moves a few pixels; a finger after holding it still for a moment (a quick
-// swipe still scrolls the page). While it moves, the row is lifted and a blue line shows where it will land. Letting go calls
+// box, button or link. A mouse picks it up after it moves a few pixels; a finger on the Route or Run box at once (as on Weekly
+// Dispatch), and anywhere else after holding it still for a moment (a quick swipe there still scrolls the page). While it moves, the row is lifted and a blue line shows where it will land. Letting go calls
 // onMove(id, toIndex), toIndex being its new place among the data-drag rows. Keyboard: the row takes focus (Tab) and
 // Alt+Up / Alt+Down move it one place. Rows without data-drag (loaded, skipped) stay where they are and take no drop.
 
@@ -19,14 +19,16 @@ export function mountRowDrag({ box, canDrag, onMove }) {
   document.body.appendChild(line);
 
   function slotAt(y, from) {
-    // The place among the other movable rows the pointer is over: above a row's middle lands before it.
-    const list = rows().filter(r => r !== from);
+    // The place among the other movable rows the pointer is over: above a row's middle lands before it. Rows are matched by
+    // id, not by element: the list can be drawn again mid-drag (another screen's save lands), and the dragged load's new
+    // line must not count as one of the others.
+    const list = rows().filter(r => r.dataset.drag !== from);
     let i = 0;
     for (; i < list.length; i++) { const b = list[i].getBoundingClientRect(); if (y < b.top + b.height / 2) break; }
     return { i, list };
   }
   function showLine(y) {
-    const { i, list } = slotAt(y, drag.row);
+    const { i, list } = slotAt(y, drag.id);
     const ref = list[i] || list[list.length - 1];
     if (!ref) { line.hidden = true; return i; }
     const b = ref.getBoundingClientRect(), t = box.closest('table').getBoundingClientRect();
@@ -59,9 +61,11 @@ export function mountRowDrag({ box, canDrag, onMove }) {
     const row = e.target.closest('tr[data-drag]');
     if (!row || !box.contains(row) || e.target.closest(SKIP)) return;
     const touch = e.pointerType !== 'mouse';
-    press = { row, x: e.clientX, y: e.clientY, pointerId: e.pointerId, touch };
-    // A finger holds still to pick the row up; moving first is a scroll.
-    if (touch) press.timer = setTimeout(() => { if (press && !drag) begin(); }, HOLD_MS);
+    // The Route and Run boxes (the first two) are the handle for a finger, as on Weekly Dispatch: it drags straight away.
+    const handle = !!e.target.closest('td') && e.target.closest('td').cellIndex < 2;
+    press = { row, x: e.clientX, y: e.clientY, pointerId: e.pointerId, touch: touch && !handle };
+    // Elsewhere on the line a finger holds still to pick the row up; moving first is a scroll.
+    if (press.touch) press.timer = setTimeout(() => { if (press && !drag) begin(); }, HOLD_MS);
   });
   box.addEventListener('pointermove', e => {
     if (!press) return;
