@@ -4,23 +4,31 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const P = require('../../../tools/production-env.cjs');
 
-// The production server's settings: the real sheets read only, no write-back, no sandbox copies, no made-up data.
+// The production server's settings: the real sheets, dispatch changes written to the real Live sheet only (Joe 10/12),
+// no sandbox copies, no made-up data.
 const ROOT = path.join(__dirname, '../../..');
 const settings = require(path.join(ROOT, 'production-settings.json'));
 const sandbox = P.sandboxIds(path.join(ROOT, 'sandbox-sources.json'));
 
-test('the production settings in the repository pass and read the real sheets', () => {
+const REAL_LIVE = '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg';
+
+test('the production settings in the repository pass, read the real sheets and write only the real Live sheet', () => {
   const { env, problems } = P.productionEnv(settings, '', sandbox);
   assert.deepEqual(problems, []);
   assert.equal(env.READ_UNIONTOWN_SHEETS, '1');
-  assert.equal(P.envText(env).includes('WRITEBACK_JSON'), false);
+  assert.deepEqual(JSON.parse(env.WRITEBACK_JSON), { spreadsheetId: REAL_LIVE });
+  assert.match(P.envText(env), new RegExp('^WRITEBACK_JSON=\\{"spreadsheetId":"' + REAL_LIVE + '"\\}$', 'm'));
 });
 
-test('production refuses the write-back, the made-up sheets and the sandbox copies', () => {
+test('production refuses a write-back to any other sheet, the made-up sheets and the sandbox copies', () => {
   const firstCopy = [...sandbox][0];
   assert.ok(firstCopy, 'sandbox-sources.json names its copies');
   const bad = [
-    'WRITEBACK_JSON={"spreadsheetId":"11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg"}',
+    'WRITEBACK_JSON={"spreadsheetId":"1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU"}', // Driver Master
+    'WRITEBACK_JSON={"spreadsheetId":"1UrAzrPIe4x6jcNBCjCJUIE8mjvJAniZMoONRGK8GJmw"}', // Charleston Live
+    'WRITEBACK_JSON={"spreadsheetId":"' + REAL_LIVE + '","masters":{"drivers":{"spreadsheetId":"1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU","tab":"DRIVERS_MASTER"}}}',
+    'WRITEBACK_JSON={"spreadsheetId":"' + firstCopy + '"}',
+    'WRITEBACK_JSON=not json',
     'DEMO_DATA=1',
     'SOURCES_JSON={"live":{"spreadsheetId":"' + firstCopy + '"}}',
     'READ_UNIONTOWN_SHEETS=0',

@@ -5,7 +5,8 @@
  * production deploy. The deploy stops if the settings would do anything Joe has not allowed:
  *   - production must read the real Uniontown sheets (READ_UNIONTOWN_SHEETS=1), never the made-up ones (DEMO_DATA) and
  *     never the sandbox copies (SOURCES_JSON or any sandbox copy ID);
- *   - production must not write to any sheet (WRITEBACK_JSON) until Joe types the sentence that allows it;
+ *   - production writes only dispatch changes to the real Uniontown Live workbook (Joe 10/12: "Let the new app write
+ *     dispatch changes to the real Live sheet."): WRITEBACK_JSON may name that workbook and nothing else (no master lists);
  *   - email only from and to United Dairy addresses.
  *
  *   node tools/production-env.cjs [settings.json]   prints the .env text; PRODUCTION_ENV (KEY=value lines, a GitHub
@@ -15,12 +16,12 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const ALLOWED = ['READ_UNIONTOWN_SHEETS', 'MAIL_FROM', 'REPORT_TO'];
+const ALLOWED = ['READ_UNIONTOWN_SHEETS', 'MAIL_FROM', 'REPORT_TO', 'WRITEBACK_JSON'];
+const REAL_LIVE = require('../functions/src/sources').UNIONTOWN.live.spreadsheetId;
 const WHY = {
   DEMO_DATA: 'production must show the real sheets, not the made-up ones',
   DEMO_ADMINS: 'production must take its administrators from the real Users Master',
   SOURCES_JSON: 'production reads the real sheets, never the sandbox copies',
-  WRITEBACK_JSON: 'production may not write to any sheet until Joe types the sentence that allows it',
   UD_LOCAL_NO_TRIGGERS: 'that setting is for test machines only'
 };
 const UD = /^[^@\s,]+@uniteddairy\.com$/i;
@@ -56,6 +57,13 @@ function productionEnv(settings, extra, sandbox) {
     if (/[\r\n]/.test(v)) problems.push(k + ' must be one line');
     (sandbox || new Set()).forEach(id => { if (id && v.includes(id)) problems.push(k + ' names a sandbox sheet copy (' + id + ')'); });
   });
+  if (env.WRITEBACK_JSON !== undefined && String(env.WRITEBACK_JSON).trim() !== '') {
+    let w = null;
+    try { w = JSON.parse(String(env.WRITEBACK_JSON)); } catch (e) { problems.push('WRITEBACK_JSON is not JSON'); }
+    if (w && (typeof w !== 'object' || Array.isArray(w) || Object.keys(w).join() !== 'spreadsheetId' || w.spreadsheetId !== REAL_LIVE)) {
+      problems.push('WRITEBACK_JSON may only be {"spreadsheetId":"' + REAL_LIVE + '"}: production writes dispatch changes to the real Uniontown Live sheet and nothing else');
+    }
+  }
   if (String(env.READ_UNIONTOWN_SHEETS) !== '1') problems.push('READ_UNIONTOWN_SHEETS must be 1: production reads the real Uniontown sheets (read only)');
   if (env.MAIL_FROM && !UD.test(String(env.MAIL_FROM).trim())) problems.push('MAIL_FROM must be one @uniteddairy.com address');
   String(env.REPORT_TO || '').split(',').map(s => s.trim()).filter(Boolean).forEach(a => {

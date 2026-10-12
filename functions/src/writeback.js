@@ -9,8 +9,10 @@
  * already holds the new value). If someone typed something else into that cell in the meantime, the cell is NOT
  * written; it goes on the `conflicts` list with both values, so nothing is lost without anyone knowing.
  *
- * Phase 2: only a sandbox copy of the Live workbook may be written. The production workbook is refused here,
- * whatever the settings say; writing to it needs the per-screen switch and Joe's go.
+ * Only a sandbox copy of the Live workbook, or (Joe 10/12: "Let the new app write dispatch changes to the real Live
+ * sheet.") the real Uniontown Live workbook when the production server asks for it. Every other production sheet is
+ * refused here, whatever the settings say; Administration's tools, the master lists and the fleet sync keep
+ * assertSandboxTarget.
  */
 'use strict';
 
@@ -31,6 +33,13 @@ const PRODUCTION_IDS = Object.freeze([UNIONTOWN.live.spreadsheetId, UNIONTOWN.pl
 function assertSandboxTarget(spreadsheetId) {
   if (!spreadsheetId) throw new Error('Write-back stopped: no sandbox Live workbook is set');
   if (PRODUCTION_IDS.indexOf(spreadsheetId) >= 0) throw new Error('Write-back stopped: ' + spreadsheetId + ' is a production sheet; only a sandbox copy may be written in this phase');
+}
+
+// The Live write-back's own check: the real Uniontown Live workbook only when allowRealLive (the production server,
+// index.js); anything else must be a sandbox copy.
+function assertLiveTarget(spreadsheetId, allowRealLive) {
+  if (allowRealLive && spreadsheetId === UNIONTOWN.live.spreadsheetId) return;
+  assertSandboxTarget(spreadsheetId);
 }
 
 function columnLetter(index) {
@@ -64,10 +73,10 @@ function findRow(values, item) {
 
 /*
  * One pass: writes up to BATCH queued saves. sheets = { batchGet(id, ranges), batchUpdate(id, [{range, values}]) }.
- * target = { spreadsheetId } of the sandbox Live workbook. Returns counts.
+ * target = { spreadsheetId } of the Live workbook; allowRealLive lets it be the real Uniontown one. Returns counts.
  */
-async function runWriteBack({ db, sheets, target, now }) {
-  assertSandboxTarget(target && target.spreadsheetId);
+async function runWriteBack({ db, sheets, target, now, allowRealLive }) {
+  assertLiveTarget(target && target.spreadsheetId, allowRealLive);
   const stamp = (now ? now() : new Date()).toISOString();
   const pending = await db.collection(C.outbox).where('status', '==', 'pending').orderBy('at').orderBy('requestId').limit(BATCH).get();
   const items = pending.docs.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data()));
@@ -156,4 +165,4 @@ async function runWriteBack({ db, sheets, target, now }) {
   return { written, conflicts, items: items.length };
 }
 
-module.exports = { runWriteBack, assertSandboxTarget, findRow, columnLetter, PRODUCTION_IDS };
+module.exports = { runWriteBack, assertSandboxTarget, assertLiveTarget, findRow, columnLetter, PRODUCTION_IDS };
