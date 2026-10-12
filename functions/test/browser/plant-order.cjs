@@ -67,7 +67,13 @@ async function press(page, route, dir) {
     assert.deepEqual((await routes(loader)).slice(0, 7), ['6303', '801', '802', '805', '808', '811', '812'], 'the route cell still reads as the route; the left-over load stays on top');
     assert.equal(await loader.$(row('6303') + ' .lo-move'), null, 'a prior-day load has no arrows');
     assert.equal(await loader.$('.lo-grip, [data-grip]'), null, 'Joe 10/12: no grab dots, only the up / down arrows');
-    assert.equal(await loader.isDisabled(row('801') + ' .lo-move.up'), true, 'the first load of the day cannot go up');
+    // Joe 10/12 (as Daily Dispatch): a load already loaded (801, 802, 805 are Done in the test sheet) has no arrows; 808,
+    // still loading, is then the first that can move.
+    for (const r of ['801', '802', '805']) {
+      assert.equal(await loader.$eval(row(r), t => t.classList.contains('done')), true, r + ' starts Done in the test sheet');
+      assert.equal(await loader.$(row(r) + ' .lo-move'), null, r + ' is already loaded, so it has no arrows');
+    }
+    assert.equal(await loader.isDisabled(row('808') + ' .lo-move.up'), true, 'the first load not yet loaded cannot go up');
     if (SHOTS) {
       await loader.screenshot({ path: path.join(SHOTS, '1-loadout-order-1920.png'), scale: 'css' });
       await loader.screenshot({ path: path.join(SHOTS, '2-loadout-order-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 475 }, scale: 'device' });
@@ -78,6 +84,7 @@ async function press(page, route, dir) {
     await waitOrder(loader, ['801', '802', '805', '808', '812', '811']);
     await waitOrder(watcher, ['801', '802', '805', '808', '812', '811']);
     await loader.waitForFunction(() => document.activeElement && /run_p811/.test(document.activeElement.dataset.idMove || ''));
+    results.push('Loaded loads (801, 802, 805) show no arrows; 808 is the first that can move');
     results.push('Down arrow on 811 moved it after 812 and kept the arrow selected; the other open screen shows it');
 
     // Up three times on 815: before 808.
@@ -89,14 +96,14 @@ async function press(page, route, dir) {
     const run = async (r) => (await db().collection('runs').doc('2026-10-04__run_p' + r).get()).data().days.fri.loadSequenceOverride;
     assert.deepEqual(await Promise.all(['815', '808', '812', '811'].map(run)), [40, 50, 60, 70], 'saved as the day\'s load_sequence_override with the numbers the loads had');
 
-    // A finger on a tablet: 6302 up to before 805.
+    // A finger on a tablet: 6302 up as far as it goes, right after the loaded 805.
     const tablet = await openPage(browser, { viewport: { width: 1280, height: 800 }, hasTouch: true, isMobile: false }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
     await tablet.waitForSelector(row('6302') + ' .lo-move.up');
     await waitOrder(tablet, ['801', '802', '805', '815', '808', '812', '811']);
-    while ((await routes(tablet)).indexOf('6302') > (await routes(tablet)).indexOf('805')) await press(tablet, '6302', 'up');
-    await waitOrder(tablet, ['801', '802', '6302', '805']);
-    await waitOrder(watcher, ['801', '802', '6302', '805']);
-    results.push('Up arrow on a 1280 tablet: 6302 moved up before 805');
+    while (!(await tablet.isDisabled(row('6302') + ' .lo-move.up'))) await press(tablet, '6302', 'up');
+    await waitOrder(tablet, ['801', '802', '805', '6302', '815']);
+    await waitOrder(watcher, ['801', '802', '805', '6302', '815']);
+    results.push('Up arrow on a 1280 tablet: 6302 moved up to the first open place, right after the loaded 805');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '4-loadout-order-tablet-1280.png') });
 
     // Skip: 812 waits at the bottom with no arrows; Down on 808 steps over it.
@@ -105,10 +112,11 @@ async function press(page, route, dir) {
     assert.equal(await tablet.$(row('812') + ' .lo-move'), null, 'a skipped load has no arrows');
     assert.ok(await tablet.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1)), 'Start and Skip fit their cell with the arrows shown');
     await press(tablet, '808', 'down');
-    await waitOrder(tablet, ['801', '802', '6302', '805', '815', '811', '808']);
+    await waitOrder(tablet, ['801', '802', '805', '6302', '815', '811', '808']);
     assert.equal(await tablet.$eval('#rows tr[data-row]:last-child', t => t.dataset.row.split('|')[0]), '2026-10-04__run_p812', 'the skipped load stays at the bottom');
     results.push('Skip with the arrows: 812 waits at the bottom without arrows; 808 moved down past 811');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '5-loadout-order-skip-tablet-1280.png') });
+
 
     // The arrows are on every loadout (Case, Totes, Boxes, Tanker) at 1536 and 1920: visible, inside the Route column, before
     // the route number, with no grab dots. Today and the coming days have them; a past day does not.
