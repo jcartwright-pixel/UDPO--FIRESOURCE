@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Location Areas · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/safety.css">
+  <script src="js/logic.js"></script>
+  <script src="js/safety-rules.js"></script>
+</head>
+<body class="fill safety-page setup-page la-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Location Areas</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Administration · Plant Setup</span><h1>Location Areas</h1><span class="sw-counts" id="counts"></span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <a class="sw-top" href="safety-setup.html" id="setup-link" data-top>Checklist Setup</a>
+      <select id="plant" aria-label="Plant" data-top></select>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="notice warning" id="locked" role="status" hidden>Location Areas is under construction. Only Administrators can open it while it is being built.</div>
+    <div class="view" id="view">
+      <div class="sw-sheet">
+        <table class="sw-grid sw-setup">
+          <colgroup><col style="width:52%"><col style="width:10%"><col style="width:22%"><col style="width:16%"></colgroup>
+          <thead><tr><th>Area / sub-area</th><th>On</th><th>Order</th><th>Safety items</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="sw-foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError, mayOpenBuilding } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { pickPlant, plantsOf, canSetUp, modeText, watchSetup } from './js/safety.js';
+
+    // Location Areas (Joe 10/12, Administration > Plant Setup): each plant's areas (Plant, Garage, Office, Yard and any added)
+    // and their sub-areas. One list: the Safety Walkthrough walks it in this order, Checklist Setup puts its items in these
+    // sub-areas, and other screens can use it later. Each box saves as it is left: type over a name to rename it, untick On
+    // to turn it off, Move up / Move down for the order, + Add sub-area, + Add area. Nothing is ever deleted, only turned
+    // off, so old walks and issues still read. Under construction: Administrators only.
+    const S = window.UDSafety;
+    const params = new URLSearchParams(location.search);
+    const plantBox = document.getElementById('plant');
+    let db = null, person = null, app = {}, plant = '', setup = null, seen = false, stop = null, chain = Promise.resolve(), pending = null;
+    const list = () => pending || S.locations(setup && setup.locations);
+    const copy = () => JSON.parse(JSON.stringify(list()));
+    const newKey = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const inp = (k, v, label, ph) => '<input type="text" data-k="' + k + '" value="' + escapeHtml(v || '') + '" maxlength="60" aria-label="' + escapeHtml(label) + '"' + (ph ? ' placeholder="' + escapeHtml(ph) + '"' : '') + '>';
+    const tick = (on, dis, label) => '<label class="sw-check"><input type="checkbox" data-k="on" aria-label="' + escapeHtml(label) + '"' + (on ? ' checked' : '') + dis + '>' + (on ? 'On' : 'Off') + '</label>';
+    const moves = (up, down, set) => set ? '<button type="button" class="sw-btn sw-small" data-la-up="' + up + '">Move up</button><button type="button" class="sw-btn sw-small" data-la-down="' + down + '">Move down</button>' : '';
+    function render(force) {
+      document.getElementById('mode-text').textContent = modeText(app);
+      document.getElementById('setup-link').href = 'safety-setup.html?plant=' + encodeURIComponent(plant);
+      const set = canSetUp(person, app), dis = set ? '' : ' disabled', L = list();
+      const used = {};
+      S.checklist(setup, true).forEach(a => { used[a.key] = a.items.filter(i => !i.off).length; });
+      const subs = L.reduce((n, a) => n + a.subs.length, 0);
+      document.getElementById('counts').textContent = seen ? L.length + ' areas · ' + subs + ' sub-areas' + (setup && setup.locations ? '' : ' · the starting list') : '';
+      document.getElementById('foot').textContent = set ? 'Each box saves as you leave it. Type over a name to rename it. Untick On to take an area or sub-area off the walk; nothing is ever deleted, so old walks still read. The Safety Walkthrough walks the areas in this order; Checklist Setup puts its items in these sub-areas.' : 'View only. A manager or administrator changes the areas.';
+      if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
+      document.getElementById('rows').innerHTML = !seen ? '<tr><td colspan="4" class="sw-empty">Reading the areas…</td></tr>' : L.map((a, ai) =>
+        '<tr class="sw-place-row' + (a.off ? ' sw-off' : '') + '" data-a="' + ai + '"><td>' + (set ? inp('name', a.name, 'Area name') : '<b>' + escapeHtml(a.name) + '</b>') + '</td>' +
+          '<td>' + tick(!a.off, dis, a.name + ' on') + '</td><td>' + moves(ai, ai, set) + '</td>' +
+          '<td>' + a.subs.reduce((n, x) => n + (used[x.key] || 0), 0) + '</td></tr>' +
+        a.subs.map((x, xi) => '<tr class="sw-sub-row' + (x.off || a.off ? ' sw-off' : '') + '" data-a="' + ai + '" data-s="' + xi + '"><td>' + (set ? inp('name', x.name, 'Sub-area name') : escapeHtml(x.name)) + '</td>' +
+          '<td>' + tick(!x.off, dis, x.name + ' on') + '</td><td>' + moves(ai + '.' + xi, ai + '.' + xi, set) + '</td>' +
+          '<td>' + (used[x.key] || 0) + '</td></tr>').join('') +
+        (set ? '<tr class="sw-add sw-sub-row" data-a="' + ai + '" data-newsub="1"><td colspan="4">' + inp('newsub', '', 'New sub-area in ' + a.name, '+ Add sub-area to ' + a.name) + '</td></tr>' : '')).join('') +
+        (set && seen ? '<tr class="sw-add" data-newarea="1"><td colspan="4">' + inp('newarea', '', 'New area', '+ Add area (like Docks or Warehouse)') + '</td></tr>' : '');
+    }
+    function send(next) {
+      pending = next;
+      const run = chain.then(() => save('saveLocationAreas', { facilityId: plant, areas: next }));
+      chain = run.catch(() => {});
+      return run.then(() => showError(''), err => { pending = null; showError(err); render(true); });
+    }
+    const commit = (next) => { send(next).then(() => render(true)); render(true); };
+    const taken = (L, words, but) => L.some(a => a !== but && a.name.toLowerCase() === words.toLowerCase());
+    document.getElementById('rows').addEventListener('change', e => {
+      const t = e.target, tr = t.closest('tr');
+      if (!tr || !canSetUp(person, app)) return;
+      const L = copy(), words = String(t.value || '').trim();
+      if (tr.dataset.newarea) {
+        if (!words) return;
+        if (taken(L, words)) { showError(words + ' is already an area.'); return; }
+        L.push({ key: newKey('p'), name: words, off: false, subs: [] });
+        return commit(L);
+      }
+      const a = L[+tr.dataset.a];
+      if (!a) return;
+      if (tr.dataset.newsub) {
+        if (!words) return;
+        if (a.subs.some(x => x.name.toLowerCase() === words.toLowerCase())) { showError(words + ' is already in ' + a.name + '.'); return; }
+        a.subs.push({ key: newKey('s'), name: words, off: false });
+        return commit(L);
+      }
+      const x = tr.dataset.s !== undefined ? a.subs[+tr.dataset.s] : a;
+      if (t.dataset.k === 'name') {
+        if (!words) { showError((x === a ? 'An area' : 'A sub-area') + ' needs a name. To take it off the walk, untick On.'); t.value = x.name; return; }
+        if (x === a && taken(L, words, a)) { showError(words + ' is already an area.'); t.value = x.name; return; }
+        x.name = words;
+      }
+      if (t.dataset.k === 'on') x.off = !t.checked;
+      commit(L);
+    });
+    // Move up / Move down: an area among the areas, a sub-area within its area.
+    document.getElementById('rows').addEventListener('click', e => {
+      const b = e.target.closest('[data-la-up],[data-la-down]');
+      if (!b || !canSetUp(person, app)) return;
+      const L = copy(), dir = b.dataset.laUp !== undefined ? -1 : 1, [ai, xi] = String(b.dataset.laUp !== undefined ? b.dataset.laUp : b.dataset.laDown).split('.').map(Number);
+      const arr = xi === undefined || isNaN(xi) ? L : L[ai].subs, at = xi === undefined || isNaN(xi) ? ai : xi, to = at + dir;
+      if (to < 0 || to >= arr.length) return;
+      arr.splice(to, 0, arr.splice(at, 1)[0]);
+      commit(L);
+    });
+    function follow() {
+      if (stop) stop();
+      seen = false; setup = null; pending = null; render(true);
+      plantBox.value = plant;
+      try { sessionStorage.setItem('udPlant', plant); } catch (err) { /* no storage */ }
+      stop = watchSetup(db, plant, s => { setup = s; seen = true; if (pending && JSON.stringify(S.locations(s && s.locations)) === JSON.stringify(pending)) pending = null; render(); });
+    }
+    plantBox.onchange = () => { plant = plantBox.value; follow(); };
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        const ok = mayOpenBuilding(person);
+        document.getElementById('locked').hidden = ok;
+        document.getElementById('view').hidden = !ok;
+        if (!ok) return;
+        plantBox.innerHTML = plantsOf(person).map(p => '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + '</option>').join('');
+        if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render(true);
+      });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(true); });
+    });
+  </script>
+</body>
+</html>

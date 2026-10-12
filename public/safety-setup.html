@@ -29,6 +29,7 @@
     <div class="head">
       <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1>Checklist Setup</h1><span class="sw-counts" id="counts"></span></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <a class="sw-top" href="location-areas.html" id="areas-link" data-top>Location Areas</a>
       <a class="sw-top pri" href="safety.html" data-top>Weekly Walk</a>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -52,44 +53,42 @@
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { pickPlant, plantName, canSetUp, modeText, watchSetup } from './js/safety.js';
 
-    // Checklist Setup (Joe 10/12, mock-ups A and J): the plant's own checklist, Plant, Garage and Office, each with its
-    // sub-areas in walking order. It starts from the researched list (safety-rules.js). Each box saves as it is left: rename an
-    // area or a sub-area by typing over it, + Add sub-area, + Add area, Move up / Move down for the walking order, change an
-    // item's words, Weekly or Monthly, take it off the walk, Move to another sub-area, or type a new one in a sub-area's empty
-    // row. An item once used is never deleted, only taken off the walk, so old walks still read. A manager or administrator.
+    // Checklist Setup (Joe 10/12, mock-ups A and J): the plant's own checklist, under the areas and sub-areas of its Location
+    // Areas (Administration > Plant Setup, where they are added, renamed, put in walking order and turned off). It starts from
+    // the researched list (safety-rules.js). Each box saves as it is left: change an item's words, Weekly or Monthly, take it
+    // off the walk, Move to another sub-area, or type a new one in a sub-area's empty row. An item once used is never deleted,
+    // only taken off the walk, so old walks still read. A manager or administrator.
     const S = window.UDSafety;
     const params = new URLSearchParams(location.search);
     let db = null, person = null, app = {}, plant = '', setup = null, seen = false, stop = null, chain = Promise.resolve(), pending = null;
-    const areas = () => pending || S.checklist(setup, true);
-    const newKey = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const areas = () => pending ? S.checklist(Object.assign({}, setup || {}, { areas: pending }), true) : S.checklist(setup, true);
     const inp = (k, v, label, ph, max) => '<input type="text" data-k="' + k + '" value="' + escapeHtml(v || '') + '" maxlength="' + (max || 60) + '" aria-label="' + escapeHtml(label) + '"' + (ph ? ' placeholder="' + escapeHtml(ph) + '"' : '') + '>';
+    const offTag = '<span class="sw-pill gray">Turned off in Location Areas</span>';
     function render(force) {
       document.getElementById('mode-text').textContent = modeText(app);
       document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
+      document.getElementById('areas-link').href = 'location-areas.html?plant=' + encodeURIComponent(plant);
       const set = canSetUp(person, app), dis = set ? '' : ' disabled', list = areas(), P = S.places(list);
-      const on = list.reduce((n, a) => n + a.items.filter(i => !i.off).length, 0);
-      document.getElementById('counts').textContent = P.length + ' areas · ' + list.length + ' sub-areas · ' + on + ' items on the walk' + (setup ? '' : ' · the starting list');
-      document.getElementById('foot').textContent = set ? 'Each box saves as you leave it. Type over a name to rename it. Monthly items are on the first walk of each month. Type in a sub-area\'s empty row to add an item.' : 'View only. A manager or administrator changes the checklist.';
+      const on = list.reduce((n, a) => n + (a.off ? 0 : a.items.filter(i => !i.off).length), 0);
+      document.getElementById('counts').textContent = P.length + ' areas · ' + list.length + ' sub-areas · ' + on + ' items on the walk' + (setup && setup.areas ? '' : ' · the starting list');
+      document.getElementById('foot').textContent = set ? 'Each box saves as you leave it. Monthly items are on the first walk of each month. Type in a sub-area\'s empty row to add an item. Areas and sub-areas are added, renamed, put in order and turned off on Location Areas.' : 'View only. A manager or administrator changes the checklist.';
       if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
-      const moveTo = (ai) => '<select data-k="move" aria-label="Move to another sub-area"' + dis + '><option value="">Move to…</option>' + P.map(p => '<optgroup label="' + escapeHtml(p.name) + '">' + p.areas.map(a => { const j = list.indexOf(a); return j === ai ? '' : '<option value="' + j + '">' + escapeHtml(a.name) + '</option>'; }).join('') + '</optgroup>').join('') + '</select>';
+      const moveTo = (ai) => '<select data-k="move" aria-label="Move to another sub-area"' + dis + '><option value="">Move to…</option>' + P.map(p => '<optgroup label="' + escapeHtml(p.name) + '">' + p.areas.map(a => { const j = list.indexOf(a); return j === ai ? '' : '<option value="' + j + '">' + escapeHtml(a.name) + (a.off ? ' (off)' : '') + '</option>'; }).join('') + '</optgroup>').join('') + '</select>';
       document.getElementById('rows').innerHTML = !seen ? '<tr><td colspan="4" class="sw-empty">Reading the checklist…</td></tr>' : P.map(p =>
-        '<tr class="sw-place-row" data-place="' + escapeHtml(p.name) + '"><td colspan="4">' + (set ? inp('place', p.name, 'Area name') : '<b>' + escapeHtml(p.name) + '</b>') + '<span class="sw-how">' + p.areas.length + ' sub-areas · ' + p.areas.reduce((n, a) => n + a.items.length, 0) + ' items</span></td></tr>' +
+        '<tr class="sw-place-row" data-place="' + escapeHtml(p.name) + '"><td colspan="4"><b>' + escapeHtml(p.name) + '</b><span class="sw-how">' + p.areas.length + ' sub-areas · ' + p.areas.reduce((n, a) => n + a.items.length, 0) + ' items</span></td></tr>' +
         p.areas.map(a => { const ai = list.indexOf(a);
-          return '<tr class="sw-sub-row" data-a="' + ai + '"><td colspan="4"><div class="sw-sub-line">' + (set ? inp('name', a.name, 'Sub-area name') : '<b>' + escapeHtml(a.name) + '</b>') +
-              (set ? '<button type="button" class="sw-btn sw-small" data-sub-up="' + ai + '">Move up</button><button type="button" class="sw-btn sw-small" data-sub-down="' + ai + '">Move down</button>' : '') + '</div></td></tr>' +
+          return '<tr class="sw-sub-row' + (a.off ? ' sw-off' : '') + '" data-a="' + ai + '"><td colspan="4"><div class="sw-sub-line"><b>' + escapeHtml(a.name) + '</b>' + (a.off ? offTag : '') + '</div></td></tr>' +
             a.items.map((i, ii) => '<tr data-a="' + ai + '" data-i="' + ii + '">' +
               '<td>' + (set ? inp('text', i.text, 'Item', '', 160) : escapeHtml(i.text)) + '</td>' +
               '<td><select data-k="freq" aria-label="How often"' + dis + '>' + S.FREQS.map(f => '<option value="' + f + '"' + (f === i.freq ? ' selected' : '') + '>' + (f === 'WEEKLY' ? 'Weekly' : 'Monthly') + '</option>').join('') + '</select></td>' +
               '<td><label class="sw-check"><input type="checkbox" data-k="on"' + (i.off ? '' : ' checked') + dis + '>' + (i.off ? 'Off' : 'On') + '</label></td>' +
               '<td>' + moveTo(ai) + '</td></tr>').join('') +
             (set ? '<tr class="sw-add" data-a="' + ai + '" data-new="1"><td>' + inp('text', '', 'New item in ' + a.name, 'Add an item to ' + a.name, 160) + '</td><td></td><td></td><td></td></tr>' : '');
-        }).join('') +
-        (set ? '<tr class="sw-add" data-place="' + escapeHtml(p.name) + '" data-newsub="1"><td colspan="4">' + inp('newsub', '', 'New sub-area in ' + p.name, '+ Add sub-area to ' + p.name) + '</td></tr>' : '')).join('') +
-        (set && seen ? '<tr class="sw-add" data-newplace="1"><td colspan="4">' + inp('newplace', '', 'New area', '+ Add area (like Plant, Garage or Office)') + '</td></tr>' : '');
+        }).join('')).join('');
     }
     function send(list) {
       pending = list;
-      const run = chain.then(() => save('saveSafetyChecklist', { facilityId: plant, areas: list }));
+      const run = chain.then(() => save('saveSafetyChecklist', { facilityId: plant, areas: list.map(a => ({ place: a.place, key: a.key, name: a.name, items: a.items })) }));
       chain = run.catch(() => {});
       return run.then(() => showError(''), err => { pending = null; showError(err); render(true); });
     }
@@ -99,28 +98,8 @@
       const t = e.target, tr = t.closest('tr');
       if (!tr || !canSetUp(person, app)) return;
       const list = copy(), words = String(t.value || '').trim();
-      if (tr.dataset.newplace) {
-        if (!words) return;
-        if (list.some(a => a.place === words)) { showError(words + ' is already an area.'); return; }
-        list.push({ place: words, key: newKey('a'), name: 'Main', items: [] });
-        return commit(list);
-      }
-      if (tr.dataset.newsub) {
-        if (!words) return;
-        // A new sub-area goes after the area's last one.
-        const at = list.map(a => a.place).lastIndexOf(tr.dataset.place);
-        list.splice(at + 1, 0, { place: tr.dataset.place, key: newKey('a'), name: words, items: [] });
-        return commit(list);
-      }
-      if (t.dataset.k === 'place') {
-        if (!words) { showError('An area needs a name.'); t.value = tr.dataset.place; return; }
-        if (words !== tr.dataset.place && list.some(a => a.place === words)) { showError(words + ' is already an area.'); t.value = tr.dataset.place; return; }
-        list.forEach(a => { if (a.place === tr.dataset.place) a.place = words; });
-        return commit(list);
-      }
       const a = list[+tr.dataset.a];
       if (!a) return;
-      if (t.dataset.k === 'name') { if (!words) { showError('A sub-area needs a name.'); t.value = a.name; return; } a.name = words; return commit(list); }
       if (tr.dataset.new) {
         if (!words) return;
         a.items.push({ id: a.key + '_' + Date.now().toString(36), text: words, freq: 'WEEKLY', off: false });
@@ -134,21 +113,10 @@
       if (t.dataset.k === 'move') { const to = list[+t.value]; if (!to) return; a.items.splice(+tr.dataset.i, 1); to.items.push(i); }
       commit(list);
     });
-    // Move up / Move down: the walking order of a sub-area within its area.
-    document.getElementById('rows').addEventListener('click', e => {
-      const b = e.target.closest('[data-sub-up],[data-sub-down]');
-      if (!b || !canSetUp(person, app)) return;
-      const list = copy(), at = +(b.dataset.subUp || b.dataset.subDown), dir = b.dataset.subUp ? -1 : 1, a = list[at];
-      let to = at + dir;
-      while (list[to] && list[to].place !== a.place) to += dir;
-      if (!list[to]) return;
-      list.splice(at, 1); list.splice(to, 0, a);
-      commit(list);
-    });
     function follow() {
       if (stop) stop();
       seen = false; setup = null; pending = null; render(true);
-      stop = watchSetup(db, plant, s => { setup = s; seen = true; if (pending && s && JSON.stringify(S.checklist(s, true)) === JSON.stringify(S.checklist({ areas: pending }, true))) pending = null; render(); });
+      stop = watchSetup(db, plant, s => { setup = s; seen = true; if (pending && s && JSON.stringify(S.checklist(s, true)) === JSON.stringify(areas())) pending = null; render(); });
     }
     startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {

@@ -64,8 +64,13 @@ export function watchOpenIssues(db, plant, cb, fail) {
 export function watchIssues(db, plant, cb, fail) {
   return onSnapshot(query(collection(db, 'safetyIssues'), where('facilityId', '==', plant)), s => cb(s.docs.map(d => Object.assign({ id: d.id }, d.data()))), fail);
 }
+// The plant's checklist with its Location Areas (Joe 10/12) as setup.locations; cb once both have been read, then on each change.
 export function watchSetup(db, plant, cb) {
-  return onSnapshot(doc(db, 'safetySetup', plant), s => cb(s.exists() ? s.data() : null), () => cb(null));
+  let setup, locs;
+  const send = () => { if (setup !== undefined && locs !== undefined) cb(setup || locs ? Object.assign({}, setup || {}, { locations: locs }) : null); };
+  const a = onSnapshot(doc(db, 'safetySetup', plant), s => { setup = s.exists() ? s.data() : null; send(); }, () => { setup = null; send(); });
+  const b = onSnapshot(doc(db, 'locationAreas', plant), s => { locs = s.exists() ? s.data() : null; send(); }, () => { locs = null; send(); });
+  return () => { a(); b(); };
 }
 export function watchExtinguishers(db, plant, cb, fail) {
   return onSnapshot(query(collection(db, 'extinguishers'), where('facilityId', '==', plant)), s => cb(s.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(e => e.status !== 'RETIRED')

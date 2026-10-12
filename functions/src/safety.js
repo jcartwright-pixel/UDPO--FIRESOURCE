@@ -14,6 +14,7 @@
  * saveExtinguisherCheck: one item of this month's check of an extinguisher; a Not good opens (or updates) an issue.
  * saveSafetyChecklist: a plant's own checklist (Checklist Setup): Plant, Garage and Office (each sub-area's place), sub-areas
  *   in walking order, their items.
+ * saveLocationAreas: a plant's Location Areas (Administration > Plant Setup): areas and sub-areas, the walk's order.
  *
  * Plant Maintenance (being built in its own thread) picks up issues with sendToMaint true and no workOrderId, and fills in
  * workOrderId and maintStatus; until then they show "Waiting for Plant Maintenance". Nothing here writes Google Sheets.
@@ -50,9 +51,11 @@ function walkDay(date, stamp, SaveError) {
   const today = L.localDay(stamp);
   if (date !== today && date !== L.addDays(today, -1)) throw new SaveError('BAD_REQUEST', 'A walk is saved on the day it is walked. Reload the page.');
 }
+// The plant's checklist (Checklist Setup) and its Location Areas (the walk's areas, sub-areas and their order).
 async function setupOf(tx, db, facilityId) {
   const s = await tx.get(db.collection('safetySetup').doc(facilityId));
-  return s.exists ? s.data() : null;
+  const l = await tx.get(db.collection('locationAreas').doc(facilityId));
+  return Object.assign({}, s.exists ? s.data() : {}, { locations: l.exists ? l.data() : null });
 }
 // The saver's name from the Users list, so the screens show "Joe Cartwright", not an email.
 async function whoIs(tx, db, email) {
@@ -338,8 +341,8 @@ function validateChecklist(input, SaveError) {
   if (!Array.isArray(input.areas) || !input.areas.length || input.areas.length > 80) throw new SaveError('BAD_REQUEST', 'The checklist needs at least one area.');
   const seen = {}, areaSeen = {};
   const areas = input.areas.map((a, n) => {
-    const name = text(a && a.name, 60), key = text(a && a.key, 40) || 'area' + (n + 1), place = text(a && a.place, 40) || 'Plant';
-    if (!name) throw new SaveError('BAD_REQUEST', 'Every area needs a name.');
+    // Joe 10/12: names and places come from Location Areas; a sub-area added here before that keeps its own.
+    const key = text(a && a.key, 40) || 'area' + (n + 1), name = text(a && a.name, 60) || key, place = text(a && a.place, 40) || 'Plant';
     if (!/^[A-Za-z0-9_-]+$/.test(key)) throw new SaveError('BAD_REQUEST', 'Bad area.');
     const items = (Array.isArray(a.items) ? a.items : []).slice(0, 60).map(i => {
       const id = text(i && i.id, 60), t = text(i && i.text, 160), freq = text(i && i.freq, 10).toUpperCase() || 'WEEKLY';
@@ -375,4 +378,46 @@ async function saveChecklist(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { validateWalk, saveWalk, validateIssue, saveIssue, validateExtinguisher, saveExtinguisher, validateExtCheck, saveExtCheck, validateChecklist, saveChecklist };
+// saveLocationAreas (Joe 10/12, Administration > Plant Setup > Location Areas): a plant's areas and their sub-areas, in order.
+// Names can change and anything can be turned off; nothing is ever taken off the list, so old walks and issues still read.
+function validateLocations(input, SaveError) {
+  const facilityId = plantOf(input.facilityId, SaveError);
+  if (!Array.isArray(input.areas) || !input.areas.length || input.areas.length > 30) throw new SaveError('BAD_REQUEST', 'A plant needs at least one area.');
+  const seen = {};
+  const keyOf = (v) => {
+    const k = text(v, 40);
+    if (!/^[A-Za-z0-9_-]+$/.test(k)) throw new SaveError('BAD_REQUEST', 'Bad area.');
+    if (seen[k]) throw new SaveError('BAD_REQUEST', 'An area is listed twice.');
+    seen[k] = true;
+    return k;
+  };
+  const areas = input.areas.map(a => {
+    const key = keyOf(a && a.key), name = text(a && a.name, 40);
+    if (!name) throw new SaveError('BAD_REQUEST', 'Every area needs a name.');
+    const subs = (Array.isArray(a.subs) ? a.subs : []).slice(0, 60).map(x => {
+      const k = keyOf(x && x.key), n = text(x && x.name, 60);
+      if (!n) throw new SaveError('BAD_REQUEST', 'Every sub-area needs a name (' + name + ').');
+      return { key: k, name: n, off: x.off === true };
+    });
+    return { key, name, off: a.off === true, subs };
+  });
+  return { facilityId, areas };
+}
+async function saveLocations(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('locationAreas').doc(req.facilityId), had = await tx.get(ref);
+  const before = S.locations(had.exists ? had.data() : null);
+  const areas = req.areas.map(a => Object.assign({}, a, { subs: a.subs.slice() }));
+  const now = {};
+  areas.forEach(a => { now[a.key] = true; a.subs.forEach(x => { now[x.key] = true; }); });
+  before.forEach(a => {
+    let to = areas.find(x => x.key === a.key);
+    if (!to) { to = { key: a.key, name: a.name, off: true, subs: [] }; areas.push(to); now[a.key] = true; }
+    a.subs.forEach(x => { if (!now[x.key]) { to.subs.push({ key: x.key, name: x.name, off: true }); now[x.key] = true; } });
+  });
+  tx.set(ref, { facilityId: req.facilityId, areas, updatedAt: stamp, updatedBy: email });
+  const result = { ok: true, requestId: req.requestId, facilityId: req.facilityId, message: 'Location Areas saved.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId, before: had.exists ? { areas: before.length } : null, after: { areas: areas.length }, result });
+  return result;
+}
+
+module.exports = { validateWalk, saveWalk, validateIssue, saveIssue, validateExtinguisher, saveExtinguisher, validateExtCheck, saveExtCheck, validateChecklist, saveChecklist, validateLocations, saveLocations };

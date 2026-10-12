@@ -136,11 +136,11 @@ async function cameraShot(page, color) {
     await wk.waitForSelector(row('dock_chocks'));
     const tree = () => wk.$$eval('#areas button', b => b.map(x => x.firstChild.textContent));
     const P = S.places(S.checklist(null));
-    assert.deepEqual(await tree(), ['Open issues from earlier walks', 'Plant'].concat(P[0].areas.map(a => a.name), ['Garage', 'Office', 'Walk notes']), 'Plant is open with its sub-areas; Garage and Office are folded');
+    assert.deepEqual(await tree(), ['Open issues from earlier walks', 'Plant'].concat(P[0].areas.map(a => a.name), ['Garage', 'Office', 'Yard', 'Walk notes']), 'Plant is open with its sub-areas; Garage, Office and Yard are folded');
     assert.match(await wk.textContent('#areas [data-place="Garage"] small'), /^0 of \d+ · Show$/);
     assert.equal(await wk.textContent('#list section h2'), 'Plant \u203a Receiving & Docks');
     await wk.click('#areas [data-place="Garage"]');
-    assert.deepEqual((await tree()).slice(-8), ['Garage'].concat(P[1].areas.map(a => a.name), ['Office', 'Walk notes']), 'Show opens Garage');
+    assert.deepEqual((await tree()).slice(-9), ['Garage'].concat(P[1].areas.map(a => a.name), ['Office', 'Yard', 'Walk notes']), 'Show opens Garage');
     await wk.click('#areas [data-place="Garage"]');
     // The earlier issue (floors) shows in the sub-area where it was found; Next goes on in walking order.
     await wk.click('#areas [data-area="processing"]');
@@ -268,30 +268,69 @@ async function cameraShot(page, color) {
     }
     results.push('Past Walks lists today\'s walk with its notes and photos; Checklist Setup shows the starting list; both fit 1536');
 
-    // Joe 10/12 (mock-ups A and J): Checklist Setup renames a sub-area, adds one, moves an item to it and changes the walking order.
+    // Joe 10/12 (Location Areas, Administration > Plant Setup): rename a sub-area, add one, turn one off, put it in order.
+    const la = await openPage(browser, 1536, 864, '/location-areas.html?' + ADMIN);
+    await la.waitForSelector('#rows tr.sw-place-row');
+    assert.deepEqual(await la.$$eval('#rows tr.sw-place-row input[data-k="name"]', i => i.map(x => x.value)), ['Plant', 'Garage', 'Office', 'Yard']);
+    assert.match(await la.textContent('#counts'), /4 areas · 21 sub-areas · the starting list/);
+    const locsNow = async () => S.locations((await db().collection('locationAreas').doc(UT).get()).data() || null);
+    const laUntil = async (ok, what) => { for (let i = 0; i < 40; i++) { if (ok(await locsNow())) return; await la.waitForTimeout(250); } assert.fail(what); };
+    await la.fill('#rows tr.sw-sub-row input[value="Wash Bay"]', 'Truck Wash');
+    await la.press('#rows tr.sw-sub-row input[value="Wash Bay"]', 'Tab');
+    await laUntil(l => l[1].subs.some(x => x.key === 'g_wash' && x.name === 'Truck Wash'), 'the sub-area is renamed');
+    await la.fill('#rows tr[data-newsub][data-a="2"] input', 'Conference Room');
+    await la.press('#rows tr[data-newsub][data-a="2"] input', 'Tab');
+    await laUntil(l => l[2].subs[l[2].subs.length - 1].name === 'Conference Room', 'a sub-area is added at the end of Office');
+    await la.waitForSelector('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-la-up]');
+    await la.click('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-la-up]');
+    await laUntil(l => { const o = l[2].subs.map(x => x.name); return o[o.length - 1] === 'Stairs & Exits' && o[o.length - 2] === 'Conference Room'; }, 'Move up changes the walking order');
+    await la.waitForSelector('#rows tr.sw-sub-row:has(input[value="Ammonia Room"]) input[data-k="on"]');
+    await la.uncheck('#rows tr.sw-sub-row:has(input[value="Ammonia Room"]) input[data-k="on"]');
+    await laUntil(l => l[0].subs.find(x => x.key === 'ammonia').off, 'a sub-area is turned off');
+    await la.waitForFunction(() => !/the starting list/.test(document.getElementById('counts').textContent));
+    await fits(la, 'Location Areas at 1536');
+    await shot(la, 'location-areas-1536');
+    await la.setViewportSize({ width: 1920, height: 1080 });
+    await fits(la, 'Location Areas at 1920');
+    await shot(la, 'location-areas-1920');
+    assert.deepEqual(la.errors, []);
+    await la.close();
+    results.push('Location Areas (Plant, Garage, Office, Yard): a sub-area renamed by typing over it, + Add sub-area, Move up and turning one off all save; it fits 1536 and 1920');
+
+    // Checklist Setup follows Location Areas (names, order, turned off) and Move to puts an item in another sub-area.
     const cs = await openPage(browser, 1536, 864, '/safety-setup.html?' + ADMIN);
     await cs.waitForSelector('#rows tr.sw-place-row');
-    assert.deepEqual(await cs.$$eval('#rows tr.sw-place-row input[data-k="place"]', i => i.map(x => x.value)), ['Plant', 'Garage', 'Office']);
-    const setupNow = async () => S.checklist((await db().collection('safetySetup').doc(UT).get()).data() || null, true);
+    assert.deepEqual(await cs.$$eval('#rows tr.sw-place-row b', i => i.map(x => x.textContent)), ['Plant', 'Garage', 'Office', 'Yard']);
+    assert.equal(await cs.$$eval('#rows input[data-k="place"], #rows [data-sub-up]', i => i.length), 0, 'areas are changed on Location Areas, not here');
+    await cs.waitForSelector('#rows tr.sw-sub-row b:text-is("Truck Wash")');
+    assert.match(await cs.textContent('#rows tr.sw-sub-row:has(b:text-is("Ammonia Room"))'), /Turned off in Location Areas/);
+    assert.match(await cs.getAttribute('#areas-link', 'href'), /^location-areas\.html\?plant=/);
+    const setupNow = async () => S.checklist(Object.assign({}, (await db().collection('safetySetup').doc(UT).get()).data() || {}, { locations: (await db().collection('locationAreas').doc(UT).get()).data() }), true);
     const until = async (ok, what) => { for (let i = 0; i < 40; i++) { if (ok(await setupNow())) return; await cs.waitForTimeout(250); } assert.fail(what); };
-    await cs.fill('#rows tr.sw-sub-row input[value="Wash Bay"]', 'Truck Wash');
-    await cs.press('#rows tr.sw-sub-row input[value="Wash Bay"]', 'Tab');
-    await until(l => l.some(a => a.key === 'g_wash' && a.name === 'Truck Wash' && a.place === 'Garage'), 'the sub-area is renamed');
-    await cs.fill('#rows tr[data-newsub][data-place="Office"] input', 'Conference Room');
-    await cs.press('#rows tr[data-newsub][data-place="Office"] input', 'Tab');
-    await until(l => l.length && l[l.length - 1].name === 'Conference Room' && l[l.length - 1].place === 'Office', 'a sub-area is added at the end of Office');
-    await cs.waitForSelector('#rows tr.sw-sub-row input[value="Conference Room"]');
     const cleanRow = '#rows tr:has(input[value="Microwave and fridge area clean"])';
     await cs.selectOption(cleanRow + ' select[data-k="move"]', { label: 'Conference Room' });
     await until(l => (l.find(a => a.name === 'Conference Room') || { items: [] }).items.some(i => i.id === 'o_clean') && !l.find(a => a.key === 'o_break').items.some(i => i.id === 'o_clean'), 'Move to moves the item');
-    await cs.waitForSelector('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-sub-up]');
-    await cs.click('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-sub-up]');
-    await until(l => { const o = l.filter(a => a.place === 'Office').map(a => a.name); return o[o.length - 1] === 'Stairs & Exits' && o[o.length - 2] === 'Conference Room'; }, 'Move up changes the walking order');
     await fits(cs, 'Checklist Setup at 1536');
     await shot(cs, 'safety-setup-areas-1536');
     assert.deepEqual(cs.errors, []);
     await cs.close();
-    results.push('Checklist Setup (Plant, Garage, Office): a sub-area renamed by typing over it, + Add sub-area, Move to another sub-area and Move up for the walking order all save');
+    results.push('Checklist Setup follows Location Areas: renamed and added sub-areas show, a turned-off one says so, and Move to puts an item in another sub-area');
+
+    // The walk follows Location Areas: the new sub-area with its item, the renamed one, and no Ammonia Room.
+    const lw = await openPage(browser, 1536, 864, '/safety.html?' + ADMIN);
+    await lw.waitForSelector('#areas [data-place="Office"]');
+    for (const place of ['Plant', 'Garage', 'Office', 'Yard']) {
+      if (await lw.getAttribute('#areas [data-place="' + place + '"]', 'aria-expanded') !== 'true') await lw.click('#areas [data-place="' + place + '"]');
+      await lw.waitForSelector('#areas [data-place="' + place + '"][aria-expanded="true"]');
+    }
+    await lw.waitForFunction(() => /Truck Wash/.test(document.getElementById('areas').textContent));
+    const subs = await lw.$$eval('#areas [data-area].sub', b => b.map(x => x.textContent));
+    assert.ok(subs.some(t => /Conference Room/.test(t)) && subs.some(t => /Truck Wash/.test(t)) && !subs.some(t => /Ammonia Room/.test(t)), 'the walk follows Location Areas: ' + JSON.stringify(subs));
+    assert.deepEqual(await lw.$$eval('#areas [data-place]', b => [...new Set(b.map(x => x.dataset.place))]), ['Plant', 'Garage', 'Office', 'Yard']);
+    await shot(lw, 'safety-walk-location-areas-1536');
+    assert.deepEqual(lw.errors, []);
+    await lw.close();
+    results.push('The walk follows Location Areas: renamed and added sub-areas show in order, a turned-off one is left off');
 
     // Joe 10/12: iPad and Android, tablets both ways and a phone. Every safety screen fits the device with big buttons.
     const DEVICES = [['iPad (gen 7)', 'ipad-portrait'], ['iPad (gen 7) landscape', 'ipad-landscape'], ['Galaxy Tab S4', 'android-tablet-portrait'], ['Galaxy Tab S4 landscape', 'android-tablet-landscape'], ['Pixel 7', 'android-phone']];
