@@ -217,3 +217,11 @@ table.sw-grid tr.sw-sub-row td { background: #f7fafd !important; }
 .sw-sub-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 table.sw-grid .sw-sub-line input[data-k="name"] { width: 260px; font-weight: 700; }
 table.sw-grid tr.sw-add input[data-k="newsub"], table.sw-grid tr.sw-add input[data-k="newplace"] { width: 340px; max-width: 100%; }
+/* Joe 10/12: a sub-area turned off in Location Areas, on Checklist Setup and Location Areas. */
+.sw-pill.gray { background: #eef1f4; color: #4b5563; }
+.sw-off b, .sw-off input[type=text] { color: #6b7280; }
+.sw-sub-line .sw-pill { margin-left: 12px; }
+.la-page .sw-sub-row td:first-child { padding-left: 32px; }
+.la-page .sw-grid td .sw-btn + .sw-btn { margin-left: 8px; }
+.la-page .sw-grid input[type=text] { width: 100%; max-width: 420px; }
+.la-page select#plant { font-size: 16px; min-height: 40px; padding: 6px 10px; }

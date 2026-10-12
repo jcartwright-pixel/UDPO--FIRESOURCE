@@ -165,6 +165,27 @@ test('Checklist Setup: a manager changes the plant\'s list; an item left out sta
   await assert.rejects(applyAction(db(), { email: PLANT_PERSON }, { action: 'saveSafetyChecklist', requestId: rid(), facilityId: UT, areas }, at(MON)), /permission|not allowed|role/i);
 });
 
+test('Location Areas (Joe 10/12): rename, reorder and turn off; nothing is ever dropped; the walk follows them', async () => {
+  const L = S.locations(null);
+  assert.deepEqual(L.map(a => a.name), ['Plant', 'Garage', 'Office', 'Yard']);
+  const next = JSON.parse(JSON.stringify(L));
+  next[0].subs[0].name = 'Docks';
+  next[0].subs.find(x => x.key === 'ammonia').off = true;
+  next[3].subs.push({ key: 'yard_scale', name: 'Truck Scale' });
+  next.splice(1, 1); // the Garage left out of what is sent
+  await applyAction(db(), { email: MANAGER }, { action: 'saveLocationAreas', requestId: rid(), facilityId: UT, areas: next.reverse() }, at(MON));
+  const saved = (await db().collection('locationAreas').doc(UT).get()).data();
+  assert.deepEqual(saved.areas.map(a => [a.name, a.off]), [['Yard', false], ['Office', false], ['Plant', false], ['Garage', true]], 'an area left out stays, turned off');
+  const setup = { locations: saved };
+  const P = S.places(S.walkList(setup, true));
+  assert.deepEqual(P.map(p => p.name), ['Yard', 'Office', 'Plant'], 'the walk follows their order and leaves turned-off areas off');
+  assert.equal(P[2].areas[0].name, 'Docks');
+  assert.ok(!P[2].areas.some(a => a.key === 'ammonia'));
+  await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'nh3_leaks', status: 'GOOD' }, MON), /not on this plant's checklist/, 'a turned-off sub-area is not walked');
+  await assert.rejects(applyAction(db(), { email: MANAGER }, { action: 'saveLocationAreas', requestId: rid(), facilityId: UT, areas: [{ key: 'plant', name: '', subs: [] }] }, at(MON)), /needs a name/);
+  await assert.rejects(applyAction(db(), { email: PLANT_PERSON }, { action: 'saveLocationAreas', requestId: rid(), facilityId: UT, areas: next }, at(MON)), /permission|not allowed|role/i);
+});
+
 test('Notes (Joe 10/12): a note on any row, kept when the row changes; a note on an earlier issue; notes for the whole walk', async () => {
   await walkTap('2026-10-05', 'note', { itemId: 'exit_signs', note: 'Bulb dim by dock 3' }, MON, PLANT_PERSON);
   let w = await walk('2026-10-05');

@@ -31,7 +31,9 @@ export const ADMIN_GROUPS = [
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
     ['machine-products', 'Product Sheet', "Each plant's product sheet by area and group: every detail of each product, and the Product drop-down on Quality Checks. Add or edit a product, or load the whole list from the template.", 'products.html', 'production.webp'],
-    ['plant-shifts', 'Plant Shifts', 'Each plant\'s Distribution and Plant Production shifts (Uniontown distribution: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week']
+    ['plant-shifts', 'Plant Shifts', 'Each plant\'s Distribution and Plant Production shifts (Uniontown distribution: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week'],
+    // Joe 10/12: one list of each plant's areas and sub-areas; the Safety Walkthrough walks it, other screens can use it later.
+    ['location-areas', 'Location Areas', "Each plant's areas (Plant, Garage, Office, Yard) and their sub-areas: add, rename, reorder, turn off. The Safety Walkthrough walks them in this order; other screens can use them later.", 'location-areas.html', 'map']
   ]],
   // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.
   ['Connections & Keys', 'The API keys the app uses: paste, replace and test them here', [

@@ -74,8 +74,6 @@
       ['emerg_lights', 'Emergency lights: press test, lights come on', 'MONTHLY'],
       ['alarm_valves', 'Fire alarm pull stations and sprinkler valves clear', 'WEEKLY'],
       ['sprinkler_clear', 'Nothing stored within 18 inches of sprinkler heads', 'WEEKLY']] },
-    { place: 'Plant', key: 'outside', name: 'Outside', items: [
-      ['outside', 'Outside walkways, steps and lot lighting OK', 'WEEKLY']] },
     { place: 'Garage', key: 'g_bays', name: 'Repair Bays', items: [
       ['g_lifts', 'Lifts inspected, locks working', 'WEEKLY'],
       ['g_stands', 'Jack stands under raised trucks', 'WEEKLY'],
@@ -111,8 +109,16 @@
       ['o_rails', 'Handrails tight', 'WEEKLY'],
       ['o_stairs', 'Stairs clear and lit', 'WEEKLY'],
       ['o_exit_doors', 'Exit doors open from the inside', 'WEEKLY'],
-      ['o_evac_map', 'Evacuation map posted', 'MONTHLY']] }
+      ['o_evac_map', 'Evacuation map posted', 'MONTHLY']] },
+    { place: 'Yard', key: 'outside', name: 'Parking Lot & Walkways', items: [
+      ['outside', 'Outside walkways, steps and lot lighting OK', 'WEEKLY']] }
   ];
+  // Joe 10/12: each plant's Location Areas (Administration > Plant Setup): the areas (Plant, Garage, Office, Yard) and their
+  // sub-areas, one list the Safety Walkthrough walks in order and other screens can use later. With none saved a plant starts
+  // from the sub-areas above, plus the yard's own. Keys never change once used.
+  var EXTRA_SUBS = { Yard: [['yard_truck', 'Truck Yard'], ['yard_storage', 'Outside Storage']] };
+  var PLACE_KEYS = { Plant: 'plant', Garage: 'garage', Office: 'office', Yard: 'yard' };
+
   // The monthly check of each fire extinguisher (OSHA 1910.157(e)(2), NFPA 10 7.2).
   var EXT_ITEMS = [
     ['in_place', 'In its place, sign visible, nothing in front of it'],
@@ -129,16 +135,42 @@
   function noon(key) { var p = String(key).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2], 12); }
   function isKey(v) { return /^\d{4}-\d\d-\d\d$/.test(text(v)) && isFinite(noon(v)); }
 
-  // The checklist the plant walks: its own saved one (Checklist Setup), else the list above. Items turned off are left out
-  // unless all is true (Checklist Setup shows them).
+  // A plant's Location Areas: [{ key, name, off, subs: [{ key, name, off }] }], its saved list or the starting one.
+  function locations(doc) {
+    var saved = doc && Array.isArray(doc.areas) && doc.areas.length ? doc.areas : null;
+    if (!saved) {
+      saved = [];
+      DEFAULT_AREAS.forEach(function (a) {
+        var p = saved.filter(function (x) { return x.name === a.place; })[0];
+        if (!p) { p = { key: PLACE_KEYS[a.place] || a.place.toLowerCase(), name: a.place, subs: [] }; saved.push(p); }
+        p.subs.push({ key: a.key, name: a.name });
+      });
+      saved.forEach(function (p) { (EXTRA_SUBS[p.name] || []).forEach(function (x) { p.subs.push({ key: x[0], name: x[1] }); }); });
+    }
+    return saved.map(function (a) {
+      return { key: text(a.key), name: text(a.name), off: a.off === true, subs: (a.subs || []).map(function (x) { return { key: text(x.key), name: text(x.name), off: x.off === true }; })
+        .filter(function (x) { return x.key && x.name; }) };
+    }).filter(function (a) { return a.key && a.name; });
+  }
+  // The checklist the plant walks, in its Location Areas' order: each sub-area with the items Checklist Setup put there (its
+  // own saved list, else the list above). Areas, sub-areas and items turned off are left out unless all is true (the setup
+  // screens show them, sub-areas with no items too). A sub-area saved before Location Areas keeps its own place and name.
   function checklist(setup, all) {
-    var areas = setup && Array.isArray(setup.areas) && setup.areas.length ? setup.areas : DEFAULT_AREAS.map(function (a) {
+    var saved = setup && Array.isArray(setup.areas) && setup.areas.length ? setup.areas : DEFAULT_AREAS.map(function (a) {
       return { place: a.place, key: a.key, name: a.name, items: a.items.map(function (i) { return { id: i[0], text: i[1], freq: i[2] }; }) };
     });
-    return areas.map(function (a) {
-      return { place: text(a.place) || 'Plant', key: text(a.key), name: text(a.name), items: (a.items || []).map(function (i) { return { id: text(i.id), text: text(i.text), freq: FREQS.indexOf(i.freq) >= 0 ? i.freq : 'WEEKLY', off: i.off === true }; })
+    var byKey = {}, used = {};
+    saved.forEach(function (a) { if (text(a.key)) byKey[text(a.key)] = a; });
+    var out = [];
+    locations(setup && setup.locations).forEach(function (p) { p.subs.forEach(function (x) {
+      used[x.key] = true;
+      out.push({ place: p.name, placeKey: p.key, key: x.key, name: x.name, off: p.off || x.off, items: (byKey[x.key] || {}).items || [] });
+    }); });
+    saved.forEach(function (a) { var k = text(a.key); if (k && !used[k]) out.push({ place: text(a.place) || 'Plant', placeKey: '', key: k, name: text(a.name) || k, off: false, items: a.items || [] }); });
+    return out.map(function (a) {
+      return { place: a.place, placeKey: a.placeKey, key: a.key, name: a.name, off: a.off, items: a.items.map(function (i) { return { id: text(i.id), text: text(i.text), freq: FREQS.indexOf(i.freq) >= 0 ? i.freq : 'WEEKLY', off: i.off === true }; })
         .filter(function (i) { return i.id && i.text && (all || !i.off); }) };
-    }).filter(function (a) { return a.key && a.name && (all || a.items.length); });
+    }).filter(function (a) { return all || (!a.off && a.items.length); });
   }
   // The areas and items on one walk: monthly items only on the month's first walk.
   function walkList(setup, monthly) {
@@ -159,7 +191,7 @@
   function areaName(a) { return a.place ? a.place + ' \u203a ' + a.name : a.name; }
   function findItem(setup, id) {
     var out = null;
-    checklist(setup, true).forEach(function (a) { a.items.forEach(function (i) { if (i.id === id) out = { area: areaName(a), areaKey: a.key, place: a.place, id: i.id, text: i.text, freq: i.freq, off: i.off }; }); });
+    checklist(setup, true).forEach(function (a) { a.items.forEach(function (i) { if (i.id === id) out = { area: areaName(a), areaKey: a.key, place: a.place, id: i.id, text: i.text, freq: i.freq, off: i.off || a.off === true }; }); });
     return out;
   }
   function walkId(facilityId, date) { return text(facilityId) + '__' + text(date); }
@@ -198,6 +230,6 @@
   function extId(facilityId, tag) { return text(facilityId) + '__' + text(tag).replace(/[^A-Za-z0-9-]+/g, '_'); }
 
   return { STATUSES: STATUSES, FREQS: FREQS, DEFAULT_AREAS: DEFAULT_AREAS, EXT_ITEMS: EXT_ITEMS, EXT_TYPES: EXT_TYPES, LONG_OPEN_DAYS: LONG_OPEN_DAYS, DUE_SOON_DAYS: DUE_SOON_DAYS,
-    checklist: checklist, walkList: walkList, places: places, areaName: areaName, findItem: findItem, walkId: walkId, monthOf: monthOf, walkCounts: walkCounts, daysOpen: daysOpen, isRepeat: isRepeat,
+    locations: locations, checklist: checklist, walkList: walkList, places: places, areaName: areaName, findItem: findItem, walkId: walkId, monthOf: monthOf, walkCounts: walkCounts, daysOpen: daysOpen, isRepeat: isRepeat,
     extMonth: extMonth, dueState: dueState, extId: extId, isKey: isKey, pad: pad };
 });

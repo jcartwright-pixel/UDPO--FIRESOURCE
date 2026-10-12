@@ -81,6 +81,7 @@ service cloud.firestore {
     match /safetyPhotos/{id} { allow read: if activeUser(); }
     match /extinguishers/{id} { allow read: if activeUser(); }
     match /safetySetup/{id} { allow read: if activeUser(); }
+    match /locationAreas/{id} { allow read: if activeUser(); }
     // Plant Maintenance: machinery, work orders and PM tasks (saved only through the server).
     match /plantMachines/{id} { allow read: if activeUser(); }
     match /plantWorkOrders/{id} { allow read: if activeUser(); }
