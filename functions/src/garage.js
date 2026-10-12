@@ -592,7 +592,10 @@ async function garageCall(db, input, now) {
     return { ok: true };
   }
   if (op === 'step') return step(db, input, nowMs);
+  // Plant Maintenance's Maintenance Station (Joe 10/12): the same technicians and sign-in, the plant's work orders.
+  if (op === 'pmBoard') return require('./plantmaint').stationBoard(db, input, nowMs);
+  if (op === 'pmStep') return require('./plantmaint').stationStep(db, input, nowMs);
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, fleetRules, validateFleet, saveFleet, RULES_DOC, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, LOGINS };
+module.exports = { G, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, LOGINS };

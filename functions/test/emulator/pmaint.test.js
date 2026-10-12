@@ -88,3 +88,76 @@ test('PM Schedule: a manager adds a PM to a machine, its due day follows; Send t
   await pm({}, { taskId: made.taskId, status: 'REMOVED' });
   await assert.rejects(act(MANAGER, 'sendPmToMaintenance', { taskId: made.taskId }), /no longer on the schedule/);
 });
+
+// Joe 10/12: a breakdown is recorded with when it was back up and what fixed it; a Maintenance Request says how long it can wait.
+test('Shift Notes: a Breakdown keeps Back up at and What fixed it; a Maintenance Request keeps Can it wait', async () => {
+  const brk = await act(PLANT, 'saveShiftNote', { values: { Entry: 'Valve 14 blew a seal', Type: 'Breakdown', Equipment: 'GALLON FILLER', UpAt: '10:20', Fix: 'Replaced the seal' }, readingTime: '09:42', followUpStatus: 'RESOLVED' });
+  const req = await act(PLANT, 'saveShiftNote', { values: { Entry: 'Water leak under the pasteurizer', Type: 'Maintenance Request', Equipment: 'GALLON FILLER', Urgency: 'This week' }, followUpStatus: 'OPEN' });
+  const get = async (r) => (await db().collection('plantJournal').doc(r.checkId).get()).data().payload.values;
+  assert.deepEqual(await get(brk), { Entry: 'Valve 14 blew a seal', Type: 'Breakdown', Equipment: 'GALLON FILLER', UpAt: '10:20', Fix: 'Replaced the seal' });
+  assert.equal((await get(req)).Urgency, 'This week');
+  // Still down, then back up in a review under it.
+  const still = await act(PLANT, 'saveShiftNote', { values: { Entry: 'Capper jammed', Type: 'Breakdown', Equipment: 'GALLON FILLER' }, readingTime: '11:00', followUpStatus: 'OPEN' });
+  await act(PLANT, 'saveShiftNote', { values: { Entry: 'Back up', Type: 'REVIEW', ParentId: still.entryId, UpAt: '11:25', Fix: 'Cleared the jam' }, followUpStatus: 'RESOLVED' });
+  const R = require('../../src/plant-rules');
+  const log = R.shiftLog((await db().collection('plantJournal').where('type', '==', R.SHIFT_TYPE).get()).docs.map(d => d.data()), Date.parse('2026-10-08T16:00:00Z'), 24 * 3650);
+  const row = log.find(r => r.entryId === still.entryId);
+  assert.deepEqual([row.upAt, row.fix], ['11:25', 'Cleared the jam']);
+  await assert.rejects(act(PLANT, 'saveShiftNote', { values: { Entry: 'x', Type: 'Breakdown', UpAt: 'soon' }, followUpStatus: 'OPEN' }), /Back up at must be a time/);
+  await assert.rejects(act(PLANT, 'saveShiftNote', { values: { Entry: 'x', Type: 'Maintenance Request', Urgency: 'Never' }, followUpStatus: 'OPEN' }), /Can it wait must be/);
+});
+
+// Mock-up E: the Maintenance Station works the plant's work orders like the Garage Station (same technicians and login IDs).
+test('Maintenance Station: start, a helper, need parts, complete a PM (Last done moves on); report a problem; record a breakdown', async () => {
+  const GA = require('../../src/garage');
+  const at = (min) => () => new Date(Date.parse('2026-10-08T14:00:00Z') + (min || 0) * 60000);
+  for (const [id, name, pin] of [['TECH-JT', 'JELLICK Tom', '48213'], ['TECH-JN', 'NARD Jaxon', '551902']]) {
+    await db().collection('garageTechs').doc(id).set({ tech_id: id, name, active: 'YES', facility_id: 'fac_uniontown' });
+    await db().collection('garageLogins').doc(id).set({ hash: GA.loginHash(id, pin) });
+  }
+  const LOGIN = { TOM: ['TECH-JT', '48213'], JAX: ['TECH-JN', '551902'] };
+  const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const call = (fields, min) => GA.garageCall(db(), Object.assign({ facilityId: 'fac_uniontown' }, fields), at(min));
+  const as = async (who, fields, min) => { const s = await call({ op: 'signIn', techId: LOGIN[who][0], loginId: LOGIN[who][1], tokens: [] }, min); return call(Object.assign({ op: 'pmStep', tokens: [s.token], requestId: rid() }, fields), min); };
+
+  const made = await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: 'ut_prod_gallon_filler', task: 'Grease bearings', every: 1, unit: 'MONTHS', lastDone: '2026-09-01' } });
+  const sent = await act(MANAGER, 'sendPmToMaintenance', { taskId: made.taskId });
+  let b = await call({ op: 'pmBoard' });
+  assert.deepEqual(b.jobs.map(j => [j.woNumber, j.unit, j.from, j.pm]), [['M-1001', 'GALLON FILLER', 'PM', true]]);
+  assert.ok(b.machines.some(m => m.name === 'GALLON FILLER'));
+  assert.deepEqual(b.techs.map(t => [t.name, t.on]), [['JELLICK Tom', null], ['NARD Jaxon', null]]);
+  await assert.rejects(call({ op: 'pmStep', tokens: [], step: 'START', id: sent.workOrderId, requestId: rid() }), /GARAGE_SIGN_IN_REQUIRED/);
+
+  await as('TOM', { step: 'START', id: sent.workOrderId }, 0);
+  let r = await as('JAX', { step: 'HELPER', id: sent.workOrderId }, 10);
+  assert.deepEqual(r.job.onNow.map(p => p.name), ['JELLICK Tom', 'NARD Jaxon']);
+  b = await call({ op: 'pmBoard' }, 11);
+  assert.deepEqual(b.techs.filter(t => t.on).map(t => t.on.unit), ['M-1001 GALLON FILLER', 'M-1001 GALLON FILLER']);
+  r = await as('TOM', { step: 'PARTS', id: sent.workOrderId }, 30);
+  assert.deepEqual([r.job.status, r.job.onNow, r.job.laborMinutes], ['PARTS', [], 50]);
+  await as('TOM', { step: 'RESUME', id: sent.workOrderId }, 60);
+  await assert.rejects(as('TOM', { step: 'DONE', id: sent.workOrderId, fixed: 'Fixed it', safe: true, signature: SIG }, 70), /Tap what you fixed/);
+  r = await as('TOM', { step: 'DONE', id: sent.workOrderId, fixed: 'PM done', note: 'All 6 bearings', safe: true, signature: SIG }, 90);
+  assert.equal(r.job.status, 'DONE');
+  assert.deepEqual([r.pm.lastDone, r.pm.nextDue], ['2026-10-08', '2026-11-08']);
+  const wo = (await db().collection('plantWorkOrders').doc(sent.workOrderId).get()).data();
+  assert.deepEqual([wo.status, wo.completedBy, wo.fixedNote, wo.onNow, wo.laborMinutes], ['DONE', 'JELLICK Tom', 'PM done: All 6 bearings', '', 80]);
+  const task = (await db().collection('plantPmTasks').doc(made.taskId).get()).data();
+  assert.deepEqual([task.lastDone, task.nextDue, task.sentWorkOrderId], ['2026-10-08', '2026-11-08', '']);
+  assert.deepEqual((await call({ op: 'pmBoard' }, 91)).jobs, [], 'a finished work order leaves the tablet');
+
+  // + Report a Problem: the next number, from maintenance.
+  r = await as('JAX', { step: 'REPORT', machineId: 'ut_prod_gallon_filler', problem: 'Guard rail loose', lineDown: false }, 100);
+  assert.match(r.message, /^M-1002 GALLON FILLER/);
+  await assert.rejects(as('JAX', { step: 'REPORT', machineId: 'ut_prod_gallon_filler', problem: '', lineDown: false }, 101), /Type what's wrong/);
+  // Not safe to run: stays open and the line is down.
+  r = await as('JAX', { step: 'DONE', id: r.job.id, fixed: 'Adjusted', safe: false, signature: SIG }, 110);
+  assert.deepEqual([r.job.status, r.job.canRun], ['WORKING', false]);
+
+  // Record a Breakdown: on the shift log as a Breakdown on that machine, back up and fixed.
+  r = await as('TOM', { step: 'BREAKDOWN', machineId: 'ut_prod_gallon_filler', downAt: '09:42', upAt: '10:20', cause: 'Valve 14 blew a seal', fix: 'Replaced the seal' }, 120);
+  const entry = (await db().collection('plantJournal').where('recordId', '==', r.entryId).get()).docs[0].data();
+  assert.deepEqual([entry.type, entry.status, entry.payload.readingTime, entry.payload.values], ['SHIFT_REPORT', 'RESOLVED', '09:42',
+    { Entry: 'Valve 14 blew a seal', Type: 'Breakdown', Equipment: 'GALLON FILLER', UpAt: '10:20', Fix: 'Replaced the seal' }]);
+  await assert.rejects(as('TOM', { step: 'BREAKDOWN', machineId: 'ut_prod_gallon_filler', downAt: '', cause: 'x' }, 121), /when it went down/);
+});

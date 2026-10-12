@@ -113,7 +113,7 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     await notes.waitForSelector('#another:not([hidden])');
     // Joe 10/11: the Shift drop-down starts on the shift now (from Plant Shifts) and is kept with the entry.
     assert.match(await notes.inputValue('select.sn-shift'), /^(FIRST|SECOND|THIRD) SHIFT$/);
-    assert.deepEqual(await notes.$$eval('#lines [data-kind]', b => b.map(x => x.dataset.kind)), ['Handoff', 'Breakdown', 'Incident', 'Safety', 'Quality', 'Other']);
+    assert.deepEqual(await notes.$$eval('#lines [data-kind]', b => b.map(x => x.dataset.kind)), ['Handoff', 'Breakdown', 'Maintenance Request', 'Incident', 'Safety', 'Quality', 'Other'], 'Joe 10/12: Maintenance Requests have their own button');
     assert.match(await nWatch.textContent('#history'), /Cooler 2 floor · (FIRST|SECOND|THIRD) SHIFT/);
     await notes.click('#another');
     assert.equal(await notes.inputValue('.sn-entry'), '', 'Start Another Entry empties the form');

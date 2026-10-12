@@ -910,3 +910,15 @@ body.lo-dragging, body.lo-dragging * { cursor: grabbing !important; user-select:
 .products-page .pm-edit-note { margin: 12px 0 0; min-height: 20px; font-size: 16px; color: #1d6b3a; font-weight: 700; }
 .products-page .pm-edit-note.bad { color: #a32020; }
 @media (max-width: 700px) { .products-page .pm-edit-grid { grid-template-columns: 1fr; } }
+
+/* Shift Notes (Joe 10/12): a breakdown's down and back up times, and what maintenance did with a request. */
+.shift-page .qc-fields .half { grid-column: span 2; }
+.shift-page .qc-fields .half textarea { min-height: 70px; }
+.shift-page .sn-down { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 6px 0; padding: 7px 10px; border-radius: 8px; background: #f6f9fc; font-size: 16px; }
+.shift-page .sn-down label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--muted); }
+.shift-page .sn-down input { height: 38px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; }
+.shift-page .sn-down .sn-fixbox { flex: 1 1 260px; min-width: 0; }
+.shift-page .sn-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.shift-page .sn-pill.red { background: #fde8e8; color: #b42318; } .shift-page .sn-pill.green { background: #e3f4e8; color: #1d6b37; }
+.shift-page .sn-pill.amber { background: #fff1dc; color: #8a5200; } .shift-page .sn-pill.blue { background: #e8f0f8; color: var(--ud-blue); }
+@media (max-width: 1400px) { .shift-page .qc-fields .half { grid-column: span 1; } }

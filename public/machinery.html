@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/pmaint.css">
   <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
   <script src="js/pmaint-rules.js"></script>
 </head>
 <body class="fill pm-page mach-page">
@@ -121,10 +122,15 @@
         html += '<h3>PM schedule <small>' + (tasks.length ? '' : 'none yet · add them on PM Schedule') + '</small><a class="pm-btn" style="margin-left:auto" href="pmschedule.html?plant=' + encodeURIComponent(plant) + '&machine=' + encodeURIComponent(m.id) + '">PM Schedule</a></h3>' +
           (tasks.length ? '<table class="pm-table"><thead><tr><th>Task</th><th>How often</th><th>Last done</th><th>Next due</th></tr></thead><tbody>' + tasks.map(t => '<tr><td>' + escapeHtml(t.task) + '</td><td class="nowrap">' + escapeHtml(R.everyText(t.every, t.unit)) + '</td><td class="nowrap">' + day(t.lastDone) + '</td><td class="nowrap">' +
             (t.state === 'LATE' ? '<span class="pm-pill red">' + day(t.due) + ' late</span>' : day(t.due)) + '</td></tr>').join('') + '</tbody></table>' : '');
-        const hist = data.workOrders.filter(w => w.machineId === m.id).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-        html += '<h3>History <small>breakdowns, work orders and PMs</small></h3>' + (hist.length ? '<table class="pm-table"><thead><tr><th>Date</th><th>From</th><th>What</th><th>Work order</th></tr></thead><tbody>' + hist.map(w =>
-          '<tr><td class="nowrap">' + when(w.createdAt) + '</td><td class="nowrap">' + (w.source === 'SHIFT_NOTES' ? 'Shift Notes' : w.source === 'PM' ? 'PM' : 'Maintenance') + '</td><td>' + escapeHtml(w.problem || '') + (w.fixedNote ? '<small>Fixed: ' + escapeHtml(w.fixedNote) + '</small>' : '') + '</td>' +
-          '<td class="nowrap">' + escapeHtml(w.woNumber || '') + ' · ' + escapeHtml(R.statusWord(w.status)) + '</td></tr>').join('') + '</tbody></table>' : '<p class="pm-muted">Nothing yet. Breakdowns sent from Shift Notes and every work order on this machine show here.</p>');
+        // History: breakdowns recorded on Shift Notes, requests, work orders and PMs, newest first.
+        const hm = (n) => n === null || n === undefined ? '' : n >= 60 ? Math.floor(n / 60) + ' h ' + (n % 60) + ' m' : n + ' min';
+        const hist = data.breakdowns.filter(b => b.machineId === m.id).map(b => ({ at: b.recordedAt, from: 'Breakdown', what: b.entry + (b.fix ? ' · fix: ' + b.fix : ''), who: b.stillDown ? 'still down' + (b.down !== null ? ' · ' + hm(b.down) : '') : (b.down !== null ? hm(b.down) + ' down' : 'recorded') }))
+          .concat(data.requests.filter(r => r.machineId === m.id && !r.workOrder).map(r => ({ at: r.recordedAt, from: 'Request', what: r.entry, who: r.status === 'RESOLVED' ? 'fixed' : 'waiting' })))
+          .concat(data.workOrders.filter(w => w.machineId === m.id).map(w => ({ at: w.createdAt, from: w.source === 'PM' ? 'PM' : w.source === 'SHIFT_NOTES' ? 'Request' : 'Work order', what: (w.problem || '') + (w.fixedNote ? ' · fixed: ' + w.fixedNote : ''), who: (w.woNumber || '') + ' · ' + R.statusWord(w.status) })))
+          .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+        const downMonth = data.breakdowns.filter(b => b.machineId === m.id && String(b.recordedAt) >= new Date(Date.now() - 30 * 86400000).toISOString()).reduce((n, b) => n + (b.down || 0), 0);
+        html += '<h3>History <small>breakdowns, requests, work orders and PMs' + (downMonth ? ' · down ' + hm(downMonth) + ' in the last 30 days' : '') + '</small></h3>' + (hist.length ? '<table class="pm-table"><thead><tr><th>Date</th><th>From</th><th>What</th><th>Work order / time down</th></tr></thead><tbody>' + hist.map(h =>
+          '<tr><td class="nowrap">' + when(h.at) + '</td><td class="nowrap">' + h.from + '</td><td>' + escapeHtml(h.what) + '</td><td class="nowrap">' + escapeHtml(h.who) + '</td></tr>').join('') + '</tbody></table>' : '<p class="pm-muted">Nothing yet. Breakdowns recorded on Shift Notes, requests and every work order on this machine show here.</p>');
       }
       card.innerHTML = html;
       if (!m) { const n = card.querySelector('[data-k="name"]'); if (n) n.focus(); }

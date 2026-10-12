@@ -182,4 +182,206 @@ async function sendPmToMaintenance(tx, db, req, email, stamp, logRef, mode, Save
   return result;
 }
 
-module.exports = { validateMachine, saveMachine, validateSend, makeWorkOrder, woIdFor, validatePmTask, savePmTask, validateSendPm, sendPmToMaintenance };
+/* ---------- Maintenance Station (mock-up E): the tablet, like the Garage Station ---------- */
+/*
+ * Joe 10/12: the mechanics work the plant's work orders the way they work the garage's: the open work orders come up first with
+ * no sign-in; a mechanic taps one, then their name and login ID (the same technicians and login IDs as the Garage Station), and
+ * Starts their own clock. Need Parts, Add another mechanic, Stop, and Complete (what was fixed, safe to run, finger signature).
+ * A PM work order completed moves the PM task's Last done to that day. + Report a Problem makes a work order; Record a Breakdown
+ * puts a big one fixed on the spot (machine, down, back up, cause and fix) on the shift log, the same as Shift Notes does.
+ */
+const GA = () => require('./garage');
+const A = () => require('./actions');
+const SaveErr = (code, message) => new (A().SaveError)(code, message);
+const CLOCKS = 'plantMaintClocks';
+const FIXES = ['Replaced a part', 'Repaired', 'Adjusted', 'Cleaned', 'Lubricated', 'PM done', 'Nothing wrong'];
+const STATION_OPS = ['START', 'HELPER', 'PARTS', 'RESUME', 'STOP', 'DONE', 'REPORT', 'BREAKDOWN'];
+const SIGNATURE_MAX = 30000;
+const short = (v, max) => text(v).replace(/\s+/g, ' ').slice(0, max);
+const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+const laborOf = (o) => (Array.isArray(o.labor) ? o.labor : []).filter(s => s && s.tech_id).map(s => ({ tech_id: String(s.tech_id), name: String(s.name || ''), start: String(s.start || ''), end: String(s.end || ''), minutes: Number(s.minutes) || 0 }));
+const joinNames = (list) => list.filter((n, i) => n && list.indexOf(n) === i).join(', ');
+const FROM_WORD = { SHIFT_NOTES: 'Request from the plant', PM: 'PM', MAINTENANCE: 'Reported by maintenance' };
+
+// A work order as the tablet shows it.
+function stationJob(o) {
+  const labor = laborOf(o);
+  return { id: o.id, woNumber: text(o.woNumber), unit: text(o.machine) || 'Plant', area: text(o.area), problem: text(o.problem), source: text(o.source), from: FROM_WORD[o.source] || 'Work order',
+    urgency: text(o.urgency), createdAt: text(o.createdAt), canRun: text(o.lineDown).toUpperCase() !== 'YES', status: text(o.status).toUpperCase() || 'NEW', pm: !!o.pmTaskId,
+    onNow: labor.filter(s => !s.end).map(s => ({ id: s.tech_id, name: s.name, since: s.start })), labor: labor.filter(s => s.end).map(s => ({ name: s.name, minutes: s.minutes })),
+    laborMinutes: labor.reduce((n, s) => n + (s.end ? s.minutes : 0), 0) };
+}
+
+async function stationBoard(db, input, nowMs) {
+  const facilityId = plantOf(input.facilityId || 'fac_uniontown', A().SaveError);
+  const techs = GA().activeTechs((await db.collection('garageTechs').get()).docs.map(d => d.data()));
+  const setup = (await db.collection('plantSetup').where('type', '==', 'PRODUCTION_AREA').get()).docs.map(d => d.data());
+  const saved = (await db.collection('plantMachines').where('facilityId', '==', facilityId).get()).docs.map(d => Object.assign({ id: d.id }, d.data()));
+  const orders = (await db.collection('plantWorkOrders').where('facilityId', '==', facilityId).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
+  const clocks = {};
+  (await db.collection(CLOCKS).get()).docs.forEach(d => { const c = d.data(); if (c.techId && c.facilityId === facilityId) clocks[c.techId] = c; });
+  const rank = (j) => (j.canRun ? 1 : 0) + (j.status === 'PARTS' ? 2 : 0);
+  const jobs = orders.filter(o => R.isOpen(o)).map(stationJob).sort((a, b) => rank(a) - rank(b) || a.createdAt.localeCompare(b.createdAt));
+  const open = {}; jobs.forEach(j => { open[j.id] = j; });
+  const today = nyDay(nowMs);
+  return { techs: techs.map(t => { const c = clocks[t.id], j = c && open[c.workOrderId]; return Object.assign({}, t, { on: j ? { id: j.id, unit: j.woNumber + ' ' + j.unit, since: c.since } : null }); }),
+    jobs, doneToday: orders.filter(o => text(o.status).toUpperCase() === 'DONE' && o.completedAt && nyDay(Date.parse(o.completedAt)) === today).length,
+    machines: R.machines(setup, saved, facilityId, false).map(m => ({ id: m.id, name: m.name, area: m.area })), fixes: FIXES, now: new Date(nowMs).toISOString() };
+}
+
+function validateStation(input) {
+  const op = short(input.step, 12).toUpperCase();
+  if (STATION_OPS.indexOf(op) < 0) throw SaveErr('BAD_REQUEST', 'Maintenance: unknown step ' + (op || '(none)') + '.');
+  const requestId = short(input.requestId, 80);
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(requestId)) throw SaveErr('BAD_REQUEST', 'Each step needs a requestId');
+  const out = { op, requestId, facilityId: plantOf(input.facilityId || 'fac_uniontown', A().SaveError), id: short(input.id, 120) };
+  if (op === 'REPORT' || op === 'BREAKDOWN') {
+    out.machineId = short(input.machineId, 120);
+    if (!/^[A-Za-z0-9_-]+$/.test(out.machineId)) throw SaveErr('BAD_REQUEST', 'Tap the machine.');
+  }
+  if (op === 'REPORT') {
+    out.problem = short(input.problem, 300);
+    if (!out.problem) throw SaveErr('BAD_REQUEST', 'Type what\'s wrong.');
+    if (typeof input.lineDown !== 'boolean') throw SaveErr('BAD_REQUEST', 'Tap Yes or No for "Is the line down?".');
+    out.lineDown = input.lineDown;
+    return out;
+  }
+  if (op === 'BREAKDOWN') {
+    out.downAt = short(input.downAt, 5); out.upAt = short(input.upAt, 5);
+    if (!/^\d{1,2}:\d\d$/.test(out.downAt)) throw SaveErr('BAD_REQUEST', 'Enter when it went down.');
+    if (out.upAt && !/^\d{1,2}:\d\d$/.test(out.upAt)) throw SaveErr('BAD_REQUEST', 'Back up at must be a time.');
+    out.cause = short(input.cause, 1000); out.fix = short(input.fix, 1000);
+    if (!out.cause) throw SaveErr('BAD_REQUEST', 'Type what happened.');
+    return out;
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(out.id)) throw SaveErr('BAD_REQUEST', 'That work order is not on the list any more. Go back to Work Orders.');
+  if (op === 'DONE') {
+    out.fixed = short(input.fixed, 40);
+    if (FIXES.indexOf(out.fixed) < 0) throw SaveErr('BAD_REQUEST', 'Tap what you fixed.');
+    if (typeof input.safe !== 'boolean') throw SaveErr('BAD_REQUEST', 'Tap Yes or No for "Safe to run?".');
+    out.safe = input.safe;
+    out.note = short(input.note, 300);
+    out.signature = String(input.signature || '');
+    if (out.signature.length > SIGNATURE_MAX || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(out.signature)) throw SaveErr('BAD_REQUEST', 'Sign with your finger in the box.');
+  }
+  return out;
+}
+
+async function stationStep(db, input, nowMs) {
+  const req = validateStation(input);
+  const stamp = new Date(nowMs).toISOString();
+  return db.runTransaction(async tx => {
+    const logRef = db.collection('actions').doc(req.requestId), logSnap = await tx.get(logRef);
+    if (logSnap.exists) return Object.assign({}, logSnap.data().result, { repeated: true });
+    const people = await GA().signedInTechs(tx, db, input.tokens, nowMs);
+    if (!people.length) throw SaveErr('NOT_ALLOWED', 'GARAGE_SIGN_IN_REQUIRED: Tap your name and enter your login ID.');
+    const names = people.map(p => p.name), by = 'maintenance:' + names.join('+');
+    const mode = await A().requireTestMode(tx, db, 'plant');
+    const renewAll = () => GA().renew((r, d) => tx.update(r, d), people, nowMs);
+    const result = { ok: true, requestId: req.requestId };
+
+    if (req.op === 'REPORT' || req.op === 'BREAKDOWN') {
+      const all = await plantMachines(tx, db, req.facilityId), m = all.find(x => x.id === req.machineId && x.status !== 'RETIRED');
+      if (!m) throw SaveErr('NOT_FOUND', 'That machine is not on this plant\'s list.');
+      if (req.op === 'REPORT') {
+        const num = await nextNumber(tx, db, req.facilityId), ref = db.collection('plantWorkOrders').doc(docId('MT_' + req.requestId));
+        const wo = { woNumber: R.woNumber(num.n), facilityId: req.facilityId, machineId: m.id, machine: m.name, area: m.area || '', problem: req.problem, notes: '', lineDown: req.lineDown ? 'YES' : 'NO',
+          type: 'Maintenance', urgency: '', source: 'MAINTENANCE', status: 'NEW', labor: [], createdAt: stamp, createdBy: by, updatedAt: stamp, updatedBy: by, testEdited: true };
+        num.write(stamp);
+        renewAll();
+        tx.set(ref, wo);
+        result.job = stationJob(Object.assign({ id: ref.id }, wo));
+        result.message = wo.woNumber + ' ' + m.name + ' is on the work orders.';
+        tx.set(logRef, { action: 'maintReport', by, at: stamp, mode: mode.mode, workOrderId: ref.id, after: wo, result });
+        return result;
+      }
+      // Record a Breakdown: the same entry Shift Notes makes, so it shows on Shift Notes, the machine's history and down time.
+      const now = new Date(stamp), entryId = 'SHIFT-' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 30);
+      const values = Object.assign({ Entry: req.cause, Type: 'Breakdown', Equipment: m.name }, req.upAt ? { UpAt: req.upAt } : {}, req.fix ? { Fix: req.fix } : {});
+      const status = req.upAt ? 'RESOLVED' : 'OPEN', shift = PR.shiftAt(now.getTime());
+      const payload = { entryId, date: L.operatingDay(now), shift, section: 'HANDOFF', readingTime: req.downAt, values, notes: '', followUpStatus: status, facilityId: req.facilityId };
+      const docName = PR.SHIFT_TYPE + '_app_' + entryId.replace(/[^A-Za-z0-9]/g, '');
+      renewAll();
+      tx.set(db.collection('plantJournal').doc(docName), { recordId: entryId, type: PR.SHIFT_TYPE, date: payload.date, status, shift, area: 'HANDOFF', notes: '', payload, facilityId: req.facilityId,
+        recordedAt: stamp, recordedBy: by, createdInApp: true, testEdited: true, editedAt: stamp });
+      result.entryId = entryId;
+      result.message = 'Breakdown on ' + m.name + ' recorded.';
+      tx.set(logRef, { action: 'maintBreakdown', by, at: stamp, mode: mode.mode, entryId, after: payload, result });
+      return result;
+    }
+
+    const ref = db.collection('plantWorkOrders').doc(req.id), snap = await tx.get(ref);
+    if (!snap.exists || text(snap.data().facilityId) !== req.facilityId) throw SaveErr('NOT_FOUND', 'That work order is not on the list any more. Go back to Work Orders.');
+    const order = Object.assign({}, snap.data(), { id: ref.id });
+    if (!R.isOpen(order)) throw SaveErr('NOT_ALLOWED', 'That work order is already finished.');
+    const finishing = req.op === 'DONE' && req.safe;
+    let taskRef = null, task = null;
+    if (finishing && order.pmTaskId) { taskRef = db.collection('plantPmTasks').doc(docId(order.pmTaskId)); const t = await tx.get(taskRef); task = t.exists ? t.data() : null; }
+
+    // The clocks: each signed-in mechanic's own (one plant job at a time), and every clock still running on this job.
+    const labor = laborOf(order);
+    const clockIds = people.map(p => p.id).concat(labor.filter(s => !s.end).map(s => s.tech_id)).filter((v, i, a) => a.indexOf(v) === i);
+    const clockRefs = clockIds.map(id => db.collection(CLOCKS).doc(docId(id)));
+    const clockSnaps = clockRefs.length ? await tx.getAll(...clockRefs) : [];
+    const clocks = {}; clockSnaps.forEach((s, i) => { clocks[clockIds[i]] = { ref: clockRefs[i], data: s.exists ? s.data() : null }; });
+    const starting = ['START', 'HELPER', 'RESUME'].indexOf(req.op) >= 0;
+    const elsewhere = starting ? people.map(p => clocks[p.id].data).filter(c => c && c.workOrderId && c.workOrderId !== ref.id) : [];
+    const otherIds = elsewhere.map(c => c.workOrderId).filter((v, i, a) => a.indexOf(v) === i);
+    const otherRefs = otherIds.map(id => db.collection('plantWorkOrders').doc(docId(id)));
+    const otherSnaps = otherRefs.length ? await tx.getAll(...otherRefs) : [];
+
+    const minutesFrom = (iso) => Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000)) || 0;
+    const closeClock = (list, techId) => list.forEach(s => { if (s.tech_id === techId && !s.end) { s.end = stamp; s.minutes = minutesFrom(s.start); } });
+    const laborFields = (list) => ({ labor: list, onNow: joinNames(list.filter(s => !s.end).map(s => s.name)), laborMinutes: list.reduce((n, s) => n + (s.end ? s.minutes : 0), 0) });
+    const writes = [];
+    if (starting) {
+      people.forEach(p => {
+        if (labor.some(s => s.tech_id === p.id && !s.end)) return;
+        labor.push({ tech_id: p.id, name: p.name, start: stamp, end: '', minutes: 0 });
+        writes.push(['set', clocks[p.id].ref, { techId: p.id, name: p.name, facilityId: req.facilityId, workOrderId: ref.id, machine: text(order.machine), since: stamp }]);
+      });
+      otherSnaps.forEach((s, i) => {
+        if (!s.exists) return;
+        const list = laborOf(s.data()), moving = people.filter(p => clocks[p.id].data && clocks[p.id].data.workOrderId === otherIds[i]);
+        moving.forEach(p => closeClock(list, p.id));
+        writes.push(['update', otherRefs[i], Object.assign(laborFields(list), { updatedAt: stamp, updatedBy: by, testEdited: true })]);
+        result.stoppedOn = (result.stoppedOn || []).concat(text(s.data().woNumber) || otherIds[i]);
+      });
+    } else if (req.op === 'STOP' || req.op === 'PARTS' || finishing) {
+      const who = req.op === 'STOP' ? people.map(p => p.id) : labor.filter(s => !s.end).map(s => s.tech_id);
+      who.forEach(id => {
+        closeClock(labor, id);
+        const c = clocks[id] && clocks[id].data;
+        if (c && c.workOrderId === ref.id) writes.push(['delete', clocks[id].ref]);
+      });
+    }
+
+    const was = text(order.status).toUpperCase() || 'NEW', techs = text(order.techs).split(/\s*,\s*/).filter(Boolean);
+    const change = Object.assign({ techs: joinNames(techs.concat(names)), startedAt: order.startedAt || stamp, updatedAt: stamp, updatedBy: by, testEdited: true }, laborFields(labor));
+    if (req.op === 'STOP' && was === 'NEW') change.status = 'WORKING';
+    if (req.op === 'START' || req.op === 'HELPER') change.status = was === 'PARTS' ? 'PARTS' : 'WORKING';
+    if (req.op === 'PARTS') Object.assign(change, { status: 'PARTS', partsAt: stamp });
+    if (req.op === 'RESUME') change.status = 'WORKING';
+    if (req.op === 'DONE') {
+      Object.assign(change, { fixed: req.fixed, fixedNote: req.note ? req.fixed + ': ' + req.note : req.fixed, safe: req.safe ? 'YES' : 'NO', signedBy: names[0], signature: req.signature });
+      if (!req.safe) Object.assign(change, { status: 'WORKING', lineDown: 'YES' });
+      else Object.assign(change, { status: 'DONE', lineDown: 'NO', completedAt: stamp, completedBy: names[0], minutes: minutesFrom(change.startedAt) });
+    }
+    tx.update(ref, change);
+    renewAll();
+    writes.forEach(([kind, r, d]) => { if (kind === 'delete') tx.delete(r); else if (kind === 'set') tx.set(r, d); else tx.update(r, d); });
+    if (taskRef && task && task.status !== 'REMOVED') {
+      // A PM done: Last done is today, and the next one is counted from it.
+      const today = nyDay(nowMs);
+      const move = { lastDone: today, nextDue: R.nextDue(today, task.every, task.unit), lastWorkOrderId: ref.id, sentWorkOrderId: '', sentWoNumber: '', updatedAt: stamp, updatedBy: by, testEdited: true };
+      tx.update(taskRef, move);
+      result.pm = move;
+    }
+    result.job = stationJob(Object.assign({}, order, change));
+    const logged = Object.assign({}, change); if (logged.signature) logged.signature = '(signature, ' + logged.signature.length + ' characters)';
+    tx.set(logRef, { action: 'maint' + req.op, by, at: stamp, mode: mode.mode, workOrderId: ref.id, after: logged, result });
+    return result;
+  });
+}
+
+module.exports = { stationBoard, stationStep, FIXES, validateMachine, saveMachine, validateSend, makeWorkOrder, woIdFor, validatePmTask, savePmTask, validateSendPm, sendPmToMaintenance };
