@@ -93,7 +93,7 @@ async function setSwitch(db, user, input, ready, now) {
       Object.keys(SCREENS).forEach(k => { if (L.GO_LIVE[k] && L.GO_LIVE[k].ready) after.screenOwners[k] = 'new'; });
     } else {
       if (input.writeBack && !ready) throw new SwitchError('NOT_ALLOWED', 'The server has no sandbox sheet to write to yet (WRITEBACK_JSON)');
-      if (!input.writeBack && anyNew(config)) throw new SwitchError('NOT_ALLOWED', 'Move every screen back to the current app before turning the write-back off');
+      if (!input.writeBack && anyNew(config)) throw new SwitchError('NOT_ALLOWED', 'Switch every screen off before turning the write-back off');
       after.writeBack = input.writeBack;
     }
     const result = { ok: true, requestId, screenOwners: after.screenOwners, writeBack: after.writeBack, fullyLive: after.fullyLive };

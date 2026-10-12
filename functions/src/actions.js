@@ -61,6 +61,8 @@ const ACTIONS = Object.freeze({
   resetWeek: { roles: REORDER_ROLES, screen: 'weeklyDispatch' },
   saveRoute: { roles: REORDER_ROLES, screen: 'routes' },
   reorderRouteDay: { roles: REORDER_ROLES, screen: 'routes' },
+  // Joe 10/12: on Weekly Dispatch a manager drags a route's line up or down (saved as Route Master's route_week_display).
+  reorderWeek: { roles: REORDER_ROLES, screen: 'weeklyDispatch' },
   updateIssue: { roles: SAVE_ROLES, screen: 'checkIns' },
   setWeekReason: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
@@ -226,6 +228,14 @@ function validate(input) {
     if (!Array.isArray(input.runIds) || !input.runIds.length || input.runIds.length > 300) throw new SaveError('BAD_REQUEST', 'The order is missing');
     out.day = input.day;
     out.runIds = input.runIds.map(id => text(id, 120));
+    return out;
+  }
+  if (action === 'reorderWeek') {
+    if (!L.isDateKey(input.weekStart) || L.weekStart(input.weekStart) !== input.weekStart) throw new SaveError('BAD_REQUEST', 'weekStart must be a Sunday (yyyy-mm-dd)');
+    if (!Array.isArray(input.runIds) || !input.runIds.length || input.runIds.length > 300) throw new SaveError('BAD_REQUEST', 'The order is missing');
+    out.weekStart = input.weekStart;
+    out.runIds = [...new Set(input.runIds.map(id => text(id, 120)).filter(Boolean))];
+    if (out.runIds.length !== input.runIds.length) throw new SaveError('BAD_REQUEST', 'The order has a run twice or a blank run');
     return out;
   }
   if (action === 'publishWeek' || action === 'resetWeek') {
@@ -585,6 +595,18 @@ function dayCells(day, values, stamp, email) {
 /*
  * Runs one save. user = the signed-in person ({email}). Returns {ok, requestId, runs:[{runDocId, rev}], repeated}.
  */
+// Which of these saves this person may make (Administration > People & Roles counts, not only the role), without saving
+// anything. Joe 10/12: a tablet account with "Update route loading: Allowed" still showed View only, because the screen
+// checked the role alone. Only names in ACTIONS are answered.
+async function checkSaves(db, user, actions) {
+  const out = {};
+  for (const action of (Array.isArray(actions) ? actions : []).slice(0, 20)) {
+    if (!ACTIONS[action]) continue;
+    try { await db.runTransaction(tx => requireSaver(tx, db, user, ACTIONS[action].roles, action)); out[action] = true; } catch (e) { out[action] = false; }
+  }
+  return out;
+}
+
 async function applyAction(db, user, input, now) {
   const req = validate(input);
   const spec = ACTIONS[req.action];
@@ -629,6 +651,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveRoute') return saveRoute(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderRouteDay') return reorderRouteDay(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'reorderWeek') return reorderWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'addPickup' || req.action === 'completePickup') return PLANT.savePickup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveUnloading') return PLANT.saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, queueSheetCells);
     if (req.action === 'completeWash') return PLANT.saveWash(tx, db, req, email, stamp, logRef, mode, SaveError);
@@ -1012,7 +1035,7 @@ function writeLive(tx, db, mode, req, stamp, email, snap, run, ch, result) {
   const ps = Object.keys(ch.days).filter(p => Object.keys(ch.days[p]).length);
   if (!ps.length && !Object.keys(ch.run).length) return;
   const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp }, cells = {};
-  Object.keys(ch.run).forEach(k => { update[k] = ch.run[k]; cells[LIVE_RUN_COLUMNS[k]] = String(ch.run[k]); });
+  Object.keys(ch.run).forEach(k => { const v = ch.run[k]; update[k] = v; cells[LIVE_RUN_COLUMNS[k]] = typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v); });
   ps.forEach(p => {
     Object.keys(ch.days[p]).forEach(k => { update['days.' + p + '.' + k] = ch.days[p][k]; });
     update['days.' + p + '.updatedAt'] = stamp; update['days.' + p + '.updatedBy'] = email;
@@ -1036,6 +1059,9 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
     rows.forEach((s, i) => { const run = s.data();
       // 7.0.272: who runs it follows Route Master too (route name, run, Run By).
       ['routeName', 'run', 'coverageType', 'coverageOwner'].forEach(f => { const v = String(m[f] || '').trim(); if (v && String(run[f] || '').trim() !== v) changes[i].run[f] = v; });
+      // Joe 10/12 (907 / 950): Show on Daily Dispatch switched in the Route Editor reaches the Current and Next weeks' rows too,
+      // since Daily reads the week's own flag (a FALSE there hides the run whatever Route Master says).
+      if (req && req.fields && typeof req.fields.displayDaily === 'boolean' && run.displayDaily !== req.fields.displayDaily) changes[i].run.displayDaily = req.fields.displayDaily;
     });
     L.DAYS.forEach(p => {
       // A run on two rows (one per set of days): the day belongs to the row that runs it, else the first row.
@@ -1205,6 +1231,31 @@ async function reorderRouteDay(tx, db, req, email, stamp, logRef, mode) {
   });
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, day: req.day, before, after: req.runIds.map((id, i) => ({ runId: id, loadOrder: (i + 1) * 10 })), result });
+  return result;
+}
+
+/*
+ * Weekly Dispatch order (Joe 10/12, "grab the line and move it"): the routes in their new order get route_week_display
+ * 10, 20, 30... in Route Master, and the runs of this week and the weeks after it take the same order at once, so Weekly
+ * shows it before the next copy. Runs not in the list keep theirs.
+ */
+async function reorderWeek(tx, db, req, email, stamp, logRef, mode) {
+  const refs = req.runIds.map(id => db.collection(C.routes).doc(M.safeIdPart(id)));
+  const [snaps, runSnap] = await Promise.all([Promise.all(refs.map(r => tx.get(r))), tx.get(db.collection(C.runs).where('weekStart', '>=', req.weekStart))]);
+  snaps.forEach((s, i) => { if (!s.exists) throw new SaveError('NOT_FOUND', req.runIds[i] + ' is no longer in the Route Master copy'); });
+  const before = snaps.map(s => ({ runId: s.id, weekOrder: s.data().weekOrder === undefined ? null : s.data().weekOrder }));
+  const order = {};
+  refs.forEach((r, i) => {
+    order[snaps[i].id] = (i + 1) * 10;
+    tx.update(r, { weekOrder: (i + 1) * 10, testEdited: true, editedAt: stamp, editedBy: email });
+    queueMaster(tx, db, mode, req.requestId, String(i), r, snaps[i].data().id || req.runIds[i], { weekOrder: (i + 1) * 10 }, false, stamp, email);
+  });
+  runSnap.docs.forEach(d => {
+    const id = M.safeIdPart(String(d.data().runId || ''));
+    if (order[id] !== undefined && d.data().weekOrder !== order[id]) tx.update(d.ref, { weekOrder: order[id] });
+  });
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before, after: req.runIds.map((id, i) => ({ runId: id, weekOrder: (i + 1) * 10 })), result });
   return result;
 }
 
@@ -1549,4 +1600,4 @@ async function clearConflict(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { applyAction, validate, requireTestMode, queueSheetCells, maintQueue, SaveError, ACTIONS, SAVE_ROLES, REORDER_ROLES, DRIVER_ROLES };
+module.exports = { applyAction, checkSaves, validate, requireTestMode, queueSheetCells, maintQueue, SaveError, ACTIONS, SAVE_ROLES, REORDER_ROLES, DRIVER_ROLES };

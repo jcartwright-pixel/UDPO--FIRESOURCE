@@ -921,3 +921,32 @@
 .shift-page .sn-pill.red { background: #fde8e8; color: #b42318; } .shift-page .sn-pill.green { background: #e3f4e8; color: #1d6b37; }
 .shift-page .sn-pill.amber { background: #fff1dc; color: #8a5200; } .shift-page .sn-pill.blue { background: #e8f0f8; color: var(--ud-blue); }
 @media (max-width: 1400px) { .shift-page .qc-fields .half { grid-column: span 1; } }
+
+/* Joe 10/12 ("mobile looks wrong and I can't edit"): on a phone the Loadout Center was a desk table squeezed into a strip a
+   few rows high. Now the page scrolls as a whole and each load is a card: route and run on top, then the truck, trailer and
+   count boxes full width and big enough for a thumb, with every box named on the card. Desk and tablet are unchanged. */
+@media (max-width: 700px) {
+  body.fill.loadout-page #screen:not([hidden]) { height: auto; min-height: 100vh; }
+  body.fill.loadout-page .view:not([hidden]) { flex: none; }
+  .plant-page.loadout-page .sheet.scroll-list { flex: none; overflow: visible; background: transparent; border: 0; box-shadow: none; }
+  .plant-page.loadout-page .sheet.scroll-list table.loadout { min-width: 0; width: 100%; table-layout: auto; }
+  .plant-page.loadout-page table.loadout colgroup, .plant-page.loadout-page table.loadout thead { display: none; }
+  .plant-page.loadout-page table.loadout, .plant-page.loadout-page table.loadout tbody { display: block; }
+  .plant-page.loadout-page table.loadout tr.divider { display: block; margin: 8px 0; }
+  .plant-page.loadout-page table.loadout tr.divider td { display: block; white-space: normal; border-radius: 8px; }
+  .plant-page.loadout-page table.loadout tr[data-row] { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin: 0 0 12px; padding: 12px; background: #fff; border: 1px solid #dbe4ec; border-left: 6px solid #9fb3c8; border-radius: 12px; }
+  .plant-page.loadout-page table.loadout tr[data-row].loading { border-left-color: #d98a00; background: #fffaf0; }
+  .plant-page.loadout-page table.loadout tr[data-row].done { border-left-color: #2f8f4e; background: #f1faf3; }
+  .plant-page.loadout-page table.loadout tr[data-row] td { display: block; height: auto; padding: 0; border: 0; background: transparent; box-shadow: none; text-align: left; white-space: normal; overflow: visible; font-size: 16px; min-width: 0; }
+  .plant-page.loadout-page table.loadout tr[data-row] td[data-l]::before { content: attr(data-l); display: block; margin-bottom: 4px; color: #43607c; font-size: 16px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .plant-page.loadout-page table.loadout tr[data-row] td:first-child { font-size: 22px; font-weight: 900; }
+  .plant-page.loadout-page table.loadout tr.divider td { height: auto; line-height: 1.3; padding: 8px 10px; }
+  .plant-page.loadout-page table.loadout tr[data-row] td.lo-driver { grid-column: 1 / -1; font-size: 16px !important; }
+  .plant-page.loadout-page table.loadout tr[data-row] td input { width: 100%; height: 48px; padding: 0 10px; font-size: 18px; border-radius: 8px; }
+  .plant-page.loadout-page table.loadout tr[data-row] td button { min-height: 44px; font-size: 16px; }
+  .plant-page.loadout-page table.loadout tr[data-row] td button.state, .plant-page.loadout-page table.loadout tr[data-row] td button.pu,
+  .plant-page.loadout-page table.loadout tr[data-row] td button.edit-row { width: 100%; }
+  .plant-page.loadout-page table.loadout tr[data-row] td .clock-cell { display: flex; gap: 8px; }
+  .plant-page.loadout-page table.loadout tr[data-row] td .clock-cell button { flex: 1; }
+  .plant-page.loadout-page table.loadout tr[data-row] td:empty { display: none; }
+}

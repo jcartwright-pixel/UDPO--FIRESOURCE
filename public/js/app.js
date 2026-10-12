@@ -597,6 +597,20 @@ export async function requireSignIn(ready) {
     who.textContent = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || user.email || '?').slice(0, 2)).toUpperCase();
     who.title = user.email || '';
     who.classList.add('initials');
+    // Joe 10/12 ("tapping does nothing"): a tap on the circle shows the signed-in account for a few seconds.
+    who.dataset.initials = who.textContent; who.dataset.email = user.email || '';
+    who.setAttribute('role', 'button'); who.tabIndex = 0;
+    if (!who.dataset.tap) {
+      who.dataset.tap = '1';
+      let back = null;
+      const show = () => {
+        if (!who.dataset.email || !who.classList.contains('initials')) return;
+        who.textContent = who.dataset.email; who.classList.add('open');
+        clearTimeout(back); back = setTimeout(() => { who.textContent = who.dataset.initials; who.classList.remove('open'); }, 6000);
+      };
+      who.addEventListener('click', show);
+      who.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(); } });
+    }
   };
   const remember = (email) => { try { if (email) sessionStorage.setItem('udActive', email); else sessionStorage.removeItem('udActive'); } catch (e) { /* no storage */ } };
   onAuthStateChanged(auth, async (user) => {
@@ -736,6 +750,13 @@ export function friendlyError(e) {
 }
 
 // Any other server call that changes something (the per-screen switch): also one call with its own requestId.
+// Which saves the signed-in person may make, as the server decides (role, Role Templates and the person's Allow / Deny in
+// Administration > People & Roles). Joe 10/12: a screen that checked the role alone showed View only to someone allowed.
+// Nothing is saved; an answer that cannot be had counts as not allowed (the role check still stands).
+export async function allowedSaves(actions) {
+  try { return (await callServer('save', { checkSaves: actions })).allowed || {}; } catch (e) { return {}; }
+}
+
 export async function callServer(name, fields) {
   const { functions } = await start();
   const requestId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
@@ -787,6 +808,24 @@ export function fitToWindow(lineCount, gap) {
   }
 }
 const FIT_ROW_MIN = 32, FIT_FONT_MIN = 16;
+
+// Joe 10/12: a screen not switched on in Administration > Go-Live Switches says so on the screen itself, in one short line
+// under the title (the cards carry no tags, and the TEST COPY box is hidden). show = false takes the line away.
+export function goLiveNote(show) {
+  let el = document.getElementById('golive-note');
+  if (!show) { if (el) el.hidden = true; return; }
+  if (!el) {
+    const badge = document.getElementById('mode-text');
+    const after = badge && badge.closest('.badge-test') ? badge.closest('.badge-test').parentElement : document.querySelector('main > *');
+    if (!after) return;
+    el = document.createElement('div');
+    el.id = 'golive-note';
+    el.className = 'golive-note';
+    el.textContent = 'View only until switched on in Go-Live Switches.';
+    after.insertAdjacentElement('afterend', el);
+  }
+  el.hidden = false;
+}
 
 export function escapeHtml(value) {
   return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

@@ -66,7 +66,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { savedText, watchRound } from './js/autosave.js';
 
@@ -130,7 +130,8 @@
         ? q.rows.length + ' trailer' + (q.rows.length === 1 ? '' : 's') + ' due, ' + q.locked.length + ' checked in the last 2 hours. ' + (ck ? 'Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.' : 'View only.')
         : hist.length + ' record' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      goLiveNote(st.live && st.owner !== 'new');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
 

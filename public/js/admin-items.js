@@ -28,7 +28,7 @@ export const ADMIN_GROUPS = [
     ['settings', 'Dispatch Settings', 'Dispatch defaults and options.', 'settings.html', 'gear'],
     ['routes', 'Route Editor', 'Routes, runs, times and which days each run goes.', 'routes.html', 'map'],
     // Joe 10/12: switching screens lives here, not on the cards' tags (they can no longer be clicked).
-    ['switch', 'Go-Live Switches', 'Which app runs each screen, the write-back to the Live sheet, Mark fully live (the tag comes off the cards), and one button to turn on everything that is ready.', '', 'swap']
+    ['switch', 'Go-Live Switches', 'Which screens are switched on, the write-back to the Live sheet, Mark fully live, and one button to turn on everything that is ready.', '', 'swap']
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
     ['machine-products', 'Product Sheet', "Each plant's product sheet by area and group: every detail of each product, and the Product drop-down on Quality Checks. Add or edit a product, or load the whole list from the template.", 'products.html', 'production.webp'],

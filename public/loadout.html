@@ -93,9 +93,10 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
+    import { mountRowDrag } from './js/row-drag.js';
 
     const L = window.UDLogic;
     const params = new URLSearchParams(location.search);
@@ -114,7 +115,16 @@
     const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state !== 'DONE' && r.state !== 'LOADING';
     const unsubs = [];
 
-    const canLoad = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
+    // The role, or what Administration > People & Roles allows this person (Joe 10/12: allowed but shown View only).
+    let allowed = {};
+    // Joe 10/12 (a bare "View only."): say why, and which account this is.
+    let signedEmail = '';
+    const viewOnlyWhy = () => {
+      const s = L.screenState(app, 'plantLoading');
+      if (!s.open) return 'View only: ' + s.why + '.';
+      return 'View only: ' + (signedEmail || 'this account') + ' is not allowed to save Case Loadout. In Administration > People & Roles give it the Plant Employee role or allow Update route loading.';
+    };
+    const canLoad = () => (L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.savePlantLoad === true) && L.screenState(app, 'plantLoading').open;
     const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 
     function rowsNow() {
@@ -132,12 +142,6 @@
       normal: [['Route', 4.8], ['Run', 9], ['Driver / CVG', 15.6], ['Truck', 8.1], ['Trailer', 8.1], ['', 6.4], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
       TANKER: [['Route', 5.6], ['Run', 15], ['Driver / CVG', 20], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
-    // With the loading order editable (today, someone who can load), the Route column also holds the up / down arrows
-    // (Joe 10/12: arrows, no grab dots), so the column is a little wider; Total Time gives up the room.
-    const ORDER_COLS = {
-      normal: [['Route', 7.2], ['Run', 9], ['Driver / CVG', 15.2], ['Truck', 8.1], ['Trailer', 8.1], ['', 6.4], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 5], ['P/U', 8], ['', 6]],
-      TANKER: [['Route', 6.4], ['Run', 14], ['Driver / CVG', 20.2], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
-    };
     // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
     function fitDrivers() {
       document.querySelectorAll('#rows td.lo-driver').forEach(td => {
@@ -148,15 +152,13 @@
     }
     addEventListener('resize', fitDrivers);
 
-    // Loading order (as in the old app): today's loads of the shown department move one place with the up / down arrows beside
-    // the route; the new order is saved as today's load_sequence_override, which Driver Station, View Loadout and Plant Station
-    // follow. Today and the coming days (the operating day rolls at 6 AM); prior-day loads keep their place on top. On every
-    // loadout (Case, Totes, Boxes, Tanker), every load of the day, an added one too; a past day stays as loaded.
+    // Loading order (as in the old app): today's loads of the shown department are dragged up or down by their line (Joe 10/12);
+    // the new order is saved as today's load_sequence_override, which Driver Station, View Loadout and Plant Station follow.
+    // Today and the coming days (the operating day rolls at 6 AM); prior-day loads keep their place on top. On every loadout
+    // (Case, Totes, Boxes, Tanker), every load of the day, an added one too; a past day stays as loaded.
     const canOrder = () => canLoad() && date >= today();
     const orderRows = (rows) => rows.filter(r => !r.prior && r.loadDate === date);
-    // A skipped load waits at the bottom without arrows; the others move around it (its place in the order is kept).
-    // Joe 10/12 (as Daily Dispatch): no arrows on a load that is already loaded.
-    const shownOrder = () => orderRows(rowsNow().filter(r => r.area === area)).filter(r => !isSkipped(r) && r.state !== 'DONE');
+    // A skipped load and a load already loaded do not move (no line to drag); the others move around them, which keep their places.
     let heldMove = null;
 
     function render() {
@@ -189,21 +191,14 @@
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
       const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r) && r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
-      const cols = (ordering ? ORDER_COLS : COLS)[area === 'TANKER' ? 'TANKER' : 'normal'];
+      const cols = COLS[area === 'TANKER' ? 'TANKER' : 'normal'];
       document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
       const edit = canLoad(), dis = edit ? '' : ' disabled';
       const orderIds = ordering ? movable.map(r => r.id) : [];
-      // The arrows are drawn by CSS, so the cell's text stays the route.
-      const routeCell = (r) => {
-        const i = orderIds.indexOf(r.id);
-        if (i < 0) return '<td class="strong">' + escapeHtml(r.route) + '</td>';
-        const name = escapeHtml(r.route + ' ' + r.run);
-        return '<td class="strong lo-route"><span class="lo-order"><span class="lo-arrows">' +
-          '<button type="button" class="lo-move up" data-move="-1" data-id-move="' + r.id + '" aria-label="Load ' + name + ' earlier" title="Load earlier"' + (i === 0 ? ' disabled' : '') + '></button>' +
-          '<button type="button" class="lo-move down" data-move="1" data-id-move="' + r.id + '" aria-label="Load ' + name + ' later" title="Load later"' + (i === orderIds.length - 1 ? ' disabled' : '') + '></button></span>' +
-          '<span class="lo-num">' + escapeHtml(r.route) + '</span></span></td>';
-      };
+      // Joe 10/12: a load not yet loaded is dragged up or down by its line (no arrows, no grab dots).
+      const routeCell = (r) => '<td class="strong">' + escapeHtml(r.route) + '</td>';
+      const dragAttrs = (r) => orderIds.indexOf(r.id) < 0 ? '' : ' data-drag="' + r.id + '" tabindex="0" aria-label="Load ' + escapeHtml(r.route + ' ' + r.run) + ', place ' + (orderIds.indexOf(r.id) + 1) + ' of ' + orderIds.length + '. Drag up or down, or Alt and the up or down arrow, to change the loading order"';
       let html = '', lastPrior = null;
       rows.forEach(r => {
         if (r.prior !== lastPrior) {
@@ -223,11 +218,11 @@
         const total = mins === null ? '' : '<span class="' + (stale ? 'stale' : st === 'LOADING' ? 'running' : '') + '">' + (st === 'LOADING' ? P.runningText(r.startedAt, mins) : P.minutesText(mins)) + '</span>';
         const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (skip ? ' skipped' : '');
         if (area === 'TANKER') {
-          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + escapeHtml(r.run) + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
+          html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + escapeHtml(r.run) + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + status + '</td><td>' + escapeHtml(r.shift) + '</td><td>' + puBtn + '</td><td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         } else {
-          html += '<tr class="' + cls + '" data-row="' + r.id + '">' + routeCell(r) + '<td>' + runCell + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
+          html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + runCell + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
             '<td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
@@ -235,16 +230,21 @@
       });
       // Keep the cursor where it is when a redraw lands while someone types.
       const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.id ? [document.activeElement.dataset.id, document.activeElement.dataset.k, document.activeElement.value] : null;
-      // The arrow just pressed stays selected when the list is drawn again, so it can be pressed again.
-      const a = document.activeElement, held = a && a.dataset && a.dataset.idMove ? [a.dataset.idMove, a.dataset.move] : heldMove;
+      // The load just moved with the keyboard stays selected when the list is drawn again, so it can be moved again.
+      const a = document.activeElement, held = a && a.dataset && a.dataset.drag ? a.dataset.drag : heldMove;
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="' + cols.length + '" class="empty">No ' + P.AREA[area].tile.toLowerCase() + ' loads for ' + L.dayName(date) + ' ' + shortDate(date) + '.</td></tr>';
+      // Phones (Joe 10/12 "mobile looks wrong"): each load is a card, so every box is named on the card itself.
+      const heads = cols.map(([h], i) => (area !== 'TANKER' && i === 5 ? info.label : h));
+      document.querySelectorAll('#rows tr[data-row]').forEach(tr => [...tr.children].forEach((td, i) => { if (heads[i]) td.dataset.l = heads[i]; }));
       fitDrivers();
-      if (held) { const g = document.querySelector('#rows [data-id-move="' + held[0] + '"][data-move="' + held[1] + '"]'); if (g && !g.disabled) g.focus(); }
+      if (held) { const g = document.querySelector('#rows tr[data-drag="' + CSS.escape(held) + '"]'); if (g) g.focus(); }
       heldMove = null;
       if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
-      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Use the up and down arrows beside a route to change this day\'s loading order.' : '') : 'View only.') + ' Changes from the sheets show here within about a minute.';
+      document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Drag a load up or down by its line to change this day\'s loading order.' : '') : viewOnlyWhy()) + ' Changes from the sheets show here within about a minute.';
       const s = L.screenState(app, 'plantLoading');
-      document.getElementById('mode-text').textContent = s.live ? (s.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      goLiveNote(s.live && s.owner !== 'new');
+      // Joe 10/12: no "new app" words; not switched on says where to switch it.
+      document.getElementById('mode-text').textContent = s.live ? (s.open ? 'LIVE' : s.owner === 'new' ? 'VIEW ONLY: WRITE-BACK TO THE SHEET IS OFF' : 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES') : 'TEST COPY';
     }
 
     function rowById(id) { return rowsNow().find(r => r.id === id); }
@@ -288,17 +288,15 @@
       saveLoadOrder(next);
     }
 
-    // Joe 10/12: up / down arrows beside the route move a load one place (no grab dots); the arrow pressed stays selected.
-    document.getElementById('rows').addEventListener('click', e => {
-      const b = e.target.closest('[data-move]');
-      if (!b || b.disabled || !canOrder()) return;
-      e.stopPropagation();
-      const id = b.dataset.idMove, step = Number(b.dataset.move), shown = shownOrder(), i = shown.findIndex(r => r.id === id), next = shown[i + step];
+    // Joe 10/12 ("grab the line with the hand and drag it"): toIndex is the load's new place among the loads shown with a line
+    // to drag (not loaded, not skipped); loaded and skipped loads keep their places in the order.
+    mountRowDrag({ box: document.getElementById('rows'), canDrag: canOrder, onMove: (id, to, byKey) => {
+      const shown = [...document.querySelectorAll('#rows tr[data-drag]')].map(tr => tr.dataset.drag), i = shown.indexOf(id), target = rowById(shown[to]);
       const full = orderRows(rowsNow().filter(r => r.area === area));
-      if (i < 0 || !next) return;
-      heldMove = [id, String(step)];
-      moveLoad(id, full.findIndex(r => r.id === next.id));
-    });
+      if (i < 0 || !target || to === i) return;
+      if (byKey) heldMove = id;
+      moveLoad(id, full.findIndex(r => r.id === target.id));
+    } });
 
     // One save, shown at once; if the server refuses it the row goes back and the reason shows. What was shown is kept
     // until the server answers (by then the database copy holds the saved value), and only if no later change replaced it.
@@ -542,8 +540,14 @@
       if (box && !box.disabled && box.showPicker) { try { box.showPicker(); } catch (err) { /* not allowed here */ } }
     });
     requireSignIn(async (user) => {
+      signedEmail = user.email || '';
       ({ db } = await start());
-      watchPerson(db, user, p => { person = p; render(); });
+      let askedRights = '';
+      watchPerson(db, user, p => {
+        person = p; render();
+        const key = JSON.stringify([p && p.roles, p && p.email]);
+        if (key !== askedRights) { askedRights = key; allowedSaves(['savePlantLoad']).then(a => { allowed = a; render(); }); }
+      });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
         const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));

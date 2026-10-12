@@ -604,6 +604,8 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 
 /* Header shows only the user's initials; the full email is on hover. */
 .topbar .who.initials { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.45); color: #fff; font-size: 14px; font-weight: 800; letter-spacing: .02em; }
+.topbar .who.initials { cursor: pointer; }
+.topbar .who.initials.open { width: auto; max-width: 70vw; padding: 0 14px; border-radius: 19px; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Relief has its own column on the Driver Roster, so the small tag beside the name is not shown. */
 .drivers-page td.name .chip { display: none; }
 /* Driver Roster on laptops: smaller type so every heading and name fits. */
@@ -1592,20 +1594,19 @@ span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-
 /* Joe 10/11: the plant home stays blank for the moment it takes to know whether this person starts on the all-plants overview. */
 body.deciding #screen { visibility: hidden; }
 
-/* Daily Dispatch: a manager grabs a load by the handle on its route number and moves it up or down, with a mouse or a
-   finger (Joe 10/11, the same handle as Daily Case Loadout). The row being moved is shaded; a blue line shows where it lands. */
-/* Joe 10/12: no grab dots; up and down arrows beside the route number move a load (the Route Master load-order arrows' look). */
-body.daily-look table.daily td.route { white-space: nowrap; }
-body.daily-look table.daily .dd-route { display: inline-block; min-width: 3ch; vertical-align: middle; }
-body.daily-look table.daily .dd-move { display: inline-flex; flex-direction: column; gap: 2px; margin-left: 6px; vertical-align: middle; }
-body.daily-look table.daily button.seq-move { width: 30px; height: 18px; padding: 0; border: 1px solid #9dc2df; border-radius: 5px; background: #edf7ff; color: #0a5e9d; font-size: 11px; line-height: 1; cursor: pointer; }
-body.daily-look table.daily button.seq-move[data-move="-1"]::before { content: "\25B2"; }
-body.daily-look table.daily button.seq-move[data-move="1"]::before { content: "\25BC"; }
-body.daily-look table.daily button.seq-move:hover:not(:disabled) { border-color: #1f6feb; background: #dcebff; }
-body.daily-look table.daily button.seq-move:disabled { opacity: .3; cursor: default; }
+/* Daily Dispatch (Joe 10/12): a manager grabs the line itself with the hand and drags it up or down; no grab dots, no arrows.
+   The row being moved is shaded; a blue line shows where it lands. */
+body.daily-look table.daily tr.mover td { cursor: grab; }
+body.daily-look table.daily tr.mover td button, body.daily-look table.daily tr.mover td input, body.daily-look table.daily tr.mover td select { cursor: pointer; }
 body.daily-look table.daily tr.dragging td { background: #e8f1fa !important; }
 body.daily-look table.daily tr.drop-before td { box-shadow: inset 0 3px 0 #1f6feb; }
 body.daily-look table.daily tr.drop-after td { box-shadow: inset 0 -3px 0 #1f6feb; }
+/* Weekly Dispatch: the same grab-and-drag (Joe 10/12). A finger drags from the Route or Run box; the rest of the line scrolls. */
+.weekly-page #rows tr.mover td { cursor: grab; }
+.weekly-page #rows tr.dragging td { background: #e8f1fa !important; }
+.weekly-page #rows tr.drop-before td { box-shadow: inset 0 3px 0 #1f6feb; }
+.weekly-page #rows tr.drop-after td { box-shadow: inset 0 -3px 0 #1f6feb; }
+.weekly-page #rows tr.mover td:nth-child(-n+2), body.daily-look table.daily tr.mover td:nth-child(-n+2) { touch-action: none; }
 body.dd-dragging, body.dd-dragging * { cursor: grabbing !important; user-select: none; }
 
 /* Truck Issues at 1920 with Windows display scaling (Joe 10/11): Reviewed, Emailed and Garage give up a little width so every
@@ -1691,3 +1692,17 @@ body.uc-locked #screen > :not(.topbar):not(.uc-refused) { display: none !importa
 .day-pin #go-today { height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid #e5891a; background: #fff4e5; color: #8a4b00; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .day-pin[hidden] { display: none !important; }
 #week-panel .week-warn { font-size: 16px; line-height: 1.45; margin: 4px 0 14px; color: #8a4b00; font-weight: 700; }
+
+/* Joe 10/12: a screen not switched on in Go-Live Switches says so in one line under its title. */
+.golive-note { margin: 0 16px 8px; padding: 8px 14px; border-radius: 8px; background: #fff4e5; color: #8a4b00; border: 1px solid #f0d48a; font-size: 16px; font-weight: 700; }
+.golive-note[hidden] { display: none; }
+/* Joe 10/12: drag a line up or down by grabbing it (js/row-drag.js); no grab dots, no arrows. */
+tr[data-drag] > td { cursor: grab; }
+tr[data-drag] > td input, tr[data-drag] > td button, tr[data-drag] > td select { cursor: auto; }
+tr[data-drag] > td button { cursor: pointer; }
+tr[data-drag]:focus-visible { outline: 3px solid var(--ud-blue, #0b4f86); outline-offset: -3px; }
+tr.row-dragging > td { background: #e8f1fa !important; }
+/* Same as Weekly Dispatch: a finger drags straight from the Route or Run box; elsewhere it holds a moment first, so the page scrolls. */
+tr[data-drag] > td:nth-child(-n+2) { touch-action: none; }
+body.row-drag-on, body.row-drag-on * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+.row-drop-line { position: absolute; height: 3px; background: #1f6feb; z-index: 60; pointer-events: none; }

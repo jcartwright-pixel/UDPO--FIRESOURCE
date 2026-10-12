@@ -99,6 +99,23 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await at(p), 'run_t801|tue trailer');
     results.push('typing 777 (not on Equipment Master) and Enter kept trailer T-777');
 
+    // Joe 10/12 ("891 now won't show whole number"): the short number of a truck taken on another load finds it, greyed with
+    // why, and Enter does not save the short number as typed; the old truck stays.
+    await p.keyboard.press('Shift+Tab');
+    assert.equal(await at(p), 'run_t801|tue truck');
+    const truckBefore = await text(p, R801, 5);
+    await p.keyboard.type('0001');
+    await p.waitForSelector('.cell-pop [data-i].off');
+    assert.match(await p.textContent('.cell-pop [data-i].off'), /^900001.*802/);
+    assert.match(await p.textContent('.cell-pop p'), /Tick OVR/);
+    await p.keyboard.press('Enter');
+    await p.waitForTimeout(500);
+    assert.equal(await text(p, R801, 5), truckBefore, 'the short number was not saved as typed');
+    await p.keyboard.press('ArrowUp');
+    await p.keyboard.press('Tab');
+    assert.equal(await at(p), 'run_t801|tue trailer');
+    results.push('typing 0001 on 801 found 900001 greyed "on 802" with "Tick OVR"; Enter kept ' + truckBefore + ' instead of saving 0001');
+
     // Typing a driver name: Enter takes the best match and moves down.
     await p.keyboard.press('Shift+Tab');
     await p.keyboard.press('Shift+Tab');
@@ -178,7 +195,10 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.click('#edit-modal [data-close]');
     results.push('the Edit box lists Regular then Relief drivers; picking CASEY, LEE there brought his truck 900003 into the box and the row');
 
-    // A refused save says Not saved, and leaving while a save is going asks first.
+    // A refused save says Not saved, and leaving while a save is going asks first. The Edit box's driver and truck saves finish
+    // first: a save still waiting in line would start after the refused one and turn the sign back to Saved.
+    await p.evaluate(async () => { window.__udEdit = await import('./js/edit.js'); });
+    await p.waitForFunction(() => window.__udEdit.savesPending() === 0, null, { timeout: 8000 });
     await p.evaluate(async () => { const m = await import('./js/edit.js'); try { await m.saveOptimistic('noSuchAction', {}, () => {}, () => {}, () => {}); } catch (e) { /* shown on screen */ } });
     await p.waitForFunction(() => /Not saved/.test(document.getElementById('save-pill').textContent));
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-save-pill-failed-1920.png'), clip: { x: 0, y: 70, width: 1920, height: 300 } });
@@ -219,7 +239,7 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await sun.waitForSelector('#rows tr[data-id="2026-10-11__run_t802|sun"]');
     assert.deepEqual(await bandsOf(sun), ['SUNDAY DELIVERIES, 10-11-26', 'ALREADY LOADED SATURDAY, 10-10-26', 'run_t801|sun',
       'LOADING TODAY, SUNDAY 10-11-26', 'run_t802|sun', 'MONDAY DELIVERIES, 10-12-26', 'run_t802|mon']);
-    assert.equal(await sun.$$eval('#rows tr.already [data-move], #rows [data-grip]', g => g.length), 0, 'no move arrows on an already-loaded row, and no grab handles');
+    assert.equal(await sun.$$eval('#rows tr.already.mover, #rows [data-move], #rows [data-grip]', g => g.length), 0, 'an already-loaded line cannot be dragged; no arrows or grab dots');
     assert.match(await sun.textContent('#count'), /^2 loads/, 'the count leaves out the already-loaded row');
     if (SHOTS) await sun.screenshot({ path: path.join(SHOTS, 'daily-sunday-already-loaded-1920.png') });
     assert.deepEqual(sun.errors, []);

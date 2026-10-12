@@ -322,8 +322,12 @@
   // (udpoV754CanAdjustLoadSequence_). The screens use these to show the edit controls; the server enforces them.
   var SAVE_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER', 'SUPERVISOR', 'DISPATCHER'];
   var REORDER_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER'];
+  // Joe 10/12: People & Roles reads "Plant Employee", "plant-employee" and PLANT_EMPLOYEE as the same role (rights.js);
+  // so does every role check here.
+  function roleKey(r) { return String(r || '').trim().toUpperCase().replace(/[\s-]+/g, '_'); }
   function hasRole(person, roles) {
-    return !!(person && person.status === 'ACTIVE' && (person.roles || []).some(function (r) { return roles.indexOf(r) >= 0; }));
+    var want = (roles || []).map(roleKey);
+    return !!(person && String(person.status || '').trim().toUpperCase() === 'ACTIVE' && (person.roles || []).some(function (r) { return want.indexOf(roleKey(r)) >= 0; }));
   }
 
   // Joe 10/10: the plants (the current app's facility list) and who sees which. A person's plant list (USERS_MASTER
@@ -355,7 +359,10 @@
     drivers: 'Drivers', vacations: 'Vacation Schedule', routes: 'Route Editor',
     // Joe 10/12: "Let the new app write plant loading to the real Live sheet." The Plant Distribution screens (Loadout Center,
     // Trailer Assignments, Unloading, Truck Washing, Product Returns): a load, its order and its case returns go to the Live week tabs.
-    plantLoading: 'Plant Loading' };
+    plantLoading: 'Plant Loading',
+    // Joe 10/12 ("turn all 8 sheets on"): the plant check screens (Cooler Temperatures, Quality, Yard, Shift Report Log, Scheduler,
+    // Line Targets), Products, Safety Walkthrough and Plant Maintenance. Their saves stay in the new app.
+    plant: 'Plant Operations' };
   function screenOwners(config) {
     var out = {}, set = (config && config.screenOwners) || {};
     Object.keys(SCREENS).forEach(function (k) { out[k] = 'old'; });
@@ -367,9 +374,9 @@
     var owners = screenOwners(config), owner = owners[screen] || 'old', name = SCREENS[screen] || screen;
     var writeBack = !!(config && config.writeBack && config.writeBack.enabled === true);
     var anyNew = Object.keys(owners).some(function (k) { return owners[k] === 'new'; });
-    if (owner === 'new') return { owner: owner, live: true, open: writeBack, why: writeBack ? '' : name + ' belongs to the new app but the write-back is off; ask an administrator' };
+    if (owner === 'new') return { owner: owner, live: true, open: writeBack, why: writeBack ? '' : name + ' is switched on but the write-back is off; ask an administrator' };
     if (config && config.mode === 'live' && !anyNew) return { owner: owner, live: false, open: false, why: 'The app is marked live but no screen belongs to the new app; saves stay in test mode only' };
-    if (anyNew) return { owner: owner, live: true, open: false, why: name + ' is still run from the current app; save it there' };
+    if (anyNew) return { owner: owner, live: true, open: false, why: name + ' is view only until it is switched on in Administration > Go-Live Switches' };
     return { owner: owner, live: false, open: true, why: '' };
   }
 
@@ -381,14 +388,16 @@
     dailyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
     weeklyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
     checkIns: { area: 'Route Distribution', ready: false, why: 'Truck problems it files cannot reach the current app yet.' },
-    drivers: { area: 'Route Distribution', ready: false, why: 'Would write Driver Master. Needs your OK.' },
-    vacations: { area: 'Route Distribution', ready: false, why: 'Would write the Vacations sheet. Needs your OK.' },
-    routes: { area: 'Route Distribution', ready: false, why: 'Would write Route Master. Needs your OK.' },
-    plantLoading: { area: 'Plant Distribution', ready: true, why: 'Writes loads, loading order and case returns to the Live sheet week tabs, and Loadout History when a load is Done. You OK\'d it 10/12.' }
+    // Joe 10/12: "Let the new app write Route Master, Driver Master, Equipment Master, Users, Exceptions and Vacations to the real sheets."
+    drivers: { area: 'Route Distribution', ready: true, why: 'Writes Driver Master, and days off to the Exceptions sheet. You OK\'d it 10/12.' },
+    vacations: { area: 'Route Distribution', ready: true, why: 'Writes the Vacations sheet. You OK\'d it 10/12.' },
+    routes: { area: 'Route Distribution', ready: true, why: 'Writes Route Master. You OK\'d it 10/12.' },
+    plantLoading: { area: 'Plant Distribution', ready: true, why: 'Writes loads, loading order and case returns to the Live sheet week tabs, and Loadout History when a load is Done. You OK\'d it 10/12.' },
+    plant: { area: 'Plant Production', ready: true, why: 'Cooler temperatures, quality, yard, shift notes, the scheduler, line targets, products, safety and plant maintenance save in the new app and keep their history there. The current app keeps its own copies elsewhere and does not see these. You asked to turn it on 10/12.' }
   };
   // Shown on Go-Live Switches but not a switch yet. (Plant Loading became a switch on 10/12.)
   var GO_LIVE_LATER = [];
-  // "Fully live": the screen is on the new app for good, so its tag comes off the cards. Moving it back clears it.
+  // "Fully live": the screen is switched on for good. Switching it off clears it.
   function fullyLive(config, screen) {
     return screenOwners(config)[screen] === 'new' && !!(config && config.fullyLive && config.fullyLive[screen] === true);
   }

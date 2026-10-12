@@ -107,7 +107,7 @@ const DEFAULTS = Object.freeze({
 const ACTION_RIGHT = Object.freeze({
   assignDriver: 'dispatch.write', assignTruck: 'dispatch.write', assignTrailer: 'dispatch.write', setDriverNote: 'dispatch.write', setRuns: 'dispatch.write',
   setDispatchTime: 'dispatch.write', setJack: 'dispatch.write', moveRun: 'dispatch.write', setUnitDown: 'fleet.status.write', setUnitUp: 'fleet.status.write',
-  reorderLoads: 'dispatch.override', clearConflict: 'dispatch.write', saveCheckIn: 'dispatch.write', setDriverTruck: 'drivers.write', setDriverAvailable: 'drivers.status.write',
+  reorderLoads: 'dispatch.override', reorderWeek: 'dispatch.override', clearConflict: 'dispatch.write', saveCheckIn: 'dispatch.write', setDriverTruck: 'drivers.write', setDriverAvailable: 'drivers.status.write',
   setDriverRelief: 'drivers.write', saveDriver: 'drivers.write', removeDrivers: 'drivers.write', saveDriverException: 'drivers.status.write', saveVacation: 'vacations.write',
   publishWeek: 'dispatch.publish', resetWeek: 'dispatch.publish', saveRoute: 'routes.write', reorderRouteDay: 'routes.write', updateIssue: 'issues.write',
   setWeekReason: 'dispatch.write', saveDriverTemplate: 'drivers.write', saveOtr: 'otr.write', saveScorecard: 'drivers.write', saveOpsAssignment: 'drivers.write',

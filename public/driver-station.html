@@ -30,6 +30,8 @@
       <span class="who" id="who"></span>
       <button id="signout" type="button">Sign out</button>
     </div>
+    <!-- Joe 10/12: the TV screen has no buttons, so a small Exit in the corner unattaches it (manager release code). -->
+    <button type="button" class="ds-exit" id="tv-exit" hidden>Exit</button>
     <div class="head">
       <div class="title"><span class="eyebrow" id="eyebrow">Driver Loadout &amp; Pickup</span><h1><span id="plant">Uniontown</span> Loadout <span class="ds-day" id="weekday"></span></h1></div>
       <p class="ds-welcome" id="welcome" hidden></p>
@@ -70,8 +72,9 @@
     const full = params.get('tv') === '1', tv = full || params.get('view') !== 'desk';
     document.body.classList.toggle('ds-tv', tv);
     document.body.classList.toggle('ds-full', full);
-    document.getElementById('go-back').addEventListener('click', goBack);
-    document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
+    // Joe 10/12: a kiosk with a code stays put; Back and Home ask for the manager release code first (see leave()).
+    document.getElementById('go-back').addEventListener('click', async () => { if (await leave()) goBack(); });
+    document.getElementById('go-home').addEventListener('click', async () => { if (await leave()) location.href = 'index.html'; });
     document.getElementById('tv').textContent = tv ? 'Desk view' : 'Driver Room display';
     document.getElementById('eyebrow').textContent = tv ? 'Driver Room Display' : 'Driver Loadout & Pickup';
     document.getElementById('weather').hidden = !tv;
@@ -161,12 +164,21 @@
       document.getElementById('eyebrow').textContent = kiosk ? kiosk.name + ' · ' + kiosk.plant : eyebrow;
       sig = ''; weekSig = ''; render();
     }
+    const release = (why) => askRelease(document.getElementById('release-box'), { why, status: () => stationCall('status', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown' }),
+      release: (code) => stationCall('release', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown', code }), onError: showError });
+    // Leaving a coded kiosk unattaches it: the manager release code (when the plant has one), then the code is forgotten.
+    async function leave() {
+      if (!kiosk) return true;
+      if (!(await release('A manager must type the manager release code to take this screen off the Driver Room.'))) return false;
+      kiosk = null; remember(CODE_KEY, null); return true;
+    }
     document.getElementById('change').addEventListener('click', async () => {
-      const ok = await askRelease(document.getElementById('release-box'), { status: () => stationCall('status', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown' }),
-        release: (code) => stationCall('release', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown', code }), onError: showError });
-      if (!ok) return;
+      if (!(await release())) return;
       kiosk = null; remember(CODE_KEY, null); gate().catch(err => showError(err.message));
     });
+    // The TV's Exit: release, then the plain Driver Station link (the code screen, with Back and Home).
+    document.getElementById('tv-exit').hidden = !full;
+    document.getElementById('tv-exit').addEventListener('click', async () => { if (await leave()) location.replace(location.pathname); });
 
     requireSignIn(async () => {
       const { db } = await start();

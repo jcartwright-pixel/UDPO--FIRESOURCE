@@ -315,6 +315,20 @@ async function pickupWho(tx, db, req, email) {
   return (snap.exists && text(snap.data().name)) || email;
 }
 
+// Joe 10/12 ("turn all 8 sheets on"): a pickup also goes to the Plant Operations workbook's LIVE PLANT OPERATIONS tab, in the
+// current app's columns (udpoV7268SavePlantPickup_), when the write-back names a copy of it (WRITEBACK_JSON "plant").
+function pickupSheetOn() {
+  try { return !!((JSON.parse(process.env.WRITEBACK_JSON || '{}').plant || {}).pickups); } catch (e) { return false; }
+}
+function pickupRow(p, email, stamp) {
+  return { pickup_id: p.pickupId, facility_id: 'fac_uniontown', service_date: p.date, route_id: p.routeId, run_id: p.runId, route: p.route, run: p.run,
+    operation_type: 'PICKUP', item: p.item, quantity: String(p.quantity), pickup_location: p.location || '', notes: p.notes || '', status: p.status,
+    created_at: p.createdAt, created_by: p.createdBy, updated_at: stamp, updated_by: email, completed_at: p.completedAt || '', completed_by: p.completedBy || '' };
+}
+function queuePickup(tx, db, mode, req, ref, rowId, cells, create, stamp, email) {
+  if (pickupSheetOn()) queueMaster(tx, db, mode, req.requestId, 'pickup', ref, rowId, cells, create, stamp, email, 'pickups');
+}
+
 async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const who = await pickupWho(tx, db, req, email);
   if (req.action === 'completePickup' && /^note:/.test(req.pickupId)) {
@@ -333,6 +347,7 @@ async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
       createdByName: (noteBy && noteBy.exists && text(noteBy.data().name)) || note.createdBy || who, completedAt: stamp, completedBy: email, completedByName: who,
       createdInApp: true, testEdited: true, editedAt: stamp };
     tx.set(ref, p);
+    queuePickup(tx, db, mode, req, ref, id, pickupRow(p, email, stamp), true, stamp, email);
     const result = { ok: true, requestId: req.requestId, pickupId: id };
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, pickupId: id, fromNote: req.pickupId, after: p, result });
     return result;
@@ -343,7 +358,10 @@ async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
     if (!snap.exists) throw new SaveError('NOT_FOUND', 'That pickup is no longer on the list');
     const p = snap.data();
     const result = { ok: true, requestId: req.requestId, pickupId: req.pickupId, already: p.status === 'COMPLETE' };
-    if (p.status !== 'COMPLETE') tx.update(ref, { status: 'COMPLETE', completedAt: stamp, completedBy: email, completedByName: who, testEdited: true, editedAt: stamp });
+    if (p.status !== 'COMPLETE') {
+      tx.update(ref, { status: 'COMPLETE', completedAt: stamp, completedBy: email, completedByName: who, testEdited: true, editedAt: stamp });
+      queuePickup(tx, db, mode, req, ref, p.pickupId || req.pickupId, { status: 'COMPLETE', completed_at: stamp, completed_by: email, updated_at: stamp, updated_by: email }, false, stamp, email);
+    }
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, pickupId: req.pickupId, before: { status: p.status }, after: { status: 'COMPLETE' }, result });
     return result;
   }
@@ -355,6 +373,7 @@ async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
     item: req.item, quantity: String(req.quantity), location: '', notes: req.notes, status: 'PENDING', createdAt: stamp, createdBy: email, createdByName: who, completedAt: '', completedBy: '',
     createdInApp: true, testEdited: true, editedAt: stamp };
   tx.set(db.collection('pickups').doc(id), p);
+  queuePickup(tx, db, mode, req, db.collection('pickups').doc(id), id, pickupRow(p, email, stamp), true, stamp, email);
   const result = { ok: true, requestId: req.requestId, pickupId: id };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, after: p, result });
   return result;

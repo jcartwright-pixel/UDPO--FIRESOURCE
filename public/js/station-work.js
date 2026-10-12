@@ -5,7 +5,7 @@
  * only, one card per load that a finger can work. No dates, no other areas, no Edit box, no manager numbers, and no link to
  * any manager screen. The saves are the same ones the Loadout Center and Unloading & Washing make.
  */
-import { save, escapeHtml, shortDate, showError } from './app.js';
+import { save, escapeHtml, shortDate, showError, allowedSaves } from './app.js';
 import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import * as P from './plant-core.js';
 import { watchProducts, OTHER } from './products.js';
@@ -31,7 +31,16 @@ export function mountStationWork({ db, box, person }) {
   const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state === 'WAITING';
   let unsubs = [];
 
-  const canSave = () => L.hasRole(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
+  // The role, or what Administration > People & Roles allows this person (asked of the server once per person).
+  const VIEW_SAVE = { loading: 'savePlantLoad', unloading: 'saveUnloading', washing: 'completeWash', returns: 'addReturn' };
+  let allowed = {}, askedFor = null;
+  const askRights = () => {
+    const p = person(), key = p ? (p.email || p.name || '') + '|' + (p.roles || []).join(',') : null;
+    if (!p || key === askedFor) return;
+    askedFor = key;
+    allowedSaves(Object.values(VIEW_SAVE).concat(['addPickup', 'completePickup'])).then(a => { allowed = a; render(); });
+  };
+  const canSave = () => (L.hasRole(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed[VIEW_SAVE[view] || 'savePlantLoad'] === true) && L.screenState(app, 'plantLoading').open;
   const myName = () => (station && station.name) || '';
   const weekDays = () => { const s = L.weekStart(date), out = []; for (let d = s; d <= date; d = L.addDays(d, 1)) out.push(d); return out; };
   const dayJournal = () => week.filter(d => d.date === date);
@@ -174,11 +183,16 @@ export function mountStationWork({ db, box, person }) {
   }
 
   function render() {
+    askRights();
     if (!station || !view) { box.innerHTML = ''; return; }
     // Keep the box being typed in (and what is typed) when a change from another screen redraws the list.
     const a = document.activeElement, keep = a && box.contains(a) && a.dataset && a.dataset.k ? [a.dataset.id, a.dataset.k, a.selectionStart] : null;
     const s = L.screenState(app, 'plantLoading');
-    const note = person() && !canSave() ? '<p class="sw-note">View only' + (s.why ? ': ' + escapeHtml(s.why) : '') + '.</p>' : '';
+    // Joe 10/12 photo ("I can't edit", a bare "View only."): say why. Either the screen is not open, or the account signed in
+    // on this tablet has no plant role in the Users list.
+    const p = person() || {}, who = (p.email || (p.cells && p.cells.email) || '') + (p.name ? ' (' + p.name + ')' : '') || 'This account';
+    const why = s.why || (!s.open ? '' : who + ' is not allowed to save this. In Administration > People & Roles give it the Plant Employee role or allow this work, or sign this tablet in with its station code');
+    const note = person() && !canSave() ? '<p class="sw-note">View only' + (why ? ': ' + escapeHtml(why) : '') + '.</p>' : '';
     box.innerHTML = note + (view === 'loading' ? loadingView() : view === 'unloading' ? unloadingView() : view === 'washing' ? washingView() : returnsView());
     if (keep) {
       const el = box.querySelector('[data-id="' + CSS.escape(keep[0]) + '"][data-k="' + keep[1] + '"]');

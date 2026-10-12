@@ -53,7 +53,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchMaint, plantFor } from './js/pmaint.js';
     import { savedText } from './js/autosave.js';
@@ -83,7 +83,8 @@
       document.getElementById('area').innerHTML = opt('', area, 'All Areas') + areas.map(a => opt(a, area, a)).join('') + opt('-', area, 'No area yet');
       document.getElementById('add').disabled = !canSave();
       const st = L.screenState(app, 'plant');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      goLiveNote(st.live && st.owner !== 'new');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
     function drawList() {

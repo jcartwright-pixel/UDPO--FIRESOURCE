@@ -48,6 +48,18 @@ function assertLiveTarget(spreadsheetId, allowRealLive) {
   assertSandboxTarget(spreadsheetId);
 }
 
+// Joe 10/12: "Let the new app write Route Master, Driver Master, Equipment Master, Users, Exceptions and Vacations to the
+// real sheets." The production server writes these six real master lists (and no other master or production sheet).
+const REAL_MASTER_LISTS = Object.freeze(['routes', 'drivers', 'equipment', 'users', 'exceptions', 'vacations']);
+
+// The master write-back's own check: a list's real Uniontown sheet only when allowReal names that list (the production
+// server, index.js) and only for the six lists above; anything else must be a sandbox copy.
+function assertMasterTarget(list, spreadsheetId, allowReal) {
+  const real = UNIONTOWN.masters[list];
+  if (allowReal && allowReal.indexOf(list) >= 0 && REAL_MASTER_LISTS.indexOf(list) >= 0 && real && spreadsheetId === real.spreadsheetId) return;
+  assertSandboxTarget(spreadsheetId);
+}
+
 function columnLetter(index) {
   let n = index + 1, s = '';
   while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
@@ -216,4 +228,4 @@ async function historyWrites(sheets, spreadsheetId, items, stamp, db) {
   return { updates, ops, written, conflicts: 0 };
 }
 
-module.exports = { runWriteBack, assertSandboxTarget, assertLiveTarget, findRow, columnLetter, PRODUCTION_IDS, HISTORY_TAB, HISTORY_HEADERS };
+module.exports = { runWriteBack, assertSandboxTarget, assertLiveTarget, assertMasterTarget, REAL_MASTER_LISTS, findRow, columnLetter, PRODUCTION_IDS, HISTORY_TAB, HISTORY_HEADERS };

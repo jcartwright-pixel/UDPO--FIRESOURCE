@@ -595,6 +595,31 @@ async function windowTestLog(db, email, input, stamp) {
 
 /* ---------- Run Runtime Pre-Flight (the health check) ---------- */
 
+// The six real master sheets the live server writes (sources.js UNIONTOWN.masters), in the order Joe named them.
+const REAL_SHEETS = require('./sources').UNIONTOWN.masters;
+const REAL_MASTERS = [['routes', 'Route Master'], ['drivers', 'Driver Master'], ['equipment', 'Equipment Master'], ['users', 'Users'],
+  ['exceptions', 'Exceptions'], ['vacations', 'Vacations']];
+
+// Whether this server's own account may edit each spreadsheet (Drive's canEdit; a sheet not shared with it at all is a no).
+async function driveSheetAccess(ids) {
+  const { GoogleAuth } = require('google-auth-library');
+  const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/drive.metadata.readonly'] });
+  const client = await auth.getClient(), account = ((await auth.getCredentials()) || {}).client_email || '';
+  const canEdit = {};
+  for (const id of ids) {
+    try {
+      const r = await client.request({ url: 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id), params: { fields: 'capabilities(canEdit)', supportsAllDrives: true } });
+      canEdit[id] = !!(r.data && r.data.capabilities && r.data.capabilities.canEdit);
+    } catch (e) {
+      // 404: not shared with this account at all. A 403 because the Drive API is off is not a sharing answer, so it fails the check.
+      const st = e.response && e.response.status, why = JSON.stringify((e.response && e.response.data) || e.message || '');
+      if (st === 404 || (st === 403 && !/SERVICE_DISABLED|accessNotConfigured|has not been used/i.test(why))) canEdit[id] = false;
+      else throw new Error(/SERVICE_DISABLED|accessNotConfigured|has not been used/i.test(why) ? 'The Google Drive API is off for this project; the next deploy turns it on.' : String(e.message || e));
+    }
+  }
+  return { account, canEdit };
+}
+
 async function preflight(db, deps) {
   const d = deps || {}, now = d.now ? d.now() : new Date(), env = d.env || process.env, checks = [];
   const check = async (name, fn) => {
@@ -645,6 +670,16 @@ async function preflight(db, deps) {
   await check('Write-back to the master lists', async () => {
     const old = (await db.collection(C.masterOutbox).where('status', '==', 'pending').get()).docs.map(x => x.data()).filter(x => minsAgo(x.at) > 10);
     return old.length ? { status: 'FAIL', detail: old.length + ' master-list change(s) waiting more than 10 minutes.' } : { detail: 'Nothing waiting.' };
+  });
+  // Joe 10/12: the live server writes the six real master sheets, so its account must be an Editor on each one.
+  await check('Edit access to the master sheets', async () => {
+    if (env.READ_UNIONTOWN_SHEETS !== '1' || env.SOURCES_JSON || env.DEMO_DATA === '1') return { detail: 'Sandbox: the real master sheets are not written from here.' };
+    const access = d.sheetAccess || driveSheetAccess;
+    const { account, canEdit } = await access(REAL_MASTERS.map(([k]) => REAL_SHEETS[k].spreadsheetId));
+    const missing = REAL_MASTERS.filter(([k]) => !canEdit[REAL_SHEETS[k].spreadsheetId]).map(([, label]) => label);
+    return missing.length
+      ? { status: 'FAIL', detail: 'Share as Editor with ' + (account || 'the server account') + ': ' + missing.join(', ') + '.' }
+      : { detail: 'The server account can edit ' + REAL_MASTERS.map(([, label]) => label).join(', ') + '.' };
   });
   await check('Sheet Conflicts', async () => {
     const n = (await db.collection(C.conflicts).get()).docs.filter(x => !x.data().clearedAt && x.data().status !== 'CLEARED').length;

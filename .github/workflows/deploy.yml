@@ -131,6 +131,9 @@ jobs:
           gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet
           # The copy reads the sheets through the Google Sheets API.
           gcloud services enable sheets.googleapis.com --project "$PROJECT" --quiet
+          # Pre-Flight's "Edit access to the master sheets" asks Drive whether the server account may edit each real master sheet.
+          gcloud services enable drive.googleapis.com --project "$PROJECT" --quiet \
+            || echo "::warning::Could not turn on the Drive API for $PROJECT; Pre-Flight cannot check the master sheets' sharing until it is on."
           # Send Current Report email (src/mail.js): Gmail sent as MAIL_FROM by the server account, which signs for itself
           # through IAM Credentials (no key).
           gcloud services enable iamcredentials.googleapis.com gmail.googleapis.com --project "$PROJECT" --quiet \

@@ -39,6 +39,8 @@ export function keepCursor(tbody, rebuild) {
 }
 
 // Best match first: the same text, then (units) a number ending in what is typed, then starting with it, then a word starting with it, then anywhere.
+const endsWith = (c, typed) => { const k = String(c.key || c.label).toUpperCase(), q = String(typed || '').trim().toUpperCase(); return !!q && (k === q || k.slice(-q.length) === q); };
+
 export function rankChoices(choices, typed, unit) {
   const q = String(typed || '').trim().toUpperCase();
   if (!q) return choices.slice();
@@ -129,7 +131,8 @@ export function bindDailyKeys(tbody, h) {
 
     function paint() {
       const q = input.value.trim();
-      shown = q ? rankChoices(choices, q, unit) : choices.slice();
+      // Units that cannot be used show only for a typed number (a full list would end in every inactive unit).
+      shown = q ? rankChoices(choices, q, unit) : choices.filter(c => !(unit && c.blocked));
       const best = q ? shown.find(pickable) : null;
       // The best match stays highlighted wherever it sits; the list keeps its groups (Relief, Regular, ... Unavailable last).
       if (q) shown = shown.map((c, i) => ({ c, i, g: choices.indexOf(choices.find(x => x.group === c.group)) })).sort((a, b) => a.g - b.g || a.i - b.i).map(x => x.c);
@@ -140,7 +143,8 @@ export function bindDailyKeys(tbody, h) {
         last = c.head;
         html += '<div role="option" data-i="' + i + '" class="' + (i === active ? 'active ' : '') + (c.blocked ? 'off' : '') + '">' + esc(c.label) + (c.reason ? '<em>' + esc(c.reason) + '</em>' : c.note ? '<em class="note">' + esc(c.note) + '</em>' : '') + '</div>';
       });
-      pop.innerHTML = html + (shown.length ? '' : unit ? '<p>Not on Equipment Master. Enter keeps it as typed.</p>' : '<p>No match. Esc keeps the old one.</p>') + '<small>Enter takes it and moves down · Tab next cell · Esc keeps the old one</small>';
+      const onlyBlocked = unit && shown.length && !shown.some(pickable) && shown.some(c => endsWith(c, q));
+      pop.innerHTML = html + (shown.length ? (onlyBlocked ? '<p>That unit cannot be used now. Tick OVR to use it anyway.</p>' : '') : unit ? '<p>Not on Equipment Master. Enter keeps it as typed.</p>' : '<p>No match. Esc keeps the old one.</p>') + '<small>Enter takes it and moves down · Tab next cell · Esc keeps the old one</small>';
       place();
       const a = pop.querySelector('.active');
       if (a) a.scrollIntoView({ block: 'nearest' });
@@ -171,7 +175,9 @@ export function bindDailyKeys(tbody, h) {
       if (take) {
         if (pickable(shown[active]) && (input.value.trim() || all)) value = shown[active].value;
         else if (!input.value.trim() && !all) value = ''; // Delete / Backspace then Enter clears the cell
-        // A truck or trailer number with no match is kept as typed, like the current app (trailers as T-###).
+        // A truck or trailer number with no match is kept as typed, like the current app (trailers as T-###); one that matches
+        // a unit that cannot be used now (greyed, with why) is not saved as typed: the old one stays (Joe 10/12, 891).
+        else if (unit && input.value.trim() && shown.some(c => c.blocked && endsWith(c, input.value))) value = null;
         else if (unit && input.value.trim()) { const t = input.value.trim().toUpperCase().replace(/\s+/g, ''); value = { unit: kind === 'trailer' ? 'T-' + t.replace(/^T-?/, '') : t }; }
       }
       want = to;
