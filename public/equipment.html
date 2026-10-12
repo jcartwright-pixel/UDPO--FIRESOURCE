@@ -29,7 +29,7 @@
     </div>
     <div class="head">
       <div class="title"><h1>Equipment</h1><small>Trucks and trailers the dispatch lists offer (Equipment Master)</small></div>
-      <div class="actions in-head fleet-sync"><button type="button" id="fleet-sync" hidden>Sync fleet list</button><span id="fleet-synced"></span></div>
+      <div class="actions in-head fleet-sync"><button type="button" id="fleet-sync" hidden>Sync fleet list</button><button type="button" id="fleet-preview" hidden>Preview fleet sync</button><span id="fleet-synced"></span></div>
       <div class="counts"><div><b id="n-trucks">-</b>Trucks</div><div><b id="n-trailers">-</b>Trailers</div><div><b id="n-down">-</b>Down / out</div></div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Equipment Master is not changed yet. Fleet service and work orders stay in the current app.</span></div>
     </div>
@@ -48,6 +48,20 @@
       </div>
     </div>
   </div>
+
+  <div class="modal-back" id="fp-back" hidden></div>
+  <section class="modal fp-modal" id="fp-modal" role="dialog" aria-labelledby="fp-title" hidden>
+    <h2 id="fp-title">Fleet list sync preview <small id="fp-when"></small></h2>
+    <p class="fp-note">Nothing has been changed. This is every cell the sync would change in Equipment Master, read from the fleet list.</p>
+    <div class="fp-sum" id="fp-sum"></div>
+    <div class="chips" id="fp-filters"></div>
+    <div class="fp-list"><table>
+      <colgroup><col style="width:8%"><col style="width:11%"><col style="width:13%"><col style="width:11%"><col style="width:19.5%"><col style="width:19.5%"><col style="width:13%"><col style="width:5%"></colgroup>
+      <thead><tr><th>Unit</th><th>Plant</th><th>Change</th><th>Column</th><th>Now</th><th>Would be</th><th>Why</th><th>Row</th></tr></thead>
+      <tbody id="fp-rows"></tbody>
+    </table></div>
+    <div class="modal-actions"><button type="button" id="fp-again">Run preview again</button><button type="button" id="fp-csv">Download list</button><button type="button" class="primary" id="fp-close">Close</button></div>
+  </section>
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, shortTime, showError, callServer } from './js/app.js';
@@ -86,10 +100,57 @@
     function paintSync() {
       const button = document.getElementById('fleet-sync'), line = document.getElementById('fleet-synced');
       button.hidden = !L.hasRole(lists.person, MANAGERS);
+      document.getElementById('fleet-preview').hidden = !L.hasRole(lists.person, MANAGERS);
       button.disabled = syncing;
       line.textContent = syncText();
       line.className = fleetSync && fleetSync.ok === false && !syncing ? 'bad' : '';
     }
+    // Joe 10/12 ("Yes, preview first"): every cell the sync would change, by plant; nothing is written.
+    let preview = null, previewing = false, fpPlant = 'all';
+    const KIND = { added: 'New unit', back: 'Back on the list', inactive: 'Off the list (INACTIVE)', changed: 'Updated' };
+    const PLANTS = ['Uniontown', 'Charleston', 'Martins Ferry', 'Other branch'];
+    function paintPreview() {
+      const box = document.getElementById('fp-modal');
+      if (box.hidden) return;
+      const ch = (preview && preview.changes) || [];
+      document.getElementById('fp-when').textContent = previewing ? 'reading the fleet list...' : preview && preview.at ? shortDate(preview.at) + ' ' + shortTime(preview.at) : '';
+      const units = (list) => new Set(list.map(c => c.unit)).size;
+      document.getElementById('fp-sum').innerHTML = preview && preview.ok === false ? '<b class="bad">' + escapeHtml(preview.error) + '</b>'
+        : PLANTS.filter(p => ch.some(c => c.plant === p)).map(p => { const mine = ch.filter(c => c.plant === p); return '<div><b>' + escapeHtml(p) + '</b>' + Object.keys(KIND).filter(k => mine.some(c => c.kind === k)).map(k => units(mine.filter(c => c.kind === k)) + ' ' + KIND[k].toLowerCase()).join(', ') + '</div>'; }).join('') || (previewing ? '' : '<div>No changes: Equipment Master already matches the fleet list.</div>');
+      document.getElementById('fp-filters').innerHTML = [['all', 'All (' + ch.length + ')']].concat(PLANTS.filter(p => ch.some(c => c.plant === p)).map(p => [p, p + ' (' + ch.filter(c => c.plant === p).length + ')'])).map(([k, t]) => '<button type="button" data-fp="' + escapeHtml(k) + '" class="chip' + (fpPlant === k ? ' on' : '') + '">' + escapeHtml(t) + '</button>').join('');
+      // Units coming off or back first, then new ones, then the rest; by unit number within each.
+      const ORDER = ['inactive', 'back', 'added', 'changed'];
+      const shown = ch.filter(c => fpPlant === 'all' || c.plant === fpPlant).slice().sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind) || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }) || a.row - b.row);
+      document.getElementById('fp-rows').innerHTML = shown.map(c => '<tr class="fp-' + c.kind + '"><td><b>' + escapeHtml(c.unit) + '</b></td><td>' + escapeHtml(c.plant) + '</td><td>' + escapeHtml(KIND[c.kind] || c.kind) + '</td><td>' + escapeHtml(c.field) + '</td><td>' + escapeHtml(c.from || '(blank)') + '</td><td><b>' + escapeHtml(c.to || '(blank)') + '</b></td><td>' + escapeHtml(c.why || '') + '</td><td>' + c.row + '</td></tr>').join('');
+      document.getElementById('fp-again').disabled = previewing;
+      document.getElementById('fp-csv').disabled = !ch.length;
+    }
+    async function runPreview() {
+      previewing = true; paintPreview();
+      try { preview = await callServer('fleetSyncNow', { preview: true }); }
+      catch (e) { preview = { ok: false, at: new Date().toISOString(), error: String(e.message || e) }; }
+      previewing = false; paintPreview();
+    }
+    function closePreview() { document.getElementById('fp-modal').hidden = true; document.getElementById('fp-back').hidden = true; }
+    document.getElementById('fleet-preview').addEventListener('click', () => {
+      document.getElementById('fp-modal').hidden = false; document.getElementById('fp-back').hidden = false;
+      paintPreview();
+      if (!preview || !preview.changes) runPreview();
+    });
+    document.getElementById('fp-again').addEventListener('click', runPreview);
+    document.getElementById('fp-close').addEventListener('click', closePreview);
+    document.getElementById('fp-back').addEventListener('click', closePreview);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('fp-modal').hidden) closePreview(); });
+    document.getElementById('fp-filters').addEventListener('click', e => { const b = e.target.closest('[data-fp]'); if (b) { fpPlant = b.dataset.fp; paintPreview(); } });
+    document.getElementById('fp-csv').addEventListener('click', () => {
+      const q = (v) => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+      const csv = [['Unit', 'Plant', 'Change', 'Column', 'Now', 'Would be', 'Why', 'Sheet row']].concat(((preview && preview.changes) || []).map(c => [c.unit, c.plant, KIND[c.kind] || c.kind, c.field, c.from, c.to, c.why || '', c.row])).map(r => r.map(q).join(',')).join('\r\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      a.download = 'fleet-sync-preview-' + String((preview && preview.at) || '').slice(0, 10) + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+
     document.getElementById('fleet-sync').addEventListener('click', async () => {
       syncing = true; paintSync();
       try { fleetSync = await callServer('fleetSyncNow', {}); }
@@ -152,6 +213,7 @@
       watchLists(user, render);
       let shownDay = today();
       setInterval(() => { if (today() !== shownDay) { shownDay = today(); render(); } }, 60000);
+      onSnapshot(doc(db, 'config', 'fleetSyncPreview'), s => { if (!previewing && s.exists()) { preview = s.data(); paintPreview(); } }, () => {});
       onSnapshot(doc(db, 'config', 'fleetSync'), s => { if (!syncing) { fleetSync = s.exists() ? s.data() : null; paintSync(); } }, () => {});
       onSnapshot(collection(db, 'routes'), s => { routes = s.docs.map(d => d.data()); render(); }, e => showError('Could not read Route Master (' + e.message + '). Check the network and reload the page.'));
     });

@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { planFleetSync, fleetUnits } = require('../../src/fleetsync');
+const { planFleetSync, fleetUnits, unitKey } = require('../../src/fleetsync');
 
 const FLEET = [
   ['United Dairy fleet list'],
@@ -74,4 +74,29 @@ test('fleet sync keeps the lessor with the fleet text, so Fleet Service can leav
   assert.equal(L.unitLeased({ notes: units[1].notes }), false);
   assert.equal(L.unitLeased({ notes: 'DOWN: Lease: return' }), false, 'only the fleet text counts');
   assert.equal(L.cleanUnitNote(units[0].notes), '', 'the screens never show it');
+});
+
+// Joe 10/12: the fleet list's T-95 is Equipment Master's T-095. They are one unit, so the sync brings T-095 back instead of
+// adding a second T-95 row and leaving T-095 INACTIVE.
+test('fleet sync matches unit numbers with or without leading zeros', () => {
+  assert.deepEqual(['T-95', 'T-095', 't 095', '0670', '123891'].map(unitKey), ['T-95', 'T-95', 'T-95', '670', '123891']);
+  const master = MASTER.concat([row({ equipment_id: 'veh_trailer_t_095', equipment_type: 'TRAILER', unit_id: 'T-095', facility_id: 'fac_uniontown', location: 'UNKNOWN', status: 'INACTIVE', source_present: 'FALSE' })]);
+  const { cells, summary } = planFleetSync(FLEET, master, AT);
+  const v = apply(master, cells);
+  assert.deepEqual(summary.added.sort(), ['902'], 'no second row for T-95');
+  assert.equal(v.filter(r => /^T-0?95$/.test(r[2])).length, 1);
+  assert.deepEqual(['status', 'facility_id', 'source_present'].map(k => get(v, 'T-095', k)), ['ACTIVE', 'fac_charleston', 'TRUE']);
+});
+
+// Joe 10/12 ("Yes, preview first"): the preview lists every shown cell it would change, by unit and plant, in plain words.
+test('fleet sync preview lists each change with its unit, plant, sheet row, now and would be', () => {
+  const { changes } = planFleetSync(FLEET, MASTER, AT);
+  const c237 = changes.find(c => c.unit === '237' && c.field === 'Status');
+  assert.deepEqual(c237, { unit: '237', plant: 'Uniontown', row: 5, field: 'Status', from: 'ACTIVE', to: 'INACTIVE', kind: 'inactive', why: 'Not on the fleet list' });
+  assert.equal(changes.find(c => c.unit === '688' && c.field === 'Status').why, 'Yard truck on the fleet list');
+  const away = planFleetSync(FLEET.concat([['237', '', '', '', 'Tractor', 'Marietta OH Branch', '', '']]), MASTER, AT).changes.find(c => c.unit === '237' && c.field === 'Status');
+  assert.equal(away.why, 'Fleet list: Marietta OH Branch');
+  const t95 = changes.find(c => c.unit === 'T-95' && c.field === 'Plant');
+  assert.deepEqual([t95.to, t95.kind, t95.plant, t95.why], ['Charleston', 'added', 'Charleston', '']);
+  assert.ok(!changes.some(c => /updated|sync|version|created/i.test(c.field)), 'bookkeeping columns are written but not listed');
 });

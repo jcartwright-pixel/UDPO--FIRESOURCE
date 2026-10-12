@@ -1706,3 +1706,22 @@ tr.row-dragging > td { background: #e8f1fa !important; }
 tr[data-drag]:not([data-drag-group]) > td:nth-child(-n+2), tr[data-drag] > td[data-drag-handle] { touch-action: none; }
 body.row-drag-on, body.row-drag-on * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
 .row-drop-line { position: absolute; height: 3px; background: #1f6feb; z-index: 60; pointer-events: none; }
+
+/* Equipment: fleet list sync preview (Joe 10/12). Text 16px; the list scrolls under a sticky head. */
+.fp-modal { width: min(1180px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 10px; font-size: 16px; }
+.fp-modal h2 { margin: 0; }
+.fp-note { margin: 0; color: #44515e; }
+.fp-sum { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.fp-sum div b { margin-right: 8px; color: var(--ud-blue-dark); }
+.fp-sum .bad { color: #b3261e; }
+.fp-modal .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fp-modal .chip { min-height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.fp-modal .chip.on { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.fp-list { max-height: calc(100vh - 330px); min-height: 160px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; -webkit-overflow-scrolling: touch; }
+.fp-list table { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: fixed; }
+.fp-list th { position: sticky; top: 0; background: var(--ud-blue-dark, #0b3a66); color: #fff; text-align: left; padding: 8px 10px; font-size: 16px; }
+.fp-list td { padding: 6px 10px; border-top: 1px solid var(--line); text-align: left; overflow-wrap: break-word; white-space: normal; text-overflow: clip; overflow: visible; }
+.fp-list tr.fp-inactive td:nth-child(3) { color: #b3261e; font-weight: 700; }
+.fp-list tr.fp-back td:nth-child(3), .fp-list tr.fp-added td:nth-child(3) { color: #1b7a3a; font-weight: 700; }
+.fp-modal .modal-actions { margin-top: 0; }
+.fp-modal .modal-actions button { font-size: 16px; }

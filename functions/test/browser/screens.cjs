@@ -1037,14 +1037,34 @@ async function noScroll(page) {
     // The test project names no sandbox Equipment Master copy, so the server says so on the line (no pop-up).
     await eqm.waitForFunction(() => /not set up here/.test(document.getElementById('fleet-synced').textContent));
     assert.equal(await eqm.$eval('#fleet-synced', x => x.className), 'bad');
+    // Joe 10/12 ("Yes, preview first"): Preview fleet sync lists every change by plant, with why a unit comes off; nothing is written.
+    await db().collection('config').doc('fleetSyncPreview').set({ ok: true, preview: true, at: '2026-10-12T19:45:00.000Z', by: 'manager.test@uniteddairy.com', changes: [
+      { unit: 'T-095', plant: 'Charleston', row: 4, field: 'Status', from: 'INACTIVE', to: 'ACTIVE', kind: 'back', why: '' },
+      { unit: 'T-10212', plant: 'Uniontown', row: 7, field: 'Status', from: 'ACTIVE', to: 'INACTIVE', kind: 'inactive', why: 'Fleet list: Marietta OH Branch' },
+      { unit: '9715', plant: 'Charleston', row: 9, field: 'Status', from: 'ACTIVE', to: 'INACTIVE', kind: 'inactive', why: 'Yard truck on the fleet list' }] });
+    await eqm.waitForSelector('#fleet-preview:not([hidden])');
+    await eqm.click('#fleet-preview');
+    await eqm.waitForSelector('#fp-rows tr');
+    assert.equal(await eqm.$$eval('#fp-rows tr', r => r.length), 3);
+    assert.match(await eqm.textContent('#fp-modal'), /Nothing has been changed/);
+    assert.match(await eqm.textContent('#fp-sum'), /Charleston\s*1 back on the list, 1 off the list/);
+    assert.match(await eqm.textContent('#fp-rows'), /Fleet list: Marietta OH Branch/);
+    await eqm.click('[data-fp="Uniontown"]');
+    assert.equal(await eqm.$$eval('#fp-rows tr', r => r.length), 1);
+    assert.equal(await eqm.$eval('#fp-csv', b => b.disabled), false, 'the list can be downloaded');
+    assert.ok(await eqm.$eval('#fp-rows td', td => parseFloat(getComputedStyle(td).fontSize) >= 16), 'text at least 16px');
+    await eqm.click('#fp-close');
+    assert.equal(await eqm.$eval('#fp-modal', m => m.hidden), true);
+    await db().collection('config').doc('fleetSyncPreview').delete();
     await eqm.close();
     const eqv = await openPage(browser, 1920, 950, '/equipment.html?testEmail=dispatch.test@uniteddairy.com');
     await eqv.waitForSelector('#rows tr[data-id="veh_truck_900001"]');
     assert.equal(await eqv.$eval('#fleet-sync', b => b.hidden), true, 'a dispatcher has no Sync button');
+    assert.equal(await eqv.$eval('#fleet-preview', b => b.hidden), true, 'a dispatcher has no Preview button');
     assert.match(await eqv.textContent('#fleet-synced'), /Fleet list synced/);
     await eqv.close();
     await db().collection('config').doc('fleetSync').delete();
-    results.push('Equipment: a manager sees Sync fleet list with when it last synced; the button answers on the line; a dispatcher has no button');
+    results.push('Equipment: a manager sees Sync fleet list with when it last synced; the button answers on the line; Preview fleet sync lists each change by plant with why; a dispatcher has neither button');
     // Joe 10/10 (route 855): the one-run editor has every day field of the old one (Order, Day Notes), a blank unit default on a
     // running day says "none set", and the action buttons are square tiles in one row.
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
