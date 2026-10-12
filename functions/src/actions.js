@@ -67,16 +67,16 @@ const ACTIONS = Object.freeze({
   saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
   saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
   saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'drivers' },
-  // The plant side (plant.js): Loadout Center loads and pickups.
-  savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
-  addPickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
-  completePickup: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  // The plant side (plant.js): Loadout Center loads and pickups. The Plant Distribution screens are their own switch (Plant Loading).
+  savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
+  addPickup: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
+  completePickup: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
   // Loadout Center: drag a load to change today's loading order (saved as the day's load_sequence_override).
-  reorderPlantLoads: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  reorderPlantLoads: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
   // Unloading & Washing, Product Returns and Truck Washing.
-  saveUnloading: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
-  completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
-  addReturn: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  saveUnloading: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
+  completeWash: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
+  addReturn: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
   // Plant Operations Scheduler (Shipping and Receiving).
   savePlantSchedule: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveYardCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
@@ -543,6 +543,27 @@ function queueCells(tx, db, requestId, part, run, runDocId, cells, stamp, email,
     match: { runId: run.runId || '', route: run.route || '', run: run.run || '', days }, cells
   }, extra || {}));
 }
+/*
+ * LOADOUT HISTORY (the current app's udpoV7197RecordLoadoutHistory_): when a load is saved Done, or a Done load is corrected,
+ * one row per run_id|load_date in that tab of the Live workbook, so the week tab's loading cells can be cleared later without
+ * losing when the route was loaded. Written by writeback.js (the row found by history_key, else added under the last).
+ */
+const HISTORY_FIELDS = ['completeTime', 'loadStatus', 'casesOut', 'loadTemperature', 'plantStartedAt'];
+function queueLoadoutHistory(tx, db, req, run, d, after, stamp, email) {
+  const t = (v) => v === null || v === undefined ? '' : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v);
+  const complete = t(d.completeTime), status = t(d.loadStatus).toUpperCase();
+  if (!complete && status !== 'COMPLETE') return;
+  if (!HISTORY_FIELDS.some(k => after[k] !== undefined)) return;
+  const delivery = L.addDays(run.weekStart, L.DAYS.indexOf(req.day));
+  const offset = d.loadDayOffset === null || d.loadDayOffset === undefined || d.loadDayOffset === '' ? -1 : Number(d.loadDayOffset);
+  const loadDate = L.dateKey(d.loadDate) || L.addDays(delivery, offset), key = (run.runId || '') + '|' + loadDate;
+  tx.set(db.collection(C.outbox).doc(req.requestId + '-h'), {
+    status: 'pending', at: stamp, by: email, requestId: req.requestId, history: true, key, runDocId: req.runDocId,
+    row: { archived_at: stamp, reason: 'Loadout completed', live_tab: run.sourceTab || '', live_row: t(run.sheetRow), route: t(run.route), run_id: t(run.runId), run: t(run.run),
+      load_date: loadDate, delivery_date: L.dateKey(d.deliveryDate) || delivery, cases_out: t(d.casesOut), complete_time: complete, load_status: status, loaded_complete: t(d.loadedComplete),
+      load_temperature: t(d.loadTemperature), written_by: email, source_note: '', source_written_at: '', history_key: key, started_at: t(d.plantStartedAt) }
+  });
+}
 function dayCells(day, values, stamp, email) {
   const cells = {};
   Object.keys(values).forEach(field => {
@@ -655,13 +676,16 @@ async function applyAction(db, user, input, now) {
     // the Driver Assignment Board shows those days light blue.
     // A truck or trailer picked by hand marks <day>_equipment_override, as the current app's Live save does (034_V740 line 115), and a
     // depart time typed by hand marks <day>_dispatch_time_override: Route Master and Driver Master saves then leave that day's pick alone (D6).
+    // A truck or trailer typed at the dock (savePlantLoad) marks it too, as the current app's plant save does (034_V740 line 115).
+    const plantUnit = req.action === 'savePlantLoad' && (after.truck !== undefined || after.trailer !== undefined);
     const marks = req.action === 'assignDriver' || req.action === 'setRuns' ? { routeOverride: 'TRUE' }
-      : req.action === 'assignTruck' || req.action === 'assignTrailer' ? { equipmentOverride: 'TRUE' } : req.action === 'setDispatchTime' ? { dispatchTimeOverride: 'TRUE' } : {};
+      : req.action === 'assignTruck' || req.action === 'assignTrailer' || plantUnit ? { equipmentOverride: 'TRUE' } : req.action === 'setDispatchTime' ? { dispatchTimeOverride: 'TRUE' } : {};
     Object.keys(marks).forEach(k => { update['days.' + req.day + '.' + k] = marks[k]; });
     update['days.' + req.day + '.updatedAt'] = stamp;
     update['days.' + req.day + '.updatedBy'] = email;
     tx.update(runRef, update);
     if (mode.writeBack) queueSheetCells(tx, db, req.requestId, '', run, req.runDocId, req.day, Object.assign({}, after, marks), stamp, email);
+    if (mode.writeBack && req.action === 'savePlantLoad') queueLoadoutHistory(tx, db, req, run, Object.assign({}, day, after), after, stamp, email);
     const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }] };
     if (writeMaint) result.maintenance = writeMaint(maintQueue(tx, db, mode, req.requestId, stamp, email));
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });

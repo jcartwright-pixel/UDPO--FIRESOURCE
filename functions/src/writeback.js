@@ -23,6 +23,12 @@ const { UNIONTOWN } = require('./sources');
 const C = M.COLLECTIONS;
 const BATCH = 50;
 
+// The current app's LOADOUT HISTORY tab in the Live workbook (209_V7197_LoadoutHistory.gs): headers on row 1, one row per
+// run_id|load_date (history_key). actions.js queueLoadoutHistory queues the rows.
+const HISTORY_TAB = 'LOADOUT HISTORY';
+const HISTORY_HEADERS = Object.freeze(['archived_at', 'reason', 'live_tab', 'live_row', 'route', 'run_id', 'run', 'load_date', 'delivery_date', 'cases_out',
+  'complete_time', 'load_status', 'loaded_complete', 'load_temperature', 'written_by', 'source_note', 'source_written_at', 'history_key', 'started_at']);
+
 // Every production spreadsheet the current app uses. The write-back never writes to any of them.
 const PRODUCTION_IDS = Object.freeze([UNIONTOWN.live.spreadsheetId, UNIONTOWN.plant.pickups.spreadsheetId].concat(Object.keys(UNIONTOWN.masters).map(k => UNIONTOWN.masters[k].spreadsheetId)).concat([
   '1UrAzrPIe4x6jcNBCjCJUIE8mjvJAniZMoONRGK8GJmw', '1ac78al6_HhYA3_89kwYU93KbIzOv0vqExYhFsG1i4Rk', // Charleston, Martins Ferry Live
@@ -79,18 +85,19 @@ async function runWriteBack({ db, sheets, target, now, allowRealLive }) {
   assertLiveTarget(target && target.spreadsheetId, allowRealLive);
   const stamp = (now ? now() : new Date()).toISOString();
   const pending = await db.collection(C.outbox).where('status', '==', 'pending').orderBy('at').orderBy('requestId').limit(BATCH).get();
-  const items = pending.docs.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data()));
-  if (!items.length) return { written: 0, conflicts: 0, items: 0 };
+  const all = pending.docs.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data()));
+  if (!all.length) return { written: 0, conflicts: 0, items: 0 };
+  const items = all.filter(i => !i.history), history = all.filter(i => i.history);
 
   // One read per tab touched.
   const tabs = [...new Set(items.map(i => i.tab))];
-  const tabValues = await sheets.batchGet(target.spreadsheetId, tabs.map(t => "'" + t + "'"));
+  const tabValues = tabs.length ? await sheets.batchGet(target.spreadsheetId, tabs.map(t => "'" + t + "'")) : [];
   const sheet = {};
   tabs.forEach((t, i) => { sheet[t] = tabValues[i]; });
 
   // What the new app last knew for each cell: the run's copy of the sheet row, updated as cells are written.
   const runIds = [...new Set(items.map(i => i.runDocId))];
-  const runSnaps = await db.getAll(...runIds.map(id => db.collection(C.runs).doc(id)));
+  const runSnaps = runIds.length ? await db.getAll(...runIds.map(id => db.collection(C.runs).doc(id))) : [];
   const known = {};
   runSnaps.forEach((snap, i) => { known[runIds[i]] = snap.exists ? Object.assign({}, snap.data().cells || {}) : {}; });
 
@@ -156,13 +163,57 @@ async function runWriteBack({ db, sheets, target, now, allowRealLive }) {
     ops.push({ ref: item.ref, update: { status: itemConflicts ? 'conflict' : 'done', doneAt: stamp, sheetRow: r + 1 } });
   });
 
+  if (history.length) {
+    const h = await historyWrites(sheets, target.spreadsheetId, history, stamp, db);
+    if (h.updates.length) updates[HISTORY_TAB] = h.updates;
+    ops.push(...h.ops);
+    written += h.written; conflicts += h.conflicts;
+  }
+
   // Sheet first, then mark the queue: if the sheet write fails nothing is marked and the next pass retries.
   for (const tab of Object.keys(updates)) await sheets.batchUpdate(target.spreadsheetId, updates[tab]);
   const batch = db.batch();
   ops.forEach(op => (op.update ? batch.update(op.ref, op.update) : batch.set(op.ref, op.data)));
   runIds.forEach(id => { if (runSnaps[runIds.indexOf(id)].exists) batch.update(db.collection(C.runs).doc(id), { cells: known[id] }); });
   await batch.commit();
-  return { written, conflicts, items: items.length };
+  return { written, conflicts, items: all.length };
 }
 
-module.exports = { runWriteBack, assertSandboxTarget, assertLiveTarget, findRow, columnLetter, PRODUCTION_IDS };
+// LOADOUT HISTORY rows: the row whose history_key matches is updated (a correction), else one is added under the last row.
+// The tab is made, with its headers, if the workbook has none yet (as the current app does on the first Done load).
+async function historyWrites(sheets, spreadsheetId, items, stamp, db) {
+  const range = "'" + HISTORY_TAB + "'";
+  let values;
+  try {
+    values = (await sheets.batchGet(spreadsheetId, [range]))[0] || [];
+  } catch (e) {
+    if (!sheets.structure || !/Unable to parse range|no fake tab/i.test(String(e && e.message))) throw e;
+    await sheets.structure(spreadsheetId, [{ addSheet: { properties: { title: HISTORY_TAB, gridProperties: { frozenRowCount: 1 } } } }]);
+    values = [];
+  }
+  const updates = [], ops = [], cell = (c, r, v) => updates.push({ range: range + '!' + columnLetter(c) + r, values: [[v]] });
+  const header = (values[0] || []).map(text);
+  // Headers: written when the tab is new or row 1 is blank; a row 1 with other headers is never written over.
+  if (HISTORY_HEADERS.some((x, c) => header[c] && header[c] !== x)) {
+    items.forEach(item => {
+      ops.push({ ref: db.collection(C.conflicts).doc(item.id), data: { open: true, at: stamp, requestId: item.requestId, by: item.by, tab: HISTORY_TAB, runDocId: item.runDocId || '', route: item.row.route, run: item.row.run,
+        problem: 'the LOADOUT HISTORY tab has other headers; the history row was not written', cells: item.row } });
+      ops.push({ ref: item.ref, update: { status: 'conflict', doneAt: stamp } });
+    });
+    return { updates: [], ops, written: 0, conflicts: items.length };
+  }
+  HISTORY_HEADERS.forEach((x, c) => { if (!header[c]) cell(c, 1, x); });
+  values[0] = HISTORY_HEADERS.slice();
+  const keyCol = HISTORY_HEADERS.indexOf('history_key');
+  let written = 0;
+  items.forEach(item => {
+    let r = values.findIndex((row, i) => i > 0 && text((row || [])[keyCol]) === item.key);
+    if (r < 0) { r = Math.max(values.length, 1); values[r] = []; }
+    HISTORY_HEADERS.forEach((x, c) => { const v = text(item.row[x]); if (text(values[r][c]) !== v) { cell(c, r + 1, v); values[r][c] = v; } });
+    written++;
+    ops.push({ ref: item.ref, update: { status: 'done', doneAt: stamp, sheetRow: r + 1 } });
+  });
+  return { updates, ops, written, conflicts: 0 };
+}
+
+module.exports = { runWriteBack, assertSandboxTarget, assertLiveTarget, findRow, columnLetter, PRODUCTION_IDS, HISTORY_TAB, HISTORY_HEADERS };

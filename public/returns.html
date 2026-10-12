@@ -80,7 +80,7 @@
     const returned = {};       // return id -> true while its RTA is saving, and a moment after (until the database shows it)
     const got = { runs: false, journal: false };
     const unsubs = [];
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
 
     const list = () => P.returnsFor(runs, date, journal).map(x => (returned[x.id] ? Object.assign({}, x, { pending: false }) : x));
 
@@ -104,7 +104,7 @@
       document.getElementById('add-open').hidden = !ck || !(got.runs && got.journal);
       if (!ck) bar.hidden = true;
       else if (!bar.hidden && got.runs && (document.activeElement !== loadBox || loadBox.value === '')) fillLoads();
-      const st = L.screenState(app, 'plant');
+      const st = L.screenState(app, 'plantLoading');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
 

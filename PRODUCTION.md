@@ -10,8 +10,8 @@ does, one release step puts the app live: merge the release into `main`, then ru
   (`11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg`), Route, Driver, Equipment and Users Master, day offs, vacations
   (`functions/src/sources.js`, the same IDs as the current app), and the Plant Operations workbook
   (`1to7JVLHCqkIiU4uuIKP1ogjPBi_52eSS-b7TBKMBed0`).
-- Writes to **one sheet only**, and only dispatch changes: Joe typed *"Let the new app write dispatch changes to the
-  real Live sheet."* on 10/12. `production-settings.json` names the real Uniontown Live workbook as the write-back
+- Writes to **one sheet only**, and only dispatch changes and plant loading: Joe typed *"Let the new app write dispatch
+  changes to the real Live sheet."* and *"Let the new app write plant loading to the real Live sheet"* on 10/12. `production-settings.json` names the real Uniontown Live workbook as the write-back
   target; `tools/production-env.cjs` stops the deploy if it names anything else (or any master list), and
   `functions/src/writeback.js` refuses every other production sheet in code. Nothing is written until an
   administrator turns the write-back on (see *Writing dispatch changes to the real Live sheet* below).
@@ -29,6 +29,15 @@ trailer, dispatch time, the day's notes and status columns, `<day>_updated_at` /
 when a run is added to a week. A cell someone changed in the sheet since the new app last read it is not written; it
 goes on the conflicts list. Master lists, the maintenance queues, the Plant Operations workbook and the other plants
 are never written.
+
+Plant Loading (its own switch on Go-Live Switches; the Loadout Center, Trailer Assignments, Unloading, Truck Washing and
+Product Returns): the cells the current app's plant save writes, in the same rows the same way: `<day>_load_status`,
+`_cases_out`, `_extension_05` (start), `_complete_time` (end), `_load_temperature`, `_extension_03` (plant notes),
+`_extension_04` (shift), the truck and trailer with `_equipment_override` = TRUE, `_runs`, `_load_sequence_override`
+(loading order), `_plant_case_return` (unloading), and `_updated_at` / `_updated_by`. A load saved Done (or a Done load
+corrected) also writes its row of the **LOADOUT HISTORY** tab of the same workbook, found by `history_key`
+(`run_id|load_date`), else added under the last row, as the current app does. Pickups, washes and product returns stay in
+the new app (the current app keeps them in the Plant Operations workbook, which is never written).
 
 To turn it on: share the Live workbook with the server account `<project number>-compute@developer.gserviceaccount.com`
 as **Editor**; then an Administrator turns the write-back on in the app and moves Daily Dispatch and Weekly Dispatch to

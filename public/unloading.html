@@ -75,7 +75,7 @@
     const washedNow = {};      // wash item id -> true while its Wash press is saving
     const unsubs = [];
 
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
     const check = () => mode === 'check' && canSave();
 
     function data() {
@@ -154,7 +154,7 @@
       }
       document.getElementById('foot').textContent = mine.length + ' ' + name.toLowerCase() + ' loads back ' + (date === today() ? 'today' : 'on ' + shortDate(date)) + '. ' +
         (ck ? 'Start, type the count, then End. One unload at a time.' : canSave() ? 'View Only: press Check Off to work the list.' : 'View only.') + ' Changes show on every screen at once.';
-      const st = L.screenState(app, 'plant');
+      const st = L.screenState(app, 'plantLoading');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
     }
 
