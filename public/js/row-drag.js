@@ -2,7 +2,7 @@
 //
 // mountRowDrag({ box, canDrag, onMove }) on a <tbody>: every row with data-drag="<id>" can be picked up anywhere except on a
 // box, button or link. A mouse picks it up after it moves a few pixels; a finger on the Route or Run box at once (as on Weekly
-// Dispatch), and anywhere else after holding it still for a moment (a quick swipe there still scrolls the page). While it moves, the row is lifted and a blue line shows where it will land. Letting go calls
+// Dispatch), and anywhere else after holding it still for a moment (a quick swipe there still scrolls the page). While it moves, the row is lifted, a blue line shows where it will land, and the list scrolls by itself near the edge. Letting go calls
 // onMove(id, toIndex), toIndex being its new place among the data-drag rows. Keyboard: the row takes focus (Tab) and
 // Alt+Up / Alt+Down move it one place. Rows without data-drag (loaded, skipped) stay where they are and take no drop.
 // Rows with data-drag-group move only among rows of the same group (Location Areas: areas among areas, a sub-area within
@@ -41,17 +41,35 @@ export function mountRowDrag({ box, canDrag, onMove, handle = (td) => td.cellInd
     line.hidden = false;
     return i;
   }
+  function scrollerOf(el) {
+    for (let n = el && el.parentElement; n && n !== document.body; n = n.parentElement) {
+      const o = getComputedStyle(n).overflowY;
+      if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+    }
+    return document.scrollingElement;
+  }
   function begin() {
     const g = group(press.row), at = rows(g).indexOf(press.row);
     drag = { row: press.row, id: press.row.dataset.drag, group: g, from: at, to: at };
     drag.row.classList.add('row-dragging');
     document.body.classList.add('row-drag-on');
     try { box.setPointerCapture(press.pointerId); } catch (e) { /* the pointer is gone */ }
+    // Near the top or bottom of the window (or the list's own scroll box) the list scrolls by itself, as on Daily Dispatch,
+    // so a load can be moved past what is on screen.
+    const sc = scrollerOf(box);
+    drag.y = press.y;
+    drag.scroller = setInterval(() => {
+      if (!drag) return;
+      const r = sc === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : sc.getBoundingClientRect(), edge = 48;
+      const step = drag.y < r.top + edge ? -12 : drag.y > r.bottom - edge ? 12 : 0;
+      if (step) { sc.scrollTop += step; drag.to = showLine(drag.y); }
+    }, 30);
     if (navigator.vibrate && press.touch) { try { navigator.vibrate(15); } catch (e) { /* not allowed */ } }
   }
   function end(drop) {
     clearTimeout(press && press.timer);
     if (drag) {
+      clearInterval(drag.scroller);
       drag.row.classList.remove('row-dragging');
       document.body.classList.remove('row-drag-on');
       line.hidden = true;
@@ -80,6 +98,7 @@ export function mountRowDrag({ box, canDrag, onMove, handle = (td) => td.cellInd
       begin();
     }
     e.preventDefault();
+    drag.y = e.clientY;
     drag.to = showLine(e.clientY);
   });
   box.addEventListener('pointerup', () => end(true));
