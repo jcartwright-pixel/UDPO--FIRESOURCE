@@ -39,7 +39,7 @@
     <div class="head">
       <div class="title"><span class="eyebrow" id="eyebrow">Driver Loadout &amp; Pickup</span><h1><span id="plant">Uniontown</span> Loadout <span class="ds-day" id="weekday"></span></h1></div>
       <p class="ds-welcome" id="welcome" hidden></p>
-      <button type="button" id="tv" data-top>Driver Room TV</button><button type="button" id="refresh" data-top>&#8635; Refresh</button>
+      <button type="button" id="tv" data-top>Driver's Kiosk Station</button><button type="button" id="refresh" data-top>&#8635; Refresh</button>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -80,7 +80,7 @@
     document.getElementById('go-back').addEventListener('click', async () => { if (await leave()) goBack(); });
     document.getElementById('go-home').addEventListener('click', async () => { if (await leave()) location.href = 'index.html'; });
     document.getElementById('tv').textContent = tv ? 'Desk view' : 'Driver Room display';
-    document.getElementById('eyebrow').textContent = tv ? 'Driver Room Display' : 'Driver Loadout & Pickup';
+    document.getElementById('eyebrow').textContent = tv ? "Driver's Kiosk Station" : 'Driver Loadout & Pickup';
     document.getElementById('weather').hidden = !tv;
     let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = L.operatingDay(new Date()), updated = null;
 
@@ -158,7 +158,7 @@
       if (r.needCode) {
         kiosk = null; lockStation(document.getElementById('change'), false); show(true);
         kiosk = await askCode(document.getElementById('code-box'), { kind: 'KIOSK', storeKey: CODE_KEY, call: stationCall, title: 'Enter this station\'s code',
-          hint: 'Type the Driver Room TV\'s code (Administration > Driver Station Codes). The Driver Room tablet\'s code opens the drivers\' Check-In instead. It remembers it after this.', message: r.message });
+          hint: 'Type the code of the Driver\'s Kiosk Station (the TV) or the Driver Room Check-In Station (the drivers\' tablet) from Administration > Driver Station Codes. It remembers it after this.', message: r.message });
       } else kiosk = r.station || null;
       // Joe 10/12: one Driver Station link; the code decides the screen. A TV's code opens the TV display (no buttons, both
       // lists rolling), also when the TV reopens the plain link later.

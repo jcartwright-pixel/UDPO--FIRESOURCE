@@ -290,7 +290,7 @@
     if (room && station) {
       document.body.classList.add('room');
       document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="css/driver-room.css">');
-      document.querySelector('.phone-top b').textContent = (station.plant || 'United Dairy') + ' Driver Room';
+      document.querySelector('.phone-top b').textContent = (station.plant || 'United Dairy') + ' Driver Room Check-In Station';
       document.getElementById('change').textContent = 'Done';
       // Joe 10/12 "Station": no Back, Home or Sign out; Release at the very bottom (manager release code) is the only way out.
       lockStation(document.getElementById('m-station'), true);

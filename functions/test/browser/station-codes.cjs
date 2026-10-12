@@ -92,16 +92,16 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/12: like Plant Station Codes: the one Driver Station (TV loadout) link ("I shouldn't have to have a different
     // link"), its stations right under it, then the drivers' phone link.
     assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
-    assert.match(await p.textContent('.ap-link[data-link="driver"] h4'), /^Driver Station \(TV loadout\)$/);
+    assert.match(await p.textContent('.ap-link[data-link="driver"] h4'), /^Driver's Kiosk Station and Driver Room Check-In Station$/);
     assert.deepEqual(await p.$$eval('.ap-link[data-link="driver"], #st-list, .ap-link[data-link="route"]', l => l.map(x => x.dataset.link || x.id)), ['driver', 'st-list', 'route'], 'the stations sit under the Driver Station link');
     assert.equal((await p.textContent('#st-add')).trim(), '+ Add Station');
     await p.fill('#st-name', 'Plant kiosk');
     await p.click('#st-add');
     await p.waitForSelector('#st-list .ap-item b:text-is("Plant kiosk")');
-    codes.kiosk = await makeCode('Driver Room kiosk');
-    codes.tv = await makeCode('Driver Room TV');
+    codes.kiosk = await makeCode('Driver Room Check-In Station');
+    codes.tv = await makeCode("Driver's Kiosk Station");
     assert.equal(await p.isVisible('#view .ap-msg.good'), false, 'no green status bar (errors only)');
-    assert.deepEqual(await p.$$eval('#st-list .ap-item b', b => b.map(x => x.textContent)), ['Driver Room kiosk', 'Driver Room TV', 'Plant kiosk']);
+    assert.deepEqual(await p.$$eval('#st-list .ap-item b', b => b.map(x => x.textContent)), ['Driver Room Check-In Station', "Driver's Kiosk Station", 'Plant kiosk']);
     await twoShots(p, '3-driver-station-codes');
     assert.deepEqual(p.errors, []);
     results.push('Driver Station Codes: one Driver Station link, its stations under it (+ Add Station, more than one per plant), then the drivers\' phone link');
@@ -192,7 +192,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Driver Station link opens the drivers' Check-In page (View Loadout, DVIR, Check-In), which keeps the code.
     await Promise.all([ds.waitForURL(/route\.html\?room=1$/), ds.click('#code-box button')]);
     await ds.waitForSelector('#step-menu:not([hidden]) #m-checkin');
-    assert.equal(await ds.textContent('.phone-top b'), 'Uniontown Driver Room');
+    assert.equal(await ds.textContent('.phone-top b'), 'Uniontown Driver Room Check-In Station');
     assert.equal(await ds.$('#go-back, #go-home, #signout'), null, 'no Back, Home or Sign out into the app');
     assert.ok(await ds.evaluate(() => localStorage.getItem('udKioskCode')), 'the existing link keeps it too');
     await shot(ds, '8-driver-kiosk-opened-1536.png');
@@ -217,7 +217,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await tv.waitForSelector('#code-box form.st-code');
     await tv.fill('#code-box input', codes.tv);
     await Promise.all([tv.waitForURL(/tv=1/), tv.click('#code-box button')]);
-    await tv.waitForSelector('#eyebrow:text("Driver Room TV · Uniontown")');
+    await tv.waitForSelector('#eyebrow:text("Driver\'s Kiosk Station · Uniontown")');
     await shot(tv, '9-driver-room-tv-1536.png');
     // No release code yet: the TV's Release refuses too, and the TV has no Sign out or Exit.
     await locked(tv, '#change', 'driver-station-tv');
@@ -229,7 +229,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // The TV keeps its code: opening the one Driver Station link again goes straight to the TV board.
     await tv.goto(HOSTING + '/driver-station.html' + ADMIN);
     await tv.waitForURL(/tv=1/);
-    await tv.waitForSelector('#eyebrow:text("Driver Room TV · Uniontown")');
+    await tv.waitForSelector('#eyebrow:text("Driver\'s Kiosk Station · Uniontown")');
     results.push('Driver Room TV: its code on the one Driver Station link opens the full-screen TV board, also when reopened; no Sign out or Exit, and Release refuses until a manager release code is set');
 
     // Joe 10/12: the TV's Release at the bottom, with the plant's manager release code, unattaches the TV and goes to the code

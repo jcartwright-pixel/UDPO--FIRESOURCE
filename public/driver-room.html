@@ -9,7 +9,7 @@
   <link rel="manifest" href="driver-station.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>Driver Room Check-In</title>
+  <title>Driver Room Check-In Station</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
   <link rel="stylesheet" href="css/driver-room.css">
@@ -18,7 +18,7 @@
   Joe 10/12: the Driver Room tablet looks exactly like the drivers' phone (route.html?room=1): View Loadout, DVIR and
   Check-In. This page only takes the tablet's Driver Room kiosk code once (no United Dairy account), then sends it there.
   The Driver Station link does the same with that code, so the tablet can stay on its existing link. A TV's code is refused
-  here: the TV keeps the Driver Station (TV loadout) board.
+  here: the TV keeps the Driver's Kiosk Station board.
 -->
 <body class="dr-page">
   <header class="dr-top">
@@ -48,7 +48,7 @@
       if (!r.needCode && r.station) return go();
       $('code-box').hidden = false;
       await askCode($('code-box'), { kind: 'KIOSK', storeKey: KEY, call: stationCall, title: 'Enter the Driver Room station code',
-        hint: 'A manager makes it in Administration > Links & Codes > Driver Station Codes (the Driver Room kiosk station, Create code). The tablet remembers it after this.', message: r.message });
+        hint: 'A manager makes it in Administration > Links & Codes > Driver Station Codes (the Driver Room Check-In Station, Create code). The tablet remembers it after this.', message: r.message });
       go();
     }
     gate().catch(err => showError('Could not check this tablet\'s station code: ' + err.message));

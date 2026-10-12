@@ -74,13 +74,13 @@ async function touchPage(browser, width, height, url, mobile) {
       // The TV's code is refused here: the TV keeps the Driver Station link.
       await p.fill('#code-box input', tv);
       await p.click('#code-box button');
-      await p.waitForSelector('.st-code-msg:text("Driver Room TV")');
+      await p.waitForSelector('.st-code-msg:text("Driver\'s Kiosk Station")');
       await p.fill('#code-box input', kiosk);
       await p.click('#code-box button');
       // Joe 10/12 "the driver's phone is exactly how this should look": the phone screens in Driver Room mode, three choices.
       await p.waitForURL(/route\.html\?room=1$/);
       await p.waitForSelector('#step-menu:not([hidden]) #m-checkin');
-      assert.equal(await p.textContent('.phone-top b'), 'Uniontown Driver Room');
+      assert.equal(await p.textContent('.phone-top b'), 'Uniontown Driver Room Check-In Station');
       assert.deepEqual(await p.$$eval('#step-menu .drv-card b', b => b.map(x => x.textContent)), ['View Loadout', 'DVIR', 'Check-In']);
       assert.equal(await p.$('#go-back, #go-home, #signout'), null, 'no Back, Home or Sign out into the app');
       assert.ok(await p.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth), 'no side scroll');
