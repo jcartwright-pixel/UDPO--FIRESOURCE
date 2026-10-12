@@ -183,6 +183,12 @@ body.ds-tv { background: #071d30; }
 body.ds-tv .sidemenu, body.ds-tv .side-flyouts { display: none !important; }
 /* The TV itself (?tv=1): no header and no buttons, the board only. */
 body.ds-full .topbar, body.ds-full .actions.in-head { display: none !important; }
+/* Joe 10/12: the TV's small Exit, faint in the top-right corner of the dark header so it does not draw the eye. */
+.ds-exit { position: fixed; right: 12px; top: 12px; z-index: 50; min-height: 40px; padding: 0 16px; font: inherit; font-size: 16px; font-weight: 700; color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.5); border-radius: 8px; opacity: .6; cursor: pointer; }
+.ds-exit:hover, .ds-exit:focus-visible { opacity: 1; background: rgba(255,255,255,.15); }
+.ds-exit[hidden] { display: none; }
+body.ds-full #release-box:not([hidden]) { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 60; width: min(720px, calc(100vw - 32px)); box-shadow: 0 12px 40px rgba(0,0,0,.35); border-radius: 12px; }
+body.ds-full #release-box .ps-release { margin: 0; }
 body.ds-tv .side-main { margin-left: 0 !important; }
 body.ds-tv .head { background: linear-gradient(90deg, #073861, #126aa5, #0b4d83); color: #fff; }
 body.ds-tv .head h1 { font-size: 38px; color: #fff; } body.ds-tv .ds-day { color: #f4c542; } body.ds-tv .eyebrow { color: #cfe3f6; }
