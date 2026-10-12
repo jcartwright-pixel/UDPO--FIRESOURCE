@@ -296,6 +296,25 @@ async function noScroll(page) {
     const rsFit = await wkMgr.evaluate(() => ({ scroll: document.documentElement.scrollHeight, inner: window.innerHeight }));
     assert.ok(rsFit.scroll <= rsFit.inner, 'Weekly still fits after Reset Week');
     if (SHOTS) await wkMgr.screenshot({ path: path.join(SHOTS, 'weekly-after-reset-1366.png') });
+    // Joe 10/12 ("grab the line and move it"): Weekly lines drag too, no arrows and no dots; a dispatcher cannot move them.
+    assert.equal(await wkEdit.$('#rows tr.mover'), null, 'a dispatcher cannot move Weekly lines');
+    assert.equal(await wkMgr.$('#rows [data-grip], #rows .dd-grip, #rows button[data-move]'), null, 'no grab dots and no arrows on Weekly');
+    await wkMgr.waitForSelector('#rows tr.mover');
+    assert.equal(await wkMgr.$eval('#rows tr.mover td', td => getComputedStyle(td).cursor), 'grab', 'the Weekly line shows the hand');
+    {
+      const order = () => wkMgr.$$eval('#rows tr.mover', trs => trs.map(tr => tr.children[0].textContent + '/' + tr.children[1].textContent));
+      const was = await order();
+      const second = await wkMgr.$$eval('#rows tr.mover td:nth-child(2)', tds => tds.slice(0, 2).map(td => { const b = td.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2, b.top]; }));
+      await wkMgr.mouse.move(second[1][0], second[1][1]);
+      await wkMgr.mouse.down();
+      await wkMgr.mouse.move(second[1][0], second[1][1] - 10, { steps: 3 });
+      await wkMgr.mouse.move(second[0][0], second[0][2] + 4, { steps: 8 });
+      await wkMgr.mouse.up();
+      const want = [was[1], was[0]].concat(was.slice(2)).join(',');
+      await wkMgr.waitForFunction((w) => [...document.querySelectorAll('#rows tr.mover')].map(tr => tr.children[0].textContent + '/' + tr.children[1].textContent).join(',') === w, want, { timeout: 5000 });
+      assert.equal(await wkMgr.$('.popover'), null, 'letting go of a drag does not open a day');
+      results.push('Weekly: a manager dragged ' + was[1] + ' above ' + was[0] + ' (no arrows, no dots); a dispatcher sees no drag');
+    }
     results.push('Reset Week: a dispatcher cannot; a manager clicked twice: 802 Tuesday CARRIER went back to its standard driver CASEY, who is called off that day, so it is red as Driver Off - Needs Driver (Joe 10/11); Thursday off again; Monday still Vacation - Needs Driver');
     results.push('Weekly: 801 Thursday showed PLANT LOAD from the plant scheduler and took ADAMS (the run turned on, the mark stayed); CARRIER picked for 802 Tuesday, Route Run Days turned 802 Thursday on (Needs Driver), CASEY on vacation Monday from the Driver Assignment Board left 802 Monday as Vacation - Needs Driver, Publish recorded');
 

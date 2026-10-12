@@ -61,6 +61,8 @@ const ACTIONS = Object.freeze({
   resetWeek: { roles: REORDER_ROLES, screen: 'weeklyDispatch' },
   saveRoute: { roles: REORDER_ROLES, screen: 'routes' },
   reorderRouteDay: { roles: REORDER_ROLES, screen: 'routes' },
+  // Joe 10/12: on Weekly Dispatch a manager drags a route's line up or down (saved as Route Master's route_week_display).
+  reorderWeek: { roles: REORDER_ROLES, screen: 'weeklyDispatch' },
   updateIssue: { roles: SAVE_ROLES, screen: 'checkIns' },
   setWeekReason: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
@@ -226,6 +228,14 @@ function validate(input) {
     if (!Array.isArray(input.runIds) || !input.runIds.length || input.runIds.length > 300) throw new SaveError('BAD_REQUEST', 'The order is missing');
     out.day = input.day;
     out.runIds = input.runIds.map(id => text(id, 120));
+    return out;
+  }
+  if (action === 'reorderWeek') {
+    if (!L.isDateKey(input.weekStart) || L.weekStart(input.weekStart) !== input.weekStart) throw new SaveError('BAD_REQUEST', 'weekStart must be a Sunday (yyyy-mm-dd)');
+    if (!Array.isArray(input.runIds) || !input.runIds.length || input.runIds.length > 300) throw new SaveError('BAD_REQUEST', 'The order is missing');
+    out.weekStart = input.weekStart;
+    out.runIds = [...new Set(input.runIds.map(id => text(id, 120)).filter(Boolean))];
+    if (out.runIds.length !== input.runIds.length) throw new SaveError('BAD_REQUEST', 'The order has a run twice or a blank run');
     return out;
   }
   if (action === 'publishWeek' || action === 'resetWeek') {
@@ -641,6 +651,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveRoute') return saveRoute(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderRouteDay') return reorderRouteDay(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'reorderWeek') return reorderWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'addPickup' || req.action === 'completePickup') return PLANT.savePickup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveUnloading') return PLANT.saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, queueSheetCells);
     if (req.action === 'completeWash') return PLANT.saveWash(tx, db, req, email, stamp, logRef, mode, SaveError);
@@ -1220,6 +1231,31 @@ async function reorderRouteDay(tx, db, req, email, stamp, logRef, mode) {
   });
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, day: req.day, before, after: req.runIds.map((id, i) => ({ runId: id, loadOrder: (i + 1) * 10 })), result });
+  return result;
+}
+
+/*
+ * Weekly Dispatch order (Joe 10/12, "grab the line and move it"): the routes in their new order get route_week_display
+ * 10, 20, 30... in Route Master, and the runs of this week and the weeks after it take the same order at once, so Weekly
+ * shows it before the next copy. Runs not in the list keep theirs.
+ */
+async function reorderWeek(tx, db, req, email, stamp, logRef, mode) {
+  const refs = req.runIds.map(id => db.collection(C.routes).doc(M.safeIdPart(id)));
+  const [snaps, runSnap] = await Promise.all([Promise.all(refs.map(r => tx.get(r))), tx.get(db.collection(C.runs).where('weekStart', '>=', req.weekStart))]);
+  snaps.forEach((s, i) => { if (!s.exists) throw new SaveError('NOT_FOUND', req.runIds[i] + ' is no longer in the Route Master copy'); });
+  const before = snaps.map(s => ({ runId: s.id, weekOrder: s.data().weekOrder === undefined ? null : s.data().weekOrder }));
+  const order = {};
+  refs.forEach((r, i) => {
+    order[snaps[i].id] = (i + 1) * 10;
+    tx.update(r, { weekOrder: (i + 1) * 10, testEdited: true, editedAt: stamp, editedBy: email });
+    queueMaster(tx, db, mode, req.requestId, String(i), r, snaps[i].data().id || req.runIds[i], { weekOrder: (i + 1) * 10 }, false, stamp, email);
+  });
+  runSnap.docs.forEach(d => {
+    const id = M.safeIdPart(String(d.data().runId || ''));
+    if (order[id] !== undefined && d.data().weekOrder !== order[id]) tx.update(d.ref, { weekOrder: order[id] });
+  });
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before, after: req.runIds.map((id, i) => ({ runId: id, weekOrder: (i + 1) * 10 })), result });
   return result;
 }
 

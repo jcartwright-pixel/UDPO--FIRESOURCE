@@ -290,6 +290,20 @@ export async function saveOrder(getRuns, loadDate, orderedRows, render) {
   }
 }
 
+// Weekly Dispatch order (Joe 10/12): the routes in their new order; shown at once, put back if the server refuses it.
+export async function saveWeekOrder(getRuns, weekStart, orderedRows, render) {
+  const runs = getRuns(), before = runs.map(r => r.weekOrder);
+  orderedRows.forEach((row, i) => runs.filter(r => r.runId === row.runId).forEach(r => { r.weekOrder = (i + 1) * 10; }));
+  render();
+  try {
+    await save('reorderWeek', { weekStart, runIds: orderedRows.map(r => r.runId) });
+  } catch (e) {
+    runs.forEach((r, i) => { r.weekOrder = before[i]; });
+    render();
+    showError(friendlyError(e));
+  }
+}
+
 // Any other one-call save: apply() shows it at once, undo() puts it back if the server refuses it.
 export async function saveOptimistic(action, fields, apply, undo, render) {
   apply();

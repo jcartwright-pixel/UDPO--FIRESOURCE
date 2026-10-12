@@ -118,6 +118,22 @@ test('saves queued before the real sheets were turned on are held, not written',
   assert.equal(held[0].docId, 'drv_test_casey');
 });
 
+// Joe 10/12: on Weekly Dispatch a manager drags a route's line; the order goes to Route Master (route_week_display) and the
+// runs of that week on take it at once.
+test('Weekly Dispatch drag order: Route Master route_week_display and the runs of the week on', async () => {
+  await applyAction(db(), MANAGER, { action: 'reorderWeek', requestId: rid(), weekStart: '2026-10-04', runIds: ['run_t802', 'run_t801'] }, tick);
+  assert.deepEqual(await Promise.all(['run_t802', 'run_t801'].map(async id => (await db().collection('routes').doc(id).get()).data().weekOrder)), [10, 20]);
+  const runs = (await db().collection('runs').where('weekStart', '>=', '2026-10-04').get()).docs.map(d => d.data()).filter(r => r.runId === 'run_t801' || r.runId === 'run_t802');
+  assert.ok(runs.length >= 2);
+  runs.forEach(r => assert.equal(r.weekOrder, r.runId === 'run_t802' ? 10 : 20, r.weekStart + ' ' + r.runId));
+  await runMasterWriteBack({ db: db(), sheets, targets: TARGETS, now: tick });
+  assert.equal(cell('ROUTES_MASTER', 'run_id', 'run_t802', 'route_week_display'), 10);
+  assert.equal(cell('ROUTES_MASTER', 'run_id', 'run_t801', 'route_week_display'), 20);
+  // A dispatcher cannot change the order, and a run named twice is refused.
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'reorderWeek', requestId: rid(), weekStart: '2026-10-04', runIds: ['run_t801', 'run_t802'] }, tick));
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'reorderWeek', requestId: rid(), weekStart: '2026-10-04', runIds: ['run_t801', 'run_t801'] }, tick), /twice/);
+});
+
 test('with the write-back off, master saves queue nothing', async () => {
   await db().collection('config').doc('app').set({ writeBack: { enabled: false } }, { merge: true });
   await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_casey', name: 'CASEY, LEE B', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false });
