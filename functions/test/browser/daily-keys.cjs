@@ -225,6 +225,30 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.deepEqual(sun.errors, []);
     results.push('Sunday 10/11 shows 801 under ALREADY LOADED SATURDAY, 10-10-26, then 802 under LOADING TODAY; count 2 loads');
 
+    // Joe 10/12: the picked day stays after leaving and coming back; a move into another week asks first (Continue or Cancel).
+    const dp = await openPage(browser, 1536, 730, '/daily.html?date=2026-10-10&testEmail=dispatch.test@uniteddairy.com');
+    await dp.waitForSelector('#rows tr');
+    await dp.click('#prev');
+    await dp.waitForSelector('#week-panel:not([hidden])');
+    assert.match(await dp.textContent('#week-text'), /week beginning 10-11-26 to the week beginning 10-4-26/, await dp.textContent('#week-text'));
+    await dp.click('#week-panel [data-close]');
+    assert.equal(await dp.$eval('#load-day', s => s.value), '2026-10-10', 'Cancel stays on Saturday');
+    await dp.click('#prev');
+    await dp.click('#week-go');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-09');
+    await dp.click('#next');
+    await dp.waitForSelector('#week-panel:not([hidden])');
+    await dp.click('#week-go');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-10');
+    await dp.click('#next');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
+    assert.equal(await dp.$eval('#week-panel', w => w.hidden), true, 'a move inside the week does not ask');
+    await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
+    assert.equal(await dp.isVisible('#go-today'), true, 'Go to today shows when the kept day is not today');
+    assert.deepEqual(dp.errors, []);
+    results.push('Daily keeps the picked day after leaving and coming back; moving into another week asks Continue or Cancel');
+
     assert.deepEqual(p.errors, []);
     console.log('Daily keys:\n- ' + results.join('\n- '));
   } finally {

@@ -45,6 +45,7 @@
           <button type="button" id="next" aria-label="Next day">&#9654;</button>
         </div>
       </div>
+      <div class="field day-pin" id="day-pin" hidden><label>&nbsp;</label><button type="button" id="go-today" title="The screen stays on the day you picked until you change it">Go to today</button></div>
       <div class="field"><label for="delivery-day">Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
       <div class="actions in-head">
         <a class="button" id="go-weekly" href="weekly.html">Weekly Dispatch</a>
@@ -87,6 +88,12 @@
       <label class="wide">Note<input id="off-note" maxlength="300"></label>
     </div>
     <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="off-save">Save Driver Status</button></div>
+  </section>
+
+  <section class="modal" id="week-panel" role="alertdialog" aria-labelledby="week-title" hidden>
+    <h2 id="week-title">Change the week?</h2>
+    <p id="week-text" class="week-warn"></p>
+    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="week-go">Continue</button></div>
   </section>
 
   <section class="modal" id="add-panel" role="dialog" aria-labelledby="add-title" hidden>
@@ -401,7 +408,7 @@
     });
 
     /* ---------- Edit box: the same fields as the current screen; each change saves the moment it is made ---------- */
-    const modals = ['edit-modal', 'calloff-panel', 'add-panel', 'down-panel'];
+    const modals = ['edit-modal', 'calloff-panel', 'add-panel', 'down-panel', 'week-panel'];
     function openModal(id) { modals.forEach(m => { document.getElementById(m).hidden = m !== id; }); document.getElementById('modal-back').hidden = false; }
     function closeModals() { modals.forEach(m => { document.getElementById(m).hidden = true; }); document.getElementById('modal-back').hidden = true; editRow = null; }
     document.getElementById('modal-back').onclick = closeModals;
@@ -614,6 +621,7 @@
       if (unsubscribeRuns) unsubscribeRuns();
       const begin = weekBegin(loadDate);
       document.getElementById('week-begin').value = shortDate(L.addDays(begin, 1));
+      document.getElementById('day-pin').hidden = loadDate === L.operatingDay(new Date());
       document.getElementById('load-day').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
         const key = L.addDays(begin, i);
         return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key)) + '</option>';
@@ -630,7 +638,20 @@
       }, e => showError('Could not read the dispatch: ' + e.message));
     }
 
-    function move(days) { closeModals(); loadDate = L.addDays(loadDate, days); watchRuns(); }
+    // Joe 10/12: the day picked stays picked (per person, on this computer) after leaving the page and coming back, until he
+    // changes it; a move into another week asks first (Continue or Cancel).
+    let dayKey = '';
+    function goTo(key) {
+      if (!L.isDateKey(key) || key === loadDate) return;
+      const go = () => { closeModals(); loadDate = key; try { if (dayKey) localStorage.setItem(dayKey, key); } catch (e) { /* storage off */ } watchRuns(); };
+      if (weekBegin(key) === weekBegin(loadDate)) return go();
+      document.getElementById('week-text').textContent = 'This moves Daily Dispatch from the week beginning ' + shortDate(L.addDays(weekBegin(loadDate), 1)) +
+        ' to the week beginning ' + shortDate(L.addDays(weekBegin(key), 1)) + ' (' + L.dayName(key) + ' ' + shortDate(key) + ').';
+      document.getElementById('week-go').onclick = go;
+      openModal('week-panel');
+      document.getElementById('week-go').focus();
+    }
+    function move(days) { goTo(L.addDays(loadDate, days)); }
 
     requireSignIn(async (user) => {
       const { db } = await start();
@@ -652,7 +673,10 @@
       document.getElementById('next').onclick = () => move(1);
       document.getElementById('week-prev').onclick = () => move(-7);
       document.getElementById('week-next').onclick = () => move(7);
-      document.getElementById('load-day').onchange = e => { if (L.isDateKey(e.target.value)) { closeModals(); loadDate = e.target.value; watchRuns(); } };
+      document.getElementById('load-day').onchange = e => goTo(e.target.value);
+      document.getElementById('go-today').onclick = () => goTo(L.operatingDay(new Date()));
+      dayKey = 'ud.daily.day.' + String(params.get('testEmail') || (user && user.email) || '').toLowerCase();
+      if (!L.isDateKey(params.get('date'))) { try { const kept = localStorage.getItem(dayKey); if (L.isDateKey(kept)) loadDate = kept; } catch (e) { /* storage off */ } }
       window.addEventListener('resize', render);
       watchRuns();
     });
