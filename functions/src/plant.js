@@ -734,8 +734,15 @@ function validateShiftNote(input, SaveError) {
   const v = input.values && typeof input.values === 'object' ? input.values : {};
   const out = { parentId: text(v.ParentId).slice(0, 80), entry: text(v.Entry).slice(0, 4000), notes: text(input.notes).slice(0, 1500), readingTime: text(input.readingTime).slice(0, 20) };
   out.type = out.parentId ? 'REVIEW' : text(v.Type).slice(0, 40) || 'Handoff';
-  if (!out.parentId && R.ENTRY_TYPES.indexOf(out.type) < 0) throw new SaveError('BAD_REQUEST', 'Type must be Breakdown, Incident, Safety, Quality, Handoff or Other.');
+  if (!out.parentId && R.ENTRY_TYPES.indexOf(out.type) < 0) throw new SaveError('BAD_REQUEST', 'Type must be Breakdown, Maintenance Request, Incident, Safety, Quality, Handoff or Other.');
   out.equipment = out.parentId ? '' : text(v.Equipment).slice(0, 80);
+  // Joe 10/12: a breakdown is recorded with when it was back up and what fixed it (on the entry, or later in a review under it);
+  // a Maintenance Request says how long it can wait.
+  out.upAt = text(v.UpAt).slice(0, 5);
+  if (out.upAt && !/^\d{1,2}:\d\d$/.test(out.upAt)) throw new SaveError('BAD_REQUEST', 'Back up at must be a time.');
+  out.fix = text(v.Fix).slice(0, 1000);
+  out.urgency = out.parentId ? '' : text(v.Urgency).slice(0, 30);
+  if (out.urgency && R.URGENCIES.indexOf(out.urgency) < 0) throw new SaveError('BAD_REQUEST', 'Can it wait must be ' + R.URGENCIES.join(', ') + '.');
   out.shift = text(input.shift).toUpperCase();
   // Any of the plant's shifts (Administration > Plant Setup > Plant Shifts can rename them), picked on Shift Notes.
   if (out.shift && R.SHIFTS.indexOf(out.shift) < 0 && !/^[A-Z0-9][A-Z0-9 &'.-]{0,39}$/.test(out.shift)) throw new SaveError('BAD_REQUEST', 'Shift could not be determined.');
@@ -750,6 +757,10 @@ function validateShiftNote(input, SaveError) {
   return out;
 }
 
+// What an entry keeps: its words, type and equipment, and (when given) back up at, what fixed it and how long it can wait.
+function entryValues(req) {
+  return Object.assign({ Entry: req.entry, Type: req.type, Equipment: req.equipment }, req.upAt ? { UpAt: req.upAt } : {}, req.fix ? { Fix: req.fix } : {}, req.urgency ? { Urgency: req.urgency } : {});
+}
 async function saveShiftNote(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const journal = db.collection('plantJournal');
   if (req.parentId) {
@@ -760,7 +771,7 @@ async function saveShiftNote(tx, db, req, email, stamp, logRef, mode, SaveError)
     const ref = journal.doc(req.checkId), had = await tx.get(ref), old = had.exists ? had.data() : null, p = (old && old.payload) || {};
     if (!old || old.type !== R.SHIFT_TYPE || (p.values || {}).ParentId) throw new SaveError('NOT_FOUND', 'That entry is no longer on the log.');
     if (Date.parse(stamp) - R.when(old.recordedAt) >= FILL_IN_HOURS * 3600000) throw new SaveError('CONFLICT', 'That entry is too old to change. Start a new entry.');
-    const shift = req.shift || p.shift, payload = Object.assign({}, p, { shift, readingTime: req.readingTime || p.readingTime, values: { Entry: req.entry, Type: req.type, Equipment: req.equipment }, notes: req.notes, followUpStatus: req.followUpStatus });
+    const shift = req.shift || p.shift, payload = Object.assign({}, p, { shift, readingTime: req.readingTime || p.readingTime, values: entryValues(req), notes: req.notes, followUpStatus: req.followUpStatus });
     tx.update(ref, { status: req.followUpStatus, shift, notes: req.notes, payload, editedAt: stamp, editedBy: email, testEdited: true });
     const result = { ok: true, requestId: req.requestId, entryId: p.entryId || old.recordId, checkId: req.checkId, shift, recordedAt: old.recordedAt, message: 'Shift entry saved.' };
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, entryId: result.entryId, checkId: req.checkId, before: p, after: payload, result });
@@ -768,7 +779,7 @@ async function saveShiftNote(tx, db, req, email, stamp, logRef, mode, SaveError)
   }
   const now = new Date(stamp), entryId = 'SHIFT-' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 30);
   const shift = req.shift || R.shiftAt(now.getTime());
-  const values = req.parentId ? { Entry: req.entry, Type: 'REVIEW', ParentId: req.parentId } : { Entry: req.entry, Type: req.type, Equipment: req.equipment };
+  const values = req.parentId ? Object.assign({ Entry: req.entry, Type: 'REVIEW', ParentId: req.parentId }, req.upAt ? { UpAt: req.upAt } : {}, req.fix ? { Fix: req.fix } : {}) : entryValues(req);
   const payload = { entryId, date: L.operatingDay(now), shift, section: 'HANDOFF', readingTime: req.readingTime, values, notes: req.notes, followUpStatus: req.followUpStatus };
   const docName = R.SHIFT_TYPE + '_app_' + entryId.replace(/[^A-Za-z0-9]/g, '');
   tx.set(journal.doc(docName), { recordId: entryId, type: R.SHIFT_TYPE, date: payload.date, status: req.followUpStatus, shift, area: 'HANDOFF',

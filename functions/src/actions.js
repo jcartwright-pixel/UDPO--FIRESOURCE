@@ -19,6 +19,7 @@ const OTR = require('./otr-core');
 const SC = require('./sc-core');
 const PLANT = require('./plant');
 const PROD = require('./production');
+const PMAINT = require('./plantmaint');
 const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
 const ROLL = require('./weekroll');
@@ -90,6 +91,11 @@ const ACTIONS = Object.freeze({
   // Plant Production (production.js): the line tablet's taps, and how each line is counted (Line Targets).
   saveLineEntry: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveLineCounter: { roles: REORDER_ROLES, screen: 'plant' },
+  // Plant Maintenance (plantmaint.js): the machinery list, and Maintenance Center's Make Work Order (a plant request becomes a work order).
+  saveMachine: { roles: REORDER_ROLES, screen: 'plant' },
+  makeWorkOrder: { roles: L.SAVE_ROLES, screen: 'plant' },
+  savePmTask: { roles: REORDER_ROLES, screen: 'plant' },
+  sendPmToMaintenance: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
   sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
   // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js).
@@ -360,6 +366,10 @@ function validate(input) {
   if (action === 'savePlantShifts') return Object.assign(out, PLANT.validatePlantShifts(input, SaveError));
   if (action === 'saveLineEntry') return Object.assign(out, PROD.validateLineEntry(input, SaveError));
   if (action === 'saveLineCounter') return Object.assign(out, PROD.validateLineCounter(input, SaveError));
+  if (action === 'saveMachine') return Object.assign(out, PMAINT.validateMachine(input, SaveError));
+  if (action === 'makeWorkOrder') return Object.assign(out, PMAINT.validateSend(input, SaveError));
+  if (action === 'savePmTask') return Object.assign(out, PMAINT.validatePmTask(input, SaveError));
+  if (action === 'sendPmToMaintenance') return Object.assign(out, PMAINT.validateSendPm(input, SaveError));
   if (action === 'sendToGarage') return GARAGE.validateSend(input, out);
   if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(action) >= 0) return GARAGE.validateFleet(action, input, out);
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
@@ -591,6 +601,10 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'savePlantShifts') return PLANT.savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLineEntry') return PROD.saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLineCounter') return PROD.saveLineCounter(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveMachine') return PMAINT.saveMachine(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'makeWorkOrder') return PMAINT.makeWorkOrder(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'savePmTask') return PMAINT.savePmTask(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'sendPmToMaintenance') return PMAINT.sendPmToMaintenance(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);
