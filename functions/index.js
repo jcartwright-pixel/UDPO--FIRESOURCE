@@ -20,11 +20,14 @@
  *   admin                 Administration's own pages (src/admin.js): people, role templates, links and codes, email, repairs, tools
  *   stationRelease        the Plant Station tablet's Change Station: the plant's manager release code, when one is set
  *   adminJobsEvery5Minutes  repair emails to lessors, the driver check-in mailbox and the weekly archive, each at its Refresh Rate
+ *   deviceReads           the one door for every reading device: a line's label reader (its line PC) now, a receiving scanner later (src/reader.js)
+ *   lineReader            Line Targets, administrators: make a line's reader key; start or stop the sandbox test feed
+ *   productionEveryMinute the sandbox test feed's pretend jugs, and a stop when a label reader line goes quiet
  */
 'use strict';
 
 const admin = require('firebase-admin');
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
@@ -46,6 +49,7 @@ const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = requ
 const ADMIN = require('./src/admin');
 const { adminCall, stationRelease, AdminError } = ADMIN;
 const TOOLS = require('./src/admintools');
+const READER = require('./src/reader');
 const L = require('./src/logic');
 
 admin.initializeApp();
@@ -106,7 +110,7 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
 });
 
-const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
@@ -287,4 +291,25 @@ exports.fleetSyncNow = onCall({ timeoutSeconds: 120, maxInstances: 1 }, async (r
   if (!target) throw new HttpsError('failed-precondition', 'The fleet list sync is not set up here; the current app syncs it every week');
   const sheets = makeSheetsWriter();
   return runFleetSync({ db, reader: sheets, sheets, target, by: user.email });
+});
+
+// Reading devices (src/reader.js): a line PC posts {device, reads: [{upc, date}]} with the device's key; Receiving plugs in later.
+const projectId = () => process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
+exports.deviceReads = onRequest({ maxInstances: 3, timeoutSeconds: 30 }, async (req, res) => {
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST the reads.' }); return; }
+  try {
+    const [status, body] = await READER.handleReads(db, req.headers, req.body);
+    res.status(status).json(body);
+  } catch (error) {
+    console.error('deviceReads', error);
+    res.status(500).json({ ok: false, error: 'The server could not count those jugs. Send them again.' });
+  }
+});
+exports.lineReader = onCall({ timeoutSeconds: 30 }, async (request) => {
+  const user = signedIn(request);
+  try { return await READER.readerAll(db, user, request.data, { project: projectId() }); } catch (error) { throw asHttps(error); }
+});
+exports.productionEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 60, maxInstances: 1 }, async () => {
+  const done = await READER.readerMinute(db, { project: projectId() });
+  if (done.length) console.log('production', done.join('; '));
 });
