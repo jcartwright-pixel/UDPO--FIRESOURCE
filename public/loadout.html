@@ -155,7 +155,8 @@
     const canOrder = () => canLoad() && date >= today();
     const orderRows = (rows) => rows.filter(r => !r.prior && r.loadDate === date);
     // A skipped load waits at the bottom without arrows; the others move around it (its place in the order is kept).
-    const shownOrder = () => orderRows(rowsNow().filter(r => r.area === area)).filter(r => !isSkipped(r));
+    // Joe 10/12 (as Daily Dispatch): no arrows on a load that is already loaded.
+    const shownOrder = () => orderRows(rowsNow().filter(r => r.area === area)).filter(r => !isSkipped(r) && r.state !== 'DONE');
     let heldMove = null;
 
     function render() {
@@ -187,7 +188,7 @@
         '<span>' + escapeHtml(info.label) + ' <b>' + c.quantity.toLocaleString() + '</b></span>' +
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
-      const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r)) : [], ordering = movable.length > 0;
+      const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r) && r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
       const cols = (ordering ? ORDER_COLS : COLS)[area === 'TANKER' ? 'TANKER' : 'normal'];
       document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
