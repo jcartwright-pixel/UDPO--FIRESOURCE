@@ -260,16 +260,19 @@ async function writeBackIfOn(part) {
   const live = part === 'master' ? null : await runWriteBack({ db, sheets, target, allowRealLive: realLive() });
   // Production: dispatch changes to the Live tabs, and (Joe 10/12: "Let the new app write Route Master, Driver Master,
   // Equipment Master, Users, Exceptions and Vacations to the real sheets.") those six real master lists, the same sheets the
-  // copy reads; no other master list and no maintenance queue is written. config/app.realMasters.enabled === false stops
+  // copy reads, and (Joe 10/12) the check-in problem tabs of the real Live workbook; no other list is written. config/app.realMasters.enabled === false stops
   // them; saves queued before they were first turned on are held, not written (masterwrite.js since).
   if (realLive()) {
     if (part === 'live') return { live, master: null };
     const since = await realMastersSince();
     if (!since) return { live, master: null };
-    const { UNIONTOWN } = require('./src/sources'), { REAL_MASTER_LISTS } = require('./src/writeback');
+    const { UNIONTOWN } = require('./src/sources'), { REAL_MASTER_LISTS, REAL_LIVE_QUEUE_LISTS } = require('./src/writeback');
     const targets = {};
     REAL_MASTER_LISTS.forEach(k => { targets[k] = UNIONTOWN.masters[k]; });
-    return { live, master: await runMasterWriteBack({ db, sheets, targets, only: true, allowReal: REAL_MASTER_LISTS, since }) };
+    // Driver Check-ins (Joe 10/12): the problems a check-in reports go to these tabs of the real Live workbook.
+    const { TABS, LISTS } = require('./src/maintenance');
+    Object.keys(LISTS).forEach(k => { targets[LISTS[k]] = { spreadsheetId: UNIONTOWN.live.spreadsheetId, tab: TABS[k] }; });
+    return { live, master: await runMasterWriteBack({ db, sheets, targets, only: true, allowReal: REAL_MASTER_LISTS.concat(REAL_LIVE_QUEUE_LISTS), since }) };
   }
   // Master lists: only those WRITEBACK_JSON.masters names ({"drivers": {"spreadsheetId", "tab"}, ...}), each the same copy the
   // transfer reads (SOURCES_JSON), for the same reason as above.

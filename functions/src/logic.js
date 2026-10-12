@@ -387,7 +387,7 @@
   var GO_LIVE = {
     dailyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
     weeklyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
-    checkIns: { area: 'Route Distribution', ready: false, why: 'Truck problems it files cannot reach the current app yet.' },
+    checkIns: { area: 'Route Distribution', ready: true, why: 'Writes check-ins to the Live week tabs, and the problems they report to the Live sheet\'s TRUCK LIVE, TRAILER LIVE, FORK TRUCK LIVE, WASH / CLEANING LIVE and REFUSALS / RETURNS LIVE tabs. You OK\'d it 10/12.' },
     // Joe 10/12: "Let the new app write Route Master, Driver Master, Equipment Master, Users, Exceptions and Vacations to the real sheets."
     drivers: { area: 'Route Distribution', ready: true, why: 'Writes Driver Master, and days off to the Exceptions sheet. You OK\'d it 10/12.' },
     vacations: { area: 'Route Distribution', ready: true, why: 'Writes the Vacations sheet. You OK\'d it 10/12.' },

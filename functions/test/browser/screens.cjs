@@ -17,7 +17,7 @@ const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR || '';
 
-async function openPage(browser, width, height, url) {
+async function openPage(browser, width, height, url, init) {
   // The Safety Walkthrough's offline screen cache (sw.js) fetches the Firebase code itself, outside page.route; it is
   // checked in safety.cjs, which serves that code to it.
   const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
@@ -28,6 +28,7 @@ async function openPage(browser, width, height, url) {
   });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
+  if (init) await page.addInitScript(init);
   await page.goto(HOSTING + url);
   page.errors = errors;
   return page;
@@ -1186,7 +1187,21 @@ async function noScroll(page) {
     assert.equal(await gl.textContent('.adm-item[data-key="switch"] .adm-name'), 'Go-Live Switches');
     await gl.click('.adm-item[data-key="switch"]');
     await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"]');
-    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
+    // Joe 10/12 ("... and make Driver Check-ins ready"): every screen is ready now. A screen that is not ready still cannot be
+    // moved: checked on a second page where Driver Check-ins is marked not ready for this test only.
+    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), false, 'Driver Check-ins is ready');
+    {
+      const nr = await openPage(browser, 1536, 730, '/administration.html?testEmail=admin.test@uniteddairy.com', () => {
+        let v;
+        Object.defineProperty(window, 'UDLogic', { configurable: true, get: () => v, set: (x) => { v = x; if (x && x.GO_LIVE && x.GO_LIVE.checkIns) x.GO_LIVE.checkIns = Object.assign({}, x.GO_LIVE.checkIns, { ready: false, why: 'Not built yet.' }); } });
+      });
+      await nr.waitForSelector('.adm-item[data-key="switch"]');
+      await nr.click('.adm-item[data-key="switch"]');
+      await nr.waitForSelector('#gl-rows tr[data-row="checkIns"]');
+      assert.equal(await nr.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
+      assert.match(await nr.textContent('#gl-rows tr[data-row="checkIns"]'), /Not built yet/);
+      await nr.close();
+    }
     // Joe 10/12: Drivers, Vacation Schedule and Route Editor are ready (they write Driver Master, Vacations, Route Master).
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="drivers"] [data-act="new"]'), false);
     // Joe 10/12 ("Let the new app write plant loading to the real Live sheet."): Plant Loading is a switch of its own, ready.
@@ -1194,7 +1209,7 @@ async function noScroll(page) {
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="plantLoading"] [data-act="new"]'), false);
     // Joe 10/12 ("turn all 8 sheets on"): the plant check screens, Products, Safety and Plant Maintenance have a switch, ready.
     assert.match(await gl.textContent('#gl-rows tr[data-row="plant"]'), /Plant Operations[\s\S]*Off[\s\S]*Ready/);
-    // Turn on everything that is ready: pressed twice; every ready screen goes to the new app, Driver Check-ins stays.
+    // Turn on everything that is ready: pressed twice; every ready screen goes to the new app (Driver Check-ins too, Joe 10/12).
     await gl.click('#gl-all');
     assert.match(await gl.textContent('#gl-all'), /Press again/);
     assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'old', 'one press does nothing');
@@ -1205,7 +1220,7 @@ async function noScroll(page) {
     assert.equal(cfg.screenOwners.weeklyDispatch, 'new');
     assert.equal(cfg.screenOwners.plantLoading, 'new');
     assert.equal(cfg.screenOwners.drivers, 'new');
-    assert.equal(cfg.screenOwners.checkIns, 'old');
+    assert.equal(cfg.screenOwners.checkIns, 'new');
     assert.equal(cfg.screenOwners.plant, 'new');
     if (SHOTS) await gl.screenshot({ path: path.join(SHOTS, 'go-live-switches-1536.png') });
     const onNew = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');

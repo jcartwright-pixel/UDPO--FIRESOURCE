@@ -92,8 +92,8 @@ test('Turn on everything that is ready turns the write-back on and moves only th
   assert.equal(out.screenOwners.plantLoading, 'new', 'Plant Loading is ready (Joe 10/12)');
   // Joe 10/12 ("Let the new app write Route Master, Driver Master, ... and Vacations to the real sheets."): Drivers, Vacation
   // Schedule and Route Editor are ready too; Driver Check-ins is not.
-  ['drivers', 'vacations', 'routes'].forEach(k => assert.equal(out.screenOwners[k], 'new', k + ' is ready (Joe 10/12)'));
-  assert.equal(out.screenOwners.checkIns, 'old', 'checkIns is not ready');
+  // Joe 10/12 ("... and make Driver Check-ins ready"): Driver Check-ins too, so every screen moves.
+  ['drivers', 'vacations', 'routes', 'checkIns'].forEach(k => assert.equal(out.screenOwners[k], 'new', k + ' is ready (Joe 10/12)'));
   assert.equal(out.screenOwners.plant, 'new', 'Plant Operations is ready (Joe 10/12, "turn all 8 sheets on")');
   const c = await config();
   assert.equal(c.mode, 'live');
@@ -101,10 +101,17 @@ test('Turn on everything that is ready turns the write-back on and moves only th
   assert.equal((await db().collection('actions').where('action', '==', 'turnOnAllReady').get()).size, 1);
 });
 
+// Every screen is ready now (Joe 10/12), so the refusal is checked with Driver Check-ins marked not ready in this test only.
 test('a screen that is not ready cannot move to the new app', async () => {
-  await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
-  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), screen: 'checkIns', owner: 'new' }, true), /Driver Check-ins is not ready/);
-  assert.equal((await config()).screenOwners.checkIns, 'old');
+  const L = require('../../src/logic'), kept = L.GO_LIVE.checkIns;
+  L.GO_LIVE.checkIns = Object.assign({}, kept, { ready: false, why: 'Not built yet.' });
+  try {
+    await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
+    await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), screen: 'checkIns', owner: 'new' }, true), /Driver Check-ins is not ready/);
+    assert.equal((await config()).screenOwners.checkIns, 'old');
+    const all = await setSwitch(db(), ADMIN, { requestId: rid(), allReady: true }, true);
+    assert.equal(all.screenOwners.checkIns, 'old', 'Turn on everything that is ready leaves a screen that is not ready');
+  } finally { L.GO_LIVE.checkIns = kept; }
 });
 
 test('Fully live needs the new app, and moving a screen back clears it', async () => {
