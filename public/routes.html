@@ -51,6 +51,7 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="recap-totals" id="recap-totals" hidden></div>
+    <div class="name-help" id="name-help"><b>Stream ID</b> the name on the Driver Room board (kiosk) and driver schedule; a check-in email may use it too &middot; <b>Route</b> the number (901) &middot; <b>Route Name</b> every run of the route (Martins Ferry) &middot; <b>Run</b> this run (Product) &middot; <b>Run Type</b> Load 1, Load 2. Screens show <b>901 Martins Ferry Product Load 1</b>. Click, type, then click away or press Enter to save.</div>
     <div class="sheet" id="sheet"><table id="table"></table></div>
     <div class="footer"><span id="count"></span><span id="work-sub"></span></div>
   </div>
@@ -181,39 +182,46 @@
     }
 
     const head = (first, last) => '<thead><tr>' + first + DAYS.map(p => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '</th>').join('') + (last || '') + '</tr></thead>';
-    const routeCells = (r) => '<td class="strong">' + escapeHtml(r.route) + '<small>' + escapeHtml(r.routeName || '') + '</small></td><td class="strong">' + escapeHtml(r.run || '') + '</td>';
+    // Joe 10/12: Route, Route Name and Run Name in their own columns on every view, each one typed over right there
+    // (Route Master route / route_name / run). The run's id never changes, so its weeks, loadouts and history stay with it.
+    // Joe 10/12: the five Route Master naming columns, in its order: stream_id, route, route_name, run, route_run_type.
+    const NAME_FIELDS = ['streamId', 'route', 'routeName', 'run', 'routeRunType'];
+    const NAME_COLS = '<col style="width:9%"><col style="width:5%"><col style="width:9%"><col style="width:10%"><col style="width:6%">';
+    const NAME_HEADS = '<th title="stream_id: the name on the Driver Room board (kiosk) and driver schedule">Stream ID</th><th title="route: the route number">Route</th>' +
+      '<th title="route_name: one name for every run of this route">Route Name</th><th title="run: this run only">Run</th><th title="route_run_type: Load 1, Load 2">Run Type</th>';
+    const NAME_TITLES = { streamId: 'Stream ID: the name on the Driver Room board and driver schedule; a check-in email may use it', route: 'Route number for this run',
+      routeName: 'Route Name: changes every run of this route', run: 'Run for this run only', routeRunType: 'Run Type: Load 1, Load 2' };
+    const nameCell = (r, f, edit) => '<td class="strong name-cell"><input class="nm" data-name="' + f + '" value="' + escapeHtml(r[f] || '') + '" aria-label="' + escapeHtml(NAME_TITLES[f] + ', ' + r.route + ' ' + (r.run || '')) + '" title="' + NAME_TITLES[f] + '" autocomplete="off" maxlength="' + (f === 'route' ? 20 : f === 'routeRunType' ? 40 : 80) + '"' + (edit ? '' : ' readonly') + '></td>';
+    const routeCells = (r, edit) => NAME_FIELDS.map(f => nameCell(r, f, edit)).join('');
     function gridView(g, list, edit) {
-      return '<colgroup><col style="width:8%"><col style="width:15%"><col span="7" style="width:11%"></colgroup>' + head('<th>Route</th><th>Run / Destination</th>') + '<tbody>' +
-        list.map((r, ri) => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r) + DAYS.map((p, di) => {
+      return '<colgroup>' + NAME_COLS + '<col span="7" style="width:8.71%"></colgroup>' + head(NAME_HEADS) + '<tbody>' +
+        list.map((r, ri) => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r, edit) + DAYS.map((p, di) => {
           const on = !!day(r, p).active;
           return '<td class="' + (on ? '' : 'norun') + '"><input class="cell" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(p) + ', ' + g.title) + '" data-day="' + p + '" data-r="' + ri + '" data-c="' + di + '" value="' + escapeHtml(cellValue(r, p, g.field)) + '" placeholder="' + (on ? g.ph : '') + '" autocomplete="off"' + (edit ? '' : ' readonly') + '></td>';
-        }).join('') + '</tr>').join('') + '</tbody>' + (list.length ? '' : '<tbody><tr><td colspan="9" class="empty">No runs to show.</td></tr></tbody>');
+        }).join('') + '</tr>').join('') + '</tbody>' + (list.length ? '' : '<tbody><tr><td colspan="12" class="empty">No runs to show.</td></tr></tbody>');
     }
     function daysView(list, edit) {
-      let prior = '';
       // Joe 10/9: Route Days is the quick "runs or not" screen; Edit Route on each run opens the full Route Editor form.
-      return '<colgroup><col style="width:8%"><col style="width:15%"><col span="7" style="width:9.57%"><col style="width:10%"></colgroup>' + head('<th>Route</th><th>Run / Destination</th>', '<th>Action</th>') + '<tbody>' +
+      return '<colgroup>' + NAME_COLS + '<col span="7" style="width:7.29%"><col style="width:10%"></colgroup>' + head(NAME_HEADS, '<th>Action</th>') + '<tbody>' +
         list.map(r => {
-          const same = prior === r.route; prior = r.route;
-          return '<tr data-id="' + escapeHtml(r.id) + '">' +
-            '<td class="strong">' + (same ? '<small>&#8627; same route</small>' : escapeHtml(r.route) + '<small>' + escapeHtml(r.routeName || '') + '</small>') + '</td><td class="strong">' + escapeHtml(r.run || '') + '</td>' +
+          return '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r, edit) +
             DAYS.map(p => { const on = !!day(r, p).active; return '<td><button type="button" class="toggle' + (on ? ' on' : '') + '" data-runday="' + p + '" aria-pressed="' + on + '" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(p)) + '"' + (edit ? '' : ' disabled') + '>' + (on ? 'RUNS' : 'DOES NOT RUN') + '</button></td>'; }).join('') +
             '<td><button type="button" class="edit edit-route" data-edit-route="' + escapeHtml(r.id) + '" title="Open the Route Editor for this run">Edit Route</button></td></tr>';
-        }).join('') + (list.length ? '' : '<tr><td colspan="10" class="empty">No runs to show.</td></tr>') + '</tbody>';
+        }).join('') + (list.length ? '' : '<tr><td colspan="13" class="empty">No runs to show.</td></tr>') + '</tbody>';
     }
     function seqList() {
       return routes.filter(r => isActive(r) && day(r, seqDay).active && (!pickRoute || r.route === pickRoute))
         .sort((a, b) => (day(a, seqDay).loadOrder == null ? 999999 : day(a, seqDay).loadOrder) - (day(b, seqDay).loadOrder == null ? 999999 : day(b, seqDay).loadOrder) || byOrder(a, b));
     }
     function seqView(list, edit) {
-      return '<colgroup><col style="width:8%"><col style="width:11%"><col style="width:27%"><col style="width:13%"><col style="width:12%"><col style="width:17%"><col style="width:12%"></colgroup>' +
-        '<thead><tr><th>Order</th><th>Route</th><th>Run / Destination</th><th>Start time</th><th>Load day</th><th>Run by</th><th>Move</th></tr></thead><tbody>' +
+      return '<colgroup><col style="width:8%"><col style="width:9%"><col style="width:14%"><col style="width:15%"><col style="width:12%"><col style="width:11%"><col style="width:17%"><col style="width:14%"></colgroup>' +
+        '<thead><tr><th>Order</th><th>Route</th><th>Route Name</th><th>Run Name</th><th>Start time</th><th>Load day</th><th>Run by</th><th>Move</th></tr></thead><tbody>' +
         list.map((r, i) => '<tr data-id="' + escapeHtml(r.id) + '" data-i="' + i + '" draggable="true"' + (edit ? '' : ' class="no-drag"') + '><td>' + escapeHtml(cellValue(r, seqDay, 'loadOrder') || '-') + '</td>' +
-          '<td class="strong' + (edit ? ' grab' : '') + '">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(cellValue(r, seqDay, 'dispatchTime')) + '</td>' +
+          '<td class="strong' + (edit ? ' grab' : '') + '">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.routeName || '') + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(cellValue(r, seqDay, 'dispatchTime')) + '</td>' +
           '<td>' + escapeHtml(cellValue(r, seqDay, 'loadDayOffset')) + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td>' +
           '<td class="move"><button type="button" class="seq-move" data-move="-1" aria-label="Move ' + escapeHtml(r.route) + ' up" title="Load earlier"' + (edit && i > 0 ? '' : ' disabled') + '>&#9650;</button>' +
           '<button type="button" class="seq-move" data-move="1" aria-label="Move ' + escapeHtml(r.route) + ' down" title="Load later"' + (edit && i < list.length - 1 ? '' : ' disabled') + '>&#9660;</button></td></tr>').join('') +
-        (list.length ? '' : '<tr><td colspan="7" class="empty">No runs on ' + NAME(seqDay) + '.</td></tr>') + '</tbody>';
+        (list.length ? '' : '<tr><td colspan="8" class="empty">No runs on ' + NAME(seqDay) + '.</td></tr>') + '</tbody>';
     }
     const yesNo = (name, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '><option value="true"' + (v ? ' selected' : '') + '>YES</option><option value="false"' + (v ? '' : ' selected') + '>NO</option></select>';
     const choice = (name, list, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '>' + (list.indexOf(v) < 0 && v ? '<option selected>' + escapeHtml(v) + '</option>' : '') + list.map(x => '<option' + (x === v ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select>';
@@ -222,8 +230,8 @@
       const r = pickRun ? list[0] : list.length === 1 ? list[0] : null;
       if (!r) return '<tbody><tr><td class="empty pick-one">Pick a route and a run / destination at the top (or click Edit Route on Route Days) to see its details.</td></tr></tbody>';
       return '<tbody><tr><td class="details-cell"><form class="details" data-id="' + escapeHtml(r.id) + '" onsubmit="return false">' +
-        '<label>Route' + textIn('route', r.route, edit) + '</label><label>Route Name' + textIn('routeName', r.routeName, edit) + '</label><label>Order' + textIn('weekOrder', r.weekOrder, edit, 'number') + '</label>' +
-        '<label>Run / Destination' + textIn('run', r.run, edit) + '</label><label>Movement Type' + textIn('movementType', r.movementType, edit) + '</label>' +
+        '<label>Route' + textIn('route', r.route, edit) + '</label><label>Route Name (every run of ' + escapeHtml(r.route) + ')' + textIn('routeName', r.routeName, edit) + '</label><label>Order' + textIn('weekOrder', r.weekOrder, edit, 'number') + '</label>' +
+        '<label>Run (Run / Destination)' + textIn('run', r.run, edit) + '</label><label>Run Type (Load 1, Load 2)' + textIn('routeRunType', r.routeRunType, edit) + '</label><label>Stream ID (Driver Room board)' + textIn('streamId', r.streamId, edit) + '</label><label>Movement Type' + textIn('movementType', r.movementType, edit) + '</label>' +
         '<label>Route ID<input readonly value="' + escapeHtml(r.routeId || '') + '"></label><label>Run ID<input readonly value="' + escapeHtml(r.id) + '"></label><label>Facility ID<input readonly value="' + escapeHtml(r.facilityId || '') + '"></label>' +
         '<label>Departure Day' + textIn('departureDay', r.departureDay, edit) + '</label><label>Run Active' + yesNo('active', isActive(r), edit) + '</label><label>Sleeper' + yesNo('sleeper', !!r.sleeper, edit) + '</label>' +
         '<label>Loadout Type' + choice('loadType', LOADOUT, r.loadType || 'None', edit) + '</label><label>Run By' + choice('coverageOwner', RUN_BY, r.coverageOwner || 'Uniontown', edit) + '</label>' +
@@ -265,23 +273,23 @@
     };
     const liveText = (v) => v === true ? 'YES' : v === false ? 'NO' : 'blank';
     function rulesView(list, edit) {
-      return '<colgroup><col style="width:7%"><col style="width:17%"><col span="6" style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:19%"></colgroup>' +
-        '<thead><tr><th>Route</th><th>Run / Destination</th><th>Run Active</th><th>Show Daily</th><th>Show Weekly</th><th>Show in Plant</th><th>Mobile route</th><th>Route list</th><th>Live row Weekly</th><th>On Weekly now</th><th>Why</th></tr></thead><tbody>' +
+      return '<colgroup>' + NAME_COLS + '<col span="6" style="width:5.5%"><col style="width:6%"><col style="width:6%"><col style="width:16%"></colgroup>' +
+        '<thead><tr>' + NAME_HEADS + '<th>Run Active</th><th>Show Daily</th><th>Show Weekly</th><th>Show in Plant</th><th>Mobile route</th><th>Route list</th><th>Live row Weekly</th><th>On Weekly now</th><th>Why</th></tr></thead><tbody>' +
         list.map(r => { const w = weeklyRule(r), live = liveRows[r.id];
-          return '<tr data-id="' + escapeHtml(r.id) + '"' + (w.shown ? '' : ' class="hidden-run"') + '>' + routeCells(r) + flag(r, 'active', edit) + flag(r, 'displayDaily', edit) + flag(r, 'displayWeekly', edit) + flag(r, 'displayPlant', edit) + flag(r, 'displayMobile', edit) + flag(r, 'displayRouteMaster', edit) +
+          return '<tr data-id="' + escapeHtml(r.id) + '"' + (w.shown ? '' : ' class="hidden-run"') + '>' + routeCells(r, edit) + flag(r, 'active', edit) + flag(r, 'displayDaily', edit) + flag(r, 'displayWeekly', edit) + flag(r, 'displayPlant', edit) + flag(r, 'displayMobile', edit) + flag(r, 'displayRouteMaster', edit) +
             '<td>' + (live ? liveText(live.displayWeekly) : '-') + '</td><td><b class="' + (w.shown ? 'shown' : 'off') + '">' + (w.shown ? 'SHOWN' : 'HIDDEN') + '</b></td><td class="why">' + escapeHtml(w.why) + '</td></tr>'; }).join('') +
-        (list.length ? '' : '<tr><td colspan="11" class="empty">No runs to show.</td></tr>') + '</tbody>';
+        (list.length ? '' : '<tr><td colspan="14" class="empty">No runs to show.</td></tr>') + '</tbody>';
     }
     function recapView(list) {
       const yes = (v) => v ? '&#10003;' : '';
-      return '<colgroup><col style="width:6%"><col style="width:14%"><col style="width:9%"><col style="width:9%"><col style="width:20%"><col span="7" style="width:6%"></colgroup>' +
-        '<thead><tr><th>Route</th><th>Run / Destination</th><th>Run by</th><th>Loadout</th><th>Days</th><th>Active</th><th>Daily</th><th>Weekly</th><th>Plant</th><th>Mobile route</th><th>Sleeper</th><th>Drop &amp; hook</th></tr></thead><tbody>' +
-        list.map(r => '<tr><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td><td>' + escapeHtml(r.loadType || 'None') + '</td>' +
+      return '<colgroup>' + NAME_COLS + '<col style="width:7%"><col style="width:7%"><col style="width:12%"><col span="7" style="width:5%"></colgroup>' +
+        '<thead><tr>' + NAME_HEADS + '<th>Run by</th><th>Loadout</th><th>Days</th><th>Active</th><th>Daily</th><th>Weekly</th><th>Plant</th><th>Mobile route</th><th>Sleeper</th><th>Drop &amp; hook</th></tr></thead><tbody>' +
+        list.map(r => '<tr data-id="' + escapeHtml(r.id) + '">' + NAME_FIELDS.map(f => '<td' + (f === 'route' ? ' class="strong"' : '') + '>' + escapeHtml(r[f] || '') + '</td>').join('') + '<td>' + escapeHtml(r.coverageOwner || '') + '</td><td>' + escapeHtml(r.loadType || 'None') + '</td>' +
           '<td>' + escapeHtml(DAYS.filter(p => day(r, p).active).map(p => NAME(p).slice(0, 3)).join(' ')) + '</td><td>' + yes(isActive(r)) + '</td><td>' + yes(shows(r, 'displayDaily')) + '</td><td>' + yes(shows(r, 'displayWeekly')) + '</td>' +
           '<td>' + yes(shows(r, 'displayPlant')) + '</td><td>' + yes(shows(r, 'displayMobile')) + '</td><td>' + yes(r.sleeper) + '</td><td>' + yes(r.dropAndHook) + '</td></tr>').join('') +
-          (list.length ? '' : '<tr><td colspan="12" class="empty">No runs to show.</td></tr>') + '</tbody>' +
+          (list.length ? '' : '<tr><td colspan="15" class="empty">No runs to show.</td></tr>') + '</tbody>' +
         // Totals under each column: how many runs shown have each box ticked, and the running days in the week.
-        (list.length ? '<tfoot><tr class="recap-sum"><td class="strong">Totals</td><td>' + list.length + (list.length === 1 ? ' run' : ' runs') + '</td><td></td><td></td><td>' + occurrences(list) + ' run days</td>' +
+        (list.length ? '<tfoot><tr class="recap-sum"><td class="strong">Totals</td><td></td><td></td><td>' + list.length + (list.length === 1 ? ' run' : ' runs') + '</td><td></td><td></td><td></td><td>' + occurrences(list) + ' run days</td>' +
           [isActive, r => shows(r, 'displayDaily'), r => shows(r, 'displayWeekly'), r => shows(r, 'displayPlant'), r => shows(r, 'displayMobile'), r => !!r.sleeper, r => !!r.dropAndHook].map(f => '<td>' + list.filter(f).length + '</td>').join('') + '</tr></tfoot>' : '');
     }
     const occurrences = (list) => list.reduce((n, r) => n + DAYS.filter(p => day(r, p).active).length, 0);
@@ -297,13 +305,13 @@
     const tick = (r, f, on, label, edit) => '<td><input type="checkbox" class="rf" data-many="' + f + '"' + (on ? ' checked' : '') + (edit ? '' : ' disabled') + ' aria-label="' + label + '" title="' + label + '"></td>';
     const pick = (f, list, v, edit, label) => '<td><select class="rf" data-many="' + f + '"' + (edit ? '' : ' disabled') + ' aria-label="' + label + '">' + (list.indexOf(v) < 0 && v ? '<option selected>' + escapeHtml(v) + '</option>' : '') + list.map(x => '<option' + (x === v ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select></td>';
     function manyView(list, edit) {
-      return '<colgroup><col style="width:7%"><col style="width:17%"><col style="width:12%"><col style="width:12%"><col span="8" style="width:6.5%"></colgroup>' +
-        '<thead><tr><th>Route</th><th>Run</th><th>Loadout</th><th>Run by</th><th>Plant</th><th>Weekly</th><th>Daily</th><th>Mobile route</th><th>Route list</th><th>Sleeper</th><th>Drop &amp; hook</th><th>Active</th></tr></thead><tbody>' +
-        list.map(r => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r) + pick('loadType', LOADOUT, r.loadType || 'None', edit, 'Loadout type') + pick('coverageOwner', RUN_BY, r.coverageOwner || 'Uniontown', edit, 'Run by') +
+      return '<colgroup>' + NAME_COLS + '<col style="width:7%"><col style="width:7%"><col span="8" style="width:5.875%"></colgroup>' +
+        '<thead><tr>' + NAME_HEADS + '<th>Loadout</th><th>Run by</th><th>Plant</th><th>Weekly</th><th>Daily</th><th>Mobile route</th><th>Route list</th><th>Sleeper</th><th>Drop &amp; hook</th><th>Active</th></tr></thead><tbody>' +
+        list.map(r => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r, edit) + pick('loadType', LOADOUT, r.loadType || 'None', edit, 'Loadout type') + pick('coverageOwner', RUN_BY, r.coverageOwner || 'Uniontown', edit, 'Run by') +
           tick(r, 'displayPlant', shows(r, 'displayPlant'), 'Show in Plant', edit) + tick(r, 'displayWeekly', shows(r, 'displayWeekly'), 'Show on Weekly Dispatch', edit) + tick(r, 'displayDaily', shows(r, 'displayDaily'), 'Show on Daily Dispatch', edit) +
           tick(r, 'displayMobile', shows(r, 'displayMobile'), 'Show on the driver Route app', edit) + tick(r, 'displayRouteMaster', shows(r, 'displayRouteMaster'), 'Show in the Route list', edit) +
           tick(r, 'sleeper', !!r.sleeper, 'Sleeper: leaves one day, returns the next', edit) + tick(r, 'dropAndHook', !!r.dropAndHook, 'Drop and hook', edit) + tick(r, 'active', isActive(r), 'Active', edit) + '</tr>').join('') +
-        (list.length ? '' : '<tr><td colspan="12" class="empty">No runs to show.</td></tr>') + '</tbody>';
+        (list.length ? '' : '<tr><td colspan="15" class="empty">No runs to show.</td></tr>') + '</tbody>';
     }
 
     /* ---------- Saves: shown at once, one call each ---------- */
@@ -333,8 +341,24 @@
     const table = document.getElementById('table');
     // A Route Master update that arrived while a box was being typed in is drawn once the box is left (after its own save).
     table.addEventListener('focusout', () => { if (redrawLater) { redrawLater = false; renderSoon(); } });
+    // A name typed over saves on that run; Route Name saves on every run of the route (Joe 10/12).
+    function saveName(r, f, raw) {
+      const v = String(raw || '').trim();
+      if (!r || v === String(r[f] || '').trim()) return;
+      if (!v && f === 'route') { showError('Route cannot be blank.'); render(); return; }
+      const runs = f === 'routeName' ? routes.filter(x => x.route === r.route) : [r];
+      if (f === 'route' && pickRoute === r.route) { pickRoute = v; pickRun = r.id; }
+      runs.forEach(x => saveRun(x, { [f]: v }, null, y => { y[f] = v; }));
+    }
+    table.addEventListener('keydown', e => {
+      const nm = e.target.closest('input.nm');
+      if (!nm || nm.readOnly) return;
+      if (e.key === 'Enter') { e.preventDefault(); nm.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); nm.value = nm.defaultValue; nm.blur(); }
+    });
     table.addEventListener('change', e => {
       if (e.target.matches('input.cell')) return saveCell(e.target);
+      if (e.target.matches('input.nm')) return saveName(routes.find(x => x.id === e.target.closest('tr').dataset.id), e.target.dataset.name, e.target.value);
       if (e.target.matches('input.dcell')) {
         const r = routes.find(x => x.id === e.target.closest('tr').dataset.id), p = e.target.dataset.day, field = e.target.dataset.field, value = e.target.value.trim();
         if (value === cellValue(r, p, field)) return;
@@ -352,6 +376,7 @@
       let v = e.target.value;
       if (e.target.tagName === 'SELECT' && (v === 'true' || v === 'false')) v = v === 'true';
       if (f === 'weekOrder') v = v === '' ? null : Number(v);
+      if (NAME_FIELDS.indexOf(f) >= 0) return saveName(r, f, v);
       saveRun(r, { [f]: v }, null, x => { x[f] = v; if (f === 'active') x.routeStatus = v ? 'ACTIVE' : x.routeStatus; });
     });
     /*
