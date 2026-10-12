@@ -22,8 +22,8 @@ const SDK = path.dirname(require.resolve('firebase/package.json'));
 const MANAGER = '?testEmail=manager.test@uniteddairy.com';
 const SHOTS = process.env.SHOTS || '';
 
-async function openPage(browser, width, height, url, clock) {
-  const page = await browser.newPage({ viewport: { width, height } });
+async function openPage(browser, width, height, url, clock, touch) {
+  const page = await browser.newPage(touch ? { viewport: { width, height }, hasTouch: true, isMobile: true } : { viewport: { width, height } });
   if (clock) await page.clock.setFixedTime(new Date(clock));
   await localCalls(page);
   // The public callables answer straight from the server code when no functions emulator runs (LOCAL_CALLS=1).
@@ -232,7 +232,7 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     // Joe 10/12 photo: on a tablet held upright (800 wide) the run name ran into the truck number. Route, run, truck and
     // trailer must not overlap on any card.
     for (const [w, h] of [[600, 960], [800, 1280], [1024, 768]]) {
-    const upright = await openPage(browser, w, h, '/plant-station.html' + MANAGER, clock);
+    const upright = await openPage(browser, w, h, '/plant-station.html' + MANAGER, clock, true);
     await upright.click('[data-station="CASE"]');
     await upright.waitForSelector('#work .sw-card');
     const clash = await upright.$$eval('#work .sw-head:not(.tall)', heads => heads.map(h => {
@@ -250,15 +250,51 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.deepEqual(clash, [], 'nothing overlaps on a card on a ' + w + ' wide tablet');
     assert.ok(await fits(upright), 'the station work fits a ' + w + ' wide tablet');
     await shot(upright, 'plant-station-case-tablet-' + w + '.png');
+    // Joe 10/12: "it won't even let me scroll." A finger swipe up on the touch tablet must move the page.
+    assert.ok(await upright.evaluate(() => document.scrollingElement.scrollHeight > innerHeight + 50), 'the station work is taller than a ' + w + ' wide tablet');
+    const cdp = await upright.context().newCDPSession(upright);
+    const fx = Math.round(w / 2), fy = Math.round(h * 0.75);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: fx, y: fy }] });
+    for (let i = 1; i <= 12; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: fx, y: fy - Math.round(h / 2) * i / 12 }] }); await upright.waitForTimeout(16); }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const moved = await upright.waitForFunction(() => scrollY > 50, null, { timeout: 3000 }).then(() => true, () => false);
+    assert.ok(moved, 'a finger swipe scrolls the station page on a ' + w + ' wide touch tablet');
+    await upright.evaluate(() => scrollTo(0, 0));
     assert.deepEqual(upright.errors, []);
     }
+    // Joe 10/12: "it still will not let me edit ... And I have those rights turned on." An account whose role alone
+    // cannot save plant work, but which Administration > People & Roles allows "Update route loading", can edit.
+    const RIGHTS = 'rights.test@uniteddairy.com';
+    const mgr = (await db().collection('users').doc('manager.test@uniteddairy.com').get()).data();
+    await db().collection('users').doc(RIGHTS).set(Object.assign({}, mgr, { email: RIGHTS, name: 'Rights Test', roles: ['MECHANIC'], cells: Object.assign({}, mgr.cells, { email: RIGHTS }) }));
+    const asRights = async () => {
+      const pg = await openPage(browser, 800, 1280, '/plant-station.html?testEmail=' + RIGHTS, clock, true);
+      await pg.click('[data-station="CASE"]');
+      await pg.waitForSelector('#work .sw-card');
+      return pg;
+    };
+    const noGrant = await asRights();
+    await noGrant.waitForSelector('#work .sw-note:has-text("View only")');
+    assert.equal(await noGrant.$('#work .sw-card:not(.done) [data-act="start"]:not([disabled])'), null, 'no Start without the role or the right');
+    await noGrant.close();
+    await db().collection('personRights').doc(RIGHTS).set({ grants: ['plant.loading.write'], denials: [] });
+    const granted = await asRights();
+    const gStart = '#work .sw-card:not(.done):not(.run) [data-act="start"]:not([disabled])';
+    await granted.waitForSelector(gStart, { timeout: 10000 });
+    assert.equal(await granted.$('#work .sw-note'), null, 'no View only note for an account People & Roles allows');
+    const gid = await granted.getAttribute('#work .sw-card:not(.done):not(.run) >> nth=0', 'data-sw');
+    await granted.click('#work .sw-card[data-sw="' + gid + '"] [data-act="start"]');
+    await granted.waitForSelector('#work .sw-card[data-sw="' + gid + '"].run .sw-badge:text-is("LOADING")', { timeout: 10000 });
+    assert.deepEqual(granted.errors, []);
+    await granted.close();
+    results.push('Plant Station: an account allowed "Update route loading" in People & Roles can Start a load though its role alone cannot; without it, View only says why');
     const stPhone = await openPage(browser, 390, 844, '/plant-station.html' + MANAGER, clock);
     await stPhone.click('[data-station="CASE"]');
     await stPhone.waitForSelector('#work .sw-card');
     assert.ok(await fits(stPhone), 'the station work fits a phone');
     await shot(stPhone, 'plant-station-case-phone-390.png');
     assert.deepEqual(stPhone.errors, []);
-    results.push('Plant Station: the employee view on the station page (today, its area, cards; Start, cases, Complete); no Back, Home, dates, Edit or links to the manager screens; nothing overlaps on a tablet 600, 800 or 1024 wide');
+    results.push('Plant Station: the employee view on the station page (today, its area, cards; Start, cases, Complete); no Back, Home, dates, Edit or links to the manager screens; nothing overlaps on a tablet 600, 800 or 1024 wide, and a finger swipe scrolls it');
   } finally {
     await browser.close();
   }

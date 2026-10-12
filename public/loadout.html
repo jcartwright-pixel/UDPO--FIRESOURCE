@@ -93,7 +93,7 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -114,7 +114,9 @@
     const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state !== 'DONE' && r.state !== 'LOADING';
     const unsubs = [];
 
-    const canLoad = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
+    // The role, or what Administration > People & Roles allows this person (Joe 10/12: allowed but shown View only).
+    let allowed = {};
+    const canLoad = () => (L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.savePlantLoad === true) && L.screenState(app, 'plantLoading').open;
     const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 
     function rowsNow() {
@@ -546,7 +548,12 @@
     });
     requireSignIn(async (user) => {
       ({ db } = await start());
-      watchPerson(db, user, p => { person = p; render(); });
+      let askedRights = '';
+      watchPerson(db, user, p => {
+        person = p; render();
+        const key = JSON.stringify([p && p.roles, p && p.email]);
+        if (key !== askedRights) { askedRights = key; allowedSaves(['savePlantLoad']).then(a => { allowed = a; render(); }); }
+      });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
         const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));

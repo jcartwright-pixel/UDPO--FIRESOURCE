@@ -736,6 +736,13 @@ export function friendlyError(e) {
 }
 
 // Any other server call that changes something (the per-screen switch): also one call with its own requestId.
+// Which saves the signed-in person may make, as the server decides (role, Role Templates and the person's Allow / Deny in
+// Administration > People & Roles). Joe 10/12: a screen that checked the role alone showed View only to someone allowed.
+// Nothing is saved; an answer that cannot be had counts as not allowed (the role check still stands).
+export async function allowedSaves(actions) {
+  try { return (await callServer('save', { checkSaves: actions })).allowed || {}; } catch (e) { return {}; }
+}
+
 export async function callServer(name, fields) {
   const { functions } = await start();
   const requestId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');

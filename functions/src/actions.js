@@ -585,6 +585,18 @@ function dayCells(day, values, stamp, email) {
 /*
  * Runs one save. user = the signed-in person ({email}). Returns {ok, requestId, runs:[{runDocId, rev}], repeated}.
  */
+// Which of these saves this person may make (Administration > People & Roles counts, not only the role), without saving
+// anything. Joe 10/12: a tablet account with "Update route loading: Allowed" still showed View only, because the screen
+// checked the role alone. Only names in ACTIONS are answered.
+async function checkSaves(db, user, actions) {
+  const out = {};
+  for (const action of (Array.isArray(actions) ? actions : []).slice(0, 20)) {
+    if (!ACTIONS[action]) continue;
+    try { await db.runTransaction(tx => requireSaver(tx, db, user, ACTIONS[action].roles, action)); out[action] = true; } catch (e) { out[action] = false; }
+  }
+  return out;
+}
+
 async function applyAction(db, user, input, now) {
   const req = validate(input);
   const spec = ACTIONS[req.action];
@@ -1549,4 +1561,4 @@ async function clearConflict(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { applyAction, validate, requireTestMode, queueSheetCells, maintQueue, SaveError, ACTIONS, SAVE_ROLES, REORDER_ROLES, DRIVER_ROLES };
+module.exports = { applyAction, checkSaves, validate, requireTestMode, queueSheetCells, maintQueue, SaveError, ACTIONS, SAVE_ROLES, REORDER_ROLES, DRIVER_ROLES };

@@ -244,6 +244,8 @@ body.ds-tv .foot { color: #cfe3f6; }
 
 /* ---------- Plant Station (plant-station.html) ---------- */
 /* Plant Station: a tablet screen (Joe 10/10, "basically a mobile"): slim header, no desktop menu, big touch cards. */
+/* Joe 10/12 "it won't even let me scroll": app.css locks the body (height 100%, overflow hidden) for the desk screens; the station page scrolls as a whole. */
+body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .ps-page #ps-top { min-height: 56px; gap: 8px; padding: 6px 14px; position: sticky; top: 0; z-index: 5; }
 .ps-page #ps-top button { min-height: 40px; padding: 0 14px; font-size: 15px; }
 .ps-page #ps-top .ps-brand img { width: auto; height: 38px; }
