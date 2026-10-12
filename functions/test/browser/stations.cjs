@@ -23,7 +23,7 @@ const MANAGER = '?testEmail=manager.test@uniteddairy.com';
 const SHOTS = process.env.SHOTS || '';
 
 async function openPage(browser, width, height, url, clock, touch) {
-  const page = await browser.newPage(touch ? { viewport: { width, height }, hasTouch: true, isMobile: true } : { viewport: { width, height } });
+  const page = await browser.newPage(Object.assign(touch ? { viewport: { width, height }, hasTouch: true, isMobile: true } : { viewport: { width, height } }, { serviceWorkers: 'block' }));
   if (clock) await page.clock.setFixedTime(new Date(clock));
   await localCalls(page);
   // The public callables answer straight from the server code when no functions emulator runs (LOCAL_CALLS=1).
@@ -61,7 +61,7 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
   const results = [];
   try {
     // Garage Station: the technicians' names, then the login ID on the keypad, then the jobs.
-    const gs = await openPage(browser, 1920, 1080, '/garage-station.html');
+    const gs = await openPage(browser, 1920, 1080, '/garage-station.html?testEmail=manager.test@uniteddairy.com');
     await gs.waitForSelector('[data-tech="TECH-JT"]', { timeout: 10000 });
     await shot(gs, 'garage-station-sign-in-1920.png');
     await gs.click('[data-tech="TECH-JT"]');

@@ -25,7 +25,9 @@ test('the sandbox build gets Diagnostics on every screen, and the production che
     // Every screen that uses the shared app script is fitted, at the very top of its page; the drivers' phone page is not.
     fs.readdirSync(dir).filter(f => f.endsWith('.html')).forEach(f => {
       const html = fs.readFileSync(path.join(dir, f), 'utf8');
-      if (f === 'route.html') assert.ok(!html.includes(D.TAG), 'the drivers\' phone page is left alone');
+      // The drivers' phone page is left alone, and so is a page with no shared app script (driver-room.html only sends the
+      // tablet on to the Driver Station link, Joe 10/12).
+      if (f === 'route.html' || !html.includes('js/app.js')) assert.ok(!html.includes(D.TAG), f + ' is left alone');
       else assert.ok(html.indexOf(D.TAG) > 0 && html.indexOf(D.TAG) < html.indexOf('<title>'), f + ' has the probe first');
     });
     // The check opens Home and every screen the menu lists, once each.

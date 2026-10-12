@@ -739,7 +739,7 @@ async function noScroll(page) {
     results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
     // Joe 10/10: every screen, plant screens included, shows Back and Home together; Joe 10/10 evening: in the header, not the menu.
     // The drivers' no-account pages aside: the phone page and the Driver Room Check-In tablet (Joe 10/12, leaves only by
-    // Change Station and the manager release code).
+    // Release and the manager release code).
     const fsMod = require('fs'), pathMod = require('path');
     const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html');
     const bh = await openPage(browser, 1366, 768, '/index.html?testEmail=manager.test@uniteddairy.com');

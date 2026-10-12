@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="manifest" href="manifest.webmanifest">
+  <!-- Joe 10/12: installed from here ("Garage Station"), it opens full screen in its own window, no browser bars. -->
+  <link rel="manifest" href="garage-station.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Garage Station">
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
@@ -12,12 +16,20 @@
   <link rel="stylesheet" href="css/stations.css">
 </head>
 <body class="fill phone gs-page">
-  <div id="screen">
+  <!-- Joe 10/12 "all my stations will have a United Dairy login, then a code to direct it to the correct place": the garage
+       tablet signs in with a United Dairy Google account first; then its station code. Mechanics still sign each job. -->
+  <div class="signin" id="signin" hidden>
+    <h1>Garage Station</h1>
+    <p>Sign in with the tablet's United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+  <div id="screen" hidden>
     <!-- Joe 10/10: a tablet screen on every screen size: a slim header with Back and Home, no desktop side menu. -->
     <div class="topbar">
       <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
       <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
-      <button type="button" class="gs-nav" id="gs-change" hidden>Change Station</button>
+      <button type="button" class="gs-nav" id="gs-change" hidden>Release</button>
       <span class="gs-people" id="people"></span>
       <button id="gs-signout" type="button" hidden>Sign Out</button>
     </div>
@@ -108,9 +120,9 @@
   </div>
 
   <script type="module">
-    import { start, escapeHtml, goBack } from './js/app.js';
+    import { start, escapeHtml, goBack, requireSignIn } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
-    import { resolveStation, askCode, askRelease, remember } from './js/station-code.js';
+    import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
 
     /*
      * The current app's Garage Station (GarageStation.html, 7.0.276), reworked the way Joe asked (10/10 evening): the open
@@ -144,18 +156,19 @@
     async function gate(msg) {
       const r = msg !== undefined ? { needCode: true, message: msg } : await resolveStation('GARAGE', CODE_KEY, stationCall);
       if (r.needCode) {
-        station = null; $('gs-change').hidden = true; $('title').textContent = 'Garage Station'; view('code');
+        station = null; lockStation($('gs-change'), false); $('title').textContent = 'Garage Station'; view('code');
         station = await askCode($('view-code'), { kind: 'GARAGE', storeKey: CODE_KEY, call: stationCall, title: 'Enter this tablet\'s station code',
           hint: 'A manager gives each garage station its code (Administration > Garage Station Codes). The tablet remembers its station after this.', message: r.message });
         view('jobs');
       } else station = r.station || null;
-      $('gs-change').hidden = !station;
+      // Joe 10/12: a coded station has no Back or Home; Release at the bottom (manager release code) is the only way out.
+      lockStation($('gs-change'), !!station);
       if (station) $('title').textContent = station.name + ' · ' + station.plant;
       message('');
       return load();
     }
     $('gs-change').addEventListener('click', async () => {
-      const ok = await askRelease($('gs-release'), { status: () => call('release', { step: 'status' }), release: (code) => call('release', { step: 'release', code }), onError: message });
+      const ok = await askRelease($('gs-release'), { status: () => call('release', { step: 'status' }), release: (code) => call('release', { step: 'release', code }), onError: message, mustHave: true });
       if (!ok) return;
       station = null; remember(CODE_KEY, null); gate().catch(err => message(err.message));
     });
@@ -436,7 +449,8 @@
     }, 30000);
 
     view('jobs');
-    gate().catch(err => message(err.message));
+    let opened = false;
+    requireSignIn(() => { if (opened) return; opened = true; gate().catch(err => message(err.message)); });
   </script>
 </body>
 </html>
