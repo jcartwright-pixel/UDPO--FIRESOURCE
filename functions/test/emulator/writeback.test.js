@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { db, clear } = require('./helpers');
 const { runTransfer } = require('../../src/transfer');
 const { applyAction } = require('../../src/actions');
-const { runWriteBack, assertSandboxTarget } = require('../../src/writeback');
+const { runWriteBack, assertSandboxTarget, assertLiveTarget } = require('../../src/writeback');
 const F = require('../fixtures/fake-sheets');
 
 const DISPATCHER = { email: 'dispatch.test@uniteddairy.com' };
@@ -120,4 +120,12 @@ test('the production Live workbook and master sheets are refused', () => {
   assert.throws(() => assertSandboxTarget('11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg'), /production sheet/);
   assert.throws(() => assertSandboxTarget('1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU'), /production sheet/);
   assert.throws(() => assertSandboxTarget(''), /no sandbox Live workbook/);
+});
+
+test('the production server may write the real Uniontown Live workbook, and no other production sheet', () => {
+  assert.doesNotThrow(() => assertLiveTarget('11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', true));
+  assert.throws(() => assertLiveTarget('11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', false), /production sheet/);
+  assert.throws(() => assertLiveTarget('1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU', true), /production sheet/);
+  assert.throws(() => assertLiveTarget('1UrAzrPIe4x6jcNBCjCJUIE8mjvJAniZMoONRGK8GJmw', true), /production sheet/);
+  assert.doesNotThrow(() => assertLiveTarget(SANDBOX.spreadsheetId, false));
 });

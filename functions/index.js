@@ -159,7 +159,8 @@ exports.mocreo = onCall({ timeoutSeconds: 60 }, async (request) => {
 // The sandbox sheet copies the Administration tools may read (Date Inventory) and change (Archive now, Date Convert, both
 // refused on a production sheet by writeback.js), and a copy from the sheets on request (Refresh Home Summary Now).
 function adminDeps() {
-  const setup = transferSetup(), live = process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1' ? JSON.parse(process.env.WRITEBACK_JSON).spreadsheetId : '';
+  // Production writes only dispatch changes to the real Live sheet, so its Administration tools keep no Live workbook to change.
+  const setup = transferSetup(), live = process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1' && !realLive() ? JSON.parse(process.env.WRITEBACK_JSON).spreadsheetId : '';
   return {
     env: process.env,
     sources: setup && process.env.DEMO_DATA !== '1' ? setup.sources : null,
@@ -203,15 +204,22 @@ exports.save = onCall(async (request) => {
   }
 });
 
-// The write-back runs only when config/app.writeBack.enabled is true and WRITEBACK_JSON names the sandbox Live
-// workbook ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
+// The production server: it reads the real Uniontown sheets (no SOURCES_JSON copies), so its write-back target is the real
+// Live workbook (Joe 10/12: "Let the new app write dispatch changes to the real Live sheet."; production-env.cjs allows
+// no other target there).
+function realLive() {
+  return process.env.READ_UNIONTOWN_SHEETS === '1' && !process.env.SOURCES_JSON && process.env.DEMO_DATA !== '1';
+}
+
+// The write-back runs only when config/app.writeBack.enabled is true and WRITEBACK_JSON names the Live workbook the
+// copy reads ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
 async function writeBackIfOn(part) {
   const config = (await db.collection('config').doc('app').get()).data() || {};
   if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
   const target = JSON.parse(process.env.WRITEBACK_JSON);
   // With the switch off, only People & Roles saves go out, and only to the sandbox's Users sheet copy (admin.js usersCopy).
   if (!config.writeBack || config.writeBack.enabled !== true) {
-    if (part === 'live' || !ADMIN.usersCopy(process.env)) return null;
+    if (part === 'live' || realLive() || !ADMIN.usersCopy(process.env)) return null;
     const users = target.masters.users, source = transferSources(process.env).masters.users;
     if (!source || source.spreadsheetId !== users.spreadsheetId || source.tab !== users.tab) throw new Error('Write-back stopped: WRITEBACK_JSON.masters.users and SOURCES_JSON must name the same sandbox copy');
     return { live: null, master: await runMasterWriteBack({ db, sheets: makeSheetsWriter(), targets: { users }, only: true }) };
@@ -221,7 +229,9 @@ async function writeBackIfOn(part) {
     throw new Error('Write-back stopped: WRITEBACK_JSON and SOURCES_JSON must name the same sandbox Live workbook');
   }
   const sheets = makeSheetsWriter();
-  const live = part === 'master' ? null : await runWriteBack({ db, sheets, target });
+  const live = part === 'master' ? null : await runWriteBack({ db, sheets, target, allowRealLive: realLive() });
+  // Production: dispatch changes to the Live tabs only; no master lists and no maintenance queues are written.
+  if (realLive()) return { live, master: null };
   // Master lists: only those WRITEBACK_JSON.masters names ({"drivers": {"spreadsheetId", "tab"}, ...}), each the same copy the
   // transfer reads (SOURCES_JSON), for the same reason as above.
   const masters = Object.assign({}, target.masters || {}), sources = transferSources(process.env).masters;
