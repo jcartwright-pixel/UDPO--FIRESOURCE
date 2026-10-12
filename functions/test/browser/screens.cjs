@@ -18,7 +18,9 @@ const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR || '';
 
 async function openPage(browser, width, height, url) {
-  const page = await browser.newPage({ viewport: { width, height } });
+  // The Safety Walkthrough's offline screen cache (sw.js) fetches the Firebase code itself, outside page.route; it is
+  // checked in safety.cjs, which serves that code to it.
+  const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
   // The screens load Google's Firebase files from www.gstatic.com; here they come from the installed package.
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     const file = route.request().url().split('/').pop();

@@ -34,6 +34,7 @@
       <a class="sw-top" href="safety-issues.html" data-top>Open Issues</a>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <div class="notice warning" id="offline-line" role="status" hidden></div>
     <div class="view" id="list-view">
       <div class="sw-sheet">
         <table class="sw-grid">
@@ -49,7 +50,9 @@
     </div>
   </div>
 
+  <script>window.UD_OFFLINE = true;</script>
   <script type="module">
+    import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
     import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { today, thisMonth, monthName, pickPlant, plantName, canWalk, canSetUp, modeText, watchExtinguishers } from './js/safety.js';
@@ -60,7 +63,7 @@
     // administrator keeps the list: each box saves as it is left; the empty row at the bottom adds one.
     const S = window.UDSafety;
     const params = new URLSearchParams(location.search);
-    let db = null, person = null, app = {}, plant = '', exts = null, stop = null, checking = params.get('tag') || '', chain = Promise.resolve();
+    let db = null, person = null, app = {}, plant = '', exts = null, stop = null, checking = params.get('tag') || '', chain = Promise.resolve(), addedTag = '';
     const mine = {}, armed = {};
     const month = thisMonth();
     const DATES = [['annualDue', 'Annual service'], ['sixYearDue', '6-year'], ['hydroDue', 'Hydro test']];
@@ -118,10 +121,20 @@
       drawHead();
       if (!showCheck) drawList(force);
     }
+    // Joe 10/12: the monthly check is done walking the plant on a tablet; with no signal its taps are held on the tablet and
+    // sent later. Changing the list itself (Checklist Setup work, done at a desk) still needs a connection.
     function send(action, fields, undo) {
-      const run = chain.then(() => save(action, fields));
+      const run = chain.then(() => action === 'saveExtinguisherCheck' ? offlineSave(action, fields) : save(action, fields));
       chain = run.catch(() => {});
       return run.then(() => showError(''), err => { if (undo) undo(); showError(err); render(); });
+    }
+    // Added: the list shows it as soon as the saved list has it, and the empty row is ready for the next one.
+    function shown() {
+      if (!addedTag || !(exts || []).some(e => e.tag === addedTag)) return;
+      addedTag = '';
+      render(true);
+      const tag = document.querySelector('#rows tr[data-new] input[data-k="tag"]');
+      if (tag) tag.focus();
     }
     const rowFields = (e) => ({ facilityId: plant, tag: e.tag, location: e.location || '', type: e.type || '', size: e.size || '', annualDue: e.annualDue || '', sixYearDue: e.sixYearDue || '', hydroDue: e.hydroDue || '' });
     document.getElementById('rows').addEventListener('change', e => {
@@ -131,12 +144,7 @@
         const v = (k) => (tr.querySelector('[data-k="' + k + '"]') || {}).value || '';
         if (!v('tag').trim() || !v('location').trim()) return;
         send('saveExtinguisher', { isNew: true, facilityId: plant, tag: v('tag').trim(), location: v('location').trim(), type: v('type'), size: v('size').trim(), annualDue: v('annualDue').trim(), sixYearDue: v('sixYearDue').trim(), hydroDue: v('hydroDue').trim() })
-          .then(() => {
-            // Added: the list shows it at once and the empty row is ready for the next one.
-            render(true);
-            const tag = document.querySelector('#rows tr[data-new] input[data-k="tag"]');
-            if (tag) tag.focus();
-          });
+          .then(() => { addedTag = v('tag').trim(); shown(); });
         return;
       }
       const ext = extOf(tr.dataset.id);
@@ -171,13 +179,16 @@
     function follow() {
       if (stop) stop();
       exts = null; render();
+      waiting('saveExtinguisherCheck').then(list => { list.filter(e => e.fields.month === month && e.fields.item).forEach(e => { const f = e.fields; mine[f.extinguisherId] = Object.assign({}, mine[f.extinguisherId] || {}, { [f.item]: f.status }); }); render(); });
       stop = watchExtinguishers(db, plant, list => {
         exts = list;
         // Taps that have reached the saved check.
+        shown();
         Object.keys(mine).forEach(id => { const e = list.find(x => x.id === id), saved = e && e.checks && e.checks[month] && e.checks[month].items || {}; Object.keys(mine[id]).forEach(k => { if ((saved[k] || '') === mine[id][k]) delete mine[id][k]; }); });
         render();
       }, e => showError('Could not read the extinguishers (' + e.message + '). Check the network and reload the page.'));
     }
+    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {

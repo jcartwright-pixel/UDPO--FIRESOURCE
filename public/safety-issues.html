@@ -34,10 +34,11 @@
       <div class="sw-filter" id="filter" data-top><button type="button" data-f="OPEN" aria-pressed="true">Open</button><button type="button" data-f="FIXED" aria-pressed="false">Fixed</button><button type="button" data-f="ALL" aria-pressed="false">All</button></div>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <div class="notice warning" id="offline-line" role="status" hidden></div>
     <div class="view">
       <div class="sw-sheet">
         <table class="sw-grid">
-          <thead><tr><th>Found</th><th>Area</th><th>What is wrong</th><th>Found by</th><th>Open</th><th>Walks</th><th>Photo</th><th>Plant Maintenance</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Found</th><th>Area</th><th>What is wrong</th><th>Found by</th><th>Open</th><th>Walks</th><th>Photos</th><th>Plant Maintenance</th><th>Status</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -45,8 +46,10 @@
     </div>
   </div>
 
+  <script>window.UD_OFFLINE = true;</script>
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
+    import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
+    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
     import { doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { today, pickPlant, plantName, canWalk, modeText, watchIssues, agePill, maintText } from './js/safety.js';
 
@@ -55,38 +58,51 @@
     const S = window.UDSafety;
     const params = new URLSearchParams(location.search);
     let db = null, person = null, app = {}, plant = '', issues = null, filter = 'OPEN', stop = null, chain = Promise.resolve();
-    const armed = {};
+    const armed = {}, mine = {}, photos = {};
+    // Joe 10/12: Mark Fixed, Reopen and Plant Maintenance made with no signal are held on this tablet and shown as made.
+    const issueOf = (i) => Object.assign({}, i, mine[i.id] || {});
+    const photoIdsOf = (i) => (Array.isArray(i.photoIds) ? i.photoIds : i.photo ? [i.id] : []).concat(Array.isArray(i.lastPhotoIds) ? i.lastPhotoIds : []);
+    async function loadPhoto(id) {
+      photos[id] = null;
+      try { const s = await getDoc(doc(db, 'safetyPhotos', id)); photos[id] = s.exists() ? s.data().data : null; } catch (e) { photos[id] = null; }
+      if (photos[id]) render();
+    }
+    const thumbs = (i) => '<span class="sw-thumbs">' + photoIdsOf(i).map(pid => { if (photos[pid] === undefined) loadPhoto(pid); return photos[pid] ? '<img src="' + photos[pid] + '" alt="Photo" data-big>' : '<span class="sw-thumb-wait">Photo</span>'; }).join('') + '</span>';
     const editable = () => canWalk(person, app);
     function render() {
       document.getElementById('mode-text').textContent = modeText(app);
       document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
       document.querySelectorAll('#filter [data-f]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === filter)));
       if (!issues) { document.getElementById('rows').innerHTML = '<tr><td colspan="10" class="sw-empty">Reading the issues…</td></tr>'; return; }
-      const openList = issues.filter(i => i.status === 'OPEN'), long = openList.filter(i => S.daysOpen(i, today()) > S.LONG_OPEN_DAYS).length, maint = openList.filter(i => i.sendToMaint).length;
+      const openList = issues.map(issueOf).filter(i => i.status === 'OPEN'), long = openList.filter(i => S.daysOpen(i, today()) > S.LONG_OPEN_DAYS).length, maint = openList.filter(i => i.sendToMaint).length;
       document.getElementById('counts').innerHTML = '<b class="r">' + openList.length + ' open</b> · <b class="r">' + long + ' over 30 days</b> · ' + maint + ' marked for Plant Maintenance';
-      const rows = issues.filter(i => filter === 'ALL' || i.status === filter).sort((a, b) => (a.status === b.status ? 0 : a.status === 'OPEN' ? -1 : 1) || String(b.foundOn).localeCompare(String(a.foundOn)));
+      const rows = issues.map(issueOf).filter(i => filter === 'ALL' || i.status === filter).sort((a, b) => (a.status === b.status ? 0 : a.status === 'OPEN' ? -1 : 1) || String(b.foundOn).localeCompare(String(a.foundOn)));
       const dis = editable() ? '' : ' disabled';
       document.getElementById('rows').innerHTML = rows.map(i => {
         const fixed = i.status === 'FIXED', walks = (i.walks || []).length;
-        return '<tr' + (fixed ? ' class="fixed"' : '') + ' data-id="' + escapeHtml(i.id) + '"><td class="nw">' + shortDate(i.foundOn) + '</td><td>' + escapeHtml(i.area) + '</td><td><b>' + escapeHtml(i.item) + '</b>' + (i.note ? '<span class="sw-how">' + escapeHtml(i.note) + '</span>' : '') + (i.lastNote ? '<span class="sw-how">Last walk: ' + escapeHtml(i.lastNote) + '</span>' : '') + '</td>' +
+        return '<tr' + (fixed ? ' class="fixed"' : '') + ' data-id="' + escapeHtml(i.id) + '"><td class="nw">' + shortDate(i.foundOn) + '</td><td>' + escapeHtml(i.area) + '</td><td><b>' + escapeHtml(i.item) + '</b>' + (i.note ? '<span class="sw-how">' + escapeHtml(i.note) + '</span>' : '') + (i.lastNote ? '<span class="sw-how">Latest note' + (i.lastNoteOn ? ' ' + shortDate(i.lastNoteOn) : '') + (i.lastNoteByName ? ', ' + escapeHtml(i.lastNoteByName) : '') + ': ' + escapeHtml(i.lastNote) + '</span>' : '') + '</td>' +
           '<td class="nw">' + escapeHtml(i.foundByName || i.foundBy || '') + '</td><td class="nw">' + agePill(i) + '</td><td class="nw">' + (walks > 1 ? '<span class="sw-pill red">REPEAT · ' + walks + '</span>' : walks || '') + '</td>' +
-          '<td>' + (i.photo ? '<button type="button" class="sw-btn sw-small" data-photo="' + escapeHtml(i.id) + '">Photo</button>' : '') + '</td>' +
+          '<td>' + (photoIdsOf(i).length ? thumbs(i) : '') + '</td>' +
           '<td><label class="sw-check"><input type="checkbox" data-maint="' + escapeHtml(i.id) + '"' + (i.sendToMaint ? ' checked' : '') + (fixed ? ' disabled' : dis) + '>' + maintText(i) + '</label></td>' +
           '<td class="nw">' + (fixed ? '<span class="sw-pill green">FIXED ' + shortDate(i.fixedOn) + (i.fixedByName ? ' · ' + escapeHtml(i.fixedByName) : '') + '</span>' : '<span class="sw-pill red">OPEN</span>') + '</td>' +
           '<td class="nw">' + (editable() ? '<button type="button" class="sw-btn sw-small" data-op="' + (fixed ? 'reopen' : 'fixed') + '" data-id="' + escapeHtml(i.id) + '">' + (armed[i.id] ? 'Press again' : fixed ? 'Reopen' : 'Mark Fixed') + '</button>' : '') + '</td></tr>';
       }).join('') || '<tr><td colspan="10" class="sw-empty">' + (filter === 'OPEN' ? 'No open issues. Everything found on the walks has been fixed.' : 'Nothing here yet.') + '</td></tr>';
     }
+    function held(f) {
+      if (f.op === 'fixed') mine[f.issueId] = Object.assign({}, mine[f.issueId] || {}, { status: 'FIXED', fixedOn: today() });
+      else if (f.op === 'reopen') mine[f.issueId] = Object.assign({}, mine[f.issueId] || {}, { status: 'OPEN' });
+      else if (f.op === 'maint') mine[f.issueId] = Object.assign({}, mine[f.issueId] || {}, { sendToMaint: f.maint });
+    }
     function send(fields) {
-      const run = chain.then(() => save('saveSafetyIssue', fields));
+      held(fields); render();
+      const run = chain.then(() => offlineSave('saveSafetyIssue', fields));
       chain = run.catch(() => {});
-      return run.then(() => showError(''), err => { showError(err); render(); });
+      return run.then(() => showError(''), err => { delete mine[fields.issueId]; showError(err); render(); });
     }
     document.getElementById('rows').addEventListener('click', async e => {
-      const p = e.target.closest('[data-photo]');
+      const p = e.target.closest('[data-big]');
       if (p) {
-        const s = await getDoc(doc(db, 'safetyPhotos', p.dataset.photo)).catch(() => null);
-        if (!s || !s.exists()) { showError('That photo could not be read.'); return; }
-        const d = document.createElement('div'); d.className = 'sw-bigphoto'; d.innerHTML = '<img alt="Photo">'; d.firstChild.src = s.data().data; d.addEventListener('click', () => d.remove()); document.body.appendChild(d);
+        const d = document.createElement('div'); d.className = 'sw-bigphoto'; d.innerHTML = '<img alt="Photo">'; d.firstChild.src = p.src; d.addEventListener('click', () => d.remove()); document.body.appendChild(d);
         return;
       }
       const b = e.target.closest('[data-op]');
@@ -102,8 +118,15 @@
     function follow() {
       if (stop) stop();
       issues = null; render();
-      stop = watchIssues(db, plant, list => { issues = list; render(); }, e => showError('Could not read the issues (' + e.message + '). Check the network and reload the page.'));
+      waiting('saveSafetyIssue').then(list => { list.forEach(e => held(e.fields)); render(); });
+      stop = watchIssues(db, plant, list => {
+        issues = list;
+        // What was changed here has reached the saved issue.
+        Object.keys(mine).forEach(id => { const i = list.find(x => x.id === id); if (i && Object.keys(mine[id]).every(k => k === 'fixedOn' || i[k] === mine[id][k])) delete mine[id]; });
+        render();
+      }, e => showError('Could not read the issues (' + e.message + '). Check the network and reload the page.'));
     }
+    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
