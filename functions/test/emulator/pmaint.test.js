@@ -160,4 +160,15 @@ test('Maintenance Station: start, a helper, need parts, complete a PM (Last done
   assert.deepEqual([entry.type, entry.status, entry.payload.readingTime, entry.payload.values], ['SHIFT_REPORT', 'RESOLVED', '09:42',
     { Entry: 'Valve 14 blew a seal', Type: 'Breakdown', Equipment: 'GALLON FILLER', UpAt: '10:20', Fix: 'Replaced the seal' }]);
   await assert.rejects(as('TOM', { step: 'BREAKDOWN', machineId: 'ut_prod_gallon_filler', downAt: '', cause: 'x' }, 121), /when it went down/);
+
+  // The garage tablet's station code (Links & Codes) locks the garage tablet, not this one; its steps still need a login ID.
+  await db().collection('users').doc('boss@uniteddairy.com').set({ name: 'Boss', status: 'ACTIVE', roles: ['ADMINISTRATOR'], facilities: ['*'], cells: { id: 'usr_boss', version: '1' } });
+  const AD = require('../../src/admin'), boss = (input) => AD.adminCall(db(), { email: 'boss@uniteddairy.com' }, input);
+  await boss({ op: 'stationCode', key: (await boss({ op: 'stations', kind: 'GARAGE' })).stations[0].key });
+  await assert.rejects(GA.garageCall(db(), { op: 'board' }, at(130)), /STATION_CODE/);
+  await assert.rejects(GA.garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213', tokens: [] }, at(130)), /STATION_CODE/);
+  assert.ok(Array.isArray((await call({ op: 'pmBoard' }, 130)).jobs));
+  const s = await call({ op: 'signIn', maint: true, techId: 'TECH-JT', loginId: '48213', tokens: [] }, 131);
+  r = await call({ op: 'pmStep', tokens: [s.token], requestId: rid(), step: 'REPORT', machineId: 'ut_prod_gallon_filler', problem: 'Belt squeal', lineDown: false }, 131);
+  assert.match(r.message, /^M-1003/);
 });

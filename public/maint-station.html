@@ -144,7 +144,7 @@
     let machinePick = '', downPick = null, reportDraft = null, brkPick = '', brkDraft = null;
 
     const fn = async () => httpsCallable((await start()).functions, 'garage');
-    async function call(op, fields) { return (await (await fn())(Object.assign({ op, facilityId: PLANT }, fields || {}))).data; }
+    async function call(op, fields) { return (await (await fn())(Object.assign({ op, facilityId: PLANT, maint: true }, fields || {}))).data; }
     const signOut = (token) => { if (token) call('signOut', { tokens: [token] }).catch(() => {}); };
     function message(text, ok) { const m = $('gs-message'); m.textContent = text || ''; m.hidden = !text; m.classList.toggle('ok', !!ok); }
     const VIEWS = ['sign', 'jobs', 'job', 'fix', 'safe', 'report', 'breakdown'];

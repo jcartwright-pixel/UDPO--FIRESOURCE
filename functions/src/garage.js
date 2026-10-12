@@ -589,7 +589,8 @@ async function garageCall(db, input, now) {
   // the garage tablet, so the garage's station code does not lock it; every step still needs a mechanic's login ID.
   if (op === 'pmBoard') return require('./plantmaint').stationBoard(db, input, nowMs);
   if (op === 'pmStep') return require('./plantmaint').stationStep(db, input, nowMs);
-  if (await ST.needsCode(db, 'GARAGE', FACILITY)) {
+  const maintSignIn = input.maint === true && (op === 'signIn' || op === 'signOut');
+  if (!maintSignIn && await ST.needsCode(db, 'GARAGE', FACILITY)) {
     const st = input.station || {}, ok = await ST.check(db, 'GARAGE', st.key, st.version);
     if (!ok.ok) throw SaveErr('NOT_ALLOWED', 'STATION_CODE: ' + ok.message.replace('This station', 'This garage tablet').replace(/Enter a station code\.|Enter it.*$/, 'Enter the garage station code.'));
   }
