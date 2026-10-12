@@ -59,3 +59,28 @@ test('a wrong code is refused, and after 30 wrong codes in a minute even the rig
   await newRouteCode(db(), MANAGER);
   await assert.rejects(phoneCall(db(), { code, op: 'roster' }, at(12)), /not right/);
 });
+
+// Joe 10/12: the Driver Room Check-In tablet uses its own station code (a Driver Room kiosk station) instead of the phones'
+// Route Distribution code; a TV's code is refused there, and a new code shuts out the tablet's old one.
+test('the Driver Room tablet works on its Driver Room kiosk station code, not a TV code', async () => {
+  const A = require('../../src/admin'), BOSS = { email: 'admin.test@uniteddairy.com' };
+  const kiosk = (await A.adminCall(db(), BOSS, { op: 'stationCode', key: 'fac_uniontown_kiosk_driver' })).code;
+  const tv = (await A.adminCall(db(), BOSS, { op: 'stationCode', key: 'fac_uniontown_kiosk_tv' })).code;
+  const refused = await phoneCall(db(), { op: 'roomEnter', code: tv }, at());
+  assert.equal(refused.ok, false);
+  assert.match(refused.message, /Driver Room TV/);
+  const room = await phoneCall(db(), { op: 'roomEnter', code: kiosk }, at());
+  assert.equal(room.ok, true);
+  const station = { key: room.station.key, version: room.station.version };
+  // No Route Distribution code is needed (the phones' code is not even made here).
+  const roster = await phoneCall(db(), { station, op: 'roster' }, at());
+  assert.deepEqual(roster.drivers.map(d => [d.name, d.relief]), [['ADAMS, PAT', false], ['BROOK, SAM', true], ['CASEY, LEE', false]]);
+  const board = await phoneCall(db(), { station, op: 'board' }, at());
+  assert.ok(Array.isArray(board.rows));
+  await assert.rejects(phoneCall(db(), { station: { key: station.key, version: 'old' }, op: 'roster' }, at()), /new code.*\(station code\)/);
+  // A TV station's key with its own version is refused too.
+  const tvRoom = (await require('../../src/stations').check(db(), 'KIOSK', 'fac_uniontown_kiosk_tv', '')).ok;
+  assert.equal(tvRoom, false);
+  await A.adminCall(db(), BOSS, { op: 'stationCode', key: 'fac_uniontown_kiosk_driver' });
+  assert.equal((await phoneCall(db(), { op: 'roomCheck', station }, at())).ok, false);
+});

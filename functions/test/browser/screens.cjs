@@ -17,7 +17,7 @@ const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR || '';
 
-async function openPage(browser, width, height, url) {
+async function openPage(browser, width, height, url, init) {
   // The Safety Walkthrough's offline screen cache (sw.js) fetches the Firebase code itself, outside page.route; it is
   // checked in safety.cjs, which serves that code to it.
   const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
@@ -28,6 +28,7 @@ async function openPage(browser, width, height, url) {
   });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
+  if (init) await page.addInitScript(init);
   await page.goto(HOSTING + url);
   page.errors = errors;
   return page;
@@ -478,6 +479,9 @@ async function noScroll(page) {
     const phone = await openPage(browser, 390, 844, '/route.html');
     await phone.fill('#code', phoneCode.toLowerCase());
     await phone.click('#step-code button[type=submit]');
+    // Joe 10/12: the three choices first; Check-In asks for the name.
+    await phone.waitForSelector('#step-menu:not([hidden])', { timeout: 8000 });
+    await phone.click('#m-checkin');
     await phone.waitForSelector('#step-name:not([hidden])', { timeout: 8000 });
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'phone-name-390.png') });
     await phone.selectOption('#name', 'drv_test_casey');
@@ -497,8 +501,11 @@ async function noScroll(page) {
       await ciMgr.goto(HOSTING + '/checkins.html?date=' + phoneLoad + '&testEmail=manager.test@uniteddairy.com');
       await ciMgr.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && /400/.test(tr.textContent) && /Check engine light/.test(tr.textContent)), null, { timeout: 8000 });
     }
-    // The name and the code stay on the phone.
+    // The name and the code stay on the phone: it opens on the three choices, and Check-In needs no name again.
     await phone.reload();
+    await phone.waitForSelector('#step-menu:not([hidden])', { timeout: 8000 });
+    assert.match(await phone.textContent('#m-who'), /CASEY, LEE/);
+    await phone.click('#m-checkin');
     await phone.waitForSelector('#step-loads:not([hidden])', { timeout: 8000 });
     assert.deepEqual([...ciMgr.errors, ...phone.errors], []);
     await Promise.all([ciMgr.close(), phone.close()]);
@@ -731,8 +738,10 @@ async function noScroll(page) {
     await fs2.close();
     results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
     // Joe 10/10: every screen, plant screens included, shows Back and Home together; Joe 10/10 evening: in the header, not the menu.
+    // The drivers' no-account pages aside: the phone page and the Driver Room Check-In tablet (Joe 10/12, leaves only by
+    // Change Station and the manager release code).
     const fsMod = require('fs'), pathMod = require('path');
-    const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html');
+    const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html');
     const bh = await openPage(browser, 1366, 768, '/index.html?testEmail=manager.test@uniteddairy.com');
     const missing = [];
     for (const pg of pages) {
@@ -1036,14 +1045,34 @@ async function noScroll(page) {
     // The test project names no sandbox Equipment Master copy, so the server says so on the line (no pop-up).
     await eqm.waitForFunction(() => /not set up here/.test(document.getElementById('fleet-synced').textContent));
     assert.equal(await eqm.$eval('#fleet-synced', x => x.className), 'bad');
+    // Joe 10/12 ("Yes, preview first"): Preview fleet sync lists every change by plant, with why a unit comes off; nothing is written.
+    await db().collection('config').doc('fleetSyncPreview').set({ ok: true, preview: true, at: '2026-10-12T19:45:00.000Z', by: 'manager.test@uniteddairy.com', changes: [
+      { unit: 'T-095', plant: 'Charleston', row: 4, field: 'Status', from: 'INACTIVE', to: 'ACTIVE', kind: 'back', why: '' },
+      { unit: 'T-10212', plant: 'Uniontown', row: 7, field: 'Status', from: 'ACTIVE', to: 'INACTIVE', kind: 'inactive', why: 'Fleet list: Marietta OH Branch' },
+      { unit: '9715', plant: 'Charleston', row: 9, field: 'Status', from: 'ACTIVE', to: 'INACTIVE', kind: 'inactive', why: 'Yard truck on the fleet list' }] });
+    await eqm.waitForSelector('#fleet-preview:not([hidden])');
+    await eqm.click('#fleet-preview');
+    await eqm.waitForSelector('#fp-rows tr');
+    assert.equal(await eqm.$$eval('#fp-rows tr', r => r.length), 3);
+    assert.match(await eqm.textContent('#fp-modal'), /Nothing has been changed/);
+    assert.match(await eqm.textContent('#fp-sum'), /Charleston\s*1 back on the list, 1 off the list/);
+    assert.match(await eqm.textContent('#fp-rows'), /Fleet list: Marietta OH Branch/);
+    await eqm.click('[data-fp="Uniontown"]');
+    assert.equal(await eqm.$$eval('#fp-rows tr', r => r.length), 1);
+    assert.equal(await eqm.$eval('#fp-csv', b => b.disabled), false, 'the list can be downloaded');
+    assert.ok(await eqm.$eval('#fp-rows td', td => parseFloat(getComputedStyle(td).fontSize) >= 16), 'text at least 16px');
+    await eqm.click('#fp-close');
+    assert.equal(await eqm.$eval('#fp-modal', m => m.hidden), true);
+    await db().collection('config').doc('fleetSyncPreview').delete();
     await eqm.close();
     const eqv = await openPage(browser, 1920, 950, '/equipment.html?testEmail=dispatch.test@uniteddairy.com');
     await eqv.waitForSelector('#rows tr[data-id="veh_truck_900001"]');
     assert.equal(await eqv.$eval('#fleet-sync', b => b.hidden), true, 'a dispatcher has no Sync button');
+    assert.equal(await eqv.$eval('#fleet-preview', b => b.hidden), true, 'a dispatcher has no Preview button');
     assert.match(await eqv.textContent('#fleet-synced'), /Fleet list synced/);
     await eqv.close();
     await db().collection('config').doc('fleetSync').delete();
-    results.push('Equipment: a manager sees Sync fleet list with when it last synced; the button answers on the line; a dispatcher has no button');
+    results.push('Equipment: a manager sees Sync fleet list with when it last synced; the button answers on the line; Preview fleet sync lists each change by plant with why; a dispatcher has neither button');
     // Joe 10/10 (route 855): the one-run editor has every day field of the old one (Order, Day Notes), a blank unit default on a
     // running day says "none set", and the action buttons are square tiles in one row.
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
@@ -1186,7 +1215,21 @@ async function noScroll(page) {
     assert.equal(await gl.textContent('.adm-item[data-key="switch"] .adm-name'), 'Go-Live Switches');
     await gl.click('.adm-item[data-key="switch"]');
     await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"]');
-    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
+    // Joe 10/12 ("... and make Driver Check-ins ready"): every screen is ready now. A screen that is not ready still cannot be
+    // moved: checked on a second page where Driver Check-ins is marked not ready for this test only.
+    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), false, 'Driver Check-ins is ready');
+    {
+      const nr = await openPage(browser, 1536, 730, '/administration.html?testEmail=admin.test@uniteddairy.com', () => {
+        let v;
+        Object.defineProperty(window, 'UDLogic', { configurable: true, get: () => v, set: (x) => { v = x; if (x && x.GO_LIVE && x.GO_LIVE.checkIns) x.GO_LIVE.checkIns = Object.assign({}, x.GO_LIVE.checkIns, { ready: false, why: 'Not built yet.' }); } });
+      });
+      await nr.waitForSelector('.adm-item[data-key="switch"]');
+      await nr.click('.adm-item[data-key="switch"]');
+      await nr.waitForSelector('#gl-rows tr[data-row="checkIns"]');
+      assert.equal(await nr.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
+      assert.match(await nr.textContent('#gl-rows tr[data-row="checkIns"]'), /Not built yet/);
+      await nr.close();
+    }
     // Joe 10/12: Drivers, Vacation Schedule and Route Editor are ready (they write Driver Master, Vacations, Route Master).
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="drivers"] [data-act="new"]'), false);
     // Joe 10/12 ("Let the new app write plant loading to the real Live sheet."): Plant Loading is a switch of its own, ready.
@@ -1194,7 +1237,7 @@ async function noScroll(page) {
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="plantLoading"] [data-act="new"]'), false);
     // Joe 10/12 ("turn all 8 sheets on"): the plant check screens, Products, Safety and Plant Maintenance have a switch, ready.
     assert.match(await gl.textContent('#gl-rows tr[data-row="plant"]'), /Plant Operations[\s\S]*Off[\s\S]*Ready/);
-    // Turn on everything that is ready: pressed twice; every ready screen goes to the new app, Driver Check-ins stays.
+    // Turn on everything that is ready: pressed twice; every ready screen goes to the new app (Driver Check-ins too, Joe 10/12).
     await gl.click('#gl-all');
     assert.match(await gl.textContent('#gl-all'), /Press again/);
     assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'old', 'one press does nothing');
@@ -1205,7 +1248,7 @@ async function noScroll(page) {
     assert.equal(cfg.screenOwners.weeklyDispatch, 'new');
     assert.equal(cfg.screenOwners.plantLoading, 'new');
     assert.equal(cfg.screenOwners.drivers, 'new');
-    assert.equal(cfg.screenOwners.checkIns, 'old');
+    assert.equal(cfg.screenOwners.checkIns, 'new');
     assert.equal(cfg.screenOwners.plant, 'new');
     if (SHOTS) await gl.screenshot({ path: path.join(SHOTS, 'go-live-switches-1536.png') });
     const onNew = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
@@ -1217,7 +1260,12 @@ async function noScroll(page) {
     await loNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'LIVE');
     assert.deepEqual(loNew.errors, []);
     await loNew.close();
-    // A screen not switched on is view only and says where to switch it on.
+    // A screen not switched on is view only and says where to switch it on. Every screen is ready now (Joe 10/12), so Driver
+    // Check-ins is moved back to the current app first (pressed twice).
+    await gl.click('#gl-rows tr[data-row="checkIns"] [data-act="old"]');
+    await gl.click('#gl-rows tr[data-row="checkIns"] [data-act="old"]');
+    for (let i = 0; i < 50 && (await db().collection('config').doc('app').get()).data().screenOwners.checkIns !== 'old'; i++) await gl.waitForTimeout(100);
+    assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.checkIns, 'old', 'Driver Check-ins moved back');
     const onOld = await openPage(browser, 1366, 650, '/checkins.html?testEmail=dispatch.test@uniteddairy.com');
     await onOld.waitForFunction(() => document.getElementById('mode-text').textContent === 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES');
     assert.equal(await onOld.textContent('#golive-note'), 'View only until switched on in Go-Live Switches.', 'the screen itself says it is not switched on');

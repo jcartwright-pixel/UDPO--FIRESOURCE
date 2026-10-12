@@ -57,3 +57,30 @@ test('fleet sync refuses a production sheet and never writes the fleet list', as
   assert.equal(sheets.writes.length, 0);
   assert.equal((await db().collection('config').doc('fleetSync').get()).data().ok, false);
 });
+
+// Joe 10/12 ("Yes, preview first"): the preview reads both lists and writes nothing; the list of changes is kept for the screen.
+test('fleet sync preview writes nothing, keeps every change it would make, and leaves the last real sync alone', async () => {
+  await db().collection('config').doc('fleetSync').set({ ok: true, at: '2026-10-10T06:00:00.000Z', by: 'nightly' });
+  const out = await runFleetSync({ db: db(), reader: sheets, sheets, target: TARGET, fleet: FLEET, by: 'manager.test@uniteddairy.com', now, dryRun: true });
+  assert.equal(out.ok, true, out.error);
+  assert.equal(sheets.writes.length, 0, 'nothing written');
+  const p = (await db().collection('config').doc('fleetSyncPreview').get()).data();
+  assert.equal(p.preview, true);
+  assert.deepEqual(p.added, ['T-950']);
+  assert.ok(p.changes.some(c => c.unit === '900002' && c.field === 'Status' && c.from === 'ACTIVE' && c.to === 'INACTIVE' && c.plant === 'Uniontown'));
+  assert.equal((await db().collection('config').doc('fleetSync').get()).data().at, '2026-10-10T06:00:00.000Z', 'the last real sync is kept');
+});
+
+// The real Equipment Master only with allowReal (production, behind its own switch); the real Live sheet or the fleet list never.
+test('fleet sync writes the real Equipment Master only with allowReal', async () => {
+  const REAL = { spreadsheetId: '1eqZxqZNQs5gwuaRmQgPRbNvSmy7gOnwwwyoqFS3Djb4', tab: 'EQUIPMENT_MASTER' };
+  const off = await runFleetSync({ db: db(), reader: sheets, sheets, target: REAL, fleet: FLEET, now });
+  assert.equal(off.ok, false);
+  assert.equal(sheets.writes.length, 0);
+  const on = await runFleetSync({ db: db(), reader: sheets, sheets, target: REAL, fleet: FLEET, now, allowReal: true });
+  assert.equal(on.ok, true, on.error);
+  assert.ok(sheets.writes.length > 0 && sheets.writes.every(w => w.spreadsheetId === REAL.spreadsheetId));
+  const live = await runFleetSync({ db: db(), reader: sheets, sheets, target: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'EQUIPMENT_MASTER' }, fleet: FLEET, now, allowReal: true });
+  assert.equal(live.ok, false);
+  assert.match(live.error, /production/);
+});

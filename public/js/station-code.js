@@ -46,7 +46,7 @@ export function askCode(box, { kind, storeKey, call, title, hint, message }) {
 }
 
 /*
- * Change Station: once the plant has a manager release code (Administration > Plant Station Codes), a manager types it
+ * Change Station: once the plant has a manager release code (Administration > Manager Links), a manager types it
  * first. Resolves true when the tablet may leave its station, false on Cancel or when the check could not be made.
  */
 export async function askRelease(box, { status, release, onError, why }) {

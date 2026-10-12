@@ -105,6 +105,17 @@ test('allowReal lets a named list write its own real sheet, and nothing else', a
   await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { drivers: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'DRIVERS_MASTER' } }, now: tick, allowReal: ['drivers'] }), /production sheet/);
 });
 
+// Joe 10/12 ("Let the new app write Driver Check-in problems to the Live sheet's TRUCK LIVE, TRAILER LIVE, FORK TRUCK LIVE,
+// WASH / CLEANING LIVE and REFUSALS / RETURNS LIVE tabs"): those lists may write the real Live workbook, and nothing else real.
+test('allowReal lets the check-in problem lists write the real Live workbook only', async () => {
+  const LIVE = '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', ALL = ['maintTruck', 'maintTrailer', 'maintFork', 'maintWash', 'maintReturns'];
+  const out = await runMasterWriteBack({ db: db(), sheets, targets: { maintTruck: { spreadsheetId: LIVE, tab: 'TRUCK LIVE' } }, now: tick, only: true, allowReal: ALL });
+  assert.equal(out.items, 0);
+  await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { maintTruck: { spreadsheetId: LIVE, tab: 'TRUCK LIVE' } }, now: tick }), /production sheet/);
+  await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { maintTruck: { spreadsheetId: '1eqZxqZNQs5gwuaRmQgPRbNvSmy7gOnwwwyoqFS3Djb4', tab: 'TRUCK LIVE' } }, now: tick, allowReal: ALL }), /production sheet/);
+  await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { drivers: { spreadsheetId: LIVE, tab: 'DRIVERS_MASTER' } }, now: tick, allowReal: ALL.concat(['drivers']) }), /production sheet/);
+});
+
 test('saves queued before the real sheets were turned on are held, not written', async () => {
   await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_casey', name: 'CASEY, OLD', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false }, tick);
   const since = tick().toISOString();

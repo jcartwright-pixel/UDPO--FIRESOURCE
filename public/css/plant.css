@@ -190,8 +190,8 @@
 .sched-page .sc-ctrl .stepper input { width: 150px; }
 .sched-page .sc-today { font-weight: 800 !important; font-size: 14px !important; min-width: 96px; border-left: 1px solid var(--line) !important; border-right: 1px solid var(--line) !important; }
 .sched-page .sc-grow { flex: 1; }
-.sched-page .sc-key { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
-.sched-page .sc-key i { width: 14px; height: 14px; border-radius: 4px; background: #fff1d6; border: 1px solid #f0c987; }
+.sched-page .sc-key { display: inline-flex; align-items: center; gap: 7px; font-size: 16px; font-weight: 700; color: var(--muted); }
+.sched-page .sc-key i { width: 18px; height: 18px; border-radius: 4px; background: #fff1d6; border: 1px solid #f0c987; }
 .sched-page .sc-btn { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .sched-page .sc-btn.primary { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
 .sched-page .sc-ctrl > .sc-btn { min-width: 150px; }
@@ -216,7 +216,11 @@
 .sched-page.sc-recv .sc-badge { background: var(--runs-ink); }
 .sched-page .sc-hol { font-size: 11px; font-weight: 800; font-style: normal; color: #8a4b00; }
 .sched-page .sc-day small { display: block; font-size: 13px; line-height: 1.25; color: #1d4468; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--ud-blue); padding-left: 5px; }
-.sched-page .sc-day small.car { border-left-color: #e5891a; }
+/* Joe 10/12: who delivers each load (Uniontown truck, Branch, Carrier), with the legend at the top. Blue, green, purple:
+   none of them the red or yellow used for warnings and holidays. */
+.sched-page .sc-day small.by-ut, .sched-page .sc-day small.car.by-ut { border-left: 5px solid #0b5596; }
+.sched-page .sc-day small.by-branch { border-left: 5px solid #15803d; background: #e8f5ec; }
+.sched-page .sc-day small.by-carrier { border-left: 5px solid #7e3fbf; background: #f2ebfa; }
 .sched-page .sc-day small.sc-more { border: 0; padding: 0; color: var(--muted); font-weight: 700; }
 /* Week */
 .sched-page .sc-v-week { flex-direction: row; gap: 12px; }
@@ -239,7 +243,23 @@
 .sched-page .sc-col.today { background: #fffbea; }
 .sched-page .sc-load { display: block; width: 100%; text-align: left; border: 0; border-left: 4px solid var(--ud-blue); border-radius: 6px; background: var(--band); padding: 6px 8px; font: inherit; color: var(--ink); cursor: pointer; }
 .sched-page.sc-recv .sc-load { border-left-color: var(--runs-ink); background: var(--runs-bg); }
-.sched-page .sc-load.car { border-left-color: #e5891a; }
+.sched-page .sc-load.by-ut { border-left: 6px solid #0b5596; background: #e8f0f8; }
+.sched-page .sc-load.by-branch { border-left: 6px solid #15803d; background: #e8f5ec; }
+.sched-page .sc-load.by-carrier { border-left: 6px solid #7e3fbf; background: #f2ebfa; }
+.sched-page table.sc-table tr.by-ut td:first-child { box-shadow: inset 6px 0 0 #0b5596; }
+.sched-page table.sc-table tr.by-branch td { background: #e8f5ec; }
+.sched-page table.sc-table tr.by-branch td:first-child { box-shadow: inset 6px 0 0 #15803d; }
+.sched-page table.sc-table tr.by-carrier td { background: #f2ebfa; }
+.sched-page table.sc-table tr.by-carrier td:first-child { box-shadow: inset 6px 0 0 #7e3fbf; }
+.sched-page .sc-dayrow.by-ut { box-shadow: inset 5px 0 0 #0b5596; padding-left: 12px; }
+.sched-page .sc-dayrow.by-branch { box-shadow: inset 5px 0 0 #15803d; background: #e8f5ec; padding-left: 12px; }
+.sched-page .sc-dayrow.by-carrier { box-shadow: inset 5px 0 0 #7e3fbf; background: #f2ebfa; padding-left: 12px; }
+.sched-page .sc-legend { display: inline-flex; align-items: center; gap: 16px; margin-right: 18px; white-space: nowrap; }
+.sched-page .sc-by { display: inline-flex; align-items: center; gap: 7px; font-size: 16px; font-weight: 700; color: var(--ink); }
+.sched-page .sc-by i { width: 18px; height: 18px; border-radius: 4px; }
+.sched-page .sc-by.ut i { background: #0b5596; }
+.sched-page .sc-by.branch i { background: #15803d; }
+.sched-page .sc-by.carrier i { background: #7e3fbf; }
 .sched-page .sc-load strong, .sched-page .sc-load span, .sched-page .sc-load small { display: block; overflow: hidden; text-overflow: ellipsis; }
 .sched-page .sc-load strong { font-size: 14px; white-space: nowrap; }
 .sched-page .sc-load span { font-size: 13px; color: var(--muted); }

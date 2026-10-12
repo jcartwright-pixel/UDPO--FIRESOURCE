@@ -38,9 +38,10 @@ test('Operational Assignments start with the current app\'s four, in order, and 
 });
 
 // Joe 10/10: "My window should have a back button or a return to home button." Every screen (the drivers' public phone page
-// aside) loads the shared shell, which puts Back and Home at the top of the menu.
+// aside) loads the shared shell, which puts Back and Home at the top of the menu. The Driver Room Check-In tablet (Joe 10/12) is
+// the drivers' page on a shared tablet with no account: it leaves only by Change Station and the manager release code.
 test('every screen loads the shared shell that gives it Back and Home', () => {
-  const bad = fs.readdirSync(PUB).filter(f => f.endsWith('.html') && f !== 'route.html').filter(f => {
+  const bad = fs.readdirSync(PUB).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html').filter(f => {
     const text = fs.readFileSync(path.join(PUB, f), 'utf8');
     return !/js\/app\.js/.test(text) || !/id="screen"/.test(text) || !/class="topbar"/.test(text);
   });

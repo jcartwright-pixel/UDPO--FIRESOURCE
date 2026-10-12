@@ -281,9 +281,25 @@ async function cameraShot(page, color) {
     await la.fill('#rows tr[data-newsub][data-a="2"] input', 'Conference Room');
     await la.press('#rows tr[data-newsub][data-a="2"] input', 'Tab');
     await laUntil(l => l[2].subs[l[2].subs.length - 1].name === 'Conference Room', 'a sub-area is added at the end of Office');
-    await la.waitForSelector('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-la-up]');
-    await la.click('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-la-up]');
-    await laUntil(l => { const o = l[2].subs.map(x => x.name); return o[o.length - 1] === 'Stairs & Exits' && o[o.length - 2] === 'Conference Room'; }, 'Move up changes the walking order');
+    // Joe 10/12: the order changes by grabbing the line and dragging it; no Move up / Move down, no arrows, no dots.
+    assert.equal(await la.$('[data-la-up], [data-la-down], .lo-grip, [data-grip]'), null, 'no Move up / Move down buttons and no grab dots');
+    const conf = '#rows tr.sw-sub-row[data-drag]:has(input[value="Conference Room"])';
+    await la.waitForSelector(conf);
+    assert.equal(await la.$eval(conf + ' td.la-order', td => getComputedStyle(td).cursor), 'grab', 'the hand shows over a line');
+    // Keyboard: Alt+Up on the line moves it one place, and the line keeps the focus.
+    await la.focus(conf);
+    await la.keyboard.press('Alt+ArrowUp');
+    await laUntil(l => { const o = l[2].subs.map(x => x.name); return o[o.length - 1] === 'Stairs & Exits' && o[o.length - 2] === 'Conference Room'; }, 'Alt+Up changes the walking order');
+    await la.waitForFunction(() => document.activeElement && /Conference Room/.test(document.activeElement.getAttribute('aria-label') || ''));
+    // Mouse: grab Conference Room by its line and drag it above Office's first sub-area.
+    const firstOffice = '#rows tr.sw-sub-row[data-a="2"][data-s="0"]', firstName = await la.$eval(firstOffice + ' input[data-k="name"]', i => i.value);
+    const fromBox = await la.locator(conf + ' td.la-order').boundingBox(), toBox = await la.locator(firstOffice + ' td.la-order').boundingBox();
+    await la.mouse.move(fromBox.x + fromBox.width / 2, fromBox.y + fromBox.height / 2);
+    await la.mouse.down();
+    for (let i = 1; i <= 8; i++) await la.mouse.move(fromBox.x + fromBox.width / 2, fromBox.y + fromBox.height / 2 + (toBox.y + toBox.height * 0.25 - fromBox.y - fromBox.height / 2) * i / 8);
+    await la.mouse.up();
+    await laUntil(l => l[2].subs[0].name === 'Conference Room' && l[2].subs[1].name === firstName, 'dragging the line puts Conference Room first in Office');
+    await laUntil(l => l.map(a => a.name).join(',') === 'Plant,Garage,Office,Yard', 'a sub-area stays in its own area and the areas keep their order');
     await la.waitForSelector('#rows tr.sw-sub-row:has(input[value="Ammonia Room"]) input[data-k="on"]');
     await la.uncheck('#rows tr.sw-sub-row:has(input[value="Ammonia Room"]) input[data-k="on"]');
     await laUntil(l => l[0].subs.find(x => x.key === 'ammonia').off, 'a sub-area is turned off');
@@ -295,7 +311,7 @@ async function cameraShot(page, color) {
     await shot(la, 'location-areas-1920');
     assert.deepEqual(la.errors, []);
     await la.close();
-    results.push('Location Areas (Plant, Garage, Office, Yard): a sub-area renamed by typing over it, + Add sub-area, Move up and turning one off all save; it fits 1536 and 1920');
+    results.push('Location Areas (Plant, Garage, Office, Yard): a sub-area renamed by typing over it, + Add sub-area, dragging a line (mouse and Alt+Up) and turning one off all save; it fits 1536 and 1920');
 
     // Checklist Setup follows Location Areas (names, order, turned off) and Move to puts an item in another sub-area.
     const cs = await openPage(browser, 1536, 864, '/safety-setup.html?' + ADMIN);

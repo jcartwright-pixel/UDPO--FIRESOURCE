@@ -12,8 +12,10 @@
  *   writeBackOnSave       writes each save into the SANDBOX Live workbook (phase 2; production is refused)
  *   writeBackEveryMinute  retries anything the write-back could not finish
  *   masterWriteBackOnSave writes Driver / Route / Equipment Master, day off and vacation saves into SANDBOX copies
- *   fleetSyncNightly      brings Equipment Master in step with the United Dairy fleet list every night (SANDBOX copy only)
- *   fleetSyncNow          the same from Equipment's "Sync fleet list" button, for a manager or administrator
+ *   fleetSyncNightly      brings Equipment Master in step with the United Dairy fleet list every night (the sandbox copy; the
+ *                         real one only once config/app.fleetSyncReal.enabled is on, which waits for Joe's OK)
+ *   fleetSyncNow          the same from Equipment's "Sync fleet list" button, for a manager or administrator; {preview: true}
+ *                         lists every change it would make and writes nothing
  *   mailPlantReport       emails a plant report straight after Send Current Report saves it (reportmail.js; MAIL_FROM)
  *   mocreoEvery5Minutes   reads the MOCREO cooler sensors (read only) once a key is saved in Administration and tested
  *   mocreo                Administration > MOCREO & Sensors: save or replace the key (never shown again), test it, thermometer locations
@@ -116,9 +118,15 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
 
 const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
-// Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
+// Open to phones without a United Dairy account: every call is checked against the Route Distribution code (or, from the
+// Driver Room Check-In tablet, its Driver Room kiosk station code).
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
-  try { return await phoneCall(db, request.data); } catch (error) { throw asHttps(error); }
+  const input = request.data || {};
+  try {
+    // The Driver Room Check-In tablet's Change Station: the plant's manager release code (as the no-account Plant Station).
+    if (input.op === 'roomStatus' || input.op === 'roomRelease') return await ADMIN.releaseCheck(db, { op: input.op === 'roomStatus' ? 'status' : 'release', facilityId: input.facilityId, code: input.code });
+    return await phoneCall(db, input);
+  } catch (error) { throw asHttps(error); }
 });
 
 // Open to the garage tablet without a United Dairy account: every step is checked against a technician's sign-in.
@@ -260,16 +268,19 @@ async function writeBackIfOn(part) {
   const live = part === 'master' ? null : await runWriteBack({ db, sheets, target, allowRealLive: realLive() });
   // Production: dispatch changes to the Live tabs, and (Joe 10/12: "Let the new app write Route Master, Driver Master,
   // Equipment Master, Users, Exceptions and Vacations to the real sheets.") those six real master lists, the same sheets the
-  // copy reads; no other master list and no maintenance queue is written. config/app.realMasters.enabled === false stops
+  // copy reads, and (Joe 10/12) the check-in problem tabs of the real Live workbook; no other list is written. config/app.realMasters.enabled === false stops
   // them; saves queued before they were first turned on are held, not written (masterwrite.js since).
   if (realLive()) {
     if (part === 'live') return { live, master: null };
     const since = await realMastersSince();
     if (!since) return { live, master: null };
-    const { UNIONTOWN } = require('./src/sources'), { REAL_MASTER_LISTS } = require('./src/writeback');
+    const { UNIONTOWN } = require('./src/sources'), { REAL_MASTER_LISTS, REAL_LIVE_QUEUE_LISTS } = require('./src/writeback');
     const targets = {};
     REAL_MASTER_LISTS.forEach(k => { targets[k] = UNIONTOWN.masters[k]; });
-    return { live, master: await runMasterWriteBack({ db, sheets, targets, only: true, allowReal: REAL_MASTER_LISTS, since }) };
+    // Driver Check-ins (Joe 10/12): the problems a check-in reports go to these tabs of the real Live workbook.
+    const { TABS, LISTS } = require('./src/maintenance');
+    Object.keys(LISTS).forEach(k => { targets[LISTS[k]] = { spreadsheetId: UNIONTOWN.live.spreadsheetId, tab: TABS[k] }; });
+    return { live, master: await runMasterWriteBack({ db, sheets, targets, only: true, allowReal: REAL_MASTER_LISTS.concat(REAL_LIVE_QUEUE_LISTS), since }) };
   }
   // Master lists: only those WRITEBACK_JSON.masters names ({"drivers": {"spreadsheetId", "tab"}, ...}), each the same copy the
   // transfer reads (SOURCES_JSON), for the same reason as above.
@@ -323,7 +334,9 @@ if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
 exports.writeBackEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 120, maxInstances: 1 }, () => writeBackIfOn('both'));
 
 // Fleet list sync: reads the fleet list, writes only the Equipment Master copy the write-back writes (and the transfer reads).
-// Production has no WRITEBACK_JSON, so there the current app's weekly sync stays in charge and this does nothing.
+// Production has no WRITEBACK_JSON masters, so there it writes the real Equipment Master only once config/app.fleetSyncReal
+// .enabled is true (off until Joe OKs it; the current app's weekly sync stays in charge until then). A preview reads the
+// real Equipment Master there and writes nothing.
 function fleetSyncTarget() {
   if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
   const target = (JSON.parse(process.env.WRITEBACK_JSON).masters || {}).equipment;
@@ -331,12 +344,23 @@ function fleetSyncTarget() {
   if (!target || target.spreadsheetId !== source.spreadsheetId || target.tab !== source.tab) return null;
   return target;
 }
+const realEquipment = () => (realLive() ? require('./src/sources').UNIONTOWN.masters.equipment : null);
+async function realFleetSyncOn() {
+  return ((((await db.collection('config').doc('app').get()).data() || {}).fleetSyncReal) || {}).enabled === true;
+}
+// { target, allowReal } for a sync that writes, or null where none may run.
+async function fleetSyncWrite() {
+  const target = fleetSyncTarget();
+  if (target) return { target, allowReal: false };
+  const real = realEquipment();
+  return real && (await realFleetSyncOn()) ? { target: real, allowReal: true } : null;
+}
 
 exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
-  const target = fleetSyncTarget();
-  if (!target) return;
+  const run = await fleetSyncWrite();
+  if (!run) return;
   const sheets = makeSheetsWriter();
-  await runFleetSync({ db, reader: sheets, sheets, target, by: 'nightly' });
+  await runFleetSync({ db, reader: sheets, sheets, target: run.target, allowReal: run.allowReal, by: 'nightly' });
 });
 
 // MOCREO sensors (src/mocreo.js): the key is read each run, so the sync starts by itself once a key is saved and tested.
@@ -352,16 +376,22 @@ exports.mocreoEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutS
   await runMocreoSync({ db, getSecrets, fetchFn: fetch });
 });
 
+// Equipment's "Sync fleet list" button, and its "Preview fleet sync" ({preview: true}: writes nothing, lists every change).
 exports.fleetSyncNow = onCall({ timeoutSeconds: 120, maxInstances: 1 }, async (request) => {
   const user = signedIn(request);
   const person = (await db.collection('users').doc(safeIdPart(user.email)).get()).data();
   if (!person || person.status !== 'ACTIVE' || !L.hasRole(person, ['ADMINISTRATOR', 'ADMIN', 'MANAGER'])) {
     throw new HttpsError('permission-denied', 'Only a manager or administrator can sync the fleet list');
   }
-  const target = fleetSyncTarget();
-  if (!target) throw new HttpsError('failed-precondition', 'The fleet list sync is not set up here; the current app syncs it every week');
   const sheets = makeSheetsWriter();
-  return runFleetSync({ db, reader: sheets, sheets, target, by: user.email });
+  if (request.data && request.data.preview === true) {
+    const target = fleetSyncTarget() || realEquipment();
+    if (!target) throw new HttpsError('failed-precondition', 'The fleet list preview is not set up here');
+    return runFleetSync({ db, reader: sheets, sheets, target, by: user.email, dryRun: true });
+  }
+  const run = await fleetSyncWrite();
+  if (!run) throw new HttpsError('failed-precondition', 'The fleet list sync is not set up here; the current app syncs it every week');
+  return runFleetSync({ db, reader: sheets, sheets, target: run.target, allowReal: run.allowReal, by: user.email });
 });
 
 // Reading devices (src/reader.js): a line PC posts {device, reads: [{upc, date}]} with the device's key; Receiving plugs in later.

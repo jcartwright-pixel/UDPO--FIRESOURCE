@@ -50,11 +50,12 @@
     import { start, requireSignIn, save, escapeHtml, showError, mayOpenBuilding } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { pickPlant, plantsOf, canSetUp, modeText, watchSetup } from './js/safety.js';
+    import { mountRowDrag } from './js/row-drag.js';
 
     // Location Areas (Joe 10/12, Administration > Plant Setup): each plant's areas (Plant, Garage, Office, Yard and any added)
     // and their sub-areas. One list: the Safety Walkthrough walks it in this order, Checklist Setup puts its items in these
     // sub-areas, and other screens can use it later. Each box saves as it is left: type over a name to rename it, untick On
-    // to turn it off, Move up / Move down for the order, + Add sub-area, + Add area. Nothing is ever deleted, only turned
+    // to turn it off, grab a line and drag it for the order (Joe 10/12: no arrows, no dots), + Add sub-area, + Add area. Nothing is ever deleted, only turned
     // off, so old walks and issues still read. Under construction: Administrators only.
     const S = window.UDSafety;
     const params = new URLSearchParams(location.search);
@@ -65,7 +66,10 @@
     const newKey = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const inp = (k, v, label, ph) => '<input type="text" data-k="' + k + '" value="' + escapeHtml(v || '') + '" maxlength="60" aria-label="' + escapeHtml(label) + '"' + (ph ? ' placeholder="' + escapeHtml(ph) + '"' : '') + '>';
     const tick = (on, dis, label) => '<label class="sw-check"><input type="checkbox" data-k="on" aria-label="' + escapeHtml(label) + '"' + (on ? ' checked' : '') + dis + '>' + (on ? 'On' : 'Off') + '</label>';
-    const moves = (up, down, set) => set ? '<button type="button" class="sw-btn sw-small" data-la-up="' + up + '">Move up</button><button type="button" class="sw-btn sw-small" data-la-down="' + down + '">Move down</button>' : '';
+    // Order: the place number, and the box a finger drags the line from at once (anywhere else it holds a moment first).
+    const order = (n) => '<td class="la-order" data-drag-handle="1">' + n + '</td>';
+    const dragAttrs = (id, g, name, set) => set ? ' data-drag="' + id + '" data-drag-group="' + g + '" tabindex="0" aria-label="' + escapeHtml(name) + '. Drag it, or Alt and the up or down arrow, to change the order."' : '';
+    let heldMove = null;
     function render(force) {
       document.getElementById('mode-text').textContent = modeText(app);
       document.getElementById('setup-link').href = 'safety-setup.html?plant=' + encodeURIComponent(plant);
@@ -74,17 +78,21 @@
       S.checklist(setup, true).forEach(a => { used[a.key] = a.items.filter(i => !i.off).length; });
       const subs = L.reduce((n, a) => n + a.subs.length, 0);
       document.getElementById('counts').textContent = seen ? L.length + ' areas · ' + subs + ' sub-areas' + (setup && setup.locations ? '' : ' · the starting list') : '';
-      document.getElementById('foot').textContent = set ? 'Each box saves as you leave it. Type over a name to rename it. Untick On to take an area or sub-area off the walk; nothing is ever deleted, so old walks still read. The Safety Walkthrough walks the areas in this order; Checklist Setup puts its items in these sub-areas.' : 'View only. A manager or administrator changes the areas.';
+      document.getElementById('foot').textContent = set ? 'Each box saves as you leave it. Grab a line and drag it up or down to change the order. Type over a name to rename it. Untick On to take an area or sub-area off the walk; nothing is ever deleted, so old walks still read. The Safety Walkthrough walks the areas in this order; Checklist Setup puts its items in these sub-areas.' : 'View only. A manager or administrator changes the areas.';
       if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
+      const act = document.activeElement, keep = heldMove || (act && act.matches && act.matches('#rows tr[data-drag]') ? act.dataset.drag : null);
       document.getElementById('rows').innerHTML = !seen ? '<tr><td colspan="4" class="sw-empty">Reading the areas…</td></tr>' : L.map((a, ai) =>
-        '<tr class="sw-place-row' + (a.off ? ' sw-off' : '') + '" data-a="' + ai + '"><td>' + (set ? inp('name', a.name, 'Area name') : '<b>' + escapeHtml(a.name) + '</b>') + '</td>' +
-          '<td>' + tick(!a.off, dis, a.name + ' on') + '</td><td>' + moves(ai, ai, set) + '</td>' +
+        '<tr class="sw-place-row' + (a.off ? ' sw-off' : '') + '" data-a="' + ai + '"' + dragAttrs(String(ai), 'areas', a.name, set) + '><td>' + (set ? inp('name', a.name, 'Area name') : '<b>' + escapeHtml(a.name) + '</b>') + '</td>' +
+          '<td>' + tick(!a.off, dis, a.name + ' on') + '</td>' + order(ai + 1) +
           '<td>' + a.subs.reduce((n, x) => n + (used[x.key] || 0), 0) + '</td></tr>' +
-        a.subs.map((x, xi) => '<tr class="sw-sub-row' + (x.off || a.off ? ' sw-off' : '') + '" data-a="' + ai + '" data-s="' + xi + '"><td>' + (set ? inp('name', x.name, 'Sub-area name') : escapeHtml(x.name)) + '</td>' +
-          '<td>' + tick(!x.off, dis, x.name + ' on') + '</td><td>' + moves(ai + '.' + xi, ai + '.' + xi, set) + '</td>' +
+        a.subs.map((x, xi) => '<tr class="sw-sub-row' + (x.off || a.off ? ' sw-off' : '') + '" data-a="' + ai + '" data-s="' + xi + '"' + dragAttrs(ai + '.' + xi, 'subs' + ai, x.name, set) + '><td>' + (set ? inp('name', x.name, 'Sub-area name') : escapeHtml(x.name)) + '</td>' +
+          '<td>' + tick(!x.off, dis, x.name + ' on') + '</td>' + order((ai + 1) + '.' + (xi + 1)) +
           '<td>' + (used[x.key] || 0) + '</td></tr>').join('') +
         (set ? '<tr class="sw-add sw-sub-row" data-a="' + ai + '" data-newsub="1"><td colspan="4">' + inp('newsub', '', 'New sub-area in ' + a.name, '+ Add sub-area to ' + a.name) + '</td></tr>' : '')).join('') +
         (set && seen ? '<tr class="sw-add" data-newarea="1"><td colspan="4">' + inp('newarea', '', 'New area', '+ Add area (like Docks or Warehouse)') + '</td></tr>' : '');
+      // A line moved with the keyboard keeps the focus, so Alt+Up can be pressed again.
+      heldMove = null;
+      if (keep) { const tr = document.querySelector('#rows tr[data-drag="' + keep + '"]'); if (tr) tr.focus(); }
     }
     function send(next) {
       pending = next;
@@ -121,16 +129,15 @@
       if (t.dataset.k === 'on') x.off = !t.checked;
       commit(L);
     });
-    // Move up / Move down: an area among the areas, a sub-area within its area.
-    document.getElementById('rows').addEventListener('click', e => {
-      const b = e.target.closest('[data-la-up],[data-la-down]');
-      if (!b || !canSetUp(person, app)) return;
-      const L = copy(), dir = b.dataset.laUp !== undefined ? -1 : 1, [ai, xi] = String(b.dataset.laUp !== undefined ? b.dataset.laUp : b.dataset.laDown).split('.').map(Number);
-      const arr = xi === undefined || isNaN(xi) ? L : L[ai].subs, at = xi === undefined || isNaN(xi) ? ai : xi, to = at + dir;
-      if (to < 0 || to >= arr.length) return;
+    // Drag a line (or Alt+Up / Alt+Down): an area among the areas, a sub-area within its area.
+    mountRowDrag({ box: document.getElementById('rows'), canDrag: () => canSetUp(person, app), handle: (td) => td.hasAttribute('data-drag-handle'), onMove: (id, to, byKey) => {
+      const L = copy(), [ai, xi] = String(id).split('.').map(Number), sub = xi !== undefined && !isNaN(xi);
+      const arr = sub ? (L[ai] && L[ai].subs) : L, at = sub ? xi : ai;
+      if (!arr || to < 0 || to >= arr.length || to === at) return;
       arr.splice(to, 0, arr.splice(at, 1)[0]);
+      if (byKey) heldMove = sub ? ai + '.' + to : String(to);
       commit(L);
-    });
+    } });
     function follow() {
       if (stop) stop();
       seen = false; setup = null; pending = null; render(true);

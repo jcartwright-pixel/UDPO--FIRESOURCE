@@ -26,6 +26,7 @@ service cloud.firestore {
     function activeUserOrStation() { return activeUser() || plantStation(); }
     match /config/app { allow read: if activeUserOrStation(); }
     match /config/fleetSync { allow read: if activeUser(); }
+    match /config/fleetSyncPreview { allow read: if activeUser(); }
     match /config/mocreo { allow read: if activeUser(); }
     // Fleet Service's service rules (Fleet Service Setup; the server writes them).
     match /config/fleetRules { allow read: if activeUser(); }
