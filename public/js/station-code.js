@@ -49,17 +49,17 @@ export function askCode(box, { kind, storeKey, call, title, hint, message }) {
  * Change Station: once the plant has a manager release code (Administration > Plant Station Codes), a manager types it
  * first. Resolves true when the tablet may leave its station, false on Cancel or when the check could not be made.
  */
-export async function askRelease(box, { status, release, onError }) {
+export async function askRelease(box, { status, release, onError, why }) {
   let required = false;
   try { required = (await status()).required; } catch (err) {
     // No answer: the station stays as it is, so a dropped network cannot get past the code.
-    onError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and press Change Station again.');
+    onError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and try again.');
     return false;
   }
   if (!required) return true;
   return new Promise(resolve => {
     box.hidden = false;
-    box.innerHTML = '<form class="ps-release"><p>A manager must type the manager release code to change this tablet\'s station.</p>' +
+    box.innerHTML = '<form class="ps-release"><p>' + (why || 'A manager must type the manager release code to change this tablet\'s station.') + '</p>' +
       '<label>Manager release code <input name="code" maxlength="48" autocomplete="off" autocapitalize="characters"></label>' +
       '<button type="submit">RELEASE THIS STATION</button><button type="button" data-cancel>CANCEL</button><span class="ps-release-msg" role="status"></span></form>';
     const form = box.querySelector('form'), msg = box.querySelector('.ps-release-msg');
