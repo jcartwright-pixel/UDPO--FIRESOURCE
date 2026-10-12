@@ -126,8 +126,6 @@
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     const L = window.UDLogic;
-    // Joe 10/12: a run reads as Route, Route Name and Run Name ("6301" then "Walmart Load 1"), never 6301_1.
-    const routeNo = (r) => L.routeNumber(r.route), runName = (r) => L.runLabel(r.routeName, r.run, r.routeRunType), fullName = (r) => routeNo(r) + ' ' + runName(r);
     const params = new URLSearchParams(location.search);
     let loadDate = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
     let unsubscribeRuns = null, runs = [], rows = [], editing = false, dragging = null, writeBack = false, editRow = null;
@@ -256,8 +254,8 @@
         // Joe 10/12: a manager grabs the line itself (hand cursor) and drags it up or down; no grab dots, no arrows.
         const mover = order && !r.off && !r.already;
         body.push('<tr data-id="' + escapeHtml(r.id) + '" data-index="' + i + '"' + (r.off ? ' class="off"' : r.already ? ' class="already"' : mover ? ' class="mover" title="Drag the line up or down to change the load order (Alt+Up / Alt+Down from the keyboard)"' : '') + '>' +
-          '<td class="route">' + escapeHtml(routeNo(r)) + '</td>' +
-          cell(runName(r), 'strong') +
+          '<td class="route">' + escapeHtml(r.route) + '</td>' +
+          cell(r.run, 'strong') +
           '<td><button type="button" class="toggle' + (r.off ? '' : ' on') + '" data-runs' + (edit ? '' : ' disabled') + ' aria-pressed="' + !r.off + '" title="Click to change whether this run runs">' + (r.off ? 'NO RUN' : 'RUNS') + '</button></td>' +
           (!driver && needs && cover[r.id]
             ? cell('', 'missing offcover', live && 'driver').replace('<td ', '<td data-cover="' + escapeHtml(coverLabel(cover[r.id])) + '" ').replace('title=""', 'title="' + escapeHtml(coverLabel(cover[r.id]) + ': needs a driver') + '"')
@@ -308,7 +306,7 @@
     function unitBlocks(kind, row) {
       const day = dayRowsFor(row), out = {}, key = kind === 'truck' ? 'truckId' : 'trailerId';
       // Joe 10/12: a driver on two loads that day keeps his truck on both, so his own other loads do not block it.
-      day.forEach(r => { if (r !== row && !r.off && r[key] && !out[r[key]] && !(kind === 'truck' && r.driverId && r.driverId === row.driverId)) out[r[key]] = 'ON ' + routeNo(r); });
+      day.forEach(r => { if (r !== row && !r.off && r[key] && !out[r[key]] && !(kind === 'truck' && r.driverId && r.driverId === row.driverId)) out[r[key]] = 'ON ' + r.route; });
       return Object.assign(out, L.unitConflicts(day, row, kind, rmHours));
     }
     const pickOpts = (kind, row) => ({ override: !!ovr[row.id], date: row.deliveryDate, conflicts: kind === 'truck' || kind === 'trailer' ? unitBlocks(kind, row) : null });
@@ -316,7 +314,7 @@
     // Drivers and units already used on this delivery day, so the list can show "(on 802)".
     function busyFor(kind, row) {
       const key = kind === 'driver' ? 'driverId' : kind === 'truck' ? 'truckId' : 'trailerId', busy = {};
-      dayRowsFor(row, kind === 'driver').forEach(r => { if (r !== row && !r.off && r[key]) busy[r[key]] = 'on ' + routeNo(r); });
+      dayRowsFor(row, kind === 'driver').forEach(r => { if (r !== row && !r.off && r[key]) busy[r[key]] = 'on ' + r.route; });
       return busy;
     }
 
@@ -511,9 +509,9 @@
       if (!first && box.contains(document.activeElement) && document.activeElement.matches('input, textarea, select')) return; // do not wipe typing or an open list
       const select = (kind, current) => '<select data-field="' + kind + '"' + (row.off ? ' disabled' : '') + '>' +
         (kind === 'driver' ? driverOptionsHtml(current || (coverageName(row) ? '__CVG__:' + coverageName(row) : ''), busyFor(kind, row), pickOpts(kind, row)) : optionsHtml(kind, current, busyFor(kind, row), pickOpts(kind, row))) + '</select>';
-      box.innerHTML = '<h2 id="edit-title">' + escapeHtml(fullName(row)) + ' <small>' + escapeHtml(row.deliveryDay + ' ' + shortDate(row.deliveryDate)) + '</small></h2>' +
+      box.innerHTML = '<h2 id="edit-title">' + escapeHtml(row.route + ' ' + row.run) + ' <small>' + escapeHtml(row.deliveryDay + ' ' + shortDate(row.deliveryDate)) + '</small></h2>' +
         '<div class="modal-grid">' +
-        '<label>Route<input value="' + escapeHtml(routeNo(row)) + '" disabled></label><label>Run<input value="' + escapeHtml(runName(row)) + '" disabled></label>' +
+        '<label>Route<input value="' + escapeHtml(row.route) + '" disabled></label><label>Run<input value="' + escapeHtml(row.run) + '" disabled></label>' +
         '<label>Does it run?<select data-field="runs"><option value="true"' + (row.off ? '' : ' selected') + '>YES</option><option value="false"' + (row.off ? ' selected' : '') + '>NO</option></select></label>' +
         '<label>Driver' + (coverageName(row) ? ' / CVG' : '') + select('driver', row.driverId) + '</label>' +
         '<label>Truck' + select('truck', row.truckId) + '</label><label>Trailer' + select('trailer', row.trailerId) + '</label>' +
@@ -578,7 +576,7 @@
     document.getElementById('open-add').onclick = () => {
       addable = L.notRunningRows(runs, loadDate);
       document.getElementById('add-pick').innerHTML = addable.length
-        ? '<option value="">Select a route / run</option>' + addable.map((r, i) => '<option value="' + i + '">' + escapeHtml(fullName(r) + ', ' + L.dayName(r.deliveryDate) + ' ' + shortDate(r.deliveryDate)) + '</option>').join('')
+        ? '<option value="">Select a route / run</option>' + addable.map((r, i) => '<option value="' + i + '">' + escapeHtml(r.route + ' ' + r.run + ', ' + L.dayName(r.deliveryDate) + ' ' + shortDate(r.deliveryDate)) + '</option>').join('')
         : '<option value="">Every route already runs on this day</option>';
       paintAddWhere();
       openModal('add-panel');
@@ -589,7 +587,7 @@
       const day = r && document.getElementById('add-pick').value !== '' ? rows.filter(x => !x.off && !x.already && x.loadDate === loadDate) : [];
       box.hidden = !canReorder() || !day.length;
       document.getElementById('add-where').innerHTML = '<option value="">At the end</option><option value="first">First, before Route ' + escapeHtml(day.length ? day[0].route : '') + '</option>' +
-        day.map(x => '<option value="' + escapeHtml(x.id) + '">After Route ' + escapeHtml(fullName(x)) + '</option>').join('');
+        day.map(x => '<option value="' + escapeHtml(x.id) + '">After Route ' + escapeHtml(x.route + ' ' + x.run) + '</option>').join('');
     }
     document.getElementById('add-pick').onchange = paintAddWhere;
     document.getElementById('add-save').onclick = () => {
@@ -681,7 +679,7 @@
         if (r.deliveryDate !== group) loaded = '';
         group = r.deliveryDate;
         if (mixed(r.deliveryDate) && r.loadDate !== loaded) { loaded = r.loadDate; html += '<tr class="pgroup"><td colspan="14">' + escapeHtml('Loaded ' + L.dayName(r.loadDate) + ', ' + usDate(r.loadDate)) + '</td></tr>'; }
-        html += '<tr><td>' + [routeNo(r), runName(r), r.driver || coverageName(r), r.truck, r.trailer, departText(r), '', '', '', '', '', '', r.palletJack, r.pickup ? 'PICKUP ' + r.pickup : r.driverNotes].map(v => escapeHtml(show(v))).join('</td><td>') + '</td></tr>';
+        html += '<tr><td>' + [r.route, r.run, r.driver || coverageName(r), r.truck, r.trailer, departText(r), '', '', '', '', '', '', r.palletJack, r.pickup ? 'PICKUP ' + r.pickup : r.driverNotes].map(v => escapeHtml(show(v))).join('</td><td>') + '</td></tr>';
       });
       document.getElementById('print').innerHTML = html + '</tbody></table>';
       printSaved('daily');

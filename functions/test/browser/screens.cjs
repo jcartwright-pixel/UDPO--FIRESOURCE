@@ -427,11 +427,11 @@ async function noScroll(page) {
     await rt.selectOption('form.details select[data-f="loadType"]', 'Tote');
     if (SHOTS) await rt.screenshot({ path: path.join(SHOTS, 'routes-details-802-1920.png') });
     await rt.selectOption('#view-select', 'recap');
-    await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => tr.children[1].textContent === '802' && tr.children[6].textContent === 'Tote' && /Wed/.test(tr.children[7].textContent)), null, { timeout: 5000 });
+    await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => tr.children[0].textContent === '802' && tr.children[3].textContent === 'Tote' && /Wed/.test(tr.children[4].textContent)), null, { timeout: 5000 });
     await rt.click('#add-run');
     await rt.fill('#add-form input[name="run"]', 'WHEELING');
     await rt.click('#add-save');
-    await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => /WHEELING/.test(tr.textContent) || [...tr.querySelectorAll('input.nm')].some(i => i.value === 'WHEELING')), null, { timeout: 5000 });
+    await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => /WHEELING/.test(tr.textContent)), null, { timeout: 5000 });
     await rt.selectOption('#route-select', '');
     await rt.selectOption('#view-select', 'seq');
     // The Load Order list is drawn and the saves above have settled, so no copy redraws the rows in the middle of the drag.
