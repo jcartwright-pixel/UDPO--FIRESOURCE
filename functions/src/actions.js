@@ -1062,6 +1062,9 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
       // Joe 10/12 (907 / 950): Show on Daily Dispatch switched in the Route Editor reaches the Current and Next weeks' rows too,
       // since Daily reads the week's own flag (a FALSE there hides the run whatever Route Master says).
       if (req && req.fields && typeof req.fields.displayDaily === 'boolean' && run.displayDaily !== req.fields.displayDaily) changes[i].run.displayDaily = req.fields.displayDaily;
+      // Joe 10/12 (typed OK): the driver Route app switch (phone View Loadout, Driver Room board, check-in) reaches the two weeks' rows too,
+      // since those screens read the week's own display_mobile_route first.
+      if (req && req.fields && typeof req.fields.displayMobile === 'boolean' && run.displayMobileRoute !== req.fields.displayMobile) changes[i].run.displayMobileRoute = req.fields.displayMobile;
     });
     L.DAYS.forEach(p => {
       // A run on two rows (one per set of days): the day belongs to the row that runs it, else the first row.
