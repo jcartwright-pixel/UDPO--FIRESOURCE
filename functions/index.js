@@ -120,18 +120,27 @@ const asHttps = (error) => (error instanceof SaveError || error instanceof Switc
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code (or, from the
 // Driver Room Check-In tablet, its Driver Room kiosk station code).
+const roomCall = (input) => /^room/.test(String(input.op || '')) || !!input.station;
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {
   const input = request.data || {};
   try {
-    // The Driver Room Check-In tablet's Change Station: the plant's manager release code (as the no-account Plant Station).
+    // Joe 10/12: the Driver Room Check-In Station is signed in with a United Dairy account first (the Driver Station link);
+    // its station code then decides the page. The drivers' own phones keep the Route Distribution code alone.
+    if (roomCall(input) && !unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with a United Dairy account on the Driver Station link first.');
+    // The Driver Room Check-In tablet's Release: the plant's manager release code (as the no-account Plant Station).
     if (input.op === 'roomStatus' || input.op === 'roomRelease') return await ADMIN.releaseCheck(db, { op: input.op === 'roomStatus' ? 'status' : 'release', facilityId: input.facilityId, code: input.code });
     return await phoneCall(db, input);
   } catch (error) { throw asHttps(error); }
 });
 
-// Open to the garage tablet without a United Dairy account: every step is checked against a technician's sign-in.
+// The garage tablet: every step is checked against a technician's sign-in; a coded Garage Station also needs the tablet's
+// United Dairy sign-in (Joe 10/12).
 exports.garage = onCall({ maxInstances: 3 }, async (request) => {
-  try { return await garageCall(db, request.data); } catch (error) { throw asHttps(error); }
+  try {
+    // Joe 10/12: a Garage Station with its code is signed in with a United Dairy account first (as every station).
+    if (request.data && request.data.station && !unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with the tablet\'s United Dairy account on the Garage Station first.');
+    return await garageCall(db, request.data);
+  } catch (error) { throw asHttps(error); }
 });
 
 exports.newRouteCode = onCall(async (request) => {

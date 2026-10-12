@@ -68,7 +68,7 @@ test('the Driver Room tablet works on its Driver Room kiosk station code, not a 
   const tv = (await A.adminCall(db(), BOSS, { op: 'stationCode', key: 'fac_uniontown_kiosk_tv' })).code;
   const refused = await phoneCall(db(), { op: 'roomEnter', code: tv }, at());
   assert.equal(refused.ok, false);
-  assert.match(refused.message, /Driver Room TV/);
+  assert.match(refused.message, /Driver's Kiosk Station/);
   const room = await phoneCall(db(), { op: 'roomEnter', code: kiosk }, at());
   assert.equal(room.ok, true);
   const station = { key: room.station.key, version: room.station.version };
