@@ -21,6 +21,7 @@ const MANAGER = '?testEmail=manager.test@uniteddairy.com';
 
 async function openPage(browser, width, height, url) {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: SHOTS && width === 1920 ? 2 : 1 });
+  if (CLOCK.pinned) await page.clock.setFixedTime(new Date(CLOCK.ms));
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     const file = route.request().url().split('/').pop();
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, file)) });
@@ -41,31 +42,40 @@ async function shots(page, name, w) {
   if (w === 1920) await page.screenshot({ path: path.join(SHOTS, name + '-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 475 }, scale: 'device' });
 }
 
-function nyMinutes() {
+function nyMinutes(ms) {
   const p = {};
-  new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+  new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
   return Number(p.hour) * 60 + Number(p.minute);
 }
+// The test's clock. The four loads fit inside the operating day (2 hours before to 5 hours after now) only from 6:00 AM to 6:59 PM;
+// at any other hour the screens run on a clock pinned to 6:00 PM of the operating day, so the check is the same every hour of the night.
+const CLOCK = (() => {
+  const real = Date.now(), m = nyMinutes(real);
+  if (m >= 360 && m <= 1139) return { ms: real, pinned: false };
+  const day = L.operatingDay(new Date(real));
+  const ms = ['-04:00', '-05:00'].map(z => Date.parse(day + 'T18:00:00' + z)).find(t => nyMinutes(t) === 1080 && L.operatingDay(new Date(t)) === day);
+  return { ms, pinned: true };
+})();
 seed.behind = 0;
 async function seed() {
-  const date = L.operatingDay(new Date()), week = L.weekStart(date), p = L.dayPrefix(date), d = db(), now = nyMinutes();
+  const at0 = CLOCK.ms, date = L.operatingDay(new Date(at0)), week = L.weekStart(date), p = L.dayPrefix(date), d = db(), now = nyMinutes(at0);
   // Only these four loads: the made-up plant's own runs are dated in another week.
   for (const r of (await d.collection('runs').get()).docs) await r.ref.delete();
-  // Times are on the operating day's clock (after midnight the operating day is still yesterday until 6 AM), kept inside that day;
-  // how many loads are behind therefore depends on the hour the test runs, and the test counts it the same way.
-  const nowRel = now + (L.dateKey(new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })) !== date ? 1440 : 0);
-  const at = (m) => Math.max(0, Math.min(1439, nowRel + m));
-  const loads = [['501', 'AKRON', at(-120), { loadStatus: 'COMPLETE', completeTime: new Date(Date.now() - 3 * 3600000).toISOString(), truck: '214', trailer: 'T-11' }],
+  // Times are on the operating day's clock; with CLOCK they always fit inside it, so exactly one load (502, an hour past its
+  // depart time) is behind. The count still follows the screen's rule: not loaded and more than 45 minutes past the depart time.
+  const at = (m) => now + m;
+  const loads = [['501', 'AKRON', at(-120), { loadStatus: 'COMPLETE', completeTime: new Date(at0 - 3 * 3600000).toISOString(), truck: '214', trailer: 'T-11' }],
     ['502', 'CANTON', at(-60), { truck: '220', trailer: 'T-12' }], ['503', 'MASSILLON', at(240), {}], ['504', 'WOOSTER', at(300), {}]];
   for (const [i, [route, run, time, extra]] of loads.entries()) {
-    if (!extra.loadStatus && time <= nowRel + 30) seed.behind++;
+    assert.ok(time >= 0 && time <= 1439, 'load ' + route + ' fits inside the operating day');
+    if (!extra.loadStatus && now - time > 45) seed.behind++;
     await d.collection('runs').doc(week + '__mc' + route).set({ weekStart: week, sheetRow: 950 + i, route, run, routeId: 'rte_mc' + route, runId: 'run_mc' + route, active: true, loadType: 'CASE LOADOUT',
       days: { [p]: Object.assign({ runs: true, loadDayOffset: 0, loadDate: date, deliveryDate: date, dispatchTime: time, loadSequence: i + 1 }, extra) } });
   }
   await d.collection('pickups').doc('mc_pu1').set({ pickupId: 'mc_pu1', date, runId: 'run_mc503', route: '503', run: 'MASSILLON', item: 'Chocolate milk', quantity: '3 cases', status: 'PENDING' });
-  await d.collection('plantJournal').doc('SHIFT_REPORT_app_mcseed').set({ recordId: 'SHIFT-mcseed', type: 'SHIFT_REPORT', date, area: 'HANDOFF', recordedAt: new Date(Date.now() - 2 * 3600000).toISOString(), recordedBy: 'supervisor.test@uniteddairy.com',
+  await d.collection('plantJournal').doc('SHIFT_REPORT_app_mcseed').set({ recordId: 'SHIFT-mcseed', type: 'SHIFT_REPORT', date, area: 'HANDOFF', recordedAt: new Date(at0 - 2 * 3600000).toISOString(), recordedBy: 'supervisor.test@uniteddairy.com',
     createdInApp: true, payload: { entryId: 'SHIFT-mcseed', section: 'HANDOFF', shift: 'FIRST SHIFT', values: { Entry: 'Infeed belt jammed twice', Type: 'Breakdown', Equipment: 'Palletizer' }, notes: '', followUpStatus: 'OPEN' } });
-  await d.collection('plantJournal').doc('PLANT_TEMPERATURE_CHECK_app_mcseed').set({ recordId: 'TEMP-mcseed', type: 'PLANT_TEMPERATURE_CHECK', date, status: 'HIGH', recordedAt: new Date(Date.now() - 30 * 60000).toISOString(),
+  await d.collection('plantJournal').doc('PLANT_TEMPERATURE_CHECK_app_mcseed').set({ recordId: 'TEMP-mcseed', type: 'PLANT_TEMPERATURE_CHECK', date, status: 'HIGH', recordedAt: new Date(at0 - 30 * 60000).toISOString(),
     recordedBy: 'supervisor.test@uniteddairy.com', createdInApp: true, payload: { locationId: 'ut_temp_cooler_north', location: 'Cooler North', manualTemperature: 44, status: 'HIGH' } });
 }
 const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]', (c, l) => { const t = [...c.querySelectorAll('.mc-tile')].find(x => x.querySelector('span').textContent === l); return t ? t.querySelector('b').textContent + ' | ' + t.querySelector('i').textContent : ''; }, label);
@@ -74,6 +84,7 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
   await seed();
+  assert.equal(seed.behind, 1, 'one load (502) is behind');
   const browser = await chromium.launch();
   const results = [];
   try {
