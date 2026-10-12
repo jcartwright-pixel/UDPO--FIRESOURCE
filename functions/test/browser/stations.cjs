@@ -229,13 +229,36 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.equal(await tab.inputValue(at + ' [data-k="quantity"]'), '412');
     assert.equal(await tab.isDisabled(at + ' [data-k="quantity"]'), true, 'a finished load is read only on the station');
     assert.deepEqual(tab.errors, []);
+    // Joe 10/12 photo: on a tablet held upright (800 wide) the run name ran into the truck number. Route, run, truck and
+    // trailer must not overlap on any card.
+    for (const [w, h] of [[600, 960], [800, 1280], [1024, 768]]) {
+    const upright = await openPage(browser, w, h, '/plant-station.html' + MANAGER, clock);
+    await upright.click('[data-station="CASE"]');
+    await upright.waitForSelector('#work .sw-card');
+    const clash = await upright.$$eval('#work .sw-head:not(.tall)', heads => heads.map(h => {
+      // The text's own extent (a word too long for its column spills over the next one), not just the column's box.
+      const box = (sel) => {
+        const e = h.querySelector(sel);
+        if (!e || getComputedStyle(e).display === 'none') return null;
+        const r = document.createRange(); r.selectNodeContents(e);
+        const t = r.getBoundingClientRect(), c = e.getBoundingClientRect();
+        return { left: Math.min(t.left, c.left), right: Math.max(t.right, c.right), top: Math.min(t.top, c.top), bottom: Math.max(t.bottom, c.bottom) };
+      };
+      const parts = ['.route', '.run', '.truck', '.trailer'].map(box).filter(Boolean);
+      return parts.some((a, i) => parts.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1)) ? h.textContent : '';
+    }).filter(Boolean));
+    assert.deepEqual(clash, [], 'nothing overlaps on a card on a ' + w + ' wide tablet');
+    assert.ok(await fits(upright), 'the station work fits a ' + w + ' wide tablet');
+    await shot(upright, 'plant-station-case-tablet-' + w + '.png');
+    assert.deepEqual(upright.errors, []);
+    }
     const stPhone = await openPage(browser, 390, 844, '/plant-station.html' + MANAGER, clock);
     await stPhone.click('[data-station="CASE"]');
     await stPhone.waitForSelector('#work .sw-card');
     assert.ok(await fits(stPhone), 'the station work fits a phone');
     await shot(stPhone, 'plant-station-case-phone-390.png');
     assert.deepEqual(stPhone.errors, []);
-    results.push('Plant Station: the employee view on the station page (today, its area, cards; Start, cases, Complete); no Back, Home, dates, Edit or links to the manager screens');
+    results.push('Plant Station: the employee view on the station page (today, its area, cards; Start, cases, Complete); no Back, Home, dates, Edit or links to the manager screens; nothing overlaps on a tablet 600, 800 or 1024 wide');
   } finally {
     await browser.close();
   }

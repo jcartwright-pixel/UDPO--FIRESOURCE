@@ -178,7 +178,11 @@ export function mountStationWork({ db, box, person }) {
     // Keep the box being typed in (and what is typed) when a change from another screen redraws the list.
     const a = document.activeElement, keep = a && box.contains(a) && a.dataset && a.dataset.k ? [a.dataset.id, a.dataset.k, a.selectionStart] : null;
     const s = L.screenState(app, 'plantLoading');
-    const note = person() && !canSave() ? '<p class="sw-note">View only' + (s.why ? ': ' + escapeHtml(s.why) : '') + '.</p>' : '';
+    // Joe 10/12 photo ("I can't edit", a bare "View only."): say why. Either the screen is not open, or the account signed in
+    // on this tablet has no plant role in the Users list.
+    const p = person() || {}, who = p.name || p.email || 'This account';
+    const why = s.why || (!s.open ? '' : who + ' is not set up to save plant work. Give it the Plant Employee role in the Users list, or sign this tablet in with its station code');
+    const note = person() && !canSave() ? '<p class="sw-note">View only' + (why ? ': ' + escapeHtml(why) : '') + '.</p>' : '';
     box.innerHTML = note + (view === 'loading' ? loadingView() : view === 'unloading' ? unloadingView() : view === 'washing' ? washingView() : returnsView());
     if (keep) {
       const el = box.querySelector('[data-id="' + CSS.escape(keep[0]) + '"][data-k="' + keep[1] + '"]');
