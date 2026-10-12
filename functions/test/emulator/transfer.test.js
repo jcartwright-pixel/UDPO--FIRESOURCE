@@ -88,6 +88,23 @@ test('the transfer refuses to run once a screen belongs to the new app', async (
   await assert.rejects(runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: tick }), /already belongs to the new app/);
 });
 
+test('a screen moved to the new app while a copy is reading the sheets stays moved', async () => {
+  await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+  const inner = F.fakeReader(F.fakeSheets());
+  let moved = false;
+  const reader = Object.assign({}, inner, {
+    async batchGet(id, ranges) {
+      // The administrator's click lands after the copy read the switch and before it finishes.
+      if (!moved) { moved = true; await db().collection('config').doc('app').set({ screenOwners: { dailyDispatch: 'new' } }, { merge: true }); }
+      return inner.batchGet(id, ranges);
+    }
+  });
+  await runTransfer({ db: db(), reader, sources: F.SOURCES, now: tick });
+  const config = (await db().collection('config').doc('app').get()).data();
+  assert.equal(config.screenOwners.dailyDispatch, 'new');
+  assert.equal(config.mode, 'live');
+});
+
 test('two Live tabs for the same week stop the transfer', async () => {
   const tabs = F.fakeSheets();
   tabs["'LIVE NEXT WEEK'"] = tabs["'LIVE CURRENT WEEK'"];
