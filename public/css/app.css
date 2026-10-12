@@ -1728,13 +1728,3 @@ body.row-drag-on, body.row-drag-on * { cursor: grabbing !important; user-select:
 .fp-list tr.fp-back td:nth-child(3), .fp-list tr.fp-added td:nth-child(3) { color: #1b7a3a; font-weight: 700; }
 .fp-modal .modal-actions { margin-top: 0; }
 .fp-modal .modal-actions button { font-size: 16px; }
-
-/* Route names (Joe 10/12): Route, Route Name and Run Name typed over in the Route Editor's own columns. */
-.routes-page .name-help { margin: 0 16px 8px; padding: 8px 12px; background: #edf6ff; border: 1px solid #c6dced; border-radius: 10px; color: #0e3a62; font-size: 16px; font-weight: 600; line-height: 1.35; }
-.routes-page .name-help b { font-weight: 800; }
-table.routes td.name-cell { padding: 2px 4px; text-align: left; }
-table.routes input.nm { width: 100%; height: calc(var(--row) - 6px); border: 1px solid transparent; border-radius: 6px; background: transparent; font: inherit; color: inherit; padding: 0 6px; text-overflow: ellipsis; }
-table.routes input.nm:not([readonly]) { cursor: text; }
-table.routes input.nm:not([readonly]):hover { border-color: #bcd0e3; }
-table.routes input.nm:focus { border-color: var(--ud-blue); background: #fff; color: var(--ink); outline: none; }
-table.routes td.name-cell:first-child input.nm { text-align: center; }

@@ -130,30 +130,3 @@ test('Show on Daily Dispatch switched in the Route Editor reaches the Current an
   await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { routeNotes: 'note' }, days: {} });
   assert.equal((await run('2026-10-11__run_t801')).displayDaily, true);
 });
-
-test('Route names (Joe 10/12): Route Name and Run reach the Current and Next weeks; with routeNamesLive on, stream_id, route and route_run_type too, and the Previous week', async () => {
-  await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
-  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { routeName: 'DSD', run: 'Milk', routeRunType: 'Load 1', streamId: 'DSD 801' }, days: {} });
-  for (const id of ['2026-10-04__run_t801', '2026-10-11__run_t801']) {
-    const r = await run(id);
-    assert.deepEqual([r.routeName, r.run], ['DSD', 'Milk'], id + ' takes the names');
-    assert.notEqual(r.routeRunType, 'Load 1', 'Run Type waits for the switch');
-    assert.notEqual(r.streamId, 'DSD 801', 'Stream ID waits for the switch');
-  }
-  assert.notEqual((await run('2026-09-27__run_t801')).run, 'Milk', 'the Previous week waits for the switch');
-  // Joe's OK given: the switch is on. A blank Run typed in the Route Editor goes across blank.
-  await db().collection('config').doc('app').set({ routeNamesLive: { enabled: true } }, { merge: true });
-  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { run: '', routeRunType: 'Load 2' }, days: {} });
-  for (const id of ['2026-09-27__run_t801', '2026-10-04__run_t801', '2026-10-11__run_t801']) {
-    const r = await run(id);
-    assert.deepEqual([r.routeName, r.run, r.routeRunType, r.streamId], ['DSD', '', 'Load 2', 'DSD 801'], id + ' has every name');
-  }
-  await runWriteBack({ db: db(), sheets, target: { spreadsheetId: 'fake-live' }, now: NOW });
-  for (const tab of ["'LIVE PREVIOUS WEEK'", "'LIVE CURRENT WEEK'", "'LIVE NEXT WEEK'"]) {
-    const v = tabs[tab], h = v[5], row = v.find((r, i) => i > 5 && r[h.indexOf('run_id')] === 'run_t801');
-    assert.deepEqual(['stream_id', 'route_name', 'run', 'route_run_type'].map(c => row[h.indexOf(c)]), ['DSD 801', 'DSD', '', 'Load 2'], tab);
-  }
-  // The Previous week gets names only: its days are never changed.
-  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: {}, days: { wed: { active: true } } });
-  assert.equal((await run('2026-09-27__run_t801')).days.wed.runs, false, 'the Previous week days are never touched');
-});
