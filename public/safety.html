@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Weekly Walk · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/safety.css">
+  <script src="js/logic.js"></script>
+  <script src="js/safety-rules.js"></script>
+</head>
+<body class="fill safety-page walk-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Weekly Walk</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1 id="title">Weekly Walk</h1><span class="sw-counts" id="counts"></span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <a class="sw-top" href="safety-issues.html" data-top>Open Issues</a>
+      <a class="sw-top" href="extinguishers.html" data-top>Fire Extinguishers</a>
+      <a class="sw-top" href="safety-walks.html" data-top>Past Walks</a>
+      <a class="sw-top" href="safety-setup.html" data-top>Checklist Setup</a>
+      <button type="button" class="sw-top pri" id="finish" data-top>Finish Walk</button>
+      <select id="plant" class="sw-plant" aria-label="Plant" title="Plant" data-top hidden></select>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="sw-split">
+        <nav class="sw-areas" id="areas" aria-label="Areas"></nav>
+        <div class="sw-list" id="list" aria-label="Checklist"></div>
+      </div>
+      <div class="sw-foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, save, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
+    import { doc, getDoc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { today, pickPlant, plantName, drawPlantPicker, canWalk, modeText, shrinkPhoto, watchOpenIssues, watchSetup, watchExtinguishers, agePill, maintText, foundLine, thisMonth } from './js/safety.js';
+
+    // The weekly walk (Joe 10/12, mock-up B): every area on one screen, each item Good or Not good. A Not good opens a note,
+    // a photo and Send to Plant Maintenance, and becomes an open issue that the next walk reviews until it is fixed. The
+    // month's first walk carries the monthly items. Every tap and every box saves as it is left (no Save button).
+    const S = window.UDSafety, L = window.UDLogic;
+    const params = new URLSearchParams(location.search);
+    let db = null, person = null, app = {}, plant = '', walk = null, walkSeen = false, monthWalks = [], setup = null, setupSeen = false, open = [], fixedHere = [], exts = [];
+    let date = today(), viewing = '', area = '', armFinish = false, stops = [];
+    const mine = {}, reviewMine = {}, photos = {};
+    let chain = Promise.resolve();
+    const wid = () => S.walkId(plant, date);
+    // Today's walk saves; a past walk (Past Walks) is shown as it was.
+    const editable = () => !viewing && canWalk(person, app);
+    const monthly = () => walk ? walk.monthly === true : !monthWalks.some(w => w.id !== wid());
+    const list = () => S.walkList(setup, monthly());
+    const itemOf = (id) => Object.assign({}, (walk && walk.items && walk.items[id]) || {}, mine[id] || {});
+    const reviews = () => Object.assign({}, (walk && walk.reviews) || {}, reviewMine);
+    const toReview = () => open.concat(fixedHere.filter(f => !open.some(o => o.id === f.id))).filter(i => i.foundWalk !== wid());
+
+    function counts() { return S.walkCounts({ items: Object.fromEntries(list().flatMap(a => a.items.map(i => [i.id, itemOf(i.id)]))) }, list()); }
+    function drawHead() {
+      document.getElementById('mode-text').textContent = modeText(app);
+      document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
+      document.getElementById('title').textContent = (viewing ? 'Walk ' : 'Weekly Walk ') + shortDate(date);
+      const c = counts();
+      document.getElementById('counts').innerHTML = '<b class="g">' + c.good + ' Good</b> · <b class="r">' + c.notGood + ' Not good</b> · ' + c.notChecked + ' Not checked' + (monthly() ? ' · monthly items on this walk' : '');
+      const fin = document.getElementById('finish');
+      fin.hidden = !!viewing;
+      fin.disabled = !editable() || !walk;
+      fin.textContent = walk && walk.finishedAt && !armFinish ? 'Walk Finished' : armFinish ? 'Press again: ' + c.notChecked + ' not checked' : 'Finish Walk';
+      drawPlantPicker(document.getElementById('plant'), person, plant);
+      document.getElementById('plant').hidden = document.getElementById('plant').hidden || !!viewing;
+    }
+    function drawAreas() {
+      const n = toReview().filter(i => !reviews()[i.id]).length;
+      document.getElementById('areas').innerHTML = '<button type="button" class="issues' + (area === 'issues' ? ' on' : '') + '" data-area="issues">Open issues from earlier walks<small>' + (toReview().length ? n + ' to review' : 'none') + '</small></button>' +
+        list().map(a => { const done = a.items.filter(i => itemOf(i.id).status).length;
+          return '<button type="button" data-area="' + escapeHtml(a.key) + '" class="' + (area === a.key ? 'on' : '') + (done === a.items.length ? ' done' : '') + '">' + escapeHtml(a.name) + '<small>' + done + ' of ' + a.items.length + '</small></button>'; }).join('');
+    }
+    const btns = (attrs, pressed, choices) => choices.map(([v, label, cls]) => '<button type="button" class="sw-btn ' + cls + '" ' + attrs + ' data-v="' + v + '" aria-pressed="' + (pressed === v) + '"' + (editable() ? '' : ' disabled') + '>' + label + '</button>').join('');
+    function reviewRows() {
+      const rs = toReview();
+      if (!rs.length) return '<div class="sw-empty">No open issues from earlier walks.</div>';
+      return '<table class="sw-table"><tbody>' + rs.map(i => {
+        const r = reviews()[i.id], st = r ? r.status : (i.status === 'FIXED' ? 'FIXED' : '');
+        return '<tr data-issue-row="' + escapeHtml(i.id) + '"><td><b>' + escapeHtml(i.item) + '</b>' + (i.walks && i.walks.length > 1 ? ' <span class="sw-pill red">REPEAT · ' + i.walks.length + '</span>' : '') +
+          '<span class="sw-how">' + foundLine(i) + (i.note ? ' · ' + escapeHtml(i.note) : '') + '</span></td><td class="sw-state">' + agePill(i) + '</td><td class="sw-state">' + maintText(i) + '</td>' +
+          '<td class="sw-do">' + btns('data-issue="' + escapeHtml(i.id) + '"', st, [['OPEN', 'Still open', 'open'], ['FIXED', 'Fixed', 'good']]) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    }
+    function extHint() {
+      if (!exts.length) return 'No extinguishers on the list yet · <a href="extinguishers.html">Fire Extinguishers</a> adds them';
+      const m = thisMonth(), done = exts.filter(e => S.extMonth(e, m).state === 'GOOD').length;
+      return done + ' of ' + exts.length + ' checked this month · <a href="extinguishers.html">open the extinguisher list</a>';
+    }
+    function itemRows(a) {
+      return a.items.map(i => {
+        const it = itemOf(i.id), st = it.status || '';
+        let row = '<tr data-row="' + escapeHtml(i.id) + '"><td>' + escapeHtml(i.text) + (i.freq === 'MONTHLY' ? ' <span class="sw-pill blue">MONTHLY</span>' : '') +
+          (i.id === 'ext_monthly' ? '<span class="sw-how">' + extHint() + '</span>' : '') + (it.repeat ? '<span class="sw-how">Not good again: still open from an earlier walk</span>' : '') + '</td>' +
+          '<td class="sw-do">' + btns('data-item="' + escapeHtml(i.id) + '"', st, [['GOOD', 'Good', 'good'], ['NOT_GOOD', 'Not good', 'bad']]) + '</td>' +
+          '<td class="sw-state">' + (st ? '' : '<span class="sw-nc">Not checked</span>') + '</td></tr>';
+        if (st === 'NOT_GOOD') {
+          const dis = editable() ? '' : ' disabled', ph = it.photoId && photos[it.photoId];
+          row += '<tr class="sw-more" data-more="' + escapeHtml(i.id) + '"><td colspan="3"><div class="sw-more-grid">' +
+            '<div><span class="sw-label">What is wrong</span><textarea data-note="' + escapeHtml(i.id) + '" maxlength="500" aria-label="What is wrong: ' + escapeHtml(i.text) + '"' + dis + '>' + escapeHtml(it.note || '') + '</textarea></div>' +
+            '<div><span class="sw-label">Photo</span><div class="sw-photo">' + (ph ? '<img src="' + ph + '" alt="Photo" data-big>' : '') +
+              (editable() ? (it.photo ? '<button type="button" data-unphoto="' + escapeHtml(i.id) + '">Remove</button>' : '<label>+ Add photo<input type="file" accept="image/*" capture="environment" data-photo="' + escapeHtml(i.id) + '"></label>') : (it.photo ? '' : '<span class="sw-nc">No photo</span>')) + '</div></div>' +
+            '<div><span class="sw-label">Plant Maintenance</span><label class="sw-check"><input type="checkbox" data-maint="' + escapeHtml(i.id) + '"' + (it.maint ? ' checked' : '') + dis + '>Send to Plant Maintenance as a work order</label>' +
+              '<span class="sw-how">Saved as an open issue. It comes back on the next walk until it is marked Fixed.' + (it.maint ? ' Plant Maintenance picks it up once that module is ready.' : '') + '</span></div>' +
+            '</div></td></tr>';
+          if (it.photoId && photos[it.photoId] === undefined) loadPhoto(it.photoId);
+        }
+        return row;
+      }).join('');
+    }
+    function drawList(force) {
+      const box = document.getElementById('list');
+      if (force !== true && box.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA') return;
+      const top = box.scrollTop;
+      box.innerHTML = '<section data-sec="issues"><div class="sw-sec"><h2>Open issues from earlier walks</h2><span>' + (viewing ? 'As they were reviewed on this walk.' : 'Mark each one Still open or Fixed.') + '</span></div>' + reviewRows() + '</section>' +
+        list().map(a => '<section data-sec="' + escapeHtml(a.key) + '"><div class="sw-sec"><h2>' + escapeHtml(a.name) + '</h2>' + (a === list()[0] && walk ? '<span>Started by ' + escapeHtml(walk.startedByName || walk.startedBy || '') + ' ' + dateTimeText(walk.startedAt).replace(/^\S+ /, '') + (walk.finishedAt ? ' · finished ' + dateTimeText(walk.finishedAt).replace(/^\S+ /, '') : '') + '</span>' : '') + '</div>' +
+          '<table class="sw-table"><tbody>' + itemRows(a) + '</tbody></table></section>').join('');
+      box.scrollTop = top;
+    }
+    function render(force) {
+      if (!plant) return;
+      drawHead(); drawAreas(); drawList(force);
+      const ready = setupSeen && walkSeen;
+      document.getElementById('foot').textContent = !ready ? 'Reading the walk…' : viewing ? 'A past walk, as it was saved.' : editable() ? 'Every tap and every box saves as you leave it. Tap a pressed button again to make it Not checked. A Not good stays open until someone marks it Fixed.' : 'View only. Plant people, supervisors, managers and administrators walk the plant.';
+    }
+    async function loadPhoto(id) {
+      photos[id] = null;
+      try { const s = await getDoc(doc(db, 'safetyPhotos', id)); photos[id] = s.exists() ? s.data().data : null; } catch (e) { photos[id] = null; }
+      if (photos[id]) render();
+    }
+
+    // Saves go one at a time, in the order they were made.
+    function send(fields, undo) {
+      const run = chain.then(() => save('saveSafetyWalk', Object.assign({ facilityId: plant, date }, fields)));
+      chain = run.catch(() => {});
+      return run.then(() => showError(''), err => { if (undo) undo(); showError(err); render(true); });
+    }
+    const list$ = document.getElementById('list');
+    list$.addEventListener('click', e => {
+      const big = e.target.closest('[data-big]');
+      if (big) { const d = document.createElement('div'); d.className = 'sw-bigphoto'; d.innerHTML = '<img alt="Photo">'; d.firstChild.src = big.src; d.addEventListener('click', () => d.remove()); document.body.appendChild(d); return; }
+      if (!editable()) return;
+      const b = e.target.closest('.sw-btn');
+      if (b && b.dataset.item) {
+        const id = b.dataset.item, status = b.getAttribute('aria-pressed') === 'true' ? '' : b.dataset.v, prev = mine[id];
+        mine[id] = Object.assign({}, mine[id] || {}, { status });
+        render(true);
+        send({ op: 'item', itemId: id, status }, () => { if (prev) mine[id] = prev; else delete mine[id]; });
+        return;
+      }
+      if (b && b.dataset.issue) {
+        const id = b.dataset.issue, status = b.dataset.v;
+        if (b.getAttribute('aria-pressed') === 'true') return;
+        reviewMine[id] = { status };
+        render(true);
+        send({ op: 'review', issueId: id, status }, () => { delete reviewMine[id]; });
+        return;
+      }
+      const un = e.target.closest('[data-unphoto]');
+      if (un) { const id = un.dataset.unphoto; mine[id] = Object.assign({}, mine[id] || {}, { photo: false, photoId: '' }); render(true); send({ op: 'photo', itemId: id, photo: '' }, () => { delete mine[id].photo; delete mine[id].photoId; }); }
+    });
+    list$.addEventListener('change', async e => {
+      if (!editable()) return;
+      const t = e.target;
+      if (t.dataset.note) { const id = t.dataset.note; mine[id] = Object.assign({}, mine[id] || {}, { note: t.value.trim() }); send({ op: 'note', itemId: id, note: t.value.trim() }); return; }
+      if (t.dataset.maint) { const id = t.dataset.maint; mine[id] = Object.assign({}, mine[id] || {}, { maint: t.checked }); render(true); send({ op: 'maint', itemId: id, maint: t.checked }, () => { delete mine[id].maint; }); return; }
+      if (t.dataset.photo && t.files && t.files[0]) {
+        const id = t.dataset.photo;
+        try {
+          const data = await shrinkPhoto(t.files[0]), pid = itemOf(id).photoId || ((itemOf(id).repeat ? wid() + '__' + id : itemOf(id).issueId) || '');
+          if (pid) photos[pid] = data;
+          mine[id] = Object.assign({}, mine[id] || {}, { photo: true, photoId: pid });
+          render(true);
+          send({ op: 'photo', itemId: id, photo: data }, () => { delete mine[id].photo; delete mine[id].photoId; });
+        } catch (err) { showError(err.message || String(err)); }
+      }
+    });
+    list$.addEventListener('focusout', () => setTimeout(() => { if (!list$.contains(document.activeElement)) render(); }, 0));
+    list$.addEventListener('scroll', () => {
+      const secs = [...list$.querySelectorAll('section[data-sec]')], top = list$.getBoundingClientRect().top;
+      const cur = secs.filter(s => s.getBoundingClientRect().top - top < 60).pop() || secs[0];
+      if (cur && cur.dataset.sec !== area) { area = cur.dataset.sec; drawAreas(); }
+    }, { passive: true });
+    document.getElementById('areas').addEventListener('click', e => {
+      const b = e.target.closest('[data-area]');
+      if (!b) return;
+      area = b.dataset.area; drawAreas();
+      const sec = list$.querySelector('section[data-sec="' + CSS.escape(area) + '"]');
+      if (sec) list$.scrollTop = sec.offsetTop - list$.offsetTop - (list$.firstElementChild ? list$.firstElementChild.offsetTop - list$.offsetTop : 0);
+    });
+    // Finish Walk: pressed twice when items are still Not checked (no pop-ups).
+    document.getElementById('finish').addEventListener('click', () => {
+      if (!editable() || !walk) return;
+      if (counts().notChecked && !armFinish) { armFinish = true; drawHead(); setTimeout(() => { armFinish = false; drawHead(); }, 5000); return; }
+      armFinish = false;
+      send({ op: 'finish' });
+    });
+    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; try { sessionStorage.setItem('udPlant', plant); } catch (x) { /* no storage */ } follow(); });
+
+    function follow() {
+      stops.forEach(s => s()); stops = [];
+      walk = null; walkSeen = false; setupSeen = false; open = []; fixedHere = []; exts = [];
+      Object.keys(mine).forEach(k => delete mine[k]); Object.keys(reviewMine).forEach(k => delete reviewMine[k]);
+      const fail = (e) => showError('Could not read the walk (' + e.message + '). Check the network and reload the page.');
+      stops.push(watchSetup(db, plant, s => { setup = s; setupSeen = true; render(); }));
+      stops.push(onSnapshot(doc(db, 'safetyWalks', wid()), s => {
+        walk = s.exists() ? s.data() : null; walkSeen = true;
+        // What was tapped here has reached the saved walk.
+        Object.keys(mine).forEach(id => { const w = walk && walk.items && walk.items[id]; if (w && Object.keys(mine[id]).every(k => (w[k] || '') === (mine[id][k] || ''))) delete mine[id]; });
+        Object.keys(reviewMine).forEach(id => { const r = walk && walk.reviews && walk.reviews[id]; if (r && r.status === reviewMine[id].status) delete reviewMine[id]; });
+        render();
+      }, fail));
+      stops.push(onSnapshot(query(collection(db, 'safetyWalks'), where('facilityId', '==', plant), where('month', '==', date.slice(0, 7))), s => { monthWalks = s.docs.map(d => ({ id: d.id })); render(); }, fail));
+      stops.push(watchOpenIssues(db, plant, list => { open = list.sort((a, b) => String(a.foundOn).localeCompare(String(b.foundOn))); render(); }, fail));
+      stops.push(onSnapshot(query(collection(db, 'safetyIssues'), where('facilityId', '==', plant), where('fixedWalk', '==', wid())), s => { fixedHere = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail));
+      stops.push(watchExtinguishers(db, plant, list => { exts = list; render(); }, fail));
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), async s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        if (plant) { render(true); return; }
+        // ?walk=<id> shows a past walk (Past Walks).
+        const w = params.get('walk');
+        if (w && /^fac_[a-z_]+__\d{4}-\d\d-\d\d$/.test(w)) {
+          const [p, d] = w.split('__');
+          plant = pickPlant(person, p);
+          if (plant === p) { date = d; viewing = d !== today() ? w : ''; }
+        } else plant = pickPlant(person, params.get('plant'));
+        follow();
+      });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(true); });
+    });
+  </script>
+</body>
+</html>

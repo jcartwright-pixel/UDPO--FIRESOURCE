@@ -42,18 +42,19 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await sup.waitForFunction(() => document.getElementById('plant-name').textContent === 'Uniontown Operations');
     await sup.waitForTimeout(800);
     assert.match(sup.url(), /index\.html/);
-    assert.deepEqual(await sup.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports']);
+    // Joe 10/12: Safety Walkthrough is the seventh card, next to Reports (Under Construction too).
+    assert.deepEqual(await sup.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports', 'safety']);
     assert.equal(await sup.$('#go-back'), null, 'nothing above the plant home');
     assert.equal(await sup.isVisible('#go-admin'), false, 'no Administration button');
     if (SHOTS) await sup.screenshot({ path: path.join(SHOTS, 'home-one-plant-1920.png') });
     // Joe 10/11: Under Construction modules open only for Administrators. A supervisor sees both cards with the banner, says
     // "Administrators only", and clicking one stays on the plant home; the menu links are locked; typing the address is refused.
     assert.deepEqual(await sup.$$eval('.launch-card.building', c => c.map(x => x.dataset.side + ':' + x.querySelector('.uc-admin-only').innerText + ':' + getComputedStyle(x.querySelector('.open-text')).display)),
-      ['production:Administrators only while it is being built:none', 'pmaint:Administrators only while it is being built:none']);
+      ['production:Administrators only while it is being built:none', 'pmaint:Administrators only while it is being built:none', 'safety:Administrators only while it is being built:none']);
     await sup.click('.launch-card[data-side="production"]');
     await sup.waitForTimeout(600);
     assert.match(sup.url(), /index\.html/, 'a supervisor clicking Plant Production stays on the plant home');
-    assert.deepEqual(await sup.$$eval('.sidemenu a[data-building]', a => a.map(x => x.dataset.side + ':' + getComputedStyle(x).pointerEvents)), ['production:none', 'pmaint:none']);
+    assert.deepEqual(await sup.$$eval('.sidemenu a[data-building]', a => a.map(x => x.dataset.side + ':' + getComputedStyle(x).pointerEvents)), ['production:none', 'pmaint:none', 'safety:none']);
     // Plant Production's first page is now its Production Lines board (Joe 10/11); Plant Maintenance is still the being-built page.
     for (const [page, name, inside] of [['production.html?', 'Plant Production', '#tiles'], ['soon.html?what=plant-maintenance&', 'Plant Maintenance', '.soon-card']]) {
       await sup.goto(HOSTING + '/' + page + 'testEmail=super.test@uniteddairy.com');
@@ -75,7 +76,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await sup.waitForFunction(() => /Administrators only/.test(document.getElementById('shell').textContent));
     assert.deepEqual(sup.errors, []);
     await sup.close();
-    results.push('A one-plant supervisor sees only Uniontown\'s home (six cards, no Administration); Plant Production and Plant Maintenance show Administrators only and do not open, by card, menu or address; the overview shows them Uniontown only; Administration says Administrators only');
+    results.push('A one-plant supervisor sees only Uniontown\'s home (seven cards, no Administration); Plant Production, Plant Maintenance and Safety Walkthrough show Administrators only and do not open, by card, menu or address; the overview shows them Uniontown only; Administration says Administrators only');
 
     // An Administrator: the all-plants overview first, then Uniontown, whose home has the Administration card.
     const adm = await openPage(browser, 1920, 1080, '/index.html?testEmail=admin.test@uniteddairy.com');
@@ -100,23 +101,25 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await adm.$eval('.sidemenu a.side-name', a => a.textContent.trim() + ':' + a.classList.contains('on')), 'Plant Operations:true', 'the menu shows Plant Operations as the page open');
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-uniontown-opens-plant-operations-1920.png') });
     await Promise.all([adm.waitForURL(/index\.html/), adm.click('#go-back')]);
-    // Joe 10/11: the plant home shows six cards (the plant's three, Route Distribution, Fleet & Maintenance, Reports);
+    // Joe 10/11: the plant home shows the plant's three cards, Route Distribution, Fleet & Maintenance, Reports and (Joe 10/12) Safety Walkthrough;
     // Plant Production and Plant Maintenance carry an Under Construction banner. Administration is the header button.
     await adm.waitForSelector('.launch-card[data-side="reports"]');
-    assert.deepEqual(await adm.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports']);
+    assert.deepEqual(await adm.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports', 'safety']);
     // Joe 10/11 evening: those two cards use his own pictures with the banner painted on (the clean pictures stay in the
     // library for later), so the banner comes from the picture and is not laid on twice.
-    await adm.waitForFunction(() => [...document.querySelectorAll('.launch-card.building img')].every(i => i.complete && i.naturalWidth > 0));
-    assert.deepEqual(await adm.$$eval('.launch-card.building', c => c.map(x => { const i = x.querySelector('img'); return x.dataset.side + ':' + i.alt + ':' + i.getAttribute('src') + ':' + i.naturalWidth; })),
+    await adm.waitForFunction(() => [...document.querySelectorAll('.launch-card.banner-pic img')].every(i => i.complete && i.naturalWidth > 0));
+    assert.deepEqual(await adm.$$eval('.launch-card.banner-pic', c => c.map(x => { const i = x.querySelector('img'); return x.dataset.side + ':' + i.alt + ':' + i.getAttribute('src') + ':' + i.naturalWidth; })),
       ['production:Under Construction:img/library/plant-production-construction-560.webp:560', 'pmaint:Under Construction:img/library/plant-maintenance-construction-560.webp:560']);
-    assert.equal(await adm.$$eval('.launch-card .uc-banner', b => b.length), 0, 'the banner is not drawn twice over the pictures');
+    assert.equal(await adm.$$eval('.launch-card.banner-pic .uc-banner', b => b.length), 0, 'the banner is not drawn twice over the pictures');
+    // Safety Walkthrough has a drawn icon (no picture), so its banner is laid across the icon (mock-up A).
+    assert.deepEqual(await adm.$$eval('.launch-card .uc-banner', b => b.map(x => x.closest('.launch-card').dataset.side)), ['safety']);
     for (const clean of ['plant-production-v1-560.webp', 'plant-maintenance-v1-560.webp', 'plant-production-v1-full.webp', 'plant-maintenance-v1-full.webp']) {
       assert.equal((await adm.request.get(HOSTING + '/img/library/' + clean)).status(), 200, 'the clean picture is kept in the library: ' + clean);
     }
     const fits = await adm.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.launch-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight }));
-    assert.ok(fits.bottom <= fits.inner, 'the six cards fit a 1920x1080 screen: ' + JSON.stringify(fits));
+    assert.ok(fits.bottom <= fits.inner, 'the seven cards fit a 1920x1080 screen: ' + JSON.stringify(fits));
     const sizes = await adm.$$eval('.launch-card', c => c.map(x => Math.round(x.getBoundingClientRect().width) + 'x' + Math.round(x.getBoundingClientRect().height)));
-    assert.equal(new Set(sizes).size, 1, 'the six cards are the same size: ' + sizes.join(' '));
+    assert.equal(new Set(sizes).size, 1, 'the seven cards are the same size: ' + sizes.join(' '));
     await adm.waitForSelector('#go-back');
     // Joe 10/10 evening: Administration is a header button on the main screens, not a menu item.
     assert.equal(await adm.isVisible('#go-admin'), true, 'Administration is in an Administrator\'s header');
@@ -178,7 +181,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await mods.waitForSelector('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
     await mods.hover('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
     await mods.waitForSelector('.side-flyouts .flyout.open a[data-plant="fac_uniontown"]', { state: 'visible' });
-    assert.deepEqual(await mods.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent)), ['Plant Operations', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports']);
+    assert.deepEqual(await mods.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent)), ['Plant Operations', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports', 'Safety Walkthrough']);
     await Promise.all([mods.waitForURL(/reportcenter\.html/), mods.click('.side-flyouts .flyout.open a[data-side="reports"]')]);
     await mods.waitForSelector('.rc-card');
     assert.deepEqual(await mods.$$eval('.rc-group h2', h => h.map(x => x.textContent)), ['Plant Reports', 'Distribution Reports', 'Fleet Reports']);
@@ -193,7 +196,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await mods.waitForSelector('.launch-card[data-side="production"]');
     await mods.waitForTimeout(500);
     const fits1536 = await mods.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.launch-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight }));
-    assert.ok(fits1536.bottom <= fits1536.inner, 'the six cards fit a 1536x864 screen: ' + JSON.stringify(fits1536));
+    assert.ok(fits1536.bottom <= fits1536.inner, 'the seven cards fit a 1536x864 screen: ' + JSON.stringify(fits1536));
     // Joe 10/11: Plant Production (still Under Construction) opens its Production Lines board for an administrator.
     await Promise.all([mods.waitForURL(/production\.html/), mods.click('.launch-card[data-side="production"]')]);
     await mods.waitForSelector('#tiles .pd-tile, #tiles .pd-empty');

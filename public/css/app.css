@@ -1667,3 +1667,10 @@ body.uc-locked #screen > :not(.topbar):not(.uc-refused) { display: none !importa
 .rc-card > b { font-size: 20px; color: #1f6feb; }
 @media (max-width: 1100px) { .rc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .rc-grid { grid-template-columns: 1fr; } }
+
+/* Joe 10/12: seven cards after picking a plant (Safety Walkthrough next to Reports), four to a row (mock-up A). */
+.launch-grid.six.seven { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.launch-grid.six.seven .launch-card { padding: 14px 14px 14px; }
+.launch-grid.six.seven .launch-card strong { font-size: 21px; }
+@media (max-width: 1200px) { .launch-grid.six.seven { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .launch-grid.six.seven { grid-template-columns: 1fr; } }
