@@ -553,8 +553,9 @@ export function isUnitedDairy(user) {
   return !!(user && user.emailVerified && String(user.email || '').toLowerCase().endsWith('@' + DOMAIN));
 }
 
-// The screens a Plant Station signed in by its code alone may open (Joe 10/12): the Plant Station and the screens it opens.
-export const STATION_PAGES = ['plant-station.html', 'loadout.html', 'unloading.html', 'washing.html', 'returns.html'];
+// The screens a Plant Station signed in by its code alone may open: only the Plant Station, whose tabs hold the station's work.
+// Joe 10/12: the manager screens (Loadout Center, Unloading & Washing, Washing, Returns) are not for the employees' tablets.
+export const STATION_PAGES = ['plant-station.html'];
 async function stationOf(user) {
   try {
     const c = (await user.getIdTokenResult()).claims || {};
