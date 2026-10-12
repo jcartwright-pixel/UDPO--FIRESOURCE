@@ -186,7 +186,7 @@
     // (Route Master route / route_name / run). The run's id never changes, so its weeks, loadouts and history stay with it.
     // Joe 10/12: the five Route Master naming columns, in its order: stream_id, route, route_name, run, route_run_type.
     const NAME_FIELDS = ['streamId', 'route', 'routeName', 'run', 'routeRunType'];
-    const NAME_COLS = '<col style="width:9%"><col style="width:5%"><col style="width:9%"><col style="width:10%"><col style="width:6%">';
+    const NAME_COLS = '<col style="width:10%"><col style="width:5%"><col style="width:9%"><col style="width:8%"><col style="width:7%">';
     const NAME_HEADS = '<th title="stream_id: the name on the Driver Room board (kiosk) and driver schedule">Stream ID</th><th title="route: the route number">Route</th>' +
       '<th title="route_name: one name for every run of this route">Route Name</th><th title="run: this run only">Run</th><th title="route_run_type: Load 1, Load 2">Run Type</th>';
     const NAME_TITLES = { streamId: 'Stream ID: the name on the Driver Room board and driver schedule; a check-in email may use it', route: 'Route number for this run',
@@ -305,7 +305,7 @@
     const tick = (r, f, on, label, edit) => '<td><input type="checkbox" class="rf" data-many="' + f + '"' + (on ? ' checked' : '') + (edit ? '' : ' disabled') + ' aria-label="' + label + '" title="' + label + '"></td>';
     const pick = (f, list, v, edit, label) => '<td><select class="rf" data-many="' + f + '"' + (edit ? '' : ' disabled') + ' aria-label="' + label + '">' + (list.indexOf(v) < 0 && v ? '<option selected>' + escapeHtml(v) + '</option>' : '') + list.map(x => '<option' + (x === v ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select></td>';
     function manyView(list, edit) {
-      return '<colgroup>' + NAME_COLS + '<col style="width:7%"><col style="width:7%"><col span="8" style="width:5.875%"></colgroup>' +
+      return '<colgroup>' + NAME_COLS + '<col style="width:10%"><col style="width:9%"><col span="8" style="width:5.25%"></colgroup>' +
         '<thead><tr>' + NAME_HEADS + '<th>Loadout</th><th>Run by</th><th>Plant</th><th>Weekly</th><th>Daily</th><th>Mobile route</th><th>Route list</th><th>Sleeper</th><th>Drop &amp; hook</th><th>Active</th></tr></thead><tbody>' +
         list.map(r => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r, edit) + pick('loadType', LOADOUT, r.loadType || 'None', edit, 'Loadout type') + pick('coverageOwner', RUN_BY, r.coverageOwner || 'Uniontown', edit, 'Run by') +
           tick(r, 'displayPlant', shows(r, 'displayPlant'), 'Show in Plant', edit) + tick(r, 'displayWeekly', shows(r, 'displayWeekly'), 'Show on Weekly Dispatch', edit) + tick(r, 'displayDaily', shows(r, 'displayDaily'), 'Show on Daily Dispatch', edit) +
