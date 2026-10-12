@@ -48,6 +48,7 @@ const { mailReport } = require('./src/reportmail');
 const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
 const ADMIN = require('./src/admin');
 const { adminCall, stationRelease, AdminError } = ADMIN;
+const { StationError } = require('./src/stations');
 const TOOLS = require('./src/admintools');
 const READER = require('./src/reader');
 const L = require('./src/logic');
@@ -110,7 +111,7 @@ exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
 });
 
-const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code.
 exports.phone = onCall({ maxInstances: 3 }, async (request) => {

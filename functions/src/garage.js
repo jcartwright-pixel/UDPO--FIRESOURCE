@@ -580,6 +580,15 @@ async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
 async function garageCall(db, input, now) {
   input = input || {};
   const nowMs = (now ? now() : new Date()).getTime(), op = String(input.op || '');
+  // Garage station codes (Joe 10/12, stations.js): once the garage has a code, the tablet types it once and sends the
+  // station it opened with every call; Change needs the plant's manager release code.
+  const ST = require('./stations'), asSave = (e) => { if (e instanceof ST.StationError || e instanceof require('./admin').AdminError) throw SaveErr(e.code, e.message); throw e; };
+  if (op === 'station') return ST.tabletCall(db, { op: input.step, kind: 'GARAGE', code: input.code, key: input.key, version: input.version, facilityId: FACILITY }, () => new Date(nowMs)).catch(asSave);
+  if (op === 'release') return require('./admin').releaseCheck(db, { op: input.step === 'status' ? 'status' : 'release', facilityId: FACILITY, code: input.code }, () => new Date(nowMs)).catch(asSave);
+  if (await ST.needsCode(db, 'GARAGE', FACILITY)) {
+    const st = input.station || {}, ok = await ST.check(db, 'GARAGE', st.key, st.version);
+    if (!ok.ok) throw SaveErr('NOT_ALLOWED', 'STATION_CODE: ' + ok.message.replace('This station', 'This garage tablet').replace(/Enter a station code\.|Enter it.*$/, 'Enter the garage station code.'));
+  }
   if (op === 'read') return read(db, input, nowMs);
   if (op === 'board') return board(db, nowMs);
   if (op === 'signIn') return signIn(db, input, nowMs);

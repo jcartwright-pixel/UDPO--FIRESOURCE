@@ -34,7 +34,9 @@
     <div class="ps-title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <section id="pick">
+      <!-- Joe 10/12: once Administration > Plant Station Codes has codes, a tablet types its station's code instead of picking. -->
+      <section id="code-box" hidden></section>
+      <section id="pick" hidden>
         <p class="ps-intro">Pick the work area this tablet is for. The tablet remembers it and opens straight to that station next time.</p>
         <div class="ps-stations" id="stations"></div>
       </section>
@@ -57,6 +59,7 @@
     import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
+    import { resolveStation, askCode, remember } from './js/station-code.js';
 
     // The current app's Plant Station tablet (PlantStation.html, 057_V774): one station, only its work areas. In the new app
     // the tablet signs in with a United Dairy account (no station code) and picks its station once; it is remembered on the
@@ -83,21 +86,37 @@
     const asked = new URLSearchParams(location.search).get('station') || '';
     let stationId = read() || (STATIONS.some(s => s.id === asked) ? asked : ''), runs = [];
     if (stationId && !read()) write(stationId);
+    // The station from its code (Administration > Plant Station Codes): its own name, one of the five station types.
+    const CODE_KEY = 'udPlantStationCode', stationCall = (op, f) => callServer('stationRelease', Object.assign({ op }, f));
+    let mode = 'wait', named = null;
+    async function decide(message) {
+      const r = message !== undefined ? { needCode: true, message } : await resolveStation('PLANT', CODE_KEY, stationCall);
+      if (r.station) { mode = 'code'; named = r.station; stationId = r.station.type; }
+      else if (r.needCode) {
+        mode = 'ask'; named = null; stationId = ''; render();
+        const st = await askCode(document.getElementById('code-box'), { kind: 'PLANT', storeKey: CODE_KEY, call: stationCall, title: 'Enter this tablet\'s station code',
+          hint: 'A manager gives each station its code (Administration > Plant Station Codes). The tablet remembers its station after this.', message: r.message });
+        mode = 'code'; named = st; stationId = st.type;
+      } else mode = 'free';
+      render();
+    }
 
     function render() {
       const st = STATIONS.find(s => s.id === stationId);
-      document.getElementById('pick').hidden = !!st;
+      document.getElementById('code-box').hidden = mode !== 'ask';
+      document.getElementById('pick').hidden = !!st || mode !== 'free';
       document.getElementById('station').hidden = !st;
       document.getElementById('change').hidden = !st;
       document.getElementById('pill').hidden = !st;
       document.getElementById('eyebrow').textContent = st ? 'Assigned Plant Station' : 'Plant Station';
-      document.getElementById('title').textContent = st ? st.label : 'Pick this tablet\'s station';
+      document.getElementById('title').textContent = st ? (named ? named.name : st.label) : mode === 'ask' ? 'Station code' : 'Pick this tablet\'s station';
       if (!st) {
+        if (mode !== 'free') return;
         document.getElementById('stations').innerHTML = STATIONS.map(s => '<button type="button" class="ps-station" data-station="' + s.id + '"><b>' + escapeHtml(s.label) + '</b><span>' + escapeHtml(s.what) + '</span></button>').join('');
         return;
       }
       const date = L.operatingDay(new Date());
-      document.getElementById('pill').textContent = 'Uniontown · ' + shortDate(date);
+      document.getElementById('pill').textContent = (named ? named.plant : 'Uniontown') + ' · ' + shortDate(date);
       const loads = P.loadoutRows(runs, date).filter(r => r.area === st.area), left = loads.filter(r => r.state !== 'DONE').length;
       document.getElementById('tabs').innerHTML = st.views.map(v => {
         const x = VIEWS[v], pic = typeof x.pic === 'string' ? x.pic : x.pic[st.area];
@@ -115,7 +134,7 @@
     });
     document.getElementById('go-back').addEventListener('click', goBack);
     document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
-    const leave = () => { stationId = ''; write(''); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true; render(); };
+    const leave = () => { stationId = ''; write(''); remember(CODE_KEY, null); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true; decide().catch(err => showError(err.message)); };
     const releaseBox = document.getElementById('release'), releaseMsg = document.getElementById('release-msg');
     document.getElementById('change').addEventListener('click', async () => {
       let required = false;
@@ -149,8 +168,15 @@
         stop = onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the loads: ' + e.message));
       };
       watch();
-      render();
-      setInterval(() => { if (L.operatingDay(new Date()) !== date) watch(); render(); }, 60000);
+      await decide().catch(err => showError('Could not check this tablet\'s station code: ' + (err.message || err)));
+      // A new code or a removed station sends the tablet back to the code screen (checked every 5 minutes).
+      setInterval(async () => {
+        if (L.operatingDay(new Date()) !== date) watch();
+        if (mode === 'code' && named && Date.now() % 300000 < 60000) {
+          try { const r = await stationCall('check', { kind: 'PLANT', key: named.key, version: named.version }); if (!r.ok) { remember(CODE_KEY, null); return decide(r.message); } } catch (e) { /* offline: keep the station */ }
+        }
+        render();
+      }, 60000);
     });
   </script>
 </body>
