@@ -7,12 +7,22 @@ import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18
 
 export const START_AREAS = { fac_uniontown: ['CASES', 'TANKER'] };
 export const START_GROUPS = ['Milk', 'Drinks', 'TEA'];
+// Joe 10/12: "We have mix, milk, tea, juice." Every plant's group list has these (a plant keeps the groups it added too).
+export const JOE_GROUPS = ['Milk', 'Mix', 'Tea', 'Juice'];
+const withJoeGroups = (gs) => gs.concat(JOE_GROUPS.filter(g => !gs.some(x => String(x).toUpperCase() === g.toUpperCase())));
+// Joe 10/12: Type is a drop-down on the product's Edit panel: these package types plus any a plant's products already use.
+export const START_TYPES = ['Gallon', 'Half Gallon', 'Quart', 'Pint', '2.5 Gallon', '5 Gallon', 'TOTE'];
+export function typesFrom(products) {
+  const out = START_TYPES.slice();
+  (products || []).forEach(p => { const t = String((p && p.mfgType) || '').trim(); if (t && !out.some(x => x.toUpperCase() === t.toUpperCase())) out.push(t); });
+  return out;
+}
 export const areaSlug = (facilityId, name) => facilityId + '_area_' + String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
 // {areas: [{id, name}], groups: [name], saved}: what the plant saved, else its starting areas and groups.
 export function plantSetupOf(saved, facilityId) {
   const d = (saved || []).find(x => x.facilityId === facilityId);
   return { areas: d && Array.isArray(d.areas) ? d.areas : (START_AREAS[facilityId] || []).map(n => ({ id: areaSlug(facilityId, n), name: n })),
-    groups: d && Array.isArray(d.groups) ? d.groups : START_GROUPS.slice(), saved: d || null };
+    groups: withJoeGroups(d && Array.isArray(d.groups) ? d.groups : START_GROUPS.slice()), saved: d || null };
 }
 export function watchProductSetup(db, cb, fail) {
   return onSnapshot(collection(db, 'productSetup'), s => cb(s.docs.map(d => d.data())), e => { cb([]); if (fail) fail(e); });

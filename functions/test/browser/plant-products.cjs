@@ -2,7 +2,7 @@
 /*
  * Browser check of the machine product drop-downs (Joe 10/10): Quality's Product is picked from the machine's own RedZone
  * products, blank to start, with the size following the product and "Other (type it)" for anything not listed; a product saved
- * before that is not on the list stays as its own choice. Administration > Products (Joe 10/11: plant, area and group drop-downs, Areas & Groups, template download and upload
+ * before that is not on the list stays as its own choice. Administration > Product Sheet (Joe 10/11: plant, area and group drop-downs, Areas & Groups, template download and upload; Joe 10/12: rows for reading, the ⋮ opens an Edit panel with Type and Group drop-downs
  * with a preview) changes a machine's list and Quality follows. Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -92,38 +92,74 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     const admin = await openPage(browser, 1920, 950, '/products.html?plant=fac_uniontown&line=ut_prod_totes&' + AS);
     if (process.env.XLSX_LOCAL) await admin.route(XLSX_URL, r => r.fulfill({ path: process.env.XLSX_LOCAL, contentType: 'application/javascript' }));
     const areaCount = (id) => admin.$eval('#area option[value="' + id + '"]', o => (/\((\d+)\)$/.exec(o.textContent) || [])[1]);
-    await admin.waitForFunction(() => document.getElementById('form-title').textContent === 'TOTES Products' && document.querySelectorAll('#rows input[data-k="name"]').length === 1);
+    await admin.waitForFunction(() => document.getElementById('form-title').textContent === 'TOTES Products' && document.querySelectorAll('#rows .pm-name').length === 1);
     assert.equal(await admin.inputValue('#plant'), 'fac_uniontown');
+    // Joe 10/12: "product sheet for Uniontown"; the rows are for reading and the ⋮ before a product opens its Edit panel.
+    assert.equal(await admin.textContent('#page-title'), 'Uniontown Product Sheet');
+    assert.equal(await admin.$$eval('#rows input, #rows select', x => x.length), 0, 'no boxes in the rows');
+    assert.equal(await admin.$$eval('#rows tr:first-child td:first-child .pm-dots', x => x.length), 1, 'the ⋮ is before the product name');
     assert.equal(await admin.inputValue('#area'), 'ut_prod_totes', 'the area drop-down shows the machine');
     const areaNames = await admin.$$eval('#area option', o => o.map(x => x.textContent.replace(/ \(\d+\)$/, '')));
     assert.deepEqual(areaNames.slice(-2), ['CASES', 'TANKER'], 'Uniontown\'s own areas follow its machines');
-    assert.deepEqual(await admin.$$eval('#group option', o => o.map(x => x.textContent)), ['All groups', 'Milk', 'Drinks', 'TEA']);
+    // Joe 10/12: "We have mix, milk, tea, juice": added to the plant's groups (TEA is Tea).
+    assert.deepEqual(await admin.$$eval('#group option', o => o.map(x => x.textContent)), ['All groups', 'Milk', 'Drinks', 'TEA', 'Mix', 'Juice']);
     assert.ok(!(await admin.textContent('body')).includes('RedZone'), 'no RedZone name on the screen');
-    assert.equal(await admin.inputValue('#rows input[data-k="name"]'), startOf('ut_prod_totes')[0].name);
+    assert.equal(await admin.textContent('#rows .pm-name'), startOf('ut_prod_totes')[0].name);
+    // The Edit panel holds every field; Type and Group are drop-downs.
+    await admin.click('#rows tr:first-child .pm-dots');
+    await admin.waitForSelector('#edit-back:not([hidden])');
+    assert.equal(await admin.inputValue('#edit-fields input[data-k="name"]'), startOf('ut_prod_totes')[0].name);
+    assert.deepEqual(await admin.$$eval('#edit-fields [data-k]:not(.pm-other)', x => x.map(e => e.dataset.k + ':' + e.tagName)), ['name:INPUT', 'sku:INPUT', 'upc:INPUT', 'mfgType:SELECT', 'productGroup:SELECT', 'ratePerMin:INPUT', 'targetPct:INPUT', 'minSpeed:INPUT', 'maxSpeed:INPUT', 'shelfLifeDays:INPUT']);
+    const types = await admin.$$eval('#edit-fields select[data-k="mfgType"] option', o => o.map(x => x.textContent));
+    assert.ok(['Gallon', 'Half Gallon', '2.5 Gallon', '5 Gallon', 'TOTE', 'Other (type it)'].every(t => types.includes(t)), 'Type choices: ' + types);
+    assert.deepEqual(await admin.$$eval('#edit-fields select[data-k="productGroup"] option', o => o.map(x => x.textContent)), ['', 'Milk', 'Drinks', 'TEA', 'Mix', 'Juice']);
+    await admin.click('#edit-close');
+    await admin.waitForSelector('#edit-back', { state: 'hidden' });
     await admin.click('#add');
-    await admin.fill('#rows tr:first-child input[data-k="name"]', 'UD Whole Milk Tote');
-    await admin.fill('#rows tr:first-child input[data-k="sku"]', '999001');
-    await admin.click('#form-title');
+    await admin.waitForSelector('#edit-back:not([hidden])');
+    assert.equal(await admin.textContent('#edit-title'), 'New Product');
+    await admin.fill('#edit-fields input[data-k="name"]', 'UD Whole Milk Tote');
+    await admin.fill('#edit-fields input[data-k="sku"]', '999001');
+    await admin.click('#edit-title');
     await admin.waitForFunction(() => /Saved/.test(document.getElementById('foot').textContent) && /\(2\)$/.test(document.querySelector('#area option[value="ut_prod_totes"]').textContent));
     let doc = null;
     for (let i = 0; i < 40 && !((doc = (await db().collection('plantProducts').doc('ut_prod_totes').get()).data()) && doc.products[0].sku); i++) await admin.waitForTimeout(250);
     assert.deepEqual(doc.products.map(p => [p.name, p.sku]), [['UD Whole Milk Tote', '999001'], [startOf('ut_prod_totes')[0].name, startOf('ut_prod_totes')[0].sku]]);
     // Joe 10/11: UPC, speeds, Target % and shelf life on the same row; numbers are kept as numbers, blanks left off.
-    assert.equal(await admin.inputValue('#rows tr:last-child input[data-k="ratePerMin"]'), String(startOf('ut_prod_totes')[0].ratePerMin), 'RedZone\'s Rate/Min is in the starting list');
-    await admin.fill('#rows tr:first-child input[data-k="upc"]', '0 70852 99900 1');
-    await admin.fill('#rows tr:first-child input[data-k="targetPct"]', '62.5');
-    await admin.fill('#rows tr:first-child input[data-k="shelfLifeDays"]', '14');
-    await admin.click('#form-title');
+    assert.equal(await admin.textContent('#rows tr:last-child td[data-k="ratePerMin"]'), String(startOf('ut_prod_totes')[0].ratePerMin), 'RedZone\'s Rate/Min is in the starting list');
+    await admin.fill('#edit-fields input[data-k="upc"]', '0 70852 99900 1');
+    await admin.selectOption('#edit-fields select[data-k="mfgType"]', 'TOTE');
+    await admin.selectOption('#edit-fields select[data-k="productGroup"]', 'Mix');
+    await admin.fill('#edit-fields input[data-k="targetPct"]', '62.5');
+    await admin.fill('#edit-fields input[data-k="shelfLifeDays"]', '14');
+    await admin.click('#edit-title');
     for (let i = 0; i < 40 && !((doc = (await db().collection('plantProducts').doc('ut_prod_totes').get()).data()) && doc.products[0].shelfLifeDays); i++) await admin.waitForTimeout(250);
-    assert.deepEqual([doc.products[0].upc, doc.products[0].targetPct, doc.products[0].shelfLifeDays, doc.products[0].ratePerMin], ['070852999001', 62.5, 14, undefined]);
+    assert.deepEqual([doc.products[0].upc, doc.products[0].mfgType, doc.products[0].productGroup, doc.products[0].targetPct, doc.products[0].shelfLifeDays, doc.products[0].ratePerMin], ['070852999001', 'TOTE', 'Mix', 62.5, 14, undefined]);
+    await admin.waitForFunction(() => /Saved/.test(document.getElementById('edit-note').textContent));
+    await fits(admin, 'Edit panel 1920');
+    await shots(admin, 'products-edit', 1920);
+    // Other (type it) takes a type that is not on the list.
+    await admin.selectOption('#edit-fields select[data-k="mfgType"]', '__other__');
+    await admin.fill('#edit-fields input.pm-other', 'Bag in Box');
+    await admin.click('#edit-title');
+    for (let i = 0; i < 40 && (doc = (await db().collection('plantProducts').doc('ut_prod_totes').get()).data()).products[0].mfgType !== 'Bag in Box'; i++) await admin.waitForTimeout(250);
+    assert.equal(doc.products[0].mfgType, 'Bag in Box');
+    await admin.keyboard.press('Escape');
+    await admin.waitForSelector('#edit-back', { state: 'hidden' });
+    await admin.waitForFunction(() => document.querySelector('#rows tr:first-child td[data-k="mfgType"]').textContent === 'Bag in Box' && document.querySelector('#rows tr:first-child td[data-k="upc"]').textContent === '070852999001');
+    // Add Product then Done with no name: nothing is added.
+    await admin.click('#add');
+    await admin.waitForSelector('#edit-back:not([hidden])');
+    await admin.click('#edit-close');
+    await admin.waitForFunction(() => document.querySelectorAll('#rows .pm-name').length === 2 && !document.querySelector('#rows .pm-name em'));
     await admin.selectOption('#area', 'ut_prod_htst_1');
     await admin.waitForFunction(() => document.querySelectorAll('#rows tr').length > 100);
     // Group filter: only the products in that group.
     await admin.selectOption('#group', 'TEA');
-    await admin.waitForFunction(() => { const g = [...document.querySelectorAll('#rows input[data-k="productGroup"]')]; return g.length > 5 && g.every(i => /TEA/i.test(i.value)); });
+    await admin.waitForFunction(() => { const g = [...document.querySelectorAll('#rows td[data-k="productGroup"]')]; return g.length > 5 && g.every(i => /TEA/i.test(i.textContent)); });
     await admin.selectOption('#group', '');
     await admin.fill('#find', 'jersey 2%');
-    await admin.waitForFunction(() => document.querySelectorAll('#rows input[data-k="name"]').length >= 2 && [...document.querySelectorAll('#rows input[data-k="name"]')].every(i => /JERSEY 2%/i.test(i.value)));
+    await admin.waitForFunction(() => document.querySelectorAll('#rows .pm-name').length >= 2 && [...document.querySelectorAll('#rows .pm-name')].every(i => /JERSEY 2%/i.test(i.textContent)));
     assert.match(await admin.textContent('#rows tr:first-child td.pm-check'), /Check SKU · also GV 2% Gallon/, 'a SKU on two products is marked to check');
     await fits(admin, 'Products 1920');
     await shots(admin, 'products', 1920);
@@ -183,13 +219,20 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     assert.deepEqual(admin.errors, []);
     for (const w of [1536]) {
       const narrow = await openPage(browser, w, 760, '/products.html?plant=fac_uniontown&line=ut_prod_gallon_filler&' + AS);
-      await narrow.waitForFunction(() => document.getElementById('form-title').textContent === 'GALLON FILLER Products' && document.querySelectorAll('#rows tr').length > 10);
+      await narrow.waitForFunction(() => document.getElementById('form-title').textContent === 'GALLON FILLER Products' && document.querySelectorAll('#rows tr').length > 10 && document.querySelector('#rows .pm-dots'));
       await fits(narrow, 'Products ' + w);
       const tops = await narrow.$$eval('[data-top]', els => els.map(e => Math.round(e.getBoundingClientRect().bottom)));
       assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, 'buttons and filters on one line at ' + w + ': ' + tops);
       const edge = await narrow.$$eval('[data-top]', els => Math.max(...els.map(e => e.getBoundingClientRect().right)) - document.documentElement.clientWidth);
       assert.ok(edge <= 0, 'the plant drop-down is not cut off at ' + w + ': ' + edge);
       await shots(narrow, 'products', w);
+      // The Edit panel fits Joe's screen too.
+      await narrow.click('#rows tr:nth-child(9) .pm-dots');
+      await narrow.waitForSelector('#edit-back:not([hidden])');
+      const box = await narrow.$eval('#edit-pane', e => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, scroll: e.scrollHeight - e.clientHeight }; });
+      assert.ok(box.top >= 0 && box.bottom <= 760 && box.scroll <= 0, 'the Edit panel fits with no scrolling at ' + w + ': ' + JSON.stringify(box));
+      await shots(narrow, 'products-edit', w);
+      await narrow.click('#edit-close');
       assert.deepEqual(narrow.errors, []);
     }
 

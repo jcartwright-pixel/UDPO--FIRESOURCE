@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Products · New Plant Operations</title>
+  <title>Product Sheet · New Plant Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
@@ -16,7 +16,7 @@
 </head>
 <body class="fill issues-page plant-page quality-page products-page">
   <div class="signin" id="signin" hidden>
-    <h1>Products</h1>
+    <h1>Product Sheet</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -28,7 +28,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Administration · Plant Setup</span><h1>Products</h1></div>
+      <div class="title"><span class="eyebrow">Administration · Plant Setup</span><h1><span id="page-title">Product Sheet</span></h1></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <button type="button" id="add" data-top>Add Product</button>
       <button type="button" id="reset" data-top>Starting List</button>
@@ -75,6 +75,14 @@
         <div class="pm-acts"><button type="button" class="rp-btn" id="preview-cancel">Cancel</button><button type="button" class="rp-btn primary" id="preview-save">Save Upload</button></div>
       </section>
       <datalist id="group-list"></datalist>
+      <!-- Joe 10/12: the rows are for reading; the ⋮ before a product opens its Edit panel, which holds every field (more go in FIELDS). -->
+      <div class="pm-edit-back" id="edit-back" hidden>
+        <section class="pm-edit" id="edit-pane" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+          <div class="pm-edit-head"><div><span class="eyebrow" id="edit-where"></span><h2 id="edit-title">Edit Product</h2></div><button type="button" class="rp-btn primary" id="edit-close">Done</button></div>
+          <div class="pm-edit-grid" id="edit-fields"></div>
+          <p class="pm-edit-note" id="edit-note"></p>
+        </section>
+      </div>
       <div class="foot" id="foot"></div>
     </div>
   </div>
@@ -82,7 +90,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv } from './js/products.js';
+    import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, typesFrom, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv } from './js/products.js';
     import { savedText } from './js/autosave.js';
 
     // Joe 10/10: the products each machine runs are the product drop-down on the Quality check. Joe 10/11: products are plant by
@@ -93,7 +101,7 @@
     const params = new URLSearchParams(location.search);
     const ALL_PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
     let setup = [], products = {}, changed = {}, own = [], person = null, app = {}, plant = params.get('plant') || '', chosen = params.get('line') || '', group = '', find = '', note = '', armed = null, busy = Promise.resolve();
-    let pane = 'list', draft = null, upload = null, setupRead = false;
+    let pane = 'list', draft = null, upload = null, setupRead = false, editing = null;
     // An area being changed here shows its list as typed until the database has caught up.
     const mine = {};
     const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
@@ -118,6 +126,8 @@
       const ps = plants();
       if (!ps.some(p => p.id === plant) && (person || !plant)) plant = ps[0].id;
       document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
+      // Joe 10/12: "product sheet for Uniontown".
+      document.getElementById('page-title').textContent = plantName(plant) + ' Product Sheet';
       const all = areas(), line = current();
       // The area asked for stays chosen until the machines have been read.
       if (line && setupRead) chosen = line.id;
@@ -150,19 +160,21 @@
       const shared = (p) => { const k = String(p.sku || '').trim(), set = k && bySku[k]; return set && set.size > 1 ? [...set].filter(n => n !== p.name) : null; };
       const toCheck = Object.values(bySku).filter(x => x.size > 1).length;
       document.getElementById('hstats').innerHTML = [['Areas', all.length, ''], ['Products', total, ''], ['SKUs to check', toCheck, toCheck ? 'warn' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.getElementById('foot').textContent = (ck ? 'Each box saves as you leave it. A machine\'s list is the Product drop-down on its Quality Check, which also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
+      document.getElementById('foot').textContent = (ck ? 'The ⋮ before a product opens its Edit panel; each box there saves as you leave it. A machine\'s list is the Product drop-down on its Quality Check, which also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
       if (!line) { document.getElementById('form-title').textContent = plantName(plant) + ' Products'; document.getElementById('form-last').textContent = ''; document.getElementById('rows').innerHTML = '<tr><td colspan="11" class="empty">' + escapeHtml(plantName(plant)) + ' has no areas yet. Areas &amp; Groups adds one, or Upload adds them from the template.</td></tr>'; return; }
       const c = changed[line.id];
       document.getElementById('form-title').textContent = line.name + ' Products';
       document.getElementById('form-last').textContent = c ? (c.uploaded ? 'Uploaded ' : 'Changed ') + when(c.updatedAt) + (c.updatedBy ? ' by ' + c.updatedBy : '') : line.machine ? 'Starting list (10/10)' : '';
-      // Not drawn again while someone types in the list.
-      if (force === 'keep' || (!force && document.getElementById('rows').contains(document.activeElement))) return;
-      const dis = ck ? '' : ' disabled', q = find.trim().toUpperCase();
-      const cell = (i, k, v, ph, also, extra) => '<td' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><input data-i="' + i + '" data-k="' + k + '" aria-label="' + escapeHtml(ph + (k === 'name' ? '' : ' for ' + (listOf(line.id)[i] || {}).name)) + '" value="' + escapeHtml(v === undefined || v === null ? '' : String(v)) + '" placeholder="' + ph + '" maxlength="120"' + (extra || '') + dis + '>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
-      const num = ' inputmode="decimal" class="pm-num"';
+      if (force === 'keep') return;
+      const q = find.trim().toUpperCase();
+      // Joe 10/12: the rows only show the product; the ⋮ before the name (or a double-click on the row) opens its Edit panel.
+      const show = (v) => escapeHtml(v === undefined || v === null ? '' : String(v));
+      const cell = (k, v, also) => '<td data-k="' + k + '"' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><span class="pm-val">' + show(v) + '</span>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
+      const num = (k, v) => '<td data-k="' + k + '" class="pm-num">' + show(v) + '</td>';
       const rows = listOf(line.id).map((p, i) => [p, i]).filter(([p]) => (!q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0) && (!p.name || inGroup(p)));
-      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr>' + cell(i, 'name', p.name, 'Product name') + cell(i, 'sku', p.sku, 'SKU', shared(p)) + cell(i, 'upc', p.upc, 'UPC', null, ' inputmode="numeric"') + cell(i, 'mfgType', p.mfgType, 'Type') + cell(i, 'productGroup', p.productGroup, 'Group', null, ' list="group-list"') +
-        cell(i, 'ratePerMin', p.ratePerMin, '', null, num) + cell(i, 'targetPct', p.targetPct, '', null, num) + cell(i, 'minSpeed', p.minSpeed, '', null, num) + cell(i, 'maxSpeed', p.maxSpeed, '', null, num) + cell(i, 'shelfLifeDays', p.shelfLifeDays, '', null, ' inputmode="numeric" class="pm-num"') +
+      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr data-row="' + i + '"><td data-k="name" class="pm-namecell">' + (ck ? '<button type="button" class="pm-dots" data-edit="' + i + '" aria-label="Edit ' + show(p.name || 'new product') + '" title="Edit">⋮</button>' : '') + '<span class="pm-name">' + (p.name ? show(p.name) : '<em>New product</em>') + '</span></td>' +
+        cell('sku', p.sku, shared(p)) + cell('upc', p.upc) + cell('mfgType', p.mfgType) + cell('productGroup', p.productGroup) +
+        num('ratePerMin', p.ratePerMin) + num('targetPct', p.targetPct) + num('minSpeed', p.minSpeed) + num('maxSpeed', p.maxSpeed) + num('shelfLifeDays', p.shelfLifeDays) +
         '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + i + '">' + (armed === line.id + '|' + i ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
         '<tr><td colspan="11" class="empty">' + (q || group ? 'No product matches' + (q ? ' ' + escapeHtml(find) : '') + (group ? ' in ' + escapeHtml(group) : '') + '.' : 'No products in ' + escapeHtml(line.name) + '. Add Product puts one in.') + '</td></tr>';
     }
@@ -175,18 +187,11 @@
       render(what ? true : 'keep');
       const run = busy.then(() => save('saveMachineProducts', { operationId: line.id, products: list.filter(p => String(p.name || '').trim()).map(cleanProduct) }));
       busy = run.catch(() => {});
-      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.id]; }).then(() => render());
+      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); editNote(savedText(), false); }, err => { const msg = line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'; note = 'Not saved.'; showError(msg); editNote(msg, true); delete mine[line.id]; }).then(() => render());
     }
-    document.getElementById('rows').addEventListener('change', e => {
-      const box = e.target.closest('[data-k]'), line = current();
-      if (!box || !line || !canSave()) return;
-      const list = listOf(line.id).map(p => Object.assign({}, p));
-      if (!list[box.dataset.i]) return;
-      list[box.dataset.i][box.dataset.k] = box.value.trim();
-      // Kept as the server keeps it (numbers as numbers, blanks left off), so the saved list matches what is on screen.
-      send(line, list.map(p => String(p.name || '').trim() ? cleanProduct(p) : p));
-    });
     document.getElementById('rows').addEventListener('click', e => {
+      const ed = e.target.closest('[data-edit]');
+      if (ed) { openEdit(Number(ed.dataset.edit)); return; }
       const b = e.target.closest('[data-remove]'), line = current();
       if (!b || !line || !canSave()) return;
       const key = line.id + '|' + b.dataset.remove;
@@ -201,9 +206,74 @@
       find = ''; document.getElementById('find').value = '';
       mine[line.id] = [{ name: '', sku: '', mfgType: '', productGroup: group }].concat(listOf(line.id));
       render(true);
-      const first = document.querySelector('#rows input[data-k="name"]');
-      if (first) first.focus();
+      openEdit(0);
     });
+
+    /* ---------- Edit panel (Joe 10/12) ---------- */
+    // Every field of FIELDS, one box each; Type and Group are drop-downs. Each box saves as it is left, like the rest of the plant
+    // screens. A new product is saved once it has a name; Done with no name drops it.
+    document.getElementById('rows').addEventListener('dblclick', e => { const r = e.target.closest('tr[data-row]'); if (r && !e.target.closest('button')) openEdit(Number(r.dataset.row)); });
+    function editNote(text, bad) { const n = document.getElementById('edit-note'); n.textContent = editing ? text : ''; n.classList.toggle('bad', !!bad); }
+    function openEdit(i) {
+      const line = current();
+      if (!line || !canSave() || !listOf(line.id)[i]) return;
+      editing = { areaId: line.id, i };
+      drawEdit();
+      document.getElementById('edit-back').hidden = false;
+      const first = document.querySelector('#edit-fields [data-k="' + (listOf(line.id)[i].name ? 'sku' : 'name') + '"]');
+      if (first) first.focus();
+    }
+    function drawEdit() {
+      const line = current(), p = listOf(editing.areaId)[editing.i] || {};
+      const all = [].concat(...areas().map(a => listOf(a.id)));
+      document.getElementById('edit-where').textContent = plantName(plant) + ' · ' + (line ? line.name : '');
+      document.getElementById('edit-title').textContent = p.name ? 'Edit ' + p.name : 'New Product';
+      const val = (k) => p[k] === undefined || p[k] === null ? '' : String(p[k]);
+      const pick = (k, list, label) => {
+        const v = val(k), opts = list.slice();
+        if (v && !opts.some(x => x.toUpperCase() === v.toUpperCase())) opts.push(v);
+        return '<select data-k="' + k + '" aria-label="' + label + '"><option value=""></option>' + opts.map(x => opt(x, opts.find(y => y.toUpperCase() === v.toUpperCase()) || '', x)).join('') + (k === 'mfgType' ? '<option value="__other__">Other (type it)</option>' : '') + '</select>' +
+          (k === 'mfgType' ? '<input data-k="mfgType" class="pm-other" placeholder="Type it" maxlength="40" aria-label="Other type" hidden>' : '');
+      };
+      const hint = { upc: '6 to 14 digits', ratePerMin: 'per minute', minSpeed: 'per minute', maxSpeed: 'per minute', shelfLifeDays: 'run date to code date', productGroup: 'Areas & Groups adds a group' };
+      document.getElementById('edit-fields').innerHTML = FIELDS.map(f => {
+        const box = f.k === 'mfgType' ? pick('mfgType', typesFrom(all), 'Type') : f.k === 'productGroup' ? pick('productGroup', ownOf().groups, 'Group')
+          : '<input data-k="' + f.k + '" value="' + escapeHtml(val(f.k)) + '" maxlength="120" aria-label="' + escapeHtml(f.head) + '"' + (f.num ? ' inputmode="decimal" class="pm-num"' : f.k === 'upc' ? ' inputmode="numeric"' : '') + (f.k === 'name' ? ' placeholder="Product name"' : '') + '>';
+        return '<label class="pm-field' + (f.k === 'name' ? ' wide' : '') + '"><span>' + escapeHtml(f.head) + (hint[f.k] ? ' <small>' + hint[f.k] + '</small>' : '') + '</span>' + box + '</label>';
+      }).join('');
+      editNote(p.name ? 'Each box saves as you leave it.' : 'Type the product name first; it is saved once it has one.', false);
+    }
+    document.getElementById('edit-fields').addEventListener('change', e => {
+      const box = e.target.closest('[data-k]'), line = current();
+      if (!box || !editing || !line || line.id !== editing.areaId || !canSave()) return;
+      if (box.tagName === 'SELECT' && box.value === '__other__') { const o = box.parentNode.querySelector('.pm-other'); o.hidden = false; o.focus(); return; }
+      if (box.tagName === 'SELECT' && box.dataset.k === 'mfgType') { const o = box.parentNode.querySelector('.pm-other'); if (o) o.hidden = true; }
+      const list = listOf(line.id).map(p => Object.assign({}, p));
+      if (!list[editing.i]) return;
+      const v = box.value.trim();
+      if (box.dataset.k === 'name' && !v && list[editing.i].name) { box.value = list[editing.i].name; editNote('A product needs a name. Remove takes a product off the list.', true); return; }
+      if (box.dataset.k === 'name' && list.some((p, j) => j !== editing.i && String(p.name || '').trim().toUpperCase() === v.toUpperCase())) { editNote(v + ' is already on this list. Each product needs its own name.', true); return; }
+      list[editing.i][box.dataset.k] = v;
+      if (box.dataset.k === 'name') document.getElementById('edit-title').textContent = 'Edit ' + v;
+      editNote('Saving…', false);
+      // Kept as the server keeps it (numbers as numbers, blanks left off), so the saved list matches what is on screen.
+      send(line, list.map(p => String(p.name || '').trim() ? cleanProduct(p) : p));
+    });
+    function closeEdit() {
+      if (!editing) return;
+      // Leaving a box saves it first (the change event comes before the click).
+      const line = current(), list = editing && listOf(editing.areaId);
+      if (list && line && line.id === editing.areaId && list[editing.i] && !String(list[editing.i].name || '').trim()) {
+        mine[line.id] = list.filter((p, j) => j !== editing.i);
+        if (JSON.stringify(mine[line.id]) === JSON.stringify(products[line.id] || [])) delete mine[line.id];
+      }
+      editing = null;
+      document.getElementById('edit-back').hidden = true;
+      render(true);
+    }
+    document.getElementById('edit-close').addEventListener('click', closeEdit);
+    document.getElementById('edit-back').addEventListener('click', e => { if (e.target.id === 'edit-back') closeEdit(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && editing) closeEdit(); });
     document.getElementById('reset').addEventListener('click', async () => {
       const line = current();
       if (!line || !line.machine || !canSave()) return;
