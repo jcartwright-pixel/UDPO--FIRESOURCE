@@ -58,8 +58,8 @@ async function changed() {
 function drawLine(n) {
   const box = document.getElementById('offline-line');
   if (!box) return;
-  const text = n ? (navigator.onLine ? 'Sending saves made on this iPad: ' + n : 'Saved on this iPad, sends when online: ' + n)
-    : !navigator.onLine ? 'No internet. Taps, notes and photos are saved on this iPad and sent when it is back.' : failedText;
+  const text = n ? (navigator.onLine ? 'Sending saves made on this device: ' + n : 'Saved on this device, sends when online: ' + n)
+    : !navigator.onLine ? 'No internet. Taps, notes and photos are saved on this device and sent when it is back.' : failedText;
   box.textContent = text;
   box.hidden = !text;
   box.classList.toggle('error', !n && navigator.onLine && !!failedText);
@@ -89,7 +89,7 @@ export async function flush() {
         await callServer('save', Object.assign({ action: e.action }, e.fields));
       } catch (err) {
         if (isNoConnection(err)) break;
-        failedText = 'A save made on this iPad was refused when it was sent: ' + friendlyError(err);
+        failedText = 'A save made on this device was refused when it was sent: ' + friendlyError(err);
         showError(failedText);
       }
       await remove(e.key);
@@ -101,7 +101,9 @@ export async function flush() {
 
 // Keep the screens on this iPad (see sw.js) and send waiting saves when the connection comes back.
 export function startOffline(pages) {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Only the Safety Walkthrough screens are kept on the device (safety*.html and extinguishers.html); every other screen of
+  // the app is never touched by sw.js.
+  if ('serviceWorker' in navigator) ['safety', 'extinguishers'].forEach(scope => navigator.serviceWorker.register('sw.js', { scope }).catch(() => {}));
   if (window.caches && navigator.onLine) {
     const keep = pages.concat(['css/app.css', 'css/safety.css', 'js/app.js', 'js/logic.js', 'js/safety-rules.js', 'js/safety.js', 'js/offline-saves.js',
       'img/ud-logo.webp', 'img/app-icon/favicon-32.png', 'manifest.webmanifest',

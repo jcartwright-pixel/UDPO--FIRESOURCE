@@ -33,10 +33,11 @@
       <a class="sw-top" href="safety-issues.html" data-top>Open Issues</a>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <div class="notice warning" id="offline-line" role="status" hidden></div>
     <div class="view">
       <div class="sw-sheet">
         <table class="sw-grid">
-          <thead><tr><th>Walked</th><th>Started by</th><th>Good</th><th>Not good</th><th>Not checked</th><th>Issues reviewed</th><th>Monthly items</th><th>Notes</th><th>Finished</th><th></th></tr></thead>
+          <thead><tr><th>Walked</th><th>Started by</th><th>Good</th><th>Not good</th><th>Not checked</th><th>Issues reviewed</th><th>Monthly items</th><th>Notes and photos</th><th>Finished</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -44,7 +45,9 @@
     </div>
   </div>
 
+  <script>window.UD_OFFLINE = true;</script>
   <script type="module">
+    import { startOffline } from './js/offline-saves.js';
     import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
     import { doc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { pickPlant, plantName, modeText, watchSetup } from './js/safety.js';
@@ -62,9 +65,10 @@
         const c = S.walkCounts(w, S.walkList(setup, w.monthly === true)), rv = Object.values(w.reviews || {}).filter(r => r.status).length;
         // Joe 10/12: the walk's own notes, and how many rows have a note (Open shows them).
         const nn = Object.values(w.items || {}).filter(i => i.note).length + Object.values(w.reviews || {}).filter(r => r.note).length;
+        const np = Object.values(w.items || {}).reduce((n, i) => n + (Array.isArray(i.photoIds) ? i.photoIds.length : i.photo ? 1 : 0), 0);
         return '<tr><td class="nw"><b>' + window.UDLogic.dayName(w.date) + ' ' + shortDate(w.date) + '</b></td><td>' + escapeHtml(w.startedByName || w.startedBy || '') + '</td>' +
           '<td><span class="sw-pill green">' + c.good + '</span></td><td>' + (c.notGood ? '<span class="sw-pill red">' + c.notGood + '</span>' : '0') + '</td><td>' + c.notChecked + '</td><td>' + rv + '</td><td>' + (w.monthly ? 'Yes' : '') + '</td>' +
-          '<td class="sw-notes">' + (w.note ? escapeHtml(w.note) : '') + (nn ? '<span class="sw-how">' + nn + ' row note' + (nn === 1 ? '' : 's') + '</span>' : '') + (!w.note && !nn ? '<span class="sw-nc">None</span>' : '') + '</td>' +
+          '<td class="sw-notes">' + (w.note ? escapeHtml(w.note) : '') + (nn || np ? '<span class="sw-how">' + [nn ? nn + ' row note' + (nn === 1 ? '' : 's') : '', np ? np + ' photo' + (np === 1 ? '' : 's') : ''].filter(Boolean).join(' · ') + '</span>' : '') + (!w.note && !nn && !np ? '<span class="sw-nc">None</span>' : '') + '</td>' +
           '<td class="nw">' + (w.finishedAt ? dateTimeText(w.finishedAt) + (w.finishedByName ? ' · ' + escapeHtml(w.finishedByName) : '') : '<span class="sw-nc">Not finished</span>') + '</td>' +
           '<td><a class="sw-btn sw-small" href="safety.html?walk=' + encodeURIComponent(S.walkId(w.facilityId, w.date)) + '">Open</a></td></tr>';
       }).join('') || '<tr><td colspan="10" class="sw-empty">No walks yet. Weekly Walk starts the first one.</td></tr>';
@@ -76,6 +80,7 @@
       stops.push(onSnapshot(query(collection(db, 'safetyWalks'), where('facilityId', '==', plant)), s => { walks = s.docs.map(d => d.data()).sort((a, b) => String(b.date).localeCompare(String(a.date))); render(); },
         e => showError('Could not read the walks (' + e.message + '). Check the network and reload the page.')));
     }
+    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {

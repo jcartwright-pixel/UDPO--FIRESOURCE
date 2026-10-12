@@ -92,20 +92,101 @@ table.sw-grid tr.sw-add td { background: #f7fafd; }
 .sw-setup td input[type="text"] { width: 100%; }
 .sw-setup td.area { font-weight: 800; color: var(--ud-blue-dark); }
 
-/* Tablet and narrow windows: one column, the areas become a row of buttons, rows stack with big buttons. */
-@media (max-width: 1100px) {
-  .sw-split { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+/* Tablets (iPad Safari, Android Chrome) and phones, Joe 10/12: one column, the areas a row of buttons, each item a card:
+   the item and its state, then the note and + Photo, then big Good / Not good buttons (two lines on a phone). */
+@media (max-width: 1100px), (pointer: coarse) {
+  .sw-split { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); padding: 0 12px; }
   .sw-areas { display: flex; gap: 6px; overflow-x: auto; padding: 6px; }
-  .sw-areas button { width: auto; flex: none; margin: 0; }
-  table.sw-table tr:not(.sw-more) td { display: block; border-bottom: 0; }
-  table.sw-table tr:not(.sw-more) { display: block; border-bottom: 1px solid #e3eaf1; padding: 4px 0; }
-  table.sw-table td.sw-do { text-align: left; width: auto; }
-  table.sw-table td.sw-state { width: auto; }
-  table.sw-table td.sw-note { width: auto; min-width: 0; }
-  .sw-btn { min-width: 46%; margin: 4px 1% 0 0; padding: 12px; font-size: 18px; }
+  .sw-areas button { width: auto; flex: none; margin: 0; min-height: 48px; }
+  .safety-page .head { flex-wrap: wrap; row-gap: 8px; }
+  .safety-page .head .actions.in-head { flex-wrap: wrap; justify-content: flex-start; max-width: 100%; }
+  .sw-top { min-height: 48px; }
+  table.sw-table, table.sw-table tbody { display: block; }
+  table.sw-table tr:not(.sw-more) { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "text state" "note note" "do do"; gap: 8px 12px; padding: 12px 14px; border-bottom: 1px solid #e3eaf1; }
+  table.sw-table tr:not(.sw-more) td { display: block; height: auto; padding: 0; border: 0; background: none; overflow: visible; }
+  table.sw-table tr > td:first-child { grid-area: text; }
+  table.sw-table td.sw-note { grid-area: note; width: auto; min-width: 0; }
+  table.sw-table td.sw-do { grid-area: do; width: auto; text-align: left; display: flex !important; gap: 10px; }
+  table.sw-table td.sw-state { grid-area: state; width: auto; align-self: start; text-align: right; }
+  table.sw-table tr[data-issue-row] { grid-template-areas: "text text" "age maint" "note note" "do do"; }
+  table.sw-table tr[data-issue-row] > td:nth-child(3) { grid-area: age; text-align: left; }
+  table.sw-table tr[data-issue-row] > td:nth-child(4) { grid-area: maint; }
+  table.sw-table tr.sw-more { display: block; }
+  table.sw-table tr.sw-more td { display: block; height: auto; padding: 10px 14px; }
+  .sw-btn { flex: 1; min-width: 0; margin: 0; min-height: 52px; padding: 12px; font-size: 18px; }
+  .safety-page .sw-cam { min-height: 48px; padding: 8px 16px; }
+  table.sw-table td.sw-note input { min-height: 48px; }
+  .sw-check { min-height: 44px; align-items: center; }
+  .sw-check input { width: 28px; height: 28px; }
   .sw-more-grid { grid-template-columns: 1fr; }
   .sw-bi { flex-wrap: wrap; }
   .sw-bi > span { flex-basis: 100%; }
-  .sw-bi .sw-btn { flex: 1; }
+  .sw-bi .sw-btn { flex: 1; min-height: 56px; }
+  .sw-nav { flex-wrap: wrap; }
+  .sw-nav .sw-top { min-height: 52px; }
+  .sw-sheet { margin: 0 12px; }
+  table.sw-grid td .sw-btn, table.sw-grid td a.sw-btn { min-height: 48px; padding: 10px 14px; display: inline-flex; align-items: center; }
+  table.sw-grid input, table.sw-grid select { min-height: 44px; }
+  .sw-filter button { min-height: 48px; }
+}
+/* Tablets on their side: the note and the buttons share a line. */
+@media (min-width: 900px) and (max-width: 1100px), (min-width: 900px) and (pointer: coarse) {
+  table.sw-table tr:not(.sw-more):not([data-issue-row]) { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "text state" "note do"; }
+  table.sw-table td.sw-do .sw-btn { min-width: 150px; }
+}
+/* Phones: the state goes under the item. */
+@media (max-width: 600px) {
+  table.sw-table tr:not(.sw-more):not([data-issue-row]) { grid-template-columns: 1fr; grid-template-areas: "text" "state" "note" "do"; }
+  table.sw-table td.sw-state { text-align: left; }
+  .sw-split { padding: 0 8px; }
+  .safety-page .head { padding: 8px 10px 6px; }
+  .safety-page .head .actions.in-head { width: 100%; margin-left: 0; }
+  .safety-page .head .sw-top { flex: 1 1 auto; padding: 8px 12px; }
+  .safety-page .head .title h1 { white-space: normal; }
+  .sw-counts { white-space: normal; }
 }
 table.sw-grid td.sw-notes { max-width: 420px; }
+/* Joe 10/12: saves held on the tablet with no signal (a warning line, not a pop-up). */
+.safety-page .notice.warning { margin: 0 16px 8px; background: #fff4d6; color: #7a4f00; border: 1px solid #f0c75e; border-radius: 8px; padding: 8px 12px; font-weight: 700; font-size: 16px; }
+.safety-page .notice.warning.error { background: var(--error-bg); color: var(--error-ink); border-color: transparent; }
+/* Joe 10/12: photos on any item, taken with the tablet camera. */
+.sw-notecell { display: flex; gap: 8px; align-items: center; }
+.sw-notecell input { flex: 1; }
+.sw-cam { flex: none; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 6px 12px; border: 2px dashed var(--line); border-radius: 8px; color: var(--ud-blue); background: #fff; font-weight: 700; font-size: 16px; line-height: 1.2; cursor: pointer; white-space: nowrap; }
+.sw-camera-input { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.sw-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.sw-thumbs img { width: 72px; height: 54px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); cursor: zoom-in; }
+.sw-thumb-wait { display: inline-grid; place-items: center; width: 72px; height: 54px; border-radius: 6px; border: 1px dashed var(--line); color: var(--muted); font-size: 15px; }
+.sw-bigphoto { gap: 14px; align-content: center; }
+.sw-bigphoto .sw-top { font-size: 18px; padding: 12px 24px; }
+
+/* Tablets and phones: Open Issues, Fire Extinguishers, Past Walks and Checklist Setup show each row as a card, every
+   value under its column's name (js/safety.js copies the names onto the cells), so nothing scrolls sideways. */
+@media (max-width: 1100px), (pointer: coarse) {
+  table.sw-grid, table.sw-grid tbody { display: block; }
+  table.sw-grid thead { display: none; }
+  table.sw-grid tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; padding: 12px 14px; border-bottom: 1px solid #e3eaf1; }
+  table.sw-grid td { display: block; height: auto; padding: 0; border: 0; white-space: normal !important; overflow: visible; background: none !important; text-align: left; max-width: none; }
+  table.sw-grid td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 2px; color: var(--muted); font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  table.sw-grid td.sw-empty, table.sw-grid td[colspan] { grid-column: 1 / -1; }
+  table.sw-grid td:empty { display: none; }
+}
+/* Phones: the whole page scrolls (the list is too short to scroll inside), one value per line in the cards. */
+@media (max-width: 600px) {
+  body.fill.safety-page .side-main { overflow: auto; }
+  body.fill.safety-page #screen:not([hidden]) { height: auto; min-height: 100vh; }
+  body.fill.safety-page .view:not([hidden]) { flex: none; }
+  .safety-page .sw-split { display: block; }
+  .safety-page .sw-areas { position: sticky; top: 0; z-index: 3; margin-bottom: 8px; }
+  .safety-page .sw-list, .safety-page .sw-sheet { overflow: visible; }
+  .safety-page .sw-sec { position: static; }
+  table.sw-grid tr { grid-template-columns: minmax(0, 1fr); }
+}
+/* A tick box in a table stays a tick box (the table's inputs fill their cell). */
+table.sw-grid input[type="checkbox"] { width: 24px; height: 24px; min-width: 24px; min-height: 0; flex: none; padding: 0; }
+@media (max-width: 1100px), (pointer: coarse) { table.sw-grid input[type="checkbox"] { width: 28px; height: 28px; min-width: 28px; } }
+/* The header buttons (Finish Walk too) keep 16px text. */
+.safety-page .head .actions.in-head.top-row > .sw-top, .safety-page .head .actions.in-head > .sw-top { font-size: 16px; }
+@media (max-width: 1100px), (pointer: coarse) { .safety-page .head .actions.in-head.top-row > .sw-top, .safety-page .head .actions.in-head > .sw-top { height: auto; min-height: 48px; } }
+.safety-page #filter button[data-f] { font-size: 16px; }
+@media (max-width: 1100px), (pointer: coarse) { .safety-page #filter button[data-f] { height: auto; min-height: 48px; } }

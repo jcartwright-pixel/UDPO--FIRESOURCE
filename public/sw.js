@@ -1,6 +1,7 @@
 // Joe 10/12: keeps the Safety Walkthrough screens on the iPad so they open with no signal (js/offline-saves.js fills the
 // cache and keeps the saves). Online, every screen comes from the server as before; the copy is used only when there is no
-// connection. Screens not in the cache are not touched.
+// connection. Screens not in the cache are not touched. It looks after the Safety Walkthrough screens only (registered for
+// the safety*.html and extinguishers.html scopes); the rest of the app never goes through it.
 const CACHE = 'ud-offline-v1';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
