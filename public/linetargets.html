@@ -172,13 +172,17 @@
     }
 
     // The line's whole Products list is saved each time (as on Products); saves go one at a time.
+    // A box refused here is counted, so a save that finishes later does not wipe its message.
+    let refused = 0;
+    function refuse(text) { refused++; showError(text); }
     function send(line, list) {
+      const at = refused;
       mine[line.operationId] = list;
       note = 'Saving…';
       render('keep');
       const run = busy.then(() => save('saveMachineProducts', { operationId: line.operationId, products: list.filter(p => String(p.name || '').trim()) }));
       busy = run.catch(() => {});
-      return run.then(() => { note = savedText(); showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.operationId]; }).then(() => render());
+      return run.then(() => { note = savedText(); if (refused === at) showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.operationId]; }).then(() => render());
     }
     document.getElementById('rows').addEventListener('change', e => {
       const box = e.target.closest('[data-k]'), line = current();
@@ -186,15 +190,15 @@
       const list = listOf(line.operationId).map(p => Object.assign({}, p)), row = list[box.dataset.i], k = box.dataset.k, v = box.value.trim();
       if (!row) return;
       if (k === 'upc') {
-        if (v && !/^\d{6,14}$/.test(v)) { showError('A UPC is the 6 to 14 digits under the barcode. ' + row.name + ' was not changed.'); box.value = row.upc || ''; return; }
+        if (v && !/^\d{6,14}$/.test(v)) { refuse('A UPC is the 6 to 14 digits under the barcode. ' + row.name + ' was not changed.'); box.value = row.upc || ''; return; }
         row.upc = v;
       } else {
         const n = v === '' ? '' : Number(v.replace(/[%,]/g, ''));
-        if (n !== '' && (!isFinite(n) || n < 0 || (k === 'targetPct' && n > 100))) { showError(NUM[k] + ' for ' + row.name + ' must be a number' + (k === 'targetPct' ? ' from 0 to 100' : '') + '. It was not changed.'); box.value = row[k] === undefined || row[k] === null ? '' : row[k]; return; }
+        if (n !== '' && (!isFinite(n) || n < 0 || (k === 'targetPct' && n > 100))) { refuse(NUM[k] + ' for ' + row.name + ' must be a number' + (k === 'targetPct' ? ' from 0 to 100' : '') + '. It was not changed.'); box.value = row[k] === undefined || row[k] === null ? '' : row[k]; return; }
         row[k] = n;
       }
       const lo = Number(row.minSpeed), hi = Number(row.maxSpeed);
-      if (row.minSpeed !== '' && row.maxSpeed !== '' && row.minSpeed !== undefined && row.maxSpeed !== undefined && row.minSpeed !== null && row.maxSpeed !== null && lo > hi) { showError(row.name + ': the lowest speed is higher than the highest speed. It was not changed.'); render(true); return; }
+      if (row.minSpeed !== '' && row.maxSpeed !== '' && row.minSpeed !== undefined && row.maxSpeed !== undefined && row.minSpeed !== null && row.maxSpeed !== null && lo > hi) { refuse(row.name + ': the lowest speed is higher than the highest speed. It was not changed.'); render(true); return; }
       send(line, list);
     });
     document.getElementById('counter').addEventListener('change', async e => {
