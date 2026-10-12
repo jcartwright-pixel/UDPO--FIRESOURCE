@@ -59,7 +59,7 @@ async function checkCode(db, code, stamp) {
 // A Driver Room Check-In station: a Driver Room kiosk (type DRIVER) with a code; a TV's code opens only the TV.
 function roomStation(r) {
   if (!r || !r.ok) return r || { ok: false, message: 'That station code was not recognized.' };
-  if (r.station.type !== 'DRIVER') return { ok: false, message: 'That is the code of ' + r.station.name + ' (' + r.station.typeName + '). Type the Driver Room kiosk\'s code; the TV keeps the Driver Station link.' };
+  if (r.station.type !== 'DRIVER') return { ok: false, message: 'That is the code of ' + r.station.name + ' (' + r.station.typeName + '). Type the Driver Room Check-In Station\'s code; the Driver\'s Kiosk Station (the TV) keeps the Driver Station link.' };
   if (!r.station.set) return { ok: false, message: 'This station has no code yet. A manager makes one in Administration > Links & Codes > Driver Station Codes.' };
   return r;
 }

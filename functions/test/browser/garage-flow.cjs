@@ -60,7 +60,7 @@ async function login(page, techId, digits) {
   const browser = await chromium.launch();
   const results = [];
   try {
-    const gs = await openPage(browser, 1280, 800, '/garage-station.html');
+    const gs = await openPage(browser, 1280, 800, '/garage-station.html?testEmail=manager.test@uniteddairy.com');
     // 1. The list first, no sign-in.
     await gs.waitForFunction(() => /Air leak/.test(document.getElementById('jobs').textContent) && /PJ-7/.test(document.getElementById('jobs').textContent), null, { timeout: 10000 });
     assert.equal(await gs.isVisible('#view-sign'), false, 'no sign-in before the list');

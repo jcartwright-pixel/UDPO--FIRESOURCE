@@ -6,200 +6,22 @@
   <meta name="theme-color" content="#0b3d6b">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Driver Room Check-In</title>
+  <link rel="manifest" href="driver-station.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Driver Room Check-In Station</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
   <link rel="stylesheet" href="css/driver-room.css">
 </head>
 <!--
-  Joe 10/12 (layout A): the Driver Room tablet. Today's loadout on the left; on the right three big choices, View Loadout,
-  Check-In and DVIR. Check-In and DVIR ask the driver to tap his name, then open the drivers' phone screens
-  (route.html?room=1). Five minutes with no taps signs the driver out and goes back to the scrolling View Loadout. No United
-  Dairy account: the tablet types its own station code once (Administration > Links & Codes > Driver Station Codes, a
-  Driver Room kiosk station). The Driver Room TV keeps the Driver Station link.
+  Joe 10/12: a Driver Room station signs in with a United Dairy account first, on the one Driver Station link; then its code
+  decides the page (a Driver Room Check-In Station code opens the drivers' Check-In, a Driver's Kiosk Station code the TV).
+  This older tablet link goes there.
 -->
 <body class="dr-page">
-  <header class="dr-top">
-    <h1><span id="plant">Driver Room</span> <span class="dr-day" id="day"></span></h1>
-    <button type="button" id="h-checkin" class="dr-hbtn" hidden>Check-In</button>
-    <button type="button" id="h-dvir" class="dr-hbtn" hidden>DVIR</button>
-    <button type="button" id="change" hidden>Change Station</button>
-  </header>
-  <div class="notice error" id="error" hidden></div>
-  <div id="release-box" hidden></div>
-  <section id="code-box" class="dr-code" hidden></section>
-  <main class="dr-main" id="main" hidden>
-    <section class="dr-board" aria-label="Today's loadout">
-      <h2>TODAY'S LOADOUT <span id="remaining"></span></h2>
-      <div class="dr-scroll"><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRAILER</th><th>CASES</th><th>LOAD STATUS</th><th>PICKUP</th></tr></thead><tbody id="rows"></tbody></table></div>
-      <p class="dr-foot" id="updated"></p>
-    </section>
-    <aside class="dr-side" id="side">
-      <div id="menu">
-        <h2>Driver Room</h2>
-        <p>Pick one. Check-In and DVIR ask for your name.</p>
-        <button type="button" class="dr-card blue" id="go-board">View Loadout<small>Today's routes and load status</small></button>
-        <button type="button" class="dr-card gold" id="go-dvir">DVIR<small>Pre-trip / post-trip inspection</small></button>
-        <button type="button" class="dr-card go" id="go-checkin">Check-In<small>Cases, returns, truck and trailer issues</small></button>
-      </div>
-      <div id="pick" hidden>
-        <h2 id="pick-title">Check-In</h2>
-        <p>Tap your name.</p>
-        <div id="names"></div>
-        <button type="button" class="dr-out" id="pick-cancel">Cancel</button>
-      </div>
-      <div id="me" hidden>
-        <h2 id="me-name"></h2>
-        <p id="me-load"></p>
-        <button type="button" class="dr-card go" id="to-checkin">Check-In<small>Cases, returns, truck and trailer issues</small></button>
-        <button type="button" class="dr-card gold" id="to-dvir">DVIR<small>Pre-trip / post-trip inspection</small></button>
-        <button type="button" class="dr-out" id="sign-out">Sign Out</button>
-        <p class="dr-note">Signs out by itself after 5 minutes with no taps.</p>
-      </div>
-    </aside>
-  </main>
-
-  <script type="module">
-    import { start, escapeHtml, shortDate, showError } from './js/app.js';
-    import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
-    import { resolveStation, askCode, askRelease, remember } from './js/station-code.js';
-
-    const KEY = 'udRoomStation', $ = (id) => document.getElementById(id);
-    let station = null, rows = [], roster = null;
-
-    async function phone(op, fields) {
-      const { functions } = await start();
-      try { return (await httpsCallable(functions, 'phone')(Object.assign({ op }, fields || {}))).data; }
-      catch (e) { e.message = String(e.message || e).replace(/\s*\[\d{3}\]\s*$/, ''); throw e; }
-    }
-    // The station steps of station-code.js, answered by the phone call (a Driver Room station always has a code).
-    const stationCall = (op, f) => op === 'enter' ? phone('roomEnter', { code: f.code }) : op === 'check' ? phone('roomCheck', { station: { key: f.key, version: f.version } }) : Promise.resolve({ required: true });
-    const withStation = (op, f) => phone(op, Object.assign({ station: { key: station.key, version: station.version } }, f || {}));
-
-    // The driver signed in on this tablet: kept for this visit only (the Check-In and DVIR screens read it).
-    const session = {
-      get() { try { return { id: sessionStorage.getItem('udRoom.driverId') || '', name: sessionStorage.getItem('udRoom.driverName') || '' }; } catch (e) { return { id: '', name: '' }; } },
-      set(id, name) { try { if (id) { sessionStorage.setItem('udRoom.driverId', id); sessionStorage.setItem('udRoom.driverName', name); } else { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); } } catch (e) {} }
-    };
-
-    async function gate(message) {
-      const r = message !== undefined ? { needCode: true, message } : await resolveStation('KIOSK', KEY, stationCall);
-      if (r.needCode || !r.station) {
-        station = null; $('main').hidden = true; $('change').hidden = true; $('code-box').hidden = false;
-        station = await askCode($('code-box'), { kind: 'KIOSK', storeKey: KEY, call: stationCall, title: 'Enter the Driver Room station code',
-          hint: 'A manager makes it in Administration > Links & Codes > Driver Station Codes (the Driver Room kiosk station, Create code). The tablet remembers it after this.', message: r.message });
-      } else station = r.station;
-      $('code-box').hidden = true; $('change').hidden = false;
-      $('plant').textContent = station.plant + ' Driver Room';
-      roster = null;
-      await readBoard();
-      // The screen shows once its side is drawn, so a quick tap cannot be undone by the first drawing.
-      await setMode(new URLSearchParams(location.search).get('view') === 'loadout' && !session.get().id ? 'loadout' : 'menu');
-      $('main').hidden = false;
-    }
-
-    async function readBoard() {
-      try {
-        const r = await withStation('board');
-        rows = r.rows;
-        $('day').textContent = new Date(r.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' }) + ' ' + shortDate(r.date);
-        $('remaining').textContent = '· ' + r.remaining + ' of ' + r.rows.length + ' not loaded';
-        $('rows').innerHTML = rows.map(x => '<tr class="' + String(x.state || '').toLowerCase() + '"><td class="r">' + escapeHtml(x.route) + '</td><td>' + escapeHtml(x.run || '') + '</td><td>' + escapeHtml(x.driver || '—') +
-          '</td><td>' + escapeHtml(x.trailer || '—') + '</td><td>' + escapeHtml(x.cases === '' || x.cases == null ? '—' : String(x.cases)) + '</td><td class="s">' + escapeHtml(x.status) + '</td><td>' +
-          (x.pickup ? '<b class="pu">PICKUP</b>' + (x.pickupText ? ' ' + escapeHtml(x.pickupText) : '') : '—') + '</td></tr>').join('') || '<tr><td colspan="7">No loads on today\'s loadout.</td></tr>';
-        $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-        showError('');
-      } catch (e) { stationGone(e) || showError('Could not read the loadout: ' + e.message); }
-    }
-
-    // What the right side shows: the three choices, the names (for Check-In or DVIR), or the signed-in driver. 'loadout'
-    // is the resting screen: the loadout full width, scrolling by itself, with Check-In and DVIR at the top.
-    let mode = 'menu', want = 'checkin';
-    function setMode(m) {
-      mode = m;
-      document.body.classList.toggle('dr-loadout', m === 'loadout');
-      $('h-checkin').hidden = $('h-dvir').hidden = m !== 'loadout' || !station;
-      return drawSide();
-    }
-    async function drawSide() {
-      const me = session.get();
-      if (me.id && mode !== 'loadout') mode = 'me';
-      $('menu').hidden = mode !== 'menu'; $('pick').hidden = mode !== 'names'; $('me').hidden = mode !== 'me';
-      if (mode === 'me') {
-        $('me-name').textContent = me.name;
-        const mine = rows.filter(x => String(x.driver || '').toUpperCase() === me.name.toUpperCase());
-        $('me-load').textContent = mine.map(x => 'Route ' + x.route + (x.trailer ? ' · Trailer ' + x.trailer : '')).join('  ·  ');
-        return;
-      }
-      if (mode !== 'names') return;
-      $('pick-title').textContent = want === 'dvir' ? 'DVIR' : 'Check-In';
-      if (!roster) roster = await withStation('roster').catch(e => { stationGone(e) || showError('Could not read the driver list: ' + e.message); return null; });
-      if (!roster) return;
-      const btn = (id, name) => '<button type="button" data-id="' + escapeHtml(id) + '" data-name="' + escapeHtml(name) + '">' + escapeHtml(name) + '</button>';
-      const group = (head, list) => list.length ? '<h3>' + head + '</h3><div class="dr-names">' + list.join('') + '</div>' : '';
-      $('names').innerHTML = group('REGULAR DRIVERS', roster.drivers.filter(d => !d.relief).map(d => btn(d.id, d.name))) +
-        group('RELIEF DRIVERS', roster.drivers.filter(d => d.relief).map(d => btn(d.id, d.name))) +
-        group('FILL-IN AND CARRIERS', (roster.others || []).map(n => btn('name:' + n, n)));
-    }
-    const goCheckIn = () => { location.href = 'route.html?room=1'; };
-    const goDvir = () => { location.href = 'route.html?room=1&view=dvir'; };
-    // Check-In or DVIR: the signed-in driver goes straight there; anyone else taps his name first.
-    function choose(what) { want = what; if (session.get().id) return what === 'dvir' ? goDvir() : goCheckIn(); setMode('names'); }
-
-    // A station removed, or given a new code, sends the tablet back to the code screen.
-    function stationGone(e) {
-      if (!/station (was removed|has a new code)|\(station code\)|That is the code of|has no code yet/.test(e.message)) return false;
-      remember(KEY, null); session.set(''); mode = 'menu';
-      gate(e.message.replace(/\s*\(station code\)$/, '')).catch(x => showError(x.message));
-      return true;
-    }
-
-    $('names').addEventListener('click', e => {
-      const b = e.target.closest('button[data-id]');
-      if (!b) return;
-      session.set(b.dataset.id, b.dataset.name);
-      if (want === 'dvir') goDvir(); else goCheckIn();
-    });
-    $('go-board').addEventListener('click', () => setMode('loadout'));
-    $('go-checkin').addEventListener('click', () => choose('checkin'));
-    $('go-dvir').addEventListener('click', () => choose('dvir'));
-    $('h-checkin').addEventListener('click', () => choose('checkin'));
-    $('h-dvir').addEventListener('click', () => choose('dvir'));
-    $('pick-cancel').addEventListener('click', () => setMode('menu'));
-    $('sign-out').addEventListener('click', () => { session.set(''); setMode('menu'); });
-    $('to-checkin').addEventListener('click', goCheckIn);
-    $('to-dvir').addEventListener('click', goDvir);
-    // The loadout full width: a tap on it brings back the three choices.
-    $('main').addEventListener('click', e => { if (mode === 'loadout' && e.target.closest('.dr-board')) setMode('menu'); });
-    $('change').addEventListener('click', async () => {
-      const fac = station ? station.facilityId : 'fac_uniontown';
-      const ok = await askRelease($('release-box'), { status: () => phone('roomStatus', { facilityId: fac }), release: (code) => phone('roomRelease', { facilityId: fac, code }), onError: showError });
-      if (!ok) return;
-      remember(KEY, null); session.set(''); mode = 'menu'; gate().catch(err => showError(err.message));
-    });
-
-    // Joe 10/12: 5 minutes with no taps signs the driver out and goes back to the scrolling View Loadout.
-    const IDLE = 300000;
-    let idle = Date.now();
-    ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { idle = Date.now(); }, true));
-    setInterval(() => { if (station && mode !== 'loadout' && Date.now() - idle > IDLE) { session.set(''); setMode('loadout'); } }, 5000);
-    // View Loadout scrolls by itself (a touch holds it for 20 seconds); at the end it waits, then starts over at the top.
-    let held = 0, endAt = 0;
-    $('main').addEventListener('pointerdown', () => { held = Date.now(); }, true);
-    setInterval(() => {
-      const box = document.querySelector('.dr-scroll');
-      if (mode !== 'loadout' || document.hidden || Date.now() - held < 20000 || box.scrollHeight <= box.clientHeight + 2) return;
-      if (box.scrollTop + box.clientHeight >= box.scrollHeight - 2) { if (!endAt) endAt = Date.now(); else if (Date.now() - endAt > 4000) { box.scrollTop = 0; endAt = 0; held = Date.now() - 16000; } return; }
-      box.scrollTop += 1;
-    }, 50);
-    setInterval(() => { if (station && !document.hidden) readBoard(); }, 60000);
-    // A new code or a removed station (checked every 5 minutes).
-    setInterval(async () => {
-      if (!station) return;
-      try { const r = await phone('roomCheck', { station: { key: station.key, version: station.version } }); if (!r.ok) { remember(KEY, null); session.set(''); gate(r.message).catch(() => {}); } } catch (e) { /* offline: keep the station */ }
-    }, 300000);
-
-    gate().catch(err => showError('Could not check this tablet\'s station code: ' + err.message));
-  </script>
+  <header class="dr-top"><h1><span id="plant">Driver Room</span></h1></header>
+  <p class="dr-code">Opening the Driver Station…</p>
+  <script>location.replace('driver-station.html');</script>
 </body>
 </html>

@@ -28,12 +28,14 @@ const FAILS = (db) => db.collection('private').doc('stationFails');
 const KINDS = Object.freeze({
   PLANT: { label: 'Plant Station', types: { CASE: 'Case Loadout', CASE_UNLOADING: 'Case Unloading', TOTES: 'Tote Loadout', BOXING: 'Boxing Loadout', YARD_SERVICES: 'Yard Services' } },
   GARAGE: { label: 'Garage Station', types: { GARAGE: 'Garage' } },
-  KIOSK: { label: 'Kiosk', types: { DRIVER: 'Driver Room Check-In (tablet)', TV: 'TV display' } }
+  // Joe 10/12: "Driver Room Check-In Station" (the drivers' tablet) and "Driver's Kiosk Station" (the TV: rolling loadout,
+  // dispatch and weather).
+  KIOSK: { label: 'Kiosk', types: { DRIVER: 'Driver Room Check-In Station', TV: "Driver's Kiosk Station" } }
 });
 // What each plant starts with: the current app's five stations, its garage, and the Driver Room tablet and TV.
 const STARTERS = [
   ['PLANT', 'CASE', 'Case Loadout'], ['PLANT', 'CASE_UNLOADING', 'Case Unloading'], ['PLANT', 'TOTES', 'Tote Loadout'], ['PLANT', 'BOXING', 'Boxing Loadout'],
-  ['PLANT', 'YARD_SERVICES', 'Yard Services'], ['GARAGE', 'GARAGE', 'Garage'], ['KIOSK', 'DRIVER', 'Driver Room kiosk'], ['KIOSK', 'TV', 'Driver Room TV']
+  ['PLANT', 'YARD_SERVICES', 'Yard Services'], ['GARAGE', 'GARAGE', 'Garage'], ['KIOSK', 'DRIVER', 'Driver Room Check-In Station'], ['KIOSK', 'TV', "Driver's Kiosk Station"]
 ];
 const MAX_FAILS_PER_MINUTE = 30;
 // The saves a Plant Station signed in by its code alone may make: loading, pickups, the loading order, unloading, washing
@@ -52,8 +54,10 @@ class StationError extends Error { constructor(code, message) { super(message); 
 const fail = (code, message) => { throw new StationError(code, message); };
 
 // The stations as stored, with each plant's starters until the list was first changed.
+// Joe 10/12: the Driver Room's two starter stations kept their first names in a saved list; they show Joe's names now.
+const RENAMED = { 'DRIVER|Driver Room kiosk': 'Driver Room Check-In Station', 'TV|Driver Room TV': "Driver's Kiosk Station" };
 function listOf(d) {
-  if (d && d.list) return d.list;
+  if (d && d.list) { Object.values(d.list).forEach(s => { if (s.kind === 'KIOSK' && RENAMED[s.type + '|' + s.name]) s.name = RENAMED[s.type + '|' + s.name]; }); return d.list; }
   const list = {};
   plants().forEach(p => STARTERS.forEach(([kind, type, name]) => { const key = (p.id + '_' + kind + '_' + type).toLowerCase(); list[key] = { key, kind, type, name, facilityId: p.id, order: Object.keys(list).length }; }));
   return list;
