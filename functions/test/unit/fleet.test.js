@@ -57,3 +57,13 @@ test('Driver Scorecard logic: the screen and the server load the same file; a mi
   assert.equal(rows[0].score, 100 - 4 - 3, 'check-in 4 points, 3 lost cases 3 points');
   assert.equal(rows[0].driver, 'ADAMS, PAT');
 });
+
+test('an off unit says why in words: its status, or for an ACTIVE truck or trailer, not on the fleet list (Joe 10/12, T-10308)', () => {
+  assert.equal(L.unitOffWhy({ unit: 'T-10308', type: 'TRAILER', status: 'ACTIVE', sourcePresent: false }), 'NOT ON THE FLEET LIST');
+  assert.equal(L.unitOffWhy({ unit: '537', type: 'TRUCK', status: 'DOWN', sourcePresent: true }), 'DOWN');
+  assert.equal(L.unitOffWhy({ unit: '670', type: 'TRUCK', status: 'OUT_OF_SERVICE' }), 'OUT OF SERVICE');
+  assert.equal(L.unitOffWhy({ unit: '123891', type: 'TRUCK', status: 'ACTIVE', sourcePresent: true }), '');
+  const runs = [{ id: 'w1', weekStart: '2026-10-11', route: '909_1', days: { tue: { runs: true, trailerId: 'veh_trailer_t_10308' } } }];
+  const off = L.offUnitLoads(runs, [{ id: 'veh_trailer_t_10308', unit: 'T-10308', type: 'TRAILER', status: 'ACTIVE', sourcePresent: false }], '2026-10-11');
+  assert.deepEqual(off.map(x => [x.unit, x.why, x.route]), [['T-10308', 'NOT ON THE FLEET LIST', '909_1']]);
+});

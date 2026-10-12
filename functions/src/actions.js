@@ -474,6 +474,27 @@ async function requireTestMode(tx, db, screen) {
   return SWITCH.screenMode(snap.exists ? snap.data() : {}, screen, (code, message) => new SaveError(code, message));
 }
 
+// The driver's own truck on a day he is put on (current app 7.0.267, udpoV7267DriverOwnTruck_). after gets truckId / truck when it
+// goes on; warnings says why it did not. A truck on another load that day with a different driver stays where it is.
+async function ownTruckFor(tx, db, run, runDocId, p, day, after, warnings) {
+  const d = await tx.get(db.collection(C.drivers).doc(M.safeIdPart(after.driverId)));
+  const own = d.exists && d.data().defaultTruckId;
+  if (!own || String(day.truckId || '').toUpperCase() === String(own).toUpperCase()) return;
+  const name = d.data().name || after.driver;
+  const unit = await tx.get(db.collection(C.equipment).doc(M.safeIdPart(own)));
+  if (!unit.exists) { warnings.push(name + "'s truck " + own + ' is not in Equipment Master; the route\'s truck was kept.'); return; }
+  const truck = unit.data();
+  if (L.unitOff(truck)) { warnings.push(name + "'s truck " + truck.unit + ' is ' + L.unitOffWhy(truck) + '; the route\'s truck was kept.'); return; }
+  const week = await tx.get(db.collection(C.runs).where('weekStart', '==', run.weekStart));
+  const other = week.docs.find(s => {
+    if (s.id === runDocId) return false;
+    const od = (s.data().days || {})[p] || {};
+    return od.runs && od.driverId !== after.driverId && (String(od.truckId || '').toUpperCase() === String(truck.id).toUpperCase() || (!!truck.unit && od.truck === truck.unit));
+  });
+  if (other) { warnings.push(name + "'s truck " + truck.unit + ' is already on route ' + other.data().route + ' ' + (other.data().run || '') + ' that day; the route\'s truck was kept.'); return; }
+  after.truckId = truck.id; after.truck = truck.unit;
+}
+
 async function resolveAssignment(tx, db, req, stamp, run) {
   if (req.action === 'assignDriver') {
     // Picking anyone for a day a driver went off ends the "who it was for" note on it.
@@ -517,7 +538,7 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     if (!snap.exists) throw new SaveError('NOT_FOUND', req.equipmentId + ' is not in Equipment Master');
     const e = snap.data();
     if (e.type !== type) throw new SaveError('BAD_REQUEST', e.unit + ' is a ' + e.type + ', not a ' + type);
-    if (!req.override && L.unitOff(e)) throw new SaveError('NOT_ALLOWED', e.unit + ' is ' + e.status + ' in Equipment Master (tick OVR to use it anyway)');
+    if (!req.override && L.unitOff(e)) throw new SaveError('NOT_ALLOWED', e.unit + ' is ' + L.unitOffWhy(e) + ' in Equipment Master (tick OVR to use it anyway)');
     return { [idField]: e.id, [unitField]: e.unit };
   }
   if (req.action === 'setRuns') return { runs: req.runs };
@@ -690,6 +711,10 @@ async function applyAction(db, user, input, now) {
       throw new SaveError('CHANGED', run.route + ' ' + run.run + ' was changed by someone else; the screen now shows the latest', { rev: run.rev });
     }
     const after = await resolveAssignment(tx, db, req, stamp, run);
+    // Joe 10/12 (Joel Jacobs on 901_1 with no truck): a driver put on a day, from Daily or Weekly, takes his own truck (Driver Master's
+    // assigned truck) unless it is not usable or another driver has it that day; his own other loads that day keep it too.
+    const warnings = [];
+    if (req.action === 'assignDriver' && after.driverId && day.runs) await ownTruckFor(tx, db, run, req.runDocId, req.day, day, after, warnings);
     // A check-in's problems also go to the maintenance queues (read now; written below with the check-in).
     const writeMaint = req.action === 'saveCheckIn'
       ? await MAINT.prepareMaintenance(tx, db, run, req.runDocId, req.day, L.addDays(run.weekStart, L.DAYS.indexOf(req.day)), Object.assign({}, day, after), { by: email, driver: day.driver || '' }, stamp) : null;
@@ -712,6 +737,7 @@ async function applyAction(db, user, input, now) {
     if (mode.writeBack) queueSheetCells(tx, db, req.requestId, '', run, req.runDocId, req.day, Object.assign({}, after, marks), stamp, email);
     if (mode.writeBack && req.action === 'savePlantLoad') queueLoadoutHistory(tx, db, req, run, Object.assign({}, day, after), after, stamp, email);
     const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }] };
+    if (warnings.length) result.warnings = warnings;
     if (writeMaint) result.maintenance = writeMaint(maintQueue(tx, db, mode, req.requestId, stamp, email));
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });
     return result;
@@ -1080,6 +1106,9 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
       // Joe 10/12 (907 / 950): Show on Daily Dispatch switched in the Route Editor reaches the Current and Next weeks' rows too,
       // since Daily reads the week's own flag (a FALSE there hides the run whatever Route Master says).
       if (req && req.fields && typeof req.fields.displayDaily === 'boolean' && run.displayDaily !== req.fields.displayDaily) changes[i].run.displayDaily = req.fields.displayDaily;
+      // Joe 10/12 (typed OK): the driver Route app switch (phone View Loadout, Driver Room board, check-in) reaches the two weeks' rows too,
+      // since those screens read the week's own display_mobile_route first.
+      if (req && req.fields && typeof req.fields.displayMobile === 'boolean' && run.displayMobileRoute !== req.fields.displayMobile) changes[i].run.displayMobileRoute = req.fields.displayMobile;
     });
     L.DAYS.forEach(p => {
       // A run on two rows (one per set of days): the day belongs to the row that runs it, else the first row.
@@ -1151,7 +1180,7 @@ function driverToLive(tx, db, mode, req, stamp, email, d, truckId, live, result)
     if (d.name && day.driver !== d.name) ch.driver = d.name;
     if (truckId && day.runs && !byHand(x.run, p, 'equipment_override') && day.truckId !== truckId) {
       if (!truck) warn(d.name + "'s truck " + truckId + ' is not in Equipment Master; the route\'s truck was kept.');
-      else if (L.unitOff(truck)) warn(d.name + "'s truck " + truck.unit + ' is ' + (truck.status || 'not usable') + '; the route\'s truck was kept.');
+      else if (L.unitOff(truck)) warn(d.name + "'s truck " + truck.unit + ' is ' + L.unitOffWhy(truck) + '; the route\'s truck was kept.');
       else {
         const on = (o) => { const od = Object.assign({}, (o.run.days || {})[p], o.ch.days[p]); return od.runs && (od.truckId === truck.id || (!!truck.unit && od.truck === truck.unit)); };
         const other = rows.find(o => o !== x && o.run.weekStart === x.run.weekStart && on(o));

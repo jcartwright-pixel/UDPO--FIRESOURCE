@@ -157,3 +157,29 @@ test('Route names (Joe 10/12): Route Name and Run reach the Current and Next wee
   await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: {}, days: { wed: { active: true } } });
   assert.equal((await run('2026-09-27__run_t801')).days.wed.runs, false, 'the Previous week days are never touched');
 });
+
+test('Show on the driver Route app switched in the Route Editor reaches the Current and Next weeks, and the write-back writes it (Joe 10/12, View Loadout)', async () => {
+  await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+  const L = require('../../src/logic');
+  // The Live rows say TRUE (as every LIVE CURRENT WEEK row did on 10/12), so the phone, the Driver Room board and check-in show the run.
+  for (const id of ['2026-09-27__run_t801', '2026-10-04__run_t801', '2026-10-11__run_t801']) await db().collection('runs').doc(id).update({ displayMobileRoute: true });
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { displayMobile: false }, days: {} });
+  for (const id of ['2026-10-04__run_t801', '2026-10-11__run_t801']) {
+    const r = await run(id);
+    assert.equal(r.displayMobileRoute, false, id + ' is off the driver Route app');
+    assert.equal(L.liveFlagShown(r, 'displayMobileRoute', 'mobile'), false, id + ' leaves View Loadout and the Driver Room board');
+  }
+  assert.equal((await run('2026-09-27__run_t801')).displayMobileRoute, true, 'the Previous week is never touched');
+  await runWriteBack({ db: db(), sheets, target: { spreadsheetId: 'fake-live' }, now: NOW });
+  for (const tab of ["'LIVE CURRENT WEEK'", "'LIVE NEXT WEEK'"]) {
+    const v = tabs[tab], h = v[5], row = v.find((r, i) => i > 5 && r[h.indexOf('run_id')] === 'run_t801');
+    assert.equal(row[h.indexOf('display_mobile_route')], 'FALSE', tab + ' says FALSE');
+  }
+  // Switched back on: both weeks follow. A save that does not touch the switch leaves the weeks' flags alone.
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { displayMobile: true }, days: {} });
+  assert.equal((await run('2026-10-11__run_t801')).displayMobileRoute, true);
+  await db().collection('runs').doc('2026-10-11__run_t801').update({ displayMobileRoute: false });
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { routeNotes: 'note' }, days: {} });
+  assert.equal((await run('2026-10-11__run_t801')).displayMobileRoute, false);
+});
+

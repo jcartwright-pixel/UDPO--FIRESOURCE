@@ -93,3 +93,28 @@ test('Down Trucks: a unit already down but still on loads (the current app put i
   await applyAction(db(), DISPATCHER, { action: 'setUnitUp', requestId: rid(), equipmentId: 'veh_truck_900002' });
   await assert.rejects(applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_truck_900002', clearOnly: true, today: '2026-10-06' }), /not on the down list/);
 });
+
+test("a driver put on a day takes his own truck, also when his other load that day has it; another driver's truck or a down one stays (Joe 10/12, Joel Jacobs)", async () => {
+  await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+  const T1 = '2026-10-04__run_t801';
+  await db().collection('drivers').doc('drv_test_adams').update({ defaultTruckId: 'veh_truck_900001' });
+  // His own other load that day already has the truck (880 VENTURA at 2 AM with 223879, as Joel had).
+  await db().collection('runs').doc(T1).update({ 'days.tue.runs': true, 'days.tue.driverId': 'drv_test_adams', 'days.tue.driver': 'ADAMS', 'days.tue.truckId': 'veh_truck_900001', 'days.tue.truck': '900001' });
+  await db().collection('runs').doc(RUN).update({ 'days.tue.runs': true, 'days.tue.truckId': '', 'days.tue.truck': '' });
+  const out = await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'tue', driverId: 'drv_test_adams' });
+  assert.equal(out.warnings, undefined);
+  assert.deepEqual([(await run()).days.tue.truckId, (await run()).days.tue.truck], ['veh_truck_900001', '900001']);
+  // Another driver has it that day: the route's truck stays and the save says why.
+  await db().collection('runs').doc(T1).update({ 'days.wed.runs': true, 'days.wed.driverId': 'drv_test_brook', 'days.wed.driver': 'BROOK', 'days.wed.truckId': 'veh_truck_900001', 'days.wed.truck': '900001' });
+  await db().collection('runs').doc(RUN).update({ 'days.wed.runs': true, 'days.wed.truckId': 'veh_truck_900002', 'days.wed.truck': '900002' });
+  const kept = await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'wed', driverId: 'drv_test_adams' });
+  assert.match(kept.warnings.join(' '), /truck 900001 is already on route 801/);
+  assert.equal((await run()).days.wed.truckId, 'veh_truck_900002');
+  // A down truck stays off.
+  await db().collection('equipment').doc('veh_truck_900001').update({ status: 'DOWN' });
+  await db().collection('runs').doc(T1).update({ 'days.thu.runs': false });
+  await db().collection('runs').doc(RUN).update({ 'days.thu.runs': true, 'days.thu.truckId': '', 'days.thu.truck': '' });
+  const down = await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'thu', driverId: 'drv_test_adams' });
+  assert.match(down.warnings.join(' '), /900001 is DOWN; the route's truck was kept/);
+  assert.equal((await run()).days.thu.truckId, '');
+});

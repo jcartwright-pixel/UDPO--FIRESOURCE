@@ -163,7 +163,7 @@
       ob.setAttribute('aria-pressed', String(override));
       rows = L.weeklyRows(preview ? previewRuns() : runs, week);
       // Joe 10/12 ("537 is on the list being down but shows on dispatch"): a down truck or trailer still on a run says DOWN in red.
-      const fleet = lists.fleetTrucks.concat(lists.fleetTrailers), offOf = (id) => { const e = id && fleet.find(x => String(x.id).toUpperCase() === String(id).toUpperCase()); return e && L.unitOff(e) ? (String(e.status).toUpperCase() === 'DOWN' ? 'DOWN' : String(e.status).replace(/_/g, ' ').toUpperCase()) : ''; };
+      const fleet = lists.fleetTrucks.concat(lists.fleetTrailers), offOf = (id) => { const e = id && fleet.find(x => String(x.id).toUpperCase() === String(id).toUpperCase()); return e ? L.unitOffWhy(e) : ''; };
       const unitParts = (d) => [[d.truck, d.truckId], [d.trailer, d.trailerId]].filter(x => x[0]).map(x => ({ text: x[0], off: offOf(x[1]) }));
       const unitsText = (d) => unitParts(d).map(u => u.text + (u.off ? ' (' + u.off + ')' : '')).join(' / ');
       const unitsHtml = (d) => unitParts(d).map(u => escapeHtml(u.text) + (u.off ? ' <b class="unit-down">' + escapeHtml(u.off) + '</b>' : '')).join(' / ');
