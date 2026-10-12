@@ -135,7 +135,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
     assert.deepEqual(groups, ['People & Access', 'Links & Codes', 'Email & Schedules', 'Dispatch Administration', 'Plant Setup', 'Connections & Keys', 'Fleet & GPS Setup', 'System Tools', 'Diagnostics']);
     const all = await adm.$$eval('.adm-item', t => t.length);
-    assert.equal(all, 35, 'every item from the current app\'s Administration is in the menu, plus Garage Station Codes (Joe 10/12)');
+    // Joe 10/12: Garage Station Codes added; Driver Station, Plant Station and Phone Screens moved from System Tools to Links & Codes.
+    assert.equal(all, 32, 'every item from the current app\'s Administration is in the menu');
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);

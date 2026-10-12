@@ -378,12 +378,14 @@ const APP_LINKS = [
   { key: 'tv', title: 'Driver Room TV', label: 'TV link', path: 'driver-station.html?tv=1', who: 'ud', short: 'The TV\'s UD account, then its kiosk code', opens: 'The same board full screen with no buttons, both lists rolling, for the TV on the wall.', shut: 'New code or Remove on the TV, below.' },
   { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', short: 'The station\'s code, then each mechanic\'s login ID', opens: 'One link for every garage station. Once a garage station has a code (Stations, below), the tablet types it once; mechanics then tap their name and type their login ID.', shut: 'New code or Remove on the station; turn a mechanic off in Fleet Service.' },
   { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', short: 'Anyone with the Route Distribution code', opens: 'Drivers on their own phones: View Loadout, Check-In and DVIR. No company account needed.', shut: 'Turn Off stops the drivers\' phone link (UD sign-in links keep working). A new code makes every phone ask for it again.', code: true },
+  { key: 'maint', title: 'Maintenance Station (plant machinery)', label: 'Maintenance tablet', path: 'maint-station.html', who: 'code', short: 'Each mechanic\'s name and login ID (Plant Maintenance is under construction)', opens: 'The plant machinery work orders and PMs, like the Garage Station: tap a work order, then your name and login ID.', shut: 'Turn a mechanic off in Fleet Service > Garage Technicians.' },
+  { key: 'screens', title: 'Phone Screens (try every screen)', label: 'Phone Screens', path: 'phone-screens.html', who: 'ud', short: 'Administrators, to try every phone, tablet and kiosk screen from this computer', opens: 'Every phone, tablet and kiosk screen with its link (Driver Check-In, Garage, Plant and Maintenance Station, Driver Room kiosk and TV).', shut: 'Administrators only.' },
   { key: 'personal', title: 'Personal phone links', label: '', path: '', who: 'ud', short: 'One person, with their own link and UD sign-in', opens: 'One person\'s phone screens.', shut: 'Revoke in Access & QR Codes.', goto: 'access-codes' }
 ];
 
-const MANAGER_LINKS = ['company', 'phone', 'manager', 'personal'];
+const MANAGER_LINKS = ['company', 'phone', 'manager', 'personal', 'screens'];
 const PLANT_LINKS = ['plant', 'public'];
-const GARAGE_LINKS = ['garage'];
+const GARAGE_LINKS = ['garage', 'maint'];
 const DRIVER_LINKS = ['driver', 'tv', 'route'];
 
 // The link cards for the given keys; tail is more of the page under the cards (Plant Station Codes' release codes).
@@ -407,7 +409,7 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '') 
     $('#al-list').innerHTML = links.map(l => '<div class="ap-link" data-link="' + l.key + '"><div class="ap-link-name"><h4>' + e(l.title) + '</h4><span class="ap-chip ' + (l.soon ? '' : l.who === 'ud' ? 'blue' : 'orange') + '">' + (l.soon ? 'Being built' : l.who === 'ud' ? 'UD sign-in' : 'Code, no account') + '</span></div>' +
       '<p class="ap-link-who"><b>Who can open it:</b> ' + e(l.short) + '</p><div class="ap-acts">' +
       (l.soon ? '' : l.goto ? '<button type="button" class="ap-btn small main" data-goto="' + l.goto + '">Details</button>' : '<button type="button" class="ap-btn small" data-copy="' + l.key + '">Copy Link</button><button type="button" class="ap-btn small" data-qr="' + l.key + '">Print QR</button>' +
-        '<a class="ap-btn small main" href="' + e(l.path) + '">Launch</a>') + '</div>' + (l.code ? codeRow() : '') +
+        '<a class="ap-btn small main" href="' + e(l.path) + '" data-launch target="_blank" rel="noopener" title="Opens in a new window; Administration stays open here">Launch</a>') + '</div>' + (l.code ? codeRow() : '') +
       '<details class="ap-how"><summary>How it works</summary><p>' + e(l.opens) + '</p><p><b>Turn off or change:</b> ' + e(l.shut) + '</p>' + (l.path ? '<p class="ap-url">' + e(url(l)) + '</p>' : '') +
       (l.extra ? '<p>' + e(l.extra.label) + ': <span class="ap-url">' + e(l.extra.url) + '</span></p>' : '') + '</details></div>').join('');
   }
