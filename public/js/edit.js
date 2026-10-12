@@ -247,9 +247,11 @@ export function saveAssignment(getRuns, runDocId, day, kind, pick, render, overr
   const spec = kind === 'note' ? null : KINDS[kind];
   const fields = spec ? { [spec.field]: pick.unit ? '' : pick.id } : { note: pick };
   if (spec && pick.unit) fields.unit = pick.unit; // a typed unit that is not on Equipment Master (Daily)
+  // Joe 10/12 ("a small delay when unit not on list when writing in"): a typed unit shows in the cell at once, like a picked one,
+  // instead of the cell going blank until the server answers.
   if (override) fields.override = true;
   return saveRunChange(getRuns, runDocId, day, spec ? spec.action : 'setDriverNote', fields,
-    (d) => { if (spec) { d[spec.idKey] = /^__CVG__:/.test(pick.id) || pick.unit ? '' : pick.id; d[spec.textKey] = pick.id ? pick.text : ''; } else d.driverNotes = pick; }, render);
+    (d) => { if (spec) { d[spec.idKey] = /^__CVG__:/.test(pick.id) || pick.unit ? '' : pick.id; d[spec.textKey] = pick.id || pick.unit ? pick.text : ''; } else d.driverNotes = pick; }, render);
 }
 
 // New load order for one load date: the rows in their new order. Shown at once, saved as one call.

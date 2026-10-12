@@ -92,6 +92,8 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.keyboard.type('777');
     await p.waitForSelector('.cell-pop p');
     await p.keyboard.press('Enter');
+    // Joe 10/12: the typed unit shows at once (it used to go blank until the save came back).
+    await p.waitForFunction((s) => document.querySelector(s).children[6].textContent === 'T-777', R801, { timeout: 1000 });
     await p.waitForFunction((s) => document.querySelector(s).children[6].textContent === 'T-777', R801, { timeout: 8000 });
     await p.keyboard.press('ArrowUp');
     assert.equal(await at(p), 'run_t801|tue trailer');
