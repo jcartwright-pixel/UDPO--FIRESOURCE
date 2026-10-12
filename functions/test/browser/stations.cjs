@@ -231,7 +231,8 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.deepEqual(tab.errors, []);
     // Joe 10/12 photo: on a tablet held upright (800 wide) the run name ran into the truck number. Route, run, truck and
     // trailer must not overlap on any card.
-    const upright = await openPage(browser, 800, 1280, '/plant-station.html' + MANAGER, clock);
+    for (const [w, h] of [[600, 960], [800, 1280], [1024, 768]]) {
+    const upright = await openPage(browser, w, h, '/plant-station.html' + MANAGER, clock);
     await upright.click('[data-station="CASE"]');
     await upright.waitForSelector('#work .sw-card');
     const clash = await upright.$$eval('#work .sw-head:not(.tall)', heads => heads.map(h => {
@@ -246,16 +247,18 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
       const parts = ['.route', '.run', '.truck', '.trailer'].map(box).filter(Boolean);
       return parts.some((a, i) => parts.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1)) ? h.textContent : '';
     }).filter(Boolean));
-    assert.deepEqual(clash, [], 'nothing overlaps on a card on an upright tablet');
-    assert.ok(await fits(upright), 'the station work fits an upright tablet');
+    assert.deepEqual(clash, [], 'nothing overlaps on a card on a ' + w + ' wide tablet');
+    assert.ok(await fits(upright), 'the station work fits a ' + w + ' wide tablet');
+    await shot(upright, 'plant-station-case-tablet-' + w + '.png');
     assert.deepEqual(upright.errors, []);
+    }
     const stPhone = await openPage(browser, 390, 844, '/plant-station.html' + MANAGER, clock);
     await stPhone.click('[data-station="CASE"]');
     await stPhone.waitForSelector('#work .sw-card');
     assert.ok(await fits(stPhone), 'the station work fits a phone');
     await shot(stPhone, 'plant-station-case-phone-390.png');
     assert.deepEqual(stPhone.errors, []);
-    results.push('Plant Station: the employee view on the station page (today, its area, cards; Start, cases, Complete); no Back, Home, dates, Edit or links to the manager screens; nothing overlaps on an upright 800 tablet');
+    results.push('Plant Station: the employee view on the station page (today, its area, cards; Start, cases, Complete); no Back, Home, dates, Edit or links to the manager screens; nothing overlaps on a tablet 600, 800 or 1024 wide');
   } finally {
     await browser.close();
   }

@@ -452,9 +452,9 @@ body.ds-tv .foot { color: #cfe3f6; }
   .sw-cols span:nth-child(5), .sw-cols span:last-child { grid-column: auto; }
   .sw-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-/* A tablet held upright (Joe 10/12 photo, about 800 wide): the one-line columns ran the run name into the truck, so the
+/* A tablet up to 1024 wide (Joe 10/12 photo, about 800 wide): the one-line columns ran the run name into the truck, so the
    card puts route, run, truck and trailer on one line and the status and big buttons under it. */
-@media (max-width: 1000px) {
+@media (max-width: 1024px) {
   .sw-cols { display: none; }
   .sw-head { grid-template-columns: auto minmax(0, 1fr) auto auto 20px; grid-template-areas: 'route run truck trailer chev' 'state state state state state' 'quick quick quick quick quick'; row-gap: 8px; }
   .sw-head .route { grid-area: route; } .sw-head .run { grid-area: run; } .sw-head .truck { grid-area: truck; } .sw-head .trailer { grid-area: trailer; }
