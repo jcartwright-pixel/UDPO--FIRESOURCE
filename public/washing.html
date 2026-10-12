@@ -64,7 +64,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -165,7 +165,7 @@
 
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
+      watchPerson(db, user, p => { person = p; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(collection(db, 'plantWash'), s => { sheetWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); got.sheet = true; render(); }, e => showError('Could not read the wash list (' + e.message + '). Check the network and reload the page.'));
       onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); got.app = true; render(); }, e => showError('Could not read the wash requests (' + e.message + '). Check the network and reload the page.'));

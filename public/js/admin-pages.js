@@ -373,7 +373,7 @@ const APP_LINKS = [
   { key: 'phone', title: 'Phone link', label: 'Phone link', path: 'index.html', who: 'ud', short: 'Anyone with a UD account', opens: 'The phone screens for managers, supervisors and plant staff.', shut: 'Remove them in People & Roles.' },
   { key: 'manager', title: 'Manager Web App', label: 'Manager link', path: 'manager.html', who: 'ud', short: 'Managers (UD account)', opens: 'The manager screens. Company Google sign-in, no code.', shut: 'Change their role in People & Roles.' },
   { key: 'plant', title: 'Plant Station', label: 'Tablet link', path: 'plant-station.html', who: 'ud', short: 'A tablet with a UD account, then the station\'s code', opens: 'One link for every plant station. The tablet types its station\'s code (Stations, below), opens that station and keeps it. Moving it to another station needs the plant\'s manager release code.', shut: 'New code or Remove on the station, below.' },
-  { key: 'public', title: 'Plant Station with no UD account', label: '', path: '', who: 'code', short: 'Nobody yet: being built (no IT step needed)', opens: 'A plant station on a tablet or phone with no United Dairy account, by its station code, with an On / Off switch (Off: nobody gets in on a code alone). The Google permission it needs (the app\'s server account may sign for itself) is already on in both projects; the screens and database rules for it are being built. Until then plant tablets sign in with a UD account.', shut: 'On / Off here, once it is built.', soon: true },
+  { key: 'public', title: 'Plant Station with no UD account', label: 'No-account tablet link', path: 'plant-station.html?noaccount=1', who: 'code', short: 'A tablet or phone with only its station\'s code, while it is On', opens: 'The same Plant Station on a tablet or phone with no United Dairy account (as the old app\'s public Plant Station). The tablet types its station\'s code (Stations, below) and opens only that station: loading, pickups, unloading, washing and returns, nothing else. It leaves only through Change Station and the manager release code.', shut: 'Turn Off (press twice) shuts every no-account tablet out at once; tablets with a UD account keep working. New code or Remove on a station shuts out the tablets on its old code.', noacct: true },
   { key: 'driver', title: 'Driver Station', label: 'Driver Station link', path: 'driver-station.html', who: 'ud', short: 'A Driver Room tablet, TV or kiosk with a UD account, then its station code', opens: 'One link for every driver station (Joe 10/12, like the Plant Station). The tablet, TV or kiosk types its station\'s code (Stations, below) once: a Driver Station code opens the loadout board and weekly schedule with the weather; a TV code opens the same board full screen with no buttons, both lists rolling.', shut: 'New code or Remove on the station, below.' },
   { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', short: 'The station\'s code, then each mechanic\'s login ID', opens: 'One link for every garage station. Once a garage station has a code (Stations, below), the tablet types it once; mechanics then tap their name and type their login ID.', shut: 'New code or Remove on the station; turn a mechanic off in Fleet Service.' },
   { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', short: 'Anyone with the Route Distribution code', opens: 'Drivers on their own phones: View Loadout, Check-In and DVIR. No company account needed.', shut: 'Turn Off stops the drivers\' phone link (UD sign-in links keep working). A new code makes every phone ask for it again.', code: true },
@@ -413,11 +413,12 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', 
     const card = l => '<div class="ap-link" data-link="' + l.key + '"><div class="ap-link-name"><h4>' + e(l.title) + '</h4><span class="ap-chip ' + (l.soon ? '' : l.who === 'ud' ? 'blue' : 'orange') + '">' + (l.soon ? 'Being built' : l.who === 'ud' ? 'UD sign-in' : 'Code, no account') + '</span></div>' +
       '<p class="ap-link-who"><b>Who can open it:</b> ' + e(l.short) + '</p><div class="ap-acts">' +
       (l.soon ? '' : l.goto ? '<button type="button" class="ap-btn small main" data-goto="' + l.goto + '">Details</button>' : '<button type="button" class="ap-btn small" data-copy="' + l.key + '">Copy Link</button><button type="button" class="ap-btn small" data-qr="' + l.key + '">Print QR</button>' +
-        '<a class="ap-btn small main" href="' + e(l.path) + '" data-launch target="_blank" rel="noopener" title="Opens in a new window; Administration stays open here">Launch</a>') + '</div>' + (l.code ? codeRow() : '') +
+        '<a class="ap-btn small main" href="' + e(l.path) + '" data-launch target="_blank" rel="noopener" title="Opens in a new window; Administration stays open here">Launch</a>') + '</div>' + (l.code ? codeRow() : '') + (l.noacct ? '<div class="ap-code-row" id="na-row"></div>' : '') +
       '<details class="ap-how"><summary>How it works</summary><p>' + e(l.opens) + '</p><p><b>Turn off or change:</b> ' + e(l.shut) + '</p>' + (l.path ? '<p class="ap-url">' + e(url(l)) + '</p>' : '') +
       (l.extra ? '<p>' + e(l.extra.label) + ': <span class="ap-url">' + e(l.extra.url) + '</span></p>' : '') + '</details></div>';
     $('#al-list').innerHTML = first.map(card).join('');
     if (after.length) $('#al-list2').innerHTML = after.map(card).join('');
+    box.dispatchEvent(new Event('ap-links-drawn'));
   }
   async function load() { try { data = await call('appLinks'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
   box.addEventListener('click', ev => {
@@ -439,7 +440,7 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', 
 /* ---------- Stations and their codes (Joe 10/12: one link, then a list of stations, each with its own code) ---------- */
 
 const STATION_PAGES = {
-  PLANT: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each station has its own code. On the tablet, open the Plant Station link and type the station\'s code: the tablet opens that station and keeps it. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (below). Until a plant has a station code, its tablets pick their station from the list.' },
+  PLANT: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each station has its own code. On the tablet, open the Plant Station link and type the station\'s code: the tablet opens that station and keeps it. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (below). Until a plant has a station code, its tablets pick their station from the list. The no-account link (above) uses the same codes while it is On.' },
   GARAGE: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each garage station has its own code. On the garage tablet, open the Garage Station link and type the code. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (Plant Station Codes). Until a plant has a garage code, its garage tablet opens straight away.' },
   KIOSK: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each driver station (the Driver Room tablet, the Driver Room TV, a kiosk in the plant) has its own code, and a plant can have more than one. Open the Driver Station link on it and type its code: a Driver Station code opens the loadout board, a TV code opens the full-screen TV board. It keeps it after that. To move it, a manager taps Change and types the plant\'s manager release code (Plant Station Codes). Until a plant has a driver station code, its tablets and TVs open straight away.' }
 };
@@ -454,6 +455,14 @@ function stationSection(kind) {
 }
 function bindStations(box, kind) {
   const $ = (s) => box.querySelector(s), what = STATION_PAGES[kind].what;
+  // The no-account On / Off sits in the link card, which may draw after the stations load (and again on Refresh).
+  let noAccount = null;
+  function drawNoAccount() {
+    if (!noAccount || !$('#na-row')) return;
+    $('#na-row').innerHTML = noAccount.map(p => '<b>' + e(p.name) + ':</b> <span class="ap-chip ' + (p.on ? 'good' : 'bad') + '">' + (p.on ? 'ON' : 'OFF') + '</span>' +
+      '<span style="margin-left:auto;display:flex;gap:6px">' + (p.on ? '<button type="button" class="ap-btn small" data-na-off="' + p.id + '">Turn Off</button>' : '<button type="button" class="ap-btn small main" data-na-on="' + p.id + '">Turn On</button>') + '</span>').join('');
+  }
+  box.addEventListener('ap-links-drawn', drawNoAccount);
   async function load(out) {
     try {
       const data = out && out.stations ? out : await call('stations', { kind });
@@ -463,6 +472,9 @@ function bindStations(box, kind) {
         $('#st-plant').innerHTML = data.plants.map(t => '<option value="' + t.id + '">' + e(t.name) + '</option>').join('');
         $('#st-plant').disabled = data.plants.length < 2;
       }
+      // The no-account Plant Station's On / Off for each plant (Plant Station Codes only).
+      noAccount = data.noAccount || null;
+      drawNoAccount();
       $('#st-list').innerHTML = data.stations.map(s => '<div class="ap-item" data-station-key="' + e(s.key) + '"><div><b>' + e(s.name) + '</b><small>' + e(s.typeName) + ' &middot; ' + e(s.plant) +
         (s.changedAt ? ' &middot; code changed ' + e(when(s.changedAt)) + ' by ' + e(s.changedBy) : '') + '</small></div>' +
         (s.code ? '<code>' + e(s.code) + '</code><button type="button" class="ap-btn small" data-st-copy="' + e(s.code) + '">Copy Code</button>' : '<span class="ap-chip">' + (s.set ? 'Code is set' : 'No code yet') + '</span>') +
@@ -475,6 +487,8 @@ function bindStations(box, kind) {
     if (!b) return;
     if (b.id === 'al-reload') load();
     if (b.dataset.stCopy) copyText(b, b.dataset.stCopy);
+    if (b.dataset.naOn) busy(box, b, async () => { const out = await call('noAccountSet', { facilityId: b.dataset.naOn, on: true }); await load(out); say(box, ''); });
+    if (b.dataset.naOff) twice(b, 'Click Again to Turn Off', () => busy(box, b, async () => { const out = await call('noAccountSet', { facilityId: b.dataset.naOff, on: false }); await load(out); say(box, ''); }));
     if (b.dataset.stCode) {
       const go = () => busy(box, b, async () => { const out = await call('stationCode', { key: b.dataset.stCode }); await load(out); say(box, ''); });
       if (b.dataset.again) twice(b, 'Press again to replace', go); else go();

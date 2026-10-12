@@ -66,7 +66,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import { watchProducts, OTHER } from './js/products.js';
@@ -198,7 +198,7 @@
 
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
+      watchPerson(db, user, p => { person = p; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       watch();
       // Every machine's RedZone products, one line per product name.
