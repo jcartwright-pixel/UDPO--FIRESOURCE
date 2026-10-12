@@ -559,3 +559,11 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 }
 /* Yard Services on a phone: the station's page margins give the trailer list its width. */
 @media (max-width: 599px) { .ps-page .view:has(.sw-frame) { padding-left: 6px; padding-right: 6px; } }
+/* Joe 10/12: Yard Services' two action buttons, Assign Trailer and Check Temperatures: same size, one row, phone first. */
+.ps-page .ps-tabs.actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+.ps-page .ps-tabs.actions button.ps-action, .ps-page .ps-tabs.actions button.ps-action[aria-selected="true"] { margin: 0; transform: none; box-shadow: none; border-top-width: 2px; }
+.ps-page .ps-tabs.actions button.ps-action { display: flex; align-items: center; justify-content: center; text-align: center; min-height: 64px; padding: 10px 12px;
+  border: 2px solid var(--accent); border-radius: 12px; background: #fff; color: var(--accent); }
+.ps-page .ps-tabs.actions button.ps-action b { font-size: 20px; line-height: 1.2; }
+.ps-page .ps-tabs.actions button.ps-action[aria-selected="true"] { background: var(--accent); color: #fff; }
+@media (max-width: 420px) { .ps-page .ps-tabs.actions button.ps-action b { font-size: 18px; } }

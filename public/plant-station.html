@@ -102,8 +102,9 @@
       washing: { label: 'Washing', what: 'Assigned trailer washing', accent: '#0b8da5', tone: '#e7f8fb', pic: 'truck-washing-v1-560.webp' },
       returns: { label: 'Returns', what: 'Return product to the cooler', accent: '#bd7400', tone: '#fff4db', pic: 'returns-to-cooler-v1-560.webp' },
       receiving: { label: 'Receiving', what: 'Suppliers delivering today', accent: '#168a55', tone: '#e8f8ef', pic: 'case-unloading-v1-560.webp' },
-      trailers: { label: 'Trailer Assignments', what: 'The trailer on each route', accent: '#1976d2', tone: '#e8f3ff', pic: 'yard-checks.webp' },
-      yardchecks: { label: 'Yard Checks', what: 'Trailer temperature checks', accent: '#168a55', tone: '#e8f8ef', pic: 'temperatures.webp' }
+      // Joe 10/12: Yard Services has two action buttons on top, Assign Trailer and Check Temperatures (phone first).
+      trailers: { label: 'Assign Trailer', what: 'Trailer Assignments', accent: '#1976d2', tone: '#e8f3ff', pic: 'yard-checks.webp', action: true },
+      yardchecks: { label: 'Check Temperatures', what: 'Yard Checks', accent: '#168a55', tone: '#e8f8ef', pic: 'temperatures.webp', action: true }
     };
     // Boxing's Loading tab is its Shipping / Loadout: the box loads and the scheduled shipments together.
     const viewLabel = (st, v) => (st.id === 'BOXING' && v === 'loading' ? { label: 'Shipping / Loadout', what: 'Box loads and every carrier and branch shipment' } : VIEWS[v]);
@@ -174,7 +175,9 @@
       }
       const date = L.operatingDay(new Date());
       document.getElementById('pill').textContent = (named ? named.plant : 'Uniontown') + ' · ' + shortDate(date);
-      document.getElementById('tabs').innerHTML = st.views.map(v => {
+      const actions = st.views.every(v => VIEWS[v].action);
+      document.getElementById('tabs').classList.toggle('actions', actions);
+      document.getElementById('tabs').innerHTML = actions ? st.views.map(v => '<button type="button" role="tab" class="ps-tab ps-action" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + VIEWS[v].accent + ';--tone:' + VIEWS[v].tone + '"><b>' + VIEWS[v].label + '</b></button>').join('') : st.views.map(v => {
         const x = VIEWS[v], words = viewLabel(st, v), pic = typeof x.pic === 'string' ? x.pic : x.pic[st.area];
         return '<button type="button" role="tab" class="ps-tab" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + x.accent + ';--tone:' + x.tone + '"><img src="img/library/' + pic + '" alt=""><span><b>' + words.label + '</b><small>' + words.what + '</small><span class="ps-count" data-count="' + v + '"></span></span></button>';
       }).join('');

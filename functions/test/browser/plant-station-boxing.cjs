@@ -126,7 +126,8 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
     await page.click('#change');
     await page.click('[data-station="YARD_SERVICES"]');
     await page.waitForSelector('iframe.sw-frame');
-    assert.deepEqual(await tabs(page), ['Trailer Assignments', 'Yard Checks']);
+    // Joe 10/12: two action buttons on top, same size, one row (also on a phone, below).
+    assert.deepEqual(await tabs(page), ['Assign Trailer', 'Check Temperatures']);
     const ta = page.frameLocator('iframe.sw-frame');
     await ta.locator('[data-trailer]').first().waitFor({ timeout: 15000 });
     assert.equal(await ta.locator('.topbar').isVisible(), false, 'no app header inside the station');
@@ -162,6 +163,8 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
       const over = await fr.locator('#rows .ta-row').evaluateAll(rows => rows.flatMap(r => [...r.children]).filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1 && !e.querySelector('input')).map(e => e.textContent));
       assert.deepEqual(over, [], 'nothing cut off at ' + w);
       assert.ok(await fits(p2), 'Yard Services fits ' + w);
+      const btns = await p2.$$eval('.ps-action', b => b.map(x => { const r = x.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }));
+      assert.ok(btns.length === 2 && btns[0][0] === btns[1][0] && Math.abs(btns[0][1] - btns[1][1]) <= 1 && btns[0][2] === btns[1][2], 'two same-size action buttons in one row at ' + w);
       if (w === 390) {
         const boxes = fr.locator('#rows [data-trailer]');
         await boxes.nth(1).fill('T-977');
