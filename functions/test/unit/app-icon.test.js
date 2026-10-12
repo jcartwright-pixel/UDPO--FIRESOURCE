@@ -29,9 +29,9 @@ test('every screen links the icon, and every signed-in screen links the app', ()
     const html = fs.readFileSync(path.join(PUBLIC, f), 'utf8');
     if (!html.includes('href="img/app-icon/favicon-32.png"')) bad.push(f + ': favicon');
     if (!html.includes('href="img/app-icon/apple-touch-icon.png"')) bad.push(f + ': phone icon');
-    // The public driver Check-In and the plant tablets' Plant Station are their own installs: each opens its own page, not
-    // the signed-in launcher.
-    if (f !== 'route.html' && f !== 'plant-station.html' && !html.includes('<link rel="manifest" href="manifest.webmanifest">')) bad.push(f + ': manifest');
+    // The public driver Check-In, the plant tablets' Plant Station and the Driver Room Check-In tablet (Joe 10/12, no
+    // account) are their own installs: each opens its own page, not the signed-in launcher.
+    if (f !== 'route.html' && f !== 'plant-station.html' && f !== 'driver-room.html' && !html.includes('<link rel="manifest" href="manifest.webmanifest">')) bad.push(f + ': manifest');
   });
   assert.deepEqual(bad, []);
 });

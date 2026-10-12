@@ -77,24 +77,27 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     const phone = await openPage(browser, 390, 844, '/route.html');
     await phone.fill('#code', code);
     await phone.click('#step-code button[type=submit]');
-    await phone.waitForSelector('#step-name:not([hidden])', { timeout: 8000 });
-    await phone.selectOption('#name', 'drv_test_casey');
-    await phone.click('#step-name button[type=submit]');
-    await phone.waitForSelector('#to-board', { state: 'visible', timeout: 8000 });
+    // Joe 10/12: the phone opens on three choices: View Loadout (no name needed), DVIR and Check-In (the name once).
+    await phone.waitForSelector('#step-menu:not([hidden])', { timeout: 8000 });
+    assert.deepEqual(await phone.$$eval('#step-menu .drv-card b', b => b.map(x => x.textContent)), ['View Loadout', 'DVIR', 'Check-In']);
     await shot(phone, 'phone-driver-menu-390.png');
-    await phone.click('#to-board');
+    await phone.click('#m-board');
     await phone.waitForSelector('#step-board:not([hidden])', { timeout: 8000 });
     await phone.waitForTimeout(800);
     await shot(phone, 'phone-view-loadout-390.png');
     assert.ok(await fits(phone), 'View Loadout fits the phone width');
     await phone.click('#step-board [data-back]');
-    await phone.click('#to-dvir');
+    await phone.waitForSelector('#step-menu:not([hidden])', { timeout: 8000 });
+    await phone.click('#m-dvir');
+    await phone.waitForSelector('#step-name:not([hidden])', { timeout: 8000 });
+    await phone.selectOption('#name', 'drv_test_casey');
+    await phone.click('#step-name button[type=submit]');
     await phone.waitForSelector('#step-dvir:not([hidden])', { timeout: 8000 });
     const dvir = phone;
     await shot(dvir, 'phone-dvir-390.png', true);
     assert.ok(await fits(dvir), 'the DVIR fits the phone width');
     assert.deepEqual(phone.errors, []);
-    results.push('Drivers\' phone: View Loadout and DVIR open from the driver menu and fit a 390 wide phone');
+    results.push('Drivers\' phone: opens on View Loadout, DVIR and Check-In; View Loadout needs no name, DVIR asks for it once; both fit a 390 wide phone');
 
     // The phone Check-In (Joe 10/11): over / short, a corrected truck, the jack, drop and hook, Speak; and Skip on Who is driving.
     const L = require('../../src/logic');
@@ -103,6 +106,8 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
       days: { [p]: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', truck: '900002', trailer: 'T-902/T-901' } } });
     await db().collection('equipment').doc('veh_truck_900001').set({ id: 'veh_truck_900001', type: 'TRUCK', unit: '900001', status: 'ACTIVE' });
     await phone.click('#step-dvir [data-back]');
+    await phone.waitForSelector('#step-menu:not([hidden])', { timeout: 8000 });
+    await phone.click('#m-checkin');
     await phone.waitForSelector('.phone-load', { timeout: 8000 });
     await phone.click('.phone-load');
     await phone.waitForSelector('#step-form:not([hidden])');

@@ -23,7 +23,7 @@ test('each kind starts with the current app\'s stations, none with a code', asyn
   assert.deepEqual(plant.stations.map(s => s.name), ['Case Loadout', 'Case Unloading', 'Tote Loadout', 'Boxing Loadout', 'Yard Services']);
   assert.ok(plant.stations.every(s => !s.set && s.plant === 'Uniontown'));
   assert.deepEqual((await admin({ op: 'stations', kind: 'GARAGE' })).stations.map(s => s.name), ['Garage']);
-  assert.deepEqual((await admin({ op: 'stations', kind: 'KIOSK' })).stations.map(s => s.typeName), ['Driver Station (tablet)', 'TV display']);
+  assert.deepEqual((await admin({ op: 'stations', kind: 'KIOSK' })).stations.map(s => s.typeName), ['Driver Room Check-In (tablet)', 'TV display']);
   assert.deepEqual(await tablet({ op: 'has', kind: 'PLANT', facilityId: 'fac_uniontown' }), { required: false });
   await assert.rejects(A.adminCall(db(), TABLET, { op: 'stations', kind: 'PLANT' }), /Only an administrator/);
 });
