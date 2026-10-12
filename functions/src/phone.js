@@ -15,6 +15,7 @@ const M = require('./model');
 const A = require('./actions');
 const MAINT = require('./maintenance');
 const B = require('./board-rules');
+const STATIONS = require('./stations');
 
 const C = M.COLLECTIONS;
 const { SaveError } = A;
@@ -53,6 +54,14 @@ async function checkCode(db, code, stamp) {
     }
     return true;
   });
+}
+
+// A Driver Room Check-In station: a Driver Room kiosk (type DRIVER) with a code; a TV's code opens only the TV.
+function roomStation(r) {
+  if (!r || !r.ok) return r || { ok: false, message: 'That station code was not recognized.' };
+  if (r.station.type !== 'DRIVER') return { ok: false, message: 'That is the code of ' + r.station.name + ' (' + r.station.typeName + '). Type the Driver Room kiosk\'s code; the TV keeps the Driver Station link.' };
+  if (!r.station.set) return { ok: false, message: 'This station has no code yet. A manager makes one in Administration > Links & Codes > Driver Station Codes.' };
+  return r;
 }
 
 // Today's operating day and the day before (a driver checking in after the 6 AM roll).
@@ -145,8 +154,15 @@ function checkinExtras(f, d, equipment) {
 async function phoneCall(db, input, now) {
   input = input || {};
   const stamp = (now ? now() : new Date()).toISOString();
-  if (!(await checkCode(db, String(input.code || '').slice(0, 40), stamp))) throw new SaveError('NOT_ALLOWED', 'That code is not right. Ask Dispatch for the Route Distribution code.');
   const op = String(input.op || '');
+  // Joe 10/12: the Driver Room Check-In tablet types its own station code (Driver Station Codes, a Driver Room kiosk station),
+  // not the phones' Route Distribution code. A TV's code is refused here: the TV keeps its own link.
+  if (op === 'roomEnter') return roomStation(await STATIONS.tabletCall(db, { kind: 'KIOSK', op: 'enter', code: input.code }, now));
+  if (op === 'roomCheck') return roomStation(await STATIONS.check(db, 'KIOSK', input.station && input.station.key, input.station && input.station.version));
+  if (input.station) {
+    const r = roomStation(await STATIONS.check(db, 'KIOSK', input.station.key, input.station.version));
+    if (!r.ok) throw new SaveError('NOT_ALLOWED', r.message + ' (station code)');
+  } else if (!(await checkCode(db, String(input.code || '').slice(0, 40), stamp))) throw new SaveError('NOT_ALLOWED', 'That code is not right. Ask Dispatch for the Route Distribution code.');
   if (op === 'roster') {
     const drivers = (await db.collection(C.drivers).get()).docs.map(d => d.data()).filter(d => d.name && L.driverActive(d));
     // Also the fill-in and carrier names on today's or yesterday's dispatch that are not on the roster, and the routes to pick instead of a name.
@@ -159,7 +175,7 @@ async function phoneCall(db, input, now) {
         if (date === dates[0]) routes.push({ id: 'route:' + x.id + '|' + x.p, route: x.run.route, run: x.run.run });
       });
     }
-    return { drivers: drivers.map(d => ({ id: d.id, name: d.name })).sort((a, b) => a.name.localeCompare(b.name)), dates,
+    return { drivers: drivers.map(d => ({ id: d.id, name: d.name, relief: !!d.reliefDriver })).sort((a, b) => a.name.localeCompare(b.name)), dates,
       others: Object.keys(others).map(k => others[k]).sort(), routes: routes.sort(byRoute).map(r => ({ id: r.id, name: String(r.route).replace(/_\d+$/, '') + ' · ' + r.run })) };
   }
   // View Loadout (Joe 10/10): the Driver Room board on the phone, read only, today's routes and their pickups.
@@ -168,7 +184,7 @@ async function phoneCall(db, input, now) {
     const date = L.operatingDay(new Date(stamp)), week = L.weekStart(date);
     const runs = (await db.collection(C.runs).where('weekStart', 'in', [week, L.addDays(week, 7)]).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
     const pickups = (await db.collection('pickups').where('date', 'in', [date, L.addDays(date, 1), L.addDays(date, 2), L.addDays(date, 3)]).get()).docs.map(d => d.data());
-    const rows = B.loadoutBoardRows(runs, pickups, date).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText }));
+    const rows = B.loadoutBoardRows(runs, pickups, date).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, driver: r.driver, cases: r.cases, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText }));
     return { date, rows, remaining: rows.filter(r => r.state !== 'LOADED').length, at: stamp };
   }
   const who = await whoFor(db, input.driverId);

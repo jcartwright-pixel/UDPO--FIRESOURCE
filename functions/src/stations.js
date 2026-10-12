@@ -1,7 +1,7 @@
 /*
  * Station codes (Joe 10/12, as the current app's Plant Station kiosk 057_V774 and its App Links): every tablet station has
  * its own code. Typing the code on a tablet opens that station, and the tablet keeps it until a manager types the plant's
- * release code (Administration > Plant Station Codes). Three kinds, each on its own Administration page:
+ * release code (Administration > Manager Links). Three kinds, each on its own Administration page:
  *
  *   PLANT   Plant Station tablets (plant-station.html): Case Loadout, Case Unloading, Tote, Boxing, Yard Services
  *   GARAGE  Garage Station tablets (garage-station.html)
@@ -28,7 +28,7 @@ const FAILS = (db) => db.collection('private').doc('stationFails');
 const KINDS = Object.freeze({
   PLANT: { label: 'Plant Station', types: { CASE: 'Case Loadout', CASE_UNLOADING: 'Case Unloading', TOTES: 'Tote Loadout', BOXING: 'Boxing Loadout', YARD_SERVICES: 'Yard Services' } },
   GARAGE: { label: 'Garage Station', types: { GARAGE: 'Garage' } },
-  KIOSK: { label: 'Kiosk', types: { DRIVER: 'Driver Station (tablet)', TV: 'TV display' } }
+  KIOSK: { label: 'Kiosk', types: { DRIVER: 'Driver Room Check-In (tablet)', TV: 'TV display' } }
 });
 // What each plant starts with: the current app's five stations, its garage, and the Driver Room tablet and TV.
 const STARTERS = [

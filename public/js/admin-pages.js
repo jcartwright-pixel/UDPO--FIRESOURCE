@@ -374,7 +374,8 @@ const APP_LINKS = [
   { key: 'manager', title: 'Manager Web App', label: 'Manager link', path: 'manager.html', who: 'ud', short: 'Managers (UD account)', opens: 'The manager screens. Company Google sign-in, no code.', shut: 'Change their role in People & Roles.' },
   { key: 'plant', title: 'Plant Station', label: 'Tablet link', path: 'plant-station.html', who: 'ud', short: 'A tablet with a UD account, then the station\'s code', opens: 'One link for every plant station. The tablet types its station\'s code (Stations, below), opens that station and keeps it. Moving it to another station needs the plant\'s manager release code.', shut: 'New code or Remove on the station, below.' },
   { key: 'public', title: 'Plant Station with no UD account', label: 'No-account tablet link', path: 'plant-station.html?noaccount=1', who: 'code', short: 'A tablet or phone with only its station\'s code, while it is On', opens: 'The same Plant Station on a tablet or phone with no United Dairy account (as the old app\'s public Plant Station). The tablet types its station\'s code (Stations, below) and opens only that station: loading, pickups, unloading, washing and returns, nothing else. It leaves only through Change Station and the manager release code.', shut: 'Turn Off (press twice) shuts every no-account tablet out at once; tablets with a UD account keep working. New code or Remove on a station shuts out the tablets on its old code.', noacct: true },
-  { key: 'driver', title: 'Driver Station', label: 'Driver Station link', path: 'driver-station.html', who: 'ud', short: 'A Driver Room tablet, TV or kiosk with a UD account, then its station code', opens: 'One link for every driver station (Joe 10/12, like the Plant Station). The tablet, TV or kiosk types its station\'s code (Stations, below) once: a Driver Station code opens the loadout board and weekly schedule with the weather; a TV code opens the same board full screen with no buttons, both lists rolling.', shut: 'New code or Remove on the station, below.' },
+  { key: 'driverroom', title: 'Driver Room Check-In', label: 'Driver Room tablet', path: 'driver-room.html', who: 'code', short: 'The Driver Room tablet: its station code, then View Loadout, DVIR or Check-In', opens: 'Joe 10/12: the Driver Room tablet. Today\'s loadout on the left; on the right View Loadout, DVIR and Check-In. DVIR and Check-In ask the driver to tap his name, then open the same screens as the drivers\' phones. No company account needed: the tablet types the code of a Driver Room kiosk station (Stations, below) once. The driver is signed out when he taps Done, or after 5 minutes with no taps, and the tablet goes back to View Loadout. A TV code is refused here; the TV keeps the Driver Station link.', shut: 'New code or Remove on the station, below; Change Station on the tablet asks for the manager release code.' },
+  { key: 'driver', title: 'Driver Station (TV and loadout board)', label: 'Driver Station link', path: 'driver-station.html', who: 'ud', short: 'The Driver Room TV or a loadout board, with a UD account, then its station code', opens: 'One link for every driver station (Joe 10/12, like the Plant Station). The tablet, TV or kiosk types its station\'s code (Stations, below) once: a Driver Station code opens the loadout board and weekly schedule with the weather; a TV code opens the same board full screen with no buttons, both lists rolling.', shut: 'New code or Remove on the station, below.' },
   { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', short: 'The station\'s code, then each mechanic\'s login ID', opens: 'One link for every garage station. Once a garage station has a code (Stations, below), the tablet types it once; mechanics then tap their name and type their login ID.', shut: 'New code or Remove on the station; turn a mechanic off in Fleet Service.' },
   { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', short: 'Anyone with the Route Distribution code', opens: 'Drivers on their own phones: View Loadout, Check-In and DVIR. No company account needed.', shut: 'Turn Off stops the drivers\' phone link (UD sign-in links keep working). A new code makes every phone ask for it again.', code: true },
   { key: 'maint', title: 'Maintenance Station (plant machinery)', label: 'Maintenance tablet', path: 'maint-station.html', who: 'code', short: 'Each mechanic\'s name and login ID (Plant Maintenance is under construction)', opens: 'The plant machinery work orders and PMs, like the Garage Station: tap a work order, then your name and login ID.', shut: 'Turn a mechanic off in Fleet Service > Garage Technicians.' },
@@ -386,10 +387,10 @@ const MANAGER_LINKS = ['company', 'phone', 'manager', 'personal', 'screens'];
 const PLANT_LINKS = ['plant', 'public'];
 const GARAGE_LINKS = ['garage', 'maint'];
 // Joe 10/12: the drivers like the plant: one Driver Station link, its stations right under it, then the drivers' phone link.
-const DRIVER_LINKS = ['driver'];
+const DRIVER_LINKS = ['driverroom', 'driver'];
 const DRIVER_MORE = ['route'];
 
-// The link cards for the given keys; tail is more of the page under the cards (Plant Station Codes' release codes).
+// The link cards for the given keys; tail is more of the page under the cards (Manager Links' release codes, the stations).
 export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', more = []) {
   let data = null;
   const pick = (list) => APP_LINKS.filter(l => list.indexOf(l.key) >= 0);
@@ -440,9 +441,9 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', 
 /* ---------- Stations and their codes (Joe 10/12: one link, then a list of stations, each with its own code) ---------- */
 
 const STATION_PAGES = {
-  PLANT: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each station has its own code. On the tablet, open the Plant Station link and type the station\'s code: the tablet opens that station and keeps it. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (below). Until a plant has a station code, its tablets pick their station from the list. The no-account link (above) uses the same codes while it is On.' },
-  GARAGE: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each garage station has its own code. On the garage tablet, open the Garage Station link and type the code. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (Plant Station Codes). Until a plant has a garage code, its garage tablet opens straight away.' },
-  KIOSK: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each driver station (the Driver Room tablet, the Driver Room TV, a kiosk in the plant) has its own code, and a plant can have more than one. Open the Driver Station link on it and type its code: a Driver Station code opens the loadout board, a TV code opens the full-screen TV board. It keeps it after that. To move it, a manager taps Change and types the plant\'s manager release code (Plant Station Codes). Until a plant has a driver station code, its tablets and TVs open straight away.' }
+  PLANT: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each station has its own code. On the tablet, open the Plant Station link and type the station\'s code: the tablet opens that station and keeps it. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (Manager Links). Until a plant has a station code, its tablets pick their station from the list. The no-account link (above) uses the same codes while it is On.' },
+  GARAGE: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each garage station has its own code. On the garage tablet, open the Garage Station link and type the code. To move a tablet, a manager taps Change Station and types the plant\'s manager release code (Manager Links). Until a plant has a garage code, its garage tablet opens straight away.' },
+  KIOSK: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each driver station (the Driver Room tablet, the Driver Room TV, a kiosk in the plant) has its own code, and a plant can have more than one. The Driver Room tablet opens the Driver Room Check-In link and types a Driver Room Check-In station\'s code. The TV opens the Driver Station link and types a TV station\'s code (full-screen board); a Driver Room Check-In code typed there opens the loadout board. It keeps it after that. To move it, a manager taps Change and types the plant\'s manager release code (Manager Links). Until a plant has a driver station code, its tablets and TVs open straight away.' }
 };
 
 // The station list for one kind under a page's link cards: name, type, plant, code; New code, Remove, and Add.
@@ -503,13 +504,13 @@ function bindStations(box, kind) {
   return load();
 }
 
-/* ---------- Plant Station Codes: the link, the stations, and each plant's manager release code ---------- */
+/* ---------- Each plant's manager release code (Joe 10/12: on Manager Links, not Plant Station Codes) ---------- */
 
-export async function renderStationCodes(box, ctx) {
-  const tail = stationSection('PLANT') + '<div class="ap-section" style="margin-top:10px"><h3>Manager release codes</h3>' +
-    '<details class="ap-how"><summary>How it works</summary><p>A tablet keeps its station. To move it (Plant Station, Garage Station or a kiosk), a manager taps Change Station on the tablet and types the release code for that plant. With no release code set, anyone signed in on the tablet can move it. Five wrong release codes lock the release for ten minutes.</p></details>' +
-    '<div class="ap-list" id="sc-list"></div></div>';
-  const links = renderAppLinks(box, ctx, PLANT_LINKS, tail);
+const RELEASE_SECTION = '<div class="ap-section" id="release-codes" style="margin-top:10px"><h3>Manager release codes</h3>' +
+  '<details class="ap-how"><summary>How it works</summary><p>A tablet keeps its station. To move it (Plant Station, Garage Station, the Driver Room tablet or a kiosk), a manager taps Change Station on the tablet and types the release code for that plant; the same code lets a manager Exit a kiosk. With no release code set, anyone signed in on the tablet can move it. Five wrong release codes lock the release for ten minutes.</p></details>' +
+  '<div class="ap-list" id="sc-list"></div></div>';
+
+function bindReleaseCodes(box) {
   const $ = (s) => box.querySelector(s);
   async function load() {
     try {
@@ -529,7 +530,22 @@ export async function renderStationCodes(box, ctx) {
       if (b.dataset.again) twice(b, 'Press again to replace', go); else go();
     }
   });
-  await Promise.all([links, load(), bindStations(box, 'PLANT')]);
+  return load();
+}
+
+// Manager Links: the managers' links, then each plant's manager release code.
+export async function renderManagerLinks(box, ctx) { await Promise.all([renderAppLinks(box, ctx, MANAGER_LINKS, RELEASE_SECTION), bindReleaseCodes(box)]); }
+
+/* ---------- Plant Station Codes: the link and the stations (the release codes moved to Manager Links) ---------- */
+
+export async function renderStationCodes(box, ctx) {
+  const tail = stationSection('PLANT') + '<p class="ap-note" id="release-moved">Manager release codes (to move a tablet to another station) are in <a href="#" data-goto="app-links">Manager Links</a>.</p>';
+  const links = renderAppLinks(box, ctx, PLANT_LINKS, tail);
+  box.addEventListener('click', ev => {
+    const a = ev.target.closest('a[data-goto]');
+    if (a) { ev.preventDefault(); if (ctx && ctx.open) ctx.open(a.dataset.goto); }
+  });
+  await Promise.all([links, bindStations(box, 'PLANT')]);
 }
 
 // Garage Station Codes and Driver Station Codes: the link, then the stations with their codes (drivers: then the phone link).
@@ -690,7 +706,7 @@ export const PAGES = {
   people: renderPeople,
   'role-templates': renderRoleTemplates,
   'access-codes': renderAccessCodes,
-  'app-links': renderAppLinks,
+  'app-links': renderManagerLinks,
   'station-codes': renderStationCodes,
   'garage-codes': renderGarageCodes,
   'driver-codes': renderDriverCodes,
