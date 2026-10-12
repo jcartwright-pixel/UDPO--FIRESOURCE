@@ -219,7 +219,7 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await sun.waitForSelector('#rows tr[data-id="2026-10-11__run_t802|sun"]');
     assert.deepEqual(await bandsOf(sun), ['SUNDAY DELIVERIES, 10-11-26', 'ALREADY LOADED SATURDAY, 10-10-26', 'run_t801|sun',
       'LOADING TODAY, SUNDAY 10-11-26', 'run_t802|sun', 'MONDAY DELIVERIES, 10-12-26', 'run_t802|mon']);
-    assert.equal(await sun.$$eval('#rows tr.already [data-grip]', g => g.length), 0, 'no grab handle on an already-loaded row');
+    assert.equal(await sun.$$eval('#rows tr.already [data-move], #rows [data-grip]', g => g.length), 0, 'no move arrows on an already-loaded row, and no grab handles');
     assert.match(await sun.textContent('#count'), /^2 loads/, 'the count leaves out the already-loaded row');
     if (SHOTS) await sun.screenshot({ path: path.join(SHOTS, 'daily-sunday-already-loaded-1920.png') });
     assert.deepEqual(sun.errors, []);

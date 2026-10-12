@@ -1594,9 +1594,15 @@ body.deciding #screen { visibility: hidden; }
 
 /* Daily Dispatch: a manager grabs a load by the handle on its route number and moves it up or down, with a mouse or a
    finger (Joe 10/11, the same handle as Daily Case Loadout). The row being moved is shaded; a blue line shows where it lands. */
-body.daily-look table.daily .dd-grip { height: 34px; padding: 0 6px 0 4px; border-radius: 7px; border: 1px dashed #9fb3c8; background: #f5f8fb; color: inherit; font: inherit; font-weight: 900; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
-body.daily-look table.daily .dd-grip::before { content: "\283F"; margin-right: 4px; color: #7a8ca0; font-weight: 400; }
-body.daily-look table.daily .dd-grip:hover { border-color: #1f6feb; background: #eaf2ff; }
+/* Joe 10/12: no grab dots; up and down arrows beside the route number move a load (the Route Master load-order arrows' look). */
+body.daily-look table.daily td.route { white-space: nowrap; }
+body.daily-look table.daily .dd-route { display: inline-block; min-width: 3ch; vertical-align: middle; }
+body.daily-look table.daily .dd-move { display: inline-flex; flex-direction: column; gap: 2px; margin-left: 6px; vertical-align: middle; }
+body.daily-look table.daily button.seq-move { width: 30px; height: 18px; padding: 0; border: 1px solid #9dc2df; border-radius: 5px; background: #edf7ff; color: #0a5e9d; font-size: 11px; line-height: 1; cursor: pointer; }
+body.daily-look table.daily button.seq-move[data-move="-1"]::before { content: "\25B2"; }
+body.daily-look table.daily button.seq-move[data-move="1"]::before { content: "\25BC"; }
+body.daily-look table.daily button.seq-move:hover:not(:disabled) { border-color: #1f6feb; background: #dcebff; }
+body.daily-look table.daily button.seq-move:disabled { opacity: .3; cursor: default; }
 body.daily-look table.daily tr.dragging td { background: #e8f1fa !important; }
 body.daily-look table.daily tr.drop-before td { box-shadow: inset 0 3px 0 #1f6feb; }
 body.daily-look table.daily tr.drop-after td { box-shadow: inset 0 -3px 0 #1f6feb; }
