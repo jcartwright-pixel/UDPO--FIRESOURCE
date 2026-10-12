@@ -1,10 +1,10 @@
 'use strict';
 /*
  * Browser check of the Driver Room Check-In tablet (Joe 10/12, layout A): driver-room.html with no account types a Driver
- * Room kiosk station's code (a TV's code is refused), shows today's loadout and the drivers' names (Regular, Relief); a
- * driver picks View Loadout, Check-In or DVIR; Check-In and DVIR ask his name and open the phone screens in Driver Room
- * mode; Done comes back signed out, and 5 minutes with no taps goes back to View Loadout.
- * Change Station asks for the manager release code. Pictures at 1920 and tablet 1024 go to SHOTS_DIR.
+ * Room kiosk station's code (a TV's code is refused), then shows the drivers' phone screens in Driver Room mode (Joe 10/12:
+ * "the driver's phone is exactly how this should look"): View Loadout, DVIR, Check-In; Done signs out, and 5 minutes with no
+ * taps signs out and shows the rolling View Loadout.
+ * No Back, Home or Sign out: Release at the very bottom asks for the manager release code (Joe 10/12 "Station"). Pictures at 1920 and tablet 1024 go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -19,10 +19,10 @@ const localCalls = require('./local-calls.cjs');
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR;
-const BOSS = { email: 'admin.test@uniteddairy.com' };
+const BOSS = { email: 'admin.test@uniteddairy.com' }, SIGNED = '?testEmail=admin.test@uniteddairy.com';
 
 async function openPage(browser, width, height, url) {
-  const page = await browser.newPage({ viewport: { width, height } });
+  const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
@@ -46,7 +46,7 @@ async function swipe(p) {
   return (await at()) - before;
 }
 async function touchPage(browser, width, height, url, mobile) {
-  const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: !!mobile });
+  const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: !!mobile, serviceWorkers: 'block' });
   const page = await ctx.newPage();
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
@@ -68,100 +68,148 @@ async function touchPage(browser, width, height, url, mobile) {
   const results = [];
   try {
     for (const [w, h, tag] of [[1920, 1080, '1920'], [1024, 768, 'tablet']]) {
+      // Joe 10/12 "these will still also need to have a United Dairy email address to log in first": the old tablet link
+      // and the Check-In screens with no United Dairy sign-in go to the Driver Station link's Google sign-in.
       const p = await openPage(browser, w, h, '/driver-room.html');
+      await p.waitForURL(/driver-station\.html$/);
+      await p.waitForSelector('#signin:not([hidden]) #signin-button');
+      await p.evaluate(() => localStorage.setItem('udRoomStation', JSON.stringify({ key: 'fac_uniontown_kiosk_driver', version: 'x', plant: 'Uniontown' })));
+      await p.goto(HOSTING + '/route.html?room=1');
+      await p.waitForURL(/driver-station\.html$/);
+      await p.waitForSelector('#signin:not([hidden]) #signin-button');
+      await shot(p, 'driver-room-0-signin-' + tag + '.png');
+      // Signed in with a United Dairy account, the Driver Station link asks for the station code.
+      await p.goto(HOSTING + '/driver-station.html' + SIGNED);
       await p.waitForSelector('#code-box form.st-code');
       await shot(p, 'driver-room-1-code-' + tag + '.png');
-      // The TV's code is refused here: the TV keeps the Driver Station link.
-      await p.fill('#code-box input', tv);
-      await p.click('#code-box button');
-      await p.waitForSelector('.st-code-msg:text("Driver Room TV")');
       await p.fill('#code-box input', kiosk);
       await p.click('#code-box button');
-      // Joe 10/12: three choices first: View Loadout, DVIR, Check-In.
-      await p.waitForSelector('#menu:not([hidden]) #go-checkin');
-      assert.match(await p.textContent('#plant'), /Uniontown Driver Room/);
-      assert.deepEqual(await p.$$eval('#menu .dr-card', b => b.map(x => x.firstChild.textContent)), ['View Loadout', 'DVIR', 'Check-In']);
-      await shot(p, 'driver-room-2-choices-' + tag + '.png');
-      // Check-In asks for the name.
-      await p.click('#go-checkin');
-      await p.waitForSelector('#pick:not([hidden]) #names button');
-      const heads = await p.$$eval('#names h3', x => x.map(e => e.textContent));
-      assert.deepEqual(heads.slice(0, 2), ['REGULAR DRIVERS', 'RELIEF DRIVERS']);
-      assert.ok(await p.$('#names button[data-id="drv_test_brook"]'), 'BROOK, SAM (relief) is listed');
+      // Joe 10/12 "the driver's phone is exactly how this should look": the phone screens in Driver Room mode, three choices.
+      await p.waitForURL(/route\.html\?room=1$/);
+      await p.waitForSelector('#step-menu:not([hidden]) #m-checkin');
+      assert.equal(await p.textContent('.phone-top b'), 'Uniontown Driver Room Check-In Station');
+      assert.deepEqual(await p.$$eval('#step-menu .drv-card b', b => b.map(x => x.textContent)), ['View Loadout', 'DVIR', 'Check-In']);
+      assert.equal(await p.$('#go-back, #go-home, #signout'), null, 'no Back, Home or Sign out into the app');
       assert.ok(await p.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth), 'no side scroll');
+      await shot(p, 'driver-room-2-choices-' + tag + '.png');
+      // Check-In asks for the name, then his loads; Done signs him out, back to the choices.
+      await p.click('#m-checkin');
+      await p.waitForSelector('#step-name:not([hidden])');
+      await p.waitForSelector('#name option[value="drv_test_casey"]', { state: 'attached' });
+      assert.ok(await p.$('#name option[value="drv_test_brook"]'), 'BROOK, SAM (relief) is listed');
       await shot(p, 'driver-room-3-names-' + tag + '.png');
-      // His name opens the Check-In for CASEY; Done signs him out and comes back to the choices.
-      await Promise.all([p.waitForURL(/route\.html\?room=1$/), p.click('#names button[data-id="drv_test_casey"]')]);
+      await p.selectOption('#name', 'drv_test_casey');
+      await p.click('#step-name button[type=submit]');
       await p.waitForSelector('#step-loads:not([hidden])');
       assert.equal(await p.textContent('#who'), 'CASEY, LEE');
       assert.equal(await p.textContent('#change'), 'Done');
       await shot(p, 'driver-room-4-checkin-' + tag + '.png');
-      await Promise.all([p.waitForURL(/driver-room\.html$/), p.click('#change')]);
-      await p.waitForSelector('#menu:not([hidden]) #go-dvir');
-      assert.equal(await p.isVisible('#me'), false, 'Done signed the driver out');
-      // DVIR: the name, then the DVIR; Back keeps him signed in (Check-In or DVIR without his name again), Sign Out ends it.
-      await p.click('#go-dvir');
-      await p.waitForSelector('#pick-title:text-is("DVIR")');
-      await Promise.all([p.waitForURL(/view=dvir/), p.click('#names button[data-id="drv_test_casey"]')]);
+      await p.click('#change');
+      await p.waitForSelector('#step-menu:not([hidden])');
+      assert.equal(await p.textContent('#who'), '', 'Done signed the driver out');
+      // DVIR: the name, then the DVIR; Back keeps him signed in, Done ends it.
+      await p.click('#m-dvir');
+      await p.waitForSelector('#step-name:not([hidden]) #name option[value="drv_test_casey"]', { state: 'attached' });
+      await p.selectOption('#name', 'drv_test_casey');
+      await p.click('#step-name button[type=submit]');
       await p.waitForSelector('#step-dvir:not([hidden])');
       await shot(p, 'driver-room-5-dvir-' + tag + '.png');
-      await Promise.all([p.waitForURL(/driver-room\.html$/), p.click('#step-dvir [data-back]')]);
-      await p.waitForSelector('#me:not([hidden]) #to-checkin');
-      assert.equal(await p.textContent('#me-name'), 'CASEY, LEE');
+      await p.click('#step-dvir [data-back]');
+      await p.waitForSelector('#step-menu:not([hidden])');
+      assert.match(await p.textContent('#m-who'), /CASEY, LEE/);
       await shot(p, 'driver-room-6-signed-in-' + tag + '.png');
-      await p.click('#sign-out');
-      await p.waitForSelector('#menu:not([hidden])');
-      // View Loadout: the loadout full width, with Check-In and DVIR at the top.
-      await p.click('#go-board');
-      await p.waitForSelector('body.dr-loadout #h-checkin:not([hidden])');
-      assert.equal(await p.isVisible('#side'), false);
+      await p.click('#change');
+      await p.waitForSelector('#step-menu:not([hidden])');
+      // View Loadout: the rolling loads, no name needed; a tap brings back the choices.
+      await p.click('#m-board');
+      await p.waitForSelector('#step-board:not([hidden])');
+      await p.waitForTimeout(600);
       await shot(p, 'driver-room-7-view-loadout-' + tag + '.png');
-      await p.click('#h-dvir');
-      await p.waitForSelector('#pick:not([hidden])');
-      assert.equal(await p.textContent('#pick-title'), 'DVIR');
-      await p.click('#pick-cancel');
-      await p.waitForSelector('#menu:not([hidden])');
-      results.push('Driver Room ' + tag + ': a TV code is refused; the kiosk code opens View Loadout, DVIR and Check-In; Check-In and DVIR ask for the name and open the phone screens for that driver; Done signs out, Back keeps him; View Loadout fills the screen');
+      await p.click('#board-track');
+      await p.waitForSelector('#step-menu:not([hidden])');
+      results.push('Driver Room ' + tag + ': with no United Dairy sign-in the tablet goes to the Driver Station Google sign-in; signed in, the Check-In Station code opens the phone screens (View Loadout, DVIR, Check-In) with no Back, Home or Sign out; Check-In and DVIR ask the name; Done signs out, Back keeps him; View Loadout needs no name and a tap brings back the choices');
+      // Release is a bar along the very bottom on every Driver Room screen, the rolling View Loadout too; from there it brings
+      // back the three choices with the release code box (Cancel keeps the tablet).
+      assert.equal((await p.textContent('#m-station')).trim(), 'Release');
+      await p.click('#m-board');
+      await p.waitForSelector('#step-board:not([hidden])');
+      const bar = await p.$eval('#m-station', el => el.getBoundingClientRect().bottom);
+      assert.ok(Math.abs(bar - p.viewportSize().height) < 1, 'Release sits at the very bottom');
+      await p.click('#m-station');
+      await p.waitForSelector('#step-menu:not([hidden]) #release-box form');
+      await shot(p, 'driver-room-9-release-' + tag + '.png');
+      await p.click('#release-box [data-cancel]');
+      assert.equal(await p.isVisible('#m-checkin'), true);
+      results.push('Driver Room ' + tag + ': Release sits at the very bottom on every screen; from View Loadout it brings back the choices and asks for the release code; Cancel keeps the tablet');
       if (tag === '1920') {
-        // Change Station with the manager release code.
-        await p.click('#change');
+        // Release with the manager release code.
+        await p.click('#m-station');
         await p.fill('#release-box input', release);
-        await p.click('#release-box button[type=submit]');
+        await Promise.all([p.waitForURL(/driver-station\.html$/), p.click('#release-box button[type=submit]')]);
         await p.waitForSelector('#code-box form.st-code');
         assert.equal(await p.evaluate(() => localStorage.getItem('udRoomStation')), null);
-        results.push('Driver Room: Change Station asks for the manager release code, then back to the code screen');
+        results.push('Driver Room: Release asks for the manager release code, then back to the Driver Station code screen (still signed in)');
       }
       assert.deepEqual(p.errors, []);
       await p.close();
     }
 
-    // Joe 10/12: 5 minutes with no taps signs the driver out and goes back to the scrolling View Loadout, also from the
-    // Check-In screen; the phone link never signs out by itself.
+    // Joe 10/12: 5 minutes with no taps signs the driver out and shows the rolling View Loadout; the phone link never signs
+    // out by itself.
     {
-      const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+      const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, serviceWorkers: 'block' });
       const q = await ctx.newPage();
       await q.clock.install();
       await q.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
       await localCalls(q);
-      await q.goto(HOSTING + '/driver-room.html');
+      await q.goto(HOSTING + '/driver-station.html' + SIGNED);
       await q.waitForSelector('#code-box form.st-code');
       await q.fill('#code-box input', kiosk);
       await q.click('#code-box button');
-      await q.click('#go-checkin');
-      await Promise.all([q.waitForURL(/route\.html\?room=1$/), q.click('#names button[data-id="drv_test_casey"]')]);
+      await q.waitForURL(/route\.html\?room=1$/);
+      await q.click('#m-checkin');
+      await q.waitForSelector('#step-name:not([hidden]) #name option[value="drv_test_casey"]', { state: 'attached' });
+      await q.selectOption('#name', 'drv_test_casey');
+      await q.click('#step-name button[type=submit]');
       await q.waitForSelector('#step-loads:not([hidden])');
       await q.clock.fastForward(4 * 60000);
-      assert.match(q.url(), /route\.html/, 'still on the Check-In after 4 minutes');
-      await Promise.all([q.waitForURL(/driver-room\.html\?view=loadout$/), q.clock.fastForward(70000)]);
-      await q.waitForSelector('body.dr-loadout #h-checkin:not([hidden])');
+      assert.equal(await q.isVisible('#step-loads'), true, 'still on the Check-In after 4 minutes');
+      await q.clock.fastForward(70000);
+      await q.waitForSelector('#step-board:not([hidden])');
       assert.equal(await q.evaluate(() => sessionStorage.getItem('udRoom.driverId')), null, 'signed out');
-      // On the Driver Room page itself: the choices go back to View Loadout after 5 minutes too.
-      await q.click('#h-checkin');
-      await q.waitForSelector('#pick:not([hidden])');
+      assert.equal(await q.textContent('#who'), '');
+      await q.waitForTimeout(300);
+      await shot(q, 'driver-room-8-idle-rolling-loads-tablet.png');
+      await q.click('#board-track');
+      await q.waitForSelector('#step-menu:not([hidden])');
+      // The three choices with no one signed in also go back to the rolling loads after 5 minutes.
       await q.clock.fastForward(5 * 60000 + 6000);
-      await q.waitForSelector('body.dr-loadout');
+      await q.waitForSelector('#step-board:not([hidden])');
       await ctx.close();
-      results.push('Driver Room: 5 minutes with no taps (on the Check-In or the Driver Room page) signs the driver out and goes back to View Loadout');
+      results.push('Driver Room: 5 minutes with no taps signs the driver out and shows the rolling View Loadout; a tap brings back the three choices');
+    }
+
+    // Joe 10/12 (as the old page): View Loadout on the Driver Room Check-In Station updates the moment a load changes, with
+    // no Refresh press and well before the 2-minute fallback.
+    {
+      const L = require('../../src/logic');
+      // Loaded today for tomorrow's delivery (the board shows today's loading).
+      const deliver = L.addDays(L.operatingDay(new Date()), 1), p = L.dayPrefix(deliver), id = L.weekStart(deliver) + '__run_live805';
+      await db().collection('runs').doc(id).set({ weekStart: L.weekStart(deliver), route: '805', run: 'LIVE TEST', routeId: 'rte_t805', runId: 'run_live805', rev: 0,
+        days: { [p]: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', truck: '900002', trailer: 'T-905' } } });
+      const lv = await openPage(browser, 1024, 768, '/driver-station.html' + SIGNED);
+      await lv.waitForSelector('#code-box form.st-code');
+      await lv.fill('#code-box input', kiosk);
+      await lv.click('#code-box button');
+      await lv.waitForURL(/route\.html\?room=1$/);
+      await lv.click('#m-board');
+      await lv.waitForSelector('#board-track :text("T-905")');
+      await lv.waitForTimeout(1500);
+      await db().collection('runs').doc(id).update({ ['days.' + p + '.trailer']: 'T-977' });
+      await lv.waitForSelector('#board-track :text("T-977")', { timeout: 10000 });
+      assert.deepEqual(lv.errors, []);
+      await lv.close();
+      results.push('Driver Room: View Loadout updates by itself the moment a load changes (no Refresh, well before the 2-minute fallback)');
     }
 
     // Joe 10/12 "it does not let you scroll the list": the Check-In and DVIR screens scroll by finger on a phone and on
@@ -183,12 +231,15 @@ async function touchPage(browser, width, height, url, mobile) {
       assert.deepEqual(ph.errors, []);
       await ph.context().close();
 
-      const tab = await touchPage(browser, w, h, '/driver-room.html', mobile);
+      const tab = await touchPage(browser, w, h, '/driver-station.html' + SIGNED, mobile);
       await tab.waitForSelector('#code-box form.st-code');
       await tab.fill('#code-box input', kiosk);
       await tab.click('#code-box button');
-      await tab.click('#go-dvir');
-      await Promise.all([tab.waitForURL(/view=dvir/), tab.click('#names button[data-id="drv_test_casey"]')]);
+      await tab.waitForURL(/route\.html\?room=1$/);
+      await tab.click('#m-dvir');
+      await tab.waitForSelector('#step-name:not([hidden]) #name option[value="drv_test_casey"]', { state: 'attached' });
+      await tab.selectOption('#name', 'drv_test_casey');
+      await tab.click('#step-name button[type=submit]');
       await tab.waitForSelector('#step-dvir:not([hidden])');
       const roomMoved = await swipe(tab);
       await shot(tab, 'room-scroll-dvir-' + w + '.png');
@@ -196,16 +247,6 @@ async function touchPage(browser, width, height, url, mobile) {
       assert.deepEqual(tab.errors, []);
       await tab.context().close();
     }
-    // The Driver Room page itself on a short phone screen (stacked): it scrolls as a whole to the names.
-    const short = await touchPage(browser, 390, 560, '/driver-room.html', true);
-    await short.waitForSelector('#code-box form.st-code');
-    await short.fill('#code-box input', kiosk);
-    await short.click('#code-box button');
-    await short.click('#go-checkin');
-    await short.waitForSelector('#names button[data-id="drv_test_casey"]');
-    assert.ok(await swipe(short) > 50, 'the Driver Room page scrolls by finger on a short phone screen');
-    await shot(short, 'room-scroll-names-390.png');
-    await short.context().close();
     results.push('Check-In and DVIR scroll by finger on a phone (390) and tablets (600, 800, 1024), from the phone link and the Driver Room tablet');
   } finally {
     await browser.close();

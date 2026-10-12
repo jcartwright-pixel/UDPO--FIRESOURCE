@@ -364,6 +364,12 @@ body.phone .notice { margin: 12px 16px 0; }
 .phone-load small { grid-column: 1; color: var(--muted); font-weight: 600; font-size: 13px; }
 .phone-load span { grid-column: 2; grid-row: 1 / 3; align-self: center; background: var(--ud-blue); color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 14px; }
 .phone-load.done span { background: #277b43; }
+/* Joe 10/12 (no signal): a Check-In saved on the phone, and the line saying what waits on the phone (js/phone-queue.js). */
+.phone-load.queued span { background: #9a5b00; }
+.offline-line { margin: 10px 16px 0; padding: 10px 14px; border-radius: 10px; font-size: 16px; font-weight: 700; line-height: 1.35; background: #fff4d6; color: #6b4300; border: 1px solid #f0c35a; }
+.offline-line.ok { background: #dff4e6; color: #126334; border-color: #9fd4b0; }
+.offline-line.error { background: #fde8e6; color: #8f1d15; border-color: #f2a59d; }
+.offline-line[hidden] { display: none; }
 .phone-empty { color: var(--muted); margin: 8px 0 0; }
 
 /* Short windows (a 1366x650 laptop): a slimmer header so a busy day's full list still fits on one page. */

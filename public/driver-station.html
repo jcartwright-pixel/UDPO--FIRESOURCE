@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="manifest" href="manifest.webmanifest">
+  <!-- Joe 10/12: installed from here ("Driver Station"), it opens full screen in its own window, no browser bars. -->
+  <link rel="manifest" href="driver-station.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Driver Station">
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
@@ -26,7 +30,7 @@
     <div class="topbar">
       <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
       <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
-      <button type="button" class="gs-nav" id="change" hidden>Change Station</button>
+      <button type="button" class="gs-nav" id="change" hidden>Release</button>
       <span class="who" id="who"></span>
       <button id="signout" type="button">Sign out</button>
     </div>
@@ -35,7 +39,7 @@
     <div class="head">
       <div class="title"><span class="eyebrow" id="eyebrow">Driver Loadout &amp; Pickup</span><h1><span id="plant">Uniontown</span> Loadout <span class="ds-day" id="weekday"></span></h1></div>
       <p class="ds-welcome" id="welcome" hidden></p>
-      <button type="button" id="tv" data-top>Driver Room TV</button><button type="button" id="refresh" data-top>&#8635; Refresh</button>
+      <button type="button" id="tv" data-top>Driver's Kiosk Station</button><button type="button" id="refresh" data-top>&#8635; Refresh</button>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -61,7 +65,7 @@
     import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as W from './js/weather.js';
-    import { resolveStation, askCode, askRelease, remember } from './js/station-code.js';
+    import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
 
     // The current app's Driver Room board and TV (DriverLoadoutPickup.html, 052_V749). Read only. In the new app it opens with a
     // United Dairy sign-in (no branch code); "Driver Room TV" is the old DISPLAY mode: dark, no menu, notes shown, both lists roll.
@@ -76,7 +80,7 @@
     document.getElementById('go-back').addEventListener('click', async () => { if (await leave()) goBack(); });
     document.getElementById('go-home').addEventListener('click', async () => { if (await leave()) location.href = 'index.html'; });
     document.getElementById('tv').textContent = tv ? 'Desk view' : 'Driver Room display';
-    document.getElementById('eyebrow').textContent = tv ? 'Driver Room Display' : 'Driver Loadout & Pickup';
+    document.getElementById('eyebrow').textContent = tv ? "Driver's Kiosk Station" : 'Driver Loadout & Pickup';
     document.getElementById('weather').hidden = !tv;
     let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = L.operatingDay(new Date()), updated = null;
 
@@ -152,20 +156,25 @@
       const r = msg !== undefined ? { needCode: true, message: msg } : await resolveStation('KIOSK', CODE_KEY, stationCall);
       const show = (asking) => { document.getElementById('code-box').hidden = !asking; document.getElementById('ds-grid').hidden = asking; document.getElementById('foot').hidden = asking; };
       if (r.needCode) {
-        kiosk = null; document.getElementById('change').hidden = true; show(true);
+        kiosk = null; lockStation(document.getElementById('change'), false); show(true);
         kiosk = await askCode(document.getElementById('code-box'), { kind: 'KIOSK', storeKey: CODE_KEY, call: stationCall, title: 'Enter this station\'s code',
-          hint: 'A manager gives each Driver Room tablet, TV and kiosk its code (Administration > Driver Station Codes). It remembers it after this.', message: r.message });
+          hint: 'Type the code of the Driver\'s Kiosk Station (the TV) or the Driver Room Check-In Station (the drivers\' tablet) from Administration > Driver Station Codes. It remembers it after this.', message: r.message });
       } else kiosk = r.station || null;
       // Joe 10/12: one Driver Station link; the code decides the screen. A TV's code opens the TV display (no buttons, both
       // lists rolling), also when the TV reopens the plain link later.
       if (kiosk && kiosk.type === 'TV' && !full) { location.replace(location.pathname + '?tv=1'); return; }
+      // Joe 10/12 "it should use my existing link and just be directed to only those pages": the Driver Room tablet's code (a
+      // Driver Room Check-In station) opens the drivers' phone screens (View Loadout, DVIR, Check-In), not the TV board.
+      // Reopening this link goes straight back there; Release there (with the release code) forgets both.
+      if (kiosk && kiosk.type === 'DRIVER') { remember('udRoomStation', kiosk); location.replace('route.html?room=1'); return; }
       show(false);
-      document.getElementById('change').hidden = !kiosk || full;
+      // Joe 10/12: a coded Driver Room screen (the TV too) has no Back, Home or Sign out; Release at the bottom is the only way out.
+      lockStation(document.getElementById('change'), !!kiosk);
       document.getElementById('eyebrow').textContent = kiosk ? kiosk.name + ' · ' + kiosk.plant : eyebrow;
       sig = ''; weekSig = ''; render();
     }
     const release = (why) => askRelease(document.getElementById('release-box'), { why, status: () => stationCall('status', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown' }),
-      release: (code) => stationCall('release', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown', code }), onError: showError });
+      release: (code) => stationCall('release', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown', code }), onError: showError, mustHave: true });
     // Leaving a coded kiosk unattaches it: the manager release code (when the plant has one), then the code is forgotten.
     async function leave() {
       if (!kiosk) return true;
@@ -174,9 +183,12 @@
     }
     document.getElementById('change').addEventListener('click', async () => {
       if (!(await release())) return;
-      kiosk = null; remember(CODE_KEY, null); gate().catch(err => showError(err.message));
+      kiosk = null; remember(CODE_KEY, null);
+      // The TV goes to the plain Driver Station link (the code screen, with Back and Home).
+      if (full) { location.replace(location.pathname); return; }
+      gate().catch(err => showError(err.message));
     });
-    // The TV's Exit: release, then the plain Driver Station link (the code screen, with Back and Home).
+    // A TV with no code: Exit goes to the plain Driver Station link. A coded TV leaves only by Release at the bottom.
     document.getElementById('tv-exit').hidden = !full;
     document.getElementById('tv-exit').addEventListener('click', async () => { if (await leave()) location.replace(location.pathname); });
 
