@@ -322,8 +322,12 @@
   // (udpoV754CanAdjustLoadSequence_). The screens use these to show the edit controls; the server enforces them.
   var SAVE_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER', 'SUPERVISOR', 'DISPATCHER'];
   var REORDER_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER'];
+  // Joe 10/12: People & Roles reads "Plant Employee", "plant-employee" and PLANT_EMPLOYEE as the same role (rights.js);
+  // so does every role check here.
+  function roleKey(r) { return String(r || '').trim().toUpperCase().replace(/[\s-]+/g, '_'); }
   function hasRole(person, roles) {
-    return !!(person && person.status === 'ACTIVE' && (person.roles || []).some(function (r) { return roles.indexOf(r) >= 0; }));
+    var want = (roles || []).map(roleKey);
+    return !!(person && String(person.status || '').trim().toUpperCase() === 'ACTIVE' && (person.roles || []).some(function (r) { return want.indexOf(roleKey(r)) >= 0; }));
   }
 
   // Joe 10/10: the plants (the current app's facility list) and who sees which. A person's plant list (USERS_MASTER
