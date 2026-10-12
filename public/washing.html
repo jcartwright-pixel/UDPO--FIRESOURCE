@@ -64,7 +64,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -110,6 +110,7 @@
         (Object.keys(repeat).sort((a, b) => repeat[b] - repeat[a]).slice(0, 5).map(k => '<p class="repeat"><b>' + escapeHtml(list.find(w => U.unitKey(w.trailer) === k).trailer || k) + '</b><span>' + repeat[k] + ' report' + (repeat[k] === 1 ? '' : 's') + '</span></p>').join('') || '<p class="repeat"><span>None</span></p>');
       document.getElementById('foot').textContent = list.length + (list.length === 1 ? ' wash item. ' : ' wash items. ') + (ck ? 'Wash marks the trailer washed and clears every report for it.' : 'View only.') + ' Requests come from the drivers\' check-ins, the email reports and unloading.';
       const st = L.screenState(app, 'plantLoading');
+      goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 

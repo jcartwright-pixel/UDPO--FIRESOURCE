@@ -57,7 +57,7 @@
   <section class="modal wide-modal sc-modal" id="modal" role="dialog" aria-labelledby="modal-title" hidden></section>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
     import { collection, doc, query, where, onSnapshot, getDocs } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
 
@@ -160,6 +160,7 @@
       const hs = body.querySelector('#hist-search');
       if (hs) { hs.value = search; hs.oninput = () => { search = hs.value; filterHistory(); }; filterHistory(); }
       const st = L.screenState(app, 'plant');
+      goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       if (!document.getElementById('modal').hidden && openDay) drawDay(openDay);
     }

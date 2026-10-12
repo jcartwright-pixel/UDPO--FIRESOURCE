@@ -73,7 +73,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import { watchRound } from './js/autosave.js';
@@ -173,6 +173,7 @@
       ['send-card', 'send'].forEach(id => { const sb = document.getElementById(id); if (sb.textContent !== 'Sending…') { sb.disabled = !ready(); sb.title = ready() ? '' : 'Loading the plant\'s data…'; } });
       if (!document.getElementById('modal').hidden) drawReport();
       const st = L.screenState(app, 'plant');
+      goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       // Send Current Report from the Plant menu (manager.html?report=1): open the full report once it is ready.
       if (askReport) { askReport = false; openReport(); }

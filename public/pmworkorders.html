@@ -52,7 +52,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchMaint, plantFor } from './js/pmaint.js';
 
@@ -74,6 +74,7 @@
       if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
       document.getElementById('plant-name').textContent = pl.name;
       const st = L.screenState(app, 'plant');
+      goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? 'LIVE' : 'TEST COPY';
       const orders = data ? data.workOrders : [], open = orders.filter(o => R.isOpen(o));
       document.getElementById('kpis').innerHTML = [

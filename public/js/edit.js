@@ -141,7 +141,12 @@ export function pickChoices(kind, current, busy, opts) {
   const list = KINDS[kind].list(opts);
   keepCurrent(kind, current, list, opts, false);
   const item = (group) => (o) => ({ value: o.id, label: o.text + (busy && busy[o.id] && o.id !== current && !o.why ? '  (' + busy[o.id] + ')' : ''), key: pickText(kind, o.id) || o.text, group });
-  return [{ value: '', label: '(none)', key: '', group: 'none' }].concat(list.map(item('list')), kind === 'driver' ? cvgOptions().map(item('cvg')) : []);
+  // Joe 10/12 ("891 now won't show whole number"): a unit left out (taken on another load, down, inactive) is still listed,
+  // greyed with why, so typing its short number finds it instead of saving the short number as typed; OVR makes it pickable.
+  const left = (opts && opts.override) ? [] : (kind === 'truck' ? lists.allTrucks : lists.allTrailers)
+    .filter(e => e.id !== current && !list.some(o => o.id === e.id))
+    .map(e => ({ value: e.id, label: e.unit, key: e.unit, group: 'blocked', head: 'UNAVAILABLE', reason: unitWhy(e, opts) || 'not usable', blocked: true }));
+  return [{ value: '', label: '(none)', key: '', group: 'none' }].concat(list.map(item('list')), kind === 'driver' ? cvgOptions().map(item('cvg')) : [], left);
 }
 
 /*
@@ -282,6 +287,20 @@ export async function saveOrder(getRuns, loadDate, orderedRows, render) {
     await save('reorderLoads', { loadDate, order: orderedRows.map(r => ({ runDocId: r.runDocId, day: r.day })) });
   } catch (e) {
     previous.forEach((p, i) => { if (p.run) p.run.days[p.day].loadSequenceOverride = before[i]; });
+    render();
+    showError(friendlyError(e));
+  }
+}
+
+// Weekly Dispatch order (Joe 10/12): the routes in their new order; shown at once, put back if the server refuses it.
+export async function saveWeekOrder(getRuns, weekStart, orderedRows, render) {
+  const runs = getRuns(), before = runs.map(r => r.weekOrder);
+  orderedRows.forEach((row, i) => runs.filter(r => r.runId === row.runId).forEach(r => { r.weekOrder = (i + 1) * 10; }));
+  render();
+  try {
+    await save('reorderWeek', { weekStart, runIds: orderedRows.map(r => r.runId) });
+  } catch (e) {
+    runs.forEach((r, i) => { r.weekOrder = before[i]; });
     render();
     showError(friendlyError(e));
   }

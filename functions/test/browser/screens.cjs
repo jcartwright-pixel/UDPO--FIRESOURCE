@@ -117,14 +117,23 @@ async function noScroll(page) {
     await editor.keyboard.press('Enter');
     await watcher.waitForFunction(() => document.querySelector('tr[data-id="2026-10-04__run_t802|tue"]').children[9].textContent === 'Call store on arrival', null, { timeout: 5000 });
 
-    // Joe 10/12: no grab dots. A dispatcher has no move arrows; a manager's up arrow moves 802 above 801 and the order saves as one call.
-    assert.equal(await editor.$('#rows button[data-move]'), null, 'a dispatcher has no move arrows');
-    assert.equal(await watcher.$('#rows [data-grip], #rows .dd-grip'), null, 'no grab handle');
-    await watcher.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"] button[data-move="-1"]:not([disabled])');
-    assert.equal(await watcher.$('tr[data-id="2026-10-04__run_t801|tue"] button[data-move="-1"]:not([disabled])'), null, 'the first load cannot go higher');
-    await watcher.click('tr[data-id="2026-10-04__run_t802|tue"] button[data-move="-1"]');
+    // Joe 10/12: no grab dots and no arrows. A dispatcher cannot move lines; a manager grabs 802's line and drags it above 801,
+    // and the order saves as one call.
+    assert.equal(await editor.$('#rows tr.mover'), null, 'a dispatcher cannot move lines');
+    assert.equal(await watcher.$('#rows [data-grip], #rows .dd-grip, #rows button[data-move]'), null, 'no grab dots and no arrows');
+    await watcher.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"].mover');
+    assert.equal(await watcher.$eval('tr[data-id="2026-10-04__run_t802|tue"] td.route', td => getComputedStyle(td).cursor), 'grab', 'the line shows the hand');
+    {
+      const from = await watcher.$eval('tr[data-id="2026-10-04__run_t802|tue"] td:nth-child(2)', td => { const b = td.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; });
+      const to = await watcher.$eval('tr[data-id="2026-10-04__run_t801|tue"] td:nth-child(2)', td => { const b = td.getBoundingClientRect(); return [b.left + b.width / 2, b.top + 4]; });
+      await watcher.mouse.move(from[0], from[1]);
+      await watcher.mouse.down();
+      await watcher.mouse.move(from[0], from[1] - 10, { steps: 3 });
+      await watcher.mouse.move(to[0], to[1], { steps: 8 });
+      await watcher.mouse.up();
+    }
     await editor.waitForFunction(() => [...document.querySelectorAll('#rows tr[data-id] td:first-child')].map(td => td.textContent).join(',') === '802,801', null, { timeout: 5000 });
-    results.push('a manager moved 802 above 801 with its up arrow and the dispatcher\'s screen showed the new order without reloading');
+    results.push('a manager dragged 802\'s line above 801 (hand cursor, no dots or arrows) and the dispatcher\'s screen showed the new order without reloading');
 
     // The current Daily Dispatch buttons: RUNS / NO RUN, Edit box (depart time, jack), Add Route / Run, Down Trucks / Trailers, Driver Call-Off, OVR.
     const r801 = 'tr[data-id="2026-10-04__run_t801|tue"]', r802 = 'tr[data-id="2026-10-04__run_t802|tue"]';
@@ -152,8 +161,8 @@ async function noScroll(page) {
     await watcher.selectOption('#add-where', 'first');
     await watcher.click('#add-save');
     await editor.waitForFunction(() => [...document.querySelectorAll('#rows tr[data-id] td:first-child')].map(td => td.textContent).join(',') === '801,802', null, { timeout: 5000 });
-    assert.equal(await watcher.$eval(r801 + ' button[data-move="1"]', b => b.disabled), false, 'the added route has its own move arrows');
-    results.push('Daily: a manager added 801 back as the first load, and it has move arrows like the rest');
+    assert.ok(await watcher.$(r801 + '.mover'), 'the added route can be dragged like the rest');
+    results.push('Daily: a manager added 801 back as the first load, and its line can be dragged like the rest');
 
     await editor.click(r802 + ' button[data-open]');
     await editor.fill('#edit-modal input[data-field="time"]', '4:15 AM');
@@ -287,6 +296,25 @@ async function noScroll(page) {
     const rsFit = await wkMgr.evaluate(() => ({ scroll: document.documentElement.scrollHeight, inner: window.innerHeight }));
     assert.ok(rsFit.scroll <= rsFit.inner, 'Weekly still fits after Reset Week');
     if (SHOTS) await wkMgr.screenshot({ path: path.join(SHOTS, 'weekly-after-reset-1366.png') });
+    // Joe 10/12 ("grab the line and move it"): Weekly lines drag too, no arrows and no dots; a dispatcher cannot move them.
+    assert.equal(await wkEdit.$('#rows tr.mover'), null, 'a dispatcher cannot move Weekly lines');
+    assert.equal(await wkMgr.$('#rows [data-grip], #rows .dd-grip, #rows button[data-move]'), null, 'no grab dots and no arrows on Weekly');
+    await wkMgr.waitForSelector('#rows tr.mover');
+    assert.equal(await wkMgr.$eval('#rows tr.mover td', td => getComputedStyle(td).cursor), 'grab', 'the Weekly line shows the hand');
+    {
+      const order = () => wkMgr.$$eval('#rows tr.mover', trs => trs.map(tr => tr.children[0].textContent + '/' + tr.children[1].textContent));
+      const was = await order();
+      const second = await wkMgr.$$eval('#rows tr.mover td:nth-child(2)', tds => tds.slice(0, 2).map(td => { const b = td.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2, b.top]; }));
+      await wkMgr.mouse.move(second[1][0], second[1][1]);
+      await wkMgr.mouse.down();
+      await wkMgr.mouse.move(second[1][0], second[1][1] - 10, { steps: 3 });
+      await wkMgr.mouse.move(second[0][0], second[0][2] + 4, { steps: 8 });
+      await wkMgr.mouse.up();
+      const want = [was[1], was[0]].concat(was.slice(2)).join(',');
+      await wkMgr.waitForFunction((w) => [...document.querySelectorAll('#rows tr.mover')].map(tr => tr.children[0].textContent + '/' + tr.children[1].textContent).join(',') === w, want, { timeout: 5000 });
+      assert.equal(await wkMgr.$('.popover'), null, 'letting go of a drag does not open a day');
+      results.push('Weekly: a manager dragged ' + was[1] + ' above ' + was[0] + ' (no arrows, no dots); a dispatcher sees no drag');
+    }
     results.push('Reset Week: a dispatcher cannot; a manager clicked twice: 802 Tuesday CARRIER went back to its standard driver CASEY, who is called off that day, so it is red as Driver Off - Needs Driver (Joe 10/11); Thursday off again; Monday still Vacation - Needs Driver');
     results.push('Weekly: 801 Thursday showed PLANT LOAD from the plant scheduler and took ADAMS (the run turned on, the mark stayed); CARRIER picked for 802 Tuesday, Route Run Days turned 802 Thursday on (Needs Driver), CASEY on vacation Monday from the Driver Assignment Board left 802 Monday as Vacation - Needs Driver, Publish recorded');
 
@@ -1158,11 +1186,15 @@ async function noScroll(page) {
     assert.equal(await gl.textContent('.adm-item[data-key="switch"] .adm-name'), 'Go-Live Switches');
     await gl.click('.adm-item[data-key="switch"]');
     await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"]');
-    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="drivers"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
+    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
+    // Joe 10/12: Drivers, Vacation Schedule and Route Editor are ready (they write Driver Master, Vacations, Route Master).
+    assert.equal(await gl.isDisabled('#gl-rows tr[data-row="drivers"] [data-act="new"]'), false);
     // Joe 10/12 ("Let the new app write plant loading to the real Live sheet."): Plant Loading is a switch of its own, ready.
     assert.match(await gl.textContent('#gl-rows tr[data-row="plantLoading"]'), /Plant Loading[\s\S]*Off[\s\S]*Ready[\s\S]*Loadout History/);
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="plantLoading"] [data-act="new"]'), false);
-    // Turn on everything that is ready: pressed twice; Daily and Weekly Dispatch and Plant Loading go to the new app, nothing else.
+    // Joe 10/12 ("turn all 8 sheets on"): the plant check screens, Products, Safety and Plant Maintenance have a switch, ready.
+    assert.match(await gl.textContent('#gl-rows tr[data-row="plant"]'), /Plant Operations[\s\S]*Off[\s\S]*Ready/);
+    // Turn on everything that is ready: pressed twice; every ready screen goes to the new app, Driver Check-ins stays.
     await gl.click('#gl-all');
     assert.match(await gl.textContent('#gl-all'), /Press again/);
     assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'old', 'one press does nothing');
@@ -1172,7 +1204,9 @@ async function noScroll(page) {
     assert.equal(cfg.screenOwners.dailyDispatch, 'new');
     assert.equal(cfg.screenOwners.weeklyDispatch, 'new');
     assert.equal(cfg.screenOwners.plantLoading, 'new');
-    assert.equal(cfg.screenOwners.drivers, 'old');
+    assert.equal(cfg.screenOwners.drivers, 'new');
+    assert.equal(cfg.screenOwners.checkIns, 'old');
+    assert.equal(cfg.screenOwners.plant, 'new');
     if (SHOTS) await gl.screenshot({ path: path.join(SHOTS, 'go-live-switches-1536.png') });
     const onNew = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await onNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'LIVE: SAVES GO TO THE SHEET');
@@ -1205,8 +1239,8 @@ async function noScroll(page) {
     await gl.click('#gl-wb-btn');
     await gl.waitForSelector('#view .ap-msg.bad:not([hidden])');
     assert.match(await gl.textContent('#view .ap-msg'), /Switch every screen off/);
-    // Move back clears fully live; with all three back, every screen is a test copy again.
-    for (const k of ['dailyDispatch', 'weeklyDispatch', 'plantLoading']) {
+    // Move back clears fully live; with every screen that went over back, every screen is a test copy again.
+    for (const k of ['dailyDispatch', 'weeklyDispatch', 'plantLoading', 'drivers', 'vacations', 'routes', 'plant']) {
       await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
       await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
       await gl.waitForSelector('#gl-rows tr[data-row="' + k + '"] .gl-chip.old');
@@ -1219,7 +1253,7 @@ async function noScroll(page) {
     assert.deepEqual(gl.errors, []);
     await adminHome.close();
     await gl.close();
-    results.push('Go-Live Switches: Turn on everything that is ready (pressed twice) moves Daily and Weekly Dispatch only; Mark fully live takes the tag off the card; card tags are plain labels; the write-back stays on while a screen is on the new app');
+    results.push('Go-Live Switches: Turn on everything that is ready (pressed twice) moves Daily and Weekly Dispatch, Plant Loading and Plant Operations only; Mark fully live takes the tag off the card; card tags are plain labels; the write-back stays on while a screen is on the new app');
 
     // Someone outside United Dairy is signed straight back out.
     const outsider = await openPage(browser, 1366, 650, '/daily.html?testEmail=someone@gmail.com');

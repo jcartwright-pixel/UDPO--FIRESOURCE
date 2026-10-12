@@ -91,6 +91,49 @@ test('production master sheets are refused', async () => {
   await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { drivers: { spreadsheetId: '1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU', tab: 'DRIVERS_MASTER' } }, now: tick }), /production sheet/);
 });
 
+// Joe 10/12 ("Let the new app write Route Master, Driver Master, Equipment Master, Users, Exceptions and Vacations to the real
+// sheets"): a real master sheet is written only when its list is named in allowReal and the ID is that list's own real sheet.
+test('allowReal lets a named list write its own real sheet, and nothing else', async () => {
+  const REAL_DRIVERS = { drivers: { spreadsheetId: '1rDZpcOABjGtSqobkIQPPNWyWmanfjyHeidGmTK67PvU', tab: 'DRIVERS_MASTER' } };
+  await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_casey', name: 'CASEY, LEE R', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false });
+  const out = await runMasterWriteBack({ db: db(), sheets, targets: REAL_DRIVERS, now: tick, only: true, allowReal: ['drivers'] });
+  assert.equal(out.items, 1);
+  assert.equal(cell('DRIVERS_MASTER', 'driver_id', 'drv_test_casey', 'name'), 'CASEY, LEE R');
+  // Not named in allowReal, a list pointed at another list's real sheet, or the real Live sheet: still refused.
+  await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: REAL_DRIVERS, now: tick, allowReal: ['routes'] }), /production sheet/);
+  await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { routes: REAL_DRIVERS.drivers }, now: tick, allowReal: ['routes', 'drivers'] }), /production sheet/);
+  await assert.rejects(runMasterWriteBack({ db: db(), sheets, targets: { drivers: { spreadsheetId: '11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg', tab: 'DRIVERS_MASTER' } }, now: tick, allowReal: ['drivers'] }), /production sheet/);
+});
+
+test('saves queued before the real sheets were turned on are held, not written', async () => {
+  await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_casey', name: 'CASEY, OLD', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false }, tick);
+  const since = tick().toISOString();
+  await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_brook', name: 'BROOK, NEW', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false }, tick);
+  const out = await runMasterWriteBack({ db: db(), sheets, targets: TARGETS, now: tick, since });
+  assert.equal(out.items, 1);
+  assert.equal(cell('DRIVERS_MASTER', 'driver_id', 'drv_test_brook', 'name'), 'BROOK, NEW');
+  assert.notEqual(cell('DRIVERS_MASTER', 'driver_id', 'drv_test_casey', 'name'), 'CASEY, OLD');
+  const held = (await db().collection('masterOutbox').where('status', '==', 'held').get()).docs.map(d => d.data());
+  assert.equal(held.length, 1);
+  assert.equal(held[0].docId, 'drv_test_casey');
+});
+
+// Joe 10/12: on Weekly Dispatch a manager drags a route's line; the order goes to Route Master (route_week_display) and the
+// runs of that week on take it at once.
+test('Weekly Dispatch drag order: Route Master route_week_display and the runs of the week on', async () => {
+  await applyAction(db(), MANAGER, { action: 'reorderWeek', requestId: rid(), weekStart: '2026-10-04', runIds: ['run_t802', 'run_t801'] }, tick);
+  assert.deepEqual(await Promise.all(['run_t802', 'run_t801'].map(async id => (await db().collection('routes').doc(id).get()).data().weekOrder)), [10, 20]);
+  const runs = (await db().collection('runs').where('weekStart', '>=', '2026-10-04').get()).docs.map(d => d.data()).filter(r => r.runId === 'run_t801' || r.runId === 'run_t802');
+  assert.ok(runs.length >= 2);
+  runs.forEach(r => assert.equal(r.weekOrder, r.runId === 'run_t802' ? 10 : 20, r.weekStart + ' ' + r.runId));
+  await runMasterWriteBack({ db: db(), sheets, targets: TARGETS, now: tick });
+  assert.equal(cell('ROUTES_MASTER', 'run_id', 'run_t802', 'route_week_display'), 10);
+  assert.equal(cell('ROUTES_MASTER', 'run_id', 'run_t801', 'route_week_display'), 20);
+  // A dispatcher cannot change the order, and a run named twice is refused.
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'reorderWeek', requestId: rid(), weekStart: '2026-10-04', runIds: ['run_t801', 'run_t802'] }, tick));
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'reorderWeek', requestId: rid(), weekStart: '2026-10-04', runIds: ['run_t801', 'run_t801'] }, tick), /twice/);
+});
+
 test('with the write-back off, master saves queue nothing', async () => {
   await db().collection('config').doc('app').set({ writeBack: { enabled: false } }, { merge: true });
   await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_casey', name: 'CASEY, LEE B', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: false });

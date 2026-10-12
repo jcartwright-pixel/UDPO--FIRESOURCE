@@ -60,7 +60,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, callServer, escapeHtml, showError, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, save, callServer, escapeHtml, showError, dateTimeText, goLiveNote } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchProduction, fmt } from './js/production.js';
     import { savedText } from './js/autosave.js';
@@ -88,6 +88,7 @@
       if (!ps.some(p => p.id === plant)) plant = ps[0].id;
       document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
       const st = L.screenState(app, 'plant');
+      goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
     // The label reader panel (administrators): the line PC's key (shown once) and, on the sandbox, the test feed of pretend jugs.

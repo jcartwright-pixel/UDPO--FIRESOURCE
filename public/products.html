@@ -88,7 +88,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote } from './js/app.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, typesFrom, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv } from './js/products.js';
     import { savedText } from './js/autosave.js';
@@ -143,6 +143,7 @@
       ['edit-setup', 'upload'].forEach(id => { document.getElementById(id).disabled = !ck || pane !== 'list'; });
       document.getElementById('template').disabled = pane !== 'list';
       ['group', 'area', 'plant'].forEach(id => { document.getElementById(id).disabled = pane !== 'list'; });
+      goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       ['list', 'setup', 'preview'].forEach(p => { document.getElementById(p + '-pane').hidden = pane !== p; });
     }

@@ -258,8 +258,19 @@ async function writeBackIfOn(part) {
   }
   const sheets = makeSheetsWriter();
   const live = part === 'master' ? null : await runWriteBack({ db, sheets, target, allowRealLive: realLive() });
-  // Production: dispatch changes to the Live tabs only; no master lists and no maintenance queues are written.
-  if (realLive()) return { live, master: null };
+  // Production: dispatch changes to the Live tabs, and (Joe 10/12: "Let the new app write Route Master, Driver Master,
+  // Equipment Master, Users, Exceptions and Vacations to the real sheets.") those six real master lists, the same sheets the
+  // copy reads; no other master list and no maintenance queue is written. config/app.realMasters.enabled === false stops
+  // them; saves queued before they were first turned on are held, not written (masterwrite.js since).
+  if (realLive()) {
+    if (part === 'live') return { live, master: null };
+    const since = await realMastersSince();
+    if (!since) return { live, master: null };
+    const { UNIONTOWN } = require('./src/sources'), { REAL_MASTER_LISTS } = require('./src/writeback');
+    const targets = {};
+    REAL_MASTER_LISTS.forEach(k => { targets[k] = UNIONTOWN.masters[k]; });
+    return { live, master: await runMasterWriteBack({ db, sheets, targets, only: true, allowReal: REAL_MASTER_LISTS, since }) };
+  }
   // Master lists: only those WRITEBACK_JSON.masters names ({"drivers": {"spreadsheetId", "tab"}, ...}), each the same copy the
   // transfer reads (SOURCES_JSON), for the same reason as above.
   const masters = Object.assign({}, target.masters || {}), sources = transferSources(process.env).masters;
@@ -268,11 +279,32 @@ async function writeBackIfOn(part) {
       throw new Error('Write-back stopped: WRITEBACK_JSON.masters.' + k + ' and SOURCES_JSON must name the same sandbox copy');
     }
   });
+  // Pickups: the sandbox copy of the Plant Operations workbook (WRITEBACK_JSON "plant": {"pickups": {...}}), the same copy the transfer reads.
+  const plantPickups = (target.plant || {}).pickups;
+  if (plantPickups) {
+    const src = transferSources(process.env).plant.pickups;
+    if (!src || src.spreadsheetId !== plantPickups.spreadsheetId || src.tab !== plantPickups.tab) throw new Error('Write-back stopped: WRITEBACK_JSON.plant.pickups and SOURCES_JSON must name the same sandbox copy');
+    masters.pickups = plantPickups;
+  }
   // The maintenance queues are tabs of the same sandbox Live workbook.
   const { TABS, LISTS } = require('./src/maintenance');
   Object.keys(LISTS).forEach(k => { masters[LISTS[k]] = { spreadsheetId: target.spreadsheetId, tab: TABS[k] }; });
   const master = part !== 'live' && Object.keys(masters).length ? await runMasterWriteBack({ db, sheets, targets: masters }) : null;
   return { live, master };
+}
+
+// When the production server first writes the real master lists: kept in config/app.realMasters.since, so the saves
+// queued before that are held. Null while config/app.realMasters.enabled is false.
+async function realMastersSince() {
+  const ref = db.collection('config').doc('app');
+  return db.runTransaction(async tx => {
+    const c = ((await tx.get(ref)).data() || {}).realMasters || {};
+    if (c.enabled === false) return null;
+    if (c.since) return c.since;
+    const since = new Date().toISOString();
+    tx.set(ref, { realMasters: { enabled: true, since } }, { merge: true });
+    return since;
+  });
 }
 
 // UD_LOCAL_NO_TRIGGERS=1 leaves this out on a workstation whose proxy blocks the emulator's trigger setup;

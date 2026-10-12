@@ -359,7 +359,10 @@
     drivers: 'Drivers', vacations: 'Vacation Schedule', routes: 'Route Editor',
     // Joe 10/12: "Let the new app write plant loading to the real Live sheet." The Plant Distribution screens (Loadout Center,
     // Trailer Assignments, Unloading, Truck Washing, Product Returns): a load, its order and its case returns go to the Live week tabs.
-    plantLoading: 'Plant Loading' };
+    plantLoading: 'Plant Loading',
+    // Joe 10/12 ("turn all 8 sheets on"): the plant check screens (Cooler Temperatures, Quality, Yard, Shift Report Log, Scheduler,
+    // Line Targets), Products, Safety Walkthrough and Plant Maintenance. Their saves stay in the new app.
+    plant: 'Plant Operations' };
   function screenOwners(config) {
     var out = {}, set = (config && config.screenOwners) || {};
     Object.keys(SCREENS).forEach(function (k) { out[k] = 'old'; });
@@ -385,10 +388,12 @@
     dailyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
     weeklyDispatch: { area: 'Route Distribution', ready: true, why: DISPATCH_OK },
     checkIns: { area: 'Route Distribution', ready: false, why: 'Truck problems it files cannot reach the current app yet.' },
-    drivers: { area: 'Route Distribution', ready: false, why: 'Would write Driver Master. Needs your OK.' },
-    vacations: { area: 'Route Distribution', ready: false, why: 'Would write the Vacations sheet. Needs your OK.' },
-    routes: { area: 'Route Distribution', ready: false, why: 'Would write Route Master. Needs your OK.' },
-    plantLoading: { area: 'Plant Distribution', ready: true, why: 'Writes loads, loading order and case returns to the Live sheet week tabs, and Loadout History when a load is Done. You OK\'d it 10/12.' }
+    // Joe 10/12: "Let the new app write Route Master, Driver Master, Equipment Master, Users, Exceptions and Vacations to the real sheets."
+    drivers: { area: 'Route Distribution', ready: true, why: 'Writes Driver Master, and days off to the Exceptions sheet. You OK\'d it 10/12.' },
+    vacations: { area: 'Route Distribution', ready: true, why: 'Writes the Vacations sheet. You OK\'d it 10/12.' },
+    routes: { area: 'Route Distribution', ready: true, why: 'Writes Route Master. You OK\'d it 10/12.' },
+    plantLoading: { area: 'Plant Distribution', ready: true, why: 'Writes loads, loading order and case returns to the Live sheet week tabs, and Loadout History when a load is Done. You OK\'d it 10/12.' },
+    plant: { area: 'Plant Production', ready: true, why: 'Cooler temperatures, quality, yard, shift notes, the scheduler, line targets, products, safety and plant maintenance save in the new app and keep their history there. The current app keeps its own copies elsewhere and does not see these. You asked to turn it on 10/12.' }
   };
   // Shown on Go-Live Switches but not a switch yet. (Plant Loading became a switch on 10/12.)
   var GO_LIVE_LATER = [];

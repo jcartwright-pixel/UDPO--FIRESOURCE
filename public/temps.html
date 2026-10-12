@@ -62,7 +62,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
 
@@ -149,6 +149,7 @@
       // Joe 10/10: when MOCREO was last read (the footer has the details).
       document.getElementById('sensor-at').textContent = 'Last Sensor Update: ' + (mocreo.configured && mocreo.lastSuccess ? clock(mocreo.lastSuccess) : '—');
       const st = L.screenState(app, 'plant');
+      goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
