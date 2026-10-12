@@ -497,6 +497,7 @@
     var key = kind === 'truck' ? 'truckId' : 'trailerId', out = {}, mine = runWindow(target, hoursFor), tol = 15;
     rows.forEach(function (r) {
       if (r === target || r.off || r.deliveryDate !== target.deliveryDate || !r[key] || out[r[key]]) return;
+      if (kind === 'truck' && r.driverId && r.driverId === target.driverId) return; // his own other load that day (Joe 10/12)
       var w = runWindow(r, hoursFor), busy;
       if (w.start === null || w.end === null) busy = w.start === null || mine.end === null || mine.end > w.start;
       else busy = mine.start !== null && mine.end !== null && w.start < mine.end - tol && mine.start < w.end - tol;
@@ -670,6 +671,14 @@
   // Off = not usable by the current app's rule (unitUsable below): a status outside AVAILABLE / ACTIVE / IN SERVICE / READY, or a truck
   // or trailer no longer on the fleet list import.
   function unitOff(unit) { return !unitUsable(unit); }
+  // Joe 10/12 ("T-10308 is ACTIVE (not usable)"): why an off unit is off, in words: its status (DOWN, INACTIVE, ...), or, for an
+  // ACTIVE truck or trailer, that it is not on the fleet list. '' when the unit is usable.
+  function unitOffWhy(unit) {
+    if (!unit || !unitOff(unit)) return '';
+    var status = String(unit.status || '').trim().toUpperCase();
+    if (UNIT_ON_STATUSES.indexOf(status) < 0) return status.replace(/_/g, ' ') || 'NOT USABLE';
+    return 'NOT ON THE FLEET LIST';
+  }
   // Joe 10/12 ("537 is on the list being down but shows on dispatch"): running loads from fromDate on that still carry a down,
   // inactive or out-of-service truck or trailer (the current app's week roll can put a down unit back on a route).
   function offUnitLoads(runs, equipment, fromDate) {
@@ -681,7 +690,7 @@
         if (!d || !d.runs || (fromDate && date < fromDate)) return;
         [['truckId', 'truck'], ['trailerId', 'trailer']].forEach(function (k) {
           var e = d[k[0]] && byId[String(d[k[0]]).toUpperCase()];
-          if (e && unitOff(e)) out.push({ unitId: e.id, unit: e.unit, type: e.type, status: String(e.status || ''), notes: String(e.notes || ''), route: String(run.route || ''), run: String(run.run || ''), date: date, runDocId: run.id, day: p });
+          if (e && unitOff(e)) out.push({ unitId: e.id, unit: e.unit, type: e.type, status: String(e.status || ''), why: unitOffWhy(e), notes: String(e.notes || ''), route: String(run.route || ''), run: String(run.run || ''), date: date, runDocId: run.id, day: p });
         });
       });
     });
@@ -1029,7 +1038,7 @@
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
-    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, offUnitLoads: offUnitLoads, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
+    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
