@@ -120,8 +120,8 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await shot(p, 'manager-release-codes-1920.png');
 
     await open('driver-codes', '#st-list .ap-item');
-    // Joe 10/12: one Driver Station link (the code decides tablet, TV or kiosk), then the drivers' phone link.
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driverroom', 'driver', 'route']);
+    // Joe 10/12: one Driver Station link (the code decides TV or the drivers' Check-In tablet), then the drivers' phone link.
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
     await p.click('#al-new-code');
     await p.click('#al-new-code');
     await p.waitForSelector('.ap-code-row code');

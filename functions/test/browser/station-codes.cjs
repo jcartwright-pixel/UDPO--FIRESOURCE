@@ -76,9 +76,10 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     results.push('Garage Station Codes: its own page with the Garage Station link and its stations');
 
     await open('driver-codes');
-    // Joe 10/12: like Plant Station Codes: the Driver Room Check-In link (Joe 10/12 evening), the Driver Station link, its stations
-    // right under it, then the drivers' phone link.
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driverroom', 'driver', 'route']);
+    // Joe 10/12: like Plant Station Codes: the one Driver Station (TV loadout) link ("I shouldn't have to have a different
+    // link"), its stations right under it, then the drivers' phone link.
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['driver', 'route']);
+    assert.match(await p.textContent('.ap-link[data-link="driver"] h4'), /^Driver Station \(TV loadout\)$/);
     assert.deepEqual(await p.$$eval('.ap-link[data-link="driver"], #st-list, .ap-link[data-link="route"]', l => l.map(x => x.dataset.link || x.id)), ['driver', 'st-list', 'route'], 'the stations sit under the Driver Station link');
     assert.equal((await p.textContent('#st-add')).trim(), '+ Add Station');
     await p.fill('#st-name', 'Plant kiosk');
@@ -167,22 +168,27 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await ds.fill('#code-box input', codes.kiosk);
     // Joe 10/12 "I didn't want the Driver Room TV, it is showing the kiosk": the Driver Room tablet's code typed on the
     // Driver Station link opens the drivers' Check-In page (View Loadout, DVIR, Check-In), which keeps the code.
-    await Promise.all([ds.waitForURL(/driver-room\.html$/), ds.click('#code-box button')]);
-    await ds.waitForSelector('#menu:not([hidden]) #go-checkin');
-    assert.match(await ds.textContent('#plant'), /Uniontown Driver Room/);
-    assert.equal(await ds.evaluate(() => localStorage.getItem('udKioskCode')), null, 'the Driver Station link does not keep it');
+    await Promise.all([ds.waitForURL(/route\.html\?room=1$/), ds.click('#code-box button')]);
+    await ds.waitForSelector('#step-menu:not([hidden]) #m-checkin');
+    assert.equal(await ds.textContent('.phone-top b'), 'Uniontown Driver Room');
+    assert.equal(await ds.$('#go-back, #go-home, #signout'), null, 'no Back, Home or Sign out into the app');
+    assert.ok(await ds.evaluate(() => localStorage.getItem('udKioskCode')), 'the existing link keeps it too');
     await shot(ds, '8-driver-kiosk-opened-1536.png');
+    // Reopening the existing link (or driver-room.html) goes straight back to the drivers' Check-In.
+    await ds.goto(HOSTING + '/driver-station.html' + ADMIN);
+    await ds.waitForURL(/route\.html\?room=1$/);
     await ds.goto(HOSTING + '/driver-room.html');
-    await ds.waitForSelector('#menu:not([hidden]) #go-checkin');
+    await ds.waitForURL(/route\.html\?room=1$/);
+    await ds.waitForSelector('#step-menu:not([hidden]) #m-checkin');
     // Joe 10/12: a driver must never get from the Driver Room into the app. With no manager release code set yet, Change
     // Station refuses (it used to let anyone through) and the tablet stays on its screen.
-    await ds.click('#change');
+    await ds.click('#m-station');
     await ds.waitForSelector('#error:not([hidden])');
     assert.match(await ds.textContent('#error'), /stays here until the plant has a manager release code/);
-    assert.equal(await ds.isVisible('#go-checkin'), true);
+    assert.equal(await ds.isVisible('#m-checkin'), true);
     await shot(ds, '8b-driver-room-no-release-code-1536.png');
     assert.deepEqual(ds.errors, []);
-    results.push('Driver Room kiosk: its code on the Driver Station link opens the Driver Room Check-In page, which keeps it; with no manager release code set, Change Station refuses');
+    results.push('Driver Room kiosk: its code on the existing Driver Station link opens the drivers\' Check-In (the phone screens), which keeps it; no Back, Home or Sign out; with no manager release code set, Change Station refuses');
     // A TV's code typed on the tablet link opens the TV display (no header).
     const tv = await openPage(browser, 1536, 864, '/driver-station.html' + ADMIN);
     await tv.waitForSelector('#code-box form.st-code');
@@ -225,15 +231,16 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     results.push('Driver Room TV: Exit asks for the manager release code (Cancel and a wrong code keep the TV), the right code unattaches it to the code screen with Back and Home');
 
     // The Driver Room kiosk tablet: Change Station asks for the release code; Cancel keeps it, the right code frees it.
-    await ds.click('#change');
+    await ds.click('#m-station');
     await ds.waitForSelector('#release-box form');
     await ds.click('#release-box [data-cancel]');
-    assert.equal(await ds.isVisible('#go-checkin'), true);
-    await ds.click('#change');
+    assert.equal(await ds.isVisible('#m-checkin'), true);
+    await ds.click('#m-station');
     await ds.fill('#release-box input', release);
-    await ds.click('#release-box button[type=submit]');
+    await Promise.all([ds.waitForURL(/driver-room\.html$/), ds.click('#release-box button[type=submit]')]);
     await ds.waitForSelector('#code-box form.st-code');
     assert.equal(await ds.evaluate(() => localStorage.getItem('udRoomStation')), null);
+    assert.equal(await ds.evaluate(() => localStorage.getItem('udKioskCode')), null, 'the existing link forgets it too');
     assert.deepEqual(tv.errors, []);
     results.push('Driver Room kiosk: Change Station asks for the manager release code (Cancel keeps it), then the tablet forgets its code');
   } finally {

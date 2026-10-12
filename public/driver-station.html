@@ -154,14 +154,15 @@
       if (r.needCode) {
         kiosk = null; document.getElementById('change').hidden = true; show(true);
         kiosk = await askCode(document.getElementById('code-box'), { kind: 'KIOSK', storeKey: CODE_KEY, call: stationCall, title: 'Enter this station\'s code',
-          hint: 'Type the Driver Room TV\'s code (Administration > Driver Station Codes). A Driver Room Check-In tablet\'s code opens the drivers\' Check-In page instead. It remembers it after this.', message: r.message });
+          hint: 'Type the Driver Room TV\'s code (Administration > Driver Station Codes). The Driver Room tablet\'s code opens the drivers\' Check-In instead. It remembers it after this.', message: r.message });
       } else kiosk = r.station || null;
       // Joe 10/12: one Driver Station link; the code decides the screen. A TV's code opens the TV display (no buttons, both
       // lists rolling), also when the TV reopens the plain link later.
       if (kiosk && kiosk.type === 'TV' && !full) { location.replace(location.pathname + '?tv=1'); return; }
-      // Joe 10/12 "I didn't want the Driver Room TV, it is showing the kiosk": the Driver Room tablet's code (a Driver Room
-      // Check-In station) opens the drivers' Check-In page, not the board. That page keeps the code from here on.
-      if (kiosk && kiosk.type === 'DRIVER') { remember('udRoomStation', kiosk); remember(CODE_KEY, null); location.replace('driver-room.html'); return; }
+      // Joe 10/12 "it should use my existing link and just be directed to only those pages": the Driver Room tablet's code (a
+      // Driver Room Check-In station) opens the drivers' phone screens (View Loadout, DVIR, Check-In), not the TV board.
+      // Reopening this link goes straight back there; Change Station there (with the release code) forgets both.
+      if (kiosk && kiosk.type === 'DRIVER') { remember('udRoomStation', kiosk); location.replace('route.html?room=1'); return; }
       show(false);
       // A coded Driver Room screen has no Sign out: it leaves only with the manager release code.
       document.body.classList.toggle('kiosk-locked', !!kiosk);

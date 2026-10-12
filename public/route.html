@@ -36,6 +36,8 @@
       <button type="button" id="m-checkin" class="drv-card green"><b>Check-In</b><small>Cases, returns, truck and trailer issues</small></button>
     </div>
     <p class="drv-hint" id="m-who"></p>
+    <button type="button" id="m-station" hidden>Change Station</button>
+    <div id="release-box" hidden></div>
   </section>
 
   <!-- 2. The driver picks their name once. -->
@@ -133,16 +135,19 @@
     import { start, escapeHtml, shortDate, showError } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
     import { addSpeak } from './js/speak.js';
+    import { askRelease } from './js/station-code.js';
 
-    // Joe 10/12: the Driver Room Check-In tablet (driver-room.html) opens these same Check-In and DVIR screens with ?room=1.
-    // There the tablet's station code stands in for the phones' code, the driver's name is kept only until he is done (or
-    // 5 minutes with no taps), and Done goes back to the Driver Room. The phone never signs the driver out by itself.
+    // Joe 10/12: the Driver Room Check-In tablet is this same page with ?room=1 ("the driver's phone is exactly how this should
+    // look"). The tablet's Driver Room kiosk code (typed on the Driver Station link or driver-room.html) stands in for the
+    // phones' code; the driver's name is kept only until Done, or 5 minutes with no taps, which also brings back the rolling
+    // View Loadout. Leaving the tablet takes the manager release code. The phone never signs the driver out by itself.
     const room = new URLSearchParams(location.search).get('room') === '1';
     let station = null;
     try { station = room ? JSON.parse(localStorage.getItem('udRoomStation') || 'null') : null; } catch (e) { station = null; }
     if (room && !station) location.replace('driver-room.html');
     // Done (signed out, back to the three choices), Back (still signed in), or 5 minutes idle (signed out, View Loadout).
-    const roomBack = (how) => { if (how !== 'keep') try { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); } catch (e) {} location.replace('driver-room.html' + (how === 'idle' ? '?view=loadout' : '')); };
+    // The tablet lost its station (a new code, removed): back to the code screen.
+    const roomBack = () => { try { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); localStorage.removeItem('udRoomStation'); localStorage.removeItem('udKioskCode'); } catch (e) {} location.replace('driver-room.html'); };
     // Kept on the phone (the code and the name); the page works without it, it just asks again.
     const keep = () => room ? sessionStorage : localStorage, prefix = room ? 'udRoom.' : 'udRoute.';
     const store = {
@@ -151,7 +156,7 @@
     };
     // want: what the driver picked on the three choices ('board', 'dvir', 'checkin'; '' shows the choices).
     const view = new URLSearchParams(location.search).get('view');
-    let want = view === 'dvir' ? 'dvir' : view === 'loadout' ? 'board' : room ? 'checkin' : '';
+    let want = view === 'dvir' ? 'dvir' : view === 'loadout' ? 'board' : view === 'checkin' ? 'checkin' : '';
     let code = room ? 'room' : store.get('code'), driverId = store.get('driverId'), driverName = store.get('driverName'), date = '', dates = [], loads = [], open = null, units = { trucks: [], trailers: [], jacks: [] };
 
     async function call(op, fields) {
@@ -164,7 +169,7 @@
         if (/^(functions\/)?(internal|unavailable|deadline-exceeded)$/.test(String(e.code || '')) || /^internal$|failed to fetch|network|load failed/i.test(e.message)) {
           e.message = 'No signal or the server did not answer. Your entries are still here; ' + (op === 'checkIn' ? 'press Check In again.' : op === 'dvir' ? 'press Submit again.' : 'try again in a moment.');
         }
-        if (room && /\(station code\)/.test(e.message)) { try { localStorage.removeItem('udRoomStation'); } catch (x) {} roomBack(); }
+        if (room && /\(station code\)/.test(e.message)) roomBack();
         if (/code is not right|not turned on/.test(e.message)) { code = ''; store.set('code', ''); show(); }
         if (/Pick your name/.test(e.message)) { driverId = ''; store.set('driverId', ''); show(); }
         throw e;
@@ -177,7 +182,7 @@
       document.getElementById('who').textContent = driverId ? driverName : '';
       document.getElementById('change').hidden = !driverId;
       if (!code) return step('step-code');
-      if (!want) { document.getElementById('m-who').textContent = driverId && driverId !== 'skip' ? 'Signed in as ' + driverName + '. Change it with Change at the top.' : ''; return step('step-menu'); }
+      if (!want) { document.getElementById('m-who').textContent = driverId && driverId !== 'skip' ? 'Signed in as ' + driverName + (room ? '. Done at the top signs you out.' : '. Change it with Change at the top.') : ''; return step('step-menu'); }
       if (want === 'board') return openBoard();
       if (!driverId) {
         const r = await call('roster'), opt = (v, t) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>';
@@ -277,16 +282,27 @@
       await show();
     }));
     document.getElementById('skip').addEventListener('click', run(async () => { driverId = 'skip'; driverName = ''; store.set('driverId', driverId); await show(); }));
-    document.getElementById('change').addEventListener('click', run(async () => { if (room) return roomBack(); driverId = ''; store.set('driverId', ''); open = null; await show(); }));
-    if (room) {
+    // The Driver Room's Done: signs the driver out, back to the three choices.
+    const signOut = () => { driverId = ''; driverName = ''; store.set('driverId', ''); store.set('driverName', ''); open = null; };
+    document.getElementById('change').addEventListener('click', run(async () => { signOut(); if (room) want = ''; await show(); }));
+    if (room && station) {
       document.body.classList.add('room');
       document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="css/driver-room.css">');
-      // The Driver Room: Done (instead of Change) signs the driver out; 2 minutes with no taps does too.
+      document.querySelector('.phone-top b').textContent = (station.plant || 'United Dairy') + ' Driver Room';
       document.getElementById('change').textContent = 'Done';
-      if (!driverId) roomBack();
+      document.getElementById('m-station').hidden = false;
+      // Joe 10/12: 5 minutes with no taps signs the driver out and shows the rolling View Loadout; a tap on it brings back
+      // the three choices.
       let idle = Date.now();
       ['pointerdown', 'keydown', 'input'].forEach(t => document.addEventListener(t, () => { idle = Date.now(); }, true));
-      setInterval(() => { if (Date.now() - idle > 300000) roomBack('idle'); }, 5000);
+      setInterval(() => { if (Date.now() - idle > 300000 && (want !== 'board' || driverId)) { idle = Date.now(); signOut(); want = 'board'; show().catch(err => showError(err.message)); } }, 5000);
+      document.getElementById('step-board').addEventListener('click', e => { if (e.target.closest('button')) return; clearInterval(boardTimer); want = ''; show().catch(err => showError(err.message)); });
+      // Change Station: only with the plant's manager release code (none set: the tablet stays here).
+      document.getElementById('m-station').addEventListener('click', async () => {
+        const fac = station.facilityId || 'fac_uniontown';
+        const ok = await askRelease(document.getElementById('release-box'), { status: () => call('roomStatus', { facilityId: fac }), release: (c) => call('roomRelease', { facilityId: fac, code: c }), onError: showError, mustHave: true });
+        if (ok) roomBack();
+      });
     }
     document.getElementById('days').addEventListener('click', run(async (e) => { const b = e.target.closest('[data-date]'); if (b) { date = b.dataset.date; await show(); } }));
     document.getElementById('loads').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; open = Number(b.dataset.i); fillForm(loads[open]); step('step-form'); });
@@ -340,7 +356,7 @@
     document.getElementById('board-pause').addEventListener('click', e => { boardPaused = !boardPaused; document.getElementById('board-track').classList.toggle('paused', boardPaused); e.target.textContent = boardPaused ? 'Resume scrolling' : 'Pause scrolling'; });
     document.addEventListener('visibilitychange', () => document.getElementById('board-track').classList.toggle('paused', boardPaused || document.hidden));
     // Back: the three choices (the Driver Room: back to its screen, still signed in).
-    document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => { clearInterval(boardTimer); open = null; if (room) return roomBack('keep'); want = ''; show().catch(err => showError(err.message)); }));
+    document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => { clearInterval(boardTimer); open = null; want = ''; show().catch(err => showError(err.message)); }));
 
     /* ---------- DVIR ---------- */
     const TRUCK_ITEMS = ['Brakes', 'Steering', 'Lights and reflectors', 'Tires and wheels', 'Mirrors and visibility', 'Horn and wipers', 'Emergency equipment'];
