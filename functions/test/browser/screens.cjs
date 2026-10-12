@@ -1175,14 +1175,12 @@ async function noScroll(page) {
     results.push('Menu: Administration holds Dispatch Administration; Driver Weekly Template is under Drivers only. Template: relief first, + Add Run and Copy / Paste / Paste + Add on every day');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
-    // The per-screen switch (Joe 10/12): Administration > Go-Live Switches is the only place to move a screen. The tags on
-    // the Route Distribution cards are plain labels that cannot be clicked, and a screen marked fully live has no tag.
+    // The per-screen switch (Joe 10/12): Administration > Go-Live Switches is the only place to see and change which screens
+    // are switched on. Joe 10/12 later ("remove the old stuff like new app current app"): the cards carry no tags at all.
     const adminHome = await openPage(browser, 1366, 650, '/distribution.html?testEmail=admin.test@uniteddairy.com');
-    await adminHome.waitForSelector('[data-owner="dailyDispatch"]:not(.new)');
-    assert.equal(await adminHome.$('[data-owner="writeBack"]'), null, 'the write-back has no tag on the cards');
-    await Promise.all([adminHome.waitForNavigation(), adminHome.click('[data-owner="dailyDispatch"]')]);
-    assert.match(adminHome.url(), /daily\.html/, 'a click on the tag opens the screen like the rest of the line');
-    assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.dailyDispatch, 'old', 'the tag does not switch anything');
+    await adminHome.waitForSelector('#card-daily');
+    assert.equal(await adminHome.$('[data-owner]'), null, 'no New app / Current app tags on the cards');
+    assert.doesNotMatch(await adminHome.innerText('body'), /New app|Current app/);
     const gl = await openPage(browser, 1536, 730, '/administration.html?testEmail=admin.test@uniteddairy.com');
     await gl.waitForSelector('.adm-item[data-key="switch"]');
     assert.equal(await gl.textContent('.adm-item[data-key="switch"] .adm-name'), 'Go-Live Switches');
@@ -1192,10 +1190,10 @@ async function noScroll(page) {
     // Joe 10/12: Drivers, Vacation Schedule and Route Editor are ready (they write Driver Master, Vacations, Route Master).
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="drivers"] [data-act="new"]'), false);
     // Joe 10/12 ("Let the new app write plant loading to the real Live sheet."): Plant Loading is a switch of its own, ready.
-    assert.match(await gl.textContent('#gl-rows tr[data-row="plantLoading"]'), /Plant Loading[\s\S]*Current app[\s\S]*Ready[\s\S]*Loadout History/);
+    assert.match(await gl.textContent('#gl-rows tr[data-row="plantLoading"]'), /Plant Loading[\s\S]*Off[\s\S]*Ready[\s\S]*Loadout History/);
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="plantLoading"] [data-act="new"]'), false);
     // Joe 10/12 ("turn all 8 sheets on"): the plant check screens, Products, Safety and Plant Maintenance have a switch, ready.
-    assert.match(await gl.textContent('#gl-rows tr[data-row="plant"]'), /Plant Operations[\s\S]*Current app[\s\S]*Ready/);
+    assert.match(await gl.textContent('#gl-rows tr[data-row="plant"]'), /Plant Operations[\s\S]*Off[\s\S]*Ready/);
     // Turn on everything that is ready: pressed twice; every ready screen goes to the new app, Driver Check-ins stays.
     await gl.click('#gl-all');
     assert.match(await gl.textContent('#gl-all'), /Press again/);
@@ -1211,25 +1209,28 @@ async function noScroll(page) {
     assert.equal(cfg.screenOwners.plant, 'new');
     if (SHOTS) await gl.screenshot({ path: path.join(SHOTS, 'go-live-switches-1536.png') });
     const onNew = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
-    await onNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'NEW APP: SAVES GO TO THE SHEET');
+    await onNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'LIVE: SAVES GO TO THE SHEET');
+    assert.equal(await onNew.isVisible('#golive-note'), false, 'a switched-on screen has no such line');
     await onNew.close();
     // Plant Loading moved with them: the Loadout Center saves in the new app (and its loads go to the Live sheet).
     const loNew = await openPage(browser, 1366, 650, '/loadout.html?date=2026-10-05&testEmail=manager.test@uniteddairy.com');
-    await loNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'NEW APP');
+    await loNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'LIVE');
     assert.deepEqual(loNew.errors, []);
     await loNew.close();
-    // A screen that stayed on the current app is view only in the new app.
+    // A screen not switched on is view only and says where to switch it on.
     const onOld = await openPage(browser, 1366, 650, '/checkins.html?testEmail=dispatch.test@uniteddairy.com');
-    await onOld.waitForFunction(() => document.getElementById('mode-text').textContent === 'RUN FROM THE CURRENT APP: VIEW ONLY');
+    await onOld.waitForFunction(() => document.getElementById('mode-text').textContent === 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES');
+    assert.equal(await onOld.textContent('#golive-note'), 'View only until switched on in Go-Live Switches.', 'the screen itself says it is not switched on');
+    assert.equal(await onOld.isVisible('#golive-note'), true);
     if (SHOTS) await onOld.screenshot({ path: path.join(SHOTS, 'checkins-view-only-1366.png') });
     await onOld.close();
-    // Mark fully live: the tag comes off the card.
+    // Mark fully live, and the cards still carry no tags.
     await gl.click('#gl-rows tr[data-row="dailyDispatch"] [data-act="live"]');
     await gl.click('#gl-rows tr[data-row="dailyDispatch"] [data-act="live"]');
     await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"] .gl-chip.live');
     await adminHome.goto(adminHome.url().replace(/daily\.html.*$/, 'distribution.html?testEmail=admin.test@uniteddairy.com'));
-    await adminHome.waitForSelector('[data-owner="weeklyDispatch"].new');
-    await adminHome.waitForSelector('[data-owner="dailyDispatch"]', { state: 'hidden' });
+    await adminHome.waitForFunction(() => document.getElementById('mode-text').textContent === 'Live');
+    assert.equal(await adminHome.$('[data-owner]'), null, 'still no tags once screens are switched on');
     const homeSize = await noScroll(adminHome);
     assert.ok(homeSize.scroll <= homeSize.inner && homeSize.width <= homeSize.innerWidth, 'home fits 1366x650');
     if (SHOTS) await adminHome.screenshot({ path: path.join(SHOTS, 'home-switch-1366.png') });
@@ -1237,7 +1238,7 @@ async function noScroll(page) {
     await gl.click('#gl-wb-btn');
     await gl.click('#gl-wb-btn');
     await gl.waitForSelector('#view .ap-msg.bad:not([hidden])');
-    assert.match(await gl.textContent('#view .ap-msg'), /back to the current app/);
+    assert.match(await gl.textContent('#view .ap-msg'), /Switch every screen off/);
     // Move back clears fully live; with every screen that went over back, every screen is a test copy again.
     for (const k of ['dailyDispatch', 'weeklyDispatch', 'plantLoading', 'drivers', 'vacations', 'routes', 'plant']) {
       await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
@@ -1247,7 +1248,7 @@ async function noScroll(page) {
     cfg = (await db().collection('config').doc('app').get()).data();
     assert.equal(cfg.mode, 'test');
     assert.deepEqual(cfg.fullyLive, {});
-    await adminHome.waitForSelector('[data-owner="dailyDispatch"]:not(.new)');
+    await adminHome.waitForFunction(() => document.getElementById('mode-text').textContent === 'Test copy');
     assert.deepEqual(adminHome.errors, []);
     assert.deepEqual(gl.errors, []);
     await adminHome.close();

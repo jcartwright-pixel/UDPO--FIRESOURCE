@@ -99,7 +99,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
     import { collection, doc, getDoc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import { watchProducts, OTHER } from './js/products.js';
@@ -139,7 +139,8 @@
       if (!ck) bar.hidden = true;
       else if (!bar.hidden && got.runs && (document.activeElement !== loadBox || loadBox.value === '')) fillLoads();
       const st = L.screenState(app, 'plantLoading');
-      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'NEW APP' : 'VIEW ONLY') : 'TEST COPY';
+      goLiveNote(st.live && st.owner !== 'new');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
     }
 
     // Details: the whole write-up of one return (who, when, route, driver, truck, trailer, store, product, cases, notes, source).

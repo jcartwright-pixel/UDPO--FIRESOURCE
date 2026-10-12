@@ -69,11 +69,12 @@ tab's top-left "Week Start" label (B2) is the old app's and can be stale; the ro
 | 11 | MOCREO: after the first deploy, paste the key and asset ID in **Administration > Connections & Keys > MOCREO & Sensors**, then Test Connection. (Or save them as Secret Manager secrets `MOCREO_API_KEY` and `MOCREO_ASSET_ID`.) Never in chat | Joe | The production app |
 | 12 | Optional: plant managers' email addresses for reports, as the GitHub variable `PRODUCTION_ENV` = `REPORT_TO=a@uniteddairy.com,b@uniteddairy.com` (United Dairy addresses only) | Joe | GitHub > Settings > Variables |
 | 13 | Release: merge the work into `main`, run the deploy for production, check the run's summary and the live checks | Claude, on Joe's release words | GitHub Actions |
+| 13a | After a release that writes the master sheets (Joe 10/12: Route Master, Driver Master, Equipment Master, Users, Exceptions, Vacations): **Administration > Run Runtime Pre-Flight**. *Edit access to the master sheets* names any of the six the server account cannot edit yet; Joe shares each one it names with that account as **Editor**, then runs Pre-Flight again until it passes. `config/app.realMasters.enabled = false` stops those writes | Claude asks, Joe shares | The production app; each sheet > Share |
 
 | 14 | Last, only after Joe says in words that the new app is running the plant and types *"Turn off the old app: show the moved page, stop its timed jobs and emails, keep the sheets."*: release the old app with its off switch (united-dairy-desktop-operations PR #237), then run `udpoRetireOldApp` in its Apps Script editor. Every old page shows "This app has moved" with a link here; its timed jobs and outbound email stop; the sheets are not touched. Move the tablets and phones to this app's links | Claude (release), Joe (runs it or asks Claude) | Old app's Apps Script editor |
 
 Steps 1 to 10 can be done any time; nothing runs until step 13. The deploy turns on the Google services it needs
-(Sheets, IAM Credentials, Gmail, Secret Manager) by itself.
+(Sheets, Drive, IAM Credentials, Gmail, Secret Manager) by itself.
 
 ## The safety stops in the deploy
 

@@ -5,7 +5,7 @@
  * background as one call. If the server refuses it (someone else changed that run, a unit is inactive, no
  * permission), the cell goes back to what the database holds and the reason shows as an error.
  */
-import { start, save as sendSave, savePill, showError, friendlyError, escapeHtml } from './app.js';
+import { start, save as sendSave, savePill, showError, friendlyError, escapeHtml, goLiveNote } from './app.js';
 import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const L = window.UDLogic;
@@ -82,12 +82,14 @@ export function canSave() { return L.hasRole(lists.person, L.SAVE_ROLES) && scre
 export function canReorder() { return L.hasRole(lists.person, L.REORDER_ROLES) && screenOpen(); }
 export function canManage() { return L.hasRole(lists.person, L.DRIVER_ROLES) && screenOpen(); }
 
-// The badge at the top right: the test copy's own words, or which app runs this screen once one has moved.
+// The badge at the top right: the test copy's own words, or whether this screen is switched on once one has been.
+// Joe 10/12: no "new app" / "current app" words; a screen not switched on says where to switch it.
 export function modeLabel(testText) {
   const s = L.screenState(lists.app, screenKey);
+  goLiveNote(s.live && s.owner !== 'new');
   if (!s.live) return testText;
-  if (s.owner === 'new') return s.open ? 'NEW APP: SAVES GO TO THE SHEET' : 'NEW APP: WRITE-BACK OFF, VIEW ONLY';
-  return 'RUN FROM THE CURRENT APP: VIEW ONLY';
+  if (s.owner === 'new') return s.open ? 'LIVE: SAVES GO TO THE SHEET' : 'VIEW ONLY: WRITE-BACK TO THE SHEET IS OFF';
+  return 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES';
 }
 
 // Checked when the list opens, so a unit put down a moment ago on this screen is already left out.
@@ -234,21 +236,47 @@ export function openNote(td, current, onPick) {
  * Saves to the same run wait for each other, so a quick driver-then-truck pick sends the right revision.
  */
 const queues = {};
+/*
+ * Picks still saving (sent, or waiting in line behind an earlier save to the same run). A live update that does not carry them
+ * yet would put the old value back on screen: a driver picked while the trailer's save was going showed the old driver again
+ * when the trailer's update came in, and the driver list then had the old driver "On 801". The screen passes each live
+ * update's runs through withUnsaved, which puts these picks back on until an update holds the saved revision.
+ */
+const unsaved = [], fromDatabase = new WeakMap();
+const settled = (u) => { const i = unsaved.indexOf(u); if (i >= 0) unsaved.splice(i, 1); };
+export function withUnsaved(runs) {
+  unsaved.slice().forEach(u => {
+    const run = runs.find(r => r.id === u.runDocId);
+    if (!run || !run.days || !run.days[u.day] || (u.rev && run.rev >= u.rev)) { settled(u); return; }
+    const raw = fromDatabase.get(run) || {};
+    if (!raw[u.day]) { raw[u.day] = Object.assign({}, run.days[u.day]); fromDatabase.set(run, raw); }
+    u.apply(run.days[u.day]);
+  });
+  return runs;
+}
 export function saveRunChange(getRuns, runDocId, day, action, fields, apply, render) {
   const shown = getRuns().find(r => r.id === runDocId);
   if (!shown) return Promise.resolve();
   const before = Object.assign({}, shown.days[day]);
   apply(shown.days[day]);
   render();
+  const mine = { runDocId, day, apply, rev: 0 };
+  unsaved.push(mine);
   const send = async () => {
     const run = getRuns().find(r => r.id === runDocId) || shown;
     try {
       const out = await save(action, Object.assign({ runDocId, day, expectedRev: run.rev }, fields));
       out.runs.forEach(r => { const target = getRuns().find(x => x.id === r.runDocId); if (target && target.rev < r.rev) target.rev = r.rev; });
+      // Kept on screen until a live update holds this revision (or dropped now when the answer names none).
+      const saved = out.runs.find(r => r.runDocId === runDocId);
+      if (saved && saved.rev) mine.rev = saved.rev; else settled(mine);
       return out;
     } catch (e) {
-      // Put back what the database holds (if a live update has not already replaced this run).
-      if (getRuns().indexOf(shown) >= 0) { shown.days[day] = before; render(); }
+      settled(mine);
+      // Put back what the database holds: on this run, or on the live update that replaced it (with the other picks still saving).
+      const now = getRuns().find(r => r.id === runDocId), raw = now && fromDatabase.get(now);
+      if (now === shown) { shown.days[day] = before; render(); }
+      else if (raw && raw[day]) { now.days[day] = Object.assign({}, raw[day]); unsaved.forEach(u => { if (u.runDocId === runDocId && u.day === day) u.apply(now.days[day]); }); render(); }
       showError(friendlyError(e));
       throw e;
     }
