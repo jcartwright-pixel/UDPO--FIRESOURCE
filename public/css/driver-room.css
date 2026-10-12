@@ -40,8 +40,10 @@
   .dr-top h1 { font-size: 24px; }
 }
 @media (max-width: 760px) {
-  .dr-main { flex-direction: column; }
-  .dr-side { width: auto; }
+  .dr-main { flex: none; flex-direction: column; }
+  .dr-scroll { max-height: 55vh; }
+  .dr-side { width: auto; overflow: visible; }
+  body.dr-page { height: auto; overflow: visible; overflow-x: hidden; }
 }
 /* The Check-In and DVIR phone screens, opened from the Driver Room tablet (route.html?room=1): larger on a tablet. */
 @media (min-width: 900px) { body.phone.room { zoom: 1.4; } }

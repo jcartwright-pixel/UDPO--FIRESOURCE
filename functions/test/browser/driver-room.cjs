@@ -33,6 +33,29 @@ async function openPage(browser, width, height, url) {
   return page;
 }
 const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, name) }); };
+// A finger dragged up the middle of the screen (touch events, as a tablet sends them); returns how far the page or its list moved.
+async function swipe(p) {
+  const at = () => p.evaluate(() => scrollY + [...document.querySelectorAll('*')].reduce((n, e) => n + e.scrollTop, 0));
+  const before = await at(), cdp = await p.context().newCDPSession(p), vp = p.viewportSize(), x = Math.round(vp.width / 2);
+  const from = Math.round(vp.height * 0.8), to = Math.round(vp.height * 0.3);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: from }] });
+  for (let y = from - 20; y >= to; y -= 20) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await p.waitForTimeout(400);
+  return (await at()) - before;
+}
+async function touchPage(browser, width, height, url, mobile) {
+  const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: !!mobile });
+  const page = await ctx.newPage();
+  await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
+    route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
+  });
+  await localCalls(page);
+  page.errors = [];
+  page.on('pageerror', e => page.errors.push(e.message));
+  await page.goto(HOSTING + url);
+  return page;
+}
 
 (async () => {
   await clear();
@@ -96,6 +119,51 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
       assert.deepEqual(p.errors, []);
       await p.close();
     }
+
+    // Joe 10/12 "it does not let you scroll the list": the Check-In and DVIR screens scroll by finger on a phone and on
+    // tablets (600, 800, 1024 wide), from the drivers' phone link and from the Driver Room tablet.
+    const route = (await A.adminCall(db(), BOSS, { op: 'routeCodeNew' })).code;
+    for (const [w, h, mobile] of [[390, 844, true], [600, 960, true], [800, 1280, true], [1024, 768, false]]) {
+      const ph = await touchPage(browser, w, h, '/route.html', mobile);
+      await ph.waitForSelector('#step-code:not([hidden])');
+      await ph.fill('#code', route);
+      await ph.click('#step-code button[type=submit]');
+      await ph.waitForSelector('#step-name:not([hidden])'); await ph.waitForSelector('#name option[value="drv_test_casey"]', { state: 'attached' });
+      await ph.selectOption('#name', 'drv_test_casey');
+      await ph.click('#step-name button[type=submit]');
+      await ph.waitForSelector('#step-loads:not([hidden])');
+      await ph.click('#to-dvir');
+      await ph.waitForSelector('#step-dvir:not([hidden])');
+      const moved = await swipe(ph);
+      await shot(ph, 'phone-scroll-dvir-' + w + '.png');
+      assert.ok(moved > 50, 'the phone DVIR scrolls by finger at ' + w);
+      assert.deepEqual(ph.errors, []);
+      await ph.context().close();
+
+      const tab = await touchPage(browser, w, h, '/driver-room.html', mobile);
+      await tab.waitForSelector('#code-box form.st-code');
+      await tab.fill('#code-box input', kiosk);
+      await tab.click('#code-box button');
+      await tab.waitForSelector('#names button[data-id="drv_test_casey"]');
+      await tab.click('#names button[data-id="drv_test_casey"]');
+      await Promise.all([tab.waitForURL(/view=dvir/), tab.click('#to-dvir')]);
+      await tab.waitForSelector('#step-dvir:not([hidden])');
+      const roomMoved = await swipe(tab);
+      await shot(tab, 'room-scroll-dvir-' + w + '.png');
+      assert.ok(roomMoved > 50, 'the Driver Room DVIR scrolls by finger at ' + w);
+      assert.deepEqual(tab.errors, []);
+      await tab.context().close();
+    }
+    // The Driver Room page itself on a short phone screen (stacked): it scrolls as a whole to the names.
+    const short = await touchPage(browser, 390, 560, '/driver-room.html', true);
+    await short.waitForSelector('#code-box form.st-code');
+    await short.fill('#code-box input', kiosk);
+    await short.click('#code-box button');
+    await short.waitForSelector('#names button[data-id="drv_test_casey"]');
+    assert.ok(await swipe(short) > 50, 'the Driver Room page scrolls by finger on a short phone screen');
+    await shot(short, 'room-scroll-names-390.png');
+    await short.context().close();
+    results.push('Check-In and DVIR scroll by finger on a phone (390) and tablets (600, 800, 1024), from the phone link and the Driver Room tablet');
   } finally {
     await browser.close();
   }
