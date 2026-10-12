@@ -3,6 +3,17 @@ import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.c
 import { escapeHtml, shortDate } from './app.js';
 
 const L = window.UDLogic, S = window.UDSafety;
+
+// Joe 10/12: on a tablet standing up or a phone the tables show as cards (css/safety.css); each cell carries its column's
+// name so the card can show it. Kept up as the screens redraw their rows.
+function labelCells(table) {
+  const names = [...table.querySelectorAll('thead th')].map(th => th.textContent.trim());
+  table.querySelectorAll('tbody tr').forEach(tr => { let i = 0; [...tr.children].forEach(td => { if (names[i] && !td.hasAttribute('colspan')) td.setAttribute('data-label', names[i]); else td.removeAttribute('data-label'); i += td.colSpan || 1; }); });
+}
+document.querySelectorAll('table.sw-grid').forEach(table => {
+  labelCells(table);
+  new MutationObserver(() => labelCells(table)).observe(table, { childList: true, subtree: true });
+});
 export const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
 export const today = () => L.localDay(new Date().toISOString());
 export const thisMonth = () => today().slice(0, 7);
