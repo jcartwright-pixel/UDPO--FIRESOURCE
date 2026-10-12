@@ -128,7 +128,7 @@
   function workOf(w) {
     w = w || {};
     var st = text(w.state).toUpperCase();
-    return { state: st === 'COMPLETE' ? 'COMPLETE' : st === 'WORKING' ? 'WORKING' : 'WAITING', count: text(w.count), temperature: text(w.temperature), notes: text(w.notes),
+    return { state: st === 'COMPLETE' ? 'COMPLETE' : st === 'WORKING' || st === 'PAUSED' ? st : 'WAITING', count: text(w.count), temperature: text(w.temperature), notes: text(w.notes),
       startedAt: text(w.startedAt), startedBy: text(w.startedBy), completedAt: text(w.completedAt), completedBy: text(w.completedBy) };
   }
 

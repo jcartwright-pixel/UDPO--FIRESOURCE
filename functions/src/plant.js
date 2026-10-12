@@ -187,10 +187,12 @@ function stampOrBlank(v, label, SaveError) {
 }
 
 // savePlantLoad's fields: what the Loadout Center, its Edit box and the tablet change on one load.
-const STATUSES = ['NOT_STARTED', 'LOADING', 'COMPLETE'];
+// PAUSED (the current app's Plant Station Pause, MobilePlant.html saveLoad): needs a reason, which goes on the load's notes.
+const STATUSES = ['NOT_STARTED', 'LOADING', 'PAUSED', 'COMPLETE'];
 function validateLoad(input, SaveError) {
   const f = input.fields || {}, out = {};
-  if (f.status !== undefined) { out.status = text(f.status).toUpperCase(); if (STATUSES.indexOf(out.status) < 0) throw new SaveError('BAD_REQUEST', 'Status must be Waiting, Loading or Done'); }
+  if (f.status !== undefined) { out.status = text(f.status).toUpperCase(); if (STATUSES.indexOf(out.status) < 0) throw new SaveError('BAD_REQUEST', 'Status must be Waiting, Loading, Paused or Done'); }
+  if (out.status === 'PAUSED') { out.pauseReason = text(f.pauseReason).slice(0, 300); if (!out.pauseReason) throw new SaveError('BAD_REQUEST', 'A pause reason is required.'); }
   if (f.startedAt !== undefined) out.startedAt = stampOrBlank(f.startedAt, 'Start Time', SaveError);
   if (f.completedAt !== undefined) out.completedAt = stampOrBlank(f.completedAt, 'End Time', SaveError);
   if (out.startedAt && out.completedAt && out.completedAt < out.startedAt) throw new SaveError('BAD_REQUEST', 'End Time cannot be before Start Time');
@@ -215,10 +217,43 @@ function validateLoad(input, SaveError) {
   return out;
 }
 
+// Joe 10/12: how many loads one loadout may load at the same time. A paused load does not count; starting or resuming one
+// past the limit is refused, so two tablets cannot get around it.
+const LOADING_LIMIT = Object.freeze({ CASE: 2, BOXING: 3 });
+const runAreaOf = (run) => areaOf(text(run && run.loadType) || (run && run.masterShow && run.masterShow.loadType) || '');
+// A day block is loading now: started (or marked Loading), not paused, not done.
+function dayLoadingNow(day) {
+  const s = text(day && day.loadStatus).toUpperCase();
+  if (!day || day.completeTime || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY', 'PAUSED'].indexOf(s) >= 0) return false;
+  return !!day.plantStartedAt || s === 'LOADING';
+}
+// The loads of an area loading now (today's and yesterday's still open; the Scheduler's shipments on Boxing), leaving out
+// the one being saved (except = runDocId|day, or a Scheduler record ID).
+async function loadingNow(tx, db, area, stamp, except) {
+  const today = L.operatingDay(new Date(stamp)), dates = [today, L.addDays(today, -1)];
+  const weeks = [...new Set(dates.flatMap(d => L.weeksForLoadDate(d)))];
+  const runs = (await tx.get(db.collection('runs').where('weekStart', 'in', weeks))).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
+  let n = 0;
+  runs.forEach(run => {
+    if (runAreaOf(run) !== area || text(run.routeStatus || 'ACTIVE').toUpperCase() !== 'ACTIVE' || run.active === false) return;
+    dates.forEach(d => L.loadBlocksFor(run, d).forEach(b => { if (run.id + '|' + b.prefix !== except && dayLoadingNow(run.days[b.prefix])) n++; }));
+  });
+  if (area === 'BOXING') {
+    const ships = R.scheduleEntries((await tx.get(db.collection('plantJournal').where('type', '==', R.LOAD_TYPE.SHIPPING))).docs.map(d => d.data()), 'SHIPPING');
+    n += ships.filter(x => x.id !== except && x.work.state === 'WORKING' && (x.loadDate || x.date) >= dates[1] && (x.loadDate || x.date) <= today).length;
+  }
+  return n;
+}
+function overLimit(area, n, SaveError) {
+  const max = LOADING_LIMIT[area];
+  if (max && n >= max) throw new SaveError('CONFLICT', n + ' loads are already loading. Finish or pause one first.');
+}
+
 // The day fields one savePlantLoad changes. day = the run's day block now; equipment is read only when a unit was typed.
 async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   const f = req.plant, after = {};
   if (f.runs === false) return { runs: false };
+  const wasLoading = dayLoadingNow(day);
   if (f.quantity !== undefined) after.casesOut = f.quantity;
   if (f.temperature !== undefined) after.loadTemperature = f.temperature;
   if (f.notes !== undefined) after.plantNotes = f.notes;
@@ -234,6 +269,12 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   } else if (status === 'LOADING') {
     if (completed) after.completeTime = '';
     if (!started) after.plantStartedAt = stamp;
+  } else if (status === 'PAUSED') {
+    if (completed) after.completeTime = '';
+    if (!started) after.plantStartedAt = stamp;
+    const at = new Date(stamp).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const notes = f.notes !== undefined ? f.notes : text(day.plantNotes);
+    after.plantNotes = ((notes ? notes + '\n' : '') + 'Paused ' + at + ': ' + f.pauseReason).slice(-1200);
   } else if (status === 'NOT_STARTED') {
     if (completed) after.completeTime = '';
     if (started) after.plantStartedAt = '';
@@ -241,6 +282,9 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   else if (f.completedAt !== undefined) status = started ? 'LOADING' : 'NOT_STARTED';
   else if (f.startedAt !== undefined) status = started ? 'LOADING' : 'NOT_STARTED';
   if (status) after.loadStatus = status;
+  // Starting or resuming a load (it was not loading and now is): the area's limit.
+  const nowLoading = dayLoadingNow(Object.assign({}, day, after));
+  if (nowLoading && !wasLoading && LOADING_LIMIT[runAreaOf(run)]) overLimit(runAreaOf(run), await loadingNow(tx, db, runAreaOf(run), stamp, run.id + '|' + req.day), SaveError);
   if (f.truck !== undefined || f.trailer !== undefined) {
     const equipment = (await tx.get(db.collection('equipment'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
     [['truck', 'TRUCK', 'truckId'], ['trailer', 'TRAILER', 'trailerId']].forEach(([k, type, idField]) => {
@@ -573,7 +617,8 @@ function validateSchedule(input, SaveError) {
   if (out.op === 'progress') {
     if (!out.id) throw new SaveError('BAD_REQUEST', 'Pick the load');
     out.step = text(input.step);
-    if (['start', 'save', 'complete'].indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'step must be start, save or complete');
+    if (['start', 'save', 'pause', 'complete'].indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'step must be start, save, pause or complete');
+    if (out.step === 'pause') { out.pauseReason = text(input.pauseReason).slice(0, 300); if (!out.pauseReason) throw new SaveError('BAD_REQUEST', 'A pause reason is required.'); }
     const f = input.fields || {};
     out.work = {};
     if (f.count !== undefined) { const c = text(f.count); if (c && !/^[0-9]{1,6}$/.test(c)) throw new SaveError('BAD_REQUEST', (out.lane === 'RECEIVING' ? 'Cases / pallets' : 'Boxes') + ' must be a whole number.'); out.work.count = c; }
@@ -606,11 +651,18 @@ function validateSchedule(input, SaveError) {
 
 // A station loading or receiving a scheduled load: the load's work (state, count, temperature, notes, trailer) on the same
 // record, so the scheduler and every station see it. A finished load is not changed again.
-function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mode, SaveError) {
+async function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mode, SaveError) {
   if (!had) throw new SaveError('NOT_FOUND', 'That load is no longer on the schedule.');
   const before = R.scheduleEntries([had], req.lane)[0] || null, was = (had.payload && had.payload.work) || {};
   if (was.state === 'COMPLETE') throw new SaveError('CONFLICT', 'That load is already ' + (req.lane === 'RECEIVING' ? 'received' : 'complete') + '.');
-  const work = Object.assign({}, was, req.work, { state: req.step === 'complete' ? 'COMPLETE' : 'WORKING' });
+  // Joe 10/12: a Shipping load started or resumed counts toward Boxing's limit (paused ones do not).
+  const state = req.step === 'complete' ? 'COMPLETE' : req.step === 'pause' ? 'PAUSED' : (req.step === 'save' && was.state === 'PAUSED') ? 'PAUSED' : 'WORKING';
+  if (req.lane === 'SHIPPING' && state === 'WORKING' && was.state !== 'WORKING') overLimit('BOXING', await loadingNow(tx, db, 'BOXING', stamp, req.id), SaveError);
+  const work = Object.assign({}, was, req.work, { state });
+  if (req.step === 'pause') {
+    const at = new Date(stamp).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    work.notes = ((text(work.notes) ? text(work.notes) + '\n' : '') + 'Paused ' + at + ': ' + req.pauseReason).slice(-1200);
+  }
   if (req.step === 'start' || !was.startedAt) Object.assign(work, { startedAt: was.startedAt || stamp, startedBy: was.startedBy || email });
   if (req.step === 'complete') Object.assign(work, { completedAt: stamp, completedBy: email });
   const payload = Object.assign({}, had.payload || {}, { work });

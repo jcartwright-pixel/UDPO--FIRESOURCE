@@ -27,7 +27,11 @@ export function mountStationWork({ db, box, person, onDraw }) {
   const got = { runs: false, week: false, SHIPPING: false, RECEIVING: false };
   const pending = {};       // card id -> what is shown before the server has it
   const drafts = {};        // card id -> { field: typed value } until it is saved
-  const opened = {}, closed = {}, puForm = {};
+  const opened = {}, closed = {}, puForm = {}, pauseForm = {};
+  // A refused start (the loading limit) shows on the card that was tapped too, where the finger is.
+  const refused = {};
+  const refuse = (id, m) => { showError(m); refused[id] = m; render(); setTimeout(() => { if (refused[id] === m) { delete refused[id]; render(); } }, 8000); };
+  const refusal = (id) => (refused[id] ? '<p class="sw-refuse" role="alert">' + escapeHtml(refused[id]) + '</p>' : '');
   const returned = {}, washedNow = {};
   const skipped = readSkips();
   const keepSkips = () => { try { sessionStorage.setItem(SKIP_KEY, JSON.stringify(skipped)); } catch (e) { /* private window */ } };
@@ -94,6 +98,15 @@ export function mountStationWork({ db, box, person, onDraw }) {
   }
   const minutesOf = (hhmm) => { const m = /^(\d{2}):(\d{2})$/.exec(hhmm || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
   const clock = (hhmm) => { const m = minutesOf(hhmm); return m === null ? (hhmm || '') : P.timeOfDay(m); };
+  // Joe 10/12: Case Loadout loads at most 2 loads at the same time and Boxing at most 3 (its shipments too). A paused load
+  // does not count; to resume one the count must be under the limit. The server checks the same.
+  const LIMIT = { CASE: 2, BOXING: 3 };
+  function limitMessage(exceptId) {
+    const max = LIMIT[area()];
+    if (!max || (station && station.id === 'CASE_UNLOADING')) return '';
+    const n = loads().filter(r => r.id !== exceptId && r.state === 'LOADING' && !r.paused).length + shipments().filter(x => 'sch:' + x.id !== exceptId && x.work.state === 'WORKING').length;
+    return n >= max ? n + ' loads are already loading. Finish or pause one first.' : '';
+  }
 
   // ---- drawing
   const val = (id, k, v) => (drafts[id] && drafts[id][k] !== undefined ? drafts[id][k] : v);
@@ -138,21 +151,24 @@ export function mountStationWork({ db, box, person, onDraw }) {
       if (!r.prior && lastPrior === true) html += '<p class="sw-group">Today</p>';
       lastPrior = r.prior;
       const items = P.pickupsFor(r, pk), open = items.filter(P.pickupOpen).length, st = r.state, skip = isSkipped(r);
-      const isOpen = st === 'LOADING' ? !closed[r.id] : !!opened[r.id], done = st === 'DONE';
-      const status = done ? badge('COMPLETE', 'done') : st === 'LOADING' ? badge('LOADING', 'going') : badge('WAITING');
-      const quick = ck && st === 'WAITING' && !isOpen ? '<span class="sw-quick">' + (skip ? '' : btn('SKIP', 'skip', r.id, 'warn')) + btn('START LOADING', 'start', r.id, 'primary') + '</span>' : '';
+      const going = st === 'LOADING' && !r.paused, isOpen = going ? !closed[r.id] : !!opened[r.id], done = st === 'DONE';
+      const status = done ? badge('COMPLETE', 'done') : r.paused ? badge('PAUSED', 'paused') : st === 'LOADING' ? badge('LOADING', 'going') : badge('WAITING');
+      const quick = ck && !isOpen ? (st === 'WAITING' ? '<span class="sw-quick">' + (skip ? '' : btn('SKIP', 'skip', r.id, 'warn')) + btn('START LOADING', 'start', r.id, 'primary') + '</span>'
+        : r.paused ? '<span class="sw-quick">' + btn('RESUME', 'resume', r.id, 'primary') + '</span>' : '') : '';
       const by = box ? hauler(r, carried.some(x => sameRun(r, x))) : '';
-      html += '<article class="sw-card ' + (done ? 'done' : st === 'LOADING' ? 'run' : '') + (skip ? ' skipped' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
+      html += '<article class="sw-card ' + (done ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'run' : '') + (skip ? ' skipped' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
         '<div class="sw-head" data-toggle="' + escapeHtml(r.id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '">' +
         '<b class="route">' + escapeHtml(r.route) + '</b><b class="run">' + escapeHtml(r.run) + (by ? who(by) : '') + '</b><span class="truck">' + escapeHtml(r.truck || '—') + '</span><span class="trailer">' + escapeHtml(r.trailer || '—') + '</span>' +
-        '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (skip ? '<i class="sw-flag skip">SKIPPED · COME BACK</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>';
+        '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (skip ? '<i class="sw-flag skip">SKIPPED · COME BACK</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>' + refusal(r.id);
       if (isOpen) {
         const dis = !ck || done;
         html += '<div class="sw-body"><div class="sw-fields">' + field(r.id, 'quantity', unit.label, qty(r.quantity), { mode: 'numeric', disabled: dis }) + field(r.id, 'truck', 'Truck', r.truck, { disabled: dis }) +
           field(r.id, 'trailer', 'Trailer', r.trailer, { disabled: dis }) + field(r.id, 'temperature', 'Temperature', qty(r.temperature), { mode: 'decimal', disabled: dis }) + '</div>' +
           field(r.id, 'notes', 'Notes', r.notes, { wide: true, disabled: dis }) + pickupBox(r, items, ck) +
+          pauseBox(r.id, ck && !done) +
           (ck ? '<div class="sw-actions">' + btn('+ ADD PICKUP', 'pickup', r.id, 'pick') + (st === 'WAITING' ? (skip ? '' : btn('SKIP', 'skip', r.id, 'warn')) + btn('START LOADING', 'start', r.id, 'primary')
-            : st === 'LOADING' ? btn('SAVE LOADING', 'saveload', r.id, 'primary') + btn('COMPLETE', 'complete', r.id, 'good') : badge('COMPLETE', 'done')) + '</div>' : '') + '</div>';
+            : r.paused ? btn('SAVE LOADING', 'saveload', r.id, 'primary') + btn('RESUME', 'resume', r.id, 'good')
+            : st === 'LOADING' ? btn('SAVE LOADING', 'saveload', r.id, 'primary') + btn('PAUSE', 'pause', r.id, 'warn') + btn('COMPLETE', 'complete', r.id, 'good') : badge('COMPLETE', 'done')) + '</div>' : '') + '</div>';
       }
       html += '</article>';
     });
@@ -165,22 +181,23 @@ export function mountStationWork({ db, box, person, onDraw }) {
 
   // A scheduled load's card (Shipping on the Shipping / Loadout tab, Receiving on Receiving): start, the boxes typed, complete.
   function schedCard(x, lane) {
-    const id = 'sch:' + x.id, st = x.work.state, done = st === 'COMPLETE', going = st === 'WORKING', ck = canSched(), recv = lane === 'RECEIVING';
+    const id = 'sch:' + x.id, st = x.work.state, done = st === 'COMPLETE', going = st === 'WORKING', paused = st === 'PAUSED', ck = canSched(), recv = lane === 'RECEIVING';
     const isOpen = going ? !closed[id] : !!opened[id], by = recv ? '' : hauler(x, x.scheduleType === 'CARRIER');
-    const name = x.run || x.route || 'Plant pickup', status = done ? badge(recv ? 'RECEIVED' : 'COMPLETE', 'done') : going ? badge(recv ? 'RECEIVING' : 'LOADING', 'going') : badge('WAITING');
+    const name = x.run || x.route || 'Plant pickup', status = done ? badge(recv ? 'RECEIVED' : 'COMPLETE', 'done') : paused ? badge('PAUSED', 'paused') : going ? badge(recv ? 'RECEIVING' : 'LOADING', 'going') : badge('WAITING');
     const startLabel = recv ? 'START RECEIVING' : 'START LOADING';
-    const quick = ck && st === 'WAITING' && !isOpen ? '<span class="sw-quick">' + btn(startLabel, 'sstart', id, 'primary') + '</span>' : '';
+    const quick = ck && !isOpen && (st === 'WAITING' || paused) ? '<span class="sw-quick">' + btn(paused ? 'RESUME' : startLabel, 'sstart', id, 'primary') + '</span>' : '';
     const detail = [x.pickupTime ? clock(x.pickupTime) : '', x.poNumber ? 'PO ' + x.poNumber : '', x.trailer || 'Trailer not typed yet', x.product, x.cases ? x.cases + ' cases' : ''].filter(Boolean).join(' · ');
-    let html = '<article class="sw-card sched ' + (done ? 'done' : going ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(id) + '">';
+    let html = '<article class="sw-card sched ' + (done ? 'done' : paused ? 'paused' : going ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(id) + '">';
     html += recv ? '<div class="sw-head tall" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title"><b>' + escapeHtml(x.route + ' · ' + name) + '</b><small>' + escapeHtml(detail) + '</small></span>'
       : '<div class="sw-head" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><b class="route">' + escapeHtml(x.route) + '</b><b class="run">' + escapeHtml(name) + who(by) + '</b><span class="truck">' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="trailer">' + escapeHtml(x.trailer || '—') + '</span>';
-    html += '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>';
+    html += '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>' + refusal(id);
     if (isOpen) {
       const dis = !ck || done;
       html += '<div class="sw-body"><div class="sw-fields">' + field(id, 'count', recv ? 'Cases / pallets in' : 'Boxes', x.work.count, { mode: 'numeric', disabled: dis }) + field(id, 'trailer', 'Trailer', x.trailer, { disabled: dis }) +
         field(id, 'temperature', 'Temperature', x.work.temperature, { mode: 'decimal', disabled: dis }) + '<p class="sw-po"><span>PO</span><b>' + escapeHtml(x.poNumber || '—') + '</b></p></div>' +
-        field(id, 'notes', 'Notes', x.work.notes || '', { wide: true, disabled: dis }) +
-        (ck ? '<div class="sw-actions">' + (st === 'WAITING' ? btn(startLabel, 'sstart', id, 'primary') : going ? btn(recv ? 'SAVE RECEIVING' : 'SAVE LOADING', 'ssave', id, 'primary') + btn(recv ? 'RECEIVED' : 'COMPLETE', 'sdone', id, 'good') : badge(recv ? 'RECEIVED' : 'COMPLETE', 'done')) + '</div>' : '') + '</div>';
+        field(id, 'notes', 'Notes', x.work.notes || '', { wide: true, disabled: dis }) + pauseBox(id, ck && !done) +
+        (ck ? '<div class="sw-actions">' + (st === 'WAITING' ? btn(startLabel, 'sstart', id, 'primary') : paused ? btn(recv ? 'SAVE RECEIVING' : 'SAVE LOADING', 'ssave', id, 'primary') + btn('RESUME', 'sstart', id, 'good')
+          : going ? btn(recv ? 'SAVE RECEIVING' : 'SAVE LOADING', 'ssave', id, 'primary') + btn('PAUSE', 'pause', id, 'warn') + btn(recv ? 'RECEIVED' : 'COMPLETE', 'sdone', id, 'good') : badge(recv ? 'RECEIVED' : 'COMPLETE', 'done')) + '</div>' : '') + '</div>';
     }
     return html + '</article>';
   }
@@ -201,6 +218,10 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const have = box.querySelector('iframe.sw-frame');
     if (have && have.dataset.src === src) return;
     box.innerHTML = '<iframe class="sw-frame" data-src="' + escapeHtml(src) + '" src="' + escapeHtml(src) + '" title="' + (view === 'trailers' ? 'Trailer Assignments' : 'Yard Checks') + '"></iframe>';
+  }
+  // Pause (the current app's Plant Station): a reason is required; it goes on the load's notes.
+  function pauseBox(id, ck) {
+    return ck && pauseForm[id] ? '<div class="sw-puform sw-pause">' + field(id, 'pauseReason', 'Reason for pausing (required)', '') + btn('SAVE REASON &amp; PAUSE', 'pausego', id, 'warn') + btn('CANCEL', 'pausecancel', id) + '</div>' : '';
   }
   function pickupBox(r, items, ck) {
     const list = items.map(p => '<div class="sw-pu' + (P.pickupOpen(p) ? '' : ' done') + '"><span><b>' + escapeHtml(p.item) + (p.quantity ? ' · ' + escapeHtml(p.quantity) : '') + '</b>' +
@@ -301,7 +322,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   }
   async function saveLoad(r, fields, shown) {
     const done = show(r.id, shown);
-    try { await save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }); showError(''); delete drafts[r.id]; } catch (e) { showError(r.route + ' ' + r.run + ': ' + (e.message || e)); }
+    try { await save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }); showError(''); delete drafts[r.id]; } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
     done();
   }
   const chain = {};
@@ -331,7 +352,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     }
   }
   // A scheduled load: start, save what was typed, or complete (the Scheduler's save, op progress).
-  async function saveSched(x, lane, step) {
+  async function saveSched(x, lane, step, reason) {
     const id = 'sch:' + x.id, d = drafts[id] || {}, fields = {};
     [['count', x.work.count], ['trailer', x.trailer], ['temperature', x.work.temperature], ['notes', x.work.notes]].forEach(([k, was]) => {
       if (d[k] !== undefined && String(d[k]).trim() !== String(was || '').trim()) fields[k] = k === 'trailer' ? String(d[k]).trim().toUpperCase() : String(d[k]).trim();
@@ -339,19 +360,21 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (fields.count !== undefined) fields.count = fields.count.replace(/,/g, '');
     if (fields.count && !/^\d+$/.test(fields.count)) { showError('Type a whole number for ' + (lane === 'RECEIVING' ? 'cases / pallets in' : 'boxes') + '.'); return; }
     if (step === 'save' && !Object.keys(fields).length) { showError('Nothing changed on ' + x.route + ' ' + (x.run || '') + '.'); return; }
-    const work = Object.assign({}, fields, { state: step === 'complete' ? 'COMPLETE' : 'WORKING' });
+    const work = Object.assign({}, fields, { state: step === 'complete' ? 'COMPLETE' : step === 'pause' || (step === 'save' && x.work.state === 'PAUSED') ? 'PAUSED' : 'WORKING' });
     delete work.trailer;
     const shown = { work };
     if (fields.trailer !== undefined) shown.trailer = fields.trailer;
     if (step === 'start') delete closed[id];
+    if (step === 'pause') { delete pauseForm[id]; closed[id] = true; delete opened[id]; }
     if (step === 'complete') delete opened[id];
     const done = show(id, shown);
     // Only what this save sent is cleared: a box typed while it was on its way stays typed.
     const sent = Object.assign({}, d);
     try {
-      await save('savePlantSchedule', { lane, op: 'progress', id: x.id, date: x.date, step, fields }); showError('');
+      await save('savePlantSchedule', Object.assign({ lane, op: 'progress', id: x.id, date: x.date, step, fields }, step === 'pause' ? { pauseReason: reason } : {})); showError('');
+      if (step === 'pause') delete pauseForm[id];
       if (drafts[id]) Object.keys(fields).forEach(k => { if (drafts[id][k] === sent[k]) delete drafts[id][k]; });
-    } catch (e) { showError(x.route + ' ' + (x.run || '') + ': ' + (e.message || e)); }
+    } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(id, m); else showError(x.route + ' ' + (x.run || '') + ': ' + m); }
     done();
   }
 
@@ -369,14 +392,21 @@ export function mountStationWork({ db, box, person, onDraw }) {
 
   function act(b) {
     const a = b.dataset.act, id = b.dataset.id, now = new Date().toISOString();
-    if (['sstart', 'ssave', 'sdone'].indexOf(a) >= 0) {
+    if (a === 'pause') { pauseForm[id] = true; opened[id] = true; delete closed[id]; render(); const f = box.querySelector('[data-id="' + CSS.escape(id) + '"][data-k="pauseReason"]'); if (f) f.focus(); return; }
+    if (a === 'pausecancel') { delete pauseForm[id]; if (drafts[id]) delete drafts[id].pauseReason; render(); return; }
+    const reason = String((drafts[id] || {}).pauseReason || '').trim();
+    if (a === 'pausego' && !reason) { showError('Type the reason for pausing.'); return; }
+    if (['sstart', 'ssave', 'sdone'].indexOf(a) >= 0 || (a === 'pausego' && id.indexOf('sch:') === 0)) {
       const lane = view === 'receiving' ? 'RECEIVING' : 'SHIPPING', x = (lane === 'RECEIVING' ? deliveries() : shipments()).find(y => 'sch:' + y.id === id);
       if (!x) return;
-      if (a === 'sdone' && x.work.state !== 'WORKING') { showError('Tap ' + (lane === 'RECEIVING' ? 'START RECEIVING' : 'START LOADING') + ' first.'); return; }
-      saveSched(x, lane, a === 'sstart' ? 'start' : a === 'ssave' ? 'save' : 'complete');
+      if (a === 'sdone' && x.work.state !== 'WORKING') { showError(x.work.state === 'PAUSED' ? 'Tap RESUME first.' : 'Tap ' + (lane === 'RECEIVING' ? 'START RECEIVING' : 'START LOADING') + ' first.'); return; }
+      if (a === 'sstart' && lane === 'SHIPPING') { const m = limitMessage(id); if (m) { refuse(id, m); return; } }
+      delete refused[id];
+      if (a === 'pausego' && drafts[id]) delete drafts[id].pauseReason;
+      saveSched(x, lane, a === 'sstart' ? 'start' : a === 'ssave' ? 'save' : a === 'pausego' ? 'pause' : 'complete', reason);
       return;
     }
-    if (['skip', 'start', 'saveload', 'complete', 'pickup', 'puadd', 'pucancel', 'pudone'].indexOf(a) >= 0) {
+    if (['skip', 'start', 'resume', 'pausego', 'saveload', 'complete', 'pickup', 'puadd', 'pucancel', 'pudone'].indexOf(a) >= 0) {
       const r = loads().find(x => x.id === id);
       if (!r) return;
       if (a === 'skip') { (skipped[date] = skipped[date] || {})[r.id] = true; keepSkips(); delete opened[r.id]; render(); return; }
@@ -410,10 +440,18 @@ export function mountStationWork({ db, box, person, onDraw }) {
       let typed;
       try { typed = typedLoad(r); } catch (e) { showError(e.message); return; }
       if (skipped[date] && skipped[date][r.id]) { delete skipped[date][r.id]; keepSkips(); }
-      if (a === 'start') { delete closed[r.id]; saveLoad(r, Object.assign(typed.fields, { startedAt: now, completedAt: '' }), Object.assign(typed.shown, { startedAt: now, completedAt: '', state: 'LOADING' })); return; }
+      if (a === 'start' || a === 'resume') { const m = limitMessage(r.id); if (m) { refuse(r.id, m); return; } delete refused[r.id]; }
+      if (a === 'start') { delete closed[r.id]; saveLoad(r, Object.assign(typed.fields, { startedAt: now, completedAt: '' }), Object.assign(typed.shown, { startedAt: now, completedAt: '', state: 'LOADING', paused: false })); return; }
+      if (a === 'resume') { delete closed[r.id]; saveLoad(r, Object.assign(typed.fields, { status: 'LOADING' }), Object.assign(typed.shown, { state: 'LOADING', paused: false })); return; }
+      if (a === 'pausego') {
+        delete pauseForm[r.id]; if (drafts[r.id]) delete drafts[r.id].pauseReason; closed[r.id] = true; delete opened[r.id];
+        saveLoad(r, Object.assign(typed.fields, { status: 'PAUSED', pauseReason: reason }), Object.assign(typed.shown, { paused: true }));
+        return;
+      }
       if (a === 'saveload') { if (!Object.keys(typed.fields).length) { showError('Nothing changed on ' + r.route + ' ' + r.run + '.'); return; } saveLoad(r, typed.fields, typed.shown); return; }
       if (a === 'complete') {
         if (r.state !== 'LOADING') { showError('Tap START LOADING before COMPLETE.'); return; }
+        if (r.paused) { showError('Tap RESUME before COMPLETE.'); return; }
         delete opened[r.id];
         saveLoad(r, Object.assign(typed.fields, { completedAt: now }), Object.assign(typed.shown, { completedAt: now, state: 'DONE' }));
       }

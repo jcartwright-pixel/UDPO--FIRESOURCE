@@ -58,7 +58,9 @@ function rowFor(run, block, loadDate, prior) {
     loadDate, deliveryDate: block.deliveryDate, departureDate: day.departureDate || block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
     driver: day.driver || '', truck: day.truck || '', trailer: day.trailer || '', dispatchTime: day.dispatchTime,
     quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '',
-    startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day)
+    startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day),
+    // Joe 10/12: a paused load is started but not loading now (it does not count toward the loadout's limit).
+    paused: loadState(day) === 'LOADING' && String(day.loadStatus || '').trim().toUpperCase() === 'PAUSED'
   };
 }
 

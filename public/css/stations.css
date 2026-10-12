@@ -567,3 +567,9 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 .ps-page .ps-tabs.actions button.ps-action b { font-size: 20px; line-height: 1.2; }
 .ps-page .ps-tabs.actions button.ps-action[aria-selected="true"] { background: var(--accent); color: #fff; }
 @media (max-width: 420px) { .ps-page .ps-tabs.actions button.ps-action b { font-size: 18px; } }
+/* Joe 10/12: a paused load (the loadout's limit counts only the loads loading now). */
+.sw-card.paused { border-left-color: #bd7400; background: #fffaf0; }
+.sw-badge.paused { background: #fde2c4; color: #8a3b00; }
+.sw-puform.sw-pause { grid-template-columns: minmax(0, 1fr) auto auto; }
+@media (max-width: 700px) { .sw-puform.sw-pause { grid-template-columns: 1fr; } }
+.sw-refuse { margin: 0; padding: 10px 16px; background: #fde8e8; color: #8f1d16; font-size: 18px; font-weight: 800; border-top: 1px solid #f1b7b3; }

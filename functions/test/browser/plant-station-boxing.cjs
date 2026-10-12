@@ -72,6 +72,38 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
   const browser = await chromium.launch();
   const results = [];
   try {
+    // Joe 10/12: Case Loadout loads at most 2 at the same time. The made-up day has 2 loading (808, and 6303 from yesterday).
+    const cs = await openPage(browser, 1024, 768, '/plant-station.html' + MANAGER + '&station=CASE', clock, true);
+    const cc = (id) => '#work .sw-card[data-sw="2026-10-04__run_' + id + '"]';
+    await cs.waitForSelector(cc('p811|fri'));
+    await cs.click(cc('p811|fri') + ' [data-act="start"]');
+    await cs.waitForSelector(cc('p811|fri') + ' .sw-refuse:text-is("2 loads are already loading. Finish or pause one first.")');
+    assert.equal(await cs.textContent('#error'), '2 loads are already loading. Finish or pause one first.');
+    assert.ok(parseFloat(await cs.$eval(cc('p811|fri') + ' .sw-refuse', e => getComputedStyle(e).fontSize)) >= 16);
+    await cs.$eval(cc('p811|fri'), e => e.scrollIntoView({ block: 'center' }));
+    await shot(cs, 'case-limit-refused-1024.png');
+    // Pause 808 (a reason is required), then the waiting load starts.
+    await cs.click(cc('p808|fri') + ' [data-act="pause"]');
+    await cs.click(cc('p808|fri') + ' [data-act="pausego"]');
+    assert.equal(await cs.textContent('#error'), 'Type the reason for pausing.');
+    await cs.fill(cc('p808|fri') + ' [data-k="pauseReason"]', 'Waiting on product');
+    await cs.click(cc('p808|fri') + ' [data-act="pausego"]');
+    await cs.waitForSelector(cc('p808|fri') + '.paused .sw-badge:text-is("PAUSED")', { timeout: 10000 });
+    for (let i = 0; i < 100 && (await db().collection('runs').doc('2026-10-04__run_p808').get()).data().days.fri.loadStatus !== 'PAUSED'; i++) await new Promise(r => setTimeout(r, 100));
+    await cs.click(cc('p811|fri') + ' [data-act="start"]');
+    await cs.waitForSelector(cc('p811|fri') + '.run .sw-badge:text-is("LOADING")', { timeout: 10000 });
+    assert.equal(await cs.$(cc('p811|fri') + ' .sw-refuse'), null, 'the refusal goes once the load starts');
+    for (let i = 0; i < 100 && !(await db().collection('runs').doc('2026-10-04__run_p811').get()).data().days.fri.plantStartedAt; i++) await new Promise(r => setTimeout(r, 100));
+    // Resuming 808 needs room: refused until one is finished.
+    await cs.click(cc('p808|fri') + ' [data-act="resume"]');
+    await cs.waitForSelector(cc('p808|fri') + ' .sw-refuse:text-is("2 loads are already loading. Finish or pause one first.")');
+    await cs.$eval(cc('p808|fri'), e => e.scrollIntoView({ block: 'center' }));
+    await shot(cs, 'case-limit-resume-refused-1024.png');
+    assert.match((await db().collection('runs').doc('2026-10-04__run_p808').get()).data().days.fri.plantNotes, /Paused .*: Waiting on product/);
+    assert.deepEqual(cs.errors, []);
+    await cs.close();
+    results.push('Case Loadout: 2 loads at a time; a third is refused on its card; Pause needs a reason; a paused load does not count; Resume needs room');
+
     const page = await openPage(browser, 1024, 768, '/plant-station.html' + MANAGER, clock, true);
     await page.waitForSelector('[data-station="BOXING"]');
     await page.click('[data-station="BOXING"]');
