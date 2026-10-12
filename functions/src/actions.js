@@ -1027,7 +1027,11 @@ async function liveRead(tx, db, runId) {
     tx.get(db.collection(C.equipment))]);
   const units = eqSnap.docs.map(d => d.data());
   const unit = (v, type) => { const k = String(v || '').trim().toUpperCase(); return k ? units.find(e => e.type === type && (String(e.id).toUpperCase() === k || String(e.unit).toUpperCase() === k)) || null : null; };
-  return { weeks, runs: runSnap ? runSnap.docs.filter(s => weeks.indexOf(s.data().weekStart) >= 0) : [], unit, tabs: { [w.current]: M.LIVE_TABS.current, [w.next]: M.LIVE_TABS.next } };
+  // Route names (Joe 10/12) reach the Previous week too, and stream_id / route / route_run_type as well, only once
+  // config/app.routeNamesLive.enabled is on (Joe's typed OK for those Live columns and tabs).
+  const namesLive = !!(cfg.exists && cfg.data().routeNamesLive && cfg.data().routeNamesLive.enabled === true);
+  const previous = runId && namesLive && w.previous && runSnap ? runSnap.docs.filter(s => s.data().weekStart === w.previous && s.data().sourceTab === M.LIVE_TABS.previous) : [];
+  return { weeks, runs: runSnap ? runSnap.docs.filter(s => weeks.indexOf(s.data().weekStart) >= 0) : [], previous, namesLive, unit, tabs: { [w.current]: M.LIVE_TABS.current, [w.next]: M.LIVE_TABS.next } };
 }
 
 // One Live run's changes ({run: {field: v}, days: {p: {field: v}}}) as one update and, with the write-back on, one queued row.
@@ -1050,15 +1054,29 @@ function writeLive(tx, db, mode, req, stamp, email, snap, run, ch, result) {
 const hoursNumber = (h) => { const t = String(h == null ? '' : h).trim(), m = t.match(/^(\d{1,2}):(\d{2})$/); const n = m ? Number(m[1]) + Number(m[2]) / 60 : Number(t); return t && Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
 
 // One run's Route Master standards into its Live rows of the two weeks; a run with no Live row in a week gets one.
+// Route names (Joe 10/12): Route Name and Run follow Route Master into the Live rows; with config/app.routeNamesLive on, so do
+// stream_id, route and route_run_type, and the Previous week gets the names too (names only). A name this save set goes
+// across even when blank (a Run left empty when Run Type says Load 1); others only when Route Master has one.
+const LIVE_NAME_FIELDS = ['routeName', 'run'], LIVE_MORE_NAMES = ['streamId', 'route', 'routeRunType'];
+function liveNames(m, run, req, live) {
+  const out = {}, set = (req && req.fields) || {};
+  LIVE_NAME_FIELDS.concat(live.namesLive ? LIVE_MORE_NAMES : []).forEach(f => {
+    const v = String(m[f] == null ? '' : m[f]).trim();
+    if ((v || f in set) && String(run[f] == null ? '' : run[f]).trim() !== v) out[f] = v;
+  });
+  return out;
+}
 function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
   const today = L.operatingDay(new Date(stamp));
+  (live.previous || []).forEach(s => { const ch = liveNames(m, s.data(), req, live); if (Object.keys(ch).length) writeLive(tx, db, mode, req, stamp, email, s, s.data(), { run: ch, days: {} }, result); });
   live.weeks.forEach(week => {
     const rows = live.runs.filter(s => s.data().weekStart === week);
     if (!rows.length) return addLiveRun(tx, db, mode, req, stamp, email, m, live, week, today, result);
     const changes = rows.map(() => ({ run: {}, days: {} }));
     rows.forEach((s, i) => { const run = s.data();
       // 7.0.272: who runs it follows Route Master too (route name, run, Run By).
-      ['routeName', 'run', 'coverageType', 'coverageOwner'].forEach(f => { const v = String(m[f] || '').trim(); if (v && String(run[f] || '').trim() !== v) changes[i].run[f] = v; });
+      Object.assign(changes[i].run, liveNames(m, run, req, live));
+      ['coverageType', 'coverageOwner'].forEach(f => { const v = String(m[f] || '').trim(); if (v && String(run[f] || '').trim() !== v) changes[i].run[f] = v; });
       // Joe 10/12 (907 / 950): Show on Daily Dispatch switched in the Route Editor reaches the Current and Next weeks' rows too,
       // since Daily reads the week's own flag (a FALSE there hides the run whatever Route Master says).
       if (req && req.fields && typeof req.fields.displayDaily === 'boolean' && run.displayDaily !== req.fields.displayDaily) changes[i].run.displayDaily = req.fields.displayDaily;
@@ -1147,7 +1165,7 @@ function driverToLive(tx, db, mode, req, stamp, email, d, truckId, live, result)
 }
 
 /* ---------- Route Editor (Route Master copy; ROUTES_MASTER itself is not written yet) ---------- */
-const ROUTE_FIELDS = { route: 'text', routeName: 'text', run: 'text', loadType: 'text', movementType: 'text', coverageOwner: 'text', coverageType: 'text',
+const ROUTE_FIELDS = { route: 'text', routeName: 'text', run: 'text', streamId: 'text', routeRunType: 'text', routeCode: 'text', loadType: 'text', movementType: 'text', coverageOwner: 'text', coverageType: 'text',
   departureDay: 'text', routeNotes: 'text', weekOrder: 'number', active: 'bool', sleeper: 'bool', dropAndHook: 'bool', displayDaily: 'bool',
   displayWeekly: 'bool', displayPlant: 'bool', displayMobile: 'bool', displayRouteMaster: 'bool', routeStatus: 'text' };
 const ROUTE_DAY_FIELDS = { active: 'bool', dispatchTime: 'time', loadOrder: 'number', miles: 'number', hours: 'hours', loadDayOffset: 'offset',

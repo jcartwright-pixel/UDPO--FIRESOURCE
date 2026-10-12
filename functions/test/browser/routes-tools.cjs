@@ -172,6 +172,28 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     await shot(p, 'routes-many-1920.png');
     results.push('Route Details for many runs: 802 set to Boxing, 801 to Fairmont with drop and hook, each saved on its own');
 
+    // Route Names (Joe 10/12): the route number is the first column and the only one that cannot be typed over. Run Code,
+    // Stream ID, Run and Run Type save on that run; Route Name saves on every run of the route and no other; the run id never changes.
+    await p.selectOption('#view-select', 'names');
+    const nm = (run, f) => 'table.routes.names tr[data-id="' + run + '"] input.nm[data-name="' + f + '"]';
+    await p.waitForSelector(nm('run_t801', 'run'));
+    assert.deepEqual(await p.$$eval('table.routes.names thead th', t => t.map(x => x.textContent)), ['Route', 'Run Code', 'Stream ID', 'Route Name', 'Run', 'Run Type', 'Screens show']);
+    assert.equal(await p.$$eval('table.routes.names tr[data-id="run_t801"] td:first-child input', x => x.length), 0, 'the route number is locked');
+    assert.match(await p.textContent('table.routes.names caption'), /Route Name every run of the route/);
+    for (const [f, v] of [['run', 'Load 1'], ['routeName', 'DSD'], ['routeRunType', 'Load 2'], ['routeCode', '801_1']]) { await p.fill(nm('run_t801', f), v); await p.press(nm('run_t801', f), 'Enter'); }
+    await settled();
+    for (let i = 0; i < 40; i++) {
+      const a = (await db().collection('routes').doc('run_t801').get()).data(), b = (await db().collection('routes').doc('run_t802').get()).data();
+      if (a.run === 'Load 1' && a.routeName === 'DSD' && a.routeRunType === 'Load 2' && a.routeCode === '801_1' && b.routeName === 'UT DSD MILK') break;
+      if (i === 39) assert.fail('Route names: ' + JSON.stringify({ a: [a.run, a.routeName, a.routeRunType, a.routeCode], b: b.routeName }));
+      await new Promise(r => setTimeout(r, 250));
+    }
+    await p.waitForFunction(() => /DSD Load 1 Load 2|DSD Load 1/.test(document.querySelector('table.routes.names tr[data-id="run_t801"] td.screen-name').textContent));
+    assert.equal(await p.$eval(nm('run_t801', 'run'), x => getComputedStyle(x).fontSize), '16px');
+    assert.ok(await fits(p), 'Route Names fits the screen');
+    await shot(p, 'routes-names-1920.png');
+    results.push('Route Names: route number locked; 801 Run Code, Run, Route Name and Run Type typed and saved; 802 kept its own Route Name');
+
     // Recap: the old five totals above the list, and a totals line under each column.
     await p.selectOption('#view-select', 'recap');
     await p.waitForSelector('#recap-totals:not([hidden]) strong');
