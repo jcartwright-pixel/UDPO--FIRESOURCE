@@ -93,9 +93,11 @@
     ];
     const VIEWS = {
       loading: { label: 'Loading', what: 'Assigned loadout work', accent: '#1976d2', tone: '#e8f3ff', pic: { CASE: 'case-v1.webp', TOTES: 'tote-v1.webp', BOXING: 'box-v1.webp' } },
-      unloading: { label: 'Unloading', what: 'Assigned unloading work', accent: '#168a55', tone: '#e8f8ef', pic: 'tanker-v1.webp' },
-      washing: { label: 'Washing', what: 'Assigned trailer washing', accent: '#0b8da5', tone: '#e7f8fb', pic: 'maintenance-trailer-v1-560.webp' },
-      returns: { label: 'Returns', what: 'Return product to the cooler', accent: '#bd7400', tone: '#fff4db', pic: 'box-v1.webp' }
+      // Joe 10/12: each picture shows that station's own work; the tanker is only for tanker screens. Yard Services unloads
+      // every kind of trailer, so it shows the delivery truck.
+      unloading: { label: 'Unloading', what: 'Assigned unloading work', accent: '#168a55', tone: '#e8f8ef', pic: { CASE: 'case-v1.webp', TOTES: 'tote-v1.webp', BOXING: 'box-v1.webp', '': 'distribution-truck-v1-560.webp' } },
+      washing: { label: 'Washing', what: 'Assigned trailer washing', accent: '#0b8da5', tone: '#e7f8fb', pic: 'pressure-washer-v1.webp' },
+      returns: { label: 'Returns', what: 'Return product to the cooler', accent: '#bd7400', tone: '#fff4db', pic: 'case-returns-v1.webp' }
     };
     // The tab shown (remembered on this tablet for the visit), and the station's work under the tabs.
     const VIEW_KEY = 'udPlantStationView';
