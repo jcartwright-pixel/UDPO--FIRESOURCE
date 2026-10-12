@@ -97,14 +97,15 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.waitForFunction(() => /Charleston is not connected/.test(document.getElementById('why').textContent));
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
-    // Joe 10/12: picking a plant opens its Plant Distribution (the Manager Center) first, wherever on the card it is clicked;
-    // Back from there is the plant's home with all six cards, and Back again is this overview.
-    await Promise.all([adm.waitForURL(/manager\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
-    await adm.waitForSelector('#screen .head h1');
-    assert.equal(await adm.textContent('#screen .head h1'), 'Manager Center');
-    assert.equal(await adm.$eval('.sidemenu a.side-name', a => a.textContent.trim() + ':' + a.classList.contains('on')), 'Plant Distribution:true', 'the menu shows Plant Distribution as the page open');
-    if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-uniontown-opens-plant-operations-1920.png') });
-    await Promise.all([adm.waitForURL(/index\.html/), adm.click('#go-back')]);
+    // Joe 10/12: picking a plant opens its home with all its cards, wherever on the card the plant is picked (the name, the
+    // header, Recent Activity, View Details); the Plant Distribution card there opens the Manager Center.
+    for (const spot of ['header strong', 'footer a']) {
+      await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] ' + spot)]);
+      await adm.waitForSelector('.launch-card[data-side="plant"]');
+      await adm.goto(HOSTING + '/company.html?testEmail=admin.test@uniteddairy.com');
+      await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"] .co-grid');
+    }
+    await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] .co-recent h3')]);
     // Joe 10/11: the plant home shows the plant's three cards, Route Distribution, Fleet & Maintenance, Reports and (Joe 10/12) Safety Walkthrough;
     // Plant Production and Plant Maintenance carry an Under Construction banner. Administration is the header button.
     await adm.waitForSelector('.launch-card[data-side="reports"]');
@@ -131,7 +132,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-admin-uniontown-1920.png') });
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go-back')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');
-    await Promise.all([adm.waitForURL(/manager\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] header strong')]);
+    await Promise.all([adm.waitForURL(/index\.html/), adm.click('.co-plant[data-plant="fac_uniontown"] header strong')]);
     await Promise.all([adm.waitForURL(/administration\.html/), adm.click('#go-admin')]);
     // Joe 10/10: Administration like the current app's tab: every item in a menu on the left; the item opens on the right.
     await adm.waitForSelector('.adm-item.on[data-key="people"]');
@@ -167,7 +168,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, which opens its Plant Distribution first (Back is its home with the six cards) and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
+    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');
@@ -212,12 +213,29 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     results.push('Main screen fly-out and plant home list Plant Distribution, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance and Reports; Reports lists every report and keeps its menu; Plant Production opens its Production Lines board for an administrator; the six cards fit 1536x864');
 
     // Joe 10/10: anywhere on a card opens its screen's first view; one line or number inside opens that screen.
+    // Joe 10/12: except a plant's tile on the main screen: anywhere on it, its numbers and Recent Activity lines included,
+    // opens that plant's home with its cards (the numbers used to open Loadout, Unloading or Fleet & Maintenance).
     const cards = await openPage(browser, 1920, 1080, '/company.html?testEmail=admin.test@uniteddairy.com');
-    await cards.waitForSelector('.co-plant[data-plant="fac_uniontown"] .co-grid');
-    await Promise.all([cards.waitForURL(/unloading\.html/), cards.click('.co-plant[data-plant="fac_uniontown"] .co-cell[data-open="unloading.html"] span')]);
-    await cards.goto(HOSTING + '/company.html?testEmail=admin.test@uniteddairy.com');
-    await cards.waitForSelector('.co-plant[data-plant="fac_uniontown"] .co-grid');
-    await Promise.all([cards.waitForURL(/maint\.html/), cards.click('.co-plant[data-plant="fac_uniontown"] .co-cell[data-open="maint.html"]')]);
+    const T = '.co-plant[data-plant="fac_uniontown"] ';
+    await cards.waitForSelector(T + '.co-grid');
+    assert.equal(await cards.$$eval(T + '[data-open]', x => x.length), 0, 'nothing on the plant tile opens another screen');
+    for (const spot of ['.co-cell:nth-child(1) b', '.co-cell:nth-child(3) span', '.co-cell:nth-child(8)', '.co-act:nth-child(2) b', 'footer span', '.co-grid']) {
+      await Promise.all([cards.waitForURL(/index\.html/), cards.click(T + spot)]);
+      await cards.waitForSelector('.launch-card[data-side="plant"]');
+      assert.equal(await cards.evaluate(() => sessionStorage.getItem('udPlant')), 'fac_uniontown', spot + ' remembers the plant');
+      await cards.goto(HOSTING + '/company.html?testEmail=admin.test@uniteddairy.com');
+      await cards.waitForSelector(T + '.co-grid');
+    }
+    // The ☰ menu: hovering a plant shows its sides; clicking the plant's name opens its home.
+    await cards.waitForSelector('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
+    await cards.hover('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
+    await cards.waitForSelector('.side-flyouts .flyout.open a[data-plant="fac_uniontown"]', { state: 'visible' });
+    await cards.waitForTimeout(500);
+    await Promise.all([cards.waitForURL(/index\.html/), cards.click('.side-plant[data-plant="fac_uniontown"] .side-sec-btn')]);
+    await cards.waitForSelector('.launch-card[data-side="plant"]');
+    // The plant home's Plant Distribution card opens the Manager Center.
+    await Promise.all([cards.waitForURL(/manager\.html/), cards.click('.launch-card[data-side="plant"]')]);
+    await cards.goto(HOSTING + '/maint.html?testEmail=admin.test@uniteddairy.com');
     await cards.waitForSelector('.hub-card[data-kind="TRAILER"] .hub-tiles4');
     // Fleet & Maintenance cards are links edge to edge: the top opens the card's screen, each box its own.
     await Promise.all([cards.waitForURL(/issues\.html\?kind=TRAILER$/), cards.click('.hub-card[data-kind="TRAILER"] .hub-card-head strong')]);
@@ -232,7 +250,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([cards.waitForURL(/drivers\.html/), cards.click('.card[data-card="drivers.html"] .dc-head')]);
     assert.deepEqual(cards.errors, []);
     await cards.close();
-    results.push('Cards: a card opens its screen (Route Distribution, Fleet & Maintenance, all-plants overview) and a number or line inside opens its own screen');
+    results.push('Cards: anywhere on a plant tile (numbers and lines too) and the menu plant name open the plant home, whose Plant Distribution card opens Manager Center; a card opens its screen (Route Distribution, Fleet & Maintenance, all-plants overview) and a number or line inside opens its own screen');
 
     // Phones 360 and 390 wide: the header title wraps beside the logo and never runs under the initials or Sign out.
     for (const w of [360, 390]) {
