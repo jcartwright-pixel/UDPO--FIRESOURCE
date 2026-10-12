@@ -1194,6 +1194,8 @@ async function noScroll(page) {
     // Joe 10/12 ("Let the new app write plant loading to the real Live sheet."): Plant Loading is a switch of its own, ready.
     assert.match(await gl.textContent('#gl-rows tr[data-row="plantLoading"]'), /Plant Loading[\s\S]*Current app[\s\S]*Ready[\s\S]*Loadout History/);
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="plantLoading"] [data-act="new"]'), false);
+    // Joe 10/12 ("turn all 8 sheets on"): the plant check screens, Products, Safety and Plant Maintenance have a switch, ready.
+    assert.match(await gl.textContent('#gl-rows tr[data-row="plant"]'), /Plant Operations[\s\S]*Current app[\s\S]*Ready/);
     // Turn on everything that is ready: pressed twice; every ready screen goes to the new app, Driver Check-ins stays.
     await gl.click('#gl-all');
     assert.match(await gl.textContent('#gl-all'), /Press again/);
@@ -1206,6 +1208,7 @@ async function noScroll(page) {
     assert.equal(cfg.screenOwners.plantLoading, 'new');
     assert.equal(cfg.screenOwners.drivers, 'new');
     assert.equal(cfg.screenOwners.checkIns, 'old');
+    assert.equal(cfg.screenOwners.plant, 'new');
     if (SHOTS) await gl.screenshot({ path: path.join(SHOTS, 'go-live-switches-1536.png') });
     const onNew = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
     await onNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'NEW APP: SAVES GO TO THE SHEET');
@@ -1235,8 +1238,8 @@ async function noScroll(page) {
     await gl.click('#gl-wb-btn');
     await gl.waitForSelector('#view .ap-msg.bad:not([hidden])');
     assert.match(await gl.textContent('#view .ap-msg'), /back to the current app/);
-    // Move back clears fully live; with all three back, every screen is a test copy again.
-    for (const k of ['dailyDispatch', 'weeklyDispatch', 'plantLoading']) {
+    // Move back clears fully live; with every screen that went over back, every screen is a test copy again.
+    for (const k of ['dailyDispatch', 'weeklyDispatch', 'plantLoading', 'drivers', 'vacations', 'routes', 'plant']) {
       await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
       await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
       await gl.waitForSelector('#gl-rows tr[data-row="' + k + '"] .gl-chip.old');
@@ -1249,7 +1252,7 @@ async function noScroll(page) {
     assert.deepEqual(gl.errors, []);
     await adminHome.close();
     await gl.close();
-    results.push('Go-Live Switches: Turn on everything that is ready (pressed twice) moves Daily and Weekly Dispatch only; Mark fully live takes the tag off the card; card tags are plain labels; the write-back stays on while a screen is on the new app');
+    results.push('Go-Live Switches: Turn on everything that is ready (pressed twice) moves Daily and Weekly Dispatch, Plant Loading and Plant Operations only; Mark fully live takes the tag off the card; card tags are plain labels; the write-back stays on while a screen is on the new app');
 
     // Someone outside United Dairy is signed straight back out.
     const outsider = await openPage(browser, 1366, 650, '/daily.html?testEmail=someone@gmail.com');

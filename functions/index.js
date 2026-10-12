@@ -279,6 +279,13 @@ async function writeBackIfOn(part) {
       throw new Error('Write-back stopped: WRITEBACK_JSON.masters.' + k + ' and SOURCES_JSON must name the same sandbox copy');
     }
   });
+  // Pickups: the sandbox copy of the Plant Operations workbook (WRITEBACK_JSON "plant": {"pickups": {...}}), the same copy the transfer reads.
+  const plantPickups = (target.plant || {}).pickups;
+  if (plantPickups) {
+    const src = transferSources(process.env).plant.pickups;
+    if (!src || src.spreadsheetId !== plantPickups.spreadsheetId || src.tab !== plantPickups.tab) throw new Error('Write-back stopped: WRITEBACK_JSON.plant.pickups and SOURCES_JSON must name the same sandbox copy');
+    masters.pickups = plantPickups;
+  }
   // The maintenance queues are tabs of the same sandbox Live workbook.
   const { TABS, LISTS } = require('./src/maintenance');
   Object.keys(LISTS).forEach(k => { masters[LISTS[k]] = { spreadsheetId: target.spreadsheetId, tab: TABS[k] }; });

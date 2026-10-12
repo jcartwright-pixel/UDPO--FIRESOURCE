@@ -94,6 +94,7 @@ test('Turn on everything that is ready turns the write-back on and moves only th
   // Schedule and Route Editor are ready too; Driver Check-ins is not.
   ['drivers', 'vacations', 'routes'].forEach(k => assert.equal(out.screenOwners[k], 'new', k + ' is ready (Joe 10/12)'));
   assert.equal(out.screenOwners.checkIns, 'old', 'checkIns is not ready');
+  assert.equal(out.screenOwners.plant, 'new', 'Plant Operations is ready (Joe 10/12, "turn all 8 sheets on")');
   const c = await config();
   assert.equal(c.mode, 'live');
   assert.equal(c.writeBack.enabled, true);
