@@ -132,12 +132,30 @@ async function cameraShot(page, color) {
 
     // The walk.
     const wk = await openPage(browser, 1920, 1080, '/safety.html?' + ADMIN);
+    // Joe 10/12 (mock-up A): Plant, Garage and Office fold open like folders; the walk starts at the first sub-area.
+    await wk.waitForSelector(row('dock_chocks'));
+    const tree = () => wk.$$eval('#areas button', b => b.map(x => x.firstChild.textContent));
+    const P = S.places(S.checklist(null));
+    assert.deepEqual(await tree(), ['Open issues from earlier walks', 'Plant'].concat(P[0].areas.map(a => a.name), ['Garage', 'Office', 'Walk notes']), 'Plant is open with its sub-areas; Garage and Office are folded');
+    assert.match(await wk.textContent('#areas [data-place="Garage"] small'), /^0 of \d+ · Show$/);
+    assert.equal(await wk.textContent('#list section h2'), 'Plant \u203a Receiving & Docks');
+    await wk.click('#areas [data-place="Garage"]');
+    assert.deepEqual((await tree()).slice(-8), ['Garage'].concat(P[1].areas.map(a => a.name), ['Office', 'Walk notes']), 'Show opens Garage');
+    await wk.click('#areas [data-place="Garage"]');
+    // The earlier issue (floors) shows in the sub-area where it was found; Next goes on in walking order.
+    await wk.click('#areas [data-area="processing"]');
+    await wk.waitForSelector('#list .sw-here + table tr[data-issue-row="old_issue"]');
+    assert.equal(await wk.textContent('#list .sw-next'), 'Next: Plant \u203a Ammonia Room \u2192');
+    await wk.click('#list .sw-next');
+    assert.equal(await wk.textContent('#list section h2'), 'Plant \u203a Ammonia Room');
+    await shot(wk, 'safety-walk-subarea-1920');
+    // All in order: every sub-area in one long list (kept on this device).
+    await wk.click('#list [data-mode="all"]');
     await wk.waitForSelector(row('exit_routes'));
-    await wk.waitForSelector('#list tr[data-issue-row="old_issue"]');
+    await wk.waitForSelector('#list section[data-sec="issues"] tr[data-issue-row="old_issue"]');
     assert.equal(await wk.textContent('#title'), 'Weekly Walk ' + Number(today.slice(5, 7)) + '-' + Number(today.slice(8)) + '-' + today.slice(2, 4));
     assert.ok(await wk.$(row('ext_monthly')), 'the month\'s first walk has the monthly items');
     assert.equal(await wk.textContent(row('exit_routes') + ' .sw-state'), 'Not checked');
-    assert.deepEqual(await wk.$$eval('#areas button', b => b.map(x => x.firstChild.textContent)), ['Open issues from earlier walks'].concat(S.checklist(null).map(a => a.name), ['Walk notes']));
     // Joe 10/12: every row has a note box, marked or not.
     assert.equal(await wk.$$eval('#list tr[data-row]', r => r.filter(x => !x.querySelector('input[data-note]')).length), 0, 'every row has a note box');
     await wk.click(row('exit_routes') + ' .sw-btn.good');
@@ -162,7 +180,7 @@ async function cameraShot(page, color) {
     await takePhoto(wk, 'panel_labels', '#c62828');
     await wk.waitForSelector(row('panel_labels') + ' .sw-thumbs img');
     await wk.check('#list input[data-maint="panel_labels"]');
-    await wk.click('#list tr[data-issue-row="old_issue"] .sw-btn.open');
+    await wk.click('#list section[data-sec="issues"] tr[data-issue-row="old_issue"] .sw-btn.open');
     const saved = async () => (await db().collection('safetyWalks').doc(S.walkId(UT, today)).get()).data();
     for (let i = 0; i < 40; i++) { const w = await saved(); if (w && w.items.panel_labels && w.items.panel_labels.maint && w.reviews && w.reviews.old_issue && w.reviews.old_issue.status && w.note && (w.items.exit_routes.photoIds || []).length && (w.items.panel_labels.photoIds || []).length) break; await wk.waitForTimeout(250); }
     const w = await saved();
@@ -171,7 +189,7 @@ async function cameraShot(page, color) {
     assert.deepEqual([w.items.exit_routes.photoIds.length, w.items.panel_labels.photoIds.length], [1, 1], 'a photo on a Good item and on a Not good item');
     assert.match((await db().collection('safetyPhotos').doc(w.items.exit_routes.photoIds[0]).get()).data().data, /^data:image\/jpeg;base64,/);
     assert.match(await wk.textContent('#counts'), /^1 Good · 1 Not good · \d+ Not checked/);
-    assert.equal(await wk.getAttribute('#list tr[data-issue-row="old_issue"] .sw-btn.open', 'aria-pressed'), 'true');
+    assert.equal(await wk.getAttribute('#list section[data-sec="issues"] tr[data-issue-row="old_issue"] .sw-btn.open', 'aria-pressed'), 'true');
     await fits(wk, 'The walk at 1920');
     assert.ok(await smallest(wk, '#list td, #list .sw-btn, #areas button, #list textarea, #list input[type="text"]') >= 15, 'walk text stays readable');
     await shot(wk, 'safety-walk-1920');
@@ -250,10 +268,38 @@ async function cameraShot(page, color) {
     }
     results.push('Past Walks lists today\'s walk with its notes and photos; Checklist Setup shows the starting list; both fit 1536');
 
+    // Joe 10/12 (mock-ups A and J): Checklist Setup renames a sub-area, adds one, moves an item to it and changes the walking order.
+    const cs = await openPage(browser, 1536, 864, '/safety-setup.html?' + ADMIN);
+    await cs.waitForSelector('#rows tr.sw-place-row');
+    assert.deepEqual(await cs.$$eval('#rows tr.sw-place-row input[data-k="place"]', i => i.map(x => x.value)), ['Plant', 'Garage', 'Office']);
+    const setupNow = async () => S.checklist((await db().collection('safetySetup').doc(UT).get()).data() || null, true);
+    const until = async (ok, what) => { for (let i = 0; i < 40; i++) { if (ok(await setupNow())) return; await cs.waitForTimeout(250); } assert.fail(what); };
+    await cs.fill('#rows tr.sw-sub-row input[value="Wash Bay"]', 'Truck Wash');
+    await cs.press('#rows tr.sw-sub-row input[value="Wash Bay"]', 'Tab');
+    await until(l => l.some(a => a.key === 'g_wash' && a.name === 'Truck Wash' && a.place === 'Garage'), 'the sub-area is renamed');
+    await cs.fill('#rows tr[data-newsub][data-place="Office"] input', 'Conference Room');
+    await cs.press('#rows tr[data-newsub][data-place="Office"] input', 'Tab');
+    await until(l => l.length && l[l.length - 1].name === 'Conference Room' && l[l.length - 1].place === 'Office', 'a sub-area is added at the end of Office');
+    await cs.waitForSelector('#rows tr.sw-sub-row input[value="Conference Room"]');
+    const cleanRow = '#rows tr:has(input[value="Microwave and fridge area clean"])';
+    await cs.selectOption(cleanRow + ' select[data-k="move"]', { label: 'Conference Room' });
+    await until(l => (l.find(a => a.name === 'Conference Room') || { items: [] }).items.some(i => i.id === 'o_clean') && !l.find(a => a.key === 'o_break').items.some(i => i.id === 'o_clean'), 'Move to moves the item');
+    await cs.waitForSelector('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-sub-up]');
+    await cs.click('#rows tr.sw-sub-row:has(input[value="Conference Room"]) [data-sub-up]');
+    await until(l => { const o = l.filter(a => a.place === 'Office').map(a => a.name); return o[o.length - 1] === 'Stairs & Exits' && o[o.length - 2] === 'Conference Room'; }, 'Move up changes the walking order');
+    await fits(cs, 'Checklist Setup at 1536');
+    await shot(cs, 'safety-setup-areas-1536');
+    assert.deepEqual(cs.errors, []);
+    await cs.close();
+    results.push('Checklist Setup (Plant, Garage, Office): a sub-area renamed by typing over it, + Add sub-area, Move to another sub-area and Move up for the walking order all save');
+
     // Joe 10/12: iPad and Android, tablets both ways and a phone. Every safety screen fits the device with big buttons.
     const DEVICES = [['iPad (gen 7)', 'ipad-portrait'], ['iPad (gen 7) landscape', 'ipad-landscape'], ['Galaxy Tab S4', 'android-tablet-portrait'], ['Galaxy Tab S4 landscape', 'android-tablet-landscape'], ['Pixel 7', 'android-phone']];
     for (const [name, tag] of DEVICES) {
       const d = await openDevice(browser, name, '/safety.html?' + ADMIN);
+      await d.waitForSelector('#areas [data-place="Plant"]');
+      await shot(d, 'safety-walk-tree-' + tag);
+      await d.click('#list [data-mode="all"]');
       await d.waitForSelector(row('floors'));
       await d.waitForFunction(() => document.querySelector('#list .sw-btn.good').getBoundingClientRect().height > 0);
       await fits(d, 'The walk on ' + name);
@@ -287,6 +333,7 @@ async function cameraShot(page, color) {
     const items = S.checklist(null).flatMap(a => a.items.map(i => i.id)).filter(id => ['exit_routes', 'panel_labels', 'floors', 'ext_monthly'].indexOf(id) < 0);
     for (const [name, tag, [tapId, noteId, photoId]] of [['iPad (gen 7)', 'ipad', items.slice(0, 3)], ['Galaxy Tab S4', 'android', items.slice(3, 6)]]) {
       const d = await openDevice(browser, name, '/safety.html?' + ADMIN);
+      await d.click('#list [data-mode="all"]');
       await d.waitForSelector(row(tapId));
       // The screens and the Firebase code are kept on the device, and the screen cache is in charge of the page.
       await d.waitForFunction(async () => { if (!navigator.serviceWorker.controller) return false; const c = await caches.open('ud-offline-v1'); return !!(await c.match('safety.html')) && !!(await c.match('js/offline-saves.js')) && !!(await c.match('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js')); }, null, { timeout: 20000 });

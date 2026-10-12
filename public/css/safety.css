@@ -190,3 +190,30 @@ table.sw-grid input[type="checkbox"] { width: 24px; height: 24px; min-width: 24p
 @media (max-width: 1100px), (pointer: coarse) { .safety-page .head .actions.in-head.top-row > .sw-top, .safety-page .head .actions.in-head > .sw-top { height: auto; min-height: 48px; } }
 .safety-page #filter button[data-f] { font-size: 16px; }
 @media (max-width: 1100px), (pointer: coarse) { .safety-page #filter button[data-f] { height: auto; min-height: 48px; } }
+
+/* Joe 10/12 (mock-up A): Plant, Garage and Office fold open like folders, each sub-area with its count. */
+.sw-areas button.sw-place { margin-top: 6px; background: var(--band); color: var(--ud-blue-dark); font-size: 17px; }
+.sw-areas button.sw-place.open { border-color: var(--ud-blue); }
+.sw-areas button.sub { margin-left: 14px; width: calc(100% - 14px); font-weight: 600; }
+.sw-areas button.sub.on { font-weight: 700; }
+.sw-mode { display: flex; gap: 6px; padding: 8px 14px; background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 3; }
+.sw-mode button { min-height: 40px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font-weight: 700; font-size: 16px; line-height: 1.2; font-family: inherit; cursor: pointer; white-space: nowrap; }
+.sw-mode button[aria-pressed="true"] { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.sw-list .sw-sec { top: 57px; }
+.sw-here { padding: 8px 14px; background: #fff6f6; color: var(--sw-red); font-weight: 700; font-size: 16px; border-bottom: 1px solid #f2d6d6; }
+.sw-nextrow { padding: 12px 14px; display: flex; justify-content: flex-end; }
+.sw-next { min-height: 48px; padding: 10px 22px; border: 0; border-radius: 8px; background: var(--ud-blue); color: #fff; font-weight: 800; font-size: 17px; font-family: inherit; cursor: pointer; }
+@media (max-width: 1100px), (pointer: coarse) {
+  .sw-areas button.sub { width: auto; margin-left: 0; }
+  .sw-areas button.sw-place { margin-top: 0; }
+  .sw-mode button { min-height: 48px; flex: 1; }
+  .sw-next { width: 100%; min-height: 56px; }
+}
+/* Checklist Setup (mock-up J): an area's row, then each sub-area's row with Move up / Move down, then its items. */
+table.sw-grid tr.sw-place-row td { background: var(--band) !important; }
+table.sw-grid tr.sw-place-row input[data-k="place"] { width: 260px; font-weight: 800; font-size: 18px; color: var(--ud-blue-dark); }
+table.sw-grid tr.sw-place-row .sw-how { display: inline; margin-left: 12px; }
+table.sw-grid tr.sw-sub-row td { background: #f7fafd !important; }
+.sw-sub-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+table.sw-grid .sw-sub-line input[data-k="name"] { width: 260px; font-weight: 700; }
+table.sw-grid tr.sw-add input[data-k="newsub"], table.sw-grid tr.sw-add input[data-k="newplace"] { width: 340px; max-width: 100%; }

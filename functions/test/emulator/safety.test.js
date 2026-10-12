@@ -38,7 +38,7 @@ test('A walk: Good and Not good, a note and a photo, the next walk reviews it, a
   let list = await issues();
   assert.equal(list.length, 1);
   assert.deepEqual([list[0].item, list[0].area, list[0].note, list[0].photo, list[0].sendToMaint, list[0].maintStatus, list[0].status, list[0].foundOn, list[0].foundByName],
-    ['Breakers labeled, no open holes in panels', 'Electrical', 'LP-3 missing labels', true, true, 'WAITING', 'OPEN', '2026-10-05', 'Test Viewer']);
+    ['Breakers labeled, no open holes in panels', 'Plant \u203a Electrical Rooms', 'LP-3 missing labels', true, true, 'WAITING', 'OPEN', '2026-10-05', 'Test Viewer']);
   assert.equal((await db().collection('safetyPhotos').doc(list[0].id).get()).data().data, 'data:image/jpeg;base64,AAAA');
   // Next week: not the month's first walk; the same item Not good again joins the open issue (a repeat), then it is fixed.
   await walkTap('2026-10-12', 'review', { issueId: list[0].id, status: 'OPEN' }, NEXT);
@@ -156,7 +156,9 @@ test('Checklist Setup: a manager changes the plant\'s list; an item left out sta
   await applyAction(db(), { email: MANAGER }, { action: 'saveSafetyChecklist', requestId: rid(), facilityId: UT, areas }, at(MON));
   const setup = (await db().collection('safetySetup').doc(UT).get()).data();
   const on = S.walkList(setup, true).flatMap(a => a.items.map(i => i.id));
-  assert.deepEqual(on, ['exit_routes', 'exit_signs', 'fire_new']);
+  const first = S.checklist(null)[0];
+  assert.deepEqual(on, [first.items[0].id, first.items[1].id, 'fire_new']);
+  assert.equal(setup.areas[0].place, 'Plant', 'each sub-area keeps its place (Plant, Garage or Office)');
   assert.equal(S.findItem(setup, 'floors').text, 'Floors free of standing water, milk and oil; drains open', 'items left out are kept, turned off');
   await assert.rejects(walkTap('2026-10-05', 'item', { itemId: 'floors', status: 'GOOD' }, MON), /not on this plant's checklist/, 'an item turned off is not walked');
   await walkTap('2026-10-05', 'item', { itemId: 'fire_new', status: 'GOOD' }, MON, DISPATCHER);

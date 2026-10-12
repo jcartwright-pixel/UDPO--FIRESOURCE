@@ -12,7 +12,8 @@
  * saveSafetyIssue: Open Issues' Mark Fixed, Reopen, what is wrong and Send to Plant Maintenance.
  * saveExtinguisher: add or change a plant's extinguisher (tag, location, type, size, service dates) or take it off the list.
  * saveExtinguisherCheck: one item of this month's check of an extinguisher; a Not good opens (or updates) an issue.
- * saveSafetyChecklist: a plant's own checklist (Checklist Setup).
+ * saveSafetyChecklist: a plant's own checklist (Checklist Setup): Plant, Garage and Office (each sub-area's place), sub-areas
+ *   in walking order, their items.
  *
  * Plant Maintenance (being built in its own thread) picks up issues with sendToMaint true and no workOrderId, and fills in
  * workOrderId and maintStatus; until then they show "Waiting for Plant Maintenance". Nothing here writes Google Sheets.
@@ -334,10 +335,10 @@ async function saveExtCheck(tx, db, req, email, stamp, logRef, mode, SaveError) 
 
 function validateChecklist(input, SaveError) {
   const facilityId = plantOf(input.facilityId, SaveError);
-  if (!Array.isArray(input.areas) || !input.areas.length || input.areas.length > 30) throw new SaveError('BAD_REQUEST', 'The checklist needs at least one area.');
-  const seen = {};
+  if (!Array.isArray(input.areas) || !input.areas.length || input.areas.length > 80) throw new SaveError('BAD_REQUEST', 'The checklist needs at least one area.');
+  const seen = {}, areaSeen = {};
   const areas = input.areas.map((a, n) => {
-    const name = text(a && a.name, 60), key = text(a && a.key, 40) || 'area' + (n + 1);
+    const name = text(a && a.name, 60), key = text(a && a.key, 40) || 'area' + (n + 1), place = text(a && a.place, 40) || 'Plant';
     if (!name) throw new SaveError('BAD_REQUEST', 'Every area needs a name.');
     if (!/^[A-Za-z0-9_-]+$/.test(key)) throw new SaveError('BAD_REQUEST', 'Bad area.');
     const items = (Array.isArray(a.items) ? a.items : []).slice(0, 60).map(i => {
@@ -349,7 +350,9 @@ function validateChecklist(input, SaveError) {
       seen[id] = true;
       return { id, text: t, freq, off: i.off === true };
     });
-    return { key, name, items };
+    if (areaSeen[key]) throw new SaveError('BAD_REQUEST', 'A sub-area is listed twice.');
+    areaSeen[key] = true;
+    return { place, key, name, items };
   });
   return { facilityId, areas };
 }
@@ -363,7 +366,7 @@ async function saveChecklist(tx, db, req, email, stamp, logRef, mode) {
   keep.forEach(a => a.items.forEach(i => {
     if (now[i.id]) return;
     let to = areas.find(x => x.key === a.key);
-    if (!to) { to = { key: a.key, name: a.name, items: [] }; areas.push(to); }
+    if (!to) { to = { place: a.place, key: a.key, name: a.name, items: [] }; areas.push(to); }
     to.items.push({ id: i.id, text: i.text, freq: i.freq, off: true });
   }));
   tx.set(ref, { facilityId: req.facilityId, areas, updatedAt: stamp, updatedBy: email });

@@ -54,13 +54,19 @@
     import { doc, getDoc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { today, pickPlant, plantName, canWalk, modeText, shrinkPhoto, watchOpenIssues, watchSetup, watchExtinguishers, agePill, maintText, foundLine, thisMonth } from './js/safety.js';
 
-    // The weekly walk (Joe 10/12, mock-up B): every area on one screen, each item Good or Not good, with a note and up to
-    // three photos on any item. A Not good also offers Send to Plant Maintenance, and becomes an open issue that the next walk reviews until it is fixed. The
-    // month's first walk carries the monthly items. Every tap and every box saves as it is left (no Save button).
+    // The weekly walk (Joe 10/12, mock-ups B and A): Plant, Garage and Office with their sub-areas on the left; each item Good
+    // or Not good, with a note and up to three photos. A Not good also offers Send to Plant Maintenance, and becomes an open
+    // issue that the next walk reviews until it is fixed (shown in the sub-area where it was found too). The month's first
+    // walk carries the monthly items. Every tap and every box saves as it is left (no Save button).
     const S = window.UDSafety, L = window.UDLogic;
     const params = new URLSearchParams(location.search);
     let db = null, person = null, app = {}, plant = '', walk = null, walkSeen = false, monthWalks = [], setup = null, setupSeen = false, open = [], fixedHere = [], exts = [];
     let date = today(), viewing = '', area = '', armFinish = false, stops = [];
+    // Joe 10/12 (mock-up A): Plant, Garage and Office fold open like folders; one sub-area at a time, or All in order (kept on
+    // this device). Places opened or closed here stay that way until the page is left.
+    let mode = 'one';
+    try { if (localStorage.getItem('udSafetyMode') === 'all') mode = 'all'; } catch (e) { /* no storage */ }
+    const shut = new Set(), opened = new Set();
     const mine = {}, reviewMine = {}, photos = {};
     // Joe 10/12: photos on any item (up to three). photoMine: photos taken or removed here that the saved walk does not show
     // yet (still sending, or held on this tablet with no signal): photo id -> { itemId, data ('' = removed) }.
@@ -100,14 +106,21 @@
       fin.disabled = !editable() || !walk;
       fin.textContent = walk && walk.finishedAt && !armFinish ? 'Walk Finished' : armFinish ? 'Press again: ' + c.notChecked + ' not checked' : 'Finish Walk';
     }
+    const done = (a) => a.items.filter(i => itemOf(i.id).status).length;
+    const placeOf = (key) => (list().find(a => a.key === key) || {}).place || '';
+    // Open issues from earlier walks found in a sub-area (they show there too, where they were found).
+    const issueArea = (i) => { const f = S.findItem(setup, i.itemId); return f ? f.areaKey : ''; };
+    const isOpen = (p) => opened.has(p) || (!shut.has(p) && placeOf(area) === p);
     function drawAreas() {
       const n = toReview().filter(i => !reviewed(i.id)).length;
       document.getElementById('areas').innerHTML = '<button type="button" class="issues' + (area === 'issues' ? ' on' : '') + '" data-area="issues">Open issues from earlier walks<small>' + (toReview().length ? n + ' to review' : 'none') + '</small></button>' +
-        list().map(a => { const done = a.items.filter(i => itemOf(i.id).status).length;
-          return '<button type="button" data-area="' + escapeHtml(a.key) + '" class="' + (area === a.key ? 'on' : '') + (done === a.items.length ? ' done' : '') + '">' + escapeHtml(a.name) + '<small>' + done + ' of ' + a.items.length + '</small></button>'; }).join('') +
+        S.places(list()).map(p => {
+          const d = p.areas.reduce((x, a) => x + done(a), 0), t = p.areas.reduce((x, a) => x + a.items.length, 0), on = isOpen(p.name);
+          return '<button type="button" class="sw-place' + (on ? ' open' : '') + (d === t ? ' done' : '') + '" data-place="' + escapeHtml(p.name) + '" aria-expanded="' + on + '">' + escapeHtml(p.name) + '<small>' + d + ' of ' + t + (on ? '' : ' · Show') + '</small></button>' +
+            (on ? p.areas.map(a => '<button type="button" data-area="' + escapeHtml(a.key) + '" class="sub' + (area === a.key ? ' on' : '') + (done(a) === a.items.length ? ' done' : '') + '">' + escapeHtml(a.name) + '<small>' + done(a) + ' of ' + a.items.length + '</small></button>').join('') : '');
+        }).join('') +
         '<button type="button" data-area="notes" class="' + (area === 'notes' ? 'on' : '') + (walkNote() ? ' done' : '') + '">Walk notes<small>' + (walkNote() ? 'written' : 'none') + '</small></button>';
     }
-    // Joe 10/12: a note box on every row (whatever it was marked) and one for the whole walk; each saves as it is left.
     const noteBox = (attr, val, label, ph, extra) => '<td class="sw-note"><div class="sw-notecell">' + (editable() ? '<input type="text" ' + attr + ' value="' + escapeHtml(val || '') + '" maxlength="500" placeholder="' + ph + '" aria-label="Note: ' + escapeHtml(label) + '">' : (val ? '<span>' + escapeHtml(val) + '</span>' : '')) + (extra || '') + '</div></td>';
     // The tablet's camera (Android Chrome and iPad Safari open it straight away); hidden once the item has three photos.
     // One camera box outside the list, so the list redrawing while the camera is open never loses the photo.
@@ -122,8 +135,8 @@
       }).join('') + '</span>';
     }
     const btns = (attrs, pressed, choices) => choices.map(([v, label, cls]) => '<button type="button" class="sw-btn ' + cls + '" ' + attrs + ' data-v="' + v + '" aria-pressed="' + (pressed === v) + '"' + (editable() ? '' : ' disabled') + '>' + label + '</button>').join('');
-    function reviewRows() {
-      const rs = toReview();
+    function reviewRows(only) {
+      const rs = only || toReview();
       if (!rs.length) return '<div class="sw-empty">No open issues from earlier walks.</div>';
       return '<table class="sw-table"><tbody>' + rs.map(i => {
         const r = reviews()[i.id], st = r && r.status ? r.status : (i.status === 'FIXED' ? 'FIXED' : '');
@@ -155,15 +168,30 @@
         return row;
       }).join('');
     }
+    const started = () => walk ? '<span>Started by ' + escapeHtml(walk.startedByName || walk.startedBy || '') + ' ' + dateTimeText(walk.startedAt).replace(/^\S+ /, '') + (walk.finishedAt ? ' · finished ' + dateTimeText(walk.finishedAt).replace(/^\S+ /, '') : '') + '</span>' : '';
+    const issuesSec = () => '<section data-sec="issues"><div class="sw-sec"><h2>Open issues from earlier walks</h2><span>' + (viewing ? 'As they were reviewed on this walk.' : 'Mark each one Still open or Fixed.') + '</span></div>' + reviewRows() + '</section>';
+    const notesSec = () => '<section data-sec="notes"><div class="sw-sec"><h2>Walk notes</h2><span>Anything about the whole walk.' + (walk && walk.noteByName && walkNote() ? ' Last written by ' + escapeHtml(walk.noteByName) + '.' : '') + '</span></div>' +
+      '<div class="sw-walknote">' + (editable() ? '<textarea id="walk-note" maxlength="1000" aria-label="Walk notes" placeholder="Walk notes">' + escapeHtml(walkNote()) + '</textarea>' : '<p>' + (walkNote() ? escapeHtml(walkNote()) : '<span class="sw-nc">No walk notes</span>') + '</p>') + '</div></section>';
+    const areaSec = (a, here) => '<section data-sec="' + escapeHtml(a.key) + '"><div class="sw-sec"><h2>' + escapeHtml(S.areaName(a)) + '</h2><span>' + done(a) + ' of ' + a.items.length + ' checked</span>' + (a === list()[0] ? started() : '') + '</div>' +
+      (here && here.length ? '<div class="sw-here">Still open from earlier walks, found here</div>' + reviewRows(here) : '') +
+      '<table class="sw-table"><tbody>' + itemRows(a) + '</tbody></table></section>';
+    // After a sub-area: the next one in walking order (then Walk notes).
+    function nextOf(key) {
+      const l = list(), at = l.findIndex(a => a.key === key), nx = l[at + 1];
+      return nx ? '<button type="button" class="sw-next" data-go="' + escapeHtml(nx.key) + '">Next: ' + escapeHtml(S.areaName(nx)) + ' &rarr;</button>' : '<button type="button" class="sw-next" data-go="notes">Next: Walk notes &rarr;</button>';
+    }
     function drawList(force) {
       const box = document.getElementById('list');
       if (force !== true && box.contains(document.activeElement) && ['TEXTAREA', 'INPUT'].indexOf(document.activeElement.tagName) >= 0) return;
-      const top = box.scrollTop;
-      box.innerHTML = '<section data-sec="issues"><div class="sw-sec"><h2>Open issues from earlier walks</h2><span>' + (viewing ? 'As they were reviewed on this walk.' : 'Mark each one Still open or Fixed.') + '</span></div>' + reviewRows() + '</section>' +
-        list().map(a => '<section data-sec="' + escapeHtml(a.key) + '"><div class="sw-sec"><h2>' + escapeHtml(a.name) + '</h2>' + (a === list()[0] && walk ? '<span>Started by ' + escapeHtml(walk.startedByName || walk.startedBy || '') + ' ' + dateTimeText(walk.startedAt).replace(/^\S+ /, '') + (walk.finishedAt ? ' · finished ' + dateTimeText(walk.finishedAt).replace(/^\S+ /, '') : '') + '</span>' : '') + '</div>' +
-          '<table class="sw-table"><tbody>' + itemRows(a) + '</tbody></table></section>').join('') +
-        '<section data-sec="notes"><div class="sw-sec"><h2>Walk notes</h2><span>Anything about the whole walk.' + (walk && walk.noteByName && walkNote() ? ' Last written by ' + escapeHtml(walk.noteByName) + '.' : '') + '</span></div>' +
-          '<div class="sw-walknote">' + (editable() ? '<textarea id="walk-note" maxlength="1000" aria-label="Walk notes" placeholder="Walk notes">' + escapeHtml(walkNote()) + '</textarea>' : '<p>' + (walkNote() ? escapeHtml(walkNote()) : '<span class="sw-nc">No walk notes</span>') + '</p>') + '</div></section>';
+      const top = box.scrollTop, l = list();
+      if (!area || (area !== 'issues' && area !== 'notes' && !l.some(a => a.key === area))) area = (l.find(a => done(a) < a.items.length) || l[0] || { key: 'issues' }).key;
+      const bar = '<div class="sw-mode" role="group" aria-label="Show"><button type="button" data-mode="one" aria-pressed="' + (mode === 'one') + '">This sub-area</button><button type="button" data-mode="all" aria-pressed="' + (mode === 'all') + '">All in order</button></div>';
+      let body;
+      if (mode === 'all') body = issuesSec() + l.map(a => areaSec(a)).join('') + notesSec();
+      else if (area === 'issues') body = issuesSec();
+      else if (area === 'notes') body = notesSec();
+      else { const a = l.find(x => x.key === area); body = areaSec(a, toReview().filter(i => issueArea(i) === a.key)) + '<div class="sw-nextrow">' + nextOf(a.key) + '</div>'; }
+      box.innerHTML = bar + body;
       box.scrollTop = top;
     }
     function render(force) {
@@ -262,16 +290,29 @@
     });
     list$.addEventListener('focusout', () => setTimeout(() => { if (!list$.contains(document.activeElement)) render(); }, 0));
     list$.addEventListener('scroll', () => {
+      if (mode !== 'all') return;
       const secs = [...list$.querySelectorAll('section[data-sec]')], top = list$.getBoundingClientRect().top;
       const cur = secs.filter(s => s.getBoundingClientRect().top - top < 60).pop() || secs[0];
       if (cur && cur.dataset.sec !== area) { area = cur.dataset.sec; drawAreas(); }
     }, { passive: true });
+    // Show a sub-area: on its own, or scrolled to in All in order.
+    function go(key) {
+      area = key; drawAreas();
+      if (mode !== 'all') { drawList(true); list$.scrollTop = 0; return; }
+      const sec = list$.querySelector('section[data-sec="' + CSS.escape(area) + '"]'), bar = list$.querySelector('.sw-mode');
+      if (sec) list$.scrollTop = sec.offsetTop - list$.offsetTop - (bar ? bar.offsetHeight : 0);
+    }
     document.getElementById('areas').addEventListener('click', e => {
+      const p = e.target.closest('[data-place]');
+      if (p) { const name = p.dataset.place; if (isOpen(name)) { opened.delete(name); shut.add(name); } else { shut.delete(name); opened.add(name); } drawAreas(); return; }
       const b = e.target.closest('[data-area]');
-      if (!b) return;
-      area = b.dataset.area; drawAreas();
-      const sec = list$.querySelector('section[data-sec="' + CSS.escape(area) + '"]');
-      if (sec) list$.scrollTop = sec.offsetTop - list$.offsetTop - (list$.firstElementChild ? list$.firstElementChild.offsetTop - list$.offsetTop : 0);
+      if (b) go(b.dataset.area);
+    });
+    list$.addEventListener('click', e => {
+      const m = e.target.closest('[data-mode]');
+      if (m) { mode = m.dataset.mode; try { localStorage.setItem('udSafetyMode', mode); } catch (err) { /* no storage */ } drawList(true); go(area); return; }
+      const g = e.target.closest('[data-go]');
+      if (g) { const pl = placeOf(g.dataset.go); if (pl) { shut.delete(pl); } go(g.dataset.go); }
     });
     // Finish Walk: pressed twice when items are still Not checked (no pop-ups).
     document.getElementById('finish').addEventListener('click', () => {
