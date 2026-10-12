@@ -133,9 +133,14 @@ exports.phone = onCall({ maxInstances: 3 }, async (request) => {
   } catch (error) { throw asHttps(error); }
 });
 
-// Open to the garage tablet without a United Dairy account: every step is checked against a technician's sign-in.
+// The garage tablet: every step is checked against a technician's sign-in; a coded Garage Station also needs the tablet's
+// United Dairy sign-in (Joe 10/12).
 exports.garage = onCall({ maxInstances: 3 }, async (request) => {
-  try { return await garageCall(db, request.data); } catch (error) { throw asHttps(error); }
+  try {
+    // Joe 10/12: a Garage Station with its code is signed in with a United Dairy account first (as every station).
+    if (request.data && request.data.station && !unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with the tablet\'s United Dairy account on the Garage Station first.');
+    return await garageCall(db, request.data);
+  } catch (error) { throw asHttps(error); }
 });
 
 exports.newRouteCode = onCall(async (request) => {

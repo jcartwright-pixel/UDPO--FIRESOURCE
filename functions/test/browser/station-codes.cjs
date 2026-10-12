@@ -169,7 +169,12 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.deepEqual(na.errors, []);
     results.push('Plant Station with no UD account: Off by default; On, the station code alone opens the station and its Loading screen; other screens refused; Turn Off sends it back to the code screen');
 
-    const gs = await openPage(browser, 1536, 864, '/garage-station.html');
+    // Joe 10/12 "all my stations will have a United Dairy login, then a code": the garage tablet signs in first.
+    const nogs = await openPage(browser, 1536, 864, '/garage-station.html');
+    await nogs.waitForSelector('#signin:not([hidden]) #signin-button');
+    assert.equal(await nogs.isVisible('#view-code'), false, 'no station code before the United Dairy sign-in');
+    await nogs.close();
+    const gs = await openPage(browser, 1536, 864, '/garage-station.html?testEmail=manager.test@uniteddairy.com');
     await gs.waitForSelector('#view-code form.st-code');
     await gs.fill('#view-code input', codes.garage);
     await gs.click('#view-code button');

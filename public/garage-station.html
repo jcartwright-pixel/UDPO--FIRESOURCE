@@ -16,7 +16,15 @@
   <link rel="stylesheet" href="css/stations.css">
 </head>
 <body class="fill phone gs-page">
-  <div id="screen">
+  <!-- Joe 10/12 "all my stations will have a United Dairy login, then a code to direct it to the correct place": the garage
+       tablet signs in with a United Dairy Google account first; then its station code. Mechanics still sign each job. -->
+  <div class="signin" id="signin" hidden>
+    <h1>Garage Station</h1>
+    <p>Sign in with the tablet's United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+  <div id="screen" hidden>
     <!-- Joe 10/10: a tablet screen on every screen size: a slim header with Back and Home, no desktop side menu. -->
     <div class="topbar">
       <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
@@ -112,7 +120,7 @@
   </div>
 
   <script type="module">
-    import { start, escapeHtml, goBack } from './js/app.js';
+    import { start, escapeHtml, goBack, requireSignIn } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
 
@@ -441,7 +449,8 @@
     }, 30000);
 
     view('jobs');
-    gate().catch(err => message(err.message));
+    let opened = false;
+    requireSignIn(() => { if (opened) return; opened = true; gate().catch(err => message(err.message)); });
   </script>
 </body>
 </html>
