@@ -197,7 +197,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   // In a frame each screen hides the app's header and menu by itself (app.js EMBED).
   const FRAME = { trailers: 'trailers.html', yardchecks: 'yard.html' };
   function frameView() {
-    const test = new URLSearchParams(location.search).get('testEmail'), src = FRAME[view] + (test ? '?testEmail=' + encodeURIComponent(test) : '');
+    const test = new URLSearchParams(location.search).get('testEmail'), src = FRAME[view] + '?inStation=1' + (test ? '&testEmail=' + encodeURIComponent(test) : '');
     const have = box.querySelector('iframe.sw-frame');
     if (have && have.dataset.src === src) return;
     box.innerHTML = '<iframe class="sw-frame" data-src="' + escapeHtml(src) + '" src="' + escapeHtml(src) + '" title="' + (view === 'trailers' ? 'Trailer Assignments' : 'Yard Checks') + '"></iframe>';

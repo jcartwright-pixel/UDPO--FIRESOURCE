@@ -13,6 +13,8 @@
   <script src="js/logic.js"></script>
 </head>
 <body class="fill ta-page">
+  <!-- Joe 10/12: inside the Plant Station (Yard Services) the screen has no Depart Time; it is mostly used on a phone. -->
+  <script>if (new URLSearchParams(location.search).get('inStation') === '1') document.body.classList.add('in-station');</script>
   <div class="signin" id="signin" hidden>
     <h1>Trailer Assignments</h1>
     <p>Sign in with your United Dairy Google account.</p>

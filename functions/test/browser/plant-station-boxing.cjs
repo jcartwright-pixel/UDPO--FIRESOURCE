@@ -148,12 +148,29 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
     assert.deepEqual(page.errors, []);
     results.push('Yard Services: Trailer Assignments (Run and Driver readable at 1024) and Yard Checks inside the station, without the app header and menu');
 
-    // Upright tablet and a wide screen: nothing cut off or wider than the screen.
-    for (const [w, h] of [[800, 1280], [1536, 864]]) {
+    // Joe 10/12: "we do not need to display the depart [time] on this ... this will probably be on a mobile maybe a tablet".
+    // Phone, upright tablets and a wide screen: no Depart Time, every word 16px or more, nothing cut off or wider than the
+    // screen; on the phone a trailer typed and Enter saves it and moves to the next route, as the old phone version did.
+    for (const [w, h] of [[390, 844], [600, 960], [800, 1280], [1536, 864]]) {
       const p2 = await openPage(browser, w, h, '/plant-station.html' + MANAGER + '&station=YARD_SERVICES', clock, w < 1200);
       await p2.waitForSelector('iframe.sw-frame[data-src^="trailers.html"]', { timeout: 15000 });
-      await p2.frameLocator('iframe.sw-frame').locator('[data-trailer]').first().waitFor({ timeout: 15000 });
+      const fr = p2.frameLocator('iframe.sw-frame');
+      await fr.locator('[data-trailer]').first().waitFor({ timeout: 15000 });
+      assert.equal(await fr.locator('.ta-depart').first().isVisible(), false, 'no Depart Time in the station at ' + w);
+      const small = await fr.locator('#rows .ta-row > span, .ta-headrow > span, #rows input').evaluateAll(els => els.filter(e => e.offsetParent && e.textContent.trim() || e.tagName === 'INPUT').map(e => parseFloat(getComputedStyle(e).fontSize)).filter(n => n < 16));
+      assert.deepEqual(small, [], 'every word is 16px or more at ' + w);
+      const over = await fr.locator('#rows .ta-row').evaluateAll(rows => rows.flatMap(r => [...r.children]).filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1 && !e.querySelector('input')).map(e => e.textContent));
+      assert.deepEqual(over, [], 'nothing cut off at ' + w);
       assert.ok(await fits(p2), 'Yard Services fits ' + w);
+      if (w === 390) {
+        const boxes = fr.locator('#rows [data-trailer]');
+        await boxes.nth(1).fill('T-977');
+        await boxes.nth(1).press('Enter');
+        await p2.waitForFunction(() => { const d = document.querySelector('iframe.sw-frame').contentDocument, a = d.activeElement, all = [...d.querySelectorAll('#rows [data-trailer]')]; return all.indexOf(a) === 2; });
+        for (let i = 0; i < 100 && !(await db().collection('runs').get()).docs.some(d => JSON.stringify(d.data()).includes('T-977')); i++) await new Promise(r => setTimeout(r, 100));
+        assert.ok((await db().collection('runs').get()).docs.some(d => JSON.stringify(d.data()).includes('T-977')), 'Enter saved the trailer on the phone');
+        await shot(p2, 'yard-trailers-390-typed.png');
+      }
       await shot(p2, 'yard-trailers-' + w + '.png');
       assert.deepEqual(p2.errors, []);
       await p2.close();

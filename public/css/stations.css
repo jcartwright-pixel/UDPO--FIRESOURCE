@@ -532,3 +532,30 @@ body.ds-full .station-release:hover, body.ds-full .station-release:focus-visible
 .sw-po b { display: block; margin-top: 5px; min-height: 52px; line-height: 52px; font-size: 21px; color: #0b2f55; }
 /* Yard Services (Joe 10/12): Trailer Assignments and Yard Checks shown inside the station, without their header and menu. */
 .sw-frame { display: block; width: 100%; height: calc(100dvh - 130px); min-height: 560px; border: 1px solid #d5dfea; border-radius: 12px; background: #f3f6f9; }
+/* Joe 10/12: inside the Yard Services station Trailer Assignments has no Depart Time, and on a phone (mostly) or a tablet
+   every word is 16px or more: Route, Run, Driver, Truck and Trailer, the run and driver wrapping onto a second line. */
+body.ta-page.in-station .ta-depart { display: none; }
+body.ta-page.in-station .ta-headrow { font-size: 16px; }
+body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) minmax(0, 1.1fr) 110px 170px; }
+@media (min-width: 900px) and (max-width: 1300px) { body.ta-page.in-station .ta-row { grid-template-columns: 80px minmax(0, 1fr) minmax(0, 1.1fr) 92px 140px; } }
+@media (min-width: 600px) and (max-width: 899px) { body.ta-page.in-station .ta-row { grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1fr) 84px 120px; } body.ta-page.in-station .ta-headrow { font-size: 16px; } }
+@media (max-width: 599px) {
+  /* Five columns at 16px do not fit a phone: the truck sits under the driver (and Truck under Driver in the heading). */
+  body.ta-page.in-station .ta-row { grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1.1fr) 84px; font-size: 16px; }
+  body.ta-page.in-station .ta-row > span:nth-child(3), body.ta-page.in-station .ta-row > span:nth-child(4) { text-align: left; }
+  body.ta-page.in-station .ta-row > span:nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  body.ta-page.in-station .ta-row > span:nth-child(2) { grid-column: 2; grid-row: 1 / span 2; }
+  body.ta-page.in-station .ta-row > span:nth-child(3) { grid-column: 3; grid-row: 1; padding-bottom: 0; }
+  body.ta-page.in-station .ta-row > span:nth-child(4) { grid-column: 3; grid-row: 2; padding-top: 0; }
+  body.ta-page.in-station .ta-row > span:nth-child(5) { grid-column: 4; grid-row: 1 / span 2; }
+  body.ta-page.in-station .ta-row:not(.ta-headrow) > span:nth-child(2), body.ta-page.in-station .ta-row:not(.ta-headrow) > span:nth-child(3) { font-weight: 600; }
+  body.ta-page.in-station .ta-row .grey { font-weight: 400; }
+  body.ta-page.in-station .ta-headrow { font-size: 16px; letter-spacing: 0; text-transform: none; }
+  /* A name wraps between words; only a word too long for its column is split. */
+  body.ta-page.in-station .ta-row > span { padding: 6px 2px; overflow-wrap: break-word; word-break: normal; }
+  body.ta-page.in-station .ta-row .tr input { padding: 6px 2px; }
+  body.ta-page.in-station .ta-row .rt b { font-size: 18px; }
+  body.ta-page.in-station .view { padding: 0 4px 8px; }
+}
+/* Yard Services on a phone: the station's page margins give the trailer list its width. */
+@media (max-width: 599px) { .ps-page .view:has(.sw-frame) { padding-left: 6px; padding-right: 6px; } }
