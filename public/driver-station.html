@@ -152,6 +152,8 @@
         kiosk = null; document.getElementById('change').hidden = true; show(true);
         kiosk = await askCode(document.getElementById('code-box'), { kind: 'KIOSK', storeKey: CODE_KEY, call: stationCall, title: 'Enter this kiosk\'s code',
           hint: 'A manager gives each Driver Room kiosk and TV its code (Administration > Driver Station Codes). The kiosk remembers it after this.', message: r.message });
+        // A TV's code typed on the tablet link opens the TV display (no buttons, both lists rolling).
+        if (kiosk.type === 'TV' && !full) { location.replace(location.pathname + '?tv=1'); return; }
       } else kiosk = r.station || null;
       show(false);
       document.getElementById('change').hidden = !kiosk || full;
