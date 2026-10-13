@@ -163,13 +163,21 @@ async function wasp(page, parts) {
     results.push('Boxing Receiving at 800 wide: the scan list fits, text 16px and up');
 
     // The plant home: the Inventory card (Under Construction: administrators only while it is built).
-    const home = await openPage(browser, 1536, 864, '/index.html' + ADMIN);
-    await home.evaluate(() => sessionStorage.setItem('udPlant', 'fac_uniontown'));
-    await home.goto(HOSTING + '/index.html' + ADMIN);
-    await home.waitForSelector('.launch-card[data-side="inventory"].building img');
-    await home.waitForTimeout(400);
-    await shot(home, '0-home-inventory-card-1536.png');
-    await home.close();
+    // Joe 10/13: Inventory takes the last open spot, so the home shows 8 cards, 2 rows of 4, Inventory last, with no sideways scroll.
+    for (const [w, h] of [[1536, 864], [1920, 1080]]) {
+      const home = await openPage(browser, w, h, '/index.html' + ADMIN);
+      await home.evaluate(() => sessionStorage.setItem('udPlant', 'fac_uniontown'));
+      await home.goto(HOSTING + '/index.html' + ADMIN);
+      await home.waitForSelector('.launch-card[data-side="inventory"].building img');
+      await home.waitForTimeout(400);
+      const cards = await home.$$eval('.launch-card[data-side]', els => els.filter(e => e.offsetParent).map(e => { const r = e.getBoundingClientRect(); return { side: e.dataset.side, top: Math.round(r.top) }; }));
+      assert.equal(cards.length, 8, JSON.stringify(cards));
+      assert.equal(cards[7].side, 'inventory', 'Inventory is the last card');
+      assert.equal(new Set(cards.map(c => c.top)).size, 2, 'two rows of four');
+      assert.ok(await fits(home), 'home fits at ' + w);
+      await shot(home, '0-home-inventory-card-' + w + '.png');
+      await home.close();
+    }
     // The office: Inventory > Receiving Log.
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
       const log = await openPage(browser, w, h, '/inventory.html' + ADMIN);

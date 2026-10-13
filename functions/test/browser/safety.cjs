@@ -120,7 +120,7 @@ async function cameraShot(page, color) {
       await home.goto(HOSTING + '/index.html?' + ADMIN);
       await home.waitForSelector('.launch-card[data-side="safety"]');
       await home.waitForTimeout(400);
-      assert.deepEqual(await home.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'inventory', 'distribution', 'fleet', 'reports', 'safety']);
+      assert.deepEqual(await home.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports', 'safety', 'inventory']);
       assert.equal(await home.$eval('.launch-card[data-side="safety"]', c => c.classList.contains('building') && !!c.querySelector('.uc-banner') && !!c.querySelector('svg.launch-icon')), true, 'the card has its icon and the Under Construction banner');
       const box = await home.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.launch-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight, tops: [...new Set([...document.querySelectorAll('.launch-card')].map(c => Math.round(c.getBoundingClientRect().top)))].length }));
       assert.ok(box.bottom <= box.inner, 'the seven cards fit ' + w + ': ' + JSON.stringify(box));

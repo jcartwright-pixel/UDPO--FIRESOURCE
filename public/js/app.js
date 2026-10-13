@@ -110,13 +110,13 @@ export const SIDES = [
   // Joe 10/11: still Under Construction, so its screens open only for administrators (the shared buildingSideFor / mayOpenBuilding check below).
   { key: 'production', name: 'Plant Production', home: 'production.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines'], building: true, bannerInPic: true },
   { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance'], building: true, bannerInPic: true },
-  // Joe 10/13: Inventory (receiving scan-in first; later putaway, scan-out and counts). Under Construction while it is built.
-  { key: 'inventory', name: 'Inventory', home: 'inventory.html', pic: 'box-v1.webp', note: 'Receiving scan-in: every case and pallet scanned in, by lot', sections: ['Inventory'], building: true },
   { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
   { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Plant Reports', 'Distribution Reports', 'Fleet Reports'] },
   // Joe 10/12: a Safety Walkthrough card next to Reports (mock-up A). Under Construction (administrators only) while it is built.
-  { key: 'safety', name: 'Safety Walkthrough', short: 'Safety Walkthrough', home: 'safety.html', icon: 'safety', note: 'Weekly walk, open issues and fire extinguisher checks', sections: ['Safety Walkthrough'], building: true }
+  { key: 'safety', name: 'Safety Walkthrough', short: 'Safety Walkthrough', home: 'safety.html', icon: 'safety', note: 'Weekly walk, open issues and fire extinguisher checks', sections: ['Safety Walkthrough'], building: true },
+  // Joe 10/13: Inventory (receiving scan-in first; later putaway, scan-out and counts). Its own card in the last open spot on the home. Under Construction while it is built.
+  { key: 'inventory', name: 'Inventory', home: 'inventory.html', pic: 'box-v1.webp', note: 'Receiving scan-in: every case and pallet scanned in, by lot', sections: ['Inventory'], building: true }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
 // Pages opened from inside a side (not from its menu) that still belong to it, e.g. Plant Reports from a bookmark or the TV.
