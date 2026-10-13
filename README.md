@@ -110,7 +110,7 @@ the production deploy runs `tools/sandbox-diagnostics.cjs check` and stops if an
   SECURITY_REVIEW.md       sign-in, roles, rules and write-back review, in plain words
   firestore.indexes.json   keeps the big cell maps out of the indexes
   functions/
-    index.js               transferEveryMinute (schedule), transferNow (admin), save (callable),
+    index.js               transferEveryMinute (schedule), save (callable),
                            writeBackOnSave (each save) and writeBackEveryMinute (retry)
     src/logic.js           shared dispatch rules (dates, 6 AM roll, load-day blocks, Daily/Weekly rows)
     src/model.js           collections, Live column -> field map, run IDs

@@ -109,7 +109,6 @@ button.check { background: var(--ud-blue); color: #fff; border: 0; border-radius
 .dc-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .dc-arrow { font-style: normal; font-size: 30px; line-height: .8; color: var(--accent); }
 .dc-metrics { flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: end; grid-auto-rows: minmax(70px, 112px); gap: 9px; padding: 4px 13px 13px; }
-.dc-metrics.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .dc-metric { display: flex; flex-direction: column; justify-content: center; text-align: center; background: #edf6ff; border-radius: 11px; padding: 6px 4px; min-width: 0; }
 .dc-metric em { font-style: normal; font-size: 13px; font-weight: 800; color: #2c4f72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-metric b { font-size: clamp(22px, 3.6vh, 40px); line-height: 1.1; margin: 3px 0 2px; color: #0a3866; }
@@ -509,32 +508,6 @@ body.weekly-page { background: #eef3f7; }
 .card .owner.ext { background: #fff4d9; color: #8a5a00; border-color: #f0d48a; }
 @media (max-width: 900px) { .cards.cards4 { grid-template-columns: 1fr; grid-template-rows: none; } }
 
-/* Look C (Joe picked 10/9): run cards. Each row is a rounded white strip with a little space between,
-   the first column (route, unit, driver #) is a blue badge; headings sit quietly on the page colour. */
-.sheet:has(> table.cards-look), .sheet.scroll-list:has(table.cards-look) { background: transparent; border: 0; box-shadow: none; }
-table.cards-look { border-collapse: separate; border-spacing: 0 6px; }
-table.cards-look.daily { border-spacing: 0 3px; }
-table.cards-look th, table.cards-look td { border: 0; }
-table.cards-look thead th { background: #eef3f7; color: #43607c; font-size: 13px; letter-spacing: .06em; }
-table.cards-look tbody tr td { background: #fff; box-shadow: 0 1px 0 #dbe4ec, 0 -1px 0 #dbe4ec; }
-table.cards-look tbody tr td:first-child { border-radius: 10px 0 0 10px; box-shadow: 0 1px 0 #dbe4ec, 0 -1px 0 #dbe4ec, -1px 0 0 #dbe4ec; }
-table.cards-look tbody tr td:last-child { border-radius: 0 10px 10px 0; box-shadow: 0 1px 0 #dbe4ec, 0 -1px 0 #dbe4ec, 1px 0 0 #dbe4ec; }
-table.cards-look tbody tr td:only-child { border-radius: 10px; }
-table.cards-look.daily tbody tr:not(.group):not(.off) td:first-child, table.cards-look.routes tbody tr td:first-child { font-weight: 900; color: #fff; background: #1d5b91; }
-table.cards-look.routes tbody tr td:first-child small { color: #cfe0f1; }
-table.cards-look.routes tbody tr td:first-child button.edit { background: #fff; }
-table.cards-look tbody tr.group td { background: transparent !important; box-shadow: none; color: #0e3a62; text-align: left; font-size: 15px; padding: 8px 6px 0; border-radius: 0; }
-table.cards-look tbody tr:hover td:not(:first-child):not(.missing) { background: #f5f9fd; }
-table.cards-look tbody tr.off td { background: #fff8e6; }
-table.cards-look td.empty { border-radius: 10px; }
-/* Route Days: Runs light, Does Not Run black; the black cells keep their colour inside the strips. */
-.routes-page table.routes.days.cards-look td:has(> button[data-runday]:not(.on)) { background: #171c20; }
-/* Weekly keeps its black / yellow grid (the current app's colours); look C gives the route column the blue badge. */
-@media (max-height: 800px) { table.cards-look, table.cards-look.daily { border-spacing: 0 1px; } }
-/* Home header menu (Joe 10/9): the current app's extra screens as buttons, the new app's screens in one drop-down. */
-.home-menu a.ext::after { content: " \2197"; font-size: 12px; opacity: .7; }
-.home-menu select { height: 38px; border: 1px solid #b9c7d3; border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 700; color: var(--ud-blue); background: #fff; cursor: pointer; }
-@media (max-width: 1500px) { .home-menu a.ext, .home-menu select { padding: 6px 9px; font-size: 13px; } .home-menu .who { display: none; } }
 /* Route Editor · Show / Hide Rules: each true/false the screens read, as a clear YES / NO / BLANK. */
 .routes-page table.routes.rules td:has(> button.rule) { padding: 3px 6px; }
 .routes-page table.routes.rules button.rule { width: 100%; height: 32px; border-radius: 7px; font-size: 14px; font-weight: 800; border: 1px solid transparent; cursor: pointer; }
@@ -545,7 +518,6 @@ table.cards-look td.empty { border-radius: 10px; }
 .routes-page table.routes.rules b.shown { color: #1c6b3a; }
 .routes-page table.routes.rules b.off { color: #b3261e; }
 .routes-page table.routes.rules td.why { text-align: left; white-space: normal; font-size: calc(var(--font) - 2px); }
-.routes-page table.routes.rules.cards-look tr.hidden-run > td:not(:first-child) { background: #fdf1ef; }
 
 /* Left menu (Joe, 10/9): the same on every screen; the header keeps the logo, the user and Sign out. */
 body.has-side .topbar > a:not(.brand):not(#to-conflicts) { display: none; }
@@ -631,14 +603,6 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
   .drivers-page .sheet td .status, .drivers-page .sheet td .pill { font-size: 12px; padding: 2px 6px; }
   .drivers-page button.edit, .drivers-page input.truck { font-size: 14px; height: 30px; }
 }
-/* Back button: top of the left menu on every screen except Home. */
-.sidemenu .side-back { display: flex; align-items: center; gap: 12px; margin: 0 8px 4px; width: calc(100% - 16px); padding: 9px 10px; border-radius: 9px; border: 1px solid #ffffff59; background: #ffffff14; color: #fff; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; text-align: left; }
-.sidemenu .side-back svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.sidemenu .side-back:hover { background: #ffffff2b; }
-@media (max-width: 1500px) {
-  body:not(.side-open) .sidemenu .side-back span { display: none; }
-  body:not(.side-open) .sidemenu .side-back { justify-content: center; padding: 10px 0; }
-}
 .routes-page button.rule small { display: block; font-size: 10px; font-weight: 700; color: #c7d3de; text-transform: lowercase; line-height: 1; }
 /* Equipment Issues */
 .issues-page .view { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
@@ -649,8 +613,6 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .issues-page .kpis span { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 .issues-page .kpis .warn b { color: #b45f00; }
 .issues-page .kpis .good b { color: #1d7a3e; }
-.issues-page .kind-line { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; color: var(--muted); padding: 0 4px; }
-.issues-page .kind-line b { color: #12324f; }
 .issues-page .tabs button b { margin-left: 6px; display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: #0b4f8a1a; font-size: 12px; }
 .issues-page .tabs button[aria-selected="true"] b { background: #ffffff33; }
 .issues-page table.issues td { height: 46px; font-size: 15px; }
@@ -733,9 +695,6 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .drivers-page { --font: 17px; }
 .routes-page { --font: 16px; }
 tbody td { border-bottom: 1px solid #a9bbcd; }
-table.cards-look tbody tr td { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 #a9bbcd; }
-table.cards-look tbody tr td:first-child { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 #a9bbcd, -1px 0 0 #a9bbcd; }
-table.cards-look tbody tr td:last-child { box-shadow: 0 1px 0 #a9bbcd, 0 -1px 0 #a9bbcd, 1px 0 0 #a9bbcd; }
 .weekly-page .week td { border-color: #9fb3c7; font-size: 16px; }
 .weekly-page .week tbody td.strong { font-size: 17px; }
 .weekly-page #routes-sheet td.day:not(.off) { font-size: 15px; letter-spacing: 0; }
@@ -880,8 +839,6 @@ table.fs-facts th { text-align: left; width: 48%; color: var(--muted); font-weig
 .otr-week div { display: flex; flex-direction: column; align-items: center; padding: 10px; border: 1px solid #d5e1eb; border-radius: 10px; }
 .otr-week div.today { background: #e3f3e8; border-color: #a9d8b8; }
 .otr-week span { font-size: 28px; font-weight: 800; color: #123f70; }
-.otr-rep td, .otr-rep th { padding: 4px 6px; font-size: 14px; }
-.otr-rep td.neg { color: #c62828; font-weight: 700; }
 .otr-fig input.otr-in { width: 100%; height: 32px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: right; padding: 0 6px; font: inherit; font-size: 14px; }
 .otr-fig small, .otr-fig td small { display: block; color: #8a99a8; font-size: 11px; }
 tr.otr-on td { background: #e3f3e8; }
@@ -903,7 +860,6 @@ tr.otr-on td { background: #e3f3e8; }
 .otr-import table { width: auto; margin-top: 6px; border-collapse: collapse; }
 .otr-import td { padding: 3px 14px 3px 0; font-size: 14px; text-align: left; border: 0; height: auto; }
 .otr-import p { margin: 6px 0 0; color: var(--muted); }
-.otr-rep small.otr-by { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
 /* Over the Road 10/11: Joe's OTR Trips workbook tabs (By Date, Month Recap, Cost Per Gallon), laid out like the sheets, 16px. */
 .otr-page .hint { font-size: 16px; }
 .otr-page .sheet:has(.otr-sheet) { background: transparent; border: 0; }
@@ -1120,8 +1076,6 @@ td.eq-day span { display: block; white-space: nowrap; }
   .hub-card-head { grid-template-columns: 72px 1fr auto; }
   .hub-card-head img, .hub-wrench { width: 72px; height: 58px; }
 }
-/* Pictures from the United Dairy icon library in the menu sit on a small white tile so they read on the blue menu too. */
-img.lib-icon { flex: none; width: 26px; height: 22px; object-fit: contain; background: #fff; border-radius: 5px; padding: 1px; }
 .dc-icon.pic { background: #fff; border: 1px solid var(--line); }
 .dc-icon.pic img { width: 88%; height: 88%; object-fit: contain; }
 
@@ -1212,9 +1166,6 @@ table.fs-grid td.gc.AT_GARAGE { border-left-color: #1f5f9e; } table.fs-grid td.g
 .fs-legend { display: flex; align-items: center; margin: 0 0 8px; font-size: 13px; font-weight: 700; }
 .fs-legend em { margin-left: auto; font-style: normal; color: #5a6b7d; }
 
-/* Back and Home sit together at the top of the menu on every screen (Joe 10/10); Home looks like Back. */
-.sidemenu .side-home { margin-bottom: 6px; }
-
 /* Daily Dispatch, Joe's pick 10/10 (mock-up A): every row a white card with a blue edge, route numbers in blue,
    delivery-day lines as blue banners, RUNS and Edit as round buttons. Rows still size to fit the window. */
 body.daily-look .sheet { background: transparent; border: 0; box-shadow: none; overflow: visible; }
@@ -1283,9 +1234,6 @@ body.side-pinned.side-open .side-main { margin-left: 0; }
 
 /* Joe 10/10: Administrators get a fourth home card, Administration; its link in the menu shows only to them. */
 body:not(.is-admin) .sidemenu a[href="administration.html"] { display: none; }
-.launch-grid.with-admin { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.launch-art svg.launch-admin { width: auto; height: 78%; max-width: 78%; }
-@media (max-width: 1200px) { .launch-grid.with-admin { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* The Administration Center: every item of the current app's Administration, grouped, same-size tiles. */
 
@@ -1297,11 +1245,6 @@ body:not(.is-admin) .sidemenu a[href="administration.html"] { display: none; }
 .co-date { display: flex; flex-direction: column; align-items: center; padding: 10px 22px; border-radius: 12px; background: #fff; color: #0b3d6b; }
 .co-date small { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #5a6b7d; }
 .co-date b { font-size: 18px; font-weight: 900; }
-.co-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin: 0 16px 16px; }
-.co-kpi { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 10px; border-radius: 14px; background: #fff; border: 1px solid #dfe6ee; border-top: 5px solid var(--accent); text-align: center; }
-.co-kpi span { font-size: 13px; font-weight: 800; color: #4a6b8d; text-transform: uppercase; letter-spacing: .06em; }
-.co-kpi b { font-size: 30px; font-weight: 900; color: var(--accent); }
-.co-kpi small { font-size: 13px; color: #5a6b7d; }
 .co-plants { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0 16px 24px; }
 .co-plant { display: flex; flex-direction: column; border-radius: 16px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 6px 18px rgba(11, 61, 107, .10); color: #0b3d6b; text-decoration: none; overflow: hidden; transition: transform .12s, box-shadow .12s; }
 .co-plant:hover, .co-plant:focus-visible { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(11, 61, 107, .18); }
@@ -1330,7 +1273,7 @@ body:not(.is-admin) .sidemenu a[href="administration.html"] { display: none; }
 .co-soon { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; flex: 1; min-height: 260px; padding: 24px; text-align: center; color: #5a6b7d; }
 .co-soon b { font-size: 20px; color: #0b3d6b; }
 .co-plant.planned { opacity: .92; }
-@media (max-width: 1200px) { .co-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .co-plants { grid-template-columns: 1fr; } }
+@media (max-width: 1200px) { .co-plants { grid-template-columns: 1fr; } }
 
 /* Joe 10/10: Administration like the current app's tab, only better: every item in a menu on the left, the item opens on the right. */
 body.embed .topbar, body.embed .sidemenu, body.embed .side-flyouts { display: none !important; }
@@ -1349,7 +1292,6 @@ body.embed .side-main { margin-left: 0 !important; }
 .adm-item.on { background: #0b3d6b; color: #fff; }
 .adm-item .adm-name { flex: 1; min-width: 0; }
 .adm-item em { flex: none; font-style: normal; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: #f1f3f5; color: #6a7885; }
-.adm-item.viewonly em { background: #e3f3e8; color: #1c6b3a; }
 .adm-item.on em { background: rgba(255, 255, 255, .18); color: #fff; }
 .adm-ic { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
 .adm-ic img { max-width: 28px; max-height: 24px; object-fit: contain; }
@@ -1368,15 +1310,10 @@ body.embed .side-main { margin-left: 0 !important; }
 .adm-actions .button:hover { background: #1f6feb; }
 body.embed .head > .title { display: none; }
 .adm-state { font-size: 13px; font-weight: 800; padding: 6px 14px; border-radius: 999px; background: #f1f3f5; color: #6a7885; }
-.adm-state.viewonly { background: #e3f3e8; color: #1c6b3a; }
 .adm-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: #f2f5f9; }
 .adm-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; overflow: hidden; }
 .adm-view .scroll-list { flex: 1; min-height: 0; overflow: auto; border: 1px solid #e6ecf2; border-radius: 10px; }
 .adm-view .scroll-list thead th { position: sticky; top: 0; z-index: 1; }
-.adm-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.adm-kpis div { background: #f7fafd; border: 1px solid #e6ecf2; border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.adm-kpis b { font-size: 26px; color: #0b3d6b; line-height: 1.1; }
-.adm-kpis span { font-size: 12px; font-weight: 800; color: #5a6b7d; text-transform: uppercase; letter-spacing: .03em; }
 .adm-table { width: 100%; border-collapse: collapse; font-size: 16px; }
 .adm-table th { background: #0b3d6b; color: #fff; text-align: center; padding: 9px 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
 .adm-table td { text-align: center; padding: 8px 10px; border-bottom: 1px solid #e6ecf2; }
@@ -1384,7 +1321,6 @@ body.embed .head > .title { display: none; }
 .adm-table .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
 .adm-table .pill.good { background: #e3f3e8; color: #1c6b3a; }
 .adm-table .pill.muted { background: #f1f3f5; color: #6a7885; }
-.adm-note { margin: 0; font-size: 13px; }
 .adm-loading { color: #5a6b7d; }
 .adm-soon { margin: 30px auto; max-width: 620px; text-align: center; padding: 28px; border: 1px dashed #c9d5e1; border-radius: 14px; background: #f9fbfd; }
 .adm-soon h3 { margin: 0 0 8px; font-size: 20px; color: #0b3d6b; }
@@ -1537,8 +1473,6 @@ table td button.warn { font-size: 15px; }
 .routes-page .recap-totals[hidden] { display: none; }
 .routes-page table.routes.recap tfoot td { text-align: center; position: sticky; bottom: 0; z-index: 1; background: #e3edf6; font-weight: 800; color: #0e3a62; border-top: 2px solid #9fbbe0; }
 .routes-page table.routes.seq td.move { padding: 3px 4px; white-space: nowrap; }
-.routes-page table.routes.seq button.seq-move { width: 44px; height: 32px; margin: 0 2px; border: 1px solid #9dc2df; border-radius: 7px; background: #edf7ff; color: #0a5e9d; font-size: 16px; cursor: pointer; }
-.routes-page table.routes.seq button.seq-move:disabled { opacity: .35; cursor: default; }
 .routes-page table.routes.many td:has(> select.rf) { padding: 3px 4px; }
 .routes-page table.routes.many select.rf { width: 100%; height: 34px; border: 1px solid #c5d3df; border-radius: 6px; font: inherit; font-weight: 700; color: var(--ink); background: #fff; }
 .routes-page table.routes.many input[type="checkbox"].rf { width: 22px; height: 22px; margin: 0; cursor: pointer; accent-color: #0e4f87; }

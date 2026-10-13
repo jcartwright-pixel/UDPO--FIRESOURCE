@@ -201,22 +201,6 @@ export function pickText(kind, id) {
   return item ? (kind === 'driver' ? item.name : item.unit) : '';
 }
 
-// A drop-down in place of the cell. busy = {id: "on 802"} marks drivers or units already used that day.
-export function openPicker(td, kind, current, busy, onPick, opts) {
-  const select = document.createElement('select');
-  select.className = 'picker';
-  select.setAttribute('aria-label', 'Pick the ' + kind + (td.closest('tr') && td.closest('tr').dataset.id ? ' for this run' : ''));
-  select.innerHTML = optionsHtml(kind, current, busy, opts);
-  td.textContent = '';
-  td.appendChild(select);
-  select.focus();
-  let done = false;
-  const finish = (pick) => { if (done) return; done = true; onPick(pick); };
-  select.addEventListener('change', () => finish({ id: select.value, text: pickText(kind, select.value) }));
-  select.addEventListener('blur', () => finish(null));
-  select.addEventListener('keydown', e => { if (e.key === 'Escape') finish(null); });
-}
-
 export function openNote(td, current, onPick) {
   const input = document.createElement('input');
   input.className = 'picker';
