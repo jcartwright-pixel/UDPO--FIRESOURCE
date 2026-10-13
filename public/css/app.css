@@ -934,6 +934,20 @@ table.otr-fuel { width: 560px; margin-top: 14px; }
 .sc-board tr.sc-misses td { text-align: left; background: #f7fbfe; font-size: 16px; }
 .sc-board tr.sc-misses div { padding: 2px 0; }
 .sc-pts { color: #b42318; font-weight: 800; }
+/* Joe 10/13: Driver Scorecard on GPS. Driver and truck lead; trucks with alerts and no driver dispatched are listed under the board. */
+.sc-board td.sc-who small { color: #4a5b6c; }
+.sc-board td small { white-space: nowrap; }
+.sc-board th { white-space: normal; line-height: 1.1; padding: 0 3px; }
+.sc-lost { margin-top: 16px; }
+.sc-lost h2 { color: #b42318; font-size: 18px; margin: 0 0 4px; }
+.sc-lost .hint { margin: 0 0 8px; }
+.sc-lost td.sc-lost-list { text-align: left; line-height: 1.4; padding: 6px 10px; }
+#gps-note { color: #8a5a00; font-weight: 600; }
+/* Eight boxes on one line, so the board keeps its rows at 1536. */
+.score-page .kpis { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.score-page .kpis div { padding: 6px 8px; }
+.score-page .kpis b { font-size: 24px; }
+.score-page .kpis span { letter-spacing: 0; line-height: 1.15; }
 .sc-period { font-size: 18px; color: var(--ud-blue); min-width: 170px; text-align: center; }
 .sc-set { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; padding: 4px; }
 .sc-set p { color: inherit; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
