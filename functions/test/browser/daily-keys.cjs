@@ -113,8 +113,8 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.click('.head .title h1');
     await p.waitForTimeout(300);
     assert.equal(await text(p, R801, 6), 'T-778', 'an empty box kept T-778');
-    await p.click(R802 + ' td[data-edit="trailer"]');
-    assert.equal(await at(p), 'run_t802|tue trailer');
+    await p.click(R801 + ' td[data-edit="trailer"]');
+    assert.equal(await at(p), 'run_t801|tue trailer');
     results.push('typing 778 then clicking elsewhere saved T-778; an empty box clicked away kept it');
 
     // Joe 10/12 ("891 now won't show whole number"): the short number of a truck taken on another load finds it, greyed with
