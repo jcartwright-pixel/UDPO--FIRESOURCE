@@ -34,6 +34,14 @@ test('accidents and complaints: saved Under review, a manager marks them counted
   await assert.rejects(applyAction(db(), DISPATCHER, Object.assign({ requestId: rid(), action: 'addDriverIncident', kind: 'accident', accidentClass: 1 }, who), now), /role/);
 });
 
+test('PDA: saved as counting at once (a manager decision), with the step and reason; a bad step is refused', async () => {
+  const who = { driverKey: 'DRV_TEST_ADAMS', driver: 'ADAMS, PAT', date: '2026-10-12' };
+  const out = await applyAction(db(), MANAGER, Object.assign({ requestId: rid(), action: 'addDriverIncident', kind: 'pda', step: 'written', reason: 'Attendance', note: 'third late start' }, who), now);
+  const x = (await db().collection('driverIncidents').doc(out.incidentId).get()).data();
+  assert.deepEqual([x.kind, x.step, x.reason, x.status, x.reviewedBy], ['pda', 'written', 'Attendance', 'counts', MANAGER.email]);
+  await assert.rejects(applyAction(db(), MANAGER, Object.assign({ requestId: rid(), action: 'addDriverIncident', kind: 'pda', step: 'fired' }, who), now), /PDA step/);
+});
+
 test('Excuse: a manager excuses a GPS miss with a reason, and can take it back', async () => {
   const key = 'gps|2026-10-12|223893@2026-10-12T14:00:00Z|hardBrake';
   await applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key, reason: 'Deer in the road', driverKey: 'DRV_TEST_ADAMS', what: 'Hard stop' }, now);

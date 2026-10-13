@@ -86,9 +86,11 @@ async function seed(d) {
   b.set(d.collection('driverIncidents').doc('sample_diaz_acc'), { kind: 'accident', driverKey: 'DRV_S_DIAZ', driver: 'DIAZ, RAY', date: '2026-09-20', accidentClass: 1, type: 'Backing', truck: '223896', preventable: true, note: '', status: 'counts', enteredBy: 'manager.test@uniteddairy.com', reviewedBy: 'manager.test@uniteddairy.com' });
   b.set(d.collection('driverIncidents').doc('sample_adams_acc'), { kind: 'accident', driverKey: 'DRV_TEST_ADAMS', driver: 'ADAMS, PAT', date: '2026-10-03', accidentClass: 2, type: 'Fixed object', truck: '223893', status: 'counts', enteredBy: 'manager.test@uniteddairy.com' });
   b.set(d.collection('driverIncidents').doc('sample_adams_comp'), { kind: 'complaint', driverKey: 'DRV_TEST_ADAMS', driver: 'ADAMS, PAT', date: '2026-10-05', source: 'customer', customer: 'Kroger 512', severity: 'major', type: 'Late delivery', status: 'review', enteredBy: 'manager.test@uniteddairy.com' });
+  // Joe 10/13 PDA: LANE got a written warning (counts at once, 10 points).
+  b.set(d.collection('driverIncidents').doc('sample_lane_pda'), { kind: 'pda', driverKey: 'DRV_S_COLE', driver: 'LANE, SAM', date: '2026-10-06', step: 'written', reason: 'Attendance', note: '', status: 'counts', enteredBy: 'manager.test@uniteddairy.com' });
   await b.commit();
 }
-const AREA_HEADS = ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Seatbelt', 'Fuel MPG', 'Time', 'Truck Clean', 'Accidents', 'Complaints', 'Overall'];
+const AREA_HEADS = ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Seatbelt', 'Fuel MPG', 'Time', 'Truck Clean', 'Accidents', 'Complaints', 'PDA', 'Overall'];
 const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.replace(/\u00ad/g, '').trim()));
 
 (async () => {
@@ -111,14 +113,14 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       // Joe 10/13 rewards, 10 days: check-in 7 clean, no 5 in a row, 3 missed -12 = -5 -> 70 (D); speeding 8 clean, one
       // streak +2, 2 alerts -4 = 6 -> 92 (B); hard stops: the 10-8 one is excused, so 9 clean + a streak - 2 = 9 -> 98 (A);
       // no seatbelt alerts yet (–); fuel and the rest clean (100). Truck cleanliness 2 of 5 -> 70 (D). A 1st degree accident
-      // (reviewed) -15 -> 85 (B); complaints none (100). Overall (70+100+100+100+92+98+100+100+100+70+85+100)/12 = 93 (A).
-      assert.deepEqual(ray.slice(2), ['D', 'A', 'A', 'A', 'B', 'A', 'A', '–', 'A', 'A', 'D', 'B', 'A', '93 A'], 'grades by points per day; overall = average of the areas');
+      // (reviewed) -15 -> 85 (B); complaints and PDAs none (100). Overall (70+100+100+100+92+98+100+100+100+70+85+100+100)/13 = 93 (A).
+      assert.deepEqual(ray.slice(2), ['D', 'A', 'A', 'A', 'B', 'A', 'A', '–', 'A', 'A', 'D', 'B', 'A', 'A', '93 A'], 'grades by points per day; overall = average of the areas');
       assert.equal(await sc.$eval('tr[data-key="DRV_S_BAKER"] td:nth-child(13)', td => td.textContent.trim()), '–', 'not rated this month: no grade');
       assert.match(await sc.textContent('#sc-how'), /How scoring works: each area earns \+1 for a perfect day \(no miss in it\) and \+2 for every 5 perfect days in a row/);
       // Joe 10/13 Time grade: left too early (EVANS, 10 days) and back too late (FOX, 10 days) each cost 1 a day: -10 -> 60 (D).
       assert.equal(await sc.$eval('tr[data-key="DRV_S_EVANS"] td:nth-child(12)', td => td.textContent.trim()), 'D');
       assert.equal(await sc.$eval('tr[data-key="DRV_S_FOX"] td:nth-child(12)', td => td.textContent.trim()), 'D');
-      assert.match(await sc.textContent('#sc-how'), /Accidents \(12 months\), complaints \(6 months\) and call-offs \(3 months\) count past the period shown/);
+      assert.match(await sc.textContent('#sc-how'), /Accidents \(12 months\), PDAs \(9 months\), complaints \(6 months\) and call-offs \(3 months\) count past the period shown/);
       assert.match(await sc.textContent('#unassigned'), /No driver dispatched[\s\S]*10-8-26\s*229001\s*Speeding \(66 mph in a 45/, 'the alert on a truck with no driver is kept for a manager');
       const fit = await sc.evaluate(() => ({ table: document.querySelector('.sc-board').scrollWidth, box: document.querySelector('#sheet').clientWidth,
         small: [...document.querySelectorAll('.sc-board td, .sc-board th, .sc-board small')].filter(e => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).length }));
@@ -156,7 +158,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       // Joe 10/13: a tab per area; Speeding lists every driver's speeding.
       assert.deepEqual(await heads(sc, '#cats [data-tab]'), ['Overall'].concat(AREA_HEADS.slice(2, -1), ['Incidents & Complaints']));
       const strip = await sc.$eval('#cats', c => ({ h: c.getBoundingClientRect().height, sw: c.scrollWidth, cw: c.clientWidth }));
-      assert.ok(strip.h < 60, 'the tabs stay on one line: ' + JSON.stringify(strip));
+      assert.ok(strip.h < 60 && strip.sw <= strip.cw + 1, 'the tabs fit on one line: ' + JSON.stringify(strip));
       await sc.click('#cats [data-tab="speeding"]');
       await sc.waitForSelector('table.sc-area');
       assert.deepEqual(await heads(sc, 'table.sc-area thead th'), ['#', 'Driver', 'Grade', 'Score', 'Days', 'Perfect days', 'Earned', 'Points off', 'Speeding details']);
@@ -164,7 +166,8 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-tab-speeding-' + w + '.png') });
       await sc.click('#cats [data-tab="incidents"]');
       await sc.waitForSelector('table.sc-incidents');
-      assert.equal(await sc.$$eval('table.sc-incidents tbody tr', t => t.length), 3);
+      assert.equal(await sc.$$eval('table.sc-incidents tbody tr', t => t.length), 4);
+      assert.match(await sc.textContent('table.sc-incidents'), /LANE, SAM\s*PDA\s*Written warning\s*PDA: Written warning, Attendance\s*Manager decision\s*10/);
       assert.match(await sc.textContent('table.sc-incidents tr.sc-pending'), /ADAMS, PAT\s*Complaint\s*Major\s*Customer complaint \(Major\) from Kroger 512: Late delivery/);
       assert.equal(await sc.$eval('table.sc-incidents tr.sc-pending select', s => s.value), 'review', 'Under review until a manager marks it');
       if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-incidents-' + w + '.png') });
@@ -205,10 +208,10 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       const ro = await openPage(browser, 1536, 760, '/drivers.html?testEmail=manager.test@uniteddairy.com');
       await ro.waitForSelector('#rows tr[data-id]');
       const rh = await heads(ro, '.sheet thead th');
-      assert.deepEqual(rh.slice(-3), ['Accidents', 'Complaints', 'Edit']);
+      assert.deepEqual(rh.slice(-4), ['Accidents', 'Complaints', 'PDA', 'Edit']);
       await ro.waitForFunction(() => /review/.test(document.querySelector('#rows tr[data-id="drv_test_adams"]').textContent));
-      const adams = await ro.$eval('#rows tr[data-id="drv_test_adams"]', tr => [...tr.cells].slice(-3, -1).map(c => c.textContent.trim()));
-      assert.deepEqual(adams, ['1', '0 +1 review'], 'one counting accident; one complaint under review');
+      const adams = await ro.$eval('#rows tr[data-id="drv_test_adams"]', tr => [...tr.cells].slice(-4, -1).map(c => c.textContent.trim()));
+      assert.deepEqual(adams, ['1', '0 +1 review', '0'], 'one counting accident; one complaint under review; no PDA');
       await ro.click('#rows tr[data-id="drv_test_adams"] [data-edit]');
       await ro.waitForSelector('#d-inc-list .inc-item');
       assert.equal(await ro.$$eval('#d-inc-list .inc-item', l => l.length), 2);
@@ -220,6 +223,11 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       await ro.click('#i-cancel');
       await ro.click('#d-add-complaint');
       await ro.waitForSelector('#i-severity');
+      await ro.click('#i-cancel');
+      await ro.click('#d-add-pda');
+      await ro.waitForSelector('#i-step');
+      assert.deepEqual(await ro.$$eval('#i-step option', o => o.map(x => x.textContent)), ['Verbal warning', 'Written warning', 'Final written warning', 'Suspension']);
+      if (SHOTS) await ro.screenshot({ path: path.join(SHOTS, 'after-roster-add-pda-1536.png') });
       if (SHOTS) await ro.screenshot({ path: path.join(SHOTS, 'after-roster-add-complaint-1536.png') });
       const fitR = await ro.evaluate(() => ({ sw: document.querySelector('.sheet table').scrollWidth, cw: document.querySelector('.sheet').clientWidth }));
       assert.ok(fitR.sw <= fitR.cw + 1, 'the roster fits across with the two new columns: ' + JSON.stringify(fitR));

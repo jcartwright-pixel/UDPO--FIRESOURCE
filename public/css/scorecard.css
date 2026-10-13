@@ -42,8 +42,8 @@
 .sc-reasons { display: flex; flex-wrap: wrap; gap: 14px; }
 .sc-set .otr-card > button { align-self: flex-end; }
 /* Joe 10/13 Driver Scorecard: a tab per graded area, accidents and complaints, excused misses, the kiosk (TV) view. */
-.sc-cats { display: flex; flex-wrap: nowrap; gap: 3px; overflow-x: auto; margin: 0 0 8px; padding-bottom: 2px; }
-.sc-cats button { flex: 0 0 auto; height: 38px; padding: 0 6px; border: 1px solid #b7c9d8; border-radius: 8px; background: #fff; color: #12385f; font: inherit; font-size: 16px; font-weight: 700; white-space: nowrap; }
+.sc-cats { display: flex; flex-wrap: nowrap; gap: 2px; overflow-x: auto; margin: 0 0 8px; padding-bottom: 2px; }
+.sc-cats button { flex: 0 0 auto; height: 38px; padding: 0 5px; border: 1px solid #b7c9d8; border-radius: 8px; background: #fff; color: #12385f; font: inherit; font-size: 16px; font-weight: 700; white-space: nowrap; }
 .sc-cats button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
 .sc-board.sc-area td.sc-detail, .sc-board.sc-incidents td.sc-detail { text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; padding: 4px 8px; }
 .sc-board .sc-pending, .sc-board tr.sc-pending td { color: #8a5a00; }

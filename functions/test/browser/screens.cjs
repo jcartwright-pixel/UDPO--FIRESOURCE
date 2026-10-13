@@ -880,7 +880,7 @@ async function noScroll(page) {
     // Review items 18 and 60 (Joe 10/13): no empty "later" columns, and the month reads like Oct 26.
     // Joe 10/13 (GPS, then "I just want to see the driver"): the driver, a grade for each area, the overall score (scorecard-gps.cjs).
     // Joe 10/13: sleepers, seatbelt, fuel, accidents and complaints joined (long headings may break with a soft hyphen).
-    assert.deepEqual(await sc.$$eval('table.sc-board thead th', t => t.map(x => x.textContent.replace(/\u00ad/g, ''))), ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Seatbelt', 'Fuel MPG', 'Time', 'Truck Clean', 'Accidents', 'Complaints', 'Overall']);
+    assert.deepEqual(await sc.$$eval('table.sc-board thead th', t => t.map(x => x.textContent.replace(/\u00ad/g, ''))), ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Seatbelt', 'Fuel MPG', 'Time', 'Truck Clean', 'Accidents', 'Complaints', 'PDA', 'Overall']);
     assert.match(await sc.textContent('.sc-period'), /^[A-Z][a-z]{2} \d\d$/);
     await sc.click('.tabs [data-mode="year"]');
     await sc.waitForSelector('.sc-board');

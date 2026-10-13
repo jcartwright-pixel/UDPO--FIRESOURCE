@@ -55,6 +55,9 @@ var SC_CORE = Object.freeze({
     complaintMinor: 3, complaintMajor: 10, complaintFade1: 100, complaintFade2: 50,
     // Call-offs fade over 3 months: sickFade1..3 percent in the first, second and third month, then gone.
     sickFade1: 100, sickFade2: 66, sickFade3: 33,
+    // Joe 10/13 PDA (Progressive Discipline Action), a manager's decision (no review step): Verbal warning, Written warning,
+    // Final written warning, Suspension; 100% for 0-3 months, 66% for 3-6, 33% for 6-9, then gone.
+    pdaVerbal: 5, pdaWritten: 10, pdaFinal: 20, pdaSuspension: 30, pdaFade1: 100, pdaFade2: 66, pdaFade3: 33,
     // The Driver's Kiosk Station shows grades only; 1 also shows each driver's reasons.
     kioskReasons: 0
   }),
@@ -62,14 +65,17 @@ var SC_CORE = Object.freeze({
     'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly', 'backEarlyMinutes',
     'cleanOn', 'clean5', 'clean4', 'clean3', 'clean2Off', 'clean1Off', 'sleeperIdlePct', 'seatbelt', 'mpgTarget', 'mpgBelowPct', 'mpgLow',
     'accidentBase', 'accident1', 'accident2', 'accident3', 'accidentFade1', 'accidentFade2', 'accidentFade3', 'accidentFade4',
-    'complaintMinor', 'complaintMajor', 'complaintFade1', 'complaintFade2', 'sickFade1', 'sickFade2', 'sickFade3', 'kioskReasons']),
+    'complaintMinor', 'complaintMajor', 'complaintFade1', 'complaintFade2', 'sickFade1', 'sickFade2', 'sickFade3', 'kioskReasons',
+    'pdaVerbal', 'pdaWritten', 'pdaFinal', 'pdaSuspension', 'pdaFade1', 'pdaFade2', 'pdaFade3']),
   GPS_KINDS: Object.freeze(['speeding', 'hardBrake', 'hardAccel', 'idle', 'seatbelt']),
   // Joe 10/13 (later): the board shows one grade per area and the overall score; the details are one click away.
   AREAS: Object.freeze([['checkin', 'Check-in'], ['cases', 'Cases'], ['inspection', 'Inspections'], ['attendance', 'Attendance'],
     ['speeding', 'Speeding'], ['hardStops', 'Hard Stops'], ['idling', 'Idling'], ['seatbelt', 'Seatbelt'], ['fuel', 'Fuel MPG'], ['time', 'Time'],
-    ['cleanliness', 'Truck Clean'], ['accidents', 'Accidents'], ['complaints', 'Complaints']]),
+    ['cleanliness', 'Truck Clean'], ['accidents', 'Accidents'], ['complaints', 'Complaints'], ['pda', 'PDA']]),
   // Accidents, complaints and attendance look back past the period on screen (12, 6 and 3 months), fading as they age.
-  ROLLING: Object.freeze(['attendance', 'accidents', 'complaints']),
+  ROLLING: Object.freeze(['attendance', 'accidents', 'complaints', 'pda']),
+  PDA_STEPS: Object.freeze([['verbal', 'Verbal warning', 'pdaVerbal'], ['written', 'Written warning', 'pdaWritten'], ['final', 'Final written warning', 'pdaFinal'], ['suspension', 'Suspension', 'pdaSuspension']]),
+  INCIDENT_AREA: Object.freeze({ accident: 'accidents', complaint: 'complaints', pda: 'pda' }),
   ACCIDENT_CLASSES: Object.freeze([[1, '1st degree', 'Minor'], [2, '2nd degree', 'Damage'], [3, '3rd degree', 'Total loss']]),
   INCIDENT_STATUS: Object.freeze({ review: 'Under review', counts: 'Reviewed \u2013 counts', notCounted: 'Reviewed \u2013 not counted' }),
   GPS_AREA: Object.freeze({ speeding: 'speeding', hardBrake: 'hardStops', hardAccel: 'hardStops', idle: 'idling', seatbelt: 'seatbelt' }),
@@ -319,7 +325,9 @@ function scMissKey_(kind, date, a, b) { return [kind, date, String(a == null ? '
 function scAlertKey_(date, a) { return scMissKey_('gps', date, scUnitKey_(a.tag) + '@' + (a.at || ''), a.kind); }
 function scSickFade_(date, asOf, s) { return scFade_(date, asOf, 1, [s.sickFade1, s.sickFade2, s.sickFade3]); }
 /** What an accident or complaint costs on asOf: class or severity points, faded by its age (0 once it is gone). */
+function scPdaStep_(x) { return SC_CORE.PDA_STEPS.filter(function (k) { return k[0] === x.step; })[0] || SC_CORE.PDA_STEPS[0]; }
 function scIncidentPoints_(x, s, asOf) {
+  if (x.kind === 'pda') return scRound_(s[scPdaStep_(x)[2]] * scFade_(x.date, asOf, 3, [s.pdaFade1, s.pdaFade2, s.pdaFade3]));
   if (x.kind === 'accident') {
     var c = Math.min(3, Math.max(1, Math.round(Number(x.accidentClass)) || 1));
     return scRound_(s.accidentBase * s['accident' + c] * scFade_(x.date, asOf, 3, [s.accidentFade1, s.accidentFade2, s.accidentFade3, s.accidentFade4]));
@@ -328,6 +336,7 @@ function scIncidentPoints_(x, s, asOf) {
 }
 /** An accident or complaint as one line. */
 function scIncidentText_(x) {
+  if (x.kind === 'pda') return 'PDA: ' + scPdaStep_(x)[1] + (x.reason ? ', ' + x.reason : '') + (x.note ? ' (' + x.note + ')' : '');
   if (x.kind === 'accident') {
     var c = SC_CORE.ACCIDENT_CLASSES.filter(function (k) { return k[0] === (Math.round(Number(x.accidentClass)) || 1); })[0] || SC_CORE.ACCIDENT_CLASSES[0];
     return 'Accident, ' + c[1] + ' (' + c[2] + ')' + (x.type ? ': ' + x.type : '') + (x.truck ? ', truck ' + x.truck : '') + (x.preventable ? ', preventable' : '') + (x.note ? ' (' + x.note + ')' : '');
@@ -430,9 +439,10 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
   Object.keys(by).forEach(function (k) { byName[scPersonKey_(by[k].driver)] = by[k]; });
   (opts.incidents || []).forEach(function (x) {
     if (!x || !x.date || (asOf && x.date > asOf)) return;
-    var r = by[scPersonKey_(x.driverKey)] || byName[scPersonKey_(x.driver)], area = x.kind === 'accident' ? 'accidents' : 'complaints';
+    var r = by[scPersonKey_(x.driverKey)] || byName[scPersonKey_(x.driver)], area = SC_CORE.INCIDENT_AREA[x.kind] || 'complaints';
     if (!r) return;
-    if (x.status === 'counts') {
+    // A PDA is already a manager's decision: it counts from the day it is entered.
+    if (x.status === 'counts' || (x.kind === 'pda' && x.status !== 'notCounted')) {
       var pts = scIncidentPoints_(x, s, asOf);
       if (pts > 0) r.misses.push({date: x.date, what: scIncidentText_(x), points: pts, area: area, carried: true, incidentId: x.id || ''});
     } else if (x.status !== 'notCounted') r.pending.push({date: x.date, what: scIncidentText_(x), area: area, incidentId: x.id || ''});
@@ -446,7 +456,7 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
     if (pts < 0) r.misses.push({date: x.date, what: what, points: -pts, area: 'cleanliness'});
     else r.rewards.push({date: x.date, what: what, points: pts, area: 'cleanliness'});
   });
-  var on = {accidents: !!opts.accidentsOn, complaints: !!opts.complaintsOn};
+  var on = {accidents: !!opts.accidentsOn, complaints: !!opts.complaintsOn, pda: !!opts.pdaOn};
   var rows = Object.keys(by).map(function (k) {
     var r = by[k];
     r.route = Object.keys(r.routes).sort(function (a, b) { return r.routes[b] - r.routes[a] || (a < b ? -1 : 1); })[0] || '';
@@ -553,7 +563,7 @@ function scAreas_(r, s, on) {
       out[k] = o;
       return;
     }
-    if (k === 'accidents' || k === 'complaints') {
+    if (k === 'accidents' || k === 'complaints' || k === 'pda') {
       o.lost = scRound_(carry[k] || 0); o.points = o.lost ? -o.lost : 0;
       o.days = on[k] && dates.length ? 1 : 0;
       o.score = o.days ? Math.max(0, Math.round(100 - o.lost)) : null;
@@ -645,5 +655,5 @@ function scSummary_(rows, settings, minDays) {
     leader: leader ? leader.driver : ''};
 }
 
-  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scCleanPoints_: scCleanPoints_, scAreaScore_: scAreaScore_, scMinutesOf_: scMinutesOf_, scHoursOf_: scHoursOf_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_, scMonthsBetween_: scMonthsBetween_, scFade_: scFade_, scMissKey_: scMissKey_, scAlertKey_: scAlertKey_, scIncidentPoints_: scIncidentPoints_, scIncidentText_: scIncidentText_, scDayMpg_: scDayMpg_, scAlertWeight_: scAlertWeight_ };
+  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scCleanPoints_: scCleanPoints_, scAreaScore_: scAreaScore_, scMinutesOf_: scMinutesOf_, scHoursOf_: scHoursOf_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_, scMonthsBetween_: scMonthsBetween_, scFade_: scFade_, scMissKey_: scMissKey_, scAlertKey_: scAlertKey_, scIncidentPoints_: scIncidentPoints_, scIncidentText_: scIncidentText_, scDayMpg_: scDayMpg_, scAlertWeight_: scAlertWeight_, scPdaStep_: scPdaStep_ };
 });

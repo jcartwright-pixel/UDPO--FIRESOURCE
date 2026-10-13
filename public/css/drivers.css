@@ -55,3 +55,4 @@ label.panel-check { display: flex; align-items: center; gap: 8px; text-transform
 .drivers-page .sheet thead th { white-space: normal; line-height: 1.1; overflow-wrap: normal; }
 .inc-form .panel-row > label { min-width: 0; }
 .inc-form input[type=text], .inc-form input[type=date], .inc-form select, .inc-form textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.inc-item .inc-state { margin-left: auto; color: #4a5b6c; font-weight: 700; }
