@@ -342,7 +342,7 @@
       stops.push(onSnapshot(query(collection(db, 'safetyIssues'), where('facilityId', '==', plant), where('fixedWalk', '==', wid())), s => { fixedHere = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail));
       stops.push(watchExtinguishers(db, plant, list => { exts = list; render(); }, fail));
     }
-    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']);
+    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-fire.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), async s => {

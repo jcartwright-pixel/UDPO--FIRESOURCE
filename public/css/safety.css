@@ -232,5 +232,23 @@ table.sw-grid tr.row-dragging td { background: #e8f1fa !important; }
 table.sw-ext-grid th { white-space: normal; }
 table.sw-grid tr.sw-flash td { background: #fff7d6 !important; transition: background .3s; }
 .sw-btn.pri { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+/* Joe 10/13 (mock-up B): Fire Extinguishers, Fire Alarm, Fire Suppression and Escape Plan, a line of buttons under the top
+   one; the system checks show their dates above the big buttons. */
+.sw-fire-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 16px 10px; }
+.sw-fire-nav:empty { display: none; }
+.sw-fire-dates { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-top: 6px; }
+.sw-fire-dates label { display: flex; flex-direction: column; gap: 4px; font-size: 17px; }
+.sw-fire-dates input { width: 150px; font-weight: 600; font-size: 17px; line-height: 1.2; font-family: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; }
+.sw-fire-dates label .sw-pill { align-self: flex-start; }
+.sw-fire-dates > .sw-how { margin-left: auto; text-align: right; font-size: 16px; }
+.sw-fire-note { width: 100%; min-height: 54px; font-weight: 600; font-size: 17px; line-height: 1.3; font-family: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.fire-page .sw-ext { flex: 1; min-height: 0; }
+.fire-page .sw-label { font-size: 16px; letter-spacing: .06em; }
+@media (max-width: 1100px), (pointer: coarse) {
+  .sw-fire-nav { padding: 0 12px 10px; }
+  .sw-fire-nav .sw-top { flex: 1 1 auto; min-height: 48px; }
+  .sw-fire-dates input { min-height: 48px; }
+  .sw-fire-dates > .sw-how { margin-left: 0; text-align: left; flex-basis: 100%; }
+}
 /* A long place name on the check's Next button wraps on a phone rather than pushing the page sideways. */
 @media (max-width: 1100px), (pointer: coarse) { .sw-nav .sw-top { white-space: normal; text-align: center; max-width: 100%; } }

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Fire Safety · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/safety.css">
+  <script src="js/logic.js"></script>
+  <script src="js/safety-rules.js"></script>
+</head>
+<body class="fill safety-page fire-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Fire Safety</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1 id="title">Fire Safety</h1><span class="sw-counts" id="counts"></span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
+      <a class="sw-top" href="safety.html" data-top>Weekly Walk</a>
+      <a class="sw-top" href="safety-issues.html" data-top>Open Issues</a>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="notice warning" id="offline-line" role="status" hidden></div>
+    <nav class="sw-fire-nav" id="fire-nav" aria-label="Fire safety"></nav>
+    <div class="view" id="view">
+      <div class="sw-ext" id="check"></div>
+    </div>
+  </div>
+
+  <script>window.UD_OFFLINE = true;</script>
+  <script type="module">
+    import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
+    import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
+    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { today, thisMonth, monthName, pickPlant, plantName, canWalk, canSetUp, modeText, fireNav } from './js/safety.js';
+
+    // Fire Alarm, Fire Suppression and Escape Plan (Joe 10/13, mock-up B): one monthly big-button check of the whole system,
+    // every item Good or Not good, and its dates (vendor inspection; for Escape Plan the last and next fire drill and when the
+    // maps were updated). A Not good stays on Open Issues until it is fixed. A manager or administrator types the dates; each
+    // box saves as it is left. Done walking the plant on a tablet: with no signal the taps are held on the tablet and sent later.
+    const S = window.UDSafety;
+    const params = new URLSearchParams(location.search);
+    const sys = S.fireSystem(params.get('sys')) || S.FIRE_SYSTEMS[0];
+    let db = null, person = null, app = {}, plant = '', rec = undefined, stop = null, chain = Promise.resolve();
+    let mine = {};
+    const month = thisMonth();
+    const merged = () => { const r = rec || {}, m = (r.checks || {})[month] || {}; return Object.assign({}, r, { checks: Object.assign({}, r.checks || {}, { [month]: Object.assign({}, m, { items: Object.assign({}, m.items || {}, mine) }) }) }); };
+    const duePill = (key, kind) => { if (!key) return ''; if (kind !== 'DUE') return shortDate(key); const st = S.dueState(key, today()); return st === 'PAST' ? '<span class="sw-pill red">PAST DUE</span>' : st === 'SOON' ? '<span class="sw-pill amber">DUE SOON</span>' : ''; };
+
+    function drawHead() {
+      document.getElementById('mode-text').textContent = modeText(app);
+      document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
+      document.getElementById('title').textContent = sys.name + ' · ' + monthName(month);
+      document.title = sys.name + ' · New Plant Operations';
+      const m = S.fireMonth(sys.key, merged(), month), r = rec || {};
+      const dates = sys.dates.filter(([k]) => r[k]).map(([k, l]) => l.toLowerCase() + ' ' + shortDate(r[k]));
+      document.getElementById('counts').innerHTML = escapeHtml(sys.what) + ' · ' + (m.state === 'GOOD' ? '<b class="g">Good</b>' : m.state === 'NOT_GOOD' ? '<b class="r">Not good</b>' : '<b class="a">' + m.done + ' of ' + m.total + ' done</b>') + (dates.length ? ' · ' + escapeHtml(dates.join(' · ')) : '');
+      document.getElementById('fire-nav').innerHTML = fireNav(sys.key, plant);
+    }
+    function drawCheck(force) {
+      const box = document.getElementById('check');
+      if (force !== true && box.contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+      if (rec === undefined) { box.innerHTML = '<p class="sw-empty">Reading the check…</p>'; return; }
+      const set = canSetUp(person, app), ed = canWalk(person, app), r = rec || {}, m = S.fireMonth(sys.key, merged(), month);
+      const last = Object.keys(r.checks || {}).filter(k => k < month).sort().pop(), lc = last && r.checks[last];
+      box.innerHTML = '<div class="sw-fire-dates">' + sys.dates.map(([k, l, kind]) =>
+          '<label><span class="sw-label">' + escapeHtml(l) + '</span>' + (set ? '<input data-date="' + k + '" value="' + escapeHtml(r[k] ? shortDate(r[k]) : '') + '" placeholder="3-15-27" aria-label="' + escapeHtml(l) + '">' : '<b>' + (r[k] ? shortDate(r[k]) : '<span class="sw-nc">Not set</span>') + '</b>') + duePill(r[k], kind) + '</label>').join('') +
+          '<span class="sw-how">' + (lc ? 'Last month checked ' + shortDate(lc.at) + (lc.byName ? ' by ' + escapeHtml(lc.byName) : '') : 'No earlier checks') + (m.at ? '<br>This month ' + shortDate(m.at) + (m.byName ? ' by ' + escapeHtml(m.byName) : '') : '') + '</span></div>' +
+        sys.items.map(([k, t]) => { const v = m.items[k] || '';
+          return '<div class="sw-bi"><span>' + escapeHtml(t) + (v ? '' : '<span class="sw-how sw-nc">Not checked</span>') + '</span>' +
+            [['GOOD', '&#10003; Good', 'good'], ['NOT_GOOD', '&#10007; Not good', 'bad']].map(([s, l, c]) => '<button type="button" class="sw-btn ' + c + '" data-item="' + k + '" data-v="' + s + '" aria-pressed="' + (v === s) + '"' + (ed ? '' : ' disabled') + '>' + l + '</button>').join('') + '</div>'; }).join('') +
+        (m.state === 'NOT_GOOD' ? '<div class="sw-bi"><span><span class="sw-label">What is wrong</span><textarea class="sw-fire-note" data-note="1" maxlength="300" aria-label="What is wrong with the ' + escapeHtml(sys.name) + '"' + (ed ? '' : ' disabled') + '>' + escapeHtml(m.note) + '</textarea></span></div>' : '') +
+        '<p class="sw-foot">' + (set ? 'Each date saves as you leave it. ' : '') + 'Good when every item is Good. A Not good stays on Open Issues until it is fixed.' + (sys.dates.some(d => d[2] === 'DUE') ? ' Due dates turn amber 30 days out and red when past.' : '') + '</p>';
+    }
+    function render(force) {
+      if (!plant) return;
+      drawHead();
+      drawCheck(force);
+    }
+    function send(action, fields, undo) {
+      const run = chain.then(() => action === 'saveFireSystemCheck' ? offlineSave(action, fields) : save(action, fields));
+      chain = run.catch(() => {});
+      return run.then(() => showError(''), err => { if (undo) undo(); showError(err); render(true); });
+    }
+    document.getElementById('check').addEventListener('click', e => {
+      const b = e.target.closest('.sw-btn[data-item]');
+      if (!b || !canWalk(person, app)) return;
+      const k = b.dataset.item, status = b.getAttribute('aria-pressed') === 'true' ? '' : b.dataset.v;
+      mine[k] = status;
+      render(true);
+      send('saveFireSystemCheck', { facilityId: plant, system: sys.key, month, item: k, status }, () => { delete mine[k]; });
+    });
+    document.getElementById('check').addEventListener('change', e => {
+      const t = e.target;
+      if (t.dataset.note && canWalk(person, app)) send('saveFireSystemCheck', { facilityId: plant, system: sys.key, month, note: t.value.trim() });
+      if (t.dataset.date && canSetUp(person, app)) send('saveFireSystem', { facilityId: plant, system: sys.key, [t.dataset.date]: t.value.trim() });
+    });
+    document.getElementById('check').addEventListener('focusout', () => setTimeout(() => render(), 0));
+    function follow() {
+      if (stop) stop();
+      rec = undefined; mine = {}; render(true);
+      waiting('saveFireSystemCheck').then(list => { list.filter(e => e.fields.month === month && e.fields.system === sys.key && e.fields.facilityId === plant && e.fields.item).forEach(e => { mine[e.fields.item] = e.fields.status; }); render(); });
+      stop = onSnapshot(doc(db, 'fireSystems', S.fireId(plant, sys.key)), s => {
+        rec = s.exists() ? s.data() : null;
+        // Taps that have reached the saved check.
+        const saved = (rec && rec.checks && rec.checks[month] && rec.checks[month].items) || {};
+        Object.keys(mine).forEach(k => { if ((saved[k] || '') === mine[k]) delete mine[k]; });
+        render();
+      }, e => showError('Could not read the ' + sys.name + ' check (' + e.message + '). Check the network and reload the page.'));
+    }
+    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-fire.html', 'safety-walks.html', 'safety-setup.html']);
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+        if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render();
+      });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(); });
+    });
+  </script>
+</body>
+</html>

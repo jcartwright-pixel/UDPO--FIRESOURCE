@@ -12,6 +12,8 @@
  * saveSafetyIssue: Open Issues' Mark Fixed, Reopen, what is wrong and Send to Plant Maintenance.
  * saveExtinguisher: add or change a plant's extinguisher (tag, location, type, size, service dates) or take it off the list.
  * saveExtinguisherCheck: one item of this month's check of an extinguisher; a Not good opens (or updates) an issue.
+ * saveFireSystem: a plant's Fire Alarm, Fire Suppression or Escape Plan dates (vendor inspection, fire drills, maps updated).
+ * saveFireSystemCheck: one item of this month's check of one of those systems; a Not good opens (or updates) an issue.
  * saveSafetyChecklist: a plant's own checklist (Checklist Setup): Plant, Garage and Office (each sub-area's place), sub-areas
  *   in walking order, their items.
  * saveLocationAreas: a plant's Location Areas (Administration > Plant Setup): areas and sub-areas, the walk's order.
@@ -336,6 +338,70 @@ async function saveExtCheck(tx, db, req, email, stamp, logRef, mode, SaveError) 
   return result;
 }
 
+// Joe 10/13 (mock-up B): Fire Alarm, Fire Suppression and Escape Plan: one monthly check of the whole system each, and its dates.
+function systemOf(v, SaveError) {
+  const sys = S.fireSystem(text(v, 20));
+  if (!sys) throw new SaveError('BAD_REQUEST', 'Pick Fire Alarm, Fire Suppression or Escape Plan.');
+  return sys;
+}
+const dateKeyOf = (v) => (/^\d{1,2}[-/]\d{1,2}[-/](\d{2}|\d{4})$/.test(v) ? L.dateKey(v.replace(/-/g, '/')) : S.isKey(v) ? v : '');
+function validateFireSystem(input, SaveError) {
+  const facilityId = plantOf(input.facilityId, SaveError), sys = systemOf(input.system, SaveError), out = { facilityId, system: sys.key };
+  sys.dates.forEach(([k, label]) => {
+    if (input[k] === undefined) return;
+    const v = text(input[k], 20), key = v ? dateKeyOf(v) : '';
+    if (v && !key) throw new SaveError('BAD_REQUEST', label + ' must be a date like 3-15-27.');
+    out[k] = key;
+  });
+  return out;
+}
+async function saveFireSystem(tx, db, req, email, stamp, logRef, mode) {
+  const sys = S.fireSystem(req.system), ref = db.collection('fireSystems').doc(docId(S.fireId(req.facilityId, sys.key))), had = await tx.get(ref);
+  const before = had.exists ? had.data() : null, change = { facilityId: req.facilityId, system: sys.key, updatedAt: stamp, updatedBy: email };
+  sys.dates.forEach(([k]) => { if (req[k] !== undefined) change[k] = req[k]; });
+  if (!before) Object.assign(change, { checks: {}, createdAt: stamp, createdBy: email });
+  tx.set(ref, change, { merge: true });
+  const result = { ok: true, requestId: req.requestId, fireSystemId: ref.id, message: sys.name + ' dates saved.' };
+  const pick = (d) => { const o = {}; sys.dates.forEach(([k]) => { o[k] = (d && d[k]) || ''; }); return o; };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, fireSystemId: ref.id, before: before ? pick(before) : null, after: pick(Object.assign({}, before || {}, change)), result });
+  return result;
+}
+function validateFireCheck(input, SaveError) {
+  const facilityId = plantOf(input.facilityId, SaveError), sys = systemOf(input.system, SaveError);
+  const out = { facilityId, system: sys.key, month: text(input.month, 7), item: text(input.item, 20), status: statusOf(input.status, SaveError), note: input.note === undefined ? null : text(input.note, 300) };
+  if (!/^\d{4}-\d\d$/.test(out.month)) throw new SaveError('BAD_REQUEST', 'The check has no month. Reload the page.');
+  if (out.note === null && !sys.items.some(i => i[0] === out.item)) throw new SaveError('BAD_REQUEST', 'Pick the item.');
+  return out;
+}
+async function saveFireCheck(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  if (req.month !== S.monthOf(L.localDay(stamp))) throw new SaveError('BAD_REQUEST', 'The monthly check is saved in the month it is done. Reload the page.');
+  const sys = S.fireSystem(req.system), ref = db.collection('fireSystems').doc(docId(S.fireId(req.facilityId, sys.key))), had = await tx.get(ref);
+  const issueRef = db.collection('safetyIssues').doc(docId('fire__' + ref.id + '__' + req.month)), is = await tx.get(issueRef);
+  const name = await whoIs(tx, db, email);
+  const cur = had.exists ? had.data() : {}, checks = Object.assign({}, cur.checks || {}), month = Object.assign({ items: {} }, checks[req.month] || {});
+  month.items = Object.assign({}, month.items || {});
+  const beforeState = S.fireMonth(sys.key, cur, req.month).state;
+  if (req.note !== null) month.note = req.note;
+  else if (req.status) month.items[req.item] = req.status; else delete month.items[req.item];
+  month.by = email; month.byName = name; month.at = stamp;
+  checks[req.month] = month;
+  const after = S.fireMonth(sys.key, { checks }, req.month);
+  const change = { facilityId: req.facilityId, system: sys.key, checks, updatedAt: stamp, updatedBy: email };
+  if (!had.exists) Object.assign(change, { createdAt: stamp, createdBy: email });
+  tx.set(ref, change, { merge: true });
+  // A Not good on the check is an open issue (one per system and month), kept up to date as the check changes.
+  const what = sys.name + ': ' + after.bad.join('; ');
+  if (after.state === 'NOT_GOOD') {
+    if (is.exists && is.data().status === 'OPEN') tx.update(issueRef, { item: what, note: month.note || '', updatedAt: stamp, updatedBy: email });
+    else if (!is.exists) tx.set(issueRef, { facilityId: req.facilityId, itemId: 'fire_' + sys.key, area: sys.name, item: what, note: month.note || '', photo: false, sendToMaint: false, maintStatus: '', workOrderId: '',
+      status: 'OPEN', foundOn: L.localDay(stamp), foundWalk: '', foundBy: email, foundByName: name, foundAt: stamp, walks: [], lastSeenOn: L.localDay(stamp), source: 'FIRE_SYSTEM', fireSystemId: ref.id, updatedAt: stamp, updatedBy: email });
+  } else if (is.exists && is.data().status === 'OPEN' && beforeState === 'NOT_GOOD') tx.delete(issueRef);
+  const message = req.note !== null ? 'Note saved.' : after.state === 'GOOD' ? sys.name + ' is done for the month.' : after.state === 'NOT_GOOD' ? sys.name + ': Not good. It stays open until it is fixed.' : 'Saved.';
+  const result = { ok: true, requestId: req.requestId, fireSystemId: ref.id, month: req.month, state: after.state, message };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, fireSystemId: ref.id, month: req.month, item: req.item, before: beforeState, after: after.state, result });
+  return result;
+}
+
 function validateChecklist(input, SaveError) {
   const facilityId = plantOf(input.facilityId, SaveError);
   if (!Array.isArray(input.areas) || !input.areas.length || input.areas.length > 80) throw new SaveError('BAD_REQUEST', 'The checklist needs at least one area.');
@@ -420,4 +486,4 @@ async function saveLocations(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { validateWalk, saveWalk, validateIssue, saveIssue, validateExtinguisher, saveExtinguisher, validateExtCheck, saveExtCheck, validateChecklist, saveChecklist, validateLocations, saveLocations };
+module.exports = { validateWalk, saveWalk, validateIssue, saveIssue, validateExtinguisher, saveExtinguisher, validateExtCheck, saveExtCheck, validateFireSystem, saveFireSystem, validateFireCheck, saveFireCheck, validateChecklist, saveChecklist, validateLocations, saveLocations };
