@@ -712,16 +712,18 @@ async function noScroll(page) {
     await backPage.close();
     results.push('Back: closes an opened driver first, then goes up to Route Distribution, then Home; Home has no Back');
 
-    // Driver Weekly Template: a manager turns BROOK Off on Tuesday, copies BROOK's week onto CASEY's line (review item 12: one
-    // Copy / Paste per driver line), and Save Template saves every changed cell.
+    // Driver Weekly Template: a manager makes ADAMS Available on Monday and Off on Tuesday, copies ADAMS's week onto CASEY's line
+    // (review item 12: one Copy / Paste per driver line), and Save Template saves every changed cell. (BROOK was removed above.)
     const tpl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
-    await tpl.waitForSelector('.tcell[data-driver="drv_test_brook"][data-day="tue"] select[data-status]');
+    const day = (d, p) => '.tcell[data-driver="' + d + '"][data-day="' + p + '"] select[data-status]';
+    await tpl.waitForSelector(day('drv_test_adams', 'tue'));
     assert.equal(await tpl.isDisabled('#save'), true, 'nothing to save yet');
-    await tpl.selectOption('.tcell[data-driver="drv_test_brook"][data-day="tue"] select[data-status]', 'OFF');
-    await tpl.click('tr[data-line="drv_test_brook"] td.tpl-name [data-copy]');
+    await tpl.selectOption(day('drv_test_adams', 'mon'), 'AVAILABLE');
+    await tpl.selectOption(day('drv_test_adams', 'tue'), 'OFF');
+    await tpl.click('tr[data-line="drv_test_adams"] td.tpl-name [data-copy]');
     await tpl.click('tr[data-line="drv_test_casey"] td.tpl-name [data-paste]');
-    // BROOK Tuesday; CASEY Monday (802 comes off: Available like BROOK) and Tuesday (Off like BROOK).
-    assert.equal(await tpl.textContent('#dirty'), '3 unsaved changes');
+    // ADAMS Monday and Tuesday; CASEY Monday (802 comes off: Available like ADAMS) and Tuesday (Off like ADAMS).
+    assert.equal(await tpl.textContent('#dirty'), '4 unsaved changes');
     if (SHOTS) await tpl.screenshot({ path: path.join(SHOTS, 'template-1920.png') });
     await tpl.click('#save');
     await tpl.waitForFunction(() => /^Template saved/.test(document.getElementById('dirty').textContent), null, { timeout: 10000 });
@@ -729,11 +731,11 @@ async function noScroll(page) {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
       const { db } = await start();
-      return [(await getDoc(doc(db, 'drivers', 'drv_test_brook'))).data().cells, (await getDoc(doc(db, 'drivers', 'drv_test_casey'))).data().cells];
+      return [(await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells, (await getDoc(doc(db, 'drivers', 'drv_test_casey'))).data().cells];
     });
     assert.equal(tplCells[0].tue_available, 'FALSE');
     assert.equal(tplCells[1].tue_available, 'FALSE');
-    assert.deepEqual(JSON.parse(tplCells[1].mon_assignments_json || '[]'), [], 'CASEY Monday has no run, like BROOK');
+    assert.deepEqual(JSON.parse(tplCells[1].mon_assignments_json || '[]'), [], 'CASEY Monday has no run, like ADAMS');
     assert.deepEqual(tpl.errors, []);
     const dispatcherTpl = await openPage(browser, 1366, 650, '/template.html?testEmail=dispatch.test@uniteddairy.com');
     await dispatcherTpl.waitForSelector('.tcell select[data-status]');
