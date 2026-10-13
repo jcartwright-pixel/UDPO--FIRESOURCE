@@ -27,7 +27,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Driver Scorecard</h1><small id="sub">Every driver starts the month at 100</small></div>
+      <div class="title"><h1>Driver Scorecard</h1><small id="sub">Rewards for perfect days, points off for misses</small></div>
       <div class="tabs" role="tablist">
         <button type="button" role="tab" data-mode="month" aria-selected="true">Month</button>
         <button type="button" role="tab" data-mode="week" aria-selected="false">Week</button>
@@ -38,6 +38,8 @@
     <div class="notice error" id="error" hidden></div>
     <div class="view">
       <div class="kpis" id="kpis"></div>
+      <!-- Joe 10/13: a tab for each area we grade, the Overall board, and the accidents and complaints list. -->
+      <div class="sc-cats" id="cats" role="tablist" aria-label="Grading areas"></div>
       <div class="actions" id="bar" data-top></div>
       <div class="sheet scroll-list" id="sheet"></div>
       <div class="foot" id="foot"></div>
@@ -45,7 +47,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, shortDate, save } from './js/app.js';
     import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
     import { collection, doc, onSnapshot, query, where, limit } from './js/firebase.js';
 
@@ -62,7 +64,16 @@
       if (m) { year = +m[1]; month = +m[2]; }
       if (/^\d{4}-\d{2}-\d{2}$/.test(w)) { weekStart = S.scWeekRange_(w).start; mode = 'week'; } }
     // Joe 10/13: Verizon Connect Fleet GPS for the period on screen (gpsDays: miles, yard times, fuel; gpsAlerts: speeding, hard stops, idling).
+    // Joe 10/13: truck cleanliness ratings (scorecardRatings), about once a month per driver.
+    let ratings = [], rateOpen = '', rateValue = 0;
     let gpsDays = [], gpsAlerts = [], alertsEver = null, gpsSub = null, gpsKey = '', dbRef = null;
+    // Joe 10/13: accidents / incidents and complaints (driverIncidents, entered on Driver Roster > Edit), excused GPS misses
+    // (scorecardExcuses), the area tab on screen, and ?kiosk=1 for the Driver's Kiosk Station (grades only).
+    let incidents = [], excuses = [], routeSleeper = {}, excuseOpen = '', excuseText = '';
+    let tab = 'overall';
+    const kiosk = new URLSearchParams(location.search).get('kiosk') === '1';
+    { const t = new URLSearchParams(location.search).get('tab') || ''; if (t === 'incidents' || CORE.AREAS.some(a => a[0] === t)) tab = t; }
+    if (kiosk) document.body.classList.add('sc-kiosk');
 
     function names() { const out = {}; drivers.forEach(d => { if (!d.name) return; if (d.id) out[S.scPersonKey_(d.id)] = d.name; out[S.scPersonKey_(d.name)] = d.name; }); return out; }
     // Every day in the copied Live weeks, built the current app's way (scBuildDay_).
@@ -76,7 +87,9 @@
           casesOut: d.casesOut, plantCaseReturn: d.plantCaseReturn, driverCaseReturn: d.driverCaseReturn, checkedIn: !!d.checkinCompletedAt,
           truck: d.truck || '', startTime: d.startTime || '',
           // Joe 10/13 Time grade: the day's dispatch time and expected hours, else Route Master's for that weekday.
-          dispatchTime: d.dispatchTime || ((routeTimes[p] || {})[run.runId] || {}).dispatchTime, routeHours: d.routeHours || ((routeTimes[p] || {})[run.runId] || {}).hours });
+          dispatchTime: d.dispatchTime || ((routeTimes[p] || {})[run.runId] || {}).dispatchTime, routeHours: d.routeHours || ((routeTimes[p] || {})[run.runId] || {}).hours,
+          // Joe 10/13: Route Master's Sleeper yes/no; idling on a sleeper route counts less.
+          sleeper: d.sleeper || run.sleeper || routeSleeper[run.runId] ? 'TRUE' : '' });
       }));
       const out = {}, gd = {}, ga = {};
       gpsDays.forEach(g => { (gd[g.date] = gd[g.date] || []).push(g); });
@@ -95,6 +108,7 @@
       return out;
     }
     let unassigned = {};
+    const ratingsIn = (a, z) => ratings.filter(x => x.date >= a && x.date <= z);
     function period() {
       if (mode === 'week') return S.scWeekRange_(weekStart);
       if (mode === 'year') return { start: year + '-01-01', end: year + '-12-31' };
@@ -120,11 +134,17 @@
     function board(s) {
       const t = today(), yesterday = S.scAddDays_(t, -1), days = allDays(routeMiles), ex = exceptions.map(e => Object.assign({}, e.cells || {}, { driver_id: (e.cells || {}).driver_id || e.driverId || '' }));
       const lost = (a, z) => Object.keys(unassigned).filter(d => d >= a && d <= z).sort().reduce((l, d) => l.concat(unassigned[d]), []);
+      const exMap = {};
+      excuses.forEach(x => { if (x.key) exMap[x.key] = { reason: x.reason || '', by: x.by || '' }; });
+      // Accidents (12 months), complaints (6) and call-offs (3) look back past the period, fading as they age.
+      const opts = (a, z, ratingEnd) => ({ alertsOn: alertsEver !== false || gpsAlerts.length > 0, seatbeltOn: gpsAlerts.some(x => S.scAlertKind_(x.type) === 'seatbelt'), ratings: ratingsIn(a, ratingEnd),
+        excuses: exMap, incidents, accidentsOn: incidents.some(x => x.kind === 'accident'), complaintsOn: incidents.some(x => x.kind === 'complaint'), start: a, asOf: z });
+      const offs = (a, z) => S.scCallOffDays_(ex, S.scAddDays_(a, -95), z, s);
       if (mode === 'week') {
         const w = S.scWeekRange_(weekStart), end = w.end < yesterday ? w.end : yesterday;
         let list = [];
         for (let d = w.start; d <= end; d = S.scAddDays_(d, 1)) list = list.concat(days[d] || []);
-        const rows = w.start > yesterday ? [] : S.scScoreMonth_(list, S.scCallOffDays_(ex, w.start, end, s), s, names());
+        const rows = w.start > yesterday ? [] : S.scScoreMonth_(list, offs(w.start, end), s, names(), opts(w.start, end, end));
         return { rows, minDays: 99, summary: S.scSummary_(rows, s, 99), through: end < w.start ? w.start : end, days: Object.keys(days).sort(), unassigned: lost(w.start, end) };
       }
       const first = mode === 'year' ? 1 : month, last = mode === 'year' ? 12 : month, months = [];
@@ -134,7 +154,7 @@
         const end = range.end < yesterday ? range.end : yesterday;
         let list = [];
         for (let d = range.start; d <= end; d = S.scAddDays_(d, 1)) list = list.concat(days[d] || []);
-        months.push({ month: m, rows: S.scScoreMonth_(list, S.scCallOffDays_(ex, range.start, end, s), s, names()) });
+        months.push({ month: m, rows: S.scScoreMonth_(list, offs(range.start, end), s, names(), opts(range.start, end, range.end)) });
       }
       const rows = mode === 'year' ? S.scScoreYear_(months, s) : (months[0] ? months[0].rows : []);
       const minDays = mode === 'year' ? Math.round(s.monthMinDays * months.length / 2) : s.monthMinDays;
@@ -154,8 +174,10 @@
       const s = S.scSettings_(saved), edit = canManage();
       watchGps();
       document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
-      { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Every driver starts at 100'; }
+      { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Rewards for perfect days, points off for misses'; }
       const k = document.getElementById('kpis'), bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
+      const cats = document.getElementById('cats');
+      cats.hidden = mode === 'settings' || kiosk;
       if (mode === 'settings') {
         k.innerHTML = '';
         bar.innerHTML = '<span class="hint">Change any number and it saves. Personal Day, vacation and Off never count.</span>';
@@ -165,18 +187,36 @@
           '<p><b>Cases out vs in</b> ' + n('lostCase') + ' point per lost case, at most ' + n('lostCaseDayCap') + ' a day</p>' +
           '<p><b>Clean inspections</b> ' + n('inspectionDefect') + ' points per inspection with a defect, ' + n('inspectionMissing') + ' if none done</p>' +
           '<p><b>Attendance</b> ' + n('callOff') + ' points per call-off day</p>' +
-          '<p class="later"><b>Route cuts</b> later: needs a cut mark on Daily Dispatch</p>' +
+          '<p class="later"><b>Route cuts</b> are scored on the plant side, not on the driver scorecard</p>' +
+          '<h2>Attendance fades over 3 months</h2><p>A call-off counts ' + n('sickFade1') + '% in its first month, ' + n('sickFade2') + '% in the second, ' + n('sickFade3') + '% in the third, then it is gone</p>' +
           '<h2>Driving (Verizon Fleet GPS)</h2><p class="hint">Counted on the truck, against the driver Daily Dispatch put in it that day.</p>' +
           '<p><b>Speeding</b> ' + n('speeding') + ' points per speeding alert</p>' +
           '<p><b>Hard stops</b> ' + n('hardBrake') + ' points per hard braking alert</p>' +
           '<p><b>Hard starts</b> ' + n('hardAccel') + ' points per hard acceleration alert</p>' +
           '<p><b>Idling</b> ' + n('idle') + ' points per idling alert</p>' +
+          '<p><b>Seatbelt</b> ' + n('seatbelt') + ' points per seatbelt alert (counted once the trucks send them)</p>' +
+          '<p><b>Sleeper idling weight</b> ' + n('sleeperIdlePct') + '% of the idling points on a sleeper route (Route Master "Sleeper")</p>' +
           '<p><b>Most a day</b> ' + n('gpsDayCap') + ' points from driving alerts in one day (0 = no limit)</p>' +
+          '<h2>Fuel economy (MPG)</h2><p class="hint">Counted once the trucks send fuel data.</p>' +
+          '<p><b>Low MPG</b> ' + n('mpgLow') + ' points for a day more than ' + n('mpgBelowPct') + '% under the truck\'s own average</p>' +
+          '<p><b>Target</b> ' + n('mpgTarget') + ' MPG instead of the truck\'s average (0 = use each truck\'s average)</p>' +
           '<h2>Time (dispatch and return)</h2><p class="hint">From the GPS yard leave and return. A day with no GPS yard time is not counted.</p>' +
           '<p><b>Left too early</b> ' + n('leftEarly') + ' points when the truck leaves the yard more than ' + n('earlyMinutes') + ' minutes before the dispatch time</p>' +
           '<p><b>Back too late</b> ' + n('backLate') + ' points when it is back more than ' + n('lateMinutes') + ' minutes after dispatch plus the route\'s expected hours</p>' +
           '<h2>Counts as a call-off</h2><div class="sc-reasons">' + CORE.REASONS.map(r => '<label><input type="checkbox" data-reason="' + r + '"' + (s.callOffReasons.indexOf(r) >= 0 ? ' checked' : '') + (edit ? '' : ' disabled') + '> ' + r.charAt(0) + r.slice(1).toLowerCase() + '</label>').join('') + '</div></section>' +
           '<section class="otr-card"><h2>Grades</h2><p><span class="sc g-A">A</span> ' + n('gradeA') + ' and up</p><p><span class="sc g-B">B</span> ' + n('gradeB') + ' and up</p><p><span class="sc g-C">C</span> ' + n('gradeC') + ' and up</p><p><span class="sc g-D">D</span> below</p>' +
+          '<h2>Rewards</h2>' +
+          '<p><b>Perfect day</b> ' + n('cleanDay') + ' points in each area for a day with no miss in it</p>' +
+          '<p><b>Streak</b> ' + n('streakBonus') + ' more points for every ' + n('streakDays') + ' perfect days in a row in an area</p>' +
+          '<p><b>Back early</b> ' + n('backEarly') + ' more points when back ' + n('backEarlyMinutes') + ' minutes or more before the expected return (not when they left early)</p>' +
+          '<h2>Truck cleanliness</h2><p><label><input type="checkbox" id="sc-clean-on"' + (s.cleanOn ? ' checked' : '') + (edit ? '' : ' disabled') + '> <b>On</b>: rated 1 to 5 on a driver\'s details, about once a month</label></p>' +
+          '<p><b>5</b> +' + n('clean5') + ' <b>4</b> +' + n('clean4') + ' <b>3</b> +' + n('clean3') + '</p><p><b>2</b> −' + n('clean2Off') + ' <b>1</b> −' + n('clean1Off') + ' points</p>' +
+          '<h2>Accidents / incidents</h2><p class="hint">Entered on Driver Roster &gt; Edit. Counts only once a manager marks it Reviewed \u2013 counts.</p>' +
+          '<p><b>Base</b> ' + n('accidentBase') + ' points, times ' + n('accident1') + ' for 1st degree (Minor), ' + n('accident2') + ' for 2nd (Damage), ' + n('accident3') + ' for 3rd (Total loss)</p>' +
+          '<p><b>Fades</b> ' + n('accidentFade1') + '% for 0\u20133 months, ' + n('accidentFade2') + '% 3\u20136, ' + n('accidentFade3') + '% 6\u20139, ' + n('accidentFade4') + '% 9\u201312, then gone</p>' +
+          '<h2>Complaints</h2><p><b>Minor</b> ' + n('complaintMinor') + ' points, <b>Major</b> ' + n('complaintMajor') + ' points, once reviewed as counting</p>' +
+          '<p><b>Fades</b> ' + n('complaintFade1') + '% for 0\u20133 months, ' + n('complaintFade2') + '% 3\u20136, then gone</p>' +
+          '<h2>Driver\'s Kiosk Station</h2><p><label><input type="checkbox" id="sc-kiosk-reasons"' + (s.kioskReasons ? ' checked' : '') + (edit ? '' : ' disabled') + '> <b>Show reasons on kiosk</b> (off: the TV shows the grades only)</label></p>' +
           '<h2>Driver of the Month</h2><p>Highest score, worked at least ' + n('monthMinDays') + ' days</p><button type="button" data-mode-go="month">Back to the scorecard</button></section></div>';
         foot.textContent = '';
         sheet.querySelectorAll('.sc-n').forEach(inp => { inp.onchange = () => {
@@ -187,6 +227,10 @@
           const list = [...sheet.querySelectorAll('[data-reason]:checked')].map(x => x.dataset.reason), before = saved.callOffReasons;
           saveOptimistic('saveScorecard', { callOffReasons: list }, () => { saved = Object.assign({}, saved, { callOffReasons: list }); }, () => { saved = Object.assign({}, saved, { callOffReasons: before }); }, render);
         }; });
+        { const c = sheet.querySelector('#sc-clean-on'); c.onchange = () => { const before = saved.cleanOn, v = c.checked ? 1 : 0;
+          saveOptimistic('saveScorecard', { key: 'cleanOn', value: v }, () => { saved = Object.assign({}, saved, { cleanOn: v }); }, () => { saved = Object.assign({}, saved, { cleanOn: before }); }, render); }; }
+        { const c = sheet.querySelector('#sc-kiosk-reasons'); c.onchange = () => { const before = saved.kioskReasons, v = c.checked ? 1 : 0;
+          saveOptimistic('saveScorecard', { key: 'kioskReasons', value: v }, () => { saved = Object.assign({}, saved, { kioskReasons: v }); }, () => { saved = Object.assign({}, saved, { kioskReasons: before }); }, render); }; }
         sheet.querySelector('[data-mode-go]').onclick = () => { mode = 'month'; render(); };
         return;
       }
@@ -198,36 +242,101 @@
         [lostCount, 'No driver dispatched', lostCount ? 'warn' : '']].concat(mode === 'week' ? [] : [[sm.leader || 'Nobody yet', (mode === 'year' ? 'Leading for Driver of the Year' : 'Leading for Driver of the Month') + (sm.leader ? '' : ', needs ' + b.minDays + ' days worked'), sm.leader ? 'good' : 'none']])
         .map(([v, l, c]) => '<div class="' + (c || '') + '"><b>' + escapeHtml(String(v)) + '</b><span>' + l + '</span></div>').join('');
       bar.innerHTML = '<button type="button" id="prev" aria-label="Earlier">◀</button><b class="sc-period">' + escapeHtml(label) + '</b><button type="button" id="next" aria-label="Later">▶</button><span class="hint" id="gps-note">' + (alertsEver === false && !gpsAlerts.length ? 'No GPS alerts received yet: speeding, hard stops and idling count once alerts are turned on in Verizon Fleet.' : '') + '</span><span class="spacer"></span><button type="button" class="primary" id="sc-print">Print</button>';
-      const cell = (bad, good, text) => '<td class="' + (bad ? 'sc-bad' : good ? 'sc-ok' : '') + '">' + text + '</td>';
       // Review item 18 (Joe 10/13): the empty Route Cuts column is hidden until it is built.
       // Joe 10/13 (later): the board is the driver alone: one grade per area we score and the overall score, added up over the
       // period. Everything else (trucks, routes, GPS miles, MPG, yard times, counts and each miss) is one click away on the driver.
       const clock = (m) => m == null ? '' : S.scClock_(m);
-      const AREAS = CORE.AREAS;
+      const pts = (v) => String(Math.round((v || 0) * 100) / 100);
+      // Truck cleanliness has an On/Off switch on Settings.
+      const AREAS = CORE.AREAS.filter(a => a[0] !== 'cleanliness' || s.cleanOn);
+      // Long one-word headings may break with a hyphen so 13 areas fit Joe's 1536-wide screen.
+      const HEAD = { inspection: 'Inspec&shy;tions', attendance: 'Attend&shy;ance', speeding: 'Speed&shy;ing', seatbelt: 'Seat&shy;belt', accidents: 'Acci&shy;dents', complaints: 'Com&shy;plaints' };
+      const head = (a) => HEAD[a[0]] || escapeHtml(a[1]);
       const facts = (r) => [r.truckList && r.truckList.length ? 'Truck' + (r.truckList.length > 1 ? 's ' : ' ') + r.truckList.map(escapeHtml).join(', ') : '', r.route ? 'Route ' + escapeHtml(r.route) : '',
         r.runDays + ' run' + (r.runDays === 1 ? '' : 's'), 'check-ins ' + (r.runDays - r.missedCheckins) + ' of ' + r.runDays,
         r.casesOut ? 'cases ' + r.casesOut.toLocaleString() + ' out / ' + r.casesIn.toLocaleString() + ' in' : 'cases not recorded',
         r.inspected + ' clean inspection' + (r.inspected === 1 ? '' : 's') + (r.defects ? ', ' + r.defects + ' with a defect' : '') + (r.notInspected ? ', ' + r.notInspected + ' not done' : ''),
         r.callOffs ? r.callOffs + ' call-off' + (r.callOffs === 1 ? '' : 's') : 'perfect attendance',
-        (r.speeding || 0) + ' speeding, ' + (r.hardBrakes || 0) + ' hard stop' + (r.hardBrakes === 1 ? '' : 's') + ', ' + (r.hardAccels || 0) + ' hard start' + (r.hardAccels === 1 ? '' : 's') + ', ' + (r.idles || 0) + ' idling' + (r.idleMinutes ? ' (' + Math.round(r.idleMinutes) + ' min)' : ''),
+        (r.speeding || 0) + ' speeding, ' + (r.hardBrakes || 0) + ' hard stop' + (r.hardBrakes === 1 ? '' : 's') + ', ' + (r.hardAccels || 0) + ' hard start' + (r.hardAccels === 1 ? '' : 's') + ', ' + (r.idles || 0) + ' idling' + (r.idleMinutes ? ' (' + Math.round(r.idleMinutes) + ' min)' : '') + (r.seatbelts ? ', ' + r.seatbelts + ' seatbelt' : ''),
         r.gpsMiles ? Math.round(r.gpsMiles).toLocaleString() + ' GPS miles' : r.miles ? r.miles.toLocaleString() + ' planned miles' : '',
         'MPG ' + (r.mpg ? r.mpg.toFixed(1) : 'coming'),
         (r.leftEarly || r.backLate) ? 'left early ' + r.leftEarly + ', back late ' + r.backLate : '',
         r.yardOut != null || r.yardIn != null ? 'yard out ' + (clock(r.yardOut) || '–') + ', in ' + (clock(r.yardIn) || '–') : ''].filter(Boolean).join(' · ');
-      const grade = (a) => a ? '<span class="sc g-' + a.grade + '" title="' + a.score + '">' + a.grade + '</span>' : '';
-      sheet.innerHTML = '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:20%">' + AREAS.map(() => '<col style="width:9%">').join('') + '<col style="width:13%"></colgroup>' +
-        '<thead><tr><th>#</th><th>Driver</th>' + AREAS.map(a => '<th>' + a[1] + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
-        (b.rows.filter(r => r.runDays || r.callOffs).map(r => '<tr data-key="' + escapeHtml(r.driverKey) + '" class="' + (open === r.driverKey ? 'sc-open' : '') + '"><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' +
+      const grade = (a) => a && a.grade ? '<span class="sc g-' + a.grade + '" title="' + a.score + ' (' + (a.points > 0 ? '+' : '') + pts(a.points) + ' points in ' + a.days + ' day' + (a.days === 1 ? '' : 's') + ')">' + a.grade + '</span>' : '<small>–</small>';
+      // Joe 10/13: a manager rates the driver's truck cleanliness 1 to 5 (with a date and a note) from the driver's details.
+      const rateBox = (r) => {
+        const past = ratings.filter(x => x.driverKey === r.driverKey).sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 3);
+        const hist = past.length ? 'Truck cleanliness: ' + past.map(x => x.rating + ' of 5 on ' + shortDate(x.date) + (x.note ? ' (' + escapeHtml(x.note) + ')' : '')).join(' · ') : 'Truck cleanliness: not rated yet';
+        if (!edit) return '<div class="sc-rate">' + hist + '</div>';
+        if (rateOpen !== r.driverKey) return '<div class="sc-rate">' + hist + ' <button type="button" class="sc-rate-open" data-rate="' + escapeHtml(r.driverKey) + '">Rate truck cleanliness</button></div>';
+        return '<div class="sc-rate sc-rate-form" data-driver="' + escapeHtml(r.driverKey) + '" data-name="' + escapeHtml(r.driver) + '" data-truck="' + escapeHtml(r.truck || '') + '"><b>Rate truck cleanliness</b> ' +
+          '<input type="date" class="sc-rate-date" value="' + today() + '"> ' + [1, 2, 3, 4, 5].map(v => '<button type="button" class="sc-star' + (rateValue === v ? ' on' : '') + '" data-v="' + v + '">' + v + '</button>').join('') +
+          ' <input type="text" class="sc-rate-note" maxlength="300" placeholder="Note (optional)"> <button type="button" class="primary sc-rate-save"' + (rateValue ? '' : ' disabled') + '>Save</button> <button type="button" class="sc-rate-cancel">Cancel</button>' +
+          '<small>1 = very dirty, 5 = spotless' + (r.truck ? ' · truck ' + escapeHtml(r.truck) : '') + '</small></div>';
+      };
+      // What each area earned: perfect days, streaks, early returns and good cleanliness ratings.
+      const earned = (r) => AREAS.map(a => { const o = r.areas && r.areas[a[0]]; return o && o.rewards ? a[1] + ' +' + o.rewards + ' (' + o.clean + ' perfect' + (o.streaks ? ', ' + o.streaks + ' streak' + (o.streaks === 1 ? '' : 's') : '') + (o.extra ? ', back early +' + o.extra : '') + ')' : ''; }).filter(Boolean).join(' · ');
+      const who = (email) => escapeHtml(String(email || '').split('@')[0].replace(/[._]/g, ' '));
+      // Joe 10/13: a manager can excuse a GPS or Time miss (a hard stop for a deer) with a reason; it then costs nothing.
+      const missLine = (r, m) => '<div class="' + (m.excused ? 'sc-excused' : '') + '"><b>' + shortDate(m.date) + '</b> <span class="sc-what">' + escapeHtml(m.what) + '</span>' +
+        (m.carried && m.area === 'attendance' ? ' <small class="sc-carry">from before this period</small>' : '') + ' <span class="sc-pts">−' + pts(m.points) + '</span>' +
+        (m.excused ? ' <span class="sc-ex">Excused: ' + escapeHtml(m.excused.reason) + (m.excused.by ? ' · ' + who(m.excused.by) : '') + '</span>' + (edit ? ' <button type="button" class="sc-unexcuse" data-key="' + escapeHtml(m.key) + '">Undo excuse</button>' : '')
+          : m.key && edit ? (excuseOpen === m.key ? ' <span class="sc-ex-form" data-key="' + escapeHtml(m.key) + '" data-driver="' + escapeHtml(r.driverKey) + '" data-what="' + escapeHtml(m.what) + '"><input type="text" class="sc-ex-reason" maxlength="300" value="' + escapeHtml(excuseText) + '" placeholder="Reason, for example: deer in the road"> <button type="button" class="primary sc-ex-save">Excuse</button> <button type="button" class="sc-ex-cancel">Cancel</button></span>'
+            : ' <button type="button" class="sc-excuse" data-key="' + escapeHtml(m.key) + '">Excuse</button>') : '') + '</div>';
+      const pendingLine = (p) => '<div class="sc-pending"><b>' + shortDate(p.date) + '</b> ' + escapeHtml(p.what) + ' <span class="sc-review">Under review</span></div>';
+      const detail = (r, area) => {
+        const list = (r.misses || []).filter(m => !area || m.area === area), pend = (r.pending || []).filter(p => !area || p.area === area);
+        return pend.map(pendingLine).join('') + (list.length ? list.map(m => missLine(r, m)).join('') : pend.length ? '' : 'No misses.');
+      };
+      // Joe 10/13: one line on how the scoring works, above the board.
+      const how = '<p class="sc-how" id="sc-how"><b>How scoring works:</b> each area earns +' + s.cleanDay + ' for a perfect day (no miss in it) and +' + s.streakBonus + ' for every ' + s.streakDays + ' perfect days in a row, and loses the Settings points for each miss; its grade goes by points per day worked (perfect every day = 100; A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+). Accidents (12 months), complaints (6 months) and call-offs (3 months) count past the period shown, fading as they age, once a manager reviews them. Overall is the average of the area grades.</p>';
+      const shown = b.rows.filter(r => r.runDays || r.callOffs);
+      const empty = (cols) => '<tr><td colspan="' + cols + '" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>';
+      // The area tabs: one row per driver with that area's grade, its numbers and each miss in it.
+      const areaTable = (key) => {
+        const a = CORE.AREAS.find(x => x[0] === key), rows = shown.slice().sort((x, y) => ((y.areas[key] || {}).score ?? -1) - ((x.areas[key] || {}).score ?? -1) || (x.driver < y.driver ? -1 : 1));
+        const rolling = key === 'accidents' || key === 'complaints';
+        return '<table class="issues sc-board sc-area"><colgroup><col style="width:4%"><col style="width:16%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:35%"></colgroup>' +
+          '<thead><tr><th>#</th><th>Driver</th><th>Grade</th><th>Score</th><th>' + (key === 'cleanliness' ? 'Ratings' : 'Days') + '</th><th>Perfect days</th><th>Earned</th><th>Points off</th><th>' + escapeHtml(a[1]) + ' details</th></tr></thead><tbody>' +
+          (rows.map((r, i) => { const o = r.areas[key] || {}; return '<tr><td>' + (i + 1) + '</td><td class="strong">' + escapeHtml(r.driver) + '</td><td>' + grade(o) + '</td><td>' + (o.score == null ? '–' : o.score) + '</td><td>' + (rolling ? '–' : o.days || 0) + '</td><td>' + (rolling || key === 'cleanliness' ? '–' : o.clean || 0) + '</td><td>' + (o.rewards ? '+' + pts(o.rewards) : '0') + '</td><td>' + (o.lost ? '−' + pts(o.lost) : '0') + '</td><td class="sc-detail">' + detail(r, key) + '</td></tr>'; }).join('') || empty(9)) + '</tbody></table>';
+      };
+      // Joe 10/13: every accident / incident and complaint, one row each; a manager reviews them here or on Driver Roster.
+      const incidentTable = () => {
+        const asOf = b.through, list = incidents.slice().sort((x, y) => (x.date < y.date ? 1 : -1));
+        const cls = (x) => x.kind === 'accident' ? (CORE.ACCIDENT_CLASSES.find(c => c[0] === Number(x.accidentClass)) || CORE.ACCIDENT_CLASSES[0]).slice(1).join(', ') : (x.severity === 'major' ? 'Major' : 'Minor');
+        return '<p class="sc-how">Add an accident or complaint from <a href="drivers.html">Driver Roster</a> (Edit on the driver). Each one starts Under review and counts nothing until a manager marks it Reviewed – counts.</p>' +
+          '<table class="issues sc-board sc-incidents"><colgroup><col style="width:9%"><col style="width:15%"><col style="width:10%"><col style="width:13%"><col style="width:23%"><col style="width:16%"><col style="width:6%"><col style="width:8%"></colgroup>' +
+          '<thead><tr><th>Date</th><th>Driver</th><th>Kind</th><th>Class</th><th>What happened</th><th>Status</th><th>Points now</th><th>Entered by</th></tr></thead><tbody>' +
+          (list.map(x => '<tr class="' + (x.status === 'review' || !x.status ? 'sc-pending' : '') + '"><td>' + shortDate(x.date) + '</td><td class="strong">' + escapeHtml(x.driver || x.driverKey) + '</td><td>' + (x.kind === 'accident' ? 'Accident / incident' : 'Complaint') + '</td><td>' + escapeHtml(cls(x)) + '</td>' +
+            '<td class="sc-detail">' + escapeHtml(S.scIncidentText_(x)) + '</td><td>' + (edit ? '<select class="sc-review-pick" data-id="' + escapeHtml(x.id) + '">' + Object.keys(CORE.INCIDENT_STATUS).map(k => '<option value="' + k + '"' + ((x.status || 'review') === k ? ' selected' : '') + '>' + CORE.INCIDENT_STATUS[k] + '</option>').join('') + '</select>' : escapeHtml(CORE.INCIDENT_STATUS[x.status || 'review'])) +
+            (x.reviewedBy ? '<small>' + who(x.reviewedBy) + '</small>' : '') + '</td><td>' + (x.status === 'counts' ? pts(S.scIncidentPoints_(x, s, asOf)) : '–') + '</td><td>' + who(x.enteredBy) + '</td></tr>').join('') ||
+            '<tr><td colspan="8" class="empty">No accidents or complaints entered yet.</td></tr>') + '</tbody></table>';
+      };
+      const overall = () => '<table class="issues sc-board"><colgroup><col style="width:3%"><col style="width:' + (100 - 3 - 8 - AREAS.length * 6.1).toFixed(1) + '%">' + AREAS.map(() => '<col style="width:6.1%">').join('') + '<col style="width:8%"></colgroup>' +
+        '<thead><tr><th>#</th><th>Driver</th>' + AREAS.map(a => '<th>' + head(a) + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
+        (shown.map(r => '<tr data-key="' + escapeHtml(r.driverKey) + '" class="' + (open === r.driverKey ? 'sc-open' : '') + '"><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' +
           AREAS.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') +
           '<td><span class="sc g-' + r.grade + ' sc-overall">' + r.score + ' ' + r.grade + '</span></td></tr>' +
-          (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '"><div class="sc-facts">' + facts(r) + '</div>' + (r.misses && r.misses.length ? r.misses.map(m => '<div><b>' + shortDate(m.date) + '</b> ' + escapeHtml(m.what) + ' <span class="sc-pts">−' + m.points + '</span></div>').join('') : 'No misses.') + '</td></tr>' : '')).join('') ||
-          '<tr><td colspan="' + (AREAS.length + 3) + '" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>') + '</tbody></table>' +
+          (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '"><div class="sc-facts">' + facts(r) + '</div>' + (s.cleanOn ? rateBox(r) : '') + (earned(r) ? '<div class="sc-earned">Rewards: ' + earned(r) + ' · total ' + (r.points > 0 ? '+' : '') + pts(r.points) + ' points</div>' : '') + detail(r, '') + '</td></tr>' : '')).join('') ||
+          empty(AREAS.length + 3)) + '</tbody></table>' +
         // Joe 10/13: an alert on a truck nobody was dispatched in is never dropped; a manager puts the driver on Daily Dispatch.
         (b.unassigned.length ? '<div id="unassigned" class="sc-lost"><h2>No driver dispatched</h2><p class="hint">These trucks had alerts on a day no driver was in them on Daily Dispatch. Put the driver in the truck on Daily Dispatch for that day and the alerts move to that driver.</p>' +
           '<table class="issues"><colgroup><col style="width:12%"><col style="width:14%"><col style="width:74%"></colgroup><thead><tr><th>Date</th><th>Truck</th><th>Alerts</th></tr></thead><tbody>' +
           b.unassigned.map(u => '<tr><td>' + shortDate(u.date) + '</td><td class="strong">' + escapeHtml(u.truck) + '</td><td class="sc-lost-list">' + u.alerts.map(a => escapeHtml(S.scAlertText_(a, ''))).join('<br>') + '</td></tr>').join('') +
           '</tbody></table></div>' : '');
-      foot.textContent = 'Through ' + shortDate(b.through) + ' · green = no misses, red = cost points · days counted: ' + (b.days.length ? shortDate(b.days[0]) + ' to ' + shortDate(b.days[b.days.length - 1]) + ' (the copied Live weeks)' : 'none') + ' · each grade is 100 less what that area cost (A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+); Overall adds up every area · click a driver for the details and each miss.';
+      // Joe 10/13: the Driver's Kiosk Station (TV) shows the grades only; reasons only when Settings says so.
+      if (kiosk) {
+        const reasons = (r) => (r.misses || []).filter(m => !m.excused && m.points > 0).map(m => escapeHtml(m.what)).join(' · ');
+        sheet.innerHTML = '<div class="sc-kiosk-title"><b>DRIVER SCORECARD</b><span>' + escapeHtml(label) + ' · through ' + shortDate(b.through) + '</span></div>' +
+          '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:' + (100 - 4 - 9 - AREAS.length * 6.2).toFixed(1) + '%">' + AREAS.map(() => '<col style="width:6.2%">').join('') + '<col style="width:9%"></colgroup>' +
+          '<thead><tr><th>#</th><th>Driver</th>' + AREAS.map(a => '<th>' + head(a) + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
+          (shown.map(r => '<tr><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' + AREAS.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') + '<td><span class="sc g-' + r.grade + ' sc-overall">' + r.score + ' ' + r.grade + '</span></td></tr>' +
+            (s.kioskReasons && reasons(r) ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '">' + reasons(r) + '</td></tr>' : '')).join('') || empty(AREAS.length + 3)) + '</tbody></table>';
+        return;
+      }
+      cats.innerHTML = [['overall', 'Overall']].concat(AREAS).concat([['incidents', 'Incidents & Complaints']]).map(a => '<button type="button" role="tab" data-tab="' + a[0] + '" aria-selected="' + (tab === a[0]) + '">' + escapeHtml(a[1]) + '</button>').join('');
+      sheet.innerHTML = tab === 'incidents' ? incidentTable() : tab !== 'overall' && AREAS.some(a => a[0] === tab) ? how + areaTable(tab) : how + overall();
+      foot.textContent = 'Through ' + shortDate(b.through) + ' · green = no misses, red = cost points · days counted: ' + (b.days.length ? shortDate(b.days[0]) + ' to ' + shortDate(b.days[b.days.length - 1]) + ' (the copied Live weeks)' : 'none') + ' · click a driver for the details, rewards and each miss.';
       document.getElementById('prev').onclick = () => { if (mode === 'year') year--; else if (mode === 'week') weekStart = S.scAddDays_(weekStart, -7); else if (--month < 1) { month = 12; year--; } open = ''; render(); };
       document.getElementById('next').onclick = () => { if (mode === 'year') year++; else if (mode === 'week') weekStart = S.scAddDays_(weekStart, 7); else if (++month > 12) { month = 1; year++; } open = ''; render(); };
       document.getElementById('sc-print').onclick = () => {
@@ -237,9 +346,47 @@
     }
 
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b) { mode = b.dataset.mode; open = ''; render(); } });
-    document.getElementById('sheet').addEventListener('click', e => { const tr = e.target.closest('tr[data-key]'); if (tr) { open = open === tr.dataset.key ? '' : tr.dataset.key; render(); } });
+    document.getElementById('cats').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { tab = b.dataset.tab; open = ''; render(); } });
+    // A typed excuse reason survives a redraw (new GPS every few minutes).
+    document.getElementById('sheet').addEventListener('input', e => { if (e.target.matches('.sc-ex-reason')) excuseText = e.target.value; });
+    document.getElementById('sheet').addEventListener('change', async e => {
+      const pick = e.target.closest('.sc-review-pick');
+      if (!pick) return;
+      try { await save('reviewDriverIncident', { incidentId: pick.dataset.id, status: pick.value }); } catch (err) { showError('Could not save the review (' + err.message + ').'); render(); }
+    });
+    document.getElementById('sheet').addEventListener('click', async e => {
+      const exb = e.target.closest('.sc-excuse');
+      if (exb) { excuseOpen = exb.dataset.key; excuseText = ''; render(); const i = document.querySelector('.sc-ex-reason'); if (i) i.focus(); return; }
+      const exf = e.target.closest('.sc-ex-form');
+      if (exf) {
+        if (e.target.closest('.sc-ex-cancel')) { excuseOpen = ''; render(); return; }
+        if (e.target.closest('.sc-ex-save')) {
+          const reason = exf.querySelector('.sc-ex-reason').value.trim();
+          if (!reason) { showError('Type the reason for excusing it.'); return; }
+          try { await save('excuseScorecardMiss', { key: exf.dataset.key, reason, driverKey: exf.dataset.driver, what: exf.dataset.what }); excuseOpen = ''; excuseText = ''; render(); } catch (err) { showError('Could not excuse it (' + err.message + ').'); }
+        }
+        return;
+      }
+      const unx = e.target.closest('.sc-unexcuse');
+      if (unx) { try { await save('excuseScorecardMiss', { key: unx.dataset.key, undo: true }); } catch (err) { showError('Could not take the excuse back (' + err.message + ').'); } return; }
+      const op = e.target.closest('.sc-rate-open'); if (op) { rateOpen = op.dataset.rate; rateValue = 0; render(); return; }
+      const form = e.target.closest('.sc-rate-form');
+      if (form) {
+        const star = e.target.closest('.sc-star');
+        if (star) { rateValue = Number(star.dataset.v); form.querySelectorAll('.sc-star').forEach(b => b.classList.toggle('on', b === star)); form.querySelector('.sc-rate-save').disabled = false; return; }
+        if (e.target.closest('.sc-rate-cancel')) { rateOpen = ''; render(); return; }
+        if (e.target.closest('.sc-rate-save') && rateValue) {
+          const fields = { driverKey: form.dataset.driver, driver: form.dataset.name, truck: form.dataset.truck, date: form.querySelector('.sc-rate-date').value, rating: rateValue, note: form.querySelector('.sc-rate-note').value };
+          try { await save('rateTruckClean', fields); rateOpen = ''; rateValue = 0; render(); } catch (err) { showError('Could not save the rating (' + err.message + ').'); }
+        }
+        return;
+      }
+      const tr = e.target.closest('tr[data-key]'); if (tr) { open = open === tr.dataset.key ? '' : tr.dataset.key; render(); } });
     // The browser check jumps to a week with this.
     window.udScWeek = (d) => { weekStart = S.scWeekRange_(d).start; mode = 'week'; open = ''; render(); };
+    // The kiosk (TV): a list longer than the screen scrolls slowly, waits at the end, then starts again.
+    if (kiosk) { let hold = 0; setInterval(() => { const el = document.getElementById('sheet'); if (document.hidden || el.scrollHeight <= el.clientHeight + 2) return; if (hold > 0) { hold--; return; }
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) { el.scrollTop = 0; hold = 80; } else el.scrollTop += 1; }, 60); }
     window.udBack = () => { if (open) { open = ''; render(); return true; } if (mode !== 'month') { mode = 'month'; render(); return true; } return false; };
 
     requireSignIn(async (user) => {
@@ -247,13 +394,16 @@
       dbRef = db;
       watchLists(user, render);
       onSnapshot(query(collection(db, 'gpsAlerts'), limit(1)), s => { alertsEver = !s.empty; render(); }, () => { alertsEver = false; render(); });
-      const NAMES = { runs: 'the dispatch runs', plantEvents: 'the plant check-ins', drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master' };
+      const NAMES = { runs: 'the dispatch runs', plantEvents: 'the plant check-ins', drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master', scorecardRatings: 'the truck cleanliness ratings', driverIncidents: 'the accidents and complaints', scorecardExcuses: 'the excused misses' };
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + (NAMES[name] || name) + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.'));
       watch('runs', v => { runs = v; });
       watch('plantEvents', v => { events = v; });
       watch('drivers', v => { drivers = v; });
       watch('exceptions', v => { exceptions = v; });
-      watch('routes', v => { routeMiles = {}; routeTimes = {}; L.DAYS.forEach(p => { routeMiles[p] = {}; routeTimes[p] = {}; });
+      watch('scorecardRatings', v => { ratings = v; });
+      watch('driverIncidents', v => { incidents = v; });
+      watch('scorecardExcuses', v => { excuses = v; });
+      watch('routes', v => { routeMiles = {}; routeTimes = {}; routeSleeper = {}; v.forEach(r => { if (r.sleeper) routeSleeper[r.id] = true; }); L.DAYS.forEach(p => { routeMiles[p] = {}; routeTimes[p] = {}; });
         v.forEach(r => L.DAYS.forEach(p => { const d = r.days && r.days[p]; if (d && (d.dispatchTime != null || d.hours)) routeTimes[p][r.id] = { dispatchTime: d.dispatchTime, hours: d.hours }; })); v.forEach(r => L.DAYS.forEach(p => { if (r.days && r.days[p] && r.days[p].miles) routeMiles[p][r.id] = r.days[p].miles; })); });
       onSnapshot(doc(db, 'scorecard', 'settings'), s => { saved = s.exists() ? s.data() : {}; render(); }, e => showError('Could not read the scorecard settings (' + e.message + '). The scores use the standard settings until it loads; reload the page.'));
     });

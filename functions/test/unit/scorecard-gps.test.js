@@ -30,8 +30,8 @@ test('alerts go to the driver Daily Dispatch put in that truck, not the driver F
   ];
   const m = S.scMatchGps_(DAY, days, [{ tag: '223893', miles: 182.4, yardOut: '2026-10-14T09:40:00Z', yardIn: '2026-10-14T19:05:00Z', fuelGallons: 26 }], alerts);
   const pat = m.records.find(r => r.driver === 'ADAMS, PAT'), lee = m.records.find(r => r.driver === 'BAKER, LEE');
-  assert.deepEqual(pat.alerts, { speeding: 1, hardBrake: 0, hardAccel: 0, idle: 0 }, 'the fault code is not scored');
-  assert.deepEqual(lee.alerts, { speeding: 0, hardBrake: 1, hardAccel: 1, idle: 1 }, '"223 894" on Daily Dispatch is Fleet unit 223894');
+  assert.deepEqual(pat.alerts, { speeding: 1, hardBrake: 0, hardAccel: 0, idle: 0, seatbelt: 0 }, 'the fault code is not scored');
+  assert.deepEqual(lee.alerts, { speeding: 0, hardBrake: 1, hardAccel: 1, idle: 1, seatbelt: 0 }, '"223 894" on Daily Dispatch is Fleet unit 223894');
   assert.equal(pat.gpsMiles, 182.4);
   assert.equal(S.scClock_(pat.yardOut), '5:40 AM', 'yard leave in New York time');
   assert.equal(S.scClock_(pat.yardIn), '3:05 PM');
@@ -39,8 +39,9 @@ test('alerts go to the driver Daily Dispatch put in that truck, not the driver F
 
   const rows = S.scScoreMonth_(m.records, [], S.scSettings_({}), {});
   const p = rows.find(r => r.driver === 'ADAMS, PAT'), l = rows.find(r => r.driver === 'BAKER, LEE');
-  assert.equal(p.score, 98, 'one speeding alert costs 2');
-  assert.equal(l.score, 100 - 2 - 1 - 1, 'hard stop 2, hard start 1, idling 1');
+  assert.equal(p.areas.speeding.points, -2, 'one speeding alert costs 2');
+  assert.deepEqual([p.areas.hardStops.points, p.areas.idling.points], [1, 1], 'a clean day earns 1');
+  assert.deepEqual([l.areas.hardStops.points, l.areas.idling.points, l.areas.speeding.points], [-3, -1, 1], 'hard stop 2 + hard start 1, idling 1');
   assert.equal(l.idleMinutes, 25, 'idle time from the IDLE alerts\' minutes until Fleet sends a day total');
   assert.equal(p.truck, '223893');
   assert.equal(p.mpg, 7, '182.4 miles on 26 gallons');
@@ -53,9 +54,9 @@ test('a day\'s GPS points stop at the cap; each alert past it shows 0 points', (
   const m = S.scMatchGps_(DAY, days, [], alerts);
   const r = S.scScoreMonth_(m.records, [], S.scSettings_({}), {})[0];
   assert.equal(r.speeding, 7);
-  assert.equal(r.score, 90, '7 x 2 = 14, capped at 10');
-  assert.deepEqual(r.misses.map(x => x.points), [2, 2, 2, 2, 2, 0, 0]);
-  assert.equal(S.scScoreMonth_(m.records, [], S.scSettings_({ gpsDayCap: 0 }), {})[0].score, 86, 'cap 0 = no cap');
+  assert.equal(r.areas.speeding.points, -10, '7 x 2 = 14, capped at 10');
+  assert.deepEqual(r.misses.filter(x => x.area === 'speeding').map(x => x.points), [2, 2, 2, 2, 2, 0, 0]);
+  assert.equal(S.scScoreMonth_(m.records, [], S.scSettings_({ gpsDayCap: 0 }), {})[0].areas.speeding.points, -14, 'cap 0 = no cap');
 });
 
 test('one truck, two dispatched runs: each alert goes to the run that had started; miles to the first run', () => {
@@ -95,7 +96,8 @@ test('weeks run Sunday to Saturday; the year adds up GPS counts', () => {
 test('no GPS at all leaves the old scoring exactly as it was', () => {
   const days = S.scBuildDay_('2026-10-05', [run({ casesOut: 500, plantCaseReturn: 497, truck: '' })], [], {});
   const rows = S.scScoreMonth_(days, [], S.scSettings_({}), {});
-  assert.equal(rows[0].score, 100 - 4 - 3);
+  assert.deepEqual([rows[0].areas.checkin.points, rows[0].areas.cases.points], [-4, -3]);
+  assert.equal(rows[0].areas.speeding.score, null, 'no GPS that day: driving is not graded');
   assert.equal(rows[0].speeding, 0);
   assert.equal(rows[0].mpg, null);
 });
@@ -104,13 +106,16 @@ test('Joe 10/13: one grade per area and the overall score; each area is 100 less
   const days = S.scBuildDay_(DAY, [run({ casesOut: 500, plantCaseReturn: 497 })], [dvir('855', 'SAL')], {});
   const m = S.scMatchGps_(DAY, days, [], [{ tag: '223893', at: '2026-10-14T12:00:00Z', type: 'SPEEDING' }, { tag: '223893', at: '2026-10-14T13:00:00Z', type: 'HARSH_ACCEL' }]);
   const r = S.scScoreMonth_(m.records, [], S.scSettings_({}), {})[0];
-  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'time']);
-  assert.deepEqual(Object.fromEntries(Object.entries(r.areas).map(([k, v]) => [k, v.score])),
-    { checkin: 96, cases: 97, inspection: 100, attendance: 100, speeding: 98, hardStops: 99, idling: 100, time: 100 });
-  assert.equal(r.score, 100 - 4 - 3 - 2 - 1, 'the overall adds up every area');
-  assert.equal(r.areas.checkin.grade, 'A');
+  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'seatbelt', 'fuel', 'time', 'cleanliness', 'accidents', 'complaints']);
+  assert.deepEqual(Object.fromEntries(Object.entries(r.areas).map(([k, v]) => [k, v.points])),
+    { checkin: -4, cases: -3, inspection: 1, attendance: 1, speeding: -2, hardStops: -1, idling: 1, seatbelt: 0, fuel: 0, time: 0, cleanliness: 0, accidents: 0, complaints: 0 });
+  assert.equal(r.areas.time.score, null, 'no dispatch time: Time is not graded');
+  assert.equal(r.points, -7, 'the day\'s points add up');
+  // One day: 80 + 20 x points per day, at most 100.
+  assert.deepEqual([r.areas.checkin.score, r.areas.inspection.score, r.areas.speeding.score], [0, 100, 40]);
+  assert.equal(r.score, Math.round((0 + 20 + 100 + 100 + 40 + 60 + 100) / 7), 'overall = the average of the graded areas');
   const year = S.scScoreYear_([{ month: 10, rows: [r] }], S.scSettings_({}));
-  assert.equal(year[0].areas.speeding.score, 98);
+  assert.equal(year[0].areas.speeding.score, 40);
 });
 
 test('Joe 10/13 Time grade: out more than 15 min before dispatch, or back more than 30 min past dispatch + route hours, costs 1 each', () => {
@@ -122,17 +127,124 @@ test('Joe 10/13 Time grade: out more than 15 min before dispatch, or back more t
   };
   // Dispatch 6:00 AM, 8 hours: due back 2:00 PM. Out 5:30 AM (30 early), back 3:00 PM (60 late).
   let r = S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:30:00Z', '2026-10-14T19:00:00Z'), [], S.scSettings_({}), {})[0];
-  assert.deepEqual([r.leftEarly, r.backLate, r.areas.time.score, r.score], [1, 1, 98, 98]);
+  assert.deepEqual([r.leftEarly, r.backLate, r.areas.time.points], [1, 1, -2]);
   assert.match(r.misses.map(m => m.what).join(' | '), /Left the yard 5:30 AM, 30 min before dispatch 6:00 AM \| Back at the yard 3:00 PM, 60 min past the expected 2:00 PM/);
   // Out 5:50 (10 early) and back 2:20 PM (20 late): inside the grace, nothing.
   r = S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:50:00Z', '2026-10-14T18:20:00Z'), [], S.scSettings_({}), {})[0];
-  assert.deepEqual([r.leftEarly, r.backLate, r.areas.time.score], [0, 0, 100]);
+  assert.deepEqual([r.leftEarly, r.backLate, r.areas.time.points], [0, 0, 1], 'a clean Time day earns 1');
   // No GPS yard time, or no dispatch time: not scored, not held against the driver.
   r = S.scScoreMonth_(day('06:00', 8, '', ''), [], S.scSettings_({}), {})[0];
-  assert.equal(r.areas.time.score, 100);
+  assert.deepEqual([r.areas.time.days, r.areas.time.score], [0, null]);
   r = S.scScoreMonth_(day('', 8, '2026-10-14T08:00:00Z', '2026-10-14T23:00:00Z'), [], S.scSettings_({}), {})[0];
-  assert.equal(r.areas.time.score, 100);
+  assert.deepEqual([r.areas.time.days, r.areas.time.score], [0, null]);
   // The minutes and points come from Settings.
   r = S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:30:00Z', '2026-10-14T19:00:00Z'), [], S.scSettings_({ earlyMinutes: 45, lateMinutes: 30, backLate: 3 }), {})[0];
-  assert.deepEqual([r.leftEarly, r.backLate, r.score], [0, 1, 97]);
+  assert.deepEqual([r.leftEarly, r.backLate, r.areas.time.points], [0, 1, -3]);
+});
+
+test('Joe 10/13 rewards: clean days earn 1, five in a row earn 2 more; back early (not out early) earns 1; grades go by points per day', () => {
+  const s = S.scSettings_({});
+  assert.deepEqual([s.cleanDay, s.streakDays, s.streakBonus, s.backEarly, s.backEarlyMinutes], [1, 5, 2, 1, 15]);
+  const dates = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10'];
+  let recs = [];
+  dates.forEach((date, i) => {
+    const d = S.scBuildDay_(date, [run({ dispatchTime: '06:00', routeHours: 8 })], [i === 5 ? { eventType: 'X', payload: {} } : checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
+    // Out 5:55, back 1:30 PM: 30 min before the expected 2:00 PM.
+    recs = recs.concat(S.scMatchGps_(date, d, [{ tag: '223893', miles: 100, yardOut: date + 'T09:55:00Z', yardIn: date + 'T17:30:00Z' }], []).records);
+  });
+  const r = S.scScoreMonth_(recs, [], s, {})[0];
+  assert.deepEqual([r.areas.checkin.clean, r.areas.checkin.streaks, r.areas.checkin.points], [5, 1, 5 + 2 - 4], 'five clean check-ins, a streak, then a miss');
+  assert.deepEqual([r.areas.time.points, r.areas.time.extra], [6 + 2 + 6, 6], '6 clean days, a streak, and 6 early returns');
+  assert.equal(r.areas.speeding.score, 100, 'clean every day is 100');
+  assert.equal(r.areas.checkin.score, Math.round(80 + 20 * 3 / 6), 'points per day, not total');
+  // Not rewarded for coming back early when they also left early.
+  const early = S.scMatchGps_(DAY, S.scBuildDay_(DAY, [run({ dispatchTime: '06:00', routeHours: 8 })], [], {}),
+    [{ tag: '223893', miles: 100, yardOut: DAY + 'T09:00:00Z', yardIn: DAY + 'T17:00:00Z' }], []).records;
+  const e = S.scScoreMonth_(early, [], s, {})[0];
+  assert.deepEqual([e.leftEarly, e.areas.time.extra || 0, e.areas.time.points], [1, 0, -1]);
+  // Until Fleet alerts come in, driving areas are not graded (no free rewards).
+  assert.equal(S.scScoreMonth_(recs, [], s, {}, { alertsOn: false })[0].areas.speeding.score, null);
+});
+
+test('Joe 10/13 truck cleanliness: rated 1 to 5 about once a month; counts only when rated; has an On/Off switch', () => {
+  const s = S.scSettings_({});
+  assert.deepEqual([s.cleanOn, s.clean5, s.clean4, s.clean3, s.clean2Off, s.clean1Off], [1, 2, 1, 0, 1, 2]);
+  const recs = S.scBuildDay_(DAY, [run({})], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
+  const none = S.scScoreMonth_(recs, [], s, {})[0];
+  assert.equal(none.areas.cleanliness.score, null, 'no rating this period: no grade, the overall is not touched');
+  const rated = (rating, settings) => S.scScoreMonth_(recs, [], settings || s, {}, { ratings: [{ driverKey: 'D1', date: DAY, rating, truck: '223893', note: 'cab full of trash' }] })[0];
+  assert.deepEqual([5, 4, 3, 2, 1].map(n => rated(n).areas.cleanliness.score), [100, 90, 80, 70, 60]);
+  assert.deepEqual([rated(5).areas.cleanliness.points, rated(1).areas.cleanliness.points], [2, -2]);
+  assert.match(rated(1).misses.map(m => m.what).join(' | '), /Truck cleanliness 1 of 5 \(truck 223893\): cab full of trash/);
+  assert.notEqual(rated(1).score, none.score, 'a rating moves the overall');
+  assert.equal(rated(1, S.scSettings_({ cleanOn: 0 })).areas.cleanliness.score, null, 'switched off: not graded');
+});
+
+test('Joe 10/13 sleepers: an idling alert on a sleeper route costs a quarter of the day-cab points (Settings); seatbelt counts once reported', () => {
+  const s = S.scSettings_({});
+  assert.deepEqual([s.sleeperIdlePct, s.seatbelt], [25, 3]);
+  const one = (sleeper, extra) => {
+    const d = S.scBuildDay_(DAY, [run({ sleeper: sleeper ? 'TRUE' : '' })], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
+    return S.scMatchGps_(DAY, d, [{ tag: '223893', miles: 300 }], [{ tag: '223893', at: DAY + 'T14:00:00Z', type: 'IDLE', minutes: 40 }].concat(extra || [])).records;
+  };
+  const cab = S.scScoreMonth_(one(false), [], s, {})[0], sl = S.scScoreMonth_(one(true), [], s, {})[0];
+  assert.deepEqual([cab.areas.idling.points, sl.areas.idling.points], [-1, -0.25]);
+  assert.match(sl.misses.find(m => m.area === 'idling').what, /sleeper/);
+  assert.equal(S.scScoreMonth_(one(true), [], S.scSettings_({ sleeperIdlePct: 50 }), {})[0].areas.idling.points, -0.5);
+  // Seatbelt: not graded until seatbelt alerts arrive.
+  assert.equal(S.scAlertKind_('SEATBELT'), 'seatbelt');
+  const belt = one(false, [{ tag: '223893', at: DAY + 'T15:00:00Z', type: 'SEATBELT' }]);
+  assert.equal(S.scScoreMonth_(belt, [], s, {})[0].areas.seatbelt.score, null);
+  const b = S.scScoreMonth_(belt, [], s, {}, { seatbeltOn: true })[0];
+  assert.deepEqual([b.seatbelts, b.areas.seatbelt.points], [1, -3]);
+});
+
+test('Joe 10/13 fuel economy: graded against the truck\'s own average (or a target) once fuel data comes in', () => {
+  const s = S.scSettings_({});
+  const day = (date, driver, mpg) => S.scMatchGps_(date, S.scBuildDay_(date, [run({ driver, driverId: driver })], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {}), [{ tag: '223893', miles: 300, mpg }], []).records;
+  const recs = day('2026-10-05', 'A', 7).concat(day('2026-10-06', 'A', 7), day('2026-10-07', 'B', 5));
+  const rows = S.scScoreMonth_(recs, [], s, {}), a = rows.find(r => r.driver === 'A'), b = rows.find(r => r.driver === 'B');
+  assert.deepEqual([a.areas.fuel.days, a.areas.fuel.lost, b.areas.fuel.lost], [2, 0, 1], 'the truck averages 6.2; 5.0 is more than 10% under');
+  assert.match(b.misses.find(m => m.area === 'fuel').what, /MPG 5\.0, below the truck's average 6\.2/);
+  assert.equal(S.scScoreMonth_(recs, [], S.scSettings_({ mpgTarget: 8 }), {}).find(r => r.driver === 'A').areas.fuel.lost, 2, 'a target of 8');
+  assert.equal(S.scScoreMonth_(day(DAY, 'A', null), [], s, {})[0].areas.fuel.score, null, 'no fuel data: no grade');
+});
+
+test('Joe 10/13 accidents and complaints: count only once reviewed as counting; class x 15 and complaints fade with age', () => {
+  const s = S.scSettings_({});
+  assert.deepEqual([s.accidentBase, s.accident1, s.accident2, s.accident3, s.complaintMinor, s.complaintMajor], [15, 1, 2, 3, 3, 10]);
+  const recs = S.scBuildDay_(DAY, [run({})], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
+  const acc = (o) => Object.assign({ kind: 'accident', driverKey: 'D1', driver: 'ADAMS, PAT', date: '2026-10-01', accidentClass: 2, status: 'counts' }, o);
+  const score = (incidents, on) => S.scScoreMonth_(recs, [], s, {}, Object.assign({ incidents, asOf: DAY, accidentsOn: true, complaintsOn: true }, on))[0];
+  assert.deepEqual([score([acc({})]).areas.accidents.lost, score([acc({})]).areas.accidents.score], [30, 70], '2nd degree = 15 x 2');
+  assert.equal(score([acc({ accidentClass: 3, date: '2026-06-01' })]).areas.accidents.lost, 33.75, '3rd degree, 4 months old: 45 x 75%');
+  assert.equal(score([acc({ date: '2025-09-01' })]).areas.accidents.lost, 0, 'over a year old: gone');
+  const pending = score([acc({ status: 'review' })]);
+  assert.deepEqual([pending.areas.accidents.lost, pending.pending.length], [0, 1], 'Under review counts nothing but shows');
+  assert.equal(score([acc({ status: 'notCounted' })]).pending.length, 0);
+  assert.equal(score([acc({})], { accidentsOn: false }).areas.accidents.score, null, 'no entries at all yet: not graded');
+  const comp = { kind: 'complaint', driverKey: 'D1', date: '2026-06-20', severity: 'major', status: 'counts', source: 'customer', customer: 'Kroger 512' };
+  assert.equal(score([comp]).areas.complaints.lost, 5, 'major, 3-6 months old: 10 x 50%');
+  assert.match(score([comp]).misses.find(m => m.area === 'complaints').what, /Customer complaint \(Major\) from Kroger 512/);
+});
+
+test('Joe 10/13 call-offs fade over 3 months; earlier ones carry over onto the period', () => {
+  const s = S.scSettings_({});
+  const recs = S.scBuildDay_(DAY, [run({})], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
+  const offs = [{ date: '2026-08-20', driverKey: 'D1', reason: 'SICK DAY' }, { date: '2026-10-02', driverKey: 'D1', reason: 'SICK DAY' }, { date: '2026-06-01', driverKey: 'D1', reason: 'SICK DAY' }];
+  const r = S.scScoreMonth_(recs, offs, s, {}, { start: '2026-10-01', asOf: DAY })[0];
+  assert.deepEqual(r.misses.filter(m => m.area === 'attendance').map(m => m.points), [1.98, 3], 'August is in its 2nd month (66%); June is gone');
+  assert.equal(r.callOffs, 1, 'only October\'s is in the month');
+  assert.equal(r.areas.attendance.carried, 1.98);
+});
+
+test('Joe 10/13 Excuse: an excused GPS or Time miss costs nothing and keeps the perfect day', () => {
+  const s = S.scSettings_({});
+  const recs = S.scMatchGps_(DAY, S.scBuildDay_(DAY, [run({})], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {}), [{ tag: '223893', miles: 300 }],
+    [{ tag: '223893', at: DAY + 'T14:00:00Z', type: 'HARSH_BRAKING' }]).records;
+  const plain = S.scScoreMonth_(recs, [], s, {})[0], miss = plain.misses.find(m => m.area === 'hardStops');
+  assert.equal(miss.key, S.scAlertKey_(DAY, { tag: '223893', at: DAY + 'T14:00:00Z', kind: 'hardBrake' }));
+  const ex = S.scScoreMonth_(recs, [], s, {}, { excuses: { [miss.key]: { reason: 'Deer', by: 'manager@uniteddairy.com' } } })[0];
+  const m2 = ex.misses.find(m => m.area === 'hardStops');
+  assert.deepEqual([m2.points, m2.excused.reason, ex.areas.hardStops.points, ex.hardBrakes], [0, 'Deer', 1, 1]);
 });

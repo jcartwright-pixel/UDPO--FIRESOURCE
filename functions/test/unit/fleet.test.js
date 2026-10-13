@@ -70,7 +70,8 @@ test('Driver Scorecard logic: the screen and the server load the same file; a mi
   const s = S.scSettings_({});
   const days = S.scBuildDay_('2026-10-05', [{ runId: 'r1', route: '855', run: 'SAL', runs: 'TRUE', driver: 'ADAMS, PAT', driverId: 'd1', casesOut: 500, plantCaseReturn: 497 }], [], {});
   const rows = S.scScoreMonth_(days, [], s, { D1: 'ADAMS, PAT' });
-  assert.equal(rows[0].score, 100 - 4 - 3, 'check-in 4 points, 3 lost cases 3 points');
+  // Joe 10/13 rewards: a missed check-in costs 4 and 3 lost cases 3; attendance earns 1 for the clean day.
+  assert.deepEqual([rows[0].areas.checkin.points, rows[0].areas.cases.points, rows[0].areas.attendance.points], [-4, -3, 1], 'check-in 4 points, 3 lost cases 3 points');
   assert.equal(rows[0].driver, 'ADAMS, PAT');
 });
 

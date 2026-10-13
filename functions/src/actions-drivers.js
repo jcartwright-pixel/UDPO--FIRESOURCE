@@ -176,6 +176,48 @@ async function saveScorecard(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
+// Truck cleanliness ratings: scorecardRatings/<driver>_<date> (one a day per driver; a second rating that day replaces it).
+async function rateTruckClean(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('scorecardRatings').doc(M.safeIdPart(req.driverKey + '_' + req.date)), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+  const data = { kind: 'cleanliness', driverKey: req.driverKey, driver: req.driver, date: req.date, rating: req.rating, truck: req.truck, note: req.note };
+  tx.set(ref, Object.assign({}, data, { ratedAt: stamp, ratedBy: email, testEdited: mode.mode === 'test' }));
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
+  return result;
+}
+
+// Joe 10/13: an accident / incident or a complaint, one record each (driverIncidents). It starts Under review and counts nothing
+// until a manager marks it Reviewed - counts (or Reviewed - not counted). Nothing is written to Driver Master.
+async function addDriverIncident(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('driverIncidents').doc(M.safeIdPart(req.driverKey + '_' + req.kind + '_' + req.date + '_' + String(req.requestId || Date.now()).slice(-12)));
+  const data = { kind: req.kind, driverKey: req.driverKey, driver: req.driver, date: req.date, type: req.type, note: req.note, status: 'review' };
+  if (req.kind === 'accident') Object.assign(data, { accidentClass: req.accidentClass, truck: req.truck, preventable: req.preventable });
+  else Object.assign(data, { source: req.source, customer: req.customer, severity: req.severity });
+  tx.set(ref, Object.assign({}, data, { enteredAt: stamp, enteredBy: email, testEdited: mode.mode === 'test' }));
+  const result = { ok: true, requestId: req.requestId, runs: [], incidentId: ref.id };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before: null, after: data, result });
+  return result;
+}
+async function reviewDriverIncident(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('driverIncidents').doc(req.incidentId), snap = await tx.get(ref);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'That entry is not on the list any more');
+  const before = { status: snap.data().status }, after = req.status === 'review' ? { status: 'review', reviewedBy: '', reviewedAt: '' } : { status: req.status, reviewedBy: email, reviewedAt: stamp };
+  tx.update(ref, after);
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after, result });
+  return result;
+}
+// An excused GPS or Time miss (a hard stop for a deer): scorecardExcuses/<miss key>, with the reason and who excused it.
+async function excuseScorecardMiss(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('scorecardExcuses').doc(M.safeIdPart(req.key)), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+  const data = req.undo ? null : { key: req.key, reason: req.reason, driverKey: req.driverKey, what: req.what };
+  if (req.undo) tx.delete(ref);
+  else tx.set(ref, Object.assign({}, data, { by: email, at: stamp, testEdited: mode.mode === 'test' }));
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
+  return result;
+}
+
 // Operational Assignments: opsAssignments/{NAME}, read by the screen and the driver lists with the current app's four under it.
 async function saveOpsAssignment(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection('opsAssignments').doc(M.safeIdPart(L.opsKey(req.assignment))), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
@@ -186,4 +228,4 @@ async function saveOpsAssignment(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { editDriver, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, saveOpsAssignment };
+module.exports = { editDriver, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment };

@@ -10,7 +10,18 @@
 .sc-board tr.sc-misses div { padding: 2px 0; }
 .sc-pts { color: #b42318; font-weight: 800; }
 /* Joe 10/13: Driver Scorecard on GPS. Driver and truck lead; trucks with alerts and no driver dispatched are listed under the board. */
+.sc-board thead th { text-transform: none; letter-spacing: 0; }
+.sc-rate .sc-rate-cancel { height: 38px; }
 .sc-board .sc-overall { min-width: 78px; display: inline-block; }
+.sc-board .sc-earned { color: #1c6b3a; font-weight: 600; margin-bottom: 6px; }
+.sc-board tr.sc-misses td { white-space: normal; overflow-wrap: anywhere; }
+.sc-rate { margin: 0 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600; color: #4a5b6c; }
+.sc-rate small { flex-basis: 100%; }
+.sc-rate .sc-star { min-width: 42px; height: 38px; font-weight: 800; }
+.sc-rate .sc-star.on { background: var(--ud-blue); color: #fff; }
+.sc-rate input[type=text] { min-width: 260px; height: 38px; font: inherit; }
+.sc-rate input[type=date] { height: 38px; font: inherit; }
+.sc-how { margin: 0 0 8px; color: #4a5b6c; line-height: 1.35; }
 .sc-board .sc-facts { color: #4a5b6c; font-weight: 600; margin-bottom: 6px; line-height: 1.4; }
 .sc-board td small { white-space: nowrap; }
 .sc-board th { white-space: normal; line-height: 1.1; padding: 0 3px; }
@@ -30,3 +41,22 @@
 .sc-n { width: 64px; height: 34px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: center; font: inherit; font-weight: 700; }
 .sc-reasons { display: flex; flex-wrap: wrap; gap: 14px; }
 .sc-set .otr-card > button { align-self: flex-end; }
+/* Joe 10/13 Driver Scorecard: a tab per graded area, accidents and complaints, excused misses, the kiosk (TV) view. */
+.sc-cats { display: flex; flex-wrap: nowrap; gap: 3px; overflow-x: auto; margin: 0 0 8px; padding-bottom: 2px; }
+.sc-cats button { flex: 0 0 auto; height: 38px; padding: 0 6px; border: 1px solid #b7c9d8; border-radius: 8px; background: #fff; color: #12385f; font: inherit; font-size: 16px; font-weight: 700; white-space: nowrap; }
+.sc-cats button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.sc-board.sc-area td.sc-detail, .sc-board.sc-incidents td.sc-detail { text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; padding: 4px 8px; }
+.sc-board .sc-pending, .sc-board tr.sc-pending td { color: #8a5a00; }
+.sc-board tr.sc-pending td { background: #fff6e0; }
+.sc-review { display: inline-block; padding: 0 6px; border-radius: 6px; background: #ffe7a8; color: #7a4d00; font-weight: 800; }
+.sc-board .sc-excused .sc-what, .sc-board .sc-excused .sc-pts { text-decoration: line-through; color: #7a8a99; }
+.sc-ex { color: #1c6b3a; font-weight: 700; }
+.sc-carry { color: #647b8e; }
+.sc-board .sc-excuse, .sc-board .sc-unexcuse, .sc-board .sc-ex-form button { height: 32px; padding: 0 10px; font-size: 16px; }
+.sc-ex-form input { height: 32px; min-width: 300px; font: inherit; }
+.sc-board.sc-incidents select { font: inherit; height: 34px; max-width: 100%; }
+.sc-board.sc-incidents td small { display: block; white-space: normal; font-weight: 400; color: #647b8e; }
+body.sc-kiosk #screen > .topbar, body.sc-kiosk .head, body.sc-kiosk #kpis, body.sc-kiosk #bar, body.sc-kiosk #foot, body.sc-kiosk .sidemenu { display: none !important; }
+body.sc-kiosk #sheet { height: 100vh; overflow-y: auto; }
+body.sc-kiosk .sc-board thead th { position: sticky; top: 0; z-index: 1; }
+.sc-kiosk-title { display: flex; justify-content: space-between; padding: 6px 12px; background: #20578e; color: #fff; font-size: 18px; }

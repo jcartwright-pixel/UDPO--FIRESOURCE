@@ -58,6 +58,8 @@
           <div class="ds-week-title"><b>DRIVER WEEKLY SCHEDULE</b><span id="week-of"></span></div>
           <div class="ds-scroll" id="week-scroll"><table class="ds-week-table"><thead id="week-head"></thead><tbody id="week-rows"></tbody></table></div>
         </section>
+        <!-- Joe 10/13: on the Driver's Kiosk Station the bottom panel takes turns with the Driver Scorecard: the grades only. -->
+        <section class="ds-week ds-score" id="ds-score" aria-label="Driver scorecard" hidden></section>
       </div>
       <div class="foot" id="foot"></div>
     </div>
@@ -156,6 +158,17 @@
     }
     if (tv) { weather(); setInterval(weather, 15 * 60000); }
 
+    // Joe 10/13: the TV shows the Driver Scorecard's grades (scorecard.html?kiosk=1) in turn with the weekly schedule: 60 seconds
+    // of the schedule, then 40 of the scorecard. The desk view keeps the schedule only.
+    function scoreTurns() {
+      const box = document.getElementById('ds-score'), week = document.querySelector('.ds-week:not(.ds-score)');
+      box.innerHTML = '<iframe src="scorecard.html?kiosk=1" title="Driver Scorecard grades" loading="lazy"></iframe>';
+      let showing = false;
+      const flip = () => { showing = !showing; box.hidden = !showing; week.hidden = showing; setTimeout(flip, showing ? 40000 : 60000); };
+      setTimeout(flip, 60000);
+      window.udShowScorecard = () => { showing = false; flip(); };
+    }
+
     document.getElementById('tv').addEventListener('click', () => { location.search = tv ? '?view=desk' : ''; });
     document.getElementById('refresh').addEventListener('click', () => { sig = ''; weekSig = ''; render(); });
     window.udBack = () => { if (full) { location.search = ''; return true; } return false; };
@@ -191,6 +204,7 @@
       lockStation(document.getElementById('change'), !!kiosk);
       document.getElementById('eyebrow').textContent = kiosk ? kiosk.name + ' · ' + kiosk.plant : eyebrow;
       sig = ''; weekSig = ''; render();
+      if (tv && !document.querySelector('#ds-score iframe')) scoreTurns();
     }
     const release = (why) => askRelease(document.getElementById('release-box'), { why, status: () => stationCall('status', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown' }),
       release: (code) => stationCall('release', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown', code }), onError: showError, mustHave: true });

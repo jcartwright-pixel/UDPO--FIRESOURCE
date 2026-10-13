@@ -27,7 +27,7 @@ const STATIONS = require('./stations');
 // Each screen's saves are in their own file (review item 81, Joe 10/13); this file checks, routes and logs every save.
 const { SaveError, text, requireTestMode, queueSheetCells, queueLoadoutHistory } = require('./actions-common');
 const { moveRun, setUnitDown, updateIssue, reorder } = require('./actions-daily');
-const { editDriver, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, saveOpsAssignment } = require('./actions-drivers');
+const { editDriver, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
 const { saveDriverException, saveVacation } = require('./actions-dayoff');
 const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
 const { reorderWeek, publishWeek, setWeekReason, resetWeek } = require('./actions-weekly');
@@ -71,6 +71,12 @@ const ACTIONS = Object.freeze({
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
   saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  // Joe 10/13: a manager rates a driver's truck cleanliness 1 to 5 on the Driver Scorecard.
+  rateTruckClean: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  // Joe 10/13: accidents / incidents and complaints (Driver Roster > Edit), reviewed by a manager; an excused GPS miss.
+  addDriverIncident: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  reviewDriverIncident: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  excuseScorecardMiss: { roles: DRIVER_ROLES, screen: 'scorecard' },
   saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'opsAssignments' },
   // The plant side (plant.js): Loadout Center loads and pickups. The Plant Distribution screens are their own switch (Plant Loading).
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
@@ -340,6 +346,58 @@ function validate(input) {
     out.active = input.active !== false;
     out.sequence = Number(input.sequence);
     if (!Number.isInteger(out.sequence) || out.sequence < 1 || out.sequence > 999) throw new SaveError('BAD_REQUEST', 'Order must be a whole number from 1 to 999');
+    return out;
+  }
+  if (action === 'rateTruckClean') {
+    out.driverKey = text(input.driverKey, 80).toUpperCase();
+    out.driver = text(input.driver, 80);
+    out.date = text(input.date);
+    out.rating = Number(input.rating);
+    out.truck = text(input.truck, 20);
+    out.note = text(input.note, 300);
+    if (!out.driverKey) throw new SaveError('BAD_REQUEST', 'Pick the driver');
+    if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+    if (!Number.isInteger(out.rating) || out.rating < 1 || out.rating > 5) throw new SaveError('BAD_REQUEST', 'Pick a rating from 1 to 5');
+    return out;
+  }
+  if (action === 'addDriverIncident') {
+    out.kind = text(input.kind, 20);
+    if (['accident', 'complaint'].indexOf(out.kind) < 0) throw new SaveError('BAD_REQUEST', 'kind must be accident or complaint');
+    out.driverKey = text(input.driverKey, 80).toUpperCase();
+    out.driver = text(input.driver, 80);
+    out.date = text(input.date);
+    out.type = text(input.type, 80);
+    out.note = text(input.note, 500);
+    if (!out.driverKey) throw new SaveError('BAD_REQUEST', 'Pick the driver');
+    if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'Pick the date');
+    if (out.kind === 'accident') {
+      out.accidentClass = Number(input.accidentClass);
+      if ([1, 2, 3].indexOf(out.accidentClass) < 0) throw new SaveError('BAD_REQUEST', 'Pick 1st, 2nd or 3rd degree');
+      out.truck = text(input.truck, 20);
+      out.preventable = input.preventable === true || input.preventable === 'yes';
+    } else {
+      out.source = text(input.source, 20) === 'other' ? 'other' : 'customer';
+      out.customer = text(input.customer, 80);
+      out.severity = text(input.severity, 10).toLowerCase();
+      if (['minor', 'major'].indexOf(out.severity) < 0) throw new SaveError('BAD_REQUEST', 'Pick Minor or Major');
+    }
+    return out;
+  }
+  if (action === 'reviewDriverIncident') {
+    out.incidentId = text(input.incidentId, 120);
+    out.status = text(input.status, 20);
+    if (!out.incidentId) throw new SaveError('BAD_REQUEST', 'Pick the entry');
+    if (['review', 'counts', 'notCounted'].indexOf(out.status) < 0) throw new SaveError('BAD_REQUEST', 'status must be review, counts or notCounted');
+    return out;
+  }
+  if (action === 'excuseScorecardMiss') {
+    out.key = text(input.key, 300);
+    out.reason = text(input.reason, 300);
+    out.undo = input.undo === true;
+    out.driverKey = text(input.driverKey, 80).toUpperCase();
+    out.what = text(input.what, 300);
+    if (!/^(gps|time)\|\d{4}-\d{2}-\d{2}\|/.test(out.key)) throw new SaveError('BAD_REQUEST', 'Only a GPS or Time miss can be excused');
+    if (!out.undo && !out.reason) throw new SaveError('BAD_REQUEST', 'Type the reason');
     return out;
   }
   if (action === 'saveScorecard') {
@@ -618,6 +676,10 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveScorecard') return saveScorecard(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'rateTruckClean') return rateTruckClean(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'addDriverIncident') return addDriverIncident(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'reviewDriverIncident') return reviewDriverIncident(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'excuseScorecardMiss') return excuseScorecardMiss(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOpsAssignment') return saveOpsAssignment(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'publishWeek') return publishWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
