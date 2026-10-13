@@ -19,6 +19,8 @@
   <link rel="stylesheet" href="css/stations.css">
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
+  <!-- Joe 10/13: the station works with no signal: it keeps what it read and its saves on the tablet (js/offline-saves.js). -->
+  <script>window.UD_OFFLINE = true; window.UD_STATION_OFFLINE = true;</script>
 </head>
 <body class="phone ps-page">
   <div class="signin" id="signin" hidden>
@@ -48,6 +50,7 @@
     </header>
     <div class="ps-title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
     <div class="notice error" id="error" hidden></div>
+    <p class="offline-line" id="offline-line" role="status" hidden></p>
     <div class="view">
       <!-- Joe 10/12: once Administration > Plant Station Codes has codes, a tablet types its station's code instead of picking. -->
       <section id="code-box" hidden></section>
@@ -73,6 +76,7 @@
   </div>
 
   <script type="module">
+    import { startOffline } from './js/offline-saves.js';
     import { start, requireSignIn, watchPerson, escapeHtml, shortDate, showError, goBack, callServer, stationCodeSignIn, signOutHere } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { resolveStation, askCode, remember, lockStation } from './js/station-code.js';
@@ -240,6 +244,7 @@
       } catch (err) { releaseMsg.textContent = String(err.message || err); }
     });
 
+    startOffline(['plant-station.html'], { scopes: ['plant-station'], device: 'tablet', files: [] });
     requireSignIn(async (user) => {
       const { db } = await start();
       signedAs = user.station || null; away = false;

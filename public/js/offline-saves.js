@@ -2,11 +2,13 @@
 // with no connection is kept on the iPad (IndexedDB, so closing the page or the iPad loses nothing) and sent, in the order it
 // was made, as soon as the connection is back. Each save keeps its own requestId, so one sent twice is only saved once.
 // sw.js keeps the screens themselves on the iPad so they open with no signal.
-import { start, save, callServer, friendlyError, showError } from './app.js';
+// Joe 10/13: the Plant, Garage and Driver's Kiosk stations use the same: startOffline(pages, { device: 'tablet', ... }) keeps
+// the station's screen on the tablet and its saves wait here with the "Saved on this tablet" line.
+import { start, saveNow, callServer, friendlyError, showError } from './app.js';
 
 const DB = 'udOfflineSaves', STORE = 'saves', CACHE = 'ud-offline-v1';
 const listeners = [];
-let flushing = false, failedText = '';
+let flushing = false, failedText = '', device = 'device', sentAt = 0;
 
 function open() {
   return new Promise((resolve, reject) => {
@@ -58,60 +60,92 @@ async function changed() {
 function drawLine(n) {
   const box = document.getElementById('offline-line');
   if (!box) return;
-  const text = n ? (navigator.onLine ? 'Sending saves made on this device: ' + n : 'Saved on this device, sends when online: ' + n)
-    : !navigator.onLine ? 'No internet. Taps, notes and photos are saved on this device and sent when it is back.' : failedText;
+  const text = device === 'tablet'
+    ? (n ? (navigator.onLine ? 'Sending what was saved on this tablet: ' + n : 'Saved on this tablet, will send when you have signal. Waiting: ' + n)
+      : !navigator.onLine ? 'No signal. What you enter is saved on this tablet and sent when you have signal.'
+        : failedText || (Date.now() - sentAt < 8000 ? 'Sent ✓ Everything saved on this tablet has gone through.' : ''))
+    : n ? (navigator.onLine ? 'Sending saves made on this device: ' + n : 'Saved on this device, sends when online: ' + n)
+      : !navigator.onLine ? 'No internet. Taps, notes and photos are saved on this device and sent when it is back.' : failedText;
   box.textContent = text;
   box.hidden = !text;
   box.classList.toggle('error', !n && navigator.onLine && !!failedText);
+  box.classList.toggle('ok', !n && navigator.onLine && !failedText && !!text);
 }
 
 // Save now when there is a connection; otherwise (or when the connection drops on the way) keep it on this iPad. Saves made
-// while others are still waiting wait behind them, so they reach the server in the order they were made.
-export async function offlineSave(action, fields) {
-  const entry = { action, fields: Object.assign({ requestId: rid() }, fields), at: Date.now(), email: await me() };
-  if (navigator.onLine && !(await waiting()).length) {
-    try { return await save(action, entry.fields); } catch (e) { if (!isNoConnection(e)) throw e; }
-  }
+// while others are still waiting wait behind them, so they reach the server in the order they were made. Each save starts
+// in the order it was made (the check of what waits is taken in turn; the sends themselves run side by side as before).
+let turn = Promise.resolve();
+async function keepOrSend(entry, sendNow) {
+  const decided = turn.then(async () => {
+    entry.email = await me();
+    return { sending: navigator.onLine && !(await waiting()).length ? sendNow(entry.fields) : null };
+  });
+  turn = decided.catch(() => {});
+  const { sending } = await decided;
+  if (sending) { try { return await sending; } catch (e) { if (!isNoConnection(e)) throw e; } }
   await add(entry);
   await changed();
   return { ok: true, queued: true };
+}
+export function offlineSave(action, fields) {
+  return keepOrSend({ action, fields: Object.assign({ requestId: rid() }, fields), at: Date.now() }, (f) => saveNow(action, f));
+}
+
+// Joe 10/13 (Garage Station): the same for another server call (name, e.g. 'garage'): sent now when there is signal and
+// nothing waits, otherwise kept on the tablet and sent in order. fields carries its own requestId.
+export function offlineCall(name, fields) {
+  return keepOrSend({ call: name, fields: Object.assign({ requestId: rid() }, fields), at: Date.now() }, (f) => callServer(name, f));
 }
 
 // Send what is waiting, oldest first; stop at the first save that still has no connection.
 export async function flush() {
   if (flushing || !navigator.onLine) return drawLine((await waiting()).length);
   flushing = true;
+  let sent = 0;
   try {
     const email = await me();
     for (const e of await waiting()) {
       if (e.email && email && e.email !== email) continue; // someone else's saves wait for them to sign in on this iPad
       try {
-        await callServer('save', Object.assign({ action: e.action }, e.fields));
+        await (e.call ? callServer(e.call, e.fields) : callServer('save', Object.assign({ action: e.action }, e.fields)));
       } catch (err) {
         if (isNoConnection(err)) break;
-        failedText = 'A save made on this device was refused when it was sent: ' + friendlyError(err);
+        failedText = 'A save made on this ' + device + ' was refused when it was sent: ' + friendlyError(err);
         showError(failedText);
+        sent--;
       }
+      sent++;
       await remove(e.key);
       await changed();
     }
   } finally { flushing = false; }
+  if (sent > 0) { sentAt = Date.now(); setTimeout(changed, 8500); }
   await changed();
 }
 
 // Keep the screens on this iPad (see sw.js) and send waiting saves when the connection comes back.
-export function startOffline(pages) {
-  // Only the Safety Walkthrough screens are kept on the device (safety*.html and extinguishers.html); every other screen of
-  // the app is never touched by sw.js.
-  if ('serviceWorker' in navigator) ['safety', 'extinguishers'].forEach(scope => navigator.serviceWorker.register('sw.js', { scope }).catch(() => {}));
-  if (window.caches && navigator.onLine) {
-    const keep = pages.concat(['css/app.css', 'css/safety.css', 'js/app.js', 'js/logic.js', 'js/safety-rules.js', 'js/safety.js', 'js/offline-saves.js',
-      'img/ud-logo.webp', 'img/app-icon/favicon-32.png', 'manifest.webmanifest',
+// opts (Joe 10/13, the stations): scopes = the sw.js scopes of the screens kept (default the Safety Walkthrough's), device =
+// the word on the line ('tablet' for a station), files = what else to keep. Every same-site file the screen has loaded is
+// kept too (read from the browser's list of what it loaded), so a station keeps exactly what it needs.
+export function startOffline(pages, opts) {
+  opts = opts || {};
+  device = opts.device || 'device';
+  // Only the screens named are kept on the device (default safety*.html and extinguishers.html); every other screen of the
+  // app is never touched by sw.js.
+  if ('serviceWorker' in navigator) (opts.scopes || ['safety', 'extinguishers']).forEach(scope => navigator.serviceWorker.register('sw.js', { scope }).catch(() => {}));
+  const keepAll = () => {
+    if (!window.caches || !navigator.onLine) return;
+    const loaded = opts.scopes ? performance.getEntriesByType('resource').map(r => r.name).filter(u => { try { const x = new URL(u); return x.origin === location.origin && !/^\/__\/(?!firebase\/init\.json)/.test(x.pathname); } catch (e) { return false; } }).map(u => new URL(u).pathname.replace(/^\//, '')) : [];
+    const keep = pages.concat(opts.files || ['css/app.css', 'css/safety.css', 'js/app.js', 'js/logic.js', 'js/safety-rules.js', 'js/safety.js', 'js/offline-saves.js',
+      'img/ud-logo.webp', 'img/app-icon/favicon-32.png', 'manifest.webmanifest'], loaded, [
       'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js',
       'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js'])
       .concat(['localhost', '127.0.0.1'].includes(location.hostname) ? [] : ['/__/firebase/init.json']);
-    caches.open(CACHE).then(c => keep.forEach(u => c.add(u).catch(() => {}))).catch(() => {});
-  }
+    caches.open(CACHE).then(c => [...new Set(keep)].forEach(u => c.add(u).catch(() => {}))).catch(() => {});
+  };
+  keepAll();
+  if (opts.scopes) { setTimeout(keepAll, 5000); setTimeout(keepAll, 30000); }
   window.addEventListener('online', () => { failedText = ''; flush(); });
   window.addEventListener('offline', () => changed());
   setInterval(() => { if (navigator.onLine) flush(); }, 20000);

@@ -2,7 +2,8 @@
 // cache and keeps the saves). Online, every screen comes from the server as before; the copy is used only when there is no
 // connection. Screens not in the cache are not touched. It looks after the Safety Walkthrough screens (registered for the
 // safety*.html and extinguishers.html scopes) and, Joe 10/12, the drivers' Route page and the Driver Room Check-In Station
-// (route.html, js/phone-queue.js keeps their Check-Ins and DVIRs with no signal); the rest of the app never goes through it.
+// (route.html, js/phone-queue.js keeps their Check-Ins and DVIRs with no signal) and, Joe 10/13, the Plant, Garage and Driver
+// Station screens (js/offline-saves.js); the rest of the app never goes through it.
 const CACHE = 'ud-offline-v1';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));

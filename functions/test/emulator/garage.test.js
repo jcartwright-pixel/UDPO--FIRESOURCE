@@ -120,3 +120,24 @@ test('Report a Problem and the office\'s Send to Garage: a PM done safe moves Fl
   const setup = (await db().collection('fleetSetup').doc('900002').get()).data();
   assert.deepEqual([setup.last_service_date, setup.last_service_miles, setup.track], ['2026-10-06', '98000', 'YES']);
 });
+
+// Joe 10/13 (Garage Station with no signal): a step kept on the tablet carries the mechanic's name and login ID, checked when
+// it is sent, and names the write-up instead of a work order number the tablet never learned.
+test('a step kept on the tablet: checked by name and login ID when sent, and found by its write-up', async () => {
+  const job = (await garageCall(db(), { op: 'read', tokens: [] }, now())).jobs;
+  const tom = await garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213' }, now());
+  const writeUp = (await garageCall(db(), { op: 'read', tokens: [tom.token] }, now())).jobs.find(j => j.unit === '900001').writeUp;
+  assert.deepEqual(job, []);
+  const kept = (signIn, fields, at, requestId) => garageCall(db(), Object.assign({ op: 'step', tokens: [], signIn, requestId: requestId || rid() }, fields), now(at));
+  await assert.rejects(kept({ techId: 'TECH-JT', loginId: '11111' }, { step: 'START', writeUp }), /Wrong login ID/);
+  assert.equal((await db().collection('garageLocks').doc('TECH-JT').get()).data().count, 1, 'a wrong number counts towards the lock');
+  await assert.rejects(kept({ techId: 'TECH-JT', loginId: '48213' }, { step: 'PARTS', writeUp }), /not on the list any more/, 'only Start makes the work order');
+  const startId = rid();
+  const started = await kept({ techId: 'TECH-JT', loginId: '48213' }, { step: 'START', writeUp }, 1, startId);
+  assert.deepEqual([started.job.status, started.job.techs], ['WORKING', ['JELLICK Tom']]);
+  assert.equal((await kept({ techId: 'TECH-JT', loginId: '48213' }, { step: 'START', writeUp }, 1, startId)).repeated, true, 'sent twice, saved once');
+  const done = await kept({ techId: 'TECH-JT', loginId: '48213' }, { step: 'DONE', writeUp, fixed: 'Brakes', safe: true, signature: SIG }, 30);
+  assert.equal(done.job.id, started.job.id, 'the write-up finds the work order its Start made');
+  const wo = (await db().collection('workOrders').doc(started.job.id).get()).data();
+  assert.deepEqual([wo.status, wo.signed_by, wo.minutes], ['DONE', 'JELLICK Tom', 29]);
+});
