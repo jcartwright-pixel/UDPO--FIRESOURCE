@@ -527,6 +527,9 @@ async function noScroll(page) {
       const size = await noScroll(eq);
       assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Equipment fits ' + w + 'x' + h + ': ' + JSON.stringify(size));
       assert.deepEqual(eq.errors, []);
+      // Review item 40 (Joe 10/13): the last column is headed Action and "Put down" stays on one line.
+      assert.equal(await eq.$eval('thead th:last-child', t => t.textContent), 'Action');
+      assert.ok(await eq.$$eval('#rows [data-down]', b => b.every(x => x.getClientRects().length === 1 && x.offsetHeight < 40 && x.getBoundingClientRect().right <= x.closest('td').getBoundingClientRect().right + 1)), 'Put down on one line inside its column');
       if (w === 1366) {
         await eq.click('#rows tr[data-id="veh_truck_900002"] [data-down]');
         await eq.fill('#rows tr[data-id="veh_truck_900002"] [data-reason]', 'Flat tire');
@@ -750,7 +753,9 @@ async function noScroll(page) {
     // The drivers' no-account pages aside: the phone page and the Driver Room Check-In tablet (Joe 10/12, leaves only by
     // Release and the manager release code).
     const fsMod = require('fs'), pathMod = require('path');
-    const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html');
+    // Review item 49 (Joe 10/13): the Maintenance Station and Plant Performance are stations too: only the Release bar (checked below).
+    const LOCKED = ['maint-station.html', 'plant-kiosk.html'];
+    const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html' && LOCKED.indexOf(f) < 0);
     const bh = await openPage(browser, 1366, 768, '/index.html?testEmail=manager.test@uniteddairy.com');
     const missing = [];
     for (const pg of pages) {
@@ -763,6 +768,12 @@ async function noScroll(page) {
       if (want.some(id => seen.indexOf(id) < 0)) missing.push(pg + ': ' + seen.join(','));
     }
     assert.deepEqual(missing, [], 'every screen has Back and Home');
+    for (const pg of LOCKED) {
+      await bh.goto(bh.url().replace(/\/[a-z-]+\.html.*/, '/' + pg + '?testEmail=manager.test@uniteddairy.com'));
+      await bh.waitForSelector('body.station-locked .station-release', { state: 'visible', timeout: 8000 });
+      const shown = await bh.evaluate(() => ['go-back', 'go-home', 'signout'].filter(id => { const e = document.getElementById(id); return e && e.getBoundingClientRect().width > 0; }));
+      assert.deepEqual(shown, [], pg + ' is locked: no Back, Home or Sign out, only Release');
+    }
     results.push('Back and Home: all ' + pages.length + ' screens show both in the header (Home and the all-plants overview show Home)');
     // Joe 10/10: "move the action buttons all in a line up above": on every screen the action buttons sit in one row in the top
     // line, all the same size, above the tables; no action row is left down in the screen.
@@ -789,7 +800,12 @@ async function noScroll(page) {
     // Joe 10/10 picked mock-up A: one row per unit with PM / Reefer, DOT and Plates side by side, Miles / hours now and Status, units that need something first.
     const fsB = await openPage(browser, 1920, 950, '/fleet.html?testEmail=manager.test@uniteddairy.com');
     await fsB.waitForSelector('table.fs-grid tbody tr');
-    assert.deepEqual(await fsB.$$eval('table.fs-grid thead th', t => t.map(x => x.textContent)), ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status', '']);
+    // Review item 41 (Joe 10/13): no empty column after Status; the Send to Garage column (headed Garage) shows only when a unit has something to send.
+    const fsHeads = await fsB.$$eval('table.fs-grid thead th', t => t.map(x => x.textContent));
+    assert.deepEqual(fsHeads.slice(0, 7), ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status']);
+    assert.ok(fsHeads.length === 7 || (fsHeads.length === 8 && fsHeads[7] === 'Garage' && (await fsB.$$('table.fs-grid [data-send]')).length > 0), 'no empty column after Status: ' + JSON.stringify(fsHeads));
+    assert.ok(await fsB.$eval('.fs-legend em', e => e.getBoundingClientRect().right <= e.closest('.fs-legend').getBoundingClientRect().right - 8), '"units need something" sits in from the right edge');
+    assert.ok(await fsB.$$eval('table.fs-grid td.gc small, .fs-legend em', e => e.every(x => parseFloat(getComputedStyle(x).fontSize) >= 16)), 'the helper text is 16px');
     const fsRows = await fsB.$$eval('table.fs-grid tbody tr[data-unit]', r => r.map(x => [x.dataset.unit, x.dataset.worst]));
     assert.equal(new Set(fsRows.map(r => r[0])).size, fsRows.length, 'one row per unit');
     const rank = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
@@ -1183,9 +1199,12 @@ async function noScroll(page) {
     await hub.waitForSelector('.hub-card[data-kind="GARAGE"] .hub-tile');
     assert.equal(await hub.$$eval('.hub-kpis div', d => d.length), 6);
     assert.deepEqual(await hub.$$eval('.hub-card strong', d => d.map(x => x.textContent)), ['Truck Issues', 'Trailer Issues', 'Fork Truck / Pallet Jack Issues', 'Garage']);
-    // Joe 10/10: Over the Road and Trucks Today are off the hub (they are under Reports); eleven write-ups at most; no scrolling.
+    // Joe 10/10: Over the Road and Trucks Today are off the hub (they are under Reports); no page scrolling.
     assert.deepEqual(await hub.$$eval('.hub-tiles > a', a => a.map(x => x.textContent.trim())), ['Garage Station', 'Fleet Service', 'Equipment']);
-    assert.ok(await hub.$$eval('#latest tr', r => r.length) <= 11);
+    // Review item 42 (Joe 10/13): Latest write-ups runs the full height (its own list scrolls); the small tiles are bigger, their labels 16px on one line.
+    assert.ok(await hub.$$eval('#latest tr', r => r.length) <= 40);
+    assert.ok(await hub.evaluate(() => { const v = document.querySelector('.hub-view').getBoundingClientRect(), l = document.querySelector('.hub-latest').getBoundingClientRect(), c = document.querySelector('.hub-cards').getBoundingClientRect(); return l.bottom >= v.bottom - 30 && l.bottom >= c.bottom - 2; }), 'Latest write-ups runs to the bottom');
+    assert.deepEqual(await hub.$$eval('.hub-tile span', s => s.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16 || x.getClientRects().length > 1 || x.offsetHeight > 26).map(x => x.textContent)), [], 'tile labels 16px on one line');
     assert.ok(await hub.evaluate(() => document.scrollingElement.scrollHeight <= innerHeight && document.querySelector('.hub-view').scrollHeight <= document.querySelector('.hub-view').clientHeight), 'the hub fits 1920x950');
     await hub.waitForFunction(() => [...document.querySelectorAll('.hub-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 3, null, { timeout: 10000 });
     await Promise.all([hub.waitForNavigation(), hub.click('.hub-card[data-kind="TRUCK"] .hub-card-head')]);
