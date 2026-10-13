@@ -268,7 +268,9 @@ function alertType(c, r) {
   if (/SEATBELT/.test(s)) return 'SEATBELT';
   if (/IDL/.test(s)) return 'IDLE';
   if (/SPEED/.test(s) || (num(r.LimitMph) > 0 && num(r.SpeedMph) > num(r.LimitMph))) return 'SPEEDING';
-  if (/DTC|FAULT|CHECKENGINE|MIL\b/.test(s)) return 'FAULT';
+  if (/DTC|FAULT|CHECKENGINE|ENGINECODE|TROUBLECODE|MIL\b/.test(s)) return 'FAULT';
+  if (/DVIR|INSPECTIONFAIL/.test(s)) return 'DVIR_FAILED';
+  if (/HOS(WARN|VIOL)|HOURSOFSERVICE/.test(s)) return 'HOS';
   return 'OTHER';
 }
 const fleetTime = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
