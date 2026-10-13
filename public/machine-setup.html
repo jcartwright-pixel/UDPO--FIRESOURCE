@@ -37,25 +37,25 @@
         <nav class="ms-list" aria-label="Machines"><h3>Machines</h3><div id="machines"></div></nav>
         <section class="qc-form pm-form ms-main">
           <div class="qc-top"><h2 id="form-title">Products</h2><div class="hstats" id="hstats"></div>
-            <button type="button" class="ms-add" id="add">+ Add Products</button>
             <select id="group" class="pm-pick" aria-label="Group" title="Group"></select>
             <input type="search" id="find" placeholder="Find a product" aria-label="Find a product"></div>
-          <div class="pm-scroll">
-            <table class="loadout pm-table ms-table">
-              <colgroup><col style="width:30%"><col style="width:10%"><col style="width:11%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"></colgroup>
-              <thead><tr><th>Product</th><th>SKU</th><th>Type</th><th>Group</th><th title="Full speed per minute">Full&nbsp;Speed /Min</th><th>Target %</th><th title="Lowest speed per minute">Lowest Speed</th><th title="Highest speed per minute">Highest Speed</th><th></th></tr></thead>
-              <tbody id="rows"></tbody>
-            </table>
+          <!-- Mock-up MB (Joe 10/13): what is on the machine on the left, the rest of the plant's products on the right. -->
+          <div class="ms-two">
+            <div class="ms-side ms-on"><h3 id="on-title">On</h3>
+              <div class="pm-scroll ms-lst"><table class="loadout pm-table ms-table">
+                <colgroup><col><col style="width:84px"><col style="width:96px"><col style="width:122px"></colgroup>
+                <thead><tr><th>Product</th><th>SKU</th><th title="Full speed per minute">Speed</th><th></th></tr></thead>
+                <tbody id="rows"></tbody>
+              </table></div>
+            </div>
+            <div class="ms-side ms-off"><h3 id="off-title">Not on</h3>
+              <div class="pm-scroll ms-lst"><table class="loadout pm-table ms-table">
+                <colgroup><col style="width:100px"><col><col style="width:84px"><col style="width:112px"></colgroup>
+                <thead><tr><th></th><th>Product</th><th>SKU</th><th>Type</th></tr></thead>
+                <tbody id="offrows"></tbody>
+              </table></div>
+            </div>
           </div>
-        </section>
-      </div>
-      <!-- + Add Products: a checklist of the plant's products not yet on this machine. -->
-      <div class="pm-edit-back" id="pick-back" hidden>
-        <section class="pm-edit ms-pick" id="pick-pane" role="dialog" aria-modal="true" aria-labelledby="pick-title">
-          <div class="pm-edit-head"><h2 id="pick-title">Add products</h2><div class="ms-pick-acts"><button type="button" class="rp-btn" id="pick-cancel">Cancel</button><button type="button" class="rp-btn primary" id="pick-save">Add</button></div></div>
-          <input type="search" id="pick-find" class="ms-pick-find" placeholder="Find a product or SKU" aria-label="Find a product or SKU">
-          <div class="ms-pick-list" id="pick-list"></div>
-          <p class="pm-edit-note">Only products on the Product Sheet are listed. A new product goes in with Add Product on the Product Sheet.</p>
         </section>
       </div>
       <div class="foot" id="foot"></div>
@@ -69,16 +69,16 @@
     import { mountRowDrag } from './js/row-drag.js';
     import { savedText } from './js/autosave.js';
 
-    // Machine Setup (Joe 10/13, mock-up MA): the plant's machines down the left (the same production lines Quality Checks and the
-    // Product Sheet use, then the plant's own areas). Pick one, and its products are the Product drop-down on its Quality Check:
-    // + Add Products puts more on it from the plant's Product Sheet, Remove takes one off this machine only (it stays on the Product
-    // Sheet), and dragging a line sets the order of the drop-down. The lists are the same as the Product Sheet's checks.
+    // Machine Setup (Joe 10/13, mock-up MB): the plant's machines down the left (the same production lines Quality Checks and the
+    // Product Sheet use, then the plant's own areas). Pick one: its products (the Product drop-down on its Quality Check) on the left,
+    // the rest of the plant's products on the right; Add and Take off move a product across, and dragging a line on the left sets the
+    // order of the drop-down. The lists are the same as the Product Sheet's checks.
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const ALL_PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
     const cameFrom = () => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } };
     let setup = [], products = {}, own = [], looseDocs = [], person = null, app = {}, plant = params.get('plant') || cameFrom(), chosen = params.get('line') || '';
-    let group = '', find = '', note = '', armed = null, busy = Promise.resolve(), setupRead = false, picking = null;
+    let group = '', find = '', note = '', busy = Promise.resolve(), setupRead = false;
     const mine = {}, mineLoose = {};
     const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
     const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
@@ -110,21 +110,24 @@
       const gs = ownOf().groups;
       if (group && !gs.some(g => g === group)) group = '';
       document.getElementById('group').innerHTML = opt('', group, 'All groups') + gs.map(g => opt(g, group, g)).join('');
-      document.getElementById('add').disabled = !ck || !line;
       document.getElementById('form-title').textContent = line ? line.name + ' Products' : plantName(plant) + ' Products';
       const total = rowsOf().length, list = line ? listOf(line.id) : [];
       document.getElementById('hstats').innerHTML = [['On this machine', list.length], ['At the plant', total]].map(([l, n]) => '<div><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.getElementById('foot').textContent = (ck ? 'Pick a machine on the left. + Add Products puts products from the plant\'s Product Sheet on it; Remove takes one off this machine only (it stays on the Product Sheet). Drag a line, or Alt and the up or down arrow, to change the order of the machine\'s Quality Check drop-down. A product\'s details and speeds are changed on the Product Sheet.' : 'View only. A manager or administrator changes the machines\' products.') + (note ? ' ' + note : '');
+      document.getElementById('foot').textContent = (ck ? 'Pick a machine. Left: the products on it (its Quality Check drop-down); drag a line, or Alt and the up or down arrow, to change their order. Right: the rest of the plant\'s products. Add and Take off move a product across (off this machine only; it stays on the Product Sheet). Details and speeds are changed on the Product Sheet.' : 'View only. A manager or administrator changes the machines\' products.') + (note ? ' ' + note : '');
       const q = find.trim().toUpperCase(), filtered = !!(q || group);
-      const rows = list.map((p, i) => [p, i]).filter(([p]) => (!q || (p.name + ' ' + (p.sku || '')).toUpperCase().indexOf(q) >= 0) && inGroup(p));
+      const match = (p) => (!q || (p.name + ' ' + (p.sku || '')).toUpperCase().indexOf(q) >= 0) && inGroup(p);
+      const rows = list.filter(match);
+      const off = line ? rowsOf().filter(r => !r.on[line.id]) : [], offShown = off.filter(r => match(r.p));
+      document.getElementById('on-title').textContent = line ? 'On ' + line.name + ' (' + list.length + ')' : 'On';
+      document.getElementById('off-title').textContent = line ? 'Not on ' + line.name + ' (' + off.length + ')' : 'Not on';
       // A list can be dragged only while all of it shows (a filtered list has gaps).
       const act = document.activeElement, keep = act && act.matches && act.matches('#rows tr[data-drag]') ? act.dataset.drag : null;
-      document.getElementById('rows').innerHTML = rows.map(([p]) => '<tr' + (ck && !filtered ? ' data-drag="' + escapeHtml(keyOf(p.name)) + '" tabindex="0" aria-label="' + show(p.name) + '. Drag it, or Alt and the up or down arrow, to change the order."' : '') + '><td class="pm-namecell">' + show(p.name) + '</td><td>' + show(p.sku) + '</td><td>' + show(p.mfgType) + '</td><td>' + show(p.productGroup) + '</td>' +
-        MACHINE_FIELDS.map(k => '<td class="pm-num">' + show(p[k]) + '</td>').join('') +
-        '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + escapeHtml(keyOf(p.name)) + '">' + (armed === keyOf(p.name) ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
-        '<tr><td colspan="9" class="empty">' + (!line ? 'No machines yet.' : filtered ? 'No product matches.' : 'No products on ' + escapeHtml(line.name) + ' yet. + Add Products puts them on.') + '</td></tr>';
+      document.getElementById('rows').innerHTML = rows.map(p => '<tr' + (ck && !filtered ? ' data-drag="' + escapeHtml(keyOf(p.name)) + '" tabindex="0" aria-label="' + show(p.name) + '. Drag it, or Alt and the up or down arrow, to change the order."' : ' data-key="' + escapeHtml(keyOf(p.name)) + '"') + '><td class="pm-namecell">' + show(p.name) + '</td><td>' + show(p.sku) + '</td><td class="pm-num">' + (p.ratePerMin === undefined || p.ratePerMin === '' ? '' : show(p.ratePerMin) + '/min') + '</td>' +
+        '<td>' + (ck ? '<button type="button" class="ms-off-btn" data-remove="' + escapeHtml(keyOf(p.name)) + '">Take off →</button>' : '') + '</td></tr>').join('') ||
+        '<tr><td colspan="4" class="empty">' + (!line ? 'No machines yet.' : filtered ? 'No product matches.' : 'No products on ' + escapeHtml(line.name) + ' yet. Add puts them on.') + '</td></tr>';
+      document.getElementById('offrows').innerHTML = offShown.map(r => '<tr data-key="' + escapeHtml(r.key) + '"><td>' + (ck ? '<button type="button" class="ms-add-btn" data-add="' + escapeHtml(r.key) + '">← Add</button>' : '') + '</td><td class="pm-namecell">' + show(r.p.name) + '</td><td>' + show(r.p.sku) + '</td><td>' + show(r.p.mfgType) + '</td></tr>').join('') ||
+        '<tr><td colspan="4" class="empty">' + (!line ? '' : filtered ? 'No product matches.' : 'Every product on the Product Sheet is on ' + escapeHtml(line.name) + '.') + '</td></tr>';
       if (keep) { const tr = document.querySelector('#rows tr[data-drag="' + CSS.escape(keep) + '"]'); if (tr) tr.focus(); }
-      if (picking) drawPick();
     }
 
     // The machine's whole list is saved each time (and the products on no machine when one comes off its last machine).
@@ -142,17 +145,14 @@
     document.getElementById('machines').addEventListener('click', e => {
       const b = e.target.closest('[data-line]');
       if (!b) return;
-      chosen = b.dataset.line; armed = null; note = ''; setUrl(); render();
+      chosen = b.dataset.line; note = ''; setUrl(); render();
     });
+    // Take off moves it to the right: off this machine only (off its last machine it stays on the Product Sheet, on no machine).
     document.getElementById('rows').addEventListener('click', e => {
       const b = e.target.closest('[data-remove]'), line = current();
       if (!b || !line || !canSave()) return;
-      const key = b.dataset.remove;
-      if (armed !== key) { armed = key; render(); setTimeout(() => { if (armed === key) { armed = null; render(); } }, 7000); return; }
-      armed = null;
-      const list = listOf(line.id), gone = list.find(p => keyOf(p.name) === key);
+      const key = b.dataset.remove, list = listOf(line.id), gone = list.find(p => keyOf(p.name) === key);
       if (!gone) return;
-      // Taken off its last machine, the product stays on the Product Sheet (on no machine) with its details.
       const r = rowsOf().find(x => x.key === key), last = r && Object.keys(r.on).length === 1;
       send(line, list.filter(p => keyOf(p.name) !== key), last ? looseOf().concat([gone]) : null, gone.name + ' taken off ' + line.name);
     });
@@ -168,52 +168,15 @@
     document.getElementById('find').addEventListener('input', e => { find = e.target.value; render(); });
     document.getElementById('group').addEventListener('change', e => { group = e.target.value; render(); });
 
-    /* ---------- + Add Products ---------- */
-    document.getElementById('add').addEventListener('click', () => {
-      if (!canSave() || !current()) return;
-      picking = { line: current().id, on: new Set(), find: '' };
-      document.getElementById('pick-find').value = '';
-      drawPick();
-      document.getElementById('pick-back').hidden = false;
-      document.getElementById('pick-find').focus();
-    });
-    function drawPick() {
-      const line = areas().find(a => a.id === picking.line);
-      if (!line) { closePick(); return; }
-      const q = picking.find.trim().toUpperCase();
-      const off = rowsOf().filter(r => !r.on[line.id] && (!q || (r.p.name + ' ' + (r.p.sku || '')).toUpperCase().indexOf(q) >= 0));
-      document.getElementById('pick-title').textContent = 'Add products to ' + line.name;
-      document.getElementById('pick-save').textContent = picking.on.size ? 'Add ' + picking.on.size + ' Product' + (picking.on.size === 1 ? '' : 's') : 'Add';
-      document.getElementById('pick-save').disabled = !picking.on.size;
-      document.getElementById('pick-list').innerHTML = off.map(r => { const is = picking.on.has(r.key); return '<button type="button" class="ms-pick-row' + (is ? ' on' : '') + '" data-pick="' + escapeHtml(r.key) + '" aria-pressed="' + is + '"><span class="pm-ck' + (is ? ' on' : '') + '">' + (is ? '✓' : '') + '</span><span class="n">' + show(r.p.name) + '</span><span class="s">' + show(r.p.sku) + '</span><span class="t">' + show(r.p.mfgType) + '</span></button>'; }).join('') ||
-        '<p class="empty">' + (q ? 'No product matches.' : 'Every product on the Product Sheet is already on ' + escapeHtml(line.name) + '.') + '</p>';
-    }
-    document.getElementById('pick-list').addEventListener('click', e => {
-      const b = e.target.closest('[data-pick]');
-      if (!b || !picking) return;
-      if (picking.on.has(b.dataset.pick)) picking.on.delete(b.dataset.pick); else picking.on.add(b.dataset.pick);
-      const top = document.getElementById('pick-list').scrollTop;
-      drawPick();
-      document.getElementById('pick-list').scrollTop = top;
-    });
-    document.getElementById('pick-find').addEventListener('input', e => { if (picking) { picking.find = e.target.value; drawPick(); } });
-    function closePick() { picking = null; document.getElementById('pick-back').hidden = true; }
-    document.getElementById('pick-cancel').addEventListener('click', closePick);
-    document.getElementById('pick-back').addEventListener('click', e => { if (e.target.id === 'pick-back') closePick(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && picking) closePick(); });
-    // The picked products go on the end of the machine's list, with the numbers they have on their other machines.
-    document.getElementById('pick-save').addEventListener('click', () => {
-      const line = areas().find(a => a.id === (picking && picking.line));
-      if (!line || !picking.on.size || !canSave()) return;
-      const all = areas(), rows = rowsOf().filter(r => picking.on.has(r.key));
-      const add = rows.map(r => {
-        const from = all.map(a => r.on[a.id]).find(Boolean) || r.loose || {}, p = {};
-        SHARED_FIELDS.concat(MACHINE_FIELDS).forEach(k => { const v = SHARED_FIELDS.indexOf(k) >= 0 ? r.p[k] : from[k]; if (v !== undefined && v !== '') p[k] = v; });
-        return p;
-      });
-      const leaving = rows.filter(r => r.loose).map(r => r.key);
-      closePick();
-      send(line, listOf(line.id).concat(add), leaving.length ? looseOf().filter(p => leaving.indexOf(keyOf(p.name)) < 0) : null, add.length + ' product' + (add.length === 1 ? '' : 's') + ' added to ' + line.name);
+    // ← Add puts it on the end of the machine's list, with the numbers it has on its other machines.
+    document.getElementById('offrows').addEventListener('click', e => {
+      const b = e.target.closest('[data-add]'), line = current();
+      if (!b || !line || !canSave()) return;
+      const all = areas(), r = rowsOf().find(x => x.key === b.dataset.add);
+      if (!r || r.on[line.id]) return;
+      const from = all.map(a => r.on[a.id]).find(Boolean) || r.loose || {}, p = {};
+      SHARED_FIELDS.concat(MACHINE_FIELDS).forEach(k => { const v = SHARED_FIELDS.indexOf(k) >= 0 ? r.p[k] : from[k]; if (v !== undefined && v !== '') p[k] = v; });
+      send(line, listOf(line.id).concat([p]), r.loose ? looseOf().filter(x => keyOf(x.name) !== r.key) : null, p.name + ' added to ' + line.name);
     });
 
     requireSignIn(async (user) => {

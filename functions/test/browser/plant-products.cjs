@@ -315,30 +315,31 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
       assert.deepEqual(narrow.errors, []);
     }
 
-    // Machine Setup (Joe 10/13, mock-up MA): pick a machine and set its products; the same lists as the Product Sheet's checks.
+    // Machine Setup (Joe 10/13, mock-up MB): pick a machine; its products on the left, the rest on the right; the same lists as the Product Sheet's checks.
     for (const w of [1920, 1536]) {
       const ms = await openPage(browser, w, w === 1920 ? 950 : 760, '/machine-setup.html?plant=fac_uniontown&line=ut_prod_gallon_filler&' + AS);
       await ms.waitForFunction(() => document.getElementById('form-title').textContent === 'GALLON FILLER Products' && document.querySelectorAll('#rows tr[data-drag]').length > 10);
       assert.equal(await ms.textContent('#page-title'), 'Uniontown Machine Setup');
       assert.deepEqual(await ms.$$eval('#machines .ms-mach', b => b.map(x => x.dataset.line)), ['ut_prod_boxing', 'ut_prod_totes', 'ut_prod_htst_1', 'ut_prod_gallon_filler', 'ut_prod_blow_mold', 'fac_uniontown_area_cases', 'fac_uniontown_area_tanker', 'fac_uniontown_area_dock']);
       await fits(ms, 'Machine Setup ' + w);
+      const sides = await ms.$$eval('.ms-side', e => e.map(x => { const r = x.getBoundingClientRect(); return [r.left, r.right, r.width]; }));
+      assert.ok(sides.length === 2 && sides[0][1] <= sides[1][0] && sides[1][2] > 300, 'the two lists sit side by side at ' + w + ': ' + JSON.stringify(sides));
       await shots(ms, 'machine-setup', w);
       assert.deepEqual(ms.errors, []);
       if (w !== 1920) { await ms.close(); continue; }
-      // + Add Products: a checklist of the plant's products not yet on the machine; they go on the end of its list.
+      // ← Add (mock-up MB): the right list is the plant's products not on the machine; Add puts one on the end of the left list.
       await ms.click('#machines [data-line="ut_prod_boxing"]');
       await ms.waitForFunction(() => document.getElementById('form-title').textContent === 'BOXING Products');
       const before = (await docOf('plantProducts', 'ut_prod_boxing')).products.map(p => p.name);
-      await ms.click('#add');
-      await ms.waitForSelector('#pick-back:not([hidden])');
-      assert.ok(!(await ms.$$eval('#pick-list .n', n => n.map(x => x.textContent))).some(n => before.includes(n)), 'only products not on BOXING are offered');
-      await ms.fill('#pick-find', 'eggnog');
-      await ms.click('#pick-list [data-pick="EGGNOG QUART"]');
-      await ms.fill('#pick-find', 'gv 2%');
-      await ms.click('#pick-list [data-pick="GV 2% GALLON"]');
-      assert.equal(await ms.textContent('#pick-save'), 'Add 2 Products');
-      await shots(ms, 'machine-setup-add', 1920);
-      await ms.click('#pick-save');
+      const offNames = await ms.$$eval('#offrows .pm-namecell', n => n.map(x => x.textContent));
+      assert.ok(offNames.length && !offNames.some(n => before.includes(n)), 'only products not on BOXING are on the right');
+      assert.equal(await ms.textContent('#on-title'), 'On BOXING (' + before.length + ')');
+      await ms.fill('#find', 'eggnog');
+      await ms.click('#offrows [data-add="EGGNOG QUART"]');
+      await waitDoc('plantProducts', 'ut_prod_boxing', d => d.products.length === before.length + 1);
+      await ms.fill('#find', 'gv 2%');
+      await ms.click('#offrows [data-add="GV 2% GALLON"]');
+      await ms.fill('#find', '');
       const after = (await waitDoc('plantProducts', 'ut_prod_boxing', d => d.products.length === before.length + 2)).products;
       assert.deepEqual(after.slice(-2).map(p => p.name), ['Eggnog Quart', 'GV 2% Gallon']);
       assert.deepEqual((await waitDoc('productSheet', 'fac_uniontown', d => !d.products.length)).products, [], 'Eggnog Quart is no longer on no machine');
@@ -347,10 +348,11 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
       await ms.focus('#rows tr:last-child');
       await ms.keyboard.press('Alt+ArrowUp');
       await waitDoc('plantProducts', 'ut_prod_boxing', d => d.products.slice(-2).map(p => p.name).join('|') === 'GV 2% Gallon|Eggnog Quart');
-      // Remove (press twice) takes it off this machine only; off its last machine it stays on the Product Sheet.
-      await ms.click('#rows tr[data-drag="EGGNOG QUART"] [data-remove]');
+      await shots(ms, 'machine-setup-add', 1920);
+      // Take off moves it to the right: off this machine only; off its last machine it stays on the Product Sheet.
       await ms.click('#rows tr[data-drag="EGGNOG QUART"] [data-remove]');
       await waitDoc('plantProducts', 'ut_prod_boxing', d => !d.products.some(p => p.name === 'Eggnog Quart'));
+      await ms.waitForSelector('#offrows [data-add="EGGNOG QUART"]');
       assert.deepEqual((await waitDoc('productSheet', 'fac_uniontown', d => d.products.length === 1)).products.map(p => p.name), ['Eggnog Quart']);
       // The Product Sheet shows the same checks.
       await admin.waitForFunction(() => document.querySelector('#rows tr[data-key="GV 2% GALLON"] [data-ck="ut_prod_boxing"].on') && !document.querySelector('#rows tr[data-key="EGGNOG QUART"] [data-ck].on'));
