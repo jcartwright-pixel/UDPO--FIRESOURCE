@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Loadout Center · New Plant Operations</title>
+  <title>Loadout Center · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -39,7 +39,7 @@
       <div class="field day-pin" id="day-pin" hidden><label>&nbsp;</label><button type="button" id="go-today" title="The screen stays on the day you picked until you change it">Go to today</button></div>
       <div class="dayname" id="dayname"></div>
       <div class="hstats" id="hstats"></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span id="copied">Saves stay in the new app's test copy</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span id="copied">Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice warning over-limit" id="over-limit" hidden></div>
@@ -94,8 +94,8 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError, goLiveNote, maySave } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { mountRowDrag } from './js/row-drag.js';
 
@@ -125,7 +125,7 @@
       if (!s.open) return 'View only: ' + s.why + '.';
       return 'View only: ' + (signedEmail || 'this account') + ' is not allowed to save Case Loadout. In Administration > People & Roles give it the Plant Employee role or allow Update route loading.';
     };
-    const canLoad = () => (L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.savePlantLoad === true) && L.screenState(app, 'plantLoading').open;
+    const canLoad = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading', allowed.savePlantLoad);
     const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 
     function rowsNow() {
@@ -147,9 +147,11 @@
     // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
     function fitDrivers() {
       document.querySelectorAll('#rows td.lo-driver').forEach(td => {
-        td.style.fontSize = '';
+        td.style.fontSize = ''; td.style.whiteSpace = '';
         let size = parseFloat(getComputedStyle(td).fontSize);
-        while (td.scrollWidth > td.clientWidth && size > 9) { size -= 0.5; td.style.fontSize = size + 'px'; }
+        while (td.scrollWidth > td.clientWidth && size > 16) { size -= 0.5; td.style.fontSize = size + 'px'; }
+        // Review item 56 (Joe 10/13): text never goes under 16px; a name still too wide at 16px wraps instead.
+        if (td.scrollWidth > td.clientWidth) td.style.whiteSpace = 'normal';
       });
     }
     addEventListener('resize', fitDrivers);
@@ -171,7 +173,7 @@
       const rows = byArea[area].map((r, i) => ({ r, i, k: (r.prior ? 0 : 2) + (isSkipped(r) ? 1 : 0) })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.r);
       const c = P.counts(rows), info = P.AREA[area];
       document.getElementById('title').textContent = info.title;
-      document.title = info.title + ' · New Plant Operations';
+      document.title = info.title + ' · Operations';
       document.getElementById('load-date').value = date;
       document.getElementById('day-pin').hidden = date === today();
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);

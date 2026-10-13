@@ -91,6 +91,7 @@ const ACTIONS = Object.freeze({
   saveMachineProducts: { roles: REORDER_ROLES, screen: 'plant' },
   saveProductSetup: { roles: REORDER_ROLES, screen: 'plant' },
   saveProductUpload: { roles: REORDER_ROLES, screen: 'plant' },
+  saveProductSheet: { roles: REORDER_ROLES, screen: 'plant' },
   // Administration > Plant Shifts: each plant's shifts (Plant Reports' Shift Comparison).
   savePlantShifts: { roles: REORDER_ROLES, screen: 'plant' },
   // Plant Production (production.js): the line tablet's taps, and how each line is counted (Line Targets).
@@ -389,6 +390,7 @@ function validate(input) {
   if (action === 'saveMachineProducts') return Object.assign(out, PLANT.validateMachineProducts(input, SaveError));
   if (action === 'saveProductSetup') return Object.assign(out, PLANT.validateProductSetup(input, SaveError));
   if (action === 'saveProductUpload') return Object.assign(out, PLANT.validateProductUpload(input, SaveError));
+  if (action === 'saveProductSheet') return Object.assign(out, PLANT.validateProductSheet(input, SaveError));
   if (action === 'savePlantShifts') return Object.assign(out, PLANT.validatePlantShifts(input, SaveError));
   if (action === 'saveLineEntry') return Object.assign(out, PROD.validateLineEntry(input, SaveError));
   if (action === 'saveLineCounter') return Object.assign(out, PROD.validateLineCounter(input, SaveError));
@@ -430,7 +432,7 @@ function validate(input) {
   }
   // OVR on Daily: a driver who is off that day, or a unit that is down, may still be picked on purpose.
   if (['assignDriver', 'assignTruck', 'assignTrailer'].indexOf(action) >= 0 && input.override === true) out.override = true;
-  if (action === 'setRuns') out.runs = input.runs === true;
+  if (action === 'setRuns') { out.runs = input.runs === true; if (!out.runs && typeof input.plantLoadOff === 'boolean') out.plantLoadOff = input.plantLoadOff; }
   if (action === 'setDispatchTime') {
     const t = text(input.time, 20);
     out.time = t ? L.minutesOfDay(t) : null;
@@ -474,7 +476,7 @@ async function requireSaver(tx, db, user, roles, action) {
   return person;
 }
 
-// Whether this screen may save in the new app (switch.js): every screen while it is a test copy, then only
+// Whether this screen may save in Operations (switch.js): every screen while it is a test copy, then only
 // the screens an administrator moved to the new app.
 async function requireTestMode(tx, db, screen) {
   const snap = await tx.get(db.collection(C.config).doc('app'));
@@ -549,7 +551,12 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     return { [idField]: e.id, [unitField]: e.unit };
   }
   // Joe 10/13 ("No route equals no driver"): a day turned off loses its driver, truck and trailer (that day only), so they are free.
-  if (req.action === 'setRuns') return req.runs ? { runs: true } : Object.assign({ runs: false }, L.NOT_RUNNING_CLEARS);
+  // Joe 10/13 (836 PECK): Weekly marks a plant load Not running (plantLoadOff) or back to needing a driver; a day turned on ends the mark.
+  if (req.action === 'setRuns') {
+    const was = (run.days && run.days[req.day]) || {};
+    if (req.runs) return was.plantLoadOff ? { runs: true, plantLoadOff: false } : { runs: true };
+    return Object.assign({ runs: false }, L.NOT_RUNNING_CLEARS, typeof req.plantLoadOff === 'boolean' ? { plantLoadOff: req.plantLoadOff } : {});
+  }
   if (req.action === 'setDispatchTime') return { dispatchTime: req.time };
   if (req.action === 'setJack') return { palletJack: req.jack };
   if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });
@@ -697,6 +704,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveMachineProducts') return PLANT.saveMachineProducts(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveProductSetup') return PLANT.saveProductSetup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveProductUpload') return PLANT.saveProductUpload(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveProductSheet') return PLANT.saveProductSheet(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePlantShifts') return PLANT.savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLineEntry') return PROD.saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLineCounter') return PROD.saveLineCounter(tx, db, req, email, stamp, logRef, mode, SaveError);

@@ -99,6 +99,24 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await at(p), 'run_t801|tue trailer');
     results.push('typing 777 (not on Equipment Master) and Enter kept trailer T-777');
 
+    // Joe 10/13 (8302, T-965 went back to T-978 after Print): a number typed and then a click somewhere else is taken, like Excel.
+    await p.keyboard.type('778');
+    await p.waitForSelector('.cell-pop p');
+    await p.click('.head .title h1');
+    await p.waitForFunction((s) => document.querySelector(s).children[6].textContent === 'T-778', R801, { timeout: 8000 });
+    assert.equal(await p.$('.cell-pop'), null);
+    await p.click(R801 + ' td[data-edit="trailer"]');
+    assert.equal(await at(p), 'run_t801|tue trailer');
+    // An empty box still keeps the old one when the click goes elsewhere.
+    await p.keyboard.press('F2');
+    await p.waitForSelector('.cell-pop');
+    await p.click('.head .title h1');
+    await p.waitForTimeout(300);
+    assert.equal(await text(p, R801, 6), 'T-778', 'an empty box kept T-778');
+    await p.click(R801 + ' td[data-edit="trailer"]');
+    assert.equal(await at(p), 'run_t801|tue trailer');
+    results.push('typing 778 then clicking elsewhere saved T-778; an empty box clicked away kept it');
+
     // Joe 10/12 ("891 now won't show whole number"): the short number of a truck taken on another load finds it, greyed with
     // why, and Enter does not save the short number as typed; the old truck stays.
     await p.keyboard.press('Shift+Tab');
@@ -111,6 +129,8 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.keyboard.press('Enter');
     await p.waitForTimeout(500);
     assert.equal(await text(p, R801, 5), truckBefore, 'the short number was not saved as typed');
+    // Joe 10/13: it says why the old one stayed instead of going back without a word.
+    assert.match(await p.textContent('#error'), /900001 was not put on.*802.*Tick OVR/);
     await p.keyboard.press('ArrowUp');
     await p.keyboard.press('Tab');
     assert.equal(await at(p), 'run_t801|tue trailer');
@@ -265,7 +285,8 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await dp.$eval('#week-panel', w => w.hidden), true, 'a move inside the week does not ask');
     await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com');
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
-    assert.equal(await dp.isVisible('#go-today'), true, 'Go to today shows when the kept day is not today');
+    // Joe 10/13 ("REMOVE THE GO TO TODAY"): Daily has no Go to today button; the arrows and the day box change the day.
+    assert.equal(await dp.$$eval('#go-today, #day-pin', n => n.length), 0, 'no Go to today on Daily');
     assert.deepEqual(dp.errors, []);
     results.push('Daily keeps the picked day after leaving and coming back; moving into another week asks Continue or Cancel');
 

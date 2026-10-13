@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Fleet &amp; Maintenance · New Plant Operations</title>
+  <title>Fleet &amp; Maintenance · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -51,7 +51,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
-    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, onSnapshot } from './js/firebase.js';
 
     // Joe 10/10: the current app's Fleet & Maintenance hub, where the maintenance side starts. Each list is read once
     // (write-ups, work orders, units, service setup, odometers) and every card is counted from that one copy.
@@ -101,7 +101,7 @@
         '<div class="hub-tiles4">' + tile(open.filter(x => String(x.status).toUpperCase() === 'WORKING').length, 'Working now', 'fleet.html?view=work') + tile(open.filter(x => String(x.status).toUpperCase() === 'PARTS').length, 'Waiting on parts', 'fleet.html?view=work', 'warn') +
         tile(due.items.filter(i => i.status === 'OVERDUE').length, 'Overdue service', 'fleet.html', 'warn') + tile(due.items.filter(i => i.status === 'DUE_SOON').length, 'Due soon', 'fleet.html', 'warn') +
         tile(week.length, 'Finished · this week', 'fleet.html?view=work', 'good') + tile(hours.toFixed(1), 'Hours · this week', 'fleet.html?view=work') +
-        tile(due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'DOT this month', 'fleet.html') +
+        tile(due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'Annual inspections this month', 'fleet.html') +
         tile(due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates · 30 days', 'fleet.html') + '</div></div>';
       document.getElementById('cards').innerHTML = issueCard(KINDS[0], 0) + issueCard(KINDS[1], 1) + issueCard(KINDS[2], 2) + garage;
       const type = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };

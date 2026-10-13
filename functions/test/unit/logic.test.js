@@ -238,3 +238,14 @@ test('route names read as Route, Route Name and Run Name, never 6301_1 (Joe 10/1
   assert.equal(L.runLabel('Walmart', '', 'Load 2'), 'Walmart Load 2');
   assert.equal(L.runLabel('Jersey', 'JERSEY LOAD 1', 'Load 1'), 'JERSEY LOAD 1');
 });
+
+test('Weekly: a plant load marked Not running (plantLoadOff) is off; without the mark it needs a driver (Joe 10/13, 836 PECK)', () => {
+  const row = { runId: 'run_836', coverageType: 'UNITED DAIRY', days: { wed: { runs: false, date: '2026-10-14' } } };
+  const ctx = { plant: { 'run_836|2026-10-14': [{ runId: 'run_836' }] }, dup: {}, relief: {}, exceptions: [] };
+  assert.equal(L.weeklyCellClass(row, 'wed', ctx), 'plant');
+  row.days.wed.plantLoadOff = true;
+  assert.equal(L.weeklyCellClass(row, 'wed', ctx), 'off');
+  // Weekly's rows keep the mark, so the screen shows it.
+  const shown = L.weeklyRows([{ id: 'w', weekStart: '2026-10-11', runId: 'run_836', days: { wed: { runs: false, plantLoadOff: true } } }], '2026-10-11')[0];
+  assert.equal(L.weeklyCellClass(shown, 'wed', ctx), 'off');
+});

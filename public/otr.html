@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Over the Road · New Plant Operations</title>
+  <title>Over the Road · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
   <script src="js/otr-core.js"></script>
@@ -47,7 +47,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, save } from './js/app.js';
     import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
-    import { collection, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot, query, where } from './js/firebase.js';
 
     // The current app's Over the Road module (OverTheRoad.html, 221/222_V7276): every run of a route ticked for the report is one
     // mark for its destination on its delivery day. Counts come from the copied Live weeks; a count typed by hand wins.
@@ -57,7 +57,7 @@
     // Joe 10/11: the tabs are his OTR Trips workbook's four sheets (By Date, Recap, Month Recap, Cost Per Gallon), each laid out
     // like the sheet, with the year-to-date answers and a trend picture on top (his pick B).
     let view = ['dash', 'bydate', 'figures', 'report', 'cpg', 'routes'].indexOf(q.get('view')) >= 0 ? q.get('view') : 'dash';
-    let routes = [], picks = {}, runs = [], daily = [], monthly = [], monthRuns = [], comments = [], year = Number(L.operatingDay(new Date()).slice(0, 4)), copied = '';
+    let routes = [], picks = {}, pendingRoutes = {}, runs = [], daily = [], monthly = [], monthRuns = [], comments = [], year = Number(L.operatingDay(new Date()).slice(0, 4)), copied = '';
     let ym = L.operatingDay(new Date()).slice(0, 7);
     const money = (v) => v == null ? '' : '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
     const cents = (v) => v == null ? '–' : '$' + Number(v).toFixed(3);
@@ -250,7 +250,10 @@
         foot.textContent = list.filter(r => r.include).length + ' of ' + list.length + ' active runs are on the OTR report.';
         const saveRoute = (r, include, deliveredBy, column) => {
           const runId = r.runId, destination = column || r.destination, before = picks[runId] ? Object.assign({}, picks[runId]) : null;
-          saveOptimistic('saveOtr', { op: 'route', runId, include, destination, deliveredBy }, () => { picks[runId] = { include, destination, deliveredBy }; }, () => { if (before) picks[runId] = before; else delete picks[runId]; }, render);
+          // Two quick changes on one run: the first save's snapshot must not wipe the second's choice while it is still on its way.
+          const mine = { include, destination, deliveredBy };
+          saveOptimistic('saveOtr', { op: 'route', runId, include, destination, deliveredBy }, () => { picks[runId] = mine; pendingRoutes[runId] = mine; }, () => { if (pendingRoutes[runId] === mine) delete pendingRoutes[runId]; if (before) picks[runId] = before; else delete picks[runId]; }, render)
+            .then(() => { if (pendingRoutes[runId] === mine) delete pendingRoutes[runId]; });
         };
         sheet.querySelectorAll('[data-inc]').forEach(c => { c.onchange = () => { const r = list.find(x => x.runId === c.dataset.inc); if (c.checked && !r.deliveredBy) { c.checked = false; showError('Choose who delivers ' + r.route + ' ' + r.run + ' before including it.'); return; }
           if (c.checked && !r.destination) { c.checked = false; showError('Choose the By Date column for ' + r.route + ' ' + r.run + ' before including it.'); return; } showError(''); saveRoute(r, c.checked, r.deliveredBy); }; });
@@ -390,7 +393,7 @@
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + name + ': ' + e.message));
       watch('routes', v => { routes = v; });
       watch('runs', v => { runs = v; });
-      watch('otrRoutes', v => { picks = {}; v.forEach(p => { picks[p.runId] = { include: p.include === true, destination: p.destination || '', deliveredBy: p.deliveredBy || '' }; }); });
+      watch('otrRoutes', v => { picks = {}; v.forEach(p => { picks[p.runId] = { include: p.include === true, destination: p.destination || '', deliveredBy: p.deliveredBy || '' }; }); Object.keys(pendingRoutes).forEach(id => { picks[id] = pendingRoutes[id]; }); });
       dbRef = db; needDays();
       watch('otrMonthly', v => { monthly = v; pendingFigures.forEach(put => put()); });
       watch('otrMonthRuns', v => { monthRuns = v; });

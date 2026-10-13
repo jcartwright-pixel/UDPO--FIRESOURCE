@@ -21,7 +21,9 @@ test('the sandbox build gets Diagnostics on every screen, and the production che
     const queue = D.add(dir);
     assert.ok(fs.existsSync(path.join(dir, 'diagnostics.html')) && fs.existsSync(path.join(dir, 'js', 'diag-probe.js')));
     const probe = fs.readFileSync(path.join(dir, 'js', 'diag-probe.js'), 'utf8'), app = fs.readFileSync(path.join(dir, 'js', 'app.js'), 'utf8');
-    assert.ok(!probe.includes('__FIREBASE_VERSION__') && probe.includes('firebasejs/\' + FIREBASE') && app.includes('firebasejs/' + /FIREBASE = '([^']+)'/.exec(probe)[1] + '/'), 'the probe loads the same Firebase as the app');
+    // The app's Firebase version is written in js/firebase.js only (review item 82, Joe 10/13).
+    const firebase = fs.readFileSync(path.join(dir, 'js', 'firebase.js'), 'utf8');
+    assert.ok(!probe.includes('__FIREBASE_VERSION__') && probe.includes('firebasejs/\' + FIREBASE') && firebase.includes('firebasejs/' + /FIREBASE = '([^']+)'/.exec(probe)[1] + '/'), 'the probe loads the same Firebase as the app');
     // Every screen that uses the shared app script is fitted, at the very top of its page; the drivers' phone page is not.
     fs.readdirSync(dir).filter(f => f.endsWith('.html')).forEach(f => {
       const html = fs.readFileSync(path.join(dir, f), 'utf8');

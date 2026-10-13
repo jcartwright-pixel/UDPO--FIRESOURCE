@@ -33,14 +33,15 @@ const FAILS = require('./fails');
 const A = () => require('./actions');
 const MAINT = require('./maintenance');
 const { queueMaster } = require('./masterwrite');
+const CLOCK = require('./job-clock');
 
 const C = M.COLLECTIONS;
 const SaveErr = (code, message) => new (A().SaveError)(code, message);
 const FACILITY = 'fac_uniontown';
 const G = Object.freeze({
   CATEGORIES: ['Brakes', 'Lights', 'Tires', 'Engine', 'Reefer', 'Doors / Body', 'Other'],
-  FIXES: ['Replaced a part', 'Repaired', 'Oil / PM service', 'Tires', 'Lights', 'Brakes', 'DOT inspection', 'Nothing wrong'],
-  SERVICES: { PM: 'PM service', REEFER: 'Reefer service', DOT: 'DOT annual inspection' },
+  FIXES: ['Replaced a part', 'Repaired', 'Oil / PM service', 'Tires', 'Lights', 'Brakes', 'Annual inspection', 'Nothing wrong'],
+  SERVICES: { PM: 'PM service', REEFER: 'Reefer service', DOT: 'Annual inspection' },
   STATUSES: ['NEW', 'WORKING', 'PARTS', 'DONE'],
   MAX_TECHS: 2, SESSION_MS: 30 * 60000, SIGNATURE_MAX: 30000, TECH_FAILS: 5, TECH_LOCK_MS: 5 * 60000, STATION_FAILS_PER_MINUTE: 30,
   GARAGE_MARK: 'Sent to garage'
@@ -113,8 +114,8 @@ const canRunGuess = (s) => !/OUT OF SERVICE|\bOOS\b|CAN.?T RUN|DOWN/i.test(Strin
 const writeUpKey = (r) => (KIND_KEYS[String(r.kind).toUpperCase()] || 'trucks') + '|' + r.record_id;
 const unitType = (v) => { const t = String(v || '').toUpperCase(); return t === 'TRAILER' || t === 'FORK_TRUCK' ? t : 'TRUCK'; };
 const FROM = { OFFICE: 'Office (Fleet Service)', TECH: 'Garage', WRITE_UP: 'Equipment Issues' };
-// A work order's labour: one entry per mechanic per clock (start, end, minutes); an open one has no end yet.
-const laborOf = (o) => (Array.isArray(o.labor) ? o.labor : []).filter(s => s && s.tech_id).map(s => ({ tech_id: String(s.tech_id), name: String(s.name || ''), start: String(s.start || ''), end: String(s.end || ''), minutes: Number(s.minutes) || 0 }));
+// A work order's labour: one entry per mechanic per clock (start, end, minutes); an open one has no end yet (job-clock.js).
+const { laborOf, joinNames } = CLOCK;
 
 // One job as the tablet shows it (udpoV7276Job_).
 function jobOf(o) {
@@ -283,7 +284,6 @@ function validateStep(input) {
   return out;
 }
 
-const joinNames = (list) => list.filter((n, i) => n && list.indexOf(n) === i).join(', ');
 const newOrderId = () => 'WO-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 
 async function step(db, input, nowMs) {
@@ -363,56 +363,22 @@ async function step(db, input, nowMs) {
       if (order.service_key === 'DOT') { const r = await tx.get(db.collection('config').doc(RULES_DOC)); rules = fleetRules(r.exists ? r.data() : null); }
     }
 
-    // The clocks: each signed-in mechanic's own (one job at a time), and every clock still running on this job.
+    // The clocks: each signed-in mechanic's own (one job at a time), and every clock still running on this job (job-clock.js,
+    // shared with the Maintenance Station, review item 74).
     const thisId = order.work_order_id, labor = laborOf(order);
-    const clockIds = people.map(p => p.id).concat(labor.filter(s => !s.end).map(s => s.tech_id)).filter((v, i, a) => a.indexOf(v) === i);
-    const clockRefs = clockIds.map(id => db.collection(CLOCKS).doc(docId(id)));
-    const clockSnaps = clockRefs.length ? await tx.getAll(...clockRefs) : [];
-    const clocks = {}; clockSnaps.forEach((s, i) => { clocks[clockIds[i]] = { ref: clockRefs[i], data: s.exists ? s.data() : null }; });
-    const starting = ['START', 'HELPER', 'RESUME'].indexOf(req.op) >= 0;
-    const elsewhere = starting ? people.map(p => clocks[p.id].data).filter(c => c && c.workOrderId && c.workOrderId !== thisId) : [];
-    const otherIds = elsewhere.map(c => c.workOrderId).filter((v, i, a) => a.indexOf(v) === i);
-    const otherRefs = otherIds.map(id => db.collection(WORK_ORDERS).doc(docId(id)));
-    const otherSnaps = otherRefs.length ? await tx.getAll(...otherRefs) : [];
-
-    const minutesFrom = (iso) => Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000)) || 0;
-    const closeClock = (list, techId) => list.forEach(s => { if (s.tech_id === techId && !s.end) { s.end = stamp; s.minutes = minutesFrom(s.start); } });
-    const laborFields = (list) => ({ labor: list, on_now: joinNames(list.filter(s => !s.end).map(s => s.name)), labor_minutes: list.reduce((n, s) => n + (s.end ? s.minutes : 0), 0) });
-    const clockWrites = [];
-    if (starting) {
-      people.forEach(p => {
-        if (labor.some(s => s.tech_id === p.id && !s.end)) return;
-        labor.push({ tech_id: p.id, name: p.name, start: stamp, end: '', minutes: 0 });
-        clockWrites.push(['set', clocks[p.id].ref, { techId: p.id, name: p.name, workOrderId: thisId, unit: order.unit || '', since: stamp }]);
-      });
-      // One mechanic, one job: their clock on another job stops; that job stays open.
-      otherSnaps.forEach((s, i) => {
-        if (!s.exists) return;
-        const list = laborOf(s.data()), moving = people.filter(p => clocks[p.id].data && clocks[p.id].data.workOrderId === otherIds[i]);
-        moving.forEach(p => closeClock(list, p.id));
-        clockWrites.push(['update', otherRefs[i], Object.assign(laborFields(list), { updated_at: stamp, updated_by: by, testEdited: true, editedAt: stamp })]);
-        result.stoppedOn = (result.stoppedOn || []).concat(String(s.data().unit || otherIds[i]));
-      });
-    } else if (req.op === 'STOP' || req.op === 'PARTS' || (req.op === 'DONE' && req.safe)) {
-      const who = req.op === 'STOP' ? people.map(p => p.id) : labor.filter(s => !s.end).map(s => s.tech_id);
-      who.forEach(id => {
-        closeClock(labor, id);
-        const c = clocks[id] && clocks[id].data;
-        if (c && c.workOrderId === thisId) clockWrites.push(['delete', clocks[id].ref]);
-      });
-    }
+    const moved = await CLOCK.moveClocks(tx, db, { clocks: CLOCKS, orders: WORK_ORDERS, docId, op: req.op, finishing: req.op === 'DONE' && req.safe, people, labor, thisId, nowMs, stamp,
+      keys: { onNow: 'on_now', laborMinutes: 'labor_minutes' }, clockDoc: (p) => ({ techId: p.id, name: p.name, workOrderId: thisId, unit: order.unit || '', since: stamp }),
+      touched: { updated_at: stamp, updated_by: by, testEdited: true, editedAt: stamp }, otherName: (o, id) => String(o.unit || id) });
+    if (moved.stoppedOn) result.stoppedOn = moved.stoppedOn;
 
     const was = String(order.status || 'NEW').toUpperCase(), techs = String(order.techs || '').split(/\s*,\s*/).filter(Boolean);
-    const change = Object.assign({ techs: joinNames(techs.concat(names)), started_at: order.started_at || stamp, updated_at: stamp, updated_by: by, version: (Number(order.version) || 0) + 1 }, laborFields(labor));
-    if (req.op === 'STOP' && was === 'NEW') change.status = 'WORKING';
-    if (req.op === 'START' || req.op === 'HELPER') change.status = was === 'PARTS' ? 'PARTS' : 'WORKING';
-    if (req.op === 'PARTS') Object.assign(change, { status: 'PARTS', parts_at: stamp });
-    if (req.op === 'RESUME') change.status = 'WORKING';
+    const change = Object.assign({ techs: joinNames(techs.concat(names)), started_at: order.started_at || stamp, updated_at: stamp, updated_by: by, version: (Number(order.version) || 0) + 1 }, moved.laborFields(labor),
+      CLOCK.stepStatus(req.op, was, 'parts_at', stamp));
     if (req.op === 'DONE') {
       Object.assign(change, { fixed: req.fixed, fixed_note: req.note, safe: req.safe ? 'YES' : 'NO', signed_by: names[0], signature: req.signature });
       if (!req.safe) Object.assign(change, { status: 'WORKING', can_run: 'NO' });
       else {
-        Object.assign(change, { status: 'DONE', completed_at: stamp, completed_by: names[0], can_run: 'YES', minutes: Math.max(0, Math.round((nowMs - Date.parse(change.started_at)) / 60000)) || 0 });
+        Object.assign(change, { status: 'DONE', completed_at: stamp, completed_by: names[0], can_run: 'YES', minutes: moved.minutesFrom(change.started_at) });
         if (odometer) change.odometer = odometer;
       }
     }
@@ -420,7 +386,7 @@ async function step(db, input, nowMs) {
     delete after.isNew;
     if (order.isNew) tx.set(ref, after); else tx.update(ref, Object.assign({}, change, { testEdited: true, editedAt: stamp }));
     renew((r, d) => tx.update(r, d), people, nowMs);
-    clockWrites.forEach(([kind, r, d]) => { if (kind === 'delete') tx.delete(r); else if (kind === 'set') tx.set(r, d); else tx.update(r, d); });
+    CLOCK.applyWrites(tx, moved.writes);
 
     if (req.op === 'DONE' && req.safe) {
       // The write-up is repaired (Equipment Issues' Mark Repaired), and Fleet Service's dates move on.
@@ -435,7 +401,7 @@ async function step(db, input, nowMs) {
         const today = L.operatingDay(new Date(nowMs)), move = { updated_at: stamp, updated_by: by };
         if (order.service_key === 'PM') { move.last_service_date = today; if (odometer) move.last_service_miles = String(odometer); }
         if (order.service_key === 'REEFER') { move.last_service_date = today; if (setup && String(setup.current_hours || '').trim()) move.last_service_hours = String(setup.current_hours); }
-        if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, rules.dotMonths);
+        if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, L.fleetRule(rules, String(order.unit_type || '').toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK', 'dotMonths'));
         if (setup) tx.update(setupRef, Object.assign({}, move, { testEdited: true, editedAt: stamp }));
         else tx.set(setupRef, Object.assign({ unit: order.unit, unit_type: order.unit_type, facility_id: FACILITY, track: 'YES', createdInApp: true }, move));
         result.service = move;
@@ -472,7 +438,7 @@ function validateSend(input, out) {
   out.unitType = text(input.unitType, 10).toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK';
   out.note = text(input.note, 200);
   if (!out.unit) throw SaveErr('BAD_REQUEST', 'Pick the unit');
-  if (!G.SERVICES[out.serviceKey]) throw SaveErr('BAD_REQUEST', 'Only a PM, reefer service or DOT inspection goes to the garage');
+  if (!G.SERVICES[out.serviceKey]) throw SaveErr('BAD_REQUEST', 'Only a PM, reefer service or annual inspection goes to the garage');
   return out;
 }
 
@@ -491,7 +457,9 @@ function validateSend(input, out) {
 const RULES_DOC = 'fleetRules';
 const rulesDocFor = (facilityId) => !facilityId || facilityId === FACILITY ? RULES_DOC : RULES_DOC + '_' + facilityId;
 const RULE_LIMITS = { truckMiles: [1000, 100000], truckWarnMiles: [0, 20000], trailerMonths: [1, 24], trailerHours: [50, 10000], trailerWarnDays: [0, 120],
-  dotMonths: [1, 24], dotWarnDays: [0, 180], plateWarnDays: [0, 180] };
+  dotMonths: [1, 24], dotWarnDays: [0, 180], plateWarnDays: [0, 180],
+  // Trailers' own DOT and plate rules (Joe 10/13); blank = the trucks'.
+  trailerDotMonths: [1, 24], trailerDotWarnDays: [0, 180], trailerPlateWarnDays: [0, 180] };
 // The rules in force: the saved ones over the current app's defaults (L.FLEET_RULES).
 function fleetRules(saved) {
   const out = Object.assign({}, L.FLEET_RULES);
@@ -532,7 +500,7 @@ function validateFleet(action, input, out) {
     const f = input.fields || {}, t = text(f.track, 10).toUpperCase();
     out.fields = {};
     if (f.track !== undefined) out.fields.track = t === 'YES' || t === 'NO' ? t : '';
-    [['last_service_date', 'Last service date'], ['dot_due', 'DOT due'], ['plate_expires', 'Plate expires']].forEach(([k, l]) => { if (f[k] !== undefined) out.fields[k] = ymdOrBlank(f[k], l); });
+    [['last_service_date', 'Last service date'], ['dot_due', 'Annual inspection due'], ['plate_expires', 'Plate expires']].forEach(([k, l]) => { if (f[k] !== undefined) out.fields[k] = ymdOrBlank(f[k], l); });
     [['last_service_miles', 'Last service miles', 3000000], ['last_service_hours', 'Last service hours', 200000], ['current_hours', 'Reefer hours now', 200000]].forEach(([k, l, m]) => { if (f[k] !== undefined) out.fields[k] = numOrBlank(f[k], l, m); });
     if (f.notes !== undefined) out.fields.notes = text(f.notes, 300);
     if (!Object.keys(out.fields).length) throw SaveErr('BAD_REQUEST', 'Nothing to save');

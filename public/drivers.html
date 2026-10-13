@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Driver Roster · New Plant Operations</title>
+  <title>Driver Roster · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -34,7 +34,7 @@
     <div class="notice error" id="error" hidden></div>
     <div class="split">
       <div class="split-main">
-        <button id="refresh" type="button" data-top>&#8635; Refresh</button>
+        <button id="refresh" type="button" data-top>Refresh</button>
         <div class="filters" data-top>
           <input id="search" type="search" placeholder="Search drivers or trucks...">
           <select id="status"><option value="ALL">Status: All</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>
@@ -74,14 +74,13 @@
     import { start, requireSignIn, escapeHtml, shortDate, showError, friendlyError } from './js/app.js';
     import { watchLists, lists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
     forScreen('drivers');
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
     let drivers = [], rows = [], editingId = null, panelOpen = false, typing = null, loaded = false;
     const canEdit = () => canManage();
     const truckUnit = (id) => { const t = lists.trucks.find(e => e.id === id); return t ? t.unit : ''; };
-    const us = (key) => key ? shortDate(key) : '';
     function years(key) {
       if (!key) return '-';
       const [y, m, d] = key.split('-').map(Number), [ty, tm, td] = today.split('-').map(Number);
@@ -99,7 +98,7 @@
       if (typing) return; // someone is typing a truck; the list redraws when they leave the box
       rows = L.driverRosterRows(drivers, today);
       const edit = canEdit();
-      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       document.getElementById('truck-list').innerHTML = lists.trucks.map(t => '<option value="' + escapeHtml(t.unit) + '">').join('');
       const shown = visible(), checked = new Set([...document.querySelectorAll('[data-select]:checked')].map(x => x.dataset.select));
       const dis = edit ? '' : ' disabled';
@@ -110,12 +109,12 @@
           '<td>' + r.position + '</td>' +
           '<td class="name">' + escapeHtml(r.name) + (r.reliefDriver ? '<span class="chip">RELIEF</span>' : '') + '</td>' +
           '<td class="relief-col">' + (r.reliefDriver ? '<span class="relief-yes">Relief</span>' : '') + '</td>' +
-          '<td><b>' + years(r.seniorityDate) + '</b> <small>' + (r.seniorityDate ? 'since ' + us(r.seniorityDate) : '') + '</small></td>' +
+          '<td><b>' + years(r.seniorityDate) + '</b> <small>' + (r.seniorityDate ? 'since ' + shortDate(r.seniorityDate) : '') + '</small></td>' +
           '<td><input class="truck" list="truck-list" data-truck="' + id + '" value="' + escapeHtml(truckUnit(r.defaultTruckId)) + '" placeholder="No truck" maxlength="40" autocomplete="off"' + dis + '></td>' +
           '<td>' + r.vacationWeeks + '</td>' +
           '<td><span class="status' + (r.active ? '' : ' off') + '" title="' + escapeHtml(r.unavailableReason) + '">' + (r.active ? 'Active' : 'Inactive') + '</span></td>' +
           '<td><button type="button" class="switch' + (r.active ? ' on' : '') + '" data-toggle="' + id + '" aria-label="' + (r.active ? 'Mark not available' : 'Mark available') + '"' + dis + '></button></td>' +
-          '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>&#9998; Edit</button></td></tr>';
+          '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>Edit</button></td></tr>';
       }).join('') || '<tr><td colspan="10" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
       const active = rows.filter(r => r.active);
       document.getElementById('n-active').textContent = active.length;
@@ -127,7 +126,7 @@
       // Review item 10 (Joe 10/13): the edit panel opens only on Edit or + Add Driver; otherwise the list takes the full width
       // and the three counts sit above it.
       document.querySelector('.split').classList.toggle('closed', !panelOpen);
-      if (!panelOpen) document.getElementById('panel').innerHTML = '<div class="panel-empty">Press <b>&#9998; Edit</b> on a driver\'s row (or click the name)<br>and the driver opens here to change.<br><br>Press <b>+ Add Driver</b> above for a new driver.</div>';
+      if (!panelOpen) document.getElementById('panel').innerHTML = '<div class="panel-empty">Press <b>Edit</b> on a driver\'s row (or click the name)<br>and the driver opens here to change.<br><br>Press <b>+ Add Driver</b> above for a new driver.</div>';
       fitRoster();
     }
 

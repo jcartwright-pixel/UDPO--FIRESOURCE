@@ -95,3 +95,28 @@ test('Product details: kept as numbers, checked, and an upload that leaves them 
   assert.deepEqual([after[0].sku, after[0].upc, after[0].ratePerMin, after[0].targetPct, after[0].shelfLifeDays], ['280399', '078742371126', 74, 64.37, 14]);
   assert.deepEqual(after.map(p => p.name), ['GV 2% Gallon', 'New one']);
 });
+
+// Joe 10/13: the Product Sheet is one list with a check for each machine, and Machine Setup sets one machine's products. One save
+// writes every machine list it changes and the plant's products that run on no machine yet; a new group is added to the plant.
+const sheet = (email, fields) => applyAction(db(), { email }, Object.assign({ action: 'saveProductSheet', requestId: rid() }, fields));
+test('Product Sheet: the machine lists and the products on no machine save together', async () => {
+  const done = await sheet(MANAGER, { facilityId: 'fac_uniontown', areas: [
+    { areaId: 'ut_prod_boxing', products: [{ name: 'DQ Choc 5 Gal Mix', sku: '255202', mfgType: '5 Gallon', productGroup: 'Mix', ratePerMin: '8', targetPct: '66.75' }] },
+    { areaId: 'ut_prod_htst_1', products: [{ name: 'DQ Choc 5 Gal Mix', sku: '255202', mfgType: '5 Gallon', productGroup: 'Mix', ratePerMin: '8', targetPct: '70' }] }],
+  loose: [{ name: 'Eggnog Quart', sku: '777', mfgType: 'Quart', productGroup: 'Seasonal' }] });
+  assert.deepEqual(done.addedGroups, ['Mix', 'Seasonal'], 'groups the plant has not saved yet are added (Mix is only on the screen\'s list)');
+  const get = async (c, id) => (await db().collection(c).doc(id).get()).data();
+  assert.deepEqual((await get('plantProducts', 'ut_prod_boxing')).products[0].targetPct, 66.75, 'each machine keeps its own Target %');
+  assert.deepEqual((await get('plantProducts', 'ut_prod_htst_1')).products[0].targetPct, 70);
+  assert.equal((await get('plantProducts', 'ut_prod_htst_1')).line, 'HTST #1');
+  assert.deepEqual((await get('productSheet', 'fac_uniontown')).products.map(p => p.name), ['Eggnog Quart']);
+  assert.ok((await get('productSetup', 'fac_uniontown')).groups.includes('Seasonal'));
+  // One machine alone (Machine Setup) leaves the products on no machine as they are.
+  await sheet(MANAGER, { facilityId: 'fac_uniontown', areas: [{ areaId: 'fac_uniontown_area_cases', products: [{ name: 'UD 2% Gallon case' }] }] });
+  assert.deepEqual((await get('productSheet', 'fac_uniontown')).products.map(p => p.name), ['Eggnog Quart']);
+  assert.deepEqual((await get('plantProducts', 'fac_uniontown_area_cases')).products.map(p => p.name), ['UD 2% Gallon case']);
+  await assert.rejects(sheet(DISPATCHER, { facilityId: 'fac_uniontown', areas: [], loose: [] }), /does not have a role/);
+  await assert.rejects(sheet(MANAGER, { facilityId: 'fac_uniontown', areas: [{ areaId: 'fac_charleston_area_cases', products: [] }] }), /not set up for this plant/);
+  await assert.rejects(sheet(MANAGER, { facilityId: 'fac_uniontown', areas: [{ areaId: 'ut_prod_totes', products: [{ name: 'A' }, { name: 'a' }] }] }), /on the list twice/);
+  await assert.rejects(sheet(MANAGER, { facilityId: 'fac_uniontown', areas: [] }), /Nothing to save/);
+});

@@ -330,7 +330,8 @@
           date: addDays(week, i), runs: !!d.runs, loadSequence: effectiveSequence(d),
           driverId: d.driverId || '', driver: d.driver || '', truckId: d.truckId || '', truck: d.truck || '',
           trailerId: d.trailerId || '', trailer: d.trailer || '', dispatchTime: d.dispatchTime,
-          intendedDriver: d.intendedDriver || '', driverExceptionStatus: d.driverExceptionStatus || '', routeOverride: yes(d.routeOverride)
+          intendedDriver: d.intendedDriver || '', driverExceptionStatus: d.driverExceptionStatus || '', routeOverride: yes(d.routeOverride),
+          plantLoadOff: d.plantLoadOff === true
         };
       });
       return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
@@ -377,14 +378,14 @@
 
   // The per-screen switch (switch.js): which app runs each screen. "old" = the current app (the new app shows a copy),
   // "new" = the new app saves and the write-back puts each save in the sheet. While every screen is "old" the new
-  // app is a test copy and every screen may save; once one is "new", only "new" screens save in the new app.
+  // app is a test copy and every screen may save; once one is "new", only "new" screens save in Operations.
   var SCREENS = { dailyDispatch: 'Daily Dispatch', weeklyDispatch: 'Weekly Dispatch', checkIns: 'Driver Check-ins',
     drivers: 'Drivers', vacations: 'Vacation Schedule', routes: 'Route Editor',
     // Joe 10/12: "Let the new app write plant loading to the real Live sheet." The Plant Distribution screens (Loadout Center,
     // Trailer Assignments, Unloading, Truck Washing, Product Returns): a load, its order and its case returns go to the Live week tabs.
     plantLoading: 'Plant Loading',
     // Joe 10/12 ("turn all 8 sheets on"): the plant check screens (Cooler Temperatures, Quality, Yard, Shift Report Log, Scheduler,
-    // Line Targets), Products, Safety Walkthrough and Plant Maintenance. Their saves stay in the new app.
+    // Line Targets), Products, Safety Walkthrough and Plant Maintenance. Their saves stay in Operations.
     plant: 'Plant Operations' };
   // Screens with no sheet behind them: always saved in the new app, never on Go-Live Switches.
   // Joe 10/13 ("I want everything working"): also Fleet Service Setup (service rules, unit dates, garage technicians),
@@ -396,16 +397,16 @@
     Object.keys(set).forEach(function (k) { out[k] = set[k]; });
     return out;
   }
-  // {owner, open, live, why}: open = this screen may save in the new app; why = the reason when it may not.
+  // {owner, open, live, why}: open = this screen may save in Operations; why = the reason when it may not.
   function screenState(config, screen) {
     var owners = screenOwners(config), owner = owners[screen] || 'old', name = SCREENS[screen] || screen;
     var writeBack = !!(config && config.writeBack && config.writeBack.enabled === true);
     var anyNew = Object.keys(owners).some(function (k) { return owners[k] === 'new'; });
-    // Joe 10/13 ("I can't select the routes"): screens whose saves stay in the new app and write no sheet (Over the Road,
+    // Joe 10/13 ("I can't select the routes"): screens whose saves stay in Operations and write no sheet (Over the Road,
     // Driver Scorecard) are never view only; there is nothing for a Go-Live Switch to protect.
     if (APP_ONLY[screen]) return { owner: 'app', live: anyNew, open: true, why: '' };
     if (owner === 'new') return { owner: owner, live: true, open: writeBack, why: writeBack ? '' : name + ' is switched on but the write-back is off; ask an administrator' };
-    if (config && config.mode === 'live' && !anyNew) return { owner: owner, live: false, open: false, why: 'The app is marked live but no screen belongs to the new app; saves stay in test mode only' };
+    if (config && config.mode === 'live' && !anyNew) return { owner: owner, live: false, open: false, why: 'The app is marked live but no screen belongs to Operations; saves stay in test mode only' };
     if (anyNew) return { owner: owner, live: true, open: false, why: name + ' is view only until it is switched on in Administration > Go-Live Switches' };
     return { owner: owner, live: false, open: true, why: '' };
   }
@@ -423,7 +424,7 @@
     vacations: { area: 'Route Distribution', ready: true, why: 'Writes the Vacations sheet. You OK\'d it 10/12.' },
     routes: { area: 'Route Distribution', ready: true, why: 'Writes Route Master. You OK\'d it 10/12.' },
     plantLoading: { area: 'Plant Distribution', ready: true, why: 'Writes loads, loading order and case returns to the Live sheet week tabs, and Loadout History when a load is Done. You OK\'d it 10/12.' },
-    plant: { area: 'Plant Production', ready: true, why: 'Cooler temperatures, quality, yard, shift notes, the scheduler, line targets, products, safety and plant maintenance save in the new app and keep their history there. The current app keeps its own copies elsewhere and does not see these. You asked to turn it on 10/12.' }
+    plant: { area: 'Plant Production', ready: true, why: 'Cooler temperatures, quality, yard, shift notes, the scheduler, line targets, products, safety and plant maintenance save in Operations and keep their history there. The current app keeps its own copies elsewhere and does not see these. You asked to turn it on 10/12.' }
   };
   // Shown on Go-Live Switches but not a switch yet. (Plant Loading became a switch on 10/12.)
   var GO_LIVE_LATER = [];
@@ -572,6 +573,14 @@
     if (['TRUCK', 'TRACTOR', 'POWER UNIT', 'TRACTOR TRUCK', 'STRAIGHT TRUCK', 'BOX TRUCK'].indexOf(t) >= 0) return 'TRUCK';
     return t === 'TRAILER' ? 'TRAILER' : '';
   }
+  // Joe 10/13: trailers have their own service rules. A trailer's DOT and plate rules are its own once saved
+  // (trailerDotMonths, trailerDotWarnDays, trailerPlateWarnDays); until then it follows the trucks'.
+  function fleetRule(rules, type, key) {
+    rules = rules || {};
+    var own = 'trailer' + key.charAt(0).toUpperCase() + key.slice(1), n = Number(rules[own]);
+    if (type === 'TRAILER' && rules[own] !== undefined && rules[own] !== null && rules[own] !== '' && isFinite(n)) return n;
+    return rules[key] !== undefined && rules[key] !== null && rules[key] !== '' ? Number(rules[key]) : FLEET_RULES[key];
+  }
   function fleetDue(units, setup, miles, openJobs, rules, today) {
     rules = Object.assign({}, FLEET_RULES, rules || {});
     var setupBy = {}, openBy = {}, items = [], out = [];
@@ -606,9 +615,9 @@
             late ? 'OVERDUE' : soon ? 'DUE_SOON' : 'OK', row.lastServiceDate);
         }
       }
-      if (!row.dotDue) push('DOT', 'DOT annual inspection', '', '', '', 'SET_UP', '');
-      else { var d = daysBetween(today, row.dotDue); push('DOT', 'DOT annual inspection', row.dotDue, '', d + ' days', d < 0 ? 'OVERDUE' : d <= rules.dotWarnDays ? 'DUE_SOON' : 'OK', ''); }
-      if (row.plateExpires) { var p = daysBetween(today, row.plateExpires); push('PLATE', 'Plate / registration', row.plateExpires, '', p + ' days', p < 0 ? 'OVERDUE' : p <= rules.plateWarnDays ? 'DUE_SOON' : 'OK', ''); }
+      if (!row.dotDue) push('DOT', 'Annual inspection', '', '', '', 'SET_UP', '');
+      else { var d = daysBetween(today, row.dotDue); push('DOT', 'Annual inspection', row.dotDue, '', d + ' days', d < 0 ? 'OVERDUE' : d <= fleetRule(rules, u.type, 'dotWarnDays') ? 'DUE_SOON' : 'OK', ''); }
+      if (row.plateExpires) { var p = daysBetween(today, row.plateExpires); push('PLATE', 'Plate / registration', row.plateExpires, '', p + ' days', p < 0 ? 'OVERDUE' : p <= fleetRule(rules, u.type, 'plateWarnDays') ? 'DUE_SOON' : 'OK', ''); }
     });
     var rank = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
     items.sort(function (a, b) { return rank[a.status] - rank[b.status] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }); });
@@ -814,7 +823,8 @@
   function weeklyCellClass(row, prefix, ctx) {
     var d = row.days[prefix], who = String(d.driver || '').trim().toUpperCase();
     // A plant load on the Plant Operations Scheduler for a day the run does not run: it needs a driver (current Weekly).
-    if (!d.runs) return plantFor(ctx, row, prefix) && !coveredRoute(row) ? 'plant' : 'off';
+    // Joe 10/13 (836 PECK): a plant load marked Not running on Weekly (plantLoadOff) is off like any other day.
+    if (!d.runs) return plantFor(ctx, row, prefix) && !coveredRoute(row) && d.plantLoadOff !== true ? 'plant' : 'off';
     if (coveredRoute(row)) return 'coverage';
     // Joe 10/11: a run with no driver because its regular driver is off that day (any reason) is red, so the cover shows.
     if (!who) return offCover(row, prefix, d.date, ctx) ? 'vacation-needs' : 'needs';
@@ -1077,7 +1087,7 @@
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
-    fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
+    fleetDue: fleetDue, fleetRule: fleetRule, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,

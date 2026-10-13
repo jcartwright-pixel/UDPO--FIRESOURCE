@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Shift Notes · New Plant Operations</title>
+  <title>Shift Notes · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -33,7 +33,7 @@
       <div class="tabs" id="panes" role="tablist" aria-label="Log view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
       <div class="hstats" id="hstats"></div>
       <span class="sn-since" id="since"></span>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice ok" id="saved" hidden></div>
@@ -61,8 +61,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, shortTime, showError, dateTimeText, goLiveNote } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, shortTime, showError, dateTimeText, goLiveNote, optionTag, hoursMinutesText, maySave, watchPerson } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { fillIn, savedText, watchRound, clockOf } from './js/autosave.js';
     import { shiftsFor, shiftAt } from './js/plant-reports.js';
     import { nowMinutes } from './js/plant-core.js';
@@ -87,13 +87,13 @@
     let maint = null;
     let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null, shifts = shiftsFor(null, 'fac_uniontown');
     const pending = [];
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
     const FOLLOW = { OPEN: 'Needs attention', MONITOR: 'Monitor', RESOLVED: 'Resolved' };
     const ST_CLASS = { OPEN: 'open', MONITOR: 'mon', RESOLVED: 'res' };
     const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
     const dayStamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortDate(t) + ' ' + shortTime(t) : ''; };
     const clockNow = () => new Date().toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
-    const opt = (value, current, label) => '<option value="' + value + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + escapeHtml(label || value) + '</option>';
+    const opt = (value, current, label) => optionTag(value, current, label || value, { loose: true });
     const shiftWord = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : '';
     const isKind = (r, k) => String(r.type || '').toLowerCase() === k.toLowerCase();
     const since = (at) => { const t = Date.parse(at || ''), r = Date.parse(roundStart || ''); return !isFinite(r) || (isFinite(t) && t > r); };
@@ -115,7 +115,7 @@
     // what broke, typed (Joe 10/12: "all kind of little things. Not a list"; a machine named in it goes on its history); a breakdown has its down and back up times and what fixed it, a
     // request how long it can wait. keep: the boxes change with the Type, and what is typed stays (the same entry keeps saving).
     const layout = () => kind === 'Breakdown' ? 'B' : kind === 'Maintenance Request' ? 'R' : 'N';
-    const hm = (n) => n === null || n === undefined ? '' : n >= 60 ? Math.floor(n / 60) + ' h ' + (n % 60) + ' min' : n + ' min';
+    const hm = (n) => hoursMinutesText(n);
     function drawForm(keep) {
       const ck = canSave(), m = phone.matches, shift = shiftNow(), lay = layout();
       const f0 = document.getElementById('fields'), was = {};
@@ -352,7 +352,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
+      watchPerson(db, user, p => { person = p; render(); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       // The plant's machinery (a machine named in What broke) and maintenance's work orders (what became of each request).
       watchMaint(db, 'fac_uniontown', d => { maint = d; render(); }, () => {}, { noJournal: true });

@@ -1,6 +1,6 @@
 /*
  * Administration (Joe 10/10): the current app's Administration items, rebuilt for the new app. One server call, `admin`,
- * {op, ...}; Administrators only. Everything here is kept in the new app's database (never readable by the screens
+ * {op, ...}; Administrators only. Everything here is kept in Operations's database (never readable by the screens
  * directly: the collections below are server-only in firestore.rules), except People & Roles, which also writes the
  * sandbox copy of the Users list through the master write-back (masterwrite.js; production sheets are refused there).
  *

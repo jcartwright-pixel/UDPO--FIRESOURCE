@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Operational Assignments · New Plant Operations</title>
+  <title>Operational Assignments · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -44,7 +44,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, save, showError, dateTimeText } from './js/app.js';
     import { lists, watchLists, canManage, forScreen } from './js/edit.js';
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot } from './js/firebase.js';
     import { mountRowDrag } from './js/row-drag.js';
 
     // The current app's Operational Assignments (93_DispatchAdminV037: Assignment, Active, Sequence). Each change saves at once.

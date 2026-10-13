@@ -2,11 +2,14 @@
 // one landscape page per driver with the name, weeks allowed, days booked, twelve months shaded by how many others are
 // already off against the limit, holiday weeks marked with their limit, the driver's own days, and the memo to list
 // missing days, sign and turn the sheet in.
+import { escapeHtml, printInFrame } from './app.js';
+
 const L = window.UDLogic;
 const TYPE_CLASS = { PERSONAL: 'pdd', SICK: 'skd', BEREAVEMENT: 'bvd', UNPAID: 'und' };
 const YEAR_LIMIT = 3;
 const REQUEST_LINES = 14;
-const esc = (v) => String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Review item 76 (Joe 10/13): the app's one HTML-safety helper.
+const esc = escapeHtml;
 const pad = (n) => String(n).padStart(2, '0');
 const live = (v) => v.status !== 'CANCELLED' && v.status !== 'DENIED';
 const us = (key) => { const [y, m, d] = key.split('-'); return Number(m) + '/' + Number(d) + '/' + y; };
@@ -70,15 +73,5 @@ export function vacationYearHtml(year, drivers, vacations, today) {
 
 // Printed from a hidden frame so the screen itself is left alone.
 export function printVacationYear(html) {
-  const old = document.getElementById('vacation-print-frame');
-  if (old) old.remove();
-  const frame = document.createElement('iframe');
-  frame.id = 'vacation-print-frame';
-  frame.setAttribute('aria-hidden', 'true');
-  frame.tabIndex = -1;
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-  document.body.appendChild(frame);
-  const doc = frame.contentWindow.document;
-  doc.open(); doc.write(html); doc.close();
-  setTimeout(() => { frame.contentWindow.focus(); frame.contentWindow.print(); }, 150);
+  printInFrame(html, { id: 'vacation-print-frame' });
 }

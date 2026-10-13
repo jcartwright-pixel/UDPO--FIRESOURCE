@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Yard Checks · New Plant Operations</title>
+  <title>Yard Checks · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -32,7 +32,7 @@
       <button type="button" class="yd-refresh" id="refresh" data-top>&#8635; Refresh</button><button type="button" class="yd-refresh" id="refresh-history" data-top hidden>&#8635; Refresh History</button>
       <div class="dayname" id="dayname"></div>
       <div class="hstats" id="hstats"></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -66,8 +66,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, dateTimeText, goLiveNote, shortTime, maySave, watchPerson } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { savedText, watchRound } from './js/autosave.js';
 
     const L = window.UDLogic, U = window.UDPlant;
@@ -82,8 +82,8 @@
     const unsubs = [];
     // A station tablet (Plant Station > Yard Services) may save by what Administration > People & Roles allows its account.
     let allowed = {};
-    const canSave = () => (L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.saveYardCheck === true) && L.screenState(app, 'plant').open;
-    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
+    const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant', allowed.saveYardCheck);
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : ''; };
     const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : String(v || ''); };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
     const STATUS = { COMPLETE: 'Recorded', RECORDED: 'Recorded', DEPARTED: 'Left Yard' };
@@ -297,7 +297,7 @@
 
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); }, () => {});
+      watchPerson(db, user, p => { person = p; render(); }, { withEmail: true, onError: () => {} });
       allowedSaves(['saveYardCheck']).then(a => { allowed = a; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       // Joe 10/10: after each Send Current Report the yard starts empty too: trailers finished here leave the screen, typed boxes clear.

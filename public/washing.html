@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Truck Washing · New Plant Operations</title>
+  <title>Truck Washing · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -39,7 +39,7 @@
       <div class="dayname" id="dayname"></div>
       <div class="hstats" id="hstats"></div>
       <button type="button" class="addwash-open" id="add-open" data-top>+ Add Wash</button>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -64,8 +64,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, goLiveNote, maySave } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
 
     const L = window.UDLogic, U = window.UDPlant;
@@ -75,7 +75,7 @@
     let week = [], sheetWash = [], appWash = [], person = null, app = {};
     const washedNow = {};      // trailer unit -> true while its Wash press is saving
     const unsubs = [];
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
+    const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading');
     // This week = Sunday through the day shown (the current app's "Washes this week").
     const weekDays = () => { const s = L.weekStart(date), out = []; for (let d = s; d <= date; d = L.addDays(d, 1)) out.push(d); return out; };
 

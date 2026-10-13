@@ -184,7 +184,7 @@ async function noScroll(page) {
     await editor.click('#down-panel [data-close]');
     const downDoc = await editor.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 20; i++) { const d = (await getDoc(doc(db, 'equipment', 'veh_truck_900001'))).data(); if (d.status === 'DOWN') return d; await new Promise(r => setTimeout(r, 250)); }
       return null;
@@ -219,7 +219,7 @@ async function noScroll(page) {
     await editor.keyboard.press('Escape');
     const callOff = await editor.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { collection, query, where, getDocs } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 20; i++) {
         const s = await getDocs(query(collection(db, 'exceptions'), where('driverId', '==', 'drv_test_casey')));
@@ -257,6 +257,16 @@ async function noScroll(page) {
     // Plant Load: 801 does not run Thursdays, but the plant scheduler has a load for it on 10/8, so the day needs a driver.
     const thu801 = 'xpath=//tr[td[1][text()="801"]]/td[@data-day="thu"]';
     assert.deepEqual(await wkEdit.$eval(thu801, td => [td.classList.contains('c-plant'), td.classList.contains('plant-load'), td.textContent, /pickup 7:00 AM, T-902, PO 4411/.test(td.title)]), [true, true, 'PLANT LOAD', true]);
+    // Joe 10/13 (836 PECK): a plant load can be marked Not running (the day goes black) and put back to PLANT LOAD.
+    await wkEdit.click(thu801);
+    await wkEdit.selectOption('.popover select[data-kind="driver"]', '__OFF__');
+    await wkEdit.waitForSelector('.popover', { state: 'detached' });
+    await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6]; return td.classList.contains('off') && !td.classList.contains('c-plant') && /not running/.test(td.title); }, null, { timeout: 5000 });
+    if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-plant-load-not-running-1920.png') });
+    await wkEdit.click(thu801);
+    await wkEdit.selectOption('.popover select[data-kind="driver"]', '__PLANT__');
+    await wkEdit.waitForSelector('.popover', { state: 'detached' });
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6].classList.contains('c-plant'), null, { timeout: 5000 });
     await wkEdit.click(thu801);
     assert.match(await wkEdit.$eval('.popover select[data-kind="driver"] option', o => o.textContent), /PLANT LOAD/);
     await wkEdit.selectOption('.popover select[data-kind="driver"]', 'drv_test_adams');
@@ -440,7 +450,7 @@ async function noScroll(page) {
     // Route Master updates do not redraw the list in the middle of the drag.
     await rt.waitForFunction(async () => {
       const { start } = await import('./js/app.js');
-      const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { collection, getDocs } = await import('/js/firebase.js');
       const { db } = await start();
       const all = (await getDocs(collection(db, 'routes'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
       return all.some(r => r.run === 'WHEELING') && all.some(r => r.id === 'run_t802' && r.loadType === 'Tote');
@@ -453,7 +463,7 @@ async function noScroll(page) {
       .catch(async e => { throw new Error('Load order drag: before ' + beforeDrag + ', after ' + await orderShown() + ' (' + e.message + ')'); });
     const saved801 = await rt.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 80; i++) { const d = (await getDoc(doc(db, 'routes', 'run_t801'))).data(); if (d.days.mon.loadOrder === 10 && d.days.mon.dispatchTime === 300) return d.days.mon; await new Promise(r => setTimeout(r, 250)); }
       return null;
@@ -733,7 +743,7 @@ async function noScroll(page) {
     await tpl.waitForFunction(() => /^Template saved/.test(document.getElementById('dirty').textContent), null, { timeout: 10000 });
     const tplCells = await tpl.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       return [(await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells, (await getDoc(doc(db, 'drivers', 'drv_test_casey'))).data().cells];
     });
@@ -801,12 +811,14 @@ async function noScroll(page) {
     assert.deepEqual(topBad, [], 'action buttons in one even row at the top');
     results.push('Action buttons: on 15 screens they sit in one even row in the top line, above the tables');
     await bh.close();
-    // Joe 10/10 picked mock-up A: one row per unit with PM / Reefer, DOT and Plates side by side, Miles / hours now and Status, units that need something first.
+    // Joe 10/10 picked mock-up A: one row per unit with PM / Reefer, Annual Inspection and Plates side by side, Miles / hours now and Status, units that need something first.
     const fsB = await openPage(browser, 1920, 950, '/fleet.html?testEmail=manager.test@uniteddairy.com');
     await fsB.waitForSelector('table.fs-grid tbody tr');
     // Review item 41 (Joe 10/13): no empty column after Status; the Send to Garage column (headed Garage) shows only when a unit has something to send.
     const fsHeads = await fsB.$$eval('table.fs-grid thead th', t => t.map(x => x.textContent));
-    assert.deepEqual(fsHeads.slice(0, 7), ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status']);
+    assert.deepEqual(fsHeads.slice(0, 7), ['Unit', 'Type', 'PM / Reefer', 'Annual Inspection', 'Plates', 'Miles / hours now', 'Status']);
+    // Joe 10/13: the screen says Annual Inspection, never DOT.
+    assert.deepEqual(await fsB.evaluate(() => document.body.innerText.match(/\bDOT\b/g)), null, 'no DOT words on Fleet Service');
     assert.ok(fsHeads.length === 7 || (fsHeads.length === 8 && fsHeads[7] === 'Garage' && (await fsB.$$('table.fs-grid [data-send]')).length > 0), 'no empty column after Status: ' + JSON.stringify(fsHeads));
     assert.ok(await fsB.$eval('.fs-legend em', e => e.getBoundingClientRect().right <= e.closest('.fs-legend').getBoundingClientRect().right - 8), '"units need something" sits in from the right edge');
     assert.ok(await fsB.$$eval('table.fs-grid td.gc small, .fs-legend em', e => e.every(x => parseFloat(getComputedStyle(x).fontSize) >= 16)), 'the helper text is 16px');
@@ -817,7 +829,7 @@ async function noScroll(page) {
     assert.match(await fsB.textContent('.fs-legend em'), /of \d+ units need something/);
     assert.deepEqual(fsB.errors, []);
     await fsB.close();
-    results.push('Fleet Service (mock-up A): one row per unit, PM / Reefer, DOT, Plates, Miles / hours now and Status, units that need something first');
+    results.push('Fleet Service (mock-up A): one row per unit, PM / Reefer, Annual Inspection, Plates, Miles / hours now and Status, units that need something first');
     // Over the Road: a manager marks route 801 Carrier Pickup, picks its By Date column (SAL), ticks it in OTR Routes Setup and types a
     // month's figures on Recap; Tuesday 10/6 counts it. Then Joe's workbook tabs: By Date, Month Recap and Cost Per Gallon.
     const otr = await openPage(browser, 1920, 950, '/otr.html?view=routes&testEmail=manager.test@uniteddairy.com');
@@ -836,7 +848,7 @@ async function noScroll(page) {
     await otr.waitForFunction(() => /\$0\.400/.test(document.querySelector('.otr-in[data-m="9"]').closest('tr').textContent), null, { timeout: 5000 });
     const otrSaved = await otr.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 20; i++) { const a = (await getDoc(doc(db, 'otrRoutes', 'run_t801'))).data(), b = (await getDoc(doc(db, 'otrMonthly', new Date().getFullYear() + '-09'))).data(); if (a && b && b.distribution_cost === 400000) return [a, b]; await new Promise(r => setTimeout(r, 250)); }
       return null;
@@ -876,7 +888,7 @@ async function noScroll(page) {
     await sc.press('.sc-n[data-k="callOff"]', 'Tab');
     const scSaved = await sc.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 20; i++) { const d = (await getDoc(doc(db, 'scorecard', 'settings'))).data(); if (d && d.callOff === 5) return d; await new Promise(r => setTimeout(r, 250)); }
       return null;

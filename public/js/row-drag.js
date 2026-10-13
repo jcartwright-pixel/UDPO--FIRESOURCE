@@ -12,11 +12,15 @@
 // Order), and pressing on the line's words does not start selecting text, so the drag is not mistaken for a text selection.
 // A finger also picks up the whole line, after holding it still a moment; handle() only says where it needs no hold, so a
 // swipe anywhere else on the line still scrolls the list.
+// Review item 75 (Joe 10/13): Daily Dispatch and Weekly Dispatch use this too, instead of their own copies. For them:
+// onEnd() is told when a drag ends (dropped or not), and busy() says a line is being dragged, so a screen holds its redraw
+// until the line is let go; keysInside lets Alt+Up / Alt+Down work from any box on the line (Daily's cells), not only the
+// focused line, ahead of the screen's own keys on that box.
 
 const SKIP = 'input, button, select, textarea, a, label, [contenteditable]';
 const HOLD_MS = 350, MOUSE_PX = 6;
 
-export function mountRowDrag({ box, canDrag, onMove, handle = (td) => td.cellIndex < 2 }) {
+export function mountRowDrag({ box, canDrag, onMove, onEnd, keysInside = false, handle = (td) => td.cellIndex < 2 }) {
   let press = null, drag = null;
   const group = (r) => r.dataset.dragGroup || '';
   const rows = (g) => [...box.querySelectorAll('tr[data-drag]')].filter(r => group(r) === g);
@@ -73,14 +77,16 @@ export function mountRowDrag({ box, canDrag, onMove, handle = (td) => td.cellInd
   }
   function end(drop) {
     clearTimeout(press && press.timer);
-    if (drag) {
-      clearInterval(drag.scroller);
-      drag.row.classList.remove('row-dragging');
-      document.body.classList.remove('row-drag-on');
-      line.hidden = true;
-      if (drop && drag.to !== drag.from) onMove(drag.id, drag.to);
-    }
+    const d = drag;
     press = null; drag = null;
+    if (!d) return;
+    clearInterval(d.scroller);
+    d.row.classList.remove('row-dragging');
+    document.body.classList.remove('row-drag-on');
+    line.hidden = true;
+    // The drag is over before onMove runs, so a screen that redraws on the save is not held back by it.
+    if (drop && d.to !== d.from) onMove(d.id, d.to);
+    if (onEnd) onEnd();
   }
 
   box.addEventListener('pointerdown', e => {
@@ -112,16 +118,19 @@ export function mountRowDrag({ box, canDrag, onMove, handle = (td) => td.cellInd
   box.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
   // The row's own text is not selected while it is pressed or dragged (review item 59): a press on a line is the start of a drag.
   box.addEventListener('selectstart', e => { if (drag || press) e.preventDefault(); });
+  // The browser's own drag (of the line's text) never starts in its place.
+  box.addEventListener('dragstart', e => { if (e.target.closest && e.target.closest('tr[data-drag]')) e.preventDefault(); });
   box.addEventListener('contextmenu', e => { if (drag || (press && press.touch)) e.preventDefault(); });
 
   box.addEventListener('keydown', e => {
     const row = e.target.closest && e.target.closest('tr[data-drag]');
-    if (!row || e.target !== row || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !canDrag()) return;
+    if (!row || (e.target !== row && !keysInside) || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || drag || !canDrag()) return;
     e.preventDefault();
+    if (keysInside) e.stopPropagation();
     const list = rows(group(row)), i = list.indexOf(row), to = i + (e.key === 'ArrowUp' ? -1 : 1);
     if (to < 0 || to >= list.length) return;
     onMove(row.dataset.drag, to, true);
-  });
+  }, keysInside);
 
-  return { stop: () => { line.remove(); } };
+  return { stop: () => { line.remove(); }, busy: () => !!drag };
 }

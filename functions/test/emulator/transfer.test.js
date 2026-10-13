@@ -85,7 +85,7 @@ test('a row removed from the sheet is removed from the copy', async () => {
 
 test('the transfer refuses to run once a screen belongs to the new app', async () => {
   await db().collection('config').doc('app').set({ mode: 'test', screenOwners: { dailyDispatch: 'new' } });
-  await assert.rejects(runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: tick }), /already belongs to the new app/);
+  await assert.rejects(runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: tick }), /already belongs to Operations/);
 });
 
 test('a screen moved to the new app while a copy is reading the sheets stays moved', async () => {

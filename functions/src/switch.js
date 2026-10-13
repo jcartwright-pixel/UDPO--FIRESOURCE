@@ -5,9 +5,9 @@
  * or "new" (the new app saves, and each save is written to the sheet so the current app sees it).
  *
  *   - While every screen is "old", the new app is a test copy and any of its screens may save.
- *   - Once a screen is "new", only "new" screens save in the new app; the others are view only there.
+ *   - Once a screen is "new", only "new" screens save in Operations; the others are view only there.
  *   - A screen can be "new" only while the write-back is on, and the write-back cannot be turned off while
- *     any screen is "new", so a save is never kept in the new app alone.
+ *     any screen is "new", so a save is never kept in Operations alone.
  *
  * Administration > Go-Live Switches (Joe 10/12) is the only place to flip it: one screen at a time, "Fully live" (the screen's
  * tag comes off the cards), or "Turn on everything that is ready". A screen moves to the new app only when logic.js GO_LIVE
@@ -78,14 +78,14 @@ async function setSwitch(db, user, input, ready, now) {
     const fully = Object.assign({}, config.fullyLive || {});
     const before = { screenOwners: owners, writeBack: writeBackOn(config), fullyLive: Object.assign({}, fully) };
     const after = { screenOwners: Object.assign({}, owners), writeBack: before.writeBack, fullyLive: fully };
-    const notReady = (screen) => { const g = L.GO_LIVE[screen]; return g && !g.ready ? SCREENS[screen] + ' is not ready for the new app: ' + g.why : ''; };
+    const notReady = (screen) => { const g = L.GO_LIVE[screen]; return g && !g.ready ? SCREENS[screen] + ' is not ready for Operations: ' + g.why : ''; };
     if (kind === 'screen') {
       if (input.owner === 'new' && notReady(input.screen)) throw new SwitchError('NOT_ALLOWED', notReady(input.screen));
-      if (input.owner === 'new' && !before.writeBack) throw new SwitchError('NOT_ALLOWED', 'Turn the write-back on first, so the current app sees what the new app saves');
+      if (input.owner === 'new' && !before.writeBack) throw new SwitchError('NOT_ALLOWED', 'Turn the write-back on first, so the current app sees what the Operations app saves');
       after.screenOwners[input.screen] = input.owner;
       if (input.owner === 'old') delete after.fullyLive[input.screen];
     } else if (kind === 'fullyLive') {
-      if (input.fullyLive && owners[input.screen] !== 'new') throw new SwitchError('NOT_ALLOWED', 'Move ' + SCREENS[input.screen] + ' to the new app before marking it fully live');
+      if (input.fullyLive && owners[input.screen] !== 'new') throw new SwitchError('NOT_ALLOWED', 'Move ' + SCREENS[input.screen] + ' to Operations before marking it fully live');
       if (input.fullyLive) after.fullyLive[input.screen] = true; else delete after.fullyLive[input.screen];
     } else if (kind === 'allReady') {
       if (!before.writeBack && !ready) throw new SwitchError('NOT_ALLOWED', 'The server has no sandbox sheet to write to yet (WRITEBACK_JSON)');

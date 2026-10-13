@@ -152,3 +152,35 @@ test("a driver put on a day takes his own truck, also when his other load that d
   assert.match(down.warnings.join(' '), /900001 is DOWN; the route's truck was kept/);
   assert.equal((await run()).days.thu.truckId, '');
 });
+
+test('Weekly: a plant load can be marked Not running and put back; turning the day on ends the mark (Joe 10/13, 836 PECK)', async () => {
+  await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+  await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: RUN, day: 'tue', runs: false });
+  await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: RUN, day: 'tue', runs: false, plantLoadOff: true });
+  let r = await run();
+  assert.equal(r.days.tue.runs, false);
+  assert.equal(r.days.tue.plantLoadOff, true, 'the plant load is marked not running');
+  const ctx = { plant: { [r.runId + '|' + r.days.tue.date]: [{ runId: r.runId }] }, dup: {}, relief: {}, exceptions: [] };
+  assert.equal(L.weeklyCellClass(r, 'tue', ctx), 'off', 'Weekly shows the day black, not PLANT LOAD');
+  await runWriteBack({ db: db(), sheets: F.fakeWritableSheets(tabs), target: { spreadsheetId: 'fake-live' }, now: tick });
+  const v = tabs["'LIVE CURRENT WEEK'"], h = v[5], row = v.find((x, i) => i > 5 && x[h.indexOf('run_id')] === 'run_t802');
+  assert.equal(row[h.indexOf('tue_runs')], 'FALSE');
+  assert.equal((await db().collection('conflicts').get()).size, 0, 'the mark stays in the app; no sheet conflict');
+  await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: RUN, day: 'tue', runs: false, plantLoadOff: false });
+  r = await run();
+  assert.equal(L.weeklyCellClass(r, 'tue', ctx), 'plant', 'put back: PLANT LOAD needs a driver again');
+  await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: RUN, day: 'tue', runs: false, plantLoadOff: true });
+  await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: RUN, day: 'tue', runs: true });
+  assert.equal((await run()).days.tue.plantLoadOff, false, 'a day turned on ends the mark');
+});
+
+test('Driver Notes: a typed note saves on the run and the write-back writes driver_notes (Joe 10/13, 800 Specials)', async () => {
+  await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+  const out = await applyAction(db(), DISPATCHER, { action: 'setDriverNote', requestId: rid(), runDocId: RUN, day: 'mon', note: 'Call the store first' });
+  assert.equal(out.ok, true);
+  assert.equal((await run()).days.mon.driverNotes, 'Call the store first');
+  await runWriteBack({ db: db(), sheets: F.fakeWritableSheets(tabs), target: { spreadsheetId: 'fake-live' }, now: tick });
+  const v = tabs["'LIVE CURRENT WEEK'"], h = v[5], row = v.find((x, i) => i > 5 && x[h.indexOf('run_id')] === 'run_t802');
+  assert.equal(row[h.indexOf('mon_driver_notes')], 'Call the store first');
+  assert.equal((await db().collection('conflicts').get()).size, 0);
+});

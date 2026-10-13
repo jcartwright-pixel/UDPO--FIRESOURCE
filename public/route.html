@@ -119,9 +119,9 @@
 
   <!-- DVIR: the pre-trip / post-trip inspection. -->
   <form class="phone-card drv-dvir" id="step-dvir" hidden novalidate>
-    <div class="drv-head"><h1>DVIR</h1><button type="button" data-back>&larr; Back</button></div>
+    <div class="drv-head"><h1>DVIR</h1><button type="submit" class="dv-submit" data-submit>Submit</button><button type="button" data-back>&larr; Back</button></div>
     <label id="dv-route-box">Assigned route<select id="dv-route" required></select></label>
-    <p class="drv-hint">Confirm assigned equipment and complete every inspection item.</p>
+    <p class="drv-hint">Confirm assigned equipment. Every item starts as No defect: change only the items with a defect.</p>
     <div class="phone-grid">
       <label>Inspection<select id="dv-inspection" required><option value="">Select…</option><option>Pre-trip</option><option>Post-trip</option></select></label>
       <label>Odometer<input id="dv-odometer" type="number" min="0" inputmode="numeric"></label>
@@ -141,14 +141,14 @@
       <canvas id="dv-sig" width="1200" height="300"></canvas>
       <label class="check"><input type="checkbox" id="dv-typed"> Use my typed name as my signature instead</label>
       <p class="drv-hint" id="dv-sig-status">No signature entered</p></div>
-    <button type="submit" class="primary" id="dv-send">Review inspection</button>
+    <!-- Joe 10/13: a green Submit at the top and here saves the inspection; Review inspection (kept) shows the summary first. -->
+    <div class="dv-buttons"><button type="submit" id="dv-send">Review inspection</button><button type="submit" class="dv-submit" data-submit id="dv-submit">Submit</button></div>
     <p class="drv-msg" id="dv-msg" role="status"></p>
   </form>
 
   <script type="module">
     import { start, escapeHtml, shortDate, showError, isUnitedDairy } from './js/app.js';
-    import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
-    import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { httpsCallable, doc, getDoc } from './js/firebase.js';
     import { addSpeak } from './js/speak.js';
     import { askRelease, lockStation } from './js/station-code.js';
     import { startQueue, send, waiting, onChange, keepRead, lastRead, isNoSignal } from './js/phone-queue.js';
@@ -454,7 +454,7 @@
     async function watchBoard() {
       if (boardWatch || !room) return;
       const { db } = await start();
-      const { collection, query, where, onSnapshot } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { collection, query, where, onSnapshot } = await import('./js/firebase.js');
       const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       const day = new Date(Date.now() - 6 * 3600000), sun = new Date(day.getFullYear(), day.getMonth(), day.getDate() - day.getDay());
       const weeks = [-7, 0, 7].map(n => iso(new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + n)));
@@ -483,7 +483,9 @@
     const TRAILER_ITEMS = ['Trailer brakes', 'Trailer lights and reflectors', 'Trailer tires and wheels', 'Coupling and connections', 'Doors and body'];
     const RESULTS = ['Checked — no defect', 'Defect found', 'Not applicable'];
     const $ = (id) => document.getElementById(id), form = $('step-dvir');
-    const pick = (label) => '<label>' + escapeHtml(label) + '<select required><option value="">Select…</option>' + RESULTS.map(r => '<option>' + r + '</option>').join('') + '</select></label>';
+    // Joe 10/13 "default no defect ... they're only going to select where there is a defect": every item starts as
+    // "Checked — no defect" (also after Back or a new inspection, form.reset()); the driver changes only the items with a defect.
+    const pick = (label) => '<label>' + escapeHtml(label) + '<select required>' + RESULTS.map((r, i) => '<option' + (i ? '' : ' selected') + '>' + r + '</option>').join('') + '</select></label>';
     $('dv-truck-items').innerHTML = TRUCK_ITEMS.map(pick).join('');
     addSpeak(form);
     form.querySelector('[data-trailer="1"] .dv-items').innerHTML = TRAILER_ITEMS.map(pick).join('');
@@ -515,8 +517,12 @@
       $('dv-msg').textContent = left.length ? 'A run can have at most 4 trailers. Not added: ' + left.join(', ') + '.' : '';
       unreview();
     });
-    form.addEventListener('change', unreview);
+    form.addEventListener('change', e => { if (e.target.matches('.drv-col select')) e.target.classList.toggle('dv-bad', e.target.value === 'Defect found'); unreview(); });
+    form.addEventListener('reset', () => form.querySelectorAll('select.dv-bad').forEach(x => x.classList.remove('dv-bad')));
     function unreview() { if (reviewed) { reviewed = false; $('dv-send').textContent = 'Review inspection'; } }
+    const sigBox = form.querySelector('.drv-sign');
+    // The top Submit is the form's first button, so Enter in a box would save at once: Enter moves on instead.
+    form.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) e.preventDefault(); });
     function fillRoute() {
       const l = dvLoads[Number($('dv-route').value)];
       if (!l) return;
@@ -550,9 +556,9 @@
     const at = (e) => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) * canvas.width / r.width, (e.clientY - r.top) * canvas.height / r.height]; };
     canvas.addEventListener('pointerdown', e => { if ($('dv-typed').checked) return; drawing = true; canvas.setPointerCapture(e.pointerId); const [x, y] = at(e); ctx.beginPath(); ctx.moveTo(x, y); });
     canvas.addEventListener('pointermove', e => { if (!drawing) return; const [x, y] = at(e); ctx.lineTo(x, y); ctx.stroke(); inked = true; sigStatus('Signature entered'); });
-    ['pointerup', 'pointercancel'].forEach(t => canvas.addEventListener(t, () => { if (!drawing) return; drawing = false; unreview(); if (!room) try { localStorage.setItem(sigKey, JSON.stringify({ driver: driverName, image: canvas.toDataURL('image/png') })); } catch (e) {} }));
+    ['pointerup', 'pointercancel'].forEach(t => canvas.addEventListener(t, () => { if (!drawing) return; drawing = false; unreview(); sigBox.classList.remove('dv-need'); if (!room) try { localStorage.setItem(sigKey, JSON.stringify({ driver: driverName, image: canvas.toDataURL('image/png') })); } catch (e) {} }));
     $('dv-clear').addEventListener('click', () => { clearCanvas(true); unreview(); });
-    $('dv-typed').addEventListener('change', e => sigStatus(e.target.checked ? 'Typed name will be used as your signature' : inked ? 'Drawn signature entered' : 'No signature entered'));
+    $('dv-typed').addEventListener('change', e => { if (e.target.checked) sigBox.classList.remove('dv-need'); sigStatus(e.target.checked ? 'Typed name will be used as your signature' : inked ? 'Drawn signature entered' : 'No signature entered'); });
     function smallSig() {
       for (const w of [640, 520, 420, 340, 280, 220]) {
         const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w / 4);
@@ -565,10 +571,18 @@
     form.addEventListener('submit', async e => {
       e.preventDefault();
       if (saved) return;
-      const msg = $('dv-msg'), bad = (t) => { msg.textContent = t; };
+      // Joe 10/13: the green Submit (top or bottom) saves straight away; Review inspection shows the summary, then submits.
+      const direct = !!(e.submitter && e.submitter.hasAttribute('data-submit'));
+      const msg = $('dv-msg'), bad = (t) => { msg.textContent = t; if (direct) msg.scrollIntoView({ block: 'center' }); };
+      sigBox.classList.remove('dv-need');
       const firstEmpty = [...form.querySelectorAll('[required]')].find(el => !el.closest('[hidden]') && !String(el.value).trim());
-      if (firstEmpty) { firstEmpty.focus(); return bad('Fill in ' + (firstEmpty.closest('label') ? firstEmpty.closest('label').firstChild.textContent.trim() : 'every box') + '.'); }
-      if (!inked && !$('dv-typed').checked) return bad('Please sign or choose to use your typed name.');
+      if (firstEmpty) { firstEmpty.focus(); firstEmpty.scrollIntoView({ block: 'center' }); msg.textContent = 'Fill in ' + (firstEmpty.closest('label') ? firstEmpty.closest('label').firstChild.textContent.trim() : 'every box') + '.'; return; }
+      if (!inked && !$('dv-typed').checked) {
+        // Joe 10/13 "if the driver hasn't had a signature, it scrolls down to that": the signature box is shown and outlined.
+        msg.textContent = 'Please sign or choose to use your typed name.';
+        sigBox.classList.add('dv-need'); sigBox.scrollIntoView({ block: 'center' });
+        return;
+      }
       const l = dvLoads[Number($('dv-route').value)];
       if (!l) return bad('Select the assigned route.');
       const truckChecks = [...$('dv-truck-items').querySelectorAll('select')].map(s => s.value), first = form.querySelector('[data-trailer="1"]');
@@ -585,19 +599,19 @@
       if (!signature) return bad('The drawn signature is too detailed to send. Clear it and sign with a shorter line, or use your typed name.');
       const trailers = [first.querySelector('.dv-trailer').value.trim()].concat(extras.map(d => d.querySelector('.dv-trailer').value.trim())).filter(Boolean);
       const defects = truckChecks.concat(t1).concat(...extras.map(valuesOf)).filter(v => v === 'Defect found').length;
-      if (!reviewed) {
+      if (!reviewed && !direct) {
         reviewed = true; $('dv-send').textContent = 'Submit inspection';
         return bad('Review: ' + l.route + ' · ' + l.run + ' · ' + $('dv-inspection').value + ' · Truck ' + $('dv-truck').value.trim() + ' · Trailer ' + (trailers.join(', ') || '—') + ' · ' + defects + ' defect' + (defects === 1 ? '' : 's') + '. Confirm your entries above, then submit.');
       }
       const fields = { inspection: $('dv-inspection').value, odometer: $('dv-odometer').value.trim(), truck: $('dv-truck').value.trim(), trailer: first.querySelector('.dv-trailer').value.trim(),
         checks: truckChecks.concat(t1), moreTrailers: extras.map(d => ({ trailer: d.querySelector('.dv-trailer').value.trim(), checks: valuesOf(d), issues: d.querySelector('.dv-issues').value.trim() })),
         tractorIssues: $('dv-tractor').value.trim(), trailerIssues: t1Issues, notes: $('dv-notes').value.trim(), signatureName: $('dv-name').value.trim(), signature };
-      $('dv-send').disabled = true; bad('Saving inspection…');
+      $('dv-send').disabled = true; form.querySelectorAll('[data-submit]').forEach(b => { b.disabled = true; }); bad('Saving inspection…');
       try {
         const r = await send('dvir', withWho('dvir', { driverId, runDocId: l.runDocId, day: l.day, requestId: dvRequest, fields }), 'DVIR ' + l.route + ' ' + l.run);
         saved = true; [...form.elements].forEach(el => { if (!el.matches('[data-back]')) el.disabled = true; });
         bad(r.queued ? 'Saved on this phone. It will send when you have signal.' : 'Inspection saved' + (r.trailers > 1 ? ' · ' + r.trailers + ' trailers' : '') + ' · ' + r.recordId);
-      } catch (err) { $('dv-send').disabled = false; bad(err.message); }
+      } catch (err) { $('dv-send').disabled = false; form.querySelectorAll('[data-submit]').forEach(b => { b.disabled = false; }); bad(err.message); }
     });
   </script>
 </body>

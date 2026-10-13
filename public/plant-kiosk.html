@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Plant Performance · New Plant Operations</title>
+  <title>Plant Performance · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/kiosk.css">
   <script src="js/logic.js"></script>
@@ -52,7 +52,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, goBack, callServer } from './js/app.js';
     import { askRelease, lockStation } from './js/station-code.js';
-    import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import * as R from './js/plant-reports.js';
     import { fullScreenOnTap } from './js/full-screen.js';

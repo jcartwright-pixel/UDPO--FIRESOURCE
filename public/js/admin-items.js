@@ -21,7 +21,7 @@ export const ADMIN_GROUPS = [
     ['checkin-email', 'Driver Check-In Email', 'The mailbox check for driver check-in email: on or off, sender, recipient, subject, Check now, and Use the standard addresses.', '', 'people'],
     ['refresh-rates', 'Refresh Rates', 'How often each background job runs, Save rate for each, and Archive now for completed work. Two retired jobs stay read-only.', '', 'week']
   ]],
-  ['Dispatch Administration', 'Already in the new app', [
+  ['Dispatch Administration', 'Already in Operations', [
     ['dispatch-admin', 'Dispatch Administration', 'Dispatch rules, carriers and the dispatch administration cards.', 'admin.html', 'distribution-truck-v1-560.webp'],
     ['ops', 'Operational Assignments', 'Branch, carrier and CVG assignments drivers can be given on Daily Dispatch.', 'ops.html', 'people'],
     ['print', 'Print Layouts', 'How the dispatch sheets print.', 'print.html', 'day'],
@@ -31,7 +31,9 @@ export const ADMIN_GROUPS = [
     ['switch', 'Go-Live Switches', 'Which screens are switched on, the write-back to the Live sheet, Mark fully live, and one button to turn on everything that is ready.', '', 'swap']
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
-    ['machine-products', 'Product Sheet', "Each plant's product sheet by area and group: every detail of each product, and the Product drop-down on Quality Checks. Add or edit a product, or load the whole list from the template.", 'products.html', 'production.webp'],
+    ['machine-products', 'Product Sheet', "Every product at the plant, one line each, with a check for each machine it runs on (each machine's checks are the Product drop-down on its Quality Check). Add or edit a product, download the whole list, or upload it back.", 'products.html', 'production.webp'],
+    // Joe 10/13: pick a machine (HTST #1, say) and set the products run on it; the same lists as the Product Sheet's checks.
+    ['machine-setup', 'Machine Setup', "Each machine's products: pick a machine, add or remove the products run on it, and drag them into the order of its Quality Check drop-down.", 'machine-setup.html', 'production.webp'],
     ['plant-shifts', 'Plant Shifts', 'Each plant\'s Distribution and Plant Production shifts (Uniontown distribution: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week'],
     // Joe 10/12: one list of each plant's areas and sub-areas; the Safety Walkthrough walks it, other screens can use it later.
     ['location-areas', 'Location Areas', "Each plant's areas (Plant, Garage, Office, Yard) and their sub-areas: add, rename, reorder, turn off. The Safety Walkthrough walks them in this order; other screens can use them later.", 'location-areas.html', 'map']
@@ -42,7 +44,7 @@ export const ADMIN_GROUPS = [
   ]],
   ['Fleet & GPS Setup', 'Set-up for the maintenance side', [
     ['gps', 'GPS Setup', 'The Verizon Connect sign-in and a plain pass or fail test.', 'gps.html', 'pin'],
-    ['fleet-setup', 'Fleet Service Setup', 'Service rules: PM miles, reefer months, DOT and plate warnings.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp']
+    ['fleet-setup', 'Fleet Service Setup', 'Service rules: PM miles, reefer months, annual inspection and plate warnings.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp']
   ]],
   ['System Tools', 'Checks', [
     // Joe 10/12: Driver Station and Plant Station moved to Links & Codes, where Launch opens them in a new window. Review item 54
@@ -52,7 +54,7 @@ export const ADMIN_GROUPS = [
   ['Diagnostics', 'Checks and repairs for the data behind the app', [
     ['preflight', 'Run Runtime Pre-Flight', 'Checks every sheet, column and setting the app needs and lists anything missing.', '', 'check'],
     // Joe 10/13 ("where is the sheet conflicts?"): Sheet Conflicts is in the list, so Find a setting finds it.
-    ['sheet-conflicts', 'Sheet Conflicts', 'Saves the new app did not write because someone changed the same cell in the sheet.', 'conflicts.html', 'alert'],
+    ['sheet-conflicts', 'Sheet Conflicts', 'Saves the Operations app did not write because someone changed the same cell in the sheet.', 'conflicts.html', 'alert'],
     ['update-live', 'Update Live Sheets', 'Rebuilds the Current and Next weeks from Route Master and the drivers\' standard runs, and adds missing runs (press twice).', '', 'swap'],
     ['refresh-home', 'Refresh Home Summary Now', 'Rebuilds the all-plants overview numbers right away.', '', 'factory'],
     ['plant-fresh', 'Start Plant Fresh From Today', 'Starts the plant screens over from today\'s loads.', '', 'factory'],

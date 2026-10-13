@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Shift Reports · New Plant Operations</title>
+  <title>Shift Reports · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
@@ -59,7 +59,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
-    import { collection, doc, query, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, orderBy, limit, onSnapshot } from './js/firebase.js';
     import { shiftsFor, shiftAt } from './js/plant-reports.js';
 
     const L = window.UDLogic, U = window.UDPlant, params = new URLSearchParams(location.search);

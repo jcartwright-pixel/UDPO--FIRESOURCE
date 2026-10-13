@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Production Lines · New Plant Operations</title>
+  <title>Production Lines · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/production.css">
@@ -48,8 +48,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, escapeHtml, showError, shortDate, watchPerson } from './js/app.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { watchProduction, lineView, fmt, shiftText } from './js/production.js';
     import { plantFor } from './js/pmaint.js';
 
@@ -90,13 +90,13 @@
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
-        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+      watchPerson(db, user, p => {
+        person = p;
         // Review item 31 (Joe 10/13): no plant drop-down inside a plant. The plant is ?plant= of the link, else the plant the
         // screen was opened from (this tab), else the person's first plant (pmaint.js plantFor); its name is in the line under the title.
         if (!stop) plant = plantFor(person, params.get('plant')).id;
         if (!stop) follow(); else render();
-      });
+      }, { withEmail: true });
       setInterval(render, 15000);
     });
   </script>

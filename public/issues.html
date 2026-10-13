@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Equipment Issues · New Plant Operations</title>
+  <title>Equipment Issues · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -26,7 +26,7 @@
     </div>
     <div class="head">
       <div class="title"><h1 id="title">Truck Issues</h1><small><a href="maint.html">Fleet &amp; Maintenance</a> › <span id="crumb">Truck Issues</span></small></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Email stays off in the new app</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Email stays off in Operations</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <!-- The Lessor button's email result (Administration > Repair Email): emailed, or why not. -->
@@ -58,7 +58,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
     import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
-    import { collection, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, getDoc, onSnapshot } from './js/firebase.js';
     forScreen('checkIns');
 
     const L = window.UDLogic;
@@ -82,11 +82,11 @@
 
     function render() {
       const edit = canSave(), lists3 = KINDS.map(([k]) => open(k));
-      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       const i = KINDS.findIndex(x => x[0] === kind), rows = lists3[i], truck = kind === 'TRUCK';
       document.getElementById('title').textContent = KINDS[i][3];
       document.getElementById('crumb').textContent = KINDS[i][3];
-      document.title = KINDS[i][3] + ' · New Plant Operations';
+      document.title = KINDS[i][3] + ' · Operations';
       document.getElementById('kinds').innerHTML = KINDS.map(([k, label], n) => '<button type="button" role="tab" data-kind="' + k + '" aria-selected="' + (k === kind) + '">' + label + ' <b>' + lists3[n].length + '</b></button>').join('');
       const match = (r, f) => f === 'all' || (f === 'review' ? r.needsReview : f === 'repeat' ? r.occurrences > 1 : f === 'garage' ? r.atGarage || r.toLessor : r.openedMs && now() - r.openedMs <= 7 * 86400000);
       document.getElementById('filters').innerHTML = FILTERS.map(([f, label]) => '<button type="button" data-filter="' + f + '" class="' + (filter === f ? 'on' : '') + '">' + label + '<b>' + rows.filter(r => match(r, f)).length + '</b></button>').join('');
@@ -101,11 +101,12 @@
         const sent = r.atGarage || r.toLessor, who = truck ? L.unitLessor(lists.fleetTrucks, r.unit) : null;
         const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || sent || !who.lessor ? ' disabled' : '') + ' title="' + escapeHtml(who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor): marks it sent and emails it as set in Administration > Repair Email.' : who ? who.why : '') + '">Lessor</button>';
         const garageBtn = '<button type="button" class="' + (truck ? 'seg-g' : 'to-garage') + '" data-step="garage"' + (!edit || sent ? ' disabled' : '') + ' title="Send to the garage">' + (truck ? 'Garage' : 'To garage') + '</button>';
+        // Review item 57 (Joe 10/13): the work buttons are words only (View, Repaired), no envelope or tick.
         const actions = removeFor === r.id
           ? '<span class="down-box"><input data-why maxlength="200" placeholder="Why remove it?"><button type="button" class="warn" data-remove-save>Remove</button><button type="button" data-remove-cancel>Cancel</button></span>'
-          : '<span class="work-acts"><button type="button" class="ic" data-open title="See the whole write-up" aria-label="See the whole write-up">&#9993;</button>' +
+          : '<span class="work-acts"><button type="button" class="view" data-open title="See the whole write-up" aria-label="See the whole write-up">View</button>' +
             (truck ? '<span class="seg">' + lessorBtn + garageBtn + '</span>' : garageBtn) +
-            '<button type="button" class="done" data-step="repaired" title="Mark Repaired"' + d + '>&#10003; Repaired</button>' +
+            '<button type="button" class="done" data-step="repaired" title="Mark Repaired"' + d + '>Repaired</button>' +
             '<button type="button" class="ic remove" data-remove title="Remove: not a real unit, or not a write-up. The sheet keeps the row marked Removed." aria-label="Remove"' + d + '>&#10005;</button></span>';
         const reviewed = r.needsReview ? '<input type="checkbox" data-review aria-label="Mark reviewed"' + (!edit || !r.text ? ' disabled' : '') + (r.text ? '' : ' title="Add what is wrong first"') + '>' : tick(r.reviewedBy ? 'Reviewed by ' + r.reviewedBy : 'Reviewed');
         const garage = r.atGarage ? tick('Sent to the garage ' + localWhen(r.garageAt) + ' by ' + r.garageBy) : r.toLessor ? '<span class="pill yes" title="Sent ' + escapeHtml(localWhen(r.lessorAt) + ' by ' + r.lessorBy) + '">' + escapeHtml(r.lessor) + '</span>' : dash;
