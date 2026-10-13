@@ -168,11 +168,11 @@ label.panel-check { display: flex; align-items: center; gap: 8px; text-transform
 .panel-actions button.primary { background: var(--ud-blue); color: #fff; border: 0; }
 td.name { font-weight: 800; }
 td small { color: var(--muted); font-weight: 500; }
-.chip { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 9px; background: #fdecc4; color: #8a5a00; font-size: 16px; font-weight: 800; vertical-align: middle; }
+.chip { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 9px; background: var(--pill-warn-bg); color: var(--pill-warn-ink); font-size: 16px; font-weight: 800; vertical-align: middle; }
 tr.off td { background: #fff8e6 !important; color: #7a8797; }
 tr.editing td { background: #e4efff !important; }
 span.status { display: inline-block; padding: 0 10px; border-radius: 12px; background: #dcf3e4; color: #11703a; font-size: var(--font); }
-span.status.off { background: #fdecc4; color: #8a5a00; }
+span.status.off { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
 button.switch { width: 42px; height: 22px; border: 0; border-radius: 12px; background: #cfd8e2; position: relative; cursor: pointer; vertical-align: middle; }
 button.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0003; }
 button.switch.on { background: #16a34a; } button.switch.on::after { left: 23px; }
@@ -192,7 +192,7 @@ table.daily button.toggle { font-size: var(--font); }
 td.left { text-align: left; padding-left: 8px; }
 input.ovr { width: 15px; height: min(15px, calc(var(--row) - 6px)); margin: 0; vertical-align: middle; cursor: pointer; }
 table.daily button.toggle, table.daily button.edit { line-height: 1; padding-top: 0; padding-bottom: 0; }
-.modal-back { position: fixed; inset: 0; background: #0b1f3366; z-index: 20; }
+.modal-back { z-index: 20; }
 .modal { position: fixed; z-index: 21; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; background: #fff; border-radius: 12px; border-top: 6px solid var(--ud-blue); padding: 16px 18px; box-shadow: 0 18px 50px #0004; }
 .modal.wide-modal { width: min(760px, calc(100vw - 32px)); }
 .modal h2 { margin: 0 0 12px; color: var(--ud-blue-dark); font-size: 20px; }
@@ -285,7 +285,7 @@ body.fill .scroll-list thead th { position: sticky; top: 0; z-index: 1; }
 .t-vacation { background: #dcecff; color: #0b4f8a; } .t-personal { background: #efe5ff; color: #5b3a9b; } .t-sick { background: #ffe5d6; color: #9a4b00; }
 .t-bereavement { background: #e6e9ee; color: #3b4652; } .t-unpaid { background: #fdecc4; color: #7a5600; }
 .vstatus { display: inline-block; padding: 0 10px; border-radius: 12px; font-size: 16px; font-weight: 700; background: #e6e9ee; color: #3b4652; }
-.vstatus.s-approved { background: #dcf3e4; color: #11703a; } .vstatus.s-pending { background: #fdecc4; color: #8a5a00; } .vstatus.s-denied, .vstatus.s-cancelled { background: #fde8e8; color: #9b1c1c; }
+.vstatus.s-approved { background: #dcf3e4; color: #11703a; } .vstatus.s-pending { background: var(--pill-warn-bg); color: var(--pill-warn-ink); } .vstatus.s-denied, .vstatus.s-cancelled { background: #fde8e8; color: #9b1c1c; }
 .cal-title { margin: 0; min-width: 190px; text-align: center; color: var(--ud-blue-dark); font-size: 22px; }
 #cal-month, #print-who { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; background: #fff; }
 .cal-key { display: inline-flex; gap: 10px; font-size: 16px; color: var(--muted); font-weight: 600; }
@@ -620,9 +620,9 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .issues-page table.issues td.wrong { white-space: normal; line-height: 1.25; font-weight: 600; color: #12324f; }
 .issues-page table.issues tr.review > td { background: #fff8ec; }
 .issues-page .pill { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 16px; font-weight: 800; white-space: nowrap; }
-.issues-page .pill.yes { background: #e3f4e8; color: #1d6b37; }
-.issues-page .pill.no { background: #eef2f5; color: #6b7c8c; }
-.issues-page .pill.warn { background: #fdecc4; color: #8a5a00; }
+.issues-page .pill.yes { background: var(--pill-green-bg); color: var(--pill-green-ink); }
+.issues-page .pill.no { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
+.issues-page .pill.warn { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
 .issues-page .from-mail { font-weight: 800; white-space: nowrap; }
 .issues-page .link-btn { border: 0; background: none; padding: 0; color: var(--ud-blue); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .issues-page .mail-meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 10px; font-size: 16px; }
@@ -754,11 +754,11 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
 .gps-page .gps-buttons button.big { min-height: 48px; font-size: 17px; padding: 0 28px; }
 .gps-page .gps-buttons button.armed { background: #b45309; border-color: #b45309; color: #fff; }
 .gps-page .pill { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 16px; font-weight: 800; }
-.gps-page .pill.yes { background: #e3f4e8; color: #1d6b37; }
-.gps-page .pill.warn { background: #fdecc4; color: #8a5a00; }
-.gps-page .pill.no { background: #eef2f5; color: #6b7c8c; }
+.gps-page .pill.yes { background: var(--pill-green-bg); color: var(--pill-green-ink); }
+.gps-page .pill.warn { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
+.gps-page .pill.no { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
 .gps-page .gps-result { padding: 14px 16px; border-radius: 10px; font-size: 17px; background: #eef2f6; color: var(--ink); }
-.gps-page .gps-result.ok { background: #e3f4e8; color: #1d6b37; border: 1px solid #a9d8b8; }
+.gps-page .gps-result.ok { background: var(--pill-green-bg); color: var(--pill-green-ink); border: 1px solid #a9d8b8; }
 .gps-page .gps-result.bad { background: #fde3df; color: #a8321f; border: 1px solid #f0b4aa; }
 .gps-page .gps-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 16px; }
 
@@ -925,7 +925,7 @@ table.otr-fuel { width: 560px; margin-top: 14px; }
 /* Driver Scorecard */
 .sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
 .sc.g-A { background: #e3f3e8; color: #1c6b3a; } .sc.g-B { background: #e6f0fb; color: #1d5b91; }
-.sc.g-C { background: #fff4d6; color: #8a5a00; } .sc.g-D { background: #fde8e8; color: #b42318; }
+.sc.g-C { background: #fff4d6; color: #8a5a00; } .sc.g-D { background: var(--pill-red-bg); color: var(--pill-red-ink); }
 .sc-board td.sc-ok { color: #1c6b3a; } .sc-board td.sc-bad { color: #b42318; font-weight: 700; }
 .sc-board td small, .sc-board th small { display: block; font-size: 16px; font-weight: 600; }
 .sc-board th.later, .sc-board td.later { color: #9aa9b8; }
@@ -1867,3 +1867,21 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .fleet-page .head .tabs { grid-auto-columns: auto; }
 .fleet-page .head .tabs button { padding: 0 16px; }
 .fleet-page .head .title { min-width: 400px; }
+/* Review item 83 (Joe 10/13): the status-pill colours and the pop-up backdrop were each written about six times across the
+   style sheets. Each colour pair is written once here and every pill points at it (Issues, GPS, Shift Notes, Plant Maintenance,
+   Line Targets, the line board, Safety); each pill keeps its own size and shape. */
+:root {
+  --pill-green-bg: #e3f4e8; --pill-green-ink: #1d6b37;
+  --pill-good-bg: var(--runs-bg); --pill-good-ink: var(--runs-ink);
+  --pill-amber-bg: #fff1dc; --pill-amber-ink: #8a5200;
+  --pill-warn-bg: #fdecc4; --pill-warn-ink: #8a5a00;
+  --pill-red-bg: #fde8e8; --pill-red-ink: #b42318;
+  --pill-blue-bg: var(--band); --pill-blue-ink: var(--ud-blue);
+  --pill-gray-bg: #eef2f5; --pill-gray-ink: #6b7c8c;
+  --pop-backdrop: rgba(10, 30, 50, .45);
+}
+/* One pop-up backdrop: it covers the whole window and dims the screen behind. Each pop-up keeps its own stacking and how it
+   centres its box (admin-pages.css, plant.css, returns.html). The Daily-style pop-ups (.modal-back under .modal) keep their
+   lighter dim. */
+.modal-back, .ap-modal, .manager-page .mc-modal, .products-page .pm-edit-back, .returns-page .rt-modal { position: fixed; inset: 0; background: var(--pop-backdrop); }
+.modal-back { background: #0b1f3366; }

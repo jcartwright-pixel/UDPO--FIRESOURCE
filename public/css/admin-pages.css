@@ -85,7 +85,7 @@
 @media (max-width: 1500px) { .ap-split { grid-template-columns: 1fr 1fr; } .ap-link { grid-template-columns: 1fr; } }
 @media print { .ap-noprint { display: none !important; } }
 /* Pop-ups (Add Person, a person's access, Add Role). */
-.ap-modal { position: fixed; inset: 0; z-index: 50; background: rgba(11, 30, 50, .45); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.ap-modal { z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .ap-modal[hidden] { display: none; }
 .ap-modal-box { width: min(980px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; gap: 8px; background: #fff; border-radius: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, .3); padding: 14px; }
 .ap-modal-box .ap-card { flex: 1; min-height: 0; border: 0; padding: 0; background: #fff; }
