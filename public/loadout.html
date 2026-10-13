@@ -42,6 +42,7 @@
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span id="copied">Saves stay in the new app's test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <div class="notice warning over-limit" id="over-limit" hidden></div>
     <div class="view">
       <div class="areas" id="areas"></div>
       <div class="strip" id="strip"></div>
@@ -157,6 +158,7 @@
     // Today and the coming days (the operating day rolls at 6 AM); prior-day loads keep their place on top. On every loadout
     // (Case, Totes, Boxes, Tanker), every load of the day, an added one too; a past day stays as loaded.
     const canOrder = () => canLoad() && date >= today();
+    const LOAD_LIMIT = { CASE: 2, BOXING: 3 };
     const orderRows = (rows) => rows.filter(r => !r.prior && r.loadDate === date);
     // A skipped load and a load already loaded do not move (no line to drag); the others move around them, which keep their places.
     let heldMove = null;
@@ -179,6 +181,10 @@
         return '<button type="button" class="area' + (a === area ? ' on' : '') + '" data-area="' + a + '" style="--area:' + P.AREA[a].color + '">' +
           '<span class="ring" style="--p:' + pct + '"><b>' + ac.done + '/' + ac.total + '</b></span><span><strong>' + P.AREA[a].tile + '</strong><small>' + ac.done + ' loaded · ' + (ac.total - ac.done) + ' to load</small></span></button>';
       }).join('');
+      // Heads-up when more loads are loading than the loadout's limit (a manager went past it); paused loads do not count.
+      const limit = LOAD_LIMIT[area], nowLoading = rows.filter(r => r.state === 'LOADING' && !r.paused).length, over = document.getElementById('over-limit');
+      over.hidden = !(limit && nowLoading > limit);
+      over.textContent = over.hidden ? '' : nowLoading + ' loading, over the limit of ' + limit + '. Finish or pause one when you can.';
       drawTrailers(rows);
       const pk = P.withNotePickups(all, pickups);
       const pu = rows.flatMap(r => P.pickupsFor(r, pk)), puOpen = pu.filter(P.pickupOpen).length;
@@ -187,6 +193,7 @@
         '<span><b>' + c.done + ' of ' + c.total + '</b> loaded <span class="bar"><i style="width:' + pct + '%"></i></span></span>' +
         '<span class="' + (c.prior ? 'amber' : '') + '">Left over <b>' + c.prior + '</b></span>' +
         '<span class="' + (c.loading ? 'amber' : '') + '">Loading <b>' + c.loading + '</b></span>' +
+        (c.paused ? '<span>Paused <b>' + c.paused + '</b></span>' : '') +
         '<span>' + escapeHtml(info.label) + ' <b>' + c.quantity.toLocaleString() + '</b></span>' +
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
@@ -208,7 +215,7 @@
         }
         const st = r.state, items = P.pickupsFor(r, pk), open = items.filter(P.pickupOpen).length;
         const puBtn = '<button type="button" class="pu ' + (open ? 'open' : items.length ? 'done' : '') + '" data-pu="' + r.id + '">' + (open ? 'P/U<i>' + open + '</i>' : items.length ? 'Completed' : 'P/U') + '</button>';
-        const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
+        const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : r.paused ? '&#10073;&#10073; Paused' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
         const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : k === 'truck' ? ' list="lo-trucks" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
         const mins = P.minutesTaken(r);
         const skip = isSkipped(r), skipBtn = edit && st !== 'DONE' && st !== 'LOADING' && !skip ? '<button type="button" class="skip" data-skip="' + r.id + '" title="Skip for now and come back to it">Skip</button>' : '';
@@ -307,7 +314,8 @@
       Object.keys(shown).forEach(k => { p[k] = shown[k]; (p._by = p._by || {})[k] = mine; });
       render();
       try {
-        await save('savePlantLoad', { runDocId: row.runDocId, day: row.day, fields });
+        // Joe 10/13: a manager may load past the limit here (the server checks the person; Plant Station tablets stay limited).
+        await save('savePlantLoad', { runDocId: row.runDocId, day: row.day, fields, overLimit: true });
         showError('');
       } catch (e) {
         showError(row.route + ' ' + row.run + ': ' + (e.message || e));

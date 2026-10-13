@@ -104,6 +104,27 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
     await cs.close();
     results.push('Case Loadout: 2 loads at a time; a third is refused on its card; Pause needs a reason; a paused load does not count; Resume needs room');
 
+    // Joe 10/13: a manager on the Loadout Center may go past the limit (the station above, signed in as the same manager,
+    // stays limited); a heads-up line says so.
+    const lo = await openPage(browser, 1536, 864, '/loadout.html' + MANAGER + '&area=CASE', clock);
+    await lo.waitForSelector('#rows [data-state]');
+    assert.ok(await lo.$eval('#over-limit', e => e.hidden), 'no heads-up at the limit');
+    assert.equal((await lo.textContent('#rows [data-state="2026-10-04__run_p808|fri"]')).trim(), '\u2759\u2759 Paused', 'the paused load shows as Paused, not Loading');
+    const wait = await lo.$eval('#rows', box => [...box.querySelectorAll('button.state')].find(b => !b.disabled && !/loading|done|paused/.test(b.className)).dataset.state);
+    await lo.click('#rows [data-state="' + wait + '"]');
+    await lo.click('#state-pop [data-s="LOADING"]');
+    await lo.waitForSelector('#over-limit:not([hidden])', { timeout: 10000 });
+    assert.equal(await lo.textContent('#over-limit'), '3 loading, over the limit of 2. Finish or pause one when you can.');
+    assert.ok(parseFloat(await lo.$eval('#over-limit', e => getComputedStyle(e).fontSize)) >= 16);
+    const [wRun, wDay] = wait.split('|');
+    for (let i = 0; i < 100 && !(await db().collection('runs').doc(wRun).get()).data().days[wDay].plantStartedAt; i++) await new Promise(r => setTimeout(r, 100));
+    assert.ok((await db().collection('runs').doc(wRun).get()).data().days[wDay].plantStartedAt, 'the manager\'s start saved');
+    assert.ok(await lo.$eval('#error', e => e.hidden), 'no refusal for the manager');
+    await shot(lo, 'loadout-over-limit-1536.png');
+    assert.deepEqual(lo.errors, []);
+    await lo.close();
+    results.push('Loadout Center: a manager may start a third Case load; the heads-up says "3 loading, over the limit of 2"');
+
     const page = await openPage(browser, 1024, 768, '/plant-station.html' + MANAGER, clock, true);
     await page.waitForSelector('[data-station="BOXING"]');
     await page.click('[data-station="BOXING"]');

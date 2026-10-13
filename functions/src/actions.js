@@ -448,6 +448,7 @@ function validate(input) {
   return out;
 }
 
+const MANAGER_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER', 'SUPERVISOR'];
 async function requireSaver(tx, db, user, roles, action) {
   // A Plant Station signed in by its code alone (index.js checked its station): only the plant-floor saves.
   if (user && user.station) {
@@ -642,7 +643,9 @@ async function applyAction(db, user, input, now) {
       return Object.assign({}, prior.result, { repeated: true });
     }
     const mode = await requireTestMode(tx, db, spec.screen);
-    await requireSaver(tx, db, user, spec.roles, req.action);
+    const person = await requireSaver(tx, db, user, spec.roles, req.action);
+    // Joe 10/13: managers may load past the loadout's limit from the Loadout Center; a Plant Station tablet never can.
+    req.manager = !(user && user.station) && L.hasRole(person, MANAGER_ROLES);
 
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderPlantLoads') {

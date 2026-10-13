@@ -214,11 +214,13 @@ function validateLoad(input, SaveError) {
     if (out.trailer && !/^[A-Z0-9-]{1,20}$/.test(out.trailer)) throw new SaveError('BAD_REQUEST', 'Enter one trailer number: letters, numbers and dashes only.');
     out.assign = true;
   }
+  // The Loadout Center asks to load past the limit; only a manager's save gets it (loadValues).
+  if (input.overLimit === true && !out.assign) out.overLimit = true;
   return out;
 }
 
 // Joe 10/12: how many loads one loadout may load at the same time. A paused load does not count; starting or resuming one
-// past the limit is refused, so two tablets cannot get around it.
+// past the limit is refused, so two tablets cannot get around it. Joe 10/13: a manager on the Loadout Center may go past it.
 const LOADING_LIMIT = Object.freeze({ CASE: 2, BOXING: 3 });
 const runAreaOf = (run) => areaOf(text(run && run.loadType) || (run && run.masterShow && run.masterShow.loadType) || '');
 // A day block is loading now: started (or marked Loading), not paused, not done.
@@ -284,7 +286,7 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   if (status) after.loadStatus = status;
   // Starting or resuming a load (it was not loading and now is): the area's limit.
   const nowLoading = dayLoadingNow(Object.assign({}, day, after));
-  if (nowLoading && !wasLoading && LOADING_LIMIT[runAreaOf(run)]) overLimit(runAreaOf(run), await loadingNow(tx, db, runAreaOf(run), stamp, run.id + '|' + req.day), SaveError);
+  if (nowLoading && !wasLoading && LOADING_LIMIT[runAreaOf(run)] && !(f.overLimit && req.manager)) overLimit(runAreaOf(run), await loadingNow(tx, db, runAreaOf(run), stamp, run.id + '|' + req.day), SaveError);
   if (f.truck !== undefined || f.trailer !== undefined) {
     const equipment = (await tx.get(db.collection('equipment'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
     [['truck', 'TRUCK', 'truckId'], ['trailer', 'TRAILER', 'trailerId']].forEach(([k, type, idField]) => {
