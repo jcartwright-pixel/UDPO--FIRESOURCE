@@ -1610,19 +1610,14 @@ span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-
 body.deciding #screen { visibility: hidden; }
 
 /* Daily Dispatch (Joe 10/12): a manager grabs the line itself with the hand and drags it up or down; no grab dots, no arrows.
-   The row being moved is shaded; a blue line shows where it lands. */
+   The row being moved is shaded; a blue line shows where it lands (js/row-drag.js, review item 75). */
 body.daily-look table.daily tr.mover td { cursor: grab; }
 body.daily-look table.daily tr.mover td button, body.daily-look table.daily tr.mover td input, body.daily-look table.daily tr.mover td select { cursor: pointer; }
-body.daily-look table.daily tr.dragging td { background: #e8f1fa !important; }
-body.daily-look table.daily tr.drop-before td { box-shadow: inset 0 3px 0 #1f6feb; }
-body.daily-look table.daily tr.drop-after td { box-shadow: inset 0 -3px 0 #1f6feb; }
+body.daily-look table.daily tr.row-dragging td { background: #e8f1fa !important; }
 /* Weekly Dispatch: the same grab-and-drag (Joe 10/12). A finger drags from the Route or Run box; the rest of the line scrolls. */
 .weekly-page #rows tr.mover td { cursor: grab; }
-.weekly-page #rows tr.dragging td { background: #e8f1fa !important; }
-.weekly-page #rows tr.drop-before td { box-shadow: inset 0 3px 0 #1f6feb; }
-.weekly-page #rows tr.drop-after td { box-shadow: inset 0 -3px 0 #1f6feb; }
+.weekly-page #rows tr.row-dragging td { background: #e8f1fa !important; }
 .weekly-page #rows tr.mover td:nth-child(-n+2), body.daily-look table.daily tr.mover td:nth-child(-n+2) { touch-action: none; }
-body.dd-dragging, body.dd-dragging * { cursor: grabbing !important; user-select: none; }
 
 /* Truck Issues at 1920 with Windows display scaling (Joe 10/11): Reviewed, Emailed and Garage give up a little width so every
    Work Actions button, the ✕ included, shows whole, and the top row shrinks the search box instead of running off the edge. */
