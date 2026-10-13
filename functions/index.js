@@ -101,6 +101,8 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
 exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
   const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
   if (project !== 'ud-distribution-sandbox') return;
+  // Joe 10/13: his OTR runs ticked in OTR Routes Setup, from his workbook against Route Master.
+  await require('./src/otr-seed').seedOtrRoutesOnce(db);
   await require('./src/otr-seed').seedOtrOnce(db);
 });
 

@@ -16,6 +16,8 @@
   <link rel="stylesheet" href="css/stations.css">
   <script src="js/logic.js"></script>
   <script src="js/board-rules.js"></script>
+  <!-- Joe 10/13: with no signal the station opens from the tablet and shows the last board it had (js/offline-saves.js). -->
+  <script>window.UD_OFFLINE = true;</script>
 </head>
 <body class="fill phone ds-page">
   <div class="signin" id="signin" hidden>
@@ -63,6 +65,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer } from './js/app.js';
+    import { startOffline } from './js/offline-saves.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as W from './js/weather.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
@@ -116,7 +119,7 @@
         wr.innerHTML = body || '<tr><td colspan="8" class="empty">No weekly driver assignments are available.</td></tr>';
         if (tv && body && overflows('week-scroll')) wr.innerHTML = body + '<tr class="ds-band end"><td colspan="8">&#9632; END OF LIST</td></tr><tr class="ds-band start"><td colspan="8">&#9660; START OF LIST</td></tr>' + body;
       }
-      document.getElementById('foot').textContent = 'Uniontown · Updated ' + (updated || new Date()).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' · ' + rows.length + ' route' + (rows.length === 1 ? '' : 's') + ', ' + B.remaining(rows) + ' not loaded · UNITED DAIRY ▪ QUALITY MILK & ICE CREAM PRODUCTS';
+      document.getElementById('foot').textContent = 'Uniontown · ' + (navigator.onLine ? 'Updated ' : 'No signal · last board from ') + (updated || new Date()).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' · ' + rows.length + ' route' + (rows.length === 1 ? '' : 's') + ', ' + B.remaining(rows) + ' not loaded · UNITED DAIRY ▪ QUALITY MILK & ICE CREAM PRODUCTS';
     }
 
     // TV: both lists roll on their own when they are longer than the screen (1 px every 45 ms and 50 ms, as on the old TV).
@@ -192,6 +195,15 @@
     document.getElementById('tv-exit').hidden = !full;
     document.getElementById('tv-exit').addEventListener('click', async () => { if (await leave()) location.replace(location.pathname); });
 
+    // The time the board last came from the server (kept on the tablet), not when it was read from the tablet with no signal.
+    function lastLive(s) {
+      try {
+        if (!s.metadata.fromCache) { localStorage.setItem('udBoardLive', String(Date.now())); return new Date(); }
+        const t = Number(localStorage.getItem('udBoardLive')); return t ? new Date(t) : updated;
+      } catch (e) { return new Date(); }
+    }
+    window.addEventListener('online', () => render()); window.addEventListener('offline', () => render());
+    startOffline(['driver-station.html'], { scopes: ['driver-station'], device: 'tablet', files: [] });
     requireSignIn(async () => {
       const { db } = await start();
       await gate().catch(err => showError('Could not check this kiosk\'s code: ' + (err.message || err)));
@@ -202,7 +214,7 @@
       }, 300000);
       const week = L.weekStart(date), err = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       // The board updates the moment Dispatch or the plant saves (no 10-minute wait).
-      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', [week, L.addDays(week, 7)])), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); updated = new Date(); render(); }, err('the loads'));
+      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', [week, L.addDays(week, 7)])), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); updated = lastLive(s); render(); }, err('the loads'));
       onSnapshot(collection(db, 'pickups'), s => { pickups = s.docs.map(d => d.data()); render(); }, err('the pickups'));
       onSnapshot(collection(db, 'drivers'), s => { drivers = s.docs.map(d => d.data()); render(); }, err('the drivers'));
       setInterval(render, 60000);

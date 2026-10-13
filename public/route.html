@@ -62,6 +62,8 @@
     <div class="drv-menu"><button type="button" id="to-board" class="drv-card blue"><b>View Loadout</b><small>Read-only route list and loadout status</small></button>
       <button type="button" id="to-dvir" class="drv-card gold"><b>DVIR</b><small>Driver vehicle inspection report</small></button></div>
     <div class="phone-days" id="days"></div>
+    <!-- Joe 10/13 (the old Check-In's managers' switch): a manager signed in on this phone sees every route of the day. -->
+    <button type="button" id="all-routes" class="phone-all" hidden aria-pressed="false">All routes</button>
     <div id="loads"></div>
   </section>
 
@@ -88,11 +90,12 @@
           <label class="ci-wide">Which store<input name="osStore" maxlength="120" data-voice></label>
         </div>
       </div>
-      <label class="wide">Refused / returned product<input name="refusedReturned" maxlength="200" placeholder="e.g. 2 cs 2% gal" data-voice></label>
+      <!-- Joe 10/13 (as the old Check-In): a checkbox in front of each issue; the write-up box stays. Typing ticks it. -->
+      <div class="wide ci-issue"><label class="check"><input type="checkbox" data-issue="refusedReturned refusedReturnedSource"> Refused / returned product</label><input name="refusedReturned" aria-label="Refused / returned product" maxlength="200" placeholder="e.g. 2 cs 2% gal" data-voice></div>
       <label class="wide">Which store<input name="refusedReturnedSource" maxlength="200" data-voice></label>
-      <label class="wide">Truck problems<input name="tractorIssues" maxlength="300" data-voice></label>
-      <label class="wide"><span><span class="ci-t1">Trailer</span> problems</span><input name="trailerIssues" maxlength="300" data-voice></label>
-      <label class="wide">Pallet jack problems<input name="palletJackIssues" maxlength="300" data-voice></label>
+      <div class="wide ci-issue"><label class="check"><input type="checkbox" data-issue="tractorIssues"> Truck problems</label><input name="tractorIssues" aria-label="Truck problems" maxlength="300" data-voice></div>
+      <div class="wide ci-issue"><label class="check"><input type="checkbox" data-issue="trailerIssues"> <span><span class="ci-t1">Trailer</span> problems</span></label><input name="trailerIssues" aria-label="Trailer problems" maxlength="300" data-voice></div>
+      <div class="wide ci-issue"><label class="check"><input type="checkbox" data-issue="palletJackIssues"> Pallet jack problems</label><input name="palletJackIssues" aria-label="Pallet jack problems" maxlength="300" data-voice></div>
       <label class="check wide"><input type="checkbox" name="trailerNeedsCleaned"> <span><span class="ci-t1">Trailer</span> needs cleaned</span></label>
       <label class="wide">Notes<input name="checkinNotes" maxlength="500" data-voice></label>
     </div>
@@ -140,6 +143,7 @@
   <script type="module">
     import { start, escapeHtml, shortDate, showError, isUnitedDairy } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+    import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { addSpeak } from './js/speak.js';
     import { askRelease, lockStation } from './js/station-code.js';
     import { startQueue, send, waiting, onChange, keepRead, lastRead, isNoSignal } from './js/phone-queue.js';
@@ -211,16 +215,17 @@
         return step('step-name');
       }
       if (want === 'dvir') return openDvir();
-      const r = await call('loads', { driverId, date });
-      date = r.date; dates = r.dates; loads = r.loads; driverName = r.driver; store.set('driverName', driverName);
+      const r = await call('loads', { driverId: allRoutes ? 'skip' : driverId, date });
+      date = r.date; dates = r.dates; loads = r.loads; if (!allRoutes) { driverName = r.driver; store.set('driverName', driverName); }
       if (r.units) { const dl = (id, list) => { document.getElementById(id).innerHTML = list.map(u => '<option value="' + escapeHtml(u) + '">').join(''); }; units = r.units; dl('dl-trucks', units.trucks); dl('dl-trailers', units.trailers); dl('dl-jacks', units.jacks); }
       document.getElementById('who').textContent = driverName;
       document.getElementById('days').innerHTML = dates.map((d, i) => '<button type="button" data-date="' + d + '" class="' + (d === date ? 'on' : '') + '">' + (i ? 'Yesterday ' : 'Today ') + escapeHtml(shortDate(d)) + '</button>').join('');
-      const skip = driverId === 'skip';
+      const skip = driverId === 'skip' || allRoutes;
+      showAllRoutes();
       // A Check-In saved on this phone with no signal shows as saved here until it is sent.
       const onPhone = new Set((await waiting()).filter(e => e.op === 'checkIn' && !e.refused).map(e => e.input.runDocId + '|' + e.input.day));
       const state = (l) => onPhone.has(l.runDocId + '|' + l.day) ? ['queued', 'Saved on phone'] : l.checkinCompletedAt ? ['done', 'Checked in'] : ['', 'Check In'];
-      document.getElementById('loads').innerHTML = (skip && loads.length ? '<p class="phone-empty">Pick your route to check in.</p>' : '') + loads.map((l, i) => '<button type="button" class="phone-load ' + state(l)[0] + '" data-i="' + i + '"><b>' + escapeHtml(l.route) + '</b> ' + escapeHtml(l.run) +
+      document.getElementById('loads').innerHTML = (driverId === 'skip' && loads.length ? '<p class="phone-empty">Pick your route to check in.</p>' : '') + loads.map((l, i) => '<button type="button" class="phone-load ' + state(l)[0] + '" data-i="' + i + '"><b>' + escapeHtml(l.route) + '</b> ' + escapeHtml(l.run) +
         '<small>' + escapeHtml([skip && l.driver, (l.checkinTruck || l.truck) && 'Truck ' + (l.checkinTruck || l.truck), (l.checkinTrailer || l.trailer) && 'Trailer ' + (l.checkinTrailer || l.trailer)].filter(Boolean).join(' · ')) + '</small><span>' + state(l)[1] + '</span></button>').join('') ||
         '<p class="phone-empty">Dispatch has no load for you on this day.</p>';
       step(open === null ? 'step-loads' : 'step-form');
@@ -247,6 +252,7 @@
       f.elements.osProduct.value = os ? os[3] || '' : l.overageShortageDetails || '';
       f.elements.osStore.value = os && os[4] || '';
       osShow();
+      issuesShow();
     }
 
     /* ---------- Check-In: units, drop and hook, over / short ---------- */
@@ -286,6 +292,19 @@
       return [f.querySelector('[name=osKind]:checked').value + (cases ? ' ' + cases + ' cs' : ''), product, storeName && 'Store: ' + storeName].filter(Boolean).join(' · ');
     }
     addSpeak(ciForm);
+    // Joe 10/13: each issue's checkbox goes with its write-up: typing (or Speak) ticks it, unticking empties it, and a ticked
+    // issue needs its write-up before Check In.
+    const issueBoxes = [...ciForm.querySelectorAll('[data-issue]')], issueNames = (b) => b.dataset.issue.split(' ');
+    function issuesShow() { issueBoxes.forEach(b => { b.checked = issueNames(b).some(n => ciForm.elements[n].value.trim()); }); }
+    ciForm.addEventListener('input', e => { const b = issueBoxes.find(x => issueNames(x).indexOf(e.target.name) >= 0); if (b && e.target.value.trim()) b.checked = true; });
+    issueBoxes.forEach(b => b.addEventListener('change', () => {
+      if (b.checked) ciForm.elements[issueNames(b)[0]].focus();
+      else issueNames(b).forEach(n => { ciForm.elements[n].value = ''; });
+    }));
+    function issueMissing() {
+      const b = issueBoxes.find(x => x.checked && !ciForm.elements[issueNames(x)[0]].value.trim());
+      return b ? 'Write what the ' + b.closest('label').textContent.trim().toLowerCase().replace(/ problems$/, ' problem is').replace(/^refused \/ returned product$/, 'refused or returned product is') + '.' : '';
+    }
 
     // An error also shows under the Check In button when the form is open, where the driver is looking.
     const sendError = (m) => { const p = document.getElementById('send-error'); p.textContent = m || ''; p.hidden = !m || document.getElementById('step-form').hidden; };
@@ -335,6 +354,8 @@
     document.getElementById('step-form').addEventListener('submit', run(async () => {
       const f = document.getElementById('step-form'), l = loads[open], fields = {};
       ['casesDelivered', 'driverCaseReturn', 'refusedReturned', 'refusedReturnedSource', 'tractorIssues', 'trailerIssues', 'palletJackIssues', 'checkinNotes'].forEach(k => { fields[k] = f.elements[k].value.trim(); });
+      const missing = issueMissing();
+      if (missing) throw new Error(missing);
       fields.trailerNeedsCleaned = f.elements.trailerNeedsCleaned.checked;
       fields.overageShortage = f.elements.overageShortage.checked; fields.overageShortageDetails = osText();
       fields.truck = f.elements.truck.value.trim(); fields.trailer = f.elements.trailer.value.trim(); fields.palletJack = f.elements.palletJack.value.trim();
@@ -343,10 +364,32 @@
       const btn = document.getElementById('send');
       btn.disabled = true;
       // No signal: kept on the phone and sent when the signal is back (the same requestId, so it is saved once).
-      try { await send('checkIn', withWho('checkIn', { driverId, runDocId: l.runDocId, day: l.day, requestId, fields }), 'Check-In ' + l.route + ' ' + l.run); } finally { btn.disabled = false; }
+      try { await send('checkIn', withWho('checkIn', { driverId: allRoutes ? 'skip' : driverId, runDocId: l.runDocId, day: l.day, requestId, fields }), 'Check-In ' + l.route + ' ' + l.run); } finally { btn.disabled = false; }
       open = null;
       await show();
     }));
+    // Joe 10/13 (the old Check-In's "All routes" for managers): someone signed in on this phone with a manager role
+    // (Administrator, Manager, Supervisor or Dispatcher) can switch between their name and every route of the day. The Driver
+    // Room Check-In Station never shows it.
+    const MANAGER_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER', 'SUPERVISOR', 'DISPATCHER'];
+    let allRoutes = false, manager = false;
+    function showAllRoutes() {
+      const b = document.getElementById('all-routes');
+      b.hidden = !manager || room || driverId === 'skip';
+      b.textContent = allRoutes ? 'My name only' : 'All routes';
+      b.setAttribute('aria-pressed', String(allRoutes));
+      b.classList.toggle('on', allRoutes);
+    }
+    if (!room) start().then(async ({ auth, db }) => {
+      await auth.authStateReady();
+      const u = auth.currentUser;
+      if (!isUnitedDairy(u)) return;
+      const p = (await getDoc(doc(db, 'users', String(u.email).toLowerCase()))).data() || {};
+      const key = (r) => String(r || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+      manager = String(p.status || '').trim().toUpperCase() === 'ACTIVE' && (p.roles || []).some(r => MANAGER_ROLES.indexOf(key(r)) >= 0);
+      showAllRoutes();
+    }).catch(() => {});
+    document.getElementById('all-routes').addEventListener('click', run(async () => { allRoutes = !allRoutes; await show(); }));
     document.getElementById('m-board').addEventListener('click', () => { want = 'board'; show().catch(err => showError(err.message)); });
     document.getElementById('m-dvir').addEventListener('click', run(async () => { want = 'dvir'; await show(); }));
     document.getElementById('m-checkin').addEventListener('click', run(async () => { want = 'checkin'; await show(); }));

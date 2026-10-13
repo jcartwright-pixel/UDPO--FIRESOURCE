@@ -725,7 +725,17 @@ export function savePill(state) {
   clearTimeout(pillTimer);
   if (state === 'saved') pillTimer = setTimeout(() => { pill.hidden = true; }, 4000);
 }
+// Joe 10/13: a station screen (window.UD_STATION_OFFLINE: the Plant Station) keeps a save made with no signal on the tablet
+// and sends it once when the signal is back (js/offline-saves.js); saveNow always sends at once.
 export async function save(action, fields) {
+  if (window.UD_STATION_OFFLINE) {
+    const out = await (await import('./offline-saves.js')).offlineSave(action, fields);
+    if (out && out.queued) savePill('saved');
+    return out;
+  }
+  return saveNow(action, fields);
+}
+export async function saveNow(action, fields) {
   if (window.UD_EDIT_PILL) return callServer('save', Object.assign({ action }, fields));
   if (!saving) saveFailed = false;
   saving++; savePill('saving');
