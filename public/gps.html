@@ -65,7 +65,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer, dateTimeText, serverText } from './js/app.js';
 
     let s = null, armed = null;
     const $ = (id) => document.getElementById(id);
@@ -88,7 +88,8 @@
       showError('');
       if (button) button.disabled = true;
       try { s = await callServer('gps', fields); render(); return s; }
-      catch (e) { showError('Could not reach the GPS settings (' + (e.message || String(e)) + '). Check the network and try again.'); if (!s) { $('state').textContent = 'Unknown'; $('state').className = 'pill warn'; } return null; }
+      // Review item 55 (Joe 10/13): the plain sentence, without the raw "(internal [0])" in it.
+      catch (e) { showError(serverText(e, 'the GPS settings')); if (!s) { $('state').textContent = 'Unknown'; $('state').className = 'pill warn'; } return null; }
       finally { if (button) button.disabled = false; }
     }
     $('save').onclick = async () => {

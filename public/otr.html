@@ -111,7 +111,8 @@
       if (view === 'dash') {
         const dash = O.otrDashboard_(today, merged, todayCount, monthly), c = dash.costPerGallon;
         bar.innerHTML = '<span class="hint">' + escapeHtml(dash.todayLabel) + ' · ' + dash.monthToDate + ' OTR runs in ' + escapeHtml(dash.monthLabel) + '</span><span class="spacer"></span>' + (copied ? '<span class="hint">' + escapeHtml(copied) + '</span>' : '') +
-          '<button type="button" id="copy">Copy Daily Count</button><button type="button" class="primary" data-go="report">Month Recap</button><button type="button" data-go="routes">OTR Routes Setup</button>';
+          '<button type="button" id="copy">Copy Daily Count</button>';
+        // Review item 16 (Joe 10/13): no Month Recap and OTR Routes Setup buttons here; both are tabs right above.
         sheet.innerHTML = '<div class="otr-dash"><section class="otr-card"><h2>Today</h2><div class="otr-big">' + todayCount.total + '</div><p>OTR runs today</p>' +
           '<table class="issues"><thead><tr><th>Route</th><th>Run</th><th>Delivered By</th><th>Driver</th></tr></thead><tbody>' + (todayCount.runs.map(r => '<tr><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(byRun[r.route + '|' + r.run] || '') + '</td><td>' + escapeHtml(r.driver) + '</td></tr>').join('') || '<tr><td colspan="4" class="empty">No OTR runs today' + (list.some(r => r.include) ? '' : ': tick routes in OTR Routes Setup') + '.</td></tr>') + '</tbody></table></section>' +
           '<section class="otr-card"><h2>Cost Per Gallon' + (c ? ' · ' + escapeHtml(c.label) : '') + '</h2><div class="otr-big">' + (c ? cents(c.cpg) : '–') + '</div><p>' + (c ? (c.lastYearCpg != null ? 'Last year ' + cents(c.lastYearCpg) : 'No figures for last year') + (c.employeeCpg != null ? ' · Employee ' + cents(c.employeeCpg) : '') + (c.fuelCpg != null ? ' · Fuel ' + cents(c.fuelCpg) : '') : 'Type a month\'s delivery cost and gallons in Recap') + '</p>' +

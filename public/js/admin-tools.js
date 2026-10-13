@@ -151,7 +151,7 @@ export const WINDOWS = [
   ['Scheduler', 'scheduler.html', 'Live weeks'], ['Quality Checks', 'quality.html', 'Plant setup'], ['Temperatures', 'temps.html', 'MOCREO sensors'],
   ['Yard Check', 'yard.html', 'YARD CHECK'], ['Shift Notes', 'shiftnotes.html', 'App'], ['Manager Center', 'manager.html', 'Live weeks, PLANT_OPERATIONS'],
   ['Print Layouts', 'print.html', 'Live weeks'], ['Dispatch Settings', 'settings.html', 'App'], ['Product Sheet', 'products.html', 'App'],
-  ['MOCREO & Sensors', 'mocreo.html', 'App'], ['GPS Setup', 'gps.html', 'App'], ['Phone Screens', 'phone-screens.html', 'App'],
+  ['MOCREO & Sensors', 'mocreo.html', 'App'], ['GPS Setup', 'gps.html', 'App'],
   ['Driver Station', 'driver-station.html', 'Live weeks'], ['Plant Station', 'plant-station.html', 'Live weeks'], ['Garage Station', 'garage-station.html', 'GARAGE TECHNICIANS'],
   ['Plant Reports', 'reports.html', 'Live weeks, PLANT_OPERATIONS'], ['Plant Performance Kiosk', 'plant-kiosk.html', 'Live weeks, PLANT_OPERATIONS'],
   ['Mobile Route (phone)', 'route.html', 'Live weeks']

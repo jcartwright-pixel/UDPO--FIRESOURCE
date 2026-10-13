@@ -96,7 +96,8 @@
     function rangeTitle() {
       const r = range();
       if (view === 'history') return 'Receiving History';
-      if (view === 'month') return at(date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      // Review item 60 (Joe 10/13): the month reads Oct 26 (its 3-letter name and 2-digit year).
+      if (view === 'month') return at(date).toLocaleDateString('en-US', { month: 'short' }) + ' ' + String(at(date).getFullYear()).slice(-2);
       if (view === 'week') return shortDate(r.start) + ' – ' + shortDate(r.end);
       return L.dayName(date) + ' ' + shortDate(date);
     }

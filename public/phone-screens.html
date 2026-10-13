@@ -26,43 +26,21 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Phone Screens</h1><small>Every phone, tablet and kiosk screen, to try from this computer. Each one looks the same here as on the phone, tablet or kiosk.</small></div>
+      <div class="title"><h1>Phone Screens</h1></div>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <!-- Review item 54 (Joe 10/13): this page listed the same links as Administration > Links & Codes, so the list is gone and
+         the page (kept so an old bookmark still lands somewhere) points there in one line. -->
     <div class="view">
-      <div class="pss" id="list"></div>
+      <p class="pss-moved">Every phone, tablet and kiosk link is in <a id="links" href="administration.html?item=app-links">Administration &rsaquo; Links &amp; Codes</a>.</p>
     </div>
   </div>
 
   <script type="module">
-    import { requireSignIn, escapeHtml } from './js/app.js';
-    // Joe 10/10: the phone and tablet screens, in one place, so they can be tried from a laptop.
-    const SCREENS = [
-      ['Phones', 'Driver Check-In', 'The drivers\' phone: Route Distribution code, then their name, then the loads to check in.', 'route.html'],
-      ['Phones', 'Driver View Loadout', 'The drivers\' phone: the read-only route list and loadout status.', 'route.html?view=loadout'],
-      ['Phones', 'Driver DVIR', 'The drivers\' phone: the driver vehicle inspection report.', 'route.html?view=dvir'],
-      ['Tablets', 'Garage Station', 'The garage tablet: technicians tap their name and login ID, then work their jobs.', 'garage-station.html'],
-      ['Tablets', 'Plant Station', 'The plant floor tablet: pick its station once, then Loading, Unloading, Washing and Returns.', 'plant-station.html'],
-      ['Tablets', 'Trailer Assignments', 'Trailer numbers for each load; also works on a phone.', 'trailers.html'],
-      ['Driver Room stations', 'Driver Station board', 'The driver board and weekly schedule.', 'driver-station.html'],
-      ['Driver Room stations', "Driver's Kiosk Station", 'The TV: rolling loadout, dispatch and weather, full screen, both lists roll.', 'driver-station.html?tv=1'],
-      ['Driver Room stations', 'Driver Room Check-In Station', 'The drivers\' tablet: View Loadout, DVIR and Check-In, like their phones.', 'route.html?room=1'],
-      ['Plant Performance kiosk and TV', 'Plant Performance Kiosk', 'Today\'s loadout live in big text: loaded, on time, behind, pickups, each department and what loads next.', 'plant-kiosk.html'],
-      ['Plant Performance kiosk and TV', 'Plant Performance TV', 'The same page full screen for a plant TV; the next-to-load list rolls.', 'plant-kiosk.html?tv=1']
-    ];
-    // Opened from Administration's panel, a screen still opens in the whole window, like on the phone.
-    document.getElementById('list').addEventListener('click', e => {
-      const a = e.target.closest('a[data-page]');
-      if (!a) return;
-      e.preventDefault();
-      (window.top || window).location.href = new URL(a.dataset.page, location.href).href;
-    });
-    requireSignIn(() => {
-      const groups = [...new Set(SCREENS.map(s => s[0]))];
-      document.getElementById('list').innerHTML = groups.map(g => '<h2>' + escapeHtml(g) + '</h2><div class="pss-grid">' +
-        SCREENS.filter(s => s[0] === g).map(([, name, what, page]) =>
-          '<a class="pss-card" href="' + page + '" data-page="' + page + '"><b>' + escapeHtml(name) + '</b><span>' + escapeHtml(what) + '</span><small>' + escapeHtml(location.origin + '/' + page) + '</small></a>').join('') + '</div>').join('');
-    });
+    import { requireSignIn } from './js/app.js';
+    const testEmail = new URLSearchParams(location.search).get('testEmail');
+    if (testEmail) document.getElementById('links').href += '&testEmail=' + encodeURIComponent(testEmail);
+    requireSignIn(() => {});
   </script>
 </body>
 </html>

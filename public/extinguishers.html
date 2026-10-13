@@ -59,7 +59,7 @@
     import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
     import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { today, thisMonth, monthName, pickPlant, plantName, canWalk, canSetUp, modeText, watchExtinguishers, watchSetup, fireNav } from './js/safety.js';
+    import { today, thisMonth, monthShort, pickPlant, plantName, canWalk, canSetUp, modeText, watchExtinguishers, watchSetup, fireNav } from './js/safety.js';
 
     // Fire Extinguishers (Joe 10/12, mock-ups E and F): each plant's extinguishers with this month's check (OSHA asks for a
     // monthly look at every one) and the annual service, 6-year and hydrostatic test dates, which turn amber 30 days out and
@@ -83,7 +83,7 @@
     function drawHead() {
       document.getElementById('mode-text').textContent = modeText(app);
       document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
-      document.getElementById('title').textContent = 'Fire Extinguishers · ' + monthName(month);
+      document.getElementById('title').textContent = 'Fire Extinguishers · ' + monthShort(month);
       const list = exts || [], st = list.map(stateOf);
       document.getElementById('counts').innerHTML = list.length + ' on the list · <b class="g">' + st.filter(m => m.state === 'GOOD').length + ' Good</b> · <b class="a">' + st.filter(m => m.state === 'DUE').length + ' Due</b> · <b class="r">' + st.filter(m => m.state === 'NOT_GOOD').length + ' Not good</b>';
       document.getElementById('start-check').hidden = !!checking || !list.length || !canWalk(person, app);

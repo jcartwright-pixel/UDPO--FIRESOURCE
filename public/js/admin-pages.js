@@ -102,9 +102,10 @@ export async function renderPeople(box) {
     '<button type="button" class="ap-btn" id="p-reload">Refresh</button>' +
     '<div class="ap-right"><input type="search" id="p-find" placeholder="Search name or email" aria-label="Search name or email"><select id="p-filter" aria-label="Show"><option value="all">All people</option><option value="ACTIVE">Enabled</option><option value="INACTIVE">Disabled</option></select></div></div>' +
     '<div class="ap-msg" hidden></div>' +
-    '<div class="ap-tiles"><div><b>Company sign-in</b><span>A verified United Dairy email can enter. Account roles determine access.</span></div><div><b>Administrator is assigned</b><span>A company email alone never grants administrator rights.</span></div>' +
-    '<div><b>Supplied codes are separate</b><span>Route Distribution phone and Garage Station codes do not require company email.</span></div></div>' +
-    '<div class="ap-scroll"><table class="issues adm-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Plants</th><th>Status</th></tr></thead><tbody id="people"></tbody></table></div>' +
+    // Review item 53 (Joe 10/13): the three info boxes (Company sign-in, Administrator is assigned, Supplied codes are separate)
+    // are gone, so the list starts right under the buttons. Review item 52: Email is wide and Plants and Status narrow, so an
+    // address never breaks mid-word (it may break only after the @).
+    '<div class="ap-scroll"><table class="issues adm-table people-table"><colgroup><col style="width:20%"><col style="width:36%"><col style="width:20%"><col style="width:13%"><col style="width:11%"></colgroup><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Plants</th><th>Status</th></tr></thead><tbody id="people"></tbody></table></div>' +
     '<p class="ap-note">Click a person to change or disable them. Disabled people stay visible; no account is deleted. Changes are written to the sandbox copy of the Users sheet.</p>' +
     '<div class="ap-modal" id="p-modal" hidden><div class="ap-modal-box" role="dialog" aria-modal="true" aria-label="Person"><div class="ap-msg" id="p-modal-msg" hidden></div><div class="ap-card" id="p-edit"></div></div></div>' +
     '<div class="ap-modal" id="r-modal" hidden><div class="ap-modal-box" role="dialog" aria-modal="true" aria-label="Add Role"><div class="ap-card" id="r-edit"></div></div></div></div>';
@@ -124,7 +125,7 @@ export async function renderPeople(box) {
     const q = find.trim().toLowerCase();
     const rows = data.people.filter(p => (filter === 'all' || p.status === filter) && (!q || (p.name + ' ' + p.email).toLowerCase().indexOf(q) >= 0))
       .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
-    $('#people').innerHTML = rows.map(p => '<tr data-email="' + e(p.email) + '"' + (sel && sel.email === p.email ? ' class="on"' : '') + '><td class="strong">' + e(p.name || p.email) + '</td><td>' + e(p.email) + '</td><td>' +
+    $('#people').innerHTML = rows.map(p => '<tr data-email="' + e(p.email) + '"' + (sel && sel.email === p.email ? ' class="on"' : '') + '><td class="strong">' + e(p.name || p.email) + '</td><td class="email">' + e(p.email).replace('@', '@<wbr>') + '</td><td>' +
       e(roleText(p.roles)) + '</td><td>' + e(plantsText(p)) + '</td><td><span class="pill ' + (p.status === 'ACTIVE' ? 'good' : 'muted') + '">' + (p.status === 'ACTIVE' ? 'Active' : p.status === 'INACTIVE' ? 'Disabled' : e(p.status || 'Unknown')) + '</span></td></tr>').join('') ||
       '<tr><td colspan="5" class="ap-empty">No matching people.</td></tr>';
   }
@@ -378,11 +379,11 @@ const APP_LINKS = [
   { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', short: 'The station\'s code, then each mechanic\'s login ID', opens: 'One link for every garage station. Once a garage station has a code (Stations, below), the tablet types it once; mechanics then tap their name and type their login ID.', shut: 'New code or Remove on the station; turn a mechanic off in Fleet Service.' },
   { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', short: 'Anyone with the Route Distribution code', opens: 'Drivers on their own phones: View Loadout, Check-In and DVIR. No company account needed.', shut: 'Turn Off stops the drivers\' phone link (UD sign-in links keep working). A new code makes every phone ask for it again.', code: true },
   { key: 'maint', title: 'Maintenance Station (plant machinery)', label: 'Maintenance tablet', path: 'maint-station.html', who: 'code', short: 'Each mechanic\'s name and login ID (Plant Maintenance is under construction)', opens: 'The plant machinery work orders and PMs, like the Garage Station: tap a work order, then your name and login ID.', shut: 'Turn a mechanic off in Fleet Service > Garage Technicians.' },
-  { key: 'screens', title: 'Phone Screens (try every screen)', label: 'Phone Screens', path: 'phone-screens.html', who: 'ud', short: 'Administrators, to try every phone, tablet and kiosk screen from this computer', opens: 'Every phone, tablet and kiosk screen with its link (Driver Check-In, Garage, Plant and Maintenance Station, Driver\'s Kiosk Station and Driver Room Check-In Station).', shut: 'Administrators only.' },
   { key: 'personal', title: 'Personal phone links', label: '', path: '', who: 'ud', short: 'One person, with their own link and UD sign-in', opens: 'One person\'s phone screens.', shut: 'Revoke in Access & QR Codes.', goto: 'access-codes' }
 ];
 
-const MANAGER_LINKS = ['company', 'phone', 'manager', 'personal', 'screens'];
+// Review item 54 (Joe 10/13): no Phone Screens card; it only listed these same links again.
+const MANAGER_LINKS = ['company', 'phone', 'manager', 'personal'];
 const PLANT_LINKS = ['plant', 'public'];
 const GARAGE_LINKS = ['garage', 'maint'];
 // Joe 10/12: the drivers like the plant: one Driver Station link, its stations right under it, then the drivers' phone link.

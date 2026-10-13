@@ -759,6 +759,13 @@ export function friendlyError(e) {
   if (code === 'internal' && /^internal$/i.test(msg)) return 'Something went wrong on the server. Try again; if it keeps happening, tell an administrator.';
   return msg;
 }
+// Review item 55 (Joe 10/13): a server call that fails with no message written for people (the bare "internal [0]") says so
+// in a plain sentence, naming what could not be reached; a message the server wrote for people (a check) shows as it is.
+export function serverText(e, what) {
+  const code = String(e && e.code || '').replace(/^functions\/|^firestore\//, ''), msg = String(e && e.message || e || '');
+  if (code === 'internal' || code === 'unknown' || /^(internal|unknown)\b/i.test(msg) || !msg) return 'Could not reach ' + what + '. Check the network and try again.';
+  return friendlyError(e);
+}
 
 // Any other server call that changes something (the per-screen switch): also one call with its own requestId.
 // Which saves the signed-in person may make, as the server decides (role, Role Templates and the person's Allow / Deny in

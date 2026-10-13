@@ -1781,3 +1781,13 @@ body.daily-look #delivers { display: none; }
   body.daily-look .head:has(#print-sheet) #week-begin { width: 84px; }
   body.daily-look .head:has(#print-sheet) #load-day { width: 112px; }
 }
+
+/* Review item 51 (Joe 10/13): the Administration side menu is words only (no icons); its words are 16px. */
+.adm-item { font-size: 16px; min-height: 38px; padding: 5px 12px; }
+/* Review item 52 (Joe 10/13): People & Roles' email never breaks mid-word (only after the @, when it must). */
+.people-table { table-layout: fixed; }
+.people-table td.email { overflow-wrap: normal; word-break: normal; }
+/* Review item 20 (Joe 10/13): a plant still being built is one short line under its title, not a tall empty box. */
+.co-plant.planned { align-self: start; }
+.co-plant.planned .co-soon { display: block; flex: none; min-height: 0; margin: 0; padding: 12px 18px; text-align: left; font-size: 16px; color: #5a6b7d; }
+.co-plant.planned .co-soon b { font-size: 16px; }
