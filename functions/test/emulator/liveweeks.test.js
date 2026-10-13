@@ -183,3 +183,18 @@ test('Show on the driver Route app switched in the Route Editor reaches the Curr
   assert.equal((await run('2026-10-11__run_t801')).displayMobileRoute, false);
 });
 
+
+test('a Route Editor "Run By" change stays in the app on the Live weeks: no coverage_owner cell, no sheet conflict (Joe 10/13, route 906)', async () => {
+  await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { coverageOwner: 'Marietta', displayMobile: false }, days: {} });
+  assert.equal((await run('2026-10-11__run_t801')).coverageOwner, 'Marietta', 'the app keeps Run By on the week row');
+  const out = await db().collection('outbox').get();
+  const live = out.docs.map(d => d.data()).filter(o => o.cells);
+  assert.ok(live.length, 'the save queued Live cells');
+  live.forEach(o => assert.equal(Object.prototype.hasOwnProperty.call(o.cells, 'coverage_owner'), false, 'no coverage_owner cell is sent to the sheet'));
+  await runWriteBack({ db: db(), sheets, target: { spreadsheetId: 'fake-live' }, now: NOW });
+  const conflicts = await db().collection('conflicts').get();
+  assert.deepEqual(conflicts.docs.map(d => d.data().problem || d.id), [], 'no sheet conflict');
+  const v = tabs["'LIVE NEXT WEEK'"], h = v[5], row = v.find((r, i) => i > 5 && r[h.indexOf('run_id')] === 'run_t801');
+  assert.equal(row[h.indexOf('display_mobile_route')], 'FALSE', 'the other cells of the save are still written');
+});
