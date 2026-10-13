@@ -62,6 +62,11 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     assert.equal(await p.$$eval('.adm-nav .adm-item svg, .adm-nav .adm-item img, .adm-nav .adm-ic', x => x.length), 0);
     assert.equal(await p.$('#view .ap-tiles'), null);
     assert.equal(await emailsWhole(p), true);
+    // Joe 10/13: typing "conflicts" in Find a setting finds Sheet Conflicts under Diagnostics.
+    await p.fill('#find', 'conflicts');
+    await p.waitForFunction(() => [...document.querySelectorAll('.adm-item')].map(x => x.dataset.key).join() === 'sheet-conflicts');
+    await p.fill('#find', '');
+    await p.waitForSelector('.adm-item[data-key="people"]');
     await shot(p, 'people-1920.png');
     await shot(p, 'people-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
 
