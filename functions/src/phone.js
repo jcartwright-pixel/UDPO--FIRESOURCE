@@ -12,6 +12,7 @@
 const crypto = require('crypto');
 const L = require('./logic');
 const M = require('./model');
+const FAILS = require('./fails');
 const A = require('./actions');
 const MAINT = require('./maintenance');
 const B = require('./board-rules');
@@ -32,12 +33,13 @@ async function newRouteCode(db, user, now) {
   await db.runTransaction(async tx => {
     const person = await tx.get(db.collection(C.users).doc(M.safeIdPart(String(user.email).toLowerCase())));
     if (!person.exists || person.data().status !== 'ACTIVE' || !L.hasRole(person.data(), L.REORDER_ROLES)) throw new SaveError('NOT_ALLOWED', 'Only a manager or administrator can make a new phone code');
-    tx.set(CODE_REF(db), { codeHash: hashCode(code, salt), salt, enabled: true, setAt: stamp, setBy: String(user.email).toLowerCase(), failed: { minute: '', count: 0 } });
+    tx.set(CODE_REF(db), { codeHash: hashCode(code, salt), salt, enabled: true, setAt: stamp, setBy: String(user.email).toLowerCase(), failedBy: {} });
   });
   return { code, setAt: stamp };
 }
 
-async function checkCode(db, code, stamp) {
+// Wrong codes count per device (fails.js): 30 in a minute locks out that phone only.
+async function checkCode(db, code, stamp, device) {
   const minute = stamp.slice(0, 16);
   return db.runTransaction(async tx => {
     const snap = await tx.get(CODE_REF(db));
@@ -45,11 +47,12 @@ async function checkCode(db, code, stamp) {
     // Where a manager turns it on now (Joe 10/11): Administration > Links & Codes > Driver Station Codes.
     if (!c || !c.codeHash) throw new SaveError('NOT_ALLOWED', 'Phone Check-In is not turned on yet. A manager makes the code in Administration > Links & Codes > Driver Station Codes (Generate Code) and gives it to the drivers.');
     if (c.enabled !== true) throw new SaveError('NOT_ALLOWED', 'Phone Check-In is turned off right now. A manager turns it back on in Administration > Links & Codes > Driver Station Codes (Turn On).');
-    const failed = c.failed && c.failed.minute === minute ? c.failed.count : 0;
+    const failedBy = FAILS.current(c.failedBy, f => f.minute === minute), failed = (failedBy[device] || {}).count || 0;
     if (failed >= MAX_FAILED_PER_MINUTE) throw new SaveError('NOT_ALLOWED', 'Too many wrong codes; wait a minute and try again');
     const given = Buffer.from(hashCode(code || '', c.salt), 'hex'), want = Buffer.from(c.codeHash, 'hex');
     if (!code || given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
-      tx.update(snap.ref, { failed: { minute, count: failed + 1 } });
+      failedBy[device] = { minute, count: failed + 1 };
+      tx.update(snap.ref, { failedBy });
       return false;
     }
     return true;
@@ -162,7 +165,7 @@ async function phoneCall(db, input, now) {
   if (input.station) {
     const r = roomStation(await STATIONS.check(db, 'KIOSK', input.station.key, input.station.version));
     if (!r.ok) throw new SaveError('NOT_ALLOWED', r.message + ' (station code)');
-  } else if (!(await checkCode(db, String(input.code || '').slice(0, 40), stamp))) throw new SaveError('NOT_ALLOWED', 'That code is not right. Ask Dispatch for the Route Distribution code.');
+  } else if (!(await checkCode(db, String(input.code || '').slice(0, 40), stamp, FAILS.who(input)))) throw new SaveError('NOT_ALLOWED', 'That code is not right. Ask Dispatch for the Route Distribution code.');
   if (op === 'roster') {
     const drivers = (await db.collection(C.drivers).get()).docs.map(d => d.data()).filter(d => d.name && L.driverActive(d));
     // Also the fill-in and carrier names on today's or yesterday's dispatch that are not on the roster, and the routes to pick instead of a name.

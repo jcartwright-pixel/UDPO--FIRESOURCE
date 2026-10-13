@@ -205,3 +205,53 @@ for (const [name, save] of [
     assert.deepEqual([day.driver, day.truck, day.trailer], ['', '', ''], 'the driver, truck and trailer are free that day');
   });
 }
+
+// Review item 64 (Joe 10/13): the on-save pass and the every-minute pass can run at the same time.
+test('two write-back passes at once: each save is claimed by one pass only and written once', async () => {
+  await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: '2026-10-04__run_t802', day: 'tue', driverId: 'drv_test_adams' });
+  const slow = Object.assign({}, sheets, { batchGet: async (...a) => { await new Promise(r => setTimeout(r, 300)); return sheets.batchGet(...a); } });
+  const [a, b] = await Promise.all([runWriteBack({ db: db(), sheets: slow, target: SANDBOX, now: tick }), runWriteBack({ db: db(), sheets: slow, target: SANDBOX, now: tick })]);
+  assert.equal(a.items + b.items, 1, 'one pass took the save, the other found nothing to do');
+  assert.equal(sheets.writes.length, 1);
+  assert.equal(cellOf('run_t802', 'tue_driver'), 'ADAMS, PAT');
+  const left = (await db().collection('outbox').get()).docs.map(d => d.data().status);
+  assert.deepEqual(left, ['done']);
+});
+
+test('a sheet write that fails puts the claimed saves back to wait for the next pass', async () => {
+  await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: '2026-10-04__run_t802', day: 'tue', driverId: 'drv_test_adams' });
+  const broken = Object.assign({}, sheets, { batchUpdate: async () => { throw new Error('quota'); } });
+  await assert.rejects(runWriteBack({ db: db(), sheets: broken, target: SANDBOX, now: tick }), /quota/);
+  const item = (await db().collection('outbox').get()).docs[0].data();
+  assert.equal(item.status, 'pending');
+  assert.match(item.lastError, /quota/);
+  assert.equal((await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick })).items, 1);
+  assert.equal(cellOf('run_t802', 'tue_driver'), 'ADAMS, PAT');
+});
+
+test('a write-back pass saves only the cells it wrote on the run, never an older copy of the rest', async () => {
+  await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: '2026-10-04__run_t802', day: 'tue', driverId: 'drv_test_adams' });
+  const ref = db().collection('runs').doc('2026-10-04__run_t802');
+  // A copy from the sheet lands while the pass is writing the sheet.
+  const during = Object.assign({}, sheets, { batchUpdate: async (...a) => { await sheets.batchUpdate(...a); await ref.update({ 'cells.wed_driver_notes': 'from the sheet copy' }); } });
+  await runWriteBack({ db: db(), sheets: during, target: SANDBOX, now: tick });
+  const cells = (await ref.get()).data().cells;
+  assert.equal(cells.wed_driver_notes, 'from the sheet copy', 'the newer copy is kept');
+  assert.equal(cells.tue_driver, 'ADAMS, PAT');
+});
+
+// Review item 65 (Joe 10/13): a unit down on the same run in this week and next week.
+test('Truck Down on the same run in both weeks queues a sheet change for each week', async () => {
+  const weeks = ['2026-10-04', '2026-10-11'];
+  for (const w of weeks) {
+    const ref = db().collection('runs').doc(w + '__run_t802');
+    if (!(await ref.get()).exists) continue;
+    await ref.update({ 'days.tue.truckId': 'veh_truck_900002', 'days.tue.truck': '900002' });
+  }
+  const present = (await Promise.all(weeks.map(w => db().collection('runs').doc(w + '__run_t802').get()))).filter(s => s.exists).length;
+  assert.equal(present, 2, 'the fixture has the run in both weeks');
+  const requestId = rid();
+  await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId, equipmentId: 'veh_truck_900002', reason: 'Brakes', today: '2026-10-06' });
+  const queued = (await db().collection('outbox').get()).docs.map(d => d.data()).filter(d => d.requestId === requestId && /run_t802/.test(d.runDocId));
+  assert.deepEqual(queued.map(d => d.runDocId).sort(), weeks.map(w => w + '__run_t802'));
+});
