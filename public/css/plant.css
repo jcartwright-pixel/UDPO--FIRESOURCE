@@ -1105,3 +1105,72 @@
 
 /* Review item 38 (Joe 10/13): Loadout's Edit Load box saves each box as it is left; the time of the last save shows beside Close. */
 .plant-page .edit-saved { align-self: center; font-size: 16px; font-weight: 700; color: #1f7a4d; }
+
+/* Joe 10/13 (mock-up A): the Product Sheet is one list with a green column per machine. The sheet slides sideways inside its box
+   and the Product column stays put; the two heading lines stay at the top. Text stays 16px; the columns are narrow instead. */
+.products-page .pm-sheet { table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+.products-page .pm-sheet col.c-name { width: 300px; } .products-page .pm-sheet col.c-sku { width: 96px; } .products-page .pm-sheet col.c-upc { width: 130px; }
+.products-page .pm-sheet col.c-type { width: 112px; } .products-page .pm-sheet col.c-group { width: 92px; } .products-page .pm-sheet col.c-mach { width: 80px; }
+.products-page .pm-sheet col.c-num { width: 86px; } .products-page .pm-sheet col.c-rm { width: 104px; }
+.products-page .pm-sheet thead tr.pm-band th { height: 30px; top: 0; font-size: 14px; letter-spacing: .06em; border-bottom: 1px solid rgba(255, 255, 255, .25); }
+.products-page .pm-sheet thead tr:not(.pm-band) th { top: 30px; height: 58px; padding: 4px 3px; overflow-wrap: anywhere; }
+.products-page .pm-sheet thead th { border-right: 1px solid rgba(255, 255, 255, .18); }
+.products-page .pm-sheet thead th.pm-m { background: #0d6b45; }
+.products-page .pm-sheet .pm-pin { position: sticky; left: 0; z-index: 2; box-shadow: 2px 0 0 #c9d6e3; }
+.products-page .pm-sheet td.pm-pin { background: #fff; }
+.products-page .pm-sheet thead th.pm-pin { z-index: 4; }
+.products-page .pm-sheet tbody tr:hover td.pm-pin { background: #f1f6fb; }
+.products-page .pm-sheet td.pm-mc { background: #f6fbf8; padding: 0; }
+.products-page .pm-ck { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 2px solid #9fb3c8; border-radius: 7px; background: #fff; color: #fff; font: inherit; font-size: 20px; font-weight: 900; line-height: 1; cursor: pointer; vertical-align: middle; padding: 0; }
+.products-page .pm-ck.on { background: #1d7a3e; border-color: #1d7a3e; }
+.products-page .pm-ck:disabled { cursor: default; opacity: .8; }
+.products-page .pm-ck:focus-visible { outline: 3px solid var(--ud-blue); outline-offset: 2px; }
+.products-page .pm-sheet td.pm-vary { color: #9a5b00; font-weight: 800; }
+.products-page .pm-edit.pm-edit-wide { width: min(980px, 100%); padding-top: 12px; padding-bottom: 10px; }
+.products-page .pm-edit-grid.pm-edit-three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; }
+.products-page .pm-edit-three .pm-field.wide { grid-column: 1 / -1; }
+.products-page .pm-edit-three .pm-field input, .products-page .pm-edit-three .pm-field select { height: 38px; }
+.products-page .pm-edit-sub { margin: 12px 0 6px; font-size: 16px; color: var(--ud-blue-dark); }
+.products-page .pm-edit-sub small { font-size: 14px; font-weight: 600; color: var(--muted); }
+.products-page .pm-mgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.products-page .pm-mbox { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 3px 10px; border: 1px solid #b8cadb; border-radius: 9px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; text-align: left; cursor: pointer; }
+.products-page .pm-mbox.on { background: #eaf6ee; border-color: #1d7a3e; }
+.products-page .pm-mbox .pm-ck { width: 26px; height: 26px; font-size: 17px; flex: none; pointer-events: none; }
+.products-page .pm-speeds { width: 100%; margin-top: 8px; border-collapse: collapse; }
+.products-page .pm-speeds th { background: var(--ud-blue); color: #fff; font-size: 16px; height: 34px; padding: 0 6px; text-transform: none; }
+.products-page .pm-speeds tbody th { background: #f1f5f9; color: var(--ud-blue-dark); text-align: left; padding: 0 10px; }
+.products-page .pm-speeds td { padding: 3px 6px; border-bottom: 1px solid #e1e8ef; }
+.products-page .pm-speeds input { width: 100%; height: 34px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; text-align: center; box-sizing: border-box; }
+@media (max-width: 760px) { .products-page .pm-edit-grid.pm-edit-three { grid-template-columns: 1fr; } .products-page .pm-mgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Machine Setup (Joe 10/13, mock-up MA): the machines down the left, the picked machine's products on the right. */
+.machine-setup-page .ms-split { flex: 1 1 auto; min-height: 0; display: flex; gap: 14px; }
+.machine-setup-page .ms-list { width: 260px; flex: none; overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
+.machine-setup-page .ms-list h3 { margin: 4px 6px 8px; font-size: 16px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.machine-setup-page .ms-mach { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; padding: 8px 12px; border: 1px solid transparent; border-radius: 9px; background: none; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; text-align: left; cursor: pointer; }
+.machine-setup-page .ms-mach:hover { background: #f1f6fb; }
+.machine-setup-page .ms-mach small { display: block; font-size: 14px; font-weight: 700; color: var(--muted); }
+.machine-setup-page .ms-mach b { flex: none; background: #e8f0f8; border-radius: 999px; padding: 1px 10px; font-size: 16px; }
+.machine-setup-page .ms-mach.on { background: var(--ud-blue-dark); color: #fff; }
+.machine-setup-page .ms-mach.on small { color: #cfe0f0; }
+.machine-setup-page .ms-mach.on b { background: #fff; color: var(--ud-blue-dark); }
+.machine-setup-page .ms-main { flex: 1 1 auto; min-width: 0; }
+.machine-setup-page .ms-main .qc-top { flex-wrap: nowrap; }
+.machine-setup-page #find { width: 190px; margin-left: 0; }
+.machine-setup-page #group { width: 140px; }
+.machine-setup-page .ms-table td { height: 46px; font-size: 16px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.machine-setup-page .ms-table td.pm-namecell { text-align: left; font-weight: 700; }
+.machine-setup-page .ms-main { display: flex; flex-direction: column; min-height: 0; }
+.machine-setup-page .ms-two { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+.machine-setup-page .ms-side { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+.machine-setup-page .ms-side h3 { flex: none; margin: 0; padding: 8px 12px; line-height: 1.3; font-size: 16px; letter-spacing: .04em; text-transform: uppercase; background: #0d6b45; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.machine-setup-page .ms-off h3 { background: #5a6b7d; }
+.machine-setup-page .ms-lst { flex: 1 1 auto; min-height: 0; overflow: auto; border: 0; border-radius: 0; }
+.machine-setup-page .ms-table { width: 100%; table-layout: fixed; }
+.machine-setup-page .ms-table td.pm-namecell { white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
+.machine-setup-page .ms-off-btn, .machine-setup-page .ms-add-btn { height: 34px; padding: 0 10px; border-radius: 8px; background: #fff; font: inherit; font-size: 16px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.machine-setup-page .ms-off-btn { border: 1px solid #e3a0a0; color: #a12222; }
+.machine-setup-page .ms-add-btn { border: 1px solid #1d7a3e; color: #1d7a3e; }
+.machine-setup-page .ms-off-btn:hover { background: #fdeeee; }
+.machine-setup-page .ms-add-btn:hover { background: #eaf6ee; }
+@media (max-width: 900px) { .machine-setup-page .ms-split, .machine-setup-page .ms-two { flex-direction: column; } .machine-setup-page .ms-side { min-height: 320px; } .machine-setup-page .ms-list { width: auto; max-height: 220px; } .machine-setup-page .ms-main .qc-top { flex-wrap: wrap; } }

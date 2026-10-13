@@ -92,6 +92,7 @@ const ACTIONS = Object.freeze({
   saveMachineProducts: { roles: REORDER_ROLES, screen: 'plant' },
   saveProductSetup: { roles: REORDER_ROLES, screen: 'plant' },
   saveProductUpload: { roles: REORDER_ROLES, screen: 'plant' },
+  saveProductSheet: { roles: REORDER_ROLES, screen: 'plant' },
   // Administration > Plant Shifts: each plant's shifts (Plant Reports' Shift Comparison).
   savePlantShifts: { roles: REORDER_ROLES, screen: 'plant' },
   // Plant Production (production.js): the line tablet's taps, and how each line is counted (Line Targets).
@@ -393,6 +394,7 @@ function validate(input) {
   if (action === 'saveMachineProducts') return Object.assign(out, PLANT.validateMachineProducts(input, SaveError));
   if (action === 'saveProductSetup') return Object.assign(out, PLANT.validateProductSetup(input, SaveError));
   if (action === 'saveProductUpload') return Object.assign(out, PLANT.validateProductUpload(input, SaveError));
+  if (action === 'saveProductSheet') return Object.assign(out, PLANT.validateProductSheet(input, SaveError));
   if (action === 'savePlantShifts') return Object.assign(out, PLANT.validatePlantShifts(input, SaveError));
   if (action === 'saveLineEntry') return Object.assign(out, PROD.validateLineEntry(input, SaveError));
   if (action === 'saveLineCounter') return Object.assign(out, PROD.validateLineCounter(input, SaveError));
@@ -708,6 +710,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveMachineProducts') return PLANT.saveMachineProducts(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveProductSetup') return PLANT.saveProductSetup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveProductUpload') return PLANT.saveProductUpload(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveProductSheet') return PLANT.saveProductSheet(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePlantShifts') return PLANT.savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLineEntry') return PROD.saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLineCounter') return PROD.saveLineCounter(tx, db, req, email, stamp, logRef, mode, SaveError);
