@@ -36,6 +36,9 @@ function fleet(log, opts) {
       return reply(200, JSON.stringify(saved.map(t => ({ name: /TemplateName = (\w+)/.exec(t)[1] }))));
     }
     if (url.startsWith(BASE + '/execute?template=UDPO_TrucksNow')) {
+      if (opts.many) return reply(200, 'UnitId,Tag,LastReport,Lat,Lon,Address,Place,SpeedMph,IgnitionOn,OdometerMiles,EngineHours,Driver,Active\r\n'
+        + Array.from({ length: opts.many }, (_, i) => i + ',' + (i % 3 ? 2000 + i : 'T-' + i) + ',2026-10-13 14:05:00,40,-81,"Akron OH",,0,False,' + (i % 3 ? 1000 + i : '') + ',,,True').join('\r\n'));
+      if (opts.broken) throw new TypeError('fetch failed');
       const odo = (opts && opts.odo) || { a: 412345.6, at: '2026-10-13 14:05:00' };
       return reply(200, 'UnitId,Tag,LastReport,Lat,Lon,Address,Place,SpeedMph,IgnitionOn,OdometerMiles,EngineHours,Driver,Active\r\n'
         + '11,223876,' + odo.at + ',39.99,-81.1,"1 Main St, Uniontown OH",Uniontown Yard,0,False,' + odo.a + ',15022.5,Pat Smith,True\r\n'
@@ -108,4 +111,20 @@ test('Fleet GPS: when Fleet will not take the POST login, the address form Veriz
   const s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'test' }, o);
   assert.equal(s.result.ok, true, s.result.message);
   assert.ok(log.indexOf('GET ' + BASE + '/rest/login/united-dairy/app/pw') >= 0);
+});
+
+// Joe 10/13: Pull now on the test copy came back "Could not reach the GPS settings" with Fleet's 520 units.
+test('Fleet GPS: Pull now with all 520 Fleet units stores them all, and a failure says what failed instead of blaming the network', async () => {
+  const log = [], o = { fetch: fleet(log, { many: 520 }), base: BASE, now: NOW, sleep: async () => {} };
+  await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
+  let s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'pull' }, o);
+  assert.deepEqual(s.pulled, { trucks: 520, days: 346 }, 'every unit; miles only for units with an odometer');
+  assert.equal((await db().collection('gpsTrucks').get()).size, 520);
+  assert.equal(s.lastPullTrucks, 520);
+  assert.equal(s.lastPullError, '');
+  // Fleet cannot be reached part way: the answer is a plain sentence the screen shows, never a thrown "internal".
+  const bad = { fetch: fleet([], { broken: true }), base: BASE, now: NOW, sleep: async () => {} };
+  s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'pull' }, bad);
+  assert.match(s.pulled.error, /^The GPS read stopped part way \(fetch failed\)/);
+  assert.match(s.lastPullError, /fetch failed/);
 });

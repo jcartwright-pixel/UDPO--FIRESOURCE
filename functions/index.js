@@ -163,7 +163,7 @@ exports.people = onCall(async (request) => {
   return { people: snap.docs.map(d => { const p = d.data(); return { email: d.id, name: p.name || '', status: p.status || '', roles: p.roles || [], facilities: p.facilities || [] }; }) };
 });
 
-exports.gps = onCall({ timeoutSeconds: 120 }, async (request) => {
+exports.gps = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
   const user = signedIn(request);
   try { return await gpsCall(db, user, request.data, { local: process.env.FUNCTIONS_EMULATOR === 'true' }); } catch (error) { throw asHttps(error); }
 });

@@ -83,12 +83,23 @@
       $('last').textContent = t ? 'Last test ' + stamp(t.at) + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
       $('pulled').textContent = s.lastPullError ? 'Last read failed: ' + s.lastPullError : s.lastPull ? 'Last read ' + stamp(s.lastPull) + ': ' + s.lastPullTrucks + ' trucks.' : '';
     }
+    // Joe 10/13: Pull now said "Could not reach the GPS settings. Check the network" when the server itself had stopped
+    // part way. A server that stopped says so, names the step, and the line under the buttons is read again.
+    const STEP = { save: 'saving the login', clear: 'removing the login', test: 'the connection test', pull: 'the GPS read' };
     async function call(fields, button) {
       showError('');
       if (button) button.disabled = true;
       try { s = await callServer('gps', Object.assign({ kind: 'fleet' }, fields)); render(); return s; }
-      // Review item 55 (Joe 10/13): the plain sentence, without the raw "(internal [0])" in it.
-      catch (e) { showError(serverText(e, 'the GPS settings')); if (!s) { $('state').textContent = 'Unknown'; $('state').className = 'pill warn'; } return null; }
+      catch (e) {
+        const code = String(e && e.code || '').replace(/^functions\//, '');
+        if (fields.op !== 'status' && /^(internal|unknown|deadline-exceeded)$/.test(code)) {
+          showError('The server stopped before ' + STEP[fields.op] + ' finished (' + code + '). Your network is fine. ' +
+            (fields.op === 'pull' ? 'The read also runs on its own every 5 minutes; the line under the buttons shows how the last one went.' : 'Try again; if it happens again, tell Claude.'));
+          try { s = await callServer('gps', { kind: 'fleet', op: 'status' }); render(); } catch (e2) { /* the message above stands */ }
+        } else showError(serverText(e, 'the GPS settings')); // Review item 55: no raw "(internal [0])"
+        if (!s) { $('state').textContent = 'Unknown'; $('state').className = 'pill warn'; }
+        return null;
+      }
       finally { if (button) button.disabled = false; }
     }
     $('save').onclick = async () => {
