@@ -191,6 +191,9 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
         assert.deepEqual(await sc.$$eval('.sc-n[data-k="speeding"], .sc-n[data-k="hardBrake"], .sc-n[data-k="hardAccel"], .sc-n[data-k="idle"], .sc-n[data-k="gpsDayCap"]', l => l.map(x => x.value)), ['2', '2', '1', '1', '10']);
         assert.deepEqual(await sc.$$eval('.sc-n[data-k="sleeperIdlePct"], .sc-n[data-k="accidentBase"], .sc-n[data-k="accident2"], .sc-n[data-k="complaintMajor"], .sc-n[data-k="sickFade2"]', l => l.map(x => x.value)), ['66', '25', '15', '2', '10']);
         assert.equal(await sc.$eval('#sc-kiosk-reasons', c => c.checked), false, 'Show reasons on kiosk starts off');
+        assert.equal(await sc.$$eval('[data-kiosk-area]', l => l.length), AREA_HEADS.length - 3, 'every area can be ticked for the kiosk');
+        assert.equal(await sc.$$eval('[data-kiosk-area]:checked', l => l.length), 0, 'none ticked to start');
+        if (SHOTS) { await sc.$eval('#sc-kiosk-reasons', e => e.scrollIntoView({ block: 'center' })); await sc.screenshot({ path: path.join(SHOTS, 'after-settings-kiosk-' + w + '.png') }); }
         if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-settings-' + w + '.png') });
       }
       assert.deepEqual(sc.errors, []);
@@ -201,7 +204,9 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       const k = await openPage(browser, 1920, 330, '/scorecard.html?month=2026-10&kiosk=1&testEmail=manager.test@uniteddairy.com');
       await k.waitForSelector('.sc-kiosk-title');
       await k.waitForSelector('.sc-board tbody td.strong');
-      assert.deepEqual(await heads(k, 'table.sc-board thead th'), AREA_HEADS);
+      // Joe 10/13: the kiosk shows the overall score only, best first, until areas are ticked on Settings.
+      assert.deepEqual(await heads(k, 'table.sc-board thead th'), ['#', 'Driver', 'Overall']);
+      assert.deepEqual(await k.$$eval('table.sc-board tbody td.strong', t => t.map(x => x.textContent)).then(l => l.slice(0, 2)), ['HALL, PAT', 'KING, LEE']);
       assert.equal(await k.$$eval('tr.sc-misses, .sc-excuse, #sc-how', l => l.length), 0, 'no reasons or misses on the kiosk');
       assert.equal(await k.$eval('#kpis', e => e.offsetParent === null), true, 'no counts or buttons on the kiosk');
       if (SHOTS) await k.screenshot({ path: path.join(SHOTS, 'after-kiosk-1920.png') });

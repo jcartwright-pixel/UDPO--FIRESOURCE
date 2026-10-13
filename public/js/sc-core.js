@@ -126,6 +126,9 @@ function scSettings_(saved) {
   });
   var reasons = Array.isArray(saved.callOffReasons) ? saved.callOffReasons : d.callOffReasons;
   s.callOffReasons = SC_CORE.REASONS.filter(function (r) { return reasons.map(scPersonKey_).indexOf(r) >= 0; });
+  // Joe 10/13: the kiosk shows each driver's overall score; areas ticked here show beside it (none to start).
+  var areaKeys = SC_CORE.AREAS.map(function (a) { return a[0]; });
+  s.kioskAreas = (Array.isArray(saved.kioskAreas) ? saved.kioskAreas : []).filter(function (k) { return areaKeys.indexOf(k) >= 0; });
   if (!(s.gradeA > s.gradeB && s.gradeB > s.gradeC)) { s.gradeA = d.gradeA; s.gradeB = d.gradeB; s.gradeC = d.gradeC; }
   return s;
 }

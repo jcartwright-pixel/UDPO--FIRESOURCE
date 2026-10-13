@@ -218,7 +218,9 @@
           '<h2>PDA (Progressive Discipline Action)</h2><p class="hint">Entered on Driver Roster &gt; Edit; a manager\'s decision, so it counts from the day it is entered.</p>' +
           '<p><b>Verbal warning</b> ' + n('pdaVerbal') + ' <b>Written warning</b> ' + n('pdaWritten') + '</p><p><b>Final written warning</b> ' + n('pdaFinal') + ' <b>Suspension</b> ' + n('pdaSuspension') + ' points</p>' +
           '<p><b>Fades</b> ' + n('pdaFade1') + '% for 0\u20133 months, ' + n('pdaFade2') + '% 3\u20136, ' + n('pdaFade3') + '% 6\u20139, then gone</p>' +
-          '<h2>Driver\'s Kiosk Station</h2><p><label><input type="checkbox" id="sc-kiosk-reasons"' + (s.kioskReasons ? ' checked' : '') + (edit ? '' : ' disabled') + '> <b>Show reasons on kiosk</b> (off: the TV shows the grades only)</label></p>' +
+          '<h2>Driver\'s Kiosk Station</h2><p class="hint">The TV shows each driver\'s overall score, best first.</p><p><b>Areas shown on kiosk</b> (none ticked: overall only)</p><div class="sc-reasons sc-kiosk-areas">' +
+          CORE.AREAS.map(a => '<label><input type="checkbox" data-kiosk-area="' + a[0] + '"' + (s.kioskAreas.indexOf(a[0]) >= 0 ? ' checked' : '') + (edit ? '' : ' disabled') + '> ' + escapeHtml(a[1]) + '</label>').join('') + '</div>' +
+          '<p><label><input type="checkbox" id="sc-kiosk-reasons"' + (s.kioskReasons ? ' checked' : '') + (edit ? '' : ' disabled') + '> <b>Show reasons on kiosk</b> (off: the TV shows the scores only)</label></p>' +
           '<h2>Driver of the Month</h2><p>Highest score, worked at least ' + n('monthMinDays') + ' days</p><button type="button" data-mode-go="month">Back to the scorecard</button></section></div>';
         foot.textContent = '';
         sheet.querySelectorAll('.sc-n').forEach(inp => { inp.onchange = () => {
@@ -231,6 +233,10 @@
         }; });
         { const c = sheet.querySelector('#sc-clean-on'); c.onchange = () => { const before = saved.cleanOn, v = c.checked ? 1 : 0;
           saveOptimistic('saveScorecard', { key: 'cleanOn', value: v }, () => { saved = Object.assign({}, saved, { cleanOn: v }); }, () => { saved = Object.assign({}, saved, { cleanOn: before }); }, render); }; }
+        sheet.querySelectorAll('[data-kiosk-area]').forEach(c => { c.onchange = () => {
+          const list = [...sheet.querySelectorAll('[data-kiosk-area]:checked')].map(x => x.dataset.kioskArea), before = saved.kioskAreas;
+          saveOptimistic('saveScorecard', { kioskAreas: list }, () => { saved = Object.assign({}, saved, { kioskAreas: list }); }, () => { saved = Object.assign({}, saved, { kioskAreas: before }); }, render);
+        }; });
         { const c = sheet.querySelector('#sc-kiosk-reasons'); c.onchange = () => { const before = saved.kioskReasons, v = c.checked ? 1 : 0;
           saveOptimistic('saveScorecard', { key: 'kioskReasons', value: v }, () => { saved = Object.assign({}, saved, { kioskReasons: v }); }, () => { saved = Object.assign({}, saved, { kioskReasons: before }); }, render); }; }
         sheet.querySelector('[data-mode-go]').onclick = () => { mode = 'month'; render(); };
@@ -328,12 +334,15 @@
           '</tbody></table></div>' : '');
       // Joe 10/13: the Driver's Kiosk Station (TV) shows the grades only; reasons only when Settings says so.
       if (kiosk) {
+        // Joe 10/13: "the scorecard kiosk doesn't need to show all the grade areas": the overall score, best first, and only the
+        // areas ticked on Settings.
+        const KA = AREAS.filter(a => s.kioskAreas.indexOf(a[0]) >= 0), dw = KA.length ? Math.max(20, 100 - 6 - 16 - KA.length * 6.2) : 60;
         const reasons = (r) => (r.misses || []).filter(m => !m.excused && m.points > 0).map(m => escapeHtml(m.what)).join(' · ');
         sheet.innerHTML = '<div class="sc-kiosk-title"><b>DRIVER SCORECARD</b><span>' + escapeHtml(label) + ' · through ' + shortDate(b.through) + '</span></div>' +
-          '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:' + (100 - 4 - 9 - AREAS.length * 5.8).toFixed(1) + '%">' + AREAS.map(() => '<col style="width:5.8%">').join('') + '<col style="width:9%"></colgroup>' +
-          '<thead><tr><th>#</th><th>Driver</th>' + AREAS.map(a => '<th>' + head(a) + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
-          (shown.map(r => '<tr><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' + AREAS.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') + '<td><span class="sc g-' + r.grade + ' sc-overall">' + r.score + ' ' + r.grade + '</span></td></tr>' +
-            (s.kioskReasons && reasons(r) ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '">' + reasons(r) + '</td></tr>' : '')).join('') || empty(AREAS.length + 3)) + '</tbody></table>';
+          '<table class="issues sc-board sc-kiosk-board"><colgroup><col style="width:6%"><col style="width:' + dw.toFixed(1) + '%">' + KA.map(() => '<col style="width:6.2%">').join('') + '<col style="width:' + (KA.length ? 16 : 34) + '%"></colgroup>' +
+          '<thead><tr><th>#</th><th>Driver</th>' + KA.map(a => '<th>' + head(a) + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
+          (shown.map(r => '<tr><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' + KA.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') + '<td><span class="sc g-' + r.grade + ' sc-overall">' + r.score + ' ' + r.grade + '</span></td></tr>' +
+            (s.kioskReasons && reasons(r) ? '<tr class="sc-misses"><td></td><td colspan="' + (KA.length + 2) + '">' + reasons(r) + '</td></tr>' : '')).join('') || empty(KA.length + 3)) + '</tbody></table>';
         return;
       }
       cats.innerHTML = [['overall', 'Overall']].concat(AREAS).concat([['incidents', 'Incidents & Complaints']]).map(a => '<button type="button" role="tab" data-tab="' + a[0] + '" aria-selected="' + (tab === a[0]) + '">' + escapeHtml(a[1]) + '</button>').join('');
