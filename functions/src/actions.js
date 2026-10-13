@@ -363,7 +363,7 @@ function validate(input) {
   }
   if (action === 'addDriverIncident') {
     out.kind = text(input.kind, 20);
-    if (['accident', 'complaint'].indexOf(out.kind) < 0) throw new SaveError('BAD_REQUEST', 'kind must be accident or complaint');
+    if (['accident', 'complaint', 'pda'].indexOf(out.kind) < 0) throw new SaveError('BAD_REQUEST', 'kind must be accident, complaint or pda');
     out.driverKey = text(input.driverKey, 80).toUpperCase();
     out.driver = text(input.driver, 80);
     out.date = text(input.date);
@@ -371,7 +371,11 @@ function validate(input) {
     out.note = text(input.note, 500);
     if (!out.driverKey) throw new SaveError('BAD_REQUEST', 'Pick the driver');
     if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'Pick the date');
-    if (out.kind === 'accident') {
+    if (out.kind === 'pda') {
+      out.step = text(input.step, 20);
+      if (SC.SC_CORE.PDA_STEPS.map(k => k[0]).indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'Pick the PDA step');
+      out.reason = text(input.reason, 120);
+    } else if (out.kind === 'accident') {
       out.accidentClass = Number(input.accidentClass);
       if ([1, 2, 3].indexOf(out.accidentClass) < 0) throw new SaveError('BAD_REQUEST', 'Pick 1st, 2nd or 3rd degree');
       out.truck = text(input.truck, 20);
@@ -1542,8 +1546,10 @@ async function rateTruckClean(tx, db, req, email, stamp, logRef, mode) {
 // until a manager marks it Reviewed - counts (or Reviewed - not counted). Nothing is written to Driver Master.
 async function addDriverIncident(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection('driverIncidents').doc(M.safeIdPart(req.driverKey + '_' + req.kind + '_' + req.date + '_' + String(req.requestId || Date.now()).slice(-12)));
-  const data = { kind: req.kind, driverKey: req.driverKey, driver: req.driver, date: req.date, type: req.type, note: req.note, status: 'review' };
-  if (req.kind === 'accident') Object.assign(data, { accidentClass: req.accidentClass, truck: req.truck, preventable: req.preventable });
+  // A PDA is a manager's decision already: it is saved as counting, with who decided it.
+  const data = { kind: req.kind, driverKey: req.driverKey, driver: req.driver, date: req.date, type: req.type, note: req.note, status: req.kind === 'pda' ? 'counts' : 'review' };
+  if (req.kind === 'pda') Object.assign(data, { step: req.step, reason: req.reason, reviewedBy: email, reviewedAt: stamp });
+  else if (req.kind === 'accident') Object.assign(data, { accidentClass: req.accidentClass, truck: req.truck, preventable: req.preventable });
   else Object.assign(data, { source: req.source, customer: req.customer, severity: req.severity });
   tx.set(ref, Object.assign({}, data, { enteredAt: stamp, enteredBy: email, testEdited: mode.mode === 'test' }));
   const result = { ok: true, requestId: req.requestId, runs: [], incidentId: ref.id };

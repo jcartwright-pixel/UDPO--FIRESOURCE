@@ -1910,8 +1910,8 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .dv-odo-note { display: block; font-size: 16px; color: #2e6b3a; font-weight: 600; min-height: 0; }
 .dv-odo-note:empty { display: none; }
 /* Joe 10/13 Driver Scorecard: a tab per graded area, accidents and complaints, excused misses, the kiosk (TV) view. */
-.sc-cats { display: flex; flex-wrap: nowrap; gap: 3px; overflow-x: auto; margin: 0 0 8px; padding-bottom: 2px; }
-.sc-cats button { flex: 0 0 auto; height: 38px; padding: 0 6px; border: 1px solid #b7c9d8; border-radius: 8px; background: #fff; color: #12385f; font: inherit; font-size: 16px; font-weight: 700; white-space: nowrap; }
+.sc-cats { display: flex; flex-wrap: nowrap; gap: 2px; overflow-x: auto; margin: 0 0 8px; padding-bottom: 2px; }
+.sc-cats button { flex: 0 0 auto; height: 38px; padding: 0 5px; border: 1px solid #b7c9d8; border-radius: 8px; background: #fff; color: #12385f; font: inherit; font-size: 16px; font-weight: 700; white-space: nowrap; }
 .sc-cats button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
 .sc-board.sc-area td.sc-detail, .sc-board.sc-incidents td.sc-detail { text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; padding: 4px 8px; }
 .sc-board .sc-pending, .sc-board tr.sc-pending td { color: #8a5a00; }
@@ -1946,3 +1946,4 @@ body.sc-kiosk .sc-board thead th { position: sticky; top: 0; z-index: 1; }
 .drivers-page .sheet thead th { white-space: normal; line-height: 1.1; overflow-wrap: normal; }
 .inc-form .panel-row > label { min-width: 0; }
 .inc-form input[type=text], .inc-form input[type=date], .inc-form select, .inc-form textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.inc-item .inc-state { margin-left: auto; color: #4a5b6c; font-weight: 700; }

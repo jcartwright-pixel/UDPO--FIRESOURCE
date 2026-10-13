@@ -106,9 +106,9 @@ test('Joe 10/13: one grade per area and the overall score; each area is 100 less
   const days = S.scBuildDay_(DAY, [run({ casesOut: 500, plantCaseReturn: 497 })], [dvir('855', 'SAL')], {});
   const m = S.scMatchGps_(DAY, days, [], [{ tag: '223893', at: '2026-10-14T12:00:00Z', type: 'SPEEDING' }, { tag: '223893', at: '2026-10-14T13:00:00Z', type: 'HARSH_ACCEL' }]);
   const r = S.scScoreMonth_(m.records, [], S.scSettings_({}), {})[0];
-  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'seatbelt', 'fuel', 'time', 'cleanliness', 'accidents', 'complaints']);
+  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'seatbelt', 'fuel', 'time', 'cleanliness', 'accidents', 'complaints', 'pda']);
   assert.deepEqual(Object.fromEntries(Object.entries(r.areas).map(([k, v]) => [k, v.points])),
-    { checkin: -4, cases: -3, inspection: 1, attendance: 1, speeding: -2, hardStops: -1, idling: 1, seatbelt: 0, fuel: 0, time: 0, cleanliness: 0, accidents: 0, complaints: 0 });
+    { checkin: -4, cases: -3, inspection: 1, attendance: 1, speeding: -2, hardStops: -1, idling: 1, seatbelt: 0, fuel: 0, time: 0, cleanliness: 0, accidents: 0, complaints: 0, pda: 0 });
   assert.equal(r.areas.time.score, null, 'no dispatch time: Time is not graded');
   assert.equal(r.points, -7, 'the day\'s points add up');
   // One day: 80 + 20 x points per day, at most 100.
@@ -247,4 +247,18 @@ test('Joe 10/13 Excuse: an excused GPS or Time miss costs nothing and keeps the 
   const ex = S.scScoreMonth_(recs, [], s, {}, { excuses: { [miss.key]: { reason: 'Deer', by: 'manager@uniteddairy.com' } } })[0];
   const m2 = ex.misses.find(m => m.area === 'hardStops');
   assert.deepEqual([m2.points, m2.excused.reason, ex.areas.hardStops.points, ex.hardBrakes], [0, 'Deer', 1, 1]);
+});
+
+test('Joe 10/13 PDA: a manager\'s decision (no review); Verbal 5, Written 10, Final 20, Suspension 30; fades 100/66/33 over 9 months', () => {
+  const s = S.scSettings_({});
+  assert.deepEqual([s.pdaVerbal, s.pdaWritten, s.pdaFinal, s.pdaSuspension, s.pdaFade1, s.pdaFade2, s.pdaFade3], [5, 10, 20, 30, 100, 66, 33]);
+  const recs = S.scBuildDay_(DAY, [run({})], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
+  const pda = (o) => Object.assign({ kind: 'pda', driverKey: 'D1', driver: 'ADAMS, PAT', date: '2026-10-01', step: 'written', reason: 'Attendance' }, o);
+  const score = (list, on) => S.scScoreMonth_(recs, [], s, {}, Object.assign({ incidents: list, asOf: DAY, pdaOn: true }, on))[0];
+  assert.deepEqual([score([pda({})]).areas.pda.lost, score([pda({})]).areas.pda.score], [10, 90], 'counts with no review step');
+  assert.equal(score([pda({ step: 'suspension', date: '2026-03-01' })]).areas.pda.lost, 9.9, 'suspension, 7 months old: 30 x 33%');
+  assert.equal(score([pda({ step: 'final', date: '2026-06-20' })]).areas.pda.lost, 13.2, 'final written, 3-6 months old: 20 x 66%');
+  assert.equal(score([pda({ date: '2025-12-01' })]).areas.pda.lost, 0, 'over 9 months old: gone');
+  assert.equal(score([pda({})], { pdaOn: false }).areas.pda.score, null, 'no PDAs entered yet: not graded');
+  assert.match(score([pda({ note: 'third late start' })]).misses.find(m => m.area === 'pda').what, /PDA: Written warning, Attendance \(third late start\)/);
 });

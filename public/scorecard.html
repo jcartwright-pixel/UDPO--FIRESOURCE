@@ -135,9 +135,9 @@
       const lost = (a, z) => Object.keys(unassigned).filter(d => d >= a && d <= z).sort().reduce((l, d) => l.concat(unassigned[d]), []);
       const exMap = {};
       excuses.forEach(x => { if (x.key) exMap[x.key] = { reason: x.reason || '', by: x.by || '' }; });
-      // Accidents (12 months), complaints (6) and call-offs (3) look back past the period, fading as they age.
+      // Accidents (12 months), PDAs (9), complaints (6) and call-offs (3) look back past the period, fading as they age.
       const opts = (a, z, ratingEnd) => ({ alertsOn: alertsEver !== false || gpsAlerts.length > 0, seatbeltOn: gpsAlerts.some(x => S.scAlertKind_(x.type) === 'seatbelt'), ratings: ratingsIn(a, ratingEnd),
-        excuses: exMap, incidents, accidentsOn: incidents.some(x => x.kind === 'accident'), complaintsOn: incidents.some(x => x.kind === 'complaint'), start: a, asOf: z });
+        excuses: exMap, incidents, accidentsOn: incidents.some(x => x.kind === 'accident'), complaintsOn: incidents.some(x => x.kind === 'complaint'), pdaOn: incidents.some(x => x.kind === 'pda'), start: a, asOf: z });
       const offs = (a, z) => S.scCallOffDays_(ex, S.scAddDays_(a, -95), z, s);
       if (mode === 'week') {
         const w = S.scWeekRange_(weekStart), end = w.end < yesterday ? w.end : yesterday;
@@ -215,6 +215,9 @@
           '<p><b>Fades</b> ' + n('accidentFade1') + '% for 0\u20133 months, ' + n('accidentFade2') + '% 3\u20136, ' + n('accidentFade3') + '% 6\u20139, ' + n('accidentFade4') + '% 9\u201312, then gone</p>' +
           '<h2>Complaints</h2><p><b>Minor</b> ' + n('complaintMinor') + ' points, <b>Major</b> ' + n('complaintMajor') + ' points, once reviewed as counting</p>' +
           '<p><b>Fades</b> ' + n('complaintFade1') + '% for 0\u20133 months, ' + n('complaintFade2') + '% 3\u20136, then gone</p>' +
+          '<h2>PDA (Progressive Discipline Action)</h2><p class="hint">Entered on Driver Roster &gt; Edit; a manager\'s decision, so it counts from the day it is entered.</p>' +
+          '<p><b>Verbal warning</b> ' + n('pdaVerbal') + ' <b>Written warning</b> ' + n('pdaWritten') + '</p><p><b>Final written warning</b> ' + n('pdaFinal') + ' <b>Suspension</b> ' + n('pdaSuspension') + ' points</p>' +
+          '<p><b>Fades</b> ' + n('pdaFade1') + '% for 0\u20133 months, ' + n('pdaFade2') + '% 3\u20136, ' + n('pdaFade3') + '% 6\u20139, then gone</p>' +
           '<h2>Driver\'s Kiosk Station</h2><p><label><input type="checkbox" id="sc-kiosk-reasons"' + (s.kioskReasons ? ' checked' : '') + (edit ? '' : ' disabled') + '> <b>Show reasons on kiosk</b> (off: the TV shows the grades only)</label></p>' +
           '<h2>Driver of the Month</h2><p>Highest score, worked at least ' + n('monthMinDays') + ' days</p><button type="button" data-mode-go="month">Back to the scorecard</button></section></div>';
         foot.textContent = '';
@@ -288,13 +291,13 @@
         return pend.map(pendingLine).join('') + (list.length ? list.map(m => missLine(r, m)).join('') : pend.length ? '' : 'No misses.');
       };
       // Joe 10/13: one line on how the scoring works, above the board.
-      const how = '<p class="sc-how" id="sc-how"><b>How scoring works:</b> each area earns +' + s.cleanDay + ' for a perfect day (no miss in it) and +' + s.streakBonus + ' for every ' + s.streakDays + ' perfect days in a row, and loses the Settings points for each miss; its grade goes by points per day worked (perfect every day = 100; A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+). Accidents (12 months), complaints (6 months) and call-offs (3 months) count past the period shown, fading as they age, once a manager reviews them. Overall is the average of the area grades.</p>';
+      const how = '<p class="sc-how" id="sc-how"><b>How scoring works:</b> each area earns +' + s.cleanDay + ' for a perfect day (no miss in it) and +' + s.streakBonus + ' for every ' + s.streakDays + ' perfect days in a row, and loses the Settings points for each miss; its grade goes by points per day worked (perfect every day = 100; A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+). Accidents (12 months), PDAs (9 months), complaints (6 months) and call-offs (3 months) count past the period shown, fading as they age; accidents and complaints count once a manager reviews them. Overall is the average of the area grades.</p>';
       const shown = b.rows.filter(r => r.runDays || r.callOffs);
       const empty = (cols) => '<tr><td colspan="' + cols + '" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>';
       // The area tabs: one row per driver with that area's grade, its numbers and each miss in it.
       const areaTable = (key) => {
         const a = CORE.AREAS.find(x => x[0] === key), rows = shown.slice().sort((x, y) => ((y.areas[key] || {}).score ?? -1) - ((x.areas[key] || {}).score ?? -1) || (x.driver < y.driver ? -1 : 1));
-        const rolling = key === 'accidents' || key === 'complaints';
+        const rolling = key === 'accidents' || key === 'complaints' || key === 'pda';
         return '<table class="issues sc-board sc-area"><colgroup><col style="width:4%"><col style="width:16%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:35%"></colgroup>' +
           '<thead><tr><th>#</th><th>Driver</th><th>Grade</th><th>Score</th><th>' + (key === 'cleanliness' ? 'Ratings' : 'Days') + '</th><th>Perfect days</th><th>Earned</th><th>Points off</th><th>' + escapeHtml(a[1]) + ' details</th></tr></thead><tbody>' +
           (rows.map((r, i) => { const o = r.areas[key] || {}; return '<tr><td>' + (i + 1) + '</td><td class="strong">' + escapeHtml(r.driver) + '</td><td>' + grade(o) + '</td><td>' + (o.score == null ? '–' : o.score) + '</td><td>' + (rolling ? '–' : o.days || 0) + '</td><td>' + (rolling || key === 'cleanliness' ? '–' : o.clean || 0) + '</td><td>' + (o.rewards ? '+' + pts(o.rewards) : '0') + '</td><td>' + (o.lost ? '−' + pts(o.lost) : '0') + '</td><td class="sc-detail">' + detail(r, key) + '</td></tr>'; }).join('') || empty(9)) + '</tbody></table>';
@@ -302,16 +305,16 @@
       // Joe 10/13: every accident / incident and complaint, one row each; a manager reviews them here or on Driver Roster.
       const incidentTable = () => {
         const asOf = b.through, list = incidents.slice().sort((x, y) => (x.date < y.date ? 1 : -1));
-        const cls = (x) => x.kind === 'accident' ? (CORE.ACCIDENT_CLASSES.find(c => c[0] === Number(x.accidentClass)) || CORE.ACCIDENT_CLASSES[0]).slice(1).join(', ') : (x.severity === 'major' ? 'Major' : 'Minor');
-        return '<p class="sc-how">Add an accident or complaint from <a href="drivers.html">Driver Roster</a> (Edit on the driver). Each one starts Under review and counts nothing until a manager marks it Reviewed – counts.</p>' +
+        const cls = (x) => x.kind === 'pda' ? S.scPdaStep_(x)[1] : x.kind === 'accident' ? (CORE.ACCIDENT_CLASSES.find(c => c[0] === Number(x.accidentClass)) || CORE.ACCIDENT_CLASSES[0]).slice(1).join(', ') : (x.severity === 'major' ? 'Major' : 'Minor');
+        return '<p class="sc-how">Add an accident, complaint or PDA from <a href="drivers.html">Driver Roster</a> (Edit on the driver). Accidents and complaints start Under review and count nothing until a manager marks them Reviewed – counts; a PDA counts from the day it is entered.</p>' +
           '<table class="issues sc-board sc-incidents"><colgroup><col style="width:9%"><col style="width:15%"><col style="width:10%"><col style="width:13%"><col style="width:23%"><col style="width:16%"><col style="width:6%"><col style="width:8%"></colgroup>' +
           '<thead><tr><th>Date</th><th>Driver</th><th>Kind</th><th>Class</th><th>What happened</th><th>Status</th><th>Points now</th><th>Entered by</th></tr></thead><tbody>' +
-          (list.map(x => '<tr class="' + (x.status === 'review' || !x.status ? 'sc-pending' : '') + '"><td>' + shortDate(x.date) + '</td><td class="strong">' + escapeHtml(x.driver || x.driverKey) + '</td><td>' + (x.kind === 'accident' ? 'Accident / incident' : 'Complaint') + '</td><td>' + escapeHtml(cls(x)) + '</td>' +
-            '<td class="sc-detail">' + escapeHtml(S.scIncidentText_(x)) + '</td><td>' + (edit ? '<select class="sc-review-pick" data-id="' + escapeHtml(x.id) + '">' + Object.keys(CORE.INCIDENT_STATUS).map(k => '<option value="' + k + '"' + ((x.status || 'review') === k ? ' selected' : '') + '>' + CORE.INCIDENT_STATUS[k] + '</option>').join('') + '</select>' : escapeHtml(CORE.INCIDENT_STATUS[x.status || 'review'])) +
-            (x.reviewedBy ? '<small>' + who(x.reviewedBy) + '</small>' : '') + '</td><td>' + (x.status === 'counts' ? pts(S.scIncidentPoints_(x, s, asOf)) : '–') + '</td><td>' + who(x.enteredBy) + '</td></tr>').join('') ||
-            '<tr><td colspan="8" class="empty">No accidents or complaints entered yet.</td></tr>') + '</tbody></table>';
+          (list.map(x => '<tr class="' + (x.kind !== 'pda' && (x.status === 'review' || !x.status) ? 'sc-pending' : '') + '"><td>' + shortDate(x.date) + '</td><td class="strong">' + escapeHtml(x.driver || x.driverKey) + '</td><td>' + (x.kind === 'accident' ? 'Accident / incident' : x.kind === 'pda' ? 'PDA' : 'Complaint') + '</td><td>' + escapeHtml(cls(x)) + '</td>' +
+            '<td class="sc-detail">' + escapeHtml(S.scIncidentText_(x)) + '</td><td>' + (x.kind === 'pda' ? 'Manager decision' : edit ? '<select class="sc-review-pick" data-id="' + escapeHtml(x.id) + '">' + Object.keys(CORE.INCIDENT_STATUS).map(k => '<option value="' + k + '"' + ((x.status || 'review') === k ? ' selected' : '') + '>' + CORE.INCIDENT_STATUS[k] + '</option>').join('') + '</select>' : escapeHtml(CORE.INCIDENT_STATUS[x.status || 'review'])) +
+            (x.reviewedBy ? '<small>' + who(x.reviewedBy) + '</small>' : '') + '</td><td>' + (x.status === 'counts' || (x.kind === 'pda' && x.status !== 'notCounted') ? pts(S.scIncidentPoints_(x, s, asOf)) : '–') + '</td><td>' + who(x.enteredBy) + '</td></tr>').join('') ||
+            '<tr><td colspan="8" class="empty">No accidents, complaints or PDAs entered yet.</td></tr>') + '</tbody></table>';
       };
-      const overall = () => '<table class="issues sc-board"><colgroup><col style="width:3%"><col style="width:' + (100 - 3 - 8 - AREAS.length * 6.1).toFixed(1) + '%">' + AREAS.map(() => '<col style="width:6.1%">').join('') + '<col style="width:8%"></colgroup>' +
+      const overall = () => '<table class="issues sc-board"><colgroup><col style="width:3%"><col style="width:' + (100 - 3 - 8 - AREAS.length * 5.6).toFixed(1) + '%">' + AREAS.map(() => '<col style="width:5.6%">').join('') + '<col style="width:8%"></colgroup>' +
         '<thead><tr><th>#</th><th>Driver</th>' + AREAS.map(a => '<th>' + head(a) + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
         (shown.map(r => '<tr data-key="' + escapeHtml(r.driverKey) + '" class="' + (open === r.driverKey ? 'sc-open' : '') + '"><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' +
           AREAS.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') +
@@ -327,7 +330,7 @@
       if (kiosk) {
         const reasons = (r) => (r.misses || []).filter(m => !m.excused && m.points > 0).map(m => escapeHtml(m.what)).join(' · ');
         sheet.innerHTML = '<div class="sc-kiosk-title"><b>DRIVER SCORECARD</b><span>' + escapeHtml(label) + ' · through ' + shortDate(b.through) + '</span></div>' +
-          '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:' + (100 - 4 - 9 - AREAS.length * 6.2).toFixed(1) + '%">' + AREAS.map(() => '<col style="width:6.2%">').join('') + '<col style="width:9%"></colgroup>' +
+          '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:' + (100 - 4 - 9 - AREAS.length * 5.8).toFixed(1) + '%">' + AREAS.map(() => '<col style="width:5.8%">').join('') + '<col style="width:9%"></colgroup>' +
           '<thead><tr><th>#</th><th>Driver</th>' + AREAS.map(a => '<th>' + head(a) + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
           (shown.map(r => '<tr><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' + AREAS.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') + '<td><span class="sc g-' + r.grade + ' sc-overall">' + r.score + ' ' + r.grade + '</span></td></tr>' +
             (s.kioskReasons && reasons(r) ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '">' + reasons(r) + '</td></tr>' : '')).join('') || empty(AREAS.length + 3)) + '</tbody></table>';

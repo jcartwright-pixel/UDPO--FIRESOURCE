@@ -47,12 +47,12 @@
         <div class="sheet">
           <table>
             <colgroup>
-              <col style="width:4%"><col style="width:4%"><col style="width:14%"><col style="width:7%"><col style="width:12%"><col style="width:11%">
-              <col style="width:9%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:6%">
+              <col style="width:4%"><col style="width:4%"><col style="width:13%"><col style="width:7%"><col style="width:10%"><col style="width:11%">
+              <col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:5%"><col style="width:6%">
             </colgroup>
             <thead><tr>
               <th><input id="all" type="checkbox" aria-label="Select all drivers"></th><th>#</th><th>Driver</th><th>Relief</th><th>Seniority</th><th>Assigned truck</th>
-              <th>Vacation wks</th><th>Status</th><th>Avail&shy;able</th><th>Acci&shy;dents</th><th>Com&shy;plaints</th><th>Edit</th>
+              <th>Vacation wks</th><th>Status</th><th>Avail&shy;able</th><th>Acci&shy;dents</th><th>Com&shy;plaints</th><th>PDA</th><th>Edit</th>
             </tr></thead>
             <tbody id="rows"></tbody>
           </table>
@@ -86,8 +86,10 @@
     let incidents = [], scoreSaved = {}, incForm = '';
     const incidentsOf = (r) => incidents.filter(x => S.scPersonKey_(x.driverKey) === S.scPersonKey_(r.id) || (x.driver && S.scPersonKey_(x.driver) === S.scPersonKey_(r.name)));
     // Open = reviewed as counting and not yet faded away; under review shows beside it in amber.
-    const counting = (r, kind) => { const s = S.scSettings_(scoreSaved); return incidentsOf(r).filter(x => x.kind === kind && x.status === 'counts' && S.scIncidentPoints_(x, s, today) > 0).length; };
-    const reviewing = (r, kind) => incidentsOf(r).filter(x => x.kind === kind && (!x.status || x.status === 'review')).length;
+    // A PDA (Progressive Discipline Action) is a manager's decision: it counts without a review.
+    const counts = (x) => x.status === 'counts' || (x.kind === 'pda' && x.status !== 'notCounted');
+    const counting = (r, kind) => { const s = S.scSettings_(scoreSaved); return incidentsOf(r).filter(x => x.kind === kind && counts(x) && S.scIncidentPoints_(x, s, today) > 0).length; };
+    const reviewing = (r, kind) => kind === 'pda' ? 0 : incidentsOf(r).filter(x => x.kind === kind && (!x.status || x.status === 'review')).length;
     const countCell = (r, kind) => { const n = counting(r, kind), w = reviewing(r, kind); return '<td class="inc-count">' + (n ? '<b class="inc-n">' + n + '</b>' : '0') + (w ? ' <span class="inc-review" title="Under review">+' + w + ' review</span>' : '') + '</td>'; };
     const canEdit = () => canManage();
     const truckUnit = (id) => { const t = lists.trucks.find(e => e.id === id); return t ? t.unit : ''; };
@@ -124,9 +126,9 @@
           '<td>' + r.vacationWeeks + '</td>' +
           '<td><span class="status' + (r.active ? '' : ' off') + '" title="' + escapeHtml(r.unavailableReason) + '">' + (r.active ? 'Active' : 'Inactive') + '</span></td>' +
           '<td><button type="button" class="switch' + (r.active ? ' on' : '') + '" data-toggle="' + id + '" aria-label="' + (r.active ? 'Mark not available' : 'Mark available') + '"' + dis + '></button></td>' +
-          countCell(r, 'accident') + countCell(r, 'complaint') +
+          countCell(r, 'accident') + countCell(r, 'complaint') + countCell(r, 'pda') +
           '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>Edit</button></td></tr>';
-      }).join('') || '<tr><td colspan="12" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
+      }).join('') || '<tr><td colspan="13" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
       const active = rows.filter(r => r.active);
       document.getElementById('n-active').textContent = active.length;
       document.getElementById('n-relief').textContent = active.filter(r => r.reliefDriver).length;
@@ -174,10 +176,10 @@
         '<label class="panel-check"><input id="d-relief" type="checkbox"' + (v.reliefDriver ? ' checked' : '') + '> Relief driver</label>' +
         (r ? '<div class="panel-state"><span>Available</span><span class="status' + (r.active ? '' : ' off') + '">' + (r.active ? 'Active' : 'Inactive') + '</span></div>' : '') +
         '<div class="panel-actions"><button id="d-cancel" type="button">Cancel</button><button id="d-save" class="primary" type="button">Save Driver</button></div>' +
-        (r ? '<div class="inc-box"><h3>Accidents &amp; complaints</h3><div id="d-inc-list"></div><div class="inc-add"><button type="button" id="d-add-accident">Add accident / incident</button><button type="button" id="d-add-complaint">Add complaint</button></div><div id="d-inc-form"></div></div>' : '');
+        (r ? '<div class="inc-box"><h3>Accidents, complaints &amp; PDA</h3><div id="d-inc-list"></div><div class="inc-add"><button type="button" id="d-add-accident">Add accident / incident</button><button type="button" id="d-add-complaint">Add complaint</button><button type="button" id="d-add-pda">Add PDA</button></div><div id="d-inc-form"></div></div>' : '');
       incForm = '';
       render();
-      if (r) { paintIncidents(r); document.getElementById('d-add-accident').onclick = () => incidentForm(r, 'accident'); document.getElementById('d-add-complaint').onclick = () => incidentForm(r, 'complaint'); }
+      if (r) { paintIncidents(r); document.getElementById('d-add-accident').onclick = () => incidentForm(r, 'accident'); document.getElementById('d-add-complaint').onclick = () => incidentForm(r, 'complaint'); document.getElementById('d-add-pda').onclick = () => incidentForm(r, 'pda'); }
       document.getElementById('d-name').focus();
       document.getElementById('d-cancel').onclick = closePanel;
       document.getElementById('d-save').onclick = () => {
@@ -205,8 +207,8 @@
       const box = document.getElementById('d-inc-list');
       if (!box) return;
       const list = incidentsOf(r).sort((a, b) => a.date < b.date ? 1 : -1), edit = canEdit();
-      box.innerHTML = list.map(x => '<div class="inc-item' + (!x.status || x.status === 'review' ? ' inc-pending' : '') + '"><b>' + shortDate(x.date) + '</b> ' + escapeHtml(S.scIncidentText_(x)) +
-        (edit ? '<select class="inc-status" data-id="' + escapeHtml(x.id) + '" aria-label="Review">' + Object.keys(CORE.INCIDENT_STATUS).map(k => '<option value="' + k + '"' + ((x.status || 'review') === k ? ' selected' : '') + '>' + CORE.INCIDENT_STATUS[k] + '</option>').join('') + '</select>'
+      box.innerHTML = list.map(x => '<div class="inc-item' + (x.kind !== 'pda' && (!x.status || x.status === 'review') ? ' inc-pending' : '') + '"><b>' + shortDate(x.date) + '</b> ' + escapeHtml(S.scIncidentText_(x)) +
+        (x.kind === 'pda' ? '<span class="inc-state">Manager decision</span>' : edit ? '<select class="inc-status" data-id="' + escapeHtml(x.id) + '" aria-label="Review">' + Object.keys(CORE.INCIDENT_STATUS).map(k => '<option value="' + k + '"' + ((x.status || 'review') === k ? ' selected' : '') + '>' + CORE.INCIDENT_STATUS[k] + '</option>').join('') + '</select>'
           : '<span class="inc-state">' + escapeHtml(CORE.INCIDENT_STATUS[x.status || 'review']) + '</span>') + '</div>').join('') || '<p class="hint">None entered.</p>';
       box.querySelectorAll('.inc-status').forEach(sel => { sel.onchange = async () => {
         try { await save('reviewDriverIncident', { incidentId: sel.dataset.id, status: sel.value }); } catch (e) { showError('Could not save the review: ' + friendlyError(e)); paintIncidents(r); }
@@ -217,6 +219,25 @@
     function incidentForm(r, kind) {
       incForm = kind;
       const box = document.getElementById('d-inc-form'), acc = kind === 'accident';
+      // Joe 10/13 PDA: date, step, reason and note; it counts from the day it is entered (no review).
+      if (kind === 'pda') {
+        box.innerHTML = '<div class="inc-form"><h3>Add PDA (Progressive Discipline Action)</h3>' +
+          '<div class="panel-row"><label>Date<input id="i-date" type="date" value="' + today + '"></label><label>Step<select id="i-step">' + CORE.PDA_STEPS.map(k => '<option value="' + k[0] + '">' + k[1] + '</option>').join('') + '</select></label></div>' +
+          '<label>Reason<input id="i-reason" type="text" list="i-reasons" maxlength="120" placeholder="Attendance, safety\u2026"></label>' +
+          '<datalist id="i-reasons"><option value="Attendance"><option value="Safety"><option value="Late to dispatch"><option value="Paperwork"><option value="Conduct"><option value="Other"></datalist>' +
+          '<label>Note<textarea id="i-note" maxlength="500"></textarea></label><p class="hint">A PDA is a manager\'s decision: it counts on the scorecard from the day it is entered.</p>' +
+          '<div class="panel-actions"><button type="button" id="i-cancel">Cancel</button><button type="button" class="primary" id="i-save">Save</button></div></div>';
+        document.getElementById('i-cancel').onclick = () => { incForm = ''; box.innerHTML = ''; };
+        document.getElementById('i-save').onclick = async () => {
+          const v = (id) => document.getElementById(id).value.trim();
+          const fields = { kind, driverKey: S.scPersonKey_(r.id), driver: r.name, date: v('i-date'), step: v('i-step'), reason: v('i-reason'), note: v('i-note'), type: '' };
+          if (!fields.date) { showError('Pick the date.'); return; }
+          const btn = document.getElementById('i-save'); btn.disabled = true;
+          try { await save('addDriverIncident', fields); showError(''); incForm = ''; box.innerHTML = ''; } catch (e) { btn.disabled = false; showError('Could not save it: ' + friendlyError(e)); }
+        };
+        document.getElementById('i-date').focus();
+        return;
+      }
       box.innerHTML = '<div class="inc-form"><h3>' + (acc ? 'Add accident / incident' : 'Add complaint') + '</h3>' +
         '<div class="panel-row"><label>Date<input id="i-date" type="date" value="' + today + '"></label>' +
         (acc ? '<label>Class<select id="i-class">' + CORE.ACCIDENT_CLASSES.map(c => '<option value="' + c[0] + '">' + c[1] + ' (' + c[2] + ')</option>').join('') + '</select></label>'
