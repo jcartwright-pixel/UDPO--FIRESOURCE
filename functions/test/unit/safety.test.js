@@ -99,3 +99,14 @@ test('Fire Alarm, Fire Suppression and Escape Plan (Joe 10/13): one monthly chec
   assert.equal(S.fireMonth('alarm', null, '2026-10').state, 'DUE');
   assert.equal(S.fireId('fac_uniontown', 'escape'), 'fac_uniontown__escape');
 });
+
+test('Each location has its own areas (Joe 10/13): Uniontown starts from the list, another location starts empty', () => {
+  assert.deepEqual(S.locations(null, 'fac_uniontown').map(a => a.name), ['Plant', 'Garage', 'Office', 'Yard']);
+  assert.deepEqual(S.locations(null), S.locations(null, 'fac_uniontown'), 'no plant named: the starting list as before');
+  assert.deepEqual(S.locations(null, 'fac_charleston'), []);
+  assert.deepEqual(S.locations({ areas: [{ key: 'p1', name: 'Plant', subs: [{ key: 's1', name: 'Dock' }] }] }, 'fac_charleston').map(a => a.subs[0].name), ['Dock']);
+  assert.equal(S.checklist({ plant: 'fac_charleston', locations: null }).length, 0, 'no Uniontown items on another location\'s walk');
+  assert.ok(S.checklist({ plant: 'fac_uniontown', locations: null }).length > 10);
+  assert.equal(S.startsEmpty('fac_martins_ferry'), true);
+  assert.equal(S.startsEmpty('fac_uniontown'), false);
+});

@@ -57,7 +57,7 @@ function walkDay(date, stamp, SaveError) {
 async function setupOf(tx, db, facilityId) {
   const s = await tx.get(db.collection('safetySetup').doc(facilityId));
   const l = await tx.get(db.collection('locationAreas').doc(facilityId));
-  return Object.assign({}, s.exists ? s.data() : {}, { locations: l.exists ? l.data() : null });
+  return Object.assign({}, s.exists ? s.data() : {}, { locations: l.exists ? l.data() : null, plant: facilityId });
 }
 // The saver's name from the Users list, so the screens show "Joe Cartwright", not an email.
 async function whoIs(tx, db, email) {
@@ -428,7 +428,7 @@ function validateChecklist(input, SaveError) {
 async function saveChecklist(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection('safetySetup').doc(req.facilityId), had = await tx.get(ref);
   // An item once used is never dropped, only turned off, so old walks and issues still read.
-  const keep = had.exists ? S.checklist(had.data(), true) : S.checklist(null, true);
+  const keep = S.checklist(Object.assign({}, had.exists ? had.data() : {}, { plant: req.facilityId }), true);
   const now = {};
   req.areas.forEach(a => a.items.forEach(i => { now[i.id] = true; }));
   const areas = req.areas.map(a => Object.assign({}, a, { items: a.items.slice() }));
@@ -471,7 +471,7 @@ function validateLocations(input, SaveError) {
 }
 async function saveLocations(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection('locationAreas').doc(req.facilityId), had = await tx.get(ref);
-  const before = S.locations(had.exists ? had.data() : null);
+  const before = S.locations(had.exists ? had.data() : null, req.facilityId);
   const areas = req.areas.map(a => Object.assign({}, a, { subs: a.subs.slice() }));
   const now = {};
   areas.forEach(a => { now[a.key] = true; a.subs.forEach(x => { now[x.key] = true; }); });

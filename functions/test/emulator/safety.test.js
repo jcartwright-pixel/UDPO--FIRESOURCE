@@ -213,6 +213,17 @@ test('Location Areas (Joe 10/12): rename, reorder and turn off; nothing is ever 
   await assert.rejects(applyAction(db(), { email: PLANT_PERSON }, { action: 'saveLocationAreas', requestId: rid(), facilityId: UT, areas: next }, at(MON)), /permission|not allowed|role/i);
 });
 
+test('Location Areas per location (Joe 10/13): Charleston starts empty and gets only its own areas; Uniontown is untouched', async () => {
+  const CH = 'fac_charleston';
+  await applyAction(db(), { email: MANAGER }, { action: 'saveLocationAreas', requestId: rid(), facilityId: CH, areas: [{ key: 'ch_plant', name: 'Plant', subs: [{ key: 'ch_dock', name: 'Dock' }] }] }, at(MON));
+  const ch = (await db().collection('locationAreas').doc(CH).get()).data();
+  assert.deepEqual(ch.areas.map(a => [a.key, a.off, a.subs.map(x => x.key)]), [['ch_plant', false, ['ch_dock']]], 'none of the Uniontown starting areas are added to Charleston');
+  assert.equal((await db().collection('locationAreas').doc(UT).get()).exists, false);
+  await applyAction(db(), { email: MANAGER }, { action: 'saveSafetyChecklist', requestId: rid(), facilityId: CH, areas: [{ place: 'Plant', key: 'ch_dock', name: 'Dock', items: [{ id: 'ch_chocks', text: 'Trailers chocked', freq: 'WEEKLY' }] }] }, at(MON));
+  const cl = (await db().collection('safetySetup').doc(CH).get()).data();
+  assert.deepEqual(cl.areas.flatMap(a => a.items.map(i => i.id)), ['ch_chocks'], 'no Uniontown items are kept as off on Charleston\'s checklist');
+});
+
 test('Notes (Joe 10/12): a note on any row, kept when the row changes; a note on an earlier issue; notes for the whole walk', async () => {
   await walkTap('2026-10-05', 'note', { itemId: 'exit_signs', note: 'Bulb dim by dock 3' }, MON, PLANT_PERSON);
   let w = await walk('2026-10-05');

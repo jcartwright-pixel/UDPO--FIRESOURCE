@@ -216,7 +216,7 @@
       if (stopLocs) stopLocs();
       stopLocs = watchSetup(db, plant, s => {
         locs = [];
-        S.locations(s && s.locations).forEach(a => { if (!a.off) a.subs.forEach(x => { if (!x.off) locs.push(a.name + ' \u203a ' + x.name); }); });
+        S.locations(s && s.locations, plant).forEach(a => { if (!a.off) a.subs.forEach(x => { if (!x.off) locs.push(a.name + ' \u203a ' + x.name); }); });
         render();
       });
       stop = watchExtinguishers(db, plant, list => {
