@@ -659,3 +659,12 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 /* Review item 54 (Joe 10/13): Phone Screens is one line pointing to Administration > Links & Codes. */
 .pss-moved { margin: 12px 16px; font-size: 18px; color: #0b2f55; }
 .pss-moved a { font-weight: 800; color: #0b6eaa; }
+
+/* Joe 10/13: DVIR items start as No defect; an item changed to Defect found stands out in red. */
+.drv-dvir select.dv-bad { border-color: #b42318; background: #fdecea; color: #8a1c12; font-weight: 800; }
+/* Joe 10/13: a green Submit beside Back at the top of the DVIR and beside Review inspection at the bottom. A missing signature
+   outlines the signature box in red. */
+.phone-card button.dv-submit { background: #1b7f3b; border-color: #1b7f3b; color: #fff; }
+.drv-head button.dv-submit { min-width: 110px; }
+.dv-buttons { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.drv-sign.dv-need { border: 2px solid #b42318; background: #fdecea; }
