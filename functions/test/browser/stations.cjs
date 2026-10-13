@@ -126,6 +126,7 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await phone.fill('#step-form [name=palletJack]', '7');
     await phone.fill('#step-form .ci-tr-issues', 'Light out');
     await phone.fill('#step-form input[name=casesDelivered]', '400');
+    await phone.click('#step-form .ci-loaded label:has([value=YES])');
     await shot(phone, 'phone-checkin-filled-390.png', true);
     assert.ok(await fits(phone), 'the Check-In fits the phone width');
     await phone.click('#send');

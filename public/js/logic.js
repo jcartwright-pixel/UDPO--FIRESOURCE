@@ -653,6 +653,7 @@
       if (d.palletJackIssues) issues.push('Jack: ' + d.palletJackIssues);
       if (yes(d.trailerNeedsCleaned)) issues.push('Trailer needs cleaned');
       if (d.overageShortageDetails || yes(d.overageShortage)) issues.push('Over/short: ' + (d.overageShortageDetails || 'yes'));
+      if (d.loadedCorrectly === 'NO') issues.push('Loaded wrong: ' + (d.loadingProblem || 'yes'));
       rows.push({
         id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, run: run.run, coverageType: run.coverageType,
         // The units the driver checked in with (a corrected truck or trailer, drop-and-hook trailers), else Dispatch's.

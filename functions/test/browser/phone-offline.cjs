@@ -62,6 +62,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await ph.click('.phone-load');
     await ph.waitForSelector('#step-form:not([hidden])');
     await ph.fill('#step-form input[name=casesDelivered]', '377');
+    await ph.click('#step-form .ci-loaded label:has([value=YES])');
     await ph.click('#send');
     await ph.waitForSelector('.phone-load.queued span:text-is("Saved on phone")', { timeout: 10000 });
     assert.match(await ph.textContent('#offline-line'), /Saved on this phone, will send when you have signal\. Waiting: 1/);
