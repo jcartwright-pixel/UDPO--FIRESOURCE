@@ -99,3 +99,30 @@ test('a phone link a manager turned off says where to turn it back on', async ()
   await db().collection('config').doc('routePhone').update({ enabled: false });
   await assert.rejects(phoneCall(db(), { code, op: 'roster' }, at()), /turned off right now\. A manager turns it back on in Administration > Links & Codes > Driver Station Codes/);
 });
+
+// Joe 10/13: "Was your truck loaded correctly?" Yes / No; a No says what was wrong. It stays in the app (no Live sheet
+// column), shows on Driver Check-ins as a loading problem, and a No with nothing written, or no answer at all, is refused.
+test('"Was your truck loaded correctly?": a No with what was wrong is saved and listed; a bare No or a missing answer is refused', async () => {
+  const { code } = await newRouteCode(db(), MANAGER);
+  const load = (await phoneCall(db(), { code, op: 'loads', driverId: 'drv_test_brook' }, at())).loads[0];
+  const send = (fields) => phoneCall(db(), { code, op: 'checkIn', driverId: 'drv_test_brook', runDocId: load.runDocId, day: load.day, requestId: rid(), fields: Object.assign({ casesDelivered: '398' }, fields) }, at(1));
+  await assert.rejects(send({ loadedCorrectly: 'NO', loadingProblem: '  ' }), /Write what was loaded wrong/);
+  await assert.rejects(send({ loadedCorrectly: 'MAYBE' }), /Was your truck loaded correctly\? Tap Yes or No/);
+  await assert.rejects(send({ loadedCorrectly: 'NO', loadingProblem: '=HYPERLINK("x")' }), /Formula-style text is blocked/);
+  await send({ loadedCorrectly: 'no', loadingProblem: '2 cs 2% gallon on the wrong stop' });
+  let d = await day('801', 'tue');
+  assert.deepEqual([d.loadedCorrectly, d.loadingProblem], ['NO', '2 cs 2% gallon on the wrong stop']);
+  const runs = (await db().collection('runs').get()).docs.map(x => Object.assign({ id: x.id }, x.data()));
+  assert.deepEqual(L.checkinRows(runs, '2026-10-06').find(r => r.route === '801').issues, ['Loaded wrong: 2 cs 2% gallon on the wrong stop']);
+  const again = (await phoneCall(db(), { code, op: 'loads', driverId: 'drv_test_brook' }, at(2))).loads[0];
+  assert.deepEqual([again.loadedCorrectly, again.loadingProblem], ['NO', '2 cs 2% gallon on the wrong stop'], 'the phone gets the answer back');
+  // Yes clears what was written; a Check-In kept on a phone before the question existed (no answer sent) is still taken.
+  await send({ loadedCorrectly: 'YES', loadingProblem: 'left over' });
+  d = await day('801', 'tue');
+  assert.deepEqual([d.loadedCorrectly, d.loadingProblem], ['YES', '']);
+  await send({ casesDelivered: '399' });
+  assert.equal((await day('801', 'tue')).loadedCorrectly, 'YES', 'an older Check-In with no answer leaves the last answer');
+  // Nothing for the Live sheet: the write-back row has no column for it.
+  const out = (await db().collection('outbox').get()).docs.map(x => x.data().cells || {});
+  assert.ok(out.every(c => !Object.keys(c).some(k => /loaded|loading_problem/.test(k))));
+});

@@ -100,7 +100,7 @@
       kpi('On time', c.onTimePct === null ? '—' : c.onTimePct + '%', c.judged ? c.onTime + ' of ' + c.judged + ' loaded on time' : 'none due yet', pctClass(c.onTimePct)) +
       kpi('Late', n(c.late), c.late ? 'avg ' + R.minutesText(c.avgLate) + ' after depart' : 'none late', c.late ? 'warn' : 'good') +
       kpi('Not loaded', n(c.notLoaded), c.notLoaded ? 'never marked done' : 'none missed', c.notLoaded ? 'bad' : 'good') +
-      (c.firstStart === undefined ? kpi('Check-in shortages', n(c.shortages), 'drivers reported over / short', c.shortages ? 'warn' : '')
+      (c.firstStart === undefined ? kpi('Check-in shortages', n(c.shortages), 'drivers reported over / short or loaded wrong', c.shortages ? 'warn' : '')
         : kpi('Loadout', (c.firstStart !== null ? R.clockText(c.firstStart) : '—') + ' – ' + (c.lastFinish !== null ? R.clockText(c.lastFinish) : '—'), 'first start · last finish', '', true)) +
       kpi('Avg load', c.avgTaken === null ? '—' : c.avgTaken + '<small> min</small>', 'Start to End') +
       kpi('Pickups', n(c.pickups), 'product that did not load', c.pickups ? 'bad' : 'good') +

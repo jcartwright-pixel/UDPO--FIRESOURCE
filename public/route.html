@@ -81,6 +81,11 @@
     <div class="phone-grid">
       <label>Cases delivered<input name="casesDelivered" inputmode="numeric" pattern="[0-9]*"></label>
       <label>Cases returned<input name="driverCaseReturn" inputmode="numeric" pattern="[0-9]*"></label>
+      <!-- Joe 10/13: "Was your truck loaded correctly?" Yes or No must be picked; No asks what was wrong. It shows on Driver
+           Check-ins and on the plant's reports as a loading problem. -->
+      <div class="wide ci-loaded"><span class="ci-q" id="ci-loaded-q">Was your truck loaded correctly?</span>
+        <div class="ci-seg" role="radiogroup" aria-labelledby="ci-loaded-q"><label><input type="radio" name="loadedCorrectly" value="YES"><span>Yes</span></label><label><input type="radio" name="loadedCorrectly" value="NO"><span>No</span></label></div>
+        <div class="ci-loaded-box" hidden><input name="loadingProblem" aria-label="What was loaded wrong" placeholder="What was wrong? e.g. 2 cs 2% gal missing" maxlength="300" data-voice></div></div>
       <div class="ci-os wide">
         <label class="check"><input type="checkbox" name="overageShortage"> Overage / shortage</label>
         <div class="ci-os-box" hidden>
@@ -236,6 +241,9 @@
       document.getElementById('form-title').textContent = l.route + ' ' + l.run;
       ['casesDelivered', 'driverCaseReturn', 'refusedReturned', 'refusedReturnedSource', 'tractorIssues', 'trailerIssues', 'palletJackIssues', 'checkinNotes'].forEach(k => { f.elements[k].value = l[k] === null || l[k] === undefined ? '' : l[k]; });
       f.elements.trailerNeedsCleaned.checked = !!l.trailerNeedsCleaned;
+      f.querySelectorAll('[name=loadedCorrectly]').forEach(r => { r.checked = r.value === l.loadedCorrectly; });
+      f.elements.loadingProblem.value = l.loadingProblem || '';
+      loadedShow();
       // The units: what the driver said before, else Dispatch's (a "T-101/T-102" trailer cell is two trailers).
       const t = String(l.trailer || '').split(/[\/,;&+]+/).map(x => x.trim().toUpperCase()).filter(Boolean);
       f.elements.truck.value = l.checkinTruck || l.truck || '';
@@ -301,7 +309,13 @@
       if (b.checked) ciForm.elements[issueNames(b)[0]].focus();
       else issueNames(b).forEach(n => { ciForm.elements[n].value = ''; });
     }));
+    // Joe 10/13: No opens the box for what was wrong; Yes empties it.
+    const loadedPick = () => { const r = ciForm.querySelector('[name=loadedCorrectly]:checked'); return r ? r.value : ''; };
+    function loadedShow() { const no = loadedPick() === 'NO', row = ciForm.querySelector('.ci-loaded'); row.classList.toggle('no', no); row.querySelector('.ci-loaded-box').hidden = !no; if (!no) ciForm.elements.loadingProblem.value = ''; }
+    ciForm.querySelectorAll('[name=loadedCorrectly]').forEach(r => r.addEventListener('change', () => { loadedShow(); if (loadedPick() === 'NO') ciForm.elements.loadingProblem.focus(); }));
     function issueMissing() {
+      if (!loadedPick()) return 'Answer: Was your truck loaded correctly? Tap Yes or No.';
+      if (loadedPick() === 'NO' && !ciForm.elements.loadingProblem.value.trim()) return 'Write what was loaded wrong.';
       const b = issueBoxes.find(x => x.checked && !ciForm.elements[issueNames(x)[0]].value.trim());
       return b ? 'Write what the ' + b.closest('label').textContent.trim().toLowerCase().replace(/ problems$/, ' problem is').replace(/^refused \/ returned product$/, 'refused or returned product is') + '.' : '';
     }
@@ -357,6 +371,7 @@
       const missing = issueMissing();
       if (missing) throw new Error(missing);
       fields.trailerNeedsCleaned = f.elements.trailerNeedsCleaned.checked;
+      fields.loadedCorrectly = loadedPick(); fields.loadingProblem = fields.loadedCorrectly === 'NO' ? f.elements.loadingProblem.value.trim() : '';
       fields.overageShortage = f.elements.overageShortage.checked; fields.overageShortageDetails = osText();
       fields.truck = f.elements.truck.value.trim(); fields.trailer = f.elements.trailer.value.trim(); fields.palletJack = f.elements.palletJack.value.trim();
       fields.moreTrailers = [...ciMore.children].map(d => ({ trailer: d.querySelector('.ci-tr').value.trim(), issues: d.querySelector('.ci-tr-issues').value.trim(), needsCleaned: d.querySelector('.ci-tr-clean').checked }));

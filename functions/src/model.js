@@ -78,7 +78,9 @@ const DAY_FIELDS = Object.freeze([
 
 // Day fields kept in the new app only (the Live sheet has no column for them): who a day was for before the driver went
 // off and why, the units the driver corrected on the phone and the drop-and-hook trailers. The copy from the sheet keeps them.
-const APP_ONLY_DAY_FIELDS = Object.freeze(['intendedDriverId', 'intendedDriver', 'driverExceptionStatus', 'checkinTruck', 'checkinTrailer', 'moreTrailers']);
+const APP_ONLY_DAY_FIELDS = Object.freeze(['intendedDriverId', 'intendedDriver', 'driverExceptionStatus', 'checkinTruck', 'checkinTrailer', 'moreTrailers',
+  // Joe 10/13: the Check-In's "Was your truck loaded correctly?" has no Live sheet column; it stays in the app.
+  'loadedCorrectly', 'loadingProblem']);
 
 function normalizeHeader(value) {
   return String(value === null || value === undefined ? '' : value).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
