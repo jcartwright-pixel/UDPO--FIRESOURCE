@@ -159,7 +159,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       await sc.waitForFunction(() => /sleeper/.test((document.querySelector('tr.sc-misses') || {}).textContent || ''));
       assert.match(await sc.textContent('tr.sc-misses'), /Idling \(30 min, 12:00 PM, truck 223898\), sleeper\s*−0\.25/);
       // Joe 10/13: a tab per area; Speeding lists every driver's speeding.
-      assert.deepEqual(await heads(sc, '#cats [data-tab]'), ['Overall'].concat(AREA_HEADS.slice(2, -1), ['Incidents & Complaints']));
+      assert.deepEqual(await heads(sc, '#cats [data-tab]'), ['Overall', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Seatbelt', 'MPG', 'Time', 'Clean', 'Accidents', 'Complaints', 'PDA', 'Incidents']);
       const strip = await sc.$eval('#cats', c => ({ h: c.getBoundingClientRect().height, sw: c.scrollWidth, cw: c.clientWidth }));
       assert.ok(strip.h < 60 && strip.sw <= strip.cw + 1, 'the tabs fit on one line: ' + JSON.stringify(strip));
       await sc.click('#cats [data-tab="speeding"]');

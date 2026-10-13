@@ -345,7 +345,9 @@
             (s.kioskReasons && reasons(r) ? '<tr class="sc-misses"><td></td><td colspan="' + (KA.length + 2) + '">' + reasons(r) + '</td></tr>' : '')).join('') || empty(KA.length + 3)) + '</tbody></table>';
         return;
       }
-      cats.innerHTML = [['overall', 'Overall']].concat(AREAS).concat([['incidents', 'Incidents & Complaints']]).map(a => '<button type="button" role="tab" data-tab="' + a[0] + '" aria-selected="' + (tab === a[0]) + '">' + escapeHtml(a[1]) + '</button>').join('');
+      // Short tab words so all 16 tabs fit one line at 1536 with any font; the full name is in the tooltip and the tab's table.
+      const TAB = { fuel: 'MPG', cleanliness: 'Clean', incidents: 'Incidents' };
+      cats.innerHTML = [['overall', 'Overall']].concat(AREAS).concat([['incidents', 'Incidents & Complaints']]).map(a => '<button type="button" role="tab" data-tab="' + a[0] + '" title="' + escapeHtml(a[1]) + '" aria-selected="' + (tab === a[0]) + '">' + escapeHtml(TAB[a[0]] || a[1]) + '</button>').join('');
       sheet.innerHTML = tab === 'incidents' ? incidentTable() : tab !== 'overall' && AREAS.some(a => a[0] === tab) ? how + areaTable(tab) : how + overall();
       foot.textContent = 'Through ' + shortDate(b.through) + ' · green = no misses, red = cost points · days counted: ' + (b.days.length ? shortDate(b.days[0]) + ' to ' + shortDate(b.days[b.days.length - 1]) + ' (the copied Live weeks)' : 'none') + ' · click a driver for the details, rewards and each miss.';
       document.getElementById('prev').onclick = () => { if (mode === 'year') year--; else if (mode === 'week') weekStart = S.scAddDays_(weekStart, -7); else if (--month < 1) { month = 12; year--; } open = ''; render(); };
