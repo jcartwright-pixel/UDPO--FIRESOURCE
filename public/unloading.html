@@ -148,6 +148,10 @@
       const focused = document.activeElement && document.activeElement.dataset && (document.activeElement.dataset.f || document.activeElement.dataset.e) ? document.activeElement : null;
       const keep = focused ? [focused.dataset.key || '', focused.dataset.f || '', focused.dataset.e || '', focused.value] : null;
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="9" class="empty">' + (!mine.length ? 'No ' + name.toLowerCase() + ' unloading is scheduled for this date.' : 'Every load is unloaded.') + '</td></tr>';
+      // Review item 23 (Joe 10/13): on a phone or a small tablet each load is a card (as on Yard Checks); every box is named on
+      // the card itself by its column heading (the Start / End buttons' column has no heading on the desk, so it is named here).
+      const heads = [...document.querySelectorAll('table.unload thead th')].map((th, i) => th.textContent || (i === 6 ? 'Start / End' : ''));
+      document.querySelectorAll('#rows tr[data-key]').forEach(tr => [...tr.children].forEach((td, i) => { if (heads[i]) td.dataset.l = heads[i]; }));
       if (keep) {
         const el = keep[1] ? document.querySelector('input[data-f="' + keep[1] + '"][data-key="' + CSS.escape(keep[0]) + '"]') : document.querySelector('input[data-e="' + keep[2] + '"]');
         if (el) { el.value = keep[3]; el.focus(); }

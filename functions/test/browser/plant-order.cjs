@@ -48,20 +48,21 @@ const waitOrder = (page, list) => page.waitForFunction(want => [...document.quer
   .catch(async e => { throw new Error('Wanted ' + list.join(',') + ' but the screen shows ' + (await routes(page)).join(',') + ' / ' + (await page.textContent('#error').catch(() => ''))); });
 
 // Where to let go: just above or just below the middle of another load's line.
-async function spot(page, route, where) {
+async function spot(page, route, where, cell = 2) {
   // The list is drawn again when another screen's save lands: measure the line as it is now, again if it was just replaced.
   let b = null;
   for (let tries = 0; !b && tries < 10; tries++) {
     await page.locator(row(route)).scrollIntoViewIfNeeded().catch(() => {});
-    b = await page.locator(row(route) + ' td:nth-child(2)').boundingBox().catch(() => null);
+    b = await page.locator(row(route) + ' td:nth-child(' + cell + ')').boundingBox().catch(() => null);
     if (!b) await page.waitForTimeout(100);
   }
   if (!b) throw new Error('No line for ' + route + ': ' + (await routes(page)).join(','));
   return { x: b.x + b.width / 2, y: where === 'above' ? b.y + b.height * 0.25 : b.y + b.height * 0.75 };
 }
-// A mouse grabs a load's line (its Run cell) and lets go above or below another load.
-async function mouseDrag(page, route, onto, where, picture) {
-  const from = await spot(page, route, 'mid'), to = await spot(page, onto, where);
+// A mouse grabs a load's line (by its Run cell, or another cell: review item 59, the whole line) and lets go above or below
+// another load.
+async function mouseDrag(page, route, onto, where, picture, cell) {
+  const from = await spot(page, route, 'mid', cell), to = await spot(page, onto, where);
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   for (let i = 1; i <= 8; i++) await page.mouse.move(from.x, from.y + (to.y - from.y) * i / 8);
@@ -69,9 +70,9 @@ async function mouseDrag(page, route, onto, where, picture) {
   if (SHOTS && picture) await page.screenshot({ path: path.join(SHOTS, picture), scale: 'css' });
   await page.mouse.up();
 }
-// A finger holds a load's line still for a moment, then slides it above or below another load.
-async function touchDrag(page, route, onto, where) {
-  const from = await spot(page, route, 'mid'), to = await spot(page, onto, where), cdp = await page.context().newCDPSession(page);
+// A finger holds a load's line still for a moment (on its Run cell, or another cell), then slides it above or below another load.
+async function touchDrag(page, route, onto, where, cell) {
+  const from = await spot(page, route, 'mid', cell), to = await spot(page, onto, where), cdp = await page.context().newCDPSession(page);
   const at = (y) => [{ x: Math.round(from.x), y: Math.round(y) }];
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(from.y) });
   await page.waitForTimeout(500);
@@ -113,12 +114,15 @@ async function keyMove(page, route, dir) {
       await loader.screenshot({ path: path.join(SHOTS, '2-loadout-order-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 475 }, scale: 'device' });
     }
 
-    // The mouse drags 811 below 812; the other open screen shows it.
-    await mouseDrag(loader, '811', '812', 'below', '3-loadout-dragging-1920.png');
+    // Review item 59 (Joe 10/13, "grab the whole line"): the hand shows over every cell that is not a box or button, and the
+    // mouse drags 811 below 812 by its Driver cell (not Route or Run); no text is selected; the other open screen shows it.
+    assert.deepEqual(await loader.$eval(row('811'), tr => [1, 3, 7, 10].map(i => getComputedStyle(tr.children[i - 1]).cursor)), ['grab', 'grab', 'grab', 'grab'], 'the hand shows over Route, Driver, Depart and Total Time');
+    await mouseDrag(loader, '811', '812', 'below', '3-loadout-dragging-1920.png', 3);
     await waitOrder(loader, ['801', '802', '805', '808', '812', '811']);
     await waitOrder(watcher, ['801', '802', '805', '808', '812', '811']);
+    assert.equal(await loader.evaluate(() => String(window.getSelection())), '', 'dragging a line by its words does not select them');
     results.push('Loaded loads (801, 802, 805) do not move; 808 is the first line that can be dragged; the hand shows over a line');
-    results.push('Mouse: 811 dragged below 812; the other open screen shows it');
+    results.push('Mouse: 811 dragged below 812 by its Driver cell (the whole line grabs); no text selected; the other open screen shows it');
 
     // The keyboard: Alt+Up three times on 815 puts it before 808, and its line keeps the focus.
     for (let i = 0; i < 3; i++) await keyMove(loader, '815', 'up');
@@ -145,10 +149,11 @@ async function keyMove(page, route, dir) {
     await tablet.waitForSelector(row('812') + '.skipped');
     assert.equal(await tablet.$(row('812') + '[data-drag]'), null, 'a skipped load does not move');
     assert.ok(await tablet.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1)), 'Start and Skip fit their cell');
-    await touchDrag(tablet, '808', '811', 'below');
+    // Review item 59: a finger holds 808 by its Depart cell (not Route or Run) and slides it.
+    await touchDrag(tablet, '808', '811', 'below', 7);
     await waitOrder(tablet, ['801', '802', '805', '6302', '815', '811', '808']);
     assert.equal(await tablet.$eval('#rows tr[data-row]:last-child', t => t.dataset.row.split('|')[0]), '2026-10-04__run_p812', 'the skipped load stays at the bottom');
-    results.push('Skip: 812 waits at the bottom and does not move; 808 slid down past 811');
+    results.push('Skip: 812 waits at the bottom and does not move; 808 held by its Depart cell slid down past 811');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '5-loadout-order-skip-tablet-1280.png') });
 
 
@@ -198,6 +203,23 @@ async function keyMove(page, route, dir) {
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, '7-loadout-phone-390.png'), fullPage: true });
     assert.deepEqual(phone.errors, []);
     await phone.context().close();
+    // Review items 21 and 27 (Joe 10/13): on an 800 tablet the loads are cards too (four boxes to a line), the truck box shows the
+    // whole unit number, Status and Start / End are on the card (nothing runs off the edge), and there is no side-menu strip.
+    const tab800 = await openPage(browser, { viewport: { width: 800, height: 1280 }, hasTouch: true }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
+    await tab800.waitForSelector(row('811') + '[data-drag]');
+    const c800 = await tab800.$eval(row('811'), tr => {
+      const truck = tr.querySelector('input[data-k="truck"]');
+      return { display: getComputedStyle(tr).display, cols: getComputedStyle(tr).gridTemplateColumns.split(' ').length, truck: truck.scrollWidth <= truck.clientWidth + 1 && truck.value.length >= 6,
+        labels: [...tr.children].map(td => td.dataset.l || '').filter(Boolean), off: [...tr.children].filter(td => td.getBoundingClientRect().right > window.innerWidth + 1).length,
+        menu: getComputedStyle(document.querySelector('.sidemenu')).display };
+    });
+    assert.deepEqual([c800.display, c800.cols, c800.truck, c800.off, c800.menu], ['grid', 4, true, 0, 'none'], 'a load is a four-across card at 800, the whole truck number shows, nothing off the edge, no menu strip ' + JSON.stringify(c800));
+    assert.ok(c800.labels.includes('Status') && c800.labels.includes('Start / End'), 'Status and Start / End are named on the card ' + JSON.stringify(c800));
+    assert.ok(await tab800.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'nothing slides sideways at 800');
+    if (SHOTS) await tab800.screenshot({ path: path.join(SHOTS, '7-loadout-tablet-800.png') });
+    assert.deepEqual(tab800.errors, []);
+    await tab800.context().close();
+    results.push('Loadout on an 800 tablet: four-across cards, the whole truck number, Status and Start / End on the card, no side-menu strip');
     results.push('Phone: each load is a card with named boxes big enough to type in; the page scrolls, nothing slides sideways');
     // A day already past has nothing to drag (a coming day's own loads move by the same rule as today's, and the server takes a
     // coming day's order: test/emulator/plant-order.test.js).

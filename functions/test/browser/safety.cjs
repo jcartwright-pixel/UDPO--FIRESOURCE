@@ -359,9 +359,11 @@ async function cameraShot(page, color) {
     await la.keyboard.press('Alt+ArrowUp');
     await laUntil(l => { const o = l[2].subs.map(x => x.name); return o[o.length - 1] === 'Stairs & Exits' && o[o.length - 2] === 'Conference Room'; }, 'Alt+Up changes the walking order');
     await la.waitForFunction(() => document.activeElement && /Conference Room/.test(document.activeElement.getAttribute('aria-label') || ''));
-    // Mouse: grab Conference Room by its line and drag it above Office's first sub-area.
+    // Mouse: grab Conference Room by its line and drag it above Office's first sub-area. Review item 59 (Joe 10/13, "grab the
+    // whole line"): it is grabbed by its Used count, not the Order cell; the hand shows there too.
+    assert.equal(await la.$eval(conf + ' td:nth-child(4)', td => getComputedStyle(td).cursor), 'grab', 'the hand shows over the Used count');
     const firstOffice = '#rows tr.sw-sub-row[data-a="2"][data-s="0"]', firstName = await la.$eval(firstOffice + ' input[data-k="name"]', i => i.value);
-    const fromBox = await la.locator(conf + ' td.la-order').boundingBox(), toBox = await la.locator(firstOffice + ' td.la-order').boundingBox();
+    const fromBox = await la.locator(conf + ' td:nth-child(4)').boundingBox(), toBox = await la.locator(firstOffice + ' td.la-order').boundingBox();
     await la.mouse.move(fromBox.x + fromBox.width / 2, fromBox.y + fromBox.height / 2);
     await la.mouse.down();
     for (let i = 1; i <= 8; i++) await la.mouse.move(fromBox.x + fromBox.width / 2, fromBox.y + fromBox.height / 2 + (toBox.y + toBox.height * 0.25 - fromBox.y - fromBox.height / 2) * i / 8);
