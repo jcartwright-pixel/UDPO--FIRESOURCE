@@ -131,11 +131,10 @@ async function runWriteBack({ db, sheets, target, now, allowRealLive }) {
 async function writeClaimed({ db, sheets, target, stamp, all }) {
   const items = all.filter(i => !i.history), history = all.filter(i => i.history);
 
-  // One read per tab touched.
+  // One read per tab touched. Review item 66 (Joe 10/13): a tab the workbook does not have (renamed or deleted) no longer
+  // stops every save: its saves go on the conflicts list and the other tabs are still written.
   const tabs = [...new Set(items.map(i => i.tab))];
-  const tabValues = tabs.length ? await sheets.batchGet(target.spreadsheetId, tabs.map(t => "'" + t + "'")) : [];
-  const sheet = {};
-  tabs.forEach((t, i) => { sheet[t] = tabValues[i]; });
+  const { sheet, badTabs } = await readTabs(sheets, target.spreadsheetId, tabs);
 
   // What the new app last knew for each cell: the run's copy of the sheet row, updated as cells are written.
   const runIds = [...new Set(items.map(i => i.runDocId))];
@@ -147,6 +146,13 @@ async function writeClaimed({ db, sheets, target, stamp, all }) {
   const ops = [];
   let written = 0, conflicts = 0;
   items.forEach(item => {
+    if (badTabs[item.tab]) {
+      conflicts++;
+      ops.push({ ref: db.collection(C.conflicts).doc(item.id + '-tab'), data: { open: true, at: stamp, requestId: item.requestId, by: item.by, tab: item.tab, runDocId: item.runDocId, route: item.match && item.match.route || '', run: item.match && item.match.run || '',
+        problem: 'the Live workbook has no tab named ' + item.tab + '; nothing was written', cells: item.cells || {} } });
+      ops.push({ ref: item.ref, update: { status: 'conflict', doneAt: stamp } });
+      return;
+    }
     const values = sheet[item.tab] || [];
     const found = findRow(values, item);
     // A run Route Master added to a Live week (actions.js addLiveRun, D6): a new row under the last one, as the current app does
@@ -230,6 +236,32 @@ async function writeClaimed({ db, sheets, target, stamp, all }) {
   return { written, conflicts, items: all.length };
 }
 
+// A tab name the sheet cannot find (the Sheets API's "Unable to parse range"; the test fake's "no fake tab").
+const BAD_TAB = /Unable to parse range|no fake tab/i;
+
+// Reads every tab in one request; if that fails, each tab on its own, so one missing tab only marks that tab (review item 66).
+// Any other failure (quota, network) still stops the pass and the claimed saves wait for the next one.
+async function readTabs(sheets, spreadsheetId, tabs) {
+  const sheet = {}, badTabs = {};
+  if (!tabs.length) return { sheet, badTabs };
+  try {
+    const values = await sheets.batchGet(spreadsheetId, tabs.map(t => "'" + t + "'"));
+    tabs.forEach((t, i) => { sheet[t] = values[i]; });
+    return { sheet, badTabs };
+  } catch (e) {
+    if (!BAD_TAB.test(String(e && e.message))) throw e;
+  }
+  for (const t of tabs) {
+    try {
+      sheet[t] = (await sheets.batchGet(spreadsheetId, ["'" + t + "'"]))[0];
+    } catch (e) {
+      if (!BAD_TAB.test(String(e && e.message))) throw e;
+      badTabs[t] = true;
+    }
+  }
+  return { sheet, badTabs };
+}
+
 // LOADOUT HISTORY rows: the row whose history_key matches is updated (a correction), else one is added under the last row.
 // The tab is made, with its headers, if the workbook has none yet (as the current app does on the first Done load).
 async function historyWrites(sheets, spreadsheetId, items, stamp, db) {
@@ -238,7 +270,7 @@ async function historyWrites(sheets, spreadsheetId, items, stamp, db) {
   try {
     values = (await sheets.batchGet(spreadsheetId, [range]))[0] || [];
   } catch (e) {
-    if (!sheets.structure || !/Unable to parse range|no fake tab/i.test(String(e && e.message))) throw e;
+    if (!sheets.structure || !BAD_TAB.test(String(e && e.message))) throw e;
     await sheets.structure(spreadsheetId, [{ addSheet: { properties: { title: HISTORY_TAB, gridProperties: { frozenRowCount: 1 } } } }]);
     values = [];
   }

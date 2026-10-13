@@ -156,7 +156,7 @@ function A(m) {
   return card('load', head('load') + '<div class="dc-links two">' + m.loadLinks.join('') + '</div>' +
     '<div class="mid">' +
       '<div class="panel" style="display:flex;flex-direction:column"><div class="sec-t"><span>Loads by depart time</span><span>done / scheduled</span></div><div style="flex:1;min-height:0">' + hourBars(m, 62) + '</div>' + legend + '</div>' +
-      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, 'all departments · 30+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, m.puOpen.map(p => p.route).join(', ') || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
+      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, 'all departments · 30+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, /* review item 72 (Joe 10/13): made safe */ esc(m.puOpen.map(p => p.route).join(', ')) || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
     '</div>' + metrics(m, 'load') + '<div class="dc-bar"><i style="width:' + m.loadPct + '%"></i></div><div class="dc-note">' + m.loadNote + '  ·  ' + m.tDoneByNow + ' done by now, yesterday ' + m.yDoneByNow + ' at this time</div>', 'home4') +
   card('unload', head('unload') + '<div class="dc-links two">' + m.unloadLinks.join('') + '</div>' +
     '<div class="mid">' +

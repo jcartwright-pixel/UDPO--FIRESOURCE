@@ -45,7 +45,7 @@ module.exports = async function localCalls(page) {
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result }) });
         return;
       }
-      const result = name === 'phone' ? await phoneLocal(data) : name === 'garage' ? await garageCall(db(), data) : name === 'admin' ? await A.adminCall(db(), user, data, {}) : name === 'stationSignIn' ? await stationSignIn(data) : name === 'setSwitch' ? await require('../../src/switch').setSwitch(db(), user, data, true) : await A.stationRelease(db(), user, data);
+      const result = name === 'phone' ? await phoneLocal(data) : name === 'garage' ? await garageCall(db(), data, undefined, { user: unitedDairyUser(user && { uid: user.user_id, token: user }), claims: user }) : name === 'admin' ? await A.adminCall(db(), user, data, {}) : name === 'stationSignIn' ? await stationSignIn(data) : name === 'setSwitch' ? await require('../../src/switch').setSwitch(db(), user, data, true) : await A.stationRelease(db(), user, data);
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result }) });
     } catch (e) { await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: { status: 'FAILED_PRECONDITION', message: e.message } }) }); }
   });

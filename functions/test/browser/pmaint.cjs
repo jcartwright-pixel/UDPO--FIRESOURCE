@@ -54,6 +54,14 @@ async function plantInHeader(page, what, name) {
   await page.waitForFunction(n => document.getElementById('plant-name').textContent === n, name || 'Uniontown');
   assert.match(await page.textContent('.head .eyebrow'), new RegExp('Plant Maintenance · ' + (name || 'Uniontown')));
 }
+// Review item 68 (Joe 10/13): the Maintenance Station board needs a United Dairy sign-in (or a station code), so the tablet signs
+// in first (on the Maintenance Center, same browser) and then opens the station.
+async function stationPage(browser, width, height, plantHome) {
+  const page = await openPage(browser, width, height, '/pmaint.html?' + ADMIN, true, plantHome);
+  await plantInHeader(page, 'sign-in', plantHome === 'fac_charleston' ? 'Charleston' : 'Uniontown');
+  await page.goto(HOSTING + '/maint-station.html');
+  return page;
+}
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') }); };
 
 (async () => {
@@ -170,16 +178,24 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    const chs = await openPage(browser, 1280, 800, '/maint-station.html', true, 'fac_charleston');
+    // Review item 68: with no sign-in and no station code the board is not shown.
+    const nobody = await openPage(browser, 1280, 800, '/maint-station.html', true);
+    await nobody.waitForFunction(() => /Sign in with a United Dairy account/.test(document.getElementById('gs-message').textContent), null, { timeout: 8000 });
+    assert.equal(await nobody.$$eval('#jobs .gs-job', l => l.length), 0, 'no work orders without a sign-in');
+    assert.doesNotMatch(await nobody.textContent('body'), /JELLICK|GALLON FILLER/, 'no technician names or machines without a sign-in');
+    await nobody.context().close();
+    results.push('Maintenance Station: nothing shown without a United Dairy sign-in or station code (review item 68)');
+    const chs = await stationPage(browser, 1280, 800, 'fac_charleston');
     await chs.waitForSelector('#jobs .gs-empty');
     assert.match(await chs.textContent('#title'), /Maintenance Station · Charleston/);
     assert.doesNotMatch(await chs.textContent('#jobs'), /M-1001/, 'Charleston\'s station shows only Charleston\'s work orders');
     await chs.context().close();
     results.push('Plant comes from the plant home opened: no plant picker; Charleston\'s home opens Charleston\'s pages and station');
 
-    // Maintenance Station: no sign-in to see the work orders; name + login ID to start; Complete with a signature.
+    // Maintenance Station: the tablet's United Dairy sign-in to see the work orders (review item 68); name + login ID to start;
+    // Complete with a signature.
     for (const [w, h] of [[1280, 800], [1920, 1080]]) {
-      const page = await openPage(browser, w, h, '/maint-station.html', true);
+      const page = await stationPage(browser, w, h);
       await page.waitForSelector('#jobs .gs-job');
       assert.match(await page.textContent('#jobs'), /GALLON FILLER[\s\S]*M-1001/);
       assert.match(await page.textContent('#title'), /Maintenance Station · Uniontown/);
@@ -188,7 +204,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    const st = await openPage(browser, 1280, 800, '/maint-station.html', true);
+    const st = await stationPage(browser, 1280, 800);
     await st.waitForSelector('#jobs .gs-job');
     await st.click('#jobs .gs-job:has-text("M-1002") button');
     await st.click('#job-start');

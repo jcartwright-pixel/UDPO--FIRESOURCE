@@ -299,3 +299,26 @@ test('Date Inventory, Dry Run and Convert (sandbox copy only, read back)', async
   assert.equal(T.toSerial('2026-10-09T16:30:00Z', 'DATETIME'), 46304 + 12.5 / 24);
   assert.equal(T.toSerial('4:30 AM', 'TIME'), 4.5 / 24);
 });
+
+// Review item 70 (Joe 10/13): the Lessor button's save happened before the email; an email that fails, or a fault while
+// sending it, is reported as a saved write-up with a note that the email did not go, never as a failed save.
+test('Repair Email: when the Lessor email fails, the save still answers ok with a note that the email did not go', async () => {
+  await applyAction(db(), DISPATCHER, { action: 'saveCheckIn', requestId: rid(), runDocId: RUN, day: 'mon', tractorIssues: 'Wiper broken' });
+  const truck = L.issueRows(await records(), 'TRUCK')[0];
+  await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: 'repairs@penske.com', mode: 'SEND' } } });
+  // The mail server refuses it.
+  const refused = { env: { MAIL_FROM: 'joe@uniteddairy.com' }, sendMail: async () => { throw new Error('mail server down'); } };
+  const input = { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'PENSKE' };
+  const saved = await applyAction(db(), DISPATCHER, input);
+  const res = await T.afterSave(db(), DISPATCHER, input, saved, refused);
+  assert.equal(res.ok, true);
+  assert.equal(res.email, 'FAILED');
+  assert.match(res.message, /^Saved\. The lessor email did not go: .*mail server down/);
+  assert.match((await records()).find(r => r.kind === 'TRUCK').notes, /Sent to lessor PENSKE/, 'the save is kept');
+  // A fault while sending (here the mail step's clock throws) does not fail the save either.
+  const broken = { env: { MAIL_FROM: 'joe@uniteddairy.com' }, sendMail: async () => ({ to: [] }), now: () => { throw new Error('clock fault'); } };
+  const res2 = await T.afterSave(db(), DISPATCHER, input, saved, broken);
+  assert.equal(res2.ok, true);
+  assert.equal(res2.email, 'FAILED');
+  assert.equal(res2.message, 'Saved. The lessor email did not go: clock fault.');
+});

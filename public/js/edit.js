@@ -6,7 +6,7 @@
  * permission), the cell goes back to what the database holds and the reason shows as an error.
  */
 import { start, save as sendSave, savePill, showError, friendlyError, escapeHtml, goLiveNote } from './app.js';
-import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const L = window.UDLogic;
 
@@ -69,7 +69,9 @@ export async function watchLists(user, onChange) {
     onChange();
   });
   // Days off (Driver Call-Off, Weekly availability, Vacation Schedule): those drivers are left out unless OVR is ticked.
-  onSnapshot(collection(db, 'exceptions'), snap => { lists.exceptions = snap.docs.map(d => d.data()); onChange(); });
+  // Review item 73 (Joe 10/13): only days off ending in the previous Live week or later (Daily and Weekly show the Live weeks),
+  // not every one ever entered.
+  onSnapshot(query(collection(db, 'exceptions'), where('endDate', '>=', L.addDays(L.weekStart(L.operatingDay(new Date())), -7))), snap => { lists.exceptions = snap.docs.map(d => d.data()); onChange(); });
   // Operational Assignments: Carrier, Fairmont... offered under Other CVG / Carriers in the driver lists.
   onSnapshot(collection(db, 'opsAssignments'), snap => { lists.ops = L.opsAssignments(snap.docs.map(d => d.data())); onChange(); });
   // Which app runs each screen: a screen still run from the current app is view only here once any screen has moved.

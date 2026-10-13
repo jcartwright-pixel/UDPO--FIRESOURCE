@@ -100,3 +100,15 @@ test('fleet sync preview lists each change with its unit, plant, sheet row, now 
   assert.deepEqual([t95.to, t95.kind, t95.plant, t95.why], ['Charleston', 'added', 'Charleston', '']);
   assert.ok(!changes.some(c => /updated|sync|version|created/i.test(c.field)), 'bookkeeping columns are written but not listed');
 });
+
+// Review item 67 (Joe 10/13): the fleet list holds only trucks and trailers; other kinds are never set INACTIVE.
+test('fleet sync never sets fork trucks, pallet jacks or other kinds INACTIVE', () => {
+  const master = MASTER.concat([
+    row({ equipment_id: 'eq_fork_3', equipment_type: 'FORK_TRUCK', unit_id: 'FT-3', facility_id: 'fac_uniontown', status: 'ACTIVE', source_present: 'TRUE' }),
+    row({ equipment_id: 'eq_pj_12', equipment_type: 'PALLET_JACK', unit_id: 'PJ-12', facility_id: 'fac_uniontown', status: 'ACTIVE', source_present: 'TRUE' }),
+    row({ equipment_id: 'eq_x_9', equipment_type: '', unit_id: 'X-9', facility_id: 'fac_uniontown', status: 'ACTIVE', source_present: 'TRUE' })]);
+  const { cells, summary } = planFleetSync(FLEET, master, AT);
+  const v = apply(master, cells);
+  ['FT-3', 'PJ-12', 'X-9'].forEach(u => assert.equal(get(v, u, 'status'), 'ACTIVE', u));
+  assert.deepEqual(summary.inactive.sort(), ['237', '688'], 'only trucks and trailers come off');
+});

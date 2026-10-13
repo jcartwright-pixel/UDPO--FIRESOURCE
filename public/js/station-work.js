@@ -603,7 +603,8 @@ export function mountStationWork({ db, box, person, onDraw }) {
     schedUnsubs.forEach(u => u()); schedUnsubs = [];
     if (!want) return;
     const fail = (what) => (e) => { if (!stopped) showError('Could not read ' + what + ': ' + e.message); };
-    schedUnsubs = ['SHIPPING', 'RECEIVING'].map(lane => onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.LOAD_TYPE[lane])),
+    // Review item 73 (Joe 10/13): the schedule's entries of the last 14 days and later (the tablet shows today's), not every one ever made.
+    schedUnsubs = ['SHIPPING', 'RECEIVING'].map(lane => onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.LOAD_TYPE[lane]), where('date', '>=', L.addDays(today(), -14))),
       s => { sched[lane] = s.docs.map(d => d.data()); got[lane] = true; render(); }, fail('the ' + (lane === 'SHIPPING' ? 'Shipping' : 'Receiving') + ' schedule')));
     schedUnsubs.push(onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; }));
   }

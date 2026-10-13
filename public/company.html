@@ -97,7 +97,9 @@
       const { db } = await start();
       const fail = (what) => e => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; ready = true; render(); }, fail('your user record'));
-      onSnapshot(collection(db, 'maintenance'), s => { data.maintenance = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, fail('the maintenance list'));
+      // Review item 73 (Joe 10/13): Home counts open write-ups only, so it reads only those not finished or removed (the
+      // finished ones are what grows every day); the Maintenance number stays the same.
+      onSnapshot(query(collection(db, 'maintenance'), where('status', 'not-in', ['COMPLETE', 'COMPLETED', 'CLOSED', 'RESOLVED', 'REPAIRED', 'REMOVED'])), s => { data.maintenance = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, fail('the maintenance list'));
       const unsubs = [];
       const watch = () => {
         date = today();
