@@ -62,6 +62,11 @@ async function stationPage(browser, width, height, plantHome) {
   await page.goto(HOSTING + '/maint-station.html');
   return page;
 }
+// Review item 34 (Joe 10/13): the help line at the bottom keeps a gap from the side menu, as the boxes above it do.
+async function footGap(page, what) {
+  const gap = await page.evaluate(() => { const f = document.getElementById('foot'), m = document.querySelector('.sidemenu'), r = document.createRange(); r.selectNodeContents(f); return Math.round(r.getBoundingClientRect().left - (m ? m.getBoundingClientRect().right : 0)); });
+  assert.ok(gap >= 12, what + ': the help line is not against the side menu (' + gap + 'px)');
+}
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') }); };
 
 (async () => {
@@ -90,6 +95,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       assert.match(await page.textContent('#kpis'), /Requests waiting[\s\S]*PMs overdue/);
       assert.match(await page.textContent('#pms'), /Grease filler bowl bearings[\s\S]*late/);
       await plantInHeader(page, 'Maintenance Center ' + w);
+      await footGap(page, 'Maintenance Center ' + w);
       await fits(page, 'Maintenance Center ' + w);
       await smallest(page, 'Maintenance Center ' + w);
       await shot(page, 'pmaint-center-' + w);
@@ -113,6 +119,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       await page.waitForSelector('#rows tr.on');
       assert.match(await page.textContent('#card'), /GALLON FILLER[\s\S]*From your Production Lines list[\s\S]*Grease filler bowl bearings[\s\S]*History[\s\S]*Valve 14 blew a seal/);
       await plantInHeader(page, 'Machinery ' + w);
+      await footGap(page, 'Machinery ' + w);
       await fits(page, 'Machinery ' + w);
       await smallest(page, 'Machinery ' + w);
       await shot(page, 'pmaint-machinery-' + w);
@@ -129,7 +136,11 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
     await mach.press('#card [data-k="make"]', 'Tab');
     await mach.waitForFunction(() => /Quincy/.test(document.getElementById('rows').textContent), null, { timeout: 8000 });
     assert.deepEqual(mach.errors, []);
-    results.push('Machinery: Air Compressor 2 added on leaving its name box; Make saved on leaving its box');
+    // Review item 35 (Joe 10/13): the Installed box reads 10-8-26 (the shared short date box), not mm/dd/yyyy.
+    await mach.fill('#card [data-k="installed"]', '2026-10-08');
+    await mach.press('#card [data-k="installed"]', 'Tab');
+    await mach.waitForFunction(() => { const i = document.querySelector('#card [data-k="installed"]'), f = i && i.parentElement.querySelector('.ud-date-face'); return f && !f.hidden && f.textContent === '10-8-26' && i.classList.contains('ud-date-dressed'); }, null, { timeout: 8000 });
+    results.push('Machinery: Air Compressor 2 added on leaving its name box; Make saved on leaving its box; Installed reads 10-8-26');
 
     // PM Schedule: Overdue first; + Add PM Task saves once it has a machine and what the PM is.
     for (const [w, h] of SIZES) {
@@ -137,6 +148,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       await page.waitForSelector('#rows tr[data-id]');
       assert.match(await page.innerHTML('#rows'), /Overdue \(1\)[\s\S]*Grease filler bowl bearings[\s\S]*Sent · M-1002[\s\S]*Later \(1\)[\s\S]*Blow down/);
       await plantInHeader(page, 'PM Schedule ' + w);
+      await footGap(page, 'PM Schedule ' + w);
       await fits(page, 'PM Schedule ' + w);
       await smallest(page, 'PM Schedule ' + w);
       await shot(page, 'pmaint-pmschedule-' + w);

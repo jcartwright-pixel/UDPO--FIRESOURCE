@@ -101,7 +101,8 @@
       kpi('Late', n(c.late), c.late ? 'avg ' + R.minutesText(c.avgLate) + ' after depart' : 'none late', c.late ? 'warn' : 'good') +
       kpi('Not loaded', n(c.notLoaded), c.notLoaded ? 'never marked done' : 'none missed', c.notLoaded ? 'bad' : 'good') +
       (c.firstStart === undefined ? kpi('Check-in shortages', n(c.shortages), 'drivers reported over / short or loaded wrong', c.shortages ? 'warn' : '')
-        : kpi('Loadout', (c.firstStart !== null ? R.clockText(c.firstStart) : '—') + ' – ' + (c.lastFinish !== null ? R.clockText(c.lastFinish) : '—'), 'first start · last finish', '', true)) +
+        // Review item 29 (Joe 10/13): each time keeps its AM/PM; the two times may sit on two lines instead of being cut.
+        : kpi('Loadout', (c.firstStart !== null ? R.clockText(c.firstStart).replace(' ', '&nbsp;') : '—') + ' – ' + (c.lastFinish !== null ? R.clockText(c.lastFinish).replace(' ', '&nbsp;') : '—'), 'first start · last finish', '', true)) +
       kpi('Avg load', c.avgTaken === null ? '—' : c.avgTaken + '<small> min</small>', 'Start to End') +
       kpi('Pickups', n(c.pickups), 'product that did not load', c.pickups ? 'bad' : 'good') +
       kpi('Breakdowns', n(c.breakdowns), c.tempsOut + ' temps out · ' + c.qualityFails + ' quality fails', c.breakdowns ? 'warn' : '') + '</div>';
@@ -113,7 +114,8 @@
       const one = (c) => {
         const future = c.date > now, k = future || c.onTimePct === null ? 'none' : pctClass(c.onTimePct);
         return '<button type="button" class="rp-day ' + k + (c.date === pick ? ' on' : '') + '" data-day="' + c.date + '" aria-pressed="' + (c.date === pick) + '"><h4>' + nice(c.weekday).slice(0, 3) + ' ' + fmt(c.date) + '</h4>' +
-          '<b>' + (future ? '—' : c.onTimePct === null ? (c.loads ? '—' : 'No loads') : c.onTimePct + '%') + '</b><span>' + (future ? 'to come' : c.judged ? c.onTime + ' of ' + c.judged + ' on time' : c.date === now ? 'today, none due yet' : 'on time') + '</span>' +
+          // Review item 29 (Joe 10/13): "No loads" in normal-sized words, not the giant number letters.
+          (!future && c.onTimePct === null && !c.loads ? '<b class="rp-none-day">No loads</b>' : '<b>' + (future ? '—' : c.onTimePct === null ? '—' : c.onTimePct + '%') + '</b>') + '<span>' + (future ? 'to come' : c.judged ? c.onTime + ' of ' + c.judged + ' on time' : c.date === now ? 'today, none due yet' : 'on time') + '</span>' +
           '<i>' + (future ? c.loads + ' loads' : c.late + ' late · ' + c.notLoaded + ' not loaded') + '</i><i class="' + (c.pickups.length ? 'bad' : '') + '">' + c.pickups.length + ' pickup' + (c.pickups.length === 1 ? '' : 's') + '</i></button>';
       };
       return '<div class="rp-days">' + list.map(one).join('') + '<button type="button" class="rp-day week ' + pctClass(t.onTimePct) + (pick === 'week' ? ' on' : '') + '" data-day="week" aria-pressed="' + (pick === 'week') + '"><h4>Week</h4><b>' + (t.onTimePct === null ? '—' : t.onTimePct + '%') + '</b><span>' + (t.judged ? t.onTime + ' of ' + t.judged + ' on time' : 'on time') + '</span><i>' + t.late + ' late · ' + t.notLoaded + ' not loaded</i><i class="' + (t.pickups ? 'bad' : '') + '">' + t.pickups + ' pickups</i></button></div>';

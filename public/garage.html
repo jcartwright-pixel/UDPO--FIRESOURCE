@@ -30,7 +30,6 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="kpis" id="kpis"></div>
       <div class="actions">
         <div class="chips" id="filters"></div>
         <input type="search" id="search" placeholder="Find a unit, problem or technician" aria-label="Find">
@@ -59,14 +58,9 @@
     const when = (s) => { const v = String(s || ''); if (/T\d/.test(v) && !isNaN(new Date(v))) return shortDate(v); const k = v.slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
     const yes = (v) => /^(Y|YES|TRUE)$/i.test(String(v || '').trim());
     const hm = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' m' : m + ' m';
-    const weekAgo = () => new Date(Date.now() - 7 * 86400000).toISOString();
 
     function render() {
-      const open = orders.filter(isOpen), done7 = orders.filter(o => o.status === 'DONE' && String(o.completed_at || '') >= weekAgo());
-      document.getElementById('kpis').innerHTML = [
-        [open.length, 'Open', ''], [orders.filter(o => o.status === 'NEW').length, 'Not started', 'warn'], [orders.filter(o => o.status === 'WORKING').length, 'Being worked', ''],
-        [orders.filter(o => o.status === 'PARTS').length, 'Waiting on parts', 'warn'], [open.filter(o => !yes(o.can_run)).length, 'Cannot run', 'warn'], [done7.length, 'Done last 7 days', 'good']
-      ].map(([n, label, c]) => '<div class="' + (n ? c : 'zero') + '"><b>' /* polish item 7: a zero is plain grey */ + n + '</b><span>' + label + '</span></div>').join('');
+      // Review item 44 (Joe 10/13): no count tiles; the filter buttons below already carry the counts.
       const match = (o, k) => k === 'all' || (k === 'open' ? isOpen(o) : k === 'parts' ? o.status === 'PARTS' : o.status === 'DONE');
       document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + orders.filter(o => match(o, k)).length + '</b></button>').join('');
       const q = search.toUpperCase();

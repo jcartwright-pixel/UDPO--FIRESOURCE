@@ -40,3 +40,37 @@ body.pk-full .topbar { display: none !important; }
   .pk-row > :nth-child(4), .pk-row > :nth-child(2) { display: none; }
   .pk-title h1 { font-size: 28px; } .pk-title b { font-size: 22px; }
 }
+
+/* Review item 49 (Joe 10/13): Plant Performance locks like the other stations: only the Release bar at the bottom (dark, to
+   match the TV), and the manager release code box over the screen. */
+body.pk-page .station-release { background: #0a1622; color: rgba(255, 255, 255, .78); border-top-color: rgba(255, 255, 255, .2); }
+body.pk-page .station-release:hover, body.pk-page .station-release:focus-visible { background: #16263a; color: #fff; }
+body.pk-page #release-box:not([hidden]) { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 60; width: min(720px, calc(100vw - 32px)); box-shadow: 0 12px 40px rgba(0, 0, 0, .45); border-radius: 12px; color: #33475b; }
+body.pk-page #release-box .ps-release { margin: 0; }
+/* The station lock's own rules (stations.css, which this page does not load: its phone column would narrow the TV). */
+body.pk-page.station-locked #go-back, body.pk-page.station-locked #go-home, body.pk-page.station-locked #signout { display: none !important; }
+body.pk-page .station-release { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; height: 56px; margin: 0; border: 0; border-top: 1px solid; border-radius: 0;
+  font: inherit; font-size: 18px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+body.pk-page .station-release[hidden] { display: none; }
+body.pk-page.station-locked.fill #screen:not([hidden]) { height: calc(100vh - 56px); }
+body.pk-page .ps-release { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px; border: 2px solid #f0b46a; border-radius: 12px; background: #fff8ee; font-size: 18px; }
+body.pk-page .ps-release p { flex-basis: 100%; margin: 0; font-weight: 700; color: #7a3d00; }
+body.pk-page .ps-release input { font: inherit; min-height: 48px; padding: 0 12px; border: 1px solid #c9d5e1; border-radius: 8px; margin-left: 8px; text-transform: uppercase; }
+body.pk-page .ps-release button { min-height: 48px; padding: 0 18px; border-radius: 8px; border: 1px solid #0b3d6b; background: #0b3d6b; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+body.pk-page .ps-release button[type=button] { background: #fff; color: #0b3d6b; }
+body.pk-page .ps-release-msg { font-weight: 700; color: #b42318; }
+
+/* Review item 50 (Joe 10/13): the logo first, then Back and Home, as on the desktop screens; the rest on the right. */
+body.pk-page .topbar > * { order: 2; }
+body.pk-page .topbar > :is(.brand, #go-back, #go-home) { order: 0; }
+body.pk-page .topbar > .test-copy-badge { order: 1; }
+body.pk-page .topbar > .brand { margin-right: 0; }
+body.pk-page .topbar::before { content: ''; order: 1; flex: 1 1 0; }
+/* Review item 39 (Joe 10/13): on a 1024 tablet the big numbers fit their tile ("100%" no longer runs into Behind Now). */
+.pk-kpis div { min-width: 0; overflow: hidden; }
+@media (max-width: 1280px) and (min-width: 901px) {
+  .pk-kpis { gap: 14px; }
+  .pk-kpis div { padding: 14px 18px; }
+  .pk-kpis b { font-size: 60px; }
+  .pk-kpis b small { font-size: 30px; }
+}

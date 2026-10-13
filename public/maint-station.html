@@ -18,6 +18,7 @@
     <div class="topbar">
       <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
       <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
+      <button type="button" class="gs-nav" id="ms-change" hidden>Release</button>
       <span class="gs-people" id="people"></span>
       <button id="gs-signout" type="button" hidden>Sign Out</button>
     </div>
@@ -27,6 +28,7 @@
     <div class="view">
       <div class="gs">
         <p class="gs-msg" id="gs-message" role="alert" hidden></p>
+        <div id="ms-release" hidden></div>
 
         <!-- Work orders: the first screen, no sign-in (Joe 10/10). -->
         <section id="view-jobs" class="gs-stack">
@@ -123,6 +125,7 @@
   <script type="module">
     import { start, escapeHtml, goBack } from './js/app.js';
     import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+    import { askRelease, lockStation } from './js/station-code.js';
     import { fullScreenOnTap } from './js/full-screen.js';
 
     fullScreenOnTap();
@@ -181,6 +184,8 @@
     function rowClass(j) { return j.status === 'PARTS' ? 'parts' : j.onNow.length ? 'working' : !j.canRun ? 'down' : j.source === 'PM' ? 'office' : ''; }
     function drawJobs() {
       $('jobs-title').textContent = 'Work Orders' + (jobs.length ? ' · ' + jobs.length + ' open' : '');
+      // Review item 48 (Joe 10/13): no "Mechanics:" with nothing after it; the line shows once the plant has mechanics.
+      $('strip').hidden = !techs.length;
       $('strip').innerHTML = '<span class="gs-label">Mechanics:</span>' + techs.map(t => '<button type="button" class="gs-chip' + (t.on ? ' on' : '') + '" data-tech="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) +
         '<small>' + (t.on ? escapeHtml(t.on.unit) + ' · ' + clock(t.on.since) : 'free') + '</small></button>').join('');
       $('jobs').innerHTML = jobs.map((j, i) => {
@@ -411,6 +416,18 @@
     };
     $('go-back').addEventListener('click', goBack);
     $('go-home').addEventListener('click', () => { location.href = 'index.html'; });
+    // Review item 49 (Joe 10/13): the Maintenance Station is a station, so it locks like the others: no Back, Home or Sign out,
+    // only the Release bar at the bottom. Release asks for the plant's manager release code (when the plant has one), then
+    // goes back to the screen it was opened from (Home when it was opened on its own).
+    lockStation($('ms-change'), true);
+    $('ms-change').addEventListener('click', async () => {
+      const ok = await askRelease($('ms-release'), { status: () => call('release', { step: 'status' }), release: (code) => call('release', { step: 'release', code }), onError: message,
+        why: 'A manager must type the manager release code to take this tablet off the Maintenance Station.' });
+      if (!ok) return;
+      let from = '';
+      try { from = document.referrer && new URL(document.referrer).origin === location.origin ? document.referrer : ''; } catch (e) { /* no referrer */ }
+      location.href = from && !/maint-station\.html/.test(from) ? from : 'index.html';
+    });
     ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { lastTouch = Date.now(); }, true));
     // The clocks tick every 30 seconds; the list comes back fresh every 30 seconds while nobody is typing a login ID.
     setInterval(() => {
