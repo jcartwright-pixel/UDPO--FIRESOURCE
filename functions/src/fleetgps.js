@@ -243,11 +243,12 @@ function advanceDays(seen, trucks, at) {
   return { seen: { date, units }, changedTrucks, days };
 }
 
-async function writeAll(db, coll, docs) {
+// merge: a day's record is written in parts (a yard-only change carries no miles), so it never wipes what it doesn't carry.
+async function writeAll(db, coll, docs, merge) {
   const ids = Object.keys(docs);
   for (let i = 0; i < ids.length; i += 400) {
     const b = db.batch();
-    ids.slice(i, i + 400).forEach(id => b.set(db.collection(coll).doc(id), docs[id]));
+    ids.slice(i, i + 400).forEach(id => b.set(db.collection(coll).doc(id), docs[id], { merge: !!merge }));
     await b.commit();
   }
 }
@@ -329,7 +330,7 @@ async function pull(db, options) {
     const seenRef = db.collection('private').doc('gpsFleetSeen');
     const step = advanceDays((await seenRef.get()).data() || {}, trucks, at);
     await writeAll(db, 'gpsTrucks', step.changedTrucks);
-    await writeAll(db, 'gpsDays', step.days);
+    await writeAll(db, 'gpsDays', step.days, true);
     await seenRef.set(step.seen);
     out.trucks = Object.keys(trucks).length; out.days = Object.keys(step.days).length;
     // The alerts are read after the trucks; a problem with them never stops the trucks' read.

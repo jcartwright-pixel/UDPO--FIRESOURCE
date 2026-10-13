@@ -150,3 +150,14 @@ test('Fleet GPS: Pull now with all 520 Fleet units stores them all, and a failur
   assert.match(s.pulled.error, /^The GPS read stopped part way \(fetch failed\)/);
   assert.match(s.lastPullError, /fetch failed/);
 });
+
+// The Driver Scorecard thread (10/13): a read where only the yard changes must not wipe the day's miles.
+test('Fleet GPS: a day record written in parts keeps its miles when only the yard changes', async () => {
+  await db().collection('gpsDays').doc('2026-10-13_T-635').set({ tag: 'T-635', date: '2026-10-13', miles: 12.4, firstMove: '2026-10-13T09:00:00.000Z', idleMinutes: 5 });
+  await db().collection('private').doc('gpsFleetSeen').set({ date: '2026-10-13', units: { 'T-635': { lr: 'x', yard: true } } });
+  const log = [], o = { fetch: fleet(log), base: BASE, now: NOW, sleep: async () => {} };
+  await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
+  await pull(db(), o);
+  const day = (await db().collection('gpsDays').doc('2026-10-13_T-635').get()).data();
+  assert.deepEqual([day.miles, day.firstMove, day.idleMinutes, day.yardOut], [12.4, '2026-10-13T09:00:00.000Z', 5, '2026-10-13T14:10:00.000Z']);
+});
