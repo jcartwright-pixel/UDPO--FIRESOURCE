@@ -337,9 +337,11 @@ export function mountStationWork({ db, box, person, onDraw }) {
   })).catch(() => {});
   async function saveLoad(r, fields, shown) {
     const done = show(r.id, shown);
-    let res;
-    try { res = await save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }); showError(''); delete drafts[r.id]; } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
-    if (queued(res)) hold(r.id, done); else done();
+    let res, ok = false;
+    try { res = await save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }); ok = true; showError(''); delete drafts[r.id]; } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
+    // A saved change stays shown until the runs list catches up, so a load just paused is not counted as loading again
+    // for a moment (which refused the next Start: "2 loads are already loading").
+    if (queued(res)) hold(r.id, done); else if (ok) setTimeout(done, 1500); else done();
   }
   const chain = {};
   async function saveUnload(r, fields, shown) {
@@ -388,13 +390,14 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const done = show(id, shown);
     // Only what this save sent is cleared: a box typed while it was on its way stays typed.
     const sent = Object.assign({}, d);
-    let res;
+    let res, ok = false;
     try {
       res = await save('savePlantSchedule', Object.assign({ lane, op: 'progress', id: x.id, date: x.date, step, fields }, step === 'pause' ? { pauseReason: reason } : {})); showError('');
       if (step === 'pause') delete pauseForm[id];
       if (drafts[id]) Object.keys(fields).forEach(k => { if (drafts[id][k] === sent[k]) delete drafts[id][k]; });
+      ok = true;
     } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(id, m); else showError(x.route + ' ' + (x.run || '') + ': ' + m); }
-    if (queued(res)) hold(id, done); else done();
+    if (queued(res)) hold(id, done); else if (ok) setTimeout(done, 1500); else done();
   }
 
   // What was typed on a load's card and differs from the load.
