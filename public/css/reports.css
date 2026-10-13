@@ -97,3 +97,7 @@ body.sr-page .view.sr-view:not([hidden]) { display: grid; grid-template-columns:
 .sr-subject { padding: 12px 16px; font-size: 16px; font-weight: 800; color: var(--ud-blue-dark); border-bottom: 1px solid #e5ebf1; }
 .sr-report iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #f4f6f8; }
 @media (max-width: 1100px) { body.sr-page .view.sr-view:not([hidden]) { grid-template-columns: 1fr; } }
+/* Review item 29 (Joe 10/13): "No loads" on a day card is a one-line word, and the Loadout times keep their AM/PM
+   (the two times go on two lines when the tile is narrow, never cut off). */
+.rp-day b.rp-none-day { font-size: 22px; line-height: 1.2; margin: 8px 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-kpi b.small { white-space: normal; line-height: 1.15; margin: 6px 0 4px; }

@@ -86,3 +86,24 @@
 .pmw-page .kpis span, .pmw-page .chips button b, .pmw-page table.issues td small, .pmw-page table.issues th { font-size: 16px; }
 .pmw-page table.issues td, .pmw-page .chips button, .pmw-page #search, .pmw-page .foot { font-size: 16px; }
 .pmw-page .pill { font-size: 15px; }
+
+/* Review item 48 (Joe 10/13): the Maintenance Station on a phone. The red and dark buttons use the app's font (a button does
+   not take the page's font by itself), and on a narrow screen the title sits on its own line with "+ Report a Problem" and
+   "Record a Breakdown" side by side under it, each on the screen. */
+.ms-page .gs-btn { font-family: inherit; }
+.ms-page #ms-release .ps-release { margin: 0; }
+@media (max-width: 700px) {
+  .ms-page .view { padding: 0 10px 10px; }
+  .ms-page .head .title h1 { font-size: 24px; }
+  .ms-page #view-jobs > .gs-bar { flex-wrap: wrap; gap: 10px; }
+  .ms-page #view-jobs > .gs-bar h2 { flex: 1 1 100%; font-size: 26px; }
+  .ms-page #view-jobs > .gs-bar .gs-btn { flex: 1 1 0; min-width: 0; min-height: 64px; padding: 8px 10px; font-size: 19px; line-height: 1.15; }
+  .ms-page .gs-empty { font-size: 22px; }
+}
+/* Review item 34 (Joe 10/13): the help line at the bottom of Machinery, Maintenance Center and PM Schedule keeps the same gap
+   from the side menu as the boxes above it. */
+.mach-page .foot, .pmc-page .foot, .pms-page .foot { margin: 0 16px; padding-bottom: 6px; }
+/* Review item 35 (Joe 10/13): Machinery's Installed box reads 10-8-26 (the shared date box in js/app.js draws the short date over
+   the browser's box). With no date yet it is blank instead of the browser's mm/dd/yyyy; while it is being typed in, the
+   browser's own text shows. */
+.mach-page input[type="date"]:not(.ud-date-dressed):not(:focus)::-webkit-datetime-edit { color: transparent; }

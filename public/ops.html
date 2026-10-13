@@ -28,11 +28,10 @@
       <div class="title"><h1>Operational Assignments</h1><small>Dispatch Administration &rsaquo; Carrier, Fairmont, Marietta, Martins Ferry and other non-driver coverage</small></div>
       <div class="actions tiles">
         <button type="button" class="primary" id="add">+ Add Assignment</button>
-        <a class="button" href="admin.html">Dispatch Administration</a>
       </div>
     </div>
     <div class="notice error" id="error" hidden></div>
-    <p class="ops-note">Active names are offered under <b>Other CVG / Carriers</b> in the driver lists on Daily and Weekly Dispatch. Order sets their place in that list.</p>
+    <p class="ops-note">Active names are offered under <b>Other CVG / Carriers</b> in the driver lists on Daily and Weekly Dispatch. Their order here is their place in that list: grab a line and drag it to move it.</p>
     <div class="sheet ops-sheet">
       <table class="ops">
         <colgroup><col style="width:34%"><col style="width:14%"><col style="width:14%"><col style="width:38%"></colgroup>
@@ -46,20 +45,21 @@
     import { start, requireSignIn, escapeHtml, save, showError, dateTimeText } from './js/app.js';
     import { lists, watchLists, canManage, forScreen } from './js/edit.js';
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { mountRowDrag } from './js/row-drag.js';
 
     // The current app's Operational Assignments (93_DispatchAdminV037: Assignment, Active, Sequence). Each change saves at once.
     const L = window.UDLogic;
     forScreen('opsAssignments');
     let docs = [], adding = false;
-    const when = (x) => x.updatedAt ? dateTimeText(x.updatedAt) + ' · ' + String(x.updatedBy || '').split('@')[0] : (x.builtIn ? 'Built in (the current app\'s list)' : '');
+    const when = (x) => x.updatedAt ? dateTimeText(x.updatedAt) + ' · ' + String(x.updatedBy || '').split('@')[0] : (x.builtIn ? 'Came with the app' : '');
     function render() {
       // A name being typed in Add stays as it is when the list refreshes.
       const typing = document.getElementById('new-name'), typed = typing ? typing.value : '', hadFocus = typing && document.activeElement === typing;
       const edit = canManage(), rows = L.opsAssignments(docs), dis = edit ? '' : ' disabled';
       document.getElementById('add').disabled = !edit;
-      document.getElementById('rows').innerHTML = rows.map(x => '<tr data-name="' + escapeHtml(x.assignment) + '" class="' + (x.active === false ? 'off' : '') + '"><td class="strong">' + escapeHtml(x.assignment) + '</td>' +
+      document.getElementById('rows').innerHTML = rows.map((x, i) => '<tr data-name="' + escapeHtml(x.assignment) + '"' + (edit ? ' data-drag="' + escapeHtml(x.assignment) + '" tabindex="0"' : '') + ' class="' + (x.active === false ? 'off' : '') + '"><td class="strong">' + escapeHtml(x.assignment) + '</td>' +
         '<td><button type="button" class="toggle' + (x.active === false ? '' : ' on') + '" data-active aria-pressed="' + (x.active !== false) + '" aria-label="' + escapeHtml(x.assignment) + ' active"' + dis + '>' + (x.active === false ? 'NO' : 'YES') + '</button></td>' +
-        '<td><input class="ops-seq" type="number" inputmode="numeric" min="1" max="999" aria-label="Order for ' + escapeHtml(x.assignment) + '" value="' + escapeHtml(x.sequence) + '"' + dis + '></td><td class="muted">' + escapeHtml(when(x)) + '</td></tr>').join('') +
+        '<td class="ops-seq">' + (i + 1) + '</td><td class="muted">' + escapeHtml(when(x)) + '</td></tr>').join('') +
         (adding ? '<tr class="adding"><td><input id="new-name" maxlength="60" aria-label="New assignment name" placeholder="Name, for example Beckley"></td><td colspan="2"><button type="button" class="primary" id="new-save">Save</button> <button type="button" id="new-cancel">Cancel</button></td><td></td></tr>' : '');
       if (adding) { const box = document.getElementById('new-name'); box.value = typed; if (!typing || hadFocus) box.focus(); }
     }
@@ -76,12 +76,16 @@
       if (e.target.id === 'new-cancel') { adding = false; render(); }
       if (e.target.id === 'new-save') addNew();
     });
-    document.getElementById('rows').addEventListener('change', e => {
-      if (!e.target.matches('.ops-seq')) return;
-      const n = Number(e.target.value), x = find(e.target);
-      if (!Number.isInteger(n) || n < 1 || n > 999) { showError('Order must be a whole number from 1 to 999'); render(); return; }
-      put(x, { sequence: n });
-    });
+    // Review item 15 (Joe 10/13): the order is set by grabbing a line and dragging it (Alt+Up / Alt+Down on a focused line), as
+    // everywhere else; no number boxes. Each assignment whose place changed saves its new Order (1, 2, 3...).
+    mountRowDrag({ box: document.getElementById('rows'), canDrag: () => canManage(), handle: (td) => td.cellIndex === 0, onMove: (name, to) => {
+      const list = L.opsAssignments(docs), from = list.findIndex(x => x.assignment === name);
+      if (from < 0 || to === from) return;
+      list.splice(to, 0, list.splice(from, 1)[0]);
+      list.forEach((x, i) => { if (Number(x.sequence) !== i + 1) put(x, { sequence: i + 1 }); });
+      const row = document.querySelector('#rows tr[data-drag="' + CSS.escape(name) + '"]');
+      if (row) row.focus();
+    } });
     document.getElementById('rows').addEventListener('keydown', e => { if (e.target.id === 'new-name' && e.key === 'Enter') addNew(); if (e.key === 'Escape' && adding) { adding = false; render(); } });
     function addNew() {
       const name = document.getElementById('new-name').value.trim().replace(/\s+/g, ' ');

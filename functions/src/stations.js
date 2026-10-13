@@ -22,6 +22,7 @@
 
 const crypto = require('crypto');
 const L = require('./logic');
+const F = require('./fails');
 
 const DOC = (db) => db.collection('private').doc('stations');
 const FAILS = (db) => db.collection('private').doc('stationFails');
@@ -145,15 +146,16 @@ async function needsCode(db, kind, facilityId) {
   return Object.keys(list).some(k => list[k].kind === kind && list[k].facilityId === (facilityId || 'fac_uniontown') && list[k].hash);
 }
 
-// A typed code: the station it opens, or {ok:false, message}. 30 wrong codes a minute across all tablets, then a wait.
-async function enter(db, kind, code, now) {
+// A typed code: the station it opens, or {ok:false, message}. 30 wrong codes a minute from one tablet (fails.js), then that
+// tablet waits; the others are not held up.
+async function enter(db, kind, code, now, device) {
   const given = normCode(code), minute = new Date(now).toISOString().slice(0, 16);
   const list = await read(db);
   const hit = Object.keys(list).map(k => list[k]).find(s => s.kind === kind && s.hash && given.length >= 6 && sameHash(hash(s.salt, given), s.hash));
   return db.runTransaction(async tx => {
-    const f = ((await tx.get(FAILS(db))).data() || {})[kind] || {}, count = f.minute === minute ? f.count || 0 : 0;
+    const byDevice = F.current(((await tx.get(FAILS(db))).data() || {})[kind], f => f.minute === minute), count = (byDevice[device] || {}).count || 0;
     if (count >= MAX_FAILS_PER_MINUTE) return { ok: false, message: 'Too many wrong station codes. Wait a minute and try again.' };
-    if (!hit) { tx.set(FAILS(db), { [kind]: { minute, count: count + 1 } }, { merge: true }); return { ok: false, message: 'That station code was not recognized.' }; }
+    if (!hit) { byDevice[device] = { minute, count: count + 1 }; tx.set(FAILS(db), { [kind]: byDevice }, { mergeFields: [kind] }); return { ok: false, message: 'That station code was not recognized.' }; }
     return { ok: true, station: shown(hit, false) };
   });
 }
@@ -174,7 +176,7 @@ async function tabletCall(db, input, now) {
   const kind = KINDS[input.kind] ? input.kind : fail('BAD_REQUEST', 'Unknown station kind');
   const t = (now ? now() : new Date()).getTime();
   if (input.op === 'has') return { required: await needsCode(db, kind, text(input.facilityId, 60)) };
-  if (input.op === 'enter') return enter(db, kind, input.code, t);
+  if (input.op === 'enter') return enter(db, kind, input.code, t, F.who(input));
   if (input.op === 'check') return check(db, kind, input.key, input.version);
   fail('BAD_REQUEST', 'Unknown station step');
 }
@@ -195,7 +197,7 @@ async function signIn(db, input, now) {
   if (input.op !== 'enter') fail('BAD_REQUEST', 'Unknown station step');
   // With every plant's switch Off, no code is even looked at.
   if (!plants().some(p => all.noAccount[p.id] === true)) return { ok: false, off: true, message: 'The Plant Station with no UD account is turned off. Sign in with a United Dairy account.' };
-  const r = await enter(db, 'PLANT', input.code, (now ? now() : new Date()).getTime());
+  const r = await enter(db, 'PLANT', input.code, (now ? now() : new Date()).getTime(), F.who(input));
   if (r.ok && all.noAccount[r.station.facilityId] !== true) return { ok: false, off: true, message: r.station.plant + '\'s Plant Station with no UD account is turned off. Sign in with a United Dairy account.' };
   return r;
 }

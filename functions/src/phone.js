@@ -12,6 +12,7 @@
 const crypto = require('crypto');
 const L = require('./logic');
 const M = require('./model');
+const FAILS = require('./fails');
 const A = require('./actions');
 const MAINT = require('./maintenance');
 const B = require('./board-rules');
@@ -32,12 +33,13 @@ async function newRouteCode(db, user, now) {
   await db.runTransaction(async tx => {
     const person = await tx.get(db.collection(C.users).doc(M.safeIdPart(String(user.email).toLowerCase())));
     if (!person.exists || person.data().status !== 'ACTIVE' || !L.hasRole(person.data(), L.REORDER_ROLES)) throw new SaveError('NOT_ALLOWED', 'Only a manager or administrator can make a new phone code');
-    tx.set(CODE_REF(db), { codeHash: hashCode(code, salt), salt, enabled: true, setAt: stamp, setBy: String(user.email).toLowerCase(), failed: { minute: '', count: 0 } });
+    tx.set(CODE_REF(db), { codeHash: hashCode(code, salt), salt, enabled: true, setAt: stamp, setBy: String(user.email).toLowerCase(), failedBy: {} });
   });
   return { code, setAt: stamp };
 }
 
-async function checkCode(db, code, stamp) {
+// Wrong codes count per device (fails.js): 30 in a minute locks out that phone only.
+async function checkCode(db, code, stamp, device) {
   const minute = stamp.slice(0, 16);
   return db.runTransaction(async tx => {
     const snap = await tx.get(CODE_REF(db));
@@ -45,11 +47,12 @@ async function checkCode(db, code, stamp) {
     // Where a manager turns it on now (Joe 10/11): Administration > Links & Codes > Driver Station Codes.
     if (!c || !c.codeHash) throw new SaveError('NOT_ALLOWED', 'Phone Check-In is not turned on yet. A manager makes the code in Administration > Links & Codes > Driver Station Codes (Generate Code) and gives it to the drivers.');
     if (c.enabled !== true) throw new SaveError('NOT_ALLOWED', 'Phone Check-In is turned off right now. A manager turns it back on in Administration > Links & Codes > Driver Station Codes (Turn On).');
-    const failed = c.failed && c.failed.minute === minute ? c.failed.count : 0;
+    const failedBy = FAILS.current(c.failedBy, f => f.minute === minute), failed = (failedBy[device] || {}).count || 0;
     if (failed >= MAX_FAILED_PER_MINUTE) throw new SaveError('NOT_ALLOWED', 'Too many wrong codes; wait a minute and try again');
     const given = Buffer.from(hashCode(code || '', c.salt), 'hex'), want = Buffer.from(c.codeHash, 'hex');
     if (!code || given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
-      tx.update(snap.ref, { failed: { minute, count: failed + 1 } });
+      failedBy[device] = { minute, count: failed + 1 };
+      tx.update(snap.ref, { failedBy });
       return false;
     }
     return true;
@@ -75,7 +78,8 @@ function loadOf(run, runDocId, p) {
     palletJackIssues: d.palletJackIssues || '', trailerNeedsCleaned: L.yes(d.trailerNeedsCleaned), checkinNotes: d.checkinNotes || '', checkinCompletedAt: d.checkinCompletedAt || '',
     // What the driver said at an earlier check-in: the unit numbers they corrected, drop-and-hook trailers, the jack, over / short.
     palletJack: d.palletJackUnit || d.palletJack || '', checkinTruck: d.checkinTruck || '', checkinTrailer: d.checkinTrailer || '', moreTrailers: Array.isArray(d.moreTrailers) ? d.moreTrailers : [],
-    overageShortage: L.yes(d.overageShortage), overageShortageDetails: d.overageShortageDetails || '' };
+    overageShortage: L.yes(d.overageShortage), overageShortageDetails: d.overageShortageDetails || '',
+    loadedCorrectly: d.loadedCorrectly || '', loadingProblem: d.loadingProblem || '' };
 }
 
 // Who is checking in (Joe 10/11, as the old "Who is driving?"): a roster driver (their id), a fill-in or carrier name that is on
@@ -125,6 +129,15 @@ function checkinExtras(f, d, equipment) {
     out.overageShortage = f.overageShortage === true || !!out.overageShortageDetails ? 'TRUE' : '';
     if (!out.overageShortage) out.overageShortageDetails = '';
   }
+  // Joe 10/13: "Was your truck loaded correctly?" YES or NO; a NO says what was wrong. (A Check-In kept on a phone before
+  // the question existed has neither and is still taken.)
+  if (f.loadedCorrectly !== undefined || f.loadingProblem !== undefined) {
+    const v = String(f.loadedCorrectly || '').trim().toUpperCase();
+    if (v !== 'YES' && v !== 'NO') bad('Answer: Was your truck loaded correctly? Tap Yes or No.');
+    out.loadedCorrectly = v;
+    out.loadingProblem = v === 'NO' ? String(f.loadingProblem || '').trim().slice(0, 300) : '';
+    if (v === 'NO' && !out.loadingProblem) bad('Write what was loaded wrong.');
+  }
   const find = (raw, kind) => { const t = unitText(raw); if (!t || /^(N\/A|NA|TBA|NONE)$/.test(t)) return t === 'NA' ? 'N/A' : t; const u = MAINT.resolveUnit(t, kind, equipment); return u.resolved ? String(u.unit).trim().toUpperCase() : t; };
   if (f.palletJack !== undefined) out.palletJackUnit = find(f.palletJack, 'FORK_TRUCK');
   if (f.truck !== undefined) { const t = find(f.truck, 'TRUCK'); out.checkinTruck = t && t !== unitText(d.truck) ? t : ''; }
@@ -143,7 +156,7 @@ function checkinExtras(f, d, equipment) {
     out.checkinTrailer = named[0] && named[0] !== unitText(d.trailer) ? named[0] : '';
     out.moreTrailers = more.map((m, i) => ({ trailer: named[i + 1], issues: String(m.issues || '').trim().slice(0, 300), needsCleaned: m.needsCleaned === true }));
   }
-  [out.overageShortageDetails].concat((out.moreTrailers || []).map(m => m.issues)).forEach(v => { if (/^=/.test(v || '')) bad('Formula-style text is blocked. Enter plain text only.'); });
+  [out.overageShortageDetails, out.loadingProblem].concat((out.moreTrailers || []).map(m => m.issues)).forEach(v => { if (/^=/.test(v || '')) bad('Formula-style text is blocked. Enter plain text only.'); });
   return out;
 }
 
@@ -162,7 +175,7 @@ async function phoneCall(db, input, now) {
   if (input.station) {
     const r = roomStation(await STATIONS.check(db, 'KIOSK', input.station.key, input.station.version));
     if (!r.ok) throw new SaveError('NOT_ALLOWED', r.message + ' (station code)');
-  } else if (!(await checkCode(db, String(input.code || '').slice(0, 40), stamp))) throw new SaveError('NOT_ALLOWED', 'That code is not right. Ask Dispatch for the Route Distribution code.');
+  } else if (!(await checkCode(db, String(input.code || '').slice(0, 40), stamp, FAILS.who(input)))) throw new SaveError('NOT_ALLOWED', 'That code is not right. Ask Dispatch for the Route Distribution code.');
   if (op === 'roster') {
     const drivers = (await db.collection(C.drivers).get()).docs.map(d => d.data()).filter(d => d.name && L.driverActive(d));
     // Also the fill-in and carrier names on today's or yesterday's dispatch that are not on the roster, and the routes to pick instead of a name.

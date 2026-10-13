@@ -20,7 +20,9 @@ const SHOTS = process.env.SHOTS_DIR;
 const ADMIN = '?testEmail=admin.test@uniteddairy.com';
 
 async function openPage(browser, width, height, url) {
-  const page = await browser.newPage({ viewport: { width, height } });
+  // The stations keep their screen on the tablet with a service worker (Joe 10/13); its fetches skip page.route, so the
+  // Firebase code it asks gstatic.com for never arrives here. Blocked as in the other checks (station-offline.cjs tests it).
+  const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
@@ -34,6 +36,8 @@ async function openPage(browser, width, height, url) {
 const shot = async (p, name, clip) => { if (SHOTS) await p.screenshot(Object.assign({ path: path.join(SHOTS, name) }, clip ? { clip } : {})); };
 const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth);
 // The buttons of a page sit on one line at the top.
+// Review item 52 (Joe 10/13): each part of an email (before and after the @) sits on one line.
+const emailsWhole = (p) => p.$$eval('#people td.email', tds => tds.length > 0 && tds.every(td => [...td.childNodes].filter(n => n.nodeType === 3).every(n => { const r = document.createRange(); r.selectNodeContents(n); return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size === 1; })));
 const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...bar.querySelectorAll(':scope > button, :scope > a, :scope > .ap-right')].map(b => Math.round(b.getBoundingClientRect().top)); return new Set(tops).size === 1; });
 
 (async () => {
@@ -53,6 +57,16 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     assert.equal(/Users sheet; editing here is being built/.test(await p.textContent('#view')), false);
     assert.deepEqual(await p.$$eval('#view .ap-bar > button', b => b.map(x => x.textContent)), ['+ Add Person', '+ Add Role', 'Refresh']);
     assert.ok(await oneLine(p));
+    // Review items 51-53 (Joe 10/13): the side menu is words only; People & Roles has no info boxes; an email address never
+    // breaks mid-word (each piece, before and after the @, stays on one line).
+    assert.equal(await p.$$eval('.adm-nav .adm-item svg, .adm-nav .adm-item img, .adm-nav .adm-ic', x => x.length), 0);
+    assert.equal(await p.$('#view .ap-tiles'), null);
+    assert.equal(await emailsWhole(p), true);
+    // Joe 10/13: typing "conflicts" in Find a setting finds Sheet Conflicts under Diagnostics.
+    await p.fill('#find', 'conflicts');
+    await p.waitForFunction(() => [...document.querySelectorAll('.adm-item')].map(x => x.dataset.key).join() === 'sheet-conflicts');
+    await p.fill('#find', '');
+    await p.waitForSelector('.adm-item[data-key="people"]');
     await shot(p, 'people-1920.png');
     await shot(p, 'people-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
 
@@ -108,7 +122,8 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     // Joe 10/11: each link where it belongs. Manager Links keeps the manager links; the tablet links go with Plant Station
     // Codes; the Driver Station and the drivers' phone link (with its Route Distribution code) go to Driver Station Codes.
     await open('app-links', '.ap-link');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['company', 'phone', 'manager', 'screens', 'personal']);
+    // Review item 54 (Joe 10/13): no Phone Screens card; it only listed the same links again.
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['company', 'phone', 'manager', 'personal']);
     // Joe 10/12: Launch opens the screen in a new window, so Administration stays where it was.
     assert.deepEqual(await p.$$eval('.ap-link a.ap-btn', a => [...new Set(a.map(x => x.target))]), ['_blank']);
     await shot(p, 'app-links-1920.png');
@@ -301,6 +316,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     const small = await openPage(browser, 1366, 768, '/administration.html' + ADMIN);
     await small.waitForSelector('#people tr');
     assert.ok(await noSideScroll(small));
+    assert.equal(await emailsWhole(small), true);
     await shot(small, 'people-1366.png');
     await small.close();
   } finally {

@@ -45,8 +45,8 @@
         <div class="sheet">
           <table>
             <colgroup>
-              <col style="width:4%"><col style="width:5%"><col style="width:22%"><col style="width:7%"><col style="width:16%"><col style="width:13%">
-              <col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:9%">
+              <col style="width:4%"><col style="width:5%"><col style="width:21%"><col style="width:7%"><col style="width:15%"><col style="width:13%">
+              <col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:9%">
             </colgroup>
             <thead><tr>
               <th><input id="all" type="checkbox" aria-label="Select all drivers"></th><th>#</th><th>Driver</th><th>Relief</th><th>Seniority</th><th>Assigned truck</th>
@@ -124,6 +124,9 @@
       document.getElementById('count').textContent = shown.length + ' of ' + rows.length + ' drivers';
       document.getElementById('add').disabled = !edit;
       syncRemove();
+      // Review item 10 (Joe 10/13): the edit panel opens only on Edit or + Add Driver; otherwise the list takes the full width
+      // and the three counts sit above it.
+      document.querySelector('.split').classList.toggle('closed', !panelOpen);
       if (!panelOpen) document.getElementById('panel').innerHTML = '<div class="panel-empty">Press <b>&#9998; Edit</b> on a driver\'s row (or click the name)<br>and the driver opens here to change.<br><br>Press <b>+ Add Driver</b> above for a new driver.</div>';
       fitRoster();
     }

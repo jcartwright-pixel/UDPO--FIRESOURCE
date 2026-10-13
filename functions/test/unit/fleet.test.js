@@ -45,6 +45,9 @@ test('Over the Road logic: the screen and the server load the same file', () => 
   const routes = O.otrRouteList_([{ runId: 'r1', route: '855', run: 'SAL 1', include: 'TRUE', destination: 'save a lot' }]);
   const day = O.otrCountDay_('2026-10-04', [{ runId: 'r1', route: '855', run: 'SAL 1', runs: 'TRUE' }, { runId: 'r1', route: '855', run: 'SAL 1', runs: 'TRUE' }], routes);
   assert.equal(day.byDestination.SAL, 2, 'two runs on one day count 2');
+  // Review item 17 (Joe 10/13): Over the Road dates read 10-8-26, and the week's days 10-4-26.
+  assert.equal(O.otrShortDate_('2026-10-08'), '10-8-26');
+  assert.deepEqual(O.otrDashboard_('2026-10-08', {}, { total: 0 }, []).week.map(d => d.label)[0], '10-4-26');
 });
 
 test('Driver Scorecard logic: the screen and the server load the same file; a missed check-in and lost cases cost points', () => {

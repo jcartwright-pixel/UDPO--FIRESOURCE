@@ -13,7 +13,7 @@
  *   - Shipping loads are PLANT_SCHEDULE records, Receiving loads PLANT_RECEIVING, added suppliers PLANT_SUPPLIER; a record's
  *     newest copy is the record now (the app's own copy is always the newest) and a DELETED one is off the schedule;
  *   - Shipping's customers are the active Route Master runs shown to the plant, an as-needed customer (".. LOAD 1",
- *     ".. LOAD 2") listed once; Receiving's are the five starting suppliers plus the added ones;
+ *     ".. LOAD 2") listed once; Receiving's are the suppliers the plant added;
  *   - weeks run Sunday to Saturday; the plant's holidays are marked on the calendar. *
  * And Yard Checks' (getDesktopUiPlantYardChecksV5063 / udpoV780LoadedTrailerTemperatureWatch_, 7.0.276):
  *   - a trailer is on the yard from the day it is loaded until its dispatch time (the dispatch nearest after the load was
@@ -100,8 +100,8 @@
 
   var LOAD_TYPE = { SHIPPING: 'PLANT_SCHEDULE', RECEIVING: 'PLANT_RECEIVING' };
   var SUPPLIER_TYPE = 'PLANT_SUPPLIER';
-  var STARTING_SUPPLIERS = [['S01', 'VALLEY FARMS MILK CO-OP', 'Valley Farms'], ['S02', 'HILLSIDE CREAM COMPANY', 'Hillside Cream'], ['S03', 'KEYSTONE CARTON SUPPLY', 'Keystone Carton'],
-    ['S04', 'TRI-STATE CAPS AND CLOSURES', 'Tri-State Caps'], ['S05', 'SWEET RIDGE INGREDIENTS', 'Sweet Ridge']];
+  // Joe 10/13 ("the ones in there I don't want to have"): no sample suppliers; the list is only the ones the plant adds.
+  var STARTING_SUPPLIERS = [];
   function lane(v) { return text(v).toUpperCase() === 'RECEIVING' ? 'RECEIVING' : 'SHIPPING'; }
 
   // The record now per record ID, of the given types: the app's copy over the sheet's, then the newest.
@@ -169,10 +169,9 @@
     return out;
   }
 
-  // Receiving's suppliers: the five starting ones, then the added ones in the order they were added.
+  // Receiving's suppliers, in the order they were added. Joe 10/13: each can be edited or removed (the same record, rewritten).
   function scheduleSuppliers(docs) {
-    var list = STARTING_SUPPLIERS.map(function (x, i) { var id = 'SUP-START-' + (i + 1); return { routeId: id, runId: id, route: x[0], run: x[1], name: x[2] }; });
-    var all = newestRecords(docs, [SUPPLIER_TYPE]), added = Object.keys(all).map(function (k) { return all[k]; });
+    var all = newestRecords(docs, [SUPPLIER_TYPE]), added = Object.keys(all).map(function (k) { return all[k]; }), list = [];
     added.sort(function (a, b) { return when(a.createdAt || a.recordedAt) - when(b.createdAt || b.recordedAt); });
     added.forEach(function (d) {
       var id = text(d.routeId) || text(d.recordId);

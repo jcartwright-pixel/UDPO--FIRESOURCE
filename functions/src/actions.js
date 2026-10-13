@@ -25,6 +25,7 @@ const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
 const ROLL = require('./weekroll');
 const STATIONS = require('./stations');
+const BOARD = require('./board-rules');
 
 const C = M.COLLECTIONS;
 
@@ -368,8 +369,9 @@ function validate(input) {
     if (!out.equipmentId) throw new SaveError('BAD_REQUEST', 'Pick the truck or trailer');
     out.reason = text(input.reason, 120);
     // Like the current app, the reason is optional.
+    // Review item 71 (Joe 10/13): the screen's "today" is no longer used (a tablet left open since yesterday cleared
+    // yesterday's runs); the server's operating day decides. An old screen may still send it; it is checked and ignored.
     if (input.today !== undefined && !L.isDateKey(input.today)) throw new SaveError('BAD_REQUEST', 'today must be yyyy-mm-dd');
-    out.today = input.today;
     // Joe 10/12: a unit already down can be taken off the loads it is still on (its status and reason stay as they are).
     out.clearOnly = input.clearOnly === true;
     return out;
@@ -559,7 +561,8 @@ async function resolveAssignment(tx, db, req, stamp, run) {
 const COLUMN_FOR = {}, TIME_FIELDS = {};
 // Kept in the new app only (the Live sheet has no column for them): who a day was for before the driver went off, and why.
 // checkinTruck / checkinTrailer / moreTrailers: the units the driver corrected on the phone and the drop-and-hook trailers (no Live column).
-const APP_ONLY = { intendedDriverId: true, intendedDriver: true, driverExceptionStatus: true, checkinTruck: true, checkinTrailer: true, moreTrailers: true };
+const APP_ONLY = {};
+M.APP_ONLY_DAY_FIELDS.forEach(f => { APP_ONLY[f] = true; });
 M.DAY_FIELDS.forEach(([field, suffix, kind]) => { COLUMN_FOR[field] = suffix; if (kind === 'time') TIME_FIELDS[field] = true; });
 // A day's "changed by hand" marks (the current app's <day>_equipment_override / _dispatch_time_override): a Route Master or
 // Driver Master save that reaches the Live weeks leaves those cells alone (D6).
@@ -821,16 +824,19 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
     return result;
   }
   if (req.clearOnly && !L.unitOff(unit)) throw new SaveError('CHANGED', unit.unit + ' is not on the down list any more');
-  const today = req.today || L.operatingDay(new Date(stamp));
+  // The server's operating day (it rolls at 6 AM), never the tablet's (review item 71).
+  const today = L.operatingDay(new Date(stamp));
   const weeks = [L.weekStart(today), L.addDays(L.weekStart(today), 7)];
   const runs = await tx.get(db.collection(C.runs).where('weekStart', 'in', weeks));
   const idKey = unit.type === 'TRAILER' ? 'trailerId' : 'truckId', textKey = unit.type === 'TRAILER' ? 'trailer' : 'truck';
-  const removed = [], taken = [];
+  const removed = [], taken = [], kept = [];
   runs.docs.forEach(r => {
     const run = r.data(), update = {}, cells = {};
     L.DAYS.forEach((p, i) => {
       const d = run.days && run.days[p];
       if (!d || d[idKey] !== unit.id || L.addDays(run.weekStart, i) < today) return;
+      // A load already loaded keeps its unit: the product is on that trailer (review item 71).
+      if (BOARD.boardState(d) === 'LOADED') { kept.push({ route: String(run.route || ''), run: String(run.run || ''), date: L.addDays(run.weekStart, i) }); return; }
       update['days.' + p + '.' + idKey] = ''; update['days.' + p + '.' + textKey] = '';
       cells[p] = true;
       removed.push(run.route + ' ' + L.addDays(run.weekStart, i));
@@ -839,7 +845,8 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
     if (!Object.keys(update).length) return;
     tx.update(r.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp }));
     result.runs.push({ runDocId: r.id, rev: run.rev + 1 });
-    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id.slice(-6) + p + i, run, r.id, p, { [idKey]: '', [textKey]: '' }, stamp, email));
+    // Each part is named by the whole run ID (its week too), so the same run in this week and next never shares one (review item 65).
+    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id + '-' + p + i, run, r.id, p, { [idKey]: '', [textKey]: '' }, stamp, email));
   });
   const downNote = req.reason ? 'DOWN: ' + req.reason : 'DOWN';
   if (!req.clearOnly) {
@@ -848,6 +855,7 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
   }
   result.removedFrom = removed;
   result.taken = taken.sort((a, b) => a.date.localeCompare(b.date) || a.route.localeCompare(b.route, undefined, { numeric: true }));
+  if (kept.length) result.keptOnLoaded = kept;
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' },
     after: req.clearOnly ? { status: unit.status, clearOnly: true, removedFrom: removed } : { status: 'DOWN', reason: req.reason, removedFrom: removed }, result });
   return result;
@@ -1052,7 +1060,7 @@ const OVERRIDE_DAY = { route_override: 'routeOverride', equipment_override: 'equ
 const byHand = (run, p, col) => L.yes(((run.days && run.days[p]) || {})[OVERRIDE_DAY[col]]) || L.yes((run.cells || {})[p + '_' + col]);
 const loadDay = (week, p, offset) => L.addDays(week, L.DAYS.indexOf(p) + (Number.isFinite(Number(offset)) && offset !== null && offset !== '' ? Number(offset) : 0));
 const LIVE_RUN_COLUMNS = {};
-M.RUN_FIELDS.forEach(([field, col]) => { LIVE_RUN_COLUMNS[field] = col; });
+M.RUN_FIELDS.forEach(([field, col]) => { if (M.APP_ONLY_RUN_FIELDS.indexOf(field) < 0) LIVE_RUN_COLUMNS[field] = col; });
 
 // runId given: that run's Live rows; else every run of the two weeks.
 async function liveRead(tx, db, runId) {
@@ -1075,7 +1083,7 @@ function writeLive(tx, db, mode, req, stamp, email, snap, run, ch, result) {
   const ps = Object.keys(ch.days).filter(p => Object.keys(ch.days[p]).length);
   if (!ps.length && !Object.keys(ch.run).length) return;
   const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp }, cells = {};
-  Object.keys(ch.run).forEach(k => { const v = ch.run[k]; update[k] = v; cells[LIVE_RUN_COLUMNS[k]] = typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v); });
+  Object.keys(ch.run).forEach(k => { const v = ch.run[k]; update[k] = v; if (!LIVE_RUN_COLUMNS[k]) return; cells[LIVE_RUN_COLUMNS[k]] = typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v); });
   ps.forEach(p => {
     Object.keys(ch.days[p]).forEach(k => { update['days.' + p + '.' + k] = ch.days[p][k]; });
     update['days.' + p + '.updatedAt'] = stamp; update['days.' + p + '.updatedBy'] = email;
@@ -1537,7 +1545,8 @@ function freeRunsForDayOff(tx, db, req, runSnaps, driver, reasonCode, stamp, ema
     if (!Object.keys(update).length) return;
     tx.update(r.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp }));
     result.runs.push({ runDocId: r.id, rev: run.rev + 1 });
-    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id.slice(-6) + p + i, run, r.id, p, cells[p], stamp, email));
+    // Each part is named by the whole run ID (its week too), so the same run in this week and next never shares one (review item 65).
+    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id + '-' + p + i, run, r.id, p, cells[p], stamp, email));
   });
 }
 

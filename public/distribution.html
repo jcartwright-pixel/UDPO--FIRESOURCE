@@ -95,7 +95,8 @@
       onSnapshot(collection(db, 'equipment'), s => { data.equipment = s.docs.map(d => d.data()).filter(e => (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location))); render(); }, fail('the units'));
       onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => d.data()); render(); }, fail('Route Master'));
       onSnapshot(collection(db, 'vacations'), s => { data.vacations = s.docs.map(d => d.data()); render(); }, fail('the vacation schedule'));
-      onSnapshot(collection(db, 'exceptions'), s => { data.exceptions = s.docs.map(d => d.data()); render(); }, fail('the days off'));
+      // Review item 73 (Joe 10/13): days off that end this week or later (today's numbers), not every one ever entered.
+      onSnapshot(query(collection(db, 'exceptions'), where('endDate', '>=', L.weekStart(today))), s => { data.exceptions = s.docs.map(d => d.data()); render(); }, fail('the days off'));
       onSnapshot(query(collection(db, 'conflicts'), where('open', '==', true), limit(101)), s => { data.conflicts = s.size > 100 ? '100+' : s.size; render(); }, fail('the conflict list'));
       onSnapshot(doc(db, 'config', 'app'), snap => {
         const c = snap.data() || {};

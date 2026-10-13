@@ -9,7 +9,8 @@ const date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingD
 let NOW = new Date();
 const data = { runs: [], journal: [], wash: [], appWash: [], pickups: [] };
 const esc = escapeHtml;
-const link = (href, label, side, alert, cls) => '<a class="dc-link' + (cls ? ' ' + cls : '') + '" href="' + href + '"><span>' + escapeHtml(label) + '</span>' + (side !== undefined ? '<b class="dc-side' + (alert ? ' alert' : '') + '">' + escapeHtml(side) + '</b>' : '') + '<i class="dc-arrow">&rarr;</i></a>';
+// Review item 28 (Joe 10/13): a long Returns or Washing line wraps to two lines, and the whole text shows on hover.
+const link = (href, label, side, alert, cls) => '<a class="dc-link' + (cls ? ' ' + cls : '') + '" href="' + href + '" title="' + escapeHtml(label) + '"><span>' + escapeHtml(label) + '</span>' + (side !== undefined ? '<b class="dc-side' + (alert ? ' alert' : '') + '">' + escapeHtml(side) + '</b>' : '') + '<i class="dc-arrow">&rarr;</i></a>';
 // Polish item 5 (Joe 10/11): past a day it reads "2 days 7 h" instead of "55 h 51".
 const hm = (m) => m == null ? '-' : m < 60 ? m + ' min' : m >= 1440 ? Math.floor(m / 1440) + (m < 2880 ? ' day ' : ' days ') + Math.floor((m % 1440) / 60) + ' h' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
 const since = (stamp) => { const t = Date.parse(stamp || ''); return isFinite(t) ? Math.max(0, Math.round((NOW.getTime() - t) / 60000)) : null; };
@@ -125,7 +126,8 @@ function metrics(m, k) {
   if (k === 'wash') return met('Open', m.openWash.length, 'To wash', m.openWash.length > 0, 'wash.open') + met('Washed', m.washed, 'Today', false, 'wash.done');
   return met('Returns', m.returns.length, 'Today', false, 'ret.total') + met('Pending', m.pend.length, 'Not returned', m.pend.length > 0, 'ret.pending');
 }
-const chip = (em, b, small, bad) => '<div class="chip' + (bad ? ' bad' : '') + '"><em>' + em + '</em><b>' + b + '</b><small>' + small + '</small></div>';
+// Review item 28: the label and the line under it show whole on hover when the tile is narrow.
+const chip = (em, b, small, bad) => '<div class="chip' + (bad ? ' bad' : '') + '" title="' + esc(em + ' · ' + String(small).replace(/<[^>]*>/g, '').replace(/&[a-z]+;/g, ' ')) + '"><em>' + em + '</em><b>' + b + '</b><small>' + small + '</small></div>';
 const delta = (t, y, lowerBetter) => { if (y == null || t == null) return ''; const d = t - y; if (!d) return 'same as yesterday'; const good = lowerBetter ? d < 0 : d > 0; return '<span class="' + (good ? 'up' : 'down') + '">' + (d > 0 ? '▲ ' : '▼ ') + Math.abs(d) + '</span> vs yesterday'; };
 
 function hourBars(m, tall) {
@@ -156,7 +158,7 @@ function A(m) {
   return card('load', head('load') + '<div class="dc-links two">' + m.loadLinks.join('') + '</div>' +
     '<div class="mid">' +
       '<div class="panel" style="display:flex;flex-direction:column"><div class="sec-t"><span>Loads by depart time</span><span>done / scheduled</span></div><div style="flex:1;min-height:0">' + hourBars(m, 62) + '</div>' + legend + '</div>' +
-      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, 'all departments · 30+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, m.puOpen.map(p => p.route).join(', ') || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
+      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, 'all departments · 30+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, /* review item 72 (Joe 10/13): made safe */ esc(m.puOpen.map(p => p.route).join(', ')) || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
     '</div>' + metrics(m, 'load') + '<div class="dc-bar"><i style="width:' + m.loadPct + '%"></i></div><div class="dc-note">' + m.loadNote + '  ·  ' + m.tDoneByNow + ' done by now, yesterday ' + m.yDoneByNow + ' at this time</div>', 'home4') +
   card('unload', head('unload') + '<div class="dc-links two">' + m.unloadLinks.join('') + '</div>' +
     '<div class="mid">' +

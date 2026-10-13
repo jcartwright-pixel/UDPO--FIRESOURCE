@@ -126,6 +126,7 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await phone.fill('#step-form [name=palletJack]', '7');
     await phone.fill('#step-form .ci-tr-issues', 'Light out');
     await phone.fill('#step-form input[name=casesDelivered]', '400');
+    await phone.click('#step-form .ci-loaded label:has([value=YES])');
     await shot(phone, 'phone-checkin-filled-390.png', true);
     assert.ok(await fits(phone), 'the Check-In fits the phone width');
     await phone.click('#send');
@@ -173,6 +174,17 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.ok(await fits(taPhone), 'Trailer Assignments fits the phone width');
     await shot(taPhone, 'trailer-assignments-phone-390.png');
     assert.equal(await taPhone.isVisible('#yard'), false, 'no yard panel on a phone');
+    // Review items 25 and 27 (Joe 10/13): on a phone each route is a card with Run, Driver, Truck, Trailer and Depart named on it;
+    // no name or truck number is broken mid-word, and there is no side-menu strip.
+    const taCard = await taPhone.$eval('#rows .ta-row', r => ({
+      display: getComputedStyle(r).display,
+      labels: [...r.children].map(s => getComputedStyle(s, '::before')).filter(b => b.display !== 'none' && b.content !== 'none' && b.content !== 'normal').map(b => b.content.replace(/"/g, '')),
+      broken: [...document.querySelectorAll('#rows .ta-row > span:not(.tr)')].filter(s => { const t = s.cloneNode(true); t.querySelectorAll('small').forEach(x => x.remove()); return t.textContent.split(/\s+/).some(w => { const g = document.createRange(); const n = [...s.childNodes].find(c => c.nodeType === 3 && c.textContent.includes(w)); if (!n || !w) return false; const i = n.textContent.indexOf(w); g.setStart(n, i); g.setEnd(n, i + w.length); return g.getClientRects().length > 1; }); }).map(s => s.textContent),
+      menu: getComputedStyle(document.querySelector('.sidemenu')).display
+    }));
+    assert.equal(taCard.display, 'flex', 'a route is a card on a phone');
+    assert.deepEqual(taCard.labels, ['Run', 'Driver', 'Truck', 'Trailer', 'Depart'], 'every box is named on the card');
+    assert.deepEqual([taCard.broken, taCard.menu], [[], 'none'], 'no word broken mid-word, no side-menu strip ' + JSON.stringify(taCard));
     assert.deepEqual(ta.errors.concat(taPhone.errors), []);
     results.push('Trailer Assignments: every unfinished load with its trailer box; the yard panel on a desk, not on a phone');
 

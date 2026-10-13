@@ -8,7 +8,7 @@ export const ADMIN_GROUPS = [
     ['access-codes', 'Access & QR Codes', 'A revocable phone link and QR code for each employee: Generate, Regenerate (press twice) and Text the link (texting is off).', '', 'pin']
   ]],
   ['Links & Codes', 'Every link and code people use to reach the app, each where it belongs', [
-    ['app-links', 'Manager Links', 'The links for managers and office staff: United Dairy Operations, the phone link, Manager Web App, personal phone links and Phone Screens (try every screen): copy, print a QR, Launch (opens in a new window); and each plant\'s manager release code to move a tablet or Exit a kiosk.', '', 'swap'],
+    ['app-links', 'Manager Links', 'The links for managers and office staff: United Dairy Operations, the phone link, Manager Web App and personal phone links: copy, print a QR, Launch (opens in a new window); and each plant\'s manager release code to move a tablet or Exit a kiosk.', '', 'swap'],
     ['station-codes', 'Plant Station Codes', 'The one Plant Station link (copy, print a QR, open), then the stations: + Add Station, each station\'s code (typed on the tablet to open that station), New code, Remove. (The manager release codes are in Manager Links.)', '', 'factory'],
     ['garage-codes', 'Garage Station Codes', 'The Garage Station and Maintenance Station links (copy, print a QR, Launch in a new window), then the garage stations: + Add Station, each station\'s code, New code, Remove.', '', 'gear'],
     ['driver-codes', 'Driver Station Codes', 'The Driver Station link, for the Driver\'s Kiosk Station (the TV) and the Driver Room Check-In Station (the drivers\' tablet, its code opens the drivers\' Check-In, like their phones): copy, print a QR, open; then the stations: + Add Station, each tablet, TV or kiosk\'s code (typed on it once), New code, Remove; and the drivers\' phone link with its Route Distribution code: new code, turn it off (press twice).', '', 'people']
@@ -45,11 +45,14 @@ export const ADMIN_GROUPS = [
     ['fleet-setup', 'Fleet Service Setup', 'Service rules: PM miles, reefer months, DOT and plate warnings.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp']
   ]],
   ['System Tools', 'Checks', [
-    // Joe 10/12: Driver Station, Plant Station and Phone Screens moved to Links & Codes, where Launch opens them in a new window.
+    // Joe 10/12: Driver Station and Plant Station moved to Links & Codes, where Launch opens them in a new window. Review item 54
+    // (Joe 10/13): Phone Screens is gone; it listed the same links as Links & Codes.
     ['window-test', 'Window Test Center', 'Opens every screen at each window size to check nothing is cut off.', '', 'check']
   ]],
   ['Diagnostics', 'Checks and repairs for the data behind the app', [
     ['preflight', 'Run Runtime Pre-Flight', 'Checks every sheet, column and setting the app needs and lists anything missing.', '', 'check'],
+    // Joe 10/13 ("where is the sheet conflicts?"): Sheet Conflicts is in the list, so Find a setting finds it.
+    ['sheet-conflicts', 'Sheet Conflicts', 'Saves the new app did not write because someone changed the same cell in the sheet.', 'conflicts.html', 'alert'],
     ['update-live', 'Update Live Sheets', 'Rebuilds the Current and Next weeks from Route Master and the drivers\' standard runs, and adds missing runs (press twice).', '', 'swap'],
     ['refresh-home', 'Refresh Home Summary Now', 'Rebuilds the all-plants overview numbers right away.', '', 'factory'],
     ['plant-fresh', 'Start Plant Fresh From Today', 'Starts the plant screens over from today\'s loads.', '', 'factory'],

@@ -28,10 +28,12 @@
       <button type="button" class="pk-nav" id="go-back" title="Back one screen">&#8249; Back</button>
       <button type="button" class="pk-nav" id="go-home" title="Home">Home</button>
       <button type="button" class="pk-nav" id="tv" title="Full screen for the TV">TV display</button>
+      <button type="button" class="pk-nav" id="change" hidden>Release</button>
       <span class="who" id="who"></span>
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <div id="release-box" hidden></div>
     <div class="pk">
       <div class="pk-title"><h1><span id="plant">UNIONTOWN PLANT</span> · TODAY</h1><b id="clock"></b></div>
       <div class="pk-kpis">
@@ -48,19 +50,39 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError, goBack } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, goBack, callServer } from './js/app.js';
+    import { askRelease, lockStation } from './js/station-code.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import * as R from './js/plant-reports.js';
+    import { fullScreenOnTap } from './js/full-screen.js';
+
+    fullScreenOnTap();
 
     // Plant Performance (Joe 10/10): today's loadout on a TV, live: loaded so far, on time, behind now, pickups, each department's
     // progress and what loads next. Read only. The same rules as Manager Center (Behind) and Plant Reports (on time).
     const L = window.UDLogic, U = window.UDPlant, params = new URLSearchParams(location.search), full = params.get('tv') === '1';
     document.body.classList.toggle('pk-full', full);
+    // Review item 39 (Joe 10/13): a plant screen; the header's second line says Plant Distribution, not Route Distribution
+    // (the kiosk has no side menu, so the shared header would fall back to Route Distribution).
+    { const small = document.querySelector('#screen > .topbar .brand small'); if (small) small.innerHTML = 'UNITED DAIRY &middot; PLANT DISTRIBUTION'; }
     document.getElementById('go-back').addEventListener('click', goBack);
     document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
     document.getElementById('tv').addEventListener('click', () => { location.search = '?tv=1'; });
     window.udBack = () => { if (full) { location.search = ''; return true; } return false; };
+    // Review item 49 (Joe 10/13): Plant Performance is a station (a kiosk or TV), so it locks like the others: no Back, Home or
+    // Sign out, only the Release bar at the bottom. Release asks for Uniontown's manager release code (when one is set), then
+    // goes back to the screen it was opened from (Home when it was opened on its own).
+    lockStation(document.getElementById('change'), true);
+    document.getElementById('change').addEventListener('click', async () => {
+      const call = (op, f) => callServer('stationRelease', Object.assign({ op, facilityId: 'fac_uniontown' }, f));
+      const ok = await askRelease(document.getElementById('release-box'), { status: () => call('status'), release: (code) => call('release', { code }), onError: showError,
+        why: 'A manager must type the manager release code to take this screen off Plant Performance.' });
+      if (!ok) return;
+      let from = '';
+      try { from = document.referrer && new URL(document.referrer).origin === location.origin ? document.referrer : ''; } catch (e) { /* no referrer */ }
+      location.href = from && !/plant-kiosk\.html/.test(from) ? from : 'index.html';
+    });
     const data = { runs: [], pickups: [], journal: [], shift: [], setup: [], lineStatus: [], tempLocs: [], sensors: [] };
     let date = L.operatingDay(new Date()), sig = '';
 

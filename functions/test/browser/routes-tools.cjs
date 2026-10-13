@@ -2,7 +2,7 @@
 /*
  * Browser check of the old Route Editor's tools in the new one (review item 14, RouteManagement.html bindGrid, sequenceView,
  * details, recap): arrow keys move between boxes, Shift+arrows mark a block, one value pasted fills the block, Ctrl+X cuts it,
- * Ctrl+D fills it down, Esc puts a box back; Load Order up / down buttons; Route Details for many runs at once; Recap totals.
+ * Ctrl+D fills it down, Esc puts a box back; Load Order by dragging a line (or Alt+Up / Alt+Down); Route Details for many runs at once; Recap totals.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -133,24 +133,31 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     assert.equal(await p.$eval(cell(first, 'mon'), x => getComputedStyle(x).fontSize), '16px');
     assert.ok(await fits(p), 'Start Times fits 1920x1080');
 
-    // Load Order: the down arrow on the first run moves it below the second; saved as one order.
+    // Load Order (review item 8, Joe 10/13): grab the first run's line and drag it below the second; saved as one order. No arrows.
     await p.selectOption('#view-select', 'seq');
-    await p.waitForSelector('table.routes tr[data-i="1"] button[data-move="1"]');
+    await p.waitForSelector('table.routes tr[data-i="1"][data-drag]');
     await p.waitForTimeout(500);
     const order = () => p.$$eval('table.routes tbody tr[data-i]', t => t.map(x => x.dataset.id));
     const before = await order();
-    assert.equal(await p.isDisabled('table.routes tr[data-i="0"] button[data-move="-1"]'), true, 'the first run cannot go up');
+    assert.equal(await p.$('table.routes button[data-move], table.routes .seq-move'), null, 'no up / down arrows');
     await shot(p, 'routes-load-order-before-1920.png');
-    await p.click('table.routes tr[data-i="0"] button[data-move="1"]');
+    const box = async (i, f) => { const b = await p.$eval('table.routes tr[data-i="' + i + '"] td:nth-child(3)', td => { const r = td.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }); return { x: b.x + b.w / 2, y: b.y + b.h * f }; };
+    const from = await box(0, 0.5), to = await box(1, 0.8);
+    await p.mouse.move(from.x, from.y);
+    await p.mouse.down();
+    for (let i = 1; i <= 8; i++) await p.mouse.move(from.x, from.y + (to.y - from.y) * i / 8);
+    await p.mouse.up();
     await p.waitForFunction((b) => { const ids = [...document.querySelectorAll('table.routes tbody tr[data-i]')].map(x => x.dataset.id); return ids[0] === b[1] && ids[1] === b[0]; }, before, { timeout: 5000 });
-    assert.equal(await stored(before[0], 'mon', 'loadOrder', 20), 20, 'moved down: order 20');
+    assert.equal(await stored(before[0], 'mon', 'loadOrder', 20), 20, 'dragged down: order 20');
     assert.equal(await stored(before[1], 'mon', 'loadOrder', 10), 10, 'moved up: order 10');
-    await p.click('table.routes tr[data-i="1"] button[data-move="-1"]');
+    // The keyboard: Alt+Up on the moved line puts it back.
+    await p.focus('table.routes tr[data-drag="' + before[0] + '"]');
+    await p.keyboard.press('Alt+ArrowUp');
     await p.waitForFunction((b) => [...document.querySelectorAll('table.routes tbody tr[data-i]')].map(x => x.dataset.id)[0] === b[0], before, { timeout: 5000 });
-    assert.deepEqual(await order(), before, 'the up arrow moves it back');
+    assert.deepEqual(await order(), before, 'Alt+Up moves it back');
     await shot(p, 'routes-load-order-1920.png');
     assert.ok(await fits(p), 'Load Order fits 1920x1080');
-    results.push('Load Order up and down arrows moved a run and saved the day\'s order');
+    results.push('Load Order: dragging a line and Alt+Up moved a run and saved the day\'s order (no arrows)');
 
     // Route Details for many runs at once: every run on one page; a list and a box save on their own.
     await p.selectOption('#view-select', 'many');
@@ -229,7 +236,7 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     assert.equal(await disp.$$eval('table.routes.many input[data-many], table.routes.many select[data-many]', x => x.every(n => n.disabled)), true);
     await disp.selectOption('#view-select', 'seq');
     await disp.waitForSelector('table.routes tr[data-i="0"]');
-    assert.equal(await disp.$$eval('button[data-move]', x => x.every(n => n.disabled)), true);
+    assert.equal(await disp.$$eval('table.routes tr[data-drag]', x => x.length), 0, 'a dispatcher cannot drag the order');
     await disp.close();
     results.push('A dispatcher sees Route Details and Load Order read only');
   } finally {

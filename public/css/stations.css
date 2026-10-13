@@ -6,7 +6,14 @@
 :is(.gs-page, .ds-page) .topbar { min-height: 56px; padding: 4px 14px; }
 :is(.gs-page, .ds-page) .topbar .brand img { width: auto; height: 40px; }
 :is(.gs-page, .ds-page) .topbar .brand small { display: none; }
-:is(.gs-page, .ds-page) .topbar .gs-nav { min-height: 40px; padding: 0 14px; font-size: 15px; order: -1; }
+/* Review item 50 (Joe 10/13): one header order everywhere, as on the desktop screens: the logo first, then Back and Home; the
+   rest (Test copy, the person, Sign out) on the right. */
+:is(.gs-page, .ds-page) .topbar .gs-nav { min-height: 40px; padding: 0 14px; font-size: 15px; }
+:is(.gs-page, .ds-page) .topbar > *, .ps-page #ps-top > * { order: 2; }
+:is(.gs-page, .ds-page) .topbar > :is(.brand, #go-back, #go-home), .ps-page #ps-top > :is(.brand, #go-back, #go-home) { order: 0; }
+:is(.gs-page, .ds-page) .topbar > .test-copy-badge, .ps-page #ps-top > .test-copy-badge { order: 1; }
+:is(.gs-page, .ds-page) .topbar > .brand, .ps-page #ps-top > .brand { margin-right: 0; }
+:is(.gs-page, .ds-page) .topbar::before, .ps-page #ps-top::before { content: ''; order: 1; flex: 1 1 0; }
 .gs { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; font-size: 22px; color: #1b2a3a; }
 .gs [hidden] { display: none !important; }
 .gs h2 { margin: 0; font-size: 34px; color: #123f70; }
@@ -211,6 +218,43 @@ body.ds-tv .foot { color: #cfe3f6; }
 @media (max-width: 760px) {
   .ds-row { grid-template-columns: 60px 1fr 1fr 70px; font-size: 15px; }
   .ds-row > span:nth-child(5), .ds-row > span:nth-child(7), .ds-headrow span:nth-child(5), .ds-headrow span:nth-child(7) { display: none; }
+}
+
+/* Review item 46 (Joe 10/13): the Driver Station on a 1024 tablet shows more of the loadout board (shorter lines, a smaller
+   heading, the weekly schedule a little lower) and every column fits, Pickup included. */
+@media (max-width: 1100px) {
+  body.ds-tv .head h1 { font-size: 30px; }
+  body.ds-tv .ds-grid { grid-template-rows: minmax(0, 1.6fr) minmax(0, 1fr); }
+  body.ds-tv .ds-row { min-height: 52px; padding: 6px 10px; gap: 0 6px; font-size: 18px; grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1.25fr) 86px 62px 112px 70px; }
+  body.ds-tv .ds-row .rt { font-size: 24px; }
+  body.ds-tv .ds-row > span { overflow-wrap: break-word; }
+  body.ds-tv .ds-headrow { min-height: 0; font-size: 16px; letter-spacing: 0; }
+}
+/* Review item 47 (Joe 10/13): the Driver Station at phone width. The header wraps instead of stacking its pieces on top of
+   each other (the logo without the app name); the board keeps Route, Run and Driver on the first line with Trailer and Load
+   status under them; the weekly schedule keeps each name whole and slides sideways inside its box. */
+@media (max-width: 760px) {
+  .ds-page .topbar { flex-wrap: wrap; row-gap: 6px; }
+  .ds-page .topbar .brand { flex: none; }
+  .ds-page .topbar .brand > span { display: none; }
+  .ds-page .topbar button { white-space: nowrap; }
+  .ds-page .head { flex-wrap: wrap; row-gap: 6px; }
+  body.ds-tv .head h1, .ds-page .head h1 { font-size: 26px; flex-wrap: wrap; row-gap: 0; white-space: normal; }
+  .ds-page .head .title { min-width: 0; flex: 1 1 100%; }
+  .ds-page .view { padding: 0 8px 8px; }
+  body.ds-tv .ds-row, .ds-row { grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr); min-height: 0; padding: 6px 8px; font-size: 17px; }
+  body.ds-tv .ds-row .rt, .ds-row .rt { font-size: 22px; grid-row: span 2; }
+  .ds-row .rt.span2 { grid-column: 1 / 3; grid-row: auto; }
+  body.ds-tv .ds-headrow, .ds-headrow { font-size: 16px; letter-spacing: 0; }
+  .ds-headrow span:nth-child(1) { grid-row: span 2; }
+  .ds-row > span:nth-child(5), .ds-row > span:nth-child(7), .ds-headrow span:nth-child(5), .ds-headrow span:nth-child(7) { display: none; }
+  .ds-week-table { min-width: 760px; }
+  .ds-week-table td, .ds-week-table th { overflow-wrap: normal; word-break: normal; }
+  .ds-week-table th:first-child, .ds-week-table td:first-child { position: sticky; left: 0; z-index: 1; background: #fff; min-width: 120px; }
+  .ds-week-table th:first-child { z-index: 2; background: #eef5fa; }
+  .ds-week-table tbody tr:nth-child(even) td:first-child { background: #eef5fa; }
+  body.ds-tv #week-scroll { overflow: auto; }
+  .ds-page .foot { font-size: 16px; }
 }
 
 /* ---------- Trailer Assignments (trailers.html): the current app's Mobile Plant trailers view ---------- */
@@ -507,16 +551,19 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 }
 
 /* Joe 10/12: a coded station (Plant, Garage, Driver Room Check-In, Driver Station TV) has no Back, Home or Sign out. The only
-   way out is the Release bar at the very bottom (manager release code). station-code.js lockStation() sets this up. */
+   way out is Release (manager release code). station-code.js lockStation() sets this up. Joe 10/13 "the release needs just to
+   be a little small, in the bottom right": a small button in the bottom-right corner, with a strip kept free under the
+   screen so it never covers anything. */
 body.station-locked #go-back, body.station-locked #go-home, body.station-locked #signout,
 body.station-locked .ds-exit { display: none !important; }
-.station-release { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; height: 56px; margin: 0; border: 0; border-top: 1px solid #b9c7d3; border-radius: 0;
-  background: #e8edf3; color: #33475b; font: inherit; font-size: 18px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.station-release { position: fixed; right: 12px; bottom: 8px; z-index: 40; min-height: 44px; min-width: 120px; margin: 0; padding: 0 20px;
+  border: 1px solid #b9c7d3; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.15);
+  background: #e8edf3; color: #33475b; font: inherit; font-size: 16px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 .station-release:hover, .station-release:focus-visible { background: #d9e2ec; color: #0b2f55; }
 .station-release[hidden] { display: none; }
-body.station-locked:not(.fill) { padding-bottom: 56px; box-sizing: border-box; }
-body.station-locked.fill #screen:not([hidden]) { height: calc(100vh - 56px); }
-body.ds-full .station-release { background: #071a2c; color: rgba(255,255,255,.75); border-top-color: rgba(255,255,255,.2); }
+body.station-locked:not(.fill) { padding-bottom: 60px; box-sizing: border-box; }
+body.station-locked.fill #screen:not([hidden]) { height: calc(100vh - 60px); }
+body.ds-full .station-release { background: #071a2c; color: rgba(255,255,255,.75); border-color: rgba(255,255,255,.2); }
 body.ds-full .station-release:hover, body.ds-full .station-release:focus-visible { background: #0d2a44; color: #fff; }
 
 /* Boxing (Joe 10/12): Shipping / Loadout colored by who takes the load, as the Scheduler's legend: blue Uniontown truck,
@@ -574,3 +621,41 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 .sw-puform.sw-pause { grid-template-columns: minmax(0, 1fr) auto auto; }
 @media (max-width: 700px) { .sw-puform.sw-pause { grid-template-columns: 1fr; } }
 .sw-refuse { margin: 0; padding: 10px 16px; background: #fde8e8; color: #8f1d16; font-size: 18px; font-weight: 800; border-top: 1px solid #f1b7b3; }
+
+/* Review item 25 (Joe 10/13): Trailer Assignments on a phone. Five narrow columns broke names and truck numbers mid-word
+   ("GREG ORY, MICHA EL", "22387 3"); now each route is a card, as on Yard Checks: the route big on top (with Totes / Box /
+   Tanker or "Still open from"), then Run, Driver, Truck, the Trailer box and Depart, each named on the left. Inside the
+   Plant Station (Yard Services) the screen keeps its own two-line phone list. */
+@media (max-width: 599px) {
+  body.ta-page:not(.in-station) .ta-grid { background: transparent; border: 0; padding: 0 2px; }
+  body.ta-page:not(.in-station) .ta-headrow { display: none; }
+  body.ta-page:not(.in-station) .ta-row:not(.ta-headrow) { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 0 0 12px; padding: 12px 14px; background: #fff; border: 1px solid #d5dfea; border-left: 6px solid #388650; border-radius: 14px; font-size: 16px; }
+  body.ta-page:not(.in-station) .ta-row.blank { background: #fff4f2; border-left-color: #c0392b; }
+  body.ta-page:not(.in-station) .ta-row.dup { background: #fffaf0; border-left-color: #d4a121; }
+  body.ta-page:not(.in-station) .ta-row.sel { background: #eef5fd; border-left-color: #2f7de1; }
+  body.ta-page:not(.in-station) .ta-row > span { display: flex; align-items: center; gap: 10px; padding: 0; text-align: left !important; overflow: visible; white-space: normal; overflow-wrap: normal; word-break: normal; }
+  body.ta-page:not(.in-station) .ta-row > span[data-l]::before { content: attr(data-l); flex: 0 0 74px; font-size: 15px; font-weight: 800; color: #5b6b7c; }
+  body.ta-page:not(.in-station) .ta-row > span.rt { align-items: baseline; flex-wrap: wrap; }
+  body.ta-page:not(.in-station) .ta-row .rt b { font-size: 24px; color: #0b3d6b; }
+  body.ta-page:not(.in-station) .ta-row .rt small { display: inline; font-size: 16px; font-weight: 700; }
+  body.ta-page:not(.in-station) .ta-row > span.ta-depart { display: flex; }
+  body.ta-page:not(.in-station) .ta-row > span.tr { flex-wrap: wrap; }
+  body.ta-page:not(.in-station) .ta-row .tr input { flex: 1; min-width: 0; height: 50px; font-size: 20px; padding: 0 12px; border-radius: 10px; }
+  body.ta-page:not(.in-station) .ta-row .tr small { flex: 1 1 100%; text-align: left; min-height: 0; padding-left: 84px; }
+  body.ta-page:not(.in-station) .ta-row .tr small:empty { display: none; }
+}
+/* Joe 10/13: "Was your truck loaded correctly?" with Yes / No on one row; No opens the box for what was wrong. The Check-In
+   still fits a 390 x 844 phone: the empty drop-and-hook list takes no room and the rows sit a little closer. */
+.phone-card .ci-loaded { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+.phone-card .ci-loaded .ci-q { font-size: 15px; font-weight: 800; line-height: 18px; color: var(--ink); }
+.phone-card .ci-loaded .ci-seg span { padding: 7px 0; }
+.phone-card .ci-loaded .ci-loaded-box { grid-column: 1 / 3; }
+.phone-card .ci-loaded .ci-loaded-box[hidden] { display: none; }
+.phone-card .ci-loaded .ci-loaded-box input { width: 100%; }
+.phone-card .ci-loaded.no { padding: 8px; margin: -2px -8px; border-radius: 10px; background: #fff5f5; border: 1px solid #f0c7c7; }
+#step-form.phone-card { gap: 8px; }
+#step-form .phone-grid { row-gap: 6px; }
+#ci-more:empty { display: none; }
+/* Review item 54 (Joe 10/13): Phone Screens is one line pointing to Administration > Links & Codes. */
+.pss-moved { margin: 12px 16px; font-size: 18px; color: #0b2f55; }
+.pss-moved a { font-weight: 800; color: #0b6eaa; }

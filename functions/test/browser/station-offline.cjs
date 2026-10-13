@@ -14,6 +14,7 @@ const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
 const G = require('../fixtures/garage-demo');
 const localCalls = require('./local-calls.cjs');
+const L = require('../../src/logic');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -110,6 +111,13 @@ async function kept(page, files) {
     // ---- Driver's Kiosk Station (TV): the last board stays with no signal.
     await clear();
     await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date() });
+    // The made-up weeks do not load on every day (nothing loads on a Tuesday), so one load for today is added: the board
+    // then has a row whatever day the check runs.
+    {
+      const delivery = L.addDays(L.operatingDay(new Date()), 1), wk = L.weekStart(delivery);
+      await db().collection('runs').doc(wk + '__run_tv805').set({ weekStart: wk, route: '805', run: 'UT DSD MILK', routeId: 'rte_tv805', runId: 'run_tv805', rev: 0,
+        days: { [L.dayPrefix(delivery)]: { runs: true, loadSequence: 15, driverId: 'drv_test_casey', driver: 'CASEY, LEE', truck: '900005', trailer: 'T-905' } } });
+    }
     {
       const { ctx, page, errors, offline } = await tablet(browser);
       await page.goto(HOSTING + '/driver-station.html' + MANAGER + '&tv=1');

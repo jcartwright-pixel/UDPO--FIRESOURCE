@@ -28,12 +28,10 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Administration · Plant Setup</span><h1>Plant Shifts</h1></div>
+      <div class="title"><span class="eyebrow">Administration · Plant Setup · <span id="plant-name"></span></span><h1>Plant Shifts</h1></div>
       <div class="rp-ctrl">
         <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="add">+ Add Shift</button></label>
         <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="reset">Starting Shifts</button></label>
-        <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn primary" id="save">Save Shifts</button></label>
-        <label class="rp-field"><span>Plant</span><select id="plant" aria-label="Plant"></select></label>
       </div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -57,9 +55,18 @@
 
     const L = window.UDLogic;
     const PLANTS = (L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }, { id: 'fac_charleston', name: 'Charleston' }, { id: 'fac_martins_ferry', name: 'Martins Ferry' }]);
-    const plantBox = document.getElementById('plant');
-    plantBox.innerHTML = PLANTS.map(p => '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + '</option>').join('');
-    let db = null, unsub = null, rows = [], dirty = false;
+    // Review item 31 (Joe 10/13): no plant drop-down inside a plant. The plant is ?plant= of the link, else the plant the screen
+    // was opened from (this tab), else the first plant; its name shows in the heading.
+    const plant = (() => {
+      let came = new URLSearchParams(location.search).get('plant') || '';
+      if (!PLANTS.some(p => p.id === came)) try { came = sessionStorage.getItem('udPlant') || ''; } catch (e) { /* no storage */ }
+      return (PLANTS.find(p => p.id === came) || PLANTS[0]).id;
+    })();
+    document.getElementById('plant-name').textContent = (PLANTS.find(p => p.id === plant) || { name: plant }).name;
+    // Review item 38 (Joe 10/13): no Save Shifts button. The list saves as a box is left (and at once on Remove or Starting
+    // Shifts), once every shift has its name, start and end; one save at a time, in order. edits counts every change,
+    // so the list read back from the database never overwrites a box being typed in.
+    let db = null, unsub = null, rows = [], dirty = false, edits = 0, chain = Promise.resolve();
     const hours = (a, b) => { const m = /^(\d{2}):(\d{2})$/, x = m.exec(a), y = m.exec(b); if (!x || !y) return ''; const len = ((Number(y[1]) * 60 + Number(y[2])) - (Number(x[1]) * 60 + Number(x[2])) + 1440) % 1440; return len ? Math.floor(len / 60) + ' h' + (len % 60 ? ' ' + (len % 60) + ' min' : '') : ''; };
 
     function draw() {
@@ -71,37 +78,53 @@
     }
     function watch() {
       if (unsub) unsub();
-      unsub = onSnapshot(doc(db, 'plantShifts', plantBox.value), s => {
+      unsub = onSnapshot(doc(db, 'plantShifts', plant), s => {
         if (dirty) return;
         const d = s.exists() ? s.data() : null;
-        rows = R.shiftsFor(d, plantBox.value, 'ALL').map(x => ({ name: x.name, side: x.side, start: x.start.padStart(5, '0'), end: x.end.padStart(5, '0') }));
+        rows = R.shiftsFor(d, plant, 'ALL').map(x => ({ name: x.name, side: x.side, start: x.start.padStart(5, '0'), end: x.end.padStart(5, '0') }));
         document.getElementById('last').textContent = d && d.updatedAt ? 'Saved ' + dateTimeText(d.updatedAt) + ' by ' + (d.updatedBy || '') : 'Starting shifts (not changed yet)';
         draw();
       }, e => showError('Could not read the shifts: ' + e.message));
     }
     // Joe 10/11: Side is a drop-down (Distribution or Plant Production); it changes on 'change'.
-    document.getElementById('rows').addEventListener('change', e => { const tr = e.target.closest('tr[data-i]'); if (tr && e.target.dataset.k === 'side') { rows[Number(tr.dataset.i)].side = e.target.value; dirty = true; } });
+    const timeOk = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+    const complete = () => rows.length > 0 && rows.every(r => String(r.name || '').trim() && timeOk(r.start) && timeOk(r.end));
+    function saveNow() {
+      if (!complete()) {
+        if (rows.length) { const ok = document.getElementById('saved'); ok.textContent = 'Fill in each shift\'s name, start and end; the list saves once every box is filled.'; ok.hidden = false; }
+        return;
+      }
+      const shifts = rows.map(r => Object.assign({}, r)), mine = edits;
+      const run = chain.then(async () => {
+        const ok = document.getElementById('saved');
+        try {
+          const res = await save('savePlantShifts', { facilityId: plant, shifts });
+          showError('');
+          ok.textContent = (res && res.message) || 'Shifts saved.'; ok.hidden = false; setTimeout(() => { if (edits === mine) ok.hidden = true; }, 6000);
+          // Only the last change's save lets the database's list back in; an earlier one would undo a later box.
+          if (edits === mine) { dirty = false; watch(); }
+        } catch (err) { showError(err.message || String(err)); }
+      });
+      chain = run.catch(() => {});
+    }
+    document.getElementById('rows').addEventListener('change', e => {
+      const tr = e.target.closest('tr[data-i]'), k = e.target.dataset.k;
+      if (!tr || !k) return;
+      rows[Number(tr.dataset.i)][k] = e.target.value; dirty = true; edits++;
+      saveNow();
+    });
     document.getElementById('rows').addEventListener('input', e => {
       const tr = e.target.closest('tr[data-i]'), k = e.target.dataset.k;
       if (!tr || !k) return;
-      rows[Number(tr.dataset.i)][k] = e.target.value; dirty = true;
+      rows[Number(tr.dataset.i)][k] = e.target.value; dirty = true; edits++;
       tr.children[4].textContent = hours(rows[Number(tr.dataset.i)].start, rows[Number(tr.dataset.i)].end);
     });
-    document.getElementById('rows').addEventListener('click', e => { const b = e.target.closest('[data-remove]'); if (!b) return; rows.splice(Number(b.dataset.remove), 1); dirty = true; draw(); });
-    document.getElementById('add').onclick = () => { rows.push({ name: '', side: 'DISTRIBUTION', start: '', end: '' }); dirty = true; draw(); document.querySelector('#rows tr:last-child input').focus(); };
-    document.getElementById('reset').onclick = () => { rows = R.shiftsFor(null, plantBox.value, 'ALL').map(x => ({ name: x.name, side: x.side, start: x.start, end: x.end })); dirty = true; draw(); };
-    plantBox.onchange = () => { dirty = false; watch(); };
-    document.getElementById('save').onclick = async (e) => {
-      const b = e.currentTarget, ok = document.getElementById('saved');
-      b.disabled = true;
-      try {
-        const res = await save('savePlantShifts', { facilityId: plantBox.value, shifts: rows });
-        dirty = false; showError('');
-        ok.textContent = (res && res.message) || 'Shifts saved.'; ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 6000);
-        watch();
-      } catch (err) { showError(err.message || String(err)); }
-      finally { b.disabled = false; }
-    };
+    // Remove and Starting Shifts save at once, so each asks for a second press first (as Starting List on Product Sheet).
+    let armed = '';
+    const arm = (b, key) => { if (armed === key) { armed = ''; return true; } armed = key; b.textContent = 'Press again'; setTimeout(() => { if (armed === key) { armed = ''; b.textContent = key === 'reset' ? 'Starting Shifts' : 'Remove'; } }, 6000); return false; };
+    document.getElementById('rows').addEventListener('click', e => { const b = e.target.closest('[data-remove]'); if (!b || !arm(b, 'remove' + b.dataset.remove)) return; rows.splice(Number(b.dataset.remove), 1); dirty = true; edits++; draw(); saveNow(); });
+    document.getElementById('add').onclick = () => { rows.push({ name: '', side: 'DISTRIBUTION', start: '', end: '' }); dirty = true; edits++; draw(); document.querySelector('#rows tr:last-child input').focus(); };
+    document.getElementById('reset').onclick = (e) => { if (!arm(e.currentTarget, 'reset')) return; e.currentTarget.textContent = 'Starting Shifts'; rows = R.shiftsFor(null, plant, 'ALL').map(x => ({ name: x.name, side: x.side, start: x.start.padStart(5, '0'), end: x.end.padStart(5, '0') })); dirty = true; edits++; draw(); saveNow(); };
     requireSignIn(async () => { ({ db } = await start()); watch(); });
   </script>
 </body>

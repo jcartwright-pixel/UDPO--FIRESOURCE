@@ -72,7 +72,8 @@
     const CHECK = { PASS: 'Pass', REVIEW: 'Review', FAIL: 'Fail' };
     const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
-    const opt = (value, current, label) => '<option value="' + value + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + label + '</option>';
+    // Review item 72 (Joe 10/13): the value and words are made safe before they are shown (a size or result typed elsewhere).
+    const opt = (value, current, label) => '<option value="' + escapeHtml(value) + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
     // Joe 10/10: the drop-downs start blank, so nothing passes without a real check.
     const pick3 = (cls, current) => '<select class="' + cls + '">' + opt('', current, '') + opt('PASS', current, 'Pass') + opt('REVIEW', current, 'Review') + opt('FAIL', current, 'Fail') + '</select>';
 

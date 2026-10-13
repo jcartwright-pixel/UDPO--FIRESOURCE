@@ -34,7 +34,7 @@
         <span class="tpl-about">Maintain the normal weekly pattern once; it becomes the standard default for every schedule week. Weekly changes override it. A driver can have more than one run on the same day.</span>
         <span class="tpl-dirty" id="dirty" data-top></span>
         <button type="button" id="refresh" data-top>Refresh</button>
-        <span class="tpl-copy" id="copy-state" data-top>No copied cell</span>
+        <span class="tpl-copy" id="copy-state" data-top>Nothing copied</span>
         <button type="button" class="go" id="save" data-top>Save Template</button>
       </div>
       <div class="sheet scroll-list">
@@ -53,7 +53,7 @@
     import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Driver Weekly Template (DriverWeeklyTemplate.html): Available, Off or Assigned runs per driver and day,
-    // Copy / Paste / Paste + Add, one Save Template. Each changed cell is one saveDriverTemplate, which also updates the copied Live weeks.
+    // Copy / Paste / Paste + Add for a driver's week, one Save Template. Each changed cell is one saveDriverTemplate, which also updates the copied Live weeks.
     forScreen('drivers');
     const L = window.UDLogic, DAYS = L.DAYS;
     let drivers = [], routes = [], edits = {}, copied = null, saving = false, note = '';
@@ -81,8 +81,14 @@
       return '<td class="tcell ' + (c.status === 'OFF' ? 'off' : c.status === 'ASSIGNMENT' ? 'on' : '') + (dirty ? ' changed' : '') + '" data-driver="' + escapeHtml(d.id) + '" data-day="' + p + '">' +
         '<select data-status aria-label="' + escapeHtml(d.name + ' ' + L.DAY_NAMES[DAYS.indexOf(p)] + ' status') + '"' + dis + '><option value="AVAILABLE"' + (c.status === 'AVAILABLE' ? ' selected' : '') + '>Available</option><option value="OFF"' + (c.status === 'OFF' ? ' selected' : '') + '>Off</option><option value="ASSIGNMENT"' + (c.status === 'ASSIGNMENT' ? ' selected' : '') + '>Assigned</option></select>' +
         c.runs.map((id, i) => '<div class="run-line" data-i="' + i + '">' + runSelect(p, id).replace('<select data-run>', '<select data-run aria-label="' + escapeHtml(d.name + ' ' + L.DAY_NAMES[DAYS.indexOf(p)] + ' run ' + (i + 1)) + '"' + dis + '>') + '<button type="button" class="mini" data-remove' + dis + ' aria-label="Remove run">×</button></div>').join('') +
-        '<button type="button" class="tpl-add" data-add' + dis + '>+ Add Run</button>' +
-        '<div class="tpl-tools"><button type="button" class="mini" data-copy' + dis + '>Copy</button><button type="button" class="mini" data-paste' + (copied && edit ? '' : ' disabled') + '>Paste</button><button type="button" class="mini" data-pasteadd' + (copied && edit ? '' : ' disabled') + '>Paste + Add</button></div></td>';
+        '<button type="button" class="tpl-add" data-add' + dis + '>+ Add Run</button></td>';
+    }
+    // Review item 12 (Joe 10/13): one Copy / Paste / Paste + Add per driver line, under the name, for the driver's whole week, so
+    // each day box has room for the run name. Paste puts the copied week on this driver; Paste + Add adds the copied runs to
+    // each day's runs.
+    function lineTools(d, edit) {
+      const dis = edit ? '' : ' disabled', pdis = copied && edit ? '' : ' disabled';
+      return '<div class="tpl-tools"><button type="button" class="mini" data-copy' + dis + ' aria-label="Copy ' + escapeHtml(d.name) + '\'s week">Copy</button><button type="button" class="mini" data-paste' + pdis + ' aria-label="Paste onto ' + escapeHtml(d.name) + '">Paste</button><button type="button" class="mini" data-pasteadd' + pdis + ' aria-label="Paste and add onto ' + escapeHtml(d.name) + '">Paste + Add</button></div>';
     }
     function render() {
       const edit = canManage();
@@ -95,7 +101,7 @@
         const group = rows.filter(r => r.reliefDriver === relief);
         if (!group.length) return;
         html += '<tr class="tpl-group"><td colspan="8">' + label + '</td></tr>';
-        group.forEach(r => { const d = byId[r.id]; html += '<tr><td class="tpl-name">' + escapeHtml(d.name) + '</td>' + DAYS.map(p => cellHtml(d, p, edit)).join('') + '</tr>'; });
+        group.forEach(r => { const d = byId[r.id]; html += '<tr data-line="' + escapeHtml(d.id) + '"><td class="tpl-name">' + escapeHtml(d.name) + lineTools(d, edit) + '</td>' + DAYS.map(p => cellHtml(d, p, edit)).join('') + '</tr>'; });
       });
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="8" class="empty">No active drivers.</td></tr>';
       const n = Object.keys(edits).length;
@@ -104,15 +110,15 @@
       document.getElementById('refresh').disabled = saving;
     }
 
-    function setCell(td, next) {
-      const d = drivers.find(x => x.id === td.dataset.driver), p = td.dataset.day, now = saved(d, p);
+    function setCell(td, next) { setDay(td.dataset.driver, td.dataset.day, next); render(); }
+    function setDay(driverId, p, next) {
+      const d = drivers.find(x => x.id === driverId), now = saved(d, p);
       next.runs = [...new Set(next.runs.filter(Boolean))].slice(0, 6);
       if (next.runs.length) next.status = 'ASSIGNMENT';
       else if (next.status === 'ASSIGNMENT') next.status = next.keep ? 'ASSIGNMENT' : 'AVAILABLE';
       delete next.keep;
       const same = next.status === now.status && next.runs.join() === now.runs.join();
       if (same) delete edits[key(d.id, p)]; else edits[key(d.id, p)] = next;
-      render();
     }
     const current = (td) => { const d = drivers.find(x => x.id === td.dataset.driver); return JSON.parse(JSON.stringify(cell(d, td.dataset.day))); };
     const rowsEl = document.getElementById('rows');
@@ -130,21 +136,29 @@
       setCell(td, c);
     });
     rowsEl.addEventListener('click', e => {
-      const b = e.target.closest('button'), td = b && b.closest('.tcell'); if (!td) return;
+      const b = e.target.closest('button'), line = b && b.closest('td.tpl-name') && b.closest('tr[data-line]');
+      if (line) {
+        const d = drivers.find(x => x.id === line.dataset.line);
+        if (b.matches('[data-copy]')) {
+          copied = { days: {} };
+          DAYS.forEach(p => { const c = cell(d, p); copied.days[p] = { status: c.status, runs: c.runs.filter(Boolean) }; });
+          document.getElementById('copy-state').textContent = 'Copied ' + d.name + '\'s week';
+          render();
+        } else if (b.matches('[data-paste], [data-pasteadd]') && copied) {
+          const add = b.matches('[data-pasteadd]');
+          showError('');
+          DAYS.forEach(p => {
+            const from = copied.days[p], c = JSON.parse(JSON.stringify(cell(d, p)));
+            setDay(d.id, p, add ? { status: from.runs.length ? 'ASSIGNMENT' : c.status, runs: c.runs.filter(Boolean).concat(from.runs) } : { status: from.status, runs: from.runs.slice() });
+          });
+          render();
+        }
+        return;
+      }
+      const td = b && b.closest('.tcell'); if (!td) return;
       const c = current(td);
       if (b.matches('[data-remove]')) { c.runs.splice(Number(b.closest('.run-line').dataset.i), 1); setCell(td, c); }
       else if (b.matches('[data-add]')) { c.runs.push(''); c.status = 'ASSIGNMENT'; c.keep = true; setCell(td, c); }
-      else if (b.matches('[data-copy]')) {
-        copied = { status: c.status, runs: c.runs.filter(Boolean) };
-        const d = drivers.find(x => x.id === td.dataset.driver);
-        document.getElementById('copy-state').textContent = 'Copied ' + d.name + ' · ' + L.DAY_NAMES[DAYS.indexOf(td.dataset.day)];
-        render();
-      } else if (b.matches('[data-paste], [data-pasteadd]') && copied) {
-        const p = td.dataset.day, ok = new Set(runsOn(p).map(r => r.id || r.runId)), bad = copied.runs.find(id => !ok.has(id));
-        if (bad) { showError('That run does not run on ' + L.DAY_NAMES[DAYS.indexOf(p)] + '. Nothing was pasted.'); return; }
-        showError('');
-        setCell(td, b.matches('[data-pasteadd]') ? { status: c.status, runs: c.runs.filter(Boolean).concat(copied.runs) } : { status: copied.status, runs: copied.runs.slice() });
-      }
     });
 
     // One save per changed cell, in order. A cell that saves leaves the list; one that fails stays changed with the reason.
@@ -184,11 +198,11 @@
         return;
       }
       if (refreshArmed) { clearTimeout(refreshArmed); refreshArmed = null; b.textContent = b.dataset.label; }
-      edits = {}; copied = null; document.getElementById('copy-state').textContent = 'No copied cell'; note = ''; showError(''); render();
+      edits = {}; copied = null; document.getElementById('copy-state').textContent = 'Nothing copied'; note = ''; showError(''); render();
     };
     // Leaving the screen with changes not saved asks first.
     window.addEventListener('beforeunload', e => { if (Object.keys(edits).length) { e.preventDefault(); e.returnValue = ''; } });
-    window.udBack = () => { if (copied) { copied = null; document.getElementById('copy-state').textContent = 'No copied cell'; render(); return true; } return false; };
+    window.udBack = () => { if (copied) { copied = null; document.getElementById('copy-state').textContent = 'Nothing copied'; render(); return true; } return false; };
 
     requireSignIn(async (user) => {
       const { db } = await start();

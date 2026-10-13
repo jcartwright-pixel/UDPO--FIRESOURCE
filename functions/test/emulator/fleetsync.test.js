@@ -84,3 +84,24 @@ test('fleet sync writes the real Equipment Master only with allowReal', async ()
   assert.equal(live.ok, false);
   assert.match(live.error, /production/);
 });
+
+// Review item 67 (Joe 10/13): the fleet list holds only trucks and trailers, so fork trucks, pallet jacks and other units
+// are never set INACTIVE by the sync (they would drop off the check-in lists).
+test('fleet sync leaves fork trucks, pallet jacks and other kinds the fleet list does not hold alone', async () => {
+  tabs["'EQUIPMENT_MASTER'"].push(
+    row({ equipment_id: 'veh_fork_ft_3', equipment_type: 'FORK_TRUCK', unit_id: 'FT-3', facility_id: 'fac_uniontown', location: 'UNIONTOWN', status: 'ACTIVE', source_present: 'TRUE' }),
+    row({ equipment_id: 'veh_pj_12', equipment_type: 'PALLET_JACK', unit_id: 'PJ-12', facility_id: 'fac_uniontown', location: 'UNIONTOWN', status: 'ACTIVE', source_present: 'TRUE' }),
+    row({ equipment_id: 'veh_other_44', equipment_type: 'YARD_TRUCK', unit_id: '44', facility_id: 'fac_uniontown', location: 'UNIONTOWN', status: 'ACTIVE', source_present: 'TRUE' }));
+  const preview = await runFleetSync({ db: db(), reader: sheets, sheets, target: TARGET, fleet: FLEET, now, dryRun: true });
+  assert.equal(preview.ok, true, preview.error);
+  assert.deepEqual(preview.inactive, ['900002'], 'only the truck that left the fleet list');
+  assert.ok(!preview.changes.some(c => ['FT-3', 'PJ-12', '44'].indexOf(c.unit) >= 0), 'the preview lists no change for them');
+  const real = await runFleetSync({ db: db(), reader: sheets, sheets, target: TARGET, fleet: FLEET, now });
+  assert.equal(real.ok, true, real.error);
+  const v = tabs["'EQUIPMENT_MASTER'"];
+  ['FT-3', 'PJ-12', '44'].forEach(u => {
+    const r = v.find(x => x[H.indexOf('unit_id')] === u);
+    assert.equal(r[H.indexOf('status')], 'ACTIVE', u + ' stays ACTIVE');
+    assert.equal(r[H.indexOf('source_present')], 'TRUE', u + ' is not marked off the list');
+  });
+});

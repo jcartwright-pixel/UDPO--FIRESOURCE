@@ -945,8 +945,10 @@
 
 /* Joe 10/12 ("mobile looks wrong and I can't edit"): on a phone the Loadout Center was a desk table squeezed into a strip a
    few rows high. Now the page scrolls as a whole and each load is a card: route and run on top, then the truck, trailer and
-   count boxes full width and big enough for a thumb, with every box named on the card. Desk and tablet are unchanged. */
-@media (max-width: 700px) {
+   count boxes full width and big enough for a thumb, with every box named on the card. Desk and tablet are unchanged.
+   Review item 21 (Joe 10/13): the cards also take over below about 1000px (an 800 tablet cut the truck numbers and ran Status
+   and Start off the edge); see the end of this file for the tablet's wider card. */
+@media (max-width: 1000px) {
   body.fill.loadout-page #screen:not([hidden]) { height: auto; min-height: 100vh; }
   body.fill.loadout-page .view:not([hidden]) { flex: none; }
   .plant-page.loadout-page .sheet.scroll-list { flex: none; overflow: visible; background: transparent; border: 0; box-shadow: none; }
@@ -971,3 +973,135 @@
   .plant-page.loadout-page table.loadout tr[data-row] td .clock-cell button { flex: 1; }
   .plant-page.loadout-page table.loadout tr[data-row] td:empty { display: none; }
 }
+/* Joe 10/13: the Scheduler's Suppliers list (Receiving). */
+.sched-page .sc-supnote { margin: 0 0 12px; font-size: 16px; color: var(--muted); }
+.sched-page .sc-suplist { max-height: 60vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.sched-page .sc-suptable { width: 100%; border-collapse: collapse; font-size: 16px; }
+.sched-page .sc-suptable th { position: sticky; top: 0; background: var(--ud-blue); color: #fff; text-align: left; padding: 8px 12px; font-size: 16px; font-weight: 800; }
+.sched-page .sc-suptable td { padding: 6px 12px; border-top: 1px solid #edf2f7; font-weight: 700; color: var(--ink); }
+.sched-page .sc-suptable td:last-child { width: 1%; text-align: right; white-space: nowrap; }
+.sched-page .sc-suptable td.empty { text-align: center; color: var(--muted); }
+.sched-page .sc-supedit { flex: none; }
+.sched-page .sc-suptable .sc-btn.small { font-size: 16px; min-height: 34px; }
+.sched-page .sc-suptable th, .sched-page .sc-suptable td { text-align: left; }
+.sched-page .sc-btn.small.sc-supbtn { min-height: 32px; font-size: 16px; padding: 0 16px; }
+
+/* Review item 21 (Joe 10/13): Daily Case Loadout on a small tablet (701-1000px) shows each load as the phone's card, four boxes
+   to a line: Route, Run and the driver on top; Truck, Trailer, the count and Depart; then Status, Start / End, Total Time and P/U.
+   The truck box is as wide as its quarter of the card, so the whole unit number shows. */
+@media (min-width: 701px) and (max-width: 1000px) {
+  .plant-page.loadout-page table.loadout tr[data-row] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .plant-page.loadout-page table.loadout tr[data-row] td.lo-driver { grid-column: span 2; }
+}
+/* Review item 22 (Joe 10/13): "forgot End?" stays one short line; when the load started shows on hover. */
+.plant-page.loadout-page td span.stale[title] { cursor: help; white-space: nowrap; }
+
+/* Review item 23 (Joe 10/13): Unloading & Washing on a phone or small tablet. Each load is a card, as on Yard Checks: the route
+   and run on top, the trailer back (with what it goes out on next) under it, then every other column named on the card
+   (Status, Cases In, RTA, Washed, Start / End, Total Time, Edit). The count tiles wrap instead of being cut, the Check Off /
+   View Only and Needs Unloading / All Loads switches wrap onto their own line, and the department tiles wrap (Returns and
+   Washing too). The page scrolls as a whole; the department stats come after the cards. */
+@media (max-width: 1000px) {
+  body.fill.unload-page #screen:not([hidden]) { height: auto; min-height: 100vh; }
+  body.fill.unload-page .view:not([hidden]) { flex: none; }
+  .plant-page.unload-page .areas.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .plant-page.unload-page .head { flex-wrap: wrap; }
+  .plant-page.unload-page .head .hstats { flex-wrap: wrap; }
+  .plant-page.unload-page .head .hstats span { white-space: nowrap; }
+  .plant-page.unload-page .head .actions.in-head.top-row { flex-wrap: wrap; flex-basis: 100%; justify-content: flex-start; row-gap: 8px; }
+  .plant-page.unload-page .uw-tabrow { flex-wrap: wrap; row-gap: 8px; }
+  .plant-page.unload-page .uw-split { flex: none; flex-direction: column; overflow: visible; }
+  .plant-page.unload-page .uw-split > .sheet { flex: none; }
+  .plant-page.unload-page .uw-side { flex: none; margin: 0 16px 12px; }
+  .plant-page.unload-page .sheet.scroll-list { flex: none; overflow: visible; background: transparent; border: 0; box-shadow: none; }
+  .plant-page.unload-page .sheet.scroll-list table.loadout { min-width: 0; width: 100%; table-layout: auto; }
+  .plant-page.unload-page table.loadout colgroup, .plant-page.unload-page table.loadout thead { display: none; }
+  .plant-page.unload-page table.loadout, .plant-page.unload-page table.loadout tbody { display: block; }
+  .plant-page.unload-page table.loadout tr[data-key] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin: 0 0 12px; padding: 12px 14px; background: #fff; border: 1px solid #dbe4ec; border-left: 6px solid #9fb3c8; border-radius: 14px; }
+  .plant-page.unload-page table.loadout tr[data-key].loading { border-left-color: #d98a00; background: #fffaf0; }
+  .plant-page.unload-page table.loadout tr[data-key].done { border-left-color: #2f8f4e; background: #f1faf3; }
+  .plant-page.unload-page table.loadout tr[data-key].needs-return { border-left-color: #b42332; }
+  .plant-page.unload-page tr.needs-return > td:first-child { box-shadow: none; }
+  .plant-page.unload-page table.loadout tr[data-key] td { display: block; height: auto; padding: 0; border: 0; background: transparent; box-shadow: none; text-align: left; white-space: normal; overflow: visible; font-size: 16px; min-width: 0; }
+  .plant-page.unload-page table.loadout tr[data-key] td[data-l]::before { content: attr(data-l); display: block; margin-bottom: 4px; color: #43607c; font-size: 15px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .plant-page.unload-page table.loadout tr[data-key] td.rr { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .plant-page.unload-page table.loadout tr[data-key] td.rr::before { display: none; }
+  .plant-page.unload-page table.loadout tr[data-key] td.rr b { font-size: 22px; font-weight: 900; }
+  .plant-page.unload-page table.loadout tr[data-key] td.rr span { font-size: 16px; }
+  .plant-page.unload-page table.loadout tr[data-key] td.trlcell { grid-column: 1 / -1; }
+  .plant-page.unload-page table.loadout tr[data-key] td.trlcell small.next { display: block; margin-top: 4px; font-size: 16px; white-space: normal; }
+  .plant-page.unload-page table.loadout tr[data-key] td input { width: 100%; height: 48px; padding: 0 10px; font-size: 18px; border-radius: 8px; box-sizing: border-box; }
+  .plant-page.unload-page table.loadout tr[data-key] td button { width: 100%; min-height: 44px; font-size: 16px; }
+  .plant-page.unload-page table.loadout tr[data-key] td:empty { display: none; }
+  .plant-page.unload-page table.loadout tr.editrow, .plant-page.unload-page table.loadout tr.editrow > td { display: block; height: auto; }
+  .plant-page.unload-page table.loadout tr.editrow { margin: -6px 0 12px; }
+  .plant-page.unload-page table.loadout tr.editrow .editbar { flex-wrap: wrap; }
+  .plant-page.unload-page table.loadout td.empty { display: block; text-align: center; }
+}
+@media (min-width: 601px) and (max-width: 1000px) {
+  .plant-page.unload-page table.loadout tr[data-key] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .plant-page.unload-page .areas.six { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 8px; }
+  .plant-page.unload-page .head .hstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .plant-page.unload-page .uw-side { margin: 0 8px 12px; }
+}
+
+/* Review item 24 (Joe 10/13): Plant Temperatures on a tablet (761-1100px: the 800 tablet, and the 1024 tablet, where the same
+   headings and the Manual Read box were cut). Each location is a card, as on Yard Checks: the name and its range on top, then
+   every column named on the card: Current Temp, Manual Read (a wide box), Trend, Status, Battery, Last Reading, Notes (full
+   width), Last Checked, By and Action. The phone keeps its own manual-check list. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  .temp-page #pane-current { background: transparent; border: 0; box-shadow: none; }
+  .temp-page #pane-current table.tp-table { min-width: 0 !important; display: block; }
+  .temp-page #pane-current table.tp-table colgroup, .temp-page #pane-current table.tp-table thead { display: none; }
+  .temp-page #pane-current table.tp-table tbody { display: block; }
+  .temp-page #pane-current table.tp-table tr[data-location] { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; margin: 0 0 12px; padding: 12px 14px; background: #fff; border: 1px solid #dbe4ec; border-left: 6px solid #9fb3c8; border-radius: 14px; }
+  .temp-page #pane-current table.tp-table tr[data-location] td { display: block; height: auto; padding: 0; border: 0; background: transparent; box-shadow: none; text-align: left; white-space: normal; overflow: visible; font-size: 16px; min-width: 0; }
+  .temp-page #pane-current table.tp-table tr[data-location] td[data-l]::before { content: attr(data-l); display: block; margin-bottom: 4px; color: #43607c; font-size: 15px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .temp-page #pane-current table.tp-table tr[data-location] td.tp-name { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .temp-page #pane-current table.tp-table tr[data-location] td.tp-name::before { display: none; }
+  .temp-page #pane-current table.tp-table tr[data-location] td.tp-name b { font-size: 22px; font-weight: 900; color: var(--ud-blue-dark); }
+  .temp-page #pane-current table.tp-table tr[data-location] td.tp-name small { font-size: 16px; }
+  .temp-page #pane-current table.tp-table tr[data-location] td:nth-child(3) { grid-column: span 2; }
+  .temp-page #pane-current table.tp-table tr[data-location] td:nth-child(8) { grid-column: 1 / -1; }
+  .temp-page #pane-current table.tp-table tr[data-location] td input { height: 48px; font-size: 18px; padding: 0 12px; }
+  .temp-page #pane-current table.tp-table tr[data-location] td small { font-size: 15px; }
+  .temp-page #pane-current table.tp-table td.empty { display: block; text-align: center; }
+}
+
+/* Review item 26 (Joe 10/13): Product Returns on a phone. "What came back" is a sentence, so its label sits above it and the
+   words read left to right across the card instead of five right-aligned lines. */
+@media (max-width: 760px) {
+  .returns-page table.loadout tbody td.detail { flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+}
+/* Review item 30 (Joe 10/13): Manager Center. Each card's four tiles sit two by two with 16px labels on one line (the label and
+   number side by side, the line under them), a route behind shows its whole "BEHIND · 4 h 0 min" (it wraps rather than being
+   cut), and on a wide screen the Send Current Report card takes two rows instead of three, with Plant Distribution Departments
+   across the top of the other two columns, so the report card has no big empty area. */
+.manager-page .mc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 6px; }
+.manager-page .mc-tile { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label num" "line line" "bar bar"; align-content: center; column-gap: 8px; row-gap: 1px; padding: 4px 10px; min-height: 0; }
+.manager-page .mc-tile span { grid-area: label; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; align-self: center; }
+.manager-page .mc-tile b { grid-area: num; font-size: 22px; line-height: 1.15; text-align: right; }
+.manager-page .mc-tile b.time { font-size: 19px; }
+.manager-page .mc-tile b small { font-size: 16px; }
+.manager-page .mc-tile i { grid-area: line; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.manager-page .mc-tile u { grid-area: bar; }
+.manager-page .mc-pvlist .mc-rt { grid-template-columns: minmax(0, 1fr) auto; }
+.manager-page .mc-pvlist .mc-rt i { grid-column: 1 / -1; white-space: normal; overflow: visible; }
+@media (min-width: 1501px) {
+  .manager-page .mc-report { grid-row: 1 / span 2; }
+  .manager-page .mc-grid [data-card="dept"] { grid-column: 2 / span 2; }
+  .manager-page .mc-grid [data-card="dept"] .mc-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+}
+@media (max-width: 1500px) { .manager-page .mc-tile { min-height: 64px; } }
+
+/* Review item 32 (Joe 10/13): Product Sheet's Edit is a word button (it was ⋮), and "Full Speed /Min" sits on two lines. */
+.products-page .pm-editbtn { height: 34px; min-width: 56px; padding: 0 10px; margin-right: 8px; vertical-align: middle; border: 1px solid var(--ud-blue); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.products-page .pm-editbtn:hover, .products-page .pm-editbtn:focus-visible { background: var(--ud-blue); color: #fff; }
+
+/* Review item 36 (Joe 10/13): Shift Notes' "Saved" pill shows only when it has something to say (no empty pill). */
+.shift-page .sn-autosave:empty { display: none; }
+
+/* Review item 38 (Joe 10/13): Loadout's Edit Load box saves each box as it is left; the time of the last save shows beside Close. */
+.plant-page .edit-saved { align-self: center; font-size: 16px; font-weight: 700; color: #1f7a4d; }

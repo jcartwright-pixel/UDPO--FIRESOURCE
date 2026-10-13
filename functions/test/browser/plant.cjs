@@ -59,6 +59,13 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       assert.ok(drivers.some(d => /ALESANTRINO, DAVID/.test(d.name)), 'the long name is on the list');
       const widths = await page.$$eval('#cols col', c => c.map(x => parseFloat(x.style.width)));
       assert.deepEqual(widths.slice(0, 6), [4.8, 9, 15.6, 8.1, 8.1, 6.4], 'Route, Truck, Trailer and Cases Out narrower; Driver wider');
+      // Review item 22 (Joe 10/13): the Start / End column has its heading, and Wednesday's 6303 (still loading, End forgotten)
+      // shows just "forgot End?" on one line; when it started shows on hover.
+      assert.equal((await page.$$eval('#head-row th', ths => ths.map(t => t.textContent)))[8], 'Start / End');
+      const forgot = await page.$eval(row('6303') + ' td:nth-child(10)', td => ({ text: td.textContent, title: (td.querySelector('[title]') || {}).title || '' }));
+      assert.equal(forgot.text, 'forgot End?', JSON.stringify(forgot));
+      assert.match(forgot.title, /^Started \w{3} \d{1,2}:\d{2} [AP]M · forgot End\?$/, 'when it started shows on hover ' + JSON.stringify(forgot));
+      assert.ok(await page.$eval(row('6303'), tr => tr.getBoundingClientRect().height < 60), '6303 stays one line high');
       const size = await page.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight, width: document.scrollingElement.scrollWidth, innerWidth: window.innerWidth }));
       assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Loadout Center fits ' + w + 'x' + h + ' with no page scrolling: ' + JSON.stringify(size));
       if (SHOTS) {
@@ -118,8 +125,16 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     await loader.click(row('6301_1') + ' button.edit-row');
     if (SHOTS) await loader.screenshot({ path: path.join(SHOTS, 'loadout-edit-1920.png'), scale: 'css' });
     await loader.fill('#edit-notes', 'Short 2 cases of buttermilk');
-    await loader.click('#edit-save');
-    await watcher.waitForFunction(() => true);
+    // Review item 38 (Joe 10/13): no Save Times & Notes button; leaving the box saves it, then Close.
+    assert.equal(await loader.$('#edit-save'), null, 'no Save button on the Edit Load box');
+    await loader.click('#edit-modal [data-close]');
+    for (let i = 0; ; i++) {
+      const days = (await db().collection('runs').get()).docs.flatMap(d => Object.values(d.data().days || {}));
+      if (days.some(d => d && d.plantNotes === 'Short 2 cases of buttermilk')) break;
+      assert.ok(i < 40, 'the note saved when its box was left');
+      await new Promise(r => setTimeout(r, 250));
+    }
+    results.push('Edit Load: the note saved on leaving the box (no Save button)');
 
     // Tanker columns.
     await loader.click('[data-area="TANKER"]');
@@ -144,6 +159,10 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       // T-951 and T-960 asked for a wash; T-993 was unloaded and not washed yet.
       assert.equal(await home.textContent('[data-n="wash.open"]'), '3');
       assert.equal(await home.textContent('[data-n="ret.pending"]'), '2');
+      // Review item 28 (Joe 10/13): the chart, list and tile labels are 16px, and a long Returns or Washing button has its whole
+      // text on hover.
+      assert.deepEqual(await home.$$eval('.dept-a .hour small, .dept-a .hour b, .dept-a .legend, .dept-a .chip em, .dept-a .chip small, .dept-a .dc-metric em, .dept-a .dc-metric small, .dept-a .sec-t, .dept-a .li, .dept-a .hb, .dept-a .dc-link', els => els.filter(e => parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.className + ' ' + e.textContent.slice(0, 20))), []);
+      assert.ok(await home.$$eval('.dept-a [data-dept="ret"] a.dc-link', a => a.every(x => x.title && x.title === x.querySelector('span').textContent)), 'each Returns button has its whole text on hover');
       if (SHOTS) {
         await home.screenshot({ path: path.join(SHOTS, 'departments-' + w + '.png'), scale: 'css' });
         if (w === 1920) await home.screenshot({ path: path.join(SHOTS, 'departments-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 475 }, scale: 'device' });

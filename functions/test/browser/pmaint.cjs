@@ -54,6 +54,19 @@ async function plantInHeader(page, what, name) {
   await page.waitForFunction(n => document.getElementById('plant-name').textContent === n, name || 'Uniontown');
   assert.match(await page.textContent('.head .eyebrow'), new RegExp('Plant Maintenance · ' + (name || 'Uniontown')));
 }
+// Review item 68 (Joe 10/13): the Maintenance Station board needs a United Dairy sign-in (or a station code), so the tablet signs
+// in first (on the Maintenance Center, same browser) and then opens the station.
+async function stationPage(browser, width, height, plantHome) {
+  const page = await openPage(browser, width, height, '/pmaint.html?' + ADMIN, true, plantHome);
+  await plantInHeader(page, 'sign-in', plantHome === 'fac_charleston' ? 'Charleston' : 'Uniontown');
+  await page.goto(HOSTING + '/maint-station.html');
+  return page;
+}
+// Review item 34 (Joe 10/13): the help line at the bottom keeps a gap from the side menu, as the boxes above it do.
+async function footGap(page, what) {
+  const gap = await page.evaluate(() => { const f = document.getElementById('foot'), m = document.querySelector('.sidemenu'), r = document.createRange(); r.selectNodeContents(f); return Math.round(r.getBoundingClientRect().left - (m ? m.getBoundingClientRect().right : 0)); });
+  assert.ok(gap >= 12, what + ': the help line is not against the side menu (' + gap + 'px)');
+}
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') }); };
 
 (async () => {
@@ -82,6 +95,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       assert.match(await page.textContent('#kpis'), /Requests waiting[\s\S]*PMs overdue/);
       assert.match(await page.textContent('#pms'), /Grease filler bowl bearings[\s\S]*late/);
       await plantInHeader(page, 'Maintenance Center ' + w);
+      await footGap(page, 'Maintenance Center ' + w);
       await fits(page, 'Maintenance Center ' + w);
       await smallest(page, 'Maintenance Center ' + w);
       await shot(page, 'pmaint-center-' + w);
@@ -105,6 +119,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       await page.waitForSelector('#rows tr.on');
       assert.match(await page.textContent('#card'), /GALLON FILLER[\s\S]*From your Production Lines list[\s\S]*Grease filler bowl bearings[\s\S]*History[\s\S]*Valve 14 blew a seal/);
       await plantInHeader(page, 'Machinery ' + w);
+      await footGap(page, 'Machinery ' + w);
       await fits(page, 'Machinery ' + w);
       await smallest(page, 'Machinery ' + w);
       await shot(page, 'pmaint-machinery-' + w);
@@ -121,7 +136,11 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
     await mach.press('#card [data-k="make"]', 'Tab');
     await mach.waitForFunction(() => /Quincy/.test(document.getElementById('rows').textContent), null, { timeout: 8000 });
     assert.deepEqual(mach.errors, []);
-    results.push('Machinery: Air Compressor 2 added on leaving its name box; Make saved on leaving its box');
+    // Review item 35 (Joe 10/13): the Installed box reads 10-8-26 (the shared short date box), not mm/dd/yyyy.
+    await mach.fill('#card [data-k="installed"]', '2026-10-08');
+    await mach.press('#card [data-k="installed"]', 'Tab');
+    await mach.waitForFunction(() => { const i = document.querySelector('#card [data-k="installed"]'), f = i && i.parentElement.querySelector('.ud-date-face'); return f && !f.hidden && f.textContent === '10-8-26' && i.classList.contains('ud-date-dressed'); }, null, { timeout: 8000 });
+    results.push('Machinery: Air Compressor 2 added on leaving its name box; Make saved on leaving its box; Installed reads 10-8-26');
 
     // PM Schedule: Overdue first; + Add PM Task saves once it has a machine and what the PM is.
     for (const [w, h] of SIZES) {
@@ -129,6 +148,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       await page.waitForSelector('#rows tr[data-id]');
       assert.match(await page.innerHTML('#rows'), /Overdue \(1\)[\s\S]*Grease filler bowl bearings[\s\S]*Sent · M-1002[\s\S]*Later \(1\)[\s\S]*Blow down/);
       await plantInHeader(page, 'PM Schedule ' + w);
+      await footGap(page, 'PM Schedule ' + w);
       await fits(page, 'PM Schedule ' + w);
       await smallest(page, 'PM Schedule ' + w);
       await shot(page, 'pmaint-pmschedule-' + w);
@@ -170,16 +190,24 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    const chs = await openPage(browser, 1280, 800, '/maint-station.html', true, 'fac_charleston');
+    // Review item 68: with no sign-in and no station code the board is not shown.
+    const nobody = await openPage(browser, 1280, 800, '/maint-station.html', true);
+    await nobody.waitForFunction(() => /Sign in with a United Dairy account/.test(document.getElementById('gs-message').textContent), null, { timeout: 8000 });
+    assert.equal(await nobody.$$eval('#jobs .gs-job', l => l.length), 0, 'no work orders without a sign-in');
+    assert.doesNotMatch(await nobody.textContent('body'), /JELLICK|GALLON FILLER/, 'no technician names or machines without a sign-in');
+    await nobody.context().close();
+    results.push('Maintenance Station: nothing shown without a United Dairy sign-in or station code (review item 68)');
+    const chs = await stationPage(browser, 1280, 800, 'fac_charleston');
     await chs.waitForSelector('#jobs .gs-empty');
     assert.match(await chs.textContent('#title'), /Maintenance Station · Charleston/);
     assert.doesNotMatch(await chs.textContent('#jobs'), /M-1001/, 'Charleston\'s station shows only Charleston\'s work orders');
     await chs.context().close();
     results.push('Plant comes from the plant home opened: no plant picker; Charleston\'s home opens Charleston\'s pages and station');
 
-    // Maintenance Station: no sign-in to see the work orders; name + login ID to start; Complete with a signature.
+    // Maintenance Station: the tablet's United Dairy sign-in to see the work orders (review item 68); name + login ID to start;
+    // Complete with a signature.
     for (const [w, h] of [[1280, 800], [1920, 1080]]) {
-      const page = await openPage(browser, w, h, '/maint-station.html', true);
+      const page = await stationPage(browser, w, h);
       await page.waitForSelector('#jobs .gs-job');
       assert.match(await page.textContent('#jobs'), /GALLON FILLER[\s\S]*M-1001/);
       assert.match(await page.textContent('#title'), /Maintenance Station · Uniontown/);
@@ -188,7 +216,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    const st = await openPage(browser, 1280, 800, '/maint-station.html', true);
+    const st = await stationPage(browser, 1280, 800);
     await st.waitForSelector('#jobs .gs-job');
     await st.click('#jobs .gs-job:has-text("M-1002") button');
     await st.click('#job-start');

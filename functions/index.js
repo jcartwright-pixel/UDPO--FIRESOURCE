@@ -38,6 +38,7 @@ const { setGlobalOptions } = require('firebase-functions/v2');
 const { runTransfer } = require('./src/transfer');
 const { applyAction, checkSaves, SaveError } = require('./src/actions');
 const { phoneCall, newRouteCode } = require('./src/phone');
+const FAILS = require('./src/fails');
 const { garageCall } = require('./src/garage');
 const { setSwitch, SwitchError } = require('./src/switch');
 const { gpsCall, GpsError } = require('./src/gps');
@@ -130,8 +131,8 @@ exports.phone = onCall({ maxInstances: 3 }, async (request) => {
     // its station code then decides the page. The drivers' own phones keep the Route Distribution code alone.
     if (roomCall(input) && !unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with a United Dairy account on the Driver Station link first.');
     // The Driver Room Check-In tablet's Release: the plant's manager release code (as the no-account Plant Station).
-    if (input.op === 'roomStatus' || input.op === 'roomRelease') return await ADMIN.releaseCheck(db, { op: input.op === 'roomStatus' ? 'status' : 'release', facilityId: input.facilityId, code: input.code });
-    return await phoneCall(db, input);
+    if (input.op === 'roomStatus' || input.op === 'roomRelease') return await ADMIN.releaseCheck(db, FAILS.withDevice(request, { op: input.op === 'roomStatus' ? 'status' : 'release', facilityId: input.facilityId, code: input.code }));
+    return await phoneCall(db, FAILS.withDevice(request, input));
   } catch (error) { throw asHttps(error); }
 });
 
@@ -141,7 +142,8 @@ exports.garage = onCall({ maxInstances: 3 }, async (request) => {
   try {
     // Joe 10/12: a Garage Station with its code is signed in with a United Dairy account first (as every station).
     if (request.data && request.data.station && !unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with the tablet\'s United Dairy account on the Garage Station first.');
-    return await garageCall(db, request.data);
+    // Review item 68 (Joe 10/13): who is calling, so the Maintenance Station board can ask for a sign-in or a station code.
+    return await garageCall(db, FAILS.withDevice(request, request.data), undefined, { user: unitedDairyUser(request.auth), claims: request.auth && request.auth.token });
   } catch (error) { throw asHttps(error); }
 });
 
@@ -209,14 +211,14 @@ exports.adminJobsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeo
 
 exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
   const user = signedIn(request);
-  try { return await stationRelease(db, user, request.data || {}); } catch (error) { throw asHttps(error); }
+  try { return await stationRelease(db, user, FAILS.withDevice(request, request.data)); } catch (error) { throw asHttps(error); }
 });
 
 // Open to tablets with no United Dairy account (Joe 10/12, the old app's public Plant Station): a plant station's code, only
 // while that plant's switch is On. The token names the station and its code's version; the database rules and save check
 // both against stationAccess / private/stations each time, so Off, New code and Remove shut the tablet out at once.
 exports.stationSignIn = onCall({ maxInstances: 3 }, async (request) => {
-  const input = request.data || {};
+  const input = FAILS.withDevice(request, request.data);
   try {
     if (input.op === 'status' || input.op === 'release') return await ADMIN.releaseCheck(db, input);
     const r = await STATIONS.signIn(db, input);

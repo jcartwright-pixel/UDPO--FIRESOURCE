@@ -41,7 +41,7 @@ test('master saves reach the sandbox copies by their ID column; new entries beco
   sheets = F.fakeWritableSheets(tabs);
   await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: 'drv_test_casey', name: 'CASEY, LEE A', hireDate: '2025-12-01', seniorityDate: '2025-12-01', truck: '', relief: true });
   const added = await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), name: 'EVANS, KIM', hireDate: '2026-10-01', seniorityDate: '2026-10-01', truck: '900002', relief: false });
-  await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_truck_900002', reason: 'brakes', today: '2026-10-09' });
+  await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_truck_900002', reason: 'brakes' });
   await applyAction(db(), MANAGER, { action: 'saveRoute', requestId: rid(), runId: 'run_t801', fields: { loadType: 'Tote' }, days: { wed: { active: true, dispatchTime: '5 AM', miles: '150' } } });
   await applyAction(db(), MANAGER, { action: 'reorderRouteDay', requestId: rid(), day: 'mon', runIds: ['run_t801', 'run_t802'] });
   const off = await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', status: 'UNAVAILABLE', reason: 'SICK DAY', startDate: '2026-10-20', endDate: '2026-10-20' });
@@ -72,7 +72,7 @@ test('master saves reach the sandbox copies by their ID column; new entries beco
 });
 
 test('a cell changed in the sheet meanwhile is kept and listed as a conflict; a waiting save is not undone by the copy', async () => {
-  await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_trailer_t_902', reason: 'flat tire', today: '2026-10-09' });
+  await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_trailer_t_902', reason: 'flat tire' });
   // Before the write-back runs, the copy runs: the app keeps its waiting save.
   await runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick });
   assert.equal((await db().collection('equipment').doc('veh_trailer_t_902').get()).data().status, 'DOWN');

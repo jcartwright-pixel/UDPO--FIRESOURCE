@@ -18,6 +18,8 @@ export const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
 export const today = () => L.localDay(new Date().toISOString());
 export const thisMonth = () => today().slice(0, 7);
 export const monthName = (m) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 1, 15)).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
+// Review item 60 (Joe 10/13): a month in a title reads Oct 26 (its 3-letter name and 2-digit year).
+export const monthShort = (m) => monthName(m).slice(0, 3) + ' ' + String(m).slice(2, 4);
 
 // The plant: the one picked on the main screen (this tab), else the person's first plant. ?plant= wins.
 export function plantsOf(person) {

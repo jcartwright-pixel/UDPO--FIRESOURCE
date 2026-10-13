@@ -142,12 +142,16 @@
         if (ck && editKey === r.key) {
           html += '<tr class="editrow"><td colspan="9"><div class="editbar"><b>Edit · ' + escapeHtml(r.route + ' ' + r.run) + '</b><span class="read">Started ' + escapeHtml(P.clock(r.startedAt) || '—') + ' · Finished ' + escapeHtml(P.clock(r.completedAt) || '—') + '</span>' +
             '<label>' + unit + ' In<input data-e="casesIn" inputmode="numeric" value="' + escapeHtml(r.casesIn) + '"></label><label>Trailer Back<input data-e="trailer" value="' + escapeHtml(r.trailer) + '"></label>' +
-            '<label class="grow">Notes<input data-e="notes" maxlength="1200" value="' + escapeHtml(r.notes) + '"></label><button type="button" class="primary" data-do="editsave"' + k(r) + '>Save</button><button type="button" data-do="editclose">Cancel</button></div></td></tr>';
+            '<label class="grow">Notes<input data-e="notes" maxlength="1200" value="' + escapeHtml(r.notes) + '"></label><button type="button" data-do="editclose">Close</button></div></td></tr>';
         }
       });
       const focused = document.activeElement && document.activeElement.dataset && (document.activeElement.dataset.f || document.activeElement.dataset.e) ? document.activeElement : null;
       const keep = focused ? [focused.dataset.key || '', focused.dataset.f || '', focused.dataset.e || '', focused.value] : null;
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="9" class="empty">' + (!mine.length ? 'No ' + name.toLowerCase() + ' unloading is scheduled for this date.' : 'Every load is unloaded.') + '</td></tr>';
+      // Review item 23 (Joe 10/13): on a phone or a small tablet each load is a card (as on Yard Checks); every box is named on
+      // the card itself by its column heading (the Start / End buttons' column has no heading on the desk, so it is named here).
+      const heads = [...document.querySelectorAll('table.unload thead th')].map((th, i) => th.textContent || (i === 6 ? 'Start / End' : ''));
+      document.querySelectorAll('#rows tr[data-key]').forEach(tr => [...tr.children].forEach((td, i) => { if (heads[i]) td.dataset.l = heads[i]; }));
       if (keep) {
         const el = keep[1] ? document.querySelector('input[data-f="' + keep[1] + '"][data-key="' + CSS.escape(keep[0]) + '"]') : document.querySelector('input[data-e="' + keep[2] + '"]');
         if (el) { el.value = keep[3]; el.focus(); }
@@ -218,13 +222,32 @@
         saveUnload(r, { trailer: v }, { trailer: v, trailerTyped: true });
       }
     }
-    rowsEl.addEventListener('change', e => { if (e.target.dataset.f) fieldSave(e.target); });
+    rowsEl.addEventListener('change', e => { if (e.target.dataset.f) fieldSave(e.target); else if (e.target.dataset.e) editSave(e.target); });
+    // Review item 38 (Joe 10/13): the line edit has no Save button. Each box saves as it is left (the same saveUnloading call),
+    // and Close shuts the edit line.
+    function editSave(el) {
+      const r = rowByKey(editKey), k = el.dataset.e;
+      if (!r || !k) return;
+      const v = String(el.value || '').trim();
+      if (k === 'casesIn') {
+        const q = v.replace(/,/g, '');
+        if (q === r.casesIn) return;
+        if (!/^\d+$/.test(q) && !(q === '' && r.status !== 'COMPLETE')) { showError('Enter a whole quantity, including zero if none.'); return; }
+        const c = q === '' ? '' : String(Number(q));
+        saveUnload(r, { casesIn: c }, { casesIn: c });
+      } else if (k === 'trailer') {
+        const t = U.trailerText(v);
+        if (t !== r.trailer) saveUnload(r, { trailer: t }, { trailer: t, trailerTyped: !!t });
+      } else if (k === 'notes') {
+        if (v !== r.notes) saveUnload(r, { notes: v }, { notes: v });
+      }
+    }
     // Pressing a button (End right after typing the count) keeps the typing box focused, so the press is not lost to a redraw;
     // End reads the typed count itself.
-    rowsEl.addEventListener('mousedown', e => { if (e.target.closest('button[data-do]') && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.f) e.preventDefault(); });
+    rowsEl.addEventListener('mousedown', e => { if (e.target.closest('button[data-do]') && document.activeElement && document.activeElement.dataset && (document.activeElement.dataset.f || document.activeElement.dataset.e)) e.preventDefault(); });
     rowsEl.addEventListener('keydown', e => {
       if (e.target.dataset.e) {
-        if (e.key === 'Enter') { const b = rowsEl.querySelector('[data-do="editsave"]'); if (b) b.click(); }
+        if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
         else if (e.key === 'Escape') { editKey = ''; render(); }
         return;
       }
@@ -234,7 +257,8 @@
       const b = e.target.closest('button[data-do]');
       if (!b || b.disabled) return;
       const a = b.dataset.do;
-      if (a === 'editclose') { editKey = ''; render(); return; }
+      // Close saves the box still being typed in first (it keeps the focus, so the box is not left before the press).
+      if (a === 'editclose') { const f = document.activeElement; if (f && f.dataset && f.dataset.e) editSave(f); editKey = ''; render(); return; }
       const r = rowByKey(b.dataset.key);
       if (!r) return;
       const now = new Date().toISOString();
@@ -251,18 +275,6 @@
       } else if (a === 'edit') {
         editKey = editKey === r.key ? '' : r.key; render();
         const first = rowsEl.querySelector('[data-e]'); if (first) first.focus();
-      } else if (a === 'editsave') {
-        const val = (n) => { const el = rowsEl.querySelector('[data-e="' + n + '"]'); return el ? el.value.trim() : null; };
-        const fields = {}, shown = {}, q = val('casesIn').replace(/,/g, ''), t = U.trailerText(val('trailer')), n = val('notes');
-        if (q !== r.casesIn) {
-          if (!/^\d+$/.test(q) && !(q === '' && r.status !== 'COMPLETE')) { showError('Enter a whole quantity, including zero if none.'); return; }
-          fields.casesIn = q === '' ? '' : String(Number(q)); shown.casesIn = fields.casesIn;
-        }
-        if (t !== r.trailer) { fields.trailer = t; shown.trailer = t; shown.trailerTyped = !!t; }
-        if (n !== r.notes) { fields.notes = n; shown.notes = n; }
-        editKey = '';
-        if (!Object.keys(fields).length) { render(); return; }
-        saveUnload(r, fields, shown);
       } else if (a === 'rta') {
         saveUnload(r, { returnIds: r.pendingReturns.map(x => x.id) }, {});
       } else if (a === 'wash') {

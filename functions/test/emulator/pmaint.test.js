@@ -117,7 +117,8 @@ test('Maintenance Station: start, a helper, need parts, complete a PM (Last done
   }
   const LOGIN = { TOM: ['TECH-JT', '48213'], JAX: ['TECH-JN', '551902'] };
   const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-  const call = (fields, min) => GA.garageCall(db(), Object.assign({ facilityId: 'fac_uniontown' }, fields), at(min));
+  // The tablet is signed in with a United Dairy account (review item 68: the board needs a sign-in or a station code).
+  const call = (fields, min) => GA.garageCall(db(), Object.assign({ facilityId: 'fac_uniontown' }, fields), at(min), { user: { uid: 'u1', email: 'maint.tablet@uniteddairy.com' } });
   const as = async (who, fields, min) => { const s = await call({ op: 'signIn', techId: LOGIN[who][0], loginId: LOGIN[who][1], tokens: [] }, min); return call(Object.assign({ op: 'pmStep', tokens: [s.token], requestId: rid() }, fields), min); };
 
   const made = await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: 'ut_prod_gallon_filler', task: 'Grease bearings', every: 1, unit: 'MONTHS', lastDone: '2026-09-01' } });
@@ -171,4 +172,32 @@ test('Maintenance Station: start, a helper, need parts, complete a PM (Last done
   const s = await call({ op: 'signIn', maint: true, techId: 'TECH-JT', loginId: '48213', tokens: [] }, 131);
   r = await call({ op: 'pmStep', tokens: [s.token], requestId: rid(), step: 'REPORT', machineId: 'ut_prod_gallon_filler', problem: 'Belt squeal', lineDown: false }, 131);
   assert.match(r.message, /^M-1003/);
+});
+
+// Review item 68 (Joe 10/13): the Maintenance Station board (technicians, open work orders, machines) is not open to anyone
+// with the link: it needs a signed-in United Dairy account or a valid station code, like the other station reads.
+test('Maintenance Station board needs a United Dairy sign-in or a valid station code', async () => {
+  const GA = require('../../src/garage'), ST = require('../../src/stations');
+  await db().collection('garageTechs').doc('TECH-JT').set({ tech_id: 'TECH-JT', name: 'JELLICK Tom', active: 'YES', facility_id: 'fac_uniontown' });
+  const board = (caller, extra) => GA.garageCall(db(), Object.assign({ op: 'pmBoard', facilityId: 'fac_uniontown', maint: true }, extra || {}), undefined, caller);
+  await assert.rejects(board(), /Sign in with a United Dairy account, or enter the station code/);
+  await assert.rejects(board({ user: null, claims: { email: 'someone@gmail.com' } }), /Sign in with a United Dairy account/);
+  const signedIn = await board({ user: { uid: 'u1', email: 'maint.tablet@uniteddairy.com' } });
+  assert.deepEqual(signedIn.techs.map(t => t.name), ['JELLICK Tom']);
+  // A Plant Station signed in by its code alone (no UD account): its own plant's board only.
+  await db().collection('users').doc('boss@uniteddairy.com').set({ name: 'Boss', status: 'ACTIVE', roles: ['ADMINISTRATOR'], facilities: ['*'], cells: { id: 'usr_boss', version: '1' } });
+  const AD = require('../../src/admin'), boss = (input) => AD.adminCall(db(), { email: 'boss@uniteddairy.com' }, input);
+  const plant = (await boss({ op: 'stations', kind: 'PLANT' })).stations.find(x => x.facilityId === 'fac_uniontown');
+  await boss({ op: 'stationCode', key: plant.key });
+  await boss({ op: 'noAccountSet', facilityId: 'fac_uniontown', on: true });
+  const claims = { udStation: plant.key, udVersion: (await ST.read(db()))[plant.key].version };
+  assert.ok(await ST.stationSaver(db(), claims), 'the fixture Plant Station is signed in by its code');
+  assert.ok(Array.isArray((await board({ user: null, claims })).jobs), 'a Plant Station signed in by its code');
+  await assert.rejects(GA.garageCall(db(), { op: 'pmBoard', facilityId: 'fac_charleston', maint: true }, undefined, { user: null, claims }), { code: 'NOT_ALLOWED' }, 'not another plant\'s board');
+  // A garage tablet's station code (its remembered station, still on the same code).
+  const garage = (await boss({ op: 'stations', kind: 'GARAGE' })).stations.find(x => x.facilityId === 'fac_uniontown');
+  const code = (await boss({ op: 'stationCode', key: garage.key })).code;
+  const st = (await GA.garageCall(db(), { op: 'station', step: 'enter', code })).station;
+  assert.ok(Array.isArray((await board(undefined, { station: { key: st.key, version: st.version } })).jobs), 'a valid garage station code');
+  await assert.rejects(board(undefined, { station: { key: st.key, version: 'old' } }), { code: 'NOT_ALLOWED' }, 'an old code does not');
 });

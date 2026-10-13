@@ -340,7 +340,7 @@ export function evenTopButtons() {
   const right = Math.min(head.getBoundingClientRect().right, document.documentElement.clientWidth) + 1;
   const tops = new Set(btns.map(b => Math.round(b.getBoundingClientRect().top)));
   // The filters after the buttons count too: a drop-down pushed off the right edge (Products at 1536) also means own widths.
-  const row = [...head.querySelectorAll('.actions > *')].filter(el => el.getBoundingClientRect().width > 0);
+  const row = [...head.querySelectorAll('.actions > *, :scope > *')].filter(el => el.getBoundingClientRect().width > 0);
   if (tops.size > 1 || btns.concat(row).some(b => b.getBoundingClientRect().right > right)) head.style.removeProperty('--top-btn-w');
 }
 (() => {
@@ -759,6 +759,13 @@ export function friendlyError(e) {
   if (code === 'internal' && /^internal$/i.test(msg)) return 'Something went wrong on the server. Try again; if it keeps happening, tell an administrator.';
   return msg;
 }
+// Review item 55 (Joe 10/13): a server call that fails with no message written for people (the bare "internal [0]") says so
+// in a plain sentence, naming what could not be reached; a message the server wrote for people (a check) shows as it is.
+export function serverText(e, what) {
+  const code = String(e && e.code || '').replace(/^functions\/|^firestore\//, ''), msg = String(e && e.message || e || '');
+  if (code === 'internal' || code === 'unknown' || /^(internal|unknown)\b/i.test(msg) || !msg) return 'Could not reach ' + what + '. Check the network and try again.';
+  return friendlyError(e);
+}
 
 // Any other server call that changes something (the per-screen switch): also one call with its own requestId.
 // Which saves the signed-in person may make, as the server decides (role, Role Templates and the person's Allow / Deny in
@@ -768,11 +775,31 @@ export async function allowedSaves(actions) {
   try { return (await callServer('save', { checkSaves: actions })).allowed || {}; } catch (e) { return {}; }
 }
 
+// Review item 69 (Joe 10/13): a call that failed with no clear answer (timed out, no connection, a server error) may still
+// have saved. Trying the same thing again reuses that try's requestId, so the server saves it once (a retry after a time-out
+// added pickups, returns and work orders twice). Any answer from the server, or 15 minutes, ends the hold.
+const IN_DOUBT_MS = 15 * 60000;
+const inDoubt = new Map(); // the call (name + fields) -> {requestId, at}
+const newRequestId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
+function mayHaveSaved(e) {
+  const code = String(e && e.code || '').replace(/^functions\//, '');
+  return ['deadline-exceeded', 'unavailable', 'internal', 'unknown', 'cancelled'].indexOf(code) >= 0 || /network|Failed to fetch|offline|timed? ?out/i.test(String(e && e.message || ''));
+}
 export async function callServer(name, fields) {
   const { functions } = await start();
-  const requestId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
-  const result = await httpsCallable(functions, name)(Object.assign({ requestId }, fields));
-  return result.data;
+  // A screen that sends its own requestId keeps it; otherwise the same call after a doubtful failure gets the same one.
+  let key = '';
+  if (!(fields && fields.requestId)) { try { key = name + '|' + JSON.stringify(fields || {}); } catch (e) { key = ''; } }
+  const held = key && inDoubt.get(key), fresh = held && Date.now() - held.at < IN_DOUBT_MS;
+  const requestId = fresh ? held.requestId : newRequestId();
+  try {
+    const result = await httpsCallable(functions, name)(Object.assign({ requestId }, fields));
+    if (key) inDoubt.delete(key);
+    return result.data;
+  } catch (e) {
+    if (key) { if (mayHaveSaved(e)) inDoubt.set(key, { requestId, at: fresh ? held.at : Date.now() }); else inDoubt.delete(key); }
+    throw e;
+  }
 }
 
 // Errors are the only messages the screens show (no status bars).
@@ -884,6 +911,10 @@ function tooWide(td) {
     return inner.getBoundingClientRect().width > el.getBoundingClientRect().width + 0.1;
   });
 }
+// Joe 10/13 (review item 3): Weekly Dispatch shrinks a driver's name to fit its day box (down to 12px) so the whole week shows
+// with every name on one line; only a name that still does not fit wraps.
+const WEEKLY_FIT_MIN = 12;
+function fitMin(td) { return td.classList.contains('day') && td.closest('.weekly-page .sheet.week') ? WEEKLY_FIT_MIN : FIT_MIN; }
 function fitCells() {
   fitQueued = false;
   const cells = [...document.querySelectorAll('tbody td')].filter(td => td.offsetParent && td.textContent.trim() && !td.querySelector('input, textarea, select, table') && !td.classList.contains('details-cell') && td.colSpan === 1);
@@ -892,7 +923,7 @@ function fitCells() {
   const wrap = [];
   for (let pass = 0; over.length && pass < 8; pass++) {
     const sizes = over.map(td => parseFloat(getComputedStyle(td).fontSize));
-    over = over.filter((td, i) => { if (sizes[i] <= FIT_MIN) { wrap.push(td); return false; } td.style.fontSize = Math.max(FIT_MIN, sizes[i] - 1) + 'px'; td.dataset.fit = '1'; return true; });
+    over = over.filter((td, i) => { const min = fitMin(td); if (sizes[i] <= min) { wrap.push(td); return false; } td.style.fontSize = Math.max(min, sizes[i] - 1) + 'px'; td.dataset.fit = '1'; return true; });
     over = over.filter(tooWide);
   }
   wrap.concat(over).forEach(td => td.classList.add('fit-wrap'));
@@ -900,3 +931,46 @@ function fitCells() {
 function queueFit() { if (!fitQueued) { fitQueued = true; requestAnimationFrame(fitCells); } }
 new MutationObserver(queueFit).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
 window.addEventListener('resize', queueFit);
+
+// Review item 2 (Joe 10/13): every date box reads 10-8-26 like the rest of the app, not the browser's 10/08/2026. The browser's
+// own box stays underneath (its calendar, typing and value are unchanged); the short date is drawn over it, and while the box
+// is being typed in the browser's own text shows.
+const DATE_VALUE = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+function dressDate(input) {
+  if (input.dataset.shortDate) return;
+  input.dataset.shortDate = '1';
+  const parent = input.parentElement;
+  if (!parent) return;
+  if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+  const face = document.createElement('span');
+  face.className = 'ud-date-face';
+  face.setAttribute('aria-hidden', 'true');
+  input.after(face);
+  let typing = false;
+  const draw = () => {
+    const v = DATE_VALUE.get.call(input), show = !!v && !typing && !!input.offsetParent;
+    input.classList.toggle('ud-date-dressed', show);
+    face.hidden = !show;
+    if (!show) return;
+    const cs = getComputedStyle(input);
+    face.textContent = shortDay(v);
+    face.style.left = (input.offsetLeft + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft)) + 'px';
+    face.style.top = input.offsetTop + 'px';
+    face.style.height = input.offsetHeight + 'px';
+    face.style.width = Math.max(0, input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 24) + 'px';
+    face.style.justifyContent = cs.textAlign === 'center' ? 'center' : cs.textAlign === 'right' || cs.textAlign === 'end' ? 'flex-end' : 'flex-start';
+    ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing'].forEach(k => { face.style[k] = cs[k]; });
+    face.style.color = cs.color;
+  };
+  // A screen that sets the box's value in code redraws it too.
+  Object.defineProperty(input, 'value', { configurable: true, get() { return DATE_VALUE.get.call(this); }, set(v) { DATE_VALUE.set.call(this, v); draw(); } });
+  input.addEventListener('input', draw);
+  input.addEventListener('change', draw);
+  input.addEventListener('focus', () => { typing = true; draw(); });
+  input.addEventListener('blur', () => { typing = false; draw(); });
+  if (window.ResizeObserver) new ResizeObserver(draw).observe(input);
+  draw();
+}
+function dressDates() { document.querySelectorAll('input[type="date"]:not([data-short-date])').forEach(dressDate); }
+new MutationObserver(dressDates).observe(document.documentElement, { childList: true, subtree: true });
+dressDates();
