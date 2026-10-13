@@ -81,6 +81,9 @@
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { resolveStation, askCode, remember, lockStation } from './js/station-code.js';
     import { mountStationWork } from './js/station-work.js';
+    import { fullScreenOnTap } from './js/full-screen.js';
+
+    fullScreenOnTap();
 
     // The current app's Plant Station tablet (PlantStation.html, 057_V774): one station, only its work areas. In the new app
     // the tablet signs in with a United Dairy account (no station code) and picks its station once; it is remembered on the

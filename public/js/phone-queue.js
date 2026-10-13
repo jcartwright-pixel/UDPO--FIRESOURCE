@@ -115,7 +115,7 @@ export function startQueue(send) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { scope: 'route' }).catch(() => {});
   if (window.caches && navigator.onLine) {
     const local = ['localhost', '127.0.0.1'].includes(location.hostname);
-    const keep = ['route.html', 'css/app.css', 'css/stations.css', 'css/driver-room.css', 'js/app.js', 'js/speak.js', 'js/station-code.js', 'js/phone-queue.js',
+    const keep = ['route.html', 'css/app.css', 'css/stations.css', 'css/driver-room.css', 'js/app.js', 'js/speak.js', 'js/station-code.js', 'js/phone-queue.js', 'js/full-screen.js',
       'route.webmanifest', 'driver-station.webmanifest', 'img/app-icon/favicon-32.png', 'img/app-icon/apple-touch-icon.png',
       'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js',
       'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js']

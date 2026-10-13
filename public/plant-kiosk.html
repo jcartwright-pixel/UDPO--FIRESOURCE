@@ -52,6 +52,9 @@
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as P from './js/plant-core.js';
     import * as R from './js/plant-reports.js';
+    import { fullScreenOnTap } from './js/full-screen.js';
+
+    fullScreenOnTap();
 
     // Plant Performance (Joe 10/10): today's loadout on a TV, live: loaded so far, on time, behind now, pickups, each department's
     // progress and what loads next. Read only. The same rules as Manager Center (Behind) and Plant Reports (on time).

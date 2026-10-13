@@ -69,6 +69,9 @@
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as W from './js/weather.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
+    import { fullScreenOnTap } from './js/full-screen.js';
+
+    fullScreenOnTap();
 
     // The current app's Driver Room board and TV (DriverLoadoutPickup.html, 052_V749). Read only. In the new app it opens with a
     // United Dairy sign-in (no branch code); "Driver Room TV" is the old DISPLAY mode: dark, no menu, notes shown, both lists roll.

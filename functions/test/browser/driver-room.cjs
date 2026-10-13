@@ -296,8 +296,23 @@ async function touchPage(browser, width, height, url, mobile) {
       const ph = await openPage(browser, 1024, 600, '/route.html');
       await ph.waitForSelector('#step-code:not([hidden])');
       assert.equal(await ph.evaluate(() => Math.round(document.body.getBoundingClientRect().width)), 460, 'the drivers\' phone link keeps its phone column');
+      // A computer with a mouse is left alone: a click there never goes full screen.
+      await ph.click('#step-code h1, #step-code b');
+      await ph.waitForTimeout(300);
+      assert.equal(await ph.evaluate(() => !!document.fullscreenElement), false, 'a click with a mouse does not go full screen');
       await ph.close();
-      results.push('Driver Room landscape tablet (1280, 1024, 800): the first tap in a Chrome tab puts it full screen; the whole width is used; the three choices in one row; the whole Check-In with the loaded-wrong box open shows above Release at 1024 and 1280 and scrolls by finger at 800; the phone link keeps its phone column');
+      // Every other tablet and phone screen does the same on its first tap: the drivers' phones, the Plant, Garage and
+      // Maintenance Stations, the Driver Station link (TV and Driver Room) and the plant TV.
+      for (const url of ['/route.html', '/plant-station.html' + SIGNED, '/garage-station.html' + SIGNED, '/maint-station.html' + SIGNED,
+        '/driver-station.html' + SIGNED, '/plant-kiosk.html' + SIGNED]) {
+        const t = await touchPage(browser, 800, 1280, url, true);
+        await t.waitForTimeout(1500);
+        await t.locator('h1:visible, h2:visible, header b:visible, .phone-top b:visible').first().click();
+        await t.waitForFunction(() => document.fullscreenElement === document.documentElement, null, { timeout: 5000 })
+          .catch(() => assert.fail(url + ': the first tap did not go full screen'));
+        await t.context().close();
+      }
+      results.push('Driver Room landscape tablet (1280, 1024, 800): the first tap in a Chrome tab puts it full screen; the whole width is used; the three choices in one row; the whole Check-In with the loaded-wrong box open shows above Release at 1024 and 1280 and scrolls by finger at 800; the phone link keeps its phone column; every station, TV and phone screen goes full screen on the first tap, a computer with a mouse never');
     }
   } finally {
     await browser.close();

@@ -152,6 +152,9 @@
     import { addSpeak } from './js/speak.js';
     import { askRelease, lockStation } from './js/station-code.js';
     import { startQueue, send, waiting, onChange, keepRead, lastRead, isNoSignal } from './js/phone-queue.js';
+    import { fullScreenOnTap } from './js/full-screen.js';
+
+    fullScreenOnTap();
 
     // Joe 10/12: the Driver Room Check-In tablet is this same page with ?room=1 ("the driver's phone is exactly how this should
     // look"). The tablet's Driver Room kiosk code (typed on the Driver Station link or driver-room.html) stands in for the
@@ -347,15 +350,6 @@
       document.getElementById('change').textContent = 'Done';
       // Joe 10/12 "Station": no Back, Home or Sign out; Release at the very bottom (manager release code) is the only way out.
       lockStation(document.getElementById('m-station'), true);
-      // Joe 10/13 "filling the whole screen, that's the whole point": opened in a Chrome tab (not the installed app, which
-      // opens full screen by itself), the first tap anywhere puts the station full screen, with no tabs or address bar; any
-      // later tap does it again if it was left. Release is still the only way out of the station.
-      const installed = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
-      document.addEventListener('click', () => {
-        const el = document.documentElement;
-        if (installed() || document.fullscreenElement || !el.requestFullscreen) return;
-        el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
-      }, true);
       // Joe 10/12: 5 minutes with no taps signs the driver out and shows the rolling View Loadout; a tap on it brings back
       // the three choices.
       let idle = Date.now();
