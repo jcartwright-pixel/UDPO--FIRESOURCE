@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { db, clear } = require('./helpers');
-const { seedOtrOnce } = require('../../src/otr-seed');
+const { seedOtrOnce, seedOtrRoutesOnce, OTR_ROUTES } = require('../../src/otr-seed');
 
 test.beforeEach(async () => { await clear(); });
 
@@ -32,4 +32,23 @@ test('Over the Road sandbox history: the bundled file holds 2026 figures', () =>
   assert.deepEqual(aug, ['distribution_cost', 'employee_cost', 'fuel_cost', 'gallons_sold']);
   assert.equal(data.comments.length, 138, 'the By Date Comment column rides along');
   assert.equal(data.comments.find(c => c.date === '2021-05-25').text, 'Lost 5 Walmart Rts');
+});
+
+// Joe 10/13: his OTR runs ticked in OTR Routes Setup from his workbook; a run set by hand stays as it is.
+test('OTR Routes Setup fill: ticks his OTR runs with their By Date column once, keeps a run set by hand', async () => {
+  await db().collection('otrRoutes').doc('run_4ebab0bd8a1aa00ce0b7').set({ runId: 'run_4ebab0bd8a1aa00ce0b7', include: false, destination: 'Peck', deliveredBy: 'Carrier Pickup' });
+  const out = await seedOtrRoutesOnce(db());
+  assert.deepEqual(out, { set: OTR_ROUTES.length - 1, kept: 1 });
+  const sal = (await db().collection('otrRoutes').doc('run_6b2007de2c62a8ca0018').get()).data();
+  assert.deepEqual([sal.include, sal.destination, sal.deliveredBy], [true, 'SAL', 'United Dairy Delivered']);
+  assert.equal((await db().collection('otrRoutes').doc('run_4ebab0bd8a1aa00ce0b7').get()).data().deliveredBy, 'Carrier Pickup');
+  assert.deepEqual(await seedOtrRoutesOnce(db()), { skipped: true }, 'runs one time');
+});
+
+test('OTR Routes Setup fill: every run goes to one of his By Date columns, and each column he counts has a run', () => {
+  const O = require('../../src/otr-core');
+  OTR_ROUTES.forEach(r => assert.ok(O.OTR_CORE.DESTINATIONS.indexOf(r[1]) >= 0, r[1]));
+  assert.equal(new Set(OTR_ROUTES.map(r => r[0])).size, OTR_ROUTES.length);
+  ['SAL', 'Jersey', 'Reinhart', 'J&J Snacks', 'Garber', 'Cream-O-Land', 'Lancaster', 'Ferry', 'Peck', 'I/W Columbus', 'I/W', 'OH Processors', 'Ventura Foods', 'USDA', 'Sun Valley']
+    .forEach(c => assert.ok(OTR_ROUTES.some(r => r[1] === c), c));
 });

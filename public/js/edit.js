@@ -86,8 +86,8 @@ export function canManage() { return L.hasRole(lists.person, L.DRIVER_ROLES) && 
 // Joe 10/12: no "new app" / "current app" words; a screen not switched on says where to switch it.
 export function modeLabel(testText) {
   const s = L.screenState(lists.app, screenKey);
-  goLiveNote(s.live && s.owner !== 'new');
-  if (!s.live) return testText;
+  goLiveNote(s.live && s.owner === 'old');
+  if (!s.live || s.owner === 'app') return testText;
   if (s.owner === 'new') return s.open ? 'LIVE: SAVES GO TO THE SHEET' : 'VIEW ONLY: WRITE-BACK TO THE SHEET IS OFF';
   return 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES';
 }
