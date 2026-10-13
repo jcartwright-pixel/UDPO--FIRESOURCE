@@ -96,6 +96,8 @@ export const MENU = [
   ['Production Lines', [['Production Lines', 'production.html', 'production.webp'], ['Line Tablet', 'line.html', 'production.webp'], ['Line Targets', 'linetargets.html', 'production.webp'], ['Production TV', 'production.html?tv=1', 'production.webp']]],
   // Joe 10/12: Plant Maintenance, like the garage work orders but for the plant's machinery: requests from the plant, work orders,
   // the PM schedule and the mechanics' tablet.
+  // Joe 10/13: Inventory, starting with Receiving scan-in (scanned on the Boxing station's Receiving tab; mock-up E is the office log).
+  ['Inventory', [['Receiving Log', 'inventory.html', 'day']]],
   ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]]
 ];
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
@@ -112,7 +114,9 @@ export const SIDES = [
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
   { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Plant Reports', 'Distribution Reports', 'Fleet Reports'] },
   // Joe 10/12: a Safety Walkthrough card next to Reports (mock-up A). Under Construction (administrators only) while it is built.
-  { key: 'safety', name: 'Safety Walkthrough', short: 'Safety Walkthrough', home: 'safety.html', icon: 'safety', note: 'Weekly walk, open issues and fire extinguisher checks', sections: ['Safety Walkthrough'], building: true }
+  { key: 'safety', name: 'Safety Walkthrough', short: 'Safety Walkthrough', home: 'safety.html', icon: 'safety', note: 'Weekly walk, open issues and fire extinguisher checks', sections: ['Safety Walkthrough'], building: true },
+  // Joe 10/13: Inventory (receiving scan-in first; later putaway, scan-out and counts). Its own card in the last open spot on the home. Under Construction while it is built.
+  { key: 'inventory', name: 'Inventory', home: 'inventory.html', pic: 'box-v1.webp', note: 'Receiving scan-in: every case and pallet scanned in, by lot', sections: ['Inventory'], building: true }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
 // Pages opened from inside a side (not from its menu) that still belong to it, e.g. Plant Reports from a bookmark or the TV.

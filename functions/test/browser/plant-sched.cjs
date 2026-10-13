@@ -201,6 +201,31 @@ async function shots(page, name, w) {
     assert.deepEqual(watcher.errors, []);
     const log = await db().collection('actions').where('action', '==', 'savePlantSchedule').get();
     assert.equal(log.size, 6, 'each change is one save in the save log');
+    // Joe 10/13 ("NEEDS ADDED", his 20 receiving suppliers): Add a List takes them pasted one per line, keeps his spelling
+    // as the Short Name, skips one already on the list, and a second paste adds nothing.
+    const JOE = ['Charles Stube', 'Dairy Ingredient', 'West Rock', 'Sig', 'Profile Films', 'Crest', 'Danisco', 'Silgan', 'Dairy House', 'Jogue',
+      'Virginia Dare', 'Synergy', 'KDV', 'Brenntag', 'Green Spot', 'Robertet Tea', 'Heritage', 'Forbes', 'Liquid B.I.B', 'U LINE'];
+    await desk.setViewportSize({ width: 1536, height: 864 });
+    await desk.click('#modal [data-close]');
+    await desk.click('[data-lane="RECEIVING"]');
+    await desk.click('#suppliers');
+    await desk.click('#supplier-list');
+    await desk.fill('#s-list', JOE.concat(['  dean foods milk ', '', 'Sig']).join('\n'));
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-add-list-1536.png'), scale: 'css' });
+    assert.ok(await desk.$eval('#s-list', e => parseFloat(getComputedStyle(e).fontSize) >= 16), 'the list box text is at least 16px');
+    await desk.click('#s-addall');
+    await desk.waitForFunction(() => /Added 20 suppliers\. Already on the list: dean foods milk, Sig\./.test((document.querySelector('.sc-supnote') || {}).textContent || ''), null, { timeout: 30000 });
+    await desk.waitForFunction(() => document.querySelectorAll('.sc-suptable tbody tr').length === 21, null, { timeout: 15000 });
+    const shortNames = await desk.$$eval('.sc-suptable tbody tr', r => r.map(x => x.cells[2].textContent));
+    assert.deepEqual(shortNames, ['Dean'].concat(JOE), 'his spelling, in his order');
+    assert.ok(await desk.$eval('#modal', m => m.getBoundingClientRect().right <= innerWidth + 1), 'the Suppliers box fits');
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-after-list-1536.png'), scale: 'css' });
+    await desk.click('#supplier-list');
+    await desk.fill('#s-list', JOE.join('\n'));
+    await desk.click('#s-addall');
+    assert.equal(await desk.textContent('#f-error'), 'All of these are already on the list.');
+    await watcher.waitForFunction(() => /Liquid B\.I\.B/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
+    results.push('Add a List (Joe\'s 20 receiving suppliers): added in his spelling and order, one already on the list skipped, pasting again adds nothing; on the other screen');
   } finally {
     await browser.close();
   }

@@ -975,6 +975,7 @@
 }
 /* Joe 10/13: the Scheduler's Suppliers list (Receiving). */
 .sched-page .sc-supnote { margin: 0 0 12px; font-size: 16px; color: var(--muted); }
+.sched-page .sc-suppaste { width: 100%; min-height: 320px; box-sizing: border-box; font: inherit; font-size: 18px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; resize: vertical; }
 .sched-page .sc-suplist { max-height: 60vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
 .sched-page .sc-suptable { width: 100%; border-collapse: collapse; font-size: 16px; }
 .sched-page .sc-suptable th { position: sticky; top: 0; background: var(--ud-blue); color: #fff; text-align: left; padding: 8px 12px; font-size: 16px; font-weight: 800; }

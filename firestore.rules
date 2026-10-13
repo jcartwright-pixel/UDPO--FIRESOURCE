@@ -69,6 +69,9 @@ service cloud.firestore {
     // The production lines, temperature locations and the lines' last checks.
     match /plantSetup/{id} { allow read: if activeUser(); }
     match /plantProducts/{id} { allow read: if activeUserOrStation(); }
+    // Receiving scan-in: each scan on a delivery, and what the plant receives (saved only through save).
+    match /receivingScans/{id} { allow read: if activeUserOrStation(); }
+    match /receivingItems/{id} { allow read: if activeUserOrStation(); }
     // Each plant's own product areas and groups (Administration > Products).
     match /productSetup/{id} { allow read: if activeUserOrStation(); }
     // Joe 10/13: the plant's products that run on no machine yet (the Product Sheet's lines with no check).
