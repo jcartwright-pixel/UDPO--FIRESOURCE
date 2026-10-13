@@ -31,12 +31,21 @@ async function run(mode, fn) {
 const all = () => run('readonly', store => new Promise(res => { const r = store.getAll(); r.onsuccess = () => res(r.result || []); }));
 const add = (entry) => run('readwrite', store => { store.add(entry); });
 const remove = (key) => run('readwrite', store => { store.delete(key); });
+const put = (entry) => run('readwrite', store => { store.put(entry); });
 
 const rid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
 // No connection (as opposed to the server refusing the save, which is shown and not kept).
 export function isNoConnection(e) {
   const code = String(e && e.code || '').replace(/^functions\//, ''), msg = String(e && e.message || e || '');
   return !navigator.onLine || code === 'unavailable' || code === 'deadline-exceeded' || /network|Failed to fetch|offline|internal/i.test(code + ' ' + msg) && !/permission|refused/i.test(msg);
+}
+// Review item 63 (Joe 10/13): with signal, a server error ('internal') looks the same as a dropped connection, so a save
+// the server keeps failing used to stop every save behind it, forever, with nothing shown. After HOLD_AFTER tries with
+// signal it is held: the error shows, the saves behind it go on, and it stays on the device and is tried again each time.
+export const HOLD_AFTER = 3;
+export function isServerError(e) {
+  const code = String(e && e.code || '').replace(/^functions\//, '');
+  return navigator.onLine && code === 'internal';
 }
 async function me() {
   const { auth } = await start();
@@ -52,15 +61,16 @@ export async function waiting(action) {
 export function onWaitingChange(fn) { listeners.push(fn); }
 async function changed() {
   const list = await waiting();
-  drawLine(list.length);
+  drawLine(list.length, list.some(e => e.held));
   listeners.forEach(fn => { try { fn(list); } catch (e) { /* a screen's own problem */ } });
 }
 
 // The warning line (no pop-ups): how many saves are on this iPad and whether there is a connection.
-function drawLine(n) {
+function drawLine(n, held) {
   const box = document.getElementById('offline-line');
   if (!box) return;
-  const text = device === 'tablet'
+  const stuck = held && navigator.onLine && !!failedText;
+  const text = stuck ? failedText : device === 'tablet'
     ? (n ? (navigator.onLine ? 'Sending what was saved on this tablet: ' + n : 'Saved on this tablet, will send when you have signal. Waiting: ' + n)
       : !navigator.onLine ? 'No signal. What you enter is saved on this tablet and sent when you have signal.'
         : failedText || (Date.now() - sentAt < 8000 ? 'Sent ✓ Everything saved on this tablet has gone through.' : ''))
@@ -68,8 +78,8 @@ function drawLine(n) {
       : !navigator.onLine ? 'No internet. Taps, notes and photos are saved on this device and sent when it is back.' : failedText;
   box.textContent = text;
   box.hidden = !text;
-  box.classList.toggle('error', !n && navigator.onLine && !!failedText);
-  box.classList.toggle('ok', !n && navigator.onLine && !failedText && !!text);
+  box.classList.toggle('error', (stuck || !n) && navigator.onLine && !!failedText);
+  box.classList.toggle('ok', !stuck && !n && navigator.onLine && !failedText && !!text);
 }
 
 // Save now when there is a connection; otherwise (or when the connection drops on the way) keep it on this iPad. Saves made
@@ -79,7 +89,7 @@ let turn = Promise.resolve();
 async function keepOrSend(entry, sendNow) {
   const decided = turn.then(async () => {
     entry.email = await me();
-    return { sending: navigator.onLine && !(await waiting()).length ? sendNow(entry.fields) : null };
+    return { sending: navigator.onLine && !(await waiting()).filter(e => !e.held).length ? sendNow(entry.fields) : null };
   });
   turn = decided.catch(() => {});
   const { sending } = await decided;
@@ -100,16 +110,28 @@ export function offlineCall(name, fields) {
 
 // Send what is waiting, oldest first; stop at the first save that still has no connection.
 export async function flush() {
-  if (flushing || !navigator.onLine) return drawLine((await waiting()).length);
+  if (flushing || !navigator.onLine) { const list = await waiting(); return drawLine(list.length, list.some(e => e.held)); }
   flushing = true;
   let sent = 0;
   try {
     const email = await me();
-    for (const e of await waiting()) {
+    const list = await waiting();
+    let held = 0;
+    // Held saves go last, so they never stop the ones behind them.
+    for (const e of list.filter(x => !x.held).concat(list.filter(x => x.held))) {
       if (e.email && email && e.email !== email) continue; // someone else's saves wait for them to sign in on this iPad
       try {
         await (e.call ? callServer(e.call, e.fields) : callServer('save', Object.assign({ action: e.action }, e.fields)));
       } catch (err) {
+        if (isServerError(err)) {
+          const tries = (e.tries || 0) + 1, hold = e.held || tries >= HOLD_AFTER;
+          await put(Object.assign({}, e, { tries, held: hold }));
+          if (!hold) break;
+          held++;
+          failedText = 'A save made on this ' + device + ' could not be sent (' + friendlyError(err) + '). It stays on this ' + device + ' and is tried again.';
+          if (!e.held) showError(failedText);
+          continue;
+        }
         if (isNoConnection(err)) break;
         failedText = 'A save made on this ' + device + ' was refused when it was sent: ' + friendlyError(err);
         showError(failedText);
@@ -119,6 +141,7 @@ export async function flush() {
       await remove(e.key);
       await changed();
     }
+    if (!held && list.some(x => x.held)) failedText = '';
   } finally { flushing = false; }
   if (sent > 0) { sentAt = Date.now(); setTimeout(changed, 8500); }
   await changed();

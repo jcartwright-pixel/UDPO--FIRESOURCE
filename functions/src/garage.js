@@ -28,6 +28,7 @@
 const crypto = require('crypto');
 const L = require('./logic');
 const M = require('./model');
+const FAILS = require('./fails');
 // actions.js loads this file (Send to Garage), so it is looked up when first used, not at load.
 const A = () => require('./actions');
 const MAINT = require('./maintenance');
@@ -170,7 +171,7 @@ function renew(write, people, nowMs) { people.filter(p => p.ref).forEach(p => wr
 
 // A mechanic's name and login ID, checked inside a save (wrong numbers count towards the 5-minute lock, as at sign-in).
 // Returns {tech} or {wrong: true}; the caller lets the transaction finish (so the count is kept) and then refuses.
-async function checkLogin(tx, db, techId, loginId, nowMs) {
+async function checkLogin(tx, db, techId, loginId, nowMs, device) {
   const stamp = new Date(nowMs).toISOString(), minute = stamp.slice(0, 16);
   const techSnap = techId ? await tx.get(db.collection(TECHS).doc(docId(techId))) : null;
   const tech = techSnap && techSnap.exists ? activeTechs([techSnap.data()])[0] : null;
@@ -180,14 +181,17 @@ async function checkLogin(tx, db, techId, loginId, nowMs) {
   const lock = lockSnap.exists ? lockSnap.data() : {}, station = stationSnap.exists ? stationSnap.data() : {};
   const fails = Date.parse(lock.since || 0) > nowMs - G.TECH_LOCK_MS ? (lock.count || 0) : 0;
   if (fails >= G.TECH_FAILS) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers. Wait 5 minutes or ask the office.');
-  const stationFails = station.minute === minute ? (station.count || 0) : 0;
+  // Counted per device (fails.js), so one tablet typing wrong numbers does not lock every garage tablet.
+  const dev = device || 'unknown', byDevice = FAILS.current(station.byDevice, f => f.minute === minute);
+  const stationFails = (byDevice[dev] || {}).count || 0;
   if (stationFails >= G.STATION_FAILS_PER_MINUTE) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers on the garage station. Wait a minute and try again.');
   const login = loginSnap.exists ? loginSnap.data() : null;
   if (!login || !login.hash) throw SaveErr('NOT_FOUND', tech.name + ' has no login ID yet. Ask the office to add it.');
   const given = Buffer.from(loginHash(techId, loginId), 'hex'), want = Buffer.from(login.hash, 'hex');
   if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
     tx.set(lockRef, { count: fails + 1, since: fails ? lock.since : stamp });
-    tx.set(stationRef, { minute, count: stationFails + 1 });
+    byDevice[dev] = { minute, count: stationFails + 1 };
+    tx.set(stationRef, { byDevice });
     return { wrong: true };
   }
   return { tech };
@@ -198,7 +202,7 @@ async function signIn(db, input, nowMs) {
   if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
   return db.runTransaction(async tx => {
     const stamp = new Date(nowMs).toISOString();
-    const checked = await checkLogin(tx, db, techId, loginId, nowMs);
+    const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input));
     if (checked.wrong) return checked;
     const tech = checked.tech, lockRef = db.collection(LOCKS).doc(docId(techId));
     const others = (await signedInTechs(tx, db, input.tokens, nowMs)).filter(p => p.id !== techId);
@@ -294,7 +298,7 @@ async function step(db, input, nowMs) {
     if (!people.length && input.signIn && typeof input.signIn === 'object') {
       const techId = text(input.signIn.techId, 80), loginId = String(input.signIn.loginId || '').trim();
       if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
-      const checked = await checkLogin(tx, db, techId, loginId, nowMs);
+      const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input));
       if (checked.wrong) return { wrong: true };
       people = [{ id: techId, name: checked.tech.name, ref: null }];
     }
@@ -604,8 +608,8 @@ async function garageCall(db, input, now) {
   // Garage station codes (Joe 10/12, stations.js): once the garage has a code, the tablet types it once and sends the
   // station it opened with every call; Change needs the plant's manager release code.
   const ST = require('./stations'), asSave = (e) => { if (e instanceof ST.StationError || e instanceof require('./admin').AdminError) throw SaveErr(e.code, e.message); throw e; };
-  if (op === 'station') return ST.tabletCall(db, { op: input.step, kind: 'GARAGE', code: input.code, key: input.key, version: input.version, facilityId: FACILITY }, () => new Date(nowMs)).catch(asSave);
-  if (op === 'release') return require('./admin').releaseCheck(db, { op: input.step === 'status' ? 'status' : 'release', facilityId: FACILITY, code: input.code }, () => new Date(nowMs)).catch(asSave);
+  if (op === 'station') return ST.tabletCall(db, { op: input.step, kind: 'GARAGE', code: input.code, key: input.key, version: input.version, facilityId: FACILITY, who: input.who }, () => new Date(nowMs)).catch(asSave);
+  if (op === 'release') return require('./admin').releaseCheck(db, { op: input.step === 'status' ? 'status' : 'release', facilityId: FACILITY, code: input.code, who: input.who }, () => new Date(nowMs)).catch(asSave);
   // Plant Maintenance's Maintenance Station (Joe 10/12): the same technicians and sign-in, the plant's work orders. It is not
   // the garage tablet, so the garage's station code does not lock it; every step still needs a mechanic's login ID.
   if (op === 'pmBoard') return require('./plantmaint').stationBoard(db, input, nowMs);

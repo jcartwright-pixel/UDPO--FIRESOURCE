@@ -22,6 +22,7 @@ const { UNIONTOWN } = require('./sources');
 
 const C = M.COLLECTIONS;
 const BATCH = 50;
+const { FieldPath } = require('firebase-admin/firestore');
 
 // The current app's LOADOUT HISTORY tab in the Live workbook (209_V7197_LoadoutHistory.gs): headers on row 1, one row per
 // run_id|load_date (history_key). actions.js queueLoadoutHistory queues the rows.
@@ -100,9 +101,34 @@ function findRow(values, item) {
 async function runWriteBack({ db, sheets, target, now, allowRealLive }) {
   assertLiveTarget(target && target.spreadsheetId, allowRealLive);
   const stamp = (now ? now() : new Date()).toISOString();
-  const pending = await db.collection(C.outbox).where('status', '==', 'pending').orderBy('at').orderBy('requestId').limit(BATCH).get();
-  const all = pending.docs.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data()));
+  // Review item 64 (Joe 10/13): claim the oldest waiting saves first, as the master write-back does, so the on-save pass and
+  // the every-minute pass never write the same saves at once (an older value landing in the sheet last). A claim older
+  // than five minutes (a pass that died) is taken over.
+  const claim = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), stale = new Date(Date.parse(stamp) - 5 * 60000).toISOString();
+  const all = await db.runTransaction(async tx => {
+    const q = await tx.get(db.collection(C.outbox).where('status', 'in', ['pending', 'writing']).orderBy('at').orderBy('requestId').limit(BATCH));
+    // Oldest first, and a save behind one another pass is still writing waits, so saves reach the sheet in order.
+    const take = [];
+    for (const d of q.docs) {
+      if (d.data().status === 'writing' && String(d.data().claimedAt || '') >= stale) break;
+      take.push(d);
+    }
+    take.forEach(d => tx.update(d.ref, { status: 'writing', claim, claimedAt: stamp }));
+    return take.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data()));
+  });
   if (!all.length) return { written: 0, conflicts: 0, items: 0 };
+  try {
+    return await writeClaimed({ db, sheets, target, stamp, all });
+  } catch (e) {
+    // Nothing written is marked: the claimed saves wait again for the next pass.
+    const back = db.batch();
+    all.forEach(i => back.update(i.ref, { status: 'pending', lastError: String(e && e.message || e).slice(0, 300), lastTriedAt: stamp }));
+    await back.commit().catch(() => {});
+    throw e;
+  }
+}
+
+async function writeClaimed({ db, sheets, target, stamp, all }) {
   const items = all.filter(i => !i.history), history = all.filter(i => i.history);
 
   // One read per tab touched.
@@ -114,8 +140,8 @@ async function runWriteBack({ db, sheets, target, now, allowRealLive }) {
   // What the new app last knew for each cell: the run's copy of the sheet row, updated as cells are written.
   const runIds = [...new Set(items.map(i => i.runDocId))];
   const runSnaps = runIds.length ? await db.getAll(...runIds.map(id => db.collection(C.runs).doc(id))) : [];
-  const known = {};
-  runSnaps.forEach((snap, i) => { known[runIds[i]] = snap.exists ? Object.assign({}, snap.data().cells || {}) : {}; });
+  const known = {}, touched = {}; // touched: run -> the cells this pass changed (only those are saved back on the run)
+  runSnaps.forEach((snap, i) => { known[runIds[i]] = snap.exists ? Object.assign({}, snap.data().cells || {}) : {}; touched[runIds[i]] = {}; });
 
   const updates = {}; // tab -> [{range, values}]
   const ops = [];
@@ -134,6 +160,7 @@ async function runWriteBack({ db, sheets, target, now, allowRealLive }) {
         row[c] = want;
         (updates[item.tab] = updates[item.tab] || []).push({ range: "'" + item.tab + "'!" + columnLetter(c) + (r + 1), values: [[want]] });
         known[item.runDocId][column] = text(want);
+        touched[item.runDocId][column] = true;
       });
       while (values.length < r) values.push([]);
       values.push(row);
@@ -173,6 +200,7 @@ async function runWriteBack({ db, sheets, target, now, allowRealLive }) {
         row[c] = want; // later queued saves to the same cell compare against this
       }
       known[item.runDocId][column] = text(want);
+      touched[item.runDocId][column] = true;
       written++;
     });
     conflicts += itemConflicts;
@@ -190,7 +218,14 @@ async function runWriteBack({ db, sheets, target, now, allowRealLive }) {
   for (const tab of Object.keys(updates)) await sheets.batchUpdate(target.spreadsheetId, updates[tab]);
   const batch = db.batch();
   ops.forEach(op => (op.update ? batch.update(op.ref, op.update) : batch.set(op.ref, op.data)));
-  runIds.forEach(id => { if (runSnaps[runIds.indexOf(id)].exists) batch.update(db.collection(C.runs).doc(id), { cells: known[id] }); });
+  // Only the cells this pass wrote: a copy from the sheet that landed during the pass keeps its other cells (review item 64).
+  runIds.forEach((id, n) => {
+    const cols = Object.keys(touched[id]);
+    if (!runSnaps[n].exists || !cols.length) return;
+    const args = [];
+    cols.forEach(col => args.push(new FieldPath('cells', col), known[id][col]));
+    batch.update(db.collection(C.runs).doc(id), ...args);
+  });
   await batch.commit();
   return { written, conflicts, items: all.length };
 }

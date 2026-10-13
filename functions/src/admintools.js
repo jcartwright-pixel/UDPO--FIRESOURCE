@@ -664,7 +664,7 @@ async function preflight(db, deps) {
   });
   await check('Write-back to the Live sheet', async () => {
     if (!(cfg.writeBack && cfg.writeBack.enabled === true)) return { status: 'WARN', detail: 'The write-back is off: saves stay in the app.' };
-    const old = (await db.collection(C.outbox).where('status', '==', 'pending').get()).docs.map(x => x.data()).filter(x => minsAgo(x.at) > 10);
+    const old = (await db.collection(C.outbox).where('status', 'in', ['pending', 'writing']).get()).docs.map(x => x.data()).filter(x => minsAgo(x.at) > 10);
     return old.length ? { status: 'FAIL', detail: old.length + ' save(s) waiting more than 10 minutes to reach the sheet.' } : { detail: 'Nothing waiting.' };
   });
   await check('Write-back to the master lists', async () => {

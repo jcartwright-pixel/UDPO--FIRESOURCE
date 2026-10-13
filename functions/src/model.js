@@ -76,6 +76,10 @@ const DAY_FIELDS = Object.freeze([
   ['updatedAt', 'updated_at', 'text'], ['updatedBy', 'updated_by', 'text']
 ]);
 
+// Day fields kept in the new app only (the Live sheet has no column for them): who a day was for before the driver went
+// off and why, the units the driver corrected on the phone and the drop-and-hook trailers. The copy from the sheet keeps them.
+const APP_ONLY_DAY_FIELDS = Object.freeze(['intendedDriverId', 'intendedDriver', 'driverExceptionStatus', 'checkinTruck', 'checkinTrailer', 'moreTrailers']);
+
 function normalizeHeader(value) {
   return String(value === null || value === undefined ? '' : value).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
@@ -100,6 +104,6 @@ function safeIdPart(value) {
 function runDocId(weekStart, rowKey) { return weekStart + '__' + safeIdPart(rowKey); }
 
 module.exports = {
-  COLLECTIONS, LIVE_TABS, LIVE_HEADER_ROW, MASTER_HEADER_ROW, RUN_FIELDS, DAY_FIELDS,
+  COLLECTIONS, LIVE_TABS, LIVE_HEADER_ROW, MASTER_HEADER_ROW, RUN_FIELDS, DAY_FIELDS, APP_ONLY_DAY_FIELDS,
   normalizeHeader, convert, safeIdPart, runDocId
 };

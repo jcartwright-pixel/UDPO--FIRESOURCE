@@ -83,6 +83,15 @@ test('wrong station codes: 30 a minute, then a wait', async () => {
   assert.equal((await ST.tabletCall(db(), { op: 'enter', kind: 'PLANT', code }, () => new Date('2026-10-12T12:01:10Z'))).ok, true);
 });
 
+// Review item 62 (Joe 10/13): one tablet typing wrong codes locks only that tablet, never every station in the company.
+test('wrong station codes lock only the tablet that typed them', async () => {
+  const key = (await admin({ op: 'stations', kind: 'PLANT' })).stations[0].key, { code } = await admin({ op: 'stationCode', key });
+  const at = new Date('2026-10-12T12:00:10Z'), one = 'a1a1a1a1a1a1a1a1', two = 'b2b2b2b2b2b2b2b2';
+  for (let i = 0; i < ST.MAX_FAILS_PER_MINUTE; i++) await ST.tabletCall(db(), { op: 'enter', kind: 'PLANT', code: 'WRONG' + i, who: one }, () => at);
+  assert.match((await ST.tabletCall(db(), { op: 'enter', kind: 'PLANT', code, who: one }, () => at)).message, /Too many/);
+  assert.equal((await ST.tabletCall(db(), { op: 'enter', kind: 'PLANT', code, who: two }, () => at)).ok, true, 'another tablet still gets in');
+});
+
 test('Garage Station: once the garage has a code, every call carries the station it opened', async () => {
   assert.ok(Array.isArray((await garageCall(db(), { op: 'board' })).jobs));
   const key = (await admin({ op: 'stations', kind: 'GARAGE' })).stations[0].key, { code } = await admin({ op: 'stationCode', key });

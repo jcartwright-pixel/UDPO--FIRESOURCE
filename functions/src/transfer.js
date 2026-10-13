@@ -447,6 +447,25 @@ function diffOps(db, collection, docs, previous, force, extra, rev, hold) {
   return { ops, hashes, written, unchanged, removed, held };
 }
 
+// A run rewritten from the sheet keeps the day fields only the app holds (model.APP_ONLY_DAY_FIELDS): the sheet has no column
+// for them, so a whole-doc rewrite would otherwise wipe a vacation's "who it was for" and the phone's trailer fixes.
+async function keepAppOnlyDays(db, ops) {
+  const writes = ops.filter(op => op.data && op.data.days);
+  for (let i = 0; i < writes.length; i += 300) {
+    const part = writes.slice(i, i + 300);
+    const snaps = await db.getAll(...part.map(op => op.ref));
+    snaps.forEach((snap, j) => {
+      const oldDays = snap.exists ? (snap.data().days || {}) : {};
+      const days = part[j].data.days;
+      Object.keys(days).forEach(p => {
+        const was = oldDays[p];
+        if (!was || !days[p]) return;
+        M.APP_ONLY_DAY_FIELDS.forEach(f => { if (was[f] !== undefined && was[f] !== '' && days[p][f] === undefined) days[p] = Object.assign({}, days[p], { [f]: was[f] }); });
+      });
+    });
+  }
+}
+
 /*
  * One transfer. reader.batchGet(spreadsheetId, [ranges]) returns one 2-D array of cell texts per range.
  * sources: { live: {spreadsheetId}, masters: {drivers: {spreadsheetId, tab}, ...} }.
@@ -466,7 +485,8 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   // A new copy of the sheets (another Live workbook than last time) replaces every row, including rows the app changed
   // without writing them to the sheet (sandbox test saves with the write-back off), so nothing from the old copy lingers.
   const liveSourceId = String(sources.live.spreadsheetId || '');
-  if (config.liveSourceId !== liveSourceId) force = true;
+  const newSource = config.liveSourceId !== liveSourceId;
+  if (newSource) force = true;
 
   // 1. Master lists.
   // Read side by side: each master list is its own spreadsheet.
@@ -540,7 +560,7 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
       sum[list] = { rows: Object.keys(read.lists[list]).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
     }
   }
-  const waiting = await db.collection(C.outbox).where('status', '==', 'pending').get();
+  const waiting = await db.collection(C.outbox).where('status', 'in', ['pending', 'writing']).get();
   const hold = {};
   const justWritten = await db.collection(C.outbox).where('doneAt', '>=', readFrom).get();
   waiting.docs.concat(justWritten.docs).forEach(d => { hold[d.data().runDocId] = true; });
@@ -549,6 +569,7 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
     const weekRef = db.collection(C.weeks).doc(tab.weekStart);
     const prev = (await weekRef.get()).data() || {};
     const d = diffOps(db, C.runs, tab.runs, prev.rowHashes || {}, force, { transferredAt: stamp }, revBase, hold);
+    if (!newSource) await keepAppOnlyDays(db, d.ops);
     ops.push(...d.ops, { ref: weekRef, data: { weekStart: tab.weekStart, sourceTab: tab.tab, rowHashes: d.hashes, rows: Object.keys(tab.runs).length, transferredAt: stamp,
       // Weekly's Publish record is kept by the copy.
       publishedAt: prev.publishedAt || '', publishedBy: prev.publishedBy || '' } });
@@ -565,6 +586,7 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
       const weekRef = db.collection(C.weeks).doc(w), prev = (await weekRef.get()).data();
       if (prev && prev.sourceTab !== HISTORY_TAB) continue;
       const d = diffOps(db, C.runs, history[w], (prev && prev.rowHashes) || {}, force, { transferredAt: stamp }, revBase);
+      if (!newSource) await keepAppOnlyDays(db, d.ops);
       ops.push(...d.ops, { ref: weekRef, data: { weekStart: w, sourceTab: HISTORY_TAB, rowHashes: d.hashes, rows: Object.keys(history[w]).length, transferredAt: stamp,
         publishedAt: (prev && prev.publishedAt) || '', publishedBy: (prev && prev.publishedBy) || '' } });
       summary.history[w] = { rows: Object.keys(history[w]).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
