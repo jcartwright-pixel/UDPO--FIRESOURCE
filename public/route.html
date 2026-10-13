@@ -121,7 +121,7 @@
   <form class="phone-card drv-dvir" id="step-dvir" hidden novalidate>
     <div class="drv-head"><h1>DVIR</h1><button type="button" data-back>&larr; Back</button></div>
     <label id="dv-route-box">Assigned route<select id="dv-route" required></select></label>
-    <p class="drv-hint">Confirm assigned equipment and complete every inspection item.</p>
+    <p class="drv-hint">Confirm assigned equipment. Every item starts as No defect: change only the items with a defect.</p>
     <div class="phone-grid">
       <label>Inspection<select id="dv-inspection" required><option value="">Select…</option><option>Pre-trip</option><option>Post-trip</option></select></label>
       <label>Odometer<input id="dv-odometer" type="number" min="0" inputmode="numeric"></label>
@@ -483,7 +483,9 @@
     const TRAILER_ITEMS = ['Trailer brakes', 'Trailer lights and reflectors', 'Trailer tires and wheels', 'Coupling and connections', 'Doors and body'];
     const RESULTS = ['Checked — no defect', 'Defect found', 'Not applicable'];
     const $ = (id) => document.getElementById(id), form = $('step-dvir');
-    const pick = (label) => '<label>' + escapeHtml(label) + '<select required><option value="">Select…</option>' + RESULTS.map(r => '<option>' + r + '</option>').join('') + '</select></label>';
+    // Joe 10/13 "default no defect ... they're only going to select where there is a defect": every item starts as
+    // "Checked — no defect" (also after Back or a new inspection, form.reset()); the driver changes only the items with a defect.
+    const pick = (label) => '<label>' + escapeHtml(label) + '<select required>' + RESULTS.map((r, i) => '<option' + (i ? '' : ' selected') + '>' + r + '</option>').join('') + '</select></label>';
     $('dv-truck-items').innerHTML = TRUCK_ITEMS.map(pick).join('');
     addSpeak(form);
     form.querySelector('[data-trailer="1"] .dv-items').innerHTML = TRAILER_ITEMS.map(pick).join('');
@@ -515,7 +517,8 @@
       $('dv-msg').textContent = left.length ? 'A run can have at most 4 trailers. Not added: ' + left.join(', ') + '.' : '';
       unreview();
     });
-    form.addEventListener('change', unreview);
+    form.addEventListener('change', e => { if (e.target.matches('.drv-col select')) e.target.classList.toggle('dv-bad', e.target.value === 'Defect found'); unreview(); });
+    form.addEventListener('reset', () => form.querySelectorAll('select.dv-bad').forEach(x => x.classList.remove('dv-bad')));
     function unreview() { if (reviewed) { reviewed = false; $('dv-send').textContent = 'Review inspection'; } }
     function fillRoute() {
       const l = dvLoads[Number($('dv-route').value)];

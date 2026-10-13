@@ -96,6 +96,32 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     const dvir = phone;
     await shot(dvir, 'phone-dvir-390.png', true);
     assert.ok(await fits(dvir), 'the DVIR fits the phone width');
+    // Joe 10/13 "default no defect": all 12 items (7 truck, 5 trailer) start as Checked — no defect; the driver changes only
+    // the ones with a defect, which turn red and still need a write-up.
+    {
+      const L0 = require('../../src/logic'), d0 = L0.operatingDay(new Date());
+      await db().collection('runs').doc(L0.weekStart(d0) + '__run_dv803').set({ weekStart: L0.weekStart(d0), route: '803', run: 'UT DSD MILK', routeId: 'rte_t803', runId: 'run_dv803', rev: 0,
+        days: { [L0.dayPrefix(d0)]: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', truck: '900003', trailer: 'T-903' } } });
+      await dvir.click('#step-dvir [data-back]');
+      await dvir.waitForSelector('#step-menu:not([hidden])', { timeout: 8000 });
+      await dvir.click('#m-dvir');
+      await dvir.waitForSelector('#step-dvir:not([hidden])', { timeout: 8000 });
+      await dvir.waitForFunction(() => document.querySelectorAll('#dv-route option').length > 1, null, { timeout: 8000 });
+    }
+    const items = await dvir.$$eval('.drv-col select', s => s.map(x => x.value));
+    assert.equal(items.length, 12);
+    assert.ok(items.every(v => v === 'Checked — no defect'), 'every DVIR item starts as no defect: ' + JSON.stringify(items));
+    await dvir.selectOption('#dv-inspection', 'Pre-trip');
+    await dvir.selectOption('#dv-truck-items label:nth-child(1) select', 'Defect found');
+    assert.equal(await dvir.$eval('#dv-truck-items label:nth-child(1) select', x => x.classList.contains('dv-bad')), true, 'a defect stands out');
+    await dvir.check('#dv-typed');
+    const said = async (re) => { await dvir.waitForFunction(r => new RegExp(r).test(document.getElementById('dv-msg').textContent), re.source, { timeout: 5000 }).catch(() => {}); return dvir.textContent('#dv-msg'); };
+    await dvir.click('#dv-send');
+    assert.match(await said(/Describe the defects/), /Describe the defects/);
+    await dvir.fill('#dv-tractor', 'Brake pedal soft');
+    await dvir.click('#dv-send');
+    assert.match(await said(/Review: .* 1 defect\./), /Review: .* 1 defect\./);
+    results.push('DVIR: every item starts as no defect; only the item changed to Defect found counts (red, and it needs its write-up)');
     assert.deepEqual(phone.errors, []);
     results.push('Drivers\' phone: opens on View Loadout, DVIR and Check-In; View Loadout needs no name, DVIR asks for it once; both fit a 390 wide phone');
 
