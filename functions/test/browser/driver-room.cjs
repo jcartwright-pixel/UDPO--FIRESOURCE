@@ -248,6 +248,53 @@ async function touchPage(browser, width, height, url, mobile) {
       await tab.context().close();
     }
     results.push('Check-In and DVIR scroll by finger on a phone (390) and tablets (600, 800, 1024), from the phone link and the Driver Room tablet');
+
+    // Joe 10/13 (photo of the Uniontown tablet in landscape): the Driver Room Check-In Station uses the tablet's whole width,
+    // not the phone column. The three choices sit in one row, and the whole Check-In (with "Was your truck loaded correctly?"
+    // answered No and its box open) shows above the Release bar with no scrolling on 1024 and 1280 landscape tablets; on
+    // 800 it is two columns and scrolls by finger. The drivers' phone link keeps its phone column.
+    {
+      const L = require('../../src/logic');
+      const today = L.operatingDay(new Date()), pf = L.dayPrefix(today), wk = L.weekStart(today);
+      await db().collection('runs').doc(wk + '__run_land801').set({ weekStart: wk, route: '811', run: 'LANDSCAPE', routeId: 'rte_land811', runId: 'run_land801', rev: 0,
+        days: { [pf]: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', truck: '900001', trailer: 'T-811' } } });
+      for (const [w, h] of [[1280, 680], [1024, 600], [800, 480]]) {
+        const tab = await touchPage(browser, w, h, '/driver-station.html' + SIGNED);
+        await tab.waitForSelector('#code-box form.st-code');
+        await tab.fill('#code-box input', kiosk);
+        await tab.click('#code-box button');
+        await tab.waitForURL(/route\.html\?room=1$/);
+        await tab.waitForSelector('#step-menu:not([hidden]) #m-checkin');
+        const fit = () => tab.evaluate(() => ({ card: Math.max(...[...document.querySelectorAll('.phone-card:not([hidden])')].map(c => c.getBoundingClientRect().bottom)),
+          bar: document.getElementById('m-station').getBoundingClientRect().top, side: document.scrollingElement.scrollWidth - innerWidth, body: document.body.getBoundingClientRect().width }));
+        let f = await fit();
+        assert.ok(f.body >= w - 1, 'the station uses the whole width at ' + w);
+        const tops = await tab.$$eval('#step-menu .drv-card', b => b.map(x => Math.round(x.getBoundingClientRect().top)));
+        assert.equal(new Set(tops).size, 1, 'the three choices in one row at ' + w);
+        assert.ok(f.card <= f.bar && f.side <= 0, 'the choices show above Release at ' + w);
+        await shot(tab, 'room-landscape-choices-' + w + '.png');
+        await tab.click('#m-checkin');
+        await tab.waitForSelector('#step-name:not([hidden]) #name option[value="drv_test_casey"]', { state: 'attached' });
+        await tab.selectOption('#name', 'drv_test_casey');
+        await tab.click('#step-name button[type=submit]');
+        await tab.click('.phone-load:has(b:text-is("811"))');
+        await tab.waitForSelector('#step-form:not([hidden])');
+        await tab.click('.ci-loaded label:has([value=NO])');
+        await tab.waitForSelector('.ci-loaded-box:not([hidden])');
+        f = await fit();
+        assert.ok(f.side <= 0, 'no side scroll on the Check-In at ' + w);
+        if (w >= 1024) assert.ok(f.card <= f.bar, 'the whole Check-In shows above Release at ' + w + ' (' + Math.round(f.card) + ' > ' + Math.round(f.bar) + ')');
+        else assert.ok(await swipe(tab) > 50, 'the Check-In scrolls by finger at ' + w);
+        await shot(tab, 'room-landscape-checkin-' + w + '.png');
+        assert.deepEqual(tab.errors, []);
+        await tab.context().close();
+      }
+      const ph = await openPage(browser, 1024, 600, '/route.html');
+      await ph.waitForSelector('#step-code:not([hidden])');
+      assert.equal(await ph.evaluate(() => Math.round(document.body.getBoundingClientRect().width)), 460, 'the drivers\' phone link keeps its phone column');
+      await ph.close();
+      results.push('Driver Room landscape tablet (1280, 1024, 800): the whole width is used; the three choices in one row; the whole Check-In with the loaded-wrong box open shows above Release at 1024 and 1280 and scrolls by finger at 800; the phone link keeps its phone column');
+    }
   } finally {
     await browser.close();
   }
