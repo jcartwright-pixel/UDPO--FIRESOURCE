@@ -239,6 +239,23 @@ async function cameraShot(page, color) {
     await ex.fill('#rows tr[data-new] input[data-k="location"]', 'Break room');
     await ex.press('#rows tr[data-new] input[data-k="location"]', 'Tab');
     await ex.waitForFunction(() => document.querySelectorAll('#rows tr[data-id]').length === 2);
+    // Joe 10/13: + Add Extinguisher goes to the new row; Location is a pick list of the plant's Location Areas; Add saves it.
+    assert.equal(await ex.isVisible('#add-ext'), true);
+    assert.match(await ex.getAttribute('#locs-link', 'href'), /^location-areas\.html\?plant=fac_uniontown$/);
+    await ex.click('#add-ext');
+    assert.equal(await ex.evaluate(() => document.activeElement.dataset.k), 'tag', '+ Add Extinguisher puts the cursor in the new row');
+    const picks = await ex.$$eval('#ext-locs option', o => o.map(x => x.value));
+    assert.ok(picks.includes('Plant \u203a Coolers') && picks.includes('Yard \u203a Truck Yard') && picks.includes('Front office hallway'), 'the Location pick list: ' + JSON.stringify(picks.slice(0, 5)));
+    assert.equal(await ex.getAttribute('#rows tr[data-new] input[data-k="location"]', 'list'), 'ext-locs');
+    await ex.click('#rows tr[data-new] [data-add]');
+    assert.match(await ex.textContent('#error'), /Type the tag number and where it hangs/, 'Add with nothing typed says what is missing');
+    await ex.fill('#rows tr[data-new] input[data-k="tag"]', '03');
+    await ex.fill('#rows tr[data-new] input[data-k="location"]', 'Plant \u203a Coolers');
+    await ex.click('#rows tr[data-new] [data-add]');
+    await ex.waitForFunction(() => document.querySelectorAll('#rows tr[data-id]').length === 3);
+    assert.equal((await db().collection('extinguishers').doc(S.extId(UT, '03')).get()).data().location, 'Plant \u203a Coolers');
+    assert.ok(await ex.$eval('#rows tr[data-new] td:nth-child(5)', td => getComputedStyle(td).display === 'table-cell'), 'the new row lines up with its columns');
+    assert.equal(await ex.$eval('table.sw-ext-grid th:nth-child(7)', th => th.scrollWidth <= th.clientWidth), true, 'ANNUAL SERVICE is not cut off');
     await fits(ex, 'Fire Extinguishers at 1920');
     await shot(ex, 'safety-extinguishers-1920');
     await ex.click('#rows tr[data-id="' + S.extId(UT, '01') + '"] [data-check]');
@@ -254,7 +271,7 @@ async function cameraShot(page, color) {
     assert.ok(await smallest(ex, '#check .sw-bi span, #check .sw-btn') >= 16, 'check text is 16px or more');
     assert.deepEqual(ex.errors, []);
     await ex.close();
-    results.push('Fire Extinguishers: the empty row adds one; annual service due within 30 days shows DUE SOON; the big-button check marks the month GOOD and Next goes to the next tag');
+    results.push('Fire Extinguishers: + Add Extinguisher, a Location pick list from Location Areas, and Add; the empty row adds one; annual service due within 30 days shows DUE SOON; the big-button check marks the month GOOD and Next goes to the next tag');
 
     // Past Walks and Checklist Setup open and fit.
     for (const page of ['safety-walks.html', 'safety-setup.html']) {

@@ -228,3 +228,7 @@ table.sw-grid tr.sw-add input[data-k="newsub"], table.sw-grid tr.sw-add input[da
 /* Location Areas: the place number is the box a finger drags a line from; the lifted line matches the loadout's. */
 .la-page td.la-order { font-weight: 700; color: var(--ud-blue-dark); }
 table.sw-grid tr.row-dragging td { background: #e8f1fa !important; }
+/* Joe 10/13: Fire Extinguishers' headings wrap rather than cut off (ANNUAL SERVICE); + Add Extinguisher lights up the new row. */
+table.sw-ext-grid th { white-space: normal; }
+table.sw-grid tr.sw-flash td { background: #fff7d6 !important; transition: background .3s; }
+.sw-btn.pri { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
