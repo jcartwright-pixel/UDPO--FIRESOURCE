@@ -1212,6 +1212,8 @@ async function noScroll(page) {
     await hub.waitForSelector('#head th');
     assert.equal(await hub.textContent('#title'), 'Truck Issues');
     assert.deepEqual(await hub.$$eval('#head th', t => t.map(x => x.textContent)), ['Truck #', 'Driver', 'Date Reported', "What's Wrong", 'Report Count', 'Reviewed', 'Emailed', 'Garage', 'Work Actions']);
+    // Review item 43 (Joe 10/13): the filter buttons on the line are one size (Trucks / Trailers / Fork Truck and All open / Need review / ...).
+    assert.equal(new Set(await hub.$$eval('.issue-bar #kinds button, .issue-bar #filters button', b => b.map(x => Math.round(x.getBoundingClientRect().height) + '/' + getComputedStyle(x).fontSize))).size, 1, 'one button size');
     if (await hub.$('#rows tr[data-id]')) assert.deepEqual(await hub.$$eval('#rows tr[data-id]:first-child .seg button', b => b.map(x => x.textContent)), ['Lessor', 'Garage']);
     await hub.click('#kinds [data-kind="FORK_TRUCK"]');
     assert.equal(await hub.textContent('#title'), 'Fork Truck / Pallet Jack Issues');

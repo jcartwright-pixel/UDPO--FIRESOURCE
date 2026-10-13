@@ -239,7 +239,7 @@ body.ds-tv .foot { color: #cfe3f6; }
   .ds-page .topbar .brand > span { display: none; }
   .ds-page .topbar button { white-space: nowrap; }
   .ds-page .head { flex-wrap: wrap; row-gap: 6px; }
-  body.ds-tv .head h1, .ds-page .head h1 { font-size: 26px; white-space: normal; }
+  body.ds-tv .head h1, .ds-page .head h1 { font-size: 26px; flex-wrap: wrap; row-gap: 0; white-space: normal; }
   .ds-page .head .title { min-width: 0; flex: 1 1 100%; }
   .ds-page .view { padding: 0 8px 8px; }
   body.ds-tv .ds-row, .ds-row { grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr); min-height: 0; padding: 6px 8px; font-size: 17px; }
