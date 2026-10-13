@@ -614,8 +614,8 @@
             late ? 'OVERDUE' : soon ? 'DUE_SOON' : 'OK', row.lastServiceDate);
         }
       }
-      if (!row.dotDue) push('DOT', 'DOT annual inspection', '', '', '', 'SET_UP', '');
-      else { var d = daysBetween(today, row.dotDue); push('DOT', 'DOT annual inspection', row.dotDue, '', d + ' days', d < 0 ? 'OVERDUE' : d <= fleetRule(rules, u.type, 'dotWarnDays') ? 'DUE_SOON' : 'OK', ''); }
+      if (!row.dotDue) push('DOT', 'Annual inspection', '', '', '', 'SET_UP', '');
+      else { var d = daysBetween(today, row.dotDue); push('DOT', 'Annual inspection', row.dotDue, '', d + ' days', d < 0 ? 'OVERDUE' : d <= fleetRule(rules, u.type, 'dotWarnDays') ? 'DUE_SOON' : 'OK', ''); }
       if (row.plateExpires) { var p = daysBetween(today, row.plateExpires); push('PLATE', 'Plate / registration', row.plateExpires, '', p + ' days', p < 0 ? 'OVERDUE' : p <= fleetRule(rules, u.type, 'plateWarnDays') ? 'DUE_SOON' : 'OK', ''); }
     });
     var rank = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };

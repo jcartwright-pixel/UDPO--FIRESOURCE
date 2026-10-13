@@ -39,8 +39,8 @@ const SaveErr = (code, message) => new (A().SaveError)(code, message);
 const FACILITY = 'fac_uniontown';
 const G = Object.freeze({
   CATEGORIES: ['Brakes', 'Lights', 'Tires', 'Engine', 'Reefer', 'Doors / Body', 'Other'],
-  FIXES: ['Replaced a part', 'Repaired', 'Oil / PM service', 'Tires', 'Lights', 'Brakes', 'DOT inspection', 'Nothing wrong'],
-  SERVICES: { PM: 'PM service', REEFER: 'Reefer service', DOT: 'DOT annual inspection' },
+  FIXES: ['Replaced a part', 'Repaired', 'Oil / PM service', 'Tires', 'Lights', 'Brakes', 'Annual inspection', 'Nothing wrong'],
+  SERVICES: { PM: 'PM service', REEFER: 'Reefer service', DOT: 'Annual inspection' },
   STATUSES: ['NEW', 'WORKING', 'PARTS', 'DONE'],
   MAX_TECHS: 2, SESSION_MS: 30 * 60000, SIGNATURE_MAX: 30000, TECH_FAILS: 5, TECH_LOCK_MS: 5 * 60000, STATION_FAILS_PER_MINUTE: 30,
   GARAGE_MARK: 'Sent to garage'
@@ -472,7 +472,7 @@ function validateSend(input, out) {
   out.unitType = text(input.unitType, 10).toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK';
   out.note = text(input.note, 200);
   if (!out.unit) throw SaveErr('BAD_REQUEST', 'Pick the unit');
-  if (!G.SERVICES[out.serviceKey]) throw SaveErr('BAD_REQUEST', 'Only a PM, reefer service or DOT inspection goes to the garage');
+  if (!G.SERVICES[out.serviceKey]) throw SaveErr('BAD_REQUEST', 'Only a PM, reefer service or annual inspection goes to the garage');
   return out;
 }
 
@@ -534,7 +534,7 @@ function validateFleet(action, input, out) {
     const f = input.fields || {}, t = text(f.track, 10).toUpperCase();
     out.fields = {};
     if (f.track !== undefined) out.fields.track = t === 'YES' || t === 'NO' ? t : '';
-    [['last_service_date', 'Last service date'], ['dot_due', 'DOT due'], ['plate_expires', 'Plate expires']].forEach(([k, l]) => { if (f[k] !== undefined) out.fields[k] = ymdOrBlank(f[k], l); });
+    [['last_service_date', 'Last service date'], ['dot_due', 'Annual inspection due'], ['plate_expires', 'Plate expires']].forEach(([k, l]) => { if (f[k] !== undefined) out.fields[k] = ymdOrBlank(f[k], l); });
     [['last_service_miles', 'Last service miles', 3000000], ['last_service_hours', 'Last service hours', 200000], ['current_hours', 'Reefer hours now', 200000]].forEach(([k, l, m]) => { if (f[k] !== undefined) out.fields[k] = numOrBlank(f[k], l, m); });
     if (f.notes !== undefined) out.fields.notes = text(f.notes, 300);
     if (!Object.keys(out.fields).length) throw SaveErr('BAD_REQUEST', 'Nothing to save');

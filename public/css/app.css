@@ -1878,3 +1878,7 @@ td.eq-act > button { white-space: nowrap; padding: 0 10px; }
 .fs-type { display: flex; align-items: center; gap: 10px; margin: 0 4px 10px; font-size: 16px; font-weight: 700; color: var(--ud-blue-dark); }
 .fs-type select { height: 40px; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; background: #fff; }
 .fs-setup .fs-rule input { width: 110px; }
+/* Joe 10/13: "Annual Inspection" is longer than "DOT"; each tab takes its own width so the tabs still sit beside the title. */
+.fleet-page .head .tabs { grid-auto-columns: auto; }
+.fleet-page .head .tabs button { padding: 0 16px; }
+.fleet-page .head .title { min-width: 400px; }

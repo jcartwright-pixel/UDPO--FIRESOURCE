@@ -32,7 +32,7 @@ test('rules: managers save them over the current app\'s defaults; bad numbers an
 });
 
 test('unit edit: dates and miles saved on the unit\'s Fleet Service row; a bad date is refused', async () => {
-  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveFleetUnit', requestId: rid(), unit: '900002', fields: { dot_due: 'soon' } }), /DOT due must be a date/);
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveFleetUnit', requestId: rid(), unit: '900002', fields: { dot_due: 'soon' } }), /Annual inspection due must be a date/);
   await applyAction(db(), MANAGER, { action: 'saveFleetUnit', requestId: rid(), unit: '900002', unitType: 'TRUCK',
     fields: { track: 'yes', last_service_date: '2026-09-01', last_service_miles: '91,500', dot_due: '2027-03-31', plate_expires: '2027-01-31', notes: 'New tires' } });
   const row = (await db().collection('fleetSetup').doc('900002').get()).data();
@@ -72,7 +72,7 @@ test('a DOT finished at the garage moves the DOT due date by the saved rule', as
   const tom = await garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213' }, now);
   const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'START', id: sent.workOrderId }, now);
-  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'DOT inspection', safe: true, signature: SIG }, now);
+  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'Annual inspection', safe: true, signature: SIG }, now);
   assert.equal((await db().collection('fleetSetup').doc('900002').get()).data().dot_due, '2027-04-06');
 });
 
@@ -99,7 +99,7 @@ test('a trailer\'s DOT finished at the garage moves by the trailers\' own DOT ru
   const tom = await garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213' }, now);
   const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'START', id: sent.workOrderId }, now);
-  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'DOT inspection', safe: true, signature: SIG }, now);
+  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'Annual inspection', safe: true, signature: SIG }, now);
   assert.equal((await db().collection('fleetSetup').doc('T-902').get()).data().dot_due, '2027-10-06');
 });
 
