@@ -102,6 +102,7 @@
 
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
+    import { mountRowDrag } from './js/row-drag.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, shortTime, showError } from './js/app.js';
     const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8)) + '/' + k.slice(0, 4);   // the approved print's style
     import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, saveOptimistic, saveWeekOrder, savesDone, forScreen, modeLabel } from './js/edit.js';
@@ -114,7 +115,7 @@
     const params = new URLSearchParams(location.search);
     const today = L.operatingDay(new Date());
     let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(today);
-    let dragging = null;
+    let rowDrag = null, held = false;
     let unsubscribe = null, unsubscribeWeek = null, unsubscribePlant = null, plantLoads = [], plantCtx = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
     // The Live weeks (config/app liveWeeks; Publish moves them on). A week before Previous opens read only; a week after Next is a
     // preview built from Route Master and Driver Master, as on the current screen, until the Next week is published.
@@ -141,7 +142,7 @@
 
     function render() {
       if (popover) return; // the editor is open; the grid redraws when it closes
-      if (dragging) { dragging.held = true; return; } // a route is being moved; the grid redraws when it is let go
+      if (rowDrag && rowDrag.busy()) { held = true; return; } // a route is being moved; the grid redraws when it is let go
       const kind = weekKind(), preview = kind === 'future' && loaded && !runs.length;
       const edit = canSave() && kind === 'live', move = canReorder() && kind === 'live' && !preview;
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
@@ -163,7 +164,7 @@
       const ctx = L.weeklyContext(rows, lists.allDrivers, lists.exceptions, plantLoads);
       plantCtx = ctx;
       document.getElementById('heads').innerHTML = headCells('<th>Route</th><th>Run / Destination</th>');
-      document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"' + (move && r.runId ? ' class="mover" title="Drag the line up or down to change the order"' : '') + '>' +
+      document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"' + (move && r.runId ? ' class="mover" data-drag="' + i + '" tabindex="0" title="Drag the line up or down to change the order"' : '') + '>' +
         '<td class="strong" title="' + escapeHtml(r.route) + '">' + escapeHtml(routeNumber(r.route)) + '</td><td class="strong">' + escapeHtml(r.run) + '</td>' +
         L.DAYS.map(p => {
           const d = r.days[p], cls = L.weeklyCellClass(r, p, ctx), locked = cls === 'coverage' && !override;
@@ -263,85 +264,21 @@
     // Joe 10/12 ("grab the line and move it", no arrows, no dots): a manager grabs a route's line and drags it up or down; the
     // new order is saved to Route Master (route_week_display) for this week on. The drag starts once the pointer has moved a few
     // pixels, so a click still opens a day. On a tablet a finger drags from the Route or Run box (the rest of the line scrolls).
+    // Review item 75 (Joe 10/13): the shared js/row-drag.js does the dragging (each line's data-drag is its place in rows;
+    // Alt+Up / Alt+Down move a focused line); a redraw waits until the line is let go.
     const weekBody = document.getElementById('rows');
-    let pressed = null, dropClick = false;
+    let dropClick = false;
     const movers = () => rows.map((r, i) => (r.runId ? i : -1)).filter(i => i >= 0);
-    function saveMove(index, to) {
-      const ordered = movers().map(i => rows[i]), moving = rows[index], from = ordered.indexOf(moving);
+    rowDrag = mountRowDrag({ box: weekBody, canDrag: () => !popover && canReorder(), onMove: (id, to) => {
+      const ordered = movers().map(i => rows[i]), moving = rows[Number(id)], from = ordered.indexOf(moving);
       if (from < 0 || to < 0 || to >= ordered.length || to === from) return;
       ordered.splice(from, 1);
       ordered.splice(to, 0, moving);
       saveWeekOrder(getRuns, week, ordered, render);
-    }
-    function weekScroller(el) {
-      for (let n = el && el.parentElement; n && n !== document.body; n = n.parentElement) {
-        const o = getComputedStyle(n).overflowY;
-        if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) return n;
-      }
-      return document.scrollingElement;
-    }
-    function weekDropTarget(x, y) {
-      const el = document.elementFromPoint(x, y), tr = el && el.closest && el.closest('#rows tr.mover[data-index]');
-      if (!tr) {
-        const all = weekBody.querySelectorAll('tr.mover[data-index]'), first = all[0], last = all[all.length - 1];
-        if (first && y < first.getBoundingClientRect().top) return { index: Number(first.dataset.index), after: false };
-        if (last && y > last.getBoundingClientRect().bottom) return { index: Number(last.dataset.index), after: true };
-        return null;
-      }
-      const box = tr.getBoundingClientRect();
-      return { index: Number(tr.dataset.index), after: y > box.top + box.height / 2 };
-    }
-    function weekMarkDrop(t) {
-      weekBody.querySelectorAll('tr.drop-before, tr.drop-after').forEach(tr => tr.classList.remove('drop-before', 'drop-after'));
-      const tr = t && weekBody.querySelector('tr[data-index="' + t.index + '"]');
-      if (tr) tr.classList.add(t.after ? 'drop-after' : 'drop-before');
-    }
-    function endWeekDrag(apply) {
-      pressed = null;
-      const d = dragging;
-      if (!d) return;
-      dragging = null;
-      clearInterval(d.scroller);
-      weekMarkDrop(null);
-      d.row.classList.remove('dragging');
-      document.body.classList.remove('dd-dragging');
+    }, onEnd: () => {
       dropClick = true; setTimeout(() => { dropClick = false; }, 0);
-      const ordered = movers().map(i => rows[i]), from = ordered.indexOf(rows[d.index]);
-      let to = d.target ? ordered.indexOf(rows[d.target.index]) + (d.target.after ? 1 : 0) : -1;
-      if (to > from) to--;
-      if (apply && d.target && from >= 0 && to >= 0 && to !== from) return saveMove(d.index, to);
-      if (d.held) render();
-    }
-    weekBody.addEventListener('dragstart', e => { if (e.target.closest && e.target.closest('tr[data-index]')) e.preventDefault(); });
-    weekBody.addEventListener('pointerdown', e => {
-      const tr = e.target.closest('tr.mover[data-index]');
-      if (!tr || dragging || popover || !canReorder() || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest('button, input, select, textarea, a')) return;
-      pressed = { tr, y: e.clientY };
-    });
-    weekBody.addEventListener('pointermove', e => {
-      if (!dragging && pressed && Math.abs(e.clientY - pressed.y) > 6 && !popover) {
-        const tr = pressed.tr;
-        dragging = { index: Number(tr.dataset.index), row: tr, target: null, x: e.clientX, y: e.clientY, scroller: null };
-        pressed = null;
-        tr.classList.add('dragging');
-        document.body.classList.add('dd-dragging');
-        try { tr.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
-        const box = weekScroller(tr);
-        dragging.scroller = setInterval(() => {
-          if (!dragging) return;
-          const r = box === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : box.getBoundingClientRect(), edge = 48;
-          const step = dragging.y < r.top + edge ? -12 : dragging.y > r.bottom - edge ? 12 : 0;
-          if (step) { box.scrollTop += step; dragging.target = weekDropTarget(dragging.x, dragging.y); weekMarkDrop(dragging.target); }
-        }, 30);
-      }
-      if (!dragging) return;
-      e.preventDefault();
-      dragging.x = e.clientX; dragging.y = e.clientY;
-      dragging.target = weekDropTarget(e.clientX, e.clientY);
-      weekMarkDrop(dragging.target);
-    });
-    document.addEventListener('pointerup', () => endWeekDrag(true));
-    document.addEventListener('pointercancel', () => endWeekDrag(false));
+      if (held) { held = false; render(); }
+    } });
     // A drag let go over a day box is not a click on it.
     weekBody.addEventListener('click', e => { if (dropClick) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
 

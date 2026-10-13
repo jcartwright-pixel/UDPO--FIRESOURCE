@@ -199,8 +199,8 @@ const STATION_OPS = ['START', 'HELPER', 'PARTS', 'RESUME', 'STOP', 'DONE', 'REPO
 const SIGNATURE_MAX = 30000;
 const short = (v, max) => text(v).replace(/\s+/g, ' ').slice(0, max);
 const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-const laborOf = (o) => (Array.isArray(o.labor) ? o.labor : []).filter(s => s && s.tech_id).map(s => ({ tech_id: String(s.tech_id), name: String(s.name || ''), start: String(s.start || ''), end: String(s.end || ''), minutes: Number(s.minutes) || 0 }));
-const joinNames = (list) => list.filter((n, i) => n && list.indexOf(n) === i).join(', ');
+const CLOCK = require('./job-clock');
+const { laborOf, joinNames } = CLOCK;
 const FROM_WORD = { SHIFT_NOTES: 'Request from the plant', PM: 'PM', MAINTENANCE: 'Reported by maintenance' };
 
 // A work order as the tablet shows it.
@@ -318,58 +318,25 @@ async function stationStep(db, input, nowMs) {
     let taskRef = null, task = null;
     if (finishing && order.pmTaskId) { taskRef = db.collection('plantPmTasks').doc(docId(order.pmTaskId)); const t = await tx.get(taskRef); task = t.exists ? t.data() : null; }
 
-    // The clocks: each signed-in mechanic's own (one plant job at a time), and every clock still running on this job.
+    // The clocks: each signed-in mechanic's own (one plant job at a time), and every clock still running on this job (job-clock.js,
+    // shared with the Garage Station, review item 74).
     const labor = laborOf(order);
-    const clockIds = people.map(p => p.id).concat(labor.filter(s => !s.end).map(s => s.tech_id)).filter((v, i, a) => a.indexOf(v) === i);
-    const clockRefs = clockIds.map(id => db.collection(CLOCKS).doc(docId(id)));
-    const clockSnaps = clockRefs.length ? await tx.getAll(...clockRefs) : [];
-    const clocks = {}; clockSnaps.forEach((s, i) => { clocks[clockIds[i]] = { ref: clockRefs[i], data: s.exists ? s.data() : null }; });
-    const starting = ['START', 'HELPER', 'RESUME'].indexOf(req.op) >= 0;
-    const elsewhere = starting ? people.map(p => clocks[p.id].data).filter(c => c && c.workOrderId && c.workOrderId !== ref.id) : [];
-    const otherIds = elsewhere.map(c => c.workOrderId).filter((v, i, a) => a.indexOf(v) === i);
-    const otherRefs = otherIds.map(id => db.collection('plantWorkOrders').doc(docId(id)));
-    const otherSnaps = otherRefs.length ? await tx.getAll(...otherRefs) : [];
-
-    const minutesFrom = (iso) => Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000)) || 0;
-    const closeClock = (list, techId) => list.forEach(s => { if (s.tech_id === techId && !s.end) { s.end = stamp; s.minutes = minutesFrom(s.start); } });
-    const laborFields = (list) => ({ labor: list, onNow: joinNames(list.filter(s => !s.end).map(s => s.name)), laborMinutes: list.reduce((n, s) => n + (s.end ? s.minutes : 0), 0) });
-    const writes = [];
-    if (starting) {
-      people.forEach(p => {
-        if (labor.some(s => s.tech_id === p.id && !s.end)) return;
-        labor.push({ tech_id: p.id, name: p.name, start: stamp, end: '', minutes: 0 });
-        writes.push(['set', clocks[p.id].ref, { techId: p.id, name: p.name, facilityId: req.facilityId, workOrderId: ref.id, machine: text(order.machine), since: stamp }]);
-      });
-      otherSnaps.forEach((s, i) => {
-        if (!s.exists) return;
-        const list = laborOf(s.data()), moving = people.filter(p => clocks[p.id].data && clocks[p.id].data.workOrderId === otherIds[i]);
-        moving.forEach(p => closeClock(list, p.id));
-        writes.push(['update', otherRefs[i], Object.assign(laborFields(list), { updatedAt: stamp, updatedBy: by, testEdited: true })]);
-        result.stoppedOn = (result.stoppedOn || []).concat(text(s.data().woNumber) || otherIds[i]);
-      });
-    } else if (req.op === 'STOP' || req.op === 'PARTS' || finishing) {
-      const who = req.op === 'STOP' ? people.map(p => p.id) : labor.filter(s => !s.end).map(s => s.tech_id);
-      who.forEach(id => {
-        closeClock(labor, id);
-        const c = clocks[id] && clocks[id].data;
-        if (c && c.workOrderId === ref.id) writes.push(['delete', clocks[id].ref]);
-      });
-    }
+    const moved = await CLOCK.moveClocks(tx, db, { clocks: CLOCKS, orders: 'plantWorkOrders', docId, op: req.op, finishing, people, labor, thisId: ref.id, nowMs, stamp,
+      keys: { onNow: 'onNow', laborMinutes: 'laborMinutes' }, clockDoc: (p) => ({ techId: p.id, name: p.name, facilityId: req.facilityId, workOrderId: ref.id, machine: text(order.machine), since: stamp }),
+      touched: { updatedAt: stamp, updatedBy: by, testEdited: true }, otherName: (o, id) => text(o.woNumber) || id });
+    if (moved.stoppedOn) result.stoppedOn = moved.stoppedOn;
 
     const was = text(order.status).toUpperCase() || 'NEW', techs = text(order.techs).split(/\s*,\s*/).filter(Boolean);
-    const change = Object.assign({ techs: joinNames(techs.concat(names)), startedAt: order.startedAt || stamp, updatedAt: stamp, updatedBy: by, testEdited: true }, laborFields(labor));
-    if (req.op === 'STOP' && was === 'NEW') change.status = 'WORKING';
-    if (req.op === 'START' || req.op === 'HELPER') change.status = was === 'PARTS' ? 'PARTS' : 'WORKING';
-    if (req.op === 'PARTS') Object.assign(change, { status: 'PARTS', partsAt: stamp });
-    if (req.op === 'RESUME') change.status = 'WORKING';
+    const change = Object.assign({ techs: joinNames(techs.concat(names)), startedAt: order.startedAt || stamp, updatedAt: stamp, updatedBy: by, testEdited: true }, moved.laborFields(labor),
+      CLOCK.stepStatus(req.op, was, 'partsAt', stamp));
     if (req.op === 'DONE') {
       Object.assign(change, { fixed: req.fixed, fixedNote: req.note ? req.fixed + ': ' + req.note : req.fixed, safe: req.safe ? 'YES' : 'NO', signedBy: names[0], signature: req.signature });
       if (!req.safe) Object.assign(change, { status: 'WORKING', lineDown: 'YES' });
-      else Object.assign(change, { status: 'DONE', lineDown: 'NO', completedAt: stamp, completedBy: names[0], minutes: minutesFrom(change.startedAt) });
+      else Object.assign(change, { status: 'DONE', lineDown: 'NO', completedAt: stamp, completedBy: names[0], minutes: moved.minutesFrom(change.startedAt) });
     }
     tx.update(ref, change);
     renewAll();
-    writes.forEach(([kind, r, d]) => { if (kind === 'delete') tx.delete(r); else if (kind === 'set') tx.set(r, d); else tx.update(r, d); });
+    CLOCK.applyWrites(tx, moved.writes);
     if (taskRef && task && task.status !== 'REMOVED') {
       // A PM done: Last done is today, and the next one is counted from it.
       const today = nyDay(nowMs);
