@@ -104,7 +104,7 @@
     import { printSaved } from './js/print-sheet.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, shortTime, showError } from './js/app.js';
     const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8)) + '/' + k.slice(0, 4);   // the approved print's style
-    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, saveOptimistic, saveWeekOrder, savesDone, forScreen, modeLabel } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, withUnsaved, saveOptimistic, saveWeekOrder, savesDone, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
     import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     // A run whose regular driver is off that day: the reason and who it is for, as "SICK DAY: ALSTON, BRANDON".
@@ -524,7 +524,9 @@
       history.replaceState(null, '', '?week=' + week + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '') + location.hash);
       loaded = false;
       unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), snap => {
-        runs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        // Picks still saving stay on screen until the update holds them, as on Daily: an update from another save used to put the
+        // old value back for a moment (a plant load marked Not running showed PLANT LOAD again until its own save came back).
+        runs = withUnsaved(snap.docs.map(d => Object.assign({ id: d.id }, d.data())));
         runsRead = true;
         loaded = true;
         render();
