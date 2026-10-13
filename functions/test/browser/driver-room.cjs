@@ -267,6 +267,10 @@ async function touchPage(browser, width, height, url, mobile) {
         await tab.waitForSelector('#step-menu:not([hidden]) #m-checkin');
         const fit = () => tab.evaluate(() => ({ card: Math.max(...[...document.querySelectorAll('.phone-card:not([hidden])')].map(c => c.getBoundingClientRect().bottom)),
           bar: document.getElementById('m-station').getBoundingClientRect().top, side: document.scrollingElement.scrollWidth - innerWidth, body: document.body.getBoundingClientRect().width }));
+        // Joe 10/13 "filling the whole screen": in a Chrome tab the first tap puts the station full screen.
+        assert.equal(await tab.evaluate(() => !!document.fullscreenElement), false);
+        await tab.click('#step-menu h1');
+        await tab.waitForFunction(() => document.fullscreenElement === document.documentElement);
         let f = await fit();
         assert.ok(f.body >= w - 1, 'the station uses the whole width at ' + w);
         const tops = await tab.$$eval('#step-menu .drv-card', b => b.map(x => Math.round(x.getBoundingClientRect().top)));
@@ -293,7 +297,7 @@ async function touchPage(browser, width, height, url, mobile) {
       await ph.waitForSelector('#step-code:not([hidden])');
       assert.equal(await ph.evaluate(() => Math.round(document.body.getBoundingClientRect().width)), 460, 'the drivers\' phone link keeps its phone column');
       await ph.close();
-      results.push('Driver Room landscape tablet (1280, 1024, 800): the whole width is used; the three choices in one row; the whole Check-In with the loaded-wrong box open shows above Release at 1024 and 1280 and scrolls by finger at 800; the phone link keeps its phone column');
+      results.push('Driver Room landscape tablet (1280, 1024, 800): the first tap in a Chrome tab puts it full screen; the whole width is used; the three choices in one row; the whole Check-In with the loaded-wrong box open shows above Release at 1024 and 1280 and scrolls by finger at 800; the phone link keeps its phone column');
     }
   } finally {
     await browser.close();
