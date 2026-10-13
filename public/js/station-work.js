@@ -453,6 +453,14 @@ export function mountStationWork({ db, box, person, onDraw }) {
       setTimeout(look, 250);
     })();
   }
+  // A save that comes back clears only what it sent: a count typed while an earlier Start was still on its way stays in
+  // its box, so the Complete tapped next sends it (it used to be wiped, and the load finished with a blank count).
+  function clearSent(id, fields) {
+    const d = drafts[id];
+    if (!d) return;
+    Object.keys(fields).forEach(k => { if (d[k] !== undefined && String(d[k]).trim() === String(fields[k]).trim()) delete d[k]; });
+    if (!Object.keys(d).length) delete drafts[id];
+  }
   async function saveLoad(r, fields, shown) {
     const done = show(r.id, shown);
     let res, ok = false;
@@ -460,7 +468,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     // Start then cleared the finish (the load showed loading again).
     const turn = (loadChain[r.id] || Promise.resolve()).then(() => save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }));
     loadChain[r.id] = turn.catch(() => {});
-    try { res = await turn; ok = true; showError(''); delete drafts[r.id]; } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
+    try { res = await turn; ok = true; showError(''); clearSent(r.id, fields); } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
     if (queued(res)) hold(r.id, done); else if (ok) settle(r.id, shown, done); else done();
   }
   const chain = {};
