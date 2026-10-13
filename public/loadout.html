@@ -147,9 +147,11 @@
     // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
     function fitDrivers() {
       document.querySelectorAll('#rows td.lo-driver').forEach(td => {
-        td.style.fontSize = '';
+        td.style.fontSize = ''; td.style.whiteSpace = '';
         let size = parseFloat(getComputedStyle(td).fontSize);
-        while (td.scrollWidth > td.clientWidth && size > 9) { size -= 0.5; td.style.fontSize = size + 'px'; }
+        while (td.scrollWidth > td.clientWidth && size > 16) { size -= 0.5; td.style.fontSize = size + 'px'; }
+        // Review item 56 (Joe 10/13): text never goes under 16px; a name still too wide at 16px wraps instead.
+        if (td.scrollWidth > td.clientWidth) td.style.whiteSpace = 'normal';
       });
     }
     addEventListener('resize', fitDrivers);

@@ -8,7 +8,7 @@
 :is(.gs-page, .ds-page) .topbar .brand small { display: none; }
 /* Review item 50 (Joe 10/13): one header order everywhere, as on the desktop screens: the logo first, then Back and Home; the
    rest (Test copy, the person, Sign out) on the right. */
-:is(.gs-page, .ds-page) .topbar .gs-nav { min-height: 40px; padding: 0 14px; font-size: 15px; }
+:is(.gs-page, .ds-page) .topbar .gs-nav { min-height: 40px; padding: 0 14px; font-size: 16px; }
 :is(.gs-page, .ds-page) .topbar > *, .ps-page #ps-top > * { order: 2; }
 :is(.gs-page, .ds-page) .topbar > :is(.brand, #go-back, #go-home), .ps-page #ps-top > :is(.brand, #go-back, #go-home) { order: 0; }
 :is(.gs-page, .ds-page) .topbar > .test-copy-badge, .ps-page #ps-top > .test-copy-badge { order: 1; }
@@ -37,7 +37,7 @@
 .gs-hint { margin: 0; color: #44515e; font-size: 20px; }
 .gs-names { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-content: start; }
 .gs-name { background: #fff; border: 3px solid #d7e1ec; border-radius: 16px; padding: 14px 10px; font-size: 26px; font-weight: 800; color: #1b2a3a; cursor: pointer; min-height: 92px; }
-.gs-name small { display: block; font-size: 15px; font-weight: 600; color: #6b7b8c; margin-top: 4px; }
+.gs-name small { display: block; font-size: 16px; font-weight: 600; color: #6b7b8c; margin-top: 4px; }
 .gs-name.on { border-color: #6d28d9; background: #f3edff; }
 .gs-name.in { border-color: #1c7c4a; background: #e3f5ea; }
 .gs-dots { display: flex; gap: 12px; justify-content: center; margin: 4px 0; }
@@ -129,7 +129,7 @@
 .drv-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .phone-card .drv-card { display: grid; gap: 2px; text-align: left; padding: 12px; min-height: 76px; border-left: 5px solid #236b9a; background: linear-gradient(90deg, #fff, #e4eff9); }
 .phone-card .drv-card.gold { border-left-color: #8d6a2a; background: linear-gradient(90deg, #fff, #f8f1df); }
-.drv-card b { font-size: 18px; color: #193e66; } .drv-card small { font-size: 13px; color: #647b8e; font-weight: 600; }
+.drv-card b { font-size: 18px; color: #193e66; } .drv-card small { font-size: 16px; color: #647b8e; font-weight: 600; }
 /* Joe 10/12: the three choices first (View Loadout, DVIR, Check-In), big enough for a thumb or a glove. */
 .drv-choices { display: grid; gap: 12px; }
 .phone-card .drv-choices .drv-card { min-height: 96px; padding: 16px 18px; }
@@ -137,21 +137,21 @@
 .phone-card .drv-card.green { border-left-color: #1b7f3b; background: linear-gradient(90deg, #fff, #e3f3e8); }
 .drv-head { display: flex; align-items: center; gap: 8px; } .drv-head h1, .drv-head h2 { flex: 1; margin: 0; }
 .drv-head button { min-height: 44px; padding: 0 12px; }
-.drv-hint { margin: 0; font-size: 14px; color: #647b8e; }
+.drv-hint { margin: 0; font-size: 16px; color: #647b8e; }
 .drv-board { height: min(60vh, 480px); overflow: hidden; border-radius: 12px; background: #eef4f8; }
 .drv-track { animation: drv-roll 30s linear infinite; }
 .drv-track.paused { animation-play-state: paused; }
 .drv-track.still { animation: none; }
 @keyframes drv-roll { from { transform: translateY(0); } to { transform: translateY(-50%); } }
-.drv-band { padding: 10px 14px; margin: 6px; border-radius: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; font-size: 13px; }
+.drv-band { padding: 10px 14px; margin: 6px; border-radius: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; font-size: 16px; }
 .drv-band.start { display: grid; grid-template-columns: 1fr auto; gap: 4px; color: #fff; background: linear-gradient(90deg, #174a80, #20578e); border-bottom: 4px solid #efbf29; }
 .drv-band.start div { grid-column: 1 / 3; text-transform: none; letter-spacing: 0; font-size: 16px; } .drv-band.start b { color: #efbf29; font-size: 20px; }
 .drv-band.end { text-align: center; background: #fbe7a6; color: #174a80; border: 2px solid #efbf29; border-bottom: 4px solid #174a80; }
 .drv-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; margin: 6px; padding: 12px 18px; background: #fff; border-radius: 12px; font-size: 16px; }
 .drv-row .rt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .drv-row .rt b { font-size: 18px; } .drv-row .rt i { font-style: normal; font-weight: 700; color: #193e66; }
-.drv-row .pill { font-weight: 700; font-size: 13px; padding: 4px 9px; border-radius: 8px; }
+.drv-row .pill { font-weight: 700; font-size: 16px; padding: 4px 9px; border-radius: 8px; }
 .drv-row .pill.loaded { background: #e4f4e9; color: #24623e; } .drv-row .pill.loading { background: #fff1ca; color: #855d08; } .drv-row .pill.waiting { background: #edf1f5; color: #193e66; }
-.drv-row .pu { grid-column: 1 / 3; background: #fde5e3; color: #8f1d16; border: 1px solid #b42332; border-radius: 8px; padding: 4px 8px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drv-row .pu { grid-column: 1 / 3; background: #fde5e3; color: #8f1d16; border: 1px solid #b42332; border-radius: 8px; padding: 4px 8px; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .drv-row .pu b { letter-spacing: .06em; }
 .drv-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
 .drv-col { display: grid; gap: 6px; align-content: start; padding: 0 8px; }
@@ -164,10 +164,10 @@
 .drv-add { display: grid; gap: 6px; }
 .drv-sign { display: grid; gap: 6px; border: 1px solid #d4e1eb; border-radius: 12px; padding: 10px; }
 .drv-sign canvas { width: 100%; height: 150px; background: #f8fbfe; border: 1px solid #cbd9e5; border-radius: 10px; touch-action: none; }
-.drv-sign label.check { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 15px; } .drv-sign label.check input { width: 22px; height: 22px; }
+.drv-sign label.check { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 16px; } .drv-sign label.check input { width: 22px; height: 22px; }
 .drv-msg { margin: 0; font-weight: 700; color: #193e66; }
-.drv-dvir .drv-col label { font-size: 12px; }
-.drv-dvir .drv-col select { font-size: 15px; padding: 7px 6px; }
+.drv-dvir .drv-col label { font-size: 16px; }
+.drv-dvir .drv-col select { font-size: 16px; padding: 7px 6px; }
 
 /* ---------- Driver Station: the Driver Room board and TV ---------- */
 .ds-page .view { padding: 0 16px 8px; }
@@ -176,17 +176,17 @@
 .ds-board, .ds-week { display: flex; flex-direction: column; min-height: 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .ds-scroll { flex: 1; min-height: 0; overflow: auto; }
 .ds-row { display: grid; grid-template-columns: 90px minmax(190px, .82fr) minmax(198px, 1.06fr) 132px 90px 160px 100px; align-items: center; gap: 0 8px; padding: 8px 12px; border-bottom: 1px solid #e3e9ef; font-size: 16px; }
-.ds-headrow { background: #20578e; color: #fff; font-weight: 800; font-size: 13px; letter-spacing: .05em; }
+.ds-headrow { background: #20578e; color: #fff; font-weight: 800; font-size: 16px; letter-spacing: .05em; }
 .ds-row .rt { font-size: 22px; font-weight: 800; color: #174a80; } .ds-row .span2 { grid-column: 1 / 3; }
 .ds-row.loading { background: #fff5d7; } .ds-row.loaded { background: #e6f6e9; }
 .ds-row .st { font-weight: 800; } .ds-row .pu-yes { color: #b42332; font-weight: 800; }
-.ds-strip { grid-column: 1 / -1; margin-top: 6px; padding: 4px 10px; border-radius: 8px; font-size: 14px; }
+.ds-strip { grid-column: 1 / -1; margin-top: 6px; padding: 4px 10px; border-radius: 8px; font-size: 16px; }
 .ds-strip.pu { background: #fde5e3; color: #8f1d16; } .ds-strip.note { background: #e3effb; color: #134c85; }
 .ds-band { text-align: center; font-weight: 800; letter-spacing: .08em; padding: 10px; }
 .ds-band.end, .ds-band.end td { background: #f4c542; color: #174a80; } .ds-band.start, .ds-band.start td { background: #174a80; color: #fff; border-bottom: 4px solid #f4c542; }
 .ds-week-title { display: flex; justify-content: space-between; padding: 8px 12px; background: #20578e; color: #fff; }
-.ds-week-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.ds-week-table th { position: sticky; top: 0; background: #eef5fa; color: #12385f; font-size: 12px; padding: 4px; } .ds-week-table th small { display: block; font-weight: 600; color: #647b8e; }
+.ds-week-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.ds-week-table th { position: sticky; top: 0; background: #eef5fa; color: #12385f; font-size: 16px; padding: 4px; } .ds-week-table th small { display: block; font-weight: 600; color: #647b8e; }
 .ds-week-table td { padding: 5px 6px; border-bottom: 1px solid #e3e9ef; text-align: center; } .ds-week-table td:first-child { text-align: left; }
 .ds-week-table tbody tr:nth-child(even) { background: #eef5fa; } .ds-week-table td.off { color: #9aa9b5; }
 .ds-welcome { margin: 0; font-size: 16px; } .ds-welcome i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2eb872; margin-right: 6px; }
@@ -208,7 +208,7 @@ body.ds-tv .ds-grid { grid-template-columns: 2.56fr 1fr; grid-template-rows: min
 body.ds-tv .ds-board { grid-row: 1; grid-column: 1; } body.ds-tv .ds-weather { grid-row: 1; grid-column: 2; } body.ds-tv .ds-week { grid-row: 2; grid-column: 1 / 3; }
 /* The small window on the right, as on the old Driver Room board: local weather on a blue panel. */
 body.ds-tv .ds-weather { display: flex; flex-direction: column; justify-content: center; padding: 24px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 18px; background: linear-gradient(145deg, #177ab8, #164f86); color: #fff; box-shadow: 0 10px 28px rgba(0, 0, 0, .22); }
-body.ds-tv .ds-weather .sym { font-size: 42px; line-height: 1; } body.ds-tv .ds-weather b { font-size: 14px; letter-spacing: .13em; opacity: .8; }
+body.ds-tv .ds-weather .sym { font-size: 42px; line-height: 1; } body.ds-tv .ds-weather b { font-size: 16px; letter-spacing: .13em; opacity: .8; }
 body.ds-tv .ds-weather h3 { margin: 12px 0 0; font-size: 32px; } body.ds-tv .ds-weather p.now { font-size: 30px; font-weight: 800; color: #fff; } body.ds-tv .ds-weather p.next { color: #d7ebf9; font-size: 17px; } body.ds-tv .ds-weather p { margin: 12px 0 0; font-size: 19px; line-height: 1.4; color: rgba(255, 255, 255, .92); }
 body.ds-tv .ds-row { min-height: 75px; font-size: 23px; grid-template-columns: 110px minmax(180px, 1fr) minmax(246px, 1.25fr) 134px 80px 155px 85px; }
 body.ds-tv .ds-row .rt { font-size: 30px; } body.ds-tv .ds-scroll { overflow: hidden; }
@@ -216,7 +216,7 @@ body.ds-tv .foot { color: #cfe3f6; }
 @media (max-width: 1550px) { body.ds-tv .ds-grid { grid-template-columns: 1fr 300px; } }
 @media (max-width: 1050px) { body.ds-tv .ds-grid { grid-template-columns: 1fr; } body.ds-tv .ds-weather { display: none !important; } body.ds-tv .ds-week { grid-column: 1; } }
 @media (max-width: 760px) {
-  .ds-row { grid-template-columns: 60px 1fr 1fr 70px; font-size: 15px; }
+  .ds-row { grid-template-columns: 60px 1fr 1fr 70px; font-size: 16px; }
   .ds-row > span:nth-child(5), .ds-row > span:nth-child(7), .ds-headrow span:nth-child(5), .ds-headrow span:nth-child(7) { display: none; }
 }
 
@@ -265,9 +265,9 @@ body.ds-tv .foot { color: #cfe3f6; }
 .ta-page .ta-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1.1fr) 96px 170px 104px; align-items: center; gap: 0;
   border-bottom: 1px solid #e3e9f0; border-left: 4px solid #388650; min-height: 52px; font-size: 16px; cursor: pointer; }
 .ta-page .ta-row > span { padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; }
-.ta-page .ta-headrow { position: sticky; top: 0; z-index: 1; background: #245990; color: #fff; text-transform: uppercase; font-weight: 700; font-size: 13px; min-height: 40px; border-left-color: #245990; cursor: default; }
+.ta-page .ta-headrow { position: sticky; top: 0; z-index: 1; background: #245990; color: #fff; text-transform: uppercase; font-weight: 700; font-size: 16px; min-height: 40px; border-left-color: #245990; cursor: default; }
 .ta-page .ta-row .rt b { font-size: 18px; }
-.ta-page .ta-row small { display: block; font-size: 12px; color: #5b6b7c; }
+.ta-page .ta-row small { display: block; font-size: 16px; color: #5b6b7c; }
 .ta-page .ta-row .grey { color: #6b7a89; }
 .ta-page .ta-row .tr input { width: 100%; text-align: center; text-transform: uppercase; font-weight: 700; font-size: 16px; padding: 6px; border: 1px solid #b9c7d6; border-radius: 6px; }
 .ta-page .ta-row .tr small { text-align: center; min-height: 14px; }
@@ -277,11 +277,11 @@ body.ds-tv .foot { color: #cfe3f6; }
 .ta-page .ta-row.dup .tr small { color: #8a5a00; font-weight: 700; }
 .ta-page .ta-row.sel { background: #dcebfb; border-left: 5px solid #2f7de1; }
 .ta-page .ta-yard { background: #fff; border: 1px solid #d5dfea; border-radius: 8px; padding: 10px 12px; max-height: calc(100dvh - 210px); overflow: auto; }
-.ta-page .ta-yard h3 { margin: 12px 0 6px; font-size: 14px; text-transform: uppercase; color: #33475b; }
+.ta-page .ta-yard h3 { margin: 12px 0 6px; font-size: 16px; text-transform: uppercase; color: #33475b; }
 .ta-page .ta-help { margin: 0; color: #0b4d83; font-weight: 700; }
 .ta-page .ta-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.ta-page .ta-chip { border-radius: 6px; padding: 6px 4px; font-weight: 700; font-size: 14px; border: 1px solid; min-height: 40px; }
-.ta-page .ta-chip small { display: block; font-weight: 400; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ta-page .ta-chip { border-radius: 6px; padding: 6px 4px; font-weight: 700; font-size: 16px; border: 1px solid; min-height: 40px; }
+.ta-page .ta-chip small { display: block; font-weight: 400; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ta-page .ta-chip.open { background: #eef8f0; border-color: #6bb07c; color: #1f5f30; cursor: pointer; }
 .ta-page .ta-chip.busy { background: #fff6df; border-color: #d4a121; color: #6e4800; }
 .ta-page .ta-chip.down { background: #fde8e8; border-color: #d98080; color: #8f1d16; }
@@ -290,9 +290,9 @@ body.ds-tv .foot { color: #cfe3f6; }
 @media (max-width: 899px) {
   .ta-page .ta-wrap { grid-template-columns: minmax(0, 1fr); }
   .ta-page .ta-yard, .ta-page .ta-depart { display: none; }
-  .ta-page .ta-row { grid-template-columns: 50px minmax(0, .9fr) minmax(0, 1fr) 52px 96px; font-size: 14px; }
+  .ta-page .ta-row { grid-template-columns: 50px minmax(0, .9fr) minmax(0, 1fr) 52px 96px; font-size: 16px; }
   .ta-page .ta-row > span { padding: 6px 3px; overflow-wrap: anywhere; }
-  .ta-page .ta-headrow { font-size: 11px; }
+  .ta-page .ta-headrow { font-size: 16px; }
   .ta-page .ta-row .rt b { font-size: 16px; }
   .ta-page .ta-row .tr input { padding: 6px 2px; }
 }
@@ -302,13 +302,13 @@ body.ds-tv .foot { color: #cfe3f6; }
 /* Joe 10/12 "it won't even let me scroll": app.css locks the body (height 100%, overflow hidden) for the desk screens; the station page scrolls as a whole. */
 body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .ps-page #ps-top { min-height: 56px; gap: 8px; padding: 6px 14px; position: sticky; top: 0; z-index: 5; }
-.ps-page #ps-top button { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.ps-page #ps-top button { min-height: 40px; padding: 0 14px; font-size: 16px; }
 .ps-page #ps-top .ps-brand img { width: auto; height: 38px; }
 .ps-page #ps-top .ps-brand strong { font-size: 20px; }
 .ps-page .ps-pill { background: #073c6a; color: #fff; border-radius: 999px; padding: 7px 14px; font-weight: 700; white-space: nowrap; }
 .ps-page .ps-pill::before { content: '\25CF  '; color: #f3b613; }
 .ps-page .ps-title { padding: 16px 18px 4px; }
-.ps-page .ps-title .eyebrow { display: block; color: #5b6b7c; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.ps-page .ps-title .eyebrow { display: block; color: #5b6b7c; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .ps-page .ps-title h1 { margin: 2px 0 0; font-size: 28px; color: #0b2f55; }
 .ps-page .view { padding: 8px 18px 24px; }
 .ps-page .ps-intro { margin: 0 0 14px; color: #33475b; font-size: 17px; }
@@ -323,7 +323,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .ps-page .ps-tab b { display: block; font-size: 27px; }
 .ps-page .ps-tab small { display: block; font-size: 17px; color: #4a5b6c; }
 .ps-page .ps-count { display: inline-block; margin-top: 8px; font-weight: 700; color: var(--accent); font-size: 17px; }
-.ps-page .ps-foot { margin-top: 18px; color: #5b6b7c; font-size: 14px; }
+.ps-page .ps-foot { margin-top: 18px; color: #5b6b7c; font-size: 16px; }
 /* Change Station with a manager release code (Administration > Manager Links). */
 .ps-release { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px; border: 2px solid #f0b46a; border-radius: 12px; background: #fff8ee; font-size: 18px; }
 .ps-release[hidden] { display: none; }
@@ -336,7 +336,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
   .ps-page #ps-top { flex-wrap: wrap; padding: 6px 10px; }
   .ps-page #ps-top .ps-brand img { display: none; }
   .ps-page #ps-top .ps-brand strong { font-size: 17px; white-space: nowrap; }
-  .ps-page #ps-top button { min-height: 36px; padding: 0 10px; font-size: 14px; }
+  .ps-page #ps-top button { min-height: 36px; padding: 0 10px; font-size: 16px; }
   .ps-page .ps-pill { order: 9; flex-basis: 100%; text-align: center; }
   .ps-page .ps-stations, .ps-page .ps-tabs { grid-template-columns: 1fr; }
   .ps-page .ps-title h1 { font-size: 24px; }
@@ -346,7 +346,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .pss h2 { margin: 14px 0 8px; font-size: 20px; color: #123f70; }
 .pss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .pss-card { display: grid; gap: 6px; padding: 16px; background: #fff; border: 1px solid #c9d6e4; border-top: 5px solid #0b6eaa; border-radius: 12px; text-decoration: none; color: #0b2f55; }
-.pss-card b { font-size: 19px; } .pss-card span { color: #4a5b6c; font-size: 15px; } .pss-card small { color: #6b7b8c; font-size: 13px; word-break: break-all; }
+.pss-card b { font-size: 19px; } .pss-card span { color: #4a5b6c; font-size: 16px; } .pss-card small { color: #6b7b8c; font-size: 16px; word-break: break-all; }
 .pss-card:hover { box-shadow: 0 2px 10px rgba(7, 60, 106, .18); }
 
 /* Joe 10/10: the drivers' phone page looks like a phone on a laptop too: one phone-width column in the middle. */
@@ -357,17 +357,17 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 
 /* Table text (Joe's standing rule, 10/10): the Driver Room weekly schedule reads at the same size as the board. */
 .ds-week-table { font-size: 16px; }
-.ds-week-table th { font-size: 15px; } .ds-week-table th small { font-size: 13px; }
+.ds-week-table th { font-size: 16px; } .ds-week-table th small { font-size: 16px; }
 
 /* Drivers' phone Check-In (Joe 10/11): the units, drop and hook, over / short, the Speak button, Skip. */
 .phone-card .ci-units { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .phone-card .ci-units input { padding: 7px 8px; font-size: 16px; }
-.phone-card button.ci-link { min-height: 0; padding: 2px 0; border: 0; background: none; text-align: left; font-size: 15px; text-decoration: underline; justify-self: start; }
+.phone-card button.ci-link { min-height: 0; padding: 2px 0; border: 0; background: none; text-align: left; font-size: 16px; text-decoration: underline; justify-self: start; }
 .phone-card .ci-trailer { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-left: 4px solid #8d6a2a; border-radius: 10px; background: #fbf8f1; }
 .phone-card .ci-trailer-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
-.phone-card .ci-trailer-head button { min-height: 38px; padding: 0 12px; font-size: 14px; }
+.phone-card .ci-trailer-head button { min-height: 38px; padding: 0 12px; font-size: 16px; }
 .phone-card .ci-trailer input { padding: 7px 9px; font-size: 16px; }
-.phone-card .ci-trailer label.check { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink); }
+.phone-card .ci-trailer label.check { display: flex; align-items: center; gap: 8px; font-size: 16px; color: var(--ink); }
 .phone-card .ci-trailer label.check input { width: 22px; height: 22px; }
 .phone-card .ci-os-box { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; margin-top: 8px; padding: 10px; border-radius: 10px; background: #fff5f5; border: 1px solid #f0c7c7; }
 .phone-card .ci-os-box[hidden] { display: none; }
@@ -381,21 +381,21 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .phone-card .speak-box { position: relative; display: block; }
 .phone-card .speak-box input { padding-right: 78px; }
 .phone-card .speak-box.area textarea { padding-bottom: 40px; }
-.phone-card button.speak { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); min-height: 0; height: 30px; padding: 0 10px; font-size: 14px; border-radius: 7px; background: #eef4fa; border: 1px solid #c4d6e8; }
+.phone-card button.speak { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); min-height: 0; height: 30px; padding: 0 10px; font-size: 16px; border-radius: 7px; background: #eef4fa; border: 1px solid #c4d6e8; }
 .phone-card .speak-box.area button.speak { top: auto; bottom: 6px; transform: none; }
 .phone-card button.speak.on { background: #c62828; color: #fff; border-color: #c62828; }
 /* The phone Check-In: what went wrong, right under the Check In button (improvements item 12). */
-.phone-card .send-error { margin: 8px 2px 0; color: #a3261b; font-weight: 700; font-size: 15px; }
+.phone-card .send-error { margin: 8px 2px 0; color: #a3261b; font-weight: 700; font-size: 16px; }
 /* Polish 8: Trailer Assignments lines up with Loadout and Unloading: same margins, eyebrow line and heading size, a card
    that stops short of the window edge, and centred column headings. */
-.ta-page .head .eyebrow { display: block; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted, #5b6b7c); }
+.ta-page .head .eyebrow { display: block; font-size: 16px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted, #5b6b7c); }
 .ta-page .view { padding: 0 16px 16px; }
-.ta-page .ta-headrow { font-size: 15px; font-weight: 800; min-height: 44px; }
+.ta-page .ta-headrow { font-size: 16px; font-weight: 800; min-height: 44px; }
 .ta-page .ta-row > span { padding: 6px 12px; }
 .ta-page .ta-row > span:not(:nth-child(3)) { text-align: center; }
 @media (min-width: 900px) { .ta-page .ta-row { grid-template-columns: 100px minmax(0, 1fr) minmax(0, 1.1fr) 110px 170px 130px; } }
 .ta-page .ta-yard { padding: 12px 16px; }
-@media (max-width: 899px) { .ta-page .view { padding: 0 8px 8px; } .ta-page .ta-row > span { padding: 6px 3px; } .ta-page .ta-headrow { font-size: 11px; } }
+@media (max-width: 899px) { .ta-page .view { padding: 0 8px 8px; } .ta-page .ta-row > span { padding: 6px 3px; } .ta-page .ta-headrow { font-size: 16px; } }
 /* Joe 10/12 (tablets): Run and Driver never shrink to a letter or two. On a 1024 tablet the yard is narrower, the fixed columns
    give up width, and a long run or driver name wraps instead of being cut. The yard and the notes are 16px or more. */
 .ta-page .ta-row > span:nth-child(2), .ta-page .ta-row > span:nth-child(3) { white-space: normal; overflow-wrap: break-word; text-overflow: clip; }
@@ -411,7 +411,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 }
 @media (min-width: 600px) and (max-width: 899px) {
   .ta-page .ta-row { grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1fr) 84px 120px; font-size: 16px; }
-  .ta-page .ta-headrow { font-size: 14px; }
+  .ta-page .ta-headrow { font-size: 16px; }
 }
 /* Polish 23: Phone Screens keeps the page's side margins, and its cards fit a phone. */
 .pss { padding: 0 16px 16px; }
@@ -631,7 +631,7 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
   body.ta-page:not(.in-station) .ta-row.dup { background: #fffaf0; border-left-color: #d4a121; }
   body.ta-page:not(.in-station) .ta-row.sel { background: #eef5fd; border-left-color: #2f7de1; }
   body.ta-page:not(.in-station) .ta-row > span { display: flex; align-items: center; gap: 10px; padding: 0; text-align: left !important; overflow: visible; white-space: normal; overflow-wrap: normal; word-break: normal; }
-  body.ta-page:not(.in-station) .ta-row > span[data-l]::before { content: attr(data-l); flex: 0 0 74px; font-size: 15px; font-weight: 800; color: #5b6b7c; }
+  body.ta-page:not(.in-station) .ta-row > span[data-l]::before { content: attr(data-l); flex: 0 0 74px; font-size: 16px; font-weight: 800; color: #5b6b7c; }
   body.ta-page:not(.in-station) .ta-row > span.rt { align-items: baseline; flex-wrap: wrap; }
   body.ta-page:not(.in-station) .ta-row .rt b { font-size: 24px; color: #0b3d6b; }
   body.ta-page:not(.in-station) .ta-row .rt small { display: inline; font-size: 16px; font-weight: 700; }
@@ -644,7 +644,7 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 /* Joe 10/13: "Was your truck loaded correctly?" with Yes / No on one row; No opens the box for what was wrong. The Check-In
    still fits a 390 x 844 phone: the empty drop-and-hook list takes no room and the rows sit a little closer. */
 .phone-card .ci-loaded { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 10px; align-items: center; }
-.phone-card .ci-loaded .ci-q { font-size: 15px; font-weight: 800; line-height: 18px; color: var(--ink); }
+.phone-card .ci-loaded .ci-q { font-size: 16px; font-weight: 800; line-height: 18px; color: var(--ink); }
 .phone-card .ci-loaded .ci-seg span { padding: 7px 0; }
 .phone-card .ci-loaded .ci-loaded-box { grid-column: 1 / 3; }
 .phone-card .ci-loaded .ci-loaded-box[hidden] { display: none; }

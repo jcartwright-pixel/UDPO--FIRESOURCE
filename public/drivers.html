@@ -34,7 +34,7 @@
     <div class="notice error" id="error" hidden></div>
     <div class="split">
       <div class="split-main">
-        <button id="refresh" type="button" data-top>&#8635; Refresh</button>
+        <button id="refresh" type="button" data-top>Refresh</button>
         <div class="filters" data-top>
           <input id="search" type="search" placeholder="Search drivers or trucks...">
           <select id="status"><option value="ALL">Status: All</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>
@@ -115,7 +115,7 @@
           '<td>' + r.vacationWeeks + '</td>' +
           '<td><span class="status' + (r.active ? '' : ' off') + '" title="' + escapeHtml(r.unavailableReason) + '">' + (r.active ? 'Active' : 'Inactive') + '</span></td>' +
           '<td><button type="button" class="switch' + (r.active ? ' on' : '') + '" data-toggle="' + id + '" aria-label="' + (r.active ? 'Mark not available' : 'Mark available') + '"' + dis + '></button></td>' +
-          '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>&#9998; Edit</button></td></tr>';
+          '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>Edit</button></td></tr>';
       }).join('') || '<tr><td colspan="10" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
       const active = rows.filter(r => r.active);
       document.getElementById('n-active').textContent = active.length;
@@ -127,7 +127,7 @@
       // Review item 10 (Joe 10/13): the edit panel opens only on Edit or + Add Driver; otherwise the list takes the full width
       // and the three counts sit above it.
       document.querySelector('.split').classList.toggle('closed', !panelOpen);
-      if (!panelOpen) document.getElementById('panel').innerHTML = '<div class="panel-empty">Press <b>&#9998; Edit</b> on a driver\'s row (or click the name)<br>and the driver opens here to change.<br><br>Press <b>+ Add Driver</b> above for a new driver.</div>';
+      if (!panelOpen) document.getElementById('panel').innerHTML = '<div class="panel-empty">Press <b>Edit</b> on a driver\'s row (or click the name)<br>and the driver opens here to change.<br><br>Press <b>+ Add Driver</b> above for a new driver.</div>';
       fitRoster();
     }
 

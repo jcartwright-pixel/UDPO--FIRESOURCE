@@ -181,6 +181,7 @@ function addSideMenu() {
   if (!bar || document.body.classList.contains('phone') || screen.querySelector('.sidemenu')) return;
   const here = (location.pathname.split('/').pop() || 'index.html');
   // Joe 10/10 evening: the menu is words only, on every page (no pictures or icons).
+  // Review item 57 (Joe 10/13): no ▸ beside a section and no ↗ beside a link to the current app either.
   const svg = () => '';
   const nav = document.createElement('nav');
   nav.className = 'sidemenu';
@@ -191,7 +192,7 @@ function addSideMenu() {
   const link = ([label, href, icon]) => {
     const ext = /^https:/.test(href);
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
-      '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
+      '>' + svg(icon) + '<span>' + label + '</span>' + '</a>';
   };
   const side = sideFor(here), groups = side ? MENU.filter(([g]) => side.sections.indexOf(g) >= 0) : [];
   // Joe 10/10 evening: Back and Home sit in the header, not in the menu. The main screen (the all-plants Operations Overview)
@@ -203,7 +204,7 @@ function addSideMenu() {
     const live = p.status === 'ACTIVE', soon = 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
     // Joe 10/12: clicking the plant's name (a second tap on a tablet) opens that plant's home; hovering shows its sides.
     return '<div class="side-sec side-plant" data-plant="' + p.id + '" data-home="' + (live ? 'index.html' : soon) + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + p.name + '">' +
-      svg('plant-building-v1-560.webp') + '<span>' + p.name + '</span><i aria-hidden="true">&#9656;</i></button>' +
+      svg('plant-building-v1-560.webp') + '<span>' + p.name + '</span></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + p.name + '</div>' +
       SIDES.map(s => sideLink(s, live ? s.home : soon).replace('<a ', '<a data-plant="' + p.id + '" ')).join('') + '</div></div>';
   };
@@ -212,7 +213,7 @@ function addSideMenu() {
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
     (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
       '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
-      svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span><i aria-hidden="true">&#9656;</i></button>' +
+      svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join(''));
   // Joe 10/11: which version this is and whether it is the test copy, at the bottom of the menu (stamped by the deploy).
   nav.insertAdjacentHTML('beforeend', '<div class="side-version" title="The version of the app on this screen"></div>');
@@ -893,9 +894,9 @@ export function shortTime(v) {
 }
 
 // Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets a little smaller print, so names and values are
-// never cut off. Joe's later rule (10/10) is never to shrink table text to fit: it stops at 15px, and a cell that still does
+// never cut off. Joe's later rule (10/10) is never to shrink table text to fit: it stops at 16px (review item 56, Joe 10/13), and a cell that still does
 // not fit wraps onto a second line (.fit-wrap) instead. Headers keep their size. Runs after every redraw and on resize.
-const FIT_MIN = 15;
+const FIT_MIN = 16;
 let fitQueued = false;
 function tooWide(td) {
   // The text's laid-out width against the room inside the padding (a day cell keeps its padding for the arrow).

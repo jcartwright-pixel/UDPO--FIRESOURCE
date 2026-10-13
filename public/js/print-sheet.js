@@ -8,7 +8,7 @@ export const BASE = { orient: 'landscape', size: 'letter', margin: 'normal', fit
 // The current app's Fleet Service & Compliance Report was a portrait letter page.
 export const SHEET_DEFAULTS = { daily: { onePage: true, copies: 3 }, weekly: { onePage: true }, vacation: { margin: 'narrow' }, scheduler: { margin: 'narrow' }, fleet: { orient: 'portrait' } };
 export const PAGE_CSS = '.pl-paper{box-sizing:border-box;background:#fff;overflow:hidden;position:relative}.pl-slice{overflow:hidden;position:relative}' +
-  '.pl-wrap{margin:18px auto 6px}.pl-wrap .pl-paper{box-shadow:0 2px 10px rgba(10,40,70,.25)}.pl-no{text-align:center;font:600 13px system-ui,Arial,sans-serif;color:#40576c;margin:6px 0 0}' +
+  '.pl-wrap{margin:18px auto 6px}.pl-wrap .pl-paper{box-shadow:0 2px 10px rgba(10,40,70,.25)}.pl-no{text-align:center;font:600 16px system-ui,Arial,sans-serif;color:#40576c;margin:6px 0 0}' +
   '.pl-wrap.skip .pl-paper{opacity:.35}.pl-wrap.skip .pl-no b{color:#9b1c1c}';
 
 /* ---------- Saved setup (this computer) ---------- */

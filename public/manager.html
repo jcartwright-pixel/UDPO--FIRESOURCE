@@ -40,7 +40,7 @@
     <div class="view mc-shell">
       <section class="mc-grid" id="grid">
         <div class="mc-card mc-report" style="--accent:#c62828">
-          <div class="mc-bar"><span class="mc-ic">&#9993;</span><strong>Send Current Report</strong></div>
+          <div class="mc-bar"><strong>Send Current Report</strong></div>
           <small class="mc-desc">Emails the plant report to the Plant Managers group. Tap the preview to open the full report, edit it or add a note.</small>
           <button type="button" class="mc-preview" data-open-report aria-label="Open the full report">
             <span class="mc-subject" id="pv-subject">Loading the report…</span>
@@ -95,8 +95,9 @@
       return '<a class="mc-tile' + (kind ? ' ' + kind : '') + '" href="' + href + '" title="Open ' + escapeHtml(label) + '"><span>' + escapeHtml(label) + '</span><b' + (/[AP]M$|^None$/.test(String(n)) ? ' class="time"' : '') + '>' + escapeHtml(String(n)) +
         (unit ? '<small>' + escapeHtml(unit) + '</small>' : '') + '</b><i>' + escapeHtml(line || '') + '</i>' + (bar == null ? '' : '<u><s style="width:' + bar + '%"></s></u>') + '</a>';
     }
+    // Review item 57 (Joe 10/13): a card's heading is words only; the icon argument is no longer drawn.
     function card(icon, title, desc, href, tiles) {
-      return '<a class="mc-bar" href="' + href + '"><span class="mc-ic">' + icon + '</span><strong>' + escapeHtml(title) + '</strong><em>Open &rsaquo;</em></a><small class="mc-desc">' + escapeHtml(desc) + '</small><div class="mc-tiles">' + tiles.join('') + '</div>';
+      return '<a class="mc-bar" href="' + href + '"><strong>' + escapeHtml(title) + '</strong><em>Open</em></a><small class="mc-desc">' + escapeHtml(desc) + '</small><div class="mc-tiles">' + tiles.join('') + '</div>';
     }
 
     function build() {
