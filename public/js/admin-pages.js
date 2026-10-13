@@ -155,7 +155,7 @@ export async function renderPeople(box) {
       '<label class="ap-field">Email identity<input type="email" id="p-email" maxlength="254" value="' + e(draft.email) + '"' + (isNew ? '' : ' readonly') + '></label>' +
       '<label class="ap-field">Assigned role<select id="p-role"' + (primary ? ' disabled' : '') + '>' + roleOpts + '</select></label>' +
       '<label class="ap-field">Account status<select id="p-status"' + (primary ? ' disabled' : '') + '><option value="ACTIVE"' + (draft.status === 'ACTIVE' ? ' selected' : '') + '>Enabled</option><option value="INACTIVE"' + (draft.status !== 'ACTIVE' ? ' selected' : '') + '>Disabled</option></select></label></div>' +
-      '<div class="ap-field"><b style="color:#0b3d6b;font-size:14px">Allowed locations</b><div class="ap-checks" id="p-plants"><label><input type="checkbox" value="*"' + (draft.facilities.indexOf('*') >= 0 ? ' checked' : '') + '> All locations</label>' +
+      '<div class="ap-field"><b style="color:#0b3d6b;font-size:16px">Allowed locations</b><div class="ap-checks" id="p-plants"><label><input type="checkbox" value="*"' + (draft.facilities.indexOf('*') >= 0 ? ' checked' : '') + '> All locations</label>' +
       L.PLANTS.map(p => '<label><input type="checkbox" value="' + p.id + '"' + (draft.facilities.indexOf(p.id) >= 0 ? ' checked' : '') + '> ' + e(p.name) + (p.status !== 'ACTIVE' ? ' (being built)' : '') + '</label>').join('') +
       '</div><span class="ap-help">All locations covers every plant, including ones added later. With none ticked, an Administrator sees every plant and anyone else sees Uniontown.</span></div>' +
       '<div><b style="color:#0b3d6b">Effective Rights</b>' + (dirty ? ' <span class="ap-chip warn">Unsaved preview</span>' : '') +

@@ -32,16 +32,17 @@ export const rid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.
 // The shared screens, put in after the work orders: one work order, Who are you?, and Complete's two steps.
 function sharedScreens(safeYes) {
   return `
-        <!-- One work order: who is on it, each mechanic's clock, Start / Add another mechanic / Need Parts / Complete. -->
+        <!-- One work order: who is on it, each mechanic's clock, Start / Add another mechanic / Need Parts / Complete.
+             Review item 57 (Joe 10/13): these buttons are words only (no ▶ ⏳ ✔ ■ icons). -->
         <section id="view-job" class="gs-stack" hidden>
           <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="jobs">&larr; Work Orders</button><h2 id="job-unit"></h2></div>
           <div class="gs-card"><div class="gs-label" id="job-label"></div><div class="gs-problem" id="job-problem"></div><div class="gs-now" id="job-now"></div></div>
           <div class="gs-card gs-crew"><div class="gs-label">On this job</div><div id="crew"></div><div class="gs-label" id="crew-done"></div></div>
           <div class="gs-two">
-            <button type="button" class="gs-btn" id="job-start">&#9654; Start work</button>
-            <button type="button" class="gs-btn gray" id="job-parts">&#9203; Need Parts</button>
+            <button type="button" class="gs-btn" id="job-start">Start work</button>
+            <button type="button" class="gs-btn gray" id="job-parts">Need Parts</button>
           </div>
-          <button type="button" class="gs-btn green gs-done" id="job-done">&#10004; Complete</button>
+          <button type="button" class="gs-btn green gs-done" id="job-done">Complete</button>
         </section>
 
         <!-- Who are you? Name, then the login ID, for every step. -->
@@ -74,7 +75,7 @@ function sharedScreens(safeYes) {
           <div class="gs-yesno"><button type="button" class="gs-btn green" data-safe="yes">${escapeHtml(safeYes)}</button><button type="button" class="gs-btn line" data-safe="no">No, still down</button></div>
           <div class="gs-label" id="sign-line">Sign with your finger</div>
           <div class="gs-sigbox"><button type="button" class="gs-btn dark" id="sig-clear">Clear</button><canvas id="sig"></canvas></div>
-          <button type="button" class="gs-btn green" id="finish">&#10004; Complete Work Order</button>
+          <button type="button" class="gs-btn green" id="finish">Complete Work Order</button>
         </section>
 `;
 }
@@ -138,13 +139,13 @@ export function mountJobStation(cfg) {
     $('job-problem').textContent = cfg.problem(j);
     $('job-now').textContent = j.status === 'PARTS' ? 'Waiting on parts' : '';
     $('crew').innerHTML = j.onNow.map(p => '<div class="gs-clock"><i>' + escapeHtml(p.name.slice(0, 1)) + '</i><b>' + escapeHtml(p.name) + '</b><span class="t">' + clock(p.since) + '</span>' +
-      '<button type="button" class="gs-btn dark" data-stop="' + escapeHtml(p.id) + '">&#9632; Stop</button></div>').join('') || '<p class="gs-hint">Nobody is on this job right now.</p>';
+      '<button type="button" class="gs-btn dark" data-stop="' + escapeHtml(p.id) + '">Stop</button></div>').join('') || '<p class="gs-hint">Nobody is on this job right now.</p>';
     const done = {}; (j.labor || []).forEach(s => { done[s.name] = (done[s.name] || 0) + s.minutes; });
     const list = Object.keys(done);
     $('crew-done').textContent = list.length ? 'Time so far: ' + list.map(n => first(n) + ' ' + hm(done[n])).join(', ') + (list.length > 1 ? ' · total ' + hm(j.laborMinutes) : '') : '';
-    $('job-start').innerHTML = j.onNow.length ? '&#128101; Add another mechanic' : '&#9654; Start work';
+    $('job-start').innerHTML = j.onNow.length ? 'Add another mechanic' : 'Start work';
     $('job-start').hidden = j.status === 'PARTS';
-    $('job-parts').innerHTML = j.status === 'PARTS' ? '&#9203; Parts are here' : '&#9203; Need Parts';
+    $('job-parts').innerHTML = j.status === 'PARTS' ? 'Parts are here' : 'Need Parts';
   }
   $('job-start').addEventListener('click', () => ask(open.onNow.length ? 'helper' : 'start', open));
   $('job-parts').addEventListener('click', () => ask(open.status === 'PARTS' ? 'resume' : 'parts', open));

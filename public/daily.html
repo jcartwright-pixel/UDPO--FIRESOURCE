@@ -29,10 +29,11 @@
     </div>
     <div class="head">
       <div class="title"><h1>Daily Dispatch</h1></div>
+      <!-- Review item 57 (Joe 10/13): the buttons are words only (no printer or truck icons). -->
       <div class="actions in-head">
         <a class="button" id="go-weekly" href="weekly.html">Weekly Dispatch</a>
-        <button type="button" class="primary" id="print-sheet">&#9635; Print Dispatch Sheet</button>
-        <button type="button" class="warn" id="open-down">&#128667; Down Trucks / Trailers</button>
+        <button type="button" class="primary" id="print-sheet">Print Dispatch Sheet</button>
+        <button type="button" class="warn" id="open-down">Down Trucks / Trailers</button>
         <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
         <button type="button" class="primary" id="open-calloff">Driver Call-Off</button>
         <button type="button" class="primary" id="open-add">+ Add Route / Run</button>
@@ -444,7 +445,7 @@
         '<div class="move-act"><button type="button" class="primary" data-move-run disabled>Move Route</button><span>Driver, truck and trailer come off when it moves.</span></div>' +
         '<label class="wide">Driver notes<textarea data-field="note" maxlength="500"' + (row.off ? ' disabled' : '') + '>' + escapeHtml(show(row.driverNotes)) + '</textarea></label>' +
         '<label class="wide check"><input type="checkbox" data-field="ovr"' + (ovr[row.id] ? ' checked' : '') + '> OVR: offer drivers who are off and units that are down</label>' +
-        '</div><div class="modal-actions"><button type="button" data-print-one>&#9635; Print Dispatch</button><button type="button" class="primary" data-close>Close</button></div>';
+        '</div><div class="modal-actions"><button type="button" data-print-one>Print Dispatch</button><button type="button" class="primary" data-close>Close</button></div>';
       box.querySelector('[data-close]').onclick = closeModals;
       box.querySelector('[data-print-one]').onclick = () => printSheet(); // the current app printed the whole sheet from here
       const move = box.querySelector('[data-move]'), moveBtn = box.querySelector('[data-move-run]');
