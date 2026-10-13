@@ -50,5 +50,53 @@ body.dr-loadout .dr-board td { font-size: 22px; padding: 12px 14px; } body.dr-lo
   .dr-side { width: auto; overflow: visible; }
   body.dr-page { height: auto; overflow: visible; overflow-x: hidden; }
 }
-/* The Check-In and DVIR phone screens, opened from the Driver Room tablet (route.html?room=1): larger on a tablet. */
-@media (min-width: 900px) { body.phone.room { zoom: 1.4; } }
+/* The Check-In and DVIR phone screens, opened from the Driver Room tablet (route.html?room=1). Joe 10/13 (photo of the
+   Uniontown tablet): on a landscape tablet they use the whole width instead of the phone column, so the three choices and
+   the whole Check-In show without scrolling. The drivers' phones keep the phone layout. */
+@media (min-width: 700px) and (orientation: landscape) {
+  /* (as specific as the phone-column rule in stations.css, which this comes after) */
+  html:has(body.phone.room:not(.gs-page):not(.ps-page):not(.ds-page)) { background: var(--bg, #f2f5f9); }
+  body.phone.room:not(.gs-page):not(.ps-page):not(.ds-page) { max-width: none; margin: 0; box-shadow: none; }
+  body.room .phone-top { padding: 10px 20px; }
+  body.room .phone-top b { font-size: 20px; }
+  body.room .phone-card { margin: 12px 16px; padding: 14px 18px; }
+  /* The small grey words a little bigger on the tablet. */
+  body.room .phone-card label { font-size: 15px; }
+  body.room .phone-card .drv-card small, body.room .phone-load small { font-size: 15px; }
+  /* The three choices side by side, big enough for a finger. */
+  body.room #step-menu .drv-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  body.room #step-menu .drv-choices .drv-card { min-height: 170px; align-content: center; padding: 20px 24px; }
+  body.room #step-menu .drv-choices .drv-card b { font-size: 32px; }
+  body.room #step-menu .drv-choices .drv-card small { font-size: 18px; }
+  body.room #step-menu .drv-hint { font-size: 17px; }
+  /* Who is driving: one comfortable column in the middle. */
+  body.room #step-name { width: min(640px, calc(100% - 32px)); margin: 24px auto; box-sizing: border-box; }
+  /* The loads: several to a row. */
+  body.room #step-loads .drv-menu { grid-template-columns: repeat(2, minmax(0, 320px)); }
+  body.room .phone-days { grid-template-columns: repeat(auto-fill, minmax(180px, 240px)); }
+  body.room #loads { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  body.room #loads .phone-load { margin-top: 0; }
+  body.room #loads .phone-empty { grid-column: 1 / -1; }
+  /* The Check-In in three columns, title on top, Back and Check In along the bottom. */
+  body.room #step-form { display: block; column-count: 3; column-gap: 24px; }
+  body.room #step-form .phone-grid { display: contents; }
+  body.room #step-form > *, body.room #step-form .phone-grid > * { break-inside: avoid; margin: 0 0 10px; }
+  body.room #step-form > h1, body.room #step-form > .phone-buttons, body.room #step-form > .send-error { column-span: all; }
+  body.room #step-form > .phone-buttons { margin: 4px 0 0; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+  body.room #step-form .ci-os-box { margin-top: 8px; }
+  /* Fixed columns, so nothing jumps across when a box opens: units, cases and the loaded question; over / short, refused
+     and the truck; the trailer, pallet jack, cleaning and notes. */
+  body.room #step-form .ci-os, body.room #step-form .ci-issue:has([data-issue="trailerIssues"]) { break-before: column; }
+  /* The unit numbers fit their boxes: no list arrow (the list still shows while typing). */
+  body.room .ci-units input::-webkit-calendar-picker-indicator { display: none !important; }
+  body.room .drv-board { height: max(200px, calc(100vh - 275px)); }
+}
+/* A big tablet (1280 wide): everything a little larger. */
+@media (min-width: 1180px) and (min-height: 640px) and (orientation: landscape) {
+  body.phone.room { zoom: 1.12; min-height: calc(100dvh / 1.12); }
+  body.room .drv-board { height: max(200px, calc(100vh / 1.12 - 275px)); }
+}
+@media (min-width: 700px) and (max-width: 940px) and (orientation: landscape) {
+  body.room #step-form { column-count: 2; }
+  body.room #step-form .ci-os, body.room #step-form .ci-issue:has([data-issue="trailerIssues"]) { break-before: auto; }
+}

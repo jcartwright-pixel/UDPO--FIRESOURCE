@@ -69,6 +69,9 @@
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import * as W from './js/weather.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
+    import { fullScreenOnTap } from './js/full-screen.js';
+
+    fullScreenOnTap();
 
     // The current app's Driver Room board and TV (DriverLoadoutPickup.html, 052_V749). Read only. In the new app it opens with a
     // United Dairy sign-in (no branch code); "Driver Room TV" is the old DISPLAY mode: dark, no menu, notes shown, both lists roll.
@@ -76,7 +79,14 @@
     const params = new URLSearchParams(location.search);
     // Joe 10/10: the Driver Room board opens as the old Driver Room display: both lists roll and the weather window sits on the
     // right. ?tv=1 is the TV itself (no header); ?view=desk is the plain list for the office.
-    const full = params.get('tv') === '1', tv = full || params.get('view') !== 'desk';
+    const full = params.get('tv') === '1', tv = full || params.get('view') !== 'desk', forRoom = params.get('for') === 'room';
+    // The code screen's own heading (setUp('') puts the loadout heading back once the code is in).
+    const loadHead = document.querySelector('.head .title h1').innerHTML;
+    function setUp(which) {
+      document.getElementById('eyebrow').textContent = which ? 'Set up this screen' : tv ? "Driver's Kiosk Station" : 'Driver Loadout & Pickup';
+      document.querySelector('.head .title h1').innerHTML = which ? escapeHtml(which) : loadHead;
+      ['tv', 'refresh'].forEach(id => { document.getElementById(id).hidden = !!which; });
+    }
     document.body.classList.toggle('ds-tv', tv);
     document.body.classList.toggle('ds-full', full);
     // Joe 10/12: a kiosk with a code stays put; Back and Home ask for the manager release code first (see leave()).
@@ -160,8 +170,15 @@
       const show = (asking) => { document.getElementById('code-box').hidden = !asking; document.getElementById('ds-grid').hidden = asking; document.getElementById('foot').hidden = asking; };
       if (r.needCode) {
         kiosk = null; lockStation(document.getElementById('change'), false); show(true);
+        // Joe 10/13: the code screen is only for setting a screen up. It names only the station the link is for (the TV, the
+        // Driver Room tablet, or either on the plain link), with no loadout title, Desk view or Refresh.
+        const which = forRoom ? 'Driver Room Check-In Station' : full ? 'Driver\'s Kiosk Station' : 'Driver Station';
+        setUp(which);
         kiosk = await askCode(document.getElementById('code-box'), { kind: 'KIOSK', storeKey: CODE_KEY, call: stationCall, title: 'Enter this station\'s code',
-          hint: 'Type the code of the Driver\'s Kiosk Station (the TV) or the Driver Room Check-In Station (the drivers\' tablet) from Administration > Driver Station Codes. It remembers it after this.', message: r.message });
+          hint: forRoom ? 'Type the Driver Room Check-In Station code (the drivers\' tablet) from Administration > Driver Station Codes. It remembers it after this.'
+            : full ? 'Type the Driver\'s Kiosk Station code (the TV) from Administration > Driver Station Codes. It remembers it after this.'
+            : 'Type this screen\'s code from Administration > Driver Station Codes. It remembers it after this.', message: r.message });
+        setUp('');
       } else kiosk = r.station || null;
       // Joe 10/12: one Driver Station link; the code decides the screen. A TV's code opens the TV display (no buttons, both
       // lists rolling), also when the TV reopens the plain link later.
@@ -187,9 +204,8 @@
     document.getElementById('change').addEventListener('click', async () => {
       if (!(await release())) return;
       kiosk = null; remember(CODE_KEY, null);
-      // The TV goes to the plain Driver Station link (the code screen, with Back and Home).
-      if (full) { location.replace(location.pathname); return; }
-      gate().catch(err => showError(err.message));
+      // Joe 10/13: Release goes to the normal Home menu (same window), not back to the code screen.
+      location.replace('index.html');
     });
     // A TV with no code: Exit goes to the plain Driver Station link. A coded TV leaves only by Release at the bottom.
     document.getElementById('tv-exit').hidden = !full;

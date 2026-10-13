@@ -3,7 +3,7 @@
  * Browser check of station codes (Joe 10/12, like the current app): Administration > Plant Station Codes, Garage Station
  * Codes and Driver Station Codes each show one link and a list of stations; + Add makes a station and Create code gives it
  * its own code. On a tablet, the Plant Station, Garage Station and Driver Room kiosk then ask for a code, open that station
- * when it is typed, and Release at the bottom (manager release code) sends them back to the code screen. Pictures at Joe's 1536 width go to SHOTS_DIR.
+ * when it is typed, and Release in the bottom-right corner (manager release code) sends them to the Home menu. Pictures at Joe's 1536 width go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -35,16 +35,19 @@ async function openPage(browser, width, height, url) {
 const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, name) }); };
 // Administration pictures: the top of the page (the links), then scrolled to the stations.
 const twoShots = async (p, name) => { await p.$eval('#view .ap-scroll', el => { el.scrollTop = 0; }); await shot(p, name + '-top-1536.png'); await p.$eval('#st-list', el => el.scrollIntoView()); await shot(p, name + '-stations-1536.png'); };
-// Joe 10/12: a coded station has no Back, Home or Sign out; its one way out is the Release bar at the very bottom. Pictures of
+// Joe 10/12: a coded station has no Back, Home or Sign out; its one way out is Release, a small button in the bottom-right corner (Joe 10/13). Pictures of
 // it at 1024 (tablet) and 1920 go to SHOTS_DIR as station-<name>-<width>.png.
 async function locked(p, sel, name) {
   for (const gone of ['#go-back', '#go-home', '#signout']) assert.equal(await p.isVisible(gone), false, gone + ' is not on a station');
   assert.equal((await p.textContent(sel)).trim(), 'Release');
-  const box = await p.$eval(sel, el => { const r = el.getBoundingClientRect(); return { bottom: r.bottom, width: r.width }; });
+  // Joe 10/13 "the release needs just to be a little small, in the bottom right": a small button in the corner (text 16px or more,
+  // big enough to tap) that covers nothing: the screen stops above it.
+  const box = await p.$eval(sel, el => { const r = el.getBoundingClientRect(); return { bottom: r.bottom, right: r.right, width: r.width, height: r.height, font: parseFloat(getComputedStyle(el).fontSize) }; });
   const size = p.viewportSize();
-  assert.ok(Math.abs(box.bottom - size.height) < 1 && box.width >= size.width - 1, 'Release is a bar along the very bottom');
+  assert.ok(size.height - box.bottom < 20 && size.width - box.right < 20 && box.width < size.width / 3, 'Release is a small button in the bottom-right corner ' + JSON.stringify(box));
+  assert.ok(box.font >= 16 && box.height >= 40, 'Release reads at 16px or more and is easy to tap ' + JSON.stringify(box));
   if (SHOTS && name) {
-    for (const [w, h] of [[1024, 768], [1920, 1080]]) { await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(300); await shot(p, 'station-' + name + '-' + w + '.png'); }
+    for (const [w, h] of [[1024, 768], [1280, 800], [1920, 1080]]) { await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(300); await shot(p, 'station-' + name + '-' + w + '.png'); }
     await p.setViewportSize(size);
   }
 }
@@ -107,7 +110,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     results.push('Driver Station Codes: one Driver Station link, its stations under it (+ Add Station, more than one per plant), then the drivers\' phone link');
 
     // The Plant Station tablet: the code screen, a wrong code, the right one opens Case Loadout; Release stays put until the
-    // plant has a manager release code (Joe 10/12: no Back, Home or Sign out; Release at the very bottom is the only way out).
+    // plant has a manager release code (Joe 10/12: no Back, Home or Sign out; Release in the bottom-right corner is the only way out).
     const ps = await openPage(browser, 1536, 864, '/plant-station.html' + ADMIN);
     await ps.waitForSelector('#code-box form.st-code');
     assert.equal(await ps.isVisible('#pick'), false, 'no station list once the plant has codes');
@@ -129,7 +132,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.match(await ps.textContent('#error'), /stays here until the plant has a manager release code/);
     assert.equal(await ps.textContent('#title'), 'Case Loadout', 'no release code: the station stays');
     assert.deepEqual(ps.errors, []);
-    results.push('Plant Station: asks for the code, opens that station, remembers it; no Back, Home or Sign out; Release at the bottom refuses until a manager release code is set');
+    results.push('Plant Station: asks for the code, opens that station, remembers it; no Back, Home or Sign out; Release in the bottom-right corner refuses until a manager release code is set');
 
     // Joe 10/12: the Plant Station with no UD account (the old app's public Plant Station), Off until an administrator turns
     // it On; then the station's code alone opens that station and its screens. Turn Off shuts the tablet out.
@@ -187,11 +190,13 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.match(await gs.textContent('#gs-message'), /stays here until the plant has a manager release code/);
     assert.ok(await gs.isVisible('[data-tech]'), 'no release code: the garage station stays');
     assert.deepEqual(gs.errors, []);
-    results.push('Garage Station: asks for the garage code, then the work orders; no Back or Home; Release at the bottom refuses until a manager release code is set');
+    results.push('Garage Station: asks for the garage code, then the work orders; no Back or Home; Release in the bottom-right corner refuses until a manager release code is set');
 
     const ds = await openPage(browser, 1536, 864, '/driver-station.html' + ADMIN);
     await ds.waitForSelector('#code-box form.st-code');
     await shot(ds, '7-driver-kiosk-code-screen-1536.png');
+    assert.equal(await ds.textContent('.head h1'), 'Driver Station', 'the code screen is a plain setup screen, not the loadout');
+    assert.equal(await ds.isVisible('#tv'), false);
     await ds.fill('#code-box input', codes.kiosk);
     // Joe 10/12 "I didn't want the Driver Room TV, it is showing the kiosk": the Driver Room tablet's code typed on the
     // Driver Station link opens the drivers' Check-In page (View Loadout, DVIR, Check-In), which keeps the code.
@@ -237,8 +242,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await tv.waitForSelector('#eyebrow:text("Driver\'s Kiosk Station · Uniontown")');
     results.push('Driver Room TV: its code on the one Driver Station link opens the full-screen TV board, also when reopened; no Sign out or Exit, and Release refuses until a manager release code is set');
 
-    // Joe 10/12: the TV's Release at the bottom, with the plant's manager release code, unattaches the TV and goes to the code
-    // screen (with Back and Home). A wrong code keeps the TV board; Cancel keeps it too.
+    // Joe 10/12: the TV's Release in the bottom-right corner, with the plant's manager release code, unattaches the TV and goes to the Home
+    // menu (Joe 10/13). A wrong code keeps the TV board; Cancel keeps it too.
     const release = (await require('../../src/admin').adminCall(db(), { email: 'admin.test@uniteddairy.com' }, { op: 'releaseCodeNew', facilityId: 'fac_uniontown' })).code;
     assert.equal(await tv.isVisible('.topbar'), false);
     await tv.click('#change');
@@ -251,13 +256,10 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await tv.waitForFunction(() => /\S/.test(document.querySelector('.ps-release-msg').textContent) && !/Checking/.test(document.querySelector('.ps-release-msg').textContent));
     assert.match(tv.url(), /tv=1/);
     await tv.fill('#release-box input', release);
-    await Promise.all([tv.waitForURL(u => !/tv=1/.test(String(u))), tv.click('#release-box button[type=submit]')]);
-    await tv.waitForSelector('#code-box form.st-code');
-    assert.equal(await tv.isVisible('#go-back'), true);
-    assert.equal(await tv.isVisible('#go-home'), true);
-    assert.equal(await tv.isVisible('#tv-exit'), false);
-    assert.equal(await tv.isVisible('#change'), false, 'released: no Release bar');
-    results.push('Driver Room TV: Release asks for the manager release code (Cancel and a wrong code keep the TV), the right code unattaches it to the code screen with Back and Home');
+    // Joe 10/13 "when I released this ... it went out too": the right code goes to the normal Home menu, and the TV forgets its code.
+    await Promise.all([tv.waitForURL(/index\.html$/), tv.click('#release-box button[type=submit]')]);
+    assert.equal(await tv.evaluate(() => localStorage.getItem('udKioskCode')), null);
+    results.push('Driver Room TV: Release asks for the manager release code (Cancel and a wrong code keep the TV), the right code unattaches it and goes to the normal Home menu');
 
     // The Driver Room kiosk tablet: Release asks for the release code; Cancel keeps it, the right code frees it.
     await ds.click('#m-station');
@@ -266,29 +268,33 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await ds.isVisible('#m-checkin'), true);
     await ds.click('#m-station');
     await ds.fill('#release-box input', release);
-    await Promise.all([ds.waitForURL(/driver-station\.html$/), ds.click('#release-box button[type=submit]')]);
-    await ds.waitForSelector('#code-box form.st-code');
+    await Promise.all([ds.waitForURL(/index\.html$/), ds.click('#release-box button[type=submit]')]);
     assert.equal(await ds.evaluate(() => localStorage.getItem('udRoomStation')), null);
     assert.equal(await ds.evaluate(() => localStorage.getItem('udKioskCode')), null, 'the existing link forgets it too');
     assert.deepEqual(tv.errors, []);
-    results.push('Driver Room kiosk: Release asks for the manager release code (Cancel keeps it), then the tablet forgets its code');
+    // Opened again to set it up, the Check-In Station's code screen names only that station: no loadout title, Desk view or Refresh.
+    await ds.goto(HOSTING + '/route.html?room=1');
+    await ds.waitForURL(/driver-station\.html\?for=room$/);
+    await ds.waitForSelector('#code-box form.st-code');
+    assert.equal(await ds.textContent('.head h1'), 'Driver Room Check-In Station');
+    assert.doesNotMatch(await ds.textContent('#code-box'), /Kiosk|TV/);
+    assert.equal(await ds.isVisible('#tv'), false);
+    assert.equal(await ds.isVisible('#refresh'), false);
+    await shot(ds, '7b-driver-room-setup-code-screen-1536.png');
+    results.push('Driver Room kiosk: Release asks for the manager release code (Cancel keeps it), then the tablet forgets its code and goes Home; set up again, its code screen names only the Check-In Station');
 
     // The Plant Station and the Garage Station: Release with the manager release code frees them to the code screen.
     await ps.click('#change');
     await ps.waitForSelector('#release:not([hidden])');
     await ps.fill('#release-code', release);
-    await ps.click('#release-go');
-    await ps.waitForSelector('#code-box form.st-code');
-    assert.equal(await ps.isVisible('#change'), false);
+    assert.deepEqual(ps.errors, []);
+    await Promise.all([ps.waitForURL(/index\.html$/), ps.click('#release-go')]);
     await gs.click('#gs-change');
     await gs.waitForSelector('#gs-release form');
     await gs.fill('#gs-release input', release);
-    await gs.click('#gs-release button[type=submit]');
-    await gs.waitForSelector('#view-code form.st-code');
-    assert.equal(await gs.isVisible('#gs-change'), false);
-    assert.deepEqual(ps.errors, []);
     assert.deepEqual(gs.errors, []);
-    results.push('Plant Station and Garage Station: Release with the manager release code frees the tablet to the code screen');
+    await Promise.all([gs.waitForURL(/index\.html$/), gs.click('#gs-release button[type=submit]')]);
+    results.push('Plant Station and Garage Station: Release with the manager release code frees the tablet to the normal Home menu');
   } finally {
     await browser.close();
   }

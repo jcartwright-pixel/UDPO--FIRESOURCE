@@ -4,7 +4,7 @@
  * Room kiosk station's code (a TV's code is refused), then shows the drivers' phone screens in Driver Room mode (Joe 10/12:
  * "the driver's phone is exactly how this should look"): View Loadout, DVIR, Check-In; Done signs out, and 5 minutes with no
  * taps signs out and shows the rolling View Loadout.
- * No Back, Home or Sign out: Release at the very bottom asks for the manager release code (Joe 10/12 "Station"). Pictures at 1920 and tablet 1024 go to SHOTS_DIR.
+ * No Back, Home or Sign out: Release, a small button in the bottom-right corner, asks for the manager release code (Joe 10/12 "Station"). Pictures at 1920 and tablet 1024 go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -128,27 +128,28 @@ async function touchPage(browser, width, height, url, mobile) {
       await p.click('#board-track');
       await p.waitForSelector('#step-menu:not([hidden])');
       results.push('Driver Room ' + tag + ': with no United Dairy sign-in the tablet goes to the Driver Station Google sign-in; signed in, the Check-In Station code opens the phone screens (View Loadout, DVIR, Check-In) with no Back, Home or Sign out; Check-In and DVIR ask the name; Done signs out, Back keeps him; View Loadout needs no name and a tap brings back the choices');
-      // Release is a bar along the very bottom on every Driver Room screen, the rolling View Loadout too; from there it brings
+      // Release is a small button in the bottom-right corner on every Driver Room screen, the rolling View Loadout too; from there it brings
       // back the three choices with the release code box (Cancel keeps the tablet).
       assert.equal((await p.textContent('#m-station')).trim(), 'Release');
       await p.click('#m-board');
       await p.waitForSelector('#step-board:not([hidden])');
-      const bar = await p.$eval('#m-station', el => el.getBoundingClientRect().bottom);
-      assert.ok(Math.abs(bar - p.viewportSize().height) < 1, 'Release sits at the very bottom');
+      const bar = await p.$eval('#m-station', el => { const r = el.getBoundingClientRect(); return { bottom: r.bottom, right: r.right, width: r.width }; });
+      const vp = p.viewportSize();
+      assert.ok(vp.height - bar.bottom < 20 && vp.width - bar.right < 20 && bar.width < vp.width / 3, 'Release is a small button in the bottom-right corner (Joe 10/13)');
       await p.click('#m-station');
       await p.waitForSelector('#step-menu:not([hidden]) #release-box form');
       await shot(p, 'driver-room-9-release-' + tag + '.png');
       await p.click('#release-box [data-cancel]');
       assert.equal(await p.isVisible('#m-checkin'), true);
-      results.push('Driver Room ' + tag + ': Release sits at the very bottom on every screen; from View Loadout it brings back the choices and asks for the release code; Cancel keeps the tablet');
+      results.push('Driver Room ' + tag + ': Release is a small button in the bottom-right corner on every screen; from View Loadout it brings back the choices and asks for the release code; Cancel keeps the tablet');
       if (tag === '1920') {
         // Release with the manager release code.
         await p.click('#m-station');
         await p.fill('#release-box input', release);
-        await Promise.all([p.waitForURL(/driver-station\.html$/), p.click('#release-box button[type=submit]')]);
-        await p.waitForSelector('#code-box form.st-code');
+        // Joe 10/13: Release goes to the normal Home menu, not the code screen.
+        await Promise.all([p.waitForURL(/index\.html$/), p.click('#release-box button[type=submit]')]);
         assert.equal(await p.evaluate(() => localStorage.getItem('udRoomStation')), null);
-        results.push('Driver Room: Release asks for the manager release code, then back to the Driver Station code screen (still signed in)');
+        results.push('Driver Room: Release asks for the manager release code, then goes to the normal Home menu (still signed in)');
       }
       assert.deepEqual(p.errors, []);
       await p.close();
@@ -248,6 +249,72 @@ async function touchPage(browser, width, height, url, mobile) {
       await tab.context().close();
     }
     results.push('Check-In and DVIR scroll by finger on a phone (390) and tablets (600, 800, 1024), from the phone link and the Driver Room tablet');
+
+    // Joe 10/13 (photo of the Uniontown tablet in landscape): the Driver Room Check-In Station uses the tablet's whole width,
+    // not the phone column. The three choices sit in one row, and the whole Check-In (with "Was your truck loaded correctly?"
+    // answered No and its box open) shows above the Release bar with no scrolling on 1024 and 1280 landscape tablets; on
+    // 800 it is two columns and scrolls by finger. The drivers' phone link keeps its phone column.
+    {
+      const L = require('../../src/logic');
+      const today = L.operatingDay(new Date()), pf = L.dayPrefix(today), wk = L.weekStart(today);
+      await db().collection('runs').doc(wk + '__run_land801').set({ weekStart: wk, route: '811', run: 'LANDSCAPE', routeId: 'rte_land811', runId: 'run_land801', rev: 0,
+        days: { [pf]: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', truck: '900001', trailer: 'T-811' } } });
+      for (const [w, h] of [[1280, 680], [1024, 600], [800, 480]]) {
+        const tab = await touchPage(browser, w, h, '/driver-station.html' + SIGNED);
+        await tab.waitForSelector('#code-box form.st-code');
+        await tab.fill('#code-box input', kiosk);
+        await tab.click('#code-box button');
+        await tab.waitForURL(/route\.html\?room=1$/);
+        await tab.waitForSelector('#step-menu:not([hidden]) #m-checkin');
+        const fit = () => tab.evaluate(() => ({ card: Math.max(...[...document.querySelectorAll('.phone-card:not([hidden])')].map(c => c.getBoundingClientRect().bottom)),
+          bar: document.getElementById('m-station').getBoundingClientRect().top, side: document.scrollingElement.scrollWidth - innerWidth, body: document.body.getBoundingClientRect().width }));
+        // Joe 10/13 "filling the whole screen": in a Chrome tab the first tap puts the station full screen.
+        assert.equal(await tab.evaluate(() => !!document.fullscreenElement), false);
+        await tab.click('#step-menu h1');
+        await tab.waitForFunction(() => document.fullscreenElement === document.documentElement);
+        let f = await fit();
+        assert.ok(f.body >= w - 1, 'the station uses the whole width at ' + w);
+        const tops = await tab.$$eval('#step-menu .drv-card', b => b.map(x => Math.round(x.getBoundingClientRect().top)));
+        assert.equal(new Set(tops).size, 1, 'the three choices in one row at ' + w);
+        assert.ok(f.card <= f.bar && f.side <= 0, 'the choices show above Release at ' + w);
+        await shot(tab, 'room-landscape-choices-' + w + '.png');
+        await tab.click('#m-checkin');
+        await tab.waitForSelector('#step-name:not([hidden]) #name option[value="drv_test_casey"]', { state: 'attached' });
+        await tab.selectOption('#name', 'drv_test_casey');
+        await tab.click('#step-name button[type=submit]');
+        await tab.click('.phone-load:has(b:text-is("811"))');
+        await tab.waitForSelector('#step-form:not([hidden])');
+        await tab.click('.ci-loaded label:has([value=NO])');
+        await tab.waitForSelector('.ci-loaded-box:not([hidden])');
+        f = await fit();
+        assert.ok(f.side <= 0, 'no side scroll on the Check-In at ' + w);
+        if (w >= 1024) assert.ok(f.card <= f.bar, 'the whole Check-In shows above Release at ' + w + ' (' + Math.round(f.card) + ' > ' + Math.round(f.bar) + ')');
+        else assert.ok(await swipe(tab) > 50, 'the Check-In scrolls by finger at ' + w);
+        await shot(tab, 'room-landscape-checkin-' + w + '.png');
+        assert.deepEqual(tab.errors, []);
+        await tab.context().close();
+      }
+      const ph = await openPage(browser, 1024, 600, '/route.html');
+      await ph.waitForSelector('#step-code:not([hidden])');
+      assert.equal(await ph.evaluate(() => Math.round(document.body.getBoundingClientRect().width)), 460, 'the drivers\' phone link keeps its phone column');
+      // A computer with a mouse is left alone: a click there never goes full screen.
+      await ph.click('#step-code h1, #step-code b');
+      await ph.waitForTimeout(300);
+      assert.equal(await ph.evaluate(() => !!document.fullscreenElement), false, 'a click with a mouse does not go full screen');
+      await ph.close();
+      // Every other tablet and phone screen does the same on its first tap: the drivers' phones, the Plant, Garage and
+      // Maintenance Stations, the Driver Station link (TV and Driver Room) and the plant TV.
+      for (const url of ['/route.html', '/plant-station.html' + SIGNED, '/garage-station.html' + SIGNED, '/maint-station.html' + SIGNED,
+        '/driver-station.html' + SIGNED, '/plant-kiosk.html' + SIGNED]) {
+        const t = await touchPage(browser, 800, 1280, url, true);
+        await t.waitForTimeout(1500);
+        await t.locator('h1:visible, h2:visible, header b:visible, .phone-top b:visible').first().click();
+        await t.waitForFunction(() => document.fullscreenElement === document.documentElement, null, { timeout: 5000 })
+          .catch(() => assert.fail(url + ': the first tap did not go full screen'));
+        await t.context().close();
+      }
+      results.push('Driver Room landscape tablet (1280, 1024, 800): the first tap in a Chrome tab puts it full screen; the whole width is used; the three choices in one row; the whole Check-In with the loaded-wrong box open shows above Release at 1024 and 1280 and scrolls by finger at 800; the phone link keeps its phone column; every station, TV and phone screen goes full screen on the first tap, a computer with a mouse never');
+    }
   } finally {
     await browser.close();
   }
