@@ -12,6 +12,7 @@ const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
+const G = require('../fixtures/garage-demo');
 const localCalls = require('./local-calls.cjs');
 
 const HOSTING = 'http://127.0.0.1:5000';
@@ -82,6 +83,7 @@ async function kept(page, files) {
       await page.click(at + ' [data-act="start"]');
       await page.waitForFunction(() => /Saved on this tablet, will send when you have signal\. Waiting: 1/.test(document.getElementById('offline-line').textContent), null, { timeout: 10000 });
       assert.equal(await page.isVisible('#error'), false, 'no error with no signal: it is saved on the tablet');
+      await page.evaluate(() => window.scrollTo(0, 0));
       await shot(page, 'station-offline-plant-saved-1024.png');
       assert.equal((await db().collection('runs').doc('2026-10-04__run_p811').get()).data().days.fri.loadStatus || '', '', 'nothing reached the server yet');
       results.push('Plant Station: with no signal it opens from the tablet with its loads, and Start is kept on the tablet with "Saved on this tablet ... Waiting: 1"');
@@ -114,12 +116,50 @@ async function kept(page, files) {
       await offline(true);
       await page.reload();
       await page.waitForSelector('#screen:not([hidden])', { timeout: 20000 });
-      await page.waitForFunction(() => /No signal · last board from/.test(document.getElementById('foot').textContent), null, { timeout: 20000 });
-      const after = await page.$$eval('.ds-row:not(.ds-headrow)', r => r.length);
-      assert.equal(after, before, 'the same board as before the signal went');
+      await page.waitForFunction((n) => document.querySelectorAll('.ds-row:not(.ds-headrow)').length === n, before, { timeout: 20000 }).catch(() => {});
+      assert.equal(await page.$$eval('.ds-row:not(.ds-headrow)', r => r.length), before, 'the same board as before the signal went');
+      assert.match(await page.textContent('#foot'), /No signal · last board from/);
       await shot(page, 'station-offline-tv-1024.png');
       assert.deepEqual(errors, []);
       results.push('Driver\'s Kiosk Station: with no signal it opens from the tablet and shows the last board, saying when it was from');
+      await ctx.close();
+    }
+
+    // ---- Garage Station: the last list stays, a Start with a mechanic's name and login ID waits on the tablet.
+    await clear();
+    await runTransfer({ db: db(), reader: F.fakeReader(G.sheets()), sources: G.SOURCES, now: () => new Date() });
+    {
+      const { ctx, page, errors, offline } = await tablet(browser);
+      await page.goto(HOSTING + '/garage-station.html' + MANAGER);
+      await page.waitForFunction(() => /900001/.test(document.getElementById('jobs').textContent), null, { timeout: 15000 });
+      await page.waitForTimeout(6500);
+      await kept(page, ['garage-station.html', 'js/offline-saves.js', 'js/station-code.js']);
+      await offline(true);
+      await page.reload();
+      await page.waitForFunction(() => /900001/.test(document.getElementById('jobs').textContent), null, { timeout: 20000 });
+      assert.match(await page.textContent('#offline-line'), /No signal\. What you enter is saved on this tablet/);
+      await page.click('.gs-job:has-text("900001") button');
+      await page.waitForSelector('#view-job:not([hidden])');
+      await page.click('#job-start');
+      await page.waitForSelector('#view-sign:not([hidden])');
+      await page.click('[data-who="TECH-JT"]');
+      for (const k of '48213') await page.click('[data-key="' + k + '"]');
+      await page.click('[data-key="go"]');
+      await page.waitForFunction(() => /JELLICK Tom: saved on this tablet/.test(document.getElementById('gs-message').textContent), null, { timeout: 10000 });
+      assert.match(await page.textContent('#offline-line'), /Saved on this tablet, will send when you have signal\. Waiting: 1/);
+      await shot(page, 'station-offline-garage-saved-1024.png');
+      assert.equal((await db().collection('workOrders').where('unit', '==', '900001').get()).size, 0, 'nothing reached the server yet');
+      results.push('Garage Station: with no signal it opens from the tablet with the last work orders; Start with name and login ID is kept with "Saved on this tablet"');
+      await offline(false);
+      await page.waitForSelector('#offline-line.ok', { timeout: 40000 });
+      const wos = (await db().collection('workOrders').where('unit', '==', '900001').get()).docs.map(d => d.data());
+      assert.equal(wos.length, 1, 'one work order');
+      assert.deepEqual([wos[0].status, wos[0].techs], ['WORKING', 'JELLICK Tom']);
+      await page.waitForFunction(() => /On it now: Tom/.test(document.getElementById('jobs').textContent), null, { timeout: 15000 });
+      assert.equal(await page.isVisible('#gs-message'), false, 'the "saved on this tablet" note goes once it is sent');
+      await shot(page, 'station-offline-garage-sent-1024.png');
+      assert.deepEqual(errors, []);
+      results.push('Garage Station: signal back, the Start is sent once and checked by Tom\'s login ID; 900001 is WORKING with Tom');
       await ctx.close();
     }
   } finally {

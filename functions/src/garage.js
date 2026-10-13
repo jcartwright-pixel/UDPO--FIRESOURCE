@@ -166,31 +166,41 @@ async function signedInTechs(tx, db, tokens, nowMs) {
   });
   return out;
 }
-function renew(write, people, nowMs) { people.forEach(p => write(p.ref, { expiresAt: new Date(nowMs + G.SESSION_MS).toISOString() })); }
+function renew(write, people, nowMs) { people.filter(p => p.ref).forEach(p => write(p.ref, { expiresAt: new Date(nowMs + G.SESSION_MS).toISOString() })); }
+
+// A mechanic's name and login ID, checked inside a save (wrong numbers count towards the 5-minute lock, as at sign-in).
+// Returns {tech} or {wrong: true}; the caller lets the transaction finish (so the count is kept) and then refuses.
+async function checkLogin(tx, db, techId, loginId, nowMs) {
+  const stamp = new Date(nowMs).toISOString(), minute = stamp.slice(0, 16);
+  const techSnap = techId ? await tx.get(db.collection(TECHS).doc(docId(techId))) : null;
+  const tech = techSnap && techSnap.exists ? activeTechs([techSnap.data()])[0] : null;
+  if (!tech) throw SaveErr('NOT_FOUND', 'Tap your name first.');
+  const lockRef = db.collection(LOCKS).doc(docId(techId)), stationRef = db.collection(LOCKS).doc('_station');
+  const [lockSnap, stationSnap, loginSnap] = await tx.getAll(lockRef, stationRef, db.collection(LOGINS).doc(docId(techId)));
+  const lock = lockSnap.exists ? lockSnap.data() : {}, station = stationSnap.exists ? stationSnap.data() : {};
+  const fails = Date.parse(lock.since || 0) > nowMs - G.TECH_LOCK_MS ? (lock.count || 0) : 0;
+  if (fails >= G.TECH_FAILS) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers. Wait 5 minutes or ask the office.');
+  const stationFails = station.minute === minute ? (station.count || 0) : 0;
+  if (stationFails >= G.STATION_FAILS_PER_MINUTE) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers on the garage station. Wait a minute and try again.');
+  const login = loginSnap.exists ? loginSnap.data() : null;
+  if (!login || !login.hash) throw SaveErr('NOT_FOUND', tech.name + ' has no login ID yet. Ask the office to add it.');
+  const given = Buffer.from(loginHash(techId, loginId), 'hex'), want = Buffer.from(login.hash, 'hex');
+  if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
+    tx.set(lockRef, { count: fails + 1, since: fails ? lock.since : stamp });
+    tx.set(stationRef, { minute, count: stationFails + 1 });
+    return { wrong: true };
+  }
+  return { tech };
+}
 
 async function signIn(db, input, nowMs) {
   const techId = text(input.techId, 80), loginId = String(input.loginId || '').trim();
   if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
   return db.runTransaction(async tx => {
-    const stamp = new Date(nowMs).toISOString(), minute = stamp.slice(0, 16);
-    const techSnap = techId ? await tx.get(db.collection(TECHS).doc(docId(techId))) : null;
-    const tech = techSnap && techSnap.exists ? activeTechs([techSnap.data()])[0] : null;
-    if (!tech) throw SaveErr('NOT_FOUND', 'Tap your name first.');
-    const lockRef = db.collection(LOCKS).doc(docId(techId)), stationRef = db.collection(LOCKS).doc('_station');
-    const [lockSnap, stationSnap, loginSnap] = await tx.getAll(lockRef, stationRef, db.collection(LOGINS).doc(docId(techId)));
-    const lock = lockSnap.exists ? lockSnap.data() : {}, station = stationSnap.exists ? stationSnap.data() : {};
-    const fails = Date.parse(lock.since || 0) > nowMs - G.TECH_LOCK_MS ? (lock.count || 0) : 0;
-    if (fails >= G.TECH_FAILS) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers. Wait 5 minutes or ask the office.');
-    const stationFails = station.minute === minute ? (station.count || 0) : 0;
-    if (stationFails >= G.STATION_FAILS_PER_MINUTE) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers on the garage station. Wait a minute and try again.');
-    const login = loginSnap.exists ? loginSnap.data() : null;
-    if (!login || !login.hash) throw SaveErr('NOT_FOUND', tech.name + ' has no login ID yet. Ask the office to add it.');
-    const given = Buffer.from(loginHash(techId, loginId), 'hex'), want = Buffer.from(login.hash, 'hex');
-    if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
-      tx.set(lockRef, { count: fails + 1, since: fails ? lock.since : stamp });
-      tx.set(stationRef, { minute, count: stationFails + 1 });
-      return { wrong: true };
-    }
+    const stamp = new Date(nowMs).toISOString();
+    const checked = await checkLogin(tx, db, techId, loginId, nowMs);
+    if (checked.wrong) return checked;
+    const tech = checked.tech, lockRef = db.collection(LOCKS).doc(docId(techId));
     const others = (await signedInTechs(tx, db, input.tokens, nowMs)).filter(p => p.id !== techId);
     if (others.length >= G.MAX_TECHS) throw SaveErr('NOT_ALLOWED', 'Two technicians are already signed in. Sign one out first.');
     const token = crypto.randomBytes(24).toString('base64url');
@@ -255,7 +265,8 @@ function validateStep(input) {
     out.problem = text(input.problem, 300);
     return out;
   }
-  if (!out.id && !(op === 'START' && /^(trucks|trailers|forks)\|.+/.test(out.writeUp))) throw SaveErr('BAD_REQUEST', 'That job is not on the list any more. Go back to Jobs.');
+  // A step on a write-up names the write-up when the tablet had no signal to learn its work order number (Joe 10/13).
+  if (!out.id && !/^(trucks|trailers|forks)\|.+/.test(out.writeUp)) throw SaveErr('BAD_REQUEST', 'That job is not on the list any more. Go back to Jobs.');
   if (op === 'DONE') {
     out.fixed = text(input.fixed, 40);
     if (G.FIXES.indexOf(out.fixed) < 0) throw SaveErr('BAD_REQUEST', 'Tap what you fixed.');
@@ -277,7 +288,16 @@ async function step(db, input, nowMs) {
   return db.runTransaction(async tx => {
     const logRef = db.collection(C.actions).doc(req.requestId), logSnap = await tx.get(logRef);
     if (logSnap.exists) return Object.assign({}, logSnap.data().result, { repeated: true });
-    const people = await signedInTechs(tx, db, input.tokens, nowMs);
+    let people = await signedInTechs(tx, db, input.tokens, nowMs);
+    // Joe 10/13 (Garage Station with no signal): a step kept on the tablet carries the mechanic's name and login ID instead of
+    // a sign-in that may have run out by the time it is sent; they are checked here as at sign-in.
+    if (!people.length && input.signIn && typeof input.signIn === 'object') {
+      const techId = text(input.signIn.techId, 80), loginId = String(input.signIn.loginId || '').trim();
+      if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
+      const checked = await checkLogin(tx, db, techId, loginId, nowMs);
+      if (checked.wrong) return { wrong: true };
+      people = [{ id: techId, name: checked.tech.name, ref: null }];
+    }
     if (!people.length) throw SaveErr('NOT_ALLOWED', 'GARAGE_SIGN_IN_REQUIRED: ' + SIGN_IN_REQUIRED);
     const names = people.map(p => p.name), by = 'garage:' + names.join('+');
     const mode = await A().requireTestMode(tx, db, 'checkIns');
@@ -312,6 +332,7 @@ async function step(db, input, nowMs) {
       writeUpRef = db.collection(C.maintenance).doc(MAINT.docId(recordId));
       const w = await tx.get(writeUpRef);
       if (hit) { ref = hit.ref; order = hit.data(); }
+      else if (req.op !== 'START') throw SaveErr('NOT_FOUND', 'That job is not on the list any more. Go back to Jobs.');
       else {
         if (!w.exists || !realWriteUp(w.data())) throw SaveErr('NOT_FOUND', 'That write-up was already fixed or removed.');
         const r = w.data(), id = newOrderId(), kind = KEY_KINDS[kindName] || 'TRUCK', problem = text(r.issue_details || r.notes, 300);
@@ -421,7 +442,7 @@ async function step(db, input, nowMs) {
     const logged = Object.assign({}, change); if (logged.signature) logged.signature = '(signature, ' + logged.signature.length + ' characters)';
     tx.set(logRef, { action: 'garage' + req.op, by, at: stamp, mode: mode.mode, workOrderId: after.work_order_id, before, after: logged, result });
     return result;
-  });
+  }).then(r => { if (r && r.wrong) throw SaveErr('NOT_ALLOWED', 'Wrong login ID. Try again.'); return r; });
 }
 
 /*

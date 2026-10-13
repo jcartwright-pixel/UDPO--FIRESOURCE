@@ -73,15 +73,29 @@ function drawLine(n) {
 }
 
 // Save now when there is a connection; otherwise (or when the connection drops on the way) keep it on this iPad. Saves made
-// while others are still waiting wait behind them, so they reach the server in the order they were made.
-export async function offlineSave(action, fields) {
-  const entry = { action, fields: Object.assign({ requestId: rid() }, fields), at: Date.now(), email: await me() };
-  if (navigator.onLine && !(await waiting()).length) {
-    try { return await saveNow(action, entry.fields); } catch (e) { if (!isNoConnection(e)) throw e; }
-  }
+// while others are still waiting wait behind them, so they reach the server in the order they were made. Each save starts
+// in the order it was made (the check of what waits is taken in turn; the sends themselves run side by side as before).
+let turn = Promise.resolve();
+async function keepOrSend(entry, sendNow) {
+  const decided = turn.then(async () => {
+    entry.email = await me();
+    return { sending: navigator.onLine && !(await waiting()).length ? sendNow(entry.fields) : null };
+  });
+  turn = decided.catch(() => {});
+  const { sending } = await decided;
+  if (sending) { try { return await sending; } catch (e) { if (!isNoConnection(e)) throw e; } }
   await add(entry);
   await changed();
   return { ok: true, queued: true };
+}
+export function offlineSave(action, fields) {
+  return keepOrSend({ action, fields: Object.assign({ requestId: rid() }, fields), at: Date.now() }, (f) => saveNow(action, f));
+}
+
+// Joe 10/13 (Garage Station): the same for another server call (name, e.g. 'garage'): sent now when there is signal and
+// nothing waits, otherwise kept on the tablet and sent in order. fields carries its own requestId.
+export function offlineCall(name, fields) {
+  return keepOrSend({ call: name, fields: Object.assign({ requestId: rid() }, fields), at: Date.now() }, (f) => callServer(name, f));
 }
 
 // Send what is waiting, oldest first; stop at the first save that still has no connection.
@@ -94,7 +108,7 @@ export async function flush() {
     for (const e of await waiting()) {
       if (e.email && email && e.email !== email) continue; // someone else's saves wait for them to sign in on this iPad
       try {
-        await callServer('save', Object.assign({ action: e.action }, e.fields));
+        await (e.call ? callServer(e.call, e.fields) : callServer('save', Object.assign({ action: e.action }, e.fields)));
       } catch (err) {
         if (isNoConnection(err)) break;
         failedText = 'A save made on this ' + device + ' was refused when it was sent: ' + friendlyError(err);

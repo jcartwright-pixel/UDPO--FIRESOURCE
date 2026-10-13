@@ -10,20 +10,29 @@ export const remember = (k, v) => { try { if (v) localStorage.setItem(k, JSON.st
  * What the tablet opens: {station} (a station from its code), {needCode, message} (codes are in use and this tablet has
  * none, or its code changed), or {free: true} (no codes at this plant yet: the page works as before).
  */
+const noSignal = (e) => !navigator.onLine || /internal|unavailable|deadline|network|failed to fetch|offline/i.test(String(e && (e.code + ' ' + e.message)));
 export async function resolveStation(kind, storeKey, call) {
   const mine = read(storeKey);
   if (mine && mine.key) {
     // Joe 10/13: with no signal the tablet keeps the station it had (checked again once the signal is back).
     let r;
     try { r = await call('check', { kind, key: mine.key, version: mine.version || '' }); } catch (e) {
-      if (!navigator.onLine || /internal|unavailable|deadline|network|failed to fetch|offline/i.test(String(e && (e.code + ' ' + e.message)))) return { station: mine, offline: true };
+      if (noSignal(e)) return { station: mine, offline: true };
       throw e;
     }
     if (r.ok) { remember(storeKey, r.station); return { station: r.station }; }
     remember(storeKey, null);
     return { needCode: true, message: r.message };
   }
-  const has = await call('has', { kind, facilityId: 'fac_uniontown' });
+  // With no signal, the last answer this tablet had (a station with no codes opens as before; unknown asks for the code).
+  const HAS = 'udStationHas.' + kind;
+  let has;
+  try { has = await call('has', { kind, facilityId: 'fac_uniontown' }); try { localStorage.setItem(HAS, has.required ? '1' : '0'); } catch (e) { /* private window */ } } catch (e) {
+    if (!noSignal(e)) throw e;
+    let last = null;
+    try { last = localStorage.getItem(HAS); } catch (x) { /* private window */ }
+    return last === '0' ? { free: true, offline: true } : { needCode: true, message: 'No signal. The station code can be checked once the signal is back.' };
+  }
   return has.required ? { needCode: true, message: '' } : { free: true };
 }
 
