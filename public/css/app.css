@@ -1757,3 +1757,52 @@ table.routes td.screen-name { text-align: left; color: var(--ud-blue); }
 /* Loadout Center: more loads loading than the loadout's limit (a manager went past it). */
 .notice.warning.over-limit { margin: 0 16px 8px; background: #fff4d6; color: #7a4b00; border: 2px solid #f0b429; border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; }
 .notice.warning.over-limit[hidden] { display: none; }
+
+/* Review item 2 (Joe 10/13): date boxes read 10-8-26 (app.js dressDate). */
+input[type="date"].ud-date-dressed::-webkit-datetime-edit { color: transparent; }
+.ud-date-face { position: absolute; z-index: 1; display: flex; align-items: center; pointer-events: none; white-space: nowrap; overflow: hidden; color: inherit; }
+/* Review item 1 (Joe 10/13): Daily's top buttons sit on the title line with the date boxes on the right (laptops and desk
+   screens; a phone keeps its wrapped layout). */
+@media (min-width: 701px) {
+  body.daily-look .head:has(#print-sheet) { flex-wrap: nowrap; align-items: flex-end; gap: 10px; }
+  body.daily-look .head:has(#print-sheet) .title { flex: none; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head { margin-left: 0; flex-wrap: nowrap; gap: 6px; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head + .field { margin-left: auto; }
+}
+body.daily-look #delivers { display: none; }
+@media (min-width: 701px) and (max-width: 1799px) {
+  /* Room for one line at 1536: Delivery day shows beside Loadout day, buttons and arrows are a little tighter. */
+  body.daily-look .head:has(#print-sheet) { gap: 8px; }
+  body.daily-look .head:has(#print-sheet) .field:has(#delivery-day) { display: none; }
+  body.daily-look #delivers { display: block; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head :is(button, a.button) { padding: 0 8px; }
+  body.daily-look .head:has(#print-sheet) .coverage { min-width: 0; padding: 1px 6px; }
+  body.daily-look .head:has(#print-sheet) .stepper button { padding: 0 6px; }
+  body.daily-look .head:has(#print-sheet) #week-begin { width: 84px; }
+  body.daily-look .head:has(#print-sheet) #load-day { width: 112px; }
+}
+/* Review item 12 (Joe 10/13): one Copy / Paste / Paste + Add per driver line, under the driver's name. */
+.template-page td.tpl-name .tpl-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; visibility: visible; }
+.template-page td.tpl-name .tpl-tools .mini { font-size: 14px; padding: 6px 8px; white-space: nowrap; line-height: 1.1; }
+/* Review item 11 (Joe 10/13): Driver Check-ins' New phone code is a normal-size button. */
+.footer button#new-code { font-size: 16px; height: 40px; padding: 0 16px; border-radius: 9px; align-self: center; }
+/* Review item 6 (Joe 10/13): Route Week Override's day boxes read RUNS or OFF on one line at readable size. */
+.routeweek-page .rw-day, .routeweek-page .rw-shell .rw-day { font-size: 16px; min-height: 32px; }
+/* Review item 7 (Joe 10/13): the Route Editor's top line holds the title, the buttons and then the filters on the right. */
+@media (min-width: 701px) {
+  .routes-page .head { flex-wrap: nowrap; align-items: flex-end; gap: 10px; }
+  .routes-page .head .title { flex: none; }
+  .routes-page .head .actions.in-head.top-row { order: 2; margin-left: 0; flex-wrap: nowrap; }
+  .routes-page .head .selectors { order: 3; margin-left: auto; flex: none; }
+  .routes-page .head .selectors select, .routes-page #active-filter { min-width: 0; }
+  .routes-page #route-select { width: 130px; } .routes-page #run-select { width: 150px; } .routes-page #view-select { width: 196px; }
+  .routes-page #active-filter { width: 140px; }
+}
+/* Review items 9 and 10 (Joe 10/13): Driver Roster. With no driver open the list takes the full width and the three counts
+   sit in a strip above it; Edit or + Add Driver opens the panel on the right as before. */
+.split.closed { grid-template-columns: minmax(0, 1fr); }
+.split.closed .split-side { order: -1; height: auto; }
+.split.closed .panel { display: none; }
+.split.closed .summary { padding: 4px 6px; }
+.split.closed .summary div { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 4px 8px; font-size: 13px; }
+.split.closed .summary b { display: inline; font-size: 22px; }

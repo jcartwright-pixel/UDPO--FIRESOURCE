@@ -702,7 +702,7 @@ async function noScroll(page) {
     await backPage.click('#rows tr td.name');
     await backPage.waitForSelector('#d-cancel');
     await backPage.click('#go-back');
-    await backPage.waitForSelector('.panel-empty');
+    await backPage.waitForSelector('.split.closed');
     assert.match(backPage.url(), /drivers\.html/, 'first Back only closes the driver');
     // Joe 10/10: Back goes up one level: a Route Distribution screen goes to the Route Distribution page, and that page goes Home.
     await Promise.all([backPage.waitForURL(/distribution\.html/), backPage.click('#go-back')]);
@@ -713,27 +713,30 @@ async function noScroll(page) {
     await backPage.close();
     results.push('Back: closes an opened driver first, then goes up to Route Distribution, then Home; Home has no Back');
 
-    // Driver Weekly Template: a manager turns ADAMS Off on Tuesday, copies it to Wednesday, and Save Template saves both cells.
+    // Driver Weekly Template: a manager makes ADAMS Available on Monday and Off on Tuesday, copies ADAMS's week onto CASEY's line
+    // (review item 12: one Copy / Paste per driver line), and Save Template saves every changed cell. (BROOK was removed above.)
     const tpl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
-    await tpl.waitForSelector('.tcell[data-driver="drv_test_adams"][data-day="tue"] select[data-status]');
+    const day = (d, p) => '.tcell[data-driver="' + d + '"][data-day="' + p + '"] select[data-status]';
+    await tpl.waitForSelector(day('drv_test_adams', 'tue'));
     assert.equal(await tpl.isDisabled('#save'), true, 'nothing to save yet');
-    await tpl.selectOption('.tcell[data-driver="drv_test_adams"][data-day="tue"] select[data-status]', 'OFF');
-    await tpl.hover('.tcell[data-driver="drv_test_adams"][data-day="tue"]');
-    await tpl.click('.tcell[data-driver="drv_test_adams"][data-day="tue"] [data-copy]');
-    await tpl.hover('.tcell[data-driver="drv_test_adams"][data-day="wed"]');
-    await tpl.click('.tcell[data-driver="drv_test_adams"][data-day="wed"] [data-paste]');
-    assert.equal(await tpl.textContent('#dirty'), '2 unsaved changes');
+    await tpl.selectOption(day('drv_test_adams', 'mon'), 'AVAILABLE');
+    await tpl.selectOption(day('drv_test_adams', 'tue'), 'OFF');
+    await tpl.click('tr[data-line="drv_test_adams"] td.tpl-name [data-copy]');
+    await tpl.click('tr[data-line="drv_test_casey"] td.tpl-name [data-paste]');
+    // ADAMS Monday and Tuesday; CASEY Monday (802 comes off: Available like ADAMS) and Tuesday (Off like ADAMS).
+    assert.equal(await tpl.textContent('#dirty'), '4 unsaved changes');
     if (SHOTS) await tpl.screenshot({ path: path.join(SHOTS, 'template-1920.png') });
     await tpl.click('#save');
     await tpl.waitForFunction(() => /^Template saved/.test(document.getElementById('dirty').textContent), null, { timeout: 10000 });
-    const adamsTpl = await tpl.evaluate(async () => {
+    const tplCells = await tpl.evaluate(async () => {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
       const { db } = await start();
-      return (await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells;
+      return [(await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells, (await getDoc(doc(db, 'drivers', 'drv_test_casey'))).data().cells];
     });
-    assert.equal(adamsTpl.tue_available, 'FALSE');
-    assert.equal(adamsTpl.wed_available, 'FALSE');
+    assert.equal(tplCells[0].tue_available, 'FALSE');
+    assert.equal(tplCells[1].tue_available, 'FALSE');
+    assert.deepEqual(JSON.parse(tplCells[1].mon_assignments_json || '[]'), [], 'CASEY Monday has no run, like ADAMS');
     assert.deepEqual(tpl.errors, []);
     const dispatcherTpl = await openPage(browser, 1366, 650, '/template.html?testEmail=dispatch.test@uniteddairy.com');
     await dispatcherTpl.waitForSelector('.tcell select[data-status]');
@@ -868,13 +871,13 @@ async function noScroll(page) {
     await adm.waitForSelector('.side-flyouts .flyout.open a[href="admin.html"]', { state: 'visible' });
     await Promise.all([adm.waitForURL(/admin\.html/), adm.click('.side-flyouts .flyout.open a[href="admin.html"]')]);
     await adm.waitForSelector('.admin-card');
-    assert.equal(await adm.$$eval('.admin-card', a => a.length), 15);
+    assert.equal(await adm.$$eval('.admin-card', a => a.length), 12, 'one card per screen (review item 13)');
     assert.equal(await adm.$$eval('.admin-card[target]', a => a.length), 0, 'no card opens a new window');
     await Promise.all([adm.waitForURL(/template\.html/), adm.click('.admin-card[href="template.html"]')]);
     await adm.waitForSelector('.tcell');
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('Dispatch Administration: 15 cards, opened from the menu; Driver Weekly Template opens in the same window');
+    results.push('Dispatch Administration: 12 cards, one per screen, opened from the menu; Driver Weekly Template opens in the same window');
     // Joe 10/10: Print Layouts took him into the old program. Every Dispatch Administration card opens a new-app screen; Operational
     // Assignments, Print Layouts and Dispatch Settings are built here, and an active assignment is a driver choice on Daily.
     const ops = await openPage(browser, 1920, 950, '/admin.html?testEmail=manager.test@uniteddairy.com');
@@ -1205,15 +1208,16 @@ async function noScroll(page) {
     results.push('Fleet & Maintenance: six counts, four cards with the library pictures; Truck Issues opens with the old columns and Lessor | Garage; Fork Truck has the trailer columns');
     // Joe 10/10 (old-screen picture): the template lists relief drivers first; every day shows + Add Run, Copy, Paste and Paste + Add.
     const tl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
-    await tl.waitForSelector('.tcell [data-copy]');
+    await tl.waitForSelector('td.tpl-name [data-copy]');
     const groups = await tl.$$eval('tr.tpl-group td', t => t.map(x => x.textContent));
     assert.match(groups[0], /Relief/i, 'relief drivers first: ' + groups.join(' | '));
-    assert.equal(await tl.$eval('.tcell [data-copy]', b => getComputedStyle(b.parentElement).visibility), 'visible', 'Copy shows without pointing at the cell');
+    assert.equal(await tl.$eval('td.tpl-name [data-copy]', b => getComputedStyle(b.parentElement).visibility), 'visible', 'Copy shows without pointing at the line');
+    assert.equal(await tl.$$eval('.tcell [data-copy]', b => b.length), 0, 'no Copy in the day boxes (one per driver line)');
     assert.equal(await tl.$eval('.tcell [data-add]', b => b.textContent), '+ Add Run');
     assert.equal(await tl.$eval('td.tpl-name', t => getComputedStyle(t).textAlign), 'left');
     assert.deepEqual(tl.errors, []);
     await tl.close();
-    results.push('Menu: Administration holds Dispatch Administration; Driver Weekly Template is under Drivers only. Template: relief first, + Add Run and Copy / Paste / Paste + Add on every day');
+    results.push('Menu: Administration holds Dispatch Administration; Driver Weekly Template is under Drivers only. Template: relief first, + Add Run on every day, Copy / Paste / Paste + Add once per driver line');
     results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
 
     // The per-screen switch (Joe 10/12): Administration > Go-Live Switches is the only place to see and change which screens

@@ -29,6 +29,14 @@
     </div>
     <div class="head">
       <div class="title"><h1>Daily Dispatch</h1></div>
+      <div class="actions in-head">
+        <a class="button" id="go-weekly" href="weekly.html">Weekly Dispatch</a>
+        <button type="button" class="primary" id="print-sheet">&#9635; Print Dispatch Sheet</button>
+        <button type="button" class="warn" id="open-down">&#128667; Down Trucks / Trailers</button>
+        <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
+        <button type="button" class="primary" id="open-calloff">Driver Call-Off</button>
+        <button type="button" class="primary" id="open-add">+ Add Route / Run</button>
+      </div>
       <div class="field">
         <label for="week-begin">Week beginning</label>
         <div class="stepper">
@@ -38,7 +46,7 @@
         </div>
       </div>
       <div class="field">
-        <label for="load-day">Loadout day</label>
+        <label for="load-day">Loadout day<span id="delivers"></span></label>
         <div class="stepper">
           <button type="button" id="prev" aria-label="Previous day">&#9664;</button>
           <select id="load-day"></select>
@@ -47,14 +55,6 @@
       </div>
       <div class="field day-pin" id="day-pin" hidden><label>&nbsp;</label><button type="button" id="go-today" title="The screen stays on the day you picked until you change it">Go to today</button></div>
       <div class="field"><label for="delivery-day">Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
-      <div class="actions in-head">
-        <a class="button" id="go-weekly" href="weekly.html">Weekly Dispatch</a>
-        <button type="button" class="primary" id="print-sheet">&#9635; Print Dispatch Sheet</button>
-        <button type="button" class="warn" id="open-down">&#128667; Down Trucks / Trailers</button>
-        <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
-        <button type="button" class="primary" id="open-calloff">Driver Call-Off</button>
-        <button type="button" class="primary" id="open-add">+ Add Route / Run</button>
-      </div>
       <div class="badge-test" id="mode"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -277,6 +277,8 @@
       document.getElementById('coverage').firstElementChild.textContent = running.length ? Math.round(100 * covered / running.length) + '%' : '—';
       document.getElementById('coverage').lastElementChild.textContent = running.length ? 'DRIVERS COVERED' : 'NO LOADS';
       document.getElementById('delivery-day').value = deliveryDayName(loadDate);
+      // On a laptop the Delivery day box makes room for the top line and its day shows next to Loadout day (review item 1).
+      document.getElementById('delivers').textContent = 'Delivers ' + deliveryDayName(loadDate);
       const groups = new Set(rows.map(r => r.deliveryDate)).size;
       document.getElementById('count').textContent = running.length + ' loads' + (running.length - covered ? ', ' + (running.length - covered) + ' need a driver' : '');
       fitToWindow(rows.length + groups + subs, 5);
