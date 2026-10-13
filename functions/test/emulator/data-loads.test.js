@@ -45,3 +45,33 @@ test('Joe\'s 20 Receiving suppliers load once: missing ones added in his spellin
   const res = await applyAction(db(), MANAGER, { action: 'savePlantSchedule', requestId: 'data-load-test-4', lane: 'RECEIVING', op: 'save', date: '2026-10-09', fields: { routeId: crest.routeId, runId: crest.runId, route: crest.route, run: crest.run, pickupTime: '08:00' } }, tick);
   assert.equal(res.ok, true);
 });
+
+test('Joe\'s four garage technicians load once by name only: one already listed in the sheet\'s spelling is skipped, no login IDs', async () => {
+  await clear();
+  const { garageCall } = require('../../src/garage');
+  const { runTransfer } = require('../../src/transfer');
+  const D = require('../../src/demo-sheets');
+  const PD = require('../fixtures/plant-demo');
+  await runTransfer({ db: db(), reader: D.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: tick });
+  await db().collection('garageTechs').get().then(s => Promise.all(s.docs.map(d => d.ref.delete())));
+  // Sean Martin is already on the list the way the GARAGE TECHNICIANS sheet writes names.
+  await db().collection('garageTechs').doc('TECH-SM').set({ tech_id: 'TECH-SM', name: 'MARTIN Sean', active: 'YES' });
+  const first = await DL.runDataLoads(db(), { now: tick });
+  const r = first[DL.GARAGE_TECHS_ID];
+  assert.deepEqual(r.added, ['TOM JELLICK', 'JOHN MYERS', 'JAXON NARD']);
+  assert.deepEqual(r.skipped, ['Shaun Martin']);
+  const techs = (await db().collection('garageTechs').get()).docs.map(d => d.data());
+  assert.equal(techs.length, 4);
+  techs.filter(t => t.dataLoad).forEach(t => assert.deepEqual([t.active, t.facility_id, /^TECH-[0-9A-F]{8}$/.test(t.tech_id)], ['YES', 'fac_uniontown', true]));
+  assert.equal((await db().collection('garageLogins').get()).size, 0, 'no login IDs are loaded');
+  // They show on the Garage Station; each needs a login ID before signing in, and Set login ID works on them.
+  const read = await garageCall(db(), { op: 'read', tokens: [] }, tick);
+  assert.deepEqual(read.techs.map(t => t.name), ['JAXON NARD', 'JOHN MYERS', 'MARTIN Sean', 'TOM JELLICK']);
+  const tom = techs.find(t => t.name === 'TOM JELLICK');
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: tom.tech_id, loginId: '48213' }, tick), /no login ID yet/);
+  await applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: 'data-load-tech-1', op: 'LOGIN', techId: tom.tech_id, loginId: '48213' }, tick);
+  assert.equal((await garageCall(db(), { op: 'signIn', techId: tom.tech_id, loginId: '48213' }, tick)).name, 'TOM JELLICK');
+  // A second run changes nothing.
+  assert.deepEqual((await DL.runDataLoads(db(), { now: tick }))[DL.GARAGE_TECHS_ID], { skipped: true });
+  assert.equal((await db().collection('garageTechs').get()).size, 4);
+});

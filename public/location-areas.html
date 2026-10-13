@@ -30,6 +30,7 @@
       <div class="title"><span class="eyebrow">Administration · Plant Setup · <span id="plant-name"></span></span><h1>Location Areas</h1><span class="sw-counts" id="counts"></span></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <a class="sw-top" href="safety-setup.html" id="setup-link" data-top>Checklist Setup</a>
+      <select id="plant" aria-label="Location" data-top></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice warning" id="locked" role="status" hidden>Location Areas is under construction. Only Administrators can open it while it is being built.</div>
@@ -48,7 +49,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, mayOpenBuilding, watchPerson } from './js/app.js';
     import { doc, onSnapshot } from './js/firebase.js';
-    import { pickPlant, plantName, canSetUp, modeText, watchSetup } from './js/safety.js';
+    import { pickPlant, plantName, plantsOf, canSetUp, modeText, watchSetup } from './js/safety.js';
     import { mountRowDrag } from './js/row-drag.js';
 
     // Location Areas (Joe 10/12, Administration > Plant Setup): each plant's areas (Plant, Garage, Office, Yard and any added)
@@ -58,10 +59,13 @@
     // off, so old walks and issues still read. Under construction: Administrators only.
     const S = window.UDSafety;
     const params = new URLSearchParams(location.search);
-    // Review item 31 (Joe 10/13): no plant drop-down inside a plant. The plant is ?plant= of the link, else the plant the screen
-    // was opened from (this tab), else the person's first plant (safety.js pickPlant); its name shows in the heading.
+    // Joe 10/13 (A): each location (Uniontown, Charleston, Martins Ferry) has its own areas, picked at the top right (his own
+    // exception to review item 31's no plant drop-down, for this Administration screen). It starts on ?plant= of the link,
+    // else the plant the screen was opened from (this tab), else the person's first plant (safety.js pickPlant). Uniontown
+    // keeps its areas; another location starts empty, with + Add area.
+    const plantBox = document.getElementById('plant');
     let db = null, person = null, app = {}, plant = '', setup = null, seen = false, stop = null, chain = Promise.resolve(), pending = null;
-    const list = () => pending || S.locations(setup && setup.locations);
+    const list = () => pending || S.locations(setup && setup.locations, plant);
     const copy = () => JSON.parse(JSON.stringify(list()));
     const newKey = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const inp = (k, v, label, ph) => '<input type="text" data-k="' + k + '" value="' + escapeHtml(v || '') + '" maxlength="60" aria-label="' + escapeHtml(label) + '"' + (ph ? ' placeholder="' + escapeHtml(ph) + '"' : '') + '>';
@@ -77,7 +81,7 @@
       const used = {};
       S.checklist(setup, true).forEach(a => { used[a.key] = a.items.filter(i => !i.off).length; });
       const subs = L.reduce((n, a) => n + a.subs.length, 0);
-      document.getElementById('counts').textContent = seen ? L.length + ' areas · ' + subs + ' sub-areas' + (setup && setup.locations ? '' : ' · the starting list') : '';
+      document.getElementById('counts').textContent = seen ? L.length + (L.length === 1 ? ' area · ' : ' areas · ') + subs + (subs === 1 ? ' sub-area' : ' sub-areas') + (setup && setup.locations || S.startsEmpty(plant) ? '' : ' · the starting list') : '';
       document.getElementById('foot').textContent = set ? 'Each box saves as you leave it. Grab a line and drag it up or down to change the order. Type over a name to rename it. Untick On to take an area or sub-area off the walk; nothing is ever deleted, so old walks still read. The Safety Walkthrough walks the areas in this order; Checklist Setup puts its items in these sub-areas.' : 'View only. A manager or administrator changes the areas.';
       if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
       const act = document.activeElement, keep = heldMove || (act && act.matches && act.matches('#rows tr[data-drag]') ? act.dataset.drag : null);
@@ -89,6 +93,7 @@
           '<td>' + tick(!x.off, dis, x.name + ' on') + '</td>' + order((ai + 1) + '.' + (xi + 1)) +
           '<td>' + (used[x.key] || 0) + '</td></tr>').join('') +
         (set ? '<tr class="sw-add sw-sub-row" data-a="' + ai + '" data-newsub="1"><td colspan="4">' + inp('newsub', '', 'New sub-area in ' + a.name, '+ Add sub-area to ' + a.name) + '</td></tr>' : '')).join('') +
+        (seen && !L.length ? '<tr><td colspan="4" class="sw-empty">No areas for ' + escapeHtml(plantName(plant)) + ' yet.' + (set ? ' Type the first one below (like Plant, Garage or Office).' : '') + '</td></tr>' : '') +
         (set && seen ? '<tr class="sw-add" data-newarea="1"><td colspan="4">' + inp('newarea', '', 'New area', '+ Add area (like Docks or Warehouse)') + '</td></tr>' : '');
       // A line moved with the keyboard keeps the focus, so Alt+Up can be pressed again.
       heldMove = null;
@@ -142,9 +147,16 @@
       if (stop) stop();
       seen = false; setup = null; pending = null; render(true);
       document.getElementById('plant-name').textContent = plantName(plant);
-      try { sessionStorage.setItem('udPlant', plant); } catch (err) { /* no storage */ }
-      stop = watchSetup(db, plant, s => { setup = s; seen = true; if (pending && JSON.stringify(S.locations(s && s.locations)) === JSON.stringify(pending)) pending = null; render(); });
+      plantBox.value = plant;
+      const at = plant;
+      stop = watchSetup(db, plant, s => { if (at !== plant) return; setup = s; seen = true; if (pending && JSON.stringify(S.locations(s && s.locations, plant)) === JSON.stringify(pending)) pending = null; render(); });
     }
+    // Picking a location here shows its areas; the plant the rest of the app is working in stays as it was.
+    plantBox.onchange = () => {
+      plant = plantBox.value;
+      const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u);
+      follow();
+    };
     requireSignIn(async (user) => {
       ({ db } = await start());
       watchPerson(db, user, p => {
@@ -153,7 +165,9 @@
         document.getElementById('locked').hidden = ok;
         document.getElementById('view').hidden = !ok;
         if (!ok) return;
-        if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render(true);
+        plantBox.innerHTML = plantsOf(person).map(p => '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + '</option>').join('');
+        plantBox.hidden = plantBox.options.length < 2;
+        if (!plant) { plant = pickPlant(person, params.get('plant')); try { sessionStorage.setItem('udPlant', plant); } catch (err) { /* no storage */ } follow(); } else { plantBox.value = plant; render(true); }
       }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(true); });
     });

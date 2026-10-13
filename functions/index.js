@@ -6,7 +6,8 @@
  *   phone                 the drivers' phone Check-In (Route Distribution code, no United Dairy account)
  *   garage                the Garage Station tablet (technician name + login ID, no United Dairy account)
  *   newRouteCode          a manager makes a new Route Distribution code for the phones
- *   gps                   a manager or administrator saves, removes or tests the Verizon Connect (Fleetmatics) API login
+ *   gps                   a manager or administrator saves, removes or tests the Verizon Connect GPS login (Fleet, or Reveal)
+ *   fleetGpsEvery5Minutes reads where each truck is now from Verizon Connect Fleet, and today's miles every 15 minutes
  *   setSwitch             an administrator moves a screen between the current app and the new one, or turns the write-back on / off
  *   writeBackOnSave       writes each save into the SANDBOX Live workbook (phase 2; production is refused)
  *   writeBackEveryMinute  retries anything the write-back could not finish
@@ -41,6 +42,7 @@ const FAILS = require('./src/fails');
 const { garageCall } = require('./src/garage');
 const { setSwitch, SwitchError } = require('./src/switch');
 const { gpsCall, GpsError } = require('./src/gps');
+const FLEETGPS = require('./src/fleetgps');
 const { unitedDairyUser } = require('./src/auth');
 const { makeSheetsReader, makeSheetsWriter } = require('./src/sheets');
 const { runWriteBack } = require('./src/writeback');
@@ -107,7 +109,7 @@ exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSec
 });
 
 // Joe 10/13: data he sent, loaded once on each app (test copy and live) after a deploy (src/data-loads.js). Each load has a
-// dataLoads/<id> marker, so it runs one time; it only adds what is missing.
+// dataLoads/<id> marker, so it runs one time; it deletes nothing.
 exports.dataLoadsOnce = onSchedule({ schedule: 'every 10 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
   await require('./src/data-loads').runDataLoads(db);
 });
@@ -161,7 +163,7 @@ exports.people = onCall(async (request) => {
   return { people: snap.docs.map(d => { const p = d.data(); return { email: d.id, name: p.name || '', status: p.status || '', roles: p.roles || [], facilities: p.facilities || [] }; }) };
 });
 
-exports.gps = onCall({ timeoutSeconds: 30 }, async (request) => {
+exports.gps = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
   const user = signedIn(request);
   try { return await gpsCall(db, user, request.data, { local: process.env.FUNCTIONS_EMULATOR === 'true' }); } catch (error) { throw asHttps(error); }
 });
@@ -367,6 +369,13 @@ exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'Americ
   if (!run) return;
   const sheets = makeSheetsWriter();
   await runFleetSync({ db, reader: sheets, sheets, target: run.target, allowReal: run.allowReal, by: 'nightly' });
+});
+
+// Verizon Connect Fleet GPS (src/fleetgps.js): where each truck is now, and every 15 minutes today's miles. It reads the
+// login saved in GPS Setup each run, so it does nothing until a manager saves one there.
+exports.fleetGpsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 240, maxInstances: 1, memory: '512MiB' }, async () => {
+  const r = await FLEETGPS.pull(db);
+  if (r && r.error) console.error('fleetGps', r.error);
 });
 
 // MOCREO sensors (src/mocreo.js): the key is read each run, so the sync starts by itself once a key is saved and tested.

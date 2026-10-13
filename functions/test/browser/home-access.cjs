@@ -199,7 +199,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([mods.waitForURL(/reportcenter\.html/), mods.click('.side-flyouts .flyout.open a[data-side="reports"]')]);
     await mods.waitForSelector('.rc-card');
     assert.deepEqual(await mods.$$eval('.rc-group h2', h => h.map(x => x.textContent)), ['Plant Reports', 'Distribution Reports', 'Fleet Reports']);
-    assert.deepEqual(await mods.$$eval('.rc-card', a => a.map(x => x.getAttribute('href'))), ['reports.html', 'shiftreports.html', 'plant-kiosk.html', 'scorecard.html', 'otr.html', 'soon.html?what=trucks-today', 'fleet.html']);
+    // Joe 10/13: Trucks Today is built (Verizon Connect Fleet), so its card opens it.
+    assert.deepEqual(await mods.$$eval('.rc-card', a => a.map(x => x.getAttribute('href'))), ['reports.html', 'shiftreports.html', 'plant-kiosk.html', 'scorecard.html', 'otr.html', 'trucks.html', 'fleet.html']);
     assert.equal(await mods.getAttribute('.sidemenu a.side-name', 'data-side'), 'reports');
     assert.ok(await noSideScroll(mods));
     await Promise.all([mods.waitForURL(/shiftreports\.html/), mods.click('.rc-card[href="shiftreports.html"]')]);

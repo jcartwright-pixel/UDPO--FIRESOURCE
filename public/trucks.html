@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Trucks Today · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/issues.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill issues-page trucks-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Trucks Today</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Trucks Today</h1><small id="sub">From Verizon Connect Fleet</small></div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-mode="today" aria-selected="true">Today's Routes</button>
+        <button type="button" role="tab" data-mode="units" aria-selected="false">All Fleet Units</button>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="kpis" id="kpis"></div>
+      <div class="sheet scroll-list" id="sheet"></div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
+    import { watchLists, lists } from './js/edit.js';
+    import { collection, onSnapshot, query, where } from './js/firebase.js';
+
+    // Trucks Today (the current app's screen A, Joe 10/9): every route on today's Daily Dispatch with where its truck is now,
+    // read from Verizon Connect Fleet every 5 minutes (functions/src/fleetgps.js) and its miles today (every 15 minutes).
+    const L = window.UDLogic;
+    const YARD = 'UNIONTOWN', NO_SIGNAL_MINUTES = 30;
+    let mode = 'today', runs = [], gps = [], days = [];
+    const key = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const digits = (s) => String(s || '').replace(/\D/g, '');
+    const nyDate = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    const clock = (iso) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? d.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
+    const ago = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return isNaN(m) ? '' : m < 1 ? 'now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min ago' : (m < 2880 ? '1 day ago' : Math.floor(m / 1440) + ' days ago'); };
+    const timeOfDay = (min) => min === null || min === undefined || min === '' ? '' : L.timeText(min);
+
+    // Fleet names a truck "223876" and a trailer "T-635"; ours are the same numbers (trailers stored as T- plus number).
+    function index() {
+      const byKey = {}, byDigits = {};
+      gps.forEach(t => { const k = key(t.tag); if (!k) return; byKey[k] = t; if (/^\d+$/.test(k)) byDigits[k] = t; });
+      return (unit) => { const k = key(unit); return k ? byKey[k] || (/^\d+$/.test(digits(unit)) && byDigits[digits(unit)]) || null : null; };
+    }
+    function state(t) {
+      if (!t) return ['nogps', 'Not in Fleet'];
+      if (!t.lastReport || (Date.now() - Date.parse(t.lastReport)) / 60000 > NO_SIGNAL_MINUTES) return ['nosignal', 'No signal'];
+      const where = (String(t.place || '') + ' ' + String(t.address || '')).toUpperCase();
+      if (where.indexOf(YARD) >= 0 && !(t.speedMph > 3)) return ['yard', 'In yard'];
+      return t.speedMph > 3 ? ['road', 'Driving'] : ['stopped', 'Stopped'];
+    }
+    const placeCell = (t) => t ? escapeHtml(t.place || t.address || '') + (t.place && t.address ? '<small>' + escapeHtml(t.address) + '</small>' : '') : '';
+    const pill = (s) => '<span class="tt-pill tt-' + s[0] + '">' + s[1] + '</span>';
+
+    function render() {
+      const find = index(), today = nyDate(new Date()), opDay = L.operatingDay(new Date());
+      const dayBy = {}; days.filter(d => d.date === today).forEach(d => { dayBy[key(d.tag)] = d; });
+      const sheet = document.getElementById('sheet'), kpis = document.getElementById('kpis'), foot = document.getElementById('foot');
+      const newest = gps.reduce((m, t) => t.updatedAt > m ? t.updatedAt : m, '');
+      document.getElementById('sub').textContent = 'From Verizon Connect Fleet · ' + shortDate(opDay) + (newest ? ' · read ' + clock(newest) : ' · not read yet');
+      document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
+      if (!gps.length) {
+        kpis.innerHTML = '';
+        sheet.innerHTML = '<div class="empty">No GPS data yet. A manager saves the Verizon Connect Fleet login in <a href="gps.html">GPS Setup</a>, presses Test connection, then Pull now.</div>';
+        foot.textContent = '';
+        return;
+      }
+      if (mode === 'today') {
+        const rows = L.dailyRows(runs, opDay).filter(r => r.truck || r.driver);
+        const list = rows.map(r => { const t = find(r.truck); return { r, t, s: state(t), d: t ? dayBy[key(t.tag)] : null }; });
+        const count = (k) => list.filter(x => x.s[0] === k).length;
+        kpis.innerHTML = [['Routes today', list.length], ['Driving', count('road')], ['Stopped', count('stopped')], ['In yard', count('yard')], ['No signal', count('nosignal')], ['Not in Fleet', count('nogps')]]
+          .map(k => '<div><b>' + k[1] + '</b><span>' + k[0] + '</span></div>').join('');
+        sheet.innerHTML = '<table class="issues tt-board"><colgroup><col style="width:6%"><col style="width:13%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:7%"><col style="width:9%"><col style="width:28%"><col style="width:14%"></colgroup>' +
+          '<thead><tr><th>Route</th><th>Driver</th><th>Truck</th><th>Dispatch</th><th>First move</th><th>Miles today</th><th>Status</th><th>Where now</th><th>Last report</th></tr></thead><tbody>' +
+          (list.map(x => '<tr class="tt-' + x.s[0] + '"><td class="strong">' + escapeHtml(x.r.route || '') + '</td><td>' + escapeHtml(x.r.driver || '') + '</td><td class="strong">' + escapeHtml(x.r.truck || '') + '</td>' +
+            '<td>' + escapeHtml(timeOfDay(x.r.dispatchTime)) + '</td><td>' + (x.d && x.d.firstMove ? clock(x.d.firstMove) : '') + '</td><td>' + (x.d ? x.d.miles.toLocaleString() : '') + '</td>' +
+            '<td>' + pill(x.s) + '</td><td>' + placeCell(x.t) + '</td><td>' + (x.t && x.t.lastReport ? clock(x.t.lastReport) + '<small>' + ago(x.t.lastReport) + '</small>' : '') + '</td></tr>').join('') ||
+            '<tr><td colspan="9" class="empty">No routes on Daily Dispatch for ' + escapeHtml(shortDate(opDay)) + '.</td></tr>') + '</tbody></table>';
+        foot.textContent = 'In yard = stopped at a place named Uniontown · No signal = no report for ' + NO_SIGNAL_MINUTES + ' minutes · Not in Fleet = the truck number on Daily Dispatch has no Fleet unit of that name · miles and first move come from the odometer, read every 5 minutes.';
+        return;
+      }
+      // All Fleet units, matched to our Equipment Master trucks and trailers (Uniontown).
+      const ours = {}; (lists.fleetTrucks || []).forEach(e => { ours[key(e.unit)] = 'Truck'; }); (lists.fleetTrailers || []).forEach(e => { ours[key(e.unit)] = 'Trailer'; });
+      const units = gps.slice().sort((a, b) => String(a.tag).localeCompare(String(b.tag), undefined, { numeric: true }))
+        .map(t => ({ t, ours: ours[key(t.tag)] || '', s: state(t), d: dayBy[key(t.tag)] }));
+      const matched = units.filter(u => u.ours).length;
+      kpis.innerHTML = [['Fleet units', units.length], ['Our trucks', units.filter(u => u.ours === 'Truck').length], ['Our trailers', units.filter(u => u.ours === 'Trailer').length],
+        ['Other units', units.length - matched], ['Reported today', units.filter(u => u.t.lastReport && nyDate(new Date(u.t.lastReport)) === today).length], ['No signal', units.filter(u => u.s[0] === 'nosignal').length]]
+        .map(k => '<div><b>' + k[1] + '</b><span>' + k[0] + '</span></div>').join('');
+      sheet.innerHTML = '<table class="issues tt-board"><colgroup><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:30%"><col style="width:12%"><col style="width:10%"><col style="width:10%"><col style="width:10%"></colgroup>' +
+        '<thead><tr><th>Fleet unit</th><th>Ours</th><th>Status</th><th>Where now</th><th>Last report</th><th>Miles today</th><th>Odometer</th><th>Engine hours</th></tr></thead><tbody>' +
+        units.map(u => '<tr class="tt-' + u.s[0] + '"><td class="strong">' + escapeHtml(u.t.tag) + '</td><td>' + (u.ours || '<small>not in Equipment</small>') + '</td><td>' + pill(u.s) + '</td><td>' + placeCell(u.t) + '</td>' +
+          '<td>' + (u.t.lastReport ? (nyDate(new Date(u.t.lastReport)) === today ? clock(u.t.lastReport) : shortDate(nyDate(new Date(u.t.lastReport)))) + '<small>' + ago(u.t.lastReport) + '</small>' : '') + '</td>' +
+          '<td>' + (u.d ? u.d.miles.toLocaleString() : '') + '</td><td>' + (u.t.odometerMiles != null ? Math.round(u.t.odometerMiles).toLocaleString() : '') + '</td><td>' + (u.t.engineHours != null ? Math.round(u.t.engineHours).toLocaleString() : '') + '</td></tr>').join('') +
+        '</tbody></table>';
+      foot.textContent = 'Every unit Verizon Connect Fleet shows, all plants. Ours = the same number in Equipment Master (Uniontown); trailers are named T- plus the number in both.';
+    }
+
+    document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b) { mode = b.dataset.mode; render(); } });
+    window.udBack = () => { if (mode !== 'today') { mode = 'today'; render(); return true; } return false; };
+    setInterval(render, 60000); // "min ago" stays true between reads
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      watchLists(user, render);
+      const NAMES = { runs: 'the dispatch runs', gpsTrucks: 'the GPS positions', gpsDays: 'the GPS miles' };
+      const watch = (name, set, q) => onSnapshot(q || collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + NAMES[name] + ' (' + e.message + '). Check the network and reload the page.'));
+      watch('runs', v => { runs = v; });
+      watch('gpsTrucks', v => { gps = v; });
+      // Only today's miles (the collection keeps every day).
+      watch('gpsDays', v => { days = v; }, query(collection(db, 'gpsDays'), where('date', '==', nyDate(new Date()))));
+    });
+  </script>
+</body>
+</html>
