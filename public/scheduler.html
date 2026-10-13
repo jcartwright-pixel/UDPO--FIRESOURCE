@@ -364,14 +364,53 @@
       };
     }
     // Joe 10/13: the Suppliers list (code, name, short name), each with Edit; New Supplier at the bottom.
+    let listNote = '';  // what Add a List did, shown on the list until the box is opened again
     function openSuppliers() {
       const ck = canSave(), list = catalog();
-      openModal('<h2 id="modal-title">Suppliers</h2><p class="sc-supnote">The suppliers you pick on Receiving loads. Loads already booked keep their supplier.</p>' +
+      openModal('<h2 id="modal-title">Suppliers</h2><p class="sc-supnote">' + (listNote ? escapeHtml(listNote) : 'The suppliers you pick on Receiving loads. Loads already booked keep their supplier.') + '</p>' +
         '<div class="sc-suplist"><table class="sc-suptable"><thead><tr><th>Code</th><th>Supplier</th><th>Short Name</th>' + (ck ? '<th></th>' : '') + '</tr></thead><tbody>' +
         (list.map(r => '<tr><td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.name) + '</td>' +
           (ck ? '<td>' + (r.temp ? '<i>Saving&hellip;</i>' : '<button type="button" class="sc-btn small" data-supplier="' + escapeHtml(r.routeId) + '">Edit</button>') + '</td>' : '') + '</tr>').join('') ||
           '<tr><td colspan="4" class="empty">No suppliers on the list.</td></tr>') + '</tbody></table></div>' +
-        '<div class="modal-actions"><button type="button" data-close>Close</button>' + (ck ? '<button type="button" class="primary" id="supplier-new">＋ New Supplier</button>' : '') + '</div>');
+        '<div class="modal-actions"><button type="button" data-close>Close</button>' + (ck ? '<button type="button" id="supplier-list">Add a List</button><button type="button" class="primary" id="supplier-new">＋ New Supplier</button>' : '') + '</div>');
+    }
+    // Joe 10/13 (20 receiving suppliers "NEEDS ADDED"): paste a list, one supplier per line. Each name is added as typed (the
+    // Short Name keeps the spelling; the Supplier column is capitals, as New Supplier), one after another; names already on
+    // the list are skipped, so the same list can be pasted again safely.
+    function openSupplierList() {
+      openModal('<h2 id="modal-title">Add a List of Suppliers</h2><p class="sc-supnote">Paste or type the suppliers, one per line. Ones already on the list are skipped.</p>' +
+        '<textarea id="s-list" class="sc-suppaste" rows="12" placeholder="One supplier per line"></textarea><div class="notice error sc-err" id="f-error" hidden></div>' +
+        '<div class="modal-actions"><button type="button" id="s-cancel">Cancel</button><button type="button" class="primary" id="s-addall">Add Suppliers</button></div>');
+      const box = document.getElementById('s-list');
+      box.focus();
+      document.getElementById('s-cancel').onclick = openSuppliers;
+      document.getElementById('s-addall').onclick = async () => {
+        const seen = new Set(catalog().map(s => s.run.toUpperCase())), add = [], skipped = [];
+        box.value.split(/\r?\n/).map(x => x.trim().replace(/\s+/g, ' ')).filter(Boolean).forEach(label => {
+          const name = label.toUpperCase();
+          if (seen.has(name)) skipped.push(label); else { seen.add(name); add.push({ name, label: label.slice(0, 40) }); }
+        });
+        if (add.some(x => x.name.length > 60)) return formError('A supplier name can be up to 60 letters.');
+        if (!add.length) return formError(skipped.length ? 'All of these are already on the list.' : 'Type the suppliers, one per line.');
+        modal.querySelectorAll('button, textarea').forEach(b => { b.disabled = true; });
+        const go = document.getElementById('s-addall'), failed = [];
+        let n = 0;
+        for (const x of add) {
+          go.textContent = 'Adding ' + (++n) + ' of ' + add.length + '…';
+          try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'addSupplier', name: x.name, label: x.label, code: '' }); }
+          catch (e) { failed.push(x.label + ': ' + (e.message || e)); }
+        }
+        showError('');
+        if (failed.length) {
+          modal.querySelectorAll('button, textarea').forEach(b => { b.disabled = false; });
+          go.textContent = 'Add Suppliers';
+          box.value = failed.map(f => f.split(': ')[0]).join('\n');
+          return formError('Not added (fix and press Add Suppliers again): ' + failed.join('; '));
+        }
+        const msg = 'Added ' + add.length + ' supplier' + (add.length === 1 ? '' : 's') + '.' + (skipped.length ? ' Already on the list: ' + skipped.join(', ') + '.' : '');
+        listNote = msg;
+        openSuppliers();
+      };
     }
     // New Supplier, or Edit Supplier (with Remove) when sup is given.
     // back: opened from the Suppliers list, so Cancel and a save go back to it (from the Week list they close the box).
@@ -438,8 +477,9 @@
         return openLoad(t.dataset.new, '');
       }
       if (t.id === 'supplier-add') return openSupplier();
-      if (t.id === 'suppliers') return openSuppliers();
+      if (t.id === 'suppliers') { listNote = ''; return openSuppliers(); }
       if (t.id === 'supplier-new') return openSupplier(null, true);
+      if (t.id === 'supplier-list') { listNote = ''; return openSupplierList(); }
       if (t.dataset.supplier) { const sup = catalog().find(r => r.routeId === t.dataset.supplier); if (sup) openSupplier(sup, !!t.closest('#modal')); return; }
       if (t.dataset.view) { setView(t.dataset.view); return; }
       if (t.dataset.lane) { lane = t.dataset.lane; search = ''; if (view === 'history' && lane !== 'RECEIVING') view = 'month'; push(); render(); }
