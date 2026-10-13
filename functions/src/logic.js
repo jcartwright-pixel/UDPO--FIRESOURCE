@@ -383,6 +383,8 @@
     // Joe 10/12 ("turn all 8 sheets on"): the plant check screens (Cooler Temperatures, Quality, Yard, Shift Report Log, Scheduler,
     // Line Targets), Products, Safety Walkthrough and Plant Maintenance. Their saves stay in the new app.
     plant: 'Plant Operations' };
+  // Screens with no sheet behind them: always saved in the new app, never on Go-Live Switches.
+  var APP_ONLY = { otr: 'Over the Road', scorecard: 'Driver Scorecard' };
   function screenOwners(config) {
     var out = {}, set = (config && config.screenOwners) || {};
     Object.keys(SCREENS).forEach(function (k) { out[k] = 'old'; });
@@ -394,6 +396,9 @@
     var owners = screenOwners(config), owner = owners[screen] || 'old', name = SCREENS[screen] || screen;
     var writeBack = !!(config && config.writeBack && config.writeBack.enabled === true);
     var anyNew = Object.keys(owners).some(function (k) { return owners[k] === 'new'; });
+    // Joe 10/13 ("I can't select the routes"): screens whose saves stay in the new app and write no sheet (Over the Road,
+    // Driver Scorecard) are never view only; there is nothing for a Go-Live Switch to protect.
+    if (APP_ONLY[screen]) return { owner: 'app', live: anyNew, open: true, why: '' };
     if (owner === 'new') return { owner: owner, live: true, open: writeBack, why: writeBack ? '' : name + ' is switched on but the write-back is off; ask an administrator' };
     if (config && config.mode === 'live' && !anyNew) return { owner: owner, live: false, open: false, why: 'The app is marked live but no screen belongs to the new app; saves stay in test mode only' };
     if (anyNew) return { owner: owner, live: true, open: false, why: name + ' is view only until it is switched on in Administration > Go-Live Switches' };
@@ -1061,7 +1066,7 @@
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
-    SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
+    SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,

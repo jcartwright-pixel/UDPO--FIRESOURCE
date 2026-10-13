@@ -60,6 +60,18 @@ test('once a screen is on the new app, only that screen saves there; the others 
   await applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-04' }, tick);
 });
 
+// Joe 10/13 ("I can't select the routes"): Over the Road and Driver Scorecard write no sheet, so they save whatever the switches say.
+test('Over the Road and Driver Scorecard are never view only: they write no sheet', async () => {
+  await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
+  await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'new' }, true);
+  const ok = await applyAction(db(), MANAGER, { action: 'saveOtr', requestId: rid(), op: 'route', runId: 'run_t801', include: true, destination: 'SAL', deliveredBy: 'United Dairy Delivered' }, tick);
+  assert.equal(ok.ok, true);
+  assert.equal((await db().collection('otrRoutes').doc('run_t801').get()).data().include, true);
+  const tabsBefore = JSON.stringify(tabs);
+  await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
+  assert.equal(JSON.stringify(tabs), tabsBefore, 'nothing goes to the sheet');
+});
+
 test('with a screen on the new app the copy keeps running, and does not undo a save the sheet does not show yet', async () => {
   await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
   await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'new' }, true);
