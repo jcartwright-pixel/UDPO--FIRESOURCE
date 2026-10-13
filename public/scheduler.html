@@ -48,7 +48,9 @@
       </div>
       <!-- Joe 10/10: the counts and the holiday colour key sit in a slim strip under the top line, so the month title and the
            buttons keep their room. -->
-      <div class="sc-strip"><div class="hstats" id="hstats"></div><span class="sc-grow"></span><span class="sc-legend" id="legend" aria-label="Who delivers the load"><span class="sc-by ut"><i></i>Uniontown truck</span><span class="sc-by branch"><i></i>Branch</span><span class="sc-by carrier"><i></i>Carrier</span></span><span class="sc-key"><i></i>Holiday</span></div>
+      <div class="sc-strip"><div class="hstats" id="hstats"></div>
+        <!-- Joe 10/13 ("Where do I edit my receivers"): Receiving's supplier list, to add, edit or remove a supplier (in this strip, so the top line keeps its room). -->
+        <button type="button" class="sc-btn small sc-supbtn" id="suppliers" hidden>Suppliers</button><span class="sc-grow"></span><span class="sc-legend" id="legend" aria-label="Who delivers the load"><span class="sc-by ut"><i></i>Uniontown truck</span><span class="sc-by branch"><i></i>Branch</span><span class="sc-by carrier"><i></i>Carrier</span></span><span class="sc-key"><i></i>Holiday</span></div>
       <div class="sc-body" id="body"></div>
     </div>
   </div>
@@ -158,6 +160,7 @@
       document.getElementById('print').textContent = 'Print ' + (view === 'history' ? 'History' : view === 'week' ? 'Weekly' : view === 'day' ? 'Daily' : 'Monthly');
       document.getElementById('pick').value = date;
       document.getElementById('add').hidden = !ck;
+      document.getElementById('suppliers').hidden = lane !== 'RECEIVING';
       let tiles;
       if (view === 'history') { const sup = new Set(inRange.map(x => x.runId || x.run)).size, wks = new Set(inRange.map(x => L.weekStart(x.date))).size; tiles = [[inRange.length, inRange.length === 1 ? 'Past load' : 'Past loads'], [sup, sup === 1 ? 'Supplier' : 'Suppliers'], [wks, wks === 1 ? 'Week' : 'Weeks']]; }
       else if (view === 'day') { const c = inRange.filter(x => x.scheduleType === 'CARRIER').length; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [c, 'Carrier'], [inRange.length - c, 'United Dairy Delivery']]; }
@@ -216,7 +219,8 @@
       const side = '<aside class="sc-whos"><h3>' + w + 's' + (lane === 'RECEIVING' && ck ? '<button type="button" class="sc-btn small" id="supplier-add">＋ New</button>' : '') + '</h3>' +
         '<input id="who-search" type="search" placeholder="Search ' + w.toLowerCase() + 's…" aria-label="Search ' + w.toLowerCase() + 's"><div class="sc-wholist">' +
         (catalog().map(r => { const name = r.name || r.run || r.route || ''; return '<div class="sc-who" data-text="' + escapeHtml([name, r.route, r.run].join(' ').toLowerCase()) + '"><span><strong>' + escapeHtml(name) + '</strong><small>' + escapeHtml([r.route, r.run].filter(Boolean).join(' · ')) + '</small></span>' +
-          (ck ? '<button type="button" class="sc-plus" data-new="' + addDate + '"' + idAttrs(r) + ' aria-label="Add load for ' + escapeHtml(name) + '">＋</button>' : '') + '</div>'; }).join('') || '<p class="sc-none">No ' + w.toLowerCase() + 's on the list.</p>') + '</div></aside>';
+          (ck && lane === 'RECEIVING' && !r.temp ? '<button type="button" class="sc-btn small sc-supedit" data-supplier="' + escapeHtml(r.routeId) + '" aria-label="Edit ' + escapeHtml(name) + '">Edit</button>' : '') +
+          (ck ? '<button type="button" class="sc-plus" data-new=""' + addDate + '"' + idAttrs(r) + ' aria-label="Add load for ' + escapeHtml(name) + '">＋</button>' : '') + '</div>'; }).join('') || '<p class="sc-none">No ' + w.toLowerCase() + 's on the list.</p>') + '</div></aside>';
       const counts = days.map(d => { const hol = R.holidayName(d); return '<div class="sc-count' + (d === t ? ' today' : '') + (hol ? ' holiday' : '') + '"' + (hol ? ' title="' + escapeHtml(hol) + '"' : '') + '><span>' + DAYS[at(d).getDay()] + ' ' + md(d) + '</span><strong>' + (map[d] || []).length + '</strong></div>'; }).join('');
       const cols = days.map(d => {
         const items = (map[d] || []).slice().sort(sortTime);
@@ -359,28 +363,67 @@
         } catch (e) { delete pending[x.id]; showError('Delete Load: ' + (e.message || e)); render(); }
       };
     }
-    function openSupplier() {
-      openModal('<h2 id="modal-title">New Supplier</h2><div class="modal-grid"><label>Supplier Name<input id="s-name" maxlength="60" placeholder="Company name"></label><label>Short Name<input id="s-label" maxlength="40" placeholder="Shown on the schedule"></label>' +
-        '<label>Code<input id="s-code" maxlength="8" placeholder="Optional, e.g. S06"></label></div><div class="notice error sc-err" id="f-error" hidden></div>' +
-        '<div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="s-save">Save Supplier</button></div>');
+    // Joe 10/13: the Suppliers list (code, name, short name), each with Edit; New Supplier at the bottom.
+    function openSuppliers() {
+      const ck = canSave(), list = catalog();
+      openModal('<h2 id="modal-title">Suppliers</h2><p class="sc-supnote">The suppliers you pick on Receiving loads. Loads already booked keep their supplier.</p>' +
+        '<div class="sc-suplist"><table class="sc-suptable"><thead><tr><th>Code</th><th>Supplier</th><th>Short Name</th>' + (ck ? '<th></th>' : '') + '</tr></thead><tbody>' +
+        (list.map(r => '<tr><td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td>' + escapeHtml(r.name) + '</td>' +
+          (ck ? '<td>' + (r.temp ? '<i>Saving&hellip;</i>' : '<button type="button" class="sc-btn small" data-supplier="' + escapeHtml(r.routeId) + '">Edit</button>') + '</td>' : '') + '</tr>').join('') ||
+          '<tr><td colspan="4" class="empty">No suppliers on the list.</td></tr>') + '</tbody></table></div>' +
+        '<div class="modal-actions"><button type="button" data-close>Close</button>' + (ck ? '<button type="button" class="primary" id="supplier-new">＋ New Supplier</button>' : '') + '</div>');
+    }
+    // New Supplier, or Edit Supplier (with Remove) when sup is given.
+    // back: opened from the Suppliers list, so Cancel and a save go back to it (from the Week list they close the box).
+    function openSupplier(sup, back) {
+      const done = () => back ? openSuppliers() : closeModal();
+      const v = (k) => escapeHtml(sup ? sup[k] || '' : '');
+      openModal('<h2 id="modal-title">' + (sup ? 'Edit Supplier' : 'New Supplier') + '</h2><div class="modal-grid"><label>Supplier Name<input id="s-name" maxlength="60" placeholder="Company name" value="' + v('run') + '"></label><label>Short Name<input id="s-label" maxlength="40" placeholder="Shown on the schedule" value="' + v('name') + '"></label>' +
+        '<label>Code<input id="s-code" maxlength="8" placeholder="Optional, e.g. S06" value="' + v('route') + '"></label></div><div class="notice error sc-err" id="f-error" hidden></div>' +
+        '<div class="modal-actions">' + (sup ? '<button type="button" class="danger sc-left" id="s-remove">Remove Supplier</button>' : '') + '<button type="button" id="s-cancel">Cancel</button><button type="button" class="primary" id="s-save">Save Supplier</button></div>');
       document.getElementById('s-name').focus();
+      document.getElementById('s-cancel').onclick = done;
+      if (sup) document.getElementById('s-remove').onclick = () => confirmSupplierRemove(sup, back);
       document.getElementById('s-save').onclick = async () => {
         const name = document.getElementById('s-name').value.trim().replace(/\s+/g, ' ').toUpperCase(), label = document.getElementById('s-label').value.trim(), code = document.getElementById('s-code').value.trim().toUpperCase();
         if (!name) return formError('Type the supplier name.');
         if (code && !/^[A-Z0-9_-]{1,8}$/.test(code)) return formError('The code can be up to 8 letters or numbers.');
-        const list = catalog();
-        if (list.some(s => s.run.toUpperCase() === name)) return formError(name + ' is already on the list.');
-        if (code && list.some(s => s.route === code)) return formError('Code ' + code + ' is already used.');
+        const others = catalog().filter(s => !sup || s.routeId !== sup.routeId);
+        if (others.some(s => s.run.toUpperCase() === name)) return formError(name + ' is already on the list.');
+        if (code && others.some(s => s.route === code)) return formError('Code ' + code + ' is already used.');
+        if (sup) return changeSupplier({ op: 'editSupplier', id: sup.routeId, name, label, code }, 'Edit Supplier', done);
         const temp = { routeId: 'new-' + Date.now(), runId: '', route: code || '…', run: name, name: label || name, temp: true };
         pendingSuppliers.push(temp);
-        closeModal(); render();
+        done(); render();
         try {
           const res = await save('savePlantSchedule', { lane: 'RECEIVING', op: 'addSupplier', name, label, code });
           Object.assign(temp, res.supplier || {});
           showError('');
-          setTimeout(() => { pendingSuppliers.splice(pendingSuppliers.indexOf(temp), 1); render(); }, 1500);
+          setTimeout(() => { pendingSuppliers.splice(pendingSuppliers.indexOf(temp), 1); render(); if (!modal.hidden && modal.querySelector('.sc-suptable')) openSuppliers(); }, 1500);
         } catch (e) { pendingSuppliers.splice(pendingSuppliers.indexOf(temp), 1); showError('New Supplier: ' + (e.message || e)); render(); }
       };
+    }
+    function confirmSupplierRemove(sup, back) {
+      openModal('<h2 id="modal-title">Remove this supplier?</h2><dl class="sc-dl"><dt>Supplier</dt><dd>' + escapeHtml(sup.run) + '</dd><dt>Code</dt><dd>' + escapeHtml(sup.route || '—') + '</dd></dl>' +
+        '<p class="sc-supnote">It comes off the list for new loads. Loads already booked keep it.</p><div class="notice error sc-err" id="f-error" hidden></div>' +
+        '<div class="modal-actions"><button type="button" id="s-keep">Keep it</button><button type="button" class="danger" id="s-go">Remove Supplier</button></div>');
+      document.getElementById('s-keep').onclick = () => openSupplier(sup, back);
+      document.getElementById('s-go').onclick = () => changeSupplier({ op: 'removeSupplier', id: sup.routeId }, 'Remove Supplier', back ? openSuppliers : closeModal);
+    }
+    // An edit or remove waits for the save (the list shows it when it lands), then goes back to the Suppliers list.
+    async function changeSupplier(req, what, done) {
+      modal.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      const go = document.getElementById('s-save') || document.getElementById('s-go');
+      if (go) go.textContent = 'Saving…';
+      try {
+        await save('savePlantSchedule', Object.assign({ lane: 'RECEIVING' }, req));
+        showError('');
+        done();
+      } catch (e) {
+        modal.querySelectorAll('button').forEach(b => { b.disabled = false; });
+        if (go) go.textContent = req.op === 'removeSupplier' ? 'Remove Supplier' : 'Save Supplier';
+        formError(what + ': ' + (e.message || e));
+      }
     }
 
     // One listener for every button on the page and in the boxes.
@@ -395,6 +438,9 @@
         return openLoad(t.dataset.new, '');
       }
       if (t.id === 'supplier-add') return openSupplier();
+      if (t.id === 'suppliers') return openSuppliers();
+      if (t.id === 'supplier-new') return openSupplier(null, true);
+      if (t.dataset.supplier) { const sup = catalog().find(r => r.routeId === t.dataset.supplier); if (sup) openSupplier(sup, !!t.closest('#modal')); return; }
       if (t.dataset.view) { setView(t.dataset.view); return; }
       if (t.dataset.lane) { lane = t.dataset.lane; search = ''; if (view === 'history' && lane !== 'RECEIVING') view = 'month'; push(); render(); }
     });
@@ -459,7 +505,7 @@
       // Every load of each lane (the journal keeps scheduler records), so a load moved to another day is never shown twice.
       onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING)), s => { loads.SHIPPING = s.docs.map(d => d.data()); seen.SHIPPING = true; render(); }, fail('the Shipping schedule'));
       onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.RECEIVING)), s => { loads.RECEIVING = s.docs.map(d => d.data()); seen.RECEIVING = true; render(); }, fail('the Receiving schedule'));
-      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.SUPPLIER_TYPE)), s => { supplierDocs = s.docs.map(d => d.data()); render(); }, fail('the suppliers'));
+      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.SUPPLIER_TYPE)), s => { supplierDocs = s.docs.map(d => d.data()); render(); if (!modal.hidden && modal.querySelector('.sc-suptable')) openSuppliers(); }, fail('the suppliers'));
       onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, fail('Route Master'));
       render();
     });

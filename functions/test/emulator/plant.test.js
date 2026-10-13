@@ -126,14 +126,45 @@ test('Scheduler: the copy brings the loads; Add, Edit and Delete Load; Plant Rou
 
 test('Scheduler: Receiving adds a supplier (next S code), refuses a repeat, and books its load', async () => {
   const out = await schedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'Ohio Valley Fruit', label: 'Ohio Fruit' });
-  assert.equal(out.supplier.route, 'S07');
+  assert.equal(out.supplier.route, 'S02', 'the next S code after the one supplier on the list (no sample suppliers since Joe 10/13)');
   await assert.rejects(schedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'ohio valley fruit' }), /already on the list/);
   await assert.rejects(schedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'Another', code: 'S06' }), /S06 is already used/);
-  const load = await schedule({ lane: 'RECEIVING', op: 'save', date: '2026-10-09', fields: { routeId: out.supplier.routeId, runId: out.supplier.runId, route: 'S07', run: 'OHIO VALLEY FRUIT', pickupTime: '11:00', product: 'Strawberries' } });
+  const load = await schedule({ lane: 'RECEIVING', op: 'save', date: '2026-10-09', fields: { routeId: out.supplier.routeId, runId: out.supplier.runId, route: 'S02', run: 'OHIO VALLEY FRUIT', pickupTime: '11:00', product: 'Strawberries' } });
   const recv = await lanes('RECEIVING');
   assert.equal(recv.find(e => e.id === load.id).product, 'Strawberries');
   assert.equal((await db().collection('plantLoads').doc(load.id).get()).exists, false, 'Receiving loads are not driver loads');
   assert.equal((await lanes('SHIPPING')).some(e => e.id === load.id), false);
+});
+
+test('Scheduler: no sample suppliers; a supplier can be edited or removed (Joe 10/13); booked loads keep it', async () => {
+  const sups = async () => R.scheduleSuppliers((await db().collection('plantJournal').where('type', '==', R.SUPPLIER_TYPE).get()).docs.map(d => d.data()));
+  assert.deepEqual((await sups()).map(x => x.run), ['MOUNTAIN STATE SUGAR'], 'only the suppliers the plant added');
+  const added = (await schedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'Ohio Valley Fruit' })).supplier;
+  const load = await schedule({ lane: 'RECEIVING', op: 'save', date: '2026-10-09', fields: { routeId: 'SUP-m1', runId: 'SUP-m1', route: 'S06', run: 'MOUNTAIN STATE SUGAR', pickupTime: '09:00' } });
+  // Edit: same place in the list, new name; a blank code keeps the code.
+  await schedule({ lane: 'RECEIVING', op: 'editSupplier', id: 'SUP-m1', name: 'Dean Foods Milk', label: 'Dean' });
+  let list = await sups();
+  assert.deepEqual(list.map(x => [x.routeId, x.route, x.run, x.name]), [['SUP-m1', 'S06', 'DEAN FOODS MILK', 'Dean'], [added.routeId, added.route, 'OHIO VALLEY FRUIT', 'OHIO VALLEY FRUIT']]);
+  await assert.rejects(schedule({ lane: 'RECEIVING', op: 'editSupplier', id: 'SUP-m1', name: 'ohio valley fruit' }), /already on the list/);
+  await assert.rejects(schedule({ lane: 'RECEIVING', op: 'editSupplier', id: 'SUP-m1', name: 'X', code: added.route }), /is already used/);
+  await schedule({ lane: 'RECEIVING', op: 'editSupplier', id: added.routeId, name: 'Ohio Valley Fruit Co', code: 'OVF' });
+  list = await sups();
+  assert.deepEqual([list[1].routeId, list[1].route, list[1].run], [added.routeId, 'OVF', 'OHIO VALLEY FRUIT CO']);
+  // Remove: off the list, cannot be picked for a new load, but its booked load can still be edited.
+  await schedule({ lane: 'RECEIVING', op: 'removeSupplier', id: 'SUP-m1' });
+  assert.deepEqual((await sups()).map(x => x.routeId), [added.routeId]);
+  await assert.rejects(schedule({ lane: 'RECEIVING', op: 'editSupplier', id: 'SUP-m1', name: 'Back' }), /no longer on the list/);
+  await assert.rejects(schedule({ lane: 'RECEIVING', op: 'save', date: '2026-10-10', fields: { routeId: 'SUP-m1', runId: 'SUP-m1', route: 'S06', run: 'DEAN FOODS MILK', pickupTime: '09:00' } }), /no longer on the list/);
+  const had = (await lanes('RECEIVING')).find(e => e.id === load.id);
+  await schedule({ lane: 'RECEIVING', op: 'save', id: load.id, date: '2026-10-09', fields: { routeId: had.routeId, runId: had.runId, route: had.route, run: had.run, pickupTime: '10:00', product: 'Cream' } });
+  const now = (await lanes('RECEIVING')).find(e => e.id === load.id);
+  assert.deepEqual([now.runId, now.pickupTime, now.product], ['SUP-m1', '10:00', 'Cream']);
+  // A load booked with an old sample supplier can still be edited.
+  const old = (await lanes('RECEIVING')).find(e => e.runId === 'SUP-START-1');
+  await schedule({ lane: 'RECEIVING', op: 'save', id: old.id, date: old.date, fields: { routeId: old.routeId, runId: old.runId, route: old.route, run: old.run, pickupTime: '07:30' } });
+  assert.equal((await lanes('RECEIVING')).find(e => e.id === old.id).pickupTime, '07:30');
+  // Shipping has no suppliers.
+  await assert.rejects(schedule({ lane: 'SHIPPING', op: 'removeSupplier', id: added.routeId }), /Suppliers are on Receiving/);
 });
 
 test('Scheduler: a station loads a Shipping load and receives a Receiving load (Joe 10/12, Boxing); a finished one stays finished', async () => {

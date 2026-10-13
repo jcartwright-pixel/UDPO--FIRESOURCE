@@ -971,3 +971,15 @@
   .plant-page.loadout-page table.loadout tr[data-row] td .clock-cell button { flex: 1; }
   .plant-page.loadout-page table.loadout tr[data-row] td:empty { display: none; }
 }
+/* Joe 10/13: the Scheduler's Suppliers list (Receiving). */
+.sched-page .sc-supnote { margin: 0 0 12px; font-size: 16px; color: var(--muted); }
+.sched-page .sc-suplist { max-height: 60vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.sched-page .sc-suptable { width: 100%; border-collapse: collapse; font-size: 16px; }
+.sched-page .sc-suptable th { position: sticky; top: 0; background: var(--ud-blue); color: #fff; text-align: left; padding: 8px 12px; font-size: 16px; font-weight: 800; }
+.sched-page .sc-suptable td { padding: 6px 12px; border-top: 1px solid #edf2f7; font-weight: 700; color: var(--ink); }
+.sched-page .sc-suptable td:last-child { width: 1%; text-align: right; white-space: nowrap; }
+.sched-page .sc-suptable td.empty { text-align: center; color: var(--muted); }
+.sched-page .sc-supedit { flex: none; }
+.sched-page .sc-suptable .sc-btn.small { font-size: 16px; min-height: 34px; }
+.sched-page .sc-suptable th, .sched-page .sc-suptable td { text-align: left; }
+.sched-page .sc-btn.small.sc-supbtn { min-height: 32px; font-size: 16px; padding: 0 16px; }

@@ -604,9 +604,13 @@ async function saveWash(tx, db, req, email, stamp, logRef, mode, SaveError) {
 const appScheduleId = (type, id) => docId(type + '_app_' + id);
 function validateSchedule(input, SaveError) {
   const out = { lane: R.lane(input.lane), op: text(input.op) || 'save' };
-  if (['save', 'remove', 'addSupplier', 'progress'].indexOf(out.op) < 0) throw new SaveError('BAD_REQUEST', 'op must be save, remove, addSupplier or progress');
-  if (out.op === 'addSupplier') {
+  const SUPPLIER_OPS = ['addSupplier', 'editSupplier', 'removeSupplier'];
+  if (['save', 'remove', 'progress'].concat(SUPPLIER_OPS).indexOf(out.op) < 0) throw new SaveError('BAD_REQUEST', 'op must be save, remove, progress, addSupplier, editSupplier or removeSupplier');
+  if (SUPPLIER_OPS.indexOf(out.op) >= 0) {
     if (out.lane !== 'RECEIVING') throw new SaveError('BAD_REQUEST', 'Suppliers are on Receiving');
+    // Joe 10/13 ("Where do I edit my receivers"): a supplier can be edited or removed, as well as added.
+    if (out.op !== 'addSupplier') { out.id = text(input.id).slice(0, 60); if (!out.id) throw new SaveError('BAD_REQUEST', 'Pick the supplier'); }
+    if (out.op === 'removeSupplier') return out;
     out.name = text(input.name).replace(/\s+/g, ' ').toUpperCase();
     out.label = text(input.label).replace(/\s+/g, ' ').slice(0, 40);
     out.code = text(input.code).toUpperCase();
@@ -686,8 +690,33 @@ async function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mo
   return result;
 }
 
+// Edit or remove a supplier. The same record is rewritten, so the list keeps its order; loads already
+// booked keep the supplier, and the schedule shows its new name.
+async function changeSupplier(tx, journal, req, email, stamp, logRef, mode, SaveError) {
+  const docs = (await tx.get(journal.where('type', '==', R.SUPPLIER_TYPE))).docs.map(d => d.data());
+  const list = R.scheduleSuppliers(docs), cur = list.find(x => x.routeId === req.id);
+  if (!cur) throw new SaveError('NOT_FOUND', 'That supplier is no longer on the list. The list was refreshed.');
+  const had = R.newestRecords(docs, [R.SUPPLIER_TYPE])[req.id] || null, others = list.filter(x => x !== cur);
+  let fields;
+  if (req.op === 'removeSupplier') fields = { status: 'DELETED', route: cur.route, run: cur.run, notes: cur.name };
+  else {
+    const code = req.code || cur.route;
+    if (others.some(x => x.run.toUpperCase() === req.name)) throw new SaveError('CONFLICT', req.name + ' is already on the list.');
+    if (others.some(x => x.route === code)) throw new SaveError('CONFLICT', 'Code ' + code + ' is already used.');
+    fields = { status: 'ACTIVE', route: code, run: req.name, notes: req.label || req.name };
+  }
+  const sup = Object.assign({ recordId: req.id, type: R.SUPPLIER_TYPE, date: (had && had.date) || L.operatingDay(new Date(stamp)), routeId: req.id, runId: cur.runId, area: 'RECEIVING', payload: {},
+    createdAt: had ? had.createdAt || had.recordedAt || '' : stamp }, fields, { recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  tx.set(journal.doc(appScheduleId(R.SUPPLIER_TYPE, req.id)), sup);
+  const after = req.op === 'removeSupplier' ? null : { routeId: req.id, runId: cur.runId, route: fields.route, run: fields.run, name: fields.notes };
+  const result = { ok: true, requestId: req.requestId, supplier: after, removed: req.op === 'removeSupplier' ? req.id : '' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, lane: req.lane, op: req.op, before: cur, after, result });
+  return result;
+}
+
 async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const type = R.LOAD_TYPE[req.lane], journal = db.collection('plantJournal');
+  if (req.op === 'editSupplier' || req.op === 'removeSupplier') return changeSupplier(tx, journal, req, email, stamp, logRef, mode, SaveError);
   if (req.op === 'addSupplier') {
     const docs = (await tx.get(journal.where('type', '==', R.SUPPLIER_TYPE))).docs.map(d => d.data());
     const list = R.scheduleSuppliers(docs);
@@ -720,7 +749,9 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
   if (req.op === 'remove') {
     rec = Object.assign({}, had, { status: 'DELETED', date: had.date || req.date });
   } else {
-    const pick = choices.filter(r => r.routeId === req.routeId && r.runId === req.runId);
+    let pick = choices.filter(r => r.routeId === req.routeId && r.runId === req.runId);
+    // A load booked with a supplier since removed can still be edited, keeping that supplier.
+    if (!pick.length && req.lane === 'RECEIVING' && had && had.routeId === req.routeId && had.runId === req.runId) pick = [{ routeId: had.routeId, runId: had.runId, route: had.route, run: had.run }];
     if (pick.length !== 1) throw new SaveError('CONFLICT', (req.lane === 'RECEIVING' ? 'That supplier' : 'That route / run') + ' is no longer on the list. The list was refreshed; pick again.');
     if (pick[0].route !== req.route || pick[0].run !== req.run) throw new SaveError('CONFLICT', 'Route Master changed that run. The list was refreshed; pick again.');
     let trailer = req.trailer;
