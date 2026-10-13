@@ -67,6 +67,9 @@ service cloud.firestore {
     match /scorecard/{id} { allow read: if activeUser(); }
     // Joe 10/13: truck cleanliness ratings (the server writes them through rateTruckClean).
     match /scorecardRatings/{id} { allow read: if activeUser(); }
+    // Joe 10/13: accidents / incidents and complaints, and excused GPS misses (the server writes them).
+    match /driverIncidents/{id} { allow read: if activeUser(); }
+    match /scorecardExcuses/{id} { allow read: if activeUser(); }
     match /opsAssignments/{id} { allow read: if activeUser(); }
     // The plant side: the plant journal, pickups, and the wash and returns lists.
     match /plantJournal/{id} { allow read: if activeUserOrStation(); }

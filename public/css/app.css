@@ -1909,3 +1909,40 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 /* DVIR: the odometer filled from GPS says so under the box. */
 .dv-odo-note { display: block; font-size: 16px; color: #2e6b3a; font-weight: 600; min-height: 0; }
 .dv-odo-note:empty { display: none; }
+/* Joe 10/13 Driver Scorecard: a tab per graded area, accidents and complaints, excused misses, the kiosk (TV) view. */
+.sc-cats { display: flex; flex-wrap: nowrap; gap: 3px; overflow-x: auto; margin: 0 0 8px; padding-bottom: 2px; }
+.sc-cats button { flex: 0 0 auto; height: 38px; padding: 0 6px; border: 1px solid #b7c9d8; border-radius: 8px; background: #fff; color: #12385f; font: inherit; font-size: 16px; font-weight: 700; white-space: nowrap; }
+.sc-cats button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.sc-board.sc-area td.sc-detail, .sc-board.sc-incidents td.sc-detail { text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; padding: 4px 8px; }
+.sc-board .sc-pending, .sc-board tr.sc-pending td { color: #8a5a00; }
+.sc-board tr.sc-pending td { background: #fff6e0; }
+.sc-review { display: inline-block; padding: 0 6px; border-radius: 6px; background: #ffe7a8; color: #7a4d00; font-weight: 800; }
+.sc-board .sc-excused .sc-what, .sc-board .sc-excused .sc-pts { text-decoration: line-through; color: #7a8a99; }
+.sc-ex { color: #1c6b3a; font-weight: 700; }
+.sc-carry { color: #647b8e; }
+.sc-board .sc-excuse, .sc-board .sc-unexcuse, .sc-board .sc-ex-form button { height: 32px; padding: 0 10px; font-size: 16px; }
+.sc-ex-form input { height: 32px; min-width: 300px; font: inherit; }
+.sc-board.sc-incidents select { font: inherit; height: 34px; max-width: 100%; }
+.sc-board.sc-incidents td small { display: block; white-space: normal; font-weight: 400; color: #647b8e; }
+body.sc-kiosk #screen > .topbar, body.sc-kiosk .head, body.sc-kiosk #kpis, body.sc-kiosk #bar, body.sc-kiosk #foot, body.sc-kiosk .sidemenu { display: none !important; }
+body.sc-kiosk #sheet { height: 100vh; overflow-y: auto; }
+body.sc-kiosk .sc-board thead th { position: sticky; top: 0; z-index: 1; }
+.sc-kiosk-title { display: flex; justify-content: space-between; padding: 6px 12px; background: #20578e; color: #fff; font-size: 18px; }
+/* Joe 10/13 Driver Roster: accidents and complaints counts and entry under Edit. */
+.drivers-page .panel { overflow-y: auto; }
+.drivers-page td.inc-count { text-align: center; white-space: normal; line-height: 1.1; }
+.drivers-page .inc-n { color: #b42318; }
+.inc-review { color: #8a5a00; font-weight: 700; font-size: 16px; }
+.inc-box { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.inc-box h3, .inc-form h3 { margin: 0; font-size: 17px; color: var(--ud-blue-dark); }
+.inc-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 6px; background: #f4f8fb; font-size: 16px; }
+.inc-item.inc-pending { background: #fff6e0; color: #8a5a00; }
+.inc-item select { margin-left: auto; height: 34px; font: inherit; font-size: 16px; }
+.inc-add { display: flex; gap: 6px; flex-wrap: wrap; }
+.inc-add button { min-height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.inc-form { display: flex; flex-direction: column; gap: 6px; background: #f7fbfe; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.inc-form .panel-actions { margin-top: 4px; }
+.drivers-page #incidents-link { display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.drivers-page .sheet thead th { white-space: normal; line-height: 1.1; overflow-wrap: normal; }
+.inc-form .panel-row > label { min-width: 0; }
+.inc-form input[type=text], .inc-form input[type=date], .inc-form select, .inc-form textarea { width: 100%; min-width: 0; box-sizing: border-box; }

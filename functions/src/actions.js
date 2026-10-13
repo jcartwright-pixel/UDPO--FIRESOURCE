@@ -72,6 +72,10 @@ const ACTIONS = Object.freeze({
   saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
   // Joe 10/13: a manager rates a driver's truck cleanliness 1 to 5 on the Driver Scorecard.
   rateTruckClean: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  // Joe 10/13: accidents / incidents and complaints (Driver Roster > Edit), reviewed by a manager; an excused GPS miss.
+  addDriverIncident: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  reviewDriverIncident: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  excuseScorecardMiss: { roles: DRIVER_ROLES, screen: 'scorecard' },
   saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'opsAssignments' },
   // The plant side (plant.js): Loadout Center loads and pickups. The Plant Distribution screens are their own switch (Plant Loading).
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
@@ -355,6 +359,46 @@ function validate(input) {
     if (!out.driverKey) throw new SaveError('BAD_REQUEST', 'Pick the driver');
     if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
     if (!Number.isInteger(out.rating) || out.rating < 1 || out.rating > 5) throw new SaveError('BAD_REQUEST', 'Pick a rating from 1 to 5');
+    return out;
+  }
+  if (action === 'addDriverIncident') {
+    out.kind = text(input.kind, 20);
+    if (['accident', 'complaint'].indexOf(out.kind) < 0) throw new SaveError('BAD_REQUEST', 'kind must be accident or complaint');
+    out.driverKey = text(input.driverKey, 80).toUpperCase();
+    out.driver = text(input.driver, 80);
+    out.date = text(input.date);
+    out.type = text(input.type, 80);
+    out.note = text(input.note, 500);
+    if (!out.driverKey) throw new SaveError('BAD_REQUEST', 'Pick the driver');
+    if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'Pick the date');
+    if (out.kind === 'accident') {
+      out.accidentClass = Number(input.accidentClass);
+      if ([1, 2, 3].indexOf(out.accidentClass) < 0) throw new SaveError('BAD_REQUEST', 'Pick 1st, 2nd or 3rd degree');
+      out.truck = text(input.truck, 20);
+      out.preventable = input.preventable === true || input.preventable === 'yes';
+    } else {
+      out.source = text(input.source, 20) === 'other' ? 'other' : 'customer';
+      out.customer = text(input.customer, 80);
+      out.severity = text(input.severity, 10).toLowerCase();
+      if (['minor', 'major'].indexOf(out.severity) < 0) throw new SaveError('BAD_REQUEST', 'Pick Minor or Major');
+    }
+    return out;
+  }
+  if (action === 'reviewDriverIncident') {
+    out.incidentId = text(input.incidentId, 120);
+    out.status = text(input.status, 20);
+    if (!out.incidentId) throw new SaveError('BAD_REQUEST', 'Pick the entry');
+    if (['review', 'counts', 'notCounted'].indexOf(out.status) < 0) throw new SaveError('BAD_REQUEST', 'status must be review, counts or notCounted');
+    return out;
+  }
+  if (action === 'excuseScorecardMiss') {
+    out.key = text(input.key, 300);
+    out.reason = text(input.reason, 300);
+    out.undo = input.undo === true;
+    out.driverKey = text(input.driverKey, 80).toUpperCase();
+    out.what = text(input.what, 300);
+    if (!/^(gps|time)\|\d{4}-\d{2}-\d{2}\|/.test(out.key)) throw new SaveError('BAD_REQUEST', 'Only a GPS or Time miss can be excused');
+    if (!out.undo && !out.reason) throw new SaveError('BAD_REQUEST', 'Type the reason');
     return out;
   }
   if (action === 'saveScorecard') {
@@ -706,6 +750,9 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveScorecard') return saveScorecard(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'rateTruckClean') return rateTruckClean(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'addDriverIncident') return addDriverIncident(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'reviewDriverIncident') return reviewDriverIncident(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'excuseScorecardMiss') return excuseScorecardMiss(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOpsAssignment') return saveOpsAssignment(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'publishWeek') return publishWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
@@ -1486,6 +1533,38 @@ async function rateTruckClean(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection('scorecardRatings').doc(M.safeIdPart(req.driverKey + '_' + req.date)), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
   const data = { kind: 'cleanliness', driverKey: req.driverKey, driver: req.driver, date: req.date, rating: req.rating, truck: req.truck, note: req.note };
   tx.set(ref, Object.assign({}, data, { ratedAt: stamp, ratedBy: email, testEdited: mode.mode === 'test' }));
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
+  return result;
+}
+
+// Joe 10/13: an accident / incident or a complaint, one record each (driverIncidents). It starts Under review and counts nothing
+// until a manager marks it Reviewed - counts (or Reviewed - not counted). Nothing is written to Driver Master.
+async function addDriverIncident(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('driverIncidents').doc(M.safeIdPart(req.driverKey + '_' + req.kind + '_' + req.date + '_' + String(req.requestId || Date.now()).slice(-12)));
+  const data = { kind: req.kind, driverKey: req.driverKey, driver: req.driver, date: req.date, type: req.type, note: req.note, status: 'review' };
+  if (req.kind === 'accident') Object.assign(data, { accidentClass: req.accidentClass, truck: req.truck, preventable: req.preventable });
+  else Object.assign(data, { source: req.source, customer: req.customer, severity: req.severity });
+  tx.set(ref, Object.assign({}, data, { enteredAt: stamp, enteredBy: email, testEdited: mode.mode === 'test' }));
+  const result = { ok: true, requestId: req.requestId, runs: [], incidentId: ref.id };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before: null, after: data, result });
+  return result;
+}
+async function reviewDriverIncident(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('driverIncidents').doc(req.incidentId), snap = await tx.get(ref);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'That entry is not on the list any more');
+  const before = { status: snap.data().status }, after = req.status === 'review' ? { status: 'review', reviewedBy: '', reviewedAt: '' } : { status: req.status, reviewedBy: email, reviewedAt: stamp };
+  tx.update(ref, after);
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after, result });
+  return result;
+}
+// An excused GPS or Time miss (a hard stop for a deer): scorecardExcuses/<miss key>, with the reason and who excused it.
+async function excuseScorecardMiss(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('scorecardExcuses').doc(M.safeIdPart(req.key)), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+  const data = req.undo ? null : { key: req.key, reason: req.reason, driverKey: req.driverKey, what: req.what };
+  if (req.undo) tx.delete(ref);
+  else tx.set(ref, Object.assign({}, data, { by: email, at: stamp, testEdited: mode.mode === 'test' }));
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
   return result;
