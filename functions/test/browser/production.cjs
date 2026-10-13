@@ -71,6 +71,9 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
       const h = w === 1536 ? 864 : 1080;
       const lt = await openPage(browser, w, h, '/linetargets.html?line=' + LINE + '&' + ADMIN);
       await lt.waitForFunction(() => document.querySelectorAll('#rows tr').length > 5 && document.getElementById('form-title').textContent === 'GALLON FILLER');
+      // Review item 31 (Joe 10/13): no plant drop-down inside a plant.
+      assert.equal(await lt.$('#plant'), null, 'no plant drop-down on Line Targets');
+      assert.equal(await lt.textContent('#plant-name'), 'Uniontown');
       const first = await lt.$$eval('#rows tr:first-child td', t => t.map(x => x.querySelector('input') ? x.querySelector('input').value : x.textContent));
       assert.deepEqual([first[0], first[4], first[5], first[8]], ['Broughton 2% Gallon', '74', '57.3', '2,544'], 'RedZone\'s Rate/Min and Target % give 2,544 an hour');
       assert.deepEqual(await lt.$$eval('.qc-lines button span', b => b.map(x => x.firstChild.textContent)), ['BOXING', 'TOTES', 'HTST #1', 'GALLON FILLER', 'BLOW MOLD']);
@@ -125,7 +128,9 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     assert.match(await tb.textContent('#date-check'), /OCT|NOV/, 'today\'s code from the 14-day shelf life');
     await tb.click('#enter-count');
     await tb.fill('#count-box', '1250');
-    await tb.click('#count-save');
+    // Review item 38 (Joe 10/13): no Save Count button; leaving the box saves the count, once.
+    assert.equal(await tb.$('#count-save'), null, 'no Save Count button');
+    await tb.press('#count-box', 'Tab');
     await tb.waitForFunction(() => document.getElementById('made').textContent === '1,250');
     await tb.click('#status-btn');
     await tb.waitForFunction(() => /LINE STOPPED/.test(document.getElementById('status-text').textContent) && document.querySelectorAll('#reasons button').length === 12);
@@ -138,9 +143,18 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     const run = (await db().collection('productionRuns').doc(P.runId(LINE, shiftKey)).get()).data();
     assert.equal(run.product, 'Broughton 2% Gallon');
     assert.equal(run.count, 1250);
+    assert.equal((run.counts || []).length, 1, 'leaving the box saved the count once, not twice');
     assert.equal(run.stops.length, 1);
     assert.equal(run.stops[0].reason, 'Caser jam');
     assert.ok(run.stops[0].end, 'running again ends the stop');
+    // Enter saves the count too, and the box being left afterwards does not save it a second time.
+    await tb.click('#enter-count');
+    await tb.fill('#count-box', '1300');
+    await tb.press('#count-box', 'Enter');
+    await tb.evaluate(() => { const b = document.getElementById('count-box'); b.dispatchEvent(new Event('change', { bubbles: true })); b.blur(); });
+    await tb.waitForFunction(() => document.getElementById('made').textContent === '1,300');
+    await new Promise(r => setTimeout(r, 1000));
+    assert.equal(((await db().collection('productionRuns').doc(P.runId(LINE, shiftKey)).get()).data().counts || []).length, 2, 'Enter then leaving the box is one save');
     assert.deepEqual(tb.errors, []);
     results.push('Line tablet: pick the product, type the count, Line Stopped shows the twelve reasons, tap why, Running Again; all saved on the line\'s shift');
 
@@ -174,6 +188,7 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
       await pl.waitForFunction(() => document.querySelectorAll('.pd-tile').length === 5);
       assert.ok(await pl.$('.pd-tile.flash[data-line="' + LINE + '"]'), 'the Gallon Filler flashes');
       assert.match(await pl.textContent('.pd-tile[data-line="' + LINE + '"] .pd-speed'), /TOO FAST 80\/MIN/);
+      assert.equal(await pl.$('#plant'), null, 'no plant drop-down on Production Lines (review item 31)');
       assert.deepEqual(await pl.$$eval('.sidemenu > a:not(.side-name)', a => a.map(x => x.textContent.trim())), ['Line Tablet', 'Line Targets', 'Production TV']);
       await fits(pl, 'Production Lines at ' + w);
       await shot(pl, 'production-lines-' + w);
@@ -198,6 +213,8 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     const key = await lt.textContent('#reader-key');
     assert.ok(key.length >= 24, 'a long key');
     assert.equal(((await db().collection('private').doc('readDevices').get()).data() || {})[LINE].hash, RD.hash(key), 'only its hash is kept');
+    // Review item 33 (Joe 10/13): app buttons (the blue edge and words), not the browser's grey ones.
+    assert.deepEqual(await lt.$$eval('#start-feed, #start-all', bs => bs.map(b => { const c = getComputedStyle(b); return [c.backgroundColor, c.borderTopColor === c.color]; })), [['rgb(255, 255, 255)', true], ['rgb(255, 255, 255)', true]]);
     await lt.click('#start-feed');
     await lt.waitForFunction(() => /Test feed running/.test(document.getElementById('reader').textContent));
     // Twenty minutes of the feed, as if it had started twenty minutes ago (so the target so far and the speed read as on the line).

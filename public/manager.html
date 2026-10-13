@@ -32,7 +32,7 @@
       <div class="dayname" id="dayname"></div>
       <!-- Joe 10/10 (look B): a Reports button on Manager Center opens the Plant Scorecard; Shift Comparison, Day-of-Week Trends
            and the Plant Performance TV are on that screen. -->
-      <a class="mc-repbtn" id="reports" href="reportcenter.html" title="Reports: every report in one place">&#128202; Reports</a>
+      <a class="mc-repbtn" id="reports" href="reportcenter.html" title="Reports: every report in one place">Reports</a>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -46,10 +46,10 @@
             <span class="mc-subject" id="pv-subject">Loading the report…</span>
             <span class="mc-chips" id="pv-chips"></span>
             <span class="mc-pvlist" id="pv-list"></span>
-            <span class="mc-pvnote">&#9998; Add a note to this report…</span>
+            <span class="mc-pvnote">Add a note to this report…</span>
           </button>
           <div class="mc-to" id="pv-to">To: Plant Managers group</div>
-          <div class="mc-acts"><button type="button" class="mc-btn" data-open-report>&#9998; Edit / Add</button><button type="button" class="mc-btn send" id="send-card">&#9993; SEND CURRENT REPORT &rsaquo;</button></div>
+          <div class="mc-acts"><button type="button" class="mc-btn" data-open-report>Edit / Add</button><button type="button" class="mc-btn send" id="send-card">SEND CURRENT REPORT</button></div>
         </div>
         <!-- Joe 10/11: production first (Departments, Scheduler), then Shift Notes and Quality, then Temperatures and Yard. -->
         <div class="mc-card" style="--accent:#d27b00" data-card="dept"></div>
@@ -65,7 +65,7 @@
   <div class="mc-modal" id="modal" hidden>
     <div class="mc-dialog" role="dialog" aria-modal="true" aria-labelledby="rp-subject">
       <div class="mc-dhead"><div><span class="eyebrow">Send Current Report · To: Plant Managers group</span><h2 id="rp-subject"></h2></div>
-        <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn" id="copy">&#10697; Copy</button><button type="button" class="mc-btn" id="print-report">&#9113; Print</button><button type="button" class="mc-btn send" id="send">&#9993; Send Current Report</button></div></div>
+        <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn" id="copy">Copy</button><button type="button" class="mc-btn" id="print-report">Print</button><button type="button" class="mc-btn send" id="send">Send Current Report</button></div></div>
       <div class="notice error" id="send-error" role="alert" hidden></div>
       <label class="mc-note">Note at the top of the email (optional)<textarea id="note" maxlength="1500" placeholder="Add a note to this report…"></textarea></label>
       <div class="mc-report-body" id="rp-body"></div>
@@ -252,8 +252,9 @@
     const reportNote = () => (document.getElementById('note').value || '').trim();
     document.getElementById('copy').onclick = async (e) => {
       const b = e.currentTarget, text = (reportNote() ? 'NOTE: ' + reportNote() + '\n\n' : '') + report.subject + '\n\n' + report.text;
-      try { await navigator.clipboard.writeText(text); b.textContent = '\u2713 Copied'; } catch (err) { showError('Could not copy the report: ' + err.message); }
-      setTimeout(() => { b.innerHTML = '&#10697; Copy'; }, 2000);
+      try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; } catch (err) { showError('Could not copy the report: ' + err.message); }
+      // Review item 30 (Joe 10/13): Manager Center's buttons are words only.
+      setTimeout(() => { b.textContent = 'Copy'; }, 2000);
     };
     document.getElementById('print-report').onclick = () => {
       const f = document.createElement('iframe');

@@ -27,9 +27,10 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <!-- Joe 10/10: the date right beside the month, and Shipping / Receiving right beside the date, a little apart, the one in use lit. -->
+      <!-- Joe 10/10: Shipping / Receiving right beside the dates, a little apart, the one in use lit. Review item 37 (Joe 10/13): no date
+           box; This week (or Today, This month) and the arrows on the right move the dates. -->
       <div class="title"><span class="eyebrow">Plant Operations Scheduler · <b id="lane-name">Shipping</b></span>
-        <div class="sc-titleline"><h1 id="range">Plant Operations Scheduler</h1><input id="pick" type="date" aria-label="Schedule date">
+        <div class="sc-titleline"><h1 id="range">Plant Operations Scheduler</h1>
           <div class="tabs lane seg sc-lane" role="group" aria-label="Shipping or Receiving"><button type="button" data-lane="SHIPPING">Shipping</button><button type="button" data-lane="RECEIVING">Receiving</button></div></div></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
     </div>
@@ -147,7 +148,6 @@
       if (view === 'history' && lane !== 'RECEIVING') view = 'month';
       document.getElementById('v-history').hidden = lane !== 'RECEIVING';
       document.querySelector('.sc-ctrl .stepper').hidden = view === 'history';
-      document.getElementById('pick').hidden = view === 'history';
       const ck = canSave(), r = range(), list = entries(), inRange = list.filter(x => x.date >= r.start && x.date <= r.end);
       document.body.classList.toggle('sc-recv', lane === 'RECEIVING');
       document.getElementById('lane-name').textContent = lane === 'RECEIVING' ? 'Receiving' : 'Shipping';
@@ -159,7 +159,6 @@
       const unit = view === 'month' ? 'month' : view === 'week' ? 'week' : 'day';
       [['prev', 'Previous '], ['next', 'Next ']].forEach(([id, w]) => { const b = document.getElementById(id); b.title = w + unit; b.setAttribute('aria-label', w + unit); });
       document.getElementById('print').textContent = 'Print ' + (view === 'history' ? 'History' : view === 'week' ? 'Weekly' : view === 'day' ? 'Daily' : 'Monthly');
-      document.getElementById('pick').value = date;
       document.getElementById('add').hidden = !ck;
       document.getElementById('suppliers').hidden = lane !== 'RECEIVING';
       let tiles;
@@ -457,7 +456,6 @@
     document.getElementById('prev').onclick = () => setDate(step(-1));
     document.getElementById('next').onclick = () => setDate(step(1));
     document.getElementById('today').onclick = () => setDate(today());
-    document.getElementById('pick').addEventListener('change', e => setDate(e.target.value));
     document.getElementById('add').onclick = () => { const r = range(), t = today(); if (view === 'history') return openLoad(t, ''); openLoad(t >= r.start && t <= r.end ? t : view === 'day' ? date : r.start, ''); };
     document.getElementById('print').onclick = printView;
 

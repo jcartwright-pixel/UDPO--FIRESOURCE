@@ -100,3 +100,10 @@
   .ms-page #view-jobs > .gs-bar .gs-btn { flex: 1 1 0; min-width: 0; min-height: 64px; padding: 8px 10px; font-size: 19px; line-height: 1.15; }
   .ms-page .gs-empty { font-size: 22px; }
 }
+/* Review item 34 (Joe 10/13): the help line at the bottom of Machinery, Maintenance Center and PM Schedule keeps the same gap
+   from the side menu as the boxes above it. */
+.mach-page .foot, .pmc-page .foot, .pms-page .foot { margin: 0 16px; padding-bottom: 6px; }
+/* Review item 35 (Joe 10/13): Machinery's Installed box reads 10-8-26 (the shared date box in js/app.js draws the short date over
+   the browser's box). With no date yet it is blank instead of the browser's mm/dd/yyyy; while it is being typed in, the
+   browser's own text shows. */
+.mach-page input[type="date"]:not(.ud-date-dressed):not(:focus)::-webkit-datetime-edit { color: transparent; }

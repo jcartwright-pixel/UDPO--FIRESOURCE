@@ -44,7 +44,7 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     assert.match(await loader.textContent('#strip'), /Pickups 1 left of 2/);
     await loader.click(row('811') + ' button.edit-row');
     await loader.fill('#edit-notes', 'pu 6 qts chocolate');
-    await loader.click('#edit-save');
+    await loader.click('#edit-modal [data-close]');
     await watcher.waitForFunction(r => document.querySelector(r + ' button.pu.open'), row('811'), { timeout: 8000 });
     assert.equal(await watcher.textContent(row('811') + ' button.pu'), 'P/U1', 'the note shows as an open pickup, red with its count');
     assert.match(await watcher.textContent('#strip'), /Pickups 2 left of 3/);

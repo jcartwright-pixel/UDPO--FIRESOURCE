@@ -70,8 +70,8 @@
     <div class="modal-actions">
       <button type="button" class="left danger-line" id="edit-notrunning">Ended Up Not Running</button>
       <button type="button" id="edit-pickup">Add Pickup</button>
-      <button type="button" data-close>Cancel</button>
-      <button type="button" class="primary" id="edit-save">Save Times &amp; Notes</button>
+      <span class="edit-saved" id="edit-saved" role="status"></span>
+      <button type="button" data-close>Close</button>
     </div>
   </section>
 
@@ -371,18 +371,36 @@
       document.getElementById('edit-temp').value = qty(row.temperature);
       document.getElementById('edit-shift').value = row.shift || '';
       document.getElementById('edit-notes').value = row.notes || '';
-      ['edit-start', 'edit-end', 'edit-temp', 'edit-shift', 'edit-notes', 'edit-save', 'edit-notrunning', 'edit-pickup'].forEach(k => { document.getElementById(k).disabled = !canLoad(); });
+      ['edit-start', 'edit-end', 'edit-temp', 'edit-shift', 'edit-notes', 'edit-notrunning', 'edit-pickup'].forEach(k => { document.getElementById(k).disabled = !canLoad(); });
+      document.getElementById('edit-saved').textContent = '';
+      EDIT_BOXES.forEach(id => { editShown[id] = document.getElementById(id).value; });
       openModal('edit-modal');
     }
-    document.getElementById('edit-save').onclick = () => {
-      const row = editing;
-      if (!row) return;
-      const startedAt = P.localToStamp(document.getElementById('edit-start').value), completedAt = P.localToStamp(document.getElementById('edit-end').value);
-      if (startedAt && completedAt && completedAt < startedAt) { showError('End Time cannot be before Start Time.'); return; }
-      const fields = { startedAt, completedAt, notes: document.getElementById('edit-notes').value, temperature: document.getElementById('edit-temp').value, shift: document.getElementById('edit-shift').value };
-      closeModals();
-      saveLoad(row, fields, { startedAt, completedAt, notes: fields.notes, temperature: fields.temperature, shift: fields.shift, state: completedAt ? 'DONE' : startedAt ? 'LOADING' : 'WAITING' });
-    };
+    // Review item 38 (Joe 10/13): no Save Times & Notes button. Each box saves as it is left (the same savePlantLoad call):
+    // Start and End go together (End cannot be before Start), Temperature, Shift and Notes each on their own. Close (or Esc,
+    // or a tap outside) saves the box still being typed in first.
+    const EDIT_BOXES = ['edit-start', 'edit-end', 'edit-temp', 'edit-shift', 'edit-notes'], editShown = {};
+    function editBoxSave(el) {
+      const row = editing, id = el && el.id;
+      if (!row || EDIT_BOXES.indexOf(id) < 0 || !canLoad() || el.value === editShown[id]) return;
+      let fields, shown;
+      if (id === 'edit-start' || id === 'edit-end') {
+        const startedAt = P.localToStamp(document.getElementById('edit-start').value), completedAt = P.localToStamp(document.getElementById('edit-end').value);
+        if (startedAt && completedAt && completedAt < startedAt) { showError('End Time cannot be before Start Time.'); return; }
+        fields = { startedAt, completedAt };
+        shown = { startedAt, completedAt, state: completedAt ? 'DONE' : startedAt ? 'LOADING' : 'WAITING' };
+      } else {
+        const k = { 'edit-temp': 'temperature', 'edit-shift': 'shift', 'edit-notes': 'notes' }[id];
+        fields = { [k]: el.value }; shown = { [k]: el.value };
+      }
+      editShown[id] = el.value;
+      const said = document.getElementById('edit-saved');
+      said.textContent = 'Saving…';
+      // saveLoad shows a refusal on the page's error line; the box says which it was.
+      saveLoad(row, fields, shown).then(() => { if (said.textContent === 'Saving…') said.textContent = document.getElementById('error').hidden ? 'Saved ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Not saved'; });
+    }
+    document.getElementById('edit-modal').addEventListener('focusout', e => editBoxSave(e.target));
+    document.getElementById('edit-shift').addEventListener('change', e => editBoxSave(e.target));
     document.getElementById('edit-notrunning').onclick = () => {
       const row = editing, btn = document.getElementById('edit-notrunning');
       if (!row) return;
@@ -488,7 +506,7 @@
     document.addEventListener('click', e => { if (!e.target.closest('#state-pop, [data-state]')) closePop(); });
     document.querySelectorAll('[data-close]').forEach(b => { b.onclick = closeModals; });
     document.getElementById('modal-back').onclick = closeModals;
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePop(); closeModals(); } });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { editBoxSave(document.activeElement); closePop(); closeModals(); } });
     window.udBack = () => { if (document.getElementById('state-pop')) { closePop(); return true; } return false; };
 
     document.getElementById('areas').addEventListener('click', e => {
