@@ -1864,3 +1864,9 @@ td.eq-act > button { white-space: nowrap; padding: 0 10px; }
 
 /* Review item 45 (Joe 10/13): plant Work Orders' search box is wide enough for "Find a machine, problem or mechanic". */
 .pmw-page #search { width: 400px; max-width: 40vw; }
+/* Fleet Service Setup (Joe 10/13): the rule labels, their units and the Add Technician boxes at the 16px everything else uses. */
+.fs-rules label { font-size: 16px; letter-spacing: .02em; }
+.fs-rule small { font-size: 16px; }
+.fs-rule input { font-size: 16px; height: 38px; }
+.fs-addtech input, .fs-addtech button { font-size: 16px; min-height: 40px; }
+.fleet-page table.issues td, .fleet-page table.issues th { font-size: 16px; }

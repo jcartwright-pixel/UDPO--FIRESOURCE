@@ -1060,7 +1060,7 @@ const OVERRIDE_DAY = { route_override: 'routeOverride', equipment_override: 'equ
 const byHand = (run, p, col) => L.yes(((run.days && run.days[p]) || {})[OVERRIDE_DAY[col]]) || L.yes((run.cells || {})[p + '_' + col]);
 const loadDay = (week, p, offset) => L.addDays(week, L.DAYS.indexOf(p) + (Number.isFinite(Number(offset)) && offset !== null && offset !== '' ? Number(offset) : 0));
 const LIVE_RUN_COLUMNS = {};
-M.RUN_FIELDS.forEach(([field, col]) => { LIVE_RUN_COLUMNS[field] = col; });
+M.RUN_FIELDS.forEach(([field, col]) => { if (M.APP_ONLY_RUN_FIELDS.indexOf(field) < 0) LIVE_RUN_COLUMNS[field] = col; });
 
 // runId given: that run's Live rows; else every run of the two weeks.
 async function liveRead(tx, db, runId) {
@@ -1083,7 +1083,7 @@ function writeLive(tx, db, mode, req, stamp, email, snap, run, ch, result) {
   const ps = Object.keys(ch.days).filter(p => Object.keys(ch.days[p]).length);
   if (!ps.length && !Object.keys(ch.run).length) return;
   const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp }, cells = {};
-  Object.keys(ch.run).forEach(k => { const v = ch.run[k]; update[k] = v; cells[LIVE_RUN_COLUMNS[k]] = typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v); });
+  Object.keys(ch.run).forEach(k => { const v = ch.run[k]; update[k] = v; if (!LIVE_RUN_COLUMNS[k]) return; cells[LIVE_RUN_COLUMNS[k]] = typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v); });
   ps.forEach(p => {
     Object.keys(ch.days[p]).forEach(k => { update['days.' + p + '.' + k] = ch.days[p][k]; });
     update['days.' + p + '.updatedAt'] = stamp; update['days.' + p + '.updatedBy'] = email;

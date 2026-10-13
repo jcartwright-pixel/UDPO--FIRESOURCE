@@ -81,6 +81,9 @@ const DAY_FIELDS = Object.freeze([
 const APP_ONLY_DAY_FIELDS = Object.freeze(['intendedDriverId', 'intendedDriver', 'driverExceptionStatus', 'checkinTruck', 'checkinTrailer', 'moreTrailers',
   // Joe 10/13: the Check-In's "Was your truck loaded correctly?" has no Live sheet column; it stays in the app.
   'loadedCorrectly', 'loadingProblem']);
+// Joe 10/13 (Sheet conflicts, route 906): the real Live week tabs have no coverage_owner column. "Run By" lives in Route Master;
+// on Live rows it stays in the app and is never written to the sheet.
+const APP_ONLY_RUN_FIELDS = Object.freeze(['coverageOwner']);
 
 function normalizeHeader(value) {
   return String(value === null || value === undefined ? '' : value).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -106,6 +109,6 @@ function safeIdPart(value) {
 function runDocId(weekStart, rowKey) { return weekStart + '__' + safeIdPart(rowKey); }
 
 module.exports = {
-  COLLECTIONS, LIVE_TABS, LIVE_HEADER_ROW, MASTER_HEADER_ROW, RUN_FIELDS, DAY_FIELDS, APP_ONLY_DAY_FIELDS,
+  COLLECTIONS, LIVE_TABS, LIVE_HEADER_ROW, MASTER_HEADER_ROW, RUN_FIELDS, DAY_FIELDS, APP_ONLY_DAY_FIELDS, APP_ONLY_RUN_FIELDS,
   normalizeHeader, convert, safeIdPart, runDocId
 };
