@@ -91,7 +91,7 @@ export const MENU = [
   ['Distribution Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
   ['Fleet Reports', [['Fleet Service Report', 'fleet.html', 'truck']]],
   // Joe 10/12: the Safety Walkthrough, a card of its own next to Reports: the weekly walk, its open issues, the extinguishers.
-  ['Safety Walkthrough', [['Weekly Walk', 'safety.html', 'safety'], ['Open Issues', 'safety-issues.html', 'alert'], ['Fire Extinguishers', 'extinguishers.html', 'safety'], ['Past Walks', 'safety-walks.html', 'day'], ['Checklist Setup', 'safety-setup.html', 'gear']]],
+  ['Safety Walkthrough', [['Weekly Walk', 'safety.html', 'safety'], ['Open Issues', 'safety-issues.html', 'alert'], ['Fire Extinguishers', 'extinguishers.html', 'safety'], ['Fire Alarm', 'safety-fire.html?sys=alarm', 'safety'], ['Fire Suppression', 'safety-fire.html?sys=suppression', 'safety'], ['Escape Plan', 'safety-fire.html?sys=escape', 'safety'], ['Past Walks', 'safety-walks.html', 'day'], ['Checklist Setup', 'safety-setup.html', 'gear']]],
   // Joe 10/11: Plant Production, our own RedZone: every line this shift, the line tablet, each product's targets and the TV.
   ['Production Lines', [['Production Lines', 'production.html', 'production.webp'], ['Line Tablet', 'line.html', 'production.webp'], ['Line Targets', 'linetargets.html', 'production.webp'], ['Production TV', 'production.html?tv=1', 'production.webp']]],
   // Joe 10/12: Plant Maintenance, like the garage work orders but for the plant's machinery: requests from the plant, work orders,
@@ -365,9 +365,9 @@ const PAGE_ICON = {
   'gps.html': 'pin', 'scorecard.html': 'star', 'reportcenter.html': 'chart',
   'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
   'garage.html': 'wrench', 'fleet.html': 'truck',
-  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'tanker-v1.webp', 'returns.html': 'box-v1.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'production.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
+  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'case-unloading-v1-560.webp', 'returns.html': 'returns-to-cooler-v1-560.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'production.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
-  'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear', 'location-areas.html': 'map',
+  'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-fire.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear', 'location-areas.html': 'map',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {
@@ -391,8 +391,9 @@ document.addEventListener('click', e => {
 // Polish 16: when the tablet or computer loses its connection a yellow bar says so at the top, so nobody thinks a press was
 // sent. Saves go to the server, so they wait for the signal; the bar goes away by itself when it is back.
 (function connectionBar() {
-  // Screens that keep saves on the device with no signal (window.UD_OFFLINE) show their own line instead.
-  if (EMBED || window.UD_OFFLINE) return;
+  // Screens that keep saves on the device with no signal (window.UD_OFFLINE, and the drivers' Route page with
+  // window.UD_PHONE_QUEUE, Joe 10/12) show their own line instead.
+  if (EMBED || window.UD_OFFLINE || window.UD_PHONE_QUEUE) return;
   let bar = null;
   const show = () => {
     if (navigator.onLine) { if (bar) bar.hidden = true; return; }
@@ -621,7 +622,7 @@ export async function requireSignIn(ready) {
       user.station = station;
       gate.hidden = true;
       screen.hidden = false;
-      // It leaves only through the Plant Station's Change Station (and the manager release code), not Sign out.
+      // It leaves only through the Plant Station's Release (and the manager release code), not Sign out.
       const out = document.getElementById('signout');
       if (out) out.hidden = true;
       const who = document.getElementById('who');
@@ -724,7 +725,17 @@ export function savePill(state) {
   clearTimeout(pillTimer);
   if (state === 'saved') pillTimer = setTimeout(() => { pill.hidden = true; }, 4000);
 }
+// Joe 10/13: a station screen (window.UD_STATION_OFFLINE: the Plant Station) keeps a save made with no signal on the tablet
+// and sends it once when the signal is back (js/offline-saves.js); saveNow always sends at once.
 export async function save(action, fields) {
+  if (window.UD_STATION_OFFLINE) {
+    const out = await (await import('./offline-saves.js')).offlineSave(action, fields);
+    if (out && out.queued) savePill('saved');
+    return out;
+  }
+  return saveNow(action, fields);
+}
+export async function saveNow(action, fields) {
   if (window.UD_EDIT_PILL) return callServer('save', Object.assign({ action }, fields));
   if (!saving) saveFailed = false;
   saving++; savePill('saving');

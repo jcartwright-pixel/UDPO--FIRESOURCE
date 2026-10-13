@@ -10,15 +10,29 @@ export const remember = (k, v) => { try { if (v) localStorage.setItem(k, JSON.st
  * What the tablet opens: {station} (a station from its code), {needCode, message} (codes are in use and this tablet has
  * none, or its code changed), or {free: true} (no codes at this plant yet: the page works as before).
  */
+const noSignal = (e) => !navigator.onLine || /internal|unavailable|deadline|network|failed to fetch|offline/i.test(String(e && (e.code + ' ' + e.message)));
 export async function resolveStation(kind, storeKey, call) {
   const mine = read(storeKey);
   if (mine && mine.key) {
-    const r = await call('check', { kind, key: mine.key, version: mine.version || '' });
+    // Joe 10/13: with no signal the tablet keeps the station it had (checked again once the signal is back).
+    let r;
+    try { r = await call('check', { kind, key: mine.key, version: mine.version || '' }); } catch (e) {
+      if (noSignal(e)) return { station: mine, offline: true };
+      throw e;
+    }
     if (r.ok) { remember(storeKey, r.station); return { station: r.station }; }
     remember(storeKey, null);
     return { needCode: true, message: r.message };
   }
-  const has = await call('has', { kind, facilityId: 'fac_uniontown' });
+  // With no signal, the last answer this tablet had (a station with no codes opens as before; unknown asks for the code).
+  const HAS = 'udStationHas.' + kind;
+  let has;
+  try { has = await call('has', { kind, facilityId: 'fac_uniontown' }); try { localStorage.setItem(HAS, has.required ? '1' : '0'); } catch (e) { /* private window */ } } catch (e) {
+    if (!noSignal(e)) throw e;
+    let last = null;
+    try { last = localStorage.getItem(HAS); } catch (x) { /* private window */ }
+    return last === '0' ? { free: true, offline: true } : { needCode: true, message: 'No signal. The station code can be checked once the signal is back.' };
+  }
   return has.required ? { needCode: true, message: '' } : { free: true };
 }
 
@@ -46,16 +60,19 @@ export function askCode(box, { kind, storeKey, call, title, hint, message }) {
 }
 
 /*
- * Change Station: once the plant has a manager release code (Administration > Manager Links), a manager types it
+ * Release: once the plant has a manager release code (Administration > Manager Links), a manager types it
  * first. Resolves true when the tablet may leave its station, false on Cancel or when the check could not be made.
  */
-export async function askRelease(box, { status, release, onError, why }) {
+export async function askRelease(box, { status, release, onError, why, mustHave }) {
   let required = false;
   try { required = (await status()).required; } catch (err) {
     // No answer: the station stays as it is, so a dropped network cannot get past the code.
     onError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and try again.');
     return false;
   }
+  // Joe 10/12: a driver must never get from the Driver Room tablet or TV into the app. Those screens (mustHave) stay put until
+  // the plant has a manager release code.
+  if (!required && mustHave) { onError('This screen stays here until the plant has a manager release code (Administration > Manager Links).'); return false; }
   if (!required) return true;
   return new Promise(resolve => {
     box.hidden = false;
@@ -72,4 +89,16 @@ export async function askRelease(box, { status, release, onError, why }) {
       try { const out = await release(form.code.value); if (out.ok) done(true); else msg.textContent = out.message; } catch (err) { msg.textContent = String(err.message || err); }
     });
   });
+}
+
+// Joe 10/12 "there will be no back buttons ... the only way to get out of that screen should be the manager release button":
+// a station with a code has no Back, Home or Sign out (stations.css hides them under body.station-locked). Its own change
+// button becomes the one "Release" bar at the very bottom of the screen, which asks for the plant's manager release code.
+export function lockStation(button, on) {
+  document.body.classList.toggle('station-locked', !!on);
+  if (button.parentNode !== document.body) document.body.appendChild(button);
+  button.textContent = 'Release';
+  button.title = 'A manager types the manager release code to take this tablet off its station';
+  button.classList.add('station-release');
+  button.hidden = !on;
 }

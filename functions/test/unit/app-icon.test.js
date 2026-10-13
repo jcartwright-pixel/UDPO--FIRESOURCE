@@ -29,9 +29,9 @@ test('every screen links the icon, and every signed-in screen links the app', ()
     const html = fs.readFileSync(path.join(PUBLIC, f), 'utf8');
     if (!html.includes('href="img/app-icon/favicon-32.png"')) bad.push(f + ': favicon');
     if (!html.includes('href="img/app-icon/apple-touch-icon.png"')) bad.push(f + ': phone icon');
-    // The public driver Check-In, the plant tablets' Plant Station and the Driver Room Check-In tablet (Joe 10/12, no
-    // account) are their own installs: each opens its own page, not the signed-in launcher.
-    if (f !== 'route.html' && f !== 'plant-station.html' && f !== 'driver-room.html' && !html.includes('<link rel="manifest" href="manifest.webmanifest">')) bad.push(f + ': manifest');
+    // The public driver Check-In and the coded stations (Plant, Garage, Driver Station and the Driver Room Check-In tablet,
+    // Joe 10/12) are their own installs: each opens its own page full screen, not the signed-in launcher.
+    if (!['route.html', 'plant-station.html', 'driver-room.html', 'driver-station.html', 'garage-station.html'].includes(f) && !html.includes('<link rel="manifest" href="manifest.webmanifest">')) bad.push(f + ': manifest');
   });
   assert.deepEqual(bad, []);
 });
@@ -62,4 +62,25 @@ test('installed from the Plant Station, "Plant Station" opens full screen to the
       }
     }
   }
+});
+
+// Joe 10/12 "it needs to open up in the window shell only": installed from the Driver Station or Garage Station link (the
+// Driver Room tablet too), the icon opens that station full screen in its own window, no browser bars.
+test('installed from a station link, the station opens full screen in its own window', () => {
+  const starts = { 'driver-station.html': ['driver-station.webmanifest', '/driver-station.html', 'Driver Station'], 'driver-room.html': ['driver-station.webmanifest', '/driver-station.html', 'Driver Station'],
+    'garage-station.html': ['garage-station.webmanifest', '/garage-station.html', 'Garage Station'] };
+  for (const [page, [file, start, name]] of Object.entries(starts)) {
+    const html = fs.readFileSync(path.join(PUBLIC, page), 'utf8');
+    assert.ok(html.includes('<link rel="manifest" href="' + file + '">'), page);
+    assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/, page);
+    const m = JSON.parse(fs.readFileSync(path.join(PUBLIC, file), 'utf8'));
+    assert.equal(m.short_name, name, file);
+    assert.equal(m.start_url, start, file);
+    assert.equal(m.id, start, file);
+    assert.equal(m.display, 'fullscreen', file);
+    assert.equal(m.scope, '/', file);
+    m.icons.forEach(i => assert.ok(fs.existsSync(path.join(PUBLIC, i.src)), i.src));
+  }
+  // The Driver Room tablet's phone screens (route.html?room=1) install the Driver Station link, not the drivers' UD Routes.
+  assert.match(fs.readFileSync(path.join(PUBLIC, 'route.html'), 'utf8'), /get\('room'\) === '1'\) document\.querySelector\('link\[rel="manifest"\]'\)\.href = 'driver-station\.webmanifest'/);
 });

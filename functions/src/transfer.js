@@ -325,7 +325,7 @@ function parseLiveTab(tabName, values, lookups) {
     run.masterShow = routeMaster ? { daily: routeMaster.displayDaily === undefined ? null : routeMaster.displayDaily, mobile: routeMaster.displayMobile === undefined ? null : routeMaster.displayMobile,
       loadType: routeMaster.loadType || '' } : { daily: null, mobile: null, loadType: '' };
     run.days = {};
-    const ranByDriver = [];
+    const offWithDriver = [];
     L.DAYS.forEach(prefix => {
       const day = {};
       M.DAY_FIELDS.forEach(([field, suffix, kind]) => {
@@ -336,14 +336,15 @@ function parseLiveTab(tabName, values, lookups) {
       });
       fixDriver(day, prefix, r.rowNumber, run, lookups, warn);
       fixEquipment(day, prefix, r.rowNumber, run, lookups, warn);
-      // Joe 10/10: a day with a driver runs. A Live row marked not running that still holds a driver (852 JERSEY LOAD 2,
-      // Wednesday 10/7) is read as running, so it shows on every screen and Route Run Days agrees; only a day with no driver stays off.
-      if (!day.runs && day.driver) { day.runs = true; ranByDriver.push(prefix); }
+      // Joe 10/13 (replaces Joe 10/10's "a day with a driver runs"): a day marked not running, on any sheet, does not show,
+      // whoever is still on it. The driver stays on the day (it may run another week).
+      if (!day.runs && day.driver) offWithDriver.push(prefix);
       run.days[prefix] = day;
     });
     run.cells = cellsOf(r.row, index);
-    // Route Master's order and Weekly setting are part of the fingerprint, so a Route Master change rewrites the run.
-    run.fingerprint = fingerprint(r.row.map(cellText).concat(['weekOrder=' + run.weekOrder, 'weeklyShow=' + run.weeklyShowMaster].concat(ranByDriver.length ? ['ranByDriver=' + ranByDriver.join('-')] : [])));
+    // Route Master's order and Weekly setting are part of the fingerprint, so a Route Master change rewrites the run. The days off
+    // with a driver are too, so only those rows (read as running before Joe 10/13) are rewritten once.
+    run.fingerprint = fingerprint(r.row.map(cellText).concat(['weekOrder=' + run.weekOrder, 'weeklyShow=' + run.weeklyShowMaster].concat(offWithDriver.length ? ['offWithDriver=' + offWithDriver.join('-')] : [])));
     runs[M.runDocId(weekStart, key)] = run;
   });
   return { tab: tabName, weekStart, runs, warnings };

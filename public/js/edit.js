@@ -86,8 +86,8 @@ export function canManage() { return L.hasRole(lists.person, L.DRIVER_ROLES) && 
 // Joe 10/12: no "new app" / "current app" words; a screen not switched on says where to switch it.
 export function modeLabel(testText) {
   const s = L.screenState(lists.app, screenKey);
-  goLiveNote(s.live && s.owner !== 'new');
-  if (!s.live) return testText;
+  goLiveNote(s.live && s.owner === 'old');
+  if (!s.live || s.owner === 'app') return testText;
   if (s.owner === 'new') return s.open ? 'LIVE: SAVES GO TO THE SHEET' : 'VIEW ONLY: WRITE-BACK TO THE SHEET IS OFF';
   return 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES';
 }
@@ -95,7 +95,7 @@ export function modeLabel(testText) {
 // Checked when the list opens, so a unit put down a moment ago on this screen is already left out.
 const units = (all, opts) => (opts && opts.override) ? all : all.filter(e => !L.unitOff(e) && !(opts && opts.conflicts && opts.conflicts[e.id]));
 // Why a unit is normally left out: down / out first, then on the road on another run (opts.conflicts, L.unitConflicts).
-const unitWhy = (e, opts) => L.unitOff(e) ? e.status : (opts && opts.conflicts && opts.conflicts[e.id]) || '';
+const unitWhy = (e, opts) => L.unitOff(e) ? L.unitOffWhy(e) : (opts && opts.conflicts && opts.conflicts[e.id]) || '';
 
 // opts = {override, date, conflicts}: with OVR every driver and unit is offered, marked with why it is normally left out.
 const KINDS = {
@@ -120,7 +120,7 @@ function keepCurrent(kind, current, list, opts, editBox) {
   if (!current || kind === 'driver' || list.some(o => o.id === current) || !pickText(kind, current)) return;
   const e = (kind === 'truck' ? lists.fleetTrucks : lists.fleetTrailers).find(x => x.id === current);
   if (e && L.unitOff(e)) {
-    if (editBox || (opts && opts.override)) list.unshift({ id: current, text: e.unit + '  [' + e.status + ']', why: true });
+    if (editBox || (opts && opts.override)) list.unshift({ id: current, text: e.unit + '  [' + L.unitOffWhy(e) + ']', why: true });
     return;
   }
   list.unshift({ id: current, text: pickText(kind, current) });

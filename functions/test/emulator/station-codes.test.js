@@ -23,9 +23,22 @@ test('each kind starts with the current app\'s stations, none with a code', asyn
   assert.deepEqual(plant.stations.map(s => s.name), ['Case Loadout', 'Case Unloading', 'Tote Loadout', 'Boxing Loadout', 'Yard Services']);
   assert.ok(plant.stations.every(s => !s.set && s.plant === 'Uniontown'));
   assert.deepEqual((await admin({ op: 'stations', kind: 'GARAGE' })).stations.map(s => s.name), ['Garage']);
-  assert.deepEqual((await admin({ op: 'stations', kind: 'KIOSK' })).stations.map(s => s.typeName), ['Driver Room Check-In (tablet)', 'TV display']);
+  assert.deepEqual((await admin({ op: 'stations', kind: 'KIOSK' })).stations.map(s => s.typeName), ['Driver Room Check-In Station', "Driver's Kiosk Station"]);
   assert.deepEqual(await tablet({ op: 'has', kind: 'PLANT', facilityId: 'fac_uniontown' }), { required: false });
   await assert.rejects(A.adminCall(db(), TABLET, { op: 'stations', kind: 'PLANT' }), /Only an administrator/);
+});
+
+// Joe 10/12: the Driver Room's two stations are "Driver Room Check-In Station" and "Driver's Kiosk Station"; a list saved under
+// their first names (Driver Room kiosk, Driver Room TV) shows the new names, and a station a manager named stays as named.
+test('the Driver Room stations show Joe\'s names, also in a list saved under the first names', async () => {
+  assert.deepEqual((await admin({ op: 'stations', kind: 'KIOSK' })).stations.map(s => s.name), ['Driver Room Check-In Station', "Driver's Kiosk Station"]);
+  const list = {
+    a: { key: 'a', kind: 'KIOSK', type: 'DRIVER', name: 'Driver Room kiosk', facilityId: 'fac_uniontown', order: 0 },
+    b: { key: 'b', kind: 'KIOSK', type: 'TV', name: 'Driver Room TV', facilityId: 'fac_uniontown', order: 1 },
+    c: { key: 'c', kind: 'KIOSK', type: 'TV', name: 'Break Room TV', facilityId: 'fac_uniontown', order: 2 }
+  };
+  await db().collection('private').doc('stations').set({ list });
+  assert.deepEqual((await admin({ op: 'stations', kind: 'KIOSK' })).stations.map(s => s.name), ['Driver Room Check-In Station', "Driver's Kiosk Station", 'Break Room TV']);
 });
 
 test('add a station, give it a code, the tablet types it and opens that station', async () => {
@@ -79,7 +92,7 @@ test('Garage Station: once the garage has a code, every call carries the station
   assert.ok(Array.isArray((await garageCall(db(), { op: 'board', station: { key: st.key, version: st.version } })).jobs));
   await admin({ op: 'stationCode', key });
   await assert.rejects(garageCall(db(), { op: 'board', station: { key: st.key, version: st.version } }), /STATION_CODE: This garage tablet has a new code/);
-  // Change Station uses the plant's manager release code.
+  // Release uses the plant's manager release code.
   assert.deepEqual(await garageCall(db(), { op: 'release', step: 'status' }), { required: false });
   const rel = (await admin({ op: 'releaseCodeNew', facilityId: 'fac_uniontown' })).code;
   assert.equal((await garageCall(db(), { op: 'release', step: 'release', code: 'WRONG123' })).ok, false);

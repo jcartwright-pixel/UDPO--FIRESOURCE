@@ -11,6 +11,8 @@
  *   - an issue can be sent to Plant Maintenance (sendToMaint); that module picks it up once it is built;
  *   - each plant's fire extinguishers (extinguishers/{facilityId}__{tag}) get a monthly check of five items; a Not good there
  *     is an open issue too. Annual service, 6-year and hydrostatic test dates show DUE SOON 30 days out and PAST DUE after;
+ *   - Joe 10/13: each plant's Fire Alarm, Fire Suppression and Escape Plan (fireSystems/{facilityId}__{system}) get one
+ *     monthly check of the whole system plus their vendor inspection or fire drill dates; a Not good is an open issue too;
  *   - each plant may change its own checklist (safetySetup/{facilityId}); with none saved it uses the list below. Joe 10/12
  *     (mock-up A): the checklist is Plant, Garage and Office (each area's place), each with its sub-areas in walking order.
  */
@@ -127,6 +129,36 @@
     ['body', 'No dents, rust or leaks; hose and nozzle clear'],
     ['tag', 'Tag shows the annual service is current']
   ];
+  // Joe 10/13 (mock-up B): Fire Alarm, Fire Suppression and Escape Plan each get one monthly check of the whole system
+  // (fireSystems/{facilityId}__{system}), every item Good or Not good, and their vendor or drill dates. A Not good is an open
+  // issue, like an extinguisher's. Item ids never change once used.
+  var FIRE_SYSTEMS = [
+    { key: 'alarm', name: 'Fire Alarm', what: 'Monthly check of the fire alarm system', items: [
+      ['panel', 'Panel shows NORMAL: no trouble or alarm lights'],
+      ['panel_area', 'Panel area clear, panel door closed, battery date in the last 4 years'],
+      ['pulls', 'Every pull station visible, not blocked, cover on'],
+      ['horns', 'Horns and strobes not damaged or covered'],
+      ['detectors', 'Smoke and heat detectors not covered, painted or damaged'],
+      ['monitoring', 'Monitoring company got the last test signal (date in the log)']],
+      dates: [['vendorDue', 'Vendor inspection due', 'DUE']] },
+    { key: 'suppression', name: 'Fire Suppression', what: 'Monthly check of the sprinklers and the kitchen hood system', items: [
+      ['valves', 'Sprinkler control valves open, locked or sealed'],
+      ['gauges', 'System gauges show normal water or air pressure'],
+      ['fdc', 'Fire department connection caps on, nothing in front of it'],
+      ['heads', 'Sprinkler heads not painted, damaged or blocked; spare heads and wrench in the cabinet'],
+      ['clearance', 'Nothing stored within 18 inches of sprinkler heads'],
+      ['riser', 'Riser room heated, no leaks, door clear'],
+      ['hood', 'Kitchen hood system: gauge in the green, pull handle clear (where there is one)']],
+      dates: [['vendorDue', 'Vendor inspection due', 'DUE']] },
+    { key: 'escape', name: 'Escape Plan', what: 'Monthly check of the evacuation maps, exit routes and meeting point', items: [
+      ['maps', 'Evacuation maps posted at every exit and in each room, "You are here" correct'],
+      ['routes', 'Exit routes clear the whole way out, doors open outward and are not locked'],
+      ['signs', 'Exit signs lit and seen from the aisles'],
+      ['cooler', 'Cooler and freezer doors open from the inside'],
+      ['meeting', 'Meeting point sign up, area clear, everyone knows it'],
+      ['headcount', 'Headcount list kept at the meeting point and up to date']],
+      dates: [['lastDrill', 'Last fire drill', 'PAST'], ['nextDrill', 'Next fire drill', 'DUE'], ['mapsUpdated', 'Maps updated', 'PAST']] }
+  ];
   var EXT_TYPES = ['ABC', 'BC', 'CO2', 'K (kitchen)', 'Water', 'D (metal)'];
   var LONG_OPEN_DAYS = 30, DUE_SOON_DAYS = 30;
 
@@ -227,9 +259,20 @@
     var d = Math.round((noon(key) - noon(today)) / 86400000);
     return d < 0 ? 'PAST' : d <= DUE_SOON_DAYS ? 'SOON' : 'OK';
   }
+  function fireSystem(key) { return FIRE_SYSTEMS.filter(function (x) { return x.key === key; })[0] || null; }
+  function fireId(facilityId, key) { return text(facilityId) + '__' + text(key); }
+  // A system's check for the month: GOOD (every item Good), NOT_GOOD (any Not good) or DUE (not finished).
+  function fireMonth(key, doc, month) {
+    var sys = fireSystem(key), list = sys ? sys.items : [], c = doc && doc.checks && doc.checks[month], items = (c && c.items) || {};
+    var bad = list.filter(function (i) { return items[i[0]] === 'NOT_GOOD'; }).map(function (i) { return i[1]; });
+    var good = list.length > 0 && list.every(function (i) { return items[i[0]] === 'GOOD'; });
+    var done = list.filter(function (i) { return items[i[0]]; }).length;
+    return { state: bad.length ? 'NOT_GOOD' : good ? 'GOOD' : 'DUE', bad: bad, done: done, total: list.length, by: text(c && c.by), byName: text(c && c.byName), at: text(c && c.at), note: text(c && c.note), items: items };
+  }
   function extId(facilityId, tag) { return text(facilityId) + '__' + text(tag).replace(/[^A-Za-z0-9-]+/g, '_'); }
 
   return { STATUSES: STATUSES, FREQS: FREQS, DEFAULT_AREAS: DEFAULT_AREAS, EXT_ITEMS: EXT_ITEMS, EXT_TYPES: EXT_TYPES, LONG_OPEN_DAYS: LONG_OPEN_DAYS, DUE_SOON_DAYS: DUE_SOON_DAYS,
     locations: locations, checklist: checklist, walkList: walkList, places: places, areaName: areaName, findItem: findItem, walkId: walkId, monthOf: monthOf, walkCounts: walkCounts, daysOpen: daysOpen, isRepeat: isRepeat,
-    extMonth: extMonth, dueState: dueState, extId: extId, isKey: isKey, pad: pad };
+    extMonth: extMonth, dueState: dueState, extId: extId, isKey: isKey, pad: pad,
+    FIRE_SYSTEMS: FIRE_SYSTEMS, fireSystem: fireSystem, fireId: fireId, fireMonth: fireMonth };
 });

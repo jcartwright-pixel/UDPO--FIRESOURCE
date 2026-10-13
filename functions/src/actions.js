@@ -48,7 +48,7 @@ const ACTIONS = Object.freeze({
   setUnitDown: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
   setUnitUp: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
   reorderLoads: { roles: REORDER_ROLES, screen: 'dailyDispatch' },
-  clearConflict: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
+  clearConflict: { roles: SAVE_ROLES, screen: 'conflicts' },
   saveCheckIn: { roles: SAVE_ROLES, screen: 'checkIns' },
   setDriverTruck: { roles: DRIVER_ROLES, screen: 'drivers' },
   setDriverAvailable: { roles: DRIVER_ROLES, screen: 'drivers' },
@@ -68,7 +68,7 @@ const ACTIONS = Object.freeze({
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
   saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
-  saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'drivers' },
+  saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'opsAssignments' },
   // The plant side (plant.js): Loadout Center loads and pickups. The Plant Distribution screens are their own switch (Plant Loading).
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
   addPickup: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
@@ -101,6 +101,8 @@ const ACTIONS = Object.freeze({
   saveSafetyIssue: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveExtinguisherCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveExtinguisher: { roles: REORDER_ROLES, screen: 'plant' },
+  saveFireSystemCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  saveFireSystem: { roles: REORDER_ROLES, screen: 'plant' },
   saveSafetyChecklist: { roles: REORDER_ROLES, screen: 'plant' },
   saveLocationAreas: { roles: REORDER_ROLES, screen: 'plant' },
   // Plant Maintenance (plantmaint.js): the machinery list, and Maintenance Center's Make Work Order (a plant request becomes a work order).
@@ -110,10 +112,10 @@ const ACTIONS = Object.freeze({
   sendPmToMaintenance: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
   sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
-  // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js).
-  saveFleetRules: { roles: REORDER_ROLES, screen: 'checkIns' },
-  saveFleetUnit: { roles: REORDER_ROLES, screen: 'checkIns' },
-  saveGarageTech: { roles: REORDER_ROLES, screen: 'checkIns' }
+  // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js). App only (logic.js APP_ONLY).
+  saveFleetRules: { roles: REORDER_ROLES, screen: 'fleetSetup' },
+  saveFleetUnit: { roles: REORDER_ROLES, screen: 'fleetSetup' },
+  saveGarageTech: { roles: REORDER_ROLES, screen: 'fleetSetup' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
@@ -392,6 +394,8 @@ function validate(input) {
   if (action === 'saveSafetyIssue') return Object.assign(out, SAFE.validateIssue(input, SaveError));
   if (action === 'saveExtinguisherCheck') return Object.assign(out, SAFE.validateExtCheck(input, SaveError));
   if (action === 'saveExtinguisher') return Object.assign(out, SAFE.validateExtinguisher(input, SaveError));
+  if (action === 'saveFireSystemCheck') return Object.assign(out, SAFE.validateFireCheck(input, SaveError));
+  if (action === 'saveFireSystem') return Object.assign(out, SAFE.validateFireSystem(input, SaveError));
   if (action === 'saveSafetyChecklist') return Object.assign(out, SAFE.validateChecklist(input, SaveError));
   if (action === 'saveLocationAreas') return Object.assign(out, SAFE.validateLocations(input, SaveError));
   if (action === 'saveMachine') return Object.assign(out, PMAINT.validateMachine(input, SaveError));
@@ -448,6 +452,7 @@ function validate(input) {
   return out;
 }
 
+const MANAGER_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER', 'SUPERVISOR'];
 async function requireSaver(tx, db, user, roles, action) {
   // A Plant Station signed in by its code alone (index.js checked its station): only the plant-floor saves.
   if (user && user.station) {
@@ -472,6 +477,27 @@ async function requireSaver(tx, db, user, roles, action) {
 async function requireTestMode(tx, db, screen) {
   const snap = await tx.get(db.collection(C.config).doc('app'));
   return SWITCH.screenMode(snap.exists ? snap.data() : {}, screen, (code, message) => new SaveError(code, message));
+}
+
+// The driver's own truck on a day he is put on (current app 7.0.267, udpoV7267DriverOwnTruck_). after gets truckId / truck when it
+// goes on; warnings says why it did not. A truck on another load that day with a different driver stays where it is.
+async function ownTruckFor(tx, db, run, runDocId, p, day, after, warnings) {
+  const d = await tx.get(db.collection(C.drivers).doc(M.safeIdPart(after.driverId)));
+  const own = d.exists && d.data().defaultTruckId;
+  if (!own || String(day.truckId || '').toUpperCase() === String(own).toUpperCase()) return;
+  const name = d.data().name || after.driver;
+  const unit = await tx.get(db.collection(C.equipment).doc(M.safeIdPart(own)));
+  if (!unit.exists) { warnings.push(name + "'s truck " + own + ' is not in Equipment Master; the route\'s truck was kept.'); return; }
+  const truck = unit.data();
+  if (L.unitOff(truck)) { warnings.push(name + "'s truck " + truck.unit + ' is ' + L.unitOffWhy(truck) + '; the route\'s truck was kept.'); return; }
+  const week = await tx.get(db.collection(C.runs).where('weekStart', '==', run.weekStart));
+  const other = week.docs.find(s => {
+    if (s.id === runDocId) return false;
+    const od = (s.data().days || {})[p] || {};
+    return od.runs && od.driverId !== after.driverId && (String(od.truckId || '').toUpperCase() === String(truck.id).toUpperCase() || (!!truck.unit && od.truck === truck.unit));
+  });
+  if (other) { warnings.push(name + "'s truck " + truck.unit + ' is already on route ' + other.data().route + ' ' + (other.data().run || '') + ' that day; the route\'s truck was kept.'); return; }
+  after.truckId = truck.id; after.truck = truck.unit;
 }
 
 async function resolveAssignment(tx, db, req, stamp, run) {
@@ -517,10 +543,11 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     if (!snap.exists) throw new SaveError('NOT_FOUND', req.equipmentId + ' is not in Equipment Master');
     const e = snap.data();
     if (e.type !== type) throw new SaveError('BAD_REQUEST', e.unit + ' is a ' + e.type + ', not a ' + type);
-    if (!req.override && L.unitOff(e)) throw new SaveError('NOT_ALLOWED', e.unit + ' is ' + e.status + ' in Equipment Master (tick OVR to use it anyway)');
+    if (!req.override && L.unitOff(e)) throw new SaveError('NOT_ALLOWED', e.unit + ' is ' + L.unitOffWhy(e) + ' in Equipment Master (tick OVR to use it anyway)');
     return { [idField]: e.id, [unitField]: e.unit };
   }
-  if (req.action === 'setRuns') return { runs: req.runs };
+  // Joe 10/13 ("No route equals no driver"): a day turned off loses its driver, truck and trailer (that day only), so they are free.
+  if (req.action === 'setRuns') return req.runs ? { runs: true } : Object.assign({ runs: false }, L.NOT_RUNNING_CLEARS);
   if (req.action === 'setDispatchTime') return { dispatchTime: req.time };
   if (req.action === 'setJack') return { palletJack: req.jack };
   if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });
@@ -621,7 +648,9 @@ async function applyAction(db, user, input, now) {
       return Object.assign({}, prior.result, { repeated: true });
     }
     const mode = await requireTestMode(tx, db, spec.screen);
-    await requireSaver(tx, db, user, spec.roles, req.action);
+    const person = await requireSaver(tx, db, user, spec.roles, req.action);
+    // Joe 10/13: managers may load past the loadout's limit from the Loadout Center; a Plant Station tablet never can.
+    req.manager = !(user && user.station) && L.hasRole(person, MANAGER_ROLES);
 
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderPlantLoads') {
@@ -672,6 +701,8 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveSafetyIssue') return SAFE.saveIssue(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveExtinguisherCheck') return SAFE.saveExtCheck(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveExtinguisher') return SAFE.saveExtinguisher(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveFireSystemCheck') return SAFE.saveFireCheck(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveFireSystem') return SAFE.saveFireSystem(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveSafetyChecklist') return SAFE.saveChecklist(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLocationAreas') return SAFE.saveLocations(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveMachine') return PMAINT.saveMachine(tx, db, req, email, stamp, logRef, mode, SaveError);
@@ -690,6 +721,10 @@ async function applyAction(db, user, input, now) {
       throw new SaveError('CHANGED', run.route + ' ' + run.run + ' was changed by someone else; the screen now shows the latest', { rev: run.rev });
     }
     const after = await resolveAssignment(tx, db, req, stamp, run);
+    // Joe 10/12 (Joel Jacobs on 901_1 with no truck): a driver put on a day, from Daily or Weekly, takes his own truck (Driver Master's
+    // assigned truck) unless it is not usable or another driver has it that day; his own other loads that day keep it too.
+    const warnings = [];
+    if (req.action === 'assignDriver' && after.driverId && day.runs) await ownTruckFor(tx, db, run, req.runDocId, req.day, day, after, warnings);
     // A check-in's problems also go to the maintenance queues (read now; written below with the check-in).
     const writeMaint = req.action === 'saveCheckIn'
       ? await MAINT.prepareMaintenance(tx, db, run, req.runDocId, req.day, L.addDays(run.weekStart, L.DAYS.indexOf(req.day)), Object.assign({}, day, after), { by: email, driver: day.driver || '' }, stamp) : null;
@@ -712,6 +747,7 @@ async function applyAction(db, user, input, now) {
     if (mode.writeBack) queueSheetCells(tx, db, req.requestId, '', run, req.runDocId, req.day, Object.assign({}, after, marks), stamp, email);
     if (mode.writeBack && req.action === 'savePlantLoad') queueLoadoutHistory(tx, db, req, run, Object.assign({}, day, after), after, stamp, email);
     const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }] };
+    if (warnings.length) result.warnings = warnings;
     if (writeMaint) result.maintenance = writeMaint(maintQueue(tx, db, mode, req.requestId, stamp, email));
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });
     return result;
@@ -1027,7 +1063,11 @@ async function liveRead(tx, db, runId) {
     tx.get(db.collection(C.equipment))]);
   const units = eqSnap.docs.map(d => d.data());
   const unit = (v, type) => { const k = String(v || '').trim().toUpperCase(); return k ? units.find(e => e.type === type && (String(e.id).toUpperCase() === k || String(e.unit).toUpperCase() === k)) || null : null; };
-  return { weeks, runs: runSnap ? runSnap.docs.filter(s => weeks.indexOf(s.data().weekStart) >= 0) : [], unit, tabs: { [w.current]: M.LIVE_TABS.current, [w.next]: M.LIVE_TABS.next } };
+  // Route names (Joe 10/12) reach the Previous week too, and stream_id / route / route_run_type as well, only once
+  // config/app.routeNamesLive.enabled is on (Joe's typed OK for those Live columns and tabs).
+  const namesLive = !!(cfg.exists && cfg.data().routeNamesLive && cfg.data().routeNamesLive.enabled === true);
+  const previous = runId && namesLive && w.previous && runSnap ? runSnap.docs.filter(s => s.data().weekStart === w.previous && s.data().sourceTab === M.LIVE_TABS.previous) : [];
+  return { weeks, runs: runSnap ? runSnap.docs.filter(s => weeks.indexOf(s.data().weekStart) >= 0) : [], previous, namesLive, unit, tabs: { [w.current]: M.LIVE_TABS.current, [w.next]: M.LIVE_TABS.next } };
 }
 
 // One Live run's changes ({run: {field: v}, days: {p: {field: v}}}) as one update and, with the write-back on, one queued row.
@@ -1050,18 +1090,35 @@ function writeLive(tx, db, mode, req, stamp, email, snap, run, ch, result) {
 const hoursNumber = (h) => { const t = String(h == null ? '' : h).trim(), m = t.match(/^(\d{1,2}):(\d{2})$/); const n = m ? Number(m[1]) + Number(m[2]) / 60 : Number(t); return t && Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
 
 // One run's Route Master standards into its Live rows of the two weeks; a run with no Live row in a week gets one.
+// Route names (Joe 10/12): Route Name and Run follow Route Master into the Live rows; with config/app.routeNamesLive on, so do
+// stream_id, route and route_run_type, and the Previous week gets the names too (names only). A name this save set goes
+// across even when blank (a Run left empty when Run Type says Load 1); others only when Route Master has one.
+const LIVE_NAME_FIELDS = ['routeName', 'run'], LIVE_MORE_NAMES = ['streamId', 'route', 'routeRunType'];
+function liveNames(m, run, req, live) {
+  const out = {}, set = (req && req.fields) || {};
+  LIVE_NAME_FIELDS.concat(live.namesLive ? LIVE_MORE_NAMES : []).forEach(f => {
+    const v = String(m[f] == null ? '' : m[f]).trim();
+    if ((v || f in set) && String(run[f] == null ? '' : run[f]).trim() !== v) out[f] = v;
+  });
+  return out;
+}
 function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
   const today = L.operatingDay(new Date(stamp));
+  (live.previous || []).forEach(s => { const ch = liveNames(m, s.data(), req, live); if (Object.keys(ch).length) writeLive(tx, db, mode, req, stamp, email, s, s.data(), { run: ch, days: {} }, result); });
   live.weeks.forEach(week => {
     const rows = live.runs.filter(s => s.data().weekStart === week);
     if (!rows.length) return addLiveRun(tx, db, mode, req, stamp, email, m, live, week, today, result);
     const changes = rows.map(() => ({ run: {}, days: {} }));
     rows.forEach((s, i) => { const run = s.data();
       // 7.0.272: who runs it follows Route Master too (route name, run, Run By).
-      ['routeName', 'run', 'coverageType', 'coverageOwner'].forEach(f => { const v = String(m[f] || '').trim(); if (v && String(run[f] || '').trim() !== v) changes[i].run[f] = v; });
+      Object.assign(changes[i].run, liveNames(m, run, req, live));
+      ['coverageType', 'coverageOwner'].forEach(f => { const v = String(m[f] || '').trim(); if (v && String(run[f] || '').trim() !== v) changes[i].run[f] = v; });
       // Joe 10/12 (907 / 950): Show on Daily Dispatch switched in the Route Editor reaches the Current and Next weeks' rows too,
       // since Daily reads the week's own flag (a FALSE there hides the run whatever Route Master says).
       if (req && req.fields && typeof req.fields.displayDaily === 'boolean' && run.displayDaily !== req.fields.displayDaily) changes[i].run.displayDaily = req.fields.displayDaily;
+      // Joe 10/12 (typed OK): the driver Route app switch (phone View Loadout, Driver Room board, check-in) reaches the two weeks' rows too,
+      // since those screens read the week's own display_mobile_route first.
+      if (req && req.fields && typeof req.fields.displayMobile === 'boolean' && run.displayMobileRoute !== req.fields.displayMobile) changes[i].run.displayMobileRoute = req.fields.displayMobile;
     });
     L.DAYS.forEach(p => {
       // A run on two rows (one per set of days): the day belongs to the row that runs it, else the first row.
@@ -1133,7 +1190,7 @@ function driverToLive(tx, db, mode, req, stamp, email, d, truckId, live, result)
     if (d.name && day.driver !== d.name) ch.driver = d.name;
     if (truckId && day.runs && !byHand(x.run, p, 'equipment_override') && day.truckId !== truckId) {
       if (!truck) warn(d.name + "'s truck " + truckId + ' is not in Equipment Master; the route\'s truck was kept.');
-      else if (L.unitOff(truck)) warn(d.name + "'s truck " + truck.unit + ' is ' + (truck.status || 'not usable') + '; the route\'s truck was kept.');
+      else if (L.unitOff(truck)) warn(d.name + "'s truck " + truck.unit + ' is ' + L.unitOffWhy(truck) + '; the route\'s truck was kept.');
       else {
         const on = (o) => { const od = Object.assign({}, (o.run.days || {})[p], o.ch.days[p]); return od.runs && (od.truckId === truck.id || (!!truck.unit && od.truck === truck.unit)); };
         const other = rows.find(o => o !== x && o.run.weekStart === x.run.weekStart && on(o));
@@ -1147,7 +1204,7 @@ function driverToLive(tx, db, mode, req, stamp, email, d, truckId, live, result)
 }
 
 /* ---------- Route Editor (Route Master copy; ROUTES_MASTER itself is not written yet) ---------- */
-const ROUTE_FIELDS = { route: 'text', routeName: 'text', run: 'text', loadType: 'text', movementType: 'text', coverageOwner: 'text', coverageType: 'text',
+const ROUTE_FIELDS = { route: 'text', routeName: 'text', run: 'text', streamId: 'text', routeRunType: 'text', routeCode: 'text', loadType: 'text', movementType: 'text', coverageOwner: 'text', coverageType: 'text',
   departureDay: 'text', routeNotes: 'text', weekOrder: 'number', active: 'bool', sleeper: 'bool', dropAndHook: 'bool', displayDaily: 'bool',
   displayWeekly: 'bool', displayPlant: 'bool', displayMobile: 'bool', displayRouteMaster: 'bool', routeStatus: 'text' };
 const ROUTE_DAY_FIELDS = { active: 'bool', dispatchTime: 'time', loadOrder: 'number', miles: 'number', hours: 'hours', loadDayOffset: 'offset',

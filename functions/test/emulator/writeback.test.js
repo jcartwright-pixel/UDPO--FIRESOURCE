@@ -179,3 +179,29 @@ test('plant loading: a LOADOUT HISTORY tab with other headers is never written o
   const c = (await db().collection('conflicts').get()).docs.map(d => d.data());
   assert.match(c[0].problem, /other headers/);
 });
+
+// Joe 10/13 (852 JERSEY LOAD 2 on the Loadout Center came back after Ended Up Not Running): the copy reads a day that still holds
+// a driver as running, so turning a day off (Loadout Center or Daily) takes the driver off too, and it stays off after the copy.
+for (const [name, save] of [
+  ['the Loadout Center\'s Ended Up Not Running', () => ({ action: 'savePlantLoad', fields: { runs: false } })],
+  ['Daily\'s not running', () => ({ action: 'setRuns', runs: false })]
+]) {
+  test(name + ' stays off after the write-back and the next copy of the sheet', async () => {
+    const RUN = '2026-10-04__run_t802';
+    await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'tue', driverId: 'drv_test_adams' }, tick);
+    await applyAction(db(), DISPATCHER, { action: 'assignTrailer', requestId: rid(), runDocId: RUN, day: 'tue', equipmentId: 'veh_trailer_t_901' }, tick);
+    await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
+    await runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick });
+    assert.equal((await db().collection('runs').doc(RUN).get()).data().days.tue.driver, 'ADAMS, PAT');
+    await applyAction(db(), DISPATCHER, Object.assign({ requestId: rid(), runDocId: RUN, day: 'tue' }, save()), tick);
+    assert.equal((await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick })).conflicts, 0);
+    assert.equal(cellOf('run_t802', 'tue_runs'), 'FALSE');
+    assert.equal(cellOf('run_t802', 'tue_driver'), '');
+    ['tue_driver_id', 'tue_truck', 'tue_tractor_id', 'tue_trailer', 'tue_trailer_id'].forEach(c => assert.equal(cellOf('run_t802', c), '', c + ' is cleared'));
+    await runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick });
+    const day = (await db().collection('runs').doc(RUN).get()).data().days.tue;
+    assert.equal(day.runs, false, 'it does not come back');
+    if (save().action === 'savePlantLoad') assert.match(day.plantNotes || '', /Ended up not running .*\(driver was ADAMS, PAT, (truck was \S+, )?trailer was T-901\)/);
+    assert.deepEqual([day.driver, day.truck, day.trailer], ['', '', ''], 'the driver, truck and trailer are free that day');
+  });
+}

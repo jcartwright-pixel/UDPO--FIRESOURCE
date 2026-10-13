@@ -19,6 +19,8 @@
   <link rel="stylesheet" href="css/stations.css">
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
+  <!-- Joe 10/13: the station works with no signal: it keeps what it read and its saves on the tablet (js/offline-saves.js). -->
+  <script>window.UD_OFFLINE = true; window.UD_STATION_OFFLINE = true;</script>
 </head>
 <body class="phone ps-page">
   <div class="signin" id="signin" hidden>
@@ -42,12 +44,13 @@
       <button type="button" id="go-home" title="Home">Home</button>
       <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Plant Station</strong></span>
       <span class="ps-pill" id="pill" hidden>Uniontown</span>
-      <button type="button" id="change" hidden>Change Station</button>
+      <button type="button" id="change" hidden>Release</button>
       <span class="who" id="who"></span>
       <button type="button" id="signout">Sign out</button>
     </header>
     <div class="ps-title"><span class="eyebrow" id="eyebrow">Plant Station</span><h1 id="title">Pick this tablet's station</h1></div>
     <div class="notice error" id="error" hidden></div>
+    <p class="offline-line" id="offline-line" role="status" hidden></p>
     <div class="view">
       <!-- Joe 10/12: once Administration > Plant Station Codes has codes, a tablet types its station's code instead of picking. -->
       <section id="code-box" hidden></section>
@@ -60,7 +63,7 @@
         <!-- Joe 10/12: the station's work shows here, the employee view only (js/station-work.js); no manager screen opens from a station. -->
         <div class="sw" id="work"></div>
         <p class="ps-foot" id="foot"></p>
-        <!-- Administration > Manager Links: once a plant has a manager release code, Change Station asks for it. -->
+        <!-- Administration > Manager Links: once a plant has a manager release code, Release asks for it. -->
         <form class="ps-release" id="release" hidden>
           <p>A manager must type the manager release code to change this tablet's station.</p>
           <label>Manager release code <input id="release-code" maxlength="48" autocomplete="off" autocapitalize="characters"></label>
@@ -73,10 +76,10 @@
   </div>
 
   <script type="module">
+    import { startOffline } from './js/offline-saves.js';
     import { start, requireSignIn, watchPerson, escapeHtml, shortDate, showError, goBack, callServer, stationCodeSignIn, signOutHere } from './js/app.js';
     import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import * as P from './js/plant-core.js';
-    import { resolveStation, askCode, remember } from './js/station-code.js';
+    import { resolveStation, askCode, remember, lockStation } from './js/station-code.js';
     import { mountStationWork } from './js/station-work.js';
 
     // The current app's Plant Station tablet (PlantStation.html, 057_V774): one station, only its work areas. In the new app
@@ -88,22 +91,34 @@
       { id: 'CASE', label: 'Case Loadout', what: 'Case loading only (unloading is the Case Unloading station)', area: 'CASE', views: ['loading'] },
       { id: 'CASE_UNLOADING', label: 'Case Unloading', what: 'Case unloading, product returns and trailer washing (no loading)', area: 'CASE', views: ['unloading', 'washing', 'returns'] },
       { id: 'TOTES', label: 'Tote Loadout', what: 'Tote loading and tote unloading', area: 'TOTES', views: ['loading', 'unloading'] },
-      { id: 'BOXING', label: 'Boxing Loadout', what: 'Box loading and box unloading', area: 'BOXING', views: ['loading', 'unloading'] },
-      { id: 'YARD_SERVICES', label: 'Yard Services', what: 'Unloading, washing, and product returns', area: '', views: ['unloading', 'washing', 'returns'] }
+      // Joe 10/12: Boxing loads its box loads and every carrier and branch shipment on one list (Shipping / Loadout), and
+      // receives the suppliers' deliveries (Receiving); it does not unload.
+      { id: 'BOXING', label: 'Boxing Loadout', what: 'Box loads, carrier and branch shipments, and receiving', area: 'BOXING', views: ['loading', 'receiving'] },
+      // Joe 10/12: Yard Services walks the yard for the trailer on each route and checks the trailers' temperatures, on the
+      // screens the plant already has (Trailer Assignments and Yard Checks), unchanged.
+      { id: 'YARD_SERVICES', label: 'Yard Services', what: 'Trailer assignments and yard temperature checks', area: '', views: ['trailers', 'yardchecks'] }
     ];
     const VIEWS = {
       loading: { label: 'Loading', what: 'Assigned loadout work', accent: '#1976d2', tone: '#e8f3ff', pic: { CASE: 'case-v1.webp', TOTES: 'tote-v1.webp', BOXING: 'box-v1.webp' } },
-      unloading: { label: 'Unloading', what: 'Assigned unloading work', accent: '#168a55', tone: '#e8f8ef', pic: 'tanker-v1.webp' },
-      washing: { label: 'Washing', what: 'Assigned trailer washing', accent: '#0b8da5', tone: '#e7f8fb', pic: 'maintenance-trailer-v1-560.webp' },
-      returns: { label: 'Returns', what: 'Return product to the cooler', accent: '#bd7400', tone: '#fff4db', pic: 'box-v1.webp' }
+      // Joe 10/12: each picture shows that station's own work, from his United Dairy Icon Library (approved/case-unloading,
+      // returns-to-cooler, truck-washing); the tanker is only for tanker screens.
+      unloading: { label: 'Unloading', what: 'Assigned unloading work', accent: '#168a55', tone: '#e8f8ef', pic: { CASE: 'case-unloading-v1-560.webp', TOTES: 'tote-v1.webp', BOXING: 'box-v1.webp' } },
+      washing: { label: 'Washing', what: 'Assigned trailer washing', accent: '#0b8da5', tone: '#e7f8fb', pic: 'truck-washing-v1-560.webp' },
+      returns: { label: 'Returns', what: 'Return product to the cooler', accent: '#bd7400', tone: '#fff4db', pic: 'returns-to-cooler-v1-560.webp' },
+      receiving: { label: 'Receiving', what: 'Suppliers delivering today', accent: '#168a55', tone: '#e8f8ef', pic: 'case-unloading-v1-560.webp' },
+      // Joe 10/12: Yard Services has two action buttons on top, Assign Trailer and Check Temperatures (phone first).
+      trailers: { label: 'Assign Trailer', what: 'Trailer Assignments', accent: '#1976d2', tone: '#e8f3ff', pic: 'yard-checks.webp', action: true },
+      yardchecks: { label: 'Check Temperatures', what: 'Yard Checks', accent: '#168a55', tone: '#e8f8ef', pic: 'temperatures.webp', action: true }
     };
+    // Boxing's Loading tab is its Shipping / Loadout: the box loads and the scheduled shipments together.
+    const viewLabel = (st, v) => (st.id === 'BOXING' && v === 'loading' ? { label: 'Shipping / Loadout', what: 'Box loads and every carrier and branch shipment' } : VIEWS[v]);
     // The tab shown (remembered on this tablet for the visit), and the station's work under the tabs.
     const VIEW_KEY = 'udPlantStationView';
     let view = (() => { try { return sessionStorage.getItem(VIEW_KEY) || ''; } catch (e) { return ''; } })(), work = null, person = null;
     const KEY = 'udPlantStation';
     const read = () => { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } };
     const write = (v) => { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* private window: not remembered */ } };
-    // A link with ?station= sets up a new tablet only. Once the tablet has a station, changing it goes through Change Station
+    // A link with ?station= sets up a new tablet only. Once the tablet has a station, changing it goes through Release
     // (and the manager release code, when the plant has one), as on the current app.
     const asked = new URLSearchParams(location.search).get('station') || '';
     let stationId = read() || (STATIONS.some(s => s.id === asked) ? asked : ''), runs = [];
@@ -152,7 +167,8 @@
       document.getElementById('code-box').hidden = mode !== 'ask';
       document.getElementById('pick').hidden = !!st || mode !== 'free';
       document.getElementById('station').hidden = !st;
-      document.getElementById('change').hidden = !st;
+      // Joe 10/12: a station has no Back, Home or Sign out; Release at the very bottom (manager release code) is the only way out.
+      lockStation(document.getElementById('change'), !!st);
       document.getElementById('pill').hidden = !st;
       document.getElementById('eyebrow').textContent = st ? 'Assigned Plant Station' : 'Plant Station';
       document.getElementById('title').textContent = st ? (named ? named.name : st.label) : mode === 'ask' ? 'Station code' : 'Pick this tablet\'s station';
@@ -163,16 +179,25 @@
       }
       const date = L.operatingDay(new Date());
       document.getElementById('pill').textContent = (named ? named.plant : 'Uniontown') + ' · ' + shortDate(date);
-      const loads = P.loadoutRows(runs, date).filter(r => r.area === st.area), left = loads.filter(r => r.state !== 'DONE').length;
-      document.getElementById('tabs').innerHTML = st.views.map(v => {
-        const x = VIEWS[v], pic = typeof x.pic === 'string' ? x.pic : x.pic[st.area];
-        const count = v === 'loading' ? '<span class="ps-count">' + left + ' remaining of ' + loads.length + ' load' + (loads.length === 1 ? '' : 's') + '</span>' : '';
-        return '<button type="button" role="tab" class="ps-tab" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + x.accent + ';--tone:' + x.tone + '"><img src="img/library/' + pic + '" alt=""><span><b>' + x.label + '</b><small>' + x.what + '</small>' + count + '</span></button>';
+      const actions = st.views.every(v => VIEWS[v].action);
+      document.getElementById('tabs').classList.toggle('actions', actions);
+      document.getElementById('tabs').innerHTML = actions ? st.views.map(v => '<button type="button" role="tab" class="ps-tab ps-action" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + VIEWS[v].accent + ';--tone:' + VIEWS[v].tone + '"><b>' + VIEWS[v].label + '</b></button>').join('') : st.views.map(v => {
+        const x = VIEWS[v], words = viewLabel(st, v), pic = typeof x.pic === 'string' ? x.pic : x.pic[st.area];
+        return '<button type="button" role="tab" class="ps-tab" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + x.accent + ';--tone:' + x.tone + '"><img src="img/library/' + pic + '" alt=""><span><b>' + words.label + '</b><small>' + words.what + '</small><span class="ps-count" data-count="' + v + '"></span></span></button>';
       }).join('');
+      counts();
       document.getElementById('tabs').classList.toggle('one', st.views.length === 1);
-      document.getElementById('foot').textContent = st.what + '. This tablet opens this station each time; use Change Station to move it.';
+      document.getElementById('foot').textContent = st.what + '. This tablet opens this station each time; a manager uses Release at the bottom to move it.';
     }
 
+    // The count under a tab (loads left), from the station's work: Boxing's Shipping / Loadout counts the scheduled shipments too.
+    function counts() {
+      document.querySelectorAll('#tabs [data-count]').forEach(el => {
+        const c = work && work.count(el.dataset.count);
+        el.textContent = c ? c.left + ' remaining of ' + c.total + ' ' + (el.dataset.count === 'receiving' ? 'deliver' + (c.total === 1 ? 'y' : 'ies') : 'load' + (c.total === 1 ? '' : 's')) : '';
+        el.hidden = !c;
+      });
+    }
     document.getElementById('tabs').addEventListener('click', e => {
       const b = e.target.closest('[data-view]');
       if (!b) return;
@@ -199,12 +224,15 @@
       let required = false;
       try { required = (await releaseCall({ op: 'status', facilityId: signedAs ? signedAs.facilityId : 'fac_uniontown' })).required; } catch (err) {
         // No answer: the station stays as it is (a code may be needed), so a dropped network cannot get past the code.
-        showError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and press Change Station again.');
+        showError('Could not check whether a manager release code is needed (' + (err.message || err) + '). Check the network and press Release again.');
         return;
       }
+      // Joe 10/12: a station opened with its code stays put until the plant has a manager release code (no code, no way out).
+      // A plant with no station codes yet still picks from the list.
+      if (!required && mode === 'code') { showError('This screen stays here until the plant has a manager release code (Administration > Manager Links).'); return; }
+      if (!required) { showError(''); leave(); return; }
       showError('');
-      if (!required) { leave(); return; }
-      releaseBox.hidden = false; releaseMsg.textContent = ''; document.getElementById('release-code').value = ''; document.getElementById('release-code').focus();
+      releaseBox.hidden = false; releaseBox.scrollIntoView({ block: 'end' }); releaseMsg.textContent = ''; document.getElementById('release-code').value = ''; document.getElementById('release-code').focus();
     });
     document.getElementById('release-cancel').addEventListener('click', () => { releaseBox.hidden = true; });
     releaseBox.addEventListener('submit', async (ev) => {
@@ -216,6 +244,7 @@
       } catch (err) { releaseMsg.textContent = String(err.message || err); }
     });
 
+    startOffline(['plant-station.html'], { scopes: ['plant-station'], device: 'tablet', files: [] });
     requireSignIn(async (user) => {
       const { db } = await start();
       signedAs = user.station || null; away = false;
@@ -230,13 +259,13 @@
         await signOutHere();
         showError(message);
       };
-      // A tablet signed in by its code alone leaves only through Change Station (and the manager release code).
+      // A tablet signed in by its code alone leaves only through Release (and the manager release code).
       document.getElementById('signout').hidden = !!signedAs;
       // Still On, and still on this code? Checked before anything is read (and again every 5 minutes below).
       if (signedAs) {
         try { const r = await callServer('stationSignIn', { op: 'check', key: signedAs.key, version: signedAs.version }); if (!r.ok) { await turnedAway(r.message); return; } } catch (e) { /* offline: keep the station */ }
       }
-      work = mountStationWork({ db, box: document.getElementById('work'), person: () => person });
+      work = mountStationWork({ db, box: document.getElementById('work'), person: () => person, onDraw: counts });
       watchPerson(db, user, p => { person = p; if (work) work.render(); });
       const watch = () => {
         date = L.operatingDay(new Date());

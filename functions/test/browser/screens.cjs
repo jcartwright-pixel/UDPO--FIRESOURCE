@@ -436,6 +436,15 @@ async function noScroll(page) {
     await rt.selectOption('#view-select', 'seq');
     // The Load Order list is drawn and the saves above have settled, so no copy redraws the rows in the middle of the drag.
     await rt.waitForFunction(() => document.querySelector('table.routes thead th') && document.querySelector('table.routes thead th').textContent === 'Order' && document.querySelector('table.routes tr[data-i="1"]'), null, { timeout: 5000 });
+    // On a slow runner a save takes several seconds: wait until 802's Tote and the WHEELING run are stored, so their
+    // Route Master updates do not redraw the list in the middle of the drag.
+    await rt.waitForFunction(async () => {
+      const { start } = await import('./js/app.js');
+      const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { db } = await start();
+      const all = (await getDocs(collection(db, 'routes'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
+      return all.some(r => r.run === 'WHEELING') && all.some(r => r.id === 'run_t802' && r.loadType === 'Tote');
+    }, null, { timeout: 20000, polling: 250 });
     await rt.waitForTimeout(600);
     const orderShown = () => rt.evaluate(() => [...document.querySelectorAll('table.routes tbody tr[data-i]')].map(tr => tr.children[1].textContent).join(','));
     const beforeDrag = await orderShown();
@@ -446,7 +455,7 @@ async function noScroll(page) {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
       const { db } = await start();
-      for (let i = 0; i < 20; i++) { const d = (await getDoc(doc(db, 'routes', 'run_t801'))).data(); if (d.days.mon.loadOrder === 10 && d.days.mon.dispatchTime === 300) return d.days.mon; await new Promise(r => setTimeout(r, 250)); }
+      for (let i = 0; i < 80; i++) { const d = (await getDoc(doc(db, 'routes', 'run_t801'))).data(); if (d.days.mon.loadOrder === 10 && d.days.mon.dispatchTime === 300) return d.days.mon; await new Promise(r => setTimeout(r, 250)); }
       return null;
     });
     assert.ok(saved801, 'Monday start time 5:00 AM and load order 10 saved for 801');
@@ -739,14 +748,16 @@ async function noScroll(page) {
     results.push('Fleet Service: Due, Work Orders, History and Setup open with no errors');
     // Joe 10/10: every screen, plant screens included, shows Back and Home together; Joe 10/10 evening: in the header, not the menu.
     // The drivers' no-account pages aside: the phone page and the Driver Room Check-In tablet (Joe 10/12, leaves only by
-    // Change Station and the manager release code).
+    // Release and the manager release code).
     const fsMod = require('fs'), pathMod = require('path');
     const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html');
     const bh = await openPage(browser, 1366, 768, '/index.html?testEmail=manager.test@uniteddairy.com');
     const missing = [];
     for (const pg of pages) {
       await bh.goto(bh.url().replace(/\/[a-z-]+\.html.*/, '/' + pg + '?testEmail=manager.test@uniteddairy.com'));
-      await bh.waitForSelector('#go-home', { timeout: 8000 }).catch(() => {});
+      // #go-home is drawn as the page loads; the screen shows once the sign-in is checked (later on the Safety Walkthrough's
+      // screens, which open their on-device copy of the data first), so wait until it can be seen.
+      await bh.waitForSelector('#go-home', { state: 'visible', timeout: 8000 }).catch(() => {});
       const seen = await bh.evaluate(() => ['go-back', 'go-home'].filter(id => { const e = document.getElementById(id); return e && e.getBoundingClientRect().width > 0; }));
       const want = pg === 'index.html' || pg === 'company.html' ? ['go-home'] : ['go-back', 'go-home'];
       if (want.some(id => seen.indexOf(id) < 0)) missing.push(pg + ': ' + seen.join(','));

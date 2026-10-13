@@ -84,6 +84,9 @@
     return parts.year + '-' + parts.month + '-' + parts.day;
   }
 
+  // Joe 10/13 ("No route equals no driver"): what a day marked not running gives up, so the driver and units are free that day.
+  var NOT_RUNNING_CLEARS = Object.freeze({ driverId: '', driver: '', truckId: '', truck: '', trailerId: '', trailer: '' });
+
   // Same rule as udpoV7000ScheduledValue_: blank, FALSE, NO, N, 0, OFF and DOES NOT RUN mean "no".
   function yes(value) {
     if (value === false || value === 0 || value === null || value === undefined) return false;
@@ -239,6 +242,26 @@
     return day.loadSequenceOverride !== null && day.loadSequenceOverride !== undefined ? day.loadSequenceOverride : day.loadSequence;
   }
 
+  // Route names (Joe 10/12): a run reads as its parts, "901 Martins Ferry Product Load 1", never "901_1". routeNumber drops a
+  // trailing _1 / _2 from the route; runLabel joins Route Name, Run and Run Type (route_run_type: Load 1, Load 2), skipping a
+  // part another part already says (JERSEY LOAD 1 on Jersey), and an old "6301_1" run name reads as "Load 1".
+  function routeNumber(route) { return String(route == null ? '' : route).trim().replace(/_\d+$/, ''); }
+  function runLabel(routeName, run, runType) {
+    var r = String(run == null ? '' : run).trim(), m = r.match(/^\d+_(\d+)$/), out = [];
+    if (m) r = 'Load ' + m[1];
+    [String(routeName == null ? '' : routeName).trim(), r, String(runType == null ? '' : runType).trim()].forEach(function (part) {
+      if (!part) return;
+      var up = part.toUpperCase();
+      for (var i = 0; i < out.length; i++) {
+        var had = out[i].toUpperCase();
+        if (had.indexOf(up) >= 0) return;
+        if (up.indexOf(had) >= 0) { out.splice(i, 1); i--; }
+      }
+      out.push(part);
+    });
+    return out.join(' ');
+  }
+
   function compareRoute(a, b) {
     return String(a.route || '').localeCompare(String(b.route || ''), undefined, { numeric: true, sensitivity: 'base' }) ||
       String(a.run || '').localeCompare(String(b.run || ''));
@@ -256,7 +279,7 @@
           runDocId: run.id,
           day: block.prefix,
           weekStart: run.weekStart,
-          routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run,
+          routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run, routeRunType: run.routeRunType || '',
           loadType: run.loadType, movementType: run.movementType, coverageType: run.coverageType,
           loadDate: loadDate, deliveryDate: block.deliveryDate, deliveryDay: DAY_NAMES[DAYS.indexOf(block.prefix)],
           loadDayOffset: block.loadDayOffset,
@@ -363,6 +386,10 @@
     // Joe 10/12 ("turn all 8 sheets on"): the plant check screens (Cooler Temperatures, Quality, Yard, Shift Report Log, Scheduler,
     // Line Targets), Products, Safety Walkthrough and Plant Maintenance. Their saves stay in the new app.
     plant: 'Plant Operations' };
+  // Screens with no sheet behind them: always saved in the new app, never on Go-Live Switches.
+  // Joe 10/13 ("I want everything working"): also Fleet Service Setup (service rules, unit dates, garage technicians),
+  // Operational Assignments and Sheet Conflicts' Clear; they used to ride on a sheet switch and went view only with it off.
+  var APP_ONLY = { otr: 'Over the Road', scorecard: 'Driver Scorecard', fleetSetup: 'Fleet Service Setup', opsAssignments: 'Operational Assignments', conflicts: 'Sheet Conflicts' };
   function screenOwners(config) {
     var out = {}, set = (config && config.screenOwners) || {};
     Object.keys(SCREENS).forEach(function (k) { out[k] = 'old'; });
@@ -374,6 +401,9 @@
     var owners = screenOwners(config), owner = owners[screen] || 'old', name = SCREENS[screen] || screen;
     var writeBack = !!(config && config.writeBack && config.writeBack.enabled === true);
     var anyNew = Object.keys(owners).some(function (k) { return owners[k] === 'new'; });
+    // Joe 10/13 ("I can't select the routes"): screens whose saves stay in the new app and write no sheet (Over the Road,
+    // Driver Scorecard) are never view only; there is nothing for a Go-Live Switch to protect.
+    if (APP_ONLY[screen]) return { owner: 'app', live: anyNew, open: true, why: '' };
     if (owner === 'new') return { owner: owner, live: true, open: writeBack, why: writeBack ? '' : name + ' is switched on but the write-back is off; ask an administrator' };
     if (config && config.mode === 'live' && !anyNew) return { owner: owner, live: false, open: false, why: 'The app is marked live but no screen belongs to the new app; saves stay in test mode only' };
     if (anyNew) return { owner: owner, live: true, open: false, why: name + ' is view only until it is switched on in Administration > Go-Live Switches' };
@@ -497,6 +527,7 @@
     var key = kind === 'truck' ? 'truckId' : 'trailerId', out = {}, mine = runWindow(target, hoursFor), tol = 15;
     rows.forEach(function (r) {
       if (r === target || r.off || r.deliveryDate !== target.deliveryDate || !r[key] || out[r[key]]) return;
+      if (kind === 'truck' && r.driverId && r.driverId === target.driverId) return; // his own other load that day (Joe 10/12)
       var w = runWindow(r, hoursFor), busy;
       if (w.start === null || w.end === null) busy = w.start === null || mine.end === null || mine.end > w.start;
       else busy = mine.start !== null && mine.end !== null && w.start < mine.end - tol && mine.start < w.end - tol;
@@ -670,6 +701,14 @@
   // Off = not usable by the current app's rule (unitUsable below): a status outside AVAILABLE / ACTIVE / IN SERVICE / READY, or a truck
   // or trailer no longer on the fleet list import.
   function unitOff(unit) { return !unitUsable(unit); }
+  // Joe 10/12 ("T-10308 is ACTIVE (not usable)"): why an off unit is off, in words: its status (DOWN, INACTIVE, ...), or, for an
+  // ACTIVE truck or trailer, that it is not on the fleet list. '' when the unit is usable.
+  function unitOffWhy(unit) {
+    if (!unit || !unitOff(unit)) return '';
+    var status = String(unit.status || '').trim().toUpperCase();
+    if (UNIT_ON_STATUSES.indexOf(status) < 0) return status.replace(/_/g, ' ') || 'NOT USABLE';
+    return 'NOT ON THE FLEET LIST';
+  }
   // Joe 10/12 ("537 is on the list being down but shows on dispatch"): running loads from fromDate on that still carry a down,
   // inactive or out-of-service truck or trailer (the current app's week roll can put a down unit back on a route).
   function offUnitLoads(runs, equipment, fromDate) {
@@ -681,7 +720,7 @@
         if (!d || !d.runs || (fromDate && date < fromDate)) return;
         [['truckId', 'truck'], ['trailerId', 'trailer']].forEach(function (k) {
           var e = d[k[0]] && byId[String(d[k[0]]).toUpperCase()];
-          if (e && unitOff(e)) out.push({ unitId: e.id, unit: e.unit, type: e.type, status: String(e.status || ''), notes: String(e.notes || ''), route: String(run.route || ''), run: String(run.run || ''), date: date, runDocId: run.id, day: p });
+          if (e && unitOff(e)) out.push({ unitId: e.id, unit: e.unit, type: e.type, status: String(e.status || ''), why: unitOffWhy(e), notes: String(e.notes || ''), route: String(run.route || ''), run: String(run.run || ''), date: date, runDocId: run.id, day: p });
         });
       });
     });
@@ -699,7 +738,7 @@
         var offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : day.loadDayOffset;
         var deliveryDate = addDays(loadDate, -offset);
         if (dayPrefix(deliveryDate) !== prefix || weekStart(deliveryDate) !== run.weekStart) return;
-        rows.push({ id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, run: run.run, deliveryDate: deliveryDate, rev: run.rev || 0 });
+        rows.push({ id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, routeName: run.routeName || '', run: run.run, routeRunType: run.routeRunType || '', deliveryDate: deliveryDate, rev: run.rev || 0 });
       });
     });
     return rows.sort(compareRoute);
@@ -1025,14 +1064,14 @@
   }
 
   return {
-    noWriteUp: noWriteUp,
+    noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS,
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
-    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, offUnitLoads: offUnitLoads, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
+    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
-    SCREENS: SCREENS, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
+    SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
@@ -1042,6 +1081,7 @@
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
+    routeNumber: routeNumber, runLabel: runLabel,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
   };

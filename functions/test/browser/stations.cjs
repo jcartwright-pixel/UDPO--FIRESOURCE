@@ -23,7 +23,7 @@ const MANAGER = '?testEmail=manager.test@uniteddairy.com';
 const SHOTS = process.env.SHOTS || '';
 
 async function openPage(browser, width, height, url, clock, touch) {
-  const page = await browser.newPage(touch ? { viewport: { width, height }, hasTouch: true, isMobile: true } : { viewport: { width, height } });
+  const page = await browser.newPage(Object.assign(touch ? { viewport: { width, height }, hasTouch: true, isMobile: true } : { viewport: { width, height } }, { serviceWorkers: 'block' }));
   if (clock) await page.clock.setFixedTime(new Date(clock));
   await localCalls(page);
   // The public callables answer straight from the server code when no functions emulator runs (LOCAL_CALLS=1).
@@ -61,7 +61,7 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
   const results = [];
   try {
     // Garage Station: the technicians' names, then the login ID on the keypad, then the jobs.
-    const gs = await openPage(browser, 1920, 1080, '/garage-station.html');
+    const gs = await openPage(browser, 1920, 1080, '/garage-station.html?testEmail=manager.test@uniteddairy.com');
     await gs.waitForSelector('[data-tech="TECH-JT"]', { timeout: 10000 });
     await shot(gs, 'garage-station-sign-in-1920.png');
     await gs.click('[data-tech="TECH-JT"]');
@@ -221,9 +221,15 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.equal(await tab.isVisible('#tabs'), false, 'one work area: no tabs, the loads straight away');
     assert.deepEqual(await managerPages(tab), [], 'no link to a manager screen from Case Loadout');
     for (const gone of ['#load-date', '.areas', 'table', '[data-edit]', '.hdr-admin', '#go-admin']) assert.equal(await tab.$(gone), null, gone + ' is not on the station');
+    // Joe 10/12: Case Loadout loads 2 at a time and the made-up day has 2 loading, so one is paused (with its reason) first.
+    const p808 = '#work .sw-card[data-sw="2026-10-04__run_p808|fri"]';
+    await tab.click(p808 + ' [data-act="pause"]');
+    await tab.fill(p808 + ' [data-k="pauseReason"]', 'Waiting on product');
+    await tab.click(p808 + ' [data-act="pausego"]');
+    await tab.waitForSelector(p808 + '.paused', { timeout: 10000 });
+    for (let i = 0; i < 100 && (await db().collection('runs').doc('2026-10-04__run_p808').get()).data().days.fri.loadStatus !== 'PAUSED'; i++) await new Promise(r => setTimeout(r, 100));
     // Start a waiting load, type its cases, Complete: the card shows each step.
-    const card = '#work .sw-card:not(.done):not(.run) >> nth=0';
-    const id = await tab.getAttribute(card, 'data-sw');
+    const id = '2026-10-04__run_p811|fri';
     const at = '#work .sw-card[data-sw="' + id + '"]';
     await tab.click(at + ' [data-act="start"]');
     await tab.waitForSelector(at + '.run.open .sw-badge:text-is("LOADING")', { timeout: 10000 });
@@ -291,10 +297,10 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await noGrant.close();
     await db().collection('personRights').doc(RIGHTS).set({ grants: ['plant.loading.write'], denials: [] });
     const granted = await asRights();
-    const gStart = '#work .sw-card:not(.done):not(.run) [data-act="start"]:not([disabled])';
+    const gStart = '#work .sw-card:not(.done):not(.run):not(.paused) [data-act="start"]:not([disabled])';
     await granted.waitForSelector(gStart, { timeout: 10000 });
     assert.equal(await granted.$('#work .sw-note'), null, 'no View only note for an account People & Roles allows');
-    const gid = await granted.getAttribute('#work .sw-card:not(.done):not(.run) >> nth=0', 'data-sw');
+    const gid = await granted.getAttribute('#work .sw-card:not(.done):not(.run):not(.paused) >> nth=0', 'data-sw');
     await granted.click('#work .sw-card[data-sw="' + gid + '"] [data-act="start"]');
     await granted.waitForSelector('#work .sw-card[data-sw="' + gid + '"].run .sw-badge:text-is("LOADING")', { timeout: 10000 });
     assert.deepEqual(granted.errors, []);
