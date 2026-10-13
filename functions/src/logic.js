@@ -330,7 +330,8 @@
           date: addDays(week, i), runs: !!d.runs, loadSequence: effectiveSequence(d),
           driverId: d.driverId || '', driver: d.driver || '', truckId: d.truckId || '', truck: d.truck || '',
           trailerId: d.trailerId || '', trailer: d.trailer || '', dispatchTime: d.dispatchTime,
-          intendedDriver: d.intendedDriver || '', driverExceptionStatus: d.driverExceptionStatus || '', routeOverride: yes(d.routeOverride)
+          intendedDriver: d.intendedDriver || '', driverExceptionStatus: d.driverExceptionStatus || '', routeOverride: yes(d.routeOverride),
+          plantLoadOff: d.plantLoadOff === true
         };
       });
       return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
@@ -822,7 +823,8 @@
   function weeklyCellClass(row, prefix, ctx) {
     var d = row.days[prefix], who = String(d.driver || '').trim().toUpperCase();
     // A plant load on the Plant Operations Scheduler for a day the run does not run: it needs a driver (current Weekly).
-    if (!d.runs) return plantFor(ctx, row, prefix) && !coveredRoute(row) ? 'plant' : 'off';
+    // Joe 10/13 (836 PECK): a plant load marked Not running on Weekly (plantLoadOff) is off like any other day.
+    if (!d.runs) return plantFor(ctx, row, prefix) && !coveredRoute(row) && d.plantLoadOff !== true ? 'plant' : 'off';
     if (coveredRoute(row)) return 'coverage';
     // Joe 10/11: a run with no driver because its regular driver is off that day (any reason) is red, so the cover shows.
     if (!who) return offCover(row, prefix, d.date, ctx) ? 'vacation-needs' : 'needs';

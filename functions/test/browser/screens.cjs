@@ -257,6 +257,16 @@ async function noScroll(page) {
     // Plant Load: 801 does not run Thursdays, but the plant scheduler has a load for it on 10/8, so the day needs a driver.
     const thu801 = 'xpath=//tr[td[1][text()="801"]]/td[@data-day="thu"]';
     assert.deepEqual(await wkEdit.$eval(thu801, td => [td.classList.contains('c-plant'), td.classList.contains('plant-load'), td.textContent, /pickup 7:00 AM, T-902, PO 4411/.test(td.title)]), [true, true, 'PLANT LOAD', true]);
+    // Joe 10/13 (836 PECK): a plant load can be marked Not running (the day goes black) and put back to PLANT LOAD.
+    await wkEdit.click(thu801);
+    await wkEdit.selectOption('.popover select[data-kind="driver"]', '__OFF__');
+    await wkEdit.waitForSelector('.popover', { state: 'detached' });
+    await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6]; return td.classList.contains('off') && !td.classList.contains('c-plant') && /not running/.test(td.title); }, null, { timeout: 5000 });
+    if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-plant-load-not-running-1920.png') });
+    await wkEdit.click(thu801);
+    await wkEdit.selectOption('.popover select[data-kind="driver"]', '__PLANT__');
+    await wkEdit.waitForSelector('.popover', { state: 'detached' });
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6].classList.contains('c-plant'), null, { timeout: 5000 });
     await wkEdit.click(thu801);
     assert.match(await wkEdit.$eval('.popover select[data-kind="driver"] option', o => o.textContent), /PLANT LOAD/);
     await wkEdit.selectOption('.popover select[data-kind="driver"]', 'drv_test_adams');
