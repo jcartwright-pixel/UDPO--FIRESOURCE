@@ -91,10 +91,13 @@ async function seed(d) {
         ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Time', 'Overall']);
       const ray = await sc.$eval('tr[data-key="DRV_S_DIAZ"]', tr => [...tr.cells].map(c => c.textContent.trim()));
       assert.equal(ray[1], 'DIAZ, RAY', 'no truck or route on the board');
-      assert.deepEqual(ray.slice(2), ['B', 'A', 'A', 'A', 'A', 'A', 'A', 'A', '80 C'], 'check-in 88 (B), speeding 96 and hard stops 96 (A), overall 80 (C)');
-      // Joe 10/13 Time grade: left too early (EVANS, 10 days) and back too late (FOX, 10 days) each cost 1 a day.
-      assert.equal(await sc.$eval('tr[data-key="DRV_S_EVANS"] td:nth-child(10)', td => td.textContent.trim()), 'B');
-      assert.equal(await sc.$eval('tr[data-key="DRV_S_FOX"] td:nth-child(10)', td => td.textContent.trim()), 'B');
+      // Joe 10/13 rewards, 10 days: check-in 7 clean, no 5 in a row, 3 missed -12 = -5 -> 70 (D); speeding 8 clean, one
+      // streak +2, 2 alerts -4 = 6 -> 92 (B); hard stops 8 clean, 2 hard stops -4 = 4 -> 88 (B); the rest clean (100).
+      assert.deepEqual(ray.slice(2), ['D', 'A', 'A', 'A', 'B', 'B', 'A', 'A', '94 A'], 'grades by points per day; overall = average of the areas');
+      assert.match(await sc.textContent('#sc-how'), /How scoring works: each area earns \+1 for a clean day and \+2 for every 5 clean days in a row/);
+      // Joe 10/13 Time grade: left too early (EVANS, 10 days) and back too late (FOX, 10 days) each cost 1 a day: -10 -> 60 (D).
+      assert.equal(await sc.$eval('tr[data-key="DRV_S_EVANS"] td:nth-child(10)', td => td.textContent.trim()), 'D');
+      assert.equal(await sc.$eval('tr[data-key="DRV_S_FOX"] td:nth-child(10)', td => td.textContent.trim()), 'D');
       assert.match(await sc.textContent('#unassigned'), /No driver dispatched[\s\S]*10-8-26\s*229001\s*Speeding \(66 mph in a 45/, 'the alert on a truck with no driver is kept for a manager');
       const fit = await sc.evaluate(() => ({ table: document.querySelector('.sc-board').scrollWidth, box: document.querySelector('#sheet').clientWidth,
         small: [...document.querySelectorAll('.sc-board td, .sc-board th, .sc-board small')].filter(e => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).length }));
