@@ -37,6 +37,7 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice warning" id="offline-line" role="status" hidden></div>
+    <nav class="sw-fire-nav" id="fire-nav" aria-label="Fire safety"></nav>
     <div class="view" id="list-view">
       <div class="sw-sheet">
         <table class="sw-grid sw-ext-grid">
@@ -58,14 +59,15 @@
     import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
     import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { today, thisMonth, monthName, pickPlant, plantName, canWalk, canSetUp, modeText, watchExtinguishers, watchSetup } from './js/safety.js';
+    import { today, thisMonth, monthName, pickPlant, plantName, canWalk, canSetUp, modeText, watchExtinguishers, watchSetup, fireNav } from './js/safety.js';
 
     // Fire Extinguishers (Joe 10/12, mock-ups E and F): each plant's extinguishers with this month's check (OSHA asks for a
     // monthly look at every one) and the annual service, 6-year and hydrostatic test dates, which turn amber 30 days out and
     // red when past. Check opens the big-button check of one extinguisher; Next goes to the next tag. A manager or
     // administrator keeps the list: each box saves as it is left; the empty row at the bottom adds one. Joe 10/13: + Add
     // Extinguisher (top) goes to that row; Location is a pick list of the plant's Location Areas (Locations opens them) and
-    // the places already used, and any place can still be typed.
+    // the places already used, and any place can still be typed. Joe 10/13 (mock-up B): a line of buttons under the top one
+    // goes to Fire Alarm, Fire Suppression and Escape Plan (safety-fire.html).
     const S = window.UDSafety;
     const params = new URLSearchParams(location.search);
     let db = null, person = null, app = {}, plant = '', exts = null, stop = null, stopLocs = null, locs = [], checking = params.get('tag') || '', chain = Promise.resolve(), addedTag = '';
@@ -88,6 +90,7 @@
       document.getElementById('add-ext').hidden = !!checking || !canSetUp(person, app);
       document.getElementById('locs-link').hidden = !!checking || !canSetUp(person, app);
       document.getElementById('locs-link').href = 'location-areas.html?plant=' + encodeURIComponent(plant);
+      document.getElementById('fire-nav').innerHTML = fireNav('ext', plant);
     }
     function drawList(force) {
       if (force !== true && document.getElementById('rows').contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
@@ -224,7 +227,7 @@
         render();
       }, e => showError('Could not read the extinguishers (' + e.message + '). Check the network and reload the page.'));
     }
-    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']);
+    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-fire.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {

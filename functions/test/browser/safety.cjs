@@ -7,6 +7,7 @@
  *     every item starts Not checked; the month's first walk has the monthly items;
  *   - the Not good shows on Open Issues and at the top of the next walk to review;
  *   - Fire Extinguishers: the empty row adds one; Check opens the big-button check; all Good makes the month GOOD;
+ *   - Joe 10/13: Fire Alarm, Fire Suppression and Escape Plan, a monthly big-button check of each with its dates;
  *   - every screen fits 1536 and 1920 with no sideways scrolling and 16px text; the walk works on a tablet (one column).
  *   - Joe 10/12: photos on any item (up to three) from the tablet camera; they show on the item, Open Issues and Past Walks.
  *   - Joe 10/12: iPad (Safari) and Android (Chrome) tablets in both directions and an Android phone: every safety screen
@@ -273,6 +274,56 @@ async function cameraShot(page, color) {
     await ex.close();
     results.push('Fire Extinguishers: + Add Extinguisher, a Location pick list from Location Areas, and Add; the empty row adds one; annual service due within 30 days shows DUE SOON; the big-button check marks the month GOOD and Next goes to the next tag');
 
+    // Joe 10/13 (mock-up B): Fire Alarm, Fire Suppression and Escape Plan, each a monthly big-button check of the whole system
+    // with its dates, reached from a line of buttons under the top one (Fire Extinguishers shows it too).
+    const fe = await openPage(browser, 1536, 864, '/extinguishers.html?' + ADMIN);
+    await fe.waitForSelector('#fire-nav a');
+    assert.deepEqual(await fe.$$eval('#fire-nav a', a => a.map(x => x.textContent)), ['Fire Extinguishers', 'Fire Alarm', 'Fire Suppression', 'Escape Plan']);
+    assert.equal(await fe.getAttribute('#fire-nav a[aria-current="page"]', 'href'), 'extinguishers.html?plant=fac_uniontown');
+    { const tops = await fe.$$eval('.head .top-row > *', b => b.filter(x => x.offsetParent).map(x => [x.textContent.trim().slice(0,20), Math.round(x.getBoundingClientRect().top), Math.round(x.getBoundingClientRect().width)])); assert.ok(Math.max(...tops.map(t => t[1])) - Math.min(...tops.map(t => t[1])) <= 4, 'Fire Extinguishers keeps its top buttons on one line: ' + JSON.stringify(tops)); }
+    await fits(fe, 'Fire Extinguishers with the fire buttons at 1536');
+    await shot(fe, 'safety-extinguishers-fire-nav-1536');
+    await fe.click('#fire-nav a:has-text("Fire Alarm")');
+    await fe.waitForSelector('#check .sw-bi .sw-btn');
+    assert.match(await fe.textContent('#title'), /^Fire Alarm · /);
+    assert.equal(await fe.$$eval('#check .sw-bi .sw-btn.good', b => b.length), S.fireSystem('alarm').items.length);
+    await fe.fill('#check input[data-date="vendorDue"]', '3-1-27');
+    await fe.press('#check input[data-date="vendorDue"]', 'Tab');
+    const fireRec = async (k) => ((await db().collection('fireSystems').doc(S.fireId(UT, k)).get()).data() || {});
+    for (let i = 0; i < 40 && (await fireRec('alarm')).vendorDue !== '2027-03-01'; i++) await fe.waitForTimeout(250);
+    assert.equal((await fireRec('alarm')).vendorDue, '2027-03-01', 'the vendor date saves as it is left');
+    await fe.click('#check .sw-btn.bad[data-item="pulls"]');
+    await fe.waitForSelector('#check textarea[data-note]');
+    await fe.fill('#check textarea[data-note]', 'Pull station by dock 3 blocked by pallets');
+    await fe.press('#check textarea[data-note]', 'Tab');
+    const fireIssue = async () => (await db().collection('safetyIssues').where('facilityId', '==', UT).where('source', '==', 'FIRE_SYSTEM').get()).docs.map(x => x.data());
+    for (let i = 0; i < 40 && !((await fireIssue())[0] || {}).note; i++) await fe.waitForTimeout(250);
+    assert.deepEqual([(await fireIssue())[0].area, (await fireIssue())[0].note], ['Fire Alarm', 'Pull station by dock 3 blocked by pallets'], 'a Not good is an open issue with what is wrong');
+    { const tops = await fe.$$eval('.head .top-row > *', b => b.filter(x => x.offsetParent).map(x => x.getBoundingClientRect().top)); assert.ok(Math.max(...tops) - Math.min(...tops) <= 4, 'top buttons on one line: ' + JSON.stringify(tops)); }
+    await fits(fe, 'Fire Alarm at 1536');
+    assert.ok(await smallest(fe, '#check .sw-bi span, #check .sw-btn, #check label, #fire-nav a') >= 16, 'Fire Alarm text is 16px or more: ' + JSON.stringify(await tiny(fe, '#check .sw-bi span, #check .sw-btn, #check label, #fire-nav a')));
+    await shot(fe, 'safety-fire-alarm-1536');
+    await fe.goto(HOSTING + '/safety-fire.html?sys=escape&' + ADMIN);
+    await fe.waitForSelector('#check .sw-bi .sw-btn');
+    assert.deepEqual(await fe.$$eval('#check .sw-fire-dates .sw-label', l => l.map(x => x.textContent)), ['Last fire drill', 'Next fire drill', 'Maps updated']);
+    for (const [k] of S.fireSystem('escape').items) { await fe.click('#check .sw-btn.good[data-item="' + k + '"]'); await fe.waitForTimeout(100); }
+    const escDone = async () => S.fireMonth('escape', await fireRec('escape'), today.slice(0, 7)).state;
+    for (let i = 0; i < 40 && await escDone() !== 'GOOD'; i++) await fe.waitForTimeout(250);
+    assert.equal(await escDone(), 'GOOD');
+    await fe.waitForFunction(() => /Good/.test(document.getElementById('counts').textContent));
+    await fits(fe, 'Escape Plan at 1536');
+    await shot(fe, 'safety-escape-plan-1536');
+    await fe.setViewportSize({ width: 1920, height: 1080 });
+    await fits(fe, 'Escape Plan at 1920');
+    await shot(fe, 'safety-escape-plan-1920');
+    await fe.goto(HOSTING + '/safety-fire.html?sys=suppression&' + ADMIN);
+    await fe.waitForSelector('#check .sw-bi .sw-btn');
+    assert.match(await fe.textContent('#check'), /Kitchen hood system/);
+    await shot(fe, 'safety-fire-suppression-1920');
+    assert.deepEqual(fe.errors, []);
+    await fe.close();
+    results.push('Fire Alarm, Fire Suppression and Escape Plan (Joe 10/13, mock-up B): a line of buttons under the top one on all four fire screens (top buttons stay on one line); each has a monthly big-button check and its dates; the vendor date saves as it is left; a Not good with what is wrong is an open issue; Escape Plan all Good marks the month Good; fits 1536 and 1920');
+
     // Past Walks and Checklist Setup open and fit.
     for (const page of ['safety-walks.html', 'safety-setup.html']) {
       const p = await openPage(browser, 1536, 864, '/' + page + '?' + ADMIN);
@@ -389,6 +440,12 @@ async function cameraShot(page, color) {
         assert.ok(await smallest(d, '#rows td, .head a, .head button') >= 16, name + ': ' + page + ' text is 16px or more: ' + JSON.stringify(await tiny(d, '#rows td, .head a, .head button')));
         await shot(d, page.replace('.html', '') + '-' + tag);
       }
+      await d.goto(HOSTING + '/safety-fire.html?sys=escape&' + ADMIN);
+      await d.waitForSelector('#check .sw-bi .sw-btn');
+      await fits(d, 'Escape Plan on ' + name);
+      assert.ok(await tall('#check .sw-btn') >= 44, name + ': Escape Plan buttons are big');
+      assert.ok(await tall('#fire-nav a') >= 44, name + ': the fire buttons are big');
+      await shot(d, 'safety-escape-plan-' + tag);
       await d.goto(HOSTING + '/extinguishers.html?' + ADMIN);
       await d.click('#rows tr[data-id="' + S.extId(UT, '02') + '"] [data-check]');
       await d.waitForSelector('#check .sw-bi');

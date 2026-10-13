@@ -151,6 +151,33 @@ test('Extinguishers: a manager adds one; the monthly check; a Not good opens an 
   assert.equal(e.status, 'RETIRED');
 });
 
+test('Fire Alarm, Fire Suppression and Escape Plan (Joe 10/13): dates, the monthly check, a Not good opens an issue', async () => {
+  const dates = (fields, email) => applyAction(db(), { email: email || MANAGER }, Object.assign({ action: 'saveFireSystem', requestId: rid(), facilityId: UT }, fields), at(MON));
+  await assert.rejects(dates({ system: 'alarm', vendorDue: '3-1-27' }, PLANT_PERSON), /permission|not allowed|role/i);
+  await assert.rejects(dates({ system: 'alarm', vendorDue: 'soon' }), /date like/);
+  await assert.rejects(dates({ system: 'boiler', vendorDue: '3-1-27' }), /Fire Alarm, Fire Suppression or Escape Plan/);
+  await dates({ system: 'alarm', vendorDue: '3-1-27' });
+  await dates({ system: 'escape', lastDrill: '4-18-26' });
+  await dates({ system: 'escape', nextDrill: '10-24-26' });
+  const rec = async (k) => (await db().collection('fireSystems').doc(S.fireId(UT, k)).get()).data();
+  assert.equal((await rec('alarm')).vendorDue, '2027-03-01');
+  assert.deepEqual([(await rec('escape')).lastDrill, (await rec('escape')).nextDrill], ['2026-04-18', '2026-10-24'], 'one date saved leaves the others');
+  const check = (system, item, status, month) => applyAction(db(), { email: PLANT_PERSON }, { action: 'saveFireSystemCheck', requestId: rid(), facilityId: UT, system, month: month || '2026-10', item, status }, at(MON));
+  for (const [k] of S.fireSystem('escape').items) await check('escape', k, 'GOOD');
+  assert.equal(S.fireMonth('escape', await rec('escape'), '2026-10').state, 'GOOD');
+  assert.equal((await rec('escape')).checks['2026-10'].byName, 'Test Viewer');
+  await check('suppression', 'valves', 'NOT_GOOD');
+  let list = await issues();
+  assert.equal(list.length, 1);
+  assert.deepEqual([list[0].area, list[0].item, list[0].source], ['Fire Suppression', 'Fire Suppression: Sprinkler control valves open, locked or sealed', 'FIRE_SYSTEM']);
+  await applyAction(db(), { email: PLANT_PERSON }, { action: 'saveFireSystemCheck', requestId: rid(), facilityId: UT, system: 'suppression', month: '2026-10', note: 'Valve 2 chain cut' }, at(MON));
+  assert.equal((await issues())[0].note, 'Valve 2 chain cut');
+  await check('suppression', 'valves', 'GOOD');
+  assert.equal((await issues()).length, 0, 'taken back before anyone fixed it');
+  await assert.rejects(check('alarm', 'panel', 'GOOD', '2026-09'), /month it is done/);
+  await assert.rejects(check('alarm', 'nope', 'GOOD'), /Pick the item/);
+});
+
 test('Checklist Setup: a manager changes the plant\'s list; an item left out stays on as off; a dispatcher may walk', async () => {
   const areas = S.checklist(null, true).slice(0, 1).map(a => Object.assign({}, a, { items: a.items.slice(0, 2).concat([{ id: 'fire_new', text: 'Hot work permits posted', freq: 'MONTHLY' }]) }));
   await applyAction(db(), { email: MANAGER }, { action: 'saveSafetyChecklist', requestId: rid(), facilityId: UT, areas }, at(MON));

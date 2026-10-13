@@ -77,6 +77,13 @@ export function watchExtinguishers(db, plant, cb, fail) {
     .sort((a, b) => String(a.tag).localeCompare(String(b.tag), 'en', { numeric: true }))), fail);
 }
 
+// Joe 10/13 (mock-up B): Fire Extinguishers, Fire Alarm, Fire Suppression and Escape Plan, one line of buttons on each of
+// those screens (the one open is blue), so the top buttons stay on one line.
+export function fireNav(here, plant) {
+  const q = plant ? 'plant=' + encodeURIComponent(plant) : '';
+  return [['ext', 'Fire Extinguishers', 'extinguishers.html' + (q ? '?' + q : '')]].concat(S.FIRE_SYSTEMS.map(x => [x.key, x.name, 'safety-fire.html?sys=' + x.key + (q ? '&' + q : '')]))
+    .map(([k, l, href]) => '<a class="sw-top' + (k === here ? ' pri" aria-current="page' : '') + '" href="' + href + '">' + escapeHtml(l) + '</a>').join('');
+}
 // "7 DAYS" in amber, red once past 30 days; "TODAY" on the day it was found.
 export function agePill(issue) {
   const d = S.daysOpen(issue, today());

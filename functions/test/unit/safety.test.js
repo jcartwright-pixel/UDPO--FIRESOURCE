@@ -82,3 +82,20 @@ test('An extinguisher\'s month and its service dates', () => {
   assert.equal(S.dueState('', '2026-10-12'), '');
   assert.equal(S.extId('fac_uniontown', '04'), 'fac_uniontown__04');
 });
+
+test('Fire Alarm, Fire Suppression and Escape Plan (Joe 10/13): one monthly check of each system', () => {
+  assert.deepEqual(S.FIRE_SYSTEMS.map(x => x.key), ['alarm', 'suppression', 'escape']);
+  assert.deepEqual(S.FIRE_SYSTEMS.map(x => x.name), ['Fire Alarm', 'Fire Suppression', 'Escape Plan']);
+  const esc = S.fireSystem('escape');
+  assert.deepEqual(esc.dates.map(d => d[0]), ['lastDrill', 'nextDrill', 'mapsUpdated']);
+  assert.ok(esc.items.some(i => /maps/i.test(i[1])) && esc.items.some(i => /meeting point/i.test(i[1])) && esc.items.some(i => /routes/i.test(i[1])));
+  assert.equal(S.fireSystem('nope'), null);
+  const items = Object.fromEntries(S.fireSystem('alarm').items.map(i => [i[0], 'GOOD']));
+  assert.equal(S.fireMonth('alarm', { checks: { '2026-10': { items } } }, '2026-10').state, 'GOOD');
+  const part = S.fireMonth('alarm', { checks: { '2026-10': { items: { panel: 'GOOD' } } } }, '2026-10');
+  assert.deepEqual([part.state, part.done, part.total], ['DUE', 1, 6]);
+  const bad = S.fireMonth('alarm', { checks: { '2026-10': { items: Object.assign({}, items, { pulls: 'NOT_GOOD' }) } } }, '2026-10');
+  assert.deepEqual([bad.state, bad.bad], ['NOT_GOOD', ['Every pull station visible, not blocked, cover on']]);
+  assert.equal(S.fireMonth('alarm', null, '2026-10').state, 'DUE');
+  assert.equal(S.fireId('fac_uniontown', 'escape'), 'fac_uniontown__escape');
+});

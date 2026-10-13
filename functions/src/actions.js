@@ -101,6 +101,8 @@ const ACTIONS = Object.freeze({
   saveSafetyIssue: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveExtinguisherCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveExtinguisher: { roles: REORDER_ROLES, screen: 'plant' },
+  saveFireSystemCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  saveFireSystem: { roles: REORDER_ROLES, screen: 'plant' },
   saveSafetyChecklist: { roles: REORDER_ROLES, screen: 'plant' },
   saveLocationAreas: { roles: REORDER_ROLES, screen: 'plant' },
   // Plant Maintenance (plantmaint.js): the machinery list, and Maintenance Center's Make Work Order (a plant request becomes a work order).
@@ -392,6 +394,8 @@ function validate(input) {
   if (action === 'saveSafetyIssue') return Object.assign(out, SAFE.validateIssue(input, SaveError));
   if (action === 'saveExtinguisherCheck') return Object.assign(out, SAFE.validateExtCheck(input, SaveError));
   if (action === 'saveExtinguisher') return Object.assign(out, SAFE.validateExtinguisher(input, SaveError));
+  if (action === 'saveFireSystemCheck') return Object.assign(out, SAFE.validateFireCheck(input, SaveError));
+  if (action === 'saveFireSystem') return Object.assign(out, SAFE.validateFireSystem(input, SaveError));
   if (action === 'saveSafetyChecklist') return Object.assign(out, SAFE.validateChecklist(input, SaveError));
   if (action === 'saveLocationAreas') return Object.assign(out, SAFE.validateLocations(input, SaveError));
   if (action === 'saveMachine') return Object.assign(out, PMAINT.validateMachine(input, SaveError));
@@ -697,6 +701,8 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'saveSafetyIssue') return SAFE.saveIssue(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveExtinguisherCheck') return SAFE.saveExtCheck(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveExtinguisher') return SAFE.saveExtinguisher(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveFireSystemCheck') return SAFE.saveFireCheck(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveFireSystem') return SAFE.saveFireSystem(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveSafetyChecklist') return SAFE.saveChecklist(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLocationAreas') return SAFE.saveLocations(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveMachine') return PMAINT.saveMachine(tx, db, req, email, stamp, logRef, mode, SaveError);

@@ -91,7 +91,7 @@ export const MENU = [
   ['Distribution Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'soon.html?what=trucks-today', 'pin']]],
   ['Fleet Reports', [['Fleet Service Report', 'fleet.html', 'truck']]],
   // Joe 10/12: the Safety Walkthrough, a card of its own next to Reports: the weekly walk, its open issues, the extinguishers.
-  ['Safety Walkthrough', [['Weekly Walk', 'safety.html', 'safety'], ['Open Issues', 'safety-issues.html', 'alert'], ['Fire Extinguishers', 'extinguishers.html', 'safety'], ['Past Walks', 'safety-walks.html', 'day'], ['Checklist Setup', 'safety-setup.html', 'gear']]],
+  ['Safety Walkthrough', [['Weekly Walk', 'safety.html', 'safety'], ['Open Issues', 'safety-issues.html', 'alert'], ['Fire Extinguishers', 'extinguishers.html', 'safety'], ['Fire Alarm', 'safety-fire.html?sys=alarm', 'safety'], ['Fire Suppression', 'safety-fire.html?sys=suppression', 'safety'], ['Escape Plan', 'safety-fire.html?sys=escape', 'safety'], ['Past Walks', 'safety-walks.html', 'day'], ['Checklist Setup', 'safety-setup.html', 'gear']]],
   // Joe 10/11: Plant Production, our own RedZone: every line this shift, the line tablet, each product's targets and the TV.
   ['Production Lines', [['Production Lines', 'production.html', 'production.webp'], ['Line Tablet', 'line.html', 'production.webp'], ['Line Targets', 'linetargets.html', 'production.webp'], ['Production TV', 'production.html?tv=1', 'production.webp']]],
   // Joe 10/12: Plant Maintenance, like the garage work orders but for the plant's machinery: requests from the plant, work orders,
@@ -367,7 +367,7 @@ const PAGE_ICON = {
   'garage.html': 'wrench', 'fleet.html': 'truck',
   'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'case-unloading-v1-560.webp', 'returns.html': 'returns-to-cooler-v1-560.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'production.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
-  'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear', 'location-areas.html': 'map',
+  'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-fire.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear', 'location-areas.html': 'map',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {

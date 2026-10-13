@@ -118,7 +118,7 @@
       seen = false; setup = null; pending = null; render(true);
       stop = watchSetup(db, plant, s => { setup = s; seen = true; if (pending && s && JSON.stringify(S.checklist(s, true)) === JSON.stringify(areas())) pending = null; render(); });
     }
-    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']);
+    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-fire.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {

@@ -80,7 +80,7 @@
       stops.push(onSnapshot(query(collection(db, 'safetyWalks'), where('facilityId', '==', plant)), s => { walks = s.docs.map(d => d.data()).sort((a, b) => String(b.date).localeCompare(String(a.date))); render(); },
         e => showError('Could not read the walks (' + e.message + '). Check the network and reload the page.')));
     }
-    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-walks.html', 'safety-setup.html']);
+    startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-fire.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
