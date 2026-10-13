@@ -35,6 +35,10 @@ var SC_CORE = Object.freeze({
   NUMBER_SETTINGS: Object.freeze(['checkinMiss', 'lostCase', 'lostCaseDayCap', 'inspectionDefect', 'inspectionMissing', 'callOff',
     'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'idle', 'gpsDayCap']),
   GPS_KINDS: Object.freeze(['speeding', 'hardBrake', 'hardAccel', 'idle']),
+  // Joe 10/13 (later): the board shows one grade per area and the overall score; the details are one click away.
+  AREAS: Object.freeze([['checkin', 'Check-in'], ['cases', 'Cases'], ['inspection', 'Inspections'], ['attendance', 'Attendance'],
+    ['speeding', 'Speeding'], ['hardStops', 'Hard Stops'], ['idling', 'Idling']]),
+  GPS_AREA: Object.freeze({ speeding: 'speeding', hardBrake: 'hardStops', hardAccel: 'hardStops', idle: 'idling' }),
   GPS_WORDS: Object.freeze({ speeding: 'Speeding', hardBrake: 'Hard stop', hardAccel: 'Hard start', idle: 'Idling' }),
   NOT_A_DRIVER: /^(|open|tba|tbd|none|n\/a|na|needs driver|.*needs driver.*|vacation.*|off)$/i
 });
@@ -261,10 +265,10 @@ function scScoreMonth_(days, callOffs, settings, names) {
     r.routes[d.route] = (r.routes[d.route] || 0) + 1;
     if (d.truck) r.trucks[d.truck] = (r.trucks[d.truck] || 0) + 1;
     scAddGps_(r, d, s);
-    if (d.checkedIn) r.checkins++; else { r.missedCheckins++; r.misses.push({date: d.date, what: 'Missed daily check-in (route ' + d.route + ')', points: s.checkinMiss}); }
+    if (d.checkedIn) r.checkins++; else { r.missedCheckins++; r.misses.push({date: d.date, what: 'Missed daily check-in (route ' + d.route + ')', points: s.checkinMiss, area: 'checkin'}); }
     if (d.inspected && !d.defect) r.inspected++;
-    else if (d.inspected) { r.defects++; r.misses.push({date: d.date, what: 'Inspection found a defect', points: s.inspectionDefect}); }
-    else { r.notInspected++; if (s.inspectionMissing) r.misses.push({date: d.date, what: 'No inspection done', points: s.inspectionMissing}); }
+    else if (d.inspected) { r.defects++; r.misses.push({date: d.date, what: 'Inspection found a defect', points: s.inspectionDefect, area: 'inspection'}); }
+    else { r.notInspected++; if (s.inspectionMissing) r.misses.push({date: d.date, what: 'No inspection done', points: s.inspectionMissing, area: 'inspection'}); }
     if (d.casesOut != null && d.casesIn != null) {
       r.casesOut += d.casesOut; r.casesIn += d.casesIn;
       var lost = Math.max(0, d.casesOut - d.casesIn);
@@ -272,14 +276,14 @@ function scScoreMonth_(days, callOffs, settings, names) {
         r.lostCases += lost;
         var pts = Math.min(s.lostCaseDayCap, lost * s.lostCase);
         r.lostPoints += pts;
-        r.misses.push({date: d.date, what: lost + ' case' + (lost === 1 ? '' : 's') + ' short (out ' + d.casesOut + ', in ' + d.casesIn + ')', points: pts});
+        r.misses.push({date: d.date, what: lost + ' case' + (lost === 1 ? '' : 's') + ' short (out ' + d.casesOut + ', in ' + d.casesIn + ')', points: pts, area: 'cases'});
       }
     }
   });
   (callOffs || []).forEach(function (c) {
     var r = get(c.driverKey, names[c.driverKey]);
     r.callOffs++;
-    r.misses.push({date: c.date, what: 'Call-off (' + c.reason.toLowerCase() + ')', points: s.callOff});
+    r.misses.push({date: c.date, what: 'Call-off (' + c.reason.toLowerCase() + ')', points: s.callOff, area: 'attendance'});
   });
   var rows = Object.keys(by).map(function (k) {
     var r = by[k];
@@ -291,6 +295,7 @@ function scScoreMonth_(days, callOffs, settings, names) {
     var points = r.missedCheckins * s.checkinMiss + r.lostPoints + r.defects * s.inspectionDefect + r.notInspected * s.inspectionMissing + r.callOffs * s.callOff + r.gpsPoints;
     r.score = Math.max(0, Math.round(100 - points));
     r.grade = scGrade_(r.score, s);
+    r.areas = scAreas_(r.misses, s);
     r.misses.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     delete r.routes; delete r.dates; delete r.trucks;
     return r;
@@ -309,7 +314,7 @@ function scAddGps_(r, d, s) {
     // Each alert shows what it cost; past the day's cap the rest show 0.
     var used = (d.alertList || []).slice(0, i).reduce(function (t, y) { return t + s[y.kind]; }, 0), full = s[x.kind];
     var p = s.gpsDayCap > 0 ? Math.max(0, Math.min(full, s.gpsDayCap - used)) : full;
-    r.misses.push({date: d.date, what: scAlertText_(x, d.truck), points: p});
+    r.misses.push({date: d.date, what: scAlertText_(x, d.truck), points: p, area: SC_CORE.GPS_AREA[x.kind]});
   });
   if (d.gpsMiles != null) { r.gpsMiles += d.gpsMiles; r.gpsDays++; }
   if (d.idleMinutes != null) r.idleMinutes += d.idleMinutes;
@@ -330,6 +335,15 @@ function scFinishGps_(r) {
   delete r.yardOuts; delete r.yardIns; delete r.mpgMiles; delete r.mpgSum; delete r.fuelMiles;
 }
 
+/** Each area's grade: 100 less the points that area cost, graded like the overall score. */
+function scAreas_(misses, s) {
+  var out = {};
+  SC_CORE.AREAS.forEach(function (a) { out[a[0]] = {points: 0}; });
+  (misses || []).forEach(function (m) { if (out[m.area]) out[m.area].points += m.points || 0; });
+  Object.keys(out).forEach(function (k) { var sc = Math.max(0, Math.round(100 - out[k].points)); out[k].score = sc; out[k].grade = scGrade_(sc, s); });
+  return out;
+}
+
 function scRank_(rows) {
   rows.sort(function (a, b) { return b.score - a.score || a.missedCheckins - b.missedCheckins || (a.driver < b.driver ? -1 : 1); });
   rows.forEach(function (r, i) { r.rank = i + 1; });
@@ -346,6 +360,7 @@ function scScoreYear_(months, settings) {
       var y = by[r.driverKey] || (by[r.driverKey] = {driverKey: r.driverKey, driver: r.driver, route: r.route, scores: [], monthsWon: 0, misses: []});
       sums.forEach(function (k) { y[k] = (y[k] || 0) + (r[k] || 0); });
       if (r.runDays) y.scores.push(r.score);
+      if (r.runDays && r.areas) Object.keys(r.areas).forEach(function (k) { var a = (y.areaScores = y.areaScores || {}); (a[k] = a[k] || []).push(r.areas[k].score); });
       if (leader && leader.driverKey === r.driverKey) y.monthsWon++;
       if (r.runDays) { y.route = r.route; y.truck = r.truck || y.truck || ''; }
       if (r.mpg && r.gpsMiles) { y.mpgMiles = (y.mpgMiles || 0) + r.gpsMiles; y.mpgGallons = (y.mpgGallons || 0) + r.gpsMiles / r.mpg; }
@@ -359,6 +374,9 @@ function scScoreYear_(months, settings) {
     y.monthsScored = n;
     y.mpg = y.mpgGallons ? Math.round(y.mpgMiles / y.mpgGallons * 10) / 10 : null;
     ['yardOut', 'yardIn'].forEach(function (k) { var l = y[k + 's'] || []; y[k] = l.length ? Math.round(l.reduce(function (t, x) { return t + x; }, 0) / l.length) : null; delete y[k + 's']; });
+    y.areas = {};
+    SC_CORE.AREAS.forEach(function (a) { var l = (y.areaScores || {})[a[0]] || [], sc = l.length ? Math.round(l.reduce(function (t, x) { return t + x; }, 0) / l.length) : 100; y.areas[a[0]] = {score: sc, grade: scGrade_(sc, settings)}; });
+    delete y.areaScores;
     delete y.scores; delete y.mpgMiles; delete y.mpgGallons;
     return y;
   });
@@ -384,5 +402,5 @@ function scSummary_(rows, settings, minDays) {
     leader: leader ? leader.driver : ''};
 }
 
-  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_ };
+  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_ };
 });

@@ -84,13 +84,12 @@ async function seed(d) {
       await sc.waitForTimeout(800);
       if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, (BEFORE ? 'before' : 'after') + '-month-' + w + '.png') });
       if (BEFORE) { await sc.close(); continue; }
+      // Joe 10/13 (later): the driver alone, one grade per area we score, then the overall score.
       assert.deepEqual(await sc.$$eval('table.sc-board thead th', t => t.map(x => x.textContent.trim())),
-        ['#', 'Driver & Truck', 'Score', 'Daily Check-in', 'Cases Out vs In', 'Clean Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'MPG', 'Miles', 'Yard Out / In']);
-      const ray = await sc.$eval('tr[data-key="DRV_S_DIAZ"]', tr => [...tr.cells].map(c => c.textContent));
-      assert.match(ray[1], /DIAZ, RAY.*Truck 223896.*Route 858/, 'driver first, then truck; route kept small');
-      assert.match(ray[7], /^2/, 'two speeding alerts on the truck he was dispatched in');
-      assert.match(ray[8], /^2/, 'two hard stops');
-      assert.match(ray[12], /AM.*PM/, 'yard leave and return times');
+        ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Overall']);
+      const ray = await sc.$eval('tr[data-key="DRV_S_DIAZ"]', tr => [...tr.cells].map(c => c.textContent.trim()));
+      assert.equal(ray[1], 'DIAZ, RAY', 'no truck or route on the board');
+      assert.deepEqual(ray.slice(2), ['B', 'A', 'A', 'A', 'A', 'A', 'A', '80 C'], 'check-in 88 (B), speeding 96 and hard stops 96 (A), overall 80 (C)');
       assert.match(await sc.textContent('#unassigned'), /No driver dispatched[\s\S]*10-8-26\s*229001\s*Speeding \(66 mph in a 45/, 'the alert on a truck with no driver is kept for a manager');
       const fit = await sc.evaluate(() => ({ table: document.querySelector('.sc-board').scrollWidth, box: document.querySelector('#sheet').clientWidth,
         small: [...document.querySelectorAll('.sc-board td, .sc-board th, .sc-board small')].filter(e => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).length }));
@@ -101,6 +100,7 @@ async function seed(d) {
       await sc.click('tr[data-key="DRV_S_DIAZ"]');
       await sc.waitForSelector('tr.sc-misses');
       assert.match(await sc.textContent('tr.sc-misses'), /Speeding \(71 mph in a 55, 9:14 AM, truck 223896, US-40 W\)\s*−2/);
+      assert.match(await sc.textContent('.sc-facts'), /Truck 223896 · Route 858[\s\S]*2 speeding, 2 hard stops[\s\S]*GPS miles[\s\S]*MPG 6\.8[\s\S]*yard out \d+:\d\d AM, in \d+:\d\d PM/, 'the GPS details are one click away');
       if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-driver-misses-' + w + '.png') });
       // Week view: Sunday to Saturday.
       await sc.click('.tabs [data-mode="week"]');

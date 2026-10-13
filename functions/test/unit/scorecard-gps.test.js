@@ -99,3 +99,16 @@ test('no GPS at all leaves the old scoring exactly as it was', () => {
   assert.equal(rows[0].speeding, 0);
   assert.equal(rows[0].mpg, null);
 });
+
+test('Joe 10/13: one grade per area and the overall score; each area is 100 less what it cost', () => {
+  const days = S.scBuildDay_(DAY, [run({ casesOut: 500, plantCaseReturn: 497 })], [dvir('855', 'SAL')], {});
+  const m = S.scMatchGps_(DAY, days, [], [{ tag: '223893', at: '2026-10-14T12:00:00Z', type: 'SPEEDING' }, { tag: '223893', at: '2026-10-14T13:00:00Z', type: 'HARSH_ACCEL' }]);
+  const r = S.scScoreMonth_(m.records, [], S.scSettings_({}), {})[0];
+  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling']);
+  assert.deepEqual(Object.fromEntries(Object.entries(r.areas).map(([k, v]) => [k, v.score])),
+    { checkin: 96, cases: 97, inspection: 100, attendance: 100, speeding: 98, hardStops: 99, idling: 100 });
+  assert.equal(r.score, 100 - 4 - 3 - 2 - 1, 'the overall adds up every area');
+  assert.equal(r.areas.checkin.grade, 'A');
+  const year = S.scScoreYear_([{ month: 10, rows: [r] }], S.scSettings_({}));
+  assert.equal(year[0].areas.speeding.score, 98);
+});

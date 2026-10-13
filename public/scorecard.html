@@ -194,31 +194,33 @@
       bar.innerHTML = '<button type="button" id="prev" aria-label="Earlier">◀</button><b class="sc-period">' + escapeHtml(label) + '</b><button type="button" id="next" aria-label="Later">▶</button><span class="hint" id="gps-note">' + (alertsEver === false && !gpsAlerts.length ? 'No GPS alerts received yet: speeding, hard stops and idling count once alerts are turned on in Verizon Fleet.' : '') + '</span><span class="spacer"></span><button type="button" class="primary" id="sc-print">Print</button>';
       const cell = (bad, good, text) => '<td class="' + (bad ? 'sc-bad' : good ? 'sc-ok' : '') + '">' + text + '</td>';
       // Review item 18 (Joe 10/13): the empty Route Cuts column is hidden until it is built.
-      // Joe 10/13 (GPS): driver and truck lead (the route is small under them); speeding, hard stops, idling, MPG, GPS miles and
-      // the usual yard leave / return times come from Verizon Fleet.
+      // Joe 10/13 (later): the board is the driver alone: one grade per area we score and the overall score, added up over the
+      // period. Everything else (trucks, routes, GPS miles, MPG, yard times, counts and each miss) is one click away on the driver.
       const clock = (m) => m == null ? '' : S.scClock_(m);
-      const gpsCell = (n, extra) => cell(n, !n, (n ? n : 'None') + (extra || ''));
-      sheet.innerHTML = '<table class="issues sc-board"><colgroup><col style="width:3%"><col style="width:16%"><col style="width:5%"><col style="width:8%"><col style="width:10%"><col style="width:9%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:5%"><col style="width:7%"><col style="width:9%"></colgroup>' +
-        '<thead><tr><th>#</th><th>Driver &amp; Truck</th><th>Score</th><th>Daily Check-in</th><th>Cases Out vs In</th><th>Clean Inspections</th><th>Attendance</th><th>Speeding</th><th>Hard Stops</th><th>Idling</th><th>MPG</th><th>Miles</th><th>Yard Out / In</th></tr></thead><tbody>' +
-        (b.rows.filter(r => r.runDays || r.callOffs).map(r => '<tr data-key="' + escapeHtml(r.driverKey) + '" class="' + (open === r.driverKey ? 'sc-open' : '') + '"><td>' + r.rank + '</td><td class="strong sc-who">' + escapeHtml(r.driver) +
-          '<small>' + [r.truck ? 'Truck ' + escapeHtml(r.truck) : 'No truck', r.route ? 'Route ' + escapeHtml(r.route) : ''].filter(Boolean).join(' · ') + '</small></td>' +
-          '<td><span class="sc g-' + r.grade + '">' + r.score + '</span></td>' + cell(r.missedCheckins, !r.missedCheckins, (r.runDays - r.missedCheckins) + ' of ' + r.runDays + (r.missedCheckins ? '<small>' + r.missedCheckins + ' missed</small>' : '')) +
-          cell(r.lostCases, !r.lostCases && r.casesOut, r.casesOut ? r.casesOut.toLocaleString() + ' / ' + r.casesIn.toLocaleString() + (r.lostCases ? '<small>' + r.lostCases + ' lost</small>' : '') : '<small>not recorded</small>') +
-          cell(r.defects, !r.defects && r.inspected, r.inspected + ' clean' + (r.defects ? '<small>' + r.defects + ' with a defect</small>' : '') + (r.notInspected ? '<small>' + r.notInspected + ' not done</small>' : '')) +
-          cell(r.callOffs, !r.callOffs, r.callOffs ? r.callOffs + ' call-off' + (r.callOffs === 1 ? '' : 's') : 'Perfect') +
-          gpsCell(r.speeding || 0) + gpsCell(r.hardBrakes || 0, r.hardAccels ? '<small>' + r.hardAccels + ' hard start' + (r.hardAccels === 1 ? '' : 's') + '</small>' : '') +
-          gpsCell(r.idles || 0, r.idleMinutes ? '<small>' + Math.round(r.idleMinutes) + ' min</small>' : '') +
-          '<td>' + (r.mpg ? r.mpg.toFixed(1) : '<small>coming</small>') + '</td>' +
-          '<td>' + (r.gpsMiles ? Math.round(r.gpsMiles).toLocaleString() + '<small>GPS</small>' : r.miles ? r.miles.toLocaleString() + '<small>planned</small>' : '') + '</td>' +
-          '<td>' + (r.yardOut != null || r.yardIn != null ? 'out ' + (clock(r.yardOut) || '–') + '<small>in ' + (clock(r.yardIn) || '–') + '</small>' : '<small>no GPS</small>') + '</td></tr>' +
-          (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="12">' + (r.misses && r.misses.length ? r.misses.map(m => '<div><b>' + shortDate(m.date) + '</b> ' + escapeHtml(m.what) + ' <span class="sc-pts">−' + m.points + '</span></div>').join('') : 'No misses.') + '</td></tr>' : '')).join('') ||
-          '<tr><td colspan="13" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>') + '</tbody></table>' +
+      const AREAS = CORE.AREAS;
+      const facts = (r) => [r.truckList && r.truckList.length ? 'Truck' + (r.truckList.length > 1 ? 's ' : ' ') + r.truckList.map(escapeHtml).join(', ') : '', r.route ? 'Route ' + escapeHtml(r.route) : '',
+        r.runDays + ' run' + (r.runDays === 1 ? '' : 's'), 'check-ins ' + (r.runDays - r.missedCheckins) + ' of ' + r.runDays,
+        r.casesOut ? 'cases ' + r.casesOut.toLocaleString() + ' out / ' + r.casesIn.toLocaleString() + ' in' : 'cases not recorded',
+        r.inspected + ' clean inspection' + (r.inspected === 1 ? '' : 's') + (r.defects ? ', ' + r.defects + ' with a defect' : '') + (r.notInspected ? ', ' + r.notInspected + ' not done' : ''),
+        r.callOffs ? r.callOffs + ' call-off' + (r.callOffs === 1 ? '' : 's') : 'perfect attendance',
+        (r.speeding || 0) + ' speeding, ' + (r.hardBrakes || 0) + ' hard stop' + (r.hardBrakes === 1 ? '' : 's') + ', ' + (r.hardAccels || 0) + ' hard start' + (r.hardAccels === 1 ? '' : 's') + ', ' + (r.idles || 0) + ' idling' + (r.idleMinutes ? ' (' + Math.round(r.idleMinutes) + ' min)' : ''),
+        r.gpsMiles ? Math.round(r.gpsMiles).toLocaleString() + ' GPS miles' : r.miles ? r.miles.toLocaleString() + ' planned miles' : '',
+        'MPG ' + (r.mpg ? r.mpg.toFixed(1) : 'coming'),
+        r.yardOut != null || r.yardIn != null ? 'yard out ' + (clock(r.yardOut) || '–') + ', in ' + (clock(r.yardIn) || '–') : ''].filter(Boolean).join(' · ');
+      const grade = (a) => a ? '<span class="sc g-' + a.grade + '" title="' + a.score + '">' + a.grade + '</span>' : '';
+      sheet.innerHTML = '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:20%">' + AREAS.map(() => '<col style="width:9%">').join('') + '<col style="width:13%"></colgroup>' +
+        '<thead><tr><th>#</th><th>Driver</th>' + AREAS.map(a => '<th>' + a[1] + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
+        (b.rows.filter(r => r.runDays || r.callOffs).map(r => '<tr data-key="' + escapeHtml(r.driverKey) + '" class="' + (open === r.driverKey ? 'sc-open' : '') + '"><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' +
+          AREAS.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') +
+          '<td><span class="sc g-' + r.grade + ' sc-overall">' + r.score + ' ' + r.grade + '</span></td></tr>' +
+          (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '"><div class="sc-facts">' + facts(r) + '</div>' + (r.misses && r.misses.length ? r.misses.map(m => '<div><b>' + shortDate(m.date) + '</b> ' + escapeHtml(m.what) + ' <span class="sc-pts">−' + m.points + '</span></div>').join('') : 'No misses.') + '</td></tr>' : '')).join('') ||
+          '<tr><td colspan="' + (AREAS.length + 3) + '" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>') + '</tbody></table>' +
         // Joe 10/13: an alert on a truck nobody was dispatched in is never dropped; a manager puts the driver on Daily Dispatch.
         (b.unassigned.length ? '<div id="unassigned" class="sc-lost"><h2>No driver dispatched</h2><p class="hint">These trucks had alerts on a day no driver was in them on Daily Dispatch. Put the driver in the truck on Daily Dispatch for that day and the alerts move to that driver.</p>' +
           '<table class="issues"><colgroup><col style="width:12%"><col style="width:14%"><col style="width:74%"></colgroup><thead><tr><th>Date</th><th>Truck</th><th>Alerts</th></tr></thead><tbody>' +
           b.unassigned.map(u => '<tr><td>' + shortDate(u.date) + '</td><td class="strong">' + escapeHtml(u.truck) + '</td><td class="sc-lost-list">' + u.alerts.map(a => escapeHtml(S.scAlertText_(a, ''))).join('<br>') + '</td></tr>').join('') +
           '</tbody></table></div>' : '');
-      foot.textContent = 'Through ' + shortDate(b.through) + ' · green = no misses, red = cost points · days counted: ' + (b.days.length ? shortDate(b.days[0]) + ' to ' + shortDate(b.days[b.days.length - 1]) + ' (the copied Live weeks)' : 'none') + ' · GPS from Verizon Fleet: yard times are the usual leave and return' + (b.rows.some(r => r.yardFromMoves) ? ' (first and last move until Fleet sends yard times)' : '') + ' · click a driver for the misses.';
+      foot.textContent = 'Through ' + shortDate(b.through) + ' · green = no misses, red = cost points · days counted: ' + (b.days.length ? shortDate(b.days[0]) + ' to ' + shortDate(b.days[b.days.length - 1]) + ' (the copied Live weeks)' : 'none') + ' · each grade is 100 less what that area cost (A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+); Overall adds up every area · click a driver for the details and each miss.';
       document.getElementById('prev').onclick = () => { if (mode === 'year') year--; else if (mode === 'week') weekStart = S.scAddDays_(weekStart, -7); else if (--month < 1) { month = 12; year--; } open = ''; render(); };
       document.getElementById('next').onclick = () => { if (mode === 'year') year++; else if (mode === 'week') weekStart = S.scAddDays_(weekStart, 7); else if (++month > 12) { month = 1; year++; } open = ''; render(); };
       document.getElementById('sc-print').onclick = () => {

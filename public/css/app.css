@@ -935,7 +935,8 @@ table.otr-fuel { width: 560px; margin-top: 14px; }
 .sc-board tr.sc-misses div { padding: 2px 0; }
 .sc-pts { color: #b42318; font-weight: 800; }
 /* Joe 10/13: Driver Scorecard on GPS. Driver and truck lead; trucks with alerts and no driver dispatched are listed under the board. */
-.sc-board td.sc-who small { color: #4a5b6c; }
+.sc-board .sc-overall { min-width: 78px; display: inline-block; }
+.sc-board .sc-facts { color: #4a5b6c; font-weight: 600; margin-bottom: 6px; line-height: 1.4; }
 .sc-board td small { white-space: nowrap; }
 .sc-board th { white-space: normal; line-height: 1.1; padding: 0 3px; }
 .sc-lost { margin-top: 16px; }
