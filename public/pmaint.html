@@ -54,7 +54,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote, hoursMinutesText, maySave, watchPerson } from './js/app.js';
     import { doc, onSnapshot } from './js/firebase.js';
     import { watchMaint, plantFor } from './js/pmaint.js';
 
@@ -65,11 +65,11 @@
     const params = new URLSearchParams(location.search);
     let plant = params.get('plant') || '', person = null, app = {}, data = null, db = null, stop = null;
     const doing = new Set();
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES) && L.screenState(app, 'plant').open;
-    const canPm = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+    const canSave = () => maySave(person, L.SAVE_ROLES, app, 'plant');
+    const canPm = () => maySave(person, L.REORDER_ROLES, app, 'plant');
     const day = (k) => (/^\d{4}-\d\d-\d\d/.test(String(k || '')) ? shortDate(String(k).slice(0, 10)) : '');
     const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
-    const hm = (n) => n === null || n === undefined ? '' : n >= 60 ? Math.floor(n / 60) + ' h ' + (n % 60) + ' m' : n + ' min';
+    const hm = (n) => hoursMinutesText(n, { unit: 'm', short: 'min' });
     const who = (e) => String(e || '').split('@')[0];
     const pill = (word, c) => '<span class="pm-pill ' + c + '">' + escapeHtml(word) + '</span>';
     const WO_CLASS = { NEW: 'amber', WORKING: 'blue', PARTS: 'amber', DONE: 'green' };
@@ -135,7 +135,7 @@
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; if (!stop) follow(); else render(); });
+      watchPerson(db, user, p => { person = p; if (!stop) follow(); else render(); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
     });
   </script>

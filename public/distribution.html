@@ -46,7 +46,7 @@
     </div>
   </div>
   <script type="module">
-    import { start, requireSignIn, showError, shortDate } from './js/app.js';
+    import { start, requireSignIn, showError, shortDate, shortTime } from './js/app.js';
     import { collection, doc, query, where, limit, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
@@ -104,7 +104,7 @@
         data.writeBack = !!(c.writeBack && c.writeBack.enabled === true);
         const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
         const tz = { timeZone: 'America/New_York' }, sameDay = at && at.toLocaleDateString('en-US', tz) === new Date().toLocaleDateString('en-US', tz);
-        document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : shortDate(at) + ' ') + at.toLocaleTimeString('en-US', Object.assign({ hour: 'numeric', minute: '2-digit' }, tz)) : 'Waiting for the first copy';
+        document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : shortDate(at) + ' ') + shortTime(at) : 'Waiting for the first copy';
         render();
       });
     });

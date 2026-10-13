@@ -9,6 +9,8 @@
  *   - Behind = not done more than 45 minutes after it leaves (Joe 10/11: 45 minutes late is not behind, 46 is);
  *   - a pickup (product that did not load at loadout) is open until it is marked complete, and shows red.
  */
+import { shortTime, dateTimeText, hoursMinutesText } from './app.js';
+
 const L = window.UDLogic;
 
 export const AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
@@ -156,7 +158,7 @@ export function clock(stamp) {
   if (!stamp) return '';
   const t = Date.parse(stamp);
   if (!isFinite(t)) return String(stamp);
-  return new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, hour: 'numeric', minute: '2-digit' }).format(new Date(t));
+  return shortTime(t);
 }
 
 // Minutes between Start and End (or now while loading).
@@ -167,10 +169,7 @@ export function minutesTaken(row, now) {
 }
 
 // "38 min", or "2 h 05 min" once it runs past two hours.
-export function minutesText(m) {
-  if (m === null || m === undefined) return '';
-  return m < 120 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min';
-}
+export function minutesText(m) { return hoursMinutesText(m, { pad: true, hoursFrom: 120 }); }
 
 // Polish item 5 (Joe 10/11): a load or unload still running after 12 hours shows when it started instead of a huge clock
 // ("Started Wed 5:13 AM · forgot End?"); otherwise the plain minutes text.
@@ -340,6 +339,5 @@ export function unloadCounts(rows) {
 export function shortStamp(stamp) {
   const t = Date.parse(stamp || '');
   if (!isFinite(t)) return txt(stamp);
-  const d = new Date(t), p = new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: '2-digit', month: 'numeric', day: 'numeric' }).formatToParts(d), g = (k) => (p.find(x => x.type === k) || {}).value;
-  return g('month') + '-' + g('day') + '-' + g('year') + ' ' + new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, hour: 'numeric', minute: '2-digit' }).format(d);
+  return dateTimeText(t);
 }

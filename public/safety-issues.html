@@ -49,7 +49,7 @@
   <script>window.UD_OFFLINE = true;</script>
   <script type="module">
     import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
-    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, shortDate, watchPerson } from './js/app.js';
     import { doc, getDoc, onSnapshot } from './js/firebase.js';
     import { today, pickPlant, plantName, canWalk, modeText, watchIssues, agePill, maintText } from './js/safety.js';
 
@@ -129,10 +129,10 @@
     startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-fire.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
-        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+      watchPerson(db, user, p => {
+        person = p;
         if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render();
-      });
+      }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(); });
     });
   </script>

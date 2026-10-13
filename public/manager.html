@@ -73,7 +73,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote, printInFrame, shortTime, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { watchRound } from './js/autosave.js';
@@ -86,8 +86,8 @@
     const data = { sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
     let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null;
     let askReport = new URLSearchParams(location.search).get('report') === '1';
-    const canSend = () => L.hasRole(person, L.SAVE_ROLES) && L.screenState(app, 'plant').open;
-    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : 'None'; };
+    const canSend = () => maySave(person, L.SAVE_ROLES, app, 'plant');
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : 'None'; };
     const pct = (a, b) => b ? Math.min(100, Math.round(a / b * 100)) : 0;
 
     // One mini-card: its label, number, the line under it and (for loads) a bar; a tap opens that screen.
@@ -257,11 +257,7 @@
       setTimeout(() => { b.textContent = 'Copy'; }, 2000);
     };
     document.getElementById('print-report').onclick = () => {
-      const f = document.createElement('iframe');
-      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-      document.body.appendChild(f);
-      f.contentDocument.open(); f.contentDocument.write('<!doctype html><title>' + escapeHtml(report.subject) + '</title>' + U.reportHtml(report, reportNote())); f.contentDocument.close();
-      setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 1000); }, 300);
+      printInFrame('<!doctype html><title>' + escapeHtml(report.subject) + '</title>' + U.reportHtml(report, reportNote()), { wait: 300, removeAfter: 1000 });
     };
 
     requireSignIn(async (user) => {
@@ -270,7 +266,7 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       let timer = null;
       const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 50); };
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; later(); });
+      watchPerson(db, user, p => { person = p; later(); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; later(); });
       onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
       onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});

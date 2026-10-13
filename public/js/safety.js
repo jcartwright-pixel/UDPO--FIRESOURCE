@@ -1,6 +1,6 @@
 // Safety Walkthrough screens (Joe 10/12): the plant being walked, who may save, the photo shrink and the shared reads.
 import { collection, doc, query, where, onSnapshot } from './firebase.js';
-import { escapeHtml, shortDate, goLiveNote } from './app.js';
+import { escapeHtml, shortDate, goLiveNote, maySave } from './app.js';
 
 const L = window.UDLogic, S = window.UDSafety;
 
@@ -34,8 +34,8 @@ export function pickPlant(person, wanted) {
   return (list.find(p => p.id === picked) || list[0]).id;
 }
 export const plantName = (id) => (L.PLANTS.find(p => p.id === id) || { name: id }).name;
-export const canWalk = (person, app) => L.hasRole(person, PLANT_ROLES) && L.screenState(app, 'plant').open;
-export const canSetUp = (person, app) => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+export const canWalk = (person, app) => maySave(person, PLANT_ROLES, app, 'plant');
+export const canSetUp = (person, app) => maySave(person, L.REORDER_ROLES, app, 'plant');
 export const modeText = (app) => { const st = L.screenState(app, 'plant'); goLiveNote(st.live && st.owner !== 'new'); return st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY'; };
 
 // A photo shrinks to 1280 pixels on its long side as a JPEG before it is saved (small enough for one record).

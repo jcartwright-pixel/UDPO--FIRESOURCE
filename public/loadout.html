@@ -94,7 +94,7 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError, goLiveNote, maySave } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { mountRowDrag } from './js/row-drag.js';
@@ -125,7 +125,7 @@
       if (!s.open) return 'View only: ' + s.why + '.';
       return 'View only: ' + (signedEmail || 'this account') + ' is not allowed to save Case Loadout. In Administration > People & Roles give it the Plant Employee role or allow Update route loading.';
     };
-    const canLoad = () => (L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.savePlantLoad === true) && L.screenState(app, 'plantLoading').open;
+    const canLoad = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading', allowed.savePlantLoad);
     const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 
     function rowsNow() {

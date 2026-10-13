@@ -45,7 +45,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, watchPerson } from './js/app.js';
     import { printSaved } from './js/print-sheet.js';
     import { plantFor } from './js/pmaint.js';
     import { collection, doc, onSnapshot } from './js/firebase.js';
@@ -332,7 +332,7 @@
     });
     window.udBack = () => { if (view !== 'due' || search) { view = 'due'; search = ''; render(); return true; } return false; };
 
-    requireSignIn(async () => {
+    requireSignIn(async (user) => {
       const { db, auth } = await start();
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); render(); }, e => showError('Could not read the ' + (READ_NAMES[name] || 'garage list') + ' (' + e.message + '). Check the network and reload the page.'));
       watch('equipment', v => { equipment = v; });
@@ -347,14 +347,14 @@
         stopRules = onSnapshot(doc(db, 'config', rulesDoc()), d => { savedRules = d.exists() ? d.data() : null; render(); }, () => {});
       };
       follow();
-      onSnapshot(doc(db, 'users', String(auth.currentUser && auth.currentUser.email || '').toLowerCase()), d => {
-        me = d.exists() ? d.data() : null;
+      watchPerson(db, user, p => {
+        me = p;
         const was = plant.id;
         plant = plantFor(me, new URLSearchParams(location.search).get('plant'));
         pick();
         if (plant.id !== was) follow();
         render();
-      }, () => {});
+      }, { onError: () => {} });
       render();
     });
   </script>

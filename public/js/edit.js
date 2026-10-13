@@ -5,7 +5,7 @@
  * background as one call. If the server refuses it (someone else changed that run, a unit is inactive, no
  * permission), the cell goes back to what the database holds and the reason shows as an error.
  */
-import { start, save as sendSave, savePill, showError, friendlyError, escapeHtml, goLiveNote } from './app.js';
+import { start, save as sendSave, savePill, showError, friendlyError, escapeHtml, goLiveNote, watchPerson, maySave } from './app.js';
 import { collection, doc, query, where, onSnapshot } from './firebase.js';
 
 const L = window.UDLogic;
@@ -76,13 +76,13 @@ export async function watchLists(user, onChange) {
   onSnapshot(collection(db, 'opsAssignments'), snap => { lists.ops = L.opsAssignments(snap.docs.map(d => d.data())); onChange(); });
   // Which app runs each screen: a screen still run from the current app is view only here once any screen has moved.
   onSnapshot(doc(db, 'config', 'app'), snap => { lists.app = snap.data() || {}; onChange(); });
-  onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), snap => { lists.person = snap.exists() ? snap.data() : null; onChange(); });
+  watchPerson(db, user, p => { lists.person = p; onChange(); });
 }
 
 export function screenOpen() { return L.screenState(lists.app, screenKey).open; }
-export function canSave() { return L.hasRole(lists.person, L.SAVE_ROLES) && screenOpen(); }
-export function canReorder() { return L.hasRole(lists.person, L.REORDER_ROLES) && screenOpen(); }
-export function canManage() { return L.hasRole(lists.person, L.DRIVER_ROLES) && screenOpen(); }
+export function canSave() { return maySave(lists.person, L.SAVE_ROLES, lists.app, screenKey); }
+export function canReorder() { return maySave(lists.person, L.REORDER_ROLES, lists.app, screenKey); }
+export function canManage() { return maySave(lists.person, L.DRIVER_ROLES, lists.app, screenKey); }
 
 // The badge at the top right: the test copy's own words, or whether this screen is switched on once one has been.
 // Joe 10/12: no "new app" / "current app" words; a screen not switched on says where to switch it.

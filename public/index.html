@@ -26,7 +26,7 @@
     <section class="launch-grid six" id="sides"></section>
   </div>
   <script type="module">
-    import { start, requireSignIn, shortDate, SIDES, ICON, escapeHtml } from './js/app.js';
+    import { start, requireSignIn, shortDate, SIDES, ICON, escapeHtml, watchPerson } from './js/app.js';
     import { doc, onSnapshot } from './js/firebase.js';
     const L = window.UDLogic;
     // Joe 10/11: Plant Production and Plant Maintenance carry an UNDER CONSTRUCTION banner across their picture.
@@ -58,8 +58,8 @@
       const today = L.operatingDay(new Date());
       document.getElementById('today').textContent = L.dayName(today) + ' ' + shortDate(today);
       const { db } = await start();
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), snap => {
-        const person = snap.exists() ? Object.assign({ email: user.email }, snap.data()) : null, plants = L.plantsFor(person);
+      watchPerson(db, user, person => {
+        const plants = L.plantsFor(person);
         let picked = '';
         try { picked = sessionStorage.getItem('udPlant') || ''; } catch (e) { /* no storage */ }
         // Someone who sees more than one plant starts on the all-plants overview; a one-plant person (Joe: a supervisor
@@ -68,7 +68,7 @@
         decided();
         const plant = L.PLANTS.find(p => p.id === (plants.indexOf(picked) >= 0 ? picked : plants[0])) || L.PLANTS[0];
         document.getElementById('plant-name').textContent = plant.name + ' Operations';
-      });
+      }, { withEmail: true });
     });
   </script>
 </body>

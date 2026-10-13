@@ -1,6 +1,7 @@
 // Printing a sheet the way Print Layouts shows it (Joe 10/10): the sheet is laid out at the paper's width, cut into pages
 // between rows (a table carried onto the next page repeats its heading row), and exactly those pages and copies are sent.
 // Print Layouts uses it for its preview; a screen's own Print button can use it with that sheet's saved setup (printSaved).
+import { escapeHtml, printInFrame } from './app.js';
 
 export const PAPER = { letter: [8.5, 11], legal: [8.5, 14] }, MARGIN = { narrow: 0.25, normal: 0.4, wide: 0.75 }, DPI = 96;
 export const BASE = { orient: 'landscape', size: 'letter', margin: 'normal', fit: true, onePage: false, copies: 1 };
@@ -21,7 +22,8 @@ export function saveSetup(key, s) {
   try { localStorage.setItem('udPrintSetup', JSON.stringify(all)); } catch (e) { /* no storage */ }
 }
 
-const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// Review item 76 (Joe 10/13): the app's one HTML-safety helper (every value written as text, as before).
+const esc = (s) => escapeHtml(String(s));
 
 // The page's styles as the printer sees them: print rules always on, screen-only rules off, page size left to this code.
 export function styles(doc) {
@@ -108,17 +110,9 @@ export function layout(d, result, st) {
 export function printPages(result, lay, st, sel) {
   const { box, pages } = lay, which = sel || pages.map((p, i) => i), copies = Math.max(1, Math.min(50, Number(st.copies) || 1));
   const list = []; for (let c = 0; c < copies; c++) which.forEach(i => list.push(pages[i]));
-  const old = document.getElementById('pl-print-frame'); if (old) old.remove();
-  const f = document.createElement('iframe');
-  f.id = 'pl-print-frame'; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-  document.body.appendChild(f);
-  const d = f.contentWindow.document;
-  d.open();
-  d.write(frameDoc(result.css, '@page{size:' + box.pw + 'in ' + box.ph + 'in;margin:0}html,body{height:auto!important;overflow:visible!important;background:#fff!important;margin:0!important}' +
+  printInFrame(frameDoc(result.css, '@page{size:' + box.pw + 'in ' + box.ph + 'in;margin:0}html,body{height:auto!important;overflow:visible!important;background:#fff!important;margin:0!important}' +
     '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}' + PAGE_CSS + '.pl-paper{break-after:page;page-break-after:always}.pl-paper:last-child{break-after:auto;page-break-after:auto}') +
-    list.map(p => '<div class="pl-paper" style="width:' + box.pw + 'in;height:' + box.ph + 'in;padding:' + box.m + 'in">' + p + '</div>').join('') + '</body></html>');
-  d.close();
-  setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); }, 250);
+    list.map(p => '<div class="pl-paper" style="width:' + box.pw + 'in;height:' + box.ph + 'in;padding:' + box.m + 'in">' + p + '</div>').join('') + '</body></html>', { id: 'pl-print-frame', wait: 250 });
 }
 
 // A screen's own Print: what it put in its #print box goes out with that sheet's saved setup from Print Layouts. When Print

@@ -46,7 +46,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, mayOpenBuilding } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, mayOpenBuilding, watchPerson } from './js/app.js';
     import { doc, onSnapshot } from './js/firebase.js';
     import { pickPlant, plantName, canSetUp, modeText, watchSetup } from './js/safety.js';
     import { mountRowDrag } from './js/row-drag.js';
@@ -147,14 +147,14 @@
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
-        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+      watchPerson(db, user, p => {
+        person = p;
         const ok = mayOpenBuilding(person);
         document.getElementById('locked').hidden = ok;
         document.getElementById('view').hidden = !ok;
         if (!ok) return;
         if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render(true);
-      });
+      }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(true); });
     });
   </script>

@@ -62,7 +62,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, shortTime, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
 
@@ -76,8 +76,8 @@
     // drafts: what is typed and not saved yet; pending: a reading shown at once, over its saved copy, until the database has it;
     // fills: each location's reading of this round, filled in box by box; notes: the "Saved" time of each location.
     const drafts = {}, pending = {}, fills = {}, notes = {};
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
-    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : '—'; };
+    const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : '—'; };
     const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : '—'; };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
     const statusClass = (v) => { v = String(v || '').toUpperCase(); return v === 'IN RANGE' || v === 'RECORDED' ? 'ok' : v === 'HIGH' || v === 'LOW' || v === 'OFFLINE' || v === 'SENSOR ERROR' ? 'bad' : v === 'STALE' ? 'warn' : 'neutral'; };
@@ -216,7 +216,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(); });
+      watchPerson(db, user, p => { person = p; render(); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupSeen = true; render(); }, fail('the temperature locations'));
       // MOCREO sensors, read by the server every 5 minutes once its key is set (functions/src/mocreo.js).

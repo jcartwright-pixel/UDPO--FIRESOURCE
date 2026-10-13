@@ -5,7 +5,7 @@
  * only, one card per load that a finger can work. No dates, no other areas, no Edit box, no manager numbers, and no link to
  * any manager screen. The saves are the same ones the Loadout Center and Unloading & Washing make.
  */
-import { save, escapeHtml, shortDate, showError, allowedSaves } from './app.js';
+import { save, escapeHtml, shortDate, showError, allowedSaves, maySave } from './app.js';
 import { collection, doc, query, where, onSnapshot } from './firebase.js';
 import * as P from './plant-core.js';
 import { watchProducts, OTHER } from './products.js';
@@ -47,9 +47,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
     askedFor = key;
     allowedSaves(Object.values(VIEW_SAVE).concat(['addPickup', 'completePickup', 'savePlantSchedule'])).then(a => { allowed = a; render(); });
   };
-  const canSave = () => (L.hasRole(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed[VIEW_SAVE[view] || 'savePlantLoad'] === true) && L.screenState(app, view === 'receiving' ? 'plant' : 'plantLoading').open;
+  const canSave = () => maySave(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, view === 'receiving' ? 'plant' : 'plantLoading', allowed[VIEW_SAVE[view] || 'savePlantLoad']);
   // A scheduled load saves through the Scheduler's save, which follows the Plant Operations switch (not Plant Loading).
-  const canSched = () => (L.hasRole(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.savePlantSchedule === true) && L.screenState(app, 'plant').open;
+  const canSched = () => maySave(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant', allowed.savePlantSchedule);
   const myName = () => (station && station.name) || '';
   const weekDays = () => { const s = L.weekStart(date), out = []; for (let d = s; d <= date; d = L.addDays(d, 1)) out.push(d); return out; };
   const dayJournal = () => week.filter(d => d.date === date);
