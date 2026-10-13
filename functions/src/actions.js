@@ -559,9 +559,8 @@ async function resolveAssignment(tx, db, req, stamp, run) {
 const COLUMN_FOR = {}, TIME_FIELDS = {};
 // Kept in the new app only (the Live sheet has no column for them): who a day was for before the driver went off, and why.
 // checkinTruck / checkinTrailer / moreTrailers: the units the driver corrected on the phone and the drop-and-hook trailers (no Live column).
-const APP_ONLY = { intendedDriverId: true, intendedDriver: true, driverExceptionStatus: true, checkinTruck: true, checkinTrailer: true, moreTrailers: true,
-  // Joe 10/13: the Check-In's "Was your truck loaded correctly?" has no Live sheet column; it stays in the app.
-  loadedCorrectly: true, loadingProblem: true };
+const APP_ONLY = {};
+M.APP_ONLY_DAY_FIELDS.forEach(f => { APP_ONLY[f] = true; });
 M.DAY_FIELDS.forEach(([field, suffix, kind]) => { COLUMN_FOR[field] = suffix; if (kind === 'time') TIME_FIELDS[field] = true; });
 // A day's "changed by hand" marks (the current app's <day>_equipment_override / _dispatch_time_override): a Route Master or
 // Driver Master save that reaches the Live weeks leaves those cells alone (D6).
@@ -841,7 +840,8 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
     if (!Object.keys(update).length) return;
     tx.update(r.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp }));
     result.runs.push({ runDocId: r.id, rev: run.rev + 1 });
-    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id.slice(-6) + p + i, run, r.id, p, { [idKey]: '', [textKey]: '' }, stamp, email));
+    // Each part is named by the whole run ID (its week too), so the same run in this week and next never shares one (review item 65).
+    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id + '-' + p + i, run, r.id, p, { [idKey]: '', [textKey]: '' }, stamp, email));
   });
   const downNote = req.reason ? 'DOWN: ' + req.reason : 'DOWN';
   if (!req.clearOnly) {
@@ -1539,7 +1539,8 @@ function freeRunsForDayOff(tx, db, req, runSnaps, driver, reasonCode, stamp, ema
     if (!Object.keys(update).length) return;
     tx.update(r.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp }));
     result.runs.push({ runDocId: r.id, rev: run.rev + 1 });
-    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id.slice(-6) + p + i, run, r.id, p, cells[p], stamp, email));
+    // Each part is named by the whole run ID (its week too), so the same run in this week and next never shares one (review item 65).
+    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id + '-' + p + i, run, r.id, p, cells[p], stamp, email));
   });
 }
 

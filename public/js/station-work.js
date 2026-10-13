@@ -335,11 +335,28 @@ export function mountStationWork({ db, box, person, onDraw }) {
     render();
     setTimeout(() => { sent.forEach(h => h.clear()); render(); }, 1500);
   })).catch(() => {});
+  // A saved load stays shown until the runs list has it (a time stamp may differ, so those are not compared), or 10 seconds
+  // at most: clearing it sooner showed a load just paused as loading again for a moment, which refused the next Start
+  // ("2 loads are already loading"), and a finished load's count blank.
+  const same = (a, b) => String(a === undefined || a === null ? '' : a) === String(b === undefined || b === null ? '' : b);
+  const loadChain = {};
+  function settle(id, shown, done) {
+    const until = Date.now() + 10000;
+    (function look() {
+      const raw = P.loadoutRows(runs, date).find(x => x.id === id);
+      if (Date.now() > until || (raw && Object.keys(shown).every(k => /At$/.test(k) || same(raw[k], shown[k])))) return done();
+      setTimeout(look, 250);
+    })();
+  }
   async function saveLoad(r, fields, shown) {
     const done = show(r.id, shown);
-    let res;
-    try { res = await save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }); showError(''); delete drafts[r.id]; } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
-    if (queued(res)) hold(r.id, done); else done();
+    let res, ok = false;
+    // One load's saves go one after another: a Complete tapped while its Start was still on its way landed first, and the
+    // Start then cleared the finish (the load showed loading again).
+    const turn = (loadChain[r.id] || Promise.resolve()).then(() => save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }));
+    loadChain[r.id] = turn.catch(() => {});
+    try { res = await turn; ok = true; showError(''); delete drafts[r.id]; } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
+    if (queued(res)) hold(r.id, done); else if (ok) settle(r.id, shown, done); else done();
   }
   const chain = {};
   async function saveUnload(r, fields, shown) {
@@ -388,13 +405,16 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const done = show(id, shown);
     // Only what this save sent is cleared: a box typed while it was on its way stays typed.
     const sent = Object.assign({}, d);
-    let res;
+    let res, ok = false;
     try {
-      res = await save('savePlantSchedule', Object.assign({ lane, op: 'progress', id: x.id, date: x.date, step, fields }, step === 'pause' ? { pauseReason: reason } : {})); showError('');
+      const turn = (loadChain[id] || Promise.resolve()).then(() => save('savePlantSchedule', Object.assign({ lane, op: 'progress', id: x.id, date: x.date, step, fields }, step === 'pause' ? { pauseReason: reason } : {})));
+      loadChain[id] = turn.catch(() => {});
+      res = await turn; showError('');
       if (step === 'pause') delete pauseForm[id];
       if (drafts[id]) Object.keys(fields).forEach(k => { if (drafts[id][k] === sent[k]) delete drafts[id][k]; });
+      ok = true;
     } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(id, m); else showError(x.route + ' ' + (x.run || '') + ': ' + m); }
-    if (queued(res)) hold(id, done); else done();
+    if (queued(res)) hold(id, done); else if (ok) setTimeout(done, 1500); else done();
   }
 
   // What was typed on a load's card and differs from the load.

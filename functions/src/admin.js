@@ -20,6 +20,7 @@
 const crypto = require('crypto');
 const L = require('./logic');
 const M = require('./model');
+const FAILS = require('./fails');
 const R = require('./rights');
 const { queueMaster } = require('./masterwrite');
 const { appMail, emailSettings, ourAddress, DOMAIN } = require('./adminmail');
@@ -235,7 +236,7 @@ async function routeCodeNew(db, email, stamp) {
   const code = Array.from(crypto.randomBytes(6)).map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
   const salt = crypto.randomBytes(12).toString('hex');
   const codeHash = crypto.createHash('sha256').update(salt + ':' + code).digest('hex');
-  await db.collection(M.COLLECTIONS.config).doc('routePhone').set({ codeHash, salt, enabled: true, setAt: stamp, setBy: email, failed: { minute: '', count: 0 } });
+  await db.collection(M.COLLECTIONS.config).doc('routePhone').set({ codeHash, salt, enabled: true, setAt: stamp, setBy: email, failedBy: {} });
   await db.collection('private').doc('routeCodeShown').set({ code, setAt: stamp });
   return { ok: true, code, message: 'New Route Distribution code made. Every phone asks for it again.' };
 }
@@ -260,7 +261,7 @@ async function releaseCodeNew(db, email, input, stamp) {
   if (!activePlants().some(p => p.id === fac)) fail('BAD_REQUEST', 'Pick a plant.');
   const code = newCode(), salt = crypto.randomBytes(12).toString('hex');
   await db.collection('private').doc('releaseCodes').set({ [fac]: { salt, hash: hash(salt, code), code, version: crypto.randomUUID(), changedAt: stamp, changedBy: email } }, { merge: true });
-  await db.collection('private').doc('releaseFails').set({ [fac]: { count: 0, until: 0 } }, { merge: true });
+  await db.collection('private').doc('releaseFails').set({ [fac]: {} }, { mergeFields: [fac] });
   return { ok: true, code, message: 'New manager release code for ' + plantName(fac) + '.' };
 }
 
@@ -286,15 +287,20 @@ async function releaseCheck(db, input, now) {
   const t = (now ? now() : new Date()).getTime();
   const failRef = db.collection('private').doc('releaseFails');
   return db.runTransaction(async tx => {
-    const f = ((await tx.get(failRef)).data() || {})[fac] || { count: 0, until: 0 };
+    // Per device (fails.js): 5 wrong codes lock out the device that typed them for 10 minutes, not the whole plant.
+    const device = FAILS.who(input);
+    const byDevice = FAILS.current(((await tx.get(failRef)).data() || {})[fac], v => (v.until || 0) > t || (v.at || 0) > t - 10 * 60000);
+    const f = byDevice[device] || { count: 0, until: 0 };
     if (f.until && f.until > t) fail('NOT_ALLOWED', 'Too many wrong manager release codes. Wait 10 minutes and try again.');
     const given = normCode(input.code);
     if (given.length < 6 || !sameHash(hash(c.salt, given), c.hash)) {
       const count = (f.until && f.until <= t ? 0 : f.count || 0) + 1;
-      tx.set(failRef, { [fac]: count >= 5 ? { count: 0, until: t + 10 * 60000 } : { count, until: 0 } }, { merge: true });
+      byDevice[device] = count >= 5 ? { count: 0, until: t + 10 * 60000, at: t } : { count, until: 0, at: t };
+      tx.set(failRef, { [fac]: byDevice }, { mergeFields: [fac] });
       return { ok: false, message: count >= 5 ? 'Too many wrong manager release codes. Wait 10 minutes and try again.' : 'The manager release code was not recognized.' };
     }
-    tx.set(failRef, { [fac]: { count: 0, until: 0 } }, { merge: true });
+    delete byDevice[device];
+    tx.set(failRef, { [fac]: byDevice }, { mergeFields: [fac] });
     return { ok: true };
   });
 }

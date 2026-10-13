@@ -86,7 +86,11 @@ export async function flush() {
       if (e.refused) continue;
       try { await sender(e.op, e.input); }
       catch (err) {
-        if (isNoSignal(err)) break;
+        // Review item 63: with signal, a server error ('internal') looks like no signal; after 3 tries it is shown as not
+        // accepted (kept on the phone with the reason) so the entries behind it still go.
+        const serverError = navigator.onLine && String(err && err.code || '').replace(/^functions\//, '') === 'internal';
+        if (serverError && (e.tries || 0) + 1 < 3) { await put(Object.assign({}, e, { tries: (e.tries || 0) + 1 })); break; }
+        if (isNoSignal(err) && !serverError) break;
         await put(Object.assign({}, e, { refused: String(err.message || err).replace(/\s*\[\d{3}\]\s*$/, '') }));
         continue;
       }
