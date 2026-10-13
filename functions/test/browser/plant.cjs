@@ -59,6 +59,13 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       assert.ok(drivers.some(d => /ALESANTRINO, DAVID/.test(d.name)), 'the long name is on the list');
       const widths = await page.$$eval('#cols col', c => c.map(x => parseFloat(x.style.width)));
       assert.deepEqual(widths.slice(0, 6), [4.8, 9, 15.6, 8.1, 8.1, 6.4], 'Route, Truck, Trailer and Cases Out narrower; Driver wider');
+      // Review item 22 (Joe 10/13): the Start / End column has its heading, and Wednesday's 6303 (still loading, End forgotten)
+      // shows just "forgot End?" on one line; when it started shows on hover.
+      assert.equal((await page.$$eval('#head-row th', ths => ths.map(t => t.textContent)))[8], 'Start / End');
+      const forgot = await page.$eval(row('6303') + ' td:nth-child(10)', td => ({ text: td.textContent, title: (td.querySelector('[title]') || {}).title || '' }));
+      assert.equal(forgot.text, 'forgot End?', JSON.stringify(forgot));
+      assert.match(forgot.title, /^Started \w{3} \d{1,2}:\d{2} [AP]M · forgot End\?$/, 'when it started shows on hover ' + JSON.stringify(forgot));
+      assert.ok(await page.$eval(row('6303'), tr => tr.getBoundingClientRect().height < 60), '6303 stays one line high');
       const size = await page.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight, width: document.scrollingElement.scrollWidth, innerWidth: window.innerWidth }));
       assert.ok(size.scroll <= size.inner && size.width <= size.innerWidth, 'Loadout Center fits ' + w + 'x' + h + ' with no page scrolling: ' + JSON.stringify(size));
       if (SHOTS) {

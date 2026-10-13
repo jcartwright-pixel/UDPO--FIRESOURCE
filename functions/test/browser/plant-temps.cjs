@@ -95,7 +95,24 @@ async function shots(page, name, w) {
     assert.deepEqual(await phone.$$eval('#pane-current th', t => t.filter(x => getComputedStyle(x).display !== 'none').map(x => x.textContent)), ['Sensor Name', 'Manual Read', 'Notes', 'Action']);
     await fits(phone, 'Temperatures phone');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'temps-phone-412.png'), scale: 'css' });
-    for (const p of [desk, watcher, phone]) assert.deepEqual(p.errors, []);
+    // Review items 24 and 27 (Joe 10/13): on an 800 tablet each location is a card with every column named on it, no heading or
+    // box is cut, and there is no side-menu strip.
+    const tablet = await openPage(browser, 800, 1280, '/temps.html' + MANAGER);
+    await tablet.waitForFunction(() => document.querySelectorAll('#rows [data-location]').length === 2);
+    const card = await tablet.$eval('#rows [data-location]', tr => ({
+      display: getComputedStyle(tr).display,
+      labels: [...tr.children].map(td => getComputedStyle(td, '::before')).filter(b => b.display !== 'none' && b.content !== 'none' && b.content !== 'normal').map(b => b.content.replace(/"/g, '')),
+      manual: tr.querySelector('.tp-manual').getBoundingClientRect().width,
+      cut: [...tr.querySelectorAll('td')].filter(td => td.getBoundingClientRect().right > window.innerWidth + 1).length,
+      menu: getComputedStyle(document.querySelector('.sidemenu')).display
+    }));
+    assert.equal(card.display, 'grid', 'a location is a card on an 800 tablet');
+    assert.deepEqual(card.labels, ['Current Temp', 'Manual Read', 'Trend', 'Status', 'Battery', 'Last Reading', 'Notes', 'Last Checked', 'By', 'Action'], 'every column is named on the card');
+    assert.ok(card.manual >= 200 && card.cut === 0 && card.menu === 'none', 'the Manual Read box is wide, nothing runs off the edge, no side-menu strip ' + JSON.stringify(card));
+    assert.ok(await tablet.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'nothing slides sideways at 800');
+    if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, 'temps-tablet-800.png'), scale: 'css' });
+    results.push('Plant Temperatures on an 800 tablet: each location is a card with every column named; no side-menu strip');
+    for (const p of [desk, watcher, phone, tablet]) assert.deepEqual(p.errors, []);
   } finally {
     await browser.close();
   }

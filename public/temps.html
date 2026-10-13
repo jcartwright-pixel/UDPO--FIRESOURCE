@@ -138,6 +138,9 @@
           // Joe 10/10: no Save button; the column shows when the reading saved, or how long the location is locked.
           '<td class="tp-act">' + (!ck ? '<span class="pill">View only</span>' : note ? '<small class="as-note' + (/^Not|^Enter/.test(note) ? ' bad' : '') + '">' + escapeHtml(note) + '</small>' : r.locked && !cur ? '<small class="as-last tp-pill locked" title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked ' + r.minutesUntilDue + ' min</small>' : cur ? '<small class="as-note tp-pill saved">Saved ' + escapeHtml(clockOf(r.lastCheckedAt)) + '</small>' : '<small class="as-last tp-pill due" title="Type the reading in Manual °F; it saves as you leave the box">Due</small>') + '</td></tr>';
       }).join('') || '<tr><td colspan="11" class="empty">' + (rows.length ? 'No locations match the ' + escapeHtml(FILTERS.find(f => f[0] === filter)[1]) + ' filter.' : (setupSeen ? 'No temperature locations are set up for this plant.' : 'Loading the temperature locations&hellip;')) + '</td></tr>';
+      // Review item 24 (Joe 10/13): on a small tablet each location is a card (as on Yard Checks), every column named on the card.
+      const heads = [...document.querySelectorAll('#pane-current thead th')].map(th => th.textContent);
+      document.querySelectorAll('#rows tr[data-location]').forEach(tr => [...tr.children].forEach((td, i) => { if (heads[i]) td.dataset.l = heads[i]; }));
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="tp-name"><b>' + escapeHtml(h.location) + '</b></td>' +
         '<td>' + escapeHtml(h.manualTemperature !== '' ? h.manualTemperature : h.sensorTemperature !== '' ? h.sensorTemperature : '—') + '</td>' +
         '<td><span class="tp-status ' + statusClass(h.status) + '">' + escapeHtml(h.status || 'Recorded') + '</span></td><td>' + (h.batteryLevel === '' ? '—' : escapeHtml(h.batteryLevel) + '%') + '</td>' +

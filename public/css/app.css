@@ -1806,3 +1806,10 @@ body.daily-look #delivers { display: none; }
 .split.closed .summary { padding: 4px 6px; }
 .split.closed .summary div { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 4px 8px; font-size: 13px; }
 .split.closed .summary b { display: inline; font-size: 22px; }
+
+/* Review item 27 (Joe 10/13): on a phone or small tablet (under about 900px) the plant screens drop the side-menu strip (the dark
+   bar with the menu button), as the stations do, so the screen gets those 64px back. Back and Home stay in the header. */
+@media (max-width: 900px) {
+  body:is(.plant-page, .ta-page).has-side .sidemenu, body:is(.plant-page, .ta-page).has-side .side-flyouts { display: none; }
+  body:is(.plant-page, .ta-page).has-side .side-main { margin-left: 0; }
+}
