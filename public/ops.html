@@ -49,7 +49,7 @@
 
     // The current app's Operational Assignments (93_DispatchAdminV037: Assignment, Active, Sequence). Each change saves at once.
     const L = window.UDLogic;
-    forScreen('drivers');
+    forScreen('opsAssignments');
     let docs = [], adding = false;
     const when = (x) => x.updatedAt ? dateTimeText(x.updatedAt) + ' · ' + String(x.updatedBy || '').split('@')[0] : (x.builtIn ? 'Built in (the current app\'s list)' : '');
     function render() {
