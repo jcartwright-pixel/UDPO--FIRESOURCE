@@ -60,3 +60,6 @@ body.sc-kiosk #screen > .topbar, body.sc-kiosk .head, body.sc-kiosk #kpis, body.
 body.sc-kiosk #sheet { height: 100vh; overflow-y: auto; }
 body.sc-kiosk .sc-board thead th { position: sticky; top: 0; z-index: 1; }
 .sc-kiosk-title { display: flex; justify-content: space-between; padding: 6px 12px; background: #20578e; color: #fff; font-size: 18px; }
+.sc-kiosk-board td, .sc-kiosk-board th { font-size: 22px; }
+.sc-kiosk-board .sc-overall { font-size: 22px; min-width: 110px; }
+.sc-kiosk-board td.strong { font-size: 22px; }

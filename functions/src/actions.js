@@ -405,6 +405,11 @@ function validate(input) {
     return out;
   }
   if (action === 'saveScorecard') {
+    if (Array.isArray(input.kioskAreas)) {
+      out.kioskAreas = [...new Set(input.kioskAreas.map(k => text(k, 40)))];
+      if (out.kioskAreas.some(k => !SC.SC_CORE.AREAS.some(a => a[0] === k))) throw new SaveError('BAD_REQUEST', 'Unknown scorecard area');
+      return out;
+    }
     if (Array.isArray(input.callOffReasons)) {
       out.callOffReasons = [...new Set(input.callOffReasons.map(r => text(r, 40).toUpperCase()))];
       if (out.callOffReasons.some(r => SC.SC_CORE.REASONS.indexOf(r) < 0)) throw new SaveError('BAD_REQUEST', 'Unknown call-off reason');

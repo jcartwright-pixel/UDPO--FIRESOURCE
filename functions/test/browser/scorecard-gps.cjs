@@ -120,6 +120,9 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       // Joe 10/13 Time grade: left too early (EVANS, 10 days) and back too late (FOX, 10 days) each cost 1 a day: -10 -> 60 (D).
       assert.equal(await sc.$eval('tr[data-key="DRV_S_EVANS"] td:nth-child(12)', td => td.textContent.trim()), 'D');
       assert.equal(await sc.$eval('tr[data-key="DRV_S_FOX"] td:nth-child(12)', td => td.textContent.trim()), 'D');
+      // Joe 10/13: driving and distribution only, nothing for the plant.
+      assert.doesNotMatch(await sc.textContent('#screen'), /plant/i, 'no plant card or plant items on the scorecard');
+      assert.match(await sc.textContent('#kpis'), /Average driver score/);
       assert.match(await sc.textContent('#sc-how'), /Accidents \(12 months\), PDAs \(9 months\), complaints \(6 months\) and call-offs \(3 months\) count past the period shown/);
       assert.match(await sc.textContent('#unassigned'), /No driver dispatched[\s\S]*10-8-26\s*229001\s*Speeding \(66 mph in a 45/, 'the alert on a truck with no driver is kept for a manager');
       const fit = await sc.evaluate(() => ({ table: document.querySelector('.sc-board').scrollWidth, box: document.querySelector('#sheet').clientWidth,
@@ -156,7 +159,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       await sc.waitForFunction(() => /sleeper/.test((document.querySelector('tr.sc-misses') || {}).textContent || ''));
       assert.match(await sc.textContent('tr.sc-misses'), /Idling \(30 min, 12:00 PM, truck 223898\), sleeper\s*−0\.25/);
       // Joe 10/13: a tab per area; Speeding lists every driver's speeding.
-      assert.deepEqual(await heads(sc, '#cats [data-tab]'), ['Overall'].concat(AREA_HEADS.slice(2, -1), ['Incidents & Complaints']));
+      assert.deepEqual(await heads(sc, '#cats [data-tab]'), ['Overall', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Seatbelt', 'MPG', 'Time', 'Clean', 'Accidents', 'Complaints', 'PDA', 'Incidents']);
       const strip = await sc.$eval('#cats', c => ({ h: c.getBoundingClientRect().height, sw: c.scrollWidth, cw: c.clientWidth }));
       assert.ok(strip.h < 60 && strip.sw <= strip.cw + 1, 'the tabs fit on one line: ' + JSON.stringify(strip));
       await sc.click('#cats [data-tab="speeding"]');
@@ -188,6 +191,9 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
         assert.deepEqual(await sc.$$eval('.sc-n[data-k="speeding"], .sc-n[data-k="hardBrake"], .sc-n[data-k="hardAccel"], .sc-n[data-k="idle"], .sc-n[data-k="gpsDayCap"]', l => l.map(x => x.value)), ['2', '2', '1', '1', '10']);
         assert.deepEqual(await sc.$$eval('.sc-n[data-k="sleeperIdlePct"], .sc-n[data-k="accidentBase"], .sc-n[data-k="accident2"], .sc-n[data-k="complaintMajor"], .sc-n[data-k="sickFade2"]', l => l.map(x => x.value)), ['66', '25', '15', '2', '10']);
         assert.equal(await sc.$eval('#sc-kiosk-reasons', c => c.checked), false, 'Show reasons on kiosk starts off');
+        assert.equal(await sc.$$eval('[data-kiosk-area]', l => l.length), AREA_HEADS.length - 3, 'every area can be ticked for the kiosk');
+        assert.equal(await sc.$$eval('[data-kiosk-area]:checked', l => l.length), 0, 'none ticked to start');
+        if (SHOTS) { await sc.$eval('#sc-kiosk-reasons', e => e.scrollIntoView({ block: 'center' })); await sc.screenshot({ path: path.join(SHOTS, 'after-settings-kiosk-' + w + '.png') }); }
         if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-settings-' + w + '.png') });
       }
       assert.deepEqual(sc.errors, []);
@@ -198,7 +204,9 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       const k = await openPage(browser, 1920, 330, '/scorecard.html?month=2026-10&kiosk=1&testEmail=manager.test@uniteddairy.com');
       await k.waitForSelector('.sc-kiosk-title');
       await k.waitForSelector('.sc-board tbody td.strong');
-      assert.deepEqual(await heads(k, 'table.sc-board thead th'), AREA_HEADS);
+      // Joe 10/13: the kiosk shows the overall score only, best first, until areas are ticked on Settings.
+      assert.deepEqual(await heads(k, 'table.sc-board thead th'), ['#', 'Driver', 'Overall']);
+      assert.deepEqual(await k.$$eval('table.sc-board tbody td.strong', t => t.map(x => x.textContent)).then(l => l.slice(0, 2)), ['HALL, PAT', 'KING, LEE']);
       assert.equal(await k.$$eval('tr.sc-misses, .sc-excuse, #sc-how', l => l.length), 0, 'no reasons or misses on the kiosk');
       assert.equal(await k.$eval('#kpis', e => e.offsetParent === null), true, 'no counts or buttons on the kiosk');
       if (SHOTS) await k.screenshot({ path: path.join(SHOTS, 'after-kiosk-1920.png') });

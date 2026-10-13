@@ -169,7 +169,7 @@ async function saveDriverTemplate(tx, db, req, email, stamp, logRef, mode) {
 // Driver Scorecard settings: scorecard/settings, read by the screen with the current app's defaults under it (scSettings_).
 async function saveScorecard(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection('scorecard').doc('settings'), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
-  const data = req.callOffReasons ? { callOffReasons: req.callOffReasons } : { [req.key]: req.value };
+  const data = req.callOffReasons ? { callOffReasons: req.callOffReasons } : req.kioskAreas ? { kioskAreas: req.kioskAreas } : { [req.key]: req.value };
   tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email }), { merge: true });
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });

@@ -54,6 +54,7 @@
     // The current app's Driver Scorecard (screen A, 224/225_V7279): one table of every driver for the month or the year.
     // Days come from every week the app keeps (the copied Live weeks, the weeks Publish moved on, and the current app's DISPATCH WEEK
     // HISTORY archive: check-ins, cases out vs in) and the plant journal (inspections, route check-ins).
+    // Joe 10/13: the scorecard is driving and distribution only: no plant card (the average is the drivers'), no route cuts.
     forScreen('scorecard');
     const L = window.UDLogic, S = window.UDScore, CORE = S.SC_CORE;
     let mode = 'month', runs = [], events = [], drivers = [], exceptions = [], saved = {}, open = '';
@@ -187,7 +188,6 @@
           '<p><b>Cases out vs in</b> ' + n('lostCase') + ' point per lost case, at most ' + n('lostCaseDayCap') + ' a day</p>' +
           '<p><b>Clean inspections</b> ' + n('inspectionDefect') + ' points per inspection with a defect, ' + n('inspectionMissing') + ' if none done</p>' +
           '<p><b>Attendance</b> ' + n('callOff') + ' points per call-off day</p>' +
-          '<p class="later"><b>Route cuts</b> are scored on the plant side, not on the driver scorecard</p>' +
           '<h2>Attendance fades over 3 months</h2><p>A call-off counts ' + n('sickFade1') + '% in its first month, ' + n('sickFade2') + '% in the second, ' + n('sickFade3') + '% in the third, then it is gone</p>' +
           '<h2>Driving (Verizon Fleet GPS)</h2><p class="hint">Counted on the truck, against the driver Daily Dispatch put in it that day.</p>' +
           '<p><b>Speeding</b> ' + n('speeding') + ' points per speeding alert</p>' +
@@ -219,7 +219,9 @@
           '<h2>PDA (Progressive Discipline Action)</h2><p class="hint">Entered on Driver Roster &gt; Edit; a manager\'s decision, so it counts from the day it is entered.</p>' +
           '<p><b>Verbal warning</b> ' + n('pdaVerbal') + ' <b>Written warning</b> ' + n('pdaWritten') + '</p><p><b>Final written warning</b> ' + n('pdaFinal') + ' <b>Suspension</b> ' + n('pdaSuspension') + ' points</p>' +
           '<p><b>Fades</b> ' + n('pdaFade1') + '% for 0\u20133 months, ' + n('pdaFade2') + '% 3\u20136, ' + n('pdaFade3') + '% 6\u20139, then gone</p>' +
-          '<h2>Driver\'s Kiosk Station</h2><p><label><input type="checkbox" id="sc-kiosk-reasons"' + (s.kioskReasons ? ' checked' : '') + (edit ? '' : ' disabled') + '> <b>Show reasons on kiosk</b> (off: the TV shows the grades only)</label></p>' +
+          '<h2>Driver\'s Kiosk Station</h2><p class="hint">The TV shows each driver\'s overall score, best first.</p><p><b>Areas shown on kiosk</b> (none ticked: overall only)</p><div class="sc-reasons sc-kiosk-areas">' +
+          CORE.AREAS.map(a => '<label><input type="checkbox" data-kiosk-area="' + a[0] + '"' + (s.kioskAreas.indexOf(a[0]) >= 0 ? ' checked' : '') + (edit ? '' : ' disabled') + '> ' + escapeHtml(a[1]) + '</label>').join('') + '</div>' +
+          '<p><label><input type="checkbox" id="sc-kiosk-reasons"' + (s.kioskReasons ? ' checked' : '') + (edit ? '' : ' disabled') + '> <b>Show reasons on kiosk</b> (off: the TV shows the scores only)</label></p>' +
           '<h2>Driver of the Month</h2><p>Highest score, worked at least ' + n('monthMinDays') + ' days</p><button type="button" data-mode-go="month">Back to the scorecard</button></section></div>';
         foot.textContent = '';
         sheet.querySelectorAll('.sc-n').forEach(inp => { inp.onchange = () => {
@@ -232,6 +234,10 @@
         }; });
         { const c = sheet.querySelector('#sc-clean-on'); c.onchange = () => { const before = saved.cleanOn, v = c.checked ? 1 : 0;
           saveOptimistic('saveScorecard', { key: 'cleanOn', value: v }, () => { saved = Object.assign({}, saved, { cleanOn: v }); }, () => { saved = Object.assign({}, saved, { cleanOn: before }); }, render); }; }
+        sheet.querySelectorAll('[data-kiosk-area]').forEach(c => { c.onchange = () => {
+          const list = [...sheet.querySelectorAll('[data-kiosk-area]:checked')].map(x => x.dataset.kioskArea), before = saved.kioskAreas;
+          saveOptimistic('saveScorecard', { kioskAreas: list }, () => { saved = Object.assign({}, saved, { kioskAreas: list }); }, () => { saved = Object.assign({}, saved, { kioskAreas: before }); }, render);
+        }; });
         { const c = sheet.querySelector('#sc-kiosk-reasons'); c.onchange = () => { const before = saved.kioskReasons, v = c.checked ? 1 : 0;
           saveOptimistic('saveScorecard', { key: 'kioskReasons', value: v }, () => { saved = Object.assign({}, saved, { kioskReasons: v }); }, () => { saved = Object.assign({}, saved, { kioskReasons: before }); }, render); }; }
         sheet.querySelector('[data-mode-go]').onclick = () => { mode = 'month'; render(); };
@@ -240,7 +246,7 @@
       // Review item 60 (Joe 10/13): the month reads Oct 26 (its 3-letter name and 2-digit year).
       const b = board(s), sm = b.summary, label = mode === 'year' ? String(year) : mode === 'week' ? 'Week of ' + shortDate(weekStart) : CORE.MONTHS[month - 1].slice(0, 3) + ' ' + String(year).slice(-2);
       const lostCount = b.unassigned.reduce((t, u) => t + u.alerts.length, 0);
-      k.innerHTML = [[sm.drivers, 'Drivers graded'], [sm.average == null ? '–' : sm.average, 'Plant average score'], [sm.missedCheckins, 'Missed check-ins', sm.missedCheckins ? 'warn' : ''],
+      k.innerHTML = [[sm.drivers, 'Drivers graded'], [sm.average == null ? '–' : sm.average, 'Average driver score'], [sm.missedCheckins, 'Missed check-ins', sm.missedCheckins ? 'warn' : ''],
         [sm.lostCases, 'Cases lost on routes', sm.lostCases ? 'warn' : ''], [sm.speeding, 'Speeding alerts', sm.speeding ? 'warn' : ''], [sm.hardBrakes, 'Hard stops', sm.hardBrakes ? 'warn' : ''],
         [lostCount, 'No driver dispatched', lostCount ? 'warn' : '']].concat(mode === 'week' ? [] : [[sm.leader || 'Nobody yet', (mode === 'year' ? 'Leading for Driver of the Year' : 'Leading for Driver of the Month') + (sm.leader ? '' : ', needs ' + b.minDays + ' days worked'), sm.leader ? 'good' : 'none']])
         .map(([v, l, c]) => '<div class="' + (c || '') + '"><b>' + escapeHtml(String(v)) + '</b><span>' + l + '</span></div>').join('');
@@ -329,15 +335,20 @@
           '</tbody></table></div>' : '');
       // Joe 10/13: the Driver's Kiosk Station (TV) shows the grades only; reasons only when Settings says so.
       if (kiosk) {
+        // Joe 10/13: "the scorecard kiosk doesn't need to show all the grade areas": the overall score, best first, and only the
+        // areas ticked on Settings.
+        const KA = AREAS.filter(a => s.kioskAreas.indexOf(a[0]) >= 0), dw = KA.length ? Math.max(20, 100 - 6 - 16 - KA.length * 6.2) : 60;
         const reasons = (r) => (r.misses || []).filter(m => !m.excused && m.points > 0).map(m => escapeHtml(m.what)).join(' · ');
         sheet.innerHTML = '<div class="sc-kiosk-title"><b>DRIVER SCORECARD</b><span>' + escapeHtml(label) + ' · through ' + shortDate(b.through) + '</span></div>' +
-          '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:' + (100 - 4 - 9 - AREAS.length * 5.8).toFixed(1) + '%">' + AREAS.map(() => '<col style="width:5.8%">').join('') + '<col style="width:9%"></colgroup>' +
-          '<thead><tr><th>#</th><th>Driver</th>' + AREAS.map(a => '<th>' + head(a) + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
-          (shown.map(r => '<tr><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' + AREAS.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') + '<td><span class="sc g-' + r.grade + ' sc-overall">' + r.score + ' ' + r.grade + '</span></td></tr>' +
-            (s.kioskReasons && reasons(r) ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '">' + reasons(r) + '</td></tr>' : '')).join('') || empty(AREAS.length + 3)) + '</tbody></table>';
+          '<table class="issues sc-board sc-kiosk-board"><colgroup><col style="width:6%"><col style="width:' + dw.toFixed(1) + '%">' + KA.map(() => '<col style="width:6.2%">').join('') + '<col style="width:' + (KA.length ? 16 : 34) + '%"></colgroup>' +
+          '<thead><tr><th>#</th><th>Driver</th>' + KA.map(a => '<th>' + head(a) + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
+          (shown.map(r => '<tr><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' + KA.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') + '<td><span class="sc g-' + r.grade + ' sc-overall">' + r.score + ' ' + r.grade + '</span></td></tr>' +
+            (s.kioskReasons && reasons(r) ? '<tr class="sc-misses"><td></td><td colspan="' + (KA.length + 2) + '">' + reasons(r) + '</td></tr>' : '')).join('') || empty(KA.length + 3)) + '</tbody></table>';
         return;
       }
-      cats.innerHTML = [['overall', 'Overall']].concat(AREAS).concat([['incidents', 'Incidents & Complaints']]).map(a => '<button type="button" role="tab" data-tab="' + a[0] + '" aria-selected="' + (tab === a[0]) + '">' + escapeHtml(a[1]) + '</button>').join('');
+      // Short tab words so all 16 tabs fit one line at 1536 with any font; the full name is in the tooltip and the tab's table.
+      const TAB = { fuel: 'MPG', cleanliness: 'Clean', incidents: 'Incidents' };
+      cats.innerHTML = [['overall', 'Overall']].concat(AREAS).concat([['incidents', 'Incidents & Complaints']]).map(a => '<button type="button" role="tab" data-tab="' + a[0] + '" title="' + escapeHtml(a[1]) + '" aria-selected="' + (tab === a[0]) + '">' + escapeHtml(TAB[a[0]] || a[1]) + '</button>').join('');
       sheet.innerHTML = tab === 'incidents' ? incidentTable() : tab !== 'overall' && AREAS.some(a => a[0] === tab) ? how + areaTable(tab) : how + overall();
       foot.textContent = 'Through ' + shortDate(b.through) + ' · green = no misses, red = cost points · days counted: ' + (b.days.length ? shortDate(b.days[0]) + ' to ' + shortDate(b.days[b.days.length - 1]) + ' (the copied Live weeks)' : 'none') + ' · click a driver for the details, rewards and each miss.';
       document.getElementById('prev').onclick = () => { if (mode === 'year') year--; else if (mode === 'week') weekStart = S.scAddDays_(weekStart, -7); else if (--month < 1) { month = 12; year--; } open = ''; render(); };
