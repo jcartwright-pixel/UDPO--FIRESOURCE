@@ -40,8 +40,38 @@ const TEMPLATES = Object.freeze({
     'OdometerMiles(mile) = Input.Odometer',
     'EngineHours = Input.TotalEngineHours',
     'Driver = Input.DriverName',
-    'Active = Input.IsActive', ''].join('\r\n') }
+    'Active = Input.IsActive', ''].join('\r\n') },
+  // Joe 10/13 (scorecard): the alerts Fleet raised (speeding, harsh braking, idling ... as set up in Fleet) since a time.
+  alerts: { name: 'UDPO_Alerts', text: [
+    '[Template]', 'TemplateVersion = 1.0', 'TableID = Alert-1.0', 'TemplateName = UDPO_Alerts', 'Intent = Retrieve', '',
+    '[User]', 'Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"', '',
+    '[Filter]', 'TimeTriggered = Between(Since, Until)', '',
+    '[Output]',
+    'AlertId = Input.Id',
+    'ConditionId = Input.ConditionId',
+    'UnitId = Input.UnitId',
+    'DriverId = Input.DriverId',
+    'Triggered(yyyy-MM-dd HH:mm:ss, UTC) = Input.TimeTriggered',
+    'TimeOn(yyyy-MM-dd HH:mm:ss, UTC) = Input.TimeOn',
+    'TimeOff(yyyy-MM-dd HH:mm:ss, UTC) = Input.TimeOff',
+    'Address = Input.Address',
+    'SpeedMph(mph) = Input.Speed',
+    'LimitMph(mph) = Input.SpeedLimit',
+    'TriggerName = Input.TriggerName',
+    'TriggerValue = Input.TriggerValue', ''].join('\r\n') },
+  // The names of the alert conditions (what kind of alert each is), asked for once per condition.
+  conditions: { name: 'UDPO_Conditions', text: [
+    '[Template]', 'TemplateVersion = 1.0', 'TableID = Condition-1.0', 'TemplateName = UDPO_Conditions', 'Intent = Retrieve', '',
+    '[User]', 'Ids(Set<Text>) = "Ids"', '',
+    '[Filter]', 'Id = In(Ids)', '',
+    '[Output]',
+    'ConditionId = Input.Id',
+    'Name = Input.Name',
+    'ConditionType = Input.ConditionType', ''].join('\r\n') }
 });
+// Joe's Fleet places for the Uniontown yard (10/13).
+const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT'];
+const inYard = (t) => YARD_PLACES.indexOf(String(t.place || '').trim().toUpperCase()) >= 0;
 const TOKEN_HOURS = 23;          // Fleet keys last 24 hours; a fresh one is asked for an hour early.
 const ZONE = 'America/New_York';
 
@@ -141,14 +171,14 @@ function namesIn(list) {
 }
 
 /** Saves our two read-only templates in the Fleet account when they are not there yet. */
-async function ensureTemplates(d, o, token) {
+async function ensureTemplates(d, o, token, list) {
   const base = baseOf(d, o);
   const res = await o.fetch(base + '/templates?auth=' + encodeURIComponent(token), { method: 'GET', headers: { Accept: 'application/json' } });
   if (res.status === 401 || res.status === 403) throw new FleetError('TEMPLATES', 'The login works, but this sub-user may not use Fleet templates (' + res.status + '). Give the sub-user an administrator role in Fleet.');
   if (res.status >= 300) throw new FleetError('TEMPLATES', 'The login works, but Verizon Fleet answered ' + res.status + ' when asked for templates. ' + short(await text(res)));
   let have = [];
   try { have = namesIn(JSON.parse(await text(res))); } catch (e) { have = []; }
-  for (const t of [TEMPLATES.trucks]) {
+  for (const t of list || [TEMPLATES.trucks]) {
     if (have.indexOf(t.name.toLowerCase()) >= 0) continue;
     const up = await o.fetch(base + '/templates?auth=' + encodeURIComponent(token), { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: t.text });
     if (up.status >= 300) throw new FleetError('TEMPLATES', 'The login works, but Verizon Fleet would not save our ' + t.name + ' template (' + up.status + '). ' + short(await text(up)));
@@ -192,12 +222,21 @@ function advanceDays(seen, trucks, at) {
   Object.keys(trucks).forEach(k => {
     const t = trucks[k], u = units[k] || {}, prev = (seen.units || {})[k] || {};
     if (prev.lr !== t.lastReport || fresh) changedTrucks[k] = t;
-    if (t.odometerMiles === null) { units[k] = Object.assign(u, { lr: t.lastReport }); return; }
-    const next = { lr: t.lastReport, odo0: u.odo0 == null ? t.odometerMiles : u.odo0, odo: t.odometerMiles, first: u.first || '', last: u.last || '', since: u.since || at };
+    // Leaving and coming back to the yard (the Fleet place, read every 5 minutes): the first time today it was seen out after
+    // being in the yard, and the last time it was seen back.
+    const yard = inYard(t), wasYard = u.yard === undefined ? null : u.yard;
+    const yardOut = u.yardOut || (wasYard === true && !yard ? at : ''), yardIn = wasYard === false && yard ? at : (u.yardIn || '');
+    const yardChanged = yardOut !== (u.yardOut || '') || yardIn !== (u.yardIn || '');
+    if (t.odometerMiles === null) {
+      units[k] = Object.assign({}, u, { lr: t.lastReport, yard, yardOut, yardIn });
+      if (yardChanged) days[date + '_' + k] = { tag: t.tag, date, yardOut, yardIn, updatedAt: at };
+      return;
+    }
+    const next = { lr: t.lastReport, odo0: u.odo0 == null ? t.odometerMiles : u.odo0, odo: t.odometerMiles, first: u.first || '', last: u.last || '', since: u.since || at, yard, yardOut, yardIn };
     if (u.odo != null && t.odometerMiles - u.odo > 0.2) { next.first = next.first || at; next.last = at; }
     units[k] = next;
-    if (fresh || u.odo !== next.odo || !u.lr) {
-      days[date + '_' + k] = { tag: t.tag, date, miles: Math.max(0, Math.round((next.odo - next.odo0) * 10) / 10), firstMove: next.first, lastMove: next.last, since: next.since,
+    if (fresh || u.odo !== next.odo || !u.lr || yardChanged) {
+      days[date + '_' + k] = { tag: t.tag, date, miles: Math.max(0, Math.round((next.odo - next.odo0) * 10) / 10), firstMove: next.first, lastMove: next.last, since: next.since, yardOut, yardIn,
         lastPlace: t.place || t.address || '', updatedAt: at };
     }
   });
@@ -213,6 +252,68 @@ async function writeAll(db, coll, docs) {
   }
 }
 
+/*
+ * Fleet alerts for the Driver Scorecard (Joe 10/13): every alert raised since the last read (the first read starts at New
+ * York midnight), kept as gpsAlerts/A<alert id> {date, tag, at, type, speedMph, limitMph, minutes, place, address, condition,
+ * fleetDriverId}. type comes from the alert's condition in Fleet (names asked for once, kept in private/gpsFleetConditions):
+ * SPEEDING, HARSH_BRAKING, HARSH_ACCEL, HARSH_TURN, IDLE, FAULT, SEATBELT or OTHER. The scorecard counts an alert against the
+ * driver Daily Dispatch put on that truck that day, not the driver Fleet shows.
+ */
+function alertType(c, r) {
+  const s = (String(c && c.name || '') + ' ' + String(c && c.type || '') + ' ' + String(r.TriggerName || '')).toUpperCase().replace(/[\s_-]+/g, '');
+  if (/HARSHBRAK|HARDBRAK|DECEL|HARDSTOP/.test(s)) return 'HARSH_BRAKING';
+  if (/HARSHACCEL|HARDACCEL|ACCELVIOL|RAPIDACCEL/.test(s)) return 'HARSH_ACCEL';
+  if (/CORNER|HARDTURN|HARSHTURN/.test(s)) return 'HARSH_TURN';
+  if (/SEATBELT/.test(s)) return 'SEATBELT';
+  if (/IDL/.test(s)) return 'IDLE';
+  if (/SPEED/.test(s) || (num(r.LimitMph) > 0 && num(r.SpeedMph) > num(r.LimitMph))) return 'SPEEDING';
+  if (/DTC|FAULT|CHECKENGINE|MIL\b/.test(s)) return 'FAULT';
+  return 'OTHER';
+}
+const fleetTime = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+
+async function pullAlerts(db, d, o, token, trucks, at) {
+  const ref = db.collection('private').doc('gpsFleet');
+  const now = new Date(at), midnight = nyMidnight(now);
+  // Each read starts 10 minutes before the last one ended (an alert can arrive late); never before today's New York midnight
+  // on the first read.
+  const since = d.alertsUntil ? new Date(Math.max(Date.parse(d.alertsUntil) - 10 * 60000, Date.parse(midnight) - 0)) : new Date(midnight);
+  if (!d.alertTemplatesReady) { await ensureTemplates(d, o, token, [TEMPLATES.alerts, TEMPLATES.conditions]); await ref.set({ alertTemplatesReady: true }, { merge: true }); }
+  const rows = (await execute(d, o, token, TEMPLATES.alerts.name, { Since: fleetTime(since), Until: fleetTime(now) })).filter(r => r.AlertId);
+  const condRef = db.collection('private').doc('gpsFleetConditions'), known = ((await condRef.get()).data() || {}).list || {};
+  const missing = [...new Set(rows.map(r => r.ConditionId).filter(id => id && !known[id]))];
+  if (missing.length) {
+    try {
+      (await execute(d, o, token, TEMPLATES.conditions.name, { Ids: missing.join(',') })).forEach(c => { if (c.ConditionId) known[c.ConditionId] = { name: c.Name || '', type: c.ConditionType || '' }; });
+    } catch (e) { if (!(e instanceof FleetError)) throw e; }
+    missing.forEach(id => { if (!known[id]) known[id] = { name: '', type: '' }; });
+    await condRef.set({ list: known });
+  }
+  const tagOf = {};
+  Object.keys(trucks).forEach(k => { if (trucks[k].unitId) tagOf[trucks[k].unitId] = trucks[k]; });
+  const docs = {};
+  rows.forEach(r => {
+    const when = utcIso(r.Triggered) || utcIso(r.TimeOn), t = tagOf[r.UnitId], c = known[r.ConditionId] || {};
+    if (!when) return;
+    const on = Date.parse(utcIso(r.TimeOn) || when), off = Date.parse(utcIso(r.TimeOff));
+    const type = alertType(c, r);
+    docs[safeIdPart('A' + r.AlertId)] = {
+      date: nyDate(when), tag: t ? t.tag : '', unitId: r.UnitId || '', at: when, type,
+      speedMph: num(r.SpeedMph), limitMph: num(r.LimitMph), minutes: isFinite(off) && off > on ? Math.round((off - on) / 60000) : null,
+      place: t && t.lastReport && Math.abs(Date.parse(t.lastReport) - Date.parse(when)) < 10 * 60000 ? t.place || '' : '',
+      address: r.Address || '', condition: c.name || c.type || r.TriggerName || '', fleetDriverId: r.DriverId || '', updatedAt: at };
+  });
+  await writeAll(db, 'gpsAlerts', docs);
+  await ref.set({ alertsUntil: at, alertsError: '', lastAlerts: Object.keys(docs).length }, { merge: true });
+  return Object.keys(docs).length;
+}
+function nyMidnight(now) {
+  const date = nyDate(now.toISOString());
+  // New York is 4 or 5 hours behind UTC; whichever of the two is that day's midnight there.
+  for (const h of [4, 5]) { const t = new Date(date + 'T' + String(h).padStart(2, '0') + ':00:00Z'); if (nyDate(t.toISOString()) === date && nyDate(new Date(t - 3600000).toISOString()) !== date) return t.toISOString(); }
+  return new Date(date + 'T05:00:00Z').toISOString();
+}
+
 /** Where every truck is now and today's miles, each run. Does nothing until a login is saved. */
 async function pull(db, options) {
   const o = withDefaults(options);
@@ -222,7 +323,7 @@ async function pull(db, options) {
   const at = o.now().toISOString(), out = { trucks: 0, days: 0 };
   try {
     const token = await key(ref, d, o, false);
-    if (!d.templatesReady) { await ensureTemplates(d, o, token); await ref.set({ templatesReady: true }, { merge: true }); }
+    if (!d.templatesReady) { await ensureTemplates(d, o, token, [TEMPLATES.trucks]); await ref.set({ templatesReady: true }, { merge: true }); }
     const trucks = {};
     (await execute(d, o, token, TEMPLATES.trucks.name)).forEach(r => { const k = truckKey(r.Tag); if (k) trucks[k] = truckRow(r, at); });
     const seenRef = db.collection('private').doc('gpsFleetSeen');
@@ -231,6 +332,9 @@ async function pull(db, options) {
     await writeAll(db, 'gpsDays', step.days);
     await seenRef.set(step.seen);
     out.trucks = Object.keys(trucks).length; out.days = Object.keys(step.days).length;
+    // The alerts are read after the trucks; a problem with them never stops the trucks' read.
+    try { out.alerts = await pullAlerts(db, d, o, token, trucks, at); }
+    catch (e) { if (!(e instanceof FleetError)) console.error('fleetGps alerts', e); await ref.set({ alertsError: short(e.message), alertsErrorAt: at }, { merge: true }); out.alertsError = short(e.message); }
     await ref.set({ lastPull: at, lastPullError: '', lastPullTrucks: out.trucks }, { merge: true });
     return out;
   } catch (e) {
@@ -262,7 +366,7 @@ async function fleetCall(db, email, input, options) {
     if (String(input.fleet || '').trim()) next.fleet = cleanFleet(input.fleet);
     if (String(input.user || '').trim()) next.user = String(input.user).trim().slice(0, 200);
     if (String(input.password || '')) next.password = String(input.password).slice(0, 200);
-    Object.assign(next, { savedAt: o.now().toISOString(), savedBy: email, lastTest: null, token: '', tokenUntil: '', templatesReady: false });
+    Object.assign(next, { savedAt: o.now().toISOString(), savedBy: email, lastTest: null, token: '', tokenUntil: '', templatesReady: false, alertTemplatesReady: false });
     await ref.set(next);
     return status(next);
   }
@@ -300,4 +404,4 @@ async function fleetCall(db, email, input, options) {
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
-module.exports = { fleetCall, pull, parseCsv, advanceDays, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { fleetCall, pull, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
