@@ -1186,3 +1186,7 @@
 .machine-setup-page .ms-off-btn:hover { background: #fdeeee; }
 .machine-setup-page .ms-add-btn:hover { background: #eaf6ee; }
 @media (max-width: 900px) { .machine-setup-page .ms-split, .machine-setup-page .ms-two { flex-direction: column; } .machine-setup-page .ms-side { min-height: 320px; } .machine-setup-page .ms-list { width: auto; max-height: 220px; } .machine-setup-page .ms-main .qc-top { flex-wrap: wrap; } }
+/* Review item 56 (16px floor) with the Product Sheet (#255): FULL SPEED needs its own width so "Full Speed /Min" keeps to two
+   lines; the band line above the headings is 16px too. */
+.products-page .pm-sheet col.c-mach + col.c-num, .products-page .pm-sheet col.c-group + col.c-num { width: 126px; }
+.products-page .pm-sheet thead tr.pm-band th { font-size: 16px; }
