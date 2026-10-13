@@ -48,7 +48,7 @@ const ACTIONS = Object.freeze({
   setUnitDown: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
   setUnitUp: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
   reorderLoads: { roles: REORDER_ROLES, screen: 'dailyDispatch' },
-  clearConflict: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
+  clearConflict: { roles: SAVE_ROLES, screen: 'conflicts' },
   saveCheckIn: { roles: SAVE_ROLES, screen: 'checkIns' },
   setDriverTruck: { roles: DRIVER_ROLES, screen: 'drivers' },
   setDriverAvailable: { roles: DRIVER_ROLES, screen: 'drivers' },
@@ -68,7 +68,7 @@ const ACTIONS = Object.freeze({
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
   saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
-  saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'drivers' },
+  saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'opsAssignments' },
   // The plant side (plant.js): Loadout Center loads and pickups. The Plant Distribution screens are their own switch (Plant Loading).
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
   addPickup: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
@@ -110,10 +110,10 @@ const ACTIONS = Object.freeze({
   sendPmToMaintenance: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
   sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
-  // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js).
-  saveFleetRules: { roles: REORDER_ROLES, screen: 'checkIns' },
-  saveFleetUnit: { roles: REORDER_ROLES, screen: 'checkIns' },
-  saveGarageTech: { roles: REORDER_ROLES, screen: 'checkIns' }
+  // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js). App only (logic.js APP_ONLY).
+  saveFleetRules: { roles: REORDER_ROLES, screen: 'fleetSetup' },
+  saveFleetUnit: { roles: REORDER_ROLES, screen: 'fleetSetup' },
+  saveGarageTech: { roles: REORDER_ROLES, screen: 'fleetSetup' }
 });
 
 const EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];

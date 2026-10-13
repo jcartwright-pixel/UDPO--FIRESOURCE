@@ -72,6 +72,23 @@ test('Over the Road and Driver Scorecard are never view only: they write no shee
   assert.equal(JSON.stringify(tabs), tabsBefore, 'nothing goes to the sheet');
 });
 
+// Joe 10/13 ("I want everything working"): Fleet Service Setup, Operational Assignments and Sheet Conflicts' Clear write no
+// sheet either, so they save with Daily Dispatch on and Driver Check-ins / Drivers still off.
+test('Fleet Service Setup, Operational Assignments and Clear on Sheet Conflicts are never view only', async () => {
+  await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
+  await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'new' }, true);
+  const c = await config();
+  assert.equal(c.screenOwners.checkIns || 'old', 'old');
+  assert.equal(c.screenOwners.drivers || 'old', 'old');
+  assert.equal((await applyAction(db(), MANAGER, { action: 'saveFleetRules', requestId: rid(), rules: { truckMiles: 20000 } }, tick)).ok, true);
+  assert.equal((await applyAction(db(), MANAGER, { action: 'saveOpsAssignment', requestId: rid(), assignment: 'Beckley', sequence: 5 }, tick)).ok, true);
+  const tabsBefore = JSON.stringify(tabs);
+  await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
+  assert.equal(JSON.stringify(tabs), tabsBefore, 'nothing goes to the sheet');
+  // A save on a screen whose sheet switch is off is still refused.
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: 'any-write-up', step: 'reviewed' }, tick), /Driver Check-ins is view only until it is switched on/);
+});
+
 test('with a screen on the new app the copy keeps running, and does not undo a save the sheet does not show yet', async () => {
   await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
   await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'new' }, true);

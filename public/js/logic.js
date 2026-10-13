@@ -384,7 +384,9 @@
     // Line Targets), Products, Safety Walkthrough and Plant Maintenance. Their saves stay in the new app.
     plant: 'Plant Operations' };
   // Screens with no sheet behind them: always saved in the new app, never on Go-Live Switches.
-  var APP_ONLY = { otr: 'Over the Road', scorecard: 'Driver Scorecard' };
+  // Joe 10/13 ("I want everything working"): also Fleet Service Setup (service rules, unit dates, garage technicians),
+  // Operational Assignments and Sheet Conflicts' Clear; they used to ride on a sheet switch and went view only with it off.
+  var APP_ONLY = { otr: 'Over the Road', scorecard: 'Driver Scorecard', fleetSetup: 'Fleet Service Setup', opsAssignments: 'Operational Assignments', conflicts: 'Sheet Conflicts' };
   function screenOwners(config) {
     var out = {}, set = (config && config.screenOwners) || {};
     Object.keys(SCREENS).forEach(function (k) { out[k] = 'old'; });
