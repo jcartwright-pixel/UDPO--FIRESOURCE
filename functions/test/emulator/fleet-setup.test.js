@@ -75,3 +75,17 @@ test('a DOT finished at the garage moves the DOT due date by the saved rule', as
   await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'DOT inspection', safe: true, signature: SIG }, now);
   assert.equal((await db().collection('fleetSetup').doc('900002').get()).data().dot_due, '2027-04-06');
 });
+
+test('each plant keeps its own rules and technicians (Joe 10/13); Uniontown stays as it was', async () => {
+  await applyAction(db(), MANAGER, { action: 'saveFleetRules', requestId: rid(), rules: { truckMiles: 18000 } });
+  await applyAction(db(), MANAGER, { action: 'saveFleetRules', requestId: rid(), facilityId: 'fac_charleston', rules: { truckMiles: 25000 } });
+  assert.equal((await db().collection('config').doc('fleetRules').get()).data().truckMiles, 18000, 'Uniontown keeps config/fleetRules');
+  assert.equal((await db().collection('config').doc('fleetRules_fac_charleston').get()).data().truckMiles, 25000);
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveFleetRules', requestId: rid(), facilityId: 'fac_nowhere', rules: { truckMiles: 25000 } }), /Unknown plant/);
+  const added = await applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'ADD', name: 'Branch Bob', loginId: '86420', facilityId: 'fac_charleston' });
+  assert.equal((await db().collection('garageTechs').doc(added.techId).get()).data().facility_id, 'fac_charleston');
+  const list = await garageCall(db(), { op: 'read', tokens: [] }, now);
+  assert.ok(!list.techs.some(t => t.id === added.techId), 'a Charleston technician is not on the Uniontown Garage Station');
+  const home = await applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'ADD', name: 'Home Hal' });
+  assert.equal((await db().collection('garageTechs').doc(home.techId).get()).data().facility_id, 'fac_uniontown', 'no plant sent = Uniontown');
+});

@@ -485,8 +485,11 @@ function validateSend(input, out) {
  *   saveGarageTech  garageTechs/<id>: add a technician, rename, turn on or off, and set or reset the login ID (5 or 6 digits, kept
  *                   only as a hash in garageLogins, never readable; two technicians cannot share one).
  * These stay in the new app (like the work orders made here): a later change to the same row in the sheet copy replaces them.
+ * Joe 10/13: each plant has its own (facilityId, a known plant, Uniontown when not sent): Uniontown's rules stay in
+ * config/fleetRules, another plant's in config/fleetRules_<plant>; a technician or unit row added here carries its plant.
  */
 const RULES_DOC = 'fleetRules';
+const rulesDocFor = (facilityId) => !facilityId || facilityId === FACILITY ? RULES_DOC : RULES_DOC + '_' + facilityId;
 const RULE_LIMITS = { truckMiles: [1000, 100000], truckWarnMiles: [0, 20000], trailerMonths: [1, 24], trailerHours: [50, 10000], trailerWarnDays: [0, 120],
   dotMonths: [1, 24], dotWarnDays: [0, 180], plateWarnDays: [0, 180] };
 // The rules in force: the saved ones over the current app's defaults (L.FLEET_RULES).
@@ -508,6 +511,8 @@ const numOrBlank = (v, label, max) => {
 
 function validateFleet(action, input, out) {
   input = input || {};
+  out.facilityId = text(input.facilityId, 60) || FACILITY;
+  if (!(L.PLANTS || []).some(p => p.id === out.facilityId)) throw SaveErr('BAD_REQUEST', 'Unknown plant');
   if (action === 'saveFleetRules') {
     out.rules = {};
     Object.keys(RULE_LIMITS).forEach(k => {
@@ -550,19 +555,19 @@ function validateFleet(action, input, out) {
 async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
   const result = { ok: true, requestId: req.requestId, runs: [] };
   if (req.action === 'saveFleetRules') {
-    const ref = db.collection('config').doc(RULES_DOC), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+    const ref = db.collection('config').doc(rulesDocFor(req.facilityId)), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
     const merged = fleetRules(Object.assign({}, before || {}, req.rules));
     if (merged.truckWarnMiles >= merged.truckMiles) throw SaveErr('BAD_REQUEST', 'The PM warning must be fewer miles than the PM interval');
     tx.set(ref, Object.assign({}, req.rules, { updatedAt: stamp, updatedBy: email }), { merge: true });
     result.rules = merged;
-    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: req.rules, result });
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId, before, after: req.rules, result });
     return result;
   }
   if (req.action === 'saveFleetUnit') {
     const ref = db.collection('fleetSetup').doc(docId(req.unit)), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
     const change = Object.assign({}, req.fields, { updated_at: stamp, updated_by: email, testEdited: true, editedAt: stamp });
     if (before) tx.update(ref, change);
-    else tx.set(ref, Object.assign({ unit: req.unit, unit_type: req.unitType, facility_id: FACILITY, createdInApp: true }, change));
+    else tx.set(ref, Object.assign({ unit: req.unit, unit_type: req.unitType, facility_id: req.facilityId || FACILITY, createdInApp: true }, change));
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, unit: req.unit, before, after: req.fields, result });
     return result;
   }
@@ -585,7 +590,7 @@ async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
     if (taken.exists && taken.data().techId !== id) throw SaveErr('BAD_REQUEST', 'Another technician already uses that login ID. Pick a different number.');
     if (mine.exists && mine.data().key && mine.data().key !== keyRef.id) oldKeyRef = db.collection(LOGINS).doc(mine.data().key);
   }
-  if (req.op === 'ADD') tx.set(ref, { tech_id: id, name: req.name, active: 'YES', facility_id: FACILITY, created_at: stamp, created_by: email, createdInApp: true });
+  if (req.op === 'ADD') tx.set(ref, { tech_id: id, name: req.name, active: 'YES', facility_id: req.facilityId || FACILITY, created_at: stamp, created_by: email, createdInApp: true });
   if (req.op === 'NAME') tx.update(ref, { name: req.name, updated_at: stamp, updated_by: email, testEdited: true });
   if (req.op === 'ACTIVE') tx.update(ref, { active: req.active ? 'YES' : 'NO', updated_at: stamp, updated_by: email, testEdited: true });
   if (keyRef) {
@@ -655,4 +660,4 @@ async function garageCall(db, input, now, caller) {
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, LOGINS };
+module.exports = { G, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, LOGINS };
