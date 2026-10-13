@@ -31,25 +31,20 @@
       <div class="title"><span class="eyebrow">Administration · Plant Setup</span><h1><span id="page-title">Product Sheet</span></h1></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <button type="button" id="add" data-top>Add Product</button>
-      <button type="button" id="reset" data-top>Starting List</button>
       <button type="button" id="edit-setup" data-top>Areas &amp; Groups</button>
-      <button type="button" id="template" data-top>Download Template</button>
+      <button type="button" id="template" data-top>Download Product List</button>
       <button type="button" id="upload" data-top>Upload</button>
       <input type="file" id="upload-file" accept=".xlsx,.xls,.csv,text/csv" hidden>
       <select id="group" class="pm-pick" aria-label="Group" title="Group" data-top></select>
-      <select id="area" class="pm-pick" aria-label="Area" title="Area" data-top></select>
+      <select id="area" class="pm-pick" aria-label="Machine" title="Machine" data-top></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
       <section class="qc-form pm-form" id="list-pane">
         <div class="qc-top"><h2 id="form-title">Products</h2><div class="hstats" id="hstats"></div><span class="qc-last" id="form-last"></span>
           <input type="search" id="find" placeholder="Find a product or SKU" aria-label="Find a product or SKU"></div>
-        <div class="pm-scroll">
-          <table class="loadout pm-table">
-            <colgroup><col style="width:20%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:7%"></colgroup>
-            <thead><tr><th>Product</th><th>SKU</th><th>UPC</th><th>Type</th><th>Group</th><th title="Full speed per minute">Full&nbsp;Speed /Min</th><th>Target %</th><th title="Lowest speed per minute">Lowest Speed</th><th title="Highest speed per minute">Highest Speed</th><th title="Days from the run date to the code date">Shelf Life Days</th><th></th></tr></thead>
-            <tbody id="rows"></tbody>
-          </table>
+        <div class="pm-scroll pm-sheet-scroll">
+          <table class="loadout pm-table pm-sheet" id="sheet"></table>
         </div>
       </section>
       <!-- Areas & Groups: the plant's machines (from Plant Operations), the areas it adds itself, and its group list. -->
@@ -66,19 +61,20 @@
         <div class="qc-top"><h2 id="preview-title">Upload</h2><div class="hstats" id="preview-stats"></div><span class="qc-last" id="preview-note"></span></div>
         <div class="pm-scroll">
           <table class="loadout pm-table pm-preview">
-            <colgroup><col style="width:15%"><col style="width:30%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:19%"></colgroup>
-            <thead><tr><th>Area</th><th>Product</th><th>SKU</th><th>Type</th><th>Group</th><th>Change</th></tr></thead>
+            <colgroup><col style="width:20%"><col style="width:26%"><col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:22%"></colgroup>
+            <thead><tr><th id="preview-where">Machines</th><th>Product</th><th>SKU</th><th>Type</th><th>Group</th><th>Change</th></tr></thead>
             <tbody id="preview-rows"></tbody>
           </table>
         </div>
         <div class="pm-acts"><button type="button" class="rp-btn" id="preview-cancel">Cancel</button><button type="button" class="rp-btn primary" id="preview-save">Save Upload</button></div>
       </section>
-      <datalist id="group-list"></datalist>
-      <!-- Joe 10/12: the rows are for reading; the Edit button before a product opens its Edit panel, which holds every field (more go in FIELDS). -->
+      <!-- Joe 10/12: the rows are for reading; the Edit button before a product opens its Edit panel, which holds every field. Joe 10/13:
+           the panel also has a box for each machine and each machine's own speeds. -->
       <div class="pm-edit-back" id="edit-back" hidden>
-        <section class="pm-edit" id="edit-pane" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+        <section class="pm-edit pm-edit-wide" id="edit-pane" role="dialog" aria-modal="true" aria-labelledby="edit-title">
           <div class="pm-edit-head"><div><span class="eyebrow" id="edit-where"></span><h2 id="edit-title">Edit Product</h2></div><button type="button" class="rp-btn primary" id="edit-close">Done</button></div>
-          <div class="pm-edit-grid" id="edit-fields"></div>
+          <div class="pm-edit-grid pm-edit-three" id="edit-fields"></div>
+          <div id="edit-machines"></div>
           <p class="pm-edit-note" id="edit-note"></p>
         </section>
       </div>
@@ -87,25 +83,30 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, shortDate } from './js/app.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, typesFrom, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv } from './js/products.js';
+    import { watchProducts, watchProductSetup, watchLoose, plantSetupOf, groupsOf, typesFrom, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv,
+      sheetRows, machineValues, shownValue, keyOf, sameList, SHARED_FIELDS, MACHINE_FIELDS, SHEET_HEAD, SHEET_TAIL, isChecked } from './js/products.js';
     import { savedText } from './js/autosave.js';
 
     // Joe 10/10: the products each machine runs are the product drop-down on the Quality check. Joe 10/11: products are plant by
-    // plant and area by area (a plant's machines plus the areas it adds itself, Uniontown's CASES and TANKER), each plant keeps its
-    // own groups (Milk, Drinks, TEA), and the list goes in with a template: Download Template, fill it in, Upload, check what it
-    // changes, Save Upload. A manager or administrator changes the lists; each box saves as it is left.
+    // plant (a plant's machines plus the areas it adds itself, Uniontown's CASES and TANKER), each plant keeps its own groups.
+    // Joe 10/13 (mock-up A): one sheet with every product of the plant, one line each, and a column for each machine with a check
+    // where the product runs on it. A check puts the product on that machine's Quality Check drop-down; taking it off takes it off
+    // there. Download Product List gives the whole list in the same shape (an X under each machine) and Upload takes it back. A
+    // manager or administrator changes the sheet; each box saves as it is left.
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const ALL_PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
     // Review item 31 (Joe 10/13): no plant drop-down inside a plant. The plant is ?plant= of the link, else the plant the screen
     // was opened from (this tab), else the person's first plant; the title names it ("Uniontown Product Sheet").
     const cameFrom = () => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } };
-    let setup = [], products = {}, changed = {}, own = [], person = null, app = {}, plant = params.get('plant') || cameFrom(), chosen = params.get('line') || '', group = '', find = '', note = '', armed = null, busy = Promise.resolve();
+    let setup = [], products = {}, changed = {}, own = [], looseDocs = [], person = null, app = {}, plant = params.get('plant') || cameFrom();
+    // The machine filter (the area drop-down before 10/13): '' all machines, an area id, or '-' for products on no machine.
+    let machineFilter = params.get('line') || '', group = '', find = '', note = '', armed = null, busy = Promise.resolve();
     let pane = 'list', draft = null, upload = null, setupRead = false, editing = null;
-    // An area being changed here shows its list as typed until the database has caught up.
-    const mine = {};
+    // Lists being changed here show as typed until the database has caught up (mine by area id, mineLoose by plant).
+    const mine = {}, mineLoose = {};
     const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
     const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
@@ -118,29 +119,29 @@
       return machines.concat(ownOf(p).areas.map(a => ({ id: a.id, name: a.name, machine: false })));
     }
     const listOf = (id) => mine[id] || products[id] || [];
-    function current() { const all = areas(); return all.find(a => a.id === chosen) || all[0] || null; }
+    const looseOf = (pid) => { const p = pid || plant; if (mineLoose[p]) return mineLoose[p]; const d = looseDocs.find(x => x.facilityId === p); return d && Array.isArray(d.products) ? d.products : []; };
+    const rowsOf = (pid) => sheetRows(areas(pid), listOf, looseOf(pid));
     const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
     const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
     const inGroup = (p) => !group || groupsOf(p).some(g => g.toUpperCase() === group.toUpperCase());
-    function setUrl() { history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (chosen ? '&line=' + encodeURIComponent(chosen) : '')); }
+    const show = (v) => escapeHtml(v === undefined || v === null ? '' : String(v));
+    const numText = (v) => String(v).replace(/\.0+$/, '');
+    function setUrl() { history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (machineFilter ? '&line=' + encodeURIComponent(machineFilter) : '')); }
 
     function drawTop() {
       const ps = plants();
       if (!ps.some(p => p.id === plant) && (person || !plant)) plant = ps[0].id;
       // Joe 10/12: "product sheet for Uniontown".
       document.getElementById('page-title').textContent = plantName(plant) + ' Product Sheet';
-      const all = areas(), line = current();
-      // The area asked for stays chosen until the machines have been read.
-      if (line && setupRead) chosen = line.id;
-      document.getElementById('area').innerHTML = all.map(a => opt(a.id, line ? line.id : '', a.name + ' (' + listOf(a.id).length + ')')).join('') || '<option value="">No areas</option>';
+      const all = areas(), rows = rowsOf();
+      if (setupRead && machineFilter && machineFilter !== '-' && !all.some(a => a.id === machineFilter)) machineFilter = '';
+      const none = rows.filter(r => !Object.keys(r.on).length).length;
+      document.getElementById('area').innerHTML = opt('', machineFilter, 'All machines') + all.map(a => opt(a.id, machineFilter, a.name + ' (' + listOf(a.id).length + ')')).join('') + opt('-', machineFilter, 'No machine (' + none + ')');
       const gs = ownOf().groups;
       if (group && !gs.some(g => g === group)) group = '';
       document.getElementById('group').innerHTML = opt('', group, 'All groups') + gs.map(g => opt(g, group, g)).join('');
-      document.getElementById('group-list').innerHTML = gs.map(g => '<option value="' + escapeHtml(g) + '">').join('');
       const ck = canSave(), st = L.screenState(app, 'plant');
-      document.getElementById('add').disabled = !ck || !line || pane !== 'list';
-      document.getElementById('reset').disabled = !ck || !line || !line.machine || pane !== 'list';
-      document.getElementById('reset').textContent = armed === chosen ? 'Press again' : 'Starting List';
+      document.getElementById('add').disabled = !ck || pane !== 'list';
       ['edit-setup', 'upload'].forEach(id => { document.getElementById(id).disabled = !ck || pane !== 'list'; });
       document.getElementById('template').disabled = pane !== 'list';
       ['group', 'area'].forEach(id => { document.getElementById(id).disabled = pane !== 'list'; });
@@ -149,87 +150,151 @@
       ['list', 'setup', 'preview'].forEach(p => { document.getElementById(p + '-pane').hidden = pane !== p; });
     }
 
+    // Header two lines: Product (stays put when the sheet slides sideways), its details, a green column per machine, the numbers.
     function render(force) {
       drawTop();
       if (pane === 'setup') return drawSetup(force);
       if (pane === 'preview') return drawPreview();
-      const all = areas(), line = current(), ck = canSave();
-      const total = all.reduce((n, a) => n + listOf(a.id).length, 0);
+      const all = areas(), ck = canSave(), rows = rowsOf();
       // Joe 10/10: the product name is what counts; some SKUs are wrong. A SKU given to more than one product at the plant is marked
       // to check (GV and Jersey both on 280305, for one), and the name is still what Quality saves.
       const bySku = {};
-      all.forEach(a => listOf(a.id).forEach(p => { const k = String(p.sku || '').trim(); if (k && p.name) (bySku[k] = bySku[k] || new Set()).add(p.name); }));
+      rows.forEach(r => { const k = String(r.p.sku || '').trim(); if (k) (bySku[k] = bySku[k] || new Set()).add(r.p.name); });
       const shared = (p) => { const k = String(p.sku || '').trim(), set = k && bySku[k]; return set && set.size > 1 ? [...set].filter(n => n !== p.name) : null; };
       const toCheck = Object.values(bySku).filter(x => x.size > 1).length;
-      document.getElementById('hstats').innerHTML = [['Areas', all.length, ''], ['Products', total, ''], ['SKUs to check', toCheck, toCheck ? 'warn' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.getElementById('foot').textContent = (ck ? 'Edit before a product opens its Edit panel; each box there saves as you leave it. A machine\'s list is the Product drop-down on its Quality Check, which also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
-      if (!line) { document.getElementById('form-title').textContent = plantName(plant) + ' Products'; document.getElementById('form-last').textContent = ''; document.getElementById('rows').innerHTML = '<tr><td colspan="11" class="empty">' + escapeHtml(plantName(plant)) + ' has no areas yet. Areas &amp; Groups adds one, or Upload adds them from the template.</td></tr>'; return; }
-      const c = changed[line.id];
-      document.getElementById('form-title').textContent = line.name + ' Products';
-      document.getElementById('form-last').textContent = c ? (c.uploaded ? 'Uploaded ' : 'Changed ') + when(c.updatedAt) + (c.updatedBy ? ' by ' + c.updatedBy : '') : line.machine ? 'Starting list (10/10)' : '';
+      document.getElementById('hstats').innerHTML = [['Machines', all.length, ''], ['Products', rows.length, ''], ['SKUs to check', toCheck, toCheck ? 'warn' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('foot').textContent = (ck ? 'One line per product. A check puts it on that machine\'s Quality Check drop-down; taking the check off takes it off there. Edit opens the product (each box saves as you leave it). The sheet slides sideways; the product name stays put. Orange numbers are different on each machine (Edit shows each one).' : 'View only. A manager or administrator changes the sheet.') + (note ? ' ' + note : '');
+      document.getElementById('form-title').textContent = plantName(plant) + ' Products';
+      const last = Object.values(changed).filter(c => all.some(a => a.id === c.operationId)).concat(looseDocs.filter(d => d.facilityId === plant)).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0];
+      document.getElementById('form-last').textContent = last ? (last.uploaded ? 'Uploaded ' : 'Changed ') + when(last.updatedAt) + (last.updatedBy ? ' by ' + last.updatedBy : '') : '';
       if (force === 'keep') return;
       const q = find.trim().toUpperCase();
-      // Joe 10/12: the rows only show the product; the Edit button before the name (or a double-click on the row) opens its Edit
-      // panel (review item 32, Joe 10/13: an Edit word button, not the ⋮ dots).
-      const show = (v) => escapeHtml(v === undefined || v === null ? '' : String(v));
+      const shown = rows.filter(r => (!q || (r.p.name + ' ' + (r.p.sku || '')).toUpperCase().indexOf(q) >= 0) && inGroup(r.p) &&
+        (!machineFilter || (machineFilter === '-' ? !Object.keys(r.on).length : !!r.on[machineFilter])));
+      const head = '<colgroup><col class="c-name">' + '<col class="c-sku"><col class="c-upc"><col class="c-type"><col class="c-group">' + all.map(() => '<col class="c-mach">').join('') +
+        '<col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num"><col class="c-rm"></colgroup>' +
+        '<thead><tr class="pm-band"><th class="pm-pin"></th><th colspan="4">Product</th><th class="pm-m" colspan="' + all.length + '">Machines · check each one it runs on</th><th colspan="6">Speeds and Targets</th></tr>' +
+        '<tr><th class="pm-pin">Product</th><th>SKU</th><th>UPC</th><th>Type</th><th>Group</th>' + all.map(a => '<th class="pm-m" data-area="' + escapeHtml(a.id) + '">' + escapeHtml(a.name) + '</th>').join('') +
+        '<th title="Full speed per minute">Full&nbsp;Speed /Min</th><th>Target %</th><th title="Lowest speed per minute">Lowest Speed</th><th title="Highest speed per minute">Highest Speed</th><th title="Days from the run date to the code date">Shelf Life Days</th><th></th></tr></thead>';
       const cell = (k, v, also) => '<td data-k="' + k + '"' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><span class="pm-val">' + show(v) + '</span>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
-      const num = (k, v) => '<td data-k="' + k + '" class="pm-num">' + show(v) + '</td>';
-      const rows = listOf(line.id).map((p, i) => [p, i]).filter(([p]) => (!q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0) && (!p.name || inGroup(p)));
-      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr data-row="' + i + '"><td data-k="name" class="pm-namecell">' + (ck ? '<button type="button" class="pm-editbtn" data-edit="' + i + '" aria-label="Edit ' + show(p.name || 'new product') + '">Edit</button>' : '') + '<span class="pm-name">' + (p.name ? show(p.name) : '<em>New product</em>') + '</span></td>' +
-        cell('sku', p.sku, shared(p)) + cell('upc', p.upc) + cell('mfgType', p.mfgType) + cell('productGroup', p.productGroup) +
-        num('ratePerMin', p.ratePerMin) + num('targetPct', p.targetPct) + num('minSpeed', p.minSpeed) + num('maxSpeed', p.maxSpeed) + num('shelfLifeDays', p.shelfLifeDays) +
-        '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + i + '">' + (armed === line.id + '|' + i ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
-        '<tr><td colspan="11" class="empty">' + (q || group ? 'No product matches' + (q ? ' ' + escapeHtml(find) : '') + (group ? ' in ' + escapeHtml(group) : '') + '.' : 'No products in ' + escapeHtml(line.name) + '. Add Product puts one in.') + '</td></tr>';
+      const num = (r, k) => {
+        const vals = machineValues(r, k, all).map(Number).filter(n => isFinite(n)), set = [...new Set(vals)];
+        if (set.length > 1) return '<td data-k="' + k + '" class="pm-num pm-vary" title="Different on each machine: Edit shows each one">' + numText(Math.min(...set)) + ' – ' + numText(Math.max(...set)) + '</td>';
+        return '<td data-k="' + k + '" class="pm-num">' + show(set.length ? set[0] : '') + '</td>';
+      };
+      const box = (r, a) => { const on = !!r.on[a.id]; return '<td class="pm-mc"><button type="button" class="pm-ck' + (on ? ' on' : '') + '" data-ck="' + escapeHtml(a.id) + '" aria-pressed="' + on + '" aria-label="' + escapeHtml(r.p.name) + ' on ' + escapeHtml(a.name) + '"' + (ck ? '' : ' disabled') + '>' + (on ? '✓' : '') + '</button></td>'; };
+      const body = shown.map(r => '<tr data-key="' + escapeHtml(r.key) + '"><td data-k="name" class="pm-namecell pm-pin">' + (ck ? '<button type="button" class="pm-editbtn" data-edit="1" aria-label="Edit ' + show(r.p.name) + '">Edit</button>' : '') + '<span class="pm-name">' + show(r.p.name) + '</span></td>' +
+        cell('sku', r.p.sku, shared(r.p)) + cell('upc', r.p.upc) + cell('mfgType', r.p.mfgType) + cell('productGroup', r.p.productGroup) +
+        all.map(a => box(r, a)).join('') + MACHINE_FIELDS.map(k => num(r, k)).join('') + '<td data-k="shelfLifeDays" class="pm-num">' + show(r.p.shelfLifeDays) + '</td>' +
+        '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="1">' + (armed === 'rm|' + r.key ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
+        '<tr><td colspan="' + (12 + all.length) + '" class="empty">' + (q || group || machineFilter ? 'No product matches' + (q ? ' ' + escapeHtml(find) : '') + (group ? ' in ' + escapeHtml(group) : '') + '.' : escapeHtml(plantName(plant)) + ' has no products yet. Add Product puts one in, or Upload loads the list.') + '</td></tr>';
+      const sc = document.querySelector('.pm-sheet-scroll'), left = sc.scrollLeft, top = sc.scrollTop;
+      document.getElementById('sheet').innerHTML = head + '<tbody id="rows">' + body + '</tbody>';
+      document.getElementById('sheet').style.width = (300 + 96 + 130 + 112 + 92 + 80 * all.length + 86 * 5 + 104) + 'px';
+      sc.scrollLeft = left; sc.scrollTop = top;
+      if (editing) drawEdit(true);
     }
 
-    // The area's whole list is saved each time; saves go one at a time.
-    function send(line, list, what) {
-      mine[line.id] = list;
+    /* ---------- Saves ---------- */
+    // One save per change: the machine lists it changes and, when they change, the plant's products on no machine.
+    function send(lists, loose, what) {
+      Object.keys(lists).forEach(id => { mine[id] = lists[id]; });
+      if (loose) mineLoose[plant] = loose;
       note = 'Saving…';
-      // A box just left is saved without drawing the list again, so the next box being typed in stays as it is.
       render(what ? true : 'keep');
-      const run = busy.then(() => save('saveMachineProducts', { operationId: line.id, products: list.filter(p => String(p.name || '').trim()).map(cleanProduct) }));
+      const pid = plant, areasOut = Object.keys(lists).map(id => ({ areaId: id, products: lists[id].map(cleanProduct) }));
+      const run = busy.then(() => save('saveProductSheet', Object.assign({ facilityId: pid, areas: areasOut }, loose ? { loose: loose.map(cleanProduct) } : {})));
       busy = run.catch(() => {});
-      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); editNote(savedText(), false); }, err => { const msg = line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'; note = 'Not saved.'; showError(msg); editNote(msg, true); delete mine[line.id]; }).then(() => render());
+      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); editNote(savedText(), false); },
+        err => { const msg = (what || 'The change') + ' not saved (' + (err.message || err) + '). Try it again.'; note = 'Not saved.'; showError(msg); editNote(msg, true); Object.keys(lists).forEach(id => { delete mine[id]; }); if (loose) delete mineLoose[pid]; })
+        .then(() => render(true));
     }
-    document.getElementById('rows').addEventListener('click', e => {
-      const ed = e.target.closest('[data-edit]');
-      if (ed) { openEdit(Number(ed.dataset.edit)); return; }
-      const b = e.target.closest('[data-remove]'), line = current();
-      if (!b || !line || !canSave()) return;
-      const key = line.id + '|' + b.dataset.remove;
-      if (armed !== key) { armed = key; render(true); setTimeout(() => { if (armed === key) { armed = null; render(true); } }, 7000); return; }
-      armed = null;
-      const list = listOf(line.id).slice(), gone = list.splice(Number(b.dataset.remove), 1)[0];
-      send(line, list, (gone && gone.name || 'Product') + ' removed');
+    const rowByKey = (k) => rowsOf().find(r => r.key === k) || null;
+    const nameOf = (a) => (areas().find(x => x.id === a) || { name: a }).name;
+    // The product as a machine keeps it: the details everyone shares, and that machine's own numbers.
+    function forMachine(r, numbersFrom) {
+      const out = {};
+      SHARED_FIELDS.forEach(k => { if (r.p[k] !== undefined && r.p[k] !== '') out[k] = r.p[k]; });
+      ['name', 'sku', 'mfgType', 'productGroup'].forEach(k => { if (out[k] === undefined) out[k] = ''; });
+      MACHINE_FIELDS.forEach(k => { if (numbersFrom && numbersFrom[k] !== undefined && numbersFrom[k] !== '') out[k] = numbersFrom[k]; });
+      return out;
+    }
+    // A check on or off: the product goes on the end of that machine's list (with the numbers it has on its other machines), or
+    // comes off it. A product taken off its last machine stays on the sheet, on no machine.
+    function toggle(r, areaId) {
+      const all = areas(), list = listOf(areaId).slice(), lists = {};
+      let loose = null;
+      if (r.on[areaId]) {
+        lists[areaId] = list.filter(p => keyOf(p.name) !== r.key);
+        if (Object.keys(r.on).length === 1) loose = looseOf().filter(p => keyOf(p.name) !== r.key).concat([forMachine(r, r.on[areaId])]);
+      } else {
+        const from = all.map(a => r.on[a.id]).find(Boolean) || r.loose;
+        lists[areaId] = list.concat([forMachine(r, from)]);
+        if (r.loose) loose = looseOf().filter(p => keyOf(p.name) !== r.key);
+      }
+      send(lists, loose, r.p.name + (r.on[areaId] ? ' off ' : ' on ') + nameOf(areaId));
+    }
+    // A detail every machine shares (name, SKU, UPC, type, group, shelf life) changes on every list the product is on.
+    function changeShared(r, k, v) {
+      const lists = {}, set = (p) => { const x = Object.assign({}, p); x[k] = v; return x; };
+      Object.keys(r.on).forEach(id => { lists[id] = listOf(id).map(p => keyOf(p.name) === r.key ? set(p) : p); });
+      const loose = r.loose ? looseOf().map(p => keyOf(p.name) === r.key ? set(p) : p) : null;
+      return send(lists, loose);
+    }
+    // A speed or target changes on one machine only (or on the product itself while it runs on no machine).
+    function changeNumber(r, areaId, k, v) {
+      const set = (p) => { const x = Object.assign({}, p); x[k] = v; return x; };
+      if (areaId) return send({ [areaId]: listOf(areaId).map(p => keyOf(p.name) === r.key ? set(p) : p) }, null);
+      return send({}, looseOf().map(p => keyOf(p.name) === r.key ? set(p) : p));
+    }
+    function removeRow(r) {
+      const lists = {};
+      Object.keys(r.on).forEach(id => { lists[id] = listOf(id).filter(p => keyOf(p.name) !== r.key); });
+      send(lists, r.loose ? looseOf().filter(p => keyOf(p.name) !== r.key) : null, r.p.name + ' removed');
+    }
+
+    document.getElementById('sheet').addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-key]');
+      if (!tr || !canSave()) return;
+      const r = rowByKey(tr.dataset.key);
+      if (!r) return;
+      if (e.target.closest('[data-edit]')) { openEdit(r.key); return; }
+      const c = e.target.closest('[data-ck]');
+      if (c) { toggle(r, c.dataset.ck); return; }
+      if (e.target.closest('[data-remove]')) {
+        const key = 'rm|' + r.key;
+        if (armed !== key) { armed = key; render(true); setTimeout(() => { if (armed === key) { armed = null; render(true); } }, 7000); return; }
+        armed = null; removeRow(r);
+      }
     });
+    document.getElementById('sheet').addEventListener('dblclick', e => { const tr = e.target.closest('tr[data-key]'); if (tr && !e.target.closest('button') && canSave()) openEdit(tr.dataset.key); });
     document.getElementById('add').addEventListener('click', () => {
-      const line = current();
-      if (!line || !canSave()) return;
+      if (!canSave()) return;
       find = ''; document.getElementById('find').value = '';
-      mine[line.id] = [{ name: '', sku: '', mfgType: '', productGroup: group }].concat(listOf(line.id));
-      render(true);
-      openEdit(0);
+      // A new product is saved once it has a name; it starts on no machine (or on the machine the sheet is showing).
+      editing = { key: '', draft: { name: '', sku: '', mfgType: '', productGroup: group }, areaId: machineFilter && machineFilter !== '-' ? machineFilter : '' };
+      openEditPanel();
     });
 
-    /* ---------- Edit panel (Joe 10/12) ---------- */
-    // Every field of FIELDS, one box each; Type and Group are drop-downs. Each box saves as it is left, like the rest of the plant
-    // screens. A new product is saved once it has a name; Done with no name drops it.
-    document.getElementById('rows').addEventListener('dblclick', e => { const r = e.target.closest('tr[data-row]'); if (r && !e.target.closest('button')) openEdit(Number(r.dataset.row)); });
+    /* ---------- Edit panel ---------- */
+    // Every shared field, one box each (Type and Group are drop-downs), a box for each machine, and each machine's speeds. Each box
+    // saves as it is left, like the rest of the plant screens. A new product is saved once it has a name; Done with no name drops it.
     function editNote(text, bad) { const n = document.getElementById('edit-note'); n.textContent = editing ? text : ''; n.classList.toggle('bad', !!bad); }
-    function openEdit(i) {
-      const line = current();
-      if (!line || !canSave() || !listOf(line.id)[i]) return;
-      editing = { areaId: line.id, i };
+    function openEdit(key) { if (!rowByKey(key)) return; editing = { key }; openEditPanel(); }
+    function openEditPanel() {
       drawEdit();
       document.getElementById('edit-back').hidden = false;
-      const first = document.querySelector('#edit-fields [data-k="' + (listOf(line.id)[i].name ? 'sku' : 'name') + '"]');
+      const first = document.querySelector('#edit-fields [data-k="' + (editing.key ? 'sku' : 'name') + '"]');
       if (first) first.focus();
     }
-    function drawEdit() {
-      const line = current(), p = listOf(editing.areaId)[editing.i] || {};
-      const all = [].concat(...areas().map(a => listOf(a.id)));
-      document.getElementById('edit-where').textContent = plantName(plant) + ' · ' + (line ? line.name : '');
+    const editRow = () => editing && editing.key ? rowByKey(editing.key) : null;
+    function drawEdit(again) {
+      const r = editRow(), p = r ? r.p : editing.draft, all = areas();
+      if (editing.key && !r) { closeEdit(); return; }
+      // Drawn again only while no box in it is being typed in.
+      if (again && document.activeElement && document.getElementById('edit-pane').contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+      const allProducts = [].concat(...all.map(a => listOf(a.id)), looseOf());
+      document.getElementById('edit-where').textContent = plantName(plant) + ' · Product Sheet';
       document.getElementById('edit-title').textContent = p.name ? 'Edit ' + p.name : 'New Product';
       const val = (k) => p[k] === undefined || p[k] === null ? '' : String(p[k]);
       const pick = (k, list, label) => {
@@ -238,38 +303,60 @@
         return '<select data-k="' + k + '" aria-label="' + label + '"><option value=""></option>' + opts.map(x => opt(x, opts.find(y => y.toUpperCase() === v.toUpperCase()) || '', x)).join('') + (k === 'mfgType' ? '<option value="__other__">Other (type it)</option>' : '') + '</select>' +
           (k === 'mfgType' ? '<input data-k="mfgType" class="pm-other" placeholder="Type it" maxlength="40" aria-label="Other type" hidden>' : '');
       };
-      const hint = { upc: '6 to 14 digits', ratePerMin: 'per minute', minSpeed: 'per minute', maxSpeed: 'per minute', shelfLifeDays: 'run date to code date', productGroup: 'Areas & Groups adds a group' };
-      document.getElementById('edit-fields').innerHTML = FIELDS.map(f => {
-        const box = f.k === 'mfgType' ? pick('mfgType', typesFrom(all), 'Type') : f.k === 'productGroup' ? pick('productGroup', ownOf().groups, 'Group')
+      const hint = { upc: '6 to 14 digits', shelfLifeDays: 'run date to code date' };
+      document.getElementById('edit-fields').innerHTML = FIELDS.filter(f => SHARED_FIELDS.indexOf(f.k) >= 0).map(f => {
+        const bx = f.k === 'mfgType' ? pick('mfgType', typesFrom(allProducts), 'Type') : f.k === 'productGroup' ? pick('productGroup', ownOf().groups, 'Group')
           : '<input data-k="' + f.k + '" value="' + escapeHtml(val(f.k)) + '" maxlength="120" aria-label="' + escapeHtml(f.head) + '"' + (f.num ? ' inputmode="decimal" class="pm-num"' : f.k === 'upc' ? ' inputmode="numeric"' : '') + (f.k === 'name' ? ' placeholder="Product name"' : '') + '>';
-        return '<label class="pm-field' + (f.k === 'name' ? ' wide' : '') + '"><span>' + escapeHtml(f.head) + (hint[f.k] ? ' <small>' + hint[f.k] + '</small>' : '') + '</span>' + box + '</label>';
+        return '<label class="pm-field' + (f.k === 'name' ? ' wide' : '') + '"><span>' + escapeHtml(f.head) + (hint[f.k] ? ' <small>' + hint[f.k] + '</small>' : '') + '</span>' + bx + '</label>';
       }).join('');
-      editNote(p.name ? 'Each box saves as you leave it.' : 'Type the product name first; it is saved once it has one.', false);
+      const on = r ? all.filter(a => r.on[a.id]) : [];
+      const numBox = (areaId, src, k, f) => '<td><input data-n="' + k + '" data-area="' + escapeHtml(areaId) + '" value="' + escapeHtml(src && src[k] !== undefined ? String(src[k]) : '') + '" inputmode="decimal" class="pm-num" aria-label="' + escapeHtml(f.head) + '"' + (r ? '' : ' disabled') + '></td>';
+      const heads = MACHINE_FIELDS.map(k => FIELDS.find(f => f.k === k));
+      const speedRows = on.length ? on.map(a => '<tr><th scope="row">' + escapeHtml(a.name) + '</th>' + heads.map(f => numBox(a.id, r.on[a.id], f.k, f)).join('') + '</tr>').join('')
+        : '<tr><th scope="row">No machine yet</th>' + heads.map(f => numBox('', r ? r.loose : null, f.k, f)).join('') + '</tr>';
+      document.getElementById('edit-machines').innerHTML = '<h3 class="pm-edit-sub">Machines it runs on <small>each check is that machine\'s Quality Check drop-down</small></h3>' +
+        '<div class="pm-mgrid">' + all.map(a => { const is = !!(r && r.on[a.id]); return '<button type="button" class="pm-mbox' + (is ? ' on' : '') + '" data-eck="' + escapeHtml(a.id) + '" aria-pressed="' + is + '"' + (r ? '' : ' disabled') + '><span class="pm-ck' + (is ? ' on' : '') + '">' + (is ? '✓' : '') + '</span>' + escapeHtml(a.name) + '</button>'; }).join('') + '</div>' +
+        '<table class="pm-speeds"><thead><tr><th>Machine</th>' + heads.map(f => '<th>' + escapeHtml(f.head.replace(' Per Min', ' /Min')) + '</th>').join('') + '</tr></thead><tbody>' + speedRows + '</tbody></table>';
+      // Drawn again (a save landed), the note keeps saying what the last save did.
+      if (!again) editNote(p.name ? 'Each box saves as you leave it.' : 'Type the product name first; it is saved once it has one.', false);
     }
-    document.getElementById('edit-fields').addEventListener('change', e => {
-      const box = e.target.closest('[data-k]'), line = current();
-      if (!box || !editing || !line || line.id !== editing.areaId || !canSave()) return;
+    document.getElementById('edit-pane').addEventListener('change', e => {
+      const box = e.target.closest('[data-k], [data-n]');
+      if (!box || !editing || !canSave()) return;
       if (box.tagName === 'SELECT' && box.value === '__other__') { const o = box.parentNode.querySelector('.pm-other'); o.hidden = false; o.focus(); return; }
       if (box.tagName === 'SELECT' && box.dataset.k === 'mfgType') { const o = box.parentNode.querySelector('.pm-other'); if (o) o.hidden = true; }
-      const list = listOf(line.id).map(p => Object.assign({}, p));
-      if (!list[editing.i]) return;
-      const v = box.value.trim();
-      if (box.dataset.k === 'name' && !v && list[editing.i].name) { box.value = list[editing.i].name; editNote('A product needs a name. Remove takes a product off the list.', true); return; }
-      if (box.dataset.k === 'name' && list.some((p, j) => j !== editing.i && String(p.name || '').trim().toUpperCase() === v.toUpperCase())) { editNote(v + ' is already on this list. Each product needs its own name.', true); return; }
-      list[editing.i][box.dataset.k] = v;
-      if (box.dataset.k === 'name') document.getElementById('edit-title').textContent = 'Edit ' + v;
+      const v = box.value.trim(), r = editRow();
+      if (box.dataset.n) { if (r) { editNote('Saving…', false); changeNumber(r, box.dataset.area, box.dataset.n, v); } return; }
+      const k = box.dataset.k, rows = rowsOf();
+      if (k === 'name') {
+        if (!v) { if (r) { box.value = r.p.name; editNote('A product needs a name. Remove takes a product off the sheet.', true); } return; }
+        if (rows.some(x => x.key === keyOf(v) && (!r || x.key !== r.key))) { editNote(v + ' is already on the sheet. Each product needs its own name.', true); return; }
+      }
+      if (!r) {
+        // The new product: saved (on no machine, or on the machine the sheet is showing) once it has a name.
+        editing.draft[k] = v;
+        if (!String(editing.draft.name || '').trim()) return;
+        const p = cleanProduct(editing.draft), key = keyOf(p.name);
+        editNote('Saving…', false);
+        if (editing.areaId) send({ [editing.areaId]: listOf(editing.areaId).concat([p]) }, null, p.name + ' added');
+        else send({}, looseOf().concat([p]), p.name + ' added');
+        editing = { key };
+        drawEdit();
+        return;
+      }
       editNote('Saving…', false);
-      // Kept as the server keeps it (numbers as numbers, blanks left off), so the saved list matches what is on screen.
-      send(line, list.map(p => String(p.name || '').trim() ? cleanProduct(p) : p));
+      changeShared(r, k, v);
+      if (k === 'name') { editing.key = keyOf(v); document.getElementById('edit-title').textContent = 'Edit ' + v; }
+    });
+    document.getElementById('edit-machines').addEventListener('click', e => {
+      const b = e.target.closest('[data-eck]'), r = editRow();
+      if (!b || !r || !canSave()) return;
+      editNote('Saving…', false);
+      toggle(r, b.dataset.eck);
+      drawEdit(true);
     });
     function closeEdit() {
       if (!editing) return;
-      // Leaving a box saves it first (the change event comes before the click).
-      const line = current(), list = editing && listOf(editing.areaId);
-      if (list && line && line.id === editing.areaId && list[editing.i] && !String(list[editing.i].name || '').trim()) {
-        mine[line.id] = list.filter((p, j) => j !== editing.i);
-        if (JSON.stringify(mine[line.id]) === JSON.stringify(products[line.id] || [])) delete mine[line.id];
-      }
       editing = null;
       document.getElementById('edit-back').hidden = true;
       render(true);
@@ -277,18 +364,8 @@
     document.getElementById('edit-close').addEventListener('click', closeEdit);
     document.getElementById('edit-back').addEventListener('click', e => { if (e.target.id === 'edit-back') closeEdit(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && editing) closeEdit(); });
-    document.getElementById('reset').addEventListener('click', async () => {
-      const line = current();
-      if (!line || !line.machine || !canSave()) return;
-      if (armed !== chosen) { armed = chosen; render(true); setTimeout(() => { if (armed === chosen) { armed = null; render(true); } }, 7000); return; }
-      armed = null;
-      const base = (await startingList()).lines.find(l => l.operationId === line.id);
-      // Never save an empty list because the starting file did not load.
-      if (!base) { showError('Could not load the starting list for ' + line.name + '; nothing was changed. Reload the page and try again.'); render(true); return; }
-      send(line, base.products.map(p => Object.assign({}, p)), 'Back on the starting list');
-    });
     document.getElementById('find').addEventListener('input', e => { find = e.target.value; render(true); });
-    document.getElementById('area').addEventListener('change', e => { chosen = e.target.value; armed = null; note = ''; setUrl(); render(true); });
+    document.getElementById('area').addEventListener('change', e => { machineFilter = e.target.value; armed = null; note = ''; setUrl(); render(true); });
     document.getElementById('group').addEventListener('change', e => { group = e.target.value; render(true); });
 
     /* ---------- Areas & Groups ---------- */
@@ -331,63 +408,146 @@
       render(true);
     });
 
-    /* ---------- Template and upload ---------- */
-    // Joe 10/11: one workbook, a tab per plant, every column (TEMPLATE without Plant: the tab is the plant). Upload takes it back the
-    // same way (a CSV with a Plant column still loads). The Excel reader is the same one Over the Road uses.
+    /* ---------- Download Product List and Upload ---------- */
+    // Joe 10/13: "download the complete list of products we have": one workbook, a tab per plant, a line per product with an X under
+    // each machine it runs on and the numbers after (the first machine's when they differ). Upload takes the same file back. A file
+    // in the layout before 10/13 (an Area column, a line per product per area) still loads. The Excel reader is Over the Road's.
     const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
     const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again')); document.head.appendChild(el); });
     const COLS = TEMPLATE.filter(t => t !== 'Plant');
-    const cellOf = (p, f) => p[f.k] === undefined || p[f.k] === null ? '' : p[f.k];
     const plantByName = (n) => { const t = String(n || '').trim().toUpperCase(); return ALL_PLANTS.find(p => p.name.toUpperCase() === t || p.id.toUpperCase() === t) || null; };
+    const SHEET_FIELDS = [['Product', 'name'], ['SKU', 'sku'], ['UPC', 'upc'], ['Type', 'mfgType'], ['Group', 'productGroup'], ['Full Speed Per Min', 'ratePerMin'], ['Target %', 'targetPct'], ['Lowest Speed', 'minSpeed'], ['Highest Speed', 'maxSpeed'], ['Shelf Life Days', 'shelfLifeDays']];
+    const today = () => { const d = new Date(); return shortDate(d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })); };
     document.getElementById('template').addEventListener('click', async () => {
       const b = document.getElementById('template');
       b.disabled = true; showError('');
       try {
-        const X = await loadXlsx(), wb = X.utils.book_new();
-        plants().forEach(pl => {
-          const rows = [COLS];
-          areas(pl.id).forEach(a => listOf(a.id).forEach(p => rows.push([a.name].concat(FIELDS.map(f => cellOf(p, f))))));
-          const ws = X.utils.aoa_to_sheet(rows);
-          ws['!cols'] = COLS.map(c => ({ wch: c === 'Product' ? 34 : c === 'Area' ? 18 : Math.max(10, c.length + 2) }));
+        const X = await loadXlsx(), wb = X.utils.book_new(), ps = plants();
+        ps.forEach(pl => {
+          const all = areas(pl.id), head = SHEET_HEAD.concat(all.map(a => a.name)).concat(SHEET_TAIL);
+          const out = [head].concat(rowsOf(pl.id).map(r => [r.p.name, r.p.sku || '', r.p.upc || '', r.p.mfgType || '', r.p.productGroup || ''].concat(all.map(a => r.on[a.id] ? 'X' : ''))
+            .concat(MACHINE_FIELDS.map(k => shownValue(r, k, all))).concat([r.p.shelfLifeDays === undefined ? '' : r.p.shelfLifeDays])));
+          const ws = X.utils.aoa_to_sheet(out);
+          ws['!cols'] = head.map((c, i) => ({ wch: i === 0 ? 34 : Math.max(8, c.length + 2) }));
           X.utils.book_append_sheet(wb, ws, pl.name.slice(0, 31));
         });
-        X.writeFile(wb, 'Products-Template.xlsx');
-        note = 'Template downloaded: a tab for each plant. Fill it in (keep the headings), then Upload.';
-      } catch (err) { showError('Template not made (' + (err.message || err) + ').'); }
+        X.writeFile(wb, (ps.length === 1 ? ps[0].name + '-' : '') + 'Product-List-' + today() + '.xlsx');
+        note = 'Product list downloaded: a tab for each plant, an X under each machine a product runs on. Change it (keep the headings), then Upload.';
+      } catch (err) { showError('Product list not made (' + (err.message || err) + ').'); }
       b.disabled = false; render(true);
     });
     document.getElementById('upload').addEventListener('click', () => { const f = document.getElementById('upload-file'); f.value = ''; f.click(); });
+    // A file's rows of cells with their heading row: [{plant, head, rows}] (a tab per plant, or a Plant column in a CSV).
     document.getElementById('upload-file').addEventListener('change', async e => {
       const f = e.target.files && e.target.files[0];
       if (!f) return;
       try {
-        let rows = [], has = {};
-        if (/\.csv$/i.test(f.name) || f.type === 'text/csv') {
-          const r = rowsByHeading(parseCsv(await f.text()));
-          rows = r.rows; has = r.has;
-        } else {
+        let tabs = [];
+        if (/\.csv$/i.test(f.name) || f.type === 'text/csv') tabs = [{ tab: '', cells: parseCsv(await f.text()) }];
+        else {
           const X = await loadXlsx(), wb = X.read(await f.arrayBuffer(), { type: 'array' });
-          wb.SheetNames.forEach(tab => {
-            const r = rowsByHeading(X.utils.sheet_to_json(wb.Sheets[tab], { header: 1, raw: false, defval: '', blankrows: false }));
-            if (!r.has.Area && !r.has.Product) return;
-            // The tab is the plant (a Plant column, when there is one, wins); a workbook with one unnamed tab is the plant shown.
-            const tp = plantByName(tab), only = wb.SheetNames.length === 1;
-            r.rows.forEach(x => { if (!x.Plant) x.Plant = tp ? tp.name : only ? plantName(plant) : tab; rows.push(x); });
-            Object.keys(r.has).forEach(k => { if (r.has[k]) has[k] = true; });
-            has.Plant = true;
-          });
+          tabs = wb.SheetNames.map(tab => ({ tab, cells: X.utils.sheet_to_json(wb.Sheets[tab], { header: 1, raw: false, defval: '', blankrows: false }), only: wb.SheetNames.length === 1 }));
         }
-        upload = readUpload(f.name, rows, has); pane = 'preview'; showError('');
+        const old = tabs.some(t => t.cells.length && t.cells[0].some(h => String(h).trim().toUpperCase() === 'AREA'));
+        upload = old ? readOldUpload(f.name, tabs) : readSheetUpload(f.name, tabs);
+        pane = 'preview'; showError('');
       } catch (err) { upload = null; showError(err.message || String(err)); }
       render(true);
     });
-    // Rows [{Plant, Area, Product, ...}] -> what they change, plant by plant: {plants: [{facilityId, name, areas, newGroups}], changes, skipped, problems}.
-    // A column the file leaves out keeps what each product has; so does a blank UPC, speed, Target % or shelf life (an old-layout
-    // file never wipes them). Plants the person cannot change are left out.
-    function readUpload(name, rows, has) {
-      if (!rows.length) throw new Error(name + ' has no product rows. Download Template gives the layout.');
+    // The tab is the plant (a Plant column, when there is one, wins); a workbook with one unnamed tab is the plant shown.
+    const plantOfTab = (t, cellPlant) => cellPlant ? plantByName(cellPlant) : plantByName(t.tab) || (t.only || !t.tab ? ALL_PLANTS.find(p => p.id === plant) : null);
+
+    // The Product List layout (Joe 10/13): per plant, each machine column in the file gets the products with an X, in the order the
+    // machine had them (new ones after, in the file's order); a product with no X is on no machine; a product not in the file comes
+    // off the sheet. A machine with no column stays as it is. A blank UPC, number or shelf life keeps what the product has, and a
+    // number the same as the one downloaded keeps each machine's own.
+    function readSheetUpload(name, tabs) {
+      const editable = plants().map(p => p.id), byPlant = {}, order = [], problems = [];
+      let skipped = 0, ignored = new Set();
+      tabs.forEach(t => {
+        if (!t.cells.length) return;
+        const head = t.cells[0].map(h => String(h == null ? '' : h).trim()), up = head.map(h => h.toUpperCase());
+        const at = (h) => up.indexOf(h.toUpperCase());
+        if (at('Product') < 0) { if (t.cells.length > 1) problems.push((t.tab || name) + ': no Product column. Download Product List gives the layout.'); return; }
+        t.cells.slice(1).forEach((cells, n) => {
+          const cellPlant = at('Plant') >= 0 ? String(cells[at('Plant')] || '').trim() : '';
+          const pl = plantOfTab(t, cellPlant);
+          if (!pl || editable.indexOf(pl.id) < 0) { skipped++; return; }
+          if (!byPlant[pl.id]) {
+            const all = areas(pl.id), cols = all.map(a => ({ a, i: at(a.name) })).filter(x => x.i >= 0);
+            head.forEach((h, i) => { if (h && h.toUpperCase() !== 'PLANT' && !SHEET_FIELDS.some(([x]) => x.toUpperCase() === h.toUpperCase()) && !cols.some(c => c.i === i)) ignored.add(h); });
+            byPlant[pl.id] = { pl, all, cols, has: {}, rows: [], seen: {} }; order.push(pl.id);
+            SHEET_FIELDS.forEach(([h]) => { byPlant[pl.id].has[h] = at(h) >= 0; });
+          }
+          const bp = byPlant[pl.id], get = (h) => at(h) >= 0 ? String(cells[at(h)] == null ? '' : cells[at(h)]).trim() : '';
+          const prod = get('Product');
+          if (!prod) { if (cells.some(c => String(c).trim())) problems.push(pl.name + ' row ' + (n + 2) + ': no Product.'); return; }
+          if (bp.seen[keyOf(prod)]) { problems.push(pl.name + ': ' + prod + ' is in the file twice.'); return; }
+          bp.seen[keyOf(prod)] = true;
+          bp.rows.push({ name: prod, get, on: bp.cols.filter(c => isChecked(cells[c.i])).map(c => c.a.id) });
+        });
+      });
+      const changes = [];
+      const out = order.map(pid => {
+        const bp = byPlant[pid], all = bp.all, was = rowsOf(pid), wasBy = {}, colIds = bp.cols.map(c => c.a.id);
+        was.forEach(r => { wasBy[r.key] = r; });
+        const lists = {}, loose = [];
+        colIds.forEach(id => { lists[id] = []; });
+        const added = {}; // area id -> products new to that machine, in the file's order
+        bp.rows.forEach(fr => {
+          const w = wasBy[keyOf(fr.name)], shared = {};
+          SHARED_FIELDS.forEach(k => {
+            const h = (SHEET_FIELDS.find(x => x[1] === k) || [])[0], v = k === 'name' ? fr.name : bp.has[h] ? fr.get(h) : '';
+            shared[k] = k !== 'name' && (!bp.has[h] || (v === '' && KEEP_FIELDS.indexOf(k) >= 0)) ? (w && w.p[k] !== undefined ? w.p[k] : '') : v;
+          });
+          const numberFor = (k, mine) => {
+            const h = SHEET_FIELDS.find(x => x[1] === k)[0], v = bp.has[h] ? fr.get(h) : '';
+            if (v === '' || (w && String(shownValue(w, k, all)) === v)) return mine && mine[k] !== undefined ? mine[k] : w ? shownValue(w, k, all) : '';
+            return v;
+          };
+          const make = (mine) => { const p = Object.assign({}, shared); MACHINE_FIELDS.forEach(k => { p[k] = numberFor(k, mine); }); return cleanProduct(p); };
+          // Machines without a column in the file keep the product as they had it.
+          const keptOn = w ? Object.keys(w.on).filter(id => colIds.indexOf(id) < 0) : [];
+          fr.on.forEach(id => { const p = make(w && w.on[id]); if (w && w.on[id]) lists[id].push(p); else (added[id] = added[id] || []).push(p); });
+          if (!fr.on.length && !keptOn.length) loose.push(make(w && w.loose));
+          const p = make(w ? (w.on[fr.on[0]] || w.loose) : null), before = w ? Object.keys(w.on).filter(id => colIds.indexOf(id) >= 0) : [];
+          const where = fr.on.concat(keptOn).map(id => (all.find(a => a.id === id) || { name: id }).name).join(', ') || 'No machine';
+          if (!w) { changes.push({ area: where, p, kind: 'add' }); return; }
+          const diff = SHARED_FIELDS.filter(k => k !== 'name' && String(w.p[k] === undefined ? '' : w.p[k]) !== String(p[k] === undefined ? '' : p[k]))
+            .map(k => FIELDS.find(f => f.k === k).head + ' ' + (w.p[k] === undefined || w.p[k] === '' ? 'blank' : w.p[k]) + ' → ' + (p[k] === undefined || p[k] === '' ? 'blank' : p[k]));
+          MACHINE_FIELDS.forEach(k => { const a = String(shownValue(w, k, all)), b = String(p[k] === undefined ? '' : p[k]); if (a !== b) diff.push(FIELDS.find(f => f.k === k).head + ' ' + (a || 'blank') + ' → ' + (b || 'blank')); });
+          const plus = fr.on.filter(id => before.indexOf(id) < 0), minus = before.filter(id => fr.on.indexOf(id) < 0);
+          if (plus.length) diff.push('On ' + plus.map(id => all.find(a => a.id === id).name).join(', '));
+          if (minus.length) diff.push('Off ' + minus.map(id => all.find(a => a.id === id).name).join(', '));
+          if (w.p.name !== fr.name) diff.unshift('Name ' + w.p.name + ' → ' + fr.name);
+          changes.push({ area: where, p, kind: diff.length ? 'change' : 'same', diff });
+        });
+        // The machine's order stays: the products it had first (in its order), then the new ones.
+        colIds.forEach(id => {
+          const order0 = listOf(id).map(p => keyOf(p.name)), pos = (p) => { const i = order0.indexOf(keyOf(p.name)); return i < 0 ? 1e9 : i; };
+          lists[id] = lists[id].sort((a, b) => pos(a) - pos(b)).concat(added[id] || []);
+        });
+        // Products on the sheet that are not in the file come off it (machines without a column in the file keep theirs).
+        was.forEach(r => { if (!bp.seen[r.key] && (r.loose || Object.keys(r.on).some(id => colIds.indexOf(id) >= 0))) changes.push({ area: Object.keys(r.on).map(id => (all.find(a => a.id === id) || { name: id }).name).join(', ') || 'No machine', p: r.p, kind: 'remove' }); });
+        return { facilityId: pid, name: bp.pl.name, lists, loose, label: bp.cols.length + ' machine column' + (bp.cols.length === 1 ? '' : 's') };
+      });
+      if (!out.length && !problems.length) throw new Error(name + ' has no product rows for ' + plants().map(p => p.name).join(' or ') + '. Download Product List gives the layout.');
+      return { file: name, sheet: true, plants: out, changes, skipped, problems, ignored: [...ignored] };
+    }
+
+    // The layout before 10/13: rows [{Plant, Area, Product, ...}], each area in the file gets the file's list.
+    function readOldUpload(name, tabs) {
+      const rows = [], has = {};
+      tabs.forEach(t => {
+        const r = rowsByHeading(t.cells);
+        if (!r.has.Area && !r.has.Product) return;
+        const tp = plantOfTab(t, '');
+        r.rows.forEach(x => { if (!x.Plant) x.Plant = tp ? tp.name : t.tab; rows.push(x); });
+        Object.keys(r.has).forEach(k => { if (r.has[k]) has[k] = true; });
+      });
+      if (!rows.length) throw new Error(name + ' has no product rows. Download Product List gives the layout.');
       const missing = ['Area', 'Product'].filter(t => !has[t]);
-      if (missing.length) throw new Error(name + ' is missing the ' + missing.join(' and ') + ' column' + (missing.length > 1 ? 's' : '') + '. Download Template gives the layout: ' + COLS.join(', ') + '.');
+      if (missing.length) throw new Error(name + ' is missing the ' + missing.join(' and ') + ' column' + (missing.length > 1 ? 's' : '') + '. Download Product List gives the layout.');
       const editable = plants().map(p => p.id), byPlant = {}, order = [], problems = [], changes = [];
       let skipped = 0;
       rows.forEach((r, n) => {
@@ -436,27 +596,36 @@
         return { facilityId: pid, name: bp.pl.name, areas: list, newGroups: [...newGroups] };
       });
       if (!out.length && !problems.length) throw new Error(name + ' has no rows for ' + plants().map(p => p.name).join(' or ') + '.');
-      return { file: name, plants: out, changes, skipped, problems };
+      return { file: name, sheet: false, plants: out, changes, skipped, problems };
     }
     function drawPreview() {
       const u = upload, c = (k) => u.changes.filter(x => x.kind === k).length;
-      const allAreas = [].concat(...u.plants.map(p => p.areas)), newAreas = allAreas.filter(a => a.isNew).map(a => a.label), newGroups = [].concat(...u.plants.map(p => p.newGroups));
       document.getElementById('preview-title').textContent = 'Upload ' + u.file;
+      document.getElementById('preview-where').textContent = u.sheet ? 'Machines' : 'Area';
       document.getElementById('preview-stats').innerHTML = [['Added', c('add'), c('add') ? 'good' : ''], ['Changed', c('change'), c('change') ? 'warn' : ''], ['Removed', c('remove'), c('remove') ? 'bad' : ''], ['Same', c('same'), '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.getElementById('preview-note').textContent = [(u.plants.length > 1 ? u.plants.map(p => p.name).join(', ') + ': ' : '') + allAreas.length + ' area' + (allAreas.length === 1 ? '' : 's') + ' in the file; areas not in it stay as they are.',
-        newAreas.length ? 'New areas: ' + newAreas.join(', ') + '.' : '', newGroups.length ? 'New groups: ' + newGroups.join(', ') + '.' : '',
-        u.skipped ? u.skipped + ' row' + (u.skipped === 1 ? '' : 's') + ' for other plants left out.' : ''].filter(Boolean).join(' ');
+      let extra = [], nothing;
+      if (u.sheet) {
+        extra = [(u.plants.length > 1 ? u.plants.map(p => p.name + ': ' + p.label).join(', ') : u.plants.map(p => p.label).join('')) + ' in the file; machines not in it stay as they are.',
+          u.ignored.length ? 'Columns left out (not a machine here): ' + u.ignored.join(', ') + '.' : ''];
+        nothing = !u.changes.some(x => x.kind !== 'same');
+      } else {
+        const allAreas = [].concat(...u.plants.map(p => p.areas)), newAreas = allAreas.filter(a => a.isNew).map(a => a.label), newGroups = [].concat(...u.plants.map(p => p.newGroups));
+        extra = [(u.plants.length > 1 ? u.plants.map(p => p.name).join(', ') + ': ' : '') + allAreas.length + ' area' + (allAreas.length === 1 ? '' : 's') + ' in the file; areas not in it stay as they are.',
+          newAreas.length ? 'New areas: ' + newAreas.join(', ') + '.' : '', newGroups.length ? 'New groups: ' + newGroups.join(', ') + '.' : ''];
+        nothing = !u.changes.some(x => x.kind !== 'same') && !newAreas.length && !newGroups.length;
+      }
+      document.getElementById('preview-note').textContent = extra.concat([u.skipped ? u.skipped + ' row' + (u.skipped === 1 ? '' : 's') + ' for other plants left out.' : '']).filter(Boolean).join(' ');
       const word = { add: 'Added', change: 'Changed', remove: 'Removed', same: 'Same' };
       const rank = { remove: 0, change: 1, add: 2, same: 3 };
       const list = u.changes.slice().sort((a, b) => rank[a.kind] - rank[b.kind]);
       document.getElementById('preview-rows').innerHTML = u.problems.map(p => '<tr class="pm-bad"><td colspan="6">' + escapeHtml(p) + ' Fix the file and upload it again.</td></tr>').join('') +
         list.map(x => '<tr class="pm-' + x.kind + '"><td>' + escapeHtml(x.area) + (x.newArea ? ' <em>new</em>' : '') + '</td><td>' + escapeHtml(x.p.name) + '</td><td>' + escapeHtml(x.p.sku || '') + '</td><td>' + escapeHtml(x.p.mfgType || '') + '</td><td>' + escapeHtml(x.p.productGroup || '') + '</td><td><b>' + word[x.kind] + '</b>' + (x.diff && x.diff.length ? '<small>' + escapeHtml(x.diff.join(' · ')) + '</small>' : '') + '</td></tr>').join('');
-      const nothing = !u.changes.some(x => x.kind !== 'same') && !newAreas.length && !newGroups.length;
       const sv = document.getElementById('preview-save');
       sv.disabled = !canSave() || u.problems.length > 0 || nothing;
       sv.textContent = u.problems.length ? 'Fix the file first' : nothing ? 'Nothing to change' : 'Save Upload';
-      document.getElementById('foot').textContent = 'Nothing is saved until Save Upload. Each area in the file gets the file\'s list; a product not in the file is removed from that area. A blank UPC, speed, Target % or shelf life keeps what the product has.';
+      document.getElementById('foot').textContent = u.sheet ? 'Nothing is saved until Save Upload. Each machine column in the file gets the products with an X; a product with no X stays on the sheet on no machine, and a product not in the file comes off the sheet. A blank UPC, speed, Target % or shelf life keeps what the product has.'
+        : 'Nothing is saved until Save Upload. Each area in the file gets the file\'s list; a product not in the file is removed from that area. A blank UPC, speed, Target % or shelf life keeps what the product has.';
     }
     document.getElementById('preview-cancel').addEventListener('click', () => { pane = 'list'; upload = null; note = 'Upload cancelled; nothing was changed.'; showError(''); render(true); });
     // One save per plant in the file, one after the other; a plant that fails says so and the plants already saved stay saved.
@@ -465,8 +634,15 @@
       b.disabled = true; b.textContent = 'Saving…';
       for (const pl of upload.plants) {
         try {
-          const res = await save('saveProductUpload', { facilityId: pl.facilityId, areas: pl.areas.map(a => ({ areaId: a.areaId, name: a.name, products: a.products })) });
-          pl.areas.forEach(a => { if (a.areaId) delete mine[a.areaId]; });
+          let res;
+          if (upload.sheet) {
+            res = await save('saveProductSheet', { facilityId: pl.facilityId, areas: Object.keys(pl.lists).map(id => ({ areaId: id, products: pl.lists[id] })), loose: pl.loose });
+            Object.keys(pl.lists).forEach(id => { delete mine[id]; }); delete mineLoose[pl.facilityId];
+            res = { message: 'Upload saved: ' + Object.values(pl.lists).reduce((n, l) => n + l.length, 0) + ' machine entries, ' + pl.loose.length + ' on no machine.' };
+          } else {
+            res = await save('saveProductUpload', { facilityId: pl.facilityId, areas: pl.areas.map(a => ({ areaId: a.areaId, name: a.name, products: a.products })) });
+            pl.areas.forEach(a => { if (a.areaId) delete mine[a.areaId]; });
+          }
           said.push((upload.plants.length > 1 ? pl.name + ': ' : '') + ((res && res.message) || 'Upload saved.'));
         } catch (err) {
           showError(pl.name + ' not saved (' + (err.message || err) + ').' + (said.length ? ' Saved: ' + said.join(' ') : ' Nothing was changed.'));
@@ -484,12 +660,16 @@
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(true); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupRead = true; render(true); }, fail('the machines'));
       watchProductSetup(db, s => { own = s; render(true); }, fail('the areas and groups'));
+      watchLoose(db, s => {
+        looseDocs = s;
+        Object.keys(mineLoose).forEach(pid => { const d = s.find(x => x.facilityId === pid); if (d && sameList(d.products, mineLoose[pid])) delete mineLoose[pid]; });
+        render(true);
+      }, fail('the products on no machine'));
       watchProducts(db, (p, c) => {
         products = p; changed = c;
-        // A saved list has caught up with what was typed here.
-        // A new line still without its product name stays on screen as typed (it is not saved until it has one).
-        Object.keys(mine).forEach(id => { if (mine[id].some(x => !String(x.name || '').trim())) return; if (c[id] && JSON.stringify(c[id].products) === JSON.stringify(mine[id].filter(x => String(x.name || '').trim()))) delete mine[id]; });
-        render();
+        // A saved list has caught up with what was changed here.
+        Object.keys(mine).forEach(id => { if (c[id] && sameList(c[id].products, mine[id])) delete mine[id]; });
+        render(true);
       }, fail('the products'));
     });
   </script>
