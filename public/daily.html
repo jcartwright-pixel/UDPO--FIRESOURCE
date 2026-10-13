@@ -376,7 +376,7 @@
       text: (row, kind) => row[kind] || '',
       pick: (row, kind, value) => kind === 'driver' ? pickDriver(row, value)
         : saveAssignment(getRuns, row.runDocId, row.day, kind, value.unit ? { id: '', unit: value.unit, text: value.unit } : { id: value, text: pickText(kind, value) }, render, ovr[row.id]),
-      editText, setEditing: (on) => { editing = on; }, render
+      editText, setEditing: (on) => { editing = on; }, render, warn: showError
     });
 
     // Current app: a double-click on a row (not on a cell that edits, a box or a button) flips RUNS / NO RUN.
