@@ -4,7 +4,7 @@
  * Copies the three Live week tabs and the Route, Driver, Equipment and Users master lists from the Google
  * Sheets into the new app's database. It only READS the sheets (read-only Google permission); it can never
  * change them. A row is rewritten only when it changed in the sheet since the last transfer, which keeps the
- * database bill small and lets a test save in the new app stay until that run changes in the sheet.
+ * database bill small and lets a test save in Operations stay until that run changes in the sheet.
  */
 'use strict';
 
@@ -476,11 +476,11 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   const configSnap = await configRef.get();
   const config = configSnap.exists ? configSnap.data() : {};
   const owners = config.screenOwners || {};
-  // Once a screen belongs to the new app its saves are the real record. The copy then keeps running only with
+  // Once a screen belongs to Operations its saves are the real record. The copy then keeps running only with
   // the write-back on (those saves reach the sheet, so reading the sheet back brings them in, and anything not
   // yet written is held below); with the write-back off it would overwrite them, so it stops.
   const moved = Object.keys(owners).filter(k => owners[k] === 'new');
-  if (moved.length && !(config.writeBack && config.writeBack.enabled === true)) throw new Error('Transfer stopped: ' + moved.join(', ') + ' already belongs to the new app and the write-back is off');
+  if (moved.length && !(config.writeBack && config.writeBack.enabled === true)) throw new Error('Transfer stopped: ' + moved.join(', ') + ' already belongs to Operations and the write-back is off');
   const readFrom = started.toISOString();
   // A new copy of the sheets (another Live workbook than last time) replaces every row, including rows the app changed
   // without writing them to the sheet (sandbox test saves with the write-back off), so nothing from the old copy lingers.

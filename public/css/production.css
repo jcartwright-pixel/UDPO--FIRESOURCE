@@ -5,12 +5,12 @@
 
 /* ---------- Line Targets ---------- */
 .lt-page .view { display: flex; flex-direction: column; min-height: 0; }
-.lt-page .qc-lines button span small { display: block; font-size: 14px; font-weight: 700; color: var(--muted); }
+.lt-page .qc-lines button span small { display: block; font-size: 16px; font-weight: 700; color: var(--muted); }
 .lt-page .qc-lines button.active span small { color: #d5e6f5; }
-.lt-note { margin: 10px 2px 0; font-size: 15px; font-weight: 600; color: var(--muted); line-height: 1.35; }
+.lt-note { margin: 10px 2px 0; font-size: 16px; font-weight: 600; color: var(--muted); line-height: 1.35; }
 .lt-form { display: flex; flex-direction: column; }
 .lt-form .qc-top { flex-wrap: nowrap; }
-.lt-pill { padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.lt-pill { padding: 4px 12px; border-radius: 999px; font-size: 16px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
 .lt-pill.auto { background: #e2f4ea; color: #1d6b3a; } .lt-pill.typed { background: #e8f0f8; color: var(--ud-blue); }
 .lt-counter { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; color: var(--muted); white-space: nowrap; }
 .lt-counter select { height: 38px; border: 2px solid #9fb3c8; border-radius: 9px; font: inherit; font-size: 16px; font-weight: 800; color: var(--ud-blue-dark); padding: 0 8px; background: #fff; }
@@ -30,7 +30,7 @@
 /* ---------- Line tablet ---------- */
 .lt-tablet .view { padding: 10px 20px 20px; }
 .lb-head { display: flex; align-items: flex-end; gap: 14px; }
-.lb-head .eyebrow { display: block; color: #5b6b7c; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.lb-head .eyebrow { display: block; color: #5b6b7c; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .lb-head h1 { margin: 2px 0 0; font-size: 38px; color: #0b2f55; }
 .lb-sub { color: #5b6b7c; font-size: 18px; margin-top: 2px; }
 .lb-live { margin-left: auto; background: #fff; border: 1px solid #c9d6e4; border-radius: 999px; padding: 8px 14px; font-size: 16px; font-weight: 800; white-space: nowrap; }
@@ -38,7 +38,7 @@
 .lb-live.auto { color: #1d7a3e; } .lb-live.typed { color: var(--ud-blue); }
 .lb-cards { display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 14px; margin-top: 12px; }
 .lb-card { background: #fff; border: 1px solid #c9d6e4; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.lb-card .eyebrow { font-size: 13px; font-weight: 800; letter-spacing: .08em; color: #5b6b7c; text-transform: uppercase; }
+.lb-card .eyebrow { font-size: 16px; font-weight: 800; letter-spacing: .08em; color: #5b6b7c; text-transform: uppercase; }
 .lb-prod { font-size: 26px; font-weight: 800; color: #0b2f55; line-height: 1.15; }
 .lb-big { font-size: 52px; font-weight: 900; line-height: 1; color: #0b2f55; }
 .lb-red { color: #c62828; }

@@ -57,7 +57,7 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
       await page.waitForSelector('#fields .sn-entry');
       // Joe 10/12: the page holds anything that happened on the shift, not only incidents and breakdowns. Review item 36 (Joe 10/13):
       // one screen, one name: the menu's Shift Notes. No empty Saved pill before anything is saved.
-      assert.deepEqual([await page.textContent('.head h1'), await page.title()], ['Shift Notes', 'Shift Notes · New Plant Operations']);
+      assert.deepEqual([await page.textContent('.head h1'), await page.title()], ['Shift Notes', 'Shift Notes · Operations']);
       assert.equal(await page.$eval('#form-last', e => e.textContent === '' ? getComputedStyle(e).display : 'has text'), 'none', 'no empty pill beside the count');
       // Joe 10/11: a Shift drop-down that starts on the shift now; no Save button (each box saves as it is left).
       // Joe 10/12: a Breakdown (the form it opens on) is recorded with the machine, when it went down, what happened, what

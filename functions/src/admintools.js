@@ -480,7 +480,7 @@ const JOBS = [
   { key: 'otr', label: 'Over-the-road run count', what: 'Counted as each Over the Road run is saved; no separate job is needed.', kind: 'fixed', every: 'With each save' },
   { key: 'homeOnce', label: 'Home summary rebuild (on demand)', what: 'Home reads the database directly, so its numbers are never older than the last copy. Refresh Home Summary Now copies the sheets at once.', kind: 'fixed', every: 'Not needed' },
   { key: 'fleetStartup', label: 'Fleet startup sync', what: 'Part of the nightly fleet sync.', kind: 'fixed', every: 'Not needed' },
-  { key: 'install', label: 'Legacy installation worker', what: 'The new app has no installation step.', kind: 'fixed', every: 'Not needed' },
+  { key: 'install', label: 'Legacy installation worker', what: 'The Operations app has no installation step.', kind: 'fixed', every: 'Not needed' },
   { key: 'dailyShift', label: 'Retired Daily Shift Report import', what: 'Retired in the current app; kept here read only.', kind: 'retired' },
   { key: 'dailyReference', label: 'Retired Daily Reference worker', what: 'Retired in the current app; kept here read only.', kind: 'retired' }
 ];

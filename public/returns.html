@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Product Returns · New Plant Operations</title>
+  <title>Product Returns · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -24,7 +24,7 @@
     .returns-page .rt-dialog { width: min(820px, 100%); max-height: 100%; overflow: auto; background: #fff; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; font-size: 16px; }
     .returns-page .rt-dhead { display: flex; align-items: flex-start; gap: 12px; }
     .returns-page .rt-dhead > div { flex: 1; min-width: 0; }
-    .returns-page .rt-dhead small { display: block; font-size: 14px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #5b6775; }
+    .returns-page .rt-dhead small { display: block; font-size: 16px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #5b6775; }
     .returns-page .rt-dhead h2 { margin: 2px 0 0; font-size: 24px; color: var(--ud-blue-dark, #053a66); }
     .returns-page .rt-dhead button { height: 40px; min-width: 100px; border-radius: 9px; border: 1px solid var(--ud-blue, #074c84); background: var(--ud-blue, #074c84); color: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
     .returns-page .rt-what { margin: 0; padding: 12px 14px; border-radius: 10px; background: #fdecec; color: #8a1c1c; font-size: 18px; font-weight: 800; white-space: pre-wrap; }
@@ -33,7 +33,7 @@
     .returns-page .rt-list dt { font-weight: 800; color: #3d4955; }
     .returns-page .rt-list dd { white-space: pre-wrap; overflow-wrap: anywhere; }
     .returns-page .rt-note { margin: 0; color: #5b6775; font-size: 16px; }
-    .returns-page .rt-mail { margin: 0; padding: 10px 12px; border-radius: 9px; background: #f4f6f8; font: 15px/1.4 ui-monospace, Consolas, monospace; white-space: pre-wrap; max-height: 320px; overflow: auto; }
+    .returns-page .rt-mail { margin: 0; padding: 10px 12px; border-radius: 9px; background: #f4f6f8; font: 16px/1.4 ui-monospace, Consolas, monospace; white-space: pre-wrap; max-height: 320px; overflow: auto; }
     .returns-page .rt-mail-head { margin: 4px 0 0; font-size: 16px; font-weight: 800; color: #3d4955; }
   </style>
 </head>
@@ -64,7 +64,7 @@
       <div class="hstats" id="hstats"></div>
       <button type="button" class="addwash-open" id="add-open" data-top hidden>+ Add Return</button>
       <div class="tabs mode" role="group" aria-label="Check Off or View Only"><button type="button" data-mode="check">Check Off</button><button type="button" data-mode="view">View Only</button></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -99,8 +99,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
-    import { collection, doc, getDoc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote, maySave } from './js/app.js';
+    import { collection, doc, getDoc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { watchProducts, OTHER } from './js/products.js';
 
@@ -113,7 +113,7 @@
     const returned = {};       // return id -> true while its RTA is saving, and a moment after (until the database shows it)
     const got = { runs: false, journal: false };
     const unsubs = [];
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
+    const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading');
 
     const list = () => P.returnsFor(runs, date, journal, queue).map(x => (returned[x.id] ? Object.assign({}, x, { pending: false }) : x));
 
@@ -174,7 +174,7 @@
         const snap = await getDoc(doc(db, 'mailCopies', emailId.replace(/[\/\s]+/g, '_').replace(/[^A-Za-z0-9_.@\-|]/g, '')));
         const m = snap.exists() ? snap.data() : null;
         box.innerHTML = m ? '<p class="rt-mail-head">The email as received ' + escapeHtml(dateTimeText(m.receivedAt)) + '</p><pre class="rt-mail">' + escapeHtml(m.body) + '</pre>'
-          : '<p class="rt-note">The original email was not kept in the new app (email ID ' + escapeHtml(emailId) + ').</p>';
+          : '<p class="rt-note">The original email was not kept in Operations (email ID ' + escapeHtml(emailId) + ').</p>';
       } catch (err) { box.innerHTML = '<p class="rt-note">Could not open the email: ' + escapeHtml(err.message) + '</p>'; }
     }
     function closeDetails() { openId = ''; mailShown = ''; modal.hidden = true; }

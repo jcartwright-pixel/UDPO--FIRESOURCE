@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Product Sheet · New Plant Operations</title>
+  <title>Product Sheet · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
@@ -83,8 +83,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, shortDate } from './js/app.js';
-    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, shortDate, optionTag, maySave, watchPerson } from './js/app.js';
+    import { collection, doc, onSnapshot } from './js/firebase.js';
     import { watchProducts, watchProductSetup, watchLoose, plantSetupOf, groupsOf, typesFrom, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv,
       sheetRows, machineValues, shownValue, keyOf, sameList, SHARED_FIELDS, MACHINE_FIELDS, SHEET_HEAD, SHEET_TAIL, isChecked } from './js/products.js';
     import { savedText } from './js/autosave.js';
@@ -107,7 +107,7 @@
     let pane = 'list', draft = null, upload = null, setupRead = false, editing = null;
     // Lists being changed here show as typed until the database has caught up (mine by area id, mineLoose by plant).
     const mine = {}, mineLoose = {};
-    const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+    const canSave = () => maySave(person, L.REORDER_ROLES, app, 'plant');
     const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
     const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
@@ -122,7 +122,7 @@
     const looseOf = (pid) => { const p = pid || plant; if (mineLoose[p]) return mineLoose[p]; const d = looseDocs.find(x => x.facilityId === p); return d && Array.isArray(d.products) ? d.products : []; };
     const rowsOf = (pid) => sheetRows(areas(pid), listOf, looseOf(pid));
     const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
-    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const opt = (v, cur, label) => optionTag(v, cur, label);
     const inGroup = (p) => !group || groupsOf(p).some(g => g.toUpperCase() === group.toUpperCase());
     const show = (v) => escapeHtml(v === undefined || v === null ? '' : String(v));
     const numText = (v) => String(v).replace(/\.0+$/, '');
@@ -527,8 +527,14 @@
           const order0 = listOf(id).map(p => keyOf(p.name)), pos = (p) => { const i = order0.indexOf(keyOf(p.name)); return i < 0 ? 1e9 : i; };
           lists[id] = lists[id].sort((a, b) => pos(a) - pos(b)).concat(added[id] || []);
         });
-        // Products on the sheet that are not in the file come off it (machines without a column in the file keep theirs).
-        was.forEach(r => { if (!bp.seen[r.key] && (r.loose || Object.keys(r.on).some(id => colIds.indexOf(id) >= 0))) changes.push({ area: Object.keys(r.on).map(id => (all.find(a => a.id === id) || { name: id }).name).join(', ') || 'No machine', p: r.p, kind: 'remove' }); });
+        // Products on the sheet that are not in the file come off the file's machines; one still on a machine the file has no column
+        // for stays on the sheet (a change: Off those machines), the rest come off the sheet.
+        was.forEach(r => {
+          if (bp.seen[r.key] || !(r.loose || Object.keys(r.on).some(id => colIds.indexOf(id) >= 0))) return;
+          const nameOf = (id) => (all.find(a => a.id === id) || { name: id }).name, ids = Object.keys(r.on), kept = ids.filter(id => colIds.indexOf(id) < 0);
+          if (kept.length) changes.push({ area: kept.map(nameOf).join(', '), p: r.p, kind: 'change', diff: ['Off ' + ids.filter(id => colIds.indexOf(id) >= 0).map(nameOf).join(', ')] });
+          else changes.push({ area: ids.map(nameOf).join(', ') || 'No machine', p: r.p, kind: 'remove' });
+        });
         return { facilityId: pid, name: bp.pl.name, lists, loose, label: bp.cols.length + ' machine column' + (bp.cols.length === 1 ? '' : 's') };
       });
       if (!out.length && !problems.length) throw new Error(name + ' has no product rows for ' + plants().map(p => p.name).join(' or ') + '. Download Product List gives the layout.');
@@ -624,7 +630,7 @@
       const sv = document.getElementById('preview-save');
       sv.disabled = !canSave() || u.problems.length > 0 || nothing;
       sv.textContent = u.problems.length ? 'Fix the file first' : nothing ? 'Nothing to change' : 'Save Upload';
-      document.getElementById('foot').textContent = u.sheet ? 'Nothing is saved until Save Upload. Each machine column in the file gets the products with an X; a product with no X stays on the sheet on no machine, and a product not in the file comes off the sheet. A blank UPC, speed, Target % or shelf life keeps what the product has.'
+      document.getElementById('foot').textContent = u.sheet ? 'Nothing is saved until Save Upload. Each machine column in the file gets the products with an X; a product with no X stays on the sheet on no machine, and a product not in the file comes off the file\'s machines (off the sheet when it is on no other machine). Machines with no column in the file stay as they are. A blank UPC, speed, Target % or shelf life keeps what the product has.'
         : 'Nothing is saved until Save Upload. Each area in the file gets the file\'s list; a product not in the file is removed from that area. A blank UPC, speed, Target % or shelf life keeps what the product has.';
     }
     document.getElementById('preview-cancel').addEventListener('click', () => { pane = 'list'; upload = null; note = 'Upload cancelled; nothing was changed.'; showError(''); render(true); });
@@ -656,7 +662,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(true); });
+      watchPerson(db, user, p => { person = p; render(true); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(true); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupRead = true; render(true); }, fail('the machines'));
       watchProductSetup(db, s => { own = s; render(true); }, fail('the areas and groups'));

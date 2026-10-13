@@ -1,6 +1,7 @@
 // Joe 10/10: no Record or Save buttons on the plant side. Each box saves as it is left, with the time and who entered it, and
 // the boxes start empty again after the next Send Current Report, so no leftover reading goes out as if it were new.
-import { collection, query, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, query, orderBy, limit, onSnapshot } from './firebase.js';
+import { shortTime } from './app.js';
 
 // The round: everything entered since the last report was sent. cb gets the time of that report ('' = none sent yet) and the report.
 export function watchRound(db, cb) {
@@ -25,7 +26,7 @@ export function fillIn(action, save, id) {
   };
 }
 
-const at = (v) => { const t = typeof v === 'number' ? v : Date.parse(v || ''); return isFinite(t) && t ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
+const at = (v) => { const t = typeof v === 'number' ? v : Date.parse(v || ''); return isFinite(t) && t ? shortTime(t) : ''; };
 export const clockOf = at;
 export const savedText = () => 'Saved ' + at(Date.now());
 // True when a record belongs to the round that started at roundStart.

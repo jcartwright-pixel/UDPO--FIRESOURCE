@@ -359,6 +359,17 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
       assert.deepEqual(ms.errors, []);
       await ms.close();
     }
+    // Joe 10/13: a file with only some machine columns (his HTST list) sets just those machines. A product it leaves out comes off
+    // them but stays on the sheet while another machine still runs it (Changed, Off HTST #1), not Removed.
+    const htstBook = await admin.evaluate(() => { const X = window.XLSX, wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Product', 'SKU', 'HTST #1'], ['1% MILK PASTEURIZED', '997520', 'X']]), 'Uniontown'); return X.write(wb, { type: 'base64', bookType: 'xlsx' }); });
+    await admin.setInputFiles('#upload-file', { name: 'htst.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(htstBook, 'base64') });
+    await admin.waitForSelector('#preview-pane:not([hidden])');
+    const gvRow = await admin.$$eval('#preview-rows tr', (trs) => { const tr = trs.find(t => t.children[1] && t.children[1].textContent === 'GV 2% Gallon'); return tr ? [tr.className, tr.lastElementChild.textContent] : null; });
+    assert.deepEqual(gvRow, ['pm-change', 'ChangedOff HTST #1'], 'GV 2% Gallon still runs on other machines, so it only comes off HTST #1');
+    assert.equal((await admin.$$eval('#preview-stats div', d => d.map(x => x.textContent)))[0], '1Added');
+    await admin.click('#preview-save');
+    await waitDoc('plantProducts', 'ut_prod_htst_1', d => d.products.map(p => p.name).join('|') === '1% MILK PASTEURIZED');
+    await admin.waitForFunction(() => document.querySelector('#rows tr[data-key="GV 2% GALLON"] [data-ck="ut_prod_gallon_filler"].on') && !document.querySelector('#rows tr[data-key="GV 2% GALLON"] [data-ck="ut_prod_htst_1"].on'));
     // Quality follows the changed list at once.
     await page.click('[data-line="ut_prod_totes"]');
     await page.waitForFunction(() => document.getElementById('form-title').textContent === 'TOTES Quality Check');

@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Location Areas · New Plant Operations</title>
+  <title>Location Areas · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/safety.css">
   <script src="js/logic.js"></script>
@@ -46,8 +46,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, mayOpenBuilding } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, escapeHtml, showError, mayOpenBuilding, watchPerson } from './js/app.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { pickPlant, plantName, canSetUp, modeText, watchSetup } from './js/safety.js';
     import { mountRowDrag } from './js/row-drag.js';
 
@@ -147,14 +147,14 @@
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
-        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+      watchPerson(db, user, p => {
+        person = p;
         const ok = mayOpenBuilding(person);
         document.getElementById('locked').hidden = ok;
         document.getElementById('view').hidden = !ok;
         if (!ok) return;
         if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render(true);
-      });
+      }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(true); });
     });
   </script>

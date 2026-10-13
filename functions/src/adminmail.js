@@ -78,7 +78,7 @@ async function appMail(db, msg, deps) {
   const from = sender.from;
   log.from = from;
   if (!settings.sending) Object.assign(log, { status: 'BLOCKED', reason: 'Outbound email is turned off.' });
-  else if (!from) Object.assign(log, { status: 'HELD', reason: 'Email is not set up in the new app yet.' });
+  else if (!from) Object.assign(log, { status: 'HELD', reason: 'Email is not set up in Operations yet.' });
   else if (!to.length) Object.assign(log, { status: 'FAILED', reason: 'No email address to send to.' });
   else {
     try {

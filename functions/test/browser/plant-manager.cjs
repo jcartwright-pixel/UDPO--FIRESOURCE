@@ -136,7 +136,7 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
     await page.fill('#note', 'Short staffed on second shift');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'manager-report-1920.png'), scale: 'css' });
     await page.click('#send');
-    await page.waitForFunction(() => /Report saved\. Email is not set up in the new app yet/.test(document.getElementById('saved').textContent) && document.getElementById('modal').hidden);
+    await page.waitForFunction(() => /Report saved\. Email is not set up in Operations yet/.test(document.getElementById('saved').textContent) && document.getElementById('modal').hidden);
     const kept = (await db().collection('plantReports').get()).docs.map(x => x.data());
     assert.equal(kept.length, 1);
     assert.match(kept[0].text, new RegExp('^NOTE: Short staffed on second shift\\n\\nROUTES BEHIND \\(' + seed.behind + '\\)'));

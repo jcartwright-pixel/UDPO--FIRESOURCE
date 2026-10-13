@@ -1,6 +1,6 @@
 // Plant Maintenance (Joe 10/12: like the garage work orders, but for the plant's machinery): what Maintenance Center, Machinery,
 // Work Orders and PM Schedule read. The rules are pmaint-rules.js (shared with the server).
-import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, query, where, onSnapshot } from './firebase.js';
 
 const R = () => window.UDPlantMaint, L = () => window.UDLogic, U = () => window.UDPlant;
 const HISTORY_DAYS = 365;
