@@ -13,7 +13,12 @@ export const remember = (k, v) => { try { if (v) localStorage.setItem(k, JSON.st
 export async function resolveStation(kind, storeKey, call) {
   const mine = read(storeKey);
   if (mine && mine.key) {
-    const r = await call('check', { kind, key: mine.key, version: mine.version || '' });
+    // Joe 10/13: with no signal the tablet keeps the station it had (checked again once the signal is back).
+    let r;
+    try { r = await call('check', { kind, key: mine.key, version: mine.version || '' }); } catch (e) {
+      if (!navigator.onLine || /internal|unavailable|deadline|network|failed to fetch|offline/i.test(String(e && (e.code + ' ' + e.message)))) return { station: mine, offline: true };
+      throw e;
+    }
     if (r.ok) { remember(storeKey, r.station); return { station: r.station }; }
     remember(storeKey, null);
     return { needCode: true, message: r.message };
