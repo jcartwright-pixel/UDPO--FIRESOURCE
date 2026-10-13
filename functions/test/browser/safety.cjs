@@ -235,6 +235,8 @@ async function cameraShot(page, color) {
     // Fire Extinguishers: add one, check it, all Good.
     const ex = await openPage(browser, 1920, 1080, '/extinguishers.html?' + ADMIN);
     await ex.waitForSelector('#rows tr[data-id]');
+    // Review item 60 (Joe 10/13): the title's month reads like Oct 26.
+    assert.match(await ex.textContent('#title'), /^Fire Extinguishers · [A-Z][a-z]{2} \d\d$/);
     assert.match(await ex.textContent('#rows tr[data-id] td:nth-child(7)'), /DUE SOON/, 'annual service within 30 days is due soon');
     await ex.fill('#rows tr[data-new] input[data-k="tag"]', '02');
     await ex.fill('#rows tr[data-new] input[data-k="location"]', 'Break room');

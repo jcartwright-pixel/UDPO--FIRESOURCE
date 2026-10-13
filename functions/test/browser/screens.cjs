@@ -830,6 +830,10 @@ async function noScroll(page) {
     assert.equal(otrSaved[0].destination, 'SAL', 'the run counts in the By Date column picked for it');
     await otr.click('.tabs [data-view="dash"]');
     await otr.waitForSelector('.otr-week');
+    // Review items 16-17 (Joe 10/13): no Month Recap / OTR Routes Setup buttons under the tabs; dates read 10-8-26.
+    assert.equal(await otr.$$eval('#bar [data-go]', b => b.length), 0);
+    assert.match(await otr.textContent('#bar .hint'), /^\d{1,2}-\d{1,2}-\d\d · /);
+    assert.ok((await otr.$$eval('.otr-week small', s => s.map(x => x.textContent))).every(t => /^\d{1,2}-\d{1,2}-\d\d$/.test(t)));
     await otr.click('.tabs [data-view="report"]');
     await otr.waitForSelector('#otr-report table');
     assert.equal(await otr.$$eval('#otr-report thead tr:first-child th:not(.gap)', ths => ths.map(t => t.textContent).join(' ')), 'Trip Dec Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec', 'Month Recap: last December, then January to December');
@@ -845,6 +849,9 @@ async function noScroll(page) {
     // Driver Scorecard: the month board, a driver's misses, the year and Settings open with no errors; a manager changes a point value.
     const sc = await openPage(browser, 1920, 950, '/scorecard.html?testEmail=manager.test@uniteddairy.com');
     await sc.waitForSelector('.sc-board');
+    // Review items 18 and 60 (Joe 10/13): no empty "later" columns, and the month reads like Oct 26.
+    assert.deepEqual(await sc.$$eval('table.sc-board thead th', t => t.map(x => x.textContent)), ['#', 'Driver', 'Route', 'Score', 'Daily Check-in', 'Cases Out vs In', 'Clean Inspections', 'Attendance', 'Miles']);
+    assert.match(await sc.textContent('.sc-period'), /^[A-Z][a-z]{2} \d\d$/);
     await sc.click('.tabs [data-mode="year"]');
     await sc.waitForSelector('.sc-board');
     await sc.click('.tabs [data-mode="settings"]');

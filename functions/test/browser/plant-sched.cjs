@@ -58,7 +58,8 @@ async function shots(page, name, w) {
       await page.waitForFunction(() => /3 loads/.test((document.querySelector('[data-day="2026-10-08"]') || {}).textContent || ''));
       assert.equal(await page.textContent('.sc-wd'), 'SUN');
       assert.equal(await page.getAttribute('.sc-day', 'data-day'), '2026-09-27');
-      assert.match(await page.textContent('#range'), /October 2026/);
+      // Review item 60 (Joe 10/13): the month reads Oct 26.
+      assert.equal(await page.textContent('#range'), 'Oct 26');
       assert.match(await page.textContent('#hstats'), /6Loads4Days booked0Holidays/);
       // Joe 10/12: a legend at the top, and each load colored by who delivers it (Uniontown truck, Branch, Carrier).
       assert.deepEqual(await page.$$eval('#legend .sc-by', s => s.map(x => x.textContent)), ['Uniontown truck', 'Branch', 'Carrier']);

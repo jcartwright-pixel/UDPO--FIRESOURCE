@@ -72,7 +72,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, callServer, dateTimeText, serverText } from './js/app.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // Joe 10/10: "Any of the API keys that we mess with, it should be in the administration app for updating ... replace the key
@@ -144,7 +144,8 @@
       showError('');
       if (button) button.disabled = true;
       try { return await callServer('mocreo', fields); }
-      catch (e) { showError(e.message || String(e)); return null; }
+      // Review item 55 (Joe 10/13): never the raw "internal [0]"; a plain sentence like GPS Setup's.
+      catch (e) { showError(serverText(e, 'the MOCREO settings')); return null; }
       finally { if (button) button.disabled = false; }
     }
     $('save').onclick = async () => {

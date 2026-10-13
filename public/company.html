@@ -29,11 +29,12 @@
     <!-- Joe 10/10: the current app's all-plants home, for Administrators and the people he picks: every plant at a glance,
          then pick a plant. Someone who sees only one plant never comes here. -->
     <section class="co-hero">
-      <div><h1>Operations Overview</h1><p>Real-time status across all facilities. Keep your routes moving.</p></div>
+      <!-- Review item 19 (Joe 10/13): no filler line under the title. -->
+      <div><h1>Operations Overview</h1></div>
       <div class="co-date"><small>Today</small><b id="today">-</b></div>
     </section>
     <div class="notice error" id="error" hidden></div>
-    <section class="co-kpis" id="kpis"></section>
+    <!-- Review item 19 (Joe 10/13): the six top tiles repeated Uniontown's card, so they are gone; the plant cards stay. -->
     <section class="co-plants" id="plants"></section>
   </div>
 
@@ -67,18 +68,14 @@
       const plants = L.plantsFor(person);
       // Someone who sees one plant never lands here; if they open it, it shows their plant only.
       const u = plants.indexOf('fac_uniontown') >= 0 ? uniontown() : null;
-      const kpi = (label, value, sub, color) => '<div class="co-kpi" style="--accent:' + color + '"><span>' + label + '</span><b>' + value + '</b><small>' + sub + '</small></div>';
-      document.getElementById('kpis').innerHTML = kpi('Scheduled Loads', u ? u.total : 0, 'Today', '#0d6efd') + kpi('Loaded', u ? u.done + ' / ' + u.total : '0 / 0', 'Loadout complete today', '#0c9a4b') +
-        kpi('Loads Completed', u ? u.done : 0, 'Connected plants (Uniontown)', '#5b7fa6') + kpi('Currently Loading', u ? u.loading : 0, 'Active work', '#7a3ff2') +
-        kpi('Unloaded', u ? u.unloaded : 0, 'Completed returns', '#f38a00') + kpi('Waiting to Unload', u ? u.waiting : 0, 'Open arrivals', '#0b8fae');
       document.getElementById('plants').innerHTML = L.PLANTS.filter(p => plants.indexOf(p.id) >= 0).map(p => {
         // Joe 10/12: picking a plant opens its home with all its cards (Plant Distribution, Plant Production, ...); the
         // Plant Distribution card there opens the Manager Center.
         const live = p.id === 'fac_uniontown' && u, href = live ? 'index.html' : 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
         const head = '<header><i class="dot"></i><a href="' + href + '"><strong>' + escapeHtml(p.name) + '</strong></a><em class="' + (p.status === 'ACTIVE' ? 'on' : '') + '">' + p.status + '</em><span aria-hidden="true">&rarr;</span></header>';
         if (!live) {
-          return '<div class="co-plant planned" data-plant="' + p.id + '" data-card="' + href + '">' + head + '<div class="co-soon"><b>Being built</b><span>' + escapeHtml(p.name) + ' is not connected to the new app yet. Its numbers show here once its sheets are added.</span></div>' +
-            '<footer><span>Next Loadout</span><b>--:--</b><a href="' + href + '">View Details &rarr;</a></footer></div>';
+          // Review item 20 (Joe 10/13): a plant not connected yet is its title and one short "being built" line, not a big empty box.
+          return '<div class="co-plant planned" data-plant="' + p.id + '" data-card="' + href + '">' + head + '<p class="co-soon"><b>Being built</b> &middot; not connected to the new app yet</p></div>';
         }
         return '<div class="co-plant" data-plant="' + p.id + '" data-card="' + href + '">' + head + '<div class="co-grid">' +
           cell('Scheduled', u.total, '') + cell('Completed', u.done, 'good') + cell('Unloaded', u.unloaded, '') + cell('Loaded', u.done + ' / ' + u.total, '') +
