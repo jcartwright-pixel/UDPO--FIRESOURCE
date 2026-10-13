@@ -1878,3 +1878,6 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .trucks-page .tt-nogps { background: #fde3df; color: #a8321f; }
 .trucks-page tr.tt-road, .trucks-page tr.tt-stopped, .trucks-page tr.tt-yard, .trucks-page tr.tt-nosignal, .trucks-page tr.tt-nogps { background: none; color: inherit; }
 .trucks-page .empty a { font-weight: 800; }
+/* DVIR: the odometer filled from GPS says so under the box. */
+.dv-odo-note { display: block; font-size: 16px; color: #2e6b3a; font-weight: 600; min-height: 0; }
+.dv-odo-note:empty { display: none; }

@@ -83,3 +83,24 @@ test('an off unit says why in words: its status, or for an ACTIVE truck or trail
   const off = L.offUnitLoads(runs, [{ id: 'veh_trailer_t_10308', unit: 'T-10308', type: 'TRAILER', status: 'ACTIVE', sourcePresent: false }], '2026-10-11');
   assert.deepEqual(off.map(x => [x.unit, x.why, x.route]), [['T-10308', 'NOT ON THE FLEET LIST', '909_1']]);
 });
+
+// Joe 10/13: miles and reefer hours from Verizon Connect Fleet (gpsTrucks) next to the drivers' DVIR odometers.
+test('GPS readings: the newer of the DVIR and GPS odometers is miles now; a trailer\'s GPS hours replace typed hours', () => {
+  const odometers = [{ unit: '223893', miles: '114,500', date: '2026-10-09', at: '2026-10-09T10:00:00Z' }, { unit: '223894', miles: 50000, date: '2026-10-10', at: '2026-10-10T12:00:00Z' }];
+  const gps = [{ tag: '223893', odometerMiles: 114720.6, engineHours: 9000, lastReport: '2026-10-10T15:00:00.000Z' },
+    { tag: '223894', odometerMiles: 49990, lastReport: '2026-10-10T11:00:00.000Z' },
+    { tag: 'T-2893', odometerMiles: null, engineHours: 1950.4, lastReport: '2026-10-10T14:00:00.000Z' },
+    { tag: 'T-2894', odometerMiles: null, engineHours: 0, lastReport: '2026-10-10T14:00:00.000Z' }];
+  const read = L.latestReadings(odometers, gps);
+  assert.deepEqual([read['223893'].miles, read['223893'].source, read['223893'].date], [114721, 'GPS', '2026-10-10']);
+  assert.deepEqual([read['223894'].miles, read['223894'].source], [50000, 'DVIR'], 'an older GPS reading does not replace a newer DVIR');
+  const setup = [{ unit: '223893', last_service_miles: '100,000' }, { unit: 'T-2893', last_service_date: '2026-06-05', last_service_hours: '1000', current_hours: '1900' },
+    { unit: 'T-2894', last_service_date: '2026-06-05', current_hours: '700' }];
+  const { units: rows, items } = L.fleetDue(units, setup, read, [], null, today);
+  const row = (u) => rows.find(r => r.unit === u);
+  assert.deepEqual([row('223893').miles, row('223893').milesSource], [114721, 'GPS']);
+  assert.deepEqual([row('T-2893').currentHours, row('T-2893').hoursSource], [1950, 'GPS']);
+  assert.equal(items.find(i => i.unit === 'T-2893' && i.key === 'REEFER').now, 1950);
+  assert.deepEqual([row('T-2894').currentHours, row('T-2894').hoursSource], [700, ''], 'zero hours from Fleet keep the typed hours');
+  assert.equal(L.latestReadings([], [])['X'], undefined);
+});

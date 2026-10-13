@@ -141,3 +141,23 @@ test('a step kept on the tablet: checked by name and login ID when sent, and fou
   const wo = (await db().collection('workOrders').doc(started.job.id).get()).data();
   assert.deepEqual([wo.status, wo.signed_by, wo.minutes], ['DONE', 'JELLICK Tom', 29]);
 });
+
+// Joe 10/13: Fleet Service's miles and reefer hours also come from GPS. A PM done safe records the newer of the DVIR and GPS
+// odometers; a reefer service records the trailer's GPS hours.
+test('a PM or reefer service done safe records the GPS miles or hours when they are the newest', async () => {
+  const tom = await garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213' }, now());
+  const step = (fields, at) => garageCall(db(), Object.assign({ op: 'step', tokens: [tom.token], requestId: rid() }, fields), now(at));
+  const mgr = { email: 'manager.test@uniteddairy.com' };
+  await db().collection('odometers').doc('o3').set({ unit: '900002', miles: 98000, date: '2026-10-06', at: '2026-10-06T08:00:00Z' });
+  await db().collection('gpsTrucks').doc('900002').set({ tag: '900002', odometerMiles: 98123.4, engineHours: 9000, lastReport: '2026-10-06T13:55:00.000Z' });
+  await db().collection('gpsTrucks').doc('T-902').set({ tag: 'T-902', odometerMiles: null, engineHours: 5123.2, lastReport: '2026-10-06T13:50:00.000Z' });
+  const pm = await applyAction(db(), mgr, { action: 'sendToGarage', requestId: rid(), unit: '900002', unitType: 'TRUCK', serviceKey: 'PM' });
+  const reefer = await applyAction(db(), mgr, { action: 'sendToGarage', requestId: rid(), unit: 'T-902', unitType: 'TRAILER', serviceKey: 'REEFER' });
+  for (const id of [pm.workOrderId, reefer.workOrderId]) {
+    await step({ step: 'START', id });
+    await step({ step: 'DONE', id, fixed: id === pm.workOrderId ? 'Oil / PM service' : 'Repaired', safe: true, signature: SIG }, 25);
+  }
+  assert.equal((await db().collection('fleetSetup').doc('900002').get()).data().last_service_miles, '98123');
+  assert.equal((await db().collection('workOrders').doc(pm.workOrderId).get()).data().odometer, 98123);
+  assert.equal((await db().collection('fleetSetup').doc('T-902').get()).data().last_service_hours, '5123');
+});
