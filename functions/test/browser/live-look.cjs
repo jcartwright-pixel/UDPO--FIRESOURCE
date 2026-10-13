@@ -3,6 +3,8 @@
  * Sign-in cannot be scripted, so it shows the signed-in layout (with no numbers) by un-hiding it.
  * Prints the measurements, and a small JPEG of the page as base64 between LIVE-PICTURE markers.
  * Usage: node test/browser/live-look.cjs https://<project>.web.app
+ * npm run test:browser also runs it against the local hosting emulator (http://127.0.0.1:5000), review item 80 (Joe 10/13).
+ * phone-speed.cjs and last-transfer.cjs stay deploy-only (deploy.yml): they time and read the deployed sandbox itself.
  */
 'use strict';
 const { chromium } = require('playwright');

@@ -46,8 +46,10 @@ def band_picture(files):
         x += p.width + round(gap * k)
     return out
 
-base = Image.open(ROOT / 'app-icon' / 'icon-source.png').convert('RGBA')
-base_mask = Image.open(ROOT / 'app-icon' / 'icon-source-maskable.png').convert('RGBA')
+# The source pictures live in tools/icon-source, not in public/, so they are not uploaded to the site (review item 79, Joe 10/13).
+SOURCE = Path(__file__).resolve().parent / 'icon-source'
+base = Image.open(SOURCE / 'icon-source.png').convert('RGBA')
+base_mask = Image.open(SOURCE / 'icon-source-maskable.png').convert('RGBA')
 for name, files in STATIONS.items():
     icon = base.copy()
     ImageDraw.Draw(icon).rounded_rectangle(BAND, radius=26, fill=(255, 255, 255, 255))

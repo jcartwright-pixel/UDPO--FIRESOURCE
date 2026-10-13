@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Vacation Schedule · New Plant Operations</title>
+  <title>Vacation Schedule · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -119,7 +119,7 @@
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
     import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
     forScreen('vacations');
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
@@ -150,7 +150,7 @@
 
     function render() {
       const edit = canEdit();
-      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       document.getElementById('add').disabled = !edit;
       document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
       ['time', 'calendar', 'eligibility'].forEach(v => { document.getElementById('view-' + v).hidden = v !== view; });

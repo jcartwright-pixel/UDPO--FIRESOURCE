@@ -110,7 +110,7 @@ the production deploy runs `tools/sandbox-diagnostics.cjs check` and stops if an
   SECURITY_REVIEW.md       sign-in, roles, rules and write-back review, in plain words
   firestore.indexes.json   keeps the big cell maps out of the indexes
   functions/
-    index.js               transferEveryMinute (schedule), transferNow (admin), save (callable),
+    index.js               transferEveryMinute (schedule), save (callable),
                            writeBackOnSave (each save) and writeBackEveryMinute (retry)
     src/logic.js           shared dispatch rules (dates, 6 AM roll, load-day blocks, Daily/Weekly rows)
     src/model.js           collections, Live column -> field map, run IDs
@@ -124,7 +124,7 @@ the production deploy runs `tools/sandbox-diagnostics.cjs check` and stops if an
     test/unit, test/emulator, test/browser, test/fixtures/fake-sheets.js
   public/                  index.html (home), daily.html, weekly.html, drivers.html, checkins.html, conflicts.html, css/app.css,
                            js/app.js, js/edit.js (pickers, optimistic saves), js/logic.js (copy)
-  tools/sync-logic.cjs     copies functions/src/logic.js to public/js/logic.js
+  tools/sync-logic.cjs     copies the 8 shared rule files (logic.js, board-rules.js, ...) from functions/src to public/js
 ```
 
 Run the tests (Node 22 and Java 21 needed for the emulators):
@@ -151,7 +151,8 @@ On a workstation whose web proxy blocks the emulator's set-up of database trigge
 `UD_LOCAL_NO_TRIGGERS=1` in `functions/.env.local` (ignored by git) before `npm run test:browser`; GitHub's test
 run keeps the trigger.
 
-After changing `functions/src/logic.js` run `npm run sync-logic`; a test fails if the screens' copy differs.
+After changing a shared rule file in `functions/src` (logic, board-rules, otr-core, sc-core, plant-rules, pmaint-rules,
+production-rules, safety-rules) run `npm run sync-logic`; a test fails if a screens copy differs.
 
 Deploy: `.github/workflows/deploy.yml`, run by hand, sandbox first. Production only after Joe's
 release words for the new app; what production needs, who makes it and the safety stops are in `PRODUCTION.md`. Until the workflow is on `main`, a commit on the work branch whose message contains

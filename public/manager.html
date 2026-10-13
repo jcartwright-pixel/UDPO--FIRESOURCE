@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Manager Center · New Plant Operations</title>
+  <title>Manager Center · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -33,14 +33,14 @@
       <!-- Joe 10/10 (look B): a Reports button on Manager Center opens the Plant Scorecard; Shift Comparison, Day-of-Week Trends
            and the Plant Performance TV are on that screen. -->
       <a class="mc-repbtn" id="reports" href="reportcenter.html" title="Reports: every report in one place">Reports</a>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice ok" id="saved" hidden></div>
     <div class="view mc-shell">
       <section class="mc-grid" id="grid">
         <div class="mc-card mc-report" style="--accent:#c62828">
-          <div class="mc-bar"><span class="mc-ic">&#9993;</span><strong>Send Current Report</strong></div>
+          <div class="mc-bar"><strong>Send Current Report</strong></div>
           <small class="mc-desc">Emails the plant report to the Plant Managers group. Tap the preview to open the full report, edit it or add a note.</small>
           <button type="button" class="mc-preview" data-open-report aria-label="Open the full report">
             <span class="mc-subject" id="pv-subject">Loading the report…</span>
@@ -73,8 +73,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote, printInFrame, shortTime, maySave, watchPerson } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { watchRound } from './js/autosave.js';
     import { cardClicks } from './js/cards.js';
@@ -86,8 +86,8 @@
     const data = { sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
     let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null;
     let askReport = new URLSearchParams(location.search).get('report') === '1';
-    const canSend = () => L.hasRole(person, L.SAVE_ROLES) && L.screenState(app, 'plant').open;
-    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : 'None'; };
+    const canSend = () => maySave(person, L.SAVE_ROLES, app, 'plant');
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : 'None'; };
     const pct = (a, b) => b ? Math.min(100, Math.round(a / b * 100)) : 0;
 
     // One mini-card: its label, number, the line under it and (for loads) a bar; a tap opens that screen.
@@ -95,8 +95,9 @@
       return '<a class="mc-tile' + (kind ? ' ' + kind : '') + '" href="' + href + '" title="Open ' + escapeHtml(label) + '"><span>' + escapeHtml(label) + '</span><b' + (/[AP]M$|^None$/.test(String(n)) ? ' class="time"' : '') + '>' + escapeHtml(String(n)) +
         (unit ? '<small>' + escapeHtml(unit) + '</small>' : '') + '</b><i>' + escapeHtml(line || '') + '</i>' + (bar == null ? '' : '<u><s style="width:' + bar + '%"></s></u>') + '</a>';
     }
+    // Review item 57 (Joe 10/13): a card's heading is words only; the icon argument is no longer drawn.
     function card(icon, title, desc, href, tiles) {
-      return '<a class="mc-bar" href="' + href + '"><span class="mc-ic">' + icon + '</span><strong>' + escapeHtml(title) + '</strong><em>Open &rsaquo;</em></a><small class="mc-desc">' + escapeHtml(desc) + '</small><div class="mc-tiles">' + tiles.join('') + '</div>';
+      return '<a class="mc-bar" href="' + href + '"><strong>' + escapeHtml(title) + '</strong><em>Open</em></a><small class="mc-desc">' + escapeHtml(desc) + '</small><div class="mc-tiles">' + tiles.join('') + '</div>';
     }
 
     function build() {
@@ -238,7 +239,7 @@
         const to = (r.sentTo || []).join(', ');
         if (r.status === 'SENT') {
           ok.className = 'notice ok';
-          ok.textContent = r.testCopy ? 'Report emailed to you only (' + to + '), as a test. The Plant Managers group will get it once the new app runs the plant.' : 'Report emailed to ' + (r.groupName || 'Plant Managers') + ' (' + to + ').';
+          ok.textContent = r.testCopy ? 'Report emailed to you only (' + to + '), as a test. The Plant Managers group will get it once the Operations app runs the plant.' : 'Report emailed to ' + (r.groupName || 'Plant Managers') + ' (' + to + ').';
         } else {
           ok.className = 'notice error';
           ok.textContent = 'Report saved but not emailed. ' + (r.reason || '');
@@ -257,11 +258,7 @@
       setTimeout(() => { b.textContent = 'Copy'; }, 2000);
     };
     document.getElementById('print-report').onclick = () => {
-      const f = document.createElement('iframe');
-      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-      document.body.appendChild(f);
-      f.contentDocument.open(); f.contentDocument.write('<!doctype html><title>' + escapeHtml(report.subject) + '</title>' + U.reportHtml(report, reportNote())); f.contentDocument.close();
-      setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 1000); }, 300);
+      printInFrame('<!doctype html><title>' + escapeHtml(report.subject) + '</title>' + U.reportHtml(report, reportNote()), { wait: 300, removeAfter: 1000 });
     };
 
     requireSignIn(async (user) => {
@@ -270,7 +267,7 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       let timer = null;
       const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 50); };
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; later(); });
+      watchPerson(db, user, p => { person = p; later(); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; later(); });
       onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
       onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});

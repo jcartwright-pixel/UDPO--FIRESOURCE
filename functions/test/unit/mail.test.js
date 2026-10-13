@@ -77,7 +77,7 @@ test('report email: SENT with who it went to; the HTML is the current app layout
 test('report email: HELD without a sender; FAILED with a plain reason; nothing done twice', async () => {
   const held = fakeRef();
   assert.equal(await RM.mailReport(held, REPORT, { env: {} }), 'HELD');
-  assert.deepEqual(held.updates[0], { status: 'HELD', emailed: false, reason: 'Email is not set up in the new app yet.' });
+  assert.deepEqual(held.updates[0], { status: 'HELD', emailed: false, reason: 'Email is not set up in Operations yet.' });
   const failed = fakeRef();
   const err = new M.MailError('NOT_DELEGATED', 'x');
   assert.equal(await RM.mailReport(failed, REPORT, { env: { MAIL_FROM: 'joe@uniteddairy.com' }, sendMail: async () => { throw err; } }), 'FAILED');

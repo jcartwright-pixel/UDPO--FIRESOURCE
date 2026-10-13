@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Trailer Assignments · New Plant Operations</title>
+  <title>Trailer Assignments · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
   <script src="js/logic.js"></script>
@@ -47,8 +47,8 @@
   <datalist id="ta-units"></datalist>
 
   <script type="module">
-    import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, maySave, watchPerson } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
 
     // The current app's Mobile Plant "Trailer Assignments" (MobilePlant.html, view trailers): which trailer goes on each
@@ -63,7 +63,7 @@
     const DOWN = ['DOWN', 'OUT OF SERVICE', 'OOS', 'REPAIR'], OFF = DOWN.concat(['INACTIVE', 'OUT', 'DISABLED', 'UNAVAILABLE']);
     // A station tablet (Plant Station > Yard Services) may save by what Administration > People & Roles allows its account.
     let allowed = {};
-    const canLoad = () => (L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) || allowed.savePlantLoad === true) && L.screenState(app, 'plantLoading').open;
+    const canLoad = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading', allowed.savePlantLoad);
     const key = (v) => String(v || '').toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/[^A-Z0-9]/g, '');
     const tText = (v) => { const t = String(v || '').trim().toUpperCase().replace(/\s+/g, ''); const m = /^T?-?T?-?(\d+)$/.exec(t); return m ? 'T-' + m[1] : t; };
     const AREA_SUB = { TOTES: 'Totes', BOXING: 'Box', TANKER: 'Tanker' };
@@ -205,7 +205,7 @@
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); }, () => {});
+      watchPerson(db, user, p => { person = p; render(); }, { onError: () => {} });
       allowedSaves(['savePlantLoad']).then(a => { allowed = a; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(query(collection(db, 'equipment'), where('type', '==', 'TRAILER')), s => {

@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Garage Work Orders · New Plant Operations</title>
+  <title>Garage Work Orders · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -46,8 +46,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, hoursMinutesText } from './js/app.js';
+    import { collection, onSnapshot } from './js/firebase.js';
 
     // The current app's GARAGE WORK ORDERS tab (220_V7276_GarageFleetService.gs), read only. NEW, WORKING and PARTS are open.
     const STATUS = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
@@ -57,7 +57,7 @@
     // A stored time (UTC) shows its New York date, so a job finished after 8 p.m. is not dated tomorrow; a plain date shows as it is.
     const when = (s) => { const v = String(s || ''); if (/T\d/.test(v) && !isNaN(new Date(v))) return shortDate(v); const k = v.slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
     const yes = (v) => /^(Y|YES|TRUE)$/i.test(String(v || '').trim());
-    const hm = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' m' : m + ' m';
+    const hm = (m) => hoursMinutesText(m, { unit: 'm', pad: true });
 
     function render() {
       // Review item 44 (Joe 10/13): no count tiles; the filter buttons below already carry the counts.

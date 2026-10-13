@@ -3,12 +3,13 @@
  * Sign-in (United Dairy Google accounts only), the database connection, the one-call save, and sizing the
  * screen to the window so nothing ever scrolls.
  */
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
+// Firebase comes from js/firebase.js, the one place its version is written (review item 82, Joe 10/13).
 import {
-  getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signInWithCustomToken, signOut, GoogleAuthProvider, connectAuthEmulator
-} from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+  initializeApp,
+  getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signInWithCustomToken, signOut, GoogleAuthProvider, connectAuthEmulator,
+  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, doc, getDoc, onSnapshot,
+  getFunctions, httpsCallable, connectFunctionsEmulator
+} from './firebase.js';
 
 export const DOMAIN = 'uniteddairy.com';
 
@@ -18,10 +19,10 @@ document.querySelectorAll('.topbar').forEach(bar => {
   const brand = document.createElement('a');
   brand.className = 'brand';
   brand.href = 'index.html';
-  brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>New Plant Operations</strong><small>UNITED DAIRY &middot; ROUTE DISTRIBUTION</small></span>';
+  brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>Operations</strong><small>UNITED DAIRY &middot; ROUTE DISTRIBUTION</small></span>';
   bar.prepend(brand);
   // Polish 10: one small yellow "Test copy" badge in the header on the sandbox (and a local copy); it comes off by itself at go-live.
-  if (/sandbox|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) brand.insertAdjacentHTML('afterend', '<span class="test-copy-badge" title="This is the test copy: changes stay in the new app">Test copy</span>');
+  if (/sandbox|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) brand.insertAdjacentHTML('afterend', '<span class="test-copy-badge" title="This is the test copy: changes stay in Operations">Test copy</span>');
 });
 
 // Joe 10/10: Administration opens a screen inside its right-hand panel; there the screen shows without its own header and menu.
@@ -181,6 +182,7 @@ function addSideMenu() {
   if (!bar || document.body.classList.contains('phone') || screen.querySelector('.sidemenu')) return;
   const here = (location.pathname.split('/').pop() || 'index.html');
   // Joe 10/10 evening: the menu is words only, on every page (no pictures or icons).
+  // Review item 57 (Joe 10/13): no ▸ beside a section and no ↗ beside a link to the current app either.
   const svg = () => '';
   const nav = document.createElement('nav');
   nav.className = 'sidemenu';
@@ -191,7 +193,7 @@ function addSideMenu() {
   const link = ([label, href, icon]) => {
     const ext = /^https:/.test(href);
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
-      '>' + svg(icon) + '<span>' + label + '</span>' + (ext ? '<i aria-hidden="true">&#8599;</i>' : '') + '</a>';
+      '>' + svg(icon) + '<span>' + label + '</span>' + '</a>';
   };
   const side = sideFor(here), groups = side ? MENU.filter(([g]) => side.sections.indexOf(g) >= 0) : [];
   // Joe 10/10 evening: Back and Home sit in the header, not in the menu. The main screen (the all-plants Operations Overview)
@@ -203,7 +205,7 @@ function addSideMenu() {
     const live = p.status === 'ACTIVE', soon = 'soon.html?what=plant-' + p.id.replace(/^fac_/, '');
     // Joe 10/12: clicking the plant's name (a second tap on a tablet) opens that plant's home; hovering shows its sides.
     return '<div class="side-sec side-plant" data-plant="' + p.id + '" data-home="' + (live ? 'index.html' : soon) + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + p.name + '">' +
-      svg('plant-building-v1-560.webp') + '<span>' + p.name + '</span><i aria-hidden="true">&#9656;</i></button>' +
+      svg('plant-building-v1-560.webp') + '<span>' + p.name + '</span></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + p.name + '</div>' +
       SIDES.map(s => sideLink(s, live ? s.home : soon).replace('<a ', '<a data-plant="' + p.id + '" ')).join('') + '</div></div>';
   };
@@ -212,7 +214,7 @@ function addSideMenu() {
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
     (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
       '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
-      svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span><i aria-hidden="true">&#9656;</i></button>' +
+      svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join(''));
   // Joe 10/11: which version this is and whether it is the test copy, at the bottom of the menu (stamped by the deploy).
   nav.insertAdjacentHTML('beforeend', '<div class="side-version" title="The version of the app on this screen"></div>');
@@ -564,9 +566,18 @@ async function stationOf(user) {
   } catch (e) { return null; }
 }
 // The person a screen shows buttons for: the Users list entry, or a code-signed Plant Station as a plant employee.
-export function watchPerson(db, user, done) {
+// Review item 76 (Joe 10/13): every screen watches the signed-in person here. opts.withEmail puts the sign-in email on the
+// entry; opts.onError is called when the Users list cannot be read.
+export function watchPerson(db, user, done, opts) {
+  const o = opts || {};
   if (user.station) { done({ status: 'ACTIVE', roles: ['PLANT_EMPLOYEE'], name: user.station.name, email: '' }); return () => {}; }
-  return onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => done(s.exists() ? s.data() : null));
+  return onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => done(s.exists() ? (o.withEmail ? Object.assign({ email: user.email }, s.data()) : s.data()) : null), o.onError);
+}
+// Review item 76 (Joe 10/13): may this person save on this screen? One of the roles (or that one save given to them in
+// Administration, allowedSave === true), and the screen switched on in Go-Live Switches (app = config/app, screen = its key).
+export function maySave(person, roles, app, screen, allowedSave) {
+  const L = window.UDLogic;
+  return (L.hasRole(person, roles) || allowedSave === true) && L.screenState(app, screen).open;
 }
 // The Plant Station with no UD account: the station code signs this tablet in as that station only.
 export async function stationCodeSignIn(code) {
@@ -869,6 +880,41 @@ export function escapeHtml(value) {
   return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// Review item 76 (Joe 10/13): one drop-down choice, picked when it is the current value. opts.loose matches as text (a number
+// or a blank current still picks it).
+export function optionTag(value, current, label, opts) {
+  const on = opts && opts.loose ? String(value) === String(current || '') : value === current;
+  return '<option value="' + escapeHtml(value) + '"' + (on ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+}
+
+// Review item 76 (Joe 10/13): minutes as hours and minutes, blank for no number. Each screen keeps its own look: unit is the
+// word after the minutes ('min', or 'm'), short the word under an hour (the unit when left out), pad writes the minutes past
+// the hour with two digits (1 h 05), hoursFrom is where hours start (60 minutes when left out).
+export function hoursMinutesText(m, opts) {
+  const o = opts || {}, unit = o.unit || 'min';
+  if (m === null || m === undefined) return '';
+  return m >= (o.hoursFrom || 60) ? Math.floor(m / 60) + ' h ' + (o.pad ? String(m % 60).padStart(2, '0') : m % 60) + ' ' + unit : m + ' ' + (o.short || unit);
+}
+
+// Review item 76 (Joe 10/13): prints a page of HTML from a hidden frame, so the screen stays where it is. opts.id names the
+// frame (one left from an earlier print is taken away first), opts.wait is the pause before printing (150 ms when left out)
+// and opts.removeAfter takes the frame away that long after printing.
+export function printInFrame(html, opts) {
+  const o = opts || {};
+  const old = o.id && document.getElementById(o.id);
+  if (old) old.remove();
+  const f = document.createElement('iframe');
+  if (o.id) f.id = o.id;
+  f.setAttribute('aria-hidden', 'true');
+  f.tabIndex = -1;
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  const d = f.contentWindow.document;
+  d.open(); d.write(html); d.close();
+  setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); if (o.removeAfter) setTimeout(() => f.remove(), o.removeAfter); }, o.wait || 150);
+  return f;
+}
+
 // Joe 10/11 (polish 6): one short date everywhere, like 10-8-26 (month-day-two-digit year, no leading zeros, no time).
 // Takes a day key (2026-10-08), a time (ISO text, a number or a Date, read in plant time) or a sheet date (10/08/2026).
 export function shortDay(v) {
@@ -893,9 +939,9 @@ export function shortTime(v) {
 }
 
 // Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets a little smaller print, so names and values are
-// never cut off. Joe's later rule (10/10) is never to shrink table text to fit: it stops at 15px, and a cell that still does
+// never cut off. Joe's later rule (10/10) is never to shrink table text to fit: it stops at 16px (review item 56, Joe 10/13), and a cell that still does
 // not fit wraps onto a second line (.fit-wrap) instead. Headers keep their size. Runs after every redraw and on resize.
-const FIT_MIN = 15;
+const FIT_MIN = 16;
 let fitQueued = false;
 function tooWide(td) {
   // The text's laid-out width against the room inside the padding (a day cell keeps its padding for the arrow).

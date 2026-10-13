@@ -148,8 +148,7 @@
 
   <script type="module">
     import { start, escapeHtml, shortDate, showError, isUnitedDairy } from './js/app.js';
-    import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
-    import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { httpsCallable, doc, getDoc } from './js/firebase.js';
     import { addSpeak } from './js/speak.js';
     import { askRelease, lockStation } from './js/station-code.js';
     import { startQueue, send, waiting, onChange, keepRead, lastRead, isNoSignal } from './js/phone-queue.js';
@@ -455,7 +454,7 @@
     async function watchBoard() {
       if (boardWatch || !room) return;
       const { db } = await start();
-      const { collection, query, where, onSnapshot } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { collection, query, where, onSnapshot } = await import('./js/firebase.js');
       const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       const day = new Date(Date.now() - 6 * 3600000), sun = new Date(day.getFullYear(), day.getMonth(), day.getDate() - day.getDay());
       const weeks = [-7, 0, 7].map(n => iso(new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + n)));

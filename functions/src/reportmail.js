@@ -52,7 +52,7 @@ async function mailReport(ref, report, deps) {
   if (!report || report.status !== 'SENDING') return null;
   let sender = { from: String(env.MAIL_FROM || '').trim(), fromName: 'United Dairy Plant Operations' };
   if (!sender.from) {
-    await ref.update({ status: 'HELD', emailed: false, reason: 'Email is not set up in the new app yet.' });
+    await ref.update({ status: 'HELD', emailed: false, reason: 'Email is not set up in Operations yet.' });
     return 'HELD';
   }
   // Administration: the Sending switch, and the location's report group the sender picked (live mode only; the sandbox

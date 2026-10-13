@@ -155,7 +155,7 @@ export async function renderPeople(box) {
       '<label class="ap-field">Email identity<input type="email" id="p-email" maxlength="254" value="' + e(draft.email) + '"' + (isNew ? '' : ' readonly') + '></label>' +
       '<label class="ap-field">Assigned role<select id="p-role"' + (primary ? ' disabled' : '') + '>' + roleOpts + '</select></label>' +
       '<label class="ap-field">Account status<select id="p-status"' + (primary ? ' disabled' : '') + '><option value="ACTIVE"' + (draft.status === 'ACTIVE' ? ' selected' : '') + '>Enabled</option><option value="INACTIVE"' + (draft.status !== 'ACTIVE' ? ' selected' : '') + '>Disabled</option></select></label></div>' +
-      '<div class="ap-field"><b style="color:#0b3d6b;font-size:14px">Allowed locations</b><div class="ap-checks" id="p-plants"><label><input type="checkbox" value="*"' + (draft.facilities.indexOf('*') >= 0 ? ' checked' : '') + '> All locations</label>' +
+      '<div class="ap-field"><b style="color:#0b3d6b;font-size:16px">Allowed locations</b><div class="ap-checks" id="p-plants"><label><input type="checkbox" value="*"' + (draft.facilities.indexOf('*') >= 0 ? ' checked' : '') + '> All locations</label>' +
       L.PLANTS.map(p => '<label><input type="checkbox" value="' + p.id + '"' + (draft.facilities.indexOf(p.id) >= 0 ? ' checked' : '') + '> ' + e(p.name) + (p.status !== 'ACTIVE' ? ' (being built)' : '') + '</label>').join('') +
       '</div><span class="ap-help">All locations covers every plant, including ones added later. With none ticked, an Administrator sees every plant and anyone else sees Uniontown.</span></div>' +
       '<div><b style="color:#0b3d6b">Effective Rights</b>' + (dirty ? ' <span class="ap-chip warn">Unsaved preview</span>' : '') +
@@ -280,7 +280,7 @@ export async function renderRoleTemplates(box) {
   let data = null, role = 'SUPERVISOR', draft = [], dirty = false;
   box.innerHTML = '<div class="ap"><div class="ap-bar"><label class="ap-field" style="flex-direction:row;align-items:center;gap:8px">Role <select id="rt-role"></select></label>' +
     '<button type="button" class="ap-btn main" id="rt-save">Save Role Template</button><button type="button" class="ap-btn" id="rt-reload">Reload Templates</button></div>' +
-    '<div class="ap-msg" hidden></div><p class="ap-note">Define each role once. Individual exceptions stay on the person (People &amp; Roles). A role\'s template changes what its people may save in the new app.</p><div class="ap-scroll" id="rt-body"></div></div>';
+    '<div class="ap-msg" hidden></div><p class="ap-note">Define each role once. Individual exceptions stay on the person (People &amp; Roles). A role\'s template changes what its people may save in Operations.</p><div class="ap-scroll" id="rt-body"></div></div>';
   const $ = (s) => box.querySelector(s);
   const current = () => (data.templates[role] || data.defaults[role] || []).slice();
   function render() {
@@ -602,7 +602,7 @@ export async function renderReportRecipients(box) {
 const STATUS = { SENT: ['Sent', 'good'], BLOCKED: ['Stopped (off)', 'bad'], FAILED: ['Failed', 'bad'], HELD: ['Held', 'warn'] };
 export async function renderSentLog(box) {
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="sl-reload">Refresh</button><span id="sl-switch-wrap" style="display:flex;gap:8px;align-items:center"></span></div>' +
-    '<div class="ap-msg" hidden></div><p class="ap-note">Every email the new app sent, stopped, held, or failed. Newest first. On the sandbox an email goes only to the person who pressed the button.</p>' +
+    '<div class="ap-msg" hidden></div><p class="ap-note">Every email the Operations app sent, stopped, held, or failed. Newest first. On the sandbox an email goes only to the person who pressed the button.</p>' +
     '<div class="ap-scroll"><table class="ap-t"><thead><tr><th>When</th><th>Status</th><th>What</th><th>To</th><th>Subject</th></tr></thead><tbody id="sl-rows"></tbody></table></div></div>';
   const $ = (s) => box.querySelector(s);
   async function load() {

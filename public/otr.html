@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Over the Road · New Plant Operations</title>
+  <title>Over the Road · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
   <script src="js/otr-core.js"></script>
@@ -47,7 +47,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, save } from './js/app.js';
     import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
-    import { collection, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot, query, where } from './js/firebase.js';
 
     // The current app's Over the Road module (OverTheRoad.html, 221/222_V7276): every run of a route ticked for the report is one
     // mark for its destination on its delivery day. Counts come from the copied Live weeks; a count typed by hand wins.

@@ -47,7 +47,7 @@ async function kept(page, files) {
     if (!navigator.serviceWorker.controller) return false;
     const c = await caches.open('ud-offline-v1');
     for (const f of files) if (!(await c.match(f))) return false;
-    return (await Promise.all(['app', 'auth', 'firestore', 'functions'].map(n => c.match('https://www.gstatic.com/firebasejs/12.18.0/firebase-' + n + '.js')))).every(Boolean);
+    return !!(await c.match('js/firebase.js')) && (await Promise.all((await import('/js/firebase.js')).FIREBASE_FILES.map(u => c.match(u)))).every(Boolean);
   }, files, { timeout: 30000 }).catch(async () => { await page.reload(); await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 20000 }); await page.waitForTimeout(6000); });
 }
 

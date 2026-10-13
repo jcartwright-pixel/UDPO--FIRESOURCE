@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Route Editor · New Plant Operations</title>
+  <title>Route Editor · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -75,7 +75,7 @@
     import { mountRowDrag } from './js/row-drag.js';
     import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canReorder } from './js/edit.js';
     forScreen('routes');
-    import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, query, where, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']; // Joe 10/10: every week runs Sunday to Saturday
@@ -94,7 +94,7 @@
       jack: { field: 'forklift', title: 'Default Pallet Jack / Forklift', sub: 'Type the unit number. Blank clears the default. ' + KEYS, ph: 'unit' }
     };
     const OTHER = {
-      seq: ['Load Order', 'Pick a day, then drag a run by its route number to its place in the loadout, or use the up and down arrows. Saved as you move it.'],
+      seq: ['Load Order', 'Pick a day, then drag a whole run line to its place in the loadout (or Alt+Up / Alt+Down). Saved as you move it.'],
       names: ['Route Names', 'Every name a run has in Route Master. The route number is locked; click any white box, type, then press Enter or click away to save.'],
       many: ['Route Details', 'Run settings for every run shown (pick a route at the top for just its runs). Each box and list saves the moment you change it.'],
       days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the normal week. Edit Route opens every setting for a run. Holidays and one-week changes: Holiday Week Editor.'],
@@ -102,7 +102,7 @@
       recap: ['Route Recap', 'Current route and run summary.'],
       rules: ['Show / Hide Rules', 'The same rules as the current app. Each YES / NO is the Route Master setting; click to flip it. A blank cell counts as NO (a run with a blank Active is inactive). Only Weekly looks further: when Route Master\'s Show Weekly is blank, this week\'s Live row decides.']
     };
-    let onlyHidden = false, routes = [], liveRows = {}, liveWeek = '', liveStop = null, liveDb = null, view = 'days', pickRoute = '', pickRun = '', filter = 'ACTIVE', seqDay = 'mon', dragging = null, pressing = false, redrawLater = false, addMode = 'route';
+    let onlyHidden = false, routes = [], liveRows = {}, liveWeek = '', liveStop = null, liveDb = null, view = 'days', pickRoute = '', pickRun = '', filter = 'ACTIVE', seqDay = 'mon', pressing = false, redrawLater = false, addMode = 'route';
     const canEdit = () => canReorder();
     const isActive = (r) => L.masterActive(r);
     const shows = (r, f) => L.masterFlag(r, f);
@@ -145,11 +145,11 @@
 
     function render() {
       // A redraw in the middle of a drag would cancel it: wait until the drag ends.
-      if (dragging !== null || pressing) { redrawLater = true; return; }
+      if (pressing) { redrawLater = true; return; }
       redrawLater = false;
       watchLiveWeek();
       const edit = canEdit();
-      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       ['add-route', 'add-run'].forEach(id => { document.getElementById(id).disabled = !edit; });
       document.getElementById('add-run').disabled = !edit || !pickRoute;
       refreshSelectors();

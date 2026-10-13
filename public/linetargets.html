@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Line Targets · New Plant Operations</title>
+  <title>Line Targets · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/production.css">
@@ -59,8 +59,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, callServer, escapeHtml, showError, dateTimeText, goLiveNote } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, callServer, escapeHtml, showError, dateTimeText, goLiveNote, optionTag, maySave, watchPerson } from './js/app.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { watchProduction, fmt } from './js/production.js';
     import { savedText } from './js/autosave.js';
 
@@ -74,12 +74,12 @@
     let plant = params.get('plant') || '', chosen = params.get('line') || '', person = null, app = {}, data = null, note = '', busy = Promise.resolve(), stop = null, db = null;
     const mine = {};
     const NUM = { shelfLifeDays: 'Shelf life days', ratePerMin: 'Full speed per minute', targetPct: 'Target %', minSpeed: 'Lowest speed', maxSpeed: 'Highest speed' };
-    const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+    const canSave = () => maySave(person, L.REORDER_ROLES, app, 'plant');
     const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
     const lines = () => (data ? data.lines : []);
     const current = () => lines().find(l => l.operationId === chosen) || lines()[0] || null;
     const listOf = (id) => mine[id] || (data && data.products[id]) || [];
-    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const opt = (v, cur, label) => optionTag(v, cur, label);
     const setUrl = () => history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (chosen ? '&line=' + encodeURIComponent(chosen) : ''));
 
     function drawTop() {
@@ -225,11 +225,11 @@
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
-        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+      watchPerson(db, user, p => {
+        person = p;
         drawTop();
         if (!stop) follow(); else if (data) render(true);
-      });
+      }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (data) render(true); });
     });
   </script>

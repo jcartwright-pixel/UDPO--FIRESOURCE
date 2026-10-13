@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Driver Scorecard · New Plant Operations</title>
+  <title>Driver Scorecard · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
   <script src="js/sc-core.js"></script>
@@ -45,7 +45,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
     import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
-    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, onSnapshot } from './js/firebase.js';
 
     // The current app's Driver Scorecard (screen A, 224/225_V7279): one table of every driver for the month or the year.
     // Days come from every week the app keeps (the copied Live weeks, the weeks Publish moved on, and the current app's DISPATCH WEEK

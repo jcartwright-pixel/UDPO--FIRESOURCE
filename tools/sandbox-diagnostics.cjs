@@ -35,8 +35,9 @@ function leftovers(dir) {
 
 function add(dir) {
   const appJs = fs.readFileSync(path.join(dir, 'js', 'app.js'), 'utf8');
-  const version = (/firebasejs\/(\d+\.\d+\.\d+)\//.exec(appJs) || [])[1];
-  if (!version) throw new Error('Could not find the Firebase version in js/app.js');
+  // The Firebase version is written in js/firebase.js only (review item 82, Joe 10/13); the probe loads the same one.
+  const version = (/FIREBASE_VERSION = '(\d+\.\d+\.\d+)'/.exec(fs.readFileSync(path.join(dir, 'js', 'firebase.js'), 'utf8')) || [])[1];
+  if (!version) throw new Error('Could not find the Firebase version in js/firebase.js');
   // The drivers' public phone page (route.html) stays exactly as it is.
   const pages = htmlFiles(dir).filter(f => f !== 'diagnostics.html' && f !== 'route.html' && fs.readFileSync(path.join(dir, f), 'utf8').includes('js/app.js'));
   // The check opens Home, then every screen in menu order (as js/app.js lists them).
@@ -45,7 +46,7 @@ function add(dir) {
   const queue = order.filter(p => pages.indexOf(p) >= 0);
   fs.writeFileSync(path.join(dir, 'js', 'diag-probe.js'), fs.readFileSync(path.join(SRC, 'js', 'diag-probe.js'), 'utf8').split('__FIREBASE_VERSION__').join(version));
   fs.writeFileSync(path.join(dir, 'diagnostics.html'), fs.readFileSync(path.join(SRC, 'diagnostics.html'), 'utf8')
-    .split('__DIAG_PAGES__').join(JSON.stringify(queue)).split('firebasejs/12.18.0/').join('firebasejs/' + version + '/'));
+    .split('__DIAG_PAGES__').join(JSON.stringify(queue)));
   let fitted = 0;
   pages.concat('diagnostics.html').forEach(f => {
     const p = path.join(dir, f), html = fs.readFileSync(p, 'utf8');
