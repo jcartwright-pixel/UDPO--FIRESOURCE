@@ -94,7 +94,7 @@
         const first = r.route !== prior; prior = r.route;
         return '<tr data-id="' + escapeHtml(r.id) + '"' + (first ? ' class="first"' : '') + '><td class="strong">' + (first ? escapeHtml(r.route) : '') + '</td><td>' + escapeHtml(r.run || r.routeName || '') + '</td>' +
           L.DAYS.map(p => { const on = !!(r.days[p] && r.days[p].runs), o = isOver(r, p);
-            return '<td><button type="button" class="rw-day' + (on ? '' : ' off') + (o ? ' over' : '') + '" data-day="' + p + '"' + (edit ? '' : ' disabled') + ' title="' + (o ? 'Changed from the normal week (normal: ' + (normalOn(r, p) ? 'runs' : 'does not run') + ')' : 'Normal week') + '">' + (on ? '&#10003; RUNS' : '&#10005; DOES NOT RUN') + '</button></td>'; }).join('') + '</tr>';
+            return '<td><button type="button" class="rw-day' + (on ? '' : ' off') + (o ? ' over' : '') + '" data-day="' + p + '"' + (edit ? '' : ' disabled') + ' title="' + (o ? 'Changed from the normal week (normal: ' + (normalOn(r, p) ? 'runs' : 'does not run') + ')' : 'Normal week') + '">' + (on ? '&#10003; RUNS' : 'OFF') + '</button></td>'; }).join('') + '</tr>';
       }).join('') || '<tr><td colspan="9" class="empty">' + (show === 'changed' ? 'Every route runs its normal week.' : 'No routes for this week.') + '</td></tr>';
       document.getElementById('n-over').textContent = over.reduce((a, r) => a + L.DAYS.filter(p => isOver(r, p)).length, 0);
       document.getElementById('n-routes').textContent = new Set(over.map(r => r.route)).size;

@@ -35,25 +35,24 @@
     import { start, requireSignIn, escapeHtml } from './js/app.js';
 
     // The current app's Dispatch Administration cards (RouteManagement.html, renderDispatchAdmin), in the same order.
-    // Every card opens its screen in the new app, in this window (Joe 10/10: never the old program).
+    // Every card opens its screen in the new app, in this window (Joe 10/10: never the old program). One card per screen (review
+    // item 13, Joe 10/13): Unit Assignments, Route Day Setup and Driver Management opened the same screens as Unit Master, Route
+    // Editor and Driver Roster, so their words joined those cards.
     const CARDS = [
-      ['Route Editor', 'routes.html', 'Pick one route and edit run days, times, load order, equipment and details.'],
-      ['Unit Assignments', 'equipment.html', 'Trucks and trailers, which are down, and what each is on today.'],
-      ['Route Day Setup', 'routes.html', 'The normal days each run goes out (Route Days).'],
+      ['Route Editor', 'routes.html', 'Pick one route and edit run days (the normal days each run goes out), times, load order, equipment and details.'],
       ['Holiday Week Editor', 'routeweek.html', 'Change which days routes run for one week only.'],
-      ['Driver Management', 'drivers.html', 'Driver records, seniority and Relief / Regular.'],
       ['Driver Weekly Template', 'template.html', "Each driver's normal week: Available, Off or their runs."],
       ['Operational Assignments', 'ops.html', 'Carrier, Fairmont, Marietta, Martins Ferry and other non-driver coverage.'],
       ['Schedule Template (Weekly)', 'weekly.html', 'Build and keep the Route × Day schedule for the week.'],
       ['Vacation Management', 'vacations.html', 'Enter and approve driver time off.'],
-      ['Driver Roster', 'drivers.html', 'The active and relief driver list.'],
+      ['Driver Roster', 'drivers.html', 'The active and relief driver list: driver records, seniority and Relief / Regular.'],
       ['Issue History', 'issues.html', 'Open, finished and past equipment issues.'],
       ['Data Quality', 'conflicts.html', 'Sheet changes that need a look.'],
-      ['Unit Master', 'equipment.html', 'Tractor, trailer and pallet jack status.'],
+      ['Unit Master', 'equipment.html', 'Tractor, trailer and pallet jack status: which are down, and what each is on today.'],
       ['Print Layouts', 'print.html', 'Dispatch and weekly schedule print tools.'],
       ['Dispatch Settings', 'settings.html', 'Dispatch preferences and setup.']
     ];
-    const OPENS = {'Unit Assignments': 'Equipment', 'Route Day Setup': 'Route Editor', 'Holiday Week Editor': 'Route Week Override', 'Driver Management': 'Driver Roster', 'Schedule Template (Weekly)': 'Weekly Dispatch', 'Vacation Management': 'Vacation Schedule', 'Issue History': 'Equipment Issues', 'Data Quality': 'Sheet Conflicts', 'Unit Master': 'Equipment'};
+    const OPENS = {'Holiday Week Editor': 'Route Week Override', 'Schedule Template (Weekly)': 'Weekly Dispatch', 'Vacation Management': 'Vacation Schedule', 'Issue History': 'Equipment Issues', 'Data Quality': 'Sheet Conflicts', 'Unit Master': 'Equipment'};
     document.getElementById('grid').innerHTML = CARDS.map(([name, href, text]) => {
       // Polish item 2 (Joe 10/11): a card whose old-app name differs from the screen it opens says which screen that is.
       const opens = OPENS[name] ? '<em class="admin-opens">Opens ' + escapeHtml(OPENS[name]) + '</em>' : '';
