@@ -1823,3 +1823,44 @@ body.daily-look #delivers { display: none; }
 .co-plant.planned { align-self: start; }
 .co-plant.planned .co-soon { display: block; flex: none; min-height: 0; margin: 0; padding: 12px 18px; text-align: left; font-size: 16px; color: #5a6b7d; }
 .co-plant.planned .co-soon b { font-size: 16px; }
+
+/* Review item 40 (Joe 10/13): Equipment's last column has a heading (Action) and room for "Put down" / "Back in service" on one line. */
+th.eq-act { white-space: nowrap; }
+td.eq-act > button { white-space: nowrap; padding: 0 10px; }
+
+/* Review item 41 (Joe 10/13): Fleet Service's "N of N units need something" sits in from the right edge, and the grey helper
+   text (under each due date, the line above the grid and the line at the bottom) is 16px. */
+.fleet-page .fs-legend { font-size: 16px; padding: 0 12px; margin-top: 4px; }
+.fleet-page table.fs-grid td.gc small { font-size: 16px; }
+.fleet-page .foot { font-size: 16px; }
+.fleet-page table.fs-grid .pill { font-size: 15px; white-space: nowrap; }
+
+/* Review item 42 (Joe 10/13): Fleet & Maintenance. The four cards sit two by two on the left; each small tile is a wide line with
+   a bigger number and a 16px label on one line (two tiles to a row); Latest write-ups runs the full height on the right. */
+@media (min-width: 1200px) {
+  .hub-page .hub-view { overflow: hidden; }
+  .hub-page .hub-body { flex: 1 0 auto; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); align-items: stretch; min-height: 0; }
+  .hub-page .hub-cards { align-content: start; }
+  .hub-page .hub-latest { contain: size; overflow: auto; }
+  .hub-page .hub-latest h2 { position: sticky; top: 0; z-index: 2; }
+  .hub-page .hub-latest table.issues thead th { position: sticky; top: 48px; z-index: 1; }
+  /* The narrower list: room for a six-digit unit and "Fork truck". */
+  .hub-page .hub-latest col:nth-child(1) { width: 21% !important; } .hub-page .hub-latest col:nth-child(2) { width: 18% !important; }
+  .hub-page .hub-latest col:nth-child(3) { width: 39% !important; } .hub-page .hub-latest col:nth-child(4) { width: 22% !important; }
+}
+.hub-page .hub-card-head { grid-template-columns: 72px 1fr auto; }
+.hub-page .hub-card-head img, .hub-page .hub-wrench { width: 72px; height: 58px; }
+.hub-page .hub-tiles4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.hub-page .hub-tile { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; min-height: 42px; padding: 4px 10px; text-align: left; }
+.hub-page .hub-tile b { font-size: 26px; min-width: 30px; text-align: right; flex: none; }
+.hub-page .hub-tile span { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #415264; }
+
+/* Review item 43 (Joe 10/13): Truck Issues' filter buttons are one size: All open / Need review / ... match Trucks / Trailers / Fork Truck. */
+.issue-bar { gap: 10px; }
+.issue-bar .kind-tabs { gap: 6px; }
+.issue-bar .kind-tabs button, .issue-bar .chips button { min-height: 44px; padding: 0 10px; border-radius: 10px; font-size: 16px; font-weight: 800; }
+.issue-bar .kind-tabs button b, .issue-bar .chips button b { margin-left: 6px; font-size: 14px; min-width: 22px; padding: 1px 6px; border-radius: 12px; }
+.issue-bar #search { min-width: 140px; }
+
+/* Review item 45 (Joe 10/13): plant Work Orders' search box is wide enough for "Find a machine, problem or mechanic". */
+.pmw-page #search { width: 400px; max-width: 40vw; }

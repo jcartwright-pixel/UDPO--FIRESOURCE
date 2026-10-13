@@ -20,7 +20,9 @@ const SHOTS = process.env.SHOTS_DIR;
 const ADMIN = '?testEmail=admin.test@uniteddairy.com';
 
 async function openPage(browser, width, height, url) {
-  const page = await browser.newPage({ viewport: { width, height } });
+  // The stations keep their screen on the tablet with a service worker (Joe 10/13); its fetches skip page.route, so the
+  // Firebase code it asks gstatic.com for never arrives here. Blocked as in the other checks (station-offline.cjs tests it).
+  const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });

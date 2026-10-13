@@ -630,7 +630,9 @@ async function garageCall(db, input, now, caller) {
   // station it opened with every call; Change needs the plant's manager release code.
   const ST = require('./stations'), asSave = (e) => { if (e instanceof ST.StationError || e instanceof require('./admin').AdminError) throw SaveErr(e.code, e.message); throw e; };
   if (op === 'station') return ST.tabletCall(db, { op: input.step, kind: 'GARAGE', code: input.code, key: input.key, version: input.version, facilityId: FACILITY, who: input.who }, () => new Date(nowMs)).catch(asSave);
-  if (op === 'release') return require('./admin').releaseCheck(db, { op: input.step === 'status' ? 'status' : 'release', facilityId: FACILITY, code: input.code, who: input.who }, () => new Date(nowMs)).catch(asSave);
+  // Review item 49 (Joe 10/13): the Maintenance Station (maint: true) locks too; its Release checks its own plant's manager release code.
+  const releaseFac = input.maint === true && /^fac_[a-z_]{1,40}$/.test(String(input.facilityId || '')) ? input.facilityId : FACILITY;
+  if (op === 'release') return require('./admin').releaseCheck(db, { op: input.step === 'status' ? 'status' : 'release', facilityId: releaseFac, code: input.code, who: input.who }, () => new Date(nowMs)).catch(asSave);
   // Plant Maintenance's Maintenance Station (Joe 10/12): the same technicians and sign-in, the plant's work orders. It is not
   // the garage tablet, so the garage's station code does not lock it; every step still needs a mechanic's login ID.
   if (op === 'pmBoard') { await maintBoardAllowed(db, input, caller); return require('./plantmaint').stationBoard(db, input, nowMs); }
