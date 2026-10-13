@@ -132,9 +132,13 @@ test('"Was your truck loaded correctly?": a No with what was wrong is saved and 
 test('the DVIR odometer starts at the truck\'s GPS odometer when Fleet has a recent reading', async () => {
   const { code } = await newRouteCode(db(), MANAGER);
   await db().collection('gpsTrucks').doc('900002').set({ tag: '900002', odometerMiles: 412358.6, lastReport: '2026-10-07T00:40:00.000Z' });
-  let load = (await phoneCall(db(), { code, op: 'loads', driverId: 'drv_test_brook' }, at())).loads[0];
+  await db().collection('gpsTrucks').doc('900001').set({ tag: '900001', odometerMiles: 98000.2, lastReport: '2026-10-06T22:00:00.000Z' });
+  const r = await phoneCall(db(), { code, op: 'loads', driverId: 'drv_test_brook' }, at());
+  let load = r.loads[0];
   assert.equal(load.truck, '900002');
   assert.deepEqual(load.gpsOdometer, { miles: 412359, at: '2026-10-07T00:40:00.000Z' });
+  // Joe 10/13: "according to what truck is entered": every truck on the list comes with its reading, so a typed truck fills too.
+  assert.deepEqual(r.gpsOdometers, { 900001: 98000, 900002: 412359 });
   await db().collection('gpsTrucks').doc('900002').set({ tag: '900002', odometerMiles: 412358.6, lastReport: '2026-10-04T00:40:00.000Z' });
   load = (await phoneCall(db(), { code, op: 'loads', driverId: 'drv_test_brook' }, at())).loads[0];
   assert.equal(load.gpsOdometer, undefined, 'a reading 3 days old is not offered');

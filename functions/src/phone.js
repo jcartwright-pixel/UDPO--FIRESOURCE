@@ -113,15 +113,18 @@ async function dayLoads(db, date) {
 const byRoute = (a, b) => String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run), undefined, { numeric: true });
 
 // The unit lists the Check-In boxes offer (a short number finds the unit; any number is still taken).
-// Joe 10/5 (GPS spec): the DVIR odometer fills from GPS. Each load's truck gets its latest Verizon Connect Fleet odometer
-// (gpsTrucks, read every 5 minutes) when Fleet heard from it in the last 2 days; the driver can still change the number.
-async function gpsOdometers(db, loads, nowMs) {
-  const ids = [...new Set(loads.map(l => M.safeIdPart(String(l.truck || '').trim().toUpperCase().replace(/\s+/g, ''))).filter(Boolean))];
-  if (!ids.length) return;
-  const docs = await db.getAll(...ids.map(id => db.collection('gpsTrucks').doc(id)));
+// Joe 10/5 (GPS spec) and 10/13 ("according to what truck is entered"): the DVIR odometer fills from GPS. Each load's truck
+// and every truck on the list get their latest Verizon Connect Fleet odometer (gpsTrucks, read every 5 minutes) when Fleet
+// heard from it in the last 2 days, so the number follows whatever truck the driver types; the driver can still change it.
+async function gpsOdometers(db, loads, trucks, nowMs) {
+  const id = (u) => M.safeIdPart(String(u || '').trim().toUpperCase().replace(/\s+/g, ''));
+  const ids = [...new Set(loads.map(l => id(l.truck)).concat((trucks || []).map(id)).filter(Boolean))];
   const by = {};
+  if (!ids.length) return by;
+  const docs = await db.getAll(...ids.map(x => db.collection('gpsTrucks').doc(x)));
   docs.forEach(d => { const t = d.exists ? d.data() : null; if (t && t.odometerMiles > 0 && nowMs - Date.parse(t.lastReport) < 2 * 86400000) by[d.id] = { miles: Math.round(t.odometerMiles), at: t.lastReport }; });
-  loads.forEach(l => { const g = by[M.safeIdPart(String(l.truck || '').trim().toUpperCase().replace(/\s+/g, ''))]; if (g) l.gpsOdometer = g; });
+  loads.forEach(l => { const g = by[id(l.truck)]; if (g) l.gpsOdometer = g; });
+  return by;
 }
 
 async function unitLists(db) {
@@ -216,9 +219,9 @@ async function phoneCall(db, input, now) {
   if (op === 'loads') {
     const date = dates.indexOf(input.date) >= 0 ? input.date : dates[0];
     const loads = (await dayLoads(db, date)).filter(x => who.mine(x.run, x.id, x.p, x.d)).map(x => loadOf(x.run, x.id, x.p)).sort(byRoute);
-    await gpsOdometers(db, loads, Date.parse(stamp) || Date.now());
+    const units = await unitLists(db), odometers = await gpsOdometers(db, loads, units.trucks, Date.parse(stamp) || Date.now());
     const label = who.kind === 'route' ? (loads[0] ? 'Route ' + String(loads[0].route).replace(/_\d+$/, '') + ' · ' + loads[0].run : 'Your route') : who.kind === 'skip' ? 'Driver not chosen' : who.name;
-    return { date, dates, driver: label, loads, units: await unitLists(db) };
+    return { date, dates, driver: label, loads, units, gpsOdometers: Object.fromEntries(Object.entries(odometers).map(([k, v]) => [k, v.miles])) };
   }
   if (op === 'dvir') return saveDvir(db, input, who, dates, stamp);
   if (op !== 'checkIn') throw new SaveError('BAD_REQUEST', 'Unknown request');
