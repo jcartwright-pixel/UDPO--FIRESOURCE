@@ -1823,3 +1823,10 @@ body.daily-look #delivers { display: none; }
 .co-plant.planned { align-self: start; }
 .co-plant.planned .co-soon { display: block; flex: none; min-height: 0; margin: 0; padding: 12px 18px; text-align: left; font-size: 16px; color: #5a6b7d; }
 .co-plant.planned .co-soon b { font-size: 16px; }
+
+/* Fleet Service Setup (Joe 10/13): the rule labels, their units and the Add Technician boxes at the 16px everything else uses. */
+.fs-rules label { font-size: 16px; letter-spacing: .02em; }
+.fs-rule small { font-size: 16px; }
+.fs-rule input { font-size: 16px; height: 38px; }
+.fs-addtech input, .fs-addtech button { font-size: 16px; min-height: 40px; }
+.fleet-page table.issues td, .fleet-page table.issues th { font-size: 16px; }
