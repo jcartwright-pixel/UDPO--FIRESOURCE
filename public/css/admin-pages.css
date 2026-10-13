@@ -1,3 +1,53 @@
+/* administration.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.adm-shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; gap: 14px; padding: 12px 16px 14px; }
+.adm-shell[hidden] { display: none; }
+.adm-shell > .soon-card { grid-column: 1 / -1; }
+.adm-nav { min-height: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #dfe6ee; border-radius: 14px; box-shadow: 0 4px 14px rgba(11, 61, 107, .06); overflow: hidden; }
+.adm-nav-head { padding: 14px 14px 10px; border-bottom: 1px solid #e6ecf2; display: flex; flex-direction: column; gap: 10px; }
+.adm-nav-head input { min-height: 40px; padding: 0 12px; border: 1px solid #cfd9e3; border-radius: 9px; font: inherit; }
+.adm-nav-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px 12px; }
+.adm-nav-group h2 { margin: 12px 8px 4px; font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; color: #5a6b7d; }
+.adm-item { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 5px 8px; border: 0; border-radius: 9px; background: none; color: #0b3d6b; font: inherit; font-size: 16px; font-weight: 700; text-align: left; cursor: pointer; }
+.adm-item:hover { background: #eef5fc; }
+.adm-item.on { background: #0b3d6b; color: #fff; }
+.adm-item .adm-name { flex: 1; min-width: 0; }
+.adm-item em { flex: none; font-style: normal; font-size: 16px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: #f1f3f5; color: #6a7885; }
+.adm-item.on em { background: rgba(255, 255, 255, .18); color: #fff; }
+.adm-ic { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
+.adm-ic svg { width: 19px; height: 19px; fill: none; stroke: #1f6feb; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.adm-ic.big { width: 48px; height: 48px; border-radius: 12px; }
+.adm-ic.big img { max-width: 42px; max-height: 36px; }
+.adm-none { margin: 14px 8px; color: #5a6b7d; }
+.adm-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #dfe6ee; border-radius: 14px; box-shadow: 0 4px 14px rgba(11, 61, 107, .06); overflow: hidden; }
+.adm-panel-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid #e6ecf2; background: linear-gradient(180deg, #f7fafd, #fff); }
+.adm-panel-head > div:not(.adm-actions) { flex: 1; min-width: 0; }
+.adm-panel-head h2 { margin: 0; font-size: 20px; font-weight: 900; color: #0b3d6b; }
+.adm-actions { flex: none; display: flex; gap: 8px; }
+.adm-actions .button:hover { background: #1f6feb; }
+.adm-state { font-size: 16px; font-weight: 800; padding: 6px 14px; border-radius: 999px; background: #f1f3f5; color: #6a7885; }
+.adm-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: #f2f5f9; }
+.adm-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; overflow: hidden; }
+.adm-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.adm-table th { background: #0b3d6b; color: #fff; text-align: center; padding: 9px 10px; font-size: 16px; text-transform: uppercase; letter-spacing: .03em; }
+.adm-table td { text-align: center; padding: 8px 10px; border-bottom: 1px solid #e6ecf2; }
+.adm-table td.strong { font-weight: 800; color: #0b3d6b; }
+.adm-table .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 16px; font-weight: 800; }
+.adm-table .pill.good { background: #e3f3e8; color: #1c6b3a; }
+.adm-table .pill.muted { background: #f1f3f5; color: #6a7885; }
+.adm-loading { color: #5a6b7d; }
+.adm-soon { margin: 30px auto; max-width: 620px; text-align: center; padding: 28px; border: 1px dashed #c9d5e1; border-radius: 14px; background: #f9fbfd; }
+.adm-soon h3 { margin: 0 0 8px; font-size: 20px; color: #0b3d6b; }
+@media (max-width: 900px) {
+  .adm-shell { grid-template-columns: 1fr; }
+  .adm-nav { max-height: 40vh; }
+}
+/* Review item 51 (Joe 10/13): the Administration side menu is words only (no icons); its words are 16px. */
+.adm-item { font-size: 16px; min-height: 38px; padding: 5px 12px; }
+/* Review item 52 (Joe 10/13): People & Roles' email never breaks mid-word (only after the @, when it must). */
+.people-table { table-layout: fixed; }
+.people-table td.email { overflow-wrap: normal; word-break: normal; }
+/* ---- */
 /* Administration pages built inside the right-hand panel (js/admin-pages.js). Text stays at 16px; long lists scroll. */
 .ap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; font-size: 16px; }
 .ap-bar { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-height: 44px; }

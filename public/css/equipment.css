@@ -1,0 +1,30 @@
+/* equipment.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+th.eq-day, td.eq-day { padding-left: 2px !important; padding-right: 2px !important; font-size: 16px; text-align: center; white-space: normal; line-height: 1.1; }
+th.eq-day { text-transform: uppercase; }
+td.eq-day.today { background: #fff8e1; }
+td.eq-day { font-size: 16px; font-weight: 800; overflow: visible !important; text-overflow: clip !important; }
+td.eq-day span { display: block; white-space: nowrap; }
+.head .actions.fleet-sync #fleet-synced { font-size: 16px; color: #44515e; max-width: 260px; line-height: 1.25; }
+.head .actions.fleet-sync #fleet-synced.bad { color: #b3261e; font-weight: 600; }
+th.eq-day { font-size: 16px; }
+td.eq-day { font-size: 16px; }
+.fp-modal { width: min(1180px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 10px; font-size: 16px; }
+.fp-modal h2 { margin: 0; }
+.fp-note { margin: 0; color: #44515e; }
+.fp-sum { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.fp-sum div b { margin-right: 8px; color: var(--ud-blue-dark); }
+.fp-sum .bad { color: #b3261e; }
+.fp-modal .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fp-modal .chip { min-height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.fp-modal .chip.on { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.fp-list { max-height: calc(100vh - 330px); min-height: 160px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; -webkit-overflow-scrolling: touch; }
+.fp-list table { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: fixed; }
+.fp-list th { position: sticky; top: 0; background: var(--ud-blue-dark, #0b3a66); color: #fff; text-align: left; padding: 8px 10px; font-size: 16px; }
+.fp-list td { padding: 6px 10px; border-top: 1px solid var(--line); text-align: left; overflow-wrap: break-word; white-space: normal; text-overflow: clip; overflow: visible; }
+.fp-list tr.fp-back td:nth-child(3), .fp-list tr.fp-added td:nth-child(3) { color: #1b7a3a; font-weight: 700; }
+.fp-modal .modal-actions { margin-top: 0; }
+.fp-modal .modal-actions button { font-size: 16px; }
+/* Review item 40 (Joe 10/13): Equipment's last column has a heading (Action) and room for "Put down" / "Back in service" on one line. */
+th.eq-act { white-space: nowrap; }
+td.eq-act > button { white-space: nowrap; padding: 0 10px; }

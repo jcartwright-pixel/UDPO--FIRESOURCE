@@ -116,6 +116,8 @@ the production deploy runs `tools/sandbox-diagnostics.cjs check` and stops if an
     src/model.js           collections, Live column -> field map, run IDs
     src/transfer.js        sheet parsing and the changed-rows-only copy
     src/actions.js         one-transaction saves, revisions, idempotent request IDs, save log
+    src/actions-*.js       each screen's saves, called by actions.js: daily, drivers, dayoff (call-off, vacations), routes, weekly,
+                           otr, live (Route / Driver Master reaching the Live weeks) and common (save error, write-back queue)
     src/auth.js            United Dairy account check
     src/writeback.js       database -> sandbox Live sheet, conflict rule, production IDs refused
     src/masterwrite.js     master-list saves -> sandbox copies of Driver / Route / Equipment Master, day offs, vacations
@@ -123,6 +125,7 @@ the production deploy runs `tools/sandbox-diagnostics.cjs check` and stops if an
     src/sources.js         Uniontown spreadsheet IDs (the same as the current app)
     test/unit, test/emulator, test/browser, test/fixtures/fake-sheets.js
   public/                  index.html (home), daily.html, weekly.html, drivers.html, checkins.html, conflicts.html, css/app.css,
+                           css/<screen>.css (styles only that screen uses, linked right after app.css),
                            js/app.js, js/edit.js (pickers, optimistic saves), js/logic.js (copy)
   tools/sync-logic.cjs     copies the 8 shared rule files (logic.js, board-rules.js, ...) from functions/src to public/js
 ```

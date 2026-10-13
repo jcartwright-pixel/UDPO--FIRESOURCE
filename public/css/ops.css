@@ -1,0 +1,7 @@
+/* ops.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.ops-note { margin: 0 16px 10px; color: #44515e; font-size: 16px; }
+.ops-sheet { max-width: 980px; }
+table.ops input.ops-seq { width: 80px; height: 34px; text-align: center; font-size: 16px; }
+table.ops tr.adding input#new-name { width: 90%; }
+.ops-page .ops-sheet { overflow: clip; }
