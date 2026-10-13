@@ -84,6 +84,9 @@
     return parts.year + '-' + parts.month + '-' + parts.day;
   }
 
+  // Joe 10/13 ("No route equals no driver"): what a day marked not running gives up, so the driver and units are free that day.
+  var NOT_RUNNING_CLEARS = Object.freeze({ driverId: '', driver: '', truckId: '', truck: '', trailerId: '', trailer: '' });
+
   // Same rule as udpoV7000ScheduledValue_: blank, FALSE, NO, N, 0, OFF and DOES NOT RUN mean "no".
   function yes(value) {
     if (value === false || value === 0 || value === null || value === undefined) return false;
@@ -1061,7 +1064,7 @@
   }
 
   return {
-    noWriteUp: noWriteUp,
+    noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS,
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,

@@ -254,13 +254,14 @@ function overLimit(area, n, SaveError) {
 // The day fields one savePlantLoad changes. day = the run's day block now; equipment is read only when a unit was typed.
 async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   const f = req.plant, after = {};
-  // Ended Up Not Running. Joe 10/13 (852 JERSEY LOAD 2 came back): the sheet copy reads a day that still holds a driver as
-  // running (transfer.js, Joe 10/10), so the day's driver comes off with it; the notes keep who it was.
+  // Ended Up Not Running. Joe 10/13: "No route equals no driver": the day's driver, truck and trailer come off it (that day only)
+  // and are free for other loads; the notes keep what they were.
   if (f.runs === false) {
-    if (!text(day.driver) && !text(day.driverId)) return { runs: false };
+    const was = [['driver', text(day.driver) || text(day.driverId)], ['truck', text(day.truck) || text(day.truckId)], ['trailer', text(day.trailer) || text(day.trailerId)]].filter(x => x[1]);
+    if (!was.length) return { runs: false };
     const at = new Date(stamp).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const notes = text(day.plantNotes);
-    return { runs: false, driverId: '', driver: '', plantNotes: ((notes ? notes + '\n' : '') + 'Ended up not running ' + at + ' (driver was ' + (text(day.driver) || text(day.driverId)) + ')').slice(-1200) };
+    return Object.assign({ runs: false }, L.NOT_RUNNING_CLEARS, { plantNotes: ((notes ? notes + '\n' : '') + 'Ended up not running ' + at + ' (' + was.map(x => x[0] + ' was ' + x[1]).join(', ') + ')').slice(-1200) });
   }
   const wasLoading = dayLoadingNow(day);
   if (f.quantity !== undefined) after.casesOut = f.quantity;

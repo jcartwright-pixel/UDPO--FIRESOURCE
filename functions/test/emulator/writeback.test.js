@@ -189,6 +189,7 @@ for (const [name, save] of [
   test(name + ' stays off after the write-back and the next copy of the sheet', async () => {
     const RUN = '2026-10-04__run_t802';
     await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'tue', driverId: 'drv_test_adams' }, tick);
+    await applyAction(db(), DISPATCHER, { action: 'assignTrailer', requestId: rid(), runDocId: RUN, day: 'tue', equipmentId: 'veh_trailer_t_901' }, tick);
     await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
     await runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick });
     assert.equal((await db().collection('runs').doc(RUN).get()).data().days.tue.driver, 'ADAMS, PAT');
@@ -196,9 +197,11 @@ for (const [name, save] of [
     assert.equal((await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick })).conflicts, 0);
     assert.equal(cellOf('run_t802', 'tue_runs'), 'FALSE');
     assert.equal(cellOf('run_t802', 'tue_driver'), '');
+    ['tue_driver_id', 'tue_truck', 'tue_tractor_id', 'tue_trailer', 'tue_trailer_id'].forEach(c => assert.equal(cellOf('run_t802', c), '', c + ' is cleared'));
     await runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick });
     const day = (await db().collection('runs').doc(RUN).get()).data().days.tue;
     assert.equal(day.runs, false, 'it does not come back');
-    if (save().action === 'savePlantLoad') assert.match(day.plantNotes || '', /Ended up not running .*\(driver was ADAMS, PAT\)/);
+    if (save().action === 'savePlantLoad') assert.match(day.plantNotes || '', /Ended up not running .*\(driver was ADAMS, PAT, (truck was \S+, )?trailer was T-901\)/);
+    assert.deepEqual([day.driver, day.truck, day.trailer], ['', '', ''], 'the driver, truck and trailer are free that day');
   });
 }
