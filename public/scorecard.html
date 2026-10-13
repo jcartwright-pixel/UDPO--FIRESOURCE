@@ -53,6 +53,7 @@
     // The current app's Driver Scorecard (screen A, 224/225_V7279): one table of every driver for the month or the year.
     // Days come from every week the app keeps (the copied Live weeks, the weeks Publish moved on, and the current app's DISPATCH WEEK
     // HISTORY archive: check-ins, cases out vs in) and the plant journal (inspections, route check-ins).
+    // Joe 10/13: the scorecard is driving and distribution only: no plant card (the average is the drivers'), no route cuts.
     forScreen('scorecard');
     const L = window.UDLogic, S = window.UDScore, CORE = S.SC_CORE;
     let mode = 'month', runs = [], events = [], drivers = [], exceptions = [], saved = {}, open = '';
@@ -186,7 +187,6 @@
           '<p><b>Cases out vs in</b> ' + n('lostCase') + ' point per lost case, at most ' + n('lostCaseDayCap') + ' a day</p>' +
           '<p><b>Clean inspections</b> ' + n('inspectionDefect') + ' points per inspection with a defect, ' + n('inspectionMissing') + ' if none done</p>' +
           '<p><b>Attendance</b> ' + n('callOff') + ' points per call-off day</p>' +
-          '<p class="later"><b>Route cuts</b> are scored on the plant side, not on the driver scorecard</p>' +
           '<h2>Attendance fades over 3 months</h2><p>A call-off counts ' + n('sickFade1') + '% in its first month, ' + n('sickFade2') + '% in the second, ' + n('sickFade3') + '% in the third, then it is gone</p>' +
           '<h2>Driving (Verizon Fleet GPS)</h2><p class="hint">Counted on the truck, against the driver Daily Dispatch put in it that day.</p>' +
           '<p><b>Speeding</b> ' + n('speeding') + ' points per speeding alert</p>' +
@@ -239,7 +239,7 @@
       // Review item 60 (Joe 10/13): the month reads Oct 26 (its 3-letter name and 2-digit year).
       const b = board(s), sm = b.summary, label = mode === 'year' ? String(year) : mode === 'week' ? 'Week of ' + shortDate(weekStart) : CORE.MONTHS[month - 1].slice(0, 3) + ' ' + String(year).slice(-2);
       const lostCount = b.unassigned.reduce((t, u) => t + u.alerts.length, 0);
-      k.innerHTML = [[sm.drivers, 'Drivers graded'], [sm.average == null ? '–' : sm.average, 'Plant average score'], [sm.missedCheckins, 'Missed check-ins', sm.missedCheckins ? 'warn' : ''],
+      k.innerHTML = [[sm.drivers, 'Drivers graded'], [sm.average == null ? '–' : sm.average, 'Average driver score'], [sm.missedCheckins, 'Missed check-ins', sm.missedCheckins ? 'warn' : ''],
         [sm.lostCases, 'Cases lost on routes', sm.lostCases ? 'warn' : ''], [sm.speeding, 'Speeding alerts', sm.speeding ? 'warn' : ''], [sm.hardBrakes, 'Hard stops', sm.hardBrakes ? 'warn' : ''],
         [lostCount, 'No driver dispatched', lostCount ? 'warn' : '']].concat(mode === 'week' ? [] : [[sm.leader || 'Nobody yet', (mode === 'year' ? 'Leading for Driver of the Year' : 'Leading for Driver of the Month') + (sm.leader ? '' : ', needs ' + b.minDays + ' days worked'), sm.leader ? 'good' : 'none']])
         .map(([v, l, c]) => '<div class="' + (c || '') + '"><b>' + escapeHtml(String(v)) + '</b><span>' + l + '</span></div>').join('');

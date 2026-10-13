@@ -120,6 +120,9 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       // Joe 10/13 Time grade: left too early (EVANS, 10 days) and back too late (FOX, 10 days) each cost 1 a day: -10 -> 60 (D).
       assert.equal(await sc.$eval('tr[data-key="DRV_S_EVANS"] td:nth-child(12)', td => td.textContent.trim()), 'D');
       assert.equal(await sc.$eval('tr[data-key="DRV_S_FOX"] td:nth-child(12)', td => td.textContent.trim()), 'D');
+      // Joe 10/13: driving and distribution only, nothing for the plant.
+      assert.doesNotMatch(await sc.textContent('#screen'), /plant/i, 'no plant card or plant items on the scorecard');
+      assert.match(await sc.textContent('#kpis'), /Average driver score/);
       assert.match(await sc.textContent('#sc-how'), /Accidents \(12 months\), PDAs \(9 months\), complaints \(6 months\) and call-offs \(3 months\) count past the period shown/);
       assert.match(await sc.textContent('#unassigned'), /No driver dispatched[\s\S]*10-8-26\s*229001\s*Speeding \(66 mph in a 45/, 'the alert on a truck with no driver is kept for a manager');
       const fit = await sc.evaluate(() => ({ table: document.querySelector('.sc-board').scrollWidth, box: document.querySelector('#sheet').clientWidth,
