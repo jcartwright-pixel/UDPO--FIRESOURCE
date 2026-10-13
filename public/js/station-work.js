@@ -9,8 +9,9 @@ import { save, escapeHtml, shortDate, showError, allowedSaves, maySave } from '.
 import { collection, doc, query, where, onSnapshot } from './firebase.js';
 import * as P from './plant-core.js';
 import { watchProducts, OTHER } from './products.js';
+import { listenForScans, scanWithCamera, cameraReads, beep } from './scan-input.js';
 
-const L = window.UDLogic, U = window.UDPlant;
+const L = window.UDLogic, U = window.UDPlant, S = window.UDScan;
 const today = () => L.operatingDay(new Date());
 const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
@@ -37,6 +38,12 @@ export function mountStationWork({ db, box, person, onDraw }) {
   const keepSkips = () => { try { sessionStorage.setItem(SKIP_KEY, JSON.stringify(skipped)); } catch (e) { /* private window */ } };
   const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state === 'WAITING';
   let unsubs = [];
+  // Receiving scan-in (Joe 10/13, mock-up A): each scan of a delivery is a line (receivingScans); what the plant receives is
+  // receivingItems. recvLocal holds a line as the tablet shows it until the database has the same (a scan made with no signal
+  // waits on the tablet like every other save).
+  let recvScans = [], recvItems = [], lastRecv = '';
+  const recvLocal = {}, recvNaming = {};
+  const scanRid = () => 'rs-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
 
   // The role, or what Administration > People & Roles allows this person (asked of the server once per person).
   const VIEW_SAVE = { loading: 'savePlantLoad', unloading: 'saveUnloading', washing: 'completeWash', returns: 'addReturn', receiving: 'savePlantSchedule' };
@@ -193,7 +200,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     html += '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>' + refusal(id);
     if (isOpen) {
       const dis = !ck || done;
-      html += '<div class="sw-body"><div class="sw-fields">' + field(id, 'count', recv ? 'Cases / pallets in' : 'Boxes', x.work.count, { mode: 'numeric', disabled: dis }) + field(id, 'trailer', 'Trailer', x.trailer, { disabled: dis }) +
+      html += '<div class="sw-body">' + (recv ? recvBlock(x, id, going, done, ck) : '') + '<div class="sw-fields">' + field(id, 'count', recv ? 'Cases / pallets in' : 'Boxes', x.work.count, { mode: 'numeric', disabled: dis }) + field(id, 'trailer', 'Trailer', x.trailer, { disabled: dis }) +
         field(id, 'temperature', 'Temperature', x.work.temperature, { mode: 'decimal', disabled: dis }) + '<p class="sw-po"><span>PO</span><b>' + escapeHtml(x.poNumber || '—') + '</b></p></div>' +
         field(id, 'notes', 'Notes', x.work.notes || '', { wide: true, disabled: dis }) + pauseBox(id, ck && !done) +
         (ck ? '<div class="sw-actions">' + (st === 'WAITING' ? btn(startLabel, 'sstart', id, 'primary') : paused ? btn(recv ? 'SAVE RECEIVING' : 'SAVE LOADING', 'ssave', id, 'primary') + btn('RESUME', 'sstart', id, 'good')
@@ -202,6 +209,104 @@ export function mountStationWork({ db, box, person, onDraw }) {
     return html + '</article>';
   }
   const shipCard = (x) => schedCard(x, 'SHIPPING');
+
+  // ---- Receiving scan-in
+  function recvLines(deliveryId) {
+    const byId = {}, at = {};
+    recvScans.forEach(l => { byId[l.scanId] = l; at[l.scanId] = l.at; });
+    Object.keys(recvLocal).forEach(k => { byId[k] = recvLocal[k]; });
+    // Newest first by the server's time; a scan the server does not have yet goes on top (the tablet's clock is not the server's).
+    return Object.values(byId).filter(l => l.deliveryId === deliveryId && l.status !== 'REMOVED').sort((x, y) => String(at[y.scanId] || '~').localeCompare(String(at[x.scanId] || '~')));
+  }
+  const recvItemName = (l) => { const it = l.itemId && recvItems.find(i => i.id === l.itemId); return it ? it.name : l.itemName || ''; };
+  // The delivery a scan goes on: the open one being received (the one last scanned or tapped when two are open).
+  function recvTarget() {
+    const open = deliveries().filter(x => x.work.state === 'WORKING' && !closed['sch:' + x.id]);
+    return open.find(x => x.id === lastRecv) || (open.length === 1 ? open[0] : null);
+  }
+  function recvBlock(x, id, going, done, ck) {
+    const lines = recvLines(x.id), total = lines.reduce((n, l) => n + (Number(l.count) || 0), 0);
+    const kinds = new Set(lines.map(l => l.itemId || l.barcode)).size, live = ck && !done;
+    let html = '<div class="rv-block">';
+    if (live && going) {
+      html += '<div class="rv-scan"><label class="rv-box"><span class="rv-dot" aria-hidden="true"></span><input data-scan-box inputmode="none" autocomplete="off" spellcheck="false" ' +
+        'placeholder="Ready: scan a case or pallet label" aria-label="Scan box"></label>' + (cameraReads() ? btn('Use camera', 'rvcam', id, 'rv-cam') : '') + '</div>';
+    } else if (live) html += '<p class="rv-hint">Tap ' + (x.work.state === 'PAUSED' ? 'RESUME' : 'START RECEIVING') + ', then scan each case or pallet label.</p>';
+    if (lines.length) {
+      html += '<table class="rv-table"><thead><tr><th>Item</th><th>Lot</th><th>Best by</th><th class="rv-n">Cases</th></tr></thead><tbody>';
+      lines.forEach(l => {
+        const name = recvItemName(l), k = l.scanId, typing = recvNaming[k];
+        let who;
+        if (name) who = '<b>' + escapeHtml(name) + '</b>';
+        else {
+          who = '<b class="rv-unknown">New barcode ' + escapeHtml(S.shownCode(l)) + '</b><small>Not on the item list yet. Which item is it?</small>';
+          if (live) {
+            who += typing ? '<input class="rv-name" data-k="rvnew" data-id="' + escapeHtml(k) + '" value="' + escapeHtml(val(k, 'rvnew', '')) + '" placeholder="Type the item\'s name" autocomplete="off">'
+              : '<select class="rv-pick" data-rvitem="' + escapeHtml(k) + '" aria-label="Which item is it?"><option value=""></option>' +
+                recvItems.slice().sort((a, b) => a.name.localeCompare(b.name)).map(i => '<option value="' + escapeHtml(i.id) + '">' + escapeHtml(i.name) + '</option>').join('') +
+                '<option value="__new">New item (type its name)</option></select>';
+          }
+        }
+        const when = l.at ? '<small>' + (l.sscc ? 'Pallet · ' : '') + escapeHtml(new Date(l.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })) + '</small>' : '';
+        const n = Number(l.count) || 0;
+        const cases = live ? '<span class="rv-qty"><button type="button" class="rv-step" data-act="rvminus" data-id="' + escapeHtml(k) + '" aria-label="One less">&minus;</button><b>' + n +
+          '</b><button type="button" class="rv-step" data-act="rvplus" data-id="' + escapeHtml(k) + '" aria-label="One more">+</button></span>' : '<b>' + n + '</b>';
+        html += '<tr' + (name ? '' : ' class="rv-new"') + '><td>' + who + (name ? when : '') + '</td><td>' + escapeHtml(l.lot || '—') + '</td><td>' + escapeHtml(S.shortDate(l.bestBy) || '—') +
+          '</td><td class="rv-n">' + cases + '</td></tr>';
+      });
+      html += '</tbody></table><p class="rv-sum">' + plural(total, 'case') + ' · ' + plural(kinds, 'item') + (live ? ' · each scan saves itself' : '') + '</p>';
+    }
+    return html + '</div>';
+  }
+  // A line's change goes on the tablet at once and to the server in order (a quick − + − keeps its order).
+  const recvChain = {};
+  function recvSave(k, fields, undo) {
+    const turn = (recvChain[k] || Promise.resolve()).then(() => save('saveReceivingScan', Object.assign({ scanId: k }, fields)));
+    recvChain[k] = turn.catch(() => {});
+    return turn.then(() => showError('')).catch(e => { undo(); render(); beep(false); showError('Scan not saved: ' + (e.message || e)); });
+  }
+  function onRecvScan(raw) {
+    if (view !== 'receiving') { beep(false); showError('Open the Receiving tab to scan a delivery in.'); return; }
+    if (!canSched()) { beep(false); showError('This tablet cannot save Receiving.'); return; }
+    const x = recvTarget();
+    if (!x) { beep(false); showError(deliveries().some(d => d.work.state === 'WORKING') ? 'Open the delivery you are receiving, then scan again.' : 'Tap START RECEIVING on the delivery, then scan again.'); return; }
+    lastRecv = x.id;
+    const p = S.parseScan(raw), key = S.barcodeKey(p), now = new Date().toISOString();
+    const same = !p.count && !p.sscc && recvLines(x.id).find(l => l.barcode === key && (l.lot || '') === (p.lot || '') && !l.labelCount && !l.sscc);
+    if (same) {
+      const was = recvLocal[same.scanId];
+      recvLocal[same.scanId] = Object.assign({}, same, { count: (Number(same.count) || 0) + 1 });
+      recvSave(same.scanId, { op: 'add', delta: 1 }, () => { if (was) recvLocal[same.scanId] = was; else delete recvLocal[same.scanId]; });
+    } else {
+      const k = scanRid(), item = recvItems.find(i => (i.barcodes || []).indexOf(key) >= 0);
+      recvLocal[k] = { scanId: k, deliveryId: x.id, status: 'ACTIVE', kind: p.kind, raw: p.raw, barcode: key, gtin: p.gtin || p.contentGtin || '', lot: p.lot || '',
+        bestBy: p.bestBy || p.useBy || p.sellBy || '', sscc: p.sscc || '', labelCount: p.count || null, count: S.scanQuantity(p), itemId: item ? item.id : '', itemName: item ? item.name : '', at: now };
+      recvSave(k, { op: 'scan', deliveryId: x.id, raw, station: myName() }, () => { delete recvLocal[k]; });
+    }
+    beep(true);
+    render();
+  }
+  function recvStep(k, delta) {
+    const l = recvLines(lastRecvOf(k)).find(y => y.scanId === k);
+    if (!l) return;
+    const was = recvLocal[k], count = Math.max(0, (Number(l.count) || 0) + delta);
+    recvLocal[k] = Object.assign({}, l, { count, status: count === 0 ? 'REMOVED' : 'ACTIVE' });
+    render();
+    recvSave(k, { op: 'add', delta }, () => { if (was) recvLocal[k] = was; else delete recvLocal[k]; });
+  }
+  const lastRecvOf = (k) => { const l = recvLocal[k] || recvScans.find(y => y.scanId === k); return l ? l.deliveryId : ''; };
+  function recvName(k, fields) {
+    const l = recvLines(lastRecvOf(k)).find(y => y.scanId === k);
+    if (!l) return;
+    const was = recvLocal[k], item = fields.itemId ? recvItems.find(i => i.id === fields.itemId) : null;
+    const name = item ? item.name : fields.newItem;
+    // Every line of this barcode on the delivery shows the name at once (the server names them all).
+    recvLines(l.deliveryId).filter(y => y.barcode === l.barcode && !y.itemId).forEach(y => { recvLocal[y.scanId] = Object.assign({}, y, { itemId: item ? item.id : 'new', itemName: name }); });
+    delete recvNaming[k];
+    if (drafts[k]) delete drafts[k].rvnew;
+    render();
+    recvSave(k, Object.assign({ op: 'name' }, fields), () => { if (was) recvLocal[k] = was; else delete recvLocal[k]; });
+  }
 
   function receivingView() {
     const list = deliveries(), left = list.filter(x => x.work.state !== 'COMPLETE').length;
@@ -431,6 +536,12 @@ export function mountStationWork({ db, box, person, onDraw }) {
 
   function act(b) {
     const a = b.dataset.act, id = b.dataset.id, now = new Date().toISOString();
+    if (a === 'rvplus' || a === 'rvminus') { recvStep(id, a === 'rvplus' ? 1 : -1); return; }
+    if (a === 'rvcam') {
+      lastRecv = id.replace(/^sch:/, '');
+      scanWithCamera().then(raw => { if (raw) onRecvScan(raw); }).catch(e => { beep(false); showError(e.message || String(e)); });
+      return;
+    }
     if (a === 'pause') { pauseForm[id] = true; opened[id] = true; delete closed[id]; render(); const f = box.querySelector('[data-id="' + CSS.escape(id) + '"][data-k="pauseReason"]'); if (f) f.focus(); return; }
     if (a === 'pausecancel') { delete pauseForm[id]; if (drafts[id]) delete drafts[id].pauseReason; render(); return; }
     const reason = String((drafts[id] || {}).pauseReason || '').trim();
@@ -440,6 +551,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
       if (!x) return;
       if (a === 'sdone' && x.work.state !== 'WORKING') { showError(x.work.state === 'PAUSED' ? 'Tap RESUME first.' : 'Tap ' + (lane === 'RECEIVING' ? 'START RECEIVING' : 'START LOADING') + ' first.'); return; }
       if (a === 'sstart' && lane === 'SHIPPING') { const m = limitMessage(id); if (m) { refuse(id, m); return; } }
+      if (lane === 'RECEIVING' && a === 'sstart') lastRecv = x.id;
       delete refused[id];
       if (a === 'pausego' && drafts[id]) delete drafts[id].pauseReason;
       saveSched(x, lane, a === 'sstart' ? 'start' : a === 'ssave' ? 'save' : a === 'pausego' ? 'pause' : 'complete', reason);
@@ -531,6 +643,17 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (!el) return;
     (drafts[el.dataset.id] = drafts[el.dataset.id] || {})[el.dataset.k] = el.value;
   });
+  // Receiving: "Which item is it?" saves when picked; a new item's name saves when the box is left (or Enter).
+  box.addEventListener('change', e => {
+    const sel = e.target.closest('[data-rvitem]');
+    if (sel) {
+      if (sel.value === '__new') { recvNaming[sel.dataset.rvitem] = true; render(); const f = box.querySelector('[data-k="rvnew"][data-id="' + CSS.escape(sel.dataset.rvitem) + '"]'); if (f) f.focus(); }
+      else if (sel.value) recvName(sel.dataset.rvitem, { itemId: sel.value });
+      return;
+    }
+    const nm = e.target.closest('[data-k="rvnew"]');
+    if (nm) { const v = String(nm.value || '').trim(); if (v) recvName(nm.dataset.id, { newItem: v }); }
+  });
   // Unloading saves each box when it is left (as the current app's Plant Station did); loading waits for SAVE LOADING.
   box.addEventListener('change', e => {
     const el = e.target.closest('[data-k]');
@@ -563,11 +686,12 @@ export function mountStationWork({ db, box, person, onDraw }) {
   box.addEventListener('keydown', e => {
     const t = e.target.closest && e.target.closest('[data-toggle]');
     if (t && e.target === t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(t.dataset.toggle); return; }
-    if (e.key === 'Enter' && e.target.matches && e.target.matches('input[data-k]') && view === 'unloading') { e.preventDefault(); e.target.blur(); }
+    if (e.key === 'Enter' && e.target.matches && e.target.matches('input[data-k]') && (view === 'unloading' || e.target.dataset.k === 'rvnew')) { e.preventDefault(); e.target.blur(); }
   });
   function toggle(id) {
     const card = box.querySelector('[data-sw="' + CSS.escape(id) + '"]'), isOpen = card && card.classList.contains('open');
     if (isOpen) { closed[id] = true; delete opened[id]; } else { opened[id] = true; delete closed[id]; }
+    if (!isOpen && id.indexOf('sch:') === 0) lastRecv = id.slice(4);
     render();
   }
   box.addEventListener('submit', e => {
@@ -606,6 +730,14 @@ export function mountStationWork({ db, box, person, onDraw }) {
     // Review item 73 (Joe 10/13): the schedule's entries of the last 14 days and later (the tablet shows today's), not every one ever made.
     schedUnsubs = ['SHIPPING', 'RECEIVING'].map(lane => onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.LOAD_TYPE[lane]), where('date', '>=', L.addDays(today(), -14))),
       s => { sched[lane] = s.docs.map(d => d.data()); got[lane] = true; render(); }, fail('the ' + (lane === 'SHIPPING' ? 'Shipping' : 'Receiving') + ' schedule')));
+    schedUnsubs.push(onSnapshot(query(collection(db, 'receivingScans'), where('date', '>=', L.addDays(today(), -14))), s => {
+      recvScans = s.docs.map(d => d.data());
+      // The tablet's own copy of a line goes once the database shows the same.
+      Object.keys(recvLocal).forEach(k => { const d = recvScans.find(y => y.scanId === k), l = recvLocal[k];
+        if (d && d.count === l.count && d.status === l.status && (d.itemId === l.itemId || (l.itemId === 'new' && d.itemId))) delete recvLocal[k]; });
+      render();
+    }, fail('the scans')));
+    schedUnsubs.push(onSnapshot(query(collection(db, 'receivingItems'), where('status', '==', 'ACTIVE')), s => { recvItems = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the item list')));
     schedUnsubs.push(onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; }));
   }
   function watch() {
@@ -632,6 +764,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (view === 'returns') render();
   }, () => {})];
   watch();
+  const stopScans = listenForScans({ onScan: raw => { if (!stopped && boxing()) onRecvScan(raw); } });
   // The day rolls at 6 AM; a running load's state is drawn again each minute (not while someone is typing).
   tick = setInterval(() => {
     if (today() !== date) { Object.keys(drafts).forEach(k => delete drafts[k]); watch(); }
@@ -649,6 +782,6 @@ export function mountStationWork({ db, box, person, onDraw }) {
       if (v === 'receiving') { const d = deliveries(); return { total: d.length, left: d.filter(x => x.work.state !== 'COMPLETE').length }; }
       return null;
     },
-    stop() { stopped = true; unsubs.concat(always, schedUnsubs).forEach(u => u()); unsubs = []; always = []; schedUnsubs = []; clearInterval(tick); }
+    stop() { stopScans(); stopped = true; unsubs.concat(always, schedUnsubs).forEach(u => u()); unsubs = []; always = []; schedUnsubs = []; clearInterval(tick); }
   };
 }

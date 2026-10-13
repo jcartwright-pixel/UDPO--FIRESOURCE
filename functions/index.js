@@ -106,6 +106,12 @@ exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSec
   await require('./src/otr-seed').seedOtrOnce(db);
 });
 
+// Joe 10/13: data he sent, loaded once on each app (test copy and live) after a deploy (src/data-loads.js). Each load has a
+// dataLoads/<id> marker, so it runs one time; it only adds what is missing.
+exports.dataLoadsOnce = onSchedule({ schedule: 'every 10 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  await require('./src/data-loads').runDataLoads(db);
+});
+
 const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code (or, from the
