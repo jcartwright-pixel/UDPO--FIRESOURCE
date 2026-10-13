@@ -83,6 +83,11 @@ async function kept(page, files) {
       await page.click(at + ' [data-act="start"]');
       await page.waitForFunction(() => /Saved on this tablet, will send when you have signal\. Waiting: 1/.test(document.getElementById('offline-line').textContent), null, { timeout: 10000 });
       assert.equal(await page.isVisible('#error'), false, 'no error with no signal: it is saved on the tablet');
+      // The card shows the tap at once, marked as waiting to be sent.
+      await page.waitForSelector(at + '.run .sw-flag.wait:text-is("WAITING TO SEND")', { timeout: 10000 });
+      assert.ok(parseFloat(await page.$eval(at + ' .sw-flag.wait', e => getComputedStyle(e).fontSize)) >= 16);
+      await page.$eval(at, e => e.scrollIntoView({ block: 'center' }));
+      await shot(page, 'station-offline-plant-waiting-card-1024.png');
       await page.evaluate(() => window.scrollTo(0, 0));
       await shot(page, 'station-offline-plant-saved-1024.png');
       assert.equal((await db().collection('runs').doc('2026-10-04__run_p811').get()).data().days.fri.loadStatus || '', '', 'nothing reached the server yet');
@@ -92,6 +97,7 @@ async function kept(page, files) {
       await page.waitForSelector('#offline-line.ok', { timeout: 40000 });
       assert.match(await page.textContent('#offline-line'), /Sent ✓/);
       await page.waitForSelector(at + '.run', { timeout: 15000 });
+      await page.waitForSelector(at + ' .sw-flag.wait', { state: 'detached', timeout: 15000 });
       assert.equal((await db().collection('runs').doc('2026-10-04__run_p811').get()).data().days.fri.loadStatus, 'LOADING');
       const logs = await db().collection('actions').where('action', '==', 'savePlantLoad').get();
       assert.equal(logs.docs.filter(d => d.data().runDocId === '2026-10-04__run_p811').length, 1, 'saved once');

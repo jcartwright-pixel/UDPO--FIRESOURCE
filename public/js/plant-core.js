@@ -137,9 +137,10 @@ export function withNotePickups(rows, pickups) {
 }
 
 export function counts(rows) {
-  const c = { total: rows.length, done: 0, loading: 0, waiting: 0, prior: 0, quantity: 0 };
+  const c = { total: rows.length, done: 0, loading: 0, waiting: 0, paused: 0, prior: 0, quantity: 0 };
   rows.forEach(r => {
-    c[r.state === 'DONE' ? 'done' : r.state === 'LOADING' ? 'loading' : 'waiting']++;
+    // A paused load is started but not loading now (Joe 10/12).
+    c[r.state === 'DONE' ? 'done' : r.state === 'LOADING' ? (r.paused ? 'paused' : 'loading') : 'waiting']++;
     if (r.prior) c.prior++;
     const n = Number(String(r.quantity == null ? '' : r.quantity).replace(/,/g, ''));
     if (isFinite(n)) c.quantity += n;

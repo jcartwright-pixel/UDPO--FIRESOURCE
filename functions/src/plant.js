@@ -214,11 +214,13 @@ function validateLoad(input, SaveError) {
     if (out.trailer && !/^[A-Z0-9-]{1,20}$/.test(out.trailer)) throw new SaveError('BAD_REQUEST', 'Enter one trailer number: letters, numbers and dashes only.');
     out.assign = true;
   }
+  // The Loadout Center asks to load past the limit; only a manager's save gets it (loadValues).
+  if (input.overLimit === true && !out.assign) out.overLimit = true;
   return out;
 }
 
 // Joe 10/12: how many loads one loadout may load at the same time. A paused load does not count; starting or resuming one
-// past the limit is refused, so two tablets cannot get around it.
+// past the limit is refused, so two tablets cannot get around it. Joe 10/13: a manager on the Loadout Center may go past it.
 const LOADING_LIMIT = Object.freeze({ CASE: 2, BOXING: 3 });
 const runAreaOf = (run) => areaOf(text(run && run.loadType) || (run && run.masterShow && run.masterShow.loadType) || '');
 // A day block is loading now: started (or marked Loading), not paused, not done.
@@ -252,7 +254,15 @@ function overLimit(area, n, SaveError) {
 // The day fields one savePlantLoad changes. day = the run's day block now; equipment is read only when a unit was typed.
 async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   const f = req.plant, after = {};
-  if (f.runs === false) return { runs: false };
+  // Ended Up Not Running. Joe 10/13: "No route equals no driver": the day's driver, truck and trailer come off it (that day only)
+  // and are free for other loads; the notes keep what they were.
+  if (f.runs === false) {
+    const was = [['driver', text(day.driver) || text(day.driverId)], ['truck', text(day.truck) || text(day.truckId)], ['trailer', text(day.trailer) || text(day.trailerId)]].filter(x => x[1]);
+    if (!was.length) return { runs: false };
+    const at = new Date(stamp).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const notes = text(day.plantNotes);
+    return Object.assign({ runs: false }, L.NOT_RUNNING_CLEARS, { plantNotes: ((notes ? notes + '\n' : '') + 'Ended up not running ' + at + ' (' + was.map(x => x[0] + ' was ' + x[1]).join(', ') + ')').slice(-1200) });
+  }
   const wasLoading = dayLoadingNow(day);
   if (f.quantity !== undefined) after.casesOut = f.quantity;
   if (f.temperature !== undefined) after.loadTemperature = f.temperature;
@@ -284,7 +294,7 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   if (status) after.loadStatus = status;
   // Starting or resuming a load (it was not loading and now is): the area's limit.
   const nowLoading = dayLoadingNow(Object.assign({}, day, after));
-  if (nowLoading && !wasLoading && LOADING_LIMIT[runAreaOf(run)]) overLimit(runAreaOf(run), await loadingNow(tx, db, runAreaOf(run), stamp, run.id + '|' + req.day), SaveError);
+  if (nowLoading && !wasLoading && LOADING_LIMIT[runAreaOf(run)] && !(f.overLimit && req.manager)) overLimit(runAreaOf(run), await loadingNow(tx, db, runAreaOf(run), stamp, run.id + '|' + req.day), SaveError);
   if (f.truck !== undefined || f.trailer !== undefined) {
     const equipment = (await tx.get(db.collection('equipment'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
     [['truck', 'TRUCK', 'truckId'], ['trailer', 'TRAILER', 'trailerId']].forEach(([k, type, idField]) => {

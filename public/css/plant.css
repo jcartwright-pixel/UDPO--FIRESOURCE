@@ -44,6 +44,7 @@
 .plant-page button.state { min-width: 96px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: #eef2f5; color: #516273; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
 .plant-page button.state.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
 .plant-page button.state.loading { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
+.plant-page button.state.paused { background: #ede7f6; color: #4a2c82; border-color: #c5b3e6; }
 .plant-page button.clock { min-width: 64px; height: 30px; border-radius: 8px; border: 1px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
 .plant-page button.clock.end { background: var(--ud-blue); color: #fff; }
 .plant-page .tick { color: var(--runs-ink); font-weight: 800; }

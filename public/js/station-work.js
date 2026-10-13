@@ -305,6 +305,10 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const why = s.why || (!s.open ? '' : who + ' is not allowed to save this. In Administration > People & Roles give it the Plant Employee role or allow this work, or sign this tablet in with its station code');
     const note = person() && !canSave() ? '<p class="sw-note">View only' + (why ? ': ' + escapeHtml(why) : '') + '.</p>' : '';
     box.innerHTML = note + (view === 'loading' ? loadingView() : view === 'unloading' ? unloadingView() : view === 'washing' ? washingView() : view === 'receiving' ? receivingView() : returnsView());
+    held.forEach(h => {
+      const card = h.id && box.querySelector('[data-sw="' + CSS.escape(h.id) + '"]'), at = card && (card.querySelector('.sw-head .sw-state') || card.querySelector('.sw-head .sw-title'));
+      if (at && !at.querySelector('.sw-flag.wait')) at.insertAdjacentHTML('beforeend', '<i class="sw-flag wait">WAITING TO SEND</i>');
+    });
     if (keep) {
       const el = box.querySelector('[data-id="' + CSS.escape(keep[0]) + '"][data-k="' + keep[1] + '"]');
       if (el) { el.focus(); try { if (keep[2] !== null && keep[2] !== undefined) el.setSelectionRange(keep[2], keep[2]); } catch (e) { /* not a text box */ } }
@@ -320,10 +324,22 @@ export function mountStationWork({ db, box, person, onDraw }) {
     render();
     return () => { if (pending[id] && pending[id]._no === mine) delete pending[id]; render(); };
   }
+  // Joe 10/13: a tap saved with no signal waits on the tablet (js/offline-saves.js). Its card keeps showing it, marked
+  // "WAITING TO SEND", until the tablet has sent everything that waited; then the card follows the database again.
+  const held = [];
+  const queued = (res) => !!(res && res.queued);
+  function hold(id, clear) { held.push({ id, clear }); render(); }
+  if (window.UD_STATION_OFFLINE) import('./offline-saves.js').then(o => o.onWaitingChange(list => {
+    if (list.length || !held.length) return;
+    const sent = held.splice(0);
+    render();
+    setTimeout(() => { sent.forEach(h => h.clear()); render(); }, 1500);
+  })).catch(() => {});
   async function saveLoad(r, fields, shown) {
     const done = show(r.id, shown);
-    try { await save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }); showError(''); delete drafts[r.id]; } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
-    done();
+    let res;
+    try { res = await save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }); showError(''); delete drafts[r.id]; } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
+    if (queued(res)) hold(r.id, done); else done();
   }
   const chain = {};
   async function saveUnload(r, fields, shown) {
@@ -331,10 +347,11 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (fields.returnIds) fields.returnIds.forEach(id => { returned[id] = true; });
     const turn = (chain[r.key] || Promise.resolve()).then(() => save('saveUnloading', { date, route: r.route, run: r.run, runDocId: r.runDocId, day: r.day, fields }));
     chain[r.key] = turn.catch(() => {});
-    let ok = true;
-    try { await turn; showError(''); } catch (e) { ok = false; showError(r.route + ' ' + r.run + ': ' + (e.message || e)); }
-    if (fields.returnIds) setTimeout(() => { fields.returnIds.forEach(id => { delete returned[id]; }); render(); }, ok ? 1500 : 0);
-    done();
+    let ok = true, res;
+    try { res = await turn; showError(''); } catch (e) { ok = false; showError(r.route + ' ' + r.run + ': ' + (e.message || e)); }
+    const back = () => { if (fields.returnIds) fields.returnIds.forEach(id => { delete returned[id]; }); done(); };
+    if (queued(res)) hold(r.key, back);
+    else { if (fields.returnIds) setTimeout(() => { fields.returnIds.forEach(id => { delete returned[id]; }); render(); }, ok ? 1500 : 0); done(); }
     return ok;
   }
   async function washTrailer(trailer) {
@@ -342,9 +359,10 @@ export function mountStationWork({ db, box, person, onDraw }) {
     washedNow[unit] = true;
     render();
     try {
-      await save('completeWash', { date, trailer: U.trailerText(trailer), close: mine.flatMap(w => w.refs) });
+      const res = await save('completeWash', { date, trailer: U.trailerText(trailer), close: mine.flatMap(w => w.refs) });
       showError('');
-      setTimeout(() => { delete washedNow[unit]; render(); }, 1500);
+      if (queued(res)) hold(mine.length ? mine[0].id : '', () => { delete washedNow[unit]; });
+      else setTimeout(() => { delete washedNow[unit]; render(); }, 1500);
     } catch (e) {
       delete washedNow[unit];
       showError('Wash ' + trailer + ' not saved (' + (e.message || e) + '). Press Confirm Washed again.');
@@ -370,12 +388,13 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const done = show(id, shown);
     // Only what this save sent is cleared: a box typed while it was on its way stays typed.
     const sent = Object.assign({}, d);
+    let res;
     try {
-      await save('savePlantSchedule', Object.assign({ lane, op: 'progress', id: x.id, date: x.date, step, fields }, step === 'pause' ? { pauseReason: reason } : {})); showError('');
+      res = await save('savePlantSchedule', Object.assign({ lane, op: 'progress', id: x.id, date: x.date, step, fields }, step === 'pause' ? { pauseReason: reason } : {})); showError('');
       if (step === 'pause') delete pauseForm[id];
       if (drafts[id]) Object.keys(fields).forEach(k => { if (drafts[id][k] === sent[k]) delete drafts[id][k]; });
     } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(id, m); else showError(x.route + ' ' + (x.run || '') + ': ' + m); }
-    done();
+    if (queued(res)) hold(id, done); else done();
   }
 
   // What was typed on a load's card and differs from the load.
@@ -482,7 +501,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
       returned[x.id] = true;
       render();
       save('saveUnloading', { date, route: x.route, run: x.run, runDocId: x.runDocId || '', day: x.day || '', fields: { returnIds: [x.id] } })
-        .then(() => { showError(''); setTimeout(() => { delete returned[x.id]; render(); }, 1500); })
+        .then(res => { showError(''); if (queued(res)) hold(x.id, () => { delete returned[x.id]; }); else setTimeout(() => { delete returned[x.id]; render(); }, 1500); })
         .catch(err => { delete returned[x.id]; render(); showError('RTA for ' + x.route + ' ' + x.run + ' not saved (' + (err.message || err) + '). Press RTA again.'); });
     }
   }

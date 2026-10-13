@@ -448,6 +448,7 @@ function validate(input) {
   return out;
 }
 
+const MANAGER_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER', 'SUPERVISOR'];
 async function requireSaver(tx, db, user, roles, action) {
   // A Plant Station signed in by its code alone (index.js checked its station): only the plant-floor saves.
   if (user && user.station) {
@@ -541,7 +542,8 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     if (!req.override && L.unitOff(e)) throw new SaveError('NOT_ALLOWED', e.unit + ' is ' + L.unitOffWhy(e) + ' in Equipment Master (tick OVR to use it anyway)');
     return { [idField]: e.id, [unitField]: e.unit };
   }
-  if (req.action === 'setRuns') return { runs: req.runs };
+  // Joe 10/13 ("No route equals no driver"): a day turned off loses its driver, truck and trailer (that day only), so they are free.
+  if (req.action === 'setRuns') return req.runs ? { runs: true } : Object.assign({ runs: false }, L.NOT_RUNNING_CLEARS);
   if (req.action === 'setDispatchTime') return { dispatchTime: req.time };
   if (req.action === 'setJack') return { palletJack: req.jack };
   if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });
@@ -642,7 +644,9 @@ async function applyAction(db, user, input, now) {
       return Object.assign({}, prior.result, { repeated: true });
     }
     const mode = await requireTestMode(tx, db, spec.screen);
-    await requireSaver(tx, db, user, spec.roles, req.action);
+    const person = await requireSaver(tx, db, user, spec.roles, req.action);
+    // Joe 10/13: managers may load past the loadout's limit from the Loadout Center; a Plant Station tablet never can.
+    req.manager = !(user && user.station) && L.hasRole(person, MANAGER_ROLES);
 
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderPlantLoads') {

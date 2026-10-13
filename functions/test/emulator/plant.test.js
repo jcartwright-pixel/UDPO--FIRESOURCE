@@ -195,6 +195,21 @@ test('Loading limit: Case Loadout loads 2 at a time; a paused one does not count
   assert.deepEqual([resumed.loadStatus, resumed.plantStartedAt], ['LOADING', '2026-10-08T05:27:00.000Z'], 'resuming keeps the start time');
 });
 
+// Joe 10/13: a manager may go past the limit from the Loadout Center (it asks with overLimit); a dispatcher, a Plant Station
+// tablet (even signed in as a manager, it never asks) and a station code alone stay limited.
+test('Loading limit: a manager on the Loadout Center may go past it; everyone else stays limited', async () => {
+  const ADMIN = { email: 'admin.test@uniteddairy.com' };
+  const all = await areaLoads('CASE'), [w1, w2] = all.filter(x => isWaiting(x.d));
+  assert.equal(all.filter(x => isLoading(x.d)).length, 2);
+  const as = (user, x, extra) => applyAction(db(), user, Object.assign({ action: 'savePlantLoad', requestId: rid(), runDocId: x.runDocId, day: x.day, fields: { status: 'LOADING' } }, extra || {}), tick);
+  await assert.rejects(as(DISPATCHER, w1, { overLimit: true }), /2 loads are already loading/, 'a dispatcher is not a manager');
+  await assert.rejects(as(ADMIN, w1), /2 loads are already loading/, 'a station tablet does not ask to go past it');
+  await assert.rejects(as({ email: 'station@uniteddairy.com', station: { name: 'Case Loadout' } }, w1, { overLimit: true }), /2 loads are already loading/, 'a station code alone is never a manager');
+  await as(ADMIN, w1, { overLimit: true });
+  assert.equal((await areaLoads('CASE')).filter(x => isLoading(x.d)).length, 3, 'the manager made it 3');
+  await assert.rejects(as(DISPATCHER, w2), /3 loads are already loading/, 'still limited for everyone else');
+});
+
 test('Loading limit: Boxing loads 3 at a time, its Scheduler shipments included; a paused shipment does not count', async () => {
   const box = await areaLoads('BOXING');
   const loading = box.filter(x => isLoading(x.d)).length, waiting = box.filter(x => isWaiting(x.d));
