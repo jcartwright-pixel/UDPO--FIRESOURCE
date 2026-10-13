@@ -30,6 +30,8 @@
       <div class="title"><span class="eyebrow" id="eyebrow">Safety Walkthrough</span><h1 id="title">Fire Extinguishers</h1><span class="sw-counts" id="counts"></span></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <button type="button" class="sw-top pri" id="start-check" data-top>Start Monthly Check</button>
+      <button type="button" class="sw-top" id="add-ext" data-top hidden>+ Add Extinguisher</button>
+      <a class="sw-top" href="location-areas.html" id="locs-link" data-top hidden>Locations</a>
       <a class="sw-top" href="safety.html" data-top>Weekly Walk</a>
       <a class="sw-top" href="safety-issues.html" data-top>Open Issues</a>
     </div>
@@ -37,12 +39,13 @@
     <div class="notice warning" id="offline-line" role="status" hidden></div>
     <div class="view" id="list-view">
       <div class="sw-sheet">
-        <table class="sw-grid">
-          <colgroup><col style="width:6%"><col style="width:21%"><col style="width:9%"><col style="width:7%"><col style="width:14%"><col style="width:12%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:6%"></colgroup>
+        <table class="sw-grid sw-ext-grid">
+          <colgroup><col style="width:6%"><col style="width:19%"><col style="width:9%"><col style="width:7%"><col style="width:13%"><col style="width:11%"><col style="width:10%"><col style="width:8%"><col style="width:8%"><col style="width:9%"></colgroup>
           <thead><tr><th>Tag</th><th>Location</th><th>Type</th><th>Size</th><th>This month</th><th>Checked</th><th>Annual service</th><th>6-year</th><th>Hydro test</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
+      <datalist id="ext-locs"></datalist>
       <div class="sw-foot" id="foot"></div>
     </div>
     <div class="view" id="check-view" hidden>
@@ -55,15 +58,17 @@
     import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
     import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { today, thisMonth, monthName, pickPlant, plantName, canWalk, canSetUp, modeText, watchExtinguishers } from './js/safety.js';
+    import { today, thisMonth, monthName, pickPlant, plantName, canWalk, canSetUp, modeText, watchExtinguishers, watchSetup } from './js/safety.js';
 
     // Fire Extinguishers (Joe 10/12, mock-ups E and F): each plant's extinguishers with this month's check (OSHA asks for a
     // monthly look at every one) and the annual service, 6-year and hydrostatic test dates, which turn amber 30 days out and
     // red when past. Check opens the big-button check of one extinguisher; Next goes to the next tag. A manager or
-    // administrator keeps the list: each box saves as it is left; the empty row at the bottom adds one.
+    // administrator keeps the list: each box saves as it is left; the empty row at the bottom adds one. Joe 10/13: + Add
+    // Extinguisher (top) goes to that row; Location is a pick list of the plant's Location Areas (Locations opens them) and
+    // the places already used, and any place can still be typed.
     const S = window.UDSafety;
     const params = new URLSearchParams(location.search);
-    let db = null, person = null, app = {}, plant = '', exts = null, stop = null, checking = params.get('tag') || '', chain = Promise.resolve(), addedTag = '';
+    let db = null, person = null, app = {}, plant = '', exts = null, stop = null, stopLocs = null, locs = [], checking = params.get('tag') || '', chain = Promise.resolve(), addedTag = '';
     const mine = {}, armed = {};
     const month = thisMonth();
     const DATES = [['annualDue', 'Annual service'], ['sixYearDue', '6-year'], ['hydroDue', 'Hydro test']];
@@ -80,12 +85,18 @@
       const list = exts || [], st = list.map(stateOf);
       document.getElementById('counts').innerHTML = list.length + ' on the list · <b class="g">' + st.filter(m => m.state === 'GOOD').length + ' Good</b> · <b class="a">' + st.filter(m => m.state === 'DUE').length + ' Due</b> · <b class="r">' + st.filter(m => m.state === 'NOT_GOOD').length + ' Not good</b>';
       document.getElementById('start-check').hidden = !!checking || !list.length || !canWalk(person, app);
+      document.getElementById('add-ext').hidden = !!checking || !canSetUp(person, app);
+      document.getElementById('locs-link').hidden = !!checking || !canSetUp(person, app);
+      document.getElementById('locs-link').href = 'location-areas.html?plant=' + encodeURIComponent(plant);
     }
     function drawList(force) {
       if (force !== true && document.getElementById('rows').contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
       if (!exts) { document.getElementById('rows').innerHTML = '<tr><td colspan="10" class="sw-empty">Reading the extinguishers…</td></tr>'; return; }
       const set = canSetUp(person, app), dis = set ? '' : ' disabled';
-      const box = (e, k, v, ph, label) => set ? '<input data-k="' + k + '" value="' + escapeHtml(v || '') + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' aria-label="' + label + '">' : escapeHtml(v || '');
+      const box = (e, k, v, ph, label) => set ? '<input data-k="' + k + '" value="' + escapeHtml(v || '') + '"' + (ph ? ' placeholder="' + ph + '"' : '') + (k === 'location' ? ' list="ext-locs"' : '') + ' aria-label="' + label + '">' : escapeHtml(v || '');
+      // The pick list: the plant's Location Areas, then places already typed.
+      const places = locs.concat(exts.map(e => e.location).filter(Boolean)).filter((v, i, a) => a.indexOf(v) === i);
+      document.getElementById('ext-locs').innerHTML = places.map(v => '<option value="' + escapeHtml(v) + '"></option>').join('');
       const dateBox = (e, k, label) => set ? '<input data-k="' + k + '" value="' + escapeHtml(e[k] ? shortDate(e[k]) : '') + '" placeholder="3-15-27" aria-label="' + label + ' for tag ' + escapeHtml(e.tag) + '">' + (S.dueState(e[k], today()) === 'PAST' ? '<span class="sw-pill red">PAST DUE</span>' : S.dueState(e[k], today()) === 'SOON' ? '<span class="sw-pill amber">DUE SOON</span>' : '') : duePill(e[k]);
       document.getElementById('rows').innerHTML = exts.map(e => {
         const m = stateOf(e);
@@ -93,8 +104,8 @@
           '<td>' + box(e, 'size', e.size, '10 lb', 'Size of tag ' + escapeHtml(e.tag)) + '</td><td>' + statePill(m) + '</td><td class="nw">' + (m.at ? shortDate(m.at) + (m.byName ? ' · ' + escapeHtml(m.byName) : '') : '<span class="sw-nc">Not checked</span>') + '</td>' +
           DATES.map(([k, l]) => '<td>' + dateBox(e, k, l) + '</td>').join('') +
           '<td class="nw">' + (canWalk(person, app) ? '<button type="button" class="sw-btn sw-small" data-check="' + escapeHtml(e.id) + '">Check</button>' : '') + (set ? ' <button type="button" class="sw-btn sw-small" data-retire="' + escapeHtml(e.id) + '" title="Take tag ' + escapeHtml(e.tag) + ' off the list">' + (armed[e.id] ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>';
-      }).join('') + (set ? '<tr class="sw-add" data-new="1"><td><input data-k="tag" placeholder="Tag" aria-label="New tag number" maxlength="12"></td><td><input data-k="location" placeholder="Where it hangs" aria-label="New location"></td><td>' + typeSel('type', '', '') + '</td><td><input data-k="size" placeholder="10 lb" aria-label="New size"></td><td colspan="2" class="sw-how">Type a tag and where it hangs to add it.</td>' +
-        DATES.map(([k, l]) => '<td><input data-k="' + k + '" placeholder="3-15-27" aria-label="New ' + l + '"></td>').join('') + '<td></td></tr>' : '') +
+      }).join('') + (set ? '<tr class="sw-add" data-new="1"><td><input data-k="tag" placeholder="Tag" aria-label="New tag number" maxlength="12"></td><td><input data-k="location" list="ext-locs" placeholder="Pick or type where it hangs" aria-label="New location"></td><td>' + typeSel('type', '', '') + '</td><td><input data-k="size" placeholder="10 lb" aria-label="New size"></td><td colspan="2"><span class="sw-how">Type a tag and where it hangs, then Add.</span></td>' +
+        DATES.map(([k, l]) => '<td><input data-k="' + k + '" placeholder="3-15-27" aria-label="New ' + l + '"></td>').join('') + '<td><button type="button" class="sw-btn sw-small pri" data-add="1">Add</button></td></tr>' : '') +
         (!exts.length && !set ? '<tr><td colspan="10" class="sw-empty">No extinguishers on the list yet. A manager or administrator adds them here.</td></tr>' : '');
       document.getElementById('foot').textContent = (set ? 'Each box saves as you leave it. ' : '') + 'This month: Good when all five items are Good. A Not good stays on Open Issues until it is fixed. Dates turn amber 30 days before they are due and red when past.';
     }
@@ -141,17 +152,36 @@
       const t = e.target, tr = t.closest('tr');
       if (!tr || !canSetUp(person, app) || !t.dataset.k) return;
       if (tr.dataset.new) {
-        const v = (k) => (tr.querySelector('[data-k="' + k + '"]') || {}).value || '';
-        if (!v('tag').trim() || !v('location').trim()) return;
-        send('saveExtinguisher', { isNew: true, facilityId: plant, tag: v('tag').trim(), location: v('location').trim(), type: v('type'), size: v('size').trim(), annualDue: v('annualDue').trim(), sixYearDue: v('sixYearDue').trim(), hydroDue: v('hydroDue').trim() })
-          .then(() => { addedTag = v('tag').trim(); shown(); });
+        // It saves as soon as the tag and where it hangs are both in (or on Add).
+        addNew(tr, false);
         return;
       }
       const ext = extOf(tr.dataset.id);
       if (!ext) return;
       send('saveExtinguisher', Object.assign(rowFields(ext), { [t.dataset.k]: t.value.trim() }));
     });
+    let adding = false;
+    function addNew(tr, loud) {
+      const v = (k) => (tr.querySelector('[data-k="' + k + '"]') || {}).value || '';
+      if (adding) return;
+      if (!v('tag').trim() || !v('location').trim()) { if (loud) showError('Type the tag number and where it hangs, then press Add.'); return; }
+      if ((exts || []).some(e => e.tag === v('tag').trim())) { showError('Tag ' + v('tag').trim() + ' is already on the list.'); return; }
+      adding = true;
+      send('saveExtinguisher', { isNew: true, facilityId: plant, tag: v('tag').trim(), location: v('location').trim(), type: v('type'), size: v('size').trim(), annualDue: v('annualDue').trim(), sixYearDue: v('sixYearDue').trim(), hydroDue: v('hydroDue').trim() })
+        .then(() => { addedTag = v('tag').trim(); shown(); }).finally(() => { adding = false; });
+    }
+    // + Add Extinguisher: the empty row at the bottom, ready to type in.
+    document.getElementById('add-ext').addEventListener('click', () => {
+      const tr = document.querySelector('#rows tr[data-new]');
+      if (!tr) return;
+      tr.scrollIntoView({ block: 'center' });
+      tr.classList.add('sw-flash');
+      setTimeout(() => tr.classList.remove('sw-flash'), 2500);
+      tr.querySelector('input[data-k="tag"]').focus();
+    });
     document.getElementById('rows').addEventListener('click', e => {
+      const a = e.target.closest('[data-add]');
+      if (a) { addNew(a.closest('tr'), true); return; }
       const c = e.target.closest('[data-check]');
       if (c) { checking = c.dataset.check; history.replaceState(null, '', '?tag=' + encodeURIComponent(checking)); render(); return; }
       const r = e.target.closest('[data-retire]');
@@ -180,6 +210,12 @@
       if (stop) stop();
       exts = null; render();
       waiting('saveExtinguisherCheck').then(list => { list.filter(e => e.fields.month === month && e.fields.item).forEach(e => { const f = e.fields; mine[f.extinguisherId] = Object.assign({}, mine[f.extinguisherId] || {}, { [f.item]: f.status }); }); render(); });
+      if (stopLocs) stopLocs();
+      stopLocs = watchSetup(db, plant, s => {
+        locs = [];
+        S.locations(s && s.locations).forEach(a => { if (!a.off) a.subs.forEach(x => { if (!x.off) locs.push(a.name + ' \u203a ' + x.name); }); });
+        render();
+      });
       stop = watchExtinguishers(db, plant, list => {
         exts = list;
         // Taps that have reached the saved check.
