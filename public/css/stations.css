@@ -439,6 +439,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw-flag { font-style: normal; font-size: 16px; font-weight: 800; padding: 3px 9px; border-radius: 8px; white-space: nowrap; }
 .sw-flag.pu { background: #b42318; color: #fff; }
 .sw-flag.skip { background: #fff4db; color: #8a4b00; border: 1px solid #e8b04a; }
+.sw-flag.wait { background: #eef2f6; color: #33475b; border: 2px dashed #6b7f93; margin-left: 6px; }
 .sw-quick { display: flex; gap: 8px; justify-content: flex-end; }
 .sw-chev { color: #5b6b7c; font-size: 16px; text-align: center; }
 .sw-body { padding: 4px 16px 16px; border-top: 1px solid #dde7ef; }
