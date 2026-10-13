@@ -20,11 +20,12 @@ const reply = (status, body) => ({ status, text: async () => body });
 // A stand-in for Verizon Connect Fleet: sub-user "app" / "pw" on fleet united-dairy gets key "k1"; it keeps the templates
 // it is sent and answers our two by name with CSV.
 function fleet(log, opts) {
+  opts = opts || {};
   const saved = [];
   return async (url, init) => {
     log.push((init.method || 'GET') + ' ' + url.replace(/auth=[^&]+/, 'auth=*'));
     if (url === BASE + '/rest/login') {
-      if (opts && opts.postMissing) return reply(405, '');
+      if (opts.postMissing) return reply(405, '');
       const b = JSON.parse(init.body);
       return b.username === 'united-dairy:app' && b.password === 'pw' ? reply(200, JSON.stringify({ token: 'k1' })) : reply(401, '');
     }
@@ -35,18 +36,10 @@ function fleet(log, opts) {
       return reply(200, JSON.stringify(saved.map(t => ({ name: /TemplateName = (\w+)/.exec(t)[1] }))));
     }
     if (url.startsWith(BASE + '/execute?template=UDPO_TrucksNow')) {
+      const odo = (opts && opts.odo) || { a: 412345.6, at: '2026-10-13 14:05:00' };
       return reply(200, 'UnitId,Tag,LastReport,Lat,Lon,Address,Place,SpeedMph,IgnitionOn,OdometerMiles,EngineHours,Driver,Active\r\n'
-        + '11,223876,2026-10-13 14:05:00,39.99,-81.1,"1 Main St, Uniontown OH",Uniontown Yard,0,False,412345.6,15022.5,Pat Smith,True\r\n'
-        + '12,223877,2026-10-13 14:06:00,40.1,-81.3,"Route 8, Akron OH",,54,True,300100,9000,,True\r\n');
-    }
-    if (url.startsWith(BASE + '/execute?template=UDPO_DayPoints')) {
-      assert.match(url, /ReportStart=2026-10-13&ReportEnd=2026-10-15/);
-      return reply(200, 'UnitId,Tag,Time,Lat,Lon,Address,MilesDelta\n'
-        + '11,223876,2026-10-13 03:30:00,0,0,Yard,5\n'      // 11:30 p.m. on 10/12 in New York: not today
-        + '11,223876,2026-10-13 10:00:00,0,0,Yard,0\n'
-        + '11,223876,2026-10-13 10:15:00,0,0,Road,12.4\n'
-        + '11,223876,2026-10-13 13:40:00,0,0,Store,30.2\n'
-        + '12,223877,2026-10-13 11:00:00,0,0,Akron,0\n');
+        + '11,223876,' + odo.at + ',39.99,-81.1,"1 Main St, Uniontown OH",Uniontown Yard,0,False,' + odo.a + ',15022.5,Pat Smith,True\r\n'
+        + '12,T-635,2026-10-13 14:06:00,40.1,-81.3,"Route 8, Akron OH",,54,True,,,,True\r\n');
     }
     return reply(404, '');
   };
@@ -54,7 +47,8 @@ function fleet(log, opts) {
 const NOW = () => new Date('2026-10-13T14:10:00Z');
 
 test('Fleet GPS: managers only, the login never comes back, Test says plainly what works, a pull stores trucks and miles', async () => {
-  const log = [], o = { fetch: fleet(log), base: BASE, now: NOW, sleep: async () => {} };
+  const log = [], state = { odo: { a: 412345.6, at: '2026-10-13 14:05:00' } }, clock = { now: new Date('2026-10-13T14:10:00Z') };
+  const o = { fetch: fleet(log, state), base: BASE, now: () => clock.now, sleep: async () => {} };
   await assert.rejects(gpsCall(db(), DISPATCHER, { kind: 'fleet', op: 'status' }, o), /Only a manager or administrator/);
   let s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'test' }, o);
   assert.match(s.result.message, /save the Fleet name/);
@@ -71,11 +65,11 @@ test('Fleet GPS: managers only, the login never comes back, Test says plainly wh
   await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'save', password: 'pw' }, o);
   s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'test' }, o);
   assert.equal(s.result.ok, true, s.result.message);
-  assert.match(s.result.message, /^Connected\. Verizon Fleet answered with 2 trucks, for example 223876, 223877\./);
-  assert.equal(log.filter(l => l.startsWith('POST ' + BASE + '/templates')).length, 2, 'both templates saved once');
+  assert.match(s.result.message, /^Connected\. Verizon Fleet answered with 2 trucks, for example 223876, T-635\./);
+  assert.equal(log.filter(l => l.startsWith('POST ' + BASE + '/templates')).length, 1, 'the template is saved once');
 
   s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'pull' }, o);
-  assert.deepEqual(s.pulled, { trucks: 2, days: 2 });
+  assert.deepEqual(s.pulled, { trucks: 2, days: 1 });
   const t = (await db().collection('gpsTrucks').doc('223876').get()).data();
   assert.equal(t.lastReport, '2026-10-13T14:05:00.000Z');
   assert.equal(t.place, 'Uniontown Yard');
@@ -84,16 +78,23 @@ test('Fleet GPS: managers only, the login never comes back, Test says plainly wh
   assert.equal(t.engineHours, 15022.5);
   assert.equal(t.ignitionOn, false);
   assert.equal(t.driver, 'Pat Smith');
-  const day = (await db().collection('gpsDays').doc('2026-10-13_223876').get()).data();
-  assert.equal(day.miles, 42.6, 'only today\'s New York points count');
-  assert.equal(day.firstMove, '2026-10-13T10:15:00.000Z');
-  assert.equal(day.lastMove, '2026-10-13T13:40:00.000Z');
-  assert.equal(day.lastPlace, 'Store');
+  assert.equal((await db().collection('gpsTrucks').doc('T-635').get()).data().odometerMiles, null, 'a trailer without an odometer');
+  let day = (await db().collection('gpsDays').doc('2026-10-13_223876').get()).data();
+  assert.deepEqual([day.miles, day.firstMove], [0, '']);
 
-  // The saved key is used again, and the templates are not sent again.
+  // Five minutes later the truck has moved 12.4 miles; the saved key is used again and the template is not sent again.
   const before = log.length;
-  await pull(db(), o);
+  clock.now = new Date('2026-10-13T14:15:00Z'); state.odo = { a: 412358, at: '2026-10-13 14:14:00' };
+  assert.deepEqual(await pull(db(), o), { trucks: 2, days: 1 });
   assert.equal(log.slice(before).filter(l => /rest\/login|\/templates/.test(l)).length, 0);
+  day = (await db().collection('gpsDays').doc('2026-10-13_223876').get()).data();
+  assert.deepEqual([day.miles, day.firstMove, day.lastMove], [12.4, '2026-10-13T14:15:00.000Z', '2026-10-13T14:15:00.000Z']);
+  // No new report: nothing is written.
+  assert.deepEqual(await pull(db(), o), { trucks: 2, days: 0 });
+  // A new New York day starts again from that day's first reading.
+  clock.now = new Date('2026-10-14T11:00:00Z'); state.odo = { a: 412400, at: '2026-10-14 10:59:00' };
+  await pull(db(), o);
+  assert.equal((await db().collection('gpsDays').doc('2026-10-14_223876').get()).data().miles, 0);
 
   s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'clear' }, o);
   assert.deepEqual([s.fleet, s.hasUser, s.hasPassword], ['united-dairy', false, false]);

@@ -368,7 +368,7 @@ const PAGE_ICON = {
   // Joe 10/11: Daily Dispatch has no title picture, so its boxes sit further left; Weekly matches it (polish 21). The other
   // screens use line drawings instead of the truck, tractor and building photos, so every title reads the same way.
   'routes.html': 'road', 'routeweek.html': 'week', 'admin.html': 'gear', 'ops.html': 'swap', 'print.html': 'day', 'settings.html': 'gear', 'soon.html': 'factory', 'otr.html': 'road',
-  'gps.html': 'pin', 'scorecard.html': 'star', 'reportcenter.html': 'chart',
+  'gps.html': 'pin', 'trucks.html': 'pin', 'scorecard.html': 'star', 'reportcenter.html': 'chart',
   'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
   'garage.html': 'wrench', 'fleet.html': 'truck',
   'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'case-unloading-v1-560.webp', 'returns.html': 'returns-to-cooler-v1-560.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'machine-setup.html': 'production.webp', 'production.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star',

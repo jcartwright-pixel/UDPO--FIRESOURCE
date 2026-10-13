@@ -1867,3 +1867,14 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .fleet-page .head .tabs { grid-auto-columns: auto; }
 .fleet-page .head .tabs button { padding: 0 16px; }
 .fleet-page .head .title { min-width: 400px; }
+
+/* Trucks Today (trucks.html): one pill per truck's status. */
+.trucks-page .tt-board td small { display: block; color: var(--muted); font-size: 14px; }
+.trucks-page .tt-pill { display: inline-block; padding: 2px 10px; border-radius: 10px; font-weight: 800; font-size: 15px; white-space: nowrap; }
+.trucks-page .tt-road { background: #e3f4e8; color: #1d6b37; }
+.trucks-page .tt-stopped { background: #e7eef7; color: #1d4f86; }
+.trucks-page .tt-yard { background: #eef2f5; color: #4b5b6b; }
+.trucks-page .tt-nosignal { background: #fdecc4; color: #8a5a00; }
+.trucks-page .tt-nogps { background: #fde3df; color: #a8321f; }
+.trucks-page tr.tt-road, .trucks-page tr.tt-stopped, .trucks-page tr.tt-yard, .trucks-page tr.tt-nosignal, .trucks-page tr.tt-nogps { background: none; color: inherit; }
+.trucks-page .empty a { font-weight: 800; }

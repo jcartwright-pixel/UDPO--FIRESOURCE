@@ -7,19 +7,18 @@
  *   1. Log in: POST https://<fleet>.api.telogis.com/rest/login with "<fleet>:<sub-user>" and the password. The answer is a
  *      key ("token") good for 24 hours, kept in private/gpsFleet with the login. If Fleet refuses the POST form, the
  *      GET form Verizon's email shows (/rest/login/<fleet>/<sub-user>/<password>) is tried once.
- *   2. Make sure our two read-only templates are saved in the Fleet account (GET /templates, else POST /templates):
- *      UDPO_TrucksNow (Unit table: where each truck is now, odometer, engine hours, driver) and UDPO_DayPoints (Point
- *      table: every GPS point between two dates, with the miles since the point before).
- *   3. Run them by name: POST /execute?template=<name>&auth=<key>[&ReportStart=..&ReportEnd=..]. The answer is CSV.
- * Nothing here writes to Fleet except saving those two templates; both only read (Intent = Retrieve).
+ *   2. Make sure our read-only template is saved in the Fleet account (GET /templates, else POST /templates):
+ *      UDPO_TrucksNow (Unit table: where each truck is now, odometer, engine hours, driver).
+ *   3. Run it by name: POST /execute?template=UDPO_TrucksNow&auth=<key>. The answer is CSV.
+ * Nothing here writes to Fleet except saving that template, which only reads (Intent = Retrieve). (The first Test, 10/13,
+ * also saved UDPO_DayPoints, a day's GPS points; it is no longer run: 520 units' points were too many.)
  *
  * The login lives in private/gpsFleet, which no screen can read (firestore.rules). The screen only learns which parts are
  * saved. What a pull stores (readable by any active user):
  *   gpsTrucks/<truck>        last report time, place, latitude/longitude, speed, ignition, odometer, engine hours, driver
- *   gpsDays/<date>_<truck>   that New York day's miles, first and last movement, last place
+ *   gpsDays/<date>_<truck>   that New York day's miles (odometer now less the day's first reading), first and last movement
  *
- * Not yet checked against a real Fleet account (no login yet): the login answer's shape, the template list's shape and the
- * speed unit name. Each step answers in plain words, so Test shows exactly which one Fleet refused.
+ * Joe's Test on the test copy passed 10/13 (520 units), so the login, template list and Unit template work as written.
  */
 'use strict';
 
@@ -41,22 +40,9 @@ const TEMPLATES = Object.freeze({
     'OdometerMiles(mile) = Input.Odometer',
     'EngineHours = Input.TotalEngineHours',
     'Driver = Input.DriverName',
-    'Active = Input.IsActive', ''].join('\r\n') },
-  points: { name: 'UDPO_DayPoints', text: [
-    '[Template]', 'TemplateVersion = 1.0', 'TableID = Point-2.0', 'TemplateName = UDPO_DayPoints', 'Intent = Retrieve', '',
-    '[User]', 'ReportStart(Timestamp) = "ReportStart"', 'ReportEnd(Timestamp) = "ReportEnd"', '',
-    '[Filter]', 'Time = Between(ReportStart, ReportEnd)', '',
-    '[Output]',
-    'UnitId = Input.UnitId',
-    'Tag = Input.Tag',
-    'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time',
-    'Lat = Input.Lat',
-    'Lon = Input.Lon',
-    'Address = Input.Address',
-    'MilesDelta(mile) = Input.OdometerDelta', ''].join('\r\n') }
+    'Active = Input.IsActive', ''].join('\r\n') }
 });
 const TOKEN_HOURS = 23;          // Fleet keys last 24 hours; a fresh one is asked for an hour early.
-const POINTS_EVERY_MINUTES = 15; // the day's miles; where each truck is now is read every run.
 const ZONE = 'America/New_York';
 
 class FleetError extends Error {
@@ -162,7 +148,7 @@ async function ensureTemplates(d, o, token) {
   if (res.status >= 300) throw new FleetError('TEMPLATES', 'The login works, but Verizon Fleet answered ' + res.status + ' when asked for templates. ' + short(await text(res)));
   let have = [];
   try { have = namesIn(JSON.parse(await text(res))); } catch (e) { have = []; }
-  for (const t of [TEMPLATES.trucks, TEMPLATES.points]) {
+  for (const t of [TEMPLATES.trucks]) {
     if (have.indexOf(t.name.toLowerCase()) >= 0) continue;
     const up = await o.fetch(base + '/templates?auth=' + encodeURIComponent(token), { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: t.text });
     if (up.status >= 300) throw new FleetError('TEMPLATES', 'The login works, but Verizon Fleet would not save our ' + t.name + ' template (' + up.status + '). ' + short(await text(up)));
@@ -195,23 +181,27 @@ function truckRow(r, at) {
   };
 }
 
-/** One New York day's miles and first / last movement per truck, from that day's GPS points. */
-function daySummaries(points, date) {
-  const by = {};
-  points.forEach(p => {
-    const t = utcIso(p.Time);
-    if (!t || nyDate(t) !== date) return;
-    const k = truckKey(p.Tag || p.UnitId);
-    if (!k) return;
-    const s = by[k] || (by[k] = { tag: p.Tag || p.UnitId, date, miles: 0, points: 0, firstMove: '', lastMove: '', lastPlace: '', lastAt: '' });
-    const m = num(p.MilesDelta) || 0;
-    s.points++;
-    s.miles += m;
-    if (m > 0.05) { if (!s.firstMove || t < s.firstMove) s.firstMove = t; if (t > s.lastMove) s.lastMove = t; }
-    if (t >= s.lastAt) { s.lastAt = t; s.lastPlace = p.Address || ''; }
+/*
+ * Today's miles from the odometer (10/13: the day's GPS points for all 520 Fleet units were too many to read in one go).
+ * seen = private/gpsFleetSeen {date, units: {truck: {lr, odo0, odo, first, last}}}: the first odometer read each New York
+ * day, the latest one, and the first and last read at which it went up. Only units whose report changed are written.
+ */
+function advanceDays(seen, trucks, at) {
+  const date = nyDate(at), fresh = seen.date !== date, units = fresh ? {} : Object.assign({}, seen.units || {});
+  const changedTrucks = {}, days = {};
+  Object.keys(trucks).forEach(k => {
+    const t = trucks[k], u = units[k] || {}, prev = (seen.units || {})[k] || {};
+    if (prev.lr !== t.lastReport || fresh) changedTrucks[k] = t;
+    if (t.odometerMiles === null) { units[k] = Object.assign(u, { lr: t.lastReport }); return; }
+    const next = { lr: t.lastReport, odo0: u.odo0 == null ? t.odometerMiles : u.odo0, odo: t.odometerMiles, first: u.first || '', last: u.last || '' };
+    if (u.odo != null && t.odometerMiles - u.odo > 0.2) { next.first = next.first || at; next.last = at; }
+    units[k] = next;
+    if (fresh || u.odo !== next.odo || !u.lr) {
+      days[date + '_' + k] = { tag: t.tag, date, miles: Math.max(0, Math.round((next.odo - next.odo0) * 10) / 10), firstMove: next.first, lastMove: next.last,
+        lastPlace: t.place || t.address || '', updatedAt: at };
+    }
   });
-  Object.keys(by).forEach(k => { by[k].miles = Math.round(by[k].miles * 10) / 10; });
-  return by;
+  return { seen: { date, units }, changedTrucks, days };
 }
 
 async function writeAll(db, coll, docs) {
@@ -223,7 +213,7 @@ async function writeAll(db, coll, docs) {
   }
 }
 
-/** Where every truck is now (each run) and, every 15 minutes, today's miles. Does nothing until a login is saved. */
+/** Where every truck is now and today's miles, each run. Does nothing until a login is saved. */
 async function pull(db, options) {
   const o = withDefaults(options);
   const ref = db.collection('private').doc('gpsFleet');
@@ -235,25 +225,20 @@ async function pull(db, options) {
     if (!d.templatesReady) { await ensureTemplates(d, o, token); await ref.set({ templatesReady: true }, { merge: true }); }
     const trucks = {};
     (await execute(d, o, token, TEMPLATES.trucks.name)).forEach(r => { const k = truckKey(r.Tag); if (k) trucks[k] = truckRow(r, at); });
-    await writeAll(db, 'gpsTrucks', trucks);
-    out.trucks = Object.keys(trucks).length;
-    if (o.points || !d.lastPoints || o.now().getTime() - Date.parse(d.lastPoints) >= POINTS_EVERY_MINUTES * 60000 - 30000) {
-      const date = nyDate(at), next = new Date(Date.parse(date + 'T00:00:00Z') + 2 * 86400000).toISOString().slice(0, 10);
-      // Dates in the address are whole UTC days, so the window runs a day long and only today's New York points are kept.
-      const days = daySummaries(await execute(d, o, token, TEMPLATES.points.name, { ReportStart: date, ReportEnd: next }), date);
-      const docs = {};
-      Object.keys(days).forEach(k => { docs[date + '_' + k] = Object.assign(days[k], { updatedAt: at }); });
-      await writeAll(db, 'gpsDays', docs);
-      out.days = Object.keys(docs).length;
-      await ref.set({ lastPoints: at }, { merge: true });
-    }
+    const seenRef = db.collection('private').doc('gpsFleetSeen');
+    const step = advanceDays((await seenRef.get()).data() || {}, trucks, at);
+    await writeAll(db, 'gpsTrucks', step.changedTrucks);
+    await writeAll(db, 'gpsDays', step.days);
+    await seenRef.set(step.seen);
+    out.trucks = Object.keys(trucks).length; out.days = Object.keys(step.days).length;
     await ref.set({ lastPull: at, lastPullError: '', lastPullTrucks: out.trucks }, { merge: true });
     return out;
   } catch (e) {
     // A refused key is dropped so the next run logs in again.
     await ref.set({ lastPullError: short(e.message), lastPullErrorAt: at, token: e.code === 'RUN' ? '' : (d.token || '') }, { merge: true });
     if (e instanceof FleetError) return Object.assign(out, { error: e.message });
-    throw e;
+    console.error('fleetGps pull', e);
+    return Object.assign(out, { error: 'The GPS read stopped part way (' + short(e.message) + '). It tries again in 5 minutes.' });
   }
 }
 
@@ -308,11 +293,11 @@ async function fleetCall(db, email, input, options) {
     return Object.assign(status(Object.assign({}, d, { lastTest })), { result });
   }
   if (op === 'pull') {
-    const r = await pull(db, Object.assign({}, options, { points: true }));
+    const r = await pull(db, options);
     const fresh = (await ref.get()).data() || {};
     return Object.assign(status(fresh), { pulled: r });
   }
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
-module.exports = { fleetCall, pull, parseCsv, daySummaries, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { fleetCall, pull, parseCsv, advanceDays, utcIso, cleanUser, FleetError, TEMPLATES };
