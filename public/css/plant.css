@@ -1103,3 +1103,9 @@
   body.yard-page .head .title { flex: 0 1 300px; min-width: 0; }
   body.yard-page .head .title .eyebrow { white-space: normal; }
 }
+/* Review item 56 follow-up: on a phone (390) with 16px words, "All Loads 12" was squeezed and cut. The Needs Unloading /
+   All Loads buttons keep their full words; if both do not fit on one line, the second goes under the first. */
+@media (max-width: 1000px) {
+  .plant-page.unload-page .uw-tabrow .tabs { flex-wrap: wrap; max-width: 100%; }
+  .plant-page.unload-page .uw-tabrow .tabs button { flex: none; white-space: nowrap; padding: 0 12px; }
+}
