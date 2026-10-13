@@ -542,7 +542,9 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     if (!req.override && L.unitOff(e)) throw new SaveError('NOT_ALLOWED', e.unit + ' is ' + L.unitOffWhy(e) + ' in Equipment Master (tick OVR to use it anyway)');
     return { [idField]: e.id, [unitField]: e.unit };
   }
-  if (req.action === 'setRuns') return { runs: req.runs };
+  // Joe 10/13: a day turned off loses its driver too; the sheet copy reads a day that still holds a driver as running
+  // (transfer.js, Joe 10/10), so the day would come back on the next copy.
+  if (req.action === 'setRuns') { const was = (run.days && run.days[req.day]) || {}; return req.runs || (!was.driver && !was.driverId) ? { runs: req.runs } : { runs: false, driverId: '', driver: '' }; }
   if (req.action === 'setDispatchTime') return { dispatchTime: req.time };
   if (req.action === 'setJack') return { palletJack: req.jack };
   if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });

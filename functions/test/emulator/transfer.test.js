@@ -111,7 +111,8 @@ test('two Live tabs for the same week stop the transfer', async () => {
   await assert.rejects(runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick }), /same week/);
 });
 
-test('a day the Live sheet marks as not running but holds a driver is read as running; a day with no driver stays off', async () => {
+// Joe 10/13 replaced Joe 10/10's rule: a day marked not running stays off even with a driver on it, and the driver stays.
+test('a day the Live sheet marks as not running stays off even with a driver on it; the driver is kept', async () => {
   const tabs = F.fakeSheets();
   const live = tabs["'LIVE CURRENT WEEK'"], head = live[5];
   live[6][head.indexOf('wed_runs')] = 'FALSE';
@@ -119,7 +120,7 @@ test('a day the Live sheet marks as not running but holds a driver is read as ru
   live[6][head.indexOf('wed_driver')] = 'ADAMS, PAT';
   await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
   const run = (await db().collection('runs').doc('2026-10-04__run_t801').get()).data();
-  assert.equal(run.days.wed.runs, true);
+  assert.equal(run.days.wed.runs, false, 'not running wins over the driver');
   assert.equal(run.days.wed.driver, 'ADAMS, PAT');
-  assert.equal(run.days.fri.runs, false, 'Friday has no driver, so it stays off');
+  assert.equal(run.days.fri.runs, false, 'Friday stays off too');
 });

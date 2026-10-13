@@ -254,7 +254,14 @@ function overLimit(area, n, SaveError) {
 // The day fields one savePlantLoad changes. day = the run's day block now; equipment is read only when a unit was typed.
 async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   const f = req.plant, after = {};
-  if (f.runs === false) return { runs: false };
+  // Ended Up Not Running. Joe 10/13 (852 JERSEY LOAD 2 came back): the sheet copy reads a day that still holds a driver as
+  // running (transfer.js, Joe 10/10), so the day's driver comes off with it; the notes keep who it was.
+  if (f.runs === false) {
+    if (!text(day.driver) && !text(day.driverId)) return { runs: false };
+    const at = new Date(stamp).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const notes = text(day.plantNotes);
+    return { runs: false, driverId: '', driver: '', plantNotes: ((notes ? notes + '\n' : '') + 'Ended up not running ' + at + ' (driver was ' + (text(day.driver) || text(day.driverId)) + ')').slice(-1200) };
+  }
   const wasLoading = dayLoadingNow(day);
   if (f.quantity !== undefined) after.casesOut = f.quantity;
   if (f.temperature !== undefined) after.loadTemperature = f.temperature;
