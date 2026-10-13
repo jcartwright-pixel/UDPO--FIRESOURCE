@@ -29,12 +29,11 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Plant Production</span><h1>Line Targets</h1></div>
+      <div class="title"><span class="eyebrow">Plant Production · <span id="plant-name"></span></span><h1>Line Targets</h1></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <a class="lt-top" id="products-link" href="products.html" data-top>Products List</a>
       <a class="lt-top" href="line.html" data-top>Line Tablet</a>
       <a class="lt-top" href="production.html?tv=1" data-top>Production TV</a>
-      <select id="plant" class="pm-pick" aria-label="Plant" title="Plant" data-top></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -85,8 +84,10 @@
 
     function drawTop() {
       const ps = plants();
-      if (!ps.some(p => p.id === plant)) plant = ps[0].id;
-      document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
+      // Review item 31 (Joe 10/13): no plant drop-down inside a plant. The plant is ?plant= of the link, else the plant the
+      // screen was opened from (this tab), else the person's first plant; its name shows in the heading.
+      if (!ps.some(p => p.id === plant)) { let came = ''; try { came = sessionStorage.getItem('udPlant') || ''; } catch (e) { /* no storage */ } plant = (ps.find(p => p.id === came) || ps[0]).id; }
+      document.getElementById('plant-name').textContent = (ps.find(p => p.id === plant) || { name: plant }).name;
       const st = L.screenState(app, 'plant');
       goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
@@ -211,7 +212,6 @@
       render(true);
     });
     document.getElementById('lines').addEventListener('click', e => { const b = e.target.closest('[data-line]'); if (!b) return; chosen = b.dataset.line; note = ''; setUrl(); render(true); });
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; chosen = ''; note = ''; setUrl(); follow(); });
 
     function follow() {
       if (stop) stop();

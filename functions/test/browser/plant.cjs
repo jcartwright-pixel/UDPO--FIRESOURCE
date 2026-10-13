@@ -118,8 +118,16 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     await loader.click(row('6301_1') + ' button.edit-row');
     if (SHOTS) await loader.screenshot({ path: path.join(SHOTS, 'loadout-edit-1920.png'), scale: 'css' });
     await loader.fill('#edit-notes', 'Short 2 cases of buttermilk');
-    await loader.click('#edit-save');
-    await watcher.waitForFunction(() => true);
+    // Review item 38 (Joe 10/13): no Save Times & Notes button; leaving the box saves it, then Close.
+    assert.equal(await loader.$('#edit-save'), null, 'no Save button on the Edit Load box');
+    await loader.click('#edit-modal [data-close]');
+    for (let i = 0; ; i++) {
+      const days = (await db().collection('runs').get()).docs.flatMap(d => Object.values(d.data().days || {}));
+      if (days.some(d => d && d.plantNotes === 'Short 2 cases of buttermilk')) break;
+      assert.ok(i < 40, 'the note saved when its box was left');
+      await new Promise(r => setTimeout(r, 250));
+    }
+    results.push('Edit Load: the note saved on leaving the box (no Save button)');
 
     // Tanker columns.
     await loader.click('[data-area="TANKER"]');
@@ -144,6 +152,10 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       // T-951 and T-960 asked for a wash; T-993 was unloaded and not washed yet.
       assert.equal(await home.textContent('[data-n="wash.open"]'), '3');
       assert.equal(await home.textContent('[data-n="ret.pending"]'), '2');
+      // Review item 28 (Joe 10/13): the chart, list and tile labels are 16px, and a long Returns or Washing button has its whole
+      // text on hover.
+      assert.deepEqual(await home.$$eval('.dept-a .hour small, .dept-a .hour b, .dept-a .legend, .dept-a .chip em, .dept-a .chip small, .dept-a .dc-metric em, .dept-a .dc-metric small, .dept-a .sec-t, .dept-a .li, .dept-a .hb, .dept-a .dc-link', els => els.filter(e => parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.className + ' ' + e.textContent.slice(0, 20))), []);
+      assert.ok(await home.$$eval('.dept-a [data-dept="ret"] a.dc-link', a => a.every(x => x.title && x.title === x.querySelector('span').textContent)), 'each Returns button has its whole text on hover');
       if (SHOTS) {
         await home.screenshot({ path: path.join(SHOTS, 'departments-' + w + '.png'), scale: 'css' });
         if (w === 1920) await home.screenshot({ path: path.join(SHOTS, 'departments-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 475 }, scale: 'device' });

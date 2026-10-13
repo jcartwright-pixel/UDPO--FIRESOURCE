@@ -40,3 +40,11 @@ body.pk-full .topbar { display: none !important; }
   .pk-row > :nth-child(4), .pk-row > :nth-child(2) { display: none; }
   .pk-title h1 { font-size: 28px; } .pk-title b { font-size: 22px; }
 }
+/* Review item 39 (Joe 10/13): on a 1024 tablet the big numbers fit their tile ("100%" no longer runs into Behind Now). */
+.pk-kpis div { min-width: 0; overflow: hidden; }
+@media (max-width: 1280px) and (min-width: 901px) {
+  .pk-kpis { gap: 14px; }
+  .pk-kpis div { padding: 14px 18px; }
+  .pk-kpis b { font-size: 60px; }
+  .pk-kpis b small { font-size: 30px; }
+}

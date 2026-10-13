@@ -36,7 +36,6 @@
       <a class="lt-top" id="tv" href="production.html?tv=1" data-top>TV Display</a>
       <a class="lt-top" href="line.html" data-top>Line Tablet</a>
       <a class="lt-top" href="linetargets.html" data-top>Line Targets</a>
-      <select id="plant" class="pm-pick" aria-label="Plant" title="Plant" data-top></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view" id="view">
@@ -52,6 +51,7 @@
     import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
     import { watchProduction, lineView, fmt, shiftText } from './js/production.js';
+    import { plantFor } from './js/pmaint.js';
 
     // Production Lines (Joe 10/11): every line this shift, made against target, stopped or running, and the speed flag (Joe: a
     // product run under or over its allowed speed). Plant Production's first page; TV Display (?tv=1) is the same board for the
@@ -62,13 +62,11 @@
     const started = Date.now(), now = () => testNow ? testNow + (Date.now() - started) : Date.now();
     window.udBack = () => { if (tv) { location.search = ''; return true; } return false; };
     let person = null, data = null, stop = null, db = null, plant = params.get('plant') || '';
-    const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
 
     function render() {
       if (!data) return;
       const t = now(), s = data.shift, views = data.lines.map(l => lineView(data, l, t));
-      document.getElementById('plant').innerHTML = plants().map(p => '<option value="' + p.id + '"' + (p.id === plant ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('');
       document.getElementById('tv').href = 'production.html?tv=1&plant=' + encodeURIComponent(plant);
       document.getElementById('tv-plant').textContent = plantName(plant).toUpperCase() + ' PRODUCTION';
       document.getElementById('tv-shift').textContent = shiftText(s) + ' · ' + shortDate(s.date);
@@ -90,12 +88,13 @@
       data = null;
       stop = watchProduction(db, plant, d => { data = d; render(); }, e => showError('Could not read the lines (' + e.message + '). Check the network.'), now);
     }
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; history.replaceState(null, '', '?plant=' + encodeURIComponent(plant)); follow(); });
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
         person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
-        if (!plants().some(p => p.id === plant)) plant = plants()[0].id;
+        // Review item 31 (Joe 10/13): no plant drop-down inside a plant. The plant is ?plant= of the link, else the plant the
+        // screen was opened from (this tab), else the person's first plant (pmaint.js plantFor); its name is in the line under the title.
+        if (!stop) plant = plantFor(person, params.get('plant')).id;
         if (!stop) follow(); else render();
       });
       setInterval(render, 15000);

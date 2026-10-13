@@ -93,11 +93,16 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     if (process.env.XLSX_LOCAL) await admin.route(XLSX_URL, r => r.fulfill({ path: process.env.XLSX_LOCAL, contentType: 'application/javascript' }));
     const areaCount = (id) => admin.$eval('#area option[value="' + id + '"]', o => (/\((\d+)\)$/.exec(o.textContent) || [])[1]);
     await admin.waitForFunction(() => document.getElementById('form-title').textContent === 'TOTES Products' && document.querySelectorAll('#rows .pm-name').length === 1);
-    assert.equal(await admin.inputValue('#plant'), 'fac_uniontown');
-    // Joe 10/12: "product sheet for Uniontown"; the rows are for reading and the ⋮ before a product opens its Edit panel.
+    // Review item 31 (Joe 10/13): no plant drop-down inside a plant; the plant comes from the link (or the plant it was opened from).
+    assert.equal(await admin.$('#plant'), null, 'no plant drop-down');
+    // Joe 10/12: "product sheet for Uniontown"; the rows are for reading and the Edit button before a product opens its Edit panel
+    // (review item 32, Joe 10/13: the word Edit, not ⋮).
     assert.equal(await admin.textContent('#page-title'), 'Uniontown Product Sheet');
     assert.equal(await admin.$$eval('#rows input, #rows select', x => x.length), 0, 'no boxes in the rows');
-    assert.equal(await admin.$$eval('#rows tr:first-child td:first-child .pm-dots', x => x.length), 1, 'the ⋮ is before the product name');
+    assert.deepEqual(await admin.$$eval('#rows tr:first-child td:first-child .pm-editbtn', x => x.map(b => b.textContent)), ['Edit'], 'the Edit button is before the product name');
+    assert.ok(!(await admin.textContent('#rows')).includes('⋮'), 'no ⋮ dots');
+    const speedLines = await admin.$eval('.pm-table thead th[title="Full speed per minute"]', th => { const r = document.createRange(); r.selectNodeContents(th); return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size; });
+    assert.ok(speedLines <= 2, 'Full Speed /Min is on two lines at most: ' + speedLines);
     assert.equal(await admin.inputValue('#area'), 'ut_prod_totes', 'the area drop-down shows the machine');
     const areaNames = await admin.$$eval('#area option', o => o.map(x => x.textContent.replace(/ \(\d+\)$/, '')));
     assert.deepEqual(areaNames.slice(-2), ['CASES', 'TANKER'], 'Uniontown\'s own areas follow its machines');
@@ -106,7 +111,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     assert.ok(!(await admin.textContent('body')).includes('RedZone'), 'no RedZone name on the screen');
     assert.equal(await admin.textContent('#rows .pm-name'), startOf('ut_prod_totes')[0].name);
     // The Edit panel holds every field; Type and Group are drop-downs.
-    await admin.click('#rows tr:first-child .pm-dots');
+    await admin.click('#rows tr:first-child .pm-editbtn');
     await admin.waitForSelector('#edit-back:not([hidden])');
     assert.equal(await admin.inputValue('#edit-fields input[data-k="name"]'), startOf('ut_prod_totes')[0].name);
     assert.deepEqual(await admin.$$eval('#edit-fields [data-k]:not(.pm-other)', x => x.map(e => e.dataset.k + ':' + e.tagName)), ['name:INPUT', 'sku:INPUT', 'upc:INPUT', 'mfgType:SELECT', 'productGroup:SELECT', 'ratePerMin:INPUT', 'targetPct:INPUT', 'minSpeed:INPUT', 'maxSpeed:INPUT', 'shelfLifeDays:INPUT']);
@@ -219,15 +224,15 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     assert.deepEqual(admin.errors, []);
     for (const w of [1536]) {
       const narrow = await openPage(browser, w, 760, '/products.html?plant=fac_uniontown&line=ut_prod_gallon_filler&' + AS);
-      await narrow.waitForFunction(() => document.getElementById('form-title').textContent === 'GALLON FILLER Products' && document.querySelectorAll('#rows tr').length > 10 && document.querySelector('#rows .pm-dots'));
+      await narrow.waitForFunction(() => document.getElementById('form-title').textContent === 'GALLON FILLER Products' && document.querySelectorAll('#rows tr').length > 10 && document.querySelector('#rows .pm-editbtn'));
       await fits(narrow, 'Products ' + w);
       const tops = await narrow.$$eval('[data-top]', els => els.map(e => Math.round(e.getBoundingClientRect().bottom)));
       assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, 'buttons and filters on one line at ' + w + ': ' + tops);
       const edge = await narrow.$$eval('[data-top]', els => Math.max(...els.map(e => e.getBoundingClientRect().right)) - document.documentElement.clientWidth);
-      assert.ok(edge <= 0, 'the plant drop-down is not cut off at ' + w + ': ' + edge);
+      assert.ok(edge <= 0, 'the last filter is not cut off at ' + w + ': ' + edge);
       await shots(narrow, 'products', w);
       // The Edit panel fits Joe's screen too.
-      await narrow.click('#rows tr:nth-child(9) .pm-dots');
+      await narrow.click('#rows tr:nth-child(9) .pm-editbtn');
       await narrow.waitForSelector('#edit-back:not([hidden])');
       const box = await narrow.$eval('#edit-pane', e => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, scroll: e.scrollHeight - e.clientHeight }; });
       assert.ok(box.top >= 0 && box.bottom <= 760 && box.scroll <= 0, 'the Edit panel fits with no scrolling at ' + w + ': ' + JSON.stringify(box));

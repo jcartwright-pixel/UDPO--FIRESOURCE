@@ -27,10 +27,9 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Administration · Plant Setup</span><h1>Location Areas</h1><span class="sw-counts" id="counts"></span></div>
+      <div class="title"><span class="eyebrow">Administration · Plant Setup · <span id="plant-name"></span></span><h1>Location Areas</h1><span class="sw-counts" id="counts"></span></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <a class="sw-top" href="safety-setup.html" id="setup-link" data-top>Checklist Setup</a>
-      <select id="plant" aria-label="Plant" data-top></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice warning" id="locked" role="status" hidden>Location Areas is under construction. Only Administrators can open it while it is being built.</div>
@@ -49,7 +48,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, mayOpenBuilding } from './js/app.js';
     import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-    import { pickPlant, plantsOf, canSetUp, modeText, watchSetup } from './js/safety.js';
+    import { pickPlant, plantName, canSetUp, modeText, watchSetup } from './js/safety.js';
     import { mountRowDrag } from './js/row-drag.js';
 
     // Location Areas (Joe 10/12, Administration > Plant Setup): each plant's areas (Plant, Garage, Office, Yard and any added)
@@ -59,7 +58,8 @@
     // off, so old walks and issues still read. Under construction: Administrators only.
     const S = window.UDSafety;
     const params = new URLSearchParams(location.search);
-    const plantBox = document.getElementById('plant');
+    // Review item 31 (Joe 10/13): no plant drop-down inside a plant. The plant is ?plant= of the link, else the plant the screen
+    // was opened from (this tab), else the person's first plant (safety.js pickPlant); its name shows in the heading.
     let db = null, person = null, app = {}, plant = '', setup = null, seen = false, stop = null, chain = Promise.resolve(), pending = null;
     const list = () => pending || S.locations(setup && setup.locations);
     const copy = () => JSON.parse(JSON.stringify(list()));
@@ -141,11 +141,10 @@
     function follow() {
       if (stop) stop();
       seen = false; setup = null; pending = null; render(true);
-      plantBox.value = plant;
+      document.getElementById('plant-name').textContent = plantName(plant);
       try { sessionStorage.setItem('udPlant', plant); } catch (err) { /* no storage */ }
       stop = watchSetup(db, plant, s => { setup = s; seen = true; if (pending && JSON.stringify(S.locations(s && s.locations)) === JSON.stringify(pending)) pending = null; render(); });
     }
-    plantBox.onchange = () => { plant = plantBox.value; follow(); };
     requireSignIn(async (user) => {
       ({ db } = await start());
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
@@ -154,7 +153,6 @@
         document.getElementById('locked').hidden = ok;
         document.getElementById('view').hidden = !ok;
         if (!ok) return;
-        plantBox.innerHTML = plantsOf(person).map(p => '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + '</option>').join('');
         if (!plant) { plant = pickPlant(person, params.get('plant')); follow(); } else render(true);
       });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(true); });

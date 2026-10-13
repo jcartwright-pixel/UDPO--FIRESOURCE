@@ -983,3 +983,34 @@
 .sched-page .sc-suptable .sc-btn.small { font-size: 16px; min-height: 34px; }
 .sched-page .sc-suptable th, .sched-page .sc-suptable td { text-align: left; }
 .sched-page .sc-btn.small.sc-supbtn { min-height: 32px; font-size: 16px; padding: 0 16px; }
+
+/* Review item 30 (Joe 10/13): Manager Center. Each card's four tiles sit two by two with 16px labels on one line (the label and
+   number side by side, the line under them), a route behind shows its whole "BEHIND · 4 h 0 min" (it wraps rather than being
+   cut), and on a wide screen the Send Current Report card takes two rows instead of three, with Plant Distribution Departments
+   across the top of the other two columns, so the report card has no big empty area. */
+.manager-page .mc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 6px; }
+.manager-page .mc-tile { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label num" "line line" "bar bar"; align-content: center; column-gap: 8px; row-gap: 1px; padding: 4px 10px; min-height: 0; }
+.manager-page .mc-tile span { grid-area: label; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; align-self: center; }
+.manager-page .mc-tile b { grid-area: num; font-size: 22px; line-height: 1.15; text-align: right; }
+.manager-page .mc-tile b.time { font-size: 19px; }
+.manager-page .mc-tile b small { font-size: 16px; }
+.manager-page .mc-tile i { grid-area: line; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.manager-page .mc-tile u { grid-area: bar; }
+.manager-page .mc-pvlist .mc-rt { grid-template-columns: minmax(0, 1fr) auto; }
+.manager-page .mc-pvlist .mc-rt i { grid-column: 1 / -1; white-space: normal; overflow: visible; }
+@media (min-width: 1501px) {
+  .manager-page .mc-report { grid-row: 1 / span 2; }
+  .manager-page .mc-grid [data-card="dept"] { grid-column: 2 / span 2; }
+  .manager-page .mc-grid [data-card="dept"] .mc-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+}
+@media (max-width: 1500px) { .manager-page .mc-tile { min-height: 64px; } }
+
+/* Review item 32 (Joe 10/13): Product Sheet's Edit is a word button (it was ⋮), and "Full Speed /Min" sits on two lines. */
+.products-page .pm-editbtn { height: 34px; min-width: 56px; padding: 0 10px; margin-right: 8px; vertical-align: middle; border: 1px solid var(--ud-blue); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.products-page .pm-editbtn:hover, .products-page .pm-editbtn:focus-visible { background: var(--ud-blue); color: #fff; }
+
+/* Review item 36 (Joe 10/13): Shift Notes' "Saved" pill shows only when it has something to say (no empty pill). */
+.shift-page .sn-autosave:empty { display: none; }
+
+/* Review item 38 (Joe 10/13): Loadout's Edit Load box saves each box as it is left; the time of the last save shows beside Close. */
+.plant-page .edit-saved { align-self: center; font-size: 16px; font-weight: 700; color: #1f7a4d; }
