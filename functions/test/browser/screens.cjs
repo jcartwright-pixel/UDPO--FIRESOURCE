@@ -501,6 +501,7 @@ async function noScroll(page) {
       await phone.click('.phone-load');
       await phone.fill('#step-form input[name=casesDelivered]', '400');
       await phone.fill('#step-form input[name=tractorIssues]', 'Check engine light');
+      await phone.click('#step-form .ci-loaded label:has([value=YES])');
       if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'phone-checkin-390.png') });
       const pf = await noScroll(phone);
       assert.ok(pf.scroll <= pf.inner && pf.width <= pf.innerWidth, 'the phone Check-In fits a 390x844 phone: ' + JSON.stringify(pf));

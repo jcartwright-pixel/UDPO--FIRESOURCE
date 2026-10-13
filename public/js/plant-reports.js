@@ -116,6 +116,8 @@ export function daySummary(date, runs, pickups, journal, nowMs, shifts) {
     // What the driver reported at check-in for this load (Daily Dispatch's check-in columns).
     x.shortage = text(d.overageShortageDetails) || (L.yes(d.overageShortage) ? 'Over / short' : '');
     x.refused = L.yes(d.refusedReturned);
+    // Joe 10/13: the driver said the truck was not loaded correctly, and what was wrong.
+    x.loadedWrong = d.loadedCorrectly === 'NO' ? 'Loaded wrong: ' + (text(d.loadingProblem) || 'yes') : '';
     return x;
   });
   const c = { date, weekday: L.dayName(date).toUpperCase(), loads: loads.length, onTime: 0, late: 0, notLoaded: 0, noTime: 0, toCome: 0, lateMinutes: 0, takenMinutes: 0, taken: 0, areas: {} };
@@ -141,7 +143,7 @@ export function daySummary(date, runs, pickups, journal, nowMs, shifts) {
   c.problems = loads.filter(x => x.result === 'LATE' || x.result === 'NOT LOADED')
     .sort((a, b) => (a.result === 'NOT LOADED') - (b.result === 'NOT LOADED') || (b.late || 0) - (a.late || 0) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
   c.loadList = loads;
-  c.shortages = loads.filter(x => x.shortage || x.refused).map(x => ({ route: x.route, run: x.run, shift: x.shift, what: [x.shortage, x.refused ? 'Refused / returned' : ''].filter(Boolean).join(' · ') }));
+  c.shortages = loads.filter(x => x.shortage || x.refused || x.loadedWrong).map(x => ({ route: x.route, run: x.run, shift: x.shift, what: [x.loadedWrong, x.shortage, x.refused ? 'Refused / returned' : ''].filter(Boolean).join(' · ') }));
   // Pickups: product that did not load on one of the day's loads (or written for the day); each goes to its load's shift.
   const seen = {};
   c.pickups = P.withNotePickups(rows, pickups || []).filter(p => text(p.status).toUpperCase() !== 'DELETED').map(p => {

@@ -75,7 +75,8 @@ function loadOf(run, runDocId, p) {
     palletJackIssues: d.palletJackIssues || '', trailerNeedsCleaned: L.yes(d.trailerNeedsCleaned), checkinNotes: d.checkinNotes || '', checkinCompletedAt: d.checkinCompletedAt || '',
     // What the driver said at an earlier check-in: the unit numbers they corrected, drop-and-hook trailers, the jack, over / short.
     palletJack: d.palletJackUnit || d.palletJack || '', checkinTruck: d.checkinTruck || '', checkinTrailer: d.checkinTrailer || '', moreTrailers: Array.isArray(d.moreTrailers) ? d.moreTrailers : [],
-    overageShortage: L.yes(d.overageShortage), overageShortageDetails: d.overageShortageDetails || '' };
+    overageShortage: L.yes(d.overageShortage), overageShortageDetails: d.overageShortageDetails || '',
+    loadedCorrectly: d.loadedCorrectly || '', loadingProblem: d.loadingProblem || '' };
 }
 
 // Who is checking in (Joe 10/11, as the old "Who is driving?"): a roster driver (their id), a fill-in or carrier name that is on
@@ -125,6 +126,15 @@ function checkinExtras(f, d, equipment) {
     out.overageShortage = f.overageShortage === true || !!out.overageShortageDetails ? 'TRUE' : '';
     if (!out.overageShortage) out.overageShortageDetails = '';
   }
+  // Joe 10/13: "Was your truck loaded correctly?" YES or NO; a NO says what was wrong. (A Check-In kept on a phone before
+  // the question existed has neither and is still taken.)
+  if (f.loadedCorrectly !== undefined || f.loadingProblem !== undefined) {
+    const v = String(f.loadedCorrectly || '').trim().toUpperCase();
+    if (v !== 'YES' && v !== 'NO') bad('Answer: Was your truck loaded correctly? Tap Yes or No.');
+    out.loadedCorrectly = v;
+    out.loadingProblem = v === 'NO' ? String(f.loadingProblem || '').trim().slice(0, 300) : '';
+    if (v === 'NO' && !out.loadingProblem) bad('Write what was loaded wrong.');
+  }
   const find = (raw, kind) => { const t = unitText(raw); if (!t || /^(N\/A|NA|TBA|NONE)$/.test(t)) return t === 'NA' ? 'N/A' : t; const u = MAINT.resolveUnit(t, kind, equipment); return u.resolved ? String(u.unit).trim().toUpperCase() : t; };
   if (f.palletJack !== undefined) out.palletJackUnit = find(f.palletJack, 'FORK_TRUCK');
   if (f.truck !== undefined) { const t = find(f.truck, 'TRUCK'); out.checkinTruck = t && t !== unitText(d.truck) ? t : ''; }
@@ -143,7 +153,7 @@ function checkinExtras(f, d, equipment) {
     out.checkinTrailer = named[0] && named[0] !== unitText(d.trailer) ? named[0] : '';
     out.moreTrailers = more.map((m, i) => ({ trailer: named[i + 1], issues: String(m.issues || '').trim().slice(0, 300), needsCleaned: m.needsCleaned === true }));
   }
-  [out.overageShortageDetails].concat((out.moreTrailers || []).map(m => m.issues)).forEach(v => { if (/^=/.test(v || '')) bad('Formula-style text is blocked. Enter plain text only.'); });
+  [out.overageShortageDetails, out.loadingProblem].concat((out.moreTrailers || []).map(m => m.issues)).forEach(v => { if (/^=/.test(v || '')) bad('Formula-style text is blocked. Enter plain text only.'); });
   return out;
 }
 

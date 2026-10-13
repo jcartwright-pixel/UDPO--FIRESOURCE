@@ -559,7 +559,9 @@ async function resolveAssignment(tx, db, req, stamp, run) {
 const COLUMN_FOR = {}, TIME_FIELDS = {};
 // Kept in the new app only (the Live sheet has no column for them): who a day was for before the driver went off, and why.
 // checkinTruck / checkinTrailer / moreTrailers: the units the driver corrected on the phone and the drop-and-hook trailers (no Live column).
-const APP_ONLY = { intendedDriverId: true, intendedDriver: true, driverExceptionStatus: true, checkinTruck: true, checkinTrailer: true, moreTrailers: true };
+const APP_ONLY = { intendedDriverId: true, intendedDriver: true, driverExceptionStatus: true, checkinTruck: true, checkinTrailer: true, moreTrailers: true,
+  // Joe 10/13: the Check-In's "Was your truck loaded correctly?" has no Live sheet column; it stays in the app.
+  loadedCorrectly: true, loadingProblem: true };
 M.DAY_FIELDS.forEach(([field, suffix, kind]) => { COLUMN_FOR[field] = suffix; if (kind === 'time') TIME_FIELDS[field] = true; });
 // A day's "changed by hand" marks (the current app's <day>_equipment_override / _dispatch_time_override): a Route Master or
 // Driver Master save that reaches the Live weeks leaves those cells alone (D6).
