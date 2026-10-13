@@ -572,6 +572,14 @@
     if (['TRUCK', 'TRACTOR', 'POWER UNIT', 'TRACTOR TRUCK', 'STRAIGHT TRUCK', 'BOX TRUCK'].indexOf(t) >= 0) return 'TRUCK';
     return t === 'TRAILER' ? 'TRAILER' : '';
   }
+  // Joe 10/13: trailers have their own service rules. A trailer's DOT and plate rules are its own once saved
+  // (trailerDotMonths, trailerDotWarnDays, trailerPlateWarnDays); until then it follows the trucks'.
+  function fleetRule(rules, type, key) {
+    rules = rules || {};
+    var own = 'trailer' + key.charAt(0).toUpperCase() + key.slice(1), n = Number(rules[own]);
+    if (type === 'TRAILER' && rules[own] !== undefined && rules[own] !== null && rules[own] !== '' && isFinite(n)) return n;
+    return rules[key] !== undefined && rules[key] !== null && rules[key] !== '' ? Number(rules[key]) : FLEET_RULES[key];
+  }
   function fleetDue(units, setup, miles, openJobs, rules, today) {
     rules = Object.assign({}, FLEET_RULES, rules || {});
     var setupBy = {}, openBy = {}, items = [], out = [];
@@ -607,8 +615,8 @@
         }
       }
       if (!row.dotDue) push('DOT', 'DOT annual inspection', '', '', '', 'SET_UP', '');
-      else { var d = daysBetween(today, row.dotDue); push('DOT', 'DOT annual inspection', row.dotDue, '', d + ' days', d < 0 ? 'OVERDUE' : d <= rules.dotWarnDays ? 'DUE_SOON' : 'OK', ''); }
-      if (row.plateExpires) { var p = daysBetween(today, row.plateExpires); push('PLATE', 'Plate / registration', row.plateExpires, '', p + ' days', p < 0 ? 'OVERDUE' : p <= rules.plateWarnDays ? 'DUE_SOON' : 'OK', ''); }
+      else { var d = daysBetween(today, row.dotDue); push('DOT', 'DOT annual inspection', row.dotDue, '', d + ' days', d < 0 ? 'OVERDUE' : d <= fleetRule(rules, u.type, 'dotWarnDays') ? 'DUE_SOON' : 'OK', ''); }
+      if (row.plateExpires) { var p = daysBetween(today, row.plateExpires); push('PLATE', 'Plate / registration', row.plateExpires, '', p + ' days', p < 0 ? 'OVERDUE' : p <= fleetRule(rules, u.type, 'plateWarnDays') ? 'DUE_SOON' : 'OK', ''); }
     });
     var rank = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
     items.sort(function (a, b) { return rank[a.status] - rank[b.status] || String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }); });
@@ -1077,7 +1085,7 @@
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
-    fleetDue: fleetDue, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
+    fleetDue: fleetDue, fleetRule: fleetRule, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,

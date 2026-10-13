@@ -140,7 +140,7 @@
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="garage-station.html">Garage Station</a>';
         sheet.innerHTML = unitGrid(due, hit);
-        foot.textContent = due.units.length + ' trucks and trailers at Uniontown · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, DOT every ' + rules().dotMonths + ' months · leased tractors: the lessor handles service.';
+        foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, DOT every ' + rules().dotMonths + ' months · leased tractors: the lessor handles service.';
       } else if (view === 'work') {
         const o = open().slice().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
@@ -175,17 +175,25 @@
       } else {
         k.innerHTML = '';
         const R = rules(), boss = canEdit();
-        const rule = (key, label, unit) => '<label>' + label + '<span class="fs-rule"><input type="number" min="0" step="1" data-rule="' + key + '" value="' + R[key] + '"' + (boss ? '' : ' disabled') + '><small>' + unit + '</small></span></label>';
+        // Joe 10/13: Truck or Trailer rules, picked at the top; a trailer's DOT and plates are its own (trailerDot...).
+        const own = (key) => ruleType === 'TRAILER' && /^(dotMonths|dotWarnDays|plateWarnDays)$/.test(key) ? 'trailer' + key.charAt(0).toUpperCase() + key.slice(1) : key;
+        const rule = (key, label, unit) => { const k = own(key), v = k in ruleDraft ? ruleDraft[k] : k === key ? R[key] : L.fleetRule(R, 'TRAILER', key);
+          return '<label>' + label + '<span class="fs-rule"><input type="number" min="0" step="1" data-rule="' + k + '" value="' + escapeHtml(String(v)) + '"' + (boss ? '' : ' disabled') + '><small>' + unit + '</small></span></label>'; };
+        const typePick = '<label class="fs-type">Rules for<select id="rule-type" aria-label="Rules for trucks or trailers"><option value="TRUCK"' + (ruleType === 'TRUCK' ? ' selected' : '') + '>Trucks</option><option value="TRAILER"' + (ruleType === 'TRAILER' ? ' selected' : '') + '>Trailers</option></select></label>';
+        const ruleList = ruleType === 'TRAILER'
+          ? rule('trailerMonths', 'Reefer service every', 'months') + rule('trailerHours', '... or every', 'reefer hours') + rule('trailerWarnDays', 'Warn reefer service', 'days ahead') + rule('dotMonths', 'DOT inspection every', 'months') + rule('dotWarnDays', 'Warn DOT', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead')
+          : rule('truckMiles', 'Truck PM every', 'miles') + rule('truckWarnMiles', 'Warn this many miles ahead', 'miles') + rule('dotMonths', 'DOT inspection every', 'months') + rule('dotWarnDays', 'Warn DOT', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead');
+        // Joe 10/13: "Ours" ticks whether a unit is in our service tracking (the unit's Track due dates); unticked units stay
+        // listed but leave the Due list. One click saves it.
+        const ours = (u) => '<input type="checkbox" class="fs-ours" data-ours="' + escapeHtml(u.unit) + '" data-type="' + u.type + '" aria-label="' + escapeHtml(u.unit) + ' is ours"' + (u.tracked ? ' checked' : '') + (boss ? '' : ' disabled') + '>';
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           (boss ? '<button type="button" class="primary" id="rules-save">Save Rules</button>' : '<span class="hint">Managers and administrators change the setup.</span>');
-        sheet.innerHTML = '<div class="fleet-split wide-left"><div><h2>Units · ' + escapeHtml(plant.name) + '</h2>' + table([10, 9, 9, 13, 14, 11, 11, 15, 8], ['Unit', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'DOT due', 'Plate expires', 'Notes', ''],
-          due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.trackSet ? (u.tracked ? 'Yes' : 'No') : 'Default') + '</td><td>' + when(u.lastServiceDate) +
+        sheet.innerHTML = '<div class="fleet-split fs-setup"><div><h2>Units · ' + escapeHtml(plant.name) + '</h2>' + table([10, 7, 10, 9, 12, 12, 11, 11, 10, 8], ['Unit', 'Ours', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'DOT due', 'Plate expires', 'Notes', ''],
+          due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + ours(u) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.trackSet ? (u.tracked ? 'Yes' : 'No') : 'Default') + '</td><td>' + when(u.lastServiceDate) +
             (u.lastServiceMiles != null ? '<small>' + num(u.lastServiceMiles) + ' mi</small>' : u.lastServiceHours != null ? '<small>' + num(u.lastServiceHours) + ' hrs</small>' : '') + '</td><td>' +
             (u.miles != null ? num(u.miles) + ' mi<small>' + when(u.milesDate) + '</small>' : u.currentHours != null ? num(u.currentHours) + ' hrs' : '') + '</td><td>' + when(u.dotDue) + '</td><td>' + when(u.plateExpires) + '</td><td class="wrong">' + escapeHtml(u.notes) + '</td><td>' +
             (boss ? '<button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit</button>' : '') + '</td></tr>').join(''), 'No units.') +
-          '</div><div><h2>Service Rules · ' + escapeHtml(plant.name) + '</h2><div class="fs-rules" id="rules">' +
-          rule('truckMiles', 'Truck PM every', 'miles') + rule('truckWarnMiles', 'Warn this many miles ahead', 'miles') + rule('trailerMonths', 'Reefer service every', 'months') + rule('trailerHours', '... or every', 'reefer hours') +
-          rule('trailerWarnDays', 'Warn reefer service', 'days ahead') + rule('dotMonths', 'DOT inspection every', 'months') + rule('dotWarnDays', 'Warn DOT', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead') + '</div>' +
+          '</div><div><h2>Service Rules · ' + escapeHtml(plant.name) + '</h2>' + typePick + '<div class="fs-rules" id="rules">' + ruleList + '</div>' +
           (savedRules && savedRules.updatedBy ? '<p class="hint">Rules last changed ' + when(savedRules.updatedAt) + ' by ' + escapeHtml(savedRules.updatedBy) + '.</p>' : '<p class="hint">These are the current app\'s rules until someone saves new ones.</p>') +
           '<h2>Garage Technicians · ' + escapeHtml(plant.name) + '</h2>' + table([50, 50], ['Name', ''], techs.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).map(x => {
             const on = L.yes(x.active === undefined || x.active === '' ? 'TRUE' : x.active), id = escapeHtml(x.tech_id || x.id);
@@ -199,6 +207,8 @@
       const p = document.getElementById('fs-print'); if (p) p.onclick = () => printReport(due, t);
       bar.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { kindFilter = b.dataset.kind; render(); }; });
       const rs = document.getElementById('rules-save'); if (rs) rs.onclick = saveRules;
+      const rt = document.getElementById('rule-type'); if (rt) rt.onchange = () => { ruleType = rt.value; render(); };
+      document.querySelectorAll('[data-rule]').forEach(i => { i.oninput = () => { ruleDraft[i.dataset.rule] = i.value; }; });
       const ta = document.getElementById('tech-add'); if (ta) ta.onclick = addTech;
     }
 
@@ -206,7 +216,7 @@
     const FROM = { WRITE_UP: 'Driver write-up', WRITEUP: 'Driver write-up', OFFICE: 'Sent from the office', TECH: 'Found by the garage', GARAGE: 'Found by the garage', DVIR: 'Driver inspection' };
     const cameFrom = (x) => x.source_from || FROM[String(x.source || '').toUpperCase()] || x.source || '';
     const fixedText = (x) => [x.fixed, x.fixed_note].filter(Boolean).join(' · ');
-    let me = null;
+    let me = null, ruleType = 'TRUCK', ruleDraft = {};
     const pick = () => { orders = rawOrders.filter(ours); techs = rawTechs.filter(ours); };
     const canEdit = () => !!me && L.hasRole(me, L.REORDER_ROLES);
     // A unit's plate number from the fleet sync's text ("External Fleet: year | make | model | VIN | plate | state | Lease: ..."):
@@ -244,10 +254,12 @@
         (canEdit() ? '<div class="gps-buttons"><button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit dates</button></div>' : '');
     }
 
+    // Save Rules saves what was typed for trucks and for trailers (switching the drop-down keeps both).
     async function saveRules() {
-      const out = {}; document.querySelectorAll('[data-rule]').forEach(i => { out[i.dataset.rule] = Number(i.value); });
+      const out = {}; Object.keys(ruleDraft).forEach(k => { out[k] = Number(ruleDraft[k]); });
+      document.querySelectorAll('[data-rule]').forEach(i => { out[i.dataset.rule] = Number(i.value); });
       const b = document.getElementById('rules-save'); b.disabled = true; showError('');
-      try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save Rules'; b.disabled = false; }, 1500); }
+      try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); ruleDraft = {}; b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save Rules'; b.disabled = false; }, 1500); }
       catch (err) { b.disabled = false; showError(err.message); }
     }
     async function addTech() {
@@ -307,13 +319,20 @@
         '<p><b>Work done · this week (Sun-Sat)</b></p>' + tbl(['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours', 'Signed'], work.map(x => '<tr><td>' + when(x.completed_at) + '</td><td>' + escapeHtml(x.unit) + '</td><td>' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(fixedText(x)) +
           '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' + (x.safe === 'YES' && x.signed_by ? '&#10003;' : '') + '</td></tr>').join('')) +
         '<p class="print-sign">Reviewed by ______________________________ &nbsp;&nbsp; Date ______________</p>' +
-        '<p class="print-foot">United Dairy · Uniontown · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · DOT every ' + rules().dotMonths + ' months · leased tractors are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
+        '<p class="print-foot">United Dairy · ' + escapeHtml(plant.name) + ' · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · DOT every ' + rules().dotMonths + ' months · leased tractors are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
       printSaved('fleet');
     }
 
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; search = ''; render(); } });
     document.getElementById('sheet').addEventListener('click', async e => {
       const ed = e.target.closest('[data-edit]'); if (ed) { openUnit(ed.dataset.edit); return; }
+      const ob = e.target.closest('[data-ours]');
+      if (ob) {
+        showError('');
+        try { await save('saveFleetUnit', { unit: ob.dataset.ours, unitType: ob.dataset.type, fields: { track: ob.checked ? 'YES' : 'NO' }, facilityId: plant.id }); }
+        catch (err) { ob.checked = !ob.checked; showError(err.message); }
+        return;
+      }
       const tb = e.target.closest('[data-tech]');
       if (tb) {
         showError('');

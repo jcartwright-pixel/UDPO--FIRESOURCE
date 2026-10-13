@@ -89,3 +89,23 @@ test('each plant keeps its own rules and technicians (Joe 10/13); Uniontown stay
   const home = await applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'ADD', name: 'Home Hal' });
   assert.equal((await db().collection('garageTechs').doc(home.techId).get()).data().facility_id, 'fac_uniontown', 'no plant sent = Uniontown');
 });
+
+test('a trailer\'s DOT finished at the garage moves by the trailers\' own DOT rule (Joe 10/13)', async () => {
+  await applyAction(db(), MANAGER, { action: 'saveFleetRules', requestId: rid(), rules: { dotMonths: 6, trailerDotMonths: 12 } });
+  const saved = (await db().collection('config').doc('fleetRules').get()).data();
+  assert.deepEqual([saved.dotMonths, saved.trailerDotMonths], [6, 12]);
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveFleetRules', requestId: rid(), rules: { trailerDotMonths: 40 } }), /whole number/);
+  const sent = await applyAction(db(), MANAGER, { action: 'sendToGarage', requestId: rid(), unit: 'T-902', unitType: 'TRAILER', serviceKey: 'DOT' });
+  const tom = await garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213' }, now);
+  const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'START', id: sent.workOrderId }, now);
+  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'DOT inspection', safe: true, signature: SIG }, now);
+  assert.equal((await db().collection('fleetSetup').doc('T-902').get()).data().dot_due, '2027-10-06');
+});
+
+test('the Ours tick: unticking a unit takes it off the due list, ticking puts it back (Joe 10/13)', async () => {
+  await applyAction(db(), MANAGER, { action: 'saveFleetUnit', requestId: rid(), unit: '900002', unitType: 'TRUCK', fields: { track: 'NO' } });
+  assert.equal((await db().collection('fleetSetup').doc('900002').get()).data().track, 'NO');
+  await applyAction(db(), MANAGER, { action: 'saveFleetUnit', requestId: rid(), unit: '900002', unitType: 'TRUCK', fields: { track: 'YES' } });
+  assert.equal((await db().collection('fleetSetup').doc('900002').get()).data().track, 'YES');
+});

@@ -1870,3 +1870,11 @@ td.eq-act > button { white-space: nowrap; padding: 0 10px; }
 .fs-rule input { font-size: 16px; height: 38px; }
 .fs-addtech input, .fs-addtech button { font-size: 16px; min-height: 40px; }
 .fleet-page table.issues td, .fleet-page table.issues th { font-size: 16px; }
+
+/* Fleet Service Setup (Joe 10/13): more room for the Service Rules side, the Ours tick and the Trucks / Trailers pick. */
+.fleet-split.fs-setup { grid-template-columns: 1.45fr 1fr; }
+@media (max-width: 1200px) { .fleet-split.fs-setup { grid-template-columns: 1fr; } }
+.fs-setup input.fs-ours { width: 24px; height: 24px; cursor: pointer; accent-color: #1d7a3e; }
+.fs-type { display: flex; align-items: center; gap: 10px; margin: 0 4px 10px; font-size: 16px; font-weight: 700; color: var(--ud-blue-dark); }
+.fs-type select { height: 40px; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; background: #fff; }
+.fs-setup .fs-rule input { width: 110px; }

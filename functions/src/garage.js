@@ -435,7 +435,7 @@ async function step(db, input, nowMs) {
         const today = L.operatingDay(new Date(nowMs)), move = { updated_at: stamp, updated_by: by };
         if (order.service_key === 'PM') { move.last_service_date = today; if (odometer) move.last_service_miles = String(odometer); }
         if (order.service_key === 'REEFER') { move.last_service_date = today; if (setup && String(setup.current_hours || '').trim()) move.last_service_hours = String(setup.current_hours); }
-        if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, rules.dotMonths);
+        if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, L.fleetRule(rules, String(order.unit_type || '').toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK', 'dotMonths'));
         if (setup) tx.update(setupRef, Object.assign({}, move, { testEdited: true, editedAt: stamp }));
         else tx.set(setupRef, Object.assign({ unit: order.unit, unit_type: order.unit_type, facility_id: FACILITY, track: 'YES', createdInApp: true }, move));
         result.service = move;
@@ -491,7 +491,9 @@ function validateSend(input, out) {
 const RULES_DOC = 'fleetRules';
 const rulesDocFor = (facilityId) => !facilityId || facilityId === FACILITY ? RULES_DOC : RULES_DOC + '_' + facilityId;
 const RULE_LIMITS = { truckMiles: [1000, 100000], truckWarnMiles: [0, 20000], trailerMonths: [1, 24], trailerHours: [50, 10000], trailerWarnDays: [0, 120],
-  dotMonths: [1, 24], dotWarnDays: [0, 180], plateWarnDays: [0, 180] };
+  dotMonths: [1, 24], dotWarnDays: [0, 180], plateWarnDays: [0, 180],
+  // Trailers' own DOT and plate rules (Joe 10/13); blank = the trucks'.
+  trailerDotMonths: [1, 24], trailerDotWarnDays: [0, 180], trailerPlateWarnDays: [0, 180] };
 // The rules in force: the saved ones over the current app's defaults (L.FLEET_RULES).
 function fleetRules(saved) {
   const out = Object.assign({}, L.FLEET_RULES);
