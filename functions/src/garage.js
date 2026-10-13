@@ -40,8 +40,8 @@ const SaveErr = (code, message) => new (A().SaveError)(code, message);
 const FACILITY = 'fac_uniontown';
 const G = Object.freeze({
   CATEGORIES: ['Brakes', 'Lights', 'Tires', 'Engine', 'Reefer', 'Doors / Body', 'Other'],
-  FIXES: ['Replaced a part', 'Repaired', 'Oil / PM service', 'Tires', 'Lights', 'Brakes', 'DOT inspection', 'Nothing wrong'],
-  SERVICES: { PM: 'PM service', REEFER: 'Reefer service', DOT: 'DOT annual inspection' },
+  FIXES: ['Replaced a part', 'Repaired', 'Oil / PM service', 'Tires', 'Lights', 'Brakes', 'Annual inspection', 'Nothing wrong'],
+  SERVICES: { PM: 'PM service', REEFER: 'Reefer service', DOT: 'Annual inspection' },
   STATUSES: ['NEW', 'WORKING', 'PARTS', 'DONE'],
   MAX_TECHS: 2, SESSION_MS: 30 * 60000, SIGNATURE_MAX: 30000, TECH_FAILS: 5, TECH_LOCK_MS: 5 * 60000, STATION_FAILS_PER_MINUTE: 30,
   GARAGE_MARK: 'Sent to garage'
@@ -401,7 +401,7 @@ async function step(db, input, nowMs) {
         const today = L.operatingDay(new Date(nowMs)), move = { updated_at: stamp, updated_by: by };
         if (order.service_key === 'PM') { move.last_service_date = today; if (odometer) move.last_service_miles = String(odometer); }
         if (order.service_key === 'REEFER') { move.last_service_date = today; if (setup && String(setup.current_hours || '').trim()) move.last_service_hours = String(setup.current_hours); }
-        if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, rules.dotMonths);
+        if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, L.fleetRule(rules, String(order.unit_type || '').toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK', 'dotMonths'));
         if (setup) tx.update(setupRef, Object.assign({}, move, { testEdited: true, editedAt: stamp }));
         else tx.set(setupRef, Object.assign({ unit: order.unit, unit_type: order.unit_type, facility_id: FACILITY, track: 'YES', createdInApp: true }, move));
         result.service = move;
@@ -438,7 +438,7 @@ function validateSend(input, out) {
   out.unitType = text(input.unitType, 10).toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK';
   out.note = text(input.note, 200);
   if (!out.unit) throw SaveErr('BAD_REQUEST', 'Pick the unit');
-  if (!G.SERVICES[out.serviceKey]) throw SaveErr('BAD_REQUEST', 'Only a PM, reefer service or DOT inspection goes to the garage');
+  if (!G.SERVICES[out.serviceKey]) throw SaveErr('BAD_REQUEST', 'Only a PM, reefer service or annual inspection goes to the garage');
   return out;
 }
 
@@ -457,7 +457,9 @@ function validateSend(input, out) {
 const RULES_DOC = 'fleetRules';
 const rulesDocFor = (facilityId) => !facilityId || facilityId === FACILITY ? RULES_DOC : RULES_DOC + '_' + facilityId;
 const RULE_LIMITS = { truckMiles: [1000, 100000], truckWarnMiles: [0, 20000], trailerMonths: [1, 24], trailerHours: [50, 10000], trailerWarnDays: [0, 120],
-  dotMonths: [1, 24], dotWarnDays: [0, 180], plateWarnDays: [0, 180] };
+  dotMonths: [1, 24], dotWarnDays: [0, 180], plateWarnDays: [0, 180],
+  // Trailers' own DOT and plate rules (Joe 10/13); blank = the trucks'.
+  trailerDotMonths: [1, 24], trailerDotWarnDays: [0, 180], trailerPlateWarnDays: [0, 180] };
 // The rules in force: the saved ones over the current app's defaults (L.FLEET_RULES).
 function fleetRules(saved) {
   const out = Object.assign({}, L.FLEET_RULES);
@@ -498,7 +500,7 @@ function validateFleet(action, input, out) {
     const f = input.fields || {}, t = text(f.track, 10).toUpperCase();
     out.fields = {};
     if (f.track !== undefined) out.fields.track = t === 'YES' || t === 'NO' ? t : '';
-    [['last_service_date', 'Last service date'], ['dot_due', 'DOT due'], ['plate_expires', 'Plate expires']].forEach(([k, l]) => { if (f[k] !== undefined) out.fields[k] = ymdOrBlank(f[k], l); });
+    [['last_service_date', 'Last service date'], ['dot_due', 'Annual inspection due'], ['plate_expires', 'Plate expires']].forEach(([k, l]) => { if (f[k] !== undefined) out.fields[k] = ymdOrBlank(f[k], l); });
     [['last_service_miles', 'Last service miles', 3000000], ['last_service_hours', 'Last service hours', 200000], ['current_hours', 'Reefer hours now', 200000]].forEach(([k, l, m]) => { if (f[k] !== undefined) out.fields[k] = numOrBlank(f[k], l, m); });
     if (f.notes !== undefined) out.fields.notes = text(f.notes, 300);
     if (!Object.keys(out.fields).length) throw SaveErr('BAD_REQUEST', 'Nothing to save');

@@ -430,7 +430,7 @@ function validate(input) {
   }
   // OVR on Daily: a driver who is off that day, or a unit that is down, may still be picked on purpose.
   if (['assignDriver', 'assignTruck', 'assignTrailer'].indexOf(action) >= 0 && input.override === true) out.override = true;
-  if (action === 'setRuns') out.runs = input.runs === true;
+  if (action === 'setRuns') { out.runs = input.runs === true; if (!out.runs && typeof input.plantLoadOff === 'boolean') out.plantLoadOff = input.plantLoadOff; }
   if (action === 'setDispatchTime') {
     const t = text(input.time, 20);
     out.time = t ? L.minutesOfDay(t) : null;
@@ -549,7 +549,12 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     return { [idField]: e.id, [unitField]: e.unit };
   }
   // Joe 10/13 ("No route equals no driver"): a day turned off loses its driver, truck and trailer (that day only), so they are free.
-  if (req.action === 'setRuns') return req.runs ? { runs: true } : Object.assign({ runs: false }, L.NOT_RUNNING_CLEARS);
+  // Joe 10/13 (836 PECK): Weekly marks a plant load Not running (plantLoadOff) or back to needing a driver; a day turned on ends the mark.
+  if (req.action === 'setRuns') {
+    const was = (run.days && run.days[req.day]) || {};
+    if (req.runs) return was.plantLoadOff ? { runs: true, plantLoadOff: false } : { runs: true };
+    return Object.assign({ runs: false }, L.NOT_RUNNING_CLEARS, typeof req.plantLoadOff === 'boolean' ? { plantLoadOff: req.plantLoadOff } : {});
+  }
   if (req.action === 'setDispatchTime') return { dispatchTime: req.time };
   if (req.action === 'setJack') return { palletJack: req.jack };
   if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });

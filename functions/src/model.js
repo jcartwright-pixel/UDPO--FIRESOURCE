@@ -80,7 +80,9 @@ const DAY_FIELDS = Object.freeze([
 // off and why, the units the driver corrected on the phone and the drop-and-hook trailers. The copy from the sheet keeps them.
 const APP_ONLY_DAY_FIELDS = Object.freeze(['intendedDriverId', 'intendedDriver', 'driverExceptionStatus', 'checkinTruck', 'checkinTrailer', 'moreTrailers',
   // Joe 10/13: the Check-In's "Was your truck loaded correctly?" has no Live sheet column; it stays in the app.
-  'loadedCorrectly', 'loadingProblem']);
+  'loadedCorrectly', 'loadingProblem',
+  // Joe 10/13 (836 PECK): a Plant Operations Scheduler load marked Not running on Weekly Dispatch; the sheet's <day>_runs is already FALSE.
+  'plantLoadOff']);
 // Joe 10/13 (Sheet conflicts, route 906): the real Live week tabs have no coverage_owner column. "Run By" lives in Route Master;
 // on Live rows it stays in the app and is never written to the sheet.
 const APP_ONLY_RUN_FIELDS = Object.freeze(['coverageOwner']);
