@@ -167,9 +167,14 @@
   function noon(key) { var p = String(key).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2], 12); }
   function isKey(v) { return /^\d{4}-\d\d-\d\d$/.test(text(v)) && isFinite(noon(v)); }
 
+  // Joe 10/13 (Location Areas, A): each location has its own areas. Uniontown starts from the list below; every other
+  // location starts empty until its own areas are added.
+  var STARTER_PLANT = 'fac_uniontown';
+  function startsEmpty(plant) { return !!text(plant) && text(plant) !== STARTER_PLANT; }
   // A plant's Location Areas: [{ key, name, off, subs: [{ key, name, off }] }], its saved list or the starting one.
-  function locations(doc) {
+  function locations(doc, plant) {
     var saved = doc && Array.isArray(doc.areas) && doc.areas.length ? doc.areas : null;
+    if (!saved && startsEmpty(plant)) saved = [];
     if (!saved) {
       saved = [];
       DEFAULT_AREAS.forEach(function (a) {
@@ -187,14 +192,16 @@
   // The checklist the plant walks, in its Location Areas' order: each sub-area with the items Checklist Setup put there (its
   // own saved list, else the list above). Areas, sub-areas and items turned off are left out unless all is true (the setup
   // screens show them, sub-areas with no items too). A sub-area saved before Location Areas keeps its own place and name.
+  // setup.plant (the screens and the server set it) picks the starting list: Uniontown's, or none for another location.
   function checklist(setup, all) {
-    var saved = setup && Array.isArray(setup.areas) && setup.areas.length ? setup.areas : DEFAULT_AREAS.map(function (a) {
+    var plant = setup && setup.plant;
+    var saved = setup && Array.isArray(setup.areas) && setup.areas.length ? setup.areas : startsEmpty(plant) ? [] : DEFAULT_AREAS.map(function (a) {
       return { place: a.place, key: a.key, name: a.name, items: a.items.map(function (i) { return { id: i[0], text: i[1], freq: i[2] }; }) };
     });
     var byKey = {}, used = {};
     saved.forEach(function (a) { if (text(a.key)) byKey[text(a.key)] = a; });
     var out = [];
-    locations(setup && setup.locations).forEach(function (p) { p.subs.forEach(function (x) {
+    locations(setup && setup.locations, plant).forEach(function (p) { p.subs.forEach(function (x) {
       used[x.key] = true;
       out.push({ place: p.name, placeKey: p.key, key: x.key, name: x.name, off: p.off || x.off, items: (byKey[x.key] || {}).items || [] });
     }); });
@@ -272,7 +279,7 @@
   function extId(facilityId, tag) { return text(facilityId) + '__' + text(tag).replace(/[^A-Za-z0-9-]+/g, '_'); }
 
   return { STATUSES: STATUSES, FREQS: FREQS, DEFAULT_AREAS: DEFAULT_AREAS, EXT_ITEMS: EXT_ITEMS, EXT_TYPES: EXT_TYPES, LONG_OPEN_DAYS: LONG_OPEN_DAYS, DUE_SOON_DAYS: DUE_SOON_DAYS,
-    locations: locations, checklist: checklist, walkList: walkList, places: places, areaName: areaName, findItem: findItem, walkId: walkId, monthOf: monthOf, walkCounts: walkCounts, daysOpen: daysOpen, isRepeat: isRepeat,
+    locations: locations, startsEmpty: startsEmpty, checklist: checklist, walkList: walkList, places: places, areaName: areaName, findItem: findItem, walkId: walkId, monthOf: monthOf, walkCounts: walkCounts, daysOpen: daysOpen, isRepeat: isRepeat,
     extMonth: extMonth, dueState: dueState, extId: extId, isKey: isKey, pad: pad,
     FIRE_SYSTEMS: FIRE_SYSTEMS, fireSystem: fireSystem, fireId: fireId, fireMonth: fireMonth };
 });

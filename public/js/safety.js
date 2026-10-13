@@ -69,7 +69,8 @@ export function watchIssues(db, plant, cb, fail) {
 // The plant's checklist with its Location Areas (Joe 10/12) as setup.locations; cb once both have been read, then on each change.
 export function watchSetup(db, plant, cb) {
   let setup, locs;
-  const send = () => { if (setup !== undefined && locs !== undefined) cb(setup || locs ? Object.assign({}, setup || {}, { locations: locs }) : null); };
+  // Joe 10/13: plant goes with it, so each location gets its own starting list (S.locations, S.checklist).
+  const send = () => { if (setup !== undefined && locs !== undefined) cb(Object.assign({}, setup || {}, { locations: locs, plant })); };
   const a = onSnapshot(doc(db, 'safetySetup', plant), s => { setup = s.exists() ? s.data() : null; send(); }, () => { setup = null; send(); });
   const b = onSnapshot(doc(db, 'locationAreas', plant), s => { locs = s.exists() ? s.data() : null; send(); }, () => { locs = null; send(); });
   return () => { a(); b(); };
