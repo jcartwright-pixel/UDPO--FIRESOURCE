@@ -566,9 +566,18 @@ async function stationOf(user) {
   } catch (e) { return null; }
 }
 // The person a screen shows buttons for: the Users list entry, or a code-signed Plant Station as a plant employee.
-export function watchPerson(db, user, done) {
+// Review item 76 (Joe 10/13): every screen watches the signed-in person here. opts.withEmail puts the sign-in email on the
+// entry; opts.onError is called when the Users list cannot be read.
+export function watchPerson(db, user, done, opts) {
+  const o = opts || {};
   if (user.station) { done({ status: 'ACTIVE', roles: ['PLANT_EMPLOYEE'], name: user.station.name, email: '' }); return () => {}; }
-  return onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => done(s.exists() ? s.data() : null));
+  return onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => done(s.exists() ? (o.withEmail ? Object.assign({ email: user.email }, s.data()) : s.data()) : null), o.onError);
+}
+// Review item 76 (Joe 10/13): may this person save on this screen? One of the roles (or that one save given to them in
+// Administration, allowedSave === true), and the screen switched on in Go-Live Switches (app = config/app, screen = its key).
+export function maySave(person, roles, app, screen, allowedSave) {
+  const L = window.UDLogic;
+  return (L.hasRole(person, roles) || allowedSave === true) && L.screenState(app, screen).open;
 }
 // The Plant Station with no UD account: the station code signs this tablet in as that station only.
 export async function stationCodeSignIn(code) {
@@ -869,6 +878,41 @@ export function goLiveNote(show) {
 
 export function escapeHtml(value) {
   return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Review item 76 (Joe 10/13): one drop-down choice, picked when it is the current value. opts.loose matches as text (a number
+// or a blank current still picks it).
+export function optionTag(value, current, label, opts) {
+  const on = opts && opts.loose ? String(value) === String(current || '') : value === current;
+  return '<option value="' + escapeHtml(value) + '"' + (on ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+}
+
+// Review item 76 (Joe 10/13): minutes as hours and minutes, blank for no number. Each screen keeps its own look: unit is the
+// word after the minutes ('min', or 'm'), short the word under an hour (the unit when left out), pad writes the minutes past
+// the hour with two digits (1 h 05), hoursFrom is where hours start (60 minutes when left out).
+export function hoursMinutesText(m, opts) {
+  const o = opts || {}, unit = o.unit || 'min';
+  if (m === null || m === undefined) return '';
+  return m >= (o.hoursFrom || 60) ? Math.floor(m / 60) + ' h ' + (o.pad ? String(m % 60).padStart(2, '0') : m % 60) + ' ' + unit : m + ' ' + (o.short || unit);
+}
+
+// Review item 76 (Joe 10/13): prints a page of HTML from a hidden frame, so the screen stays where it is. opts.id names the
+// frame (one left from an earlier print is taken away first), opts.wait is the pause before printing (150 ms when left out)
+// and opts.removeAfter takes the frame away that long after printing.
+export function printInFrame(html, opts) {
+  const o = opts || {};
+  const old = o.id && document.getElementById(o.id);
+  if (old) old.remove();
+  const f = document.createElement('iframe');
+  if (o.id) f.id = o.id;
+  f.setAttribute('aria-hidden', 'true');
+  f.tabIndex = -1;
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  const d = f.contentWindow.document;
+  d.open(); d.write(html); d.close();
+  setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); if (o.removeAfter) setTimeout(() => f.remove(), o.removeAfter); }, o.wait || 150);
+  return f;
 }
 
 // Joe 10/11 (polish 6): one short date everywhere, like 10-8-26 (month-day-two-digit year, no leading zeros, no time).

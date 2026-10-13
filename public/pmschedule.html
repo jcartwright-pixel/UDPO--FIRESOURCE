@@ -59,7 +59,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote, optionTag, maySave, watchPerson } from './js/app.js';
     import { doc, onSnapshot } from './js/firebase.js';
     import { watchMaint, plantFor } from './js/pmaint.js';
 
@@ -71,8 +71,8 @@
     let plant = params.get('plant') || '', only = params.get('machine') || '', person = null, app = {}, data = null, db = null, stop = null, adding = false, pending = false;
     let busy = Promise.resolve();
     const doing = new Set();
-    const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
-    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const canSave = () => maySave(person, L.REORDER_ROLES, app, 'plant');
+    const opt = (v, cur, label) => optionTag(v, cur, label);
     const day = (k) => (/^\d{4}-\d\d-\d\d/.test(String(k || '')) ? shortDate(String(k).slice(0, 10)) : '');
     const setUrl = () => history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (only ? '&machine=' + encodeURIComponent(only) : ''));
     const SECTIONS = [['LATE', 'Overdue'], ['WEEK', 'This week'], ['SOON', 'Next 30 days'], ['LATER', 'Later'], ['NEW', 'Never done (type its Last done day)']];
@@ -172,7 +172,7 @@
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; if (!stop) follow(); else render(); });
+      watchPerson(db, user, p => { person = p; if (!stop) follow(); else render(); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
     });
   </script>

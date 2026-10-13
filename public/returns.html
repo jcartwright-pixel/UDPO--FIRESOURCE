@@ -99,7 +99,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, dateTimeText, goLiveNote, maySave } from './js/app.js';
     import { collection, doc, getDoc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { watchProducts, OTHER } from './js/products.js';
@@ -113,7 +113,7 @@
     const returned = {};       // return id -> true while its RTA is saving, and a moment after (until the database shows it)
     const got = { runs: false, journal: false };
     const unsubs = [];
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plantLoading').open;
+    const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading');
 
     const list = () => P.returnsFor(runs, date, journal, queue).map(x => (returned[x.id] ? Object.assign({}, x, { pending: false }) : x));
 

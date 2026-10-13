@@ -74,7 +74,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, goBack, shortDate } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, goBack, shortDate, watchPerson } from './js/app.js';
     import { doc, onSnapshot } from './js/firebase.js';
     import { watchProduction, lineView, fmt, clock, shiftText } from './js/production.js';
 
@@ -238,10 +238,10 @@
 
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
-        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+      watchPerson(db, user, p => {
+        person = p;
         if (!stop) stop = watchProduction(db, plant(), d => { data = d; render(); }, e => showError('Could not read the line (' + e.message + '). Check the network.'), now);
-      });
+      }, { withEmail: true });
       // The clock moves the stopped minutes and target so far.
       setInterval(render, 15000);
     });

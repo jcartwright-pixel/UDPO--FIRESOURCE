@@ -9,6 +9,8 @@
  * Tab takes it and moves across, Esc keeps the old value. Time, Jack and Notes open on a click as before; typing on a
  * selected one starts over with what is typed, and Enter / Tab / Up / Down save and move.
  */
+import { escapeHtml } from './app.js';
+
 const LISTS = { driver: true, truck: true, trailer: true };
 let want = null; // the cell to select after the next render: {id, kind}
 
@@ -208,7 +210,8 @@ export function bindDailyKeys(tbody, h) {
   }
 }
 
-function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+// Review item 76 (Joe 10/13): the app's one HTML-safety helper.
+const esc = escapeHtml;
 
 function injectStyle() {
   if (document.getElementById('daily-keys-style')) return;

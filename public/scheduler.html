@@ -60,7 +60,7 @@
   <section class="modal wide-modal sc-modal" id="modal" role="dialog" aria-labelledby="modal-title" hidden></section>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote, printInFrame, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot, getDocs } from './js/firebase.js';
     import * as P from './js/plant-core.js';
 
@@ -73,7 +73,7 @@
     let loads = { SHIPPING: [], RECEIVING: [] }, seen = { SHIPPING: false, RECEIVING: false }, supplierDocs = [], routeDocs = [], person = null, app = {}, db = null, search = '';
     const pending = {};           // load id -> the load as saved (or {deleted: true}) while its save is on its way
     const pendingSuppliers = [];  // suppliers added while their save is on its way
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
     const who = () => lane === 'RECEIVING' ? 'Supplier' : 'Customer';
 
     /* ---------- dates ---------- */
@@ -460,14 +460,7 @@
     document.getElementById('print').onclick = printView;
 
     // Print: a landscape page in a hidden frame, so the screen stays where it is.
-    function printHtml(html) {
-      const old = document.getElementById('print-frame'); if (old) old.remove();
-      const f = document.createElement('iframe');
-      f.id = 'print-frame'; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-      document.body.appendChild(f);
-      const d = f.contentWindow.document; d.open(); d.write(html); d.close();
-      setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); }, 150);
-    }
+    function printHtml(html) { printInFrame(html, { id: 'print-frame' }); }
     function printView() {
       const head = 'United Dairy · Plant Operations Schedule' + (lane === 'RECEIVING' ? ' · Receiving' : ''), list = entries();
       const css = '@page{size:landscape;margin:.25in}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#112f53}.top{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 10px}h1{margin:0;font-size:22px}.sub{font-size:13px}' +
@@ -498,7 +491,7 @@
 
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? s.data() : null; render(); });
+      watchPerson(db, user, p => { person = p; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       // Every load of each lane (the journal keeps scheduler records), so a load moved to another day is never shown twice.

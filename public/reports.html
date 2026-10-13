@@ -48,7 +48,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, shortTime } from './js/app.js';
     import { collection, doc, getDoc, query, where, getDocs } from './js/firebase.js';
     import * as R from './js/plant-reports.js';
 
@@ -71,7 +71,7 @@
     const nice = (name) => String(name).charAt(0) + String(name).slice(1).toLowerCase();
     const pctClass = (p) => p === null || p === undefined ? '' : p >= 90 ? 'good' : p >= 80 ? 'warn' : 'bad';
     const n = (v) => v === null || v === undefined ? '—' : String(v);
-    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: L.TIME_ZONE, hour: 'numeric', minute: '2-digit' }) : ''; };
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : ''; };
     const t12 = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ''); return m ? L.timeText(Number(m[1]) * 60 + Number(m[2])) : hm; };
 
     // Reads the run documents, pickups and journal a span of days needs; each week or span is read once per opening.

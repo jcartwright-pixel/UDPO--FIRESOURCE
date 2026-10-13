@@ -46,7 +46,6 @@ const queue = makeQueue({
   refused: notAccepted,
   draw: drawLine
 });
-const remove = queue.forget, changed = queue.changed;
 
 // The entries still on this phone, oldest first (refused ones too: they are never thrown away without the driver seeing them).
 export const waiting = queue.waiting;
@@ -60,8 +59,6 @@ export function send(op, input, label) {
 
 // Send what is waiting, oldest first; stop at the first one that still has no signal.
 export const flush = queue.flush;
-// The driver closes a refused entry's message after reading it.
-export async function forgetRefused() { for (const e of await waiting()) if (e.refused) await remove(e.key); await changed(); }
 
 // The last answer of a read (roster, loads, board), kept on the phone for when there is no signal.
 export function keepRead(key, value) { try { localStorage.setItem(READS + key, JSON.stringify({ at: Date.now(), value })); } catch (e) { /* full or private */ } }

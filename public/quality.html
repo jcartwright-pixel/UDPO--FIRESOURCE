@@ -55,7 +55,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, optionTag, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
     import { watchProducts, sizeFor, OTHER } from './js/products.js';
@@ -67,13 +67,13 @@
     let setupRead = false, setup = [], lineStatus = [], journal = [], products = {}, person = null, app = {}, shownFor = '', roundStart = '', form = null;
     // A check being filled in box by box shows at once, over its saved copy, until the database has caught up.
     const pending = {};
-    const canSave = () => L.hasRole(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE'])) && L.screenState(app, 'plant').open;
+    const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
     const RESULT = { RUNNING: 'Pass', REVIEW: 'Review', DOWN: 'Fail', FINISHED: 'Finished', CHANGEOVER: 'Changeover' };
     const CHECK = { PASS: 'Pass', REVIEW: 'Review', FAIL: 'Fail' };
     const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
     // Review item 72 (Joe 10/13): the value and words are made safe before they are shown (a size or result typed elsewhere).
-    const opt = (value, current, label) => '<option value="' + escapeHtml(value) + '"' + (String(value) === String(current || '') ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const opt = (value, current, label) => optionTag(value, current, label, { loose: true });
     // Joe 10/10: the drop-downs start blank, so nothing passes without a real check.
     const pick3 = (cls, current) => '<select class="' + cls + '">' + opt('', current, '') + opt('PASS', current, 'Pass') + opt('REVIEW', current, 'Review') + opt('FAIL', current, 'Fail') + '</select>';
 
@@ -242,7 +242,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; shownFor = ''; render(); });
+      watchPerson(db, user, p => { person = p; shownFor = ''; render(); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; shownFor = ''; render(); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupRead = true; render(); }, fail('the production lines'));
       watchProducts(db, p => { products = p; shownFor = ''; render(); }, fail('the machine products'));

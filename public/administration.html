@@ -39,7 +39,7 @@
   </div>
 
   <script type="module">
-    import { requireSignIn, start, escapeHtml, ICON, callServer } from './js/app.js';
+    import { requireSignIn, start, escapeHtml, ICON, callServer, watchPerson } from './js/app.js';
     import { ADMIN_GROUPS, adminItem } from './js/admin-items.js';
     import { PAGES } from './js/admin-pages.js';
     import { TOOL_PAGES } from './js/admin-tools.js';
@@ -116,9 +116,9 @@
     document.getElementById('find').addEventListener('input', e => { find = e.target.value; renderNav(); });
     requireSignIn(async (user) => {
       const { db } = await start();
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+      watchPerson(db, user, p => {
         const was = admin;
-        admin = L.isAdmin(s.exists() ? s.data() : null);
+        admin = L.isAdmin(p);
         if (was !== admin) render();
       });
     });

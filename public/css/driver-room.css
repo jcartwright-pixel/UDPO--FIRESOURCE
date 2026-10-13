@@ -1,53 +1,13 @@
-/* Joe 10/12: the Driver Room Check-In tablet (driver-room.html), layout A: the loadout left, driver sign-in right. */
+/* The old Driver Room tablet link (driver-room.html), which now goes on to the Driver Station. Its board and sign-in styles
+   were no longer used and were taken away (review item 79, Joe 10/13). */
 .dr-page { margin: 0; min-height: 100vh; display: flex; flex-direction: column; background: #0d2238; color: #14263a; font-size: 18px; }
 .dr-top { display: flex; align-items: center; gap: 14px; padding: 10px 18px; background: linear-gradient(90deg, #0b3d6b, #1565a8); color: #fff; }
 .dr-top h1 { margin: 0; flex: 1; font-size: 28px; }
-.dr-day { color: #f5c542; }
-.dr-top button { font: inherit; font-size: 17px; font-weight: 700; min-height: 44px; padding: 0 16px; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, .55); border-radius: 8px; cursor: pointer; }
-.dr-page .notice { margin: 12px 14px 0; }
-.dr-page #release-box { margin: 12px 14px 0; }
 .dr-code { margin: 40px auto; width: min(640px, calc(100vw - 32px)); background: #fff; border-radius: 14px; padding: 8px 24px 20px; }
-.dr-main { flex: 1; display: flex; gap: 14px; padding: 14px; min-height: 0; }
-.dr-main[hidden] { display: none; }
-.dr-board { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fff; border-radius: 12px; overflow: hidden; }
-.dr-board h2 { margin: 0; padding: 10px 14px; font-size: 18px; letter-spacing: .04em; color: #fff; background: #1f4f86; }
-.dr-board h2 span { font-weight: 600; letter-spacing: 0; }
-.dr-scroll { flex: 1; overflow: auto; }
-.dr-board table { width: 100%; border-collapse: collapse; table-layout: auto; }
-.dr-board th { position: sticky; top: 0; z-index: 1; padding: 9px 10px; text-align: left; font-size: 16px; font-weight: 800; color: #14263a; background: #e9f0f7; white-space: nowrap; }
-.dr-board td { padding: 10px; font-size: 18px; text-align: left; white-space: nowrap; border: 0; border-top: 1px solid #d5dee8; }
-.dr-board td.r { font-size: 22px; font-weight: 900; color: #0b3d6b; }
-.dr-board tr.loaded { background: #e6f5ea; } .dr-board tr.loaded td.s { color: #18753a; font-weight: 800; }
-.dr-board tr.loading td.s { color: #b26b00; font-weight: 800; } .dr-board tr.waiting td.s { font-weight: 800; }
-.dr-board .pu { color: #b42318; }
-.dr-foot { margin: 0; padding: 8px 14px; font-size: 16px; color: #4a5b6d; border-top: 1px solid #d5dee8; }
-.dr-side { width: 440px; display: flex; flex-direction: column; gap: 12px; padding: 18px; overflow: auto; background: #fff; border-radius: 12px; }
-.dr-side h2 { margin: 0; font-size: 26px; color: #0b3d6b; }
-.dr-side p { margin: 4px 0 8px; font-size: 17px; color: #4a5b6d; }
-.dr-side h3 { margin: 12px 0 6px; font-size: 16px; letter-spacing: .05em; color: #4a5b6d; }
-.dr-names { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.dr-names button, .dr-out { min-height: 52px; padding: 10px; font: inherit; font-weight: 800; text-align: left; color: #14263a; background: #f6f9fc; border: 2px solid #d5dee8; border-radius: 10px; cursor: pointer; }
-#me, #menu { display: grid; gap: 14px; } #pick { display: grid; gap: 8px; } #me[hidden], #menu[hidden], #pick[hidden] { display: none; }
-.dr-card { display: block; padding: 22px; font: inherit; font-size: 30px; font-weight: 900; text-align: left; color: #fff; border: 0; border-radius: 14px; cursor: pointer; }
-.dr-card small { display: block; margin-top: 6px; font-size: 17px; font-weight: 600; opacity: .92; }
-.dr-card.go { background: #1b7f3b; } .dr-card.gold { background: #c88a00; } .dr-card.blue { background: #1f4f86; }
-/* View Loadout, the resting screen (Joe 10/12): the loadout full width, scrolling by itself; Check-In and DVIR at the top. */
-body.dr-loadout .dr-side { display: none; }
-.dr-top .dr-hbtn { font-size: 20px; font-weight: 900; min-height: 52px; padding: 0 26px; border: 0; background: #1b7f3b; }
-.dr-top #h-dvir { background: #c88a00; }
-body.dr-loadout .dr-board td { font-size: 22px; padding: 12px 14px; } body.dr-loadout .dr-board td.r { font-size: 26px; }
-.dr-note { font-size: 16px !important; }
 @media (max-width: 1100px) {
-  .dr-side { width: 330px; padding: 14px; }
-  .dr-names { grid-template-columns: 1fr; }
-  .dr-board th, .dr-board td { padding: 8px 6px; font-size: 16px; }
-  .dr-board td.r { font-size: 19px; }
   .dr-top h1 { font-size: 24px; }
 }
 @media (max-width: 760px) {
-  .dr-main { flex: none; flex-direction: column; }
-  .dr-scroll { max-height: 55vh; }
-  .dr-side { width: auto; overflow: visible; }
   body.dr-page { height: auto; overflow: visible; overflow-x: hidden; }
 }
 /* The Check-In and DVIR phone screens, opened from the Driver Room tablet (route.html?room=1). Joe 10/13 (photo of the

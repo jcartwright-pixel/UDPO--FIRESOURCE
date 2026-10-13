@@ -87,7 +87,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, optionTag, maySave, watchPerson } from './js/app.js';
     import { collection, doc, onSnapshot } from './js/firebase.js';
     import { watchProducts, startingList, watchProductSetup, plantSetupOf, groupsOf, typesFrom, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv } from './js/products.js';
     import { savedText } from './js/autosave.js';
@@ -106,7 +106,7 @@
     let pane = 'list', draft = null, upload = null, setupRead = false, editing = null;
     // An area being changed here shows its list as typed until the database has caught up.
     const mine = {};
-    const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+    const canSave = () => maySave(person, L.REORDER_ROLES, app, 'plant');
     const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
     const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
@@ -120,7 +120,7 @@
     const listOf = (id) => mine[id] || products[id] || [];
     function current() { const all = areas(); return all.find(a => a.id === chosen) || all[0] || null; }
     const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
-    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const opt = (v, cur, label) => optionTag(v, cur, label);
     const inGroup = (p) => !group || groupsOf(p).some(g => g.toUpperCase() === group.toUpperCase());
     function setUrl() { history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (chosen ? '&line=' + encodeURIComponent(chosen) : '')); }
 
@@ -480,7 +480,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(true); });
+      watchPerson(db, user, p => { person = p; render(true); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(true); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupRead = true; render(true); }, fail('the machines'));
       watchProductSetup(db, s => { own = s; render(true); }, fail('the areas and groups'));

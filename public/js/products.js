@@ -54,8 +54,6 @@ export function cleanProduct(p) {
   });
   return out;
 }
-const cell = (v) => { const s = String(v == null ? '' : v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-export function toCsv(rows) { return [TEMPLATE].concat(rows).map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'; }
 // CSV text -> rows of cells (quotes, doubled quotes, commas and line breaks in quotes, a byte-order mark).
 export function parseCsv(textIn) {
   const t = String(textIn || '').replace(/^\uFEFF/, ''), rows = [];

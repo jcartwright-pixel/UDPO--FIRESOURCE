@@ -11,6 +11,7 @@
  * Weeks run Sunday to Saturday.
  */
 import * as P from './plant-core.js';
+import { hoursMinutesText } from './app.js';
 
 const L = window.UDLogic, U = window.UDPlant;
 export const ON_TIME_MINUTES = P.BEHIND_MINUTES;
@@ -45,8 +46,7 @@ export function departAt(row) {
 export function clockText(wall) { return wall === null || wall === undefined ? '' : L.timeText(((wall % 1440) + 1440) % 1440); }
 export function minutesText(m) {
   if (m === null || m === undefined || !isFinite(m)) return '';
-  m = Math.round(m);
-  return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min';
+  return hoursMinutesText(Math.round(m), { pad: true });
 }
 
 // One load's result: ON TIME, LATE, NOT LOADED, LOADED (done with no End time) or TO COME (its time has not come yet).

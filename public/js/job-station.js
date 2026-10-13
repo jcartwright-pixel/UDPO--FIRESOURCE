@@ -17,13 +17,13 @@
  *   jobKey, jobLine, jobHead, jobLabel, problem, officeSource, downWord, unitClass, emptyJobs, noTechs, hideEmptyStrip,
  *   completeName, safeQ, safeWord, safeYes   the words and looks that differ
  */
-import { escapeHtml, goBack } from './app.js';
+import { escapeHtml, goBack, hoursMinutesText } from './app.js';
 
 const $ = (id) => document.getElementById(id);
 const READY_MS = 2 * 60000;
 export const names = (list) => list.length > 2 ? list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1] : list.join(' and ');
 const mins = (iso) => { const m = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 60000)); return isFinite(m) ? m : 0; };
-const hm = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' m' : m + ' m';
+const hm = (m) => hoursMinutesText(m, { unit: 'm', pad: true });
 const clock = (iso) => { const m = mins(iso); return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0'); };
 export const age = (iso) => { const m = mins(iso); if (!iso || !isFinite(Date.parse(iso))) return ''; return m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + (m < 2880 ? ' day ago' : ' days ago'); };
 export const first = (name) => { const p = String(name || '').split(/\s+/); return p.length > 1 && p[0] === p[0].toUpperCase() ? p.slice(1).join(' ') : p[0]; };

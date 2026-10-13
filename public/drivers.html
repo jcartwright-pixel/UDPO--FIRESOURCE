@@ -81,7 +81,6 @@
     let drivers = [], rows = [], editingId = null, panelOpen = false, typing = null, loaded = false;
     const canEdit = () => canManage();
     const truckUnit = (id) => { const t = lists.trucks.find(e => e.id === id); return t ? t.unit : ''; };
-    const us = (key) => key ? shortDate(key) : '';
     function years(key) {
       if (!key) return '-';
       const [y, m, d] = key.split('-').map(Number), [ty, tm, td] = today.split('-').map(Number);
@@ -110,7 +109,7 @@
           '<td>' + r.position + '</td>' +
           '<td class="name">' + escapeHtml(r.name) + (r.reliefDriver ? '<span class="chip">RELIEF</span>' : '') + '</td>' +
           '<td class="relief-col">' + (r.reliefDriver ? '<span class="relief-yes">Relief</span>' : '') + '</td>' +
-          '<td><b>' + years(r.seniorityDate) + '</b> <small>' + (r.seniorityDate ? 'since ' + us(r.seniorityDate) : '') + '</small></td>' +
+          '<td><b>' + years(r.seniorityDate) + '</b> <small>' + (r.seniorityDate ? 'since ' + shortDate(r.seniorityDate) : '') + '</small></td>' +
           '<td><input class="truck" list="truck-list" data-truck="' + id + '" value="' + escapeHtml(truckUnit(r.defaultTruckId)) + '" placeholder="No truck" maxlength="40" autocomplete="off"' + dis + '></td>' +
           '<td>' + r.vacationWeeks + '</td>' +
           '<td><span class="status' + (r.active ? '' : ' off') + '" title="' + escapeHtml(r.unavailableReason) + '">' + (r.active ? 'Active' : 'Inactive') + '</span></td>' +

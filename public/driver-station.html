@@ -98,14 +98,13 @@
     let runs = [], pickups = [], drivers = [], sig = '', weekSig = '', date = L.operatingDay(new Date()), updated = null;
 
     const overflows = (id) => { const el = document.getElementById(id); return el.scrollHeight > el.clientHeight + 2; };
-    const fmt = (k) => shortDate(k);
     function render() {
       date = L.operatingDay(new Date());
       const rows = B.loadoutBoardRows(runs, pickups, date), dayName = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(date))];
       document.getElementById('weekday').textContent = dayName.charAt(0) + dayName.slice(1).toLowerCase();
       if (tv) {
         const h = new Date().getHours(), w = document.getElementById('welcome');
-        w.hidden = false; w.innerHTML = '<i></i><b>Good ' + (h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening') + ', Uniontown drivers.</b> ' + fmt(date) + ' · Work safely and have a strong day.';
+        w.hidden = false; w.innerHTML = '<i></i><b>Good ' + (h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening') + ', Uniontown drivers.</b> ' + shortDate(date) + ' · Work safely and have a strong day.';
       }
       const one = rows.map(r => '<div class="ds-row ' + r.state.toLowerCase() + '">' + (r.streamId ? '<span class="rt span2">' + escapeHtml(r.streamId) + '</span>' : '<span class="rt">' + escapeHtml(r.route) + '</span><span>' + escapeHtml(r.run) + '</span>') +
         '<span>' + escapeHtml(r.driver || '—') + '</span><span class="strong">' + escapeHtml(r.trailer || '—') + '</span><span>' + escapeHtml(r.cases === '' ? '—' : String(r.cases)) + '</span><span class="st">' + r.state + '</span>' +
@@ -122,8 +121,8 @@
       const wk = B.weeklySchedule(runs, drivers, date), ws = JSON.stringify(wk);
       if (ws !== weekSig) {
         weekSig = ws;
-        document.getElementById('week-of').textContent = 'Week of ' + fmt(wk.weekStart);
-        document.getElementById('week-head').innerHTML = '<tr><th>DRIVER</th>' + wk.dates.map((d, i) => '<th>' + L.DAY_NAMES[i].slice(0, 3).toUpperCase() + '<small>' + fmt(d) + '</small></th>').join('') + '</tr>';
+        document.getElementById('week-of').textContent = 'Week of ' + shortDate(wk.weekStart);
+        document.getElementById('week-head').innerHTML = '<tr><th>DRIVER</th>' + wk.dates.map((d, i) => '<th>' + L.DAY_NAMES[i].slice(0, 3).toUpperCase() + '<small>' + shortDate(d) + '</small></th>').join('') + '</tr>';
         const body = wk.rows.map(r => '<tr><td class="strong">' + escapeHtml(r.driver) + '</td>' + r.cells.map(c => c.length ? '<td>' + escapeHtml(c.join(', ')) + '</td>' : '<td class="off">—</td>').join('') + '</tr>').join('');
         const wr = document.getElementById('week-rows');
         wr.innerHTML = body || '<tr><td colspan="8" class="empty">No weekly driver assignments are available.</td></tr>';
