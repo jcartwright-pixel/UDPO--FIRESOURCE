@@ -768,11 +768,31 @@ export async function allowedSaves(actions) {
   try { return (await callServer('save', { checkSaves: actions })).allowed || {}; } catch (e) { return {}; }
 }
 
+// Review item 69 (Joe 10/13): a call that failed with no clear answer (timed out, no connection, a server error) may still
+// have saved. Trying the same thing again reuses that try's requestId, so the server saves it once (a retry after a time-out
+// added pickups, returns and work orders twice). Any answer from the server, or 15 minutes, ends the hold.
+const IN_DOUBT_MS = 15 * 60000;
+const inDoubt = new Map(); // the call (name + fields) -> {requestId, at}
+const newRequestId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
+function mayHaveSaved(e) {
+  const code = String(e && e.code || '').replace(/^functions\//, '');
+  return ['deadline-exceeded', 'unavailable', 'internal', 'unknown', 'cancelled'].indexOf(code) >= 0 || /network|Failed to fetch|offline|timed? ?out/i.test(String(e && e.message || ''));
+}
 export async function callServer(name, fields) {
   const { functions } = await start();
-  const requestId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
-  const result = await httpsCallable(functions, name)(Object.assign({ requestId }, fields));
-  return result.data;
+  // A screen that sends its own requestId keeps it; otherwise the same call after a doubtful failure gets the same one.
+  let key = '';
+  if (!(fields && fields.requestId)) { try { key = name + '|' + JSON.stringify(fields || {}); } catch (e) { key = ''; } }
+  const held = key && inDoubt.get(key), fresh = held && Date.now() - held.at < IN_DOUBT_MS;
+  const requestId = fresh ? held.requestId : newRequestId();
+  try {
+    const result = await httpsCallable(functions, name)(Object.assign({ requestId }, fields));
+    if (key) inDoubt.delete(key);
+    return result.data;
+  } catch (e) {
+    if (key) { if (mayHaveSaved(e)) inDoubt.set(key, { requestId, at: fresh ? held.at : Date.now() }); else inDoubt.delete(key); }
+    throw e;
+  }
 }
 
 // Errors are the only messages the screens show (no status bars).

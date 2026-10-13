@@ -25,6 +25,7 @@ const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
 const ROLL = require('./weekroll');
 const STATIONS = require('./stations');
+const BOARD = require('./board-rules');
 
 const C = M.COLLECTIONS;
 
@@ -368,8 +369,9 @@ function validate(input) {
     if (!out.equipmentId) throw new SaveError('BAD_REQUEST', 'Pick the truck or trailer');
     out.reason = text(input.reason, 120);
     // Like the current app, the reason is optional.
+    // Review item 71 (Joe 10/13): the screen's "today" is no longer used (a tablet left open since yesterday cleared
+    // yesterday's runs); the server's operating day decides. An old screen may still send it; it is checked and ignored.
     if (input.today !== undefined && !L.isDateKey(input.today)) throw new SaveError('BAD_REQUEST', 'today must be yyyy-mm-dd');
-    out.today = input.today;
     // Joe 10/12: a unit already down can be taken off the loads it is still on (its status and reason stay as they are).
     out.clearOnly = input.clearOnly === true;
     return out;
@@ -822,16 +824,19 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
     return result;
   }
   if (req.clearOnly && !L.unitOff(unit)) throw new SaveError('CHANGED', unit.unit + ' is not on the down list any more');
-  const today = req.today || L.operatingDay(new Date(stamp));
+  // The server's operating day (it rolls at 6 AM), never the tablet's (review item 71).
+  const today = L.operatingDay(new Date(stamp));
   const weeks = [L.weekStart(today), L.addDays(L.weekStart(today), 7)];
   const runs = await tx.get(db.collection(C.runs).where('weekStart', 'in', weeks));
   const idKey = unit.type === 'TRAILER' ? 'trailerId' : 'truckId', textKey = unit.type === 'TRAILER' ? 'trailer' : 'truck';
-  const removed = [], taken = [];
+  const removed = [], taken = [], kept = [];
   runs.docs.forEach(r => {
     const run = r.data(), update = {}, cells = {};
     L.DAYS.forEach((p, i) => {
       const d = run.days && run.days[p];
       if (!d || d[idKey] !== unit.id || L.addDays(run.weekStart, i) < today) return;
+      // A load already loaded keeps its unit: the product is on that trailer (review item 71).
+      if (BOARD.boardState(d) === 'LOADED') { kept.push({ route: String(run.route || ''), run: String(run.run || ''), date: L.addDays(run.weekStart, i) }); return; }
       update['days.' + p + '.' + idKey] = ''; update['days.' + p + '.' + textKey] = '';
       cells[p] = true;
       removed.push(run.route + ' ' + L.addDays(run.weekStart, i));
@@ -850,6 +855,7 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
   }
   result.removedFrom = removed;
   result.taken = taken.sort((a, b) => a.date.localeCompare(b.date) || a.route.localeCompare(b.route, undefined, { numeric: true }));
+  if (kept.length) result.keptOnLoaded = kept;
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' },
     after: req.clearOnly ? { status: unit.status, clearOnly: true, removedFrom: removed } : { status: 'DOWN', reason: req.reason, removedFrom: removed }, result });
   return result;

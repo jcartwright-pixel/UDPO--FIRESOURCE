@@ -8,7 +8,8 @@
  *   - Tractor / Straight Truck = TRUCK, Trailer = TRAILER; anything else, and every yard truck, is left out;
  *   - only Uniontown, Charleston and Martins Ferry units; a unit is found by its unit number, never by row;
  *   - a unit marked OOS / out of service / remove is OUT_OF_SERVICE, others ACTIVE, but a DOWN unit stays DOWN with its reason;
- *   - a unit no longer on the list is set INACTIVE (its row, down history and reasons stay in the sheet);
+ *   - a truck or trailer no longer on the list is set INACTIVE (its row, down history and reasons stay in the sheet); fork
+ *     trucks, pallet jacks and other kinds the list does not hold are left alone (review item 67);
  *   - unit numbers match with or without leading zeros (the fleet list's T-95 is Equipment Master's T-095, Joe 10/12).
  * Only changed cells are written. A preview (dryRun) writes nothing and lists every cell it would change. The real
  * Equipment Master is written only with allowReal (production, behind config/app.fleetSyncReal.enabled, which stays off
@@ -21,6 +22,8 @@ const { assertSandboxTarget, assertMasterTarget, columnLetter } = require('./wri
 // Joe's master fleet list (Google Sheet "United Dairy fleet list"). Read only.
 const FLEET_LIST = Object.freeze({ spreadsheetId: '1fASsuj4EYl38yJJb-XlLi0D5nxcmGwE6MBWtRTTP3xc', tab: 'Complete 2025 List of Units' });
 const BY = 'fleet list sync';
+// The kinds of unit the fleet list holds (typeOf below); no other Equipment Master row is changed by the sync.
+const FLEET_KINDS = Object.freeze(['TRUCK', 'TRAILER']);
 
 const up = (v) => String(v === null || v === undefined ? '' : v).trim().toUpperCase();
 const typeOf = (asset) => { const a = up(asset); return a === 'TRACTOR' || a === 'STRAIGHT TRUCK' ? 'TRUCK' : a === 'TRAILER' ? 'TRAILER' : ''; };
@@ -107,6 +110,9 @@ function planFleetSync(fleetValues, masterValues, at) {
   rows.forEach((r, i) => {
     const u = unitKey(r[col('unit_id')]), status = up(r[col('status')]);
     if (!u || seen[u] || status === 'INACTIVE' || status === 'DOWN') return;
+    // Review item 67 (Joe 10/13): the fleet list holds only trucks and trailers, so only those can come off it. Fork trucks,
+    // pallet jacks and every other kind of unit are never set INACTIVE here.
+    if (FLEET_KINDS.indexOf(up(r[col('equipment_type')])) < 0) return;
     put(i, 'status', 'INACTIVE'); put(i, 'source_present', 'FALSE');
     summary.inactive.push(r[col('unit_id')]);
   });

@@ -251,7 +251,34 @@ test('Truck Down on the same run in both weeks queues a sheet change for each we
   const present = (await Promise.all(weeks.map(w => db().collection('runs').doc(w + '__run_t802').get()))).filter(s => s.exists).length;
   assert.equal(present, 2, 'the fixture has the run in both weeks');
   const requestId = rid();
-  await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId, equipmentId: 'veh_truck_900002', reason: 'Brakes', today: '2026-10-06' });
+  await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId, equipmentId: 'veh_truck_900002', reason: 'Brakes' }, () => new Date('2026-10-06T16:00:00Z'));
   const queued = (await db().collection('outbox').get()).docs.map(d => d.data()).filter(d => d.requestId === requestId && /run_t802/.test(d.runDocId));
   assert.deepEqual(queued.map(d => d.runDocId).sort(), weeks.map(w => w + '__run_t802'));
+});
+
+// Review item 66 (Joe 10/13): a renamed or deleted tab used to stop every save, because all tabs were read in one request.
+test('a save for a tab the workbook no longer has goes on the conflicts list; saves for the other tabs are still written', async () => {
+  await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: '2026-10-04__run_t802', day: 'tue', driverId: 'drv_test_adams' });
+  const badRequest = rid();
+  await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: badRequest, runDocId: '2026-10-04__run_t801', day: 'mon', driverId: 'drv_test_adams' });
+  // The second save's tab was renamed in the sheet after it was queued.
+  const bad = (await db().collection('outbox').where('requestId', '==', badRequest).get()).docs;
+  assert.ok(bad.length >= 1);
+  for (const d of bad) await d.ref.update({ tab: 'LIVE WEEK RENAMED' });
+  const out = await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
+  assert.equal(cellOf('run_t802', 'tue_driver'), 'ADAMS, PAT', 'the good tab is written');
+  assert.ok(out.conflicts >= 1);
+  const left = (await db().collection('outbox').get()).docs.map(d => d.data());
+  left.filter(d => d.requestId === badRequest).forEach(d => assert.equal(d.status, 'conflict'));
+  left.filter(d => d.requestId !== badRequest).forEach(d => assert.equal(d.status, 'done'));
+  const c = (await db().collection('conflicts').get()).docs.map(d => d.data()).find(x => x.requestId === badRequest);
+  assert.match(c.problem, /no tab named LIVE WEEK RENAMED/);
+  assert.equal(c.open, true);
+});
+
+test('a sheet read that fails for another reason still puts every claimed save back to wait', async () => {
+  await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: '2026-10-04__run_t802', day: 'tue', driverId: 'drv_test_adams' });
+  const broken = Object.assign({}, sheets, { batchGet: async () => { throw new Error('quota'); } });
+  await assert.rejects(runWriteBack({ db: db(), sheets: broken, target: SANDBOX, now: tick }), /quota/);
+  assert.equal((await db().collection('outbox').get()).docs[0].data().status, 'pending');
 });
