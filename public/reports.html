@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Plant Reports · New Plant Operations</title>
+  <title>Plant Reports · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
@@ -32,7 +32,7 @@
       <div class="title"><span class="eyebrow">Reports · Plant Reports</span><h1 id="title">Plant Scorecard</h1></div>
       <!-- Joe 10/10 (look B): one Scorecard page, the week on top and a day's details under it; the other reports from the drop-down. -->
       <div class="rp-ctrl">
-        <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="rp-print">&#9113; Print</button></label>
+        <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="rp-print">Print</button></label>
         <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="tv" title="Plant Performance: today, live, big text for a TV">TV display</button></label>
         <label class="rp-field"><span>Report</span><select id="report" aria-label="Report">
           <option value="scorecard">Weekly Scorecard</option><option value="shifts">Shift Comparison</option><option value="trends">Day-of-Week Trends</option>
@@ -48,8 +48,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError } from './js/app.js';
-    import { collection, doc, getDoc, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, escapeHtml, showError, shortTime } from './js/app.js';
+    import { collection, doc, getDoc, query, where, getDocs } from './js/firebase.js';
     import * as R from './js/plant-reports.js';
 
     // Plant Reports (Joe 10/10, look B): the Weekly Scorecard (seven day cards, a day's details under them), Shift Comparison
@@ -71,7 +71,7 @@
     const nice = (name) => String(name).charAt(0) + String(name).slice(1).toLowerCase();
     const pctClass = (p) => p === null || p === undefined ? '' : p >= 90 ? 'good' : p >= 80 ? 'warn' : 'bad';
     const n = (v) => v === null || v === undefined ? '—' : String(v);
-    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: L.TIME_ZONE, hour: 'numeric', minute: '2-digit' }) : ''; };
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : ''; };
     const t12 = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ''); return m ? L.timeText(Number(m[1]) * 60 + Number(m[2])) : hm; };
 
     // Reads the run documents, pickups and journal a span of days needs; each week or span is read once per opening.
@@ -185,7 +185,7 @@
         : (tr.notes.length ? tr.notes.join(' ') : 'No weekday stands out yet.') + (tr.days >= 14 ? '' : ' Only ' + tr.days + ' day' + (tr.days === 1 ? '' : 's') + ' recorded so far, so treat this as early; patterns firm up after about three weeks.');
       return '<div class="rp-lead ' + (tr.notes.length ? 'bad' : '') + '"><b>' + (tr.notes.length ? 'What stands out: ' : 'So far: ') + '</b>' + escapeHtml(lead) + '</div>' +
         card('By weekday', 'last ' + weeks + ' weeks · ' + tr.days + ' days counted', table(['Weekday', 'Days counted', 'Loads a day', 'On time', 'Avg late', 'Not loaded a day', 'Pickups a day', 'Breakdowns a day', 'Temps out a day'], rows, ''), 'rp-wide') +
-        '<p class="rp-foot">Counts the days the new app has recorded' + (tr.first ? ', starting ' + fmtY(tr.first) : '') + '. On time = loaded no later than ' + R.ON_TIME_MINUTES + ' minutes after the depart time (the same rule as Behind). Line speed (cases an hour) and the time a truck really leaves are not recorded yet.</p>';
+        '<p class="rp-foot">Counts the days the Operations app has recorded' + (tr.first ? ', starting ' + fmtY(tr.first) : '') + '. On time = loaded no later than ' + R.ON_TIME_MINUTES + ' minutes after the depart time (the same rule as Behind). Line speed (cases an hour) and the time a truck really leaves are not recorded yet.</p>';
     }
 
     function remember() {

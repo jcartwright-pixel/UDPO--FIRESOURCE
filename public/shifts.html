@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Plant Shifts · New Plant Operations</title>
+  <title>Plant Shifts · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
@@ -50,7 +50,7 @@
 
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, dateTimeText } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import * as R from './js/plant-reports.js';
 
     const L = window.UDLogic;

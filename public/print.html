@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Print Layouts · New Plant Operations</title>
+  <title>Print Layouts · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
   <style>
@@ -24,19 +24,19 @@
     @media (max-width: 1799px) { .pl-page .head .actions.tiles > :is(button, a.button) { width: auto !important; min-width: 0 !important; } }
     .pl-opts { gap: 8px; }
     .pl-opts { margin-left: auto; display: flex; align-items: flex-end; gap: 10px; flex-wrap: nowrap; }
-    .pl-opts label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 700; color: var(--muted); }
+    .pl-opts label { display: flex; flex-direction: column; gap: 3px; font-size: 16px; font-weight: 700; color: var(--muted); }
     .pl-opts select, .pl-opts input { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 700; color: var(--ud-blue-dark); background: #fff; min-width: 110px; }
     .pl-opts .stepper input { border: 0; height: 100%; min-width: 0; width: 150px; }
-    .pl-opts .pl-week { font-size: 12px; color: var(--muted); align-self: center; white-space: nowrap; }
+    .pl-opts .pl-week { font-size: 16px; color: var(--muted); align-self: center; white-space: nowrap; }
     .pl-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 270px minmax(0, 1fr) 290px; gap: 14px; padding: 0 16px 14px; }
     .pl-list, .pl-setup { background: #fff; border: 1px solid #d5e1eb; border-radius: 14px; overflow: auto; }
-    .pl-list h2, .pl-setup h2 { margin: 0; padding: 12px 14px 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    .pl-list h2, .pl-setup h2 { margin: 0; padding: 12px 14px 8px; font-size: 16px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
     .pl-item { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 14px; border-top: 1px solid #e3ebf2; cursor: pointer; color: #123f70; }
     .pl-item:hover { background: #f3f8fc; }
     .pl-item.on { background: #e3eefa; box-shadow: inset 4px 0 0 #1976d2; }
     .pl-item div { flex: 1; min-width: 0; }
-    .pl-item strong { display: block; font-size: 15.5px; }
-    .pl-item span { display: block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #60798f; line-height: 1.3; }
+    .pl-item strong { display: block; font-size: 16px; }
+    .pl-item span { display: block; margin-top: 2px; font-size: 16px; font-weight: 600; color: #60798f; line-height: 1.3; }
     .pl-item button { flex: none; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font-size: 17px; cursor: pointer; }
     .pl-item button:hover { background: var(--ud-blue); color: #fff; }
     .pl-view { position: relative; min-width: 0; min-height: 0; border-radius: 14px; background: #dfe6ee; border: 1px solid #ccd8e3; overflow: hidden; }
@@ -44,7 +44,7 @@
     .pl-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(223,230,238,.85); font-size: 17px; color: var(--ud-blue-dark); }
     .pl-setup { padding-bottom: 12px; }
     .pl-row { padding: 8px 14px; }
-    .pl-row > b { display: block; margin-bottom: 6px; font-size: 13px; color: var(--ud-blue-dark); }
+    .pl-row > b { display: block; margin-bottom: 6px; font-size: 16px; color: var(--ud-blue-dark); }
     .pl-seg { display: flex; }
     .pl-seg button { flex: 1; height: 38px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
     .pl-seg button + button { border-left: 0; }
@@ -59,8 +59,8 @@
     .pl-pages { display: grid; gap: 6px; }
     .pl-pages label { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--ud-blue-dark); }
     .pl-pages input[type=radio] { width: 17px; height: 17px; }
-    .pl-note { margin: 6px 14px 0; padding: 9px 11px; border-radius: 9px; background: #f3f8fc; color: #39566f; font-size: 12.5px; font-weight: 600; line-height: 1.4; }
-    .pl-saved { margin: 8px 14px 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+    .pl-note { margin: 6px 14px 0; padding: 9px 11px; border-radius: 9px; background: #f3f8fc; color: #39566f; font-size: 16px; font-weight: 600; line-height: 1.4; }
+    .pl-saved { margin: 8px 14px 0; font-size: 16px; font-weight: 600; color: var(--muted); }
   </style>
 </head>
 <body class="admin-page fill pl-page">

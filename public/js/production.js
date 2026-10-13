@@ -1,7 +1,7 @@
 // Plant Production (Joe 10/11: our own RedZone): what the Line Targets page, the line tablet and the production TV read.
 // The lines are the plant's machines (Plant Operations); each line's products, speeds, targets, UPCs and shelf lives are the
 // plant's Products list (Administration > Products); the shift is the plant's Plant Production shift (Plant Shifts).
-import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, query, where, onSnapshot } from './firebase.js';
 import { watchProducts } from './products.js';
 
 const U = () => window.UDPlant, R = () => window.UDProduction;

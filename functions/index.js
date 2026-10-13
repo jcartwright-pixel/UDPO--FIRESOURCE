@@ -2,7 +2,6 @@
  * United Dairy Distribution app: server entry points (Firebase Cloud Functions).
  *
  *   transferEveryMinute   copies the Live tabs and master lists into the database (read-only on the sheets)
- *   transferNow           the same on request, for an administrator ("Reset test copy" rewrites every row)
  *   save                  every save from the screens, one call each
  *   phone                 the drivers' phone Check-In (Route Distribution code, no United Dairy account)
  *   garage                the Garage Station tablet (technician name + login ID, no United Dairy account)
@@ -111,18 +110,6 @@ exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSec
 // dataLoads/<id> marker, so it runs one time; it deletes nothing.
 exports.dataLoadsOnce = onSchedule({ schedule: 'every 10 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
   await require('./src/data-loads').runDataLoads(db);
-});
-
-exports.transferNow = onCall({ timeoutSeconds: 120 }, async (request) => {
-  const user = signedIn(request);
-  const person = (await db.collection('users').doc(safeIdPart(user.email)).get()).data();
-  if (!person || person.status !== 'ACTIVE' || (person.roles || []).indexOf('ADMINISTRATOR') < 0) {
-    throw new HttpsError('permission-denied', 'Only an administrator can run the transfer by hand');
-  }
-  const setup = transferSetup();
-  if (!setup) throw new HttpsError('failed-precondition', 'No sheets are set up for this project yet (DEMO_DATA, SOURCES_JSON or READ_UNIONTOWN_SHEETS)');
-  const result = await runTransfer({ db, reader: setup.reader, sources: setup.sources, force: !!(request.data && request.data.resetTestCopy) });
-  return { at: result.at, liveWeeks: result.liveWeeks, summary: result.summary, warningCount: result.warnings.length };
 });
 
 const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);

@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Fire Extinguishers · New Plant Operations</title>
+  <title>Fire Extinguishers · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/safety.css">
   <script src="js/logic.js"></script>
@@ -57,8 +57,8 @@
   <script>window.UD_OFFLINE = true;</script>
   <script type="module">
     import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
-    import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, escapeHtml, showError, shortDate, watchPerson } from './js/app.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { today, thisMonth, monthShort, pickPlant, plantName, canWalk, canSetUp, modeText, watchExtinguishers, watchSetup, fireNav } from './js/safety.js';
 
     // Fire Extinguishers (Joe 10/12, mock-ups E and F): each plant's extinguishers with this month's check (OSHA asks for a
@@ -230,10 +230,10 @@
     startOffline(['safety.html', 'safety-issues.html', 'extinguishers.html', 'safety-fire.html', 'safety-walks.html', 'safety-setup.html']);
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
-        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+      watchPerson(db, user, p => {
+        person = p;
         if (!plant) { plant = pickPlant(person, params.get('plant') || (checking.split('__')[0] || '')); follow(); } else render();
-      });
+      }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (plant) render(); });
     });
   </script>

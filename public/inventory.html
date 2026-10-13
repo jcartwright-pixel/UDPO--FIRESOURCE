@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Receiving Log · New Plant Operations</title>
+  <title>Receiving Log · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/scan.css">
   <script src="js/logic.js"></script>
@@ -64,7 +64,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError, goLiveNote, save } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { plantFor } from './js/pmaint.js';
 
     // Receiving Log (Joe 10/13, mock-up E): every scan of every delivery, newest first, searchable by item, lot or PO, so a

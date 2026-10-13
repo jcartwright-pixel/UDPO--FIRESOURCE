@@ -9,6 +9,8 @@
  * Tab takes it and moves across, Esc keeps the old value. Time, Jack and Notes open on a click as before; typing on a
  * selected one starts over with what is typed, and Enter / Tab / Up / Down save and move.
  */
+import { escapeHtml } from './app.js';
+
 const LISTS = { driver: true, truck: true, trailer: true };
 let want = null; // the cell to select after the next render: {id, kind}
 
@@ -214,7 +216,8 @@ export function bindDailyKeys(tbody, h) {
   }
 }
 
-function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+// Review item 76 (Joe 10/13): the app's one HTML-safety helper.
+const esc = escapeHtml;
 
 function injectStyle() {
   if (document.getElementById('daily-keys-style')) return;
@@ -227,12 +230,12 @@ function injectStyle() {
     '.cell-pop [data-i]{display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-bottom:1px solid #edf2f6;cursor:pointer;white-space:nowrap}',
     '.cell-pop [data-i].active,.cell-pop [data-i]:hover{background:#dcecff}',
     '.cell-pop [data-i].off{color:#8a97a3;cursor:not-allowed;background:#f4f6f8}',
-    '.cell-pop em{margin-left:auto;font-style:normal;font-size:14px;color:#b3261e}',
+    '.cell-pop em{margin-left:auto;font-style:normal;font-size:16px;color:#b3261e}',
     '.cell-pop em.note{color:#60798f;font-weight:700}',
-    '.cell-pop h6{margin:0;padding:6px 12px;background:#eef4fa;color:#0e3a62;font-size:13px;letter-spacing:.06em;position:sticky;top:0}',
+    '.cell-pop h6{margin:0;padding:6px 12px;background:#eef4fa;color:#0e3a62;font-size:16px;letter-spacing:.06em;position:sticky;top:0}',
     '.cell-pop h6.off{color:#8a5a00;background:#fff4e0}',
     '.cell-pop p{margin:0;padding:10px 12px;color:#60798f}',
-    '.cell-pop small{display:block;padding:6px 12px;color:#60798f;font-size:13px;font-weight:700;border-top:1px solid #dfe6ee;white-space:nowrap}'
+    '.cell-pop small{display:block;padding:6px 12px;color:#60798f;font-size:16px;font-weight:700;border-top:1px solid #dfe6ee;white-space:nowrap}'
   ].join('');
   document.head.appendChild(s);
 }

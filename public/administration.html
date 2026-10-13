@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Administration · New Plant Operations</title>
+  <title>Administration · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/admin-pages.css">
   <script src="js/logic.js"></script>
@@ -39,12 +39,12 @@
   </div>
 
   <script type="module">
-    import { requireSignIn, start, escapeHtml, ICON, callServer } from './js/app.js';
+    import { requireSignIn, start, escapeHtml, ICON, callServer, watchPerson } from './js/app.js';
     import { ADMIN_GROUPS, adminItem } from './js/admin-items.js';
     import { PAGES } from './js/admin-pages.js';
     import { TOOL_PAGES } from './js/admin-tools.js';
     import { renderGoLive } from './js/admin-golive.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     const L = window.UDLogic;
     const testEmail = new URLSearchParams(location.search).get('testEmail');
     // Pages built here (js/admin-pages.js), not a separate screen: they go through the server, Administrators only.
@@ -81,8 +81,8 @@
         panel.innerHTML = head + '<div class="adm-view" id="view"><p class="adm-loading">Loading&hellip;</p></div>';
         PANELS[it.key](document.getElementById('view'), CTX);
       } else {
-        panel.innerHTML = head + '<div class="adm-view"><div class="adm-soon"><h3>Being built in the new app</h3><p>' + escapeHtml(it.what) + '</p>' +
-          '<p class="muted">In the current app this is under Administration &rsaquo; ' + escapeHtml(it.group) + '. It opens right here as soon as it is ready; nothing in the new app opens the old program.</p></div></div>';
+        panel.innerHTML = head + '<div class="adm-view"><div class="adm-soon"><h3>Being built in Operations</h3><p>' + escapeHtml(it.what) + '</p>' +
+          '<p class="muted">In the current app this is under Administration &rsaquo; ' + escapeHtml(it.group) + '. It opens right here as soon as it is ready; nothing in Operations opens the old program.</p></div></div>';
       }
     }
 
@@ -116,9 +116,9 @@
     document.getElementById('find').addEventListener('input', e => { find = e.target.value; renderNav(); });
     requireSignIn(async (user) => {
       const { db } = await start();
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
+      watchPerson(db, user, p => {
         const was = admin;
-        admin = L.isAdmin(s.exists() ? s.data() : null);
+        admin = L.isAdmin(p);
         if (was !== admin) render();
       });
     });

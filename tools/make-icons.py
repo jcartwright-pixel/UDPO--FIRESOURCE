@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Makes every app icon size from one square picture.
 
-To use a different icon: replace public/img/app-icon/icon-source.png with a square PNG
+To use a different icon: replace tools/icon-source/icon-source.png with a square PNG
 (at least 512x512) and icon-source-maskable.png with the same picture shrunk to the middle 80%
 on a filled background (Android trims the corners into a circle or rounded square), then run:
 
@@ -15,8 +15,10 @@ from pathlib import Path
 from PIL import Image
 
 ICONS = Path(__file__).resolve().parent.parent / 'public' / 'img' / 'app-icon'
-src = Image.open(ICONS / 'icon-source.png').convert('RGBA')
-mask = Image.open(ICONS / 'icon-source-maskable.png').convert('RGBA')
+# The source pictures live here in tools/, not in public/, so they are not uploaded to the site (review item 79, Joe 10/13).
+SOURCE = Path(__file__).resolve().parent / 'icon-source'
+src = Image.open(SOURCE / 'icon-source.png').convert('RGBA')
+mask = Image.open(SOURCE / 'icon-source-maskable.png').convert('RGBA')
 if src.width != src.height or mask.width != mask.height:
     raise SystemExit('the icon pictures must be square')
 

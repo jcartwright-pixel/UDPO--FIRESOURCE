@@ -1004,7 +1004,7 @@ async function sendReport(tx, db, req, email, stamp, logRef, mode, SaveError) {
     date: L.operatingDay(new Date(stamp)), at: stamp, by: email, mode: mode.mode };
   tx.set(db.collection('plantReports').doc(id), record);
   const result = { ok: true, requestId: req.requestId, reportId: id, sent: false, sending: mailOn, subject: req.subject,
-    message: mailOn ? 'Report saved. Sending the email…' : 'Report saved. Email is not set up in the new app yet, so it was not emailed to ' + req.groupName + '.' };
+    message: mailOn ? 'Report saved. Sending the email…' : 'Report saved. Email is not set up in Operations yet, so it was not emailed to ' + req.groupName + '.' };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, reportId: id, result });
   return result;
 }

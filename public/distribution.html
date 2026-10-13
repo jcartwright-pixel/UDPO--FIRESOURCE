@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Route Distribution · New Plant Operations</title>
+  <title>Route Distribution · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -46,8 +46,8 @@
     </div>
   </div>
   <script type="module">
-    import { start, requireSignIn, showError, shortDate } from './js/app.js';
-    import { collection, doc, query, where, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, showError, shortDate, shortTime } from './js/app.js';
+    import { collection, doc, query, where, limit, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
@@ -104,7 +104,7 @@
         data.writeBack = !!(c.writeBack && c.writeBack.enabled === true);
         const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
         const tz = { timeZone: 'America/New_York' }, sameDay = at && at.toLocaleDateString('en-US', tz) === new Date().toLocaleDateString('en-US', tz);
-        document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : shortDate(at) + ' ') + at.toLocaleTimeString('en-US', Object.assign({ hour: 'numeric', minute: '2-digit' }, tz)) : 'Waiting for the first copy';
+        document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : shortDate(at) + ' ') + shortTime(at) : 'Waiting for the first copy';
         render();
       });
     });

@@ -209,7 +209,7 @@ export async function renderWindowTest(box) {
             const box2 = d.getElementById('error');
             if (box2 && !box2.hidden && box2.textContent.trim()) problems.push('Error shown: ' + box2.textContent.trim().slice(0, 160));
             if (d.scrollingElement && d.scrollingElement.scrollWidth > w.innerWidth + 1) problems.push('Scrolls sideways (' + d.scrollingElement.scrollWidth + ' px wide in a ' + w.innerWidth + ' px window)');
-            if (/Being built in the new app/.test(d.body.innerText)) problems.push('Says "Being built"');
+            if (/Being built in Operations/.test(d.body.innerText)) problems.push('Says "Being built"');
           } catch (x) { problems.push('Could not read the screen'); }
           if (stillLoading) problems.push('Still loading after 12 seconds');
           finish(problems, ready);

@@ -54,7 +54,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await ph.click('#step-name button[type=submit]');
     await ph.waitForSelector('.phone-load');
     // The first visit keeps the page and the Firebase code on the phone.
-    await ph.waitForFunction(async () => { if (!navigator.serviceWorker.controller) { return false; } const c = await caches.open('ud-offline-v1'); return !!(await c.match('route.html')) && !!(await c.match('js/phone-queue.js')) && (await Promise.all(['app', 'auth', 'firestore', 'functions'].map(n => c.match('https://www.gstatic.com/firebasejs/12.18.0/firebase-' + n + '.js')))).every(Boolean); }, null, { timeout: 20000 })
+    await ph.waitForFunction(async () => { if (!navigator.serviceWorker.controller) { return false; } const c = await caches.open('ud-offline-v1'); return !!(await c.match('route.html')) && !!(await c.match('js/phone-queue.js')) && !!(await c.match('js/firebase.js')) && (await Promise.all((await import('/js/firebase.js')).FIREBASE_FILES.map(u => c.match(u)))).every(Boolean); }, null, { timeout: 20000 })
       .catch(async () => { await ph.reload(); await ph.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 20000 }); });
 
     // No signal: the Check-In is kept on the phone, the load says Saved on phone, and the line says one waits.

@@ -21,7 +21,7 @@ export const ADMIN_GROUPS = [
     ['checkin-email', 'Driver Check-In Email', 'The mailbox check for driver check-in email: on or off, sender, recipient, subject, Check now, and Use the standard addresses.', '', 'people'],
     ['refresh-rates', 'Refresh Rates', 'How often each background job runs, Save rate for each, and Archive now for completed work. Two retired jobs stay read-only.', '', 'week']
   ]],
-  ['Dispatch Administration', 'Already in the new app', [
+  ['Dispatch Administration', 'Already in Operations', [
     ['dispatch-admin', 'Dispatch Administration', 'Dispatch rules, carriers and the dispatch administration cards.', 'admin.html', 'distribution-truck-v1-560.webp'],
     ['ops', 'Operational Assignments', 'Branch, carrier and CVG assignments drivers can be given on Daily Dispatch.', 'ops.html', 'people'],
     ['print', 'Print Layouts', 'How the dispatch sheets print.', 'print.html', 'day'],
@@ -54,7 +54,7 @@ export const ADMIN_GROUPS = [
   ['Diagnostics', 'Checks and repairs for the data behind the app', [
     ['preflight', 'Run Runtime Pre-Flight', 'Checks every sheet, column and setting the app needs and lists anything missing.', '', 'check'],
     // Joe 10/13 ("where is the sheet conflicts?"): Sheet Conflicts is in the list, so Find a setting finds it.
-    ['sheet-conflicts', 'Sheet Conflicts', 'Saves the new app did not write because someone changed the same cell in the sheet.', 'conflicts.html', 'alert'],
+    ['sheet-conflicts', 'Sheet Conflicts', 'Saves the Operations app did not write because someone changed the same cell in the sheet.', 'conflicts.html', 'alert'],
     ['update-live', 'Update Live Sheets', 'Rebuilds the Current and Next weeks from Route Master and the drivers\' standard runs, and adds missing runs (press twice).', '', 'swap'],
     ['refresh-home', 'Refresh Home Summary Now', 'Rebuilds the all-plants overview numbers right away.', '', 'factory'],
     ['plant-fresh', 'Start Plant Fresh From Today', 'Starts the plant screens over from today\'s loads.', '', 'factory'],

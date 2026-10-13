@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Machinery · New Plant Operations</title>
+  <title>Machinery · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/pmaint.css">
   <script src="js/logic.js"></script>
@@ -53,8 +53,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote, optionTag, hoursMinutesText, maySave, watchPerson } from './js/app.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { watchMaint, plantFor } from './js/pmaint.js';
     import { savedText } from './js/autosave.js';
 
@@ -65,10 +65,10 @@
     const params = new URLSearchParams(location.search);
     let plant = params.get('plant') || '', chosen = params.get('machine') || '', area = '', person = null, app = {}, data = null, db = null, stop = null, adding = false, note = '', noteClass = '';
     let busy = Promise.resolve();
-    const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
-    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const canSave = () => maySave(person, L.REORDER_ROLES, app, 'plant');
+    const opt = (v, cur, label) => optionTag(v, cur, label);
     const day = (k) => (/^\d{4}-\d\d-\d\d/.test(String(k || '')) ? shortDate(String(k).slice(0, 10)) : '');
-    const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortDate(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })) : ''; };
+    const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortDate(t) : ''; };
     const setUrl = () => history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (chosen ? '&machine=' + encodeURIComponent(chosen) : ''));
     const machine = () => (data ? data.all.find(m => m.id === chosen) : null);
     const status = (m) => m.status === 'RETIRED' ? ['Retired', 'gray'] : m.down ? ['Down', 'red'] : m.parts ? ['Waiting on parts', 'amber'] : m.open ? ['Open work order', 'blue'] : ['In service', 'green'];
@@ -123,7 +123,7 @@
           (tasks.length ? '<table class="pm-table"><thead><tr><th>Task</th><th>How often</th><th>Last done</th><th>Next due</th></tr></thead><tbody>' + tasks.map(t => '<tr><td>' + escapeHtml(t.task) + '</td><td class="nowrap">' + escapeHtml(R.everyText(t.every, t.unit)) + '</td><td class="nowrap">' + day(t.lastDone) + '</td><td class="nowrap">' +
             (t.state === 'LATE' ? '<span class="pm-pill red">' + day(t.due) + ' late</span>' : day(t.due)) + '</td></tr>').join('') + '</tbody></table>' : '');
         // History: breakdowns recorded on Shift Notes, requests, work orders and PMs, newest first.
-        const hm = (n) => n === null || n === undefined ? '' : n >= 60 ? Math.floor(n / 60) + ' h ' + (n % 60) + ' m' : n + ' min';
+        const hm = (n) => hoursMinutesText(n, { unit: 'm', short: 'min' });
         const hist = data.breakdowns.filter(b => b.machineId === m.id).map(b => ({ at: b.recordedAt, from: 'Breakdown', what: b.entry + (b.fix ? ' · fix: ' + b.fix : ''), who: b.stillDown ? 'still down' + (b.down !== null ? ' · ' + hm(b.down) : '') : (b.down !== null ? hm(b.down) + ' down' : 'recorded') }))
           .concat(data.requests.filter(r => r.machineId === m.id && !r.workOrder).map(r => ({ at: r.recordedAt, from: 'Request', what: r.entry, who: r.status === 'RESOLVED' ? 'fixed' : 'waiting' })))
           .concat(data.workOrders.filter(w => w.machineId === m.id).map(w => ({ at: w.createdAt, from: w.source === 'PM' ? 'PM' : w.source === 'SHIFT_NOTES' ? 'Request' : 'Work order', what: (w.problem || '') + (w.fixedNote ? ' · fixed: ' + w.fixedNote : ''), who: (w.woNumber || '') + ' · ' + R.statusWord(w.status) })))
@@ -180,7 +180,7 @@
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; drawTop(); if (!stop) follow(); else render(true); });
+      watchPerson(db, user, p => { person = p; drawTop(); if (!stop) follow(); else render(true); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (data) render(true); });
     });
   </script>

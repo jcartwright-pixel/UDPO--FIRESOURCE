@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Line Tablet · New Plant Operations</title>
+  <title>Line Tablet · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
   <link rel="stylesheet" href="css/production.css">
@@ -74,8 +74,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, goBack, shortDate } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, escapeHtml, showError, goBack, shortDate, watchPerson } from './js/app.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { watchProduction, lineView, fmt, clock, shiftText } from './js/production.js';
 
     // The line tablet (Joe 10/11, mock-up A): at the line, big buttons. What is running, made vs target, the speed (Joe: it flashes
@@ -238,10 +238,10 @@
 
     requireSignIn(async (user) => {
       ({ db } = await start());
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => {
-        person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null;
+      watchPerson(db, user, p => {
+        person = p;
         if (!stop) stop = watchProduction(db, plant(), d => { data = d; render(); }, e => showError('Could not read the line (' + e.message + '). Check the network.'), now);
-      });
+      }, { withEmail: true });
       // The clock moves the stopped minutes and target so far.
       setInterval(render, 15000);
     });

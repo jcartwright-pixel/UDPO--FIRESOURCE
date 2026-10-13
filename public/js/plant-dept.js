@@ -1,7 +1,7 @@
 // Plant Distribution Departments, option A (Joe picked 10/10): the same reads and counts as before, plus what the bottom half of
 // each card shows (loads by depart hour, trailers to unload first, washes waiting longest, returns by reason).
 import { start, requireSignIn, showError, shortDate, escapeHtml } from './app.js';
-import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, query, where, onSnapshot } from './firebase.js';
 import * as P from './plant-core.js';
 const L = window.UDLogic;
 const params = new URLSearchParams(location.search);

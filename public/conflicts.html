@@ -7,11 +7,11 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Sheet Conflicts · New Plant Operations</title>
+  <title>Sheet Conflicts · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <style>
     /* A line refused more than once says how often under its time. */
-    .cf-times { display: block; font-size: 11px; color: #a3471a; font-weight: 600; line-height: 1.1; }
+    .cf-times { display: block; font-size: 16px; color: #a3471a; font-weight: 600; line-height: 1.1; }
   </style>
   <script src="js/logic.js"></script>
 </head>
@@ -32,7 +32,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Sheet Conflicts</h1><small>Saves the new app did not write because someone changed the same cell in the sheet</small></div>
+      <div class="title"><h1>Sheet Conflicts</h1><small>Saves the Operations app did not write because someone changed the same cell in the sheet</small></div>
       <div class="badge-test"><b>TEST COPY</b><span>Sandbox sheet only</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -55,7 +55,7 @@
     import { start, requireSignIn, fitToWindow, escapeHtml, save, showError, dateTimeText } from './js/app.js';
     import { watchLists, canSave, forScreen, modeLabel } from './js/edit.js';
     forScreen('conflicts');
-    import { collection, query, where, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, query, where, orderBy, limit, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const MAX = 200;

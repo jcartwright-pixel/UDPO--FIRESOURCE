@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Product Sheet · New Plant Operations</title>
+  <title>Product Sheet · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
@@ -83,8 +83,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, shortDate } from './js/app.js';
-    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, shortDate, optionTag, maySave, watchPerson } from './js/app.js';
+    import { collection, doc, onSnapshot } from './js/firebase.js';
     import { watchProducts, watchProductSetup, watchLoose, plantSetupOf, groupsOf, typesFrom, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv,
       sheetRows, machineValues, shownValue, keyOf, sameList, SHARED_FIELDS, MACHINE_FIELDS, SHEET_HEAD, SHEET_TAIL, isChecked } from './js/products.js';
     import { savedText } from './js/autosave.js';
@@ -107,7 +107,7 @@
     let pane = 'list', draft = null, upload = null, setupRead = false, editing = null;
     // Lists being changed here show as typed until the database has caught up (mine by area id, mineLoose by plant).
     const mine = {}, mineLoose = {};
-    const canSave = () => L.hasRole(person, L.REORDER_ROLES) && L.screenState(app, 'plant').open;
+    const canSave = () => maySave(person, L.REORDER_ROLES, app, 'plant');
     const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
     const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
@@ -122,7 +122,7 @@
     const looseOf = (pid) => { const p = pid || plant; if (mineLoose[p]) return mineLoose[p]; const d = looseDocs.find(x => x.facilityId === p); return d && Array.isArray(d.products) ? d.products : []; };
     const rowsOf = (pid) => sheetRows(areas(pid), listOf, looseOf(pid));
     const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
-    const opt = (v, cur, label) => '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    const opt = (v, cur, label) => optionTag(v, cur, label);
     const inGroup = (p) => !group || groupsOf(p).some(g => g.toUpperCase() === group.toUpperCase());
     const show = (v) => escapeHtml(v === undefined || v === null ? '' : String(v));
     const numText = (v) => String(v).replace(/\.0+$/, '');
@@ -662,7 +662,7 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
-      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; render(true); });
+      watchPerson(db, user, p => { person = p; render(true); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(true); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupRead = true; render(true); }, fail('the machines'));
       watchProductSetup(db, s => { own = s; render(true); }, fail('the areas and groups'));
