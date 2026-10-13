@@ -1757,3 +1757,27 @@ table.routes td.screen-name { text-align: left; color: var(--ud-blue); }
 /* Loadout Center: more loads loading than the loadout's limit (a manager went past it). */
 .notice.warning.over-limit { margin: 0 16px 8px; background: #fff4d6; color: #7a4b00; border: 2px solid #f0b429; border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; }
 .notice.warning.over-limit[hidden] { display: none; }
+
+/* Review item 2 (Joe 10/13): date boxes read 10-8-26 (app.js dressDate). */
+input[type="date"].ud-date-dressed::-webkit-datetime-edit { color: transparent; }
+.ud-date-face { position: absolute; z-index: 1; display: flex; align-items: center; pointer-events: none; white-space: nowrap; overflow: hidden; color: inherit; }
+/* Review item 1 (Joe 10/13): Daily's top buttons sit on the title line with the date boxes on the right (laptops and desk
+   screens; a phone keeps its wrapped layout). */
+@media (min-width: 701px) {
+  body.daily-look .head:has(#print-sheet) { flex-wrap: nowrap; align-items: flex-end; gap: 10px; }
+  body.daily-look .head:has(#print-sheet) .title { flex: none; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head { margin-left: 0; flex-wrap: nowrap; gap: 6px; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head + .field { margin-left: auto; }
+}
+body.daily-look #delivers { display: none; }
+@media (min-width: 701px) and (max-width: 1799px) {
+  /* Room for one line at 1536: Delivery day shows beside Loadout day, buttons and arrows are a little tighter. */
+  body.daily-look .head:has(#print-sheet) { gap: 8px; }
+  body.daily-look .head:has(#print-sheet) .field:has(#delivery-day) { display: none; }
+  body.daily-look #delivers { display: block; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head :is(button, a.button) { padding: 0 8px; }
+  body.daily-look .head:has(#print-sheet) .coverage { min-width: 0; padding: 1px 6px; }
+  body.daily-look .head:has(#print-sheet) .stepper button { padding: 0 6px; }
+  body.daily-look .head:has(#print-sheet) #week-begin { width: 84px; }
+  body.daily-look .head:has(#print-sheet) #load-day { width: 112px; }
+}

@@ -36,8 +36,6 @@
       <div class="title"><h1>Weekly Dispatch</h1><small id="published"></small></div>
       <div class="actions in-head">
         <a class="button" id="go-daily" href="daily.html">Daily Dispatch</a>
-        <button type="button" id="prev-week">&lt; Previous Week</button>
-        <button type="button" id="next-week">Next Week &gt;</button>
         <button type="button" id="run-days">Route Run Days</button>
         <button type="button" id="reset" title="Rebuild this whole week from Route Master and Driver Master (managers). Trucks, trailers and notes stay.">Reset Week</button>
         <button type="button" id="print-week">Print Weekly Dispatch</button>
@@ -67,7 +65,7 @@
         <h2>Route / Run Assignments</h2>
         <div class="sheet week" id="routes-sheet">
           <table>
-            <colgroup><col style="width:5%"><col style="width:14%"><col span="7" style="width:11.57%"></colgroup>
+            <colgroup><col style="width:4.5%"><col style="width:11.5%"><col span="7" style="width:12%"></colgroup>
             <thead><tr id="heads"></tr></thead>
             <tbody id="rows"></tbody>
           </table>
@@ -75,7 +73,7 @@
         <div class="wk-divider" id="board-panel">Driver Assignment Board</div>
         <div class="sheet week board" id="board-sheet">
           <table>
-            <colgroup><col style="width:19%"><col span="7" style="width:11.57%"></colgroup>
+            <colgroup><col style="width:16%"><col span="7" style="width:12%"></colgroup>
             <thead><tr id="board-heads"></tr></thead>
             <tbody id="board-rows"></tbody>
           </table>
@@ -134,15 +132,10 @@
     function headCells(first) {
       return first + L.DAYS.map((p, i) => {
         const date = L.addDays(week, i);
-        return '<th class="' + (date === today ? 'today' : '') + '">' + L.DAY_NAMES[i].slice(0, 3) + '<small>' + escapeHtml(longDate(date)) + '</small></th>';
+        return '<th class="' + (date === today ? 'today' : '') + '">' + L.DAY_NAMES[i].slice(0, 3) + '<small>' + escapeHtml(shortDate(date)) + '</small></th>';
       }).join('');
     }
 
-    // The day under each column head, as on the current Weekly screen ("OCTOBER 4").
-    function longDate(key) {
-      const [y, m, d] = key.split('-').map(Number);
-      return ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'][m - 1] + ' ' + d;
-    }
     // A split route's second load (6301_2) shows as 6301, as on the current screen.
     function routeNumber(v) { const s = String(v || ''), i = s.lastIndexOf('_'); return i > 0 && /^\d+$/.test(s.slice(i + 1)) ? s.slice(0, i) : s; }
 
@@ -563,8 +556,6 @@
       });
       document.getElementById('prev').onclick = () => move(-7);
       document.getElementById('next').onclick = () => move(7);
-      document.getElementById('prev-week').onclick = () => move(-7);
-      document.getElementById('next-week').onclick = () => move(7);
       document.getElementById('week-date').onchange = e => { if (L.isDateKey(e.target.value)) { noteText = ''; week = L.weekStart(e.target.value); watch(); } };
       window.addEventListener('resize', render);
       watch();

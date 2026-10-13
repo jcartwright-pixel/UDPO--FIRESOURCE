@@ -54,7 +54,7 @@ const routesShown = (page) => page.$$eval('#rows tr td:first-child', tds => tds.
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '3-new-next-week-1920.png') });
 
     // A week after Next: a preview from Route Master and Driver Master, view only.
-    await page.click('#next-week');
+    await page.click('#next');
     await page.waitForFunction(() => /preloaded from Route Master/.test(document.getElementById('wk-note').textContent) && document.querySelectorAll('#rows tr td.day').length > 0, null, { timeout: 8000 });
     assert.deepEqual(await routesShown(page), ['802', '801', '810']);
     assert.equal(await page.textContent('#publish'), 'Publish Stored Next Week First');
