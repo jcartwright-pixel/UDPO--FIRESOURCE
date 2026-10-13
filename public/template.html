@@ -50,7 +50,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, save } from './js/app.js';
     import { watchLists, forScreen, modeLabel, canManage } from './js/edit.js';
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot } from './js/firebase.js';
 
     // The current app's Driver Weekly Template (DriverWeeklyTemplate.html): Available, Off or Assigned runs per driver and day,
     // Copy / Paste / Paste + Add for a driver's week, one Save Template. Each changed cell is one saveDriverTemplate, which also updates the copied Live weeks.

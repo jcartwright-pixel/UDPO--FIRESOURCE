@@ -62,7 +62,7 @@
 
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, shortTime, showError, dateTimeText, goLiveNote } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { fillIn, savedText, watchRound, clockOf } from './js/autosave.js';
     import { shiftsFor, shiftAt } from './js/plant-reports.js';
     import { nowMinutes } from './js/plant-core.js';

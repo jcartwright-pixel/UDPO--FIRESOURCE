@@ -7,7 +7,7 @@
  */
 import { escapeHtml, callServer, start } from './app.js';
 import { say, errText, twice } from './admin-pages.js';
-import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { doc, onSnapshot } from './firebase.js';
 
 const L = window.UDLogic;
 const e = escapeHtml;

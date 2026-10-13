@@ -58,7 +58,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError, save } from './js/app.js';
     import { lists, watchLists, canSave, saveRunChange, forScreen, modeLabel } from './js/edit.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     forScreen('weeklyDispatch');
 
     const L = window.UDLogic;

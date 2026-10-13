@@ -74,7 +74,7 @@
     import { start, requireSignIn, escapeHtml, shortDate, showError, friendlyError } from './js/app.js';
     import { watchLists, lists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
     forScreen('drivers');
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());

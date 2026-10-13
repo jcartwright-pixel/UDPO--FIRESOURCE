@@ -44,7 +44,7 @@
   <script type="module">
     import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
     import { start, requireSignIn, save, escapeHtml, showError, shortDate } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { today, thisMonth, monthName, pickPlant, plantName, canWalk, canSetUp, modeText, fireNav } from './js/safety.js';
 
     // Fire Alarm, Fire Suppression and Escape Plan (Joe 10/13, mock-up B): one monthly big-button check of the whole system,

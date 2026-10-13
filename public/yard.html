@@ -67,7 +67,7 @@
 
   <script type="module">
     import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, dateTimeText, goLiveNote } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { savedText, watchRound } from './js/autosave.js';
 
     const L = window.UDLogic, U = window.UDPlant;

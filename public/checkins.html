@@ -62,8 +62,7 @@
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
     import { watchLists, canSave, canReorder, saveOptimistic, lists, forScreen, modeLabel } from './js/edit.js';
     forScreen('checkIns');
-    import { httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { httpsCallable, collection, doc, query, where, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const params = new URLSearchParams(location.search);

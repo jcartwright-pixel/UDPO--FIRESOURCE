@@ -55,7 +55,7 @@
     import { start, requireSignIn, fitToWindow, escapeHtml, save, showError, dateTimeText } from './js/app.js';
     import { watchLists, canSave, forScreen, modeLabel } from './js/edit.js';
     forScreen('conflicts');
-    import { collection, query, where, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, query, where, orderBy, limit, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const MAX = 200;

@@ -8,6 +8,7 @@
 // says what is the iPad's and the tablet's own: its line, whose saves go, and what happens to one the server will not take.
 import { start, saveNow, callServer, friendlyError, showError } from './app.js';
 import { makeQueue, HOLD_AFTER, isServerError } from './save-queue.js';
+import { FIREBASE_FILES } from './firebase.js';
 
 const CACHE = 'ud-offline-v1';
 let failedText = '', device = 'device', heldNow = 0;
@@ -109,10 +110,8 @@ export function startOffline(pages, opts) {
   const keepAll = () => {
     if (!window.caches || !navigator.onLine) return;
     const loaded = opts.scopes ? performance.getEntriesByType('resource').map(r => r.name).filter(u => { try { const x = new URL(u); return x.origin === location.origin && !/^\/__\/(?!firebase\/init\.json)/.test(x.pathname); } catch (e) { return false; } }).map(u => new URL(u).pathname.replace(/^\//, '')) : [];
-    const keep = pages.concat(opts.files || ['css/app.css', 'css/safety.css', 'js/app.js', 'js/logic.js', 'js/safety-rules.js', 'js/safety.js', 'js/offline-saves.js', 'js/save-queue.js',
-      'img/ud-logo.webp', 'img/app-icon/favicon-32.png', 'manifest.webmanifest'], loaded, [
-      'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js',
-      'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js'])
+    const keep = pages.concat(opts.files || ['css/app.css', 'css/safety.css', 'js/app.js', 'js/firebase.js', 'js/logic.js', 'js/safety-rules.js', 'js/safety.js', 'js/offline-saves.js', 'js/save-queue.js',
+      'img/ud-logo.webp', 'img/app-icon/favicon-32.png', 'manifest.webmanifest'], loaded, FIREBASE_FILES)
       .concat(['localhost', '127.0.0.1'].includes(location.hostname) ? [] : ['/__/firebase/init.json']);
     caches.open(CACHE).then(c => [...new Set(keep)].forEach(u => c.add(u).catch(() => {}))).catch(() => {});
   };

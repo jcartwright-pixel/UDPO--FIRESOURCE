@@ -3,12 +3,13 @@
  * Sign-in (United Dairy Google accounts only), the database connection, the one-call save, and sizing the
  * screen to the window so nothing ever scrolls.
  */
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
+// Firebase comes from js/firebase.js, the one place its version is written (review item 82, Joe 10/13).
 import {
-  getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signInWithCustomToken, signOut, GoogleAuthProvider, connectAuthEmulator
-} from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+  initializeApp,
+  getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signInWithCustomToken, signOut, GoogleAuthProvider, connectAuthEmulator,
+  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, doc, getDoc, onSnapshot,
+  getFunctions, httpsCallable, connectFunctionsEmulator
+} from './firebase.js';
 
 export const DOMAIN = 'uniteddairy.com';
 

@@ -3,7 +3,7 @@
 // database) replaces its starting list, so a new SKU goes in without a code change.
 // Joe 10/11: products are plant by plant and area by area. A plant's areas are its machines plus the areas it adds itself, and
 // it keeps its own group list (productSetup in the database; the starting ones below are the same as functions/src/plant.js).
-import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, onSnapshot } from './firebase.js';
 
 export const START_AREAS = { fac_uniontown: ['CASES', 'TANKER'] };
 export const START_GROUPS = ['Milk', 'Drinks', 'TEA'];

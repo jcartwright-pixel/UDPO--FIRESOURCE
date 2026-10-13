@@ -48,7 +48,7 @@
     import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { printSaved } from './js/print-sheet.js';
     import { plantFor } from './js/pmaint.js';
-    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, onSnapshot } from './js/firebase.js';
 
     // The current app's Fleet Service (FleetService.html, 220_V7276_GarageFleetService.gs), Send to Garage puts a PM, reefer
     // service or DOT inspection on the Garage Station (garage.js). Fleet Service Setup changes the rules (config/fleetRules), each

@@ -6,7 +6,7 @@
  * permission), the cell goes back to what the database holds and the reason shows as an error.
  */
 import { start, save as sendSave, savePill, showError, friendlyError, escapeHtml, goLiveNote } from './app.js';
-import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, query, where, onSnapshot } from './firebase.js';
 
 const L = window.UDLogic;
 

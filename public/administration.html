@@ -44,7 +44,7 @@
     import { PAGES } from './js/admin-pages.js';
     import { TOOL_PAGES } from './js/admin-tools.js';
     import { renderGoLive } from './js/admin-golive.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     const L = window.UDLogic;
     const testEmail = new URLSearchParams(location.search).get('testEmail');
     // Pages built here (js/admin-pages.js), not a separate screen: they go through the server, Administrators only.

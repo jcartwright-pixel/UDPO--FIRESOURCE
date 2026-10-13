@@ -51,7 +51,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
-    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, onSnapshot } from './js/firebase.js';
 
     // Joe 10/10: the current app's Fleet & Maintenance hub, where the maintenance side starts. Each list is read once
     // (write-ups, work orders, units, service setup, odometers) and every card is counted from that one copy.

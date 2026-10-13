@@ -47,7 +47,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot } from './js/firebase.js';
 
     // The current app's GARAGE WORK ORDERS tab (220_V7276_GarageFleetService.gs), read only. NEW, WORKING and PARTS are open.
     const STATUS = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };

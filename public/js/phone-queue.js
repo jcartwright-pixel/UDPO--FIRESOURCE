@@ -6,6 +6,7 @@
 // Review item 77 (Joe 10/13): the queue itself is the shared one (js/save-queue.js, also used by js/offline-saves.js); this
 // file says what is the phone's own: its line, and that an entry the server will not take stays on the phone, shown.
 import { makeQueue } from './save-queue.js';
+import { FIREBASE_FILES } from './firebase.js';
 
 const READS = 'udPhoneRead.', CACHE = 'ud-offline-v1';
 let sender = null;
@@ -72,11 +73,9 @@ export function startQueue(send) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { scope: 'route' }).catch(() => {});
   if (window.caches && navigator.onLine) {
     const local = ['localhost', '127.0.0.1'].includes(location.hostname);
-    const keep = ['route.html', 'css/app.css', 'css/stations.css', 'css/driver-room.css', 'js/app.js', 'js/speak.js', 'js/station-code.js', 'js/phone-queue.js', 'js/save-queue.js',
-      'route.webmanifest', 'driver-station.webmanifest', 'img/app-icon/favicon-32.png', 'img/app-icon/apple-touch-icon.png',
-      'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js',
-      'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js']
-      .concat(local ? [] : ['/__/firebase/init.json']);
+    const keep = ['route.html', 'css/app.css', 'css/stations.css', 'css/driver-room.css', 'js/app.js', 'js/firebase.js', 'js/speak.js', 'js/station-code.js', 'js/phone-queue.js', 'js/save-queue.js',
+      'route.webmanifest', 'driver-station.webmanifest', 'img/app-icon/favicon-32.png', 'img/app-icon/apple-touch-icon.png']
+      .concat(FIREBASE_FILES, local ? [] : ['/__/firebase/init.json']);
     caches.open(CACHE).then(c => keep.forEach(u => c.add(u).catch(() => {}))).catch(() => {});
   }
   queue.start();

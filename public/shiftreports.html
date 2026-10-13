@@ -59,7 +59,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
-    import { collection, doc, query, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, orderBy, limit, onSnapshot } from './js/firebase.js';
     import { shiftsFor, shiftAt } from './js/plant-reports.js';
 
     const L = window.UDLogic, U = window.UDPlant, params = new URLSearchParams(location.search);
