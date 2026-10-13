@@ -1,5 +1,5 @@
 /*
- * United Dairy New Plant Operations: the plant side's shared rules for the screens (Loadout Center, Departments, ...).
+ * United Dairy Operations: the plant side's shared rules for the screens (Loadout Center, Departments, ...).
  *
  * The same rules as the current app's plant screens:
  *   - a load's area comes from the run's load type (desktopV5063LoadoutTypeToArea_): CASE, TOTES, BOXING or TANKER;

@@ -280,7 +280,7 @@ export async function renderRoleTemplates(box) {
   let data = null, role = 'SUPERVISOR', draft = [], dirty = false;
   box.innerHTML = '<div class="ap"><div class="ap-bar"><label class="ap-field" style="flex-direction:row;align-items:center;gap:8px">Role <select id="rt-role"></select></label>' +
     '<button type="button" class="ap-btn main" id="rt-save">Save Role Template</button><button type="button" class="ap-btn" id="rt-reload">Reload Templates</button></div>' +
-    '<div class="ap-msg" hidden></div><p class="ap-note">Define each role once. Individual exceptions stay on the person (People &amp; Roles). A role\'s template changes what its people may save in the new app.</p><div class="ap-scroll" id="rt-body"></div></div>';
+    '<div class="ap-msg" hidden></div><p class="ap-note">Define each role once. Individual exceptions stay on the person (People &amp; Roles). A role\'s template changes what its people may save in Operations.</p><div class="ap-scroll" id="rt-body"></div></div>';
   const $ = (s) => box.querySelector(s);
   const current = () => (data.templates[role] || data.defaults[role] || []).slice();
   function render() {
@@ -602,7 +602,7 @@ export async function renderReportRecipients(box) {
 const STATUS = { SENT: ['Sent', 'good'], BLOCKED: ['Stopped (off)', 'bad'], FAILED: ['Failed', 'bad'], HELD: ['Held', 'warn'] };
 export async function renderSentLog(box) {
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="sl-reload">Refresh</button><span id="sl-switch-wrap" style="display:flex;gap:8px;align-items:center"></span></div>' +
-    '<div class="ap-msg" hidden></div><p class="ap-note">Every email the new app sent, stopped, held, or failed. Newest first. On the sandbox an email goes only to the person who pressed the button.</p>' +
+    '<div class="ap-msg" hidden></div><p class="ap-note">Every email the Operations app sent, stopped, held, or failed. Newest first. On the sandbox an email goes only to the person who pressed the button.</p>' +
     '<div class="ap-scroll"><table class="ap-t"><thead><tr><th>When</th><th>Status</th><th>What</th><th>To</th><th>Subject</th></tr></thead><tbody id="sl-rows"></tbody></table></div></div>';
   const $ = (s) => box.querySelector(s);
   async function load() {

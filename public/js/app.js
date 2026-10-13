@@ -19,10 +19,10 @@ document.querySelectorAll('.topbar').forEach(bar => {
   const brand = document.createElement('a');
   brand.className = 'brand';
   brand.href = 'index.html';
-  brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>New Plant Operations</strong><small>UNITED DAIRY &middot; ROUTE DISTRIBUTION</small></span>';
+  brand.innerHTML = '<img src="img/ud-logo.webp" alt="United Dairy"><span><strong>Operations</strong><small>UNITED DAIRY &middot; ROUTE DISTRIBUTION</small></span>';
   bar.prepend(brand);
   // Polish 10: one small yellow "Test copy" badge in the header on the sandbox (and a local copy); it comes off by itself at go-live.
-  if (/sandbox|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) brand.insertAdjacentHTML('afterend', '<span class="test-copy-badge" title="This is the test copy: changes stay in the new app">Test copy</span>');
+  if (/sandbox|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) brand.insertAdjacentHTML('afterend', '<span class="test-copy-badge" title="This is the test copy: changes stay in Operations">Test copy</span>');
 });
 
 // Joe 10/10: Administration opens a screen inside its right-hand panel; there the screen shows without its own header and menu.

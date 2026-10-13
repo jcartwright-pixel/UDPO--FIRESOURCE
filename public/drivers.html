@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Driver Roster · New Plant Operations</title>
+  <title>Driver Roster · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -98,7 +98,7 @@
       if (typing) return; // someone is typing a truck; the list redraws when they leave the box
       rows = L.driverRosterRows(drivers, today);
       const edit = canEdit();
-      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       document.getElementById('truck-list').innerHTML = lists.trucks.map(t => '<option value="' + escapeHtml(t.unit) + '">').join('');
       const shown = visible(), checked = new Set([...document.querySelectorAll('[data-select]:checked')].map(x => x.dataset.select));
       const dis = edit ? '' : ' disabled';

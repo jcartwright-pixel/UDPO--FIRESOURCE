@@ -377,14 +377,14 @@
 
   // The per-screen switch (switch.js): which app runs each screen. "old" = the current app (the new app shows a copy),
   // "new" = the new app saves and the write-back puts each save in the sheet. While every screen is "old" the new
-  // app is a test copy and every screen may save; once one is "new", only "new" screens save in the new app.
+  // app is a test copy and every screen may save; once one is "new", only "new" screens save in Operations.
   var SCREENS = { dailyDispatch: 'Daily Dispatch', weeklyDispatch: 'Weekly Dispatch', checkIns: 'Driver Check-ins',
     drivers: 'Drivers', vacations: 'Vacation Schedule', routes: 'Route Editor',
     // Joe 10/12: "Let the new app write plant loading to the real Live sheet." The Plant Distribution screens (Loadout Center,
     // Trailer Assignments, Unloading, Truck Washing, Product Returns): a load, its order and its case returns go to the Live week tabs.
     plantLoading: 'Plant Loading',
     // Joe 10/12 ("turn all 8 sheets on"): the plant check screens (Cooler Temperatures, Quality, Yard, Shift Report Log, Scheduler,
-    // Line Targets), Products, Safety Walkthrough and Plant Maintenance. Their saves stay in the new app.
+    // Line Targets), Products, Safety Walkthrough and Plant Maintenance. Their saves stay in Operations.
     plant: 'Plant Operations' };
   // Screens with no sheet behind them: always saved in the new app, never on Go-Live Switches.
   // Joe 10/13 ("I want everything working"): also Fleet Service Setup (service rules, unit dates, garage technicians),
@@ -396,16 +396,16 @@
     Object.keys(set).forEach(function (k) { out[k] = set[k]; });
     return out;
   }
-  // {owner, open, live, why}: open = this screen may save in the new app; why = the reason when it may not.
+  // {owner, open, live, why}: open = this screen may save in Operations; why = the reason when it may not.
   function screenState(config, screen) {
     var owners = screenOwners(config), owner = owners[screen] || 'old', name = SCREENS[screen] || screen;
     var writeBack = !!(config && config.writeBack && config.writeBack.enabled === true);
     var anyNew = Object.keys(owners).some(function (k) { return owners[k] === 'new'; });
-    // Joe 10/13 ("I can't select the routes"): screens whose saves stay in the new app and write no sheet (Over the Road,
+    // Joe 10/13 ("I can't select the routes"): screens whose saves stay in Operations and write no sheet (Over the Road,
     // Driver Scorecard) are never view only; there is nothing for a Go-Live Switch to protect.
     if (APP_ONLY[screen]) return { owner: 'app', live: anyNew, open: true, why: '' };
     if (owner === 'new') return { owner: owner, live: true, open: writeBack, why: writeBack ? '' : name + ' is switched on but the write-back is off; ask an administrator' };
-    if (config && config.mode === 'live' && !anyNew) return { owner: owner, live: false, open: false, why: 'The app is marked live but no screen belongs to the new app; saves stay in test mode only' };
+    if (config && config.mode === 'live' && !anyNew) return { owner: owner, live: false, open: false, why: 'The app is marked live but no screen belongs to Operations; saves stay in test mode only' };
     if (anyNew) return { owner: owner, live: true, open: false, why: name + ' is view only until it is switched on in Administration > Go-Live Switches' };
     return { owner: owner, live: false, open: true, why: '' };
   }
@@ -423,7 +423,7 @@
     vacations: { area: 'Route Distribution', ready: true, why: 'Writes the Vacations sheet. You OK\'d it 10/12.' },
     routes: { area: 'Route Distribution', ready: true, why: 'Writes Route Master. You OK\'d it 10/12.' },
     plantLoading: { area: 'Plant Distribution', ready: true, why: 'Writes loads, loading order and case returns to the Live sheet week tabs, and Loadout History when a load is Done. You OK\'d it 10/12.' },
-    plant: { area: 'Plant Production', ready: true, why: 'Cooler temperatures, quality, yard, shift notes, the scheduler, line targets, products, safety and plant maintenance save in the new app and keep their history there. The current app keeps its own copies elsewhere and does not see these. You asked to turn it on 10/12.' }
+    plant: { area: 'Plant Production', ready: true, why: 'Cooler temperatures, quality, yard, shift notes, the scheduler, line targets, products, safety and plant maintenance save in Operations and keep their history there. The current app keeps its own copies elsewhere and does not see these. You asked to turn it on 10/12.' }
   };
   // Shown on Go-Live Switches but not a switch yet. (Plant Loading became a switch on 10/12.)
   var GO_LIVE_LATER = [];

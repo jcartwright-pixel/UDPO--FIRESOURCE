@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Equipment Issues · New Plant Operations</title>
+  <title>Equipment Issues · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -26,7 +26,7 @@
     </div>
     <div class="head">
       <div class="title"><h1 id="title">Truck Issues</h1><small><a href="maint.html">Fleet &amp; Maintenance</a> › <span id="crumb">Truck Issues</span></small></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Email stays off in the new app</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Email stays off in Operations</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <!-- The Lessor button's email result (Administration > Repair Email): emailed, or why not. -->
@@ -82,11 +82,11 @@
 
     function render() {
       const edit = canSave(), lists3 = KINDS.map(([k]) => open(k));
-      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       const i = KINDS.findIndex(x => x[0] === kind), rows = lists3[i], truck = kind === 'TRUCK';
       document.getElementById('title').textContent = KINDS[i][3];
       document.getElementById('crumb').textContent = KINDS[i][3];
-      document.title = KINDS[i][3] + ' · New Plant Operations';
+      document.title = KINDS[i][3] + ' · Operations';
       document.getElementById('kinds').innerHTML = KINDS.map(([k, label], n) => '<button type="button" role="tab" data-kind="' + k + '" aria-selected="' + (k === kind) + '">' + label + ' <b>' + lists3[n].length + '</b></button>').join('');
       const match = (r, f) => f === 'all' || (f === 'review' ? r.needsReview : f === 'repeat' ? r.occurrences > 1 : f === 'garage' ? r.atGarage || r.toLessor : r.openedMs && now() - r.openedMs <= 7 * 86400000);
       document.getElementById('filters').innerHTML = FILTERS.map(([f, label]) => '<button type="button" data-filter="' + f + '" class="' + (filter === f ? 'on' : '') + '">' + label + '<b>' + rows.filter(r => match(r, f)).length + '</b></button>').join('');

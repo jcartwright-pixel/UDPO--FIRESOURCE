@@ -474,7 +474,7 @@ async function requireSaver(tx, db, user, roles, action) {
   return person;
 }
 
-// Whether this screen may save in the new app (switch.js): every screen while it is a test copy, then only
+// Whether this screen may save in Operations (switch.js): every screen while it is a test copy, then only
 // the screens an administrator moved to the new app.
 async function requireTestMode(tx, db, screen) {
   const snap = await tx.get(db.collection(C.config).doc('app'));

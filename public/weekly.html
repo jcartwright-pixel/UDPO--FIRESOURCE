@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Weekly Dispatch · New Plant Operations</title>
+  <title>Weekly Dispatch · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <style>
     /* Joe 10/11: a run added to a driver's day outside his normal week is yellow on the Driver Assignment Board. */
@@ -145,7 +145,7 @@
       if (rowDrag && rowDrag.busy()) { held = true; return; } // a route is being moved; the grid redraws when it is let go
       const kind = weekKind(), preview = kind === 'future' && loaded && !runs.length;
       const edit = canSave() && kind === 'live', move = canReorder() && kind === 'live' && !preview;
-      document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
+      document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN OPERATIONS');
       ['run-days', 'override'].forEach(id => { document.getElementById(id).disabled = !edit; });
       document.getElementById('publish').disabled = !canSave() || kind === 'old' || !!publishBusy;
       if (publishArmed !== (kind === 'future' ? live.next : week)) document.getElementById('publish').textContent = kind === 'future' ? 'Publish Stored Next Week First' : 'Publish to Daily Dispatch';
@@ -179,7 +179,7 @@
           const full = name + (units ? ', ' + unitsText(d) : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
           return '<td class="day c-' + cls + (plant ? ' plant-load' : '') + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + escapeHtml(full) + '"><b class="nm">' + escapeHtml(name) + '</b>' +
             (units ? '<span class="unit">' + unitsHtml(d) + '</span>' : '') + '</td>';
-        }).join('') + '</tr>').join('') || '<tr><td colspan="9" class="empty">' + (kind === 'old' ? 'This older week was not kept in the new app.' : kind === 'future' ? 'Loading Route Master to preview this week.' : 'This week is not one of the copied Live weeks.') + '</td></tr>';
+        }).join('') + '</tr>').join('') || '<tr><td colspan="9" class="empty">' + (kind === 'old' ? 'This older week was not kept in Operations.' : kind === 'future' ? 'Loading Route Master to preview this week.' : 'This week is not one of the copied Live weeks.') + '</td></tr>';
 
       const board = L.driverBoardRows(lists.allDrivers, rows, lists.exceptions, week);
       document.getElementById('board-heads').innerHTML = headCells('<th>Driver</th>');

@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Equipment · New Plant Operations</title>
+  <title>Equipment · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -161,7 +161,7 @@
     function render() {
       paintSync();
       const edit = canSave(), all = units(), on = L.unitDefaultDays(routes, all), todayP = L.dayPrefix(today());
-      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN THE NEW APP' : 'TEST COPY, READ ONLY');
+      document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       document.getElementById('n-trucks').textContent = lists.allTrucks.filter(listed).length;
       document.getElementById('n-trailers').textContent = lists.allTrailers.filter(listed).length;
       document.getElementById('n-down').textContent = all.filter(e => L.unitOff(e)).length;

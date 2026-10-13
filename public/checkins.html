@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Driver Check-ins · New Plant Operations</title>
+  <title>Driver Check-ins · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <style>.popover .close.secondary { background: #fff; color: var(--ud-blue); border: 1px solid var(--ud-blue); } #rows tr.editable:focus-visible { outline: 3px solid var(--ud-blue); outline-offset: -3px; }</style>
   <script src="js/logic.js"></script>
@@ -88,7 +88,7 @@
       if (popover) return;
       rows = L.checkinRows(runs, date);
       const edit = canSave();
-      document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN THE NEW APP');
+      document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN OPERATIONS');
       document.getElementById('rows').innerHTML = rows.map((r, i) => {
         const driver = r.driver || (r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '');
         const refused = [r.refusedReturned, r.refusedReturnedSource].filter(Boolean).join(', ');

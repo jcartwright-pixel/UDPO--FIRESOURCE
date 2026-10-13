@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Loadout Center · New Plant Operations</title>
+  <title>Loadout Center · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -39,7 +39,7 @@
       <div class="field day-pin" id="day-pin" hidden><label>&nbsp;</label><button type="button" id="go-today" title="The screen stays on the day you picked until you change it">Go to today</button></div>
       <div class="dayname" id="dayname"></div>
       <div class="hstats" id="hstats"></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span id="copied">Saves stay in the new app's test copy</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span id="copied">Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice warning over-limit" id="over-limit" hidden></div>
@@ -173,7 +173,7 @@
       const rows = byArea[area].map((r, i) => ({ r, i, k: (r.prior ? 0 : 2) + (isSkipped(r) ? 1 : 0) })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.r);
       const c = P.counts(rows), info = P.AREA[area];
       document.getElementById('title').textContent = info.title;
-      document.title = info.title + ' · New Plant Operations';
+      document.title = info.title + ' · Operations';
       document.getElementById('load-date').value = date;
       document.getElementById('day-pin').hidden = date === today();
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);

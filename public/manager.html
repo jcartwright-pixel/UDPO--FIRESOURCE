@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Manager Center · New Plant Operations</title>
+  <title>Manager Center · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -33,7 +33,7 @@
       <!-- Joe 10/10 (look B): a Reports button on Manager Center opens the Plant Scorecard; Shift Comparison, Day-of-Week Trends
            and the Plant Performance TV are on that screen. -->
       <a class="mc-repbtn" id="reports" href="reportcenter.html" title="Reports: every report in one place">Reports</a>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the new app's test copy</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice ok" id="saved" hidden></div>
@@ -239,7 +239,7 @@
         const to = (r.sentTo || []).join(', ');
         if (r.status === 'SENT') {
           ok.className = 'notice ok';
-          ok.textContent = r.testCopy ? 'Report emailed to you only (' + to + '), as a test. The Plant Managers group will get it once the new app runs the plant.' : 'Report emailed to ' + (r.groupName || 'Plant Managers') + ' (' + to + ').';
+          ok.textContent = r.testCopy ? 'Report emailed to you only (' + to + '), as a test. The Plant Managers group will get it once the Operations app runs the plant.' : 'Report emailed to ' + (r.groupName || 'Plant Managers') + ' (' + to + ').';
         } else {
           ok.className = 'notice error';
           ok.textContent = 'Report saved but not emailed. ' + (r.reason || '');

@@ -1,4 +1,4 @@
-/* New Plant Operations: the plant screens' few extra pieces, built on app.css's colours and type so every screen
+/* Operations: the plant screens' few extra pieces, built on app.css's colours and type so every screen
    keeps one look. Area colours are the current app's (CASE blue, TOTES purple, BOXING orange, TANKER green). */
 .plant-page .eyebrow { display: block; font-size: 16px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .plant-page .dayname { align-self: center; margin: 0 auto; font-size: 26px; font-weight: 800; color: var(--ud-blue-dark); letter-spacing: .02em; }

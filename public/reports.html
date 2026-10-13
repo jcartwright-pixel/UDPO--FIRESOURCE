@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Plant Reports · New Plant Operations</title>
+  <title>Plant Reports · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
@@ -185,7 +185,7 @@
         : (tr.notes.length ? tr.notes.join(' ') : 'No weekday stands out yet.') + (tr.days >= 14 ? '' : ' Only ' + tr.days + ' day' + (tr.days === 1 ? '' : 's') + ' recorded so far, so treat this as early; patterns firm up after about three weeks.');
       return '<div class="rp-lead ' + (tr.notes.length ? 'bad' : '') + '"><b>' + (tr.notes.length ? 'What stands out: ' : 'So far: ') + '</b>' + escapeHtml(lead) + '</div>' +
         card('By weekday', 'last ' + weeks + ' weeks · ' + tr.days + ' days counted', table(['Weekday', 'Days counted', 'Loads a day', 'On time', 'Avg late', 'Not loaded a day', 'Pickups a day', 'Breakdowns a day', 'Temps out a day'], rows, ''), 'rp-wide') +
-        '<p class="rp-foot">Counts the days the new app has recorded' + (tr.first ? ', starting ' + fmtY(tr.first) : '') + '. On time = loaded no later than ' + R.ON_TIME_MINUTES + ' minutes after the depart time (the same rule as Behind). Line speed (cases an hour) and the time a truck really leaves are not recorded yet.</p>';
+        '<p class="rp-foot">Counts the days the Operations app has recorded' + (tr.first ? ', starting ' + fmtY(tr.first) : '') + '. On time = loaded no later than ' + R.ON_TIME_MINUTES + ' minutes after the depart time (the same rule as Behind). Line speed (cases an hour) and the time a truck really leaves are not recorded yet.</p>';
     }
 
     function remember() {

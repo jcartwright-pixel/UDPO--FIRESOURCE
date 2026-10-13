@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Fire Safety · New Plant Operations</title>
+  <title>Fire Safety · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/safety.css">
   <script src="js/logic.js"></script>
@@ -64,7 +64,7 @@
       document.getElementById('mode-text').textContent = modeText(app);
       document.getElementById('eyebrow').textContent = 'Safety Walkthrough · ' + plantName(plant);
       document.getElementById('title').textContent = sys.name + ' · ' + monthName(month);
-      document.title = sys.name + ' · New Plant Operations';
+      document.title = sys.name + ' · Operations';
       const m = S.fireMonth(sys.key, merged(), month), r = rec || {};
       const dates = sys.dates.filter(([k]) => r[k]).map(([k, l]) => l.toLowerCase() + ' ' + shortDate(r[k]));
       document.getElementById('counts').innerHTML = escapeHtml(sys.what) + ' · ' + (m.state === 'GOOD' ? '<b class="g">Good</b>' : m.state === 'NOT_GOOD' ? '<b class="r">Not good</b>' : '<b class="a">' + m.done + ' of ' + m.total + ' done</b>') + (dates.length ? ' · ' + escapeHtml(dates.join(' · ')) : '');

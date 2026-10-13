@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Fleet Service · New Plant Operations</title>
+  <title>Fleet Service · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
@@ -192,7 +192,7 @@
             return '<tr><td class="strong">' + escapeHtml(x.name || '') + (on ? '' : ' ' + pill(['Off', 'no'])) + '</td><td>' + (boss ? '<button type="button" class="edit" data-tech="' + id + '" data-op="LOGIN">Set login ID</button> <button type="button" class="edit" data-tech="' + id + '" data-op="ACTIVE" data-on="' + (on ? '0' : '1') + '">' + (on ? 'Turn off' : 'Turn on') + '</button>' : '') + '</td></tr>';
           }).join(''), 'No technicians yet.') +
           (boss ? '<div class="fs-addtech"><input id="tech-name" placeholder="New technician name" maxlength="40" aria-label="New technician name"><input id="tech-login" placeholder="Login ID (5-6 digits)" inputmode="numeric" maxlength="6" aria-label="Login ID"><button type="button" id="tech-add">Add Technician</button></div>' : '') + '</div></div>';
-        foot.textContent = 'Each unit\'s dates, the rules and the technicians are kept in the new app. Login IDs are never shown once saved.';
+        foot.textContent = 'Each unit\'s dates, the rules and the technicians are kept in Operations. Login IDs are never shown once saved.';
       }
       const s = document.getElementById('search');
       if (s) s.oninput = (e) => { search = e.target.value.trim(); const at = e.target.selectionStart; render(); const n = document.getElementById('search'); n.focus(); n.setSelectionRange(at, at); };
