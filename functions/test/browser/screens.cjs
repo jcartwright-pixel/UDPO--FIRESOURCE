@@ -878,7 +878,8 @@ async function noScroll(page) {
     const sc = await openPage(browser, 1920, 950, '/scorecard.html?testEmail=manager.test@uniteddairy.com');
     await sc.waitForSelector('.sc-board');
     // Review items 18 and 60 (Joe 10/13): no empty "later" columns, and the month reads like Oct 26.
-    assert.deepEqual(await sc.$$eval('table.sc-board thead th', t => t.map(x => x.textContent)), ['#', 'Driver', 'Route', 'Score', 'Daily Check-in', 'Cases Out vs In', 'Clean Inspections', 'Attendance', 'Miles']);
+    // Joe 10/13 (GPS, then "I just want to see the driver"): the driver, a grade for each area, the overall score (scorecard-gps.cjs).
+    assert.deepEqual(await sc.$$eval('table.sc-board thead th', t => t.map(x => x.textContent)), ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Time', 'Overall']);
     assert.match(await sc.textContent('.sc-period'), /^[A-Z][a-z]{2} \d\d$/);
     await sc.click('.tabs [data-mode="year"]');
     await sc.waitForSelector('.sc-board');

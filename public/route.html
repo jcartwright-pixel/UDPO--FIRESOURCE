@@ -124,7 +124,7 @@
     <p class="drv-hint">Confirm assigned equipment. Every item starts as No defect: change only the items with a defect.</p>
     <div class="phone-grid">
       <label>Inspection<select id="dv-inspection" required><option value="">Select…</option><option>Pre-trip</option><option>Post-trip</option></select></label>
-      <label>Odometer<input id="dv-odometer" type="number" min="0" inputmode="numeric"></label>
+      <label>Odometer<input id="dv-odometer" type="number" min="0" inputmode="numeric"><small id="dv-odo-note" class="dv-odo-note"></small></label>
     </div>
     <div class="drv-cols">
       <div class="drv-col truck"><h2>Truck inspection</h2><label>Truck number<input id="dv-truck" required maxlength="60" class="drv-unit"></label><div id="dv-truck-items"></div>
@@ -489,7 +489,7 @@
     $('dv-truck-items').innerHTML = TRUCK_ITEMS.map(pick).join('');
     addSpeak(form);
     form.querySelector('[data-trailer="1"] .dv-items').innerHTML = TRAILER_ITEMS.map(pick).join('');
-    let dvRequest = '', reviewed = false, dvLoads = [], inked = false, saved = false;
+    let dvRequest = '', reviewed = false, dvLoads = [], dvOdometers = {}, inked = false, saved = false;
     const sigKey = 'udRoute.signature';
     function extraBox(n) {
       const d = document.createElement('div');
@@ -527,17 +527,29 @@
       const l = dvLoads[Number($('dv-route').value)];
       if (!l) return;
       $('dv-truck').value = l.truck || '';
+      // Joe 10/5 (GPS spec): the odometer starts at the truck's latest GPS reading; the driver can change it.
+      gpsOdo();
       const t = String(l.trailer || '').split(/[\/,;&+]+/).map(x => x.trim()).filter(Boolean);
       form.querySelector('[data-trailer="1"] .dv-trailer').value = (t[0] || '').toUpperCase();
       $('dv-extra').innerHTML = ''; t.slice(1, 4).forEach(x => addTrailer(x.toUpperCase())); renumber();
     }
     $('dv-route').addEventListener('change', fillRoute);
+    $('dv-odometer').addEventListener('input', () => { $('dv-odo-note').textContent = ''; });
+    // Joe 10/13: the odometer follows whatever truck is entered, from Verizon (the loads answer carries every truck's reading).
+    // A number the driver typed is never replaced.
+    function gpsOdo() {
+      const odo = $('dv-odometer'), unit = $('dv-truck').value.trim().toUpperCase().replace(/\s+/g, ''), miles = (dvOdometers || {})[unit];
+      if (odo.value && odo.dataset.gps !== odo.value) return;
+      odo.value = miles ? String(miles) : ''; odo.dataset.gps = odo.value;
+      $('dv-odo-note').textContent = miles ? 'From GPS for truck ' + unit + ' · check it matches the dash' : '';
+    }
+    ['input', 'change'].forEach(t => $('dv-truck').addEventListener(t, gpsOdo));
     async function openDvir() {
-      step('step-dvir'); form.reset(); $('dv-extra').innerHTML = ''; renumber(); saved = false; reviewed = false; $('dv-send').textContent = 'Review inspection'; $('dv-msg').textContent = '';
+      step('step-dvir'); form.reset(); $('dv-odometer').dataset.gps = ''; $('dv-odo-note').textContent = ''; $('dv-extra').innerHTML = ''; renumber(); saved = false; reviewed = false; $('dv-send').textContent = 'Review inspection'; $('dv-msg').textContent = '';
       [...form.elements].forEach(el => { el.disabled = false; });
       dvRequest = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9-]/g, '');
       const r = await call('loads', { driverId, date: dates[0] || '' });
-      dvLoads = r.loads;
+      dvLoads = r.loads; dvOdometers = r.gpsOdometers || {};
       $('dv-route').innerHTML = '<option value="">Select route…</option>' + dvLoads.map((l, i) => '<option value="' + i + '">' + escapeHtml(String(l.route).replace(/_\d+$/, '') + ' · ' + l.run) + '</option>').join('');
       if (dvLoads.length) { $('dv-route').value = '0'; fillRoute(); }
       $('dv-route-box').hidden = dvLoads.length === 1;

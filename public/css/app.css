@@ -1094,3 +1094,7 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
    lighter dim. */
 .modal-back, .ap-modal, .manager-page .mc-modal, .products-page .pm-edit-back, .returns-page .rt-modal { position: fixed; inset: 0; background: var(--pop-backdrop); }
 .modal-back { background: #0b1f3366; }
+
+/* DVIR: the odometer filled from GPS says so under the box. */
+.dv-odo-note { display: block; font-size: 16px; color: #2e6b3a; font-weight: 600; min-height: 0; }
+.dv-odo-note:empty { display: none; }

@@ -26,7 +26,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Fleet Service &amp; Compliance</h1><small id="sub">PM, reefer service, annual inspections and plates. Miles come from the driver's daily inspection; work history from the garage.</small></div>
+      <div class="title"><h1>Fleet Service &amp; Compliance</h1><small id="sub">PM, reefer service, annual inspections and plates. Miles and reefer hours come from GPS or the driver's daily inspection, whichever is newer; work history from the garage.</small></div>
       <div class="tabs" role="tablist">
         <button type="button" role="tab" data-view="due" aria-selected="true">Due · Services &amp; Annual Inspection <b id="tab-due"></b></button>
         <button type="button" role="tab" data-view="work" aria-selected="false">Work Orders <b id="tab-work"></b></button>
@@ -56,9 +56,9 @@
     // unit's dates and the garage technicians, managers and administrators only (garage.js saveFleet).
     const L = window.UDLogic;
     const STATUS = { OVERDUE: ['Overdue', 'warn'], AT_GARAGE: ['At garage', 'yes'], DUE_SOON: ['Due soon', 'warn soon'], NO_MILES: ['No miles yet', 'no'], SET_UP: ['Needs start date', 'no'], OK: ['OK', 'yes'] };
-    const READ_NAMES = { equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', workOrders: 'work orders', garageTechs: 'technician list' };
+    const READ_NAMES = { equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours', workOrders: 'work orders', garageTechs: 'technician list' };
     const JOB = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
-    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], orders = [], techs = [], rawOrders = [], rawTechs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
+    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], gps = [], orders = [], techs = [], rawOrders = [], rawTechs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
     // Joe 10/13: Fleet Service follows the plant you are in (the plant home you came through, as the plant pages do; Uniontown
     // until someone opens another plant). Units, work orders, the rules and the garage technicians are that plant's; a row saved
     // before plants were kept (no facility) is Uniontown's.
@@ -79,11 +79,7 @@
         .map(({ e, type }) => ({ unit: String(e.unit).toUpperCase(), type })).filter(u => !seen[u.unit] && (seen[u.unit] = true))
         .sort((a, b) => (a.type === b.type ? 0 : a.type === 'TRUCK' ? -1 : 1) || a.unit.localeCompare(b.unit, undefined, { numeric: true }));
     }
-    function miles() {
-      const out = {};
-      odometers.forEach(o => { const u = String(o.unit || '').toUpperCase(); if (u && (!out[u] || String(o.at) > String(out[u].at))) out[u] = o; });
-      return out;
-    }
+    const miles = () => L.latestReadings(odometers, gps);
     const open = () => orders.filter(o => String(o.status || 'NEW').toUpperCase() !== 'DONE');
     const done = () => orders.filter(o => String(o.status).toUpperCase() === 'DONE').sort((a, b) => String(b.completed_at || '').localeCompare(String(a.completed_at || '')));
     // Polish item 7 (Joe 10/11): a zero is plain grey.
@@ -112,7 +108,9 @@
       const rows = Object.values(by).filter(r => hit(r.unit)).map(r => { r.worst = Object.values(r.c).reduce((w, i) => RANK[i.status] < RANK[w] ? i.status : w, 'OK'); return r; })
         .sort((a, b) => RANK[a.worst] - RANK[b.worst] || (a.type === b.type ? 0 : a.type === 'TRUCK' ? -1 : 1) || a.unit.localeCompare(b.unit, undefined, { numeric: true }));
       const need = rows.filter(r => r.worst !== 'OK').length;
-      const now = (r) => { const i = r.c.PM; return i && i.now !== '' && i.now !== undefined && i.now !== null ? num(i.now) + (r.type === 'TRUCK' ? ' mi' : ' hrs') : ''; };
+      // Joe 10/13: a reading from Verizon Connect Fleet says GPS under it; otherwise it is the driver's DVIR (or typed hours).
+      const gpsRead = {}; due.units.forEach(u => { gpsRead[u.unit] = (u.type === 'TRUCK' ? u.milesSource : u.hoursSource) === 'GPS'; });
+      const now = (r) => { const i = r.c.PM; return i && i.now !== '' && i.now !== undefined && i.now !== null ? num(i.now) + (r.type === 'TRUCK' ? ' mi' : ' hrs') + (gpsRead[r.unit] ? '<small>GPS</small>' : '') : ''; };
       const tip = (i) => !i ? '' : [i.what, 'Due ' + (i.key === 'PM' ? num(i.dueAt) + (i.dueAt !== '' ? ' mi' : '') : when(i.dueAt)), i.now !== '' && i.now !== undefined ? 'Now ' + num(i.now) : '', 'Left ' + (typeof i.left === 'number' ? num(i.left) + ' mi' : i.left), 'Last done ' + when(i.last), (STATUS[i.status] || [''])[0]].filter(Boolean).join(' · ');
       const box = (i) => { const x = boxText(i); return '<td class="gc ' + x.s + '" title="' + escapeHtml(tip(i)) + '"><b>' + escapeHtml(x.big) + '</b><small>' + escapeHtml(x.small) + '</small></td>'; };
       // Send to Garage (managers): the PM / reefer service and DOT inspection due or overdue become Garage Station jobs. Plates never go.
@@ -192,7 +190,7 @@
         sheet.innerHTML = '<div class="fleet-split fs-setup"><div><h2>Units · ' + escapeHtml(plant.name) + '</h2>' + table([10, 7, 9, 9, 11, 11, 14, 11, 10, 8], ['Unit', 'Ours', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'Annual inspection due', 'Plate expires', 'Notes', ''],
           due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + ours(u) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.trackSet ? (u.tracked ? 'Yes' : 'No') : 'Default') + '</td><td>' + when(u.lastServiceDate) +
             (u.lastServiceMiles != null ? '<small>' + num(u.lastServiceMiles) + ' mi</small>' : u.lastServiceHours != null ? '<small>' + num(u.lastServiceHours) + ' hrs</small>' : '') + '</td><td>' +
-            (u.miles != null ? num(u.miles) + ' mi<small>' + when(u.milesDate) + '</small>' : u.currentHours != null ? num(u.currentHours) + ' hrs' : '') + '</td><td>' + when(u.dotDue) + '</td><td>' + when(u.plateExpires) + '</td><td class="wrong">' + escapeHtml(u.notes) + '</td><td>' +
+            (u.miles != null ? num(u.miles) + ' mi<small>' + (u.milesSource === 'GPS' ? 'GPS' : when(u.milesDate)) + '</small>' : u.currentHours != null ? num(u.currentHours) + ' hrs' + (u.hoursSource === 'GPS' ? '<small>GPS</small>' : '') : '') + '</td><td>' + when(u.dotDue) + '</td><td>' + when(u.plateExpires) + '</td><td class="wrong">' + escapeHtml(u.notes) + '</td><td>' +
             (boss ? '<button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit</button>' : '') + '</td></tr>').join(''), 'No units.') +
           '</div><div><h2>Service Rules · ' + escapeHtml(plant.name) + '</h2>' + typePick + '<div class="fs-rules" id="rules">' + ruleList + '</div>' +
           (savedRules && savedRules.updatedBy ? '<p class="hint">Rules last changed ' + when(savedRules.updatedAt) + ' by ' + escapeHtml(savedRules.updatedBy) + '.</p>' : '<p class="hint">These are the current app\'s rules until someone saves new ones.</p>') +
@@ -246,7 +244,7 @@
       const row = (l, v) => '<tr><th>' + l + '</th><td>' + (v === '' || v == null ? '-' : v) + '</td></tr>';
       return '<h2>' + escapeHtml(u.unit) + ' <small>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</small></h2><table class="issues fs-facts"><tbody>' +
         (model ? row('Unit', escapeHtml(model.split('|').slice(0, 3).join(' ').trim())) : '') +
-        (u.type === 'TRUCK' ? row('Miles now', u.miles != null ? num(u.miles) + ' <small>' + when(u.milesDate) + '</small>' : '') : row('Reefer hours now', u.currentHours != null ? num(u.currentHours) : '')) +
+        (u.type === 'TRUCK' ? row('Miles now', u.miles != null ? num(u.miles) + ' <small>' + (u.milesSource === 'GPS' ? 'GPS ' : 'DVIR ') + when(u.milesDate) + '</small>' : '') : row('Reefer hours now', u.currentHours != null ? num(u.currentHours) + (u.hoursSource === 'GPS' ? ' <small>GPS ' + when(u.hoursDate) + '</small>' : '') : '')) +
         row('Last ' + (u.type === 'TRUCK' ? 'PM' : 'reefer service'), when(u.lastServiceDate) + (u.lastServiceMiles != null ? ' · ' + num(u.lastServiceMiles) + ' mi' : u.lastServiceHours != null ? ' · ' + num(u.lastServiceHours) + ' hrs' : '')) +
         row('Next ' + (u.type === 'TRUCK' ? 'PM' : 'reefer service'), pm && pm.dueAt !== '' ? (pm.key === 'PM' ? num(pm.dueAt) + ' mi' : when(pm.dueAt)) + ' ' + pill(STATUS[pm.status]) : pm ? pill(STATUS[pm.status]) : '') +
         row('Next annual inspection', dot && dot.dueAt ? when(dot.dueAt) + ' ' + pill(STATUS[dot.status]) : '') + row('Plate expires', when(u.plateExpires)) + (plateOf(u.unit) ? row('Plate', escapeHtml(plateOf(u.unit))) : '') + row('Lease', lease ? escapeHtml(lease.trim()) : 'Owned') +
@@ -277,7 +275,7 @@
         '<label>Track due dates<select id="u-track"><option value="">Default (yes)</option><option value="YES"' + (u.trackSet === 'YES' ? ' selected' : '') + '>Yes</option><option value="NO"' + (u.trackSet === 'NO' ? ' selected' : '') + '>No</option></select></label>' +
         '<label>Last service date<input id="u-date" type="date" value="' + v(u.lastServiceDate) + '"></label>' +
         (u.type === 'TRUCK' ? '<label>Last service miles<input id="u-miles" inputmode="numeric" value="' + v(u.lastServiceMiles) + '"></label>' :
-          '<label>Last service reefer hours<input id="u-hours" inputmode="numeric" value="' + v(u.lastServiceHours) + '"></label><label>Reefer hours now<input id="u-now" inputmode="numeric" value="' + v(u.currentHours) + '"></label>') +
+          '<label>Last service reefer hours<input id="u-hours" inputmode="numeric" value="' + v(u.lastServiceHours) + '"></label>' + (u.hoursSource === 'GPS' ? '<label>Reefer hours now<input value="' + v(u.currentHours) + ' (from GPS)" disabled></label>' : '<label>Reefer hours now<input id="u-now" inputmode="numeric" value="' + v(u.currentHours) + '"></label>')) +
         '<label>Annual inspection due<input id="u-dot" type="date" value="' + v(u.dotDue) + '"></label><label>Plate expires<input id="u-plate" type="date" value="' + v(u.plateExpires) + '"></label>' +
         '<label class="wide">Notes<input id="u-notes" maxlength="300" value="' + v(u.notes) + '"></label></div>' +
         '<div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="u-save">Save Unit</button></div>';
@@ -286,7 +284,7 @@
       document.getElementById('u-save').onclick = async () => {
         const g = (id) => { const e = document.getElementById(id); return e ? e.value.trim() : undefined; };
         const fields = { track: g('u-track'), last_service_date: g('u-date'), dot_due: g('u-dot'), plate_expires: g('u-plate'), notes: g('u-notes') };
-        if (u.type === 'TRUCK') fields.last_service_miles = g('u-miles'); else { fields.last_service_hours = g('u-hours'); fields.current_hours = g('u-now'); }
+        if (u.type === 'TRUCK') fields.last_service_miles = g('u-miles'); else { fields.last_service_hours = g('u-hours'); if (document.getElementById('u-now')) fields.current_hours = g('u-now'); }
         const b = document.getElementById('u-save'); b.disabled = true; showError('');
         try { await save('saveFleetUnit', { unit: u.unit, unitType: u.type, fields, facilityId: plant.id }); closeUnit(); } catch (err) { b.disabled = false; showError(err.message); }
       };
@@ -358,6 +356,7 @@
       watch('equipment', v => { equipment = v; });
       watch('fleetSetup', v => { setup = v; });
       watch('odometers', v => { odometers = v; });
+      watch('gpsTrucks', v => { gps = v; });
       watch('workOrders', v => { rawOrders = v; pick(); });
       watch('garageTechs', v => { rawTechs = v; pick(); });
       let stopRules = null;

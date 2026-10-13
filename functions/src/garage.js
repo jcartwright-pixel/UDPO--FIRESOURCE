@@ -351,14 +351,17 @@ async function step(db, input, nowMs) {
     if (String(order.status || '').toUpperCase() === 'DONE') throw SaveErr('NOT_ALLOWED', 'That job is already finished.');
 
     // DONE needs the write-up (to mark it repaired), the newest odometer and Fleet Service's row, read before any write.
-    let odometer = null, setupRef = null, setup = null, rules = fleetRules(null);
+    let odometer = null, gpsHours = null, setupRef = null, setup = null, rules = fleetRules(null);
     if (req.op === 'DONE' && req.safe) {
       if (order.source_id && !writeUp) { writeUpRef = db.collection(C.maintenance).doc(MAINT.docId(order.source_id)); const w = await tx.get(writeUpRef); writeUp = w.exists ? w.data() : null; }
+      // Joe 10/13: the newer of the driver's DVIR odometer and Verizon Connect Fleet's (gpsTrucks); a trailer's GPS hours are its reefer hours.
+      const unitKey = String(order.unit).toUpperCase().replace(/\s+/g, ''), gpsId = M.safeIdPart(unitKey);
+      const gps = gpsId ? await tx.get(db.collection('gpsTrucks').doc(gpsId)) : null;
       if (unitType(order.unit_type) === 'TRUCK') {
-        const odo = (await tx.get(db.collection('odometers').where('unit', '==', String(order.unit).toUpperCase().replace(/\s+/g, '')))).docs.map(d => d.data());
-        odo.sort((a, b) => String(b.at || b.date).localeCompare(String(a.at || a.date)));
-        odometer = odo.length ? odo[0].miles : null;
-      }
+        const odo = (await tx.get(db.collection('odometers').where('unit', '==', unitKey))).docs.map(d => d.data());
+        const read = L.latestReadings(odo, gps && gps.exists ? [gps.data()] : [])[unitKey];
+        odometer = read && read.miles != null ? read.miles : null;
+      } else if (gps && gps.exists) { const read = L.latestReadings([], [gps.data()])[unitKey]; gpsHours = read && read.hours > 0 ? read.hours : null; }
       if (G.SERVICES[order.service_key]) { setupRef = db.collection('fleetSetup').doc(docId(order.unit)); const s = await tx.get(setupRef); setup = s.exists ? s.data() : null; }
       if (order.service_key === 'DOT') { const r = await tx.get(db.collection('config').doc(RULES_DOC)); rules = fleetRules(r.exists ? r.data() : null); }
     }
@@ -400,7 +403,7 @@ async function step(db, input, nowMs) {
       if (setupRef) {
         const today = L.operatingDay(new Date(nowMs)), move = { updated_at: stamp, updated_by: by };
         if (order.service_key === 'PM') { move.last_service_date = today; if (odometer) move.last_service_miles = String(odometer); }
-        if (order.service_key === 'REEFER') { move.last_service_date = today; if (setup && String(setup.current_hours || '').trim()) move.last_service_hours = String(setup.current_hours); }
+        if (order.service_key === 'REEFER') { move.last_service_date = today; if (gpsHours) move.last_service_hours = String(gpsHours); else if (setup && String(setup.current_hours || '').trim()) move.last_service_hours = String(setup.current_hours); }
         if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, L.fleetRule(rules, String(order.unit_type || '').toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK', 'dotMonths'));
         if (setup) tx.update(setupRef, Object.assign({}, move, { testEdited: true, editedAt: stamp }));
         else tx.set(setupRef, Object.assign({ unit: order.unit, unit_type: order.unit_type, facility_id: FACILITY, track: 'YES', createdInApp: true }, move));

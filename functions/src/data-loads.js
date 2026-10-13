@@ -20,10 +20,18 @@
  * technicians' names, added to Uniontown's Garage Technicians list exactly as Add Technician adds one (garage.js saveGarageTech
  * ADD), turned on, with NO login ID: login IDs are kept only as hashes the screens cannot read, so Joe types each one on
  * Fleet Service Setup (Set login ID). A name already on the list, in any spelling the sheet uses, is skipped.
+ *
+ * fleet-gps-start-miles-2026-10-13 (Joe 10/13, "input all the mileages in to our units that we have now. So then I can start
+ * adjusting those also"): every Uniontown truck on Fleet Service with no "last PM miles" gets its Verizon Fleet GPS odometer as
+ * the starting number, and every trailer with no "last reefer service hours" gets its GPS engine hours, written the way Fleet
+ * Service Setup's Save writes them (garage.js saveFleetUnit). Joe then changes each to the real last service on Fleet Service
+ * Setup. A unit that already has a number keeps it; a unit Fleet has no reading for is left blank. It waits (tries again next
+ * run) until a GPS read has brought in odometers. The marker lists every unit and number it set, for undoing by hand.
  */
 const crypto = require('crypto');
 const L = require('./logic');
 const PLANT = require('./plant');
+const GARAGE = require('./garage');
 const R = require('./plant-rules');
 
 const docId = (id) => String(id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 200);
@@ -157,13 +165,45 @@ async function loadGarageTechsOnce(db, opts) {
   });
 }
 
+const FLEET_MILES_ID = 'fleet-gps-start-miles-2026-10-13';
+const blank = (v) => v === undefined || v === null || String(v).trim() === '';
+async function loadFleetStartMilesOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  const mark = db.collection('dataLoads').doc(FLEET_MILES_ID);
+  return db.runTransaction(async tx => {
+    const m = await tx.get(mark);
+    if (m.exists && m.data().status === 'DONE') return { skipped: true };
+    const [equipment, gps, setup] = await Promise.all([tx.get(db.collection('equipment')), tx.get(db.collection('gpsTrucks')), tx.get(db.collection('fleetSetup'))]);
+    // Fleet names a truck "223876" and a trailer "T-635"; ours are the same letters and digits (trailers T- plus number).
+    const key = (u) => String(u || '').toUpperCase().replace(/[^A-Z0-9]/g, ''), byKey = {}, byDigits = {};
+    gps.docs.map(d => d.data()).forEach(t => { const k = key(t.tag); if (!k) return; byKey[k] = t; if (/^\d+$/.test(k)) byDigits[k] = t; });
+    if (!gps.docs.some(d => Number(d.data().odometerMiles) > 0)) return { waiting: 'no GPS odometers read yet' };
+    const setupBy = {}; setup.docs.forEach(d => { setupBy[String(d.data().unit || d.id).toUpperCase()] = { ref: d.ref, data: d.data() }; });
+    const set = [], kept = [], noReading = [];
+    GARAGE.garageUnits(equipment.docs.map(d => d.data())).filter(u => !u.leased).forEach(u => {
+      const t = byKey[key(u.unit)] || (/^\d+$/.test(key(u.unit)) ? byDigits[key(u.unit)] : null);
+      const field = u.type === 'TRUCK' ? 'last_service_miles' : 'last_service_hours';
+      const value = t ? Math.round(Number(u.type === 'TRUCK' ? t.odometerMiles : t.engineHours)) : 0;
+      const have = setupBy[u.unit];
+      if (have && !blank(have.data[field])) { kept.push(u.unit); return; }
+      if (!(value > 0)) { noReading.push(u.unit); return; }
+      const change = { [field]: String(value), updated_at: stamp, updated_by: BY, testEdited: true, editedAt: stamp, dataLoad: FLEET_MILES_ID };
+      if (have) tx.update(have.ref, change);
+      else tx.set(db.collection('fleetSetup').doc(docId(u.unit)), Object.assign({ unit: u.unit, unit_type: u.type, facility_id: 'fac_uniontown', createdInApp: true }, change));
+      set.push({ unit: u.unit, field, value });
+    });
+    tx.set(mark, { status: 'DONE', doneAt: stamp, what: 'Fleet Service starting miles and reefer hours from Verizon Fleet GPS (Joe 10/13)', set, kept, noReading });
+    return { set: set.length, kept: kept.length, noReading: noReading.length };
+  });
+}
+
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;
 }
 
-module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS };
+module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID };

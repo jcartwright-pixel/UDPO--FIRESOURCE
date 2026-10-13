@@ -35,6 +35,8 @@ service cloud.firestore {
     // Verizon Connect Fleet GPS (written by the server; the login stays in private/gpsFleet).
     match /gpsTrucks/{id} { allow read: if activeUser(); }
     match /gpsDays/{id} { allow read: if activeUser(); }
+    // Fleet alerts (speeding, harsh braking, idling) for the Driver Scorecard; the server writes them.
+    match /gpsAlerts/{id} { allow read: if activeUser(); }
     // Thermometer locations changed in Administration > MOCREO & Sensors (the server writes them; the key stays in private/).
     match /tempLocations/{id} { allow read: if activeUser(); }
     match /weeks/{id} { allow read: if activeUser(); }
