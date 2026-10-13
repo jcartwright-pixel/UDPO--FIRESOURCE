@@ -29,6 +29,19 @@ test('Fleet Service due list: PM by miles, reefer by months or hours, DOT and pl
   assert.equal(L.addMonths('2026-10-31', 4), '2027-02-28');
 });
 
+test('trailers have their own DOT and plate rules once saved (Joe 10/13); until then they follow the trucks\'', () => {
+  const setup = [{ unit: '223893', dot_due: '2026-11-01' }, { unit: 'T-2893', dot_due: '2026-11-01', plate_expires: '2026-10-25' }];
+  const due = (rules) => { const { items } = L.fleetDue(units.filter(u => u.unit === '223893' || u.unit === 'T-2893'), setup, {}, [], rules, today); return (u, k) => items.find(i => i.unit === u && i.key === k).status; };
+  let get = due({ dotWarnDays: 30 });
+  assert.deepEqual([get('223893', 'DOT'), get('T-2893', 'DOT')], ['DUE_SOON', 'DUE_SOON'], '22 days out, both warn at 30');
+  get = due({ dotWarnDays: 30, trailerDotWarnDays: 7, trailerPlateWarnDays: 10 });
+  assert.deepEqual([get('223893', 'DOT'), get('T-2893', 'DOT'), get('T-2893', 'PLATE')], ['DUE_SOON', 'OK', 'OK'], 'the trailer warns later by its own rules');
+  assert.equal(L.fleetRule({ dotMonths: 6 }, 'TRAILER', 'dotMonths'), 6);
+  assert.equal(L.fleetRule({ dotMonths: 6, trailerDotMonths: 12 }, 'TRAILER', 'dotMonths'), 12);
+  assert.equal(L.fleetRule({ dotMonths: 6, trailerDotMonths: 12 }, 'TRUCK', 'dotMonths'), 6);
+  assert.equal(L.fleetRule(null, 'TRAILER', 'plateWarnDays'), 30);
+});
+
 test('Fleet Service setup and garage technicians copy read only; a PIN is never copied', () => {
   const techs = parseQueue('garageTechs', [['tech_id', 'name', 'pin_hash', 'active'], ['t1', 'MIKE', 'abc123', 'TRUE']]);
   assert.equal(techs.docs.t1.name, 'MIKE');

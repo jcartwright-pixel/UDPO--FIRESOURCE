@@ -42,7 +42,7 @@ export const ADMIN_GROUPS = [
   ]],
   ['Fleet & GPS Setup', 'Set-up for the maintenance side', [
     ['gps', 'GPS Setup', 'The Verizon Connect sign-in and a plain pass or fail test.', 'gps.html', 'pin'],
-    ['fleet-setup', 'Fleet Service Setup', 'Service rules: PM miles, reefer months, DOT and plate warnings.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp']
+    ['fleet-setup', 'Fleet Service Setup', 'Service rules: PM miles, reefer months, annual inspection and plate warnings.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp']
   ]],
   ['System Tools', 'Checks', [
     // Joe 10/12: Driver Station and Plant Station moved to Links & Codes, where Launch opens them in a new window. Review item 54

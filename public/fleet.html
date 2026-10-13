@@ -25,9 +25,9 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Fleet Service &amp; Compliance</h1><small id="sub">PM, reefer service, DOT and plates. Miles come from the driver's daily inspection; work history from the garage.</small></div>
+      <div class="title"><h1>Fleet Service &amp; Compliance</h1><small id="sub">PM, reefer service, annual inspections and plates. Miles come from the driver's daily inspection; work history from the garage.</small></div>
       <div class="tabs" role="tablist">
-        <button type="button" role="tab" data-view="due" aria-selected="true">Due · Services &amp; DOT <b id="tab-due"></b></button>
+        <button type="button" role="tab" data-view="due" aria-selected="true">Due · Services &amp; Annual Inspection <b id="tab-due"></b></button>
         <button type="button" role="tab" data-view="work" aria-selected="false">Work Orders <b id="tab-work"></b></button>
         <button type="button" role="tab" data-view="history" aria-selected="false">History</button>
         <button type="button" role="tab" data-view="setup" aria-selected="false">Fleet Service Setup</button>
@@ -121,7 +121,7 @@
       // with nothing to send there is no empty column after Status.
       const garageCol = rows.some(r => send(r));
       return '<div class="fs-legend"><em>' + need + ' of ' + rows.length + ' units need something</em></div>' +
-        table(garageCol ? [9, 7, 17, 17, 17, 10, 10, 13] : [10, 8, 20, 20, 18, 12, 12], ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status'].concat(garageCol ? ['Garage'] : []),
+        table(garageCol ? [9, 7, 17, 17, 17, 10, 10, 13] : [10, 8, 20, 20, 18, 12, 12], ['Unit', 'Type', 'PM / Reefer', 'Annual Inspection', 'Plates', 'Miles / hours now', 'Status'].concat(garageCol ? ['Garage'] : []),
           rows.map(r => '<tr data-unit="' + escapeHtml(r.unit) + '" data-worst="' + r.worst + '"><td class="strong">' + escapeHtml(r.unit) + '</td><td>' + (r.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td>' +
             box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td>' + now(r) + '</td><td>' + pill(STATUS[r.worst]) + '</td>' + (garageCol ? '<td>' + send(r) + '</td>' : '') + '</tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
     }
@@ -135,12 +135,12 @@
       const bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot'), k = document.getElementById('kpis');
       const q = search.toUpperCase(), hit = (u) => !q || String(u).toUpperCase().indexOf(q) >= 0;
       if (view === 'due') {
-        k.innerHTML = kpis([[late, 'Overdue', late ? 'warn' : ''], [soon, 'Due soon', soon ? 'warn' : ''], [due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'DOT this month'],
+        k.innerHTML = kpis([[late, 'Overdue', late ? 'warn' : ''], [soon, 'Due soon', soon ? 'warn' : ''], [due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'Annual inspections this month'],
           [due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates expiring · 30 days'], [open().length, 'At the garage'], [done().filter(o => L.localDay(o.completed_at).slice(0, 7) === month).length, 'Done this month', 'good']]);
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="garage-station.html">Garage Station</a>';
         sheet.innerHTML = unitGrid(due, hit);
-        foot.textContent = due.units.length + ' trucks and trailers at Uniontown · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, DOT every ' + rules().dotMonths + ' months · leased tractors: the lessor handles service.';
+        foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · leased tractors: the lessor handles service.';
       } else if (view === 'work') {
         const o = open().slice().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
@@ -157,7 +157,7 @@
       } else if (view === 'history') {
         k.innerHTML = '';
         bar.innerHTML = '<input type="search" id="search" placeholder="Type a truck or trailer number" aria-label="Find" value="' + escapeHtml(search) + '"><div class="chips">' +
-          [['', 'All'], ['work', 'Work orders'], ['service', 'Services'], ['dot', 'DOT']].map(([v, l]) => '<button type="button" data-kind="' + v + '" class="' + (kindFilter === v ? 'on' : '') + '">' + l + '</button>').join('') + '</div><span class="spacer"></span><span class="hint">Last 12 months</span>';
+          [['', 'All'], ['work', 'Work orders'], ['service', 'Services'], ['dot', 'Annual inspection']].map(([v, l]) => '<button type="button" data-kind="' + v + '" class="' + (kindFilter === v ? 'on' : '') + '">' + l + '</button>').join('') + '</div><span class="spacer"></span><span class="hint">Last 12 months</span>';
         const yearAgo = L.addDays(t, -365), unit = oneUnit(due);
         // Open jobs are listed too (the current app's history showed them with their status), then finished ones newest first.
         const hitUnit = (u) => unit ? String(u).toUpperCase() === String(unit.unit).toUpperCase() : hit(u);
@@ -167,7 +167,7 @@
         }).filter(r => !kindFilter || r.kind === kindFilter);
         const list = table([11, 10, 11, 32, 14, 8, 14], ['Date', 'Unit', 'Kind', 'What', 'Who', 'Hours', 'Result'],
           rows.map(({ x, kind }) => { const isOpen = String(x.status || 'NEW').toUpperCase() !== 'DONE';
-            return '<tr><td>' + when(isOpen ? x.created_at : x.completed_at) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td>' + ({ work: 'Work order', service: 'Service', dot: 'DOT' })[kind] + '</td><td class="wrong">' +
+            return '<tr><td>' + when(isOpen ? x.created_at : x.completed_at) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td>' + ({ work: 'Work order', service: 'Service', dot: 'Annual inspection' })[kind] + '</td><td class="wrong">' +
             escapeHtml(x.problem || '') + (x.fixed_note ? '<small>' + escapeHtml(x.fixed_note) + '</small>' : '') + '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' +
             (isOpen ? pill(JOB[String(x.status || 'NEW').toUpperCase()] || [x.status, 'no']) : escapeHtml(x.fixed || '') + (x.safe === 'YES' ? '<small>SAFE' + (x.signed_by ? ' · SIGNED ' + escapeHtml(x.signed_by) : '') + '</small>' : x.signed_by ? '<small>signed ' + escapeHtml(x.signed_by) + '</small>' : '')) + '</td></tr>'; }).join(''), 'Nothing in the garage history yet.');
         sheet.innerHTML = unit ? '<div class="fleet-split wide-left"><div>' + list + '</div><div>' + factsPanel(unit, due, t) + '</div></div>' : list;
@@ -175,17 +175,25 @@
       } else {
         k.innerHTML = '';
         const R = rules(), boss = canEdit();
-        const rule = (key, label, unit) => '<label>' + label + '<span class="fs-rule"><input type="number" min="0" step="1" data-rule="' + key + '" value="' + R[key] + '"' + (boss ? '' : ' disabled') + '><small>' + unit + '</small></span></label>';
+        // Joe 10/13: Truck or Trailer rules, picked at the top; a trailer's DOT and plates are its own (trailerDot...).
+        const own = (key) => ruleType === 'TRAILER' && /^(dotMonths|dotWarnDays|plateWarnDays)$/.test(key) ? 'trailer' + key.charAt(0).toUpperCase() + key.slice(1) : key;
+        const rule = (key, label, unit) => { const k = own(key), v = k in ruleDraft ? ruleDraft[k] : k === key ? R[key] : L.fleetRule(R, 'TRAILER', key);
+          return '<label>' + label + '<span class="fs-rule"><input type="number" min="0" step="1" data-rule="' + k + '" value="' + escapeHtml(String(v)) + '"' + (boss ? '' : ' disabled') + '><small>' + unit + '</small></span></label>'; };
+        const typePick = '<label class="fs-type">Rules for<select id="rule-type" aria-label="Rules for trucks or trailers"><option value="TRUCK"' + (ruleType === 'TRUCK' ? ' selected' : '') + '>Trucks</option><option value="TRAILER"' + (ruleType === 'TRAILER' ? ' selected' : '') + '>Trailers</option></select></label>';
+        const ruleList = ruleType === 'TRAILER'
+          ? rule('trailerMonths', 'Reefer service every', 'months') + rule('trailerHours', '... or every', 'reefer hours') + rule('trailerWarnDays', 'Warn reefer service', 'days ahead') + rule('dotMonths', 'Annual inspection every', 'months') + rule('dotWarnDays', 'Warn annual inspection', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead')
+          : rule('truckMiles', 'Truck PM every', 'miles') + rule('truckWarnMiles', 'Warn this many miles ahead', 'miles') + rule('dotMonths', 'Annual inspection every', 'months') + rule('dotWarnDays', 'Warn annual inspection', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead');
+        // Joe 10/13: "Ours" ticks whether a unit is in our service tracking (the unit's Track due dates); unticked units stay
+        // listed but leave the Due list. One click saves it.
+        const ours = (u) => '<input type="checkbox" class="fs-ours" data-ours="' + escapeHtml(u.unit) + '" data-type="' + u.type + '" aria-label="' + escapeHtml(u.unit) + ' is ours"' + (u.tracked ? ' checked' : '') + (boss ? '' : ' disabled') + '>';
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           (boss ? '<button type="button" class="primary" id="rules-save">Save Rules</button>' : '<span class="hint">Managers and administrators change the setup.</span>');
-        sheet.innerHTML = '<div class="fleet-split wide-left"><div><h2>Units · ' + escapeHtml(plant.name) + '</h2>' + table([10, 9, 9, 13, 14, 11, 11, 15, 8], ['Unit', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'DOT due', 'Plate expires', 'Notes', ''],
-          due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.trackSet ? (u.tracked ? 'Yes' : 'No') : 'Default') + '</td><td>' + when(u.lastServiceDate) +
+        sheet.innerHTML = '<div class="fleet-split fs-setup"><div><h2>Units · ' + escapeHtml(plant.name) + '</h2>' + table([10, 7, 9, 9, 11, 11, 14, 11, 10, 8], ['Unit', 'Ours', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'Annual inspection due', 'Plate expires', 'Notes', ''],
+          due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + ours(u) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.trackSet ? (u.tracked ? 'Yes' : 'No') : 'Default') + '</td><td>' + when(u.lastServiceDate) +
             (u.lastServiceMiles != null ? '<small>' + num(u.lastServiceMiles) + ' mi</small>' : u.lastServiceHours != null ? '<small>' + num(u.lastServiceHours) + ' hrs</small>' : '') + '</td><td>' +
             (u.miles != null ? num(u.miles) + ' mi<small>' + when(u.milesDate) + '</small>' : u.currentHours != null ? num(u.currentHours) + ' hrs' : '') + '</td><td>' + when(u.dotDue) + '</td><td>' + when(u.plateExpires) + '</td><td class="wrong">' + escapeHtml(u.notes) + '</td><td>' +
             (boss ? '<button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit</button>' : '') + '</td></tr>').join(''), 'No units.') +
-          '</div><div><h2>Service Rules · ' + escapeHtml(plant.name) + '</h2><div class="fs-rules" id="rules">' +
-          rule('truckMiles', 'Truck PM every', 'miles') + rule('truckWarnMiles', 'Warn this many miles ahead', 'miles') + rule('trailerMonths', 'Reefer service every', 'months') + rule('trailerHours', '... or every', 'reefer hours') +
-          rule('trailerWarnDays', 'Warn reefer service', 'days ahead') + rule('dotMonths', 'DOT inspection every', 'months') + rule('dotWarnDays', 'Warn DOT', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead') + '</div>' +
+          '</div><div><h2>Service Rules · ' + escapeHtml(plant.name) + '</h2>' + typePick + '<div class="fs-rules" id="rules">' + ruleList + '</div>' +
           (savedRules && savedRules.updatedBy ? '<p class="hint">Rules last changed ' + when(savedRules.updatedAt) + ' by ' + escapeHtml(savedRules.updatedBy) + '.</p>' : '<p class="hint">These are the current app\'s rules until someone saves new ones.</p>') +
           '<h2>Garage Technicians · ' + escapeHtml(plant.name) + '</h2>' + table([50, 50], ['Name', ''], techs.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).map(x => {
             const on = L.yes(x.active === undefined || x.active === '' ? 'TRUE' : x.active), id = escapeHtml(x.tech_id || x.id);
@@ -199,6 +207,8 @@
       const p = document.getElementById('fs-print'); if (p) p.onclick = () => printReport(due, t);
       bar.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { kindFilter = b.dataset.kind; render(); }; });
       const rs = document.getElementById('rules-save'); if (rs) rs.onclick = saveRules;
+      const rt = document.getElementById('rule-type'); if (rt) rt.onchange = () => { ruleType = rt.value; render(); };
+      document.querySelectorAll('[data-rule]').forEach(i => { i.oninput = () => { ruleDraft[i.dataset.rule] = i.value; }; });
       const ta = document.getElementById('tech-add'); if (ta) ta.onclick = addTech;
     }
 
@@ -206,7 +216,7 @@
     const FROM = { WRITE_UP: 'Driver write-up', WRITEUP: 'Driver write-up', OFFICE: 'Sent from the office', TECH: 'Found by the garage', GARAGE: 'Found by the garage', DVIR: 'Driver inspection' };
     const cameFrom = (x) => x.source_from || FROM[String(x.source || '').toUpperCase()] || x.source || '';
     const fixedText = (x) => [x.fixed, x.fixed_note].filter(Boolean).join(' · ');
-    let me = null;
+    let me = null, ruleType = 'TRUCK', ruleDraft = {};
     const pick = () => { orders = rawOrders.filter(ours); techs = rawTechs.filter(ours); };
     const canEdit = () => !!me && L.hasRole(me, L.REORDER_ROLES);
     // A unit's plate number from the fleet sync's text ("External Fleet: year | make | model | VIN | plate | state | Lease: ..."):
@@ -238,16 +248,18 @@
         (u.type === 'TRUCK' ? row('Miles now', u.miles != null ? num(u.miles) + ' <small>' + when(u.milesDate) + '</small>' : '') : row('Reefer hours now', u.currentHours != null ? num(u.currentHours) : '')) +
         row('Last ' + (u.type === 'TRUCK' ? 'PM' : 'reefer service'), when(u.lastServiceDate) + (u.lastServiceMiles != null ? ' · ' + num(u.lastServiceMiles) + ' mi' : u.lastServiceHours != null ? ' · ' + num(u.lastServiceHours) + ' hrs' : '')) +
         row('Next ' + (u.type === 'TRUCK' ? 'PM' : 'reefer service'), pm && pm.dueAt !== '' ? (pm.key === 'PM' ? num(pm.dueAt) + ' mi' : when(pm.dueAt)) + ' ' + pill(STATUS[pm.status]) : pm ? pill(STATUS[pm.status]) : '') +
-        row('Next DOT', dot && dot.dueAt ? when(dot.dueAt) + ' ' + pill(STATUS[dot.status]) : '') + row('Plate expires', when(u.plateExpires)) + (plateOf(u.unit) ? row('Plate', escapeHtml(plateOf(u.unit))) : '') + row('Lease', lease ? escapeHtml(lease.trim()) : 'Owned') +
+        row('Next annual inspection', dot && dot.dueAt ? when(dot.dueAt) + ' ' + pill(STATUS[dot.status]) : '') + row('Plate expires', when(u.plateExpires)) + (plateOf(u.unit) ? row('Plate', escapeHtml(plateOf(u.unit))) : '') + row('Lease', lease ? escapeHtml(lease.trim()) : 'Owned') +
         row('Open work orders', open().filter(x => String(x.unit).toUpperCase() === String(u.unit).toUpperCase()).length) + row('Jobs · 12 months', jobs.length) +
         row('Mechanic hours · 12 months', Math.round(jobs.reduce((a, x) => a + (Number(x.minutes) || 0), 0) / 6) / 10) + '</tbody></table>' +
         (canEdit() ? '<div class="gps-buttons"><button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit dates</button></div>' : '');
     }
 
+    // Save Rules saves what was typed for trucks and for trailers (switching the drop-down keeps both).
     async function saveRules() {
-      const out = {}; document.querySelectorAll('[data-rule]').forEach(i => { out[i.dataset.rule] = Number(i.value); });
+      const out = {}; Object.keys(ruleDraft).forEach(k => { out[k] = Number(ruleDraft[k]); });
+      document.querySelectorAll('[data-rule]').forEach(i => { out[i.dataset.rule] = Number(i.value); });
       const b = document.getElementById('rules-save'); b.disabled = true; showError('');
-      try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save Rules'; b.disabled = false; }, 1500); }
+      try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); ruleDraft = {}; b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save Rules'; b.disabled = false; }, 1500); }
       catch (err) { b.disabled = false; showError(err.message); }
     }
     async function addTech() {
@@ -265,7 +277,7 @@
         '<label>Last service date<input id="u-date" type="date" value="' + v(u.lastServiceDate) + '"></label>' +
         (u.type === 'TRUCK' ? '<label>Last service miles<input id="u-miles" inputmode="numeric" value="' + v(u.lastServiceMiles) + '"></label>' :
           '<label>Last service reefer hours<input id="u-hours" inputmode="numeric" value="' + v(u.lastServiceHours) + '"></label><label>Reefer hours now<input id="u-now" inputmode="numeric" value="' + v(u.currentHours) + '"></label>') +
-        '<label>DOT due<input id="u-dot" type="date" value="' + v(u.dotDue) + '"></label><label>Plate expires<input id="u-plate" type="date" value="' + v(u.plateExpires) + '"></label>' +
+        '<label>Annual inspection due<input id="u-dot" type="date" value="' + v(u.dotDue) + '"></label><label>Plate expires<input id="u-plate" type="date" value="' + v(u.plateExpires) + '"></label>' +
         '<label class="wide">Notes<input id="u-notes" maxlength="300" value="' + v(u.notes) + '"></label></div>' +
         '<div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="u-save">Save Unit</button></div>';
       m.hidden = document.getElementById('modal-back').hidden = false;
@@ -298,22 +310,29 @@
       // The current app's report: four numbers, overdue and due soon, what is at the garage, DOT and plates for the next 90 days,
       // the week's work with the signed tick, and a footer (FleetService.html:155-167).
       box.innerHTML = '<h2>Fleet Service &amp; Compliance Report · ' + shortDate(t) + '</h2>' +
-        '<p class="print-tiles"><b>' + late.length + '</b> overdue · <b>' + soon.length + '</b> due soon · <b>' + due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length + '</b> DOT this month · <b>' +
+        '<p class="print-tiles"><b>' + late.length + '</b> overdue · <b>' + soon.length + '</b> due soon · <b>' + due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length + '</b> annual inspections this month · <b>' +
           due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length + '</b> plates expiring in 30 days · <b>' + open().length + '</b> at the garage · <b>' + done().filter(o => L.localDay(o.completed_at).slice(0, 7) === month).length + '</b> finished this month</p>' +
         '<p><b>Overdue and due soon</b></p>' + tbl(['Unit', 'Type', 'What', 'Due at', 'Now', 'Left', 'Status'], dueRows(late.concat(soon))) +
         '<p><b>At the garage</b></p>' + tbl(['Unit', 'Type', 'What', 'Due at', 'Now', 'Left', 'Status'], dueRows(due.items.filter(i => i.status === 'AT_GARAGE'))) +
-        '<p><b>DOT inspections · next 90 days</b></p>' + tbl(['Unit', 'Type', 'DOT due', 'Left', 'Status'], dated('DOT').map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + when(i.dueAt) + '</td><td>' + escapeHtml(i.left) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('')) +
+        '<p><b>Annual inspections · next 90 days</b></p>' + tbl(['Unit', 'Type', 'Annual inspection due', 'Left', 'Status'], dated('DOT').map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + when(i.dueAt) + '</td><td>' + escapeHtml(i.left) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('')) +
         '<p><b>Plates · next 90 days</b></p>' + tbl(['Unit', 'Type', 'Plate', 'Expires', 'Left'], dated('PLATE').map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + escapeHtml(plateNo(i.unit)) + '</td><td>' + when(i.dueAt) + '</td><td>' + escapeHtml(i.left) + '</td></tr>').join('')) +
         '<p><b>Work done · this week (Sun-Sat)</b></p>' + tbl(['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours', 'Signed'], work.map(x => '<tr><td>' + when(x.completed_at) + '</td><td>' + escapeHtml(x.unit) + '</td><td>' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(fixedText(x)) +
           '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' + (x.safe === 'YES' && x.signed_by ? '&#10003;' : '') + '</td></tr>').join('')) +
         '<p class="print-sign">Reviewed by ______________________________ &nbsp;&nbsp; Date ______________</p>' +
-        '<p class="print-foot">United Dairy · Uniontown · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · DOT every ' + rules().dotMonths + ' months · leased tractors are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
+        '<p class="print-foot">United Dairy · ' + escapeHtml(plant.name) + ' · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · annual inspection every ' + rules().dotMonths + ' months · leased tractors are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
       printSaved('fleet');
     }
 
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; search = ''; render(); } });
     document.getElementById('sheet').addEventListener('click', async e => {
       const ed = e.target.closest('[data-edit]'); if (ed) { openUnit(ed.dataset.edit); return; }
+      const ob = e.target.closest('[data-ours]');
+      if (ob) {
+        showError('');
+        try { await save('saveFleetUnit', { unit: ob.dataset.ours, unitType: ob.dataset.type, fields: { track: ob.checked ? 'YES' : 'NO' }, facilityId: plant.id }); }
+        catch (err) { ob.checked = !ob.checked; showError(err.message); }
+        return;
+      }
       const tb = e.target.closest('[data-tech]');
       if (tb) {
         showError('');
