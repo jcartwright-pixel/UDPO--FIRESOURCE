@@ -15,7 +15,13 @@
  * HTSTs stays on every other machine it runs on, and one on no other machine stays on the Product Sheet on no machine
  * (productSheet), so nothing is deleted; no other machine's list is written. The marker keeps the HTST lists and the
  * no-machine list from before, for undoing by hand. It waits (tries again next run) until both HTSTs are set up.
+ *
+ * garage-technicians-2026-10-13 (Joe 10/13, "Copy the garage technicians ... to the live app", option A): the four garage
+ * technicians' names, added to Uniontown's Garage Technicians list exactly as Add Technician adds one (garage.js saveGarageTech
+ * ADD), turned on, with NO login ID: login IDs are kept only as hashes the screens cannot read, so Joe types each one on
+ * Fleet Service Setup (Set login ID). A name already on the list, in any spelling the sheet uses, is skipped.
  */
+const crypto = require('crypto');
 const L = require('./logic');
 const PLANT = require('./plant');
 const R = require('./plant-rules');
@@ -121,13 +127,43 @@ async function loadHtstOnce(db, opts) {
   });
 }
 
+const GARAGE_TECHS_ID = 'garage-technicians-2026-10-13';
+const GARAGE_TECHS = ['Tom Jellick', 'John Myers', 'Jaxon Nard', 'Shaun Martin'];
+
+async function loadGarageTechsOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  const names = o.techNames || GARAGE_TECHS;
+  const mark = db.collection('dataLoads').doc(GARAGE_TECHS_ID), techs = db.collection('garageTechs');
+  return db.runTransaction(async tx => {
+    const m = await tx.get(mark);
+    if (m.exists && m.data().status === 'DONE') return { skipped: true };
+    const words = (n) => String(n || '').toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+    const have = (await tx.get(techs)).docs.map(d => words(d.data().name));
+    // Already there in any order or spelling the sheet uses ("JELLICK Tom", "MARTIN Sean" for Shaun): the same last name and a
+    // word starting with the same letter as the first name.
+    const listed = (w) => have.some(h => h.indexOf(w[w.length - 1]) >= 0 && h.some(x => x !== w[w.length - 1] && x[0] === w[0][0]));
+    const added = [], skipped = [];
+    names.forEach(label => {
+      const name = label.replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 40), w = words(name);
+      if (listed(w)) { skipped.push(label); return; }
+      have.push(w);
+      // The same id on every app for the same name, so a second copy of this load could never add the person twice.
+      const id = 'TECH-' + crypto.createHash('sha256').update('UDPO-TECH-LOAD|' + name).digest('hex').slice(0, 8).toUpperCase();
+      tx.set(techs.doc(docId(id)), { tech_id: id, name, active: 'YES', facility_id: 'fac_uniontown', created_at: stamp, created_by: BY, createdInApp: true, dataLoad: GARAGE_TECHS_ID });
+      added.push(name);
+    });
+    tx.set(mark, { status: 'DONE', doneAt: stamp, what: 'Garage technicians, names only (Joe 10/13)', added, skipped });
+    return { added, skipped };
+  });
+}
+
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;
 }
 
-module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS };
+module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS };
