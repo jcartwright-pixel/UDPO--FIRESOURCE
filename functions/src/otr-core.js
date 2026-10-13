@@ -92,9 +92,10 @@ function otrWeekday_(key) {
   return new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay();
 }
 
+// Review item 17 (Joe 10/13): dates read 10-8-26, like the rest of the app.
 function otrShortDate_(key) {
   var p = otrParseKey_(key);
-  return p.m + '/' + p.d + '/' + p.y;
+  return p.m + '-' + p.d + '-' + String(p.y).slice(-2);
 }
 
 /** Route Master rows -> the OTR route list. rows: [{runId, route, run, include, destination, miles:{sun..sat}}]. */
@@ -276,7 +277,7 @@ function otrDashboard_(todayKey, daily, todayCount, figures) {
   var week = [];
   for (var i = 0; i < 7; i++) {
     var k = otrAddDays_(sunday, i);
-    week.push({date: k, day: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i], label: Number(k.slice(5, 7)) + '/' + Number(k.slice(8, 10)),
+    week.push({date: k, day: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i], label: otrShortDate_(k),
       total: k > todayKey ? null : (dayTotal(k) || 0), today: k === todayKey});
   }
   var mtd = 0;

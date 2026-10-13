@@ -50,6 +50,8 @@
     // Pages built here (js/admin-pages.js), not a separate screen: they go through the server, Administrators only.
     const PANELS = Object.assign({}, PAGES, TOOL_PAGES, { switch: renderGoLive });
     let admin = null, find = '', current = ADMIN_GROUPS[0][2][0][0];
+    // Review item 54 (Joe 10/13): ?item=<key> opens that item first (Phone Screens' one line points to Links & Codes this way).
+    { const want = new URLSearchParams(location.search).get('item'); if (want && adminItem(want)) current = want; }
     const icon = (k) => /\.webp$/.test(k) ? '<img src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.gear) + '</svg>';
     const withTest = (href) => testEmail ? href + (href.indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + encodeURIComponent(testEmail) : href;
     const state = (it) => it.page ? 'ready' : PANELS[it.key] ? 'inline' : 'soon';
@@ -62,8 +64,9 @@
         if (!shown.length) return '';
         return '<div class="adm-nav-group"><h2>' + escapeHtml(group) + '</h2>' + shown.map(it => {
           const st = state(it);
+          // Review item 51 (Joe 10/13): menus are words only, so the side menu has no icons (the open item's title keeps its picture).
           return '<button type="button" class="adm-item ' + st + (it.key === current ? ' on' : '') + '" data-key="' + it.key + '"' + (it.key === current ? ' aria-current="true"' : '') + '>' +
-            '<span class="adm-ic">' + icon(it.icon) + '</span><span class="adm-name">' + escapeHtml(it.title) + '</span>' + (PILL[st] ? '<em>' + PILL[st] + '</em>' : '') + '</button>';
+            '<span class="adm-name">' + escapeHtml(it.title) + '</span>' + (PILL[st] ? '<em>' + PILL[st] + '</em>' : '') + '</button>';
         }).join('') + '</div>';
       }).join('') || '<p class="adm-none">Nothing matches. Try another word.</p>';
     }

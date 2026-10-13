@@ -7,6 +7,11 @@
 // Alt+Up / Alt+Down move it one place. Rows without data-drag (loaded, skipped) stay where they are and take no drop.
 // Rows with data-drag-group move only among rows of the same group (Location Areas: areas among areas, a sub-area within
 // its area). handle(td) says which boxes a finger drags from at once; by default the first two (Route and Run).
+// Review item 59 (Joe 10/13, "grab the whole line"): the mouse picks the line up from any cell that is not a box, button or
+// link (on Loadout the Driver, Depart or Total Time as well as Route and Run; on Location Areas the Used count as well as the
+// Order), and pressing on the line's words does not start selecting text, so the drag is not mistaken for a text selection.
+// A finger also picks up the whole line, after holding it still a moment; handle() only says where it needs no hold, so a
+// swipe anywhere else on the line still scrolls the list.
 
 const SKIP = 'input, button, select, textarea, a, label, [contenteditable]';
 const HOLD_MS = 350, MOUSE_PX = 6;
@@ -105,8 +110,8 @@ export function mountRowDrag({ box, canDrag, onMove, handle = (td) => td.cellInd
   box.addEventListener('pointercancel', () => end(false));
   // A finger holding a row: the page does not scroll under it.
   box.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
-  // The row's own text is not selected while it is dragged with the mouse.
-  box.addEventListener('selectstart', e => { if (drag) e.preventDefault(); });
+  // The row's own text is not selected while it is pressed or dragged (review item 59): a press on a line is the start of a drag.
+  box.addEventListener('selectstart', e => { if (drag || press) e.preventDefault(); });
   box.addEventListener('contextmenu', e => { if (drag || (press && press.touch)) e.preventDefault(); });
 
   box.addEventListener('keydown', e => {

@@ -235,6 +235,8 @@ async function cameraShot(page, color) {
     // Fire Extinguishers: add one, check it, all Good.
     const ex = await openPage(browser, 1920, 1080, '/extinguishers.html?' + ADMIN);
     await ex.waitForSelector('#rows tr[data-id]');
+    // Review item 60 (Joe 10/13): the title's month reads like Oct 26.
+    assert.match(await ex.textContent('#title'), /^Fire Extinguishers · [A-Z][a-z]{2} \d\d$/);
     assert.match(await ex.textContent('#rows tr[data-id] td:nth-child(7)'), /DUE SOON/, 'annual service within 30 days is due soon');
     await ex.fill('#rows tr[data-new] input[data-k="tag"]', '02');
     await ex.fill('#rows tr[data-new] input[data-k="location"]', 'Break room');
@@ -359,9 +361,11 @@ async function cameraShot(page, color) {
     await la.keyboard.press('Alt+ArrowUp');
     await laUntil(l => { const o = l[2].subs.map(x => x.name); return o[o.length - 1] === 'Stairs & Exits' && o[o.length - 2] === 'Conference Room'; }, 'Alt+Up changes the walking order');
     await la.waitForFunction(() => document.activeElement && /Conference Room/.test(document.activeElement.getAttribute('aria-label') || ''));
-    // Mouse: grab Conference Room by its line and drag it above Office's first sub-area.
+    // Mouse: grab Conference Room by its line and drag it above Office's first sub-area. Review item 59 (Joe 10/13, "grab the
+    // whole line"): it is grabbed by its Used count, not the Order cell; the hand shows there too.
+    assert.equal(await la.$eval(conf + ' td:nth-child(4)', td => getComputedStyle(td).cursor), 'grab', 'the hand shows over the Used count');
     const firstOffice = '#rows tr.sw-sub-row[data-a="2"][data-s="0"]', firstName = await la.$eval(firstOffice + ' input[data-k="name"]', i => i.value);
-    const fromBox = await la.locator(conf + ' td.la-order').boundingBox(), toBox = await la.locator(firstOffice + ' td.la-order').boundingBox();
+    const fromBox = await la.locator(conf + ' td:nth-child(4)').boundingBox(), toBox = await la.locator(firstOffice + ' td.la-order').boundingBox();
     await la.mouse.move(fromBox.x + fromBox.width / 2, fromBox.y + fromBox.height / 2);
     await la.mouse.down();
     for (let i = 1; i <= 8; i++) await la.mouse.move(fromBox.x + fromBox.width / 2, fromBox.y + fromBox.height / 2 + (toBox.y + toBox.height * 0.25 - fromBox.y - fromBox.height / 2) * i / 8);

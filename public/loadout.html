@@ -140,7 +140,8 @@
     // Joe 10/11: Route 20%, Truck 10%, Trailer 10% and Cases Out 20% narrower; Driver / CVG gets all of that room so a driver's
     // name fits on one line (a name still too long shrinks to fit, see fitDrivers).
     const COLS = {
-      normal: [['Route', 4.8], ['Run', 9], ['Driver / CVG', 15.6], ['Truck', 8.1], ['Trailer', 8.1], ['', 6.4], ['Depart', 7], ['Status', 9], ['', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
+      // Review item 22 (Joe 10/13): the Start / End column has its heading.
+      normal: [['Route', 4.8], ['Run', 9], ['Driver / CVG', 15.6], ['Truck', 8.1], ['Trailer', 8.1], ['', 6.4], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
       TANKER: [['Route', 5.6], ['Run', 15], ['Driver / CVG', 20], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
     // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
@@ -222,7 +223,11 @@
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
         const runCell = escapeHtml(r.run) + (skip ? '<span class="skip-tag">SKIPPED · COME BACK</span>' : '');
         const stale = st === 'LOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
-        const total = mins === null ? '' : '<span class="' + (stale ? 'stale' : st === 'LOADING' ? 'running' : '') + '">' + (st === 'LOADING' ? P.runningText(r.startedAt, mins) : P.minutesText(mins)) + '</span>';
+        // Review item 22 (Joe 10/13): a load left running past 12 hours shows just "forgot End?" in Total Time; when it started
+        // ("Started Wed 3:24 AM · forgot End?") shows on hover, so the line stays one line high.
+        const long = st === 'LOADING' ? P.runningText(r.startedAt, mins) : '';
+        const total = mins === null ? '' : stale && /forgot End\?$/.test(long) ? '<span class="stale" title="' + escapeHtml(long) + '">forgot End?</span>' :
+          '<span class="' + (stale ? 'stale' : st === 'LOADING' ? 'running' : '') + '">' + (st === 'LOADING' ? long : P.minutesText(mins)) + '</span>';
         const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (skip ? ' skipped' : '');
         if (area === 'TANKER') {
           html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + escapeHtml(r.run) + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +

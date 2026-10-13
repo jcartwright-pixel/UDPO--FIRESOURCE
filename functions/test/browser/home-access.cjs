@@ -86,11 +86,16 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     const adm = await openPage(browser, 1920, 1080, '/index.html?testEmail=admin.test@uniteddairy.com');
     await adm.waitForURL(/company\.html/);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"] .co-grid');
-    assert.deepEqual(await adm.$$eval('.co-kpi span', s => s.map(x => x.textContent)), ['Scheduled Loads', 'Loaded', 'Loads Completed', 'Currently Loading', 'Unloaded', 'Waiting to Unload']);
+    // Review item 19 (Joe 10/13): no six top tiles (they repeated Uniontown's card) and no filler line under the title.
+    assert.equal(await adm.$$eval('.co-kpi, #kpis', s => s.length), 0);
+    assert.equal(await adm.$$eval('.co-hero p', s => s.length), 0);
     assert.deepEqual(await adm.$$eval('.co-plant strong', s => s.map(x => x.textContent)), ['Uniontown', 'Charleston', 'Martins Ferry']);
     assert.deepEqual(await adm.$$eval('.co-plant header em', s => s.map(x => x.textContent)), ['ACTIVE', 'PLANNED', 'PLANNED']);
     assert.deepEqual(await adm.$$eval('.co-plant[data-plant="fac_uniontown"] .co-cell span', s => s.map(x => x.textContent)), ['Scheduled', 'Completed', 'Unloaded', 'Loaded', 'Loading', 'Waiting', 'Pickups', 'Maintenance']);
     assert.equal(await adm.$$eval('.co-plant.planned .co-soon b', s => s.map(x => x.textContent).join()), 'Being built,Being built');
+    // Review item 20 (Joe 10/13): Charleston and Martins Ferry are one short "being built" line each, not big empty boxes.
+    assert.ok((await adm.$$eval('.co-plant.planned', c => c.map(x => x.offsetHeight))).every(h => h < 130));
+    assert.equal(await adm.$$eval('.co-plant.planned footer', f => f.length), 0);
     assert.ok(await noSideScroll(adm), 'the overview fits the width');
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-all-plants-1920.png') });
     await Promise.all([adm.waitForURL(/soon\.html\?what=plant-charleston/), adm.click('.co-plant[data-plant="fac_charleston"]')]);
@@ -169,7 +174,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (six numbers; Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
+    results.push('An Administrator starts on the all-plants overview (Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');

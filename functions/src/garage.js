@@ -601,8 +601,29 @@ async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-/* One Garage Station call: {op: 'read' | 'signIn' | 'signOut' | 'step', tokens, ...}. Throws SaveError. */
-async function garageCall(db, input, now) {
+/*
+ * Review item 68 (Joe 10/13): the Maintenance Station board (technician names, the plant's open work orders and machines)
+ * needs a signed-in United Dairy account or a valid station code, like the other station reads. caller (index.js) is
+ * {user, claims}: user from unitedDairyUser, claims the token's claims (a Plant Station signed in by its code alone).
+ */
+async function maintBoardAllowed(db, input, caller) {
+  if (caller && caller.user) return;
+  const ST = require('./stations'), facilityId = text(input.facilityId, 60) || FACILITY;
+  const plantStation = await ST.stationSaver(db, caller && caller.claims);
+  if (plantStation && plantStation.facilityId === facilityId) return;
+  const st = input.station || {};
+  if (st.key) {
+    const ok = await ST.check(db, 'GARAGE', st.key, st.version);
+    if (ok.ok && ok.station.set && ok.station.facilityId === facilityId) return;
+  }
+  throw SaveErr('NOT_ALLOWED', 'Sign in with a United Dairy account, or enter the station code, to open the Maintenance Station.');
+}
+
+/*
+ * One Garage Station call: {op: 'read' | 'signIn' | 'signOut' | 'step', tokens, ...}. Throws SaveError. caller: who is
+ * calling, as index.js knows it from the sign-in ({user, claims}); only the Maintenance Station board looks at it.
+ */
+async function garageCall(db, input, now, caller) {
   input = input || {};
   const nowMs = (now ? now() : new Date()).getTime(), op = String(input.op || '');
   // Garage station codes (Joe 10/12, stations.js): once the garage has a code, the tablet types it once and sends the
@@ -612,7 +633,7 @@ async function garageCall(db, input, now) {
   if (op === 'release') return require('./admin').releaseCheck(db, { op: input.step === 'status' ? 'status' : 'release', facilityId: FACILITY, code: input.code, who: input.who }, () => new Date(nowMs)).catch(asSave);
   // Plant Maintenance's Maintenance Station (Joe 10/12): the same technicians and sign-in, the plant's work orders. It is not
   // the garage tablet, so the garage's station code does not lock it; every step still needs a mechanic's login ID.
-  if (op === 'pmBoard') return require('./plantmaint').stationBoard(db, input, nowMs);
+  if (op === 'pmBoard') { await maintBoardAllowed(db, input, caller); return require('./plantmaint').stationBoard(db, input, nowMs); }
   if (op === 'pmStep') return require('./plantmaint').stationStep(db, input, nowMs);
   const maintSignIn = input.maint === true && (op === 'signIn' || op === 'signOut');
   if (!maintSignIn && await ST.needsCode(db, 'GARAGE', FACILITY)) {

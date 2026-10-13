@@ -132,21 +132,23 @@
         sheet.querySelector('[data-mode-go]').onclick = () => { mode = 'month'; render(); };
         return;
       }
-      const b = board(s), sm = b.summary, label = mode === 'year' ? String(year) : CORE.MONTHS[month - 1] + ' ' + year;
+      // Review item 60 (Joe 10/13): the month reads Oct 26 (its 3-letter name and 2-digit year).
+      const b = board(s), sm = b.summary, label = mode === 'year' ? String(year) : CORE.MONTHS[month - 1].slice(0, 3) + ' ' + String(year).slice(-2);
       k.innerHTML = [[sm.drivers, 'Drivers graded'], [sm.average == null ? '–' : sm.average, 'Plant average score'], [sm.missedCheckins, 'Missed check-ins', sm.missedCheckins ? 'warn' : ''],
         [sm.lostCases, 'Cases lost on routes', sm.lostCases ? 'warn' : ''], [sm.leader || 'Nobody yet', (mode === 'year' ? 'Leading for Driver of the Year' : 'Leading for Driver of the Month') + (sm.leader ? '' : ', needs ' + b.minDays + ' days worked'), sm.leader ? 'good' : 'none']]
         .map(([v, l, c]) => '<div class="' + (c || '') + '"><b>' + escapeHtml(String(v)) + '</b><span>' + l + '</span></div>').join('');
       bar.innerHTML = '<button type="button" id="prev" aria-label="Earlier">◀</button><b class="sc-period">' + escapeHtml(label) + '</b><button type="button" id="next" aria-label="Later">▶</button><span class="spacer"></span><button type="button" class="primary" id="sc-print">Print</button>';
       const cell = (bad, good, text) => '<td class="' + (bad ? 'sc-bad' : good ? 'sc-ok' : '') + '">' + text + '</td>';
-      sheet.innerHTML = '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:15%"><col style="width:6%"><col style="width:8%"><col style="width:11%"><col style="width:12%"><col style="width:7%"><col style="width:11%"><col style="width:10%"><col style="width:7%"><col style="width:9%"></colgroup>' +
-        '<thead><tr><th>#</th><th>Driver</th><th>Route</th><th>Score</th><th>Daily Check-in</th><th>Cases Out vs In</th><th class="later">Route Cuts<small>(later)</small></th><th>Clean Inspections</th><th>Attendance</th><th>Miles</th><th class="later">Driving Habits<small>(GPS, later)</small></th></tr></thead><tbody>' +
+      // Review item 18 (Joe 10/13): the empty Route Cuts and Driving Habits columns are hidden until they are built.
+      sheet.innerHTML = '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:17%"><col style="width:7%"><col style="width:9%"><col style="width:14%"><col style="width:15%"><col style="width:14%"><col style="width:11%"><col style="width:9%"></colgroup>' +
+        '<thead><tr><th>#</th><th>Driver</th><th>Route</th><th>Score</th><th>Daily Check-in</th><th>Cases Out vs In</th><th>Clean Inspections</th><th>Attendance</th><th>Miles</th></tr></thead><tbody>' +
         (b.rows.filter(r => r.runDays || r.callOffs).map(r => '<tr data-key="' + escapeHtml(r.driverKey) + '" class="' + (open === r.driverKey ? 'sc-open' : '') + '"><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td><td>' + escapeHtml(r.route) + '</td>' +
           '<td><span class="sc g-' + r.grade + '">' + r.score + '</span></td>' + cell(r.missedCheckins, !r.missedCheckins, (r.runDays - r.missedCheckins) + ' of ' + r.runDays + (r.missedCheckins ? '<small>' + r.missedCheckins + ' missed</small>' : '')) +
           cell(r.lostCases, !r.lostCases && r.casesOut, r.casesOut ? r.casesOut.toLocaleString() + ' / ' + r.casesIn.toLocaleString() + (r.lostCases ? '<small>' + r.lostCases + ' lost</small>' : '') : '<small>not recorded</small>') +
-          '<td class="later">–</td>' + cell(r.defects, !r.defects && r.inspected, r.inspected + ' clean' + (r.defects ? '<small>' + r.defects + ' with a defect</small>' : '') + (r.notInspected ? '<small>' + r.notInspected + ' not done</small>' : '')) +
-          cell(r.callOffs, !r.callOffs, r.callOffs ? r.callOffs + ' call-off' + (r.callOffs === 1 ? '' : 's') : 'Perfect') + '<td>' + (r.miles ? r.miles.toLocaleString() : '') + '</td><td class="later">–</td></tr>' +
-          (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="10">' + (r.misses && r.misses.length ? r.misses.map(m => '<div><b>' + shortDate(m.date) + '</b> ' + escapeHtml(m.what) + ' <span class="sc-pts">−' + m.points + '</span></div>').join('') : 'No misses.') + '</td></tr>' : '')).join('') ||
-          '<tr><td colspan="11" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>') + '</tbody></table>';
+          cell(r.defects, !r.defects && r.inspected, r.inspected + ' clean' + (r.defects ? '<small>' + r.defects + ' with a defect</small>' : '') + (r.notInspected ? '<small>' + r.notInspected + ' not done</small>' : '')) +
+          cell(r.callOffs, !r.callOffs, r.callOffs ? r.callOffs + ' call-off' + (r.callOffs === 1 ? '' : 's') : 'Perfect') + '<td>' + (r.miles ? r.miles.toLocaleString() : '') + '</td></tr>' +
+          (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="8">' + (r.misses && r.misses.length ? r.misses.map(m => '<div><b>' + shortDate(m.date) + '</b> ' + escapeHtml(m.what) + ' <span class="sc-pts">−' + m.points + '</span></div>').join('') : 'No misses.') + '</td></tr>' : '')).join('') ||
+          '<tr><td colspan="9" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>') + '</tbody></table>';
       foot.textContent = 'Through ' + shortDate(b.through) + ' · green = no misses, red = cost points · days counted: ' + (b.days.length ? shortDate(b.days[0]) + ' to ' + shortDate(b.days[b.days.length - 1]) + ' (the copied Live weeks)' : 'none') + ' · click a driver for the misses.';
       document.getElementById('prev').onclick = () => { if (mode === 'year') year--; else if (--month < 1) { month = 12; year--; } open = ''; render(); };
       document.getElementById('next').onclick = () => { if (mode === 'year') year++; else if (++month > 12) { month = 1; year++; } open = ''; render(); };

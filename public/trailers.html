@@ -89,12 +89,13 @@
           const cls = !r.trailer ? ' blank' : others.length ? ' dup' : '';
           const note = !r.trailer ? 'Needs a trailer' : others.length ? 'Also on ' + others.map(x => String(x.route).replace(/_\d+$/, '')).join(', ') : '';
           const sub = (AREA_SUB[r.area] ? AREA_SUB[r.area] : '') + (r.prior ? (AREA_SUB[r.area] ? ' · ' : '') + 'Still open from ' + shortDate(r.loadDate) : '');
+          // Review item 25 (Joe 10/13): data-l names each box on the phone's card (as on Yard Checks).
           return '<div class="ta-row' + cls + (r.id === selected ? ' sel' : '') + '" role="row" data-row="' + escapeHtml(r.id) + '">' +
             '<span class="rt"><b>' + escapeHtml(String(r.route).replace(/_\d+$/, '')) + '</b>' + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span>' +
-            '<span>' + escapeHtml(r.run) + '</span><span>' + escapeHtml(r.driver || '—') + '</span><span class="grey">' + escapeHtml(r.truck || '—') + '</span>' +
-            '<span class="tr"><input type="text" maxlength="20" list="ta-units" autocomplete="off" placeholder="Trailer #" value="' + escapeHtml(r.trailer) + '" data-trailer="' + escapeHtml(r.id) + '"' +
+            '<span data-l="Run">' + escapeHtml(r.run) + '</span><span data-l="Driver">' + escapeHtml(r.driver || '—') + '</span><span class="grey" data-l="Truck">' + escapeHtml(r.truck || '—') + '</span>' +
+            '<span class="tr" data-l="Trailer"><input type="text" maxlength="20" list="ta-units" autocomplete="off" placeholder="Trailer #" value="' + escapeHtml(r.trailer) + '" data-trailer="' + escapeHtml(r.id) + '"' +
             ' aria-label="Trailer for route ' + escapeHtml(r.route + ' ' + r.run) + '"' + (can ? '' : ' disabled') + '><small>' + escapeHtml(note) + '</small></span>' +
-            '<span class="ta-depart">' + escapeHtml(P.timeOfDay(r.dispatchTime) || '—') + '</span></div>';
+            '<span class="ta-depart" data-l="Depart">' + escapeHtml(P.timeOfDay(r.dispatchTime) || '—') + '</span></div>';
         }).join('') || (gotRuns ? '<p class="empty">No loads are waiting for a trailer.</p>' : '<p class="empty">Loading the loads&hellip;</p>');
       }
       drawYard(rows, on, can);

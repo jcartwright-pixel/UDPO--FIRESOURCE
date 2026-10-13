@@ -230,13 +230,25 @@ async function sendOneRepair(db, recordId, by, note, mailDeps) {
     await addNote(db, r.record_id, 'Repair email sent ' + at + ' to ' + route.emails.join('; ') + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
     return { status: 'SENT', message: 'Emailed to ' + ROUTE_LABEL[dest.route] + (res.testCopy ? ' (test copy to ' + res.sentTo.join(', ') + ' only)' : '') + '.' };
   }
-  return { status: res.status, message: 'Not emailed: ' + res.reason };
+  return { status: res.status, message: 'Not emailed: ' + res.reason, reason: res.reason };
 }
 
 // index.js calls this after a save returns: the Lessor step's email goes out after the save, never inside it.
+// Review item 70 (Joe 10/13): the save has already happened, so an email that fails (or a fault while sending it) never turns
+// the save into a failure: the answer is still ok, with a note that the email did not go.
 async function afterSave(db, user, input, result, mailDeps) {
   if (!result || !result.ok || result.repeated || !input || input.action !== 'updateIssue' || input.step !== 'lessor' || /Already/.test(result.message || '')) return result;
-  const mail = await sendOneRepair(db, String(input.recordId || ''), String(user.email || '').toLowerCase(), '', mailDeps);
+  const by = String(user.email || '').toLowerCase();
+  let mail;
+  try {
+    mail = await sendOneRepair(db, String(input.recordId || ''), by, '', mailDeps);
+  } catch (e) {
+    const reason = String(e && e.message || e).slice(0, 200);
+    console.error('Lessor email failed after the save', input.recordId, reason);
+    await db.collection('sentEmails').add({ at: new Date().toISOString(), kind: 'Repair email', label: String(input.recordId || '').slice(0, 60), detail: 'Lessor button · ' + by, by, sentTo: [], status: 'FAILED', reason }).catch(() => {});
+    mail = { status: 'FAILED', reason };
+  }
+  if (mail.status === 'FAILED' || mail.status === 'BLOCKED') return Object.assign({}, result, { ok: true, message: 'Saved. The lessor email did not go: ' + String(mail.reason || 'unknown reason').replace(/\.+$/, '') + '.', email: mail.status });
   return Object.assign({}, result, { message: mail.message, email: mail.status });
 }
 

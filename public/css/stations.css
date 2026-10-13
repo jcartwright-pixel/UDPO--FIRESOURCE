@@ -574,6 +574,29 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 .sw-puform.sw-pause { grid-template-columns: minmax(0, 1fr) auto auto; }
 @media (max-width: 700px) { .sw-puform.sw-pause { grid-template-columns: 1fr; } }
 .sw-refuse { margin: 0; padding: 10px 16px; background: #fde8e8; color: #8f1d16; font-size: 18px; font-weight: 800; border-top: 1px solid #f1b7b3; }
+
+/* Review item 25 (Joe 10/13): Trailer Assignments on a phone. Five narrow columns broke names and truck numbers mid-word
+   ("GREG ORY, MICHA EL", "22387 3"); now each route is a card, as on Yard Checks: the route big on top (with Totes / Box /
+   Tanker or "Still open from"), then Run, Driver, Truck, the Trailer box and Depart, each named on the left. Inside the
+   Plant Station (Yard Services) the screen keeps its own two-line phone list. */
+@media (max-width: 599px) {
+  body.ta-page:not(.in-station) .ta-grid { background: transparent; border: 0; padding: 0 2px; }
+  body.ta-page:not(.in-station) .ta-headrow { display: none; }
+  body.ta-page:not(.in-station) .ta-row:not(.ta-headrow) { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 0 0 12px; padding: 12px 14px; background: #fff; border: 1px solid #d5dfea; border-left: 6px solid #388650; border-radius: 14px; font-size: 16px; }
+  body.ta-page:not(.in-station) .ta-row.blank { background: #fff4f2; border-left-color: #c0392b; }
+  body.ta-page:not(.in-station) .ta-row.dup { background: #fffaf0; border-left-color: #d4a121; }
+  body.ta-page:not(.in-station) .ta-row.sel { background: #eef5fd; border-left-color: #2f7de1; }
+  body.ta-page:not(.in-station) .ta-row > span { display: flex; align-items: center; gap: 10px; padding: 0; text-align: left !important; overflow: visible; white-space: normal; overflow-wrap: normal; word-break: normal; }
+  body.ta-page:not(.in-station) .ta-row > span[data-l]::before { content: attr(data-l); flex: 0 0 74px; font-size: 15px; font-weight: 800; color: #5b6b7c; }
+  body.ta-page:not(.in-station) .ta-row > span.rt { align-items: baseline; flex-wrap: wrap; }
+  body.ta-page:not(.in-station) .ta-row .rt b { font-size: 24px; color: #0b3d6b; }
+  body.ta-page:not(.in-station) .ta-row .rt small { display: inline; font-size: 16px; font-weight: 700; }
+  body.ta-page:not(.in-station) .ta-row > span.ta-depart { display: flex; }
+  body.ta-page:not(.in-station) .ta-row > span.tr { flex-wrap: wrap; }
+  body.ta-page:not(.in-station) .ta-row .tr input { flex: 1; min-width: 0; height: 50px; font-size: 20px; padding: 0 12px; border-radius: 10px; }
+  body.ta-page:not(.in-station) .ta-row .tr small { flex: 1 1 100%; text-align: left; min-height: 0; padding-left: 84px; }
+  body.ta-page:not(.in-station) .ta-row .tr small:empty { display: none; }
+}
 /* Joe 10/13: "Was your truck loaded correctly?" with Yes / No on one row; No opens the box for what was wrong. The Check-In
    still fits a 390 x 844 phone: the empty drop-and-hook list takes no room and the rows sit a little closer. */
 .phone-card .ci-loaded { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 10px; align-items: center; }
@@ -586,3 +609,6 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 #step-form.phone-card { gap: 8px; }
 #step-form .phone-grid { row-gap: 6px; }
 #ci-more:empty { display: none; }
+/* Review item 54 (Joe 10/13): Phone Screens is one line pointing to Administration > Links & Codes. */
+.pss-moved { margin: 12px 16px; font-size: 18px; color: #0b2f55; }
+.pss-moved a { font-weight: 800; color: #0b6eaa; }

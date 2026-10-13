@@ -459,7 +459,8 @@
         clearTimeout(boardSoon);
         boardSoon = setTimeout(() => { if (!document.getElementById('step-board').hidden) readBoard(); else boardAt = 0; }, 800);
       };
-      boardWatch = [onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), changed, () => {}), onSnapshot(collection(db, 'pickups'), changed, () => {})];
+      // Review item 73 (Joe 10/13): only pickups from yesterday on (the board is today's loads), not every pickup ever made.
+      boardWatch = [onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), changed, () => {}), onSnapshot(query(collection(db, 'pickups'), where('date', '>=', iso(new Date(day.getFullYear(), day.getMonth(), day.getDate() - 1)))), changed, () => {})];
     }
     function openBoard() {
       step('step-board'); readBoard(); watchBoard().catch(() => {}); clearInterval(boardTimer);

@@ -67,6 +67,34 @@ async function shots(page, name, w) {
       await page.close();
     }
 
+    // Review items 23 and 27 (Joe 10/13): on a phone and an 800 tablet each load is a card with every box named; nothing is cut
+    // (count tiles, switches, department tiles, "Next: 808 ..."), nothing slides sideways, and there is no side-menu strip.
+    for (const [w, h] of [[390, 844], [800, 1280]]) {
+      const page = await openPage(browser, w, h, '/unloading.html?date=' + DATE + WORKER);
+      await page.waitForSelector(row('808'));
+      const look = await page.evaluate(() => {
+        const cut = (el) => el.scrollWidth > el.clientWidth + 1 || el.getBoundingClientRect().right > window.innerWidth + 1;
+        const tr = document.querySelector('#rows tr[data-key*="|808|"]');
+        return {
+          card: getComputedStyle(tr).display,
+          labels: [...tr.children].map(td => getComputedStyle(td, '::before')).filter(b => b.display !== 'none' && b.content !== 'none' && b.content !== 'normal').map(b => b.content),
+          next: cut(tr.querySelector('small.next')),
+          stats: [...document.querySelectorAll('#hstats span')].filter(cut).map(s => s.textContent),
+          switches: [...document.querySelectorAll('[data-mode], [data-tab]')].filter(cut).map(b => b.textContent),
+          tiles: [...document.querySelectorAll('#areas .area')].filter(cut).map(a => a.textContent.slice(0, 12)),
+          sideways: document.documentElement.scrollWidth > window.innerWidth + 1,
+          menu: !!document.querySelector('.sidemenu') && getComputedStyle(document.querySelector('.sidemenu')).display !== 'none'
+        };
+      });
+      assert.equal(look.card, 'grid', 'a load is a card at ' + w);
+      assert.deepEqual(look.labels, ['"Trailer"', '"Status"', '"Cases In"', '"RTA"', '"Washed"', '"Start / End"', '"Total Time"'], 'every box is named on the card at ' + w);
+      assert.deepEqual([look.next, look.stats, look.switches, look.tiles, look.sideways, look.menu], [false, [], [], [], false, false], 'nothing cut, no sideways scroll, no side-menu strip at ' + w + ' ' + JSON.stringify(look));
+      await shots(page, 'unloading-cards', w);
+      assert.deepEqual(page.errors, []);
+      await page.close();
+    }
+    results.push('Unloading & Washing at 390 and 800: each load is a card with every box named; tiles, switches and "Next:" not cut; no side-menu strip');
+
     // Two open screens: the dock works the list, the manager's screen follows.
     const watcher = await openPage(browser, 1920, 950, '/unloading.html?date=' + DATE + MANAGER);
     const dock = await openPage(browser, 1920, 950, '/unloading.html?date=' + DATE + WORKER);
@@ -164,6 +192,24 @@ async function shots(page, name, w) {
       }
       assert.deepEqual(page.errors, []);
       await page.close();
+    }
+
+    // Review item 26 (Joe 10/13): on a phone "What came back" has its label above the words, which read across the card.
+    {
+      const page = await openPage(browser, 390, 844, '/returns.html?date=' + DATE + WORKER);
+      await page.waitForSelector('#rows tr[data-ret^="CHECKIN|"] td.detail');
+      const what = await page.$eval('#rows tr[data-ret^="CHECKIN|"] td.detail', td => {
+        const b = getComputedStyle(td, '::before'), r = td.getBoundingClientRect(), words = document.createRange();
+        words.selectNodeContents(td);
+        return { label: b.content, column: getComputedStyle(td).flexDirection, align: getComputedStyle(td).textAlign, lines: Math.round(words.getBoundingClientRect().height / parseFloat(getComputedStyle(td).fontSize) / 1.2), width: r.width };
+      });
+      assert.equal(what.label, '"What came back"');
+      assert.deepEqual([what.column, what.align], ['column', 'left'], 'the label sits above the words, which read left to right ' + JSON.stringify(what));
+      assert.ok(what.lines <= 4, 'the words use the card\'s width (not five narrow lines) ' + JSON.stringify(what));
+      await shots(page, 'returns-phone', 390);
+      assert.deepEqual(page.errors, []);
+      await page.close();
+      results.push('Product Returns on a phone: "What came back" has its label above the words');
     }
 
     // + Add Return on the Plant Station tablet: a return nobody noted, on 811 (RedZone product, cases), then RTA.
