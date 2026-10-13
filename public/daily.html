@@ -53,7 +53,6 @@
           <button type="button" id="next" aria-label="Next day">&#9654;</button>
         </div>
       </div>
-      <div class="field day-pin" id="day-pin" hidden><label>&nbsp;</label><button type="button" id="go-today" title="The screen stays on the day you picked until you change it">Go to today</button></div>
       <div class="field"><label for="delivery-day">Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
       <div class="badge-test" id="mode"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
@@ -700,7 +699,6 @@
       if (unsubscribeRuns) unsubscribeRuns();
       const begin = weekBegin(loadDate);
       document.getElementById('week-begin').value = shortDate(L.addDays(begin, 1));
-      document.getElementById('day-pin').hidden = loadDate === L.operatingDay(new Date());
       document.getElementById('load-day').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
         const key = L.addDays(begin, i);
         return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key)) + '</option>';
@@ -753,7 +751,6 @@
       document.getElementById('week-prev').onclick = () => move(-7);
       document.getElementById('week-next').onclick = () => move(7);
       document.getElementById('load-day').onchange = e => goTo(e.target.value);
-      document.getElementById('go-today').onclick = () => goTo(L.operatingDay(new Date()));
       dayKey = 'ud.daily.day.' + String(params.get('testEmail') || (user && user.email) || '').toLowerCase();
       if (!L.isDateKey(params.get('date'))) { try { const kept = localStorage.getItem(dayKey); if (L.isDateKey(kept)) loadDate = kept; } catch (e) { /* storage off */ } }
       window.addEventListener('resize', render);

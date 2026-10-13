@@ -1770,7 +1770,7 @@ input[type="date"].ud-date-dressed::-webkit-datetime-edit { color: transparent; 
   body.daily-look .head:has(#print-sheet) .actions.in-head + .field { margin-left: auto; }
 }
 body.daily-look #delivers { display: none; }
-@media (min-width: 701px) and (max-width: 1799px) {
+@media (min-width: 701px) and (max-width: 1899px) {
   /* Room for one line at 1536: Delivery day shows beside Loadout day, buttons and arrows are a little tighter. */
   body.daily-look .head:has(#print-sheet) { gap: 8px; }
   body.daily-look .head:has(#print-sheet) .field:has(#delivery-day) { display: none; }

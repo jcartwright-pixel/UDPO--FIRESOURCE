@@ -265,7 +265,8 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(await dp.$eval('#week-panel', w => w.hidden), true, 'a move inside the week does not ask');
     await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com');
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
-    assert.equal(await dp.isVisible('#go-today'), true, 'Go to today shows when the kept day is not today');
+    // Joe 10/13 ("REMOVE THE GO TO TODAY"): Daily has no Go to today button; the arrows and the day box change the day.
+    assert.equal(await dp.$$eval('#go-today, #day-pin', n => n.length), 0, 'no Go to today on Daily');
     assert.deepEqual(dp.errors, []);
     results.push('Daily keeps the picked day after leaving and coming back; moving into another week asks Continue or Cancel');
 
