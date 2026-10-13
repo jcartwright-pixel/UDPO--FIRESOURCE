@@ -1908,3 +1908,7 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
   body.daily-look .head:has(#print-sheet) #week-begin { width: 72px; }
   body.daily-look .head:has(#print-sheet) #load-day { width: 104px; }
 }
+/* Review item 56 (Joe 10/13): with 16px text, Route Days' Show / Hide Rules top line ran past the edge on a laptop (1366), so the
+   four buttons lost their even width. "Only runs hidden on Weekly" now sits on two short lines beside its box. */
+.routes-page #hidden-box { max-width: 190px; white-space: normal; line-height: 1.15; }
+.routes-page #hidden-box input { flex: none; }
