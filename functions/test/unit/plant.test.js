@@ -149,8 +149,8 @@ test('scheduler: customers are Route Master\'s plant runs, an as-needed customer
   assert.equal(list.find(r => r.route === '905').slots, 2);
   assert.equal(list.find(r => r.route === '905').runId, 'run_c905_1');
   const sup = R.scheduleSuppliers([{ recordId: 'SUP-m1', type: 'PLANT_SUPPLIER', routeId: 'SUP-m1', route: 'S06', run: 'MOUNTAIN STATE SUGAR', notes: 'Mountain Sugar', status: 'ACTIVE' }]);
-  assert.deepEqual(sup.map(s => s.route), ['S01', 'S02', 'S03', 'S04', 'S05', 'S06']);
-  assert.equal(sup[5].name, 'Mountain Sugar');
+  assert.deepEqual(sup.map(s => s.route), ['S06'], 'no sample suppliers (Joe 10/13)');
+  assert.equal(sup[0].name, 'Mountain Sugar');
 });
 
 test('scheduler: Save Load checks what the current app checks', () => {
@@ -165,6 +165,9 @@ test('scheduler: Save Load checks what the current app checks', () => {
   bad({ trailer: 'T-9<1' }, /trailer/);
   assert.throws(() => P.validateSchedule({ lane: 'SHIPPING', op: 'addSupplier', name: 'X' }, SaveError), /Suppliers are on Receiving/);
   assert.throws(() => P.validateSchedule({ lane: 'RECEIVING', op: 'addSupplier', name: 'X', code: 'TOO-LONG-1' }, SaveError), /up to 8/);
+  assert.throws(() => P.validateSchedule({ lane: 'RECEIVING', op: 'editSupplier', name: 'X' }, SaveError), /Pick the supplier/);
+  assert.throws(() => P.validateSchedule({ lane: 'RECEIVING', op: 'editSupplier', id: 'SUP-START-1', name: '' }, SaveError), /Type the supplier name/);
+  assert.deepEqual(P.validateSchedule({ lane: 'RECEIVING', op: 'removeSupplier', id: 'SUP-START-2' }, SaveError), { lane: 'RECEIVING', op: 'removeSupplier', id: 'SUP-START-2' });
 });
 
 test('yard checks: a loaded trailer is on the yard until its dispatch time; a check locks it for 2 hours; Left Yard takes the load off', () => {

@@ -98,9 +98,10 @@ async function shots(page, name, w) {
       await shots(page, 'sched-day', w);
       // Receiving: the same screen with the suppliers.
       await page.click('[data-lane="RECEIVING"]');
-      await page.waitForFunction(() => /Valley Farms/.test(document.getElementById('body').textContent));
+      // Joe 10/13: no sample suppliers; a load booked with one still shows its name.
+      await page.waitForFunction(() => /Valley Farms Milk Co-op/.test(document.getElementById('body').textContent));
       await page.click('[data-view="week"]');
-      await page.waitForFunction(() => document.querySelectorAll('.sc-who').length === 6);
+      await page.waitForFunction(() => document.querySelectorAll('.sc-who').length === 1);
       assert.deepEqual([...new Set(await page.$$eval('.sc-load', els => els.map(e => (e.className.match(/by-(\w+)/) || [])[1])))].sort(), ['carrier', 'ut'], 'Receiving: the carrier load purple, our own truck blue');
       await fits(page, 'Scheduler receiving ' + w + 'x' + h);
       await shots(page, 'sched-receiving', w);
@@ -153,8 +154,39 @@ async function shots(page, name, w) {
     await desk.fill('#s-name', 'Ohio Valley Fruit');
     await desk.fill('#s-label', 'Ohio Fruit');
     await desk.click('#s-save');
-    await watcher.waitForFunction(() => /Ohio Fruit[\s\S]*S07 · OHIO VALLEY FRUIT/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
-    results.push('New Supplier (Ohio Valley Fruit): on the other screen as S07');
+    await watcher.waitForFunction(() => /Ohio Fruit[\s\S]*S02 · OHIO VALLEY FRUIT/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
+    results.push('New Supplier (Ohio Valley Fruit): on the other screen as S02');
+    // Joe 10/13: the Suppliers button lists them; Edit renames one, Remove takes one off (after "Remove this supplier?").
+    await desk.setViewportSize({ width: 1536, height: 864 });
+    await desk.click('#suppliers');
+    await desk.waitForFunction(() => document.querySelectorAll('.sc-suptable tbody tr').length === 2 && !/Saving/.test(document.querySelector('.sc-suptable').textContent));
+    assert.deepEqual(await desk.$$eval('.sc-suptable tbody tr', r => r.map(x => x.cells[1].textContent)), ['MOUNTAIN STATE SUGAR', 'OHIO VALLEY FRUIT']);
+    assert.ok(await desk.$eval('.sc-suptable td', e => parseFloat(getComputedStyle(e).fontSize) >= 16), 'the list text is at least 16px');
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-list-1536.png'), scale: 'css' });
+    for (const w of [390, 800]) {
+      await desk.setViewportSize({ width: w, height: 844 });
+      assert.ok(await desk.$eval('#modal', m => m.getBoundingClientRect().right <= innerWidth + 1), 'the Suppliers box fits at ' + w);
+      if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-list-' + w + '.png'), scale: 'css' });
+    }
+    await desk.setViewportSize({ width: 1536, height: 864 });
+    await desk.click('.sc-suptable tbody tr:nth-child(1) [data-supplier]');
+    assert.equal(await desk.inputValue('#s-name'), 'MOUNTAIN STATE SUGAR');
+    await desk.fill('#s-name', 'Dean Foods Milk');
+    await desk.fill('#s-label', 'Dean');
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-edit-1536.png'), scale: 'css' });
+    await desk.click('#s-save');
+    await desk.waitForFunction(() => /DEAN FOODS MILK/.test((document.querySelector('.sc-suptable') || {}).textContent || ''), null, { timeout: 8000 });
+    await watcher.waitForFunction(() => /Dean[\s\S]*S06 · DEAN FOODS MILK/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
+    results.push('Edit Supplier (Mountain State Sugar to Dean Foods Milk): on the other screen');
+    await desk.click('.sc-suptable tbody tr:nth-child(2) [data-supplier]');
+    await desk.click('#s-remove');
+    assert.match(await desk.textContent('#modal'), /Remove this supplier\?[\s\S]*OHIO VALLEY FRUIT/);
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-remove-1536.png'), scale: 'css' });
+    await desk.click('#s-go');
+    await desk.waitForFunction(() => document.querySelectorAll('.sc-suptable tbody tr').length === 1, null, { timeout: 8000 });
+    await watcher.waitForFunction(() => !/OHIO VALLEY FRUIT/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
+    results.push('Remove Supplier (Ohio Valley Fruit) after "Remove this supplier?": gone from the other screen');
+    await desk.click('#modal [data-close]');
     // Month view of the day: the day box lists the loads.
     await desk.click('[data-lane="SHIPPING"]');
     await desk.click('[data-view="month"]');
@@ -165,7 +197,7 @@ async function shots(page, name, w) {
     assert.deepEqual(desk.errors, []);
     assert.deepEqual(watcher.errors, []);
     const log = await db().collection('actions').where('action', '==', 'savePlantSchedule').get();
-    assert.equal(log.size, 4, 'each change is one save in the save log');
+    assert.equal(log.size, 6, 'each change is one save in the save log');
   } finally {
     await browser.close();
   }
