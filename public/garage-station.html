@@ -177,7 +177,8 @@
     $('gs-change').addEventListener('click', async () => {
       const ok = await askRelease($('gs-release'), { status: () => call('release', { step: 'status' }), release: (code) => call('release', { step: 'release', code }), onError: message, mustHave: true });
       if (!ok) return;
-      station = null; remember(CODE_KEY, null); gate().catch(err => message(err.message));
+      // Joe 10/13: Release goes to the normal Home menu (same window), not back to the code screen.
+      station = null; remember(CODE_KEY, null); location.replace('index.html');
     });
     const signOut = (token) => { if (token) call('signOut', { tokens: [token] }).catch(() => {}); };
     function message(text, ok) { const m = $('gs-message'); m.textContent = text || ''; m.hidden = !text; m.classList.toggle('ok', !!ok); }

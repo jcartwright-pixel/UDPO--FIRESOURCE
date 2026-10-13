@@ -219,6 +219,9 @@
     const leave = () => {
       stationId = ''; write(''); remember(CODE_KEY, null); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true;
       if (signedAs) { signedAs = null; away = true; if (work) work.stop(); signOutHere(); return; } // back to the station code screen (reads stopped first)
+      // Joe 10/13: a station opened with its code goes to the normal Home menu (same window); a plant with no station codes
+      // yet goes back to its list of stations.
+      if (mode === 'code') { location.replace('index.html'); return; }
       decide().catch(err => showError(err.message));
     };
     const releaseCall = (f) => callServer(signedAs ? 'stationSignIn' : 'stationRelease', f);
