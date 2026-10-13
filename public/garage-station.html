@@ -85,6 +85,9 @@
     import { httpsCallable } from './js/firebase.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
     import { mountJobStation, rid } from './js/job-station.js';
+    import { fullScreenOnTap } from './js/full-screen.js';
+
+    fullScreenOnTap();
 
     /*
      * The Garage Station: the fleet's work orders (trucks, trailers, fork trucks and pallet jacks). The screens it shares with
@@ -128,7 +131,8 @@
     $('gs-change').addEventListener('click', async () => {
       const ok = await askRelease($('gs-release'), { status: () => call('release', { step: 'status' }), release: (code) => call('release', { step: 'release', code }), onError: S.message, mustHave: true });
       if (!ok) return;
-      station = null; remember(CODE_KEY, null); gate().catch(err => S.message(err.message));
+      // Joe 10/13: Release goes to the normal Home menu (same window), not back to the code screen.
+      station = null; remember(CODE_KEY, null); location.replace('index.html');
     });
     const TYPE = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };
 

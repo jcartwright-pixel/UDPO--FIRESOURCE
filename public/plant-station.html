@@ -82,6 +82,9 @@
     import { collection, query, where, onSnapshot } from './js/firebase.js';
     import { resolveStation, askCode, remember, lockStation } from './js/station-code.js';
     import { mountStationWork } from './js/station-work.js';
+    import { fullScreenOnTap } from './js/full-screen.js';
+
+    fullScreenOnTap();
 
     // The current app's Plant Station tablet (PlantStation.html, 057_V774): one station, only its work areas. In the new app
     // the tablet signs in with a United Dairy account (no station code) and picks its station once; it is remembered on the
@@ -188,7 +191,7 @@
       }).join('');
       counts();
       document.getElementById('tabs').classList.toggle('one', st.views.length === 1);
-      document.getElementById('foot').textContent = st.what + '. This tablet opens this station each time; a manager uses Release at the bottom to move it.';
+      document.getElementById('foot').textContent = st.what + '. This tablet opens this station each time; a manager uses Release in the bottom-right corner to move it.';
     }
 
     // The count under a tab (loads left), from the station's work: Boxing's Shipping / Loadout counts the scheduled shipments too.
@@ -217,6 +220,9 @@
     const leave = () => {
       stationId = ''; write(''); remember(CODE_KEY, null); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true;
       if (signedAs) { signedAs = null; away = true; if (work) work.stop(); signOutHere(); return; } // back to the station code screen (reads stopped first)
+      // Joe 10/13: a station opened with its code goes to the normal Home menu (same window); a plant with no station codes
+      // yet goes back to its list of stations.
+      if (mode === 'code') { location.replace('index.html'); return; }
       decide().catch(err => showError(err.message));
     };
     const releaseCall = (f) => callServer(signedAs ? 'stationSignIn' : 'stationRelease', f);
