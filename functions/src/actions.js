@@ -70,6 +70,8 @@ const ACTIONS = Object.freeze({
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
   saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  // Joe 10/13: a manager rates a driver's truck cleanliness 1 to 5 on the Driver Scorecard.
+  rateTruckClean: { roles: DRIVER_ROLES, screen: 'scorecard' },
   saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'opsAssignments' },
   // The plant side (plant.js): Loadout Center loads and pickups. The Plant Distribution screens are their own switch (Plant Loading).
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
@@ -341,6 +343,18 @@ function validate(input) {
     out.active = input.active !== false;
     out.sequence = Number(input.sequence);
     if (!Number.isInteger(out.sequence) || out.sequence < 1 || out.sequence > 999) throw new SaveError('BAD_REQUEST', 'Order must be a whole number from 1 to 999');
+    return out;
+  }
+  if (action === 'rateTruckClean') {
+    out.driverKey = text(input.driverKey, 80).toUpperCase();
+    out.driver = text(input.driver, 80);
+    out.date = text(input.date);
+    out.rating = Number(input.rating);
+    out.truck = text(input.truck, 20);
+    out.note = text(input.note, 300);
+    if (!out.driverKey) throw new SaveError('BAD_REQUEST', 'Pick the driver');
+    if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+    if (!Number.isInteger(out.rating) || out.rating < 1 || out.rating > 5) throw new SaveError('BAD_REQUEST', 'Pick a rating from 1 to 5');
     return out;
   }
   if (action === 'saveScorecard') {
@@ -691,6 +705,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveScorecard') return saveScorecard(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'rateTruckClean') return rateTruckClean(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOpsAssignment') return saveOpsAssignment(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'publishWeek') return publishWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
@@ -1461,6 +1476,16 @@ async function saveScorecard(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection('scorecard').doc('settings'), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
   const data = req.callOffReasons ? { callOffReasons: req.callOffReasons } : { [req.key]: req.value };
   tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email }), { merge: true });
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
+  return result;
+}
+
+// Truck cleanliness ratings: scorecardRatings/<driver>_<date> (one a day per driver; a second rating that day replaces it).
+async function rateTruckClean(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('scorecardRatings').doc(M.safeIdPart(req.driverKey + '_' + req.date)), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+  const data = { kind: 'cleanliness', driverKey: req.driverKey, driver: req.driver, date: req.date, rating: req.rating, truck: req.truck, note: req.note };
+  tx.set(ref, Object.assign({}, data, { ratedAt: stamp, ratedBy: email, testEdited: mode.mode === 'test' }));
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
   return result;

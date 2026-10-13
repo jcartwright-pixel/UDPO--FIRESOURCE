@@ -26,7 +26,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Driver Scorecard</h1><small id="sub">Rewards for clean days, points off for misses</small></div>
+      <div class="title"><h1>Driver Scorecard</h1><small id="sub">Rewards for perfect days, points off for misses</small></div>
       <div class="tabs" role="tablist">
         <button type="button" role="tab" data-mode="month" aria-selected="true">Month</button>
         <button type="button" role="tab" data-mode="week" aria-selected="false">Week</button>
@@ -44,7 +44,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, showError, shortDate, save } from './js/app.js';
     import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
     import { collection, doc, onSnapshot, query, where, limit } from './js/firebase.js';
 
@@ -61,6 +61,8 @@
       if (m) { year = +m[1]; month = +m[2]; }
       if (/^\d{4}-\d{2}-\d{2}$/.test(w)) { weekStart = S.scWeekRange_(w).start; mode = 'week'; } }
     // Joe 10/13: Verizon Connect Fleet GPS for the period on screen (gpsDays: miles, yard times, fuel; gpsAlerts: speeding, hard stops, idling).
+    // Joe 10/13: truck cleanliness ratings (scorecardRatings), about once a month per driver.
+    let ratings = [], rateOpen = '', rateValue = 0;
     let gpsDays = [], gpsAlerts = [], alertsEver = null, gpsSub = null, gpsKey = '', dbRef = null;
 
     function names() { const out = {}; drivers.forEach(d => { if (!d.name) return; if (d.id) out[S.scPersonKey_(d.id)] = d.name; out[S.scPersonKey_(d.name)] = d.name; }); return out; }
@@ -94,6 +96,7 @@
       return out;
     }
     let unassigned = {};
+    const ratingsIn = (a, z) => ratings.filter(x => x.date >= a && x.date <= z);
     function period() {
       if (mode === 'week') return S.scWeekRange_(weekStart);
       if (mode === 'year') return { start: year + '-01-01', end: year + '-12-31' };
@@ -123,7 +126,7 @@
         const w = S.scWeekRange_(weekStart), end = w.end < yesterday ? w.end : yesterday;
         let list = [];
         for (let d = w.start; d <= end; d = S.scAddDays_(d, 1)) list = list.concat(days[d] || []);
-        const rows = w.start > yesterday ? [] : S.scScoreMonth_(list, S.scCallOffDays_(ex, w.start, end, s), s, names(), { alertsOn: alertsEver !== false || gpsAlerts.length > 0 });
+        const rows = w.start > yesterday ? [] : S.scScoreMonth_(list, S.scCallOffDays_(ex, w.start, end, s), s, names(), { alertsOn: alertsEver !== false || gpsAlerts.length > 0, ratings: ratingsIn(w.start, end) });
         return { rows, minDays: 99, summary: S.scSummary_(rows, s, 99), through: end < w.start ? w.start : end, days: Object.keys(days).sort(), unassigned: lost(w.start, end) };
       }
       const first = mode === 'year' ? 1 : month, last = mode === 'year' ? 12 : month, months = [];
@@ -133,7 +136,7 @@
         const end = range.end < yesterday ? range.end : yesterday;
         let list = [];
         for (let d = range.start; d <= end; d = S.scAddDays_(d, 1)) list = list.concat(days[d] || []);
-        months.push({ month: m, rows: S.scScoreMonth_(list, S.scCallOffDays_(ex, range.start, end, s), s, names(), { alertsOn: alertsEver !== false || gpsAlerts.length > 0 }) });
+        months.push({ month: m, rows: S.scScoreMonth_(list, S.scCallOffDays_(ex, range.start, end, s), s, names(), { alertsOn: alertsEver !== false || gpsAlerts.length > 0, ratings: ratingsIn(range.start, range.end) }) });
       }
       const rows = mode === 'year' ? S.scScoreYear_(months, s) : (months[0] ? months[0].rows : []);
       const minDays = mode === 'year' ? Math.round(s.monthMinDays * months.length / 2) : s.monthMinDays;
@@ -153,7 +156,7 @@
       const s = S.scSettings_(saved), edit = canManage();
       watchGps();
       document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
-      { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Rewards for clean days, points off for misses'; }
+      { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Rewards for perfect days, points off for misses'; }
       const k = document.getElementById('kpis'), bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
       if (mode === 'settings') {
         k.innerHTML = '';
@@ -177,9 +180,11 @@
           '<h2>Counts as a call-off</h2><div class="sc-reasons">' + CORE.REASONS.map(r => '<label><input type="checkbox" data-reason="' + r + '"' + (s.callOffReasons.indexOf(r) >= 0 ? ' checked' : '') + (edit ? '' : ' disabled') + '> ' + r.charAt(0) + r.slice(1).toLowerCase() + '</label>').join('') + '</div></section>' +
           '<section class="otr-card"><h2>Grades</h2><p><span class="sc g-A">A</span> ' + n('gradeA') + ' and up</p><p><span class="sc g-B">B</span> ' + n('gradeB') + ' and up</p><p><span class="sc g-C">C</span> ' + n('gradeC') + ' and up</p><p><span class="sc g-D">D</span> below</p>' +
           '<h2>Rewards</h2>' +
-          '<p><b>Clean day</b> ' + n('cleanDay') + ' points in each area for a day with no miss in it</p>' +
-          '<p><b>Streak</b> ' + n('streakBonus') + ' more points for every ' + n('streakDays') + ' clean days in a row in an area</p>' +
+          '<p><b>Perfect day</b> ' + n('cleanDay') + ' points in each area for a day with no miss in it</p>' +
+          '<p><b>Streak</b> ' + n('streakBonus') + ' more points for every ' + n('streakDays') + ' perfect days in a row in an area</p>' +
           '<p><b>Back early</b> ' + n('backEarly') + ' more points when back ' + n('backEarlyMinutes') + ' minutes or more before the expected return (not when they left early)</p>' +
+          '<h2>Truck cleanliness</h2><p><label><input type="checkbox" id="sc-clean-on"' + (s.cleanOn ? ' checked' : '') + (edit ? '' : ' disabled') + '> <b>On</b>: rated 1 to 5 on a driver\'s details, about once a month</label></p>' +
+          '<p><b>5</b> +' + n('clean5') + ' <b>4</b> +' + n('clean4') + ' <b>3</b> +' + n('clean3') + '</p><p><b>2</b> −' + n('clean2Off') + ' <b>1</b> −' + n('clean1Off') + ' points</p>' +
           '<h2>Driver of the Month</h2><p>Highest score, worked at least ' + n('monthMinDays') + ' days</p><button type="button" data-mode-go="month">Back to the scorecard</button></section></div>';
         foot.textContent = '';
         sheet.querySelectorAll('.sc-n').forEach(inp => { inp.onchange = () => {
@@ -190,6 +195,8 @@
           const list = [...sheet.querySelectorAll('[data-reason]:checked')].map(x => x.dataset.reason), before = saved.callOffReasons;
           saveOptimistic('saveScorecard', { callOffReasons: list }, () => { saved = Object.assign({}, saved, { callOffReasons: list }); }, () => { saved = Object.assign({}, saved, { callOffReasons: before }); }, render);
         }; });
+        { const c = sheet.querySelector('#sc-clean-on'); c.onchange = () => { const before = saved.cleanOn, v = c.checked ? 1 : 0;
+          saveOptimistic('saveScorecard', { key: 'cleanOn', value: v }, () => { saved = Object.assign({}, saved, { cleanOn: v }); }, () => { saved = Object.assign({}, saved, { cleanOn: before }); }, render); }; }
         sheet.querySelector('[data-mode-go]').onclick = () => { mode = 'month'; render(); };
         return;
       }
@@ -206,7 +213,8 @@
       // Joe 10/13 (later): the board is the driver alone: one grade per area we score and the overall score, added up over the
       // period. Everything else (trucks, routes, GPS miles, MPG, yard times, counts and each miss) is one click away on the driver.
       const clock = (m) => m == null ? '' : S.scClock_(m);
-      const AREAS = CORE.AREAS;
+      // Truck cleanliness has an On/Off switch on Settings.
+      const AREAS = CORE.AREAS.filter(a => a[0] !== 'cleanliness' || s.cleanOn);
       const facts = (r) => [r.truckList && r.truckList.length ? 'Truck' + (r.truckList.length > 1 ? 's ' : ' ') + r.truckList.map(escapeHtml).join(', ') : '', r.route ? 'Route ' + escapeHtml(r.route) : '',
         r.runDays + ' run' + (r.runDays === 1 ? '' : 's'), 'check-ins ' + (r.runDays - r.missedCheckins) + ' of ' + r.runDays,
         r.casesOut ? 'cases ' + r.casesOut.toLocaleString() + ' out / ' + r.casesIn.toLocaleString() + ' in' : 'cases not recorded',
@@ -218,16 +226,27 @@
         (r.leftEarly || r.backLate) ? 'left early ' + r.leftEarly + ', back late ' + r.backLate : '',
         r.yardOut != null || r.yardIn != null ? 'yard out ' + (clock(r.yardOut) || '–') + ', in ' + (clock(r.yardIn) || '–') : ''].filter(Boolean).join(' · ');
       const grade = (a) => a && a.grade ? '<span class="sc g-' + a.grade + '" title="' + a.score + ' (' + (a.points > 0 ? '+' : '') + a.points + ' points in ' + a.days + ' day' + (a.days === 1 ? '' : 's') + ')">' + a.grade + '</span>' : '<small>–</small>';
-      // What each area earned: clean days, streaks and early returns.
-      const earned = (r) => AREAS.map(a => { const o = r.areas && r.areas[a[0]]; return o && o.rewards ? a[1] + ' +' + o.rewards + ' (' + o.clean + ' clean' + (o.streaks ? ', ' + o.streaks + ' streak' + (o.streaks === 1 ? '' : 's') : '') + (o.extra ? ', back early +' + o.extra : '') + ')' : ''; }).filter(Boolean).join(' · ');
+      // Joe 10/13: a manager rates the driver's truck cleanliness 1 to 5 (with a date and a note) from the driver's details.
+      const rateBox = (r) => {
+        const past = ratings.filter(x => x.driverKey === r.driverKey).sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 3);
+        const hist = past.length ? 'Truck cleanliness: ' + past.map(x => x.rating + ' of 5 on ' + shortDate(x.date) + (x.note ? ' (' + escapeHtml(x.note) + ')' : '')).join(' · ') : 'Truck cleanliness: not rated yet';
+        if (!edit) return '<div class="sc-rate">' + hist + '</div>';
+        if (rateOpen !== r.driverKey) return '<div class="sc-rate">' + hist + ' <button type="button" class="sc-rate-open" data-rate="' + escapeHtml(r.driverKey) + '">Rate truck cleanliness</button></div>';
+        return '<div class="sc-rate sc-rate-form" data-driver="' + escapeHtml(r.driverKey) + '" data-name="' + escapeHtml(r.driver) + '" data-truck="' + escapeHtml(r.truck || '') + '"><b>Rate truck cleanliness</b> ' +
+          '<input type="date" class="sc-rate-date" value="' + today() + '"> ' + [1, 2, 3, 4, 5].map(v => '<button type="button" class="sc-star' + (rateValue === v ? ' on' : '') + '" data-v="' + v + '">' + v + '</button>').join('') +
+          ' <input type="text" class="sc-rate-note" maxlength="300" placeholder="Note (optional)"> <button type="button" class="primary sc-rate-save"' + (rateValue ? '' : ' disabled') + '>Save</button> <button type="button" class="sc-rate-cancel">Cancel</button>' +
+          '<small>1 = very dirty, 5 = spotless' + (r.truck ? ' · truck ' + escapeHtml(r.truck) : '') + '</small></div>';
+      };
+      // What each area earned: perfect days, streaks, early returns and good cleanliness ratings.
+      const earned = (r) => AREAS.map(a => { const o = r.areas && r.areas[a[0]]; return o && o.rewards ? a[1] + ' +' + o.rewards + ' (' + o.clean + ' perfect' + (o.streaks ? ', ' + o.streaks + ' streak' + (o.streaks === 1 ? '' : 's') : '') + (o.extra ? ', back early +' + o.extra : '') + ')' : ''; }).filter(Boolean).join(' · ');
       // Joe 10/13: one line on how the scoring works, above the board.
-      const how = '<p class="sc-how" id="sc-how"><b>How scoring works:</b> each area earns +' + s.cleanDay + ' for a clean day and +' + s.streakBonus + ' for every ' + s.streakDays + ' clean days in a row, and loses the Settings points for each miss; its grade goes by points per day worked (clean every day = 100; A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+). Overall is the average of the area grades.</p>';
-      sheet.innerHTML = how + '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:20%">' + AREAS.map(() => '<col style="width:9%">').join('') + '<col style="width:13%"></colgroup>' +
+      const how = '<p class="sc-how" id="sc-how"><b>How scoring works:</b> each area earns +' + s.cleanDay + ' for a perfect day (no miss in it) and +' + s.streakBonus + ' for every ' + s.streakDays + ' perfect days in a row, and loses the Settings points for each miss; its grade goes by points per day worked (perfect every day = 100; A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+). Overall is the average of the area grades.</p>';
+      sheet.innerHTML = how + '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:' + (100 - 4 - 10 - AREAS.length * 8.4).toFixed(1) + '%">' + AREAS.map(() => '<col style="width:8.4%">').join('') + '<col style="width:10%"></colgroup>' +
         '<thead><tr><th>#</th><th>Driver</th>' + AREAS.map(a => '<th>' + a[1] + '</th>').join('') + '<th>Overall</th></tr></thead><tbody>' +
         (b.rows.filter(r => r.runDays || r.callOffs).map(r => '<tr data-key="' + escapeHtml(r.driverKey) + '" class="' + (open === r.driverKey ? 'sc-open' : '') + '"><td>' + r.rank + '</td><td class="strong">' + escapeHtml(r.driver) + '</td>' +
           AREAS.map(a => '<td>' + grade(r.areas && r.areas[a[0]]) + '</td>').join('') +
           '<td><span class="sc g-' + r.grade + ' sc-overall">' + r.score + ' ' + r.grade + '</span></td></tr>' +
-          (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '"><div class="sc-facts">' + facts(r) + '</div>' + (earned(r) ? '<div class="sc-earned">Rewards: ' + earned(r) + ' · total ' + (r.points > 0 ? '+' : '') + r.points + ' points</div>' : '') + (r.misses && r.misses.length ? r.misses.map(m => '<div><b>' + shortDate(m.date) + '</b> ' + escapeHtml(m.what) + ' <span class="sc-pts">−' + m.points + '</span></div>').join('') : 'No misses.') + '</td></tr>' : '')).join('') ||
+          (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '"><div class="sc-facts">' + facts(r) + '</div>' + (s.cleanOn ? rateBox(r) : '') + (earned(r) ? '<div class="sc-earned">Rewards: ' + earned(r) + ' · total ' + (r.points > 0 ? '+' : '') + r.points + ' points</div>' : '') + (r.misses && r.misses.length ? r.misses.map(m => '<div><b>' + shortDate(m.date) + '</b> ' + escapeHtml(m.what) + ' <span class="sc-pts">−' + m.points + '</span></div>').join('') : 'No misses.') + '</td></tr>' : '')).join('') ||
           '<tr><td colspan="' + (AREAS.length + 3) + '" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>') + '</tbody></table>' +
         // Joe 10/13: an alert on a truck nobody was dispatched in is never dropped; a manager puts the driver on Daily Dispatch.
         (b.unassigned.length ? '<div id="unassigned" class="sc-lost"><h2>No driver dispatched</h2><p class="hint">These trucks had alerts on a day no driver was in them on Daily Dispatch. Put the driver in the truck on Daily Dispatch for that day and the alerts move to that driver.</p>' +
@@ -244,7 +263,20 @@
     }
 
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b) { mode = b.dataset.mode; open = ''; render(); } });
-    document.getElementById('sheet').addEventListener('click', e => { const tr = e.target.closest('tr[data-key]'); if (tr) { open = open === tr.dataset.key ? '' : tr.dataset.key; render(); } });
+    document.getElementById('sheet').addEventListener('click', async e => {
+      const op = e.target.closest('.sc-rate-open'); if (op) { rateOpen = op.dataset.rate; rateValue = 0; render(); return; }
+      const form = e.target.closest('.sc-rate-form');
+      if (form) {
+        const star = e.target.closest('.sc-star');
+        if (star) { rateValue = Number(star.dataset.v); form.querySelectorAll('.sc-star').forEach(b => b.classList.toggle('on', b === star)); form.querySelector('.sc-rate-save').disabled = false; return; }
+        if (e.target.closest('.sc-rate-cancel')) { rateOpen = ''; render(); return; }
+        if (e.target.closest('.sc-rate-save') && rateValue) {
+          const fields = { driverKey: form.dataset.driver, driver: form.dataset.name, truck: form.dataset.truck, date: form.querySelector('.sc-rate-date').value, rating: rateValue, note: form.querySelector('.sc-rate-note').value };
+          try { await save('rateTruckClean', fields); rateOpen = ''; rateValue = 0; render(); } catch (err) { showError('Could not save the rating (' + err.message + ').'); }
+        }
+        return;
+      }
+      const tr = e.target.closest('tr[data-key]'); if (tr) { open = open === tr.dataset.key ? '' : tr.dataset.key; render(); } });
     // The browser check jumps to a week with this.
     window.udScWeek = (d) => { weekStart = S.scWeekRange_(d).start; mode = 'week'; open = ''; render(); };
     window.udBack = () => { if (open) { open = ''; render(); return true; } if (mode !== 'month') { mode = 'month'; render(); return true; } return false; };
@@ -254,12 +286,13 @@
       dbRef = db;
       watchLists(user, render);
       onSnapshot(query(collection(db, 'gpsAlerts'), limit(1)), s => { alertsEver = !s.empty; render(); }, () => { alertsEver = false; render(); });
-      const NAMES = { runs: 'the dispatch runs', plantEvents: 'the plant check-ins', drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master' };
+      const NAMES = { runs: 'the dispatch runs', plantEvents: 'the plant check-ins', drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master', scorecardRatings: 'the truck cleanliness ratings' };
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + (NAMES[name] || name) + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.'));
       watch('runs', v => { runs = v; });
       watch('plantEvents', v => { events = v; });
       watch('drivers', v => { drivers = v; });
       watch('exceptions', v => { exceptions = v; });
+      watch('scorecardRatings', v => { ratings = v; });
       watch('routes', v => { routeMiles = {}; routeTimes = {}; L.DAYS.forEach(p => { routeMiles[p] = {}; routeTimes[p] = {}; });
         v.forEach(r => L.DAYS.forEach(p => { const d = r.days && r.days[p]; if (d && (d.dispatchTime != null || d.hours)) routeTimes[p][r.id] = { dispatchTime: d.dispatchTime, hours: d.hours }; })); v.forEach(r => L.DAYS.forEach(p => { if (r.days && r.days[p] && r.days[p].miles) routeMiles[p][r.id] = r.days[p].miles; })); });
       onSnapshot(doc(db, 'scorecard', 'settings'), s => { saved = s.exists() ? s.data() : {}; render(); }, e => showError('Could not read the scorecard settings (' + e.message + '). The scores use the standard settings until it loads; reload the page.'));

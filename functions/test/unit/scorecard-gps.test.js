@@ -106,9 +106,9 @@ test('Joe 10/13: one grade per area and the overall score; each area is 100 less
   const days = S.scBuildDay_(DAY, [run({ casesOut: 500, plantCaseReturn: 497 })], [dvir('855', 'SAL')], {});
   const m = S.scMatchGps_(DAY, days, [], [{ tag: '223893', at: '2026-10-14T12:00:00Z', type: 'SPEEDING' }, { tag: '223893', at: '2026-10-14T13:00:00Z', type: 'HARSH_ACCEL' }]);
   const r = S.scScoreMonth_(m.records, [], S.scSettings_({}), {})[0];
-  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'time']);
+  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'time', 'cleanliness']);
   assert.deepEqual(Object.fromEntries(Object.entries(r.areas).map(([k, v]) => [k, v.points])),
-    { checkin: -4, cases: -3, inspection: 1, attendance: 1, speeding: -2, hardStops: -1, idling: 1, time: 0 });
+    { checkin: -4, cases: -3, inspection: 1, attendance: 1, speeding: -2, hardStops: -1, idling: 1, time: 0, cleanliness: 0 });
   assert.equal(r.areas.time.score, null, 'no dispatch time: Time is not graded');
   assert.equal(r.points, -7, 'the day\'s points add up');
   // One day: 80 + 20 x points per day, at most 100.
@@ -164,4 +164,18 @@ test('Joe 10/13 rewards: clean days earn 1, five in a row earn 2 more; back earl
   assert.deepEqual([e.leftEarly, e.areas.time.extra || 0, e.areas.time.points], [1, 0, -1]);
   // Until Fleet alerts come in, driving areas are not graded (no free rewards).
   assert.equal(S.scScoreMonth_(recs, [], s, {}, { alertsOn: false })[0].areas.speeding.score, null);
+});
+
+test('Joe 10/13 truck cleanliness: rated 1 to 5 about once a month; counts only when rated; has an On/Off switch', () => {
+  const s = S.scSettings_({});
+  assert.deepEqual([s.cleanOn, s.clean5, s.clean4, s.clean3, s.clean2Off, s.clean1Off], [1, 2, 1, 0, 1, 2]);
+  const recs = S.scBuildDay_(DAY, [run({})], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
+  const none = S.scScoreMonth_(recs, [], s, {})[0];
+  assert.equal(none.areas.cleanliness.score, null, 'no rating this period: no grade, the overall is not touched');
+  const rated = (rating, settings) => S.scScoreMonth_(recs, [], settings || s, {}, { ratings: [{ driverKey: 'D1', date: DAY, rating, truck: '223893', note: 'cab full of trash' }] })[0];
+  assert.deepEqual([5, 4, 3, 2, 1].map(n => rated(n).areas.cleanliness.score), [100, 90, 80, 70, 60]);
+  assert.deepEqual([rated(5).areas.cleanliness.points, rated(1).areas.cleanliness.points], [2, -2]);
+  assert.match(rated(1).misses.map(m => m.what).join(' | '), /Truck cleanliness 1 of 5 \(truck 223893\): cab full of trash/);
+  assert.notEqual(rated(1).score, none.score, 'a rating moves the overall');
+  assert.equal(rated(1, S.scSettings_({ cleanOn: 0 })).areas.cleanliness.score, null, 'switched off: not graded');
 });

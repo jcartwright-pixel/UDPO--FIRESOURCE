@@ -110,7 +110,7 @@ const ACTION_RIGHT = Object.freeze({
   reorderLoads: 'dispatch.override', reorderWeek: 'dispatch.override', clearConflict: 'dispatch.write', saveCheckIn: 'dispatch.write', setDriverTruck: 'drivers.write', setDriverAvailable: 'drivers.status.write',
   setDriverRelief: 'drivers.write', saveDriver: 'drivers.write', removeDrivers: 'drivers.write', saveDriverException: 'drivers.status.write', saveVacation: 'vacations.write',
   publishWeek: 'dispatch.publish', resetWeek: 'dispatch.publish', saveRoute: 'routes.write', reorderRouteDay: 'routes.write', updateIssue: 'issues.write',
-  setWeekReason: 'dispatch.write', saveDriverTemplate: 'drivers.write', saveOtr: 'otr.write', saveScorecard: 'drivers.write', saveOpsAssignment: 'drivers.write',
+  setWeekReason: 'dispatch.write', saveDriverTemplate: 'drivers.write', saveOtr: 'otr.write', saveScorecard: 'drivers.write', rateTruckClean: 'drivers.write', saveOpsAssignment: 'drivers.write',
   savePlantLoad: 'plant.loading.write', reorderPlantLoads: 'plant.loading.write', addPickup: 'customerPickup.write', completePickup: 'customerPickup.write', saveUnloading: 'plant.unloading.write', addReturn: 'plant.unloading.write',
   completeWash: 'plant.washing.complete', savePlantSchedule: 'operations.write', saveYardCheck: 'plant.write', saveQualityCheck: 'plant.write', saveShiftNote: 'plant.write',
   saveTemperatureCheck: 'plant.write', sendPlantReport: 'plant.report.send', saveMachineProducts: 'plant.settings.write', saveProductSetup: 'plant.settings.write', saveProductUpload: 'plant.settings.write', saveProductSheet: 'plant.settings.write', savePlantShifts: 'plant.settings.write', sendToGarage: 'issues.write',

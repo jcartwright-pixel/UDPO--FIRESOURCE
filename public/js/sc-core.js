@@ -37,14 +37,18 @@ var SC_CORE = Object.freeze({
     // Joe 10/13 rewards ("the better they do, the better the reward on everything"): every area earns cleanDay points for a
     // clean day and streakBonus for every streakDays clean days in a row; back backEarlyMinutes or more before the expected
     // return (without leaving early) earns backEarly more.
-    cleanDay: 1, streakDays: 5, streakBonus: 2, backEarly: 1, backEarlyMinutes: 15
+    cleanDay: 1, streakDays: 5, streakBonus: 2, backEarly: 1, backEarlyMinutes: 15,
+    // Joe 10/13 truck cleanliness: a manager rates the driver's truck 1 to 5 (about once a month). 5 = +2, 4 = +1, 3 = 0,
+    // 2 = -1, 1 = -2 to start (the two "off" numbers are points taken off). cleanOn 1 = on, 0 = off.
+    cleanOn: 1, clean5: 2, clean4: 1, clean3: 0, clean2Off: 1, clean1Off: 2
   }),
   NUMBER_SETTINGS: Object.freeze(['checkinMiss', 'lostCase', 'lostCaseDayCap', 'inspectionDefect', 'inspectionMissing', 'callOff',
-    'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly', 'backEarlyMinutes']),
+    'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly', 'backEarlyMinutes',
+    'cleanOn', 'clean5', 'clean4', 'clean3', 'clean2Off', 'clean1Off']),
   GPS_KINDS: Object.freeze(['speeding', 'hardBrake', 'hardAccel', 'idle']),
   // Joe 10/13 (later): the board shows one grade per area and the overall score; the details are one click away.
   AREAS: Object.freeze([['checkin', 'Check-in'], ['cases', 'Cases'], ['inspection', 'Inspections'], ['attendance', 'Attendance'],
-    ['speeding', 'Speeding'], ['hardStops', 'Hard Stops'], ['idling', 'Idling'], ['time', 'Time']]),
+    ['speeding', 'Speeding'], ['hardStops', 'Hard Stops'], ['idling', 'Idling'], ['time', 'Time'], ['cleanliness', 'Truck Clean']]),
   GPS_AREA: Object.freeze({ speeding: 'speeding', hardBrake: 'hardStops', hardAccel: 'hardStops', idle: 'idling' }),
   GPS_WORDS: Object.freeze({ speeding: 'Speeding', hardBrake: 'Hard stop', hardAccel: 'Hard start', idle: 'Idling' }),
   NOT_A_DRIVER: /^(|open|tba|tbd|none|n\/a|na|needs driver|.*needs driver.*|vacation.*|off)$/i
@@ -322,6 +326,15 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
     scored(r, c.date, 'attendance');
     r.misses.push({date: c.date, what: 'Call-off (' + c.reason.toLowerCase() + ')', points: s.callOff, area: 'attendance'});
   });
+  // Truck cleanliness ratings for the period [{driverKey, date, rating 1-5, truck, note}], when the area is on.
+  if (s.cleanOn) (opts.ratings || []).forEach(function (x) {
+    var n = Math.round(Number(x.rating));
+    if (!x.driverKey || !(n >= 1 && n <= 5) || !by[x.driverKey]) return;
+    var r = by[x.driverKey], pts = scCleanPoints_(n, s), what = 'Truck cleanliness ' + n + ' of 5' + (x.truck ? ' (truck ' + x.truck + ')' : '') + (x.note ? ': ' + x.note : '');
+    r.cleanRatings = (r.cleanRatings || []).concat([{date: x.date, rating: n, points: pts}]);
+    if (pts < 0) r.misses.push({date: x.date, what: what, points: -pts, area: 'cleanliness'});
+    else r.rewards.push({date: x.date, what: what, points: pts, area: 'cleanliness'});
+  });
   var rows = Object.keys(by).map(function (k) {
     var r = by[k];
     r.route = Object.keys(r.routes).sort(function (a, b) { return r.routes[b] - r.routes[a] || (a < b ? -1 : 1); })[0] || '';
@@ -398,12 +411,22 @@ function scFinishGps_(r) {
  * 10 days is 90). An area with no days to score shows no grade. The overall score is the average of the scored areas.
  */
 function scAreaScore_(points, days) { return days ? Math.max(0, Math.min(100, Math.round(80 + 20 * points / days))) : null; }
+function scCleanPoints_(n, s) { return n === 5 ? s.clean5 : n === 4 ? s.clean4 : n === 3 ? s.clean3 : n === 2 ? -s.clean2Off : -s.clean1Off; }
 function scAreas_(r, s) {
   var out = {}, missBy = {};
   (r.misses || []).forEach(function (m) { var k = m.area + '|' + m.date; missBy[k] = (missBy[k] || 0) + (m.points || 0); });
   var dates = Object.keys(r.scored || {}).sort();
   SC_CORE.AREAS.forEach(function (a) {
     var k = a[0], o = {days: 0, clean: 0, streaks: 0, rewards: 0, lost: 0}, run = 0;
+    // Truck cleanliness counts only its ratings: 80 + 10 x points per rating (5 = 100, 4 = 90, 3 = 80, 2 = 70, 1 = 60 to start).
+    if (k === 'cleanliness') {
+      (r.cleanRatings || []).forEach(function (x) { o.days++; if (x.points >= 0) o.rewards += x.points; else o.lost -= x.points; });
+      o.ratings = o.days; o.points = o.rewards - o.lost;
+      o.score = o.days ? Math.max(0, Math.min(100, Math.round(80 + 10 * o.points / o.days))) : null;
+      o.grade = o.score == null ? '' : scGrade_(o.score, s);
+      out[k] = o;
+      return;
+    }
     dates.forEach(function (d) {
       if (!r.scored[d][k]) return;
       o.days++;
@@ -486,5 +509,5 @@ function scSummary_(rows, settings, minDays) {
     leader: leader ? leader.driver : ''};
 }
 
-  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scAreaScore_: scAreaScore_, scMinutesOf_: scMinutesOf_, scHoursOf_: scHoursOf_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_ };
+  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scCleanPoints_: scCleanPoints_, scAreaScore_: scAreaScore_, scMinutesOf_: scMinutesOf_, scHoursOf_: scHoursOf_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_ };
 });

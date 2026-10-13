@@ -70,6 +70,9 @@ async function seed(d) {
   alert('2026-10-05', '223898', 7, 45, 'HARSH_ACCEL');
   alert('2026-10-08', '229001', 13, 20, 'SPEEDING', { speedMph: 66, limitMph: 45 });
   alert('2026-10-08', '229001', 13, 31, 'HARSH_BRAKING');
+  // Truck cleanliness, rated once this month: HALL's truck spotless (5), DIAZ's dirty (2).
+  b.set(d.collection('scorecardRatings').doc('DRV_S_ADAMS_2026-10-09'), { kind: 'cleanliness', driverKey: 'DRV_S_ADAMS', driver: 'HALL, PAT', date: '2026-10-09', rating: 5, truck: '223893', note: '' });
+  b.set(d.collection('scorecardRatings').doc('DRV_S_DIAZ_2026-10-09'), { kind: 'cleanliness', driverKey: 'DRV_S_DIAZ', driver: 'DIAZ, RAY', date: '2026-10-09', rating: 2, truck: '223896', note: 'trash in the cab' });
   await b.commit();
 }
 
@@ -88,13 +91,15 @@ async function seed(d) {
       if (BEFORE) { await sc.close(); continue; }
       // Joe 10/13 (later): the driver alone, one grade per area we score, then the overall score.
       assert.deepEqual(await sc.$$eval('table.sc-board thead th', t => t.map(x => x.textContent.trim())),
-        ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Time', 'Overall']);
+        ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Time', 'Truck Clean', 'Overall']);
       const ray = await sc.$eval('tr[data-key="DRV_S_DIAZ"]', tr => [...tr.cells].map(c => c.textContent.trim()));
       assert.equal(ray[1], 'DIAZ, RAY', 'no truck or route on the board');
       // Joe 10/13 rewards, 10 days: check-in 7 clean, no 5 in a row, 3 missed -12 = -5 -> 70 (D); speeding 8 clean, one
       // streak +2, 2 alerts -4 = 6 -> 92 (B); hard stops 8 clean, 2 hard stops -4 = 4 -> 88 (B); the rest clean (100).
-      assert.deepEqual(ray.slice(2), ['D', 'A', 'A', 'A', 'B', 'B', 'A', 'A', '94 A'], 'grades by points per day; overall = average of the areas');
-      assert.match(await sc.textContent('#sc-how'), /How scoring works: each area earns \+1 for a clean day and \+2 for every 5 clean days in a row/);
+      // Truck cleanliness 2 of 5 -> 70 (D). Overall (70+100+100+100+92+88+100+100+70)/9 = 91 (B).
+      assert.deepEqual(ray.slice(2), ['D', 'A', 'A', 'A', 'B', 'B', 'A', 'A', 'D', '91 B'], 'grades by points per day; overall = average of the areas');
+      assert.equal(await sc.$eval('tr[data-key="DRV_S_BAKER"] td:nth-child(11)', td => td.textContent.trim()), '–', 'not rated this month: no grade');
+      assert.match(await sc.textContent('#sc-how'), /How scoring works: each area earns \+1 for a perfect day \(no miss in it\) and \+2 for every 5 perfect days in a row/);
       // Joe 10/13 Time grade: left too early (EVANS, 10 days) and back too late (FOX, 10 days) each cost 1 a day: -10 -> 60 (D).
       assert.equal(await sc.$eval('tr[data-key="DRV_S_EVANS"] td:nth-child(10)', td => td.textContent.trim()), 'D');
       assert.equal(await sc.$eval('tr[data-key="DRV_S_FOX"] td:nth-child(10)', td => td.textContent.trim()), 'D');
@@ -109,7 +114,16 @@ async function seed(d) {
       await sc.waitForSelector('tr.sc-misses');
       assert.match(await sc.textContent('tr.sc-misses'), /Speeding \(71 mph in a 55, 9:14 AM, truck 223896, US-40 W\)\s*−2/);
       assert.match(await sc.textContent('.sc-facts'), /Truck 223896 · Route 858[\s\S]*2 speeding, 2 hard stops[\s\S]*GPS miles[\s\S]*MPG 6\.8[\s\S]*yard out \d+:\d\d AM, in \d+:\d\d PM/, 'the GPS details are one click away');
+      assert.match(await sc.textContent('.sc-rate'), /Truck cleanliness: 2 of 5 on 10-9-26 \(trash in the cab\)/);
       if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-driver-misses-' + w + '.png') });
+      // A manager rates the truck from the details: pick 1 to 5 and Save comes on (the save itself: scorecard-rating.test.js).
+      await sc.click('.sc-rate-open');
+      await sc.waitForSelector('.sc-rate-form');
+      assert.equal(await sc.$eval('.sc-rate-save', b => b.disabled), true);
+      await sc.click('.sc-star[data-v="4"]');
+      assert.equal(await sc.$eval('.sc-rate-save', b => b.disabled), false);
+      if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-rate-cleanliness-' + w + '.png') });
+      await sc.click('.sc-rate-cancel');
       // Week view: Sunday to Saturday.
       await sc.click('.tabs [data-mode="week"]');
       await sc.waitForSelector('.sc-board');
