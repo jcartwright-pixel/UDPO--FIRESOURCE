@@ -1159,12 +1159,12 @@ async function noScroll(page) {
     // Joe 10/10: Home is the old app's launcher, one big picture per side; each side's menu lists only its own screens.
     // Joe 10/11: six cards after picking a plant: Plant Distribution, Plant Production and Plant Maintenance (both Under
     // Construction), Route Distribution, Fleet & Maintenance and Reports. Five carry pictures; Reports has a drawn icon.
-    // Joe 10/12: a seventh, Safety Walkthrough, next to Reports, with a drawn icon too.
-    const SIX = ['Plant Distribution', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports', 'Safety Walkthrough'];
+    // Joe 10/12: a seventh, Safety Walkthrough, next to Reports, with a drawn icon too. Joe 10/13: an eighth, Inventory (its box picture), after the plant's own three.
+    const SIX = ['Plant Distribution', 'Plant Production', 'Plant Maintenance', 'Inventory', 'Route Distribution', 'Fleet & Maintenance', 'Reports', 'Safety Walkthrough'];
     const lp = await openPage(browser, 1920, 950, '/index.html?testEmail=manager.test@uniteddairy.com');
     await lp.waitForSelector('.launch-card');
     assert.deepEqual(await lp.$$eval('.launch-card strong', s => s.map(x => x.textContent)), SIX);
-    await lp.waitForFunction(() => [...document.querySelectorAll('.launch-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 5, null, { timeout: 10000 });
+    await lp.waitForFunction(() => [...document.querySelectorAll('.launch-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 6, null, { timeout: 10000 });
     assert.equal(await lp.$$eval('.launch-card[data-side="reports"] svg.launch-icon', s => s.length), 1, 'Reports shows its icon');
     assert.equal(await lp.$('.sidemenu .side-sec'), null, 'Home lists the sides, not every screen');
     assert.deepEqual(await lp.$$eval('.sidemenu a[data-side]', a => a.map(x => x.textContent.trim())), SIX);

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Receiving Log · New Plant Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/scan.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+  <script src="js/scan-rules.js"></script>
+</head>
+<body class="fill issues-page inv-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Receiving Log</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Inventory · <span id="plant-name"></span></span><h1>Receiving Log</h1></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Scanned in on the Boxing station's Receiving tab</span></div>
+      <div class="actions in-head">
+        <button type="button" id="items-open">Received Items</button>
+        <button type="button" id="print">Print</button>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="actions inv-filters">
+        <div class="chips" id="periods"></div>
+        <span class="spacer"></span>
+        <input type="search" id="search" placeholder="Find an item, lot or PO" aria-label="Find an item, lot or PO">
+        <select id="supplier" aria-label="Supplier"></select>
+      </div>
+      <div class="sheet scroll-list">
+        <table class="issues inv-log">
+          <colgroup><col style="width:7%"><col style="width:7%"><col style="width:15%"><col style="width:6%"><col style="width:20%"><col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:10%"></colgroup>
+          <thead><tr><th>Date</th><th>Time</th><th>Supplier</th><th>PO</th><th>Item</th><th>Lot</th><th>Made</th><th>Best by</th><th class="num">Cases</th><th>Temp</th><th>Received by</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </div>
+
+  <div class="modal-back" id="items-back" hidden></div>
+  <section class="modal wide-modal inv-items" id="items" role="dialog" aria-modal="true" aria-labelledby="items-title" hidden>
+    <h2 id="items-title">Received Items</h2>
+    <p class="inv-help">What the plant receives. A barcode scanned for the first time is named on the tablet and added here. Change a name and it saves when you leave the box.</p>
+    <div id="item-list"></div>
+    <div class="modal-actions"><button type="button" data-close>Close</button></div>
+  </section>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goLiveNote, save } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { plantFor } from './js/pmaint.js';
+
+    // Receiving Log (Joe 10/13, mock-up E): every scan of every delivery, newest first, searchable by item, lot or PO, so a
+    // recall can be answered: who brought lot X in, when, and how much. The scans are made on the Boxing station's Receiving
+    // tab (receivingScans); the delivery's temperature is the one typed on its card (the Scheduler's Receiving load).
+    const L = window.UDLogic, U = window.UDPlant, S = window.UDScan;
+    const params = new URLSearchParams(location.search);
+    const PERIODS = [['7', '7 days'], ['30', '30 days'], ['90', '90 days'], ['365', 'Year']];
+    let plant = params.get('plant') || '', period = '30', search = '', supplier = '', person = null, app = {}, db = null;
+    let scans = null, items = [], deliveries = {}, stops = [];
+    const today = () => L.operatingDay(new Date());
+    const timeOf = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : ''; };
+    const itemName = (l) => { const it = l.itemId && items.find(i => i.id === l.itemId); return it ? it.name : l.itemName || ''; };
+    const who = (l) => l.station || String(l.by || '').replace(/^station:/, '').split('@')[0];
+    const canEdit = () => L.hasRole(person, L.REORDER_ROLES);
+
+    function render() {
+      const pl = plantFor(person, plant);
+      if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
+      document.getElementById('plant-name').textContent = pl.name;
+      const st = L.screenState(app, 'plant');
+      goLiveNote(st.live && st.owner !== 'new');
+      document.getElementById('mode-text').textContent = st.live ? 'LIVE' : 'TEST COPY';
+      document.getElementById('periods').innerHTML = PERIODS.map(([k, label]) => '<button type="button" data-period="' + k + '" class="' + (period === k ? 'on' : '') + '">' + label + '</button>').join('');
+      const mine = (scans || []).filter(l => l.status !== 'REMOVED' && (l.facilityId || 'fac_uniontown') === plant);
+      const sups = [...new Set(mine.map(l => l.supplier).filter(Boolean))].sort();
+      const pick = document.getElementById('supplier');
+      pick.innerHTML = '<option value="">All suppliers</option>' + sups.map(s => '<option' + (s === supplier ? ' selected' : '') + '>' + escapeHtml(s) + '</option>').join('');
+      const q = search.toUpperCase();
+      const list = mine.filter(l => (!supplier || l.supplier === supplier) &&
+        (!q || [itemName(l), l.lot, l.po, l.supplier, S.shownCode(l), l.sscc].join(' ').toUpperCase().indexOf(q) >= 0))
+        .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+      document.getElementById('rows').innerHTML = list.map(l => {
+        const name = itemName(l), d = deliveries[l.deliveryId], temp = d && d.work && d.work.temperature ? d.work.temperature + ' °F' : '—';
+        return '<tr' + (name ? '' : ' class="review"') + '><td>' + escapeHtml(shortDate(l.date)) + '</td><td>' + escapeHtml(timeOf(l.at)) + '</td><td>' + escapeHtml(l.supplier || '') + '</td>' +
+          '<td>' + escapeHtml(l.po || '—') + '</td><td class="strong">' + (name ? escapeHtml(name) : 'Not named yet<small>' + escapeHtml(S.shownCode(l)) + '</small>') + (l.sscc ? '<small>Pallet ' + escapeHtml(l.sscc) + '</small>' : '') + '</td>' +
+          '<td>' + escapeHtml(l.lot || '—') + '</td><td>' + escapeHtml(S.shortDate(l.made) || '—') + '</td><td>' + escapeHtml(S.shortDate(l.bestBy) || '—') + '</td>' +
+          '<td class="num strong">' + escapeHtml(l.count) + '</td><td>' + escapeHtml(temp) + '</td><td>' + escapeHtml(who(l)) + '</td></tr>';
+      }).join('') || '<tr><td colspan="11" class="empty">' + (!scans ? 'Loading the Receiving Log&hellip;' : mine.length ? 'No scans match.' : 'Nothing scanned in yet. On the Boxing station\'s Receiving tab, start a delivery and scan its labels.') + '</td></tr>';
+      const cases = list.reduce((n, l) => n + (Number(l.count) || 0), 0);
+      document.getElementById('foot').textContent = list.length + ' scan' + (list.length === 1 ? '' : 's') + ' · ' + cases + ' case' + (cases === 1 ? '' : 's') + '. Shaded rows: a barcode not named yet.';
+      document.getElementById('items-open').hidden = !canEdit();
+      renderItems();
+    }
+
+    function renderItems() {
+      const box = document.getElementById('item-list');
+      if (document.getElementById('items').hidden) return;
+      // Not while a name is being typed (a save elsewhere would redraw the box away).
+      const a = document.activeElement;
+      if (a && a.matches && a.matches('#item-list [data-item]')) return;
+      const mine = items.filter(i => (i.facilityId || 'fac_uniontown') === plant).sort((a, b) => a.name.localeCompare(b.name));
+      box.innerHTML = mine.length ? '<table class="issues inv-item-table"><thead><tr><th>Item</th><th>Barcodes</th><th></th></tr></thead><tbody>' + mine.map(i =>
+        '<tr><td><input class="inv-name" data-item="' + escapeHtml(i.id) + '" value="' + escapeHtml(i.name) + '" aria-label="Name of ' + escapeHtml(i.name) + '"></td><td>' + (i.barcodes || []).map(b => escapeHtml(b.indexOf('TEXT:') === 0 ? b.slice(5) : S.shownCode({ gtin: b }))).join('<br>') + '</td>' +
+        '<td class="inv-item-acts"><button type="button" data-remove="' + escapeHtml(i.id) + '">Remove</button></td></tr>').join('') + '</tbody></table>'
+        : '<p class="inv-help">No items yet.</p>';
+    }
+
+    document.getElementById('periods').addEventListener('click', e => { const b = e.target.closest('[data-period]'); if (b && b.dataset.period !== period) { period = b.dataset.period; follow(); } });
+    document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
+    document.getElementById('supplier').addEventListener('change', e => { supplier = e.target.value; render(); });
+    document.getElementById('print').addEventListener('click', () => window.print());
+    const items$ = document.getElementById('items'), back$ = document.getElementById('items-back');
+    const closeItems = () => { items$.hidden = true; back$.hidden = true; };
+    document.getElementById('items-open').addEventListener('click', () => { items$.hidden = false; back$.hidden = false; renderItems(); });
+    back$.addEventListener('click', closeItems);
+    // A name saves when its box is left (Joe: no Save buttons); Remove needs a second press.
+    items$.addEventListener('change', async e => {
+      const box = e.target.closest('[data-item]'), it = box && items.find(i => i.id === box.dataset.item), name = box ? box.value.trim() : '';
+      if (!it || !name || name === it.name) return;
+      try { await save('saveReceivingItem', { op: 'edit', itemId: it.id, name }); showError(''); } catch (err) { box.value = it.name; showError(err.message || String(err)); }
+    });
+    items$.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-item]')) e.target.blur(); });
+    items$.addEventListener('click', async e => {
+      if (e.target.closest('[data-close]')) { closeItems(); return; }
+      const rem = e.target.closest('[data-remove]'), it = rem && items.find(i => i.id === rem.dataset.remove);
+      if (!it) return;
+      if (rem.dataset.armed !== '1') { rem.dataset.armed = '1'; rem.textContent = 'Press again to remove'; rem.classList.add('armed'); return; }
+      try { await save('saveReceivingItem', { op: 'remove', itemId: it.id }); showError(''); } catch (err) { showError(err.message || String(err)); }
+    });
+    window.udBack = () => { if (!items$.hidden) { closeItems(); return true; } if (search || supplier) { search = ''; supplier = ''; document.getElementById('search').value = ''; render(); return true; } return false; };
+
+    function follow() {
+      stops.forEach(u => u());
+      scans = null;
+      render();
+      const since = L.addDays(today(), -Number(period));
+      const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
+      stops = [
+        onSnapshot(query(collection(db, 'receivingScans'), where('date', '>=', since)), s => { scans = s.docs.map(d => d.data()); render(); }, fail('the Receiving Log')),
+        onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.LOAD_TYPE.RECEIVING), where('date', '>=', since)), s => {
+          deliveries = {};
+          U.scheduleEntries(s.docs.map(d => d.data()), 'RECEIVING').forEach(x => { deliveries[x.id] = x; });
+          render();
+        }, () => {}),
+        onSnapshot(query(collection(db, 'receivingItems'), where('status', '==', 'ACTIVE')), s => { items = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the item list'))
+      ];
+    }
+    requireSignIn(async (user) => {
+      ({ db } = await start());
+      let first = true;
+      onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; if (first) { first = false; follow(); } else render(); });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+    });
+  </script>
+</body>
+</html>

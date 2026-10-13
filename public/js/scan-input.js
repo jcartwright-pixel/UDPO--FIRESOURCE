@@ -22,7 +22,9 @@ export function beep(good = true) {
   } catch (e) { /* no sound is fine */ }
 }
 
-// box: the scan box (an <input>). Returns a stop function.
+// box: the scan box (an <input>), optional: any box marked data-scan-box (a screen that redraws makes a new one each time)
+// is a scan box. Returns a stop function.
+const isBox = (el) => !!(el && el.hasAttribute && el.hasAttribute('data-scan-box'));
 export function listenForScans({ box, onScan }) {
   let buffer = '', last = 0;
   const send = (raw) => { const s = String(raw || '').replace(/[\r\n]+$/, ''); if (s.trim().length >= MIN_LENGTH) onScan(s); };
@@ -37,16 +39,18 @@ export function listenForScans({ box, onScan }) {
     const now = Date.now();
     // Some scanners type the GS1 separator as Ctrl+]; keep it as the real separator.
     const ch = e.ctrlKey && (e.key === ']' || e.code === 'BracketRight') ? GS : e.key.length === 1 && !e.ctrlKey && !e.metaKey ? e.key : '';
-    if (box && e.target === box) {
-      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); send(box.value); box.value = ''; }
-      else if (ch === GS) { e.preventDefault(); box.value += GS; }
+    if (isBox(e.target)) {
+      const el = e.target;
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); const v = el.value; el.value = ''; send(v); }
+      else if (ch === GS) { e.preventDefault(); el.value += GS; }
       return;
     }
     if (typing(e.target)) { buffer = ''; return; }
     if (now - last > FAST_MS) buffer = '';
     last = now;
     if (e.key === 'Enter' || e.key === 'Tab') {
-      if (buffer.length >= MIN_LENGTH) { e.preventDefault(); send(buffer); }
+      // stopPropagation: the Enter that ends a scan must not also press whatever has the focus (a card's header).
+      if (buffer.length >= MIN_LENGTH) { e.preventDefault(); e.stopPropagation(); send(buffer); }
       buffer = '';
     } else if (ch) buffer += ch;
   };

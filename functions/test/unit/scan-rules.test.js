@@ -83,3 +83,15 @@ test('dates: two-digit years and Joe\'s 10-8-26 format', () => {
   assert.equal(S.shortDate('2026-10-08'), '10-8-26');
   assert.equal(S.shortDate(''), '');
 });
+
+test('the key an item is known by, and the code a person reads', () => {
+  const upc = S.parseScan('036000291452', NOW);
+  assert.equal(S.barcodeKey(upc), '00036000291452');
+  assert.equal(S.shownCode(upc), '036000291452');
+  assert.equal(S.shownCode(S.parseScan('4006381333931', NOW)), '4006381333931');
+  assert.equal(S.shownCode(S.parseScan('10614141000415', NOW)), '10614141000415');
+  assert.equal(S.barcodeKey(S.parseScan('l77  x', NOW)), 'TEXT:L77 X');
+  assert.equal(S.shownCode(S.parseScan('L77', NOW)), 'L77');
+  assert.equal(S.shownCode(S.parseScan('96385074', NOW)), '96385074', 'an 8-digit EAN as printed');
+  assert.equal(S.barcodeKey(null), '');
+});

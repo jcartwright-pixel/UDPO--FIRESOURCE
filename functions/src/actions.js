@@ -26,6 +26,7 @@ const RIGHTS = require('./rights');
 const ROLL = require('./weekroll');
 const STATIONS = require('./stations');
 const BOARD = require('./board-rules');
+const RECV = require('./receiving');
 
 const C = M.COLLECTIONS;
 
@@ -111,6 +112,9 @@ const ACTIONS = Object.freeze({
   makeWorkOrder: { roles: L.SAVE_ROLES, screen: 'plant' },
   savePmTask: { roles: REORDER_ROLES, screen: 'plant' },
   sendPmToMaintenance: { roles: REORDER_ROLES, screen: 'plant' },
+  // Receiving scan-in (receiving.js): each scan on a delivery, and the list of what the plant receives.
+  saveReceivingScan: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  saveReceivingItem: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
   sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
   // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js). App only (logic.js APP_ONLY).
@@ -398,6 +402,8 @@ function validate(input) {
   if (action === 'saveExtinguisher') return Object.assign(out, SAFE.validateExtinguisher(input, SaveError));
   if (action === 'saveFireSystemCheck') return Object.assign(out, SAFE.validateFireCheck(input, SaveError));
   if (action === 'saveFireSystem') return Object.assign(out, SAFE.validateFireSystem(input, SaveError));
+  if (action === 'saveReceivingScan') return Object.assign(out, RECV.validateReceiving(input, SaveError));
+  if (action === 'saveReceivingItem') return Object.assign(out, RECV.validateReceivingItem(input, SaveError));
   if (action === 'saveSafetyChecklist') return Object.assign(out, SAFE.validateChecklist(input, SaveError));
   if (action === 'saveLocationAreas') return Object.assign(out, SAFE.validateLocations(input, SaveError));
   if (action === 'saveMachine') return Object.assign(out, PMAINT.validateMachine(input, SaveError));
@@ -717,6 +723,8 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'makeWorkOrder') return PMAINT.makeWorkOrder(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePmTask') return PMAINT.savePmTask(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'sendPmToMaintenance') return PMAINT.sendPmToMaintenance(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveReceivingScan') return RECV.saveReceiving(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveReceivingItem') return RECV.saveReceivingItem(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);

@@ -5,3 +5,64 @@
 .scan-camera-tip { position: absolute; top: 16px; left: 16px; right: 16px; margin: 0; text-align: center; color: #fff; font-size: 20px; font-weight: 700; text-shadow: 0 1px 3px #000; }
 .scan-camera-close { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); min-height: 56px; min-width: 180px; border: 0; border-radius: 12px;
   background: #fff; color: #0b3d6b; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
+
+/* Receiving scan-in on the Boxing station's delivery card (Joe 10/13, mock-up A "Scan list"). */
+.rv-block { margin: 12px 0 4px; }
+.rv-scan { display: flex; gap: 10px; align-items: stretch; }
+.rv-box { flex: 1; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 16px; border: 3px solid #2d8a4e; border-radius: 12px; background: #f2fbf5; cursor: text; }
+.rv-box input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 20px; font-weight: 700; color: #1d5c34; outline: none; }
+.rv-box input::placeholder { color: #1d5c34; opacity: 1; }
+.rv-box:focus-within { box-shadow: 0 0 0 3px #2ea55a55; }
+.rv-dot { flex: none; width: 16px; height: 16px; border-radius: 50%; background: #2ea55a; box-shadow: 0 0 0 5px #2ea55a33; }
+.sw-btn.rv-cam { min-height: 60px; white-space: nowrap; }
+.rv-hint { margin: 0; padding: 12px 16px; border-radius: 10px; background: #eef4fa; color: #33475b; font-size: 18px; font-weight: 700; }
+.rv-table { width: 100%; margin-top: 12px; border-collapse: collapse; background: #fff; border: 1px solid #c9d6e3; border-radius: 12px; overflow: hidden; font-size: 18px; }
+.rv-table th { background: #e8f0f8; text-align: left; padding: 10px 12px; font-size: 16px; color: #33475b; }
+.rv-table td { padding: 10px 12px; border-top: 1px solid #e3eaf1; vertical-align: middle; }
+.rv-table { table-layout: auto; }
+.rv-table th, .rv-table td { text-align: left; }
+.rv-table th:first-child, .rv-table td:first-child { width: 52%; }
+.rv-table td b { font-size: 18px; }
+.rv-table td b, .rv-table td small { white-space: normal; overflow: visible; text-overflow: clip; }
+.rv-table td small { display: block; color: #5a6b7d; font-size: 16px; font-weight: 600; }
+.rv-table .rv-n { text-align: right; white-space: nowrap; }
+.rv-table tr.rv-new td { background: #fff8ec; }
+.rv-unknown { color: #9a4b00; }
+.rv-pick, .rv-name { display: block; margin-top: 6px; width: 100%; max-width: 340px; min-height: 48px; padding: 0 12px; border: 1px solid #b7cadb; border-radius: 9px; background: #fff;
+  font: inherit; font-size: 18px; color: #0b2f55; }
+.rv-qty { display: inline-flex; align-items: center; gap: 6px; }
+.rv-qty b { min-width: 44px; text-align: center; font-size: 22px; }
+.rv-step { width: 48px; height: 48px; border: 1px solid #b7cadb; border-radius: 9px; background: #fff; color: #0b4f8a; font: inherit; font-size: 24px; font-weight: 800; cursor: pointer; }
+.rv-sum { margin: 10px 2px 0; font-size: 18px; font-weight: 700; color: #12263a; }
+@media (max-width: 640px) {
+  .rv-table th:nth-child(3), .rv-table td:nth-child(3) { display: none; }
+  .rv-step { width: 44px; height: 44px; }
+}
+
+/* Receiving Log (Joe 10/13, mock-up E). Text never under 16px; the table scrolls under its header. */
+.inv-page .inv-filters { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.inv-page .inv-filters .spacer { flex: 1; }
+.inv-page .inv-filters input[type=search] { min-width: 260px; min-height: 44px; font-size: 16px; }
+.inv-page .inv-filters select { min-height: 44px; min-width: 200px; font: inherit; font-size: 16px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.inv-page .chips button { font-size: 16px; }
+.inv-page table.inv-log th, .inv-page table.inv-log td { font-size: 16px; padding: 9px 10px; white-space: normal; overflow-wrap: anywhere; }
+/* Dates, times, lots and numbers stay on one line; supplier, item and who wrap when the screen is narrow. */
+.inv-page table.inv-log td:nth-child(1), .inv-page table.inv-log td:nth-child(2), .inv-page table.inv-log td:nth-child(4), .inv-page table.inv-log td:nth-child(6),
+.inv-page table.inv-log td:nth-child(7), .inv-page table.inv-log td:nth-child(8), .inv-page table.inv-log td:nth-child(9), .inv-page table.inv-log td:nth-child(10),
+.inv-page table.inv-log th { white-space: nowrap; overflow-wrap: normal; }
+.inv-page table.inv-log td small { display: block; font-size: 16px; color: var(--muted); font-weight: 600; }
+.inv-page table.inv-log { table-layout: fixed; width: 100%; }
+.inv-page table.inv-log th, .inv-page table.inv-log td { text-align: left; }
+.inv-page table.inv-log .num { text-align: right; }
+.inv-page .foot { font-size: 16px; }
+.inv-items .inv-help { font-size: 16px; color: var(--muted); margin: 0 0 12px; }
+.inv-items table { width: 100%; font-size: 16px; }
+.inv-items td { padding: 8px; vertical-align: middle; }
+.inv-items .inv-name { width: 100%; min-height: 44px; font: inherit; font-size: 16px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; }
+.inv-items .inv-item-acts { text-align: right; white-space: nowrap; }
+.inv-items .inv-item-acts button { min-height: 44px; font-size: 16px; }
+.inv-items .inv-item-acts button.armed { background: #b42318; color: #fff; border-color: #b42318; }
+@media print {
+  .inv-page .inv-filters, .inv-page .head .actions, .inv-page .topbar { display: none !important; }
+  .inv-page table.inv-log th, .inv-page table.inv-log td { font-size: 11px; padding: 3px 5px; }
+}

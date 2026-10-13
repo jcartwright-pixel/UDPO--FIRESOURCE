@@ -135,9 +135,24 @@
     return out;
   }
 
+  // The barcode an item is known by: its 14-digit item code, else (a label that is not a GS1 code) what was scanned.
+  function barcodeKey(p) {
+    if (!p) return '';
+    if (p.gtin) return p.gtin;
+    if (p.contentGtin) return p.contentGtin;
+    var raw = text(p.raw).replace(/\s+/g, ' ').slice(0, 60).toUpperCase();
+    return raw ? 'TEXT:' + raw : '';
+  }
+  // What a person reads for a scan: the item code as printed (a UPC's 12 digits, an EAN's 13), else what was scanned.
+  function shownCode(p) {
+    var g = p && p.gtin;
+    if (!g) return text(p && p.raw);
+    return g.slice(0, 6) === '000000' ? g.slice(6) : g.slice(0, 2) === '00' ? g.slice(2) : g[0] === '0' ? g.slice(1) : g;
+  }
+
   // What one scan adds: a pallet label's count, else one case.
   function scanQuantity(p) { return p && p.count > 0 ? p.count : 1; }
 
   return { GS: GS, AIS: AIS, checkDigitOk: checkDigitOk, gtinKey: gtinKey, itemCore: itemCore, gs1Date: gs1Date, shortDate: shortDate,
-    parseScan: parseScan, scanQuantity: scanQuantity };
+    parseScan: parseScan, scanQuantity: scanQuantity, barcodeKey: barcodeKey, shownCode: shownCode };
 });
