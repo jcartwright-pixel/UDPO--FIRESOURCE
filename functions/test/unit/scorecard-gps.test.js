@@ -30,8 +30,8 @@ test('alerts go to the driver Daily Dispatch put in that truck, not the driver F
   ];
   const m = S.scMatchGps_(DAY, days, [{ tag: '223893', miles: 182.4, yardOut: '2026-10-14T09:40:00Z', yardIn: '2026-10-14T19:05:00Z', fuelGallons: 26 }], alerts);
   const pat = m.records.find(r => r.driver === 'ADAMS, PAT'), lee = m.records.find(r => r.driver === 'BAKER, LEE');
-  assert.deepEqual(pat.alerts, { speeding: 1, hardBrake: 0, hardAccel: 0, idle: 0 }, 'the fault code is not scored');
-  assert.deepEqual(lee.alerts, { speeding: 0, hardBrake: 1, hardAccel: 1, idle: 1 }, '"223 894" on Daily Dispatch is Fleet unit 223894');
+  assert.deepEqual(pat.alerts, { speeding: 1, hardBrake: 0, hardAccel: 0, idle: 0, seatbelt: 0 }, 'the fault code is not scored');
+  assert.deepEqual(lee.alerts, { speeding: 0, hardBrake: 1, hardAccel: 1, idle: 1, seatbelt: 0 }, '"223 894" on Daily Dispatch is Fleet unit 223894');
   assert.equal(pat.gpsMiles, 182.4);
   assert.equal(S.scClock_(pat.yardOut), '5:40 AM', 'yard leave in New York time');
   assert.equal(S.scClock_(pat.yardIn), '3:05 PM');
@@ -106,9 +106,9 @@ test('Joe 10/13: one grade per area and the overall score; each area is 100 less
   const days = S.scBuildDay_(DAY, [run({ casesOut: 500, plantCaseReturn: 497 })], [dvir('855', 'SAL')], {});
   const m = S.scMatchGps_(DAY, days, [], [{ tag: '223893', at: '2026-10-14T12:00:00Z', type: 'SPEEDING' }, { tag: '223893', at: '2026-10-14T13:00:00Z', type: 'HARSH_ACCEL' }]);
   const r = S.scScoreMonth_(m.records, [], S.scSettings_({}), {})[0];
-  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'time', 'cleanliness']);
+  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'seatbelt', 'fuel', 'time', 'cleanliness', 'accidents', 'complaints']);
   assert.deepEqual(Object.fromEntries(Object.entries(r.areas).map(([k, v]) => [k, v.points])),
-    { checkin: -4, cases: -3, inspection: 1, attendance: 1, speeding: -2, hardStops: -1, idling: 1, time: 0, cleanliness: 0 });
+    { checkin: -4, cases: -3, inspection: 1, attendance: 1, speeding: -2, hardStops: -1, idling: 1, seatbelt: 0, fuel: 0, time: 0, cleanliness: 0, accidents: 0, complaints: 0 });
   assert.equal(r.areas.time.score, null, 'no dispatch time: Time is not graded');
   assert.equal(r.points, -7, 'the day\'s points add up');
   // One day: 80 + 20 x points per day, at most 100.
