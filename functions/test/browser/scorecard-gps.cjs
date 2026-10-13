@@ -52,6 +52,8 @@ async function seed(d) {
     const ws = weekOf(date), id = ws + '__sample_' + c.route, r = runs[id] || (runs[id] = { runId: 'sample_' + c.route, route: c.route, run: 'DAY', weekStart: ws, days: {} });
     const missed = (i === 3 && j % 4 === 1) || (i === 5 && j === 2);
     r.days[DAYS[new Date(date + 'T12:00:00Z').getUTCDay()]] = { runs: true, driver: c.name, driverId: c.id, truck: c.truck, startTime: '05:00',
+      // Time grade: EVANS leaves about half an hour before a 6:15 dispatch; FOX's route is due back by 1:15 PM.
+      dispatchTime: i === 4 ? '06:15' : '05:45', routeHours: i === 5 ? 7.5 : 8.5,
       casesOut: 600, plantCaseReturn: i === 4 && j === 5 ? 594 : 600, checkinCompletedAt: missed ? '' : iso(date, 5, 2) };
     b.set(d.collection('plantEvents').doc('sample_dvir_' + c.route + '_' + date), { type: 'DVIR', date, route: c.route, run: 'DAY', defect: i === 2 && j === 3 });
     b.set(d.collection('gpsDays').doc(date + '_' + c.truck), { tag: c.truck, date, miles: 160 + i * 9 + (j % 3) * 4, firstMove: iso(date, 5, 30 + i * 3), lastMove: iso(date, 14, 10 + i * 6),
@@ -86,10 +88,13 @@ async function seed(d) {
       if (BEFORE) { await sc.close(); continue; }
       // Joe 10/13 (later): the driver alone, one grade per area we score, then the overall score.
       assert.deepEqual(await sc.$$eval('table.sc-board thead th', t => t.map(x => x.textContent.trim())),
-        ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Overall']);
+        ['#', 'Driver', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Time', 'Overall']);
       const ray = await sc.$eval('tr[data-key="DRV_S_DIAZ"]', tr => [...tr.cells].map(c => c.textContent.trim()));
       assert.equal(ray[1], 'DIAZ, RAY', 'no truck or route on the board');
-      assert.deepEqual(ray.slice(2), ['B', 'A', 'A', 'A', 'A', 'A', 'A', '80 C'], 'check-in 88 (B), speeding 96 and hard stops 96 (A), overall 80 (C)');
+      assert.deepEqual(ray.slice(2), ['B', 'A', 'A', 'A', 'A', 'A', 'A', 'A', '80 C'], 'check-in 88 (B), speeding 96 and hard stops 96 (A), overall 80 (C)');
+      // Joe 10/13 Time grade: left too early (EVANS, 10 days) and back too late (FOX, 10 days) each cost 1 a day.
+      assert.equal(await sc.$eval('tr[data-key="DRV_S_EVANS"] td:nth-child(10)', td => td.textContent.trim()), 'B');
+      assert.equal(await sc.$eval('tr[data-key="DRV_S_FOX"] td:nth-child(10)', td => td.textContent.trim()), 'B');
       assert.match(await sc.textContent('#unassigned'), /No driver dispatched[\s\S]*10-8-26\s*229001\s*Speeding \(66 mph in a 45/, 'the alert on a truck with no driver is kept for a manager');
       const fit = await sc.evaluate(() => ({ table: document.querySelector('.sc-board').scrollWidth, box: document.querySelector('#sheet').clientWidth,
         small: [...document.querySelectorAll('.sc-board td, .sc-board th, .sc-board small')].filter(e => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).length }));

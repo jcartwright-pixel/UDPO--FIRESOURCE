@@ -104,11 +104,35 @@ test('Joe 10/13: one grade per area and the overall score; each area is 100 less
   const days = S.scBuildDay_(DAY, [run({ casesOut: 500, plantCaseReturn: 497 })], [dvir('855', 'SAL')], {});
   const m = S.scMatchGps_(DAY, days, [], [{ tag: '223893', at: '2026-10-14T12:00:00Z', type: 'SPEEDING' }, { tag: '223893', at: '2026-10-14T13:00:00Z', type: 'HARSH_ACCEL' }]);
   const r = S.scScoreMonth_(m.records, [], S.scSettings_({}), {})[0];
-  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling']);
+  assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'time']);
   assert.deepEqual(Object.fromEntries(Object.entries(r.areas).map(([k, v]) => [k, v.score])),
-    { checkin: 96, cases: 97, inspection: 100, attendance: 100, speeding: 98, hardStops: 99, idling: 100 });
+    { checkin: 96, cases: 97, inspection: 100, attendance: 100, speeding: 98, hardStops: 99, idling: 100, time: 100 });
   assert.equal(r.score, 100 - 4 - 3 - 2 - 1, 'the overall adds up every area');
   assert.equal(r.areas.checkin.grade, 'A');
   const year = S.scScoreYear_([{ month: 10, rows: [r] }], S.scSettings_({}));
   assert.equal(year[0].areas.speeding.score, 98);
+});
+
+test('Joe 10/13 Time grade: out more than 15 min before dispatch, or back more than 30 min past dispatch + route hours, costs 1 each', () => {
+  assert.deepEqual([S.scMinutesOf_('06:00'), S.scMinutesOf_('5:30 PM'), S.scMinutesOf_(330), S.scMinutesOf_('')], [360, 1050, 330, null]);
+  assert.deepEqual([S.scHoursOf_('9:30'), S.scHoursOf_('8'), S.scHoursOf_('')], [9.5, 8, null]);
+  const day = (dispatchTime, routeHours, yardOut, yardIn) => {
+    const days = S.scBuildDay_(DAY, [run({ dispatchTime, routeHours })], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
+    return S.scMatchGps_(DAY, days, [{ tag: '223893', miles: 100, yardOut, yardIn }], []).records;
+  };
+  // Dispatch 6:00 AM, 8 hours: due back 2:00 PM. Out 5:30 AM (30 early), back 3:00 PM (60 late).
+  let r = S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:30:00Z', '2026-10-14T19:00:00Z'), [], S.scSettings_({}), {})[0];
+  assert.deepEqual([r.leftEarly, r.backLate, r.areas.time.score, r.score], [1, 1, 98, 98]);
+  assert.match(r.misses.map(m => m.what).join(' | '), /Left the yard 5:30 AM, 30 min before dispatch 6:00 AM \| Back at the yard 3:00 PM, 60 min past the expected 2:00 PM/);
+  // Out 5:50 (10 early) and back 2:20 PM (20 late): inside the grace, nothing.
+  r = S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:50:00Z', '2026-10-14T18:20:00Z'), [], S.scSettings_({}), {})[0];
+  assert.deepEqual([r.leftEarly, r.backLate, r.areas.time.score], [0, 0, 100]);
+  // No GPS yard time, or no dispatch time: not scored, not held against the driver.
+  r = S.scScoreMonth_(day('06:00', 8, '', ''), [], S.scSettings_({}), {})[0];
+  assert.equal(r.areas.time.score, 100);
+  r = S.scScoreMonth_(day('', 8, '2026-10-14T08:00:00Z', '2026-10-14T23:00:00Z'), [], S.scSettings_({}), {})[0];
+  assert.equal(r.areas.time.score, 100);
+  // The minutes and points come from Settings.
+  r = S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:30:00Z', '2026-10-14T19:00:00Z'), [], S.scSettings_({ earlyMinutes: 45, lateMinutes: 30, backLate: 3 }), {})[0];
+  assert.deepEqual([r.leftEarly, r.backLate, r.score], [0, 1, 97]);
 });

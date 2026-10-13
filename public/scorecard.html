@@ -73,7 +73,9 @@
         const date = L.addDays(run.weekStart, i);
         (byDate[date] = byDate[date] || []).push({ runId: run.runId, route: run.route, run: run.run, runs: d.runs ? 'TRUE' : '', driver: d.driver || '', driverId: d.driverId || '',
           casesOut: d.casesOut, plantCaseReturn: d.plantCaseReturn, driverCaseReturn: d.driverCaseReturn, checkedIn: !!d.checkinCompletedAt,
-          truck: d.truck || '', startTime: d.startTime || '' });
+          truck: d.truck || '', startTime: d.startTime || '',
+          // Joe 10/13 Time grade: the day's dispatch time and expected hours, else Route Master's for that weekday.
+          dispatchTime: d.dispatchTime || ((routeTimes[p] || {})[run.runId] || {}).dispatchTime, routeHours: d.routeHours || ((routeTimes[p] || {})[run.runId] || {}).hours });
       }));
       const out = {}, gd = {}, ga = {};
       gpsDays.forEach(g => { (gd[g.date] = gd[g.date] || []).push(g); });
@@ -112,7 +114,7 @@
         onSnapshot(range('gpsAlerts'), s => { gpsAlerts = s.docs.map(d => d.data()); render(); }, () => { gpsAlerts = []; render(); })
       ];
     }
-    let routeMiles = {};
+    let routeMiles = {}, routeTimes = {};
 
     function board(s) {
       const t = today(), yesterday = S.scAddDays_(t, -1), days = allDays(routeMiles), ex = exceptions.map(e => Object.assign({}, e.cells || {}, { driver_id: (e.cells || {}).driver_id || e.driverId || '' }));
@@ -169,6 +171,9 @@
           '<p><b>Hard starts</b> ' + n('hardAccel') + ' points per hard acceleration alert</p>' +
           '<p><b>Idling</b> ' + n('idle') + ' points per idling alert</p>' +
           '<p><b>Most a day</b> ' + n('gpsDayCap') + ' points from driving alerts in one day (0 = no limit)</p>' +
+          '<h2>Time (dispatch and return)</h2><p class="hint">From the GPS yard leave and return. A day with no GPS yard time is not counted.</p>' +
+          '<p><b>Left too early</b> ' + n('leftEarly') + ' points when the truck leaves the yard more than ' + n('earlyMinutes') + ' minutes before the dispatch time</p>' +
+          '<p><b>Back too late</b> ' + n('backLate') + ' points when it is back more than ' + n('lateMinutes') + ' minutes after dispatch plus the route\'s expected hours</p>' +
           '<h2>Counts as a call-off</h2><div class="sc-reasons">' + CORE.REASONS.map(r => '<label><input type="checkbox" data-reason="' + r + '"' + (s.callOffReasons.indexOf(r) >= 0 ? ' checked' : '') + (edit ? '' : ' disabled') + '> ' + r.charAt(0) + r.slice(1).toLowerCase() + '</label>').join('') + '</div></section>' +
           '<section class="otr-card"><h2>Grades</h2><p><span class="sc g-A">A</span> ' + n('gradeA') + ' and up</p><p><span class="sc g-B">B</span> ' + n('gradeB') + ' and up</p><p><span class="sc g-C">C</span> ' + n('gradeC') + ' and up</p><p><span class="sc g-D">D</span> below</p>' +
           '<h2>Driver of the Month</h2><p>Highest score, worked at least ' + n('monthMinDays') + ' days</p><button type="button" data-mode-go="month">Back to the scorecard</button></section></div>';
@@ -206,6 +211,7 @@
         (r.speeding || 0) + ' speeding, ' + (r.hardBrakes || 0) + ' hard stop' + (r.hardBrakes === 1 ? '' : 's') + ', ' + (r.hardAccels || 0) + ' hard start' + (r.hardAccels === 1 ? '' : 's') + ', ' + (r.idles || 0) + ' idling' + (r.idleMinutes ? ' (' + Math.round(r.idleMinutes) + ' min)' : ''),
         r.gpsMiles ? Math.round(r.gpsMiles).toLocaleString() + ' GPS miles' : r.miles ? r.miles.toLocaleString() + ' planned miles' : '',
         'MPG ' + (r.mpg ? r.mpg.toFixed(1) : 'coming'),
+        (r.leftEarly || r.backLate) ? 'left early ' + r.leftEarly + ', back late ' + r.backLate : '',
         r.yardOut != null || r.yardIn != null ? 'yard out ' + (clock(r.yardOut) || '–') + ', in ' + (clock(r.yardIn) || '–') : ''].filter(Boolean).join(' · ');
       const grade = (a) => a ? '<span class="sc g-' + a.grade + '" title="' + a.score + '">' + a.grade + '</span>' : '';
       sheet.innerHTML = '<table class="issues sc-board"><colgroup><col style="width:4%"><col style="width:20%">' + AREAS.map(() => '<col style="width:9%">').join('') + '<col style="width:13%"></colgroup>' +
@@ -246,7 +252,8 @@
       watch('plantEvents', v => { events = v; });
       watch('drivers', v => { drivers = v; });
       watch('exceptions', v => { exceptions = v; });
-      watch('routes', v => { routeMiles = {}; L.DAYS.forEach(p => { routeMiles[p] = {}; }); v.forEach(r => L.DAYS.forEach(p => { if (r.days && r.days[p] && r.days[p].miles) routeMiles[p][r.id] = r.days[p].miles; })); });
+      watch('routes', v => { routeMiles = {}; routeTimes = {}; L.DAYS.forEach(p => { routeMiles[p] = {}; routeTimes[p] = {}; });
+        v.forEach(r => L.DAYS.forEach(p => { const d = r.days && r.days[p]; if (d && (d.dispatchTime != null || d.hours)) routeTimes[p][r.id] = { dispatchTime: d.dispatchTime, hours: d.hours }; })); v.forEach(r => L.DAYS.forEach(p => { if (r.days && r.days[p] && r.days[p].miles) routeMiles[p][r.id] = r.days[p].miles; })); });
       onSnapshot(doc(db, 'scorecard', 'settings'), s => { saved = s.exists() ? s.data() : {}; render(); }, e => showError('Could not read the scorecard settings (' + e.message + '). The scores use the standard settings until it loads; reload the page.'));
     });
   </script>

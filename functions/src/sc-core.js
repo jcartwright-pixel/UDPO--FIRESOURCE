@@ -30,14 +30,17 @@ var SC_CORE = Object.freeze({
     callOffReasons: ['CALLED OFF', 'SICK DAY', 'UNPAID DAY', 'OTHER'],
     gradeA: 93, gradeB: 85, gradeC: 75, monthMinDays: 15,
     // Joe 10/13 GPS starting weights (he adjusts them on Settings): points per alert, at most gpsDayCap a day (0 = no cap).
-    speeding: 2, hardBrake: 2, hardAccel: 1, idle: 1, gpsDayCap: 10
+    speeding: 2, hardBrake: 2, hardAccel: 1, idle: 1, gpsDayCap: 10,
+    // Joe 10/13 Time grade: leaving the yard more than earlyMinutes before dispatch, or back more than lateMinutes past
+    // dispatch plus the route's expected hours, costs leftEarly / backLate points. A day with no GPS yard time is not scored.
+    earlyMinutes: 15, lateMinutes: 30, leftEarly: 1, backLate: 1
   }),
   NUMBER_SETTINGS: Object.freeze(['checkinMiss', 'lostCase', 'lostCaseDayCap', 'inspectionDefect', 'inspectionMissing', 'callOff',
-    'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'idle', 'gpsDayCap']),
+    'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate']),
   GPS_KINDS: Object.freeze(['speeding', 'hardBrake', 'hardAccel', 'idle']),
   // Joe 10/13 (later): the board shows one grade per area and the overall score; the details are one click away.
   AREAS: Object.freeze([['checkin', 'Check-in'], ['cases', 'Cases'], ['inspection', 'Inspections'], ['attendance', 'Attendance'],
-    ['speeding', 'Speeding'], ['hardStops', 'Hard Stops'], ['idling', 'Idling']]),
+    ['speeding', 'Speeding'], ['hardStops', 'Hard Stops'], ['idling', 'Idling'], ['time', 'Time']]),
   GPS_AREA: Object.freeze({ speeding: 'speeding', hardBrake: 'hardStops', hardAccel: 'hardStops', idle: 'idling' }),
   GPS_WORDS: Object.freeze({ speeding: 'Speeding', hardBrake: 'Hard stop', hardAccel: 'Hard start', idle: 'Idling' }),
   NOT_A_DRIVER: /^(|open|tba|tbd|none|n\/a|na|needs driver|.*needs driver.*|vacation.*|off)$/i
@@ -118,7 +121,8 @@ function scBuildDay_(dateKey, liveRows, events, milesByRun) {
     out.push({date: dateKey, driverKey: scPersonKey_(r.driverId || r.driver), driver: String(r.driver).trim(), route: String(r.route || '').trim(),
       run: String(r.run || '').trim(), runId: String(r.runId || '').trim(), checkedIn: !!checkins[k], inspected: insp.done, defect: insp.defect,
       casesOut: scNum_(r.casesOut), casesIn: casesIn, miles: scNum_((milesByRun || {})[r.runId]) || 0,
-      truck: String(r.truck == null ? '' : r.truck).trim(), startTime: String(r.startTime == null ? '' : r.startTime).trim()});
+      truck: String(r.truck == null ? '' : r.truck).trim(), startTime: String(r.startTime == null ? '' : r.startTime).trim(),
+      dispatchMinutes: scMinutesOf_(r.dispatchTime), routeHours: scHoursOf_(r.routeHours)});
   });
   return out;
 }
@@ -161,6 +165,25 @@ function scNyMinutes_(iso) {
     p.forEach(function (x) { if (x.type === 'hour') h = +x.value % 24; if (x.type === 'minute') m = +x.value; });
     return h * 60 + m;
   } catch (e) { return d.getHours() * 60 + d.getMinutes(); }
+}
+/** A dispatch time as minutes after midnight: 330, "5:30", "05:30 AM" or "5:30 PM" (null when there is none). */
+function scMinutesOf_(v) {
+  if (v === '' || v == null) return null;
+  if (typeof v === 'number') return isFinite(v) && v >= 0 && v < 1440 ? Math.round(v) : null;
+  var m = String(v).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/);
+  if (!m) return null;
+  var h = +m[1] % 24, ap = (m[3] || '').toUpperCase();
+  if (ap === 'PM' && h < 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  return h * 60 + +m[2];
+}
+/** Expected route hours: 9.5 or "9:30" (null when there is none). */
+function scHoursOf_(v) {
+  if (v === '' || v == null) return null;
+  var m = String(v).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (m) return +m[1] + +m[2] / 60;
+  var n = scNum_(v);
+  return n != null && n > 0 && n < 24 ? n : null;
 }
 function scClockMinutes_(hhmm) { var m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; }
 /** 345 -> "5:45 AM". */
@@ -256,7 +279,7 @@ function scScoreMonth_(days, callOffs, settings, names) {
   function get(key, name) {
     return by[key] || (by[key] = {driverKey: key, driver: names[key] || name || key, routes: {}, runDays: 0, dates: {}, checkins: 0, missedCheckins: 0,
       casesOut: 0, casesIn: 0, lostCases: 0, lostPoints: 0, inspected: 0, defects: 0, notInspected: 0, callOffs: 0, miles: 0, misses: [],
-      trucks: {}, speeding: 0, hardBrakes: 0, hardAccels: 0, idles: 0, idleMinutes: 0, gpsPoints: 0, gpsMiles: 0, gpsDays: 0, fuelGallons: 0, fuelMiles: 0, mpgMiles: 0,
+      trucks: {}, speeding: 0, hardBrakes: 0, hardAccels: 0, idles: 0, idleMinutes: 0, gpsPoints: 0, gpsMiles: 0, gpsDays: 0, fuelGallons: 0, fuelMiles: 0, mpgMiles: 0, leftEarly: 0, backLate: 0,
       mpgSum: 0, yardOuts: [], yardIns: [], yardFromMoves: false});
   }
   (days || []).forEach(function (d) {
@@ -292,7 +315,7 @@ function scScoreMonth_(days, callOffs, settings, names) {
     r.truck = Object.keys(r.trucks).sort(function (a, b) { return r.trucks[b] - r.trucks[a] || (a < b ? -1 : 1); })[0] || '';
     r.truckList = Object.keys(r.trucks).sort();
     scFinishGps_(r);
-    var points = r.missedCheckins * s.checkinMiss + r.lostPoints + r.defects * s.inspectionDefect + r.notInspected * s.inspectionMissing + r.callOffs * s.callOff + r.gpsPoints;
+    var points = r.missedCheckins * s.checkinMiss + r.lostPoints + r.defects * s.inspectionDefect + r.notInspected * s.inspectionMissing + r.callOffs * s.callOff + r.gpsPoints + r.leftEarly * s.leftEarly + r.backLate * s.backLate;
     r.score = Math.max(0, Math.round(100 - points));
     r.grade = scGrade_(r.score, s);
     r.areas = scAreas_(r.misses, s);
@@ -321,9 +344,26 @@ function scAddGps_(r, d, s) {
   else if (d.alertIdleMinutes) r.idleMinutes += d.alertIdleMinutes;
   if (d.fuelGallons && d.gpsMiles) { r.fuelGallons += d.fuelGallons; r.fuelMiles += d.gpsMiles; }
   else if (d.mpg && d.gpsMiles) { r.mpgMiles += d.gpsMiles; r.mpgSum += d.mpg * d.gpsMiles; }
+  scAddTime_(r, d, s);
   if (d.yardOut != null) r.yardOuts.push(d.yardOut);
   if (d.yardIn != null) r.yardIns.push(d.yardIn);
   if (d.yardFromMoves) r.yardFromMoves = true;
+}
+// Joe 10/13: the Time grade, on the dispatch time and the route's expected hours.
+function scAddTime_(r, d, s) {
+  if (d.dispatchMinutes == null) return;
+  if (d.yardOut != null && d.dispatchMinutes - d.yardOut > s.earlyMinutes) {
+    r.leftEarly++;
+    r.misses.push({date: d.date, what: 'Left the yard ' + scClock_(d.yardOut) + ', ' + (d.dispatchMinutes - d.yardOut) + ' min before dispatch ' + scClock_(d.dispatchMinutes), points: s.leftEarly, area: 'time'});
+  }
+  // A return before the dispatch time is the next day's (overnight); it is not scored.
+  if (d.yardIn != null && d.routeHours && d.yardIn > d.dispatchMinutes) {
+    var due = d.dispatchMinutes + Math.round(d.routeHours * 60);
+    if (d.yardIn - due > s.lateMinutes) {
+      r.backLate++;
+      r.misses.push({date: d.date, what: 'Back at the yard ' + scClock_(d.yardIn) + ', ' + (d.yardIn - due) + ' min past the expected ' + scClock_(due), points: s.backLate, area: 'time'});
+    }
+  }
 }
 // Averages: MPG from miles and gallons (or Fleet's MPG weighted by miles), the usual yard leave and return times.
 function scFinishGps_(r) {
@@ -353,7 +393,7 @@ function scRank_(rows) {
 /** Year: the score is the average of the months he drove; counts are added up. months: [{month, rows}] */
 function scScoreYear_(months, settings) {
   var by = {}, sums = ['runDays', 'daysWorked', 'checkins', 'missedCheckins', 'casesOut', 'casesIn', 'lostCases', 'inspected', 'defects',
-    'notInspected', 'callOffs', 'miles', 'speeding', 'hardBrakes', 'hardAccels', 'idles', 'idleMinutes', 'gpsPoints', 'gpsMiles', 'gpsDays', 'fuelGallons'];
+    'notInspected', 'callOffs', 'miles', 'speeding', 'hardBrakes', 'hardAccels', 'idles', 'idleMinutes', 'gpsPoints', 'gpsMiles', 'gpsDays', 'fuelGallons', 'leftEarly', 'backLate'];
   (months || []).forEach(function (m) {
     var leader = scLeader_(m.rows, settings);
     m.rows.forEach(function (r) {
@@ -402,5 +442,5 @@ function scSummary_(rows, settings, minDays) {
     leader: leader ? leader.driver : ''};
 }
 
-  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_ };
+  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scMinutesOf_: scMinutesOf_, scHoursOf_: scHoursOf_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_ };
 });
