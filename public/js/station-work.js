@@ -6,7 +6,7 @@
  * any manager screen. The saves are the same ones the Loadout Center and Unloading & Washing make.
  */
 import { save, escapeHtml, shortDate, showError, allowedSaves } from './app.js';
-import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, query, where, onSnapshot } from './firebase.js';
 import * as P from './plant-core.js';
 import { watchProducts, OTHER } from './products.js';
 

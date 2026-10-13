@@ -49,7 +49,7 @@
   <script type="module">
     import { startOffline } from './js/offline-saves.js';
     import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
-    import { doc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { doc, collection, query, where, onSnapshot } from './js/firebase.js';
     import { pickPlant, plantName, modeText, watchSetup } from './js/safety.js';
 
     // Past Walks (Joe 10/12): every walk of the plant, newest first, with its counts; Open shows it on the walk screen.

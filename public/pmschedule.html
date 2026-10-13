@@ -60,7 +60,7 @@
 
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { watchMaint, plantFor } from './js/pmaint.js';
 
     // PM Schedule (Joe 10/12, mock-up D): every PM task of the plant, Overdue first, then this week (Sunday to Saturday), the

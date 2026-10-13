@@ -66,7 +66,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer } from './js/app.js';
     import { startOffline } from './js/offline-saves.js';
-    import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, query, where, onSnapshot } from './js/firebase.js';
     import * as W from './js/weather.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
 

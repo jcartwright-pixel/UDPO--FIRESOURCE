@@ -40,7 +40,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     const L = window.UDLogic;
     const today = () => L.operatingDay(new Date());

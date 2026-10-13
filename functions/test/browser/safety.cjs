@@ -78,7 +78,7 @@ async function openDevice(browser, name, url) {
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(HOSTING + url);
   // The first visit keeps the screens and the Firebase code on the device; later screens and visits with no signal use them.
-  await page.waitForFunction(async () => { if (!navigator.serviceWorker.controller) return false; const c = await caches.open('ud-offline-v1'); return !!(await c.match('safety-issues.html')) && !!(await c.match('js/offline-saves.js')) && (await Promise.all(['app', 'auth', 'firestore', 'functions'].map(n => c.match('https://www.gstatic.com/firebasejs/12.18.0/firebase-' + n + '.js')))).every(Boolean); }, null, { timeout: 20000 });
+  await page.waitForFunction(async () => { if (!navigator.serviceWorker.controller) return false; const c = await caches.open('ud-offline-v1'); return !!(await c.match('safety-issues.html')) && !!(await c.match('js/offline-saves.js')) && !!(await c.match('js/firebase.js')) && (await Promise.all((await import('/js/firebase.js')).FIREBASE_FILES.map(u => c.match(u)))).every(Boolean); }, null, { timeout: 20000 });
   page.errors = errors;
   page.ctx = ctx;
   return page;
@@ -469,7 +469,7 @@ async function cameraShot(page, color) {
       await d.click('#list [data-mode="all"]');
       await d.waitForSelector(row(tapId));
       // The screens and the Firebase code are kept on the device, and the screen cache is in charge of the page.
-      await d.waitForFunction(async () => { if (!navigator.serviceWorker.controller) return false; const c = await caches.open('ud-offline-v1'); return !!(await c.match('safety.html')) && !!(await c.match('js/offline-saves.js')) && !!(await c.match('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js')); }, null, { timeout: 20000 });
+      await d.waitForFunction(async () => { if (!navigator.serviceWorker.controller) return false; const c = await caches.open('ud-offline-v1'); return !!(await c.match('safety.html')) && !!(await c.match('js/offline-saves.js')) && !!(await c.match('js/firebase.js')) && !!(await c.match((await import('/js/firebase.js')).FIREBASE_FILES.find(u => u.endsWith('/firebase-firestore.js')))); }, null, { timeout: 20000 });
       // The walk has been read once with signal (it is then kept on the device too).
       await d.waitForFunction(() => /^1 Good|Good · 1 Not good/.test(document.getElementById('counts').textContent) && !/Reading/.test(document.getElementById('foot').textContent));
       const wasGood = await d.evaluate(() => (document.getElementById('counts').textContent.match(/^(\d+) Good/) || [])[1]);

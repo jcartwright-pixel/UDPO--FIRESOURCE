@@ -50,7 +50,7 @@
   <script type="module">
     import { startOffline } from './js/offline-saves.js';
     import { start, requireSignIn, save, escapeHtml, showError } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { pickPlant, plantName, canSetUp, modeText, watchSetup } from './js/safety.js';
 
     // Checklist Setup (Joe 10/12, mock-ups A and J): the plant's own checklist, under the areas and sub-areas of its Location

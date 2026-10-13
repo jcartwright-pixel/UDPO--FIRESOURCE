@@ -58,7 +58,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
     import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
-    import { collection, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, getDoc, onSnapshot } from './js/firebase.js';
     forScreen('checkIns');
 
     const L = window.UDLogic;

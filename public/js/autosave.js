@@ -1,6 +1,6 @@
 // Joe 10/10: no Record or Save buttons on the plant side. Each box saves as it is left, with the time and who entered it, and
 // the boxes start empty again after the next Send Current Report, so no leftover reading goes out as if it were new.
-import { collection, query, orderBy, limit, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, query, orderBy, limit, onSnapshot } from './firebase.js';
 
 // The round: everything entered since the last report was sent. cb gets the time of that report ('' = none sent yet) and the report.
 export function watchRound(db, cb) {

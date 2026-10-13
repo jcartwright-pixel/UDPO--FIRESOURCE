@@ -73,7 +73,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError, callServer, dateTimeText, serverText } from './js/app.js';
-    import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, onSnapshot } from './js/firebase.js';
 
     // Joe 10/10: "Any of the API keys that we mess with, it should be in the administration app for updating ... replace the key
     // and then adjust the locations of the thermometers, add, subtract." Administrators only (functions/src/mocreo.js).

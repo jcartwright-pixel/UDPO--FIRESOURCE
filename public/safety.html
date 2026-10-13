@@ -51,7 +51,7 @@
   <script type="module">
     import { offlineSave, startOffline, waiting, onWaitingChange } from './js/offline-saves.js';
     import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText } from './js/app.js';
-    import { doc, getDoc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { doc, getDoc, collection, query, where, onSnapshot } from './js/firebase.js';
     import { today, pickPlant, plantName, canWalk, modeText, shrinkPhoto, watchOpenIssues, watchSetup, watchExtinguishers, agePill, maintText, foundLine, thisMonth } from './js/safety.js';
 
     // The weekly walk (Joe 10/12, mock-ups B and A): Plant, Garage and Office with their sub-areas on the left; each item Good

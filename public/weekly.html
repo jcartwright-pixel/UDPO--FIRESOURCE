@@ -106,7 +106,7 @@
     const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8)) + '/' + k.slice(0, 4);   // the approved print's style
     import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, saveOptimistic, saveWeekOrder, savesDone, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     // A run whose regular driver is off that day: the reason and who it is for, as "SICK DAY: ALSTON, BRANDON".
     const coverText = (c) => c ? String(c.reason || 'OFF').toUpperCase() + (c.name ? ': ' + c.name : '') : '\u2014 NEEDS DRIVER \u2014';
 

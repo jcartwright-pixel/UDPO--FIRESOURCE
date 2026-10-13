@@ -50,7 +50,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
-    import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { doc, onSnapshot } from './js/firebase.js';
     import { watchProduction, lineView, fmt, shiftText } from './js/production.js';
 
     // Production Lines (Joe 10/11): every line this shift, made against target, stopped or running, and the speed flag (Joe: a

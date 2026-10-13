@@ -119,7 +119,7 @@
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
     import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canManage } from './js/edit.js';
     forScreen('vacations');
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());

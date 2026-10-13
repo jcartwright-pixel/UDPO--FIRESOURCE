@@ -1,5 +1,5 @@
 // Safety Walkthrough screens (Joe 10/12): the plant being walked, who may save, the photo shrink and the shared reads.
-import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, query, where, onSnapshot } from './firebase.js';
 import { escapeHtml, shortDate, goLiveNote } from './app.js';
 
 const L = window.UDLogic, S = window.UDSafety;

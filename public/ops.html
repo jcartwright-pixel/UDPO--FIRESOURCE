@@ -44,7 +44,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, save, showError, dateTimeText } from './js/app.js';
     import { lists, watchLists, canManage, forScreen } from './js/edit.js';
-    import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, onSnapshot } from './js/firebase.js';
     import { mountRowDrag } from './js/row-drag.js';
 
     // The current app's Operational Assignments (93_DispatchAdminV037: Assignment, Active, Sequence). Each change saves at once.

@@ -3,6 +3,7 @@
 // the signal is back. Each one keeps its own requestId, so one sent twice is saved only once (the server checks it). The
 // last roster, loads and board read are kept too, so the screens still open with no signal. sw.js keeps the page itself.
 // Used by route.html: the drivers' phones and the Driver Room Check-In Station (?room=1).
+import { FIREBASE_FILES } from './firebase.js';
 
 const DB = 'udPhoneQueue', STORE = 'sends', READS = 'udPhoneRead.', CACHE = 'ud-offline-v1';
 const listeners = [];
@@ -115,11 +116,9 @@ export function startQueue(send) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { scope: 'route' }).catch(() => {});
   if (window.caches && navigator.onLine) {
     const local = ['localhost', '127.0.0.1'].includes(location.hostname);
-    const keep = ['route.html', 'css/app.css', 'css/stations.css', 'css/driver-room.css', 'js/app.js', 'js/speak.js', 'js/station-code.js', 'js/phone-queue.js',
-      'route.webmanifest', 'driver-station.webmanifest', 'img/app-icon/favicon-32.png', 'img/app-icon/apple-touch-icon.png',
-      'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js',
-      'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js', 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js']
-      .concat(local ? [] : ['/__/firebase/init.json']);
+    const keep = ['route.html', 'css/app.css', 'css/stations.css', 'css/driver-room.css', 'js/app.js', 'js/firebase.js', 'js/speak.js', 'js/station-code.js', 'js/phone-queue.js',
+      'route.webmanifest', 'driver-station.webmanifest', 'img/app-icon/favicon-32.png', 'img/app-icon/apple-touch-icon.png']
+      .concat(FIREBASE_FILES, local ? [] : ['/__/firebase/init.json']);
     caches.open(CACHE).then(c => keep.forEach(u => c.add(u).catch(() => {}))).catch(() => {});
   }
   window.addEventListener('online', () => flush());

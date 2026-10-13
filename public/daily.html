@@ -123,7 +123,7 @@
     import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, driverOptionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, withUnsaved, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     import { bindDailyKeys, keepCursor } from './js/daily-keys.js';
     forScreen('dailyDispatch');
-    import { collection, doc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     // Joe 10/12: a run reads as Route, Route Name and Run Name ("6301" then "Walmart Load 1"), never 6301_1.

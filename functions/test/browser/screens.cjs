@@ -184,7 +184,7 @@ async function noScroll(page) {
     await editor.click('#down-panel [data-close]');
     const downDoc = await editor.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 20; i++) { const d = (await getDoc(doc(db, 'equipment', 'veh_truck_900001'))).data(); if (d.status === 'DOWN') return d; await new Promise(r => setTimeout(r, 250)); }
       return null;
@@ -219,7 +219,7 @@ async function noScroll(page) {
     await editor.keyboard.press('Escape');
     const callOff = await editor.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { collection, query, where, getDocs } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 20; i++) {
         const s = await getDocs(query(collection(db, 'exceptions'), where('driverId', '==', 'drv_test_casey')));
@@ -440,7 +440,7 @@ async function noScroll(page) {
     // Route Master updates do not redraw the list in the middle of the drag.
     await rt.waitForFunction(async () => {
       const { start } = await import('./js/app.js');
-      const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { collection, getDocs } = await import('/js/firebase.js');
       const { db } = await start();
       const all = (await getDocs(collection(db, 'routes'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
       return all.some(r => r.run === 'WHEELING') && all.some(r => r.id === 'run_t802' && r.loadType === 'Tote');
@@ -453,7 +453,7 @@ async function noScroll(page) {
       .catch(async e => { throw new Error('Load order drag: before ' + beforeDrag + ', after ' + await orderShown() + ' (' + e.message + ')'); });
     const saved801 = await rt.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 80; i++) { const d = (await getDoc(doc(db, 'routes', 'run_t801'))).data(); if (d.days.mon.loadOrder === 10 && d.days.mon.dispatchTime === 300) return d.days.mon; await new Promise(r => setTimeout(r, 250)); }
       return null;
@@ -730,7 +730,7 @@ async function noScroll(page) {
     await tpl.waitForFunction(() => /^Template saved/.test(document.getElementById('dirty').textContent), null, { timeout: 10000 });
     const tplCells = await tpl.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       return [(await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells, (await getDoc(doc(db, 'drivers', 'drv_test_casey'))).data().cells];
     });
@@ -820,7 +820,7 @@ async function noScroll(page) {
     await otr.waitForFunction(() => /\$0\.400/.test(document.querySelector('.otr-in[data-m="9"]').closest('tr').textContent), null, { timeout: 5000 });
     const otrSaved = await otr.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 20; i++) { const a = (await getDoc(doc(db, 'otrRoutes', 'run_t801'))).data(), b = (await getDoc(doc(db, 'otrMonthly', new Date().getFullYear() + '-09'))).data(); if (a && b && b.distribution_cost === 400000) return [a, b]; await new Promise(r => setTimeout(r, 250)); }
       return null;
@@ -860,7 +860,7 @@ async function noScroll(page) {
     await sc.press('.sc-n[data-k="callOff"]', 'Tab');
     const scSaved = await sc.evaluate(async () => {
       const { start } = await import('./js/app.js');
-      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
       for (let i = 0; i < 20; i++) { const d = (await getDoc(doc(db, 'scorecard', 'settings'))).data(); if (d && d.callOff === 5) return d; await new Promise(r => setTimeout(r, 250)); }
       return null;
