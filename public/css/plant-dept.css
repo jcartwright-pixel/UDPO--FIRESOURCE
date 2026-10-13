@@ -91,7 +91,7 @@
 .dept-a .hour small, .dept-a .hour b, .dept-a .hour .pu, .dept-a .legend { font-size: 16px; }
 .dept-a .legend { gap: 10px; flex-wrap: wrap; row-gap: 2px; }
 .dept-a .mid { grid-template-columns: minmax(0, 1fr) 280px; }
-@media (max-width: 1700px) { .dept-a .mid { grid-template-columns: minmax(0, 1fr) 220px; } }
+@media (max-width: 1700px) { .dept-a .mid { grid-template-columns: minmax(0, 1fr) 250px; } }
 @media (max-width: 1500px), (max-height: 900px) { .dept-a .mid { height: 210px; } }
 .dept-a .hour .pu { white-space: nowrap; padding: 0 4px; }
 .dept-a .hours { gap: 4px; }
@@ -102,7 +102,10 @@
 .dept-a .card .chip b { grid-area: b; font-size: 24px; }
 .dept-a .card .chip em { grid-area: em; text-transform: none; }
 .dept-a .card .chip small { grid-area: small; }
-.dept-a .card .chip em, .dept-a .card .chip small { font-size: 16px; letter-spacing: 0; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dept-a .card .chip em, .dept-a .card .chip small { font-size: 16px; letter-spacing: 0; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A long label ("Avg time per load") may take a second line rather than be cut. */
+.dept-a .card .chip em { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.dept-a .card .chip { padding-top: 2px; padding-bottom: 2px; }
 .dept-a .card .li, .dept-a .card .li .tag, .dept-a .hb, .dept-a .hb b { font-size: 16px; }
 .dept-a .hb { grid-template-columns: 170px 1fr auto; }
 .dept-a .card.dc .dc-metric em { font-size: 16px; }
