@@ -755,7 +755,9 @@ async function noScroll(page) {
     const missing = [];
     for (const pg of pages) {
       await bh.goto(bh.url().replace(/\/[a-z-]+\.html.*/, '/' + pg + '?testEmail=manager.test@uniteddairy.com'));
-      await bh.waitForSelector('#go-home', { timeout: 8000 }).catch(() => {});
+      // #go-home is drawn as the page loads; the screen shows once the sign-in is checked (later on the Safety Walkthrough's
+      // screens, which open their on-device copy of the data first), so wait until it can be seen.
+      await bh.waitForSelector('#go-home', { state: 'visible', timeout: 8000 }).catch(() => {});
       const seen = await bh.evaluate(() => ['go-back', 'go-home'].filter(id => { const e = document.getElementById(id); return e && e.getBoundingClientRect().width > 0; }));
       const want = pg === 'index.html' || pg === 'company.html' ? ['go-home'] : ['go-back', 'go-home'];
       if (want.some(id => seen.indexOf(id) < 0)) missing.push(pg + ': ' + seen.join(','));
