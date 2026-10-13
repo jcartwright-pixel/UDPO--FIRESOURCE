@@ -109,7 +109,7 @@ exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSec
 });
 
 // Joe 10/13: data he sent, loaded once on each app (test copy and live) after a deploy (src/data-loads.js). Each load has a
-// dataLoads/<id> marker, so it runs one time; it only adds what is missing.
+// dataLoads/<id> marker, so it runs one time; it deletes nothing.
 exports.dataLoadsOnce = onSchedule({ schedule: 'every 10 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
   await require('./src/data-loads').runDataLoads(db);
 });
