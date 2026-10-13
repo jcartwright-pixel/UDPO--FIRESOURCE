@@ -229,6 +229,8 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await p.waitForFunction(() => /Sent \d+ repair|Nothing was sent/.test(document.querySelector('#view .ap-msg').textContent));
 
     await open('checkin-email', '#ce-from');
+    // The field shows before the saved settings load into it; wait for the load.
+    await p.waitForFunction(() => document.getElementById('ce-from').value !== '', null, { timeout: 10000 }).catch(() => {});
     assert.equal(await p.inputValue('#ce-from'), 'callcenter@lauttamus.com');
     await p.check('#ce-on');
     await p.click('#ce-save');
