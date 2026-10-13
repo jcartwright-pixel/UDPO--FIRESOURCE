@@ -100,6 +100,11 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       assert.deepEqual([await tileText(page, 'notes', 'Breakdowns'), await tileText(page, 'notes', 'Carried Over'), await tileText(page, 'notes', 'Handoff')],
         ['1 | still open', '0 | from earlier shifts', '0 | since the last report']);
       assert.match(await page.textContent('#pv-chips'), new RegExp(behind + ' Behind[\\s\\S]*3 of 4 To load[\\s\\S]*1 Pickups[\\s\\S]*1 Breakdowns[\\s\\S]*0 Lines down[\\s\\S]*1 Temps out'));
+      // Review item 30 (Joe 10/13): the buttons are words only (no 📊 ✉ ✎), a tile label is one 16px line, and a route behind
+      // shows its whole BEHIND line.
+      assert.deepEqual(await page.$$eval('#reports, .mc-btn, .mc-pvnote', b => b.map(x => x.textContent.trim()).filter(t => !/^[A-Za-z][A-Za-z /…]*$/.test(t))), []);
+      assert.deepEqual(await page.$$eval('.mc-tile > span', sp => sp.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16 || x.getClientRects().length > 1 || x.offsetHeight > 26).map(x => x.textContent)), []);
+      assert.deepEqual(await page.$$eval('.mc-rt i', i => i.filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.textContent)), []);
       if (w === 1920) await fits(page, 'Manager Center ' + w + 'x' + h);
       await shots(page, 'manager', w);
       assert.deepEqual(page.errors, []);

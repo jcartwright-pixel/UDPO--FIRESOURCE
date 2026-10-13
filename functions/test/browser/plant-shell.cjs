@@ -64,10 +64,13 @@ const SCREENS = [
     assert.equal(await side.$('.mc-menu, aside'), null, 'Manager Center has no menu of its own');
     const grid = await side.$eval('#grid', g => g.getBoundingClientRect().left - document.querySelector('.sidemenu').getBoundingClientRect().right);
     assert.ok(grid < 40, 'the Manager Center cards start right beside the side menu: ' + grid);
-    // The report card runs the full height of the left column; the other six cards share the two columns on the right.
-    const boxes = await side.$$eval('#grid > .mc-card', c => c.map(x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.bottom)]; }));
-    assert.ok(boxes.slice(1).every(b => b[0] > boxes[0][0]), 'every other card is right of the report card ' + JSON.stringify(boxes));
-    assert.ok(Math.abs(boxes[0][2] - Math.max(...boxes.map(b => b[2]))) <= 2 && Math.abs(boxes[0][1] - boxes[1][1]) <= 2, 'the report card is as tall as the three rows ' + JSON.stringify(boxes));
+    // Review item 30 (Joe 10/13): the report card takes the top two rows of the left column (no big empty area), Plant
+    // Distribution Departments runs across the top of the other two columns, and the last row has a card under the report card.
+    const boxes = await side.$$eval('#grid > .mc-card', c => c.map(x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.bottom), Math.round(r.right)]; }));
+    assert.ok(boxes.slice(1, 4).every(b => b[0] > boxes[0][0]), 'the cards of the top two rows are right of the report card ' + JSON.stringify(boxes));
+    assert.ok(Math.abs(boxes[0][1] - boxes[1][1]) <= 2 && Math.abs(boxes[0][2] - boxes[2][2]) <= 2, 'the report card is as tall as the top two rows ' + JSON.stringify(boxes));
+    assert.ok(Math.abs(boxes[1][3] - boxes[3][3]) <= 2 && Math.abs(boxes[1][0] - boxes[2][0]) <= 2, 'Plant Distribution Departments spans the two right columns ' + JSON.stringify(boxes));
+    assert.ok(Math.abs(boxes[4][0] - boxes[0][0]) <= 2 && boxes[4][1] >= boxes[0][2], 'a card sits under the report card ' + JSON.stringify(boxes));
     await side.hover('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]');
     await side.waitForSelector('.side-flyouts .flyout.open');
     assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Plant Departments', 'Loadout Center', 'Unloading & Washing', 'Product Returns', 'Truck Washing', 'Trailer Assignments']);
@@ -115,9 +118,9 @@ const SCREENS = [
           assert.ok(Math.max(...mids) - Math.min(...mids) <= 6, page + ' ' + w + ': the buttons and filters are on one line ' + JSON.stringify(boxes));
         }
         if (page === 'scheduler.html') {
-          const t = await p.evaluate(() => { const r = (s) => document.querySelector('.sc-titleline ' + s).getBoundingClientRect(); const d = r('#pick'), sh = r('[data-lane="SHIPPING"]'), rc = r('[data-lane="RECEIVING"]');
+          const t = await p.evaluate(() => { const r = (s) => document.querySelector('.sc-titleline ' + s).getBoundingClientRect(); const d = r('#range'), sh = r('[data-lane="SHIPPING"]'), rc = r('[data-lane="RECEIVING"]');
             return { mids: [d, sh, rc].map(x => Math.round(x.top + x.height / 2)), gap: Math.round(rc.left - sh.right), beside: Math.round(sh.left - d.right) }; });
-          assert.ok(Math.max(...t.mids) - Math.min(...t.mids) <= 6 && t.beside >= 0 && t.beside < 60 && t.gap > 0, 'scheduler.html ' + w + ': Shipping and Receiving sit beside the date with a little space between them ' + JSON.stringify(t));
+          assert.ok(Math.max(...t.mids) - Math.min(...t.mids) <= 6 && t.beside >= 0 && t.beside < 60 && t.gap > 0, 'scheduler.html ' + w + ': Shipping and Receiving sit beside the dates with a little space between them (review item 37: no date box) ' + JSON.stringify(t));
         }
         // The shared top line (data-top): the action buttons are one even row and none is left down in the screen.
         const tiles = await p.evaluate(() => {

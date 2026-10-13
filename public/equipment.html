@@ -41,8 +41,8 @@
       <div class="notice error" id="error" hidden></div>
       <div class="sheet scroll-list">
         <table>
-          <colgroup><col style="width:7%"><col style="width:5%"><col style="width:7%"><col style="width:11%"><col span="7" style="width:7.6%"><col style="width:9.8%"><col style="width:7%"></colgroup>
-          <thead><tr><th>Unit</th><th>Type</th><th>Status</th><th>Location</th><th class="eq-day">Sun</th><th class="eq-day">Mon</th><th class="eq-day">Tue</th><th class="eq-day">Wed</th><th class="eq-day">Thu</th><th class="eq-day">Fri</th><th class="eq-day">Sat</th><th>Down reason</th><th></th></tr></thead>
+          <colgroup><col style="width:7%"><col style="width:5%"><col style="width:7%"><col style="width:11%"><col span="7" style="width:7.3%"><col style="width:9.8%"><col style="width:9.1%"></colgroup>
+          <thead><tr><th>Unit</th><th>Type</th><th>Status</th><th>Location</th><th class="eq-day">Sun</th><th class="eq-day">Mon</th><th class="eq-day">Tue</th><th class="eq-day">Wed</th><th class="eq-day">Thu</th><th class="eq-day">Fri</th><th class="eq-day">Sat</th><th>Down reason</th><th class="eq-act">Action</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -178,7 +178,7 @@
         return '<tr data-id="' + escapeHtml(e.id) + '"' + (off ? ' class="off"' : '') + '><td class="strong">' + escapeHtml(e.unit) + '</td><td><span class="tag">' + (e.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</span></td>' +
           '<td><span class="status' + (off ? ' off' : '') + '">' + escapeHtml(String(e.status || '').replace(/_/g, ' ') || 'ACTIVE') + '</span></td><td><span class="nice-case">' + escapeHtml(e.location || '') + '</span></td>' +
           L.DAYS.map(p => { const r = days[p] || []; return '<td class="eq-day' + (p === todayP ? ' today' : '') + (off && r.length ? ' issue' : '') + (r.length > 1 ? ' busy' : '') + '"' + (r.length > 1 ? ' title="Set for ' + r.length + ' runs that day"' : '') + '>' + r.map(n => '<span>' + escapeHtml(n) + '</span>').join('') + '</td>'; }).join('') +
-          '<td class="left">' + escapeHtml(downReason(e) + (down && e.downSince ? ' (since ' + nyDate(e.downSince) + ')' : '')) + '</td><td>' + action + '</td></tr>';
+          '<td class="left">' + escapeHtml(downReason(e) + (down && e.downSince ? ' (since ' + nyDate(e.downSince) + ')' : '')) + '</td><td class="eq-act">' + action + '</td></tr>';
       }).join('') || '<tr><td colspan="13" class="empty">No units match.</td></tr>';
       const box = document.querySelector('[data-reason]');
       if (box) { box.value = typed; if (document.activeElement !== box) box.focus(); }

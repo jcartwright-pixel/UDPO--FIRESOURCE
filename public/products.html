@@ -38,7 +38,6 @@
       <input type="file" id="upload-file" accept=".xlsx,.xls,.csv,text/csv" hidden>
       <select id="group" class="pm-pick" aria-label="Group" title="Group" data-top></select>
       <select id="area" class="pm-pick" aria-label="Area" title="Area" data-top></select>
-      <select id="plant" class="pm-pick" aria-label="Plant" title="Plant" data-top></select>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -47,8 +46,8 @@
           <input type="search" id="find" placeholder="Find a product or SKU" aria-label="Find a product or SKU"></div>
         <div class="pm-scroll">
           <table class="loadout pm-table">
-            <colgroup><col style="width:20%"><col style="width:10%"><col style="width:11%"><col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:7%"></colgroup>
-            <thead><tr><th>Product</th><th>SKU</th><th>UPC</th><th>Type</th><th>Group</th><th title="Full speed per minute">Full Speed /Min</th><th>Target %</th><th title="Lowest speed per minute">Lowest Speed</th><th title="Highest speed per minute">Highest Speed</th><th title="Days from the run date to the code date">Shelf Life Days</th><th></th></tr></thead>
+            <colgroup><col style="width:20%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:7%"></colgroup>
+            <thead><tr><th>Product</th><th>SKU</th><th>UPC</th><th>Type</th><th>Group</th><th title="Full speed per minute">Full&nbsp;Speed /Min</th><th>Target %</th><th title="Lowest speed per minute">Lowest Speed</th><th title="Highest speed per minute">Highest Speed</th><th title="Days from the run date to the code date">Shelf Life Days</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
         </div>
@@ -75,7 +74,7 @@
         <div class="pm-acts"><button type="button" class="rp-btn" id="preview-cancel">Cancel</button><button type="button" class="rp-btn primary" id="preview-save">Save Upload</button></div>
       </section>
       <datalist id="group-list"></datalist>
-      <!-- Joe 10/12: the rows are for reading; the ⋮ before a product opens its Edit panel, which holds every field (more go in FIELDS). -->
+      <!-- Joe 10/12: the rows are for reading; the Edit button before a product opens its Edit panel, which holds every field (more go in FIELDS). -->
       <div class="pm-edit-back" id="edit-back" hidden>
         <section class="pm-edit" id="edit-pane" role="dialog" aria-modal="true" aria-labelledby="edit-title">
           <div class="pm-edit-head"><div><span class="eyebrow" id="edit-where"></span><h2 id="edit-title">Edit Product</h2></div><button type="button" class="rp-btn primary" id="edit-close">Done</button></div>
@@ -100,7 +99,10 @@
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const ALL_PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
-    let setup = [], products = {}, changed = {}, own = [], person = null, app = {}, plant = params.get('plant') || '', chosen = params.get('line') || '', group = '', find = '', note = '', armed = null, busy = Promise.resolve();
+    // Review item 31 (Joe 10/13): no plant drop-down inside a plant. The plant is ?plant= of the link, else the plant the screen
+    // was opened from (this tab), else the person's first plant; the title names it ("Uniontown Product Sheet").
+    const cameFrom = () => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } };
+    let setup = [], products = {}, changed = {}, own = [], person = null, app = {}, plant = params.get('plant') || cameFrom(), chosen = params.get('line') || '', group = '', find = '', note = '', armed = null, busy = Promise.resolve();
     let pane = 'list', draft = null, upload = null, setupRead = false, editing = null;
     // An area being changed here shows its list as typed until the database has caught up.
     const mine = {};
@@ -125,7 +127,6 @@
     function drawTop() {
       const ps = plants();
       if (!ps.some(p => p.id === plant) && (person || !plant)) plant = ps[0].id;
-      document.getElementById('plant').innerHTML = ps.map(p => opt(p.id, plant, p.name)).join('');
       // Joe 10/12: "product sheet for Uniontown".
       document.getElementById('page-title').textContent = plantName(plant) + ' Product Sheet';
       const all = areas(), line = current();
@@ -142,7 +143,7 @@
       document.getElementById('reset').textContent = armed === chosen ? 'Press again' : 'Starting List';
       ['edit-setup', 'upload'].forEach(id => { document.getElementById(id).disabled = !ck || pane !== 'list'; });
       document.getElementById('template').disabled = pane !== 'list';
-      ['group', 'area', 'plant'].forEach(id => { document.getElementById(id).disabled = pane !== 'list'; });
+      ['group', 'area'].forEach(id => { document.getElementById(id).disabled = pane !== 'list'; });
       goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
       ['list', 'setup', 'preview'].forEach(p => { document.getElementById(p + '-pane').hidden = pane !== p; });
@@ -161,19 +162,20 @@
       const shared = (p) => { const k = String(p.sku || '').trim(), set = k && bySku[k]; return set && set.size > 1 ? [...set].filter(n => n !== p.name) : null; };
       const toCheck = Object.values(bySku).filter(x => x.size > 1).length;
       document.getElementById('hstats').innerHTML = [['Areas', all.length, ''], ['Products', total, ''], ['SKUs to check', toCheck, toCheck ? 'warn' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.getElementById('foot').textContent = (ck ? 'The ⋮ before a product opens its Edit panel; each box there saves as you leave it. A machine\'s list is the Product drop-down on its Quality Check, which also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
+      document.getElementById('foot').textContent = (ck ? 'Edit before a product opens its Edit panel; each box there saves as you leave it. A machine\'s list is the Product drop-down on its Quality Check, which also keeps "Other (type it)". The product name is what is saved; a SKU marked Check SKU is on more than one product.' : 'View only. A manager or administrator changes the lists.') + (note ? ' ' + note : '');
       if (!line) { document.getElementById('form-title').textContent = plantName(plant) + ' Products'; document.getElementById('form-last').textContent = ''; document.getElementById('rows').innerHTML = '<tr><td colspan="11" class="empty">' + escapeHtml(plantName(plant)) + ' has no areas yet. Areas &amp; Groups adds one, or Upload adds them from the template.</td></tr>'; return; }
       const c = changed[line.id];
       document.getElementById('form-title').textContent = line.name + ' Products';
       document.getElementById('form-last').textContent = c ? (c.uploaded ? 'Uploaded ' : 'Changed ') + when(c.updatedAt) + (c.updatedBy ? ' by ' + c.updatedBy : '') : line.machine ? 'Starting list (10/10)' : '';
       if (force === 'keep') return;
       const q = find.trim().toUpperCase();
-      // Joe 10/12: the rows only show the product; the ⋮ before the name (or a double-click on the row) opens its Edit panel.
+      // Joe 10/12: the rows only show the product; the Edit button before the name (or a double-click on the row) opens its Edit
+      // panel (review item 32, Joe 10/13: an Edit word button, not the ⋮ dots).
       const show = (v) => escapeHtml(v === undefined || v === null ? '' : String(v));
       const cell = (k, v, also) => '<td data-k="' + k + '"' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><span class="pm-val">' + show(v) + '</span>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
       const num = (k, v) => '<td data-k="' + k + '" class="pm-num">' + show(v) + '</td>';
       const rows = listOf(line.id).map((p, i) => [p, i]).filter(([p]) => (!q || (p.name + ' ' + p.sku).toUpperCase().indexOf(q) >= 0) && (!p.name || inGroup(p)));
-      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr data-row="' + i + '"><td data-k="name" class="pm-namecell">' + (ck ? '<button type="button" class="pm-dots" data-edit="' + i + '" aria-label="Edit ' + show(p.name || 'new product') + '" title="Edit">⋮</button>' : '') + '<span class="pm-name">' + (p.name ? show(p.name) : '<em>New product</em>') + '</span></td>' +
+      document.getElementById('rows').innerHTML = rows.map(([p, i]) => '<tr data-row="' + i + '"><td data-k="name" class="pm-namecell">' + (ck ? '<button type="button" class="pm-editbtn" data-edit="' + i + '" aria-label="Edit ' + show(p.name || 'new product') + '">Edit</button>' : '') + '<span class="pm-name">' + (p.name ? show(p.name) : '<em>New product</em>') + '</span></td>' +
         cell('sku', p.sku, shared(p)) + cell('upc', p.upc) + cell('mfgType', p.mfgType) + cell('productGroup', p.productGroup) +
         num('ratePerMin', p.ratePerMin) + num('targetPct', p.targetPct) + num('minSpeed', p.minSpeed) + num('maxSpeed', p.maxSpeed) + num('shelfLifeDays', p.shelfLifeDays) +
         '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="' + i + '">' + (armed === line.id + '|' + i ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
@@ -288,7 +290,6 @@
     document.getElementById('find').addEventListener('input', e => { find = e.target.value; render(true); });
     document.getElementById('area').addEventListener('change', e => { chosen = e.target.value; armed = null; note = ''; setUrl(); render(true); });
     document.getElementById('group').addEventListener('change', e => { group = e.target.value; render(true); });
-    document.getElementById('plant').addEventListener('change', e => { plant = e.target.value; chosen = ''; group = ''; armed = null; note = ''; render(true); setUrl(); });
 
     /* ---------- Areas & Groups ---------- */
     document.getElementById('edit-setup').addEventListener('click', () => {

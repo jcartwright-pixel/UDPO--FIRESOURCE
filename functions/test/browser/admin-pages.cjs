@@ -20,7 +20,9 @@ const SHOTS = process.env.SHOTS_DIR;
 const ADMIN = '?testEmail=admin.test@uniteddairy.com';
 
 async function openPage(browser, width, height, url) {
-  const page = await browser.newPage({ viewport: { width, height } });
+  // The stations keep their screen on the tablet with a service worker (Joe 10/13); its fetches skip page.route, so the
+  // Firebase code it asks gstatic.com for never arrives here. Blocked as in the other checks (station-offline.cjs tests it).
+  const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
@@ -60,6 +62,11 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     assert.equal(await p.$$eval('.adm-nav .adm-item svg, .adm-nav .adm-item img, .adm-nav .adm-ic', x => x.length), 0);
     assert.equal(await p.$('#view .ap-tiles'), null);
     assert.equal(await emailsWhole(p), true);
+    // Joe 10/13: typing "conflicts" in Find a setting finds Sheet Conflicts under Diagnostics.
+    await p.fill('#find', 'conflicts');
+    await p.waitForFunction(() => [...document.querySelectorAll('.adm-item')].map(x => x.dataset.key).join() === 'sheet-conflicts');
+    await p.fill('#find', '');
+    await p.waitForSelector('.adm-item[data-key="people"]');
     await shot(p, 'people-1920.png');
     await shot(p, 'people-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
 

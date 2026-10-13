@@ -127,12 +127,16 @@ async function shots(page, name, w) {
     await dock.click(row('811') + ' button.edit-row');
     await dock.fill('#rows [data-e="trailer"]', '977');
     if (SHOTS) await dock.screenshot({ path: path.join(SHOTS, 'unloading-edit-1920.png'), scale: 'css' });
-    await dock.click('#rows [data-do="editsave"]');
+    // Review item 38 (Joe 10/13): no Save button on the edit line; leaving the box saves it.
+    assert.equal(await dock.$('#rows [data-do="editsave"]'), null, 'no Save button on the edit line');
+    await dock.press('#rows [data-e="trailer"]', 'Tab');
     await watcher.waitForFunction(() => /T-977/.test(document.querySelector('tr[data-key$="|811|UT DSD MILK"]').textContent), null, { timeout: 8000 }).catch(async e => {
       console.error('DEBUG2', await dock.textContent('#error'), await dock.innerHTML(row('811')).catch(() => 'gone'), await watcher.innerHTML(row('811')).catch(() => 'gone'));
       throw e;
     });
-    results.push('811 trailer back typed 977: the other screen shows T-977');
+    await dock.click('#rows [data-do="editclose"]');
+    await dock.waitForFunction(() => !document.querySelector('#rows tr.editrow'));
+    results.push('811 trailer back typed 977 and the box left (no Save button): the other screen shows T-977');
 
     // RTA on 811 (the driver's check-in return); the banner drops to the one left (805, now on All Loads).
     await dock.click(row('811') + ' button.rta');

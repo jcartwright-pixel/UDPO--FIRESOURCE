@@ -26,9 +26,10 @@
   <div id="screen" hidden>
     <!-- The line tablet is a station like the Plant Station: a slim header, no desktop menu. -->
     <header class="topbar" id="ps-top">
+      <!-- Review item 50 (Joe 10/13): the logo first, then Back and Home, as on the desktop screens. -->
+      <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Line Tablet</strong></span>
       <button type="button" id="go-back" title="Back one screen">&#8249; Back</button>
       <button type="button" id="go-home" title="Home">Home</button>
-      <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Line Tablet</strong></span>
       <span class="ps-pill" id="pill" hidden></span>
       <button type="button" id="change" hidden>Change Line</button>
       <span class="who" id="who"></span>
@@ -66,8 +67,8 @@
       <!-- Enter Count: the total made this shift, from the machine's counter. -->
       <form class="lb-pane" id="count-pane" hidden>
         <div class="lb-pane-top"><h2>How many made this shift so far?</h2></div>
-        <p class="lb-mut">Type the total from the filler's counter for this shift. Speed works out from one count to the next.</p>
-        <div class="lb-count-row"><input id="count-box" inputmode="numeric" maxlength="7" autocomplete="off" aria-label="Total made this shift"><button type="submit" class="lb-btn green" id="count-save">Save Count</button><button type="button" class="lb-btn" id="count-cancel">Cancel</button></div>
+        <p class="lb-mut">Type the total from the filler's counter for this shift. It saves when you leave the box (or press Enter). Speed works out from one count to the next.</p>
+        <div class="lb-count-row"><input id="count-box" inputmode="numeric" enterkeyhint="done" maxlength="7" autocomplete="off" aria-label="Total made this shift"><button type="button" class="lb-btn" id="count-cancel">Close</button></div>
       </form>
     </div>
   </div>
@@ -212,17 +213,24 @@
     });
     document.getElementById('enter-count').addEventListener('click', () => {
       const v = lineView(data, data.lines.find(l => l.operationId === lineId), now());
-      pane = 'count'; render();
-      const box = document.getElementById('count-box'); box.value = v.made ? String(v.made) : ''; box.focus(); box.select();
+      pane = 'count'; countShown = v.made ? String(v.made) : ''; countSent = false; render();
+      const box = document.getElementById('count-box'); box.value = countShown; box.focus(); box.select();
     });
-    document.getElementById('count-cancel').addEventListener('click', () => { pane = ''; render(); });
-    document.getElementById('count-pane').addEventListener('submit', async e => {
-      e.preventDefault();
-      const raw = document.getElementById('count-box').value.replace(/[,\s]/g, '');
+    // Review item 38 (Joe 10/13): no Save Count button. The count saves when the box is left or Enter is pressed: one save
+    // (the same saveLineEntry count), however the box is left; countSent keeps a blur after Enter from saving it again.
+    let countShown = '', countSent = false;
+    async function saveCount() {
+      if (pane !== 'count' || countSent) return;
+      const box = document.getElementById('count-box'), raw = box.value.replace(/[,\s]/g, '');
+      if (raw === countShown.replace(/[,\s]/g, '')) return;
       if (!/^\d+$/.test(raw)) { showError('Type the number made this shift, digits only.'); return; }
+      countSent = true;
       pane = '';
       await enter('count', { count: Number(raw) });
-    });
+    }
+    document.getElementById('count-box').addEventListener('change', saveCount);
+    document.getElementById('count-cancel').addEventListener('click', () => { pane = ''; render(); });
+    document.getElementById('count-pane').addEventListener('submit', e => { e.preventDefault(); saveCount(); });
     document.getElementById('line-list').addEventListener('click', e => { const b = e.target.closest('[data-line]'); if (!b) return; lineId = b.dataset.line; write(lineId); render(); });
     document.getElementById('change').addEventListener('click', () => { lineId = ''; write(''); pane = ''; history.replaceState(null, '', location.pathname); render(); });
     document.getElementById('go-back').addEventListener('click', () => { if (pane) { pane = ''; render(); return; } goBack(); });

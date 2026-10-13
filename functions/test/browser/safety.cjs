@@ -343,6 +343,9 @@ async function cameraShot(page, color) {
     await la.waitForSelector('#rows tr.sw-place-row');
     assert.deepEqual(await la.$$eval('#rows tr.sw-place-row input[data-k="name"]', i => i.map(x => x.value)), ['Plant', 'Garage', 'Office', 'Yard']);
     assert.match(await la.textContent('#counts'), /4 areas · 21 sub-areas · the starting list/);
+    // Review item 31 (Joe 10/13): no plant drop-down inside a plant; the plant's name is in the heading.
+    assert.equal(await la.$('#plant'), null, 'no plant drop-down on Location Areas');
+    assert.equal(await la.textContent('#plant-name'), 'Uniontown');
     const locsNow = async () => S.locations((await db().collection('locationAreas').doc(UT).get()).data() || null);
     const laUntil = async (ok, what) => { for (let i = 0; i < 40; i++) { if (ok(await locsNow())) return; await la.waitForTimeout(250); } assert.fail(what); };
     await la.fill('#rows tr.sw-sub-row input[value="Wash Bay"]', 'Truck Wash');

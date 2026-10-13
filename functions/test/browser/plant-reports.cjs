@@ -132,6 +132,10 @@ async function seed() {
       const k = await pg.$$eval('#detail .rp-kpi', ks => ks.map(x => x.querySelector('span').textContent + '=' + x.querySelector('b').textContent));
       assert.deepEqual(k.slice(0, 4), ['Loads=10', 'On time=60%', 'Late=3', 'Not loaded=1']);
       assert.equal(k[6], 'Pickups=3');
+      // Review item 29 (Joe 10/13): the Loadout times keep their AM/PM and are not cut off; "No loads" is never giant letters.
+      assert.match(k[4], /^Loadout=(\d+:\d\d\s[AP]M|—) – (\d+:\d\d\s[AP]M|—)$/);
+      assert.ok(await pg.$eval('#detail .rp-kpi:nth-child(5) b', b => b.scrollWidth <= b.clientWidth + 1 && b.getBoundingClientRect().right <= b.parentElement.getBoundingClientRect().right + 1), 'the Loadout times fit their tile at ' + w);
+      assert.deepEqual(await pg.$$eval('.rp-day b', bs => bs.filter(b => b.textContent === 'No loads' && (!b.classList.contains('rp-none-day') || b.getClientRects().length > 1 || b.offsetHeight > 40)).length), 0);
       assert.equal(k[7], 'Breakdowns=1');
       assert.match(await pg.textContent('#detail .rp-grid'), /503 MASSILLON[\s\S]*1 h 35 min[\s\S]*510 TANKER EAST[\s\S]*NOT LOADED/);
       assert.match(await pg.textContent('#detail'), /Check-in: 2 cs 1\/2 GAL WHOLE short/);
@@ -188,7 +192,12 @@ async function seed() {
     await ps.fill(last + 'input[data-k="start"]', '07:00');
     await ps.fill(last + 'input[data-k="end"]', '15:30');
     await shots(ps, 'plant-shifts', 1920);
-    await ps.click('#save');
+    // Review items 31 and 38 (Joe 10/13): no plant drop-down and no Save Shifts button; the list saves once the new shift's
+    // last box is left.
+    assert.equal(await ps.$('#plant'), null, 'no plant drop-down');
+    assert.equal(await ps.$('#save'), null, 'no Save Shifts button');
+    assert.equal(await ps.textContent('#plant-name'), 'Uniontown');
+    await ps.press(last + 'input[data-k="end"]', 'Tab');
     await ps.waitForFunction(() => /4 shifts saved/.test(document.getElementById('saved').textContent));
     await ps.reload();
     await ps.waitForFunction(() => document.querySelectorAll('#rows tr[data-i]').length === 4 && /Saved/.test(document.getElementById('last').textContent));
@@ -198,13 +207,17 @@ async function seed() {
     results.push('Plant Shifts: Uniontown starts with 6:00-2:30, 2:00-10:30, 10:00-5:30 (Distribution); a Plant Production shift saves beside them');
 
     // Kiosk: today's loads, 4 of 10 loaded, the next to load listed; the TV hides the header.
-    for (const [w, h, url, name] of [[1920, 1080, '/plant-kiosk.html?' + MANAGER, 'kiosk'], [1920, 1080, '/plant-kiosk.html?tv=1&' + MANAGER, 'kiosk-tv'], [1280, 800, '/plant-kiosk.html?' + MANAGER, 'kiosk-tablet']]) {
+    for (const [w, h, url, name] of [[1920, 1080, '/plant-kiosk.html?' + MANAGER, 'kiosk'], [1920, 1080, '/plant-kiosk.html?tv=1&' + MANAGER, 'kiosk-tv'], [1280, 800, '/plant-kiosk.html?' + MANAGER, 'kiosk-tablet'], [1024, 768, '/plant-kiosk.html?' + MANAGER, 'kiosk-tablet']]) {
       const ks = await openPage(browser, w, h, url);
       await ks.waitForFunction(() => /of 10/.test(document.getElementById('k-loaded').textContent));
       assert.equal(await ks.textContent('#k-loaded'), '4 of 10');
       assert.ok((await ks.$$('#next .pk-row')).length >= 6);
       assert.equal(await ks.isVisible('.topbar'), name !== 'kiosk-tv');
       assert.ok(!(await ks.$('.sidemenu')), 'no desktop menu on the kiosk');
+      // Review item 39 (Joe 10/13): a plant screen's header word, and each big number fits its own tile ("100%" at 1024).
+      if (name !== 'kiosk-tv') assert.equal(await ks.textContent('.topbar .brand small'), 'UNITED DAIRY · PLANT DISTRIBUTION');
+      const over = await ks.$$eval('.pk-kpis b', bs => bs.filter(b => { const t = b.parentElement.getBoundingClientRect(), r = document.createRange(); r.selectNodeContents(b); return r.getBoundingClientRect().right > t.right + 1; }).map(b => b.textContent));
+      assert.deepEqual(over, [], 'every kiosk number fits its tile at ' + w);
       if (SHOTS) await ks.screenshot({ path: path.join(SHOTS, name + '-' + w + '.png'), scale: 'css' });
       assert.deepEqual(ks.errors, []);
       await ks.close();

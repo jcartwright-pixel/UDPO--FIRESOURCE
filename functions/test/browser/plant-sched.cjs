@@ -89,9 +89,11 @@ async function shots(page, name, w) {
       // Day.
       await page.click('[data-view="day"]');
       await page.waitForSelector('table.sc-table');
-      // Leaving a week that holds today shows today (as the current app); pick Thursday.
-      await page.fill('#pick', DATE);
-      await page.dispatchEvent('#pick', 'change');
+      // Leaving a week that holds today shows today (as the current app); step to Thursday with the arrows (review item 37,
+      // Joe 10/13: no date box, the arrows move the dates).
+      assert.equal(await page.$('#pick'), null, 'no date box on the Scheduler');
+      const dayShown = () => page.evaluate(() => { const m = /(\d+)-(\d+)-(\d+)\s*$/.exec(document.getElementById('range').textContent.trim()); return m ? '20' + m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0') : ''; });
+      for (let i = 0; i < 400 && (await dayShown()) !== DATE; i++) { const before = await page.textContent('#range'); await page.click((await dayShown()) < DATE ? '#next' : '#prev'); await page.waitForFunction((b) => document.getElementById('range').textContent !== b, before); }
       await page.waitForFunction(() => /Thursday 10-8-26/.test(document.getElementById('range').textContent));
       assert.deepEqual(await page.$$eval('table.sc-table tbody tr td:nth-child(3)', t => t.map(x => x.textContent)), ['6:30 AM', '7:00 AM', '1:00 PM']);
       assert.deepEqual(await page.$$eval('table.sc-table tbody tr', t => t.map(x => x.className)), ['by-ut', 'by-ut', 'by-carrier'], 'the day colors each load by who delivers it');

@@ -35,7 +35,6 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="kpis" id="kpis"></div>
       <div class="actions">
         <div class="chips" id="filters"></div>
         <input type="search" id="search" placeholder="Find a machine, problem or mechanic" aria-label="Find">
@@ -67,7 +66,6 @@
     let plant = params.get('plant') || '', filter = 'open', search = '', person = null, app = {}, data = null, db = null, stop = null;
     const when = (s) => { const t = Date.parse(s || ''); return isFinite(t) ? shortDate(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })) : ''; };
     const hm = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' m' : m + ' m';
-    const weekAgo = () => new Date(Date.now() - 7 * 86400000).toISOString();
 
     function render() {
       const pl = plantFor(person, plant);
@@ -76,12 +74,8 @@
       const st = L.screenState(app, 'plant');
       goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? 'LIVE' : 'TEST COPY';
-      const orders = data ? data.workOrders : [], open = orders.filter(o => R.isOpen(o));
-      document.getElementById('kpis').innerHTML = [
-        [open.length, 'Open', ''], [orders.filter(o => o.status === 'NEW').length, 'Not started', 'warn'], [orders.filter(o => o.status === 'WORKING').length, 'Being worked', ''],
-        [orders.filter(o => o.status === 'PARTS').length, 'Waiting on parts', 'warn'], [open.filter(o => o.lineDown === 'YES').length, 'Line down', 'warn'],
-        [orders.filter(o => o.status === 'DONE' && String(o.completedAt || '') >= weekAgo()).length, 'Done last 7 days', 'good']
-      ].map(([n, label, c]) => '<div class="' + (n ? c : 'zero') + '"><b>' + n + '</b><span>' + label + '</span></div>').join('');
+      const orders = data ? data.workOrders : [];
+      // Review item 44 (Joe 10/13): no count tiles; the filter buttons below already carry the counts.
       const match = (o, k) => k === 'all' || (k === 'open' ? R.isOpen(o) : k === 'parts' ? o.status === 'PARTS' : o.status === 'DONE');
       document.getElementById('filters').innerHTML = FILTERS.map(([k, label]) => '<button type="button" data-filter="' + k + '" class="' + (filter === k ? 'on' : '') + '">' + label + '<b>' + orders.filter(o => match(o, k)).length + '</b></button>').join('');
       const q = search.toUpperCase();

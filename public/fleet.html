@@ -117,10 +117,13 @@
       // Send to Garage (managers): the PM / reefer service and DOT inspection due or overdue become Garage Station jobs. Plates never go.
       const sendable = (r) => ['PM', 'DOT'].map(k => r.c[k]).filter(i => i && (i.status === 'OVERDUE' || i.status === 'DUE_SOON' || i.status === 'NO_MILES'));
       const send = (r) => r.worst === 'AT_GARAGE' ? '<small>at garage</small>' : !sendable(r).length ? '' : '<button type="button" class="edit" data-send="' + escapeHtml(r.unit) + '" data-type="' + r.type + '" data-keys="' + sendable(r).map(i => i.key).join(',') + '" title="Put ' + escapeHtml(sendable(r).map(i => i.what).join(' and ')) + ' on the Garage Station">Send to Garage</button>';
+      // Review item 41 (Joe 10/13): the last column (Send to Garage) shows only when a row has something in it, with a heading;
+      // with nothing to send there is no empty column after Status.
+      const garageCol = rows.some(r => send(r));
       return '<div class="fs-legend"><em>' + need + ' of ' + rows.length + ' units need something</em></div>' +
-        table([9, 7, 17, 17, 17, 10, 10, 13], ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status', ''],
+        table(garageCol ? [9, 7, 17, 17, 17, 10, 10, 13] : [10, 8, 20, 20, 18, 12, 12], ['Unit', 'Type', 'PM / Reefer', 'DOT', 'Plates', 'Miles / hours now', 'Status'].concat(garageCol ? ['Garage'] : []),
           rows.map(r => '<tr data-unit="' + escapeHtml(r.unit) + '" data-worst="' + r.worst + '"><td class="strong">' + escapeHtml(r.unit) + '</td><td>' + (r.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td>' +
-            box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td>' + now(r) + '</td><td>' + pill(STATUS[r.worst]) + '</td><td>' + send(r) + '</td></tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
+            box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td>' + now(r) + '</td><td>' + pill(STATUS[r.worst]) + '</td>' + (garageCol ? '<td>' + send(r) + '</td>' : '') + '</tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
     }
 
     function render() {

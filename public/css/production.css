@@ -145,3 +145,10 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .lt-key { background: #fff8e1; border-radius: 8px; padding: 8px 10px; }
 .lt-reader-btns { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
 .lt-reader-btns button { min-height: 44px; padding: 0 18px; font-size: 16px; font-weight: 700; }
+/* Review item 33 (Joe 10/13): Make Line Key, Start Test Feed and Test Feed on Every Line are app buttons (white with the blue
+   edge and words, like Products List above them), not plain grey browser buttons; the Stop buttons are the red kind. */
+.lt-reader-btns button { border: 1px solid var(--ud-blue); border-radius: 9px; background: #fff; color: var(--ud-blue); font-family: inherit; font-weight: 800; cursor: pointer; }
+.lt-reader-btns button:hover { background: #eef5fc; }
+.lt-reader-btns button.danger { border-color: #c62828; background: #c62828; color: #fff; }
+.lt-reader-btns button.danger:hover { background: #a61f1f; }
+.lt-reader-btns button:disabled { opacity: .55; cursor: default; }
