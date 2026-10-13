@@ -1109,3 +1109,11 @@
   .plant-page.unload-page .uw-tabrow .tabs { flex-wrap: wrap; max-width: 100%; }
   .plant-page.unload-page .uw-tabrow .tabs button { flex: none; white-space: nowrap; padding: 0 12px; }
 }
+/* Review item 56 follow-up: with 16px words and wider letters, Yard Checks' Refresh dropped under the line on a laptop
+   (1366). The small title line may take two lines and the counts sit a little tighter, so everything stays on one line. */
+@media (max-width: 1500px) {
+  body.yard-page .head .title { max-width: 240px; }
+  body.yard-page .head .title .eyebrow { white-space: normal; line-height: 1.15; }
+  body.yard-page .head .hstats div { min-width: 0; padding: 4px 8px; }
+  body.yard-page .head .hstats span { letter-spacing: 0; }
+}

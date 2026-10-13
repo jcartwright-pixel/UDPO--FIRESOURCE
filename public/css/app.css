@@ -1693,7 +1693,9 @@ input[type="date"].ud-date-dressed::-webkit-datetime-edit { color: transparent; 
 /* Review item 1 (Joe 10/13): Daily's top buttons sit on the title line with the date boxes on the right (laptops and desk
    screens; a phone keeps its wrapped layout). */
 @media (min-width: 701px) {
-  body.daily-look .head:has(#print-sheet) { flex-wrap: nowrap; align-items: flex-end; gap: 10px; }
+  /* With wider letters than Windows' (Linux's DejaVu, which the online checks use) the date boxes drop under the buttons
+     instead of running past the right edge; on Joe's screens they stay on the line. */
+  body.daily-look .head:has(#print-sheet) { flex-wrap: wrap; row-gap: 6px; align-items: flex-end; gap: 10px; }
   body.daily-look .head:has(#print-sheet) .title { flex: none; }
   body.daily-look .head:has(#print-sheet) .actions.in-head { margin-left: 0; flex-wrap: nowrap; gap: 6px; }
   body.daily-look .head:has(#print-sheet) .actions.in-head + .field { margin-left: auto; }
