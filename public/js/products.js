@@ -110,3 +110,48 @@ export function rowsByHeading(rows) {
   TEMPLATE.forEach(t => { at[t] = head.indexOf(t.toUpperCase()); has[t] = at[t] >= 0; });
   return { has, rows: rows.slice(1).map(r => { const o = {}; TEMPLATE.forEach(t => { if (at[t] >= 0) o[t] = String(r[at[t]] == null ? '' : r[at[t]]).trim(); }); return o; }) };
 }
+
+// Joe 10/13: the Product Sheet is one list of the plant's products, one line each, with a check for every machine it runs on
+// (each machine's checked products are still its own list in plantProducts: the Product drop-down on its Quality Check, in the
+// machine's order, with its own speeds and Target %). A product checked on no machine is kept in productSheet/{plant}.
+// Machine Setup shows the same lists one machine at a time. A product is matched across machines by its name.
+export const SHARED_FIELDS = ['name', 'sku', 'upc', 'mfgType', 'productGroup', 'shelfLifeDays'];
+export const MACHINE_FIELDS = ['ratePerMin', 'targetPct', 'minSpeed', 'maxSpeed'];
+export const keyOf = (name) => String(name || '').trim().toUpperCase();
+// [{key, p, on: {areaId: product}, loose}] in name order: p is the product's details as first found (machines in their order, then
+// the products on no machine).
+export function sheetRows(areas, listOf, loose) {
+  const by = new Map();
+  const add = (p, areaId) => {
+    const k = keyOf(p && p.name);
+    if (!k) return;
+    let r = by.get(k);
+    if (!r) { r = { key: k, p: Object.assign({}, p), on: {}, loose: null }; by.set(k, r); }
+    if (areaId) r.on[areaId] = p; else r.loose = p;
+  };
+  areas.forEach(a => (listOf(a.id) || []).forEach(p => add(p, a.id)));
+  (loose || []).forEach(p => add(p, ''));
+  return [...by.values()].sort((a, b) => String(a.p.name).localeCompare(String(b.p.name), undefined, { numeric: true, sensitivity: 'base' }));
+}
+const has = (v) => v !== undefined && v !== null && String(v) !== '';
+// A speed or target on each machine the product runs on (in the machines' order); a product on no machine has its own.
+export function machineValues(row, k, areas) {
+  const ids = areas.map(a => a.id).filter(id => row.on[id]);
+  const vals = ids.map(id => row.on[id][k]).filter(has);
+  return ids.length ? vals : row.loose && has(row.loose[k]) ? [row.loose[k]] : [];
+}
+// The number the sheet and the downloaded list show: the first machine's (orange on the sheet when the machines differ).
+export function shownValue(row, k, areas) { const v = machineValues(row, k, areas); return v.length ? v[0] : ''; }
+export function watchLoose(db, cb, fail) {
+  return onSnapshot(collection(db, 'productSheet'), s => cb(s.docs.map(d => d.data())), e => { cb([]); if (fail) fail(e); });
+}
+// The Download Product List / Upload columns: the product, a column per machine (an X where it runs), then the numbers.
+export const SHEET_HEAD = ['Product', 'SKU', 'UPC', 'Type', 'Group'];
+export const SHEET_TAIL = ['Full Speed Per Min', 'Target %', 'Lowest Speed', 'Highest Speed', 'Shelf Life Days'];
+// A machine cell is checked when it has anything in it but 0, No, False or a dash.
+export const isChecked = (v) => { const t = String(v == null ? '' : v).trim().toUpperCase(); return t !== '' && ['0', 'NO', 'N', 'FALSE', '-'].indexOf(t) < 0; };
+// Two lists the same once both are as the server keeps them (key order and number form do not count).
+export function sameList(a, b) {
+  const canon = (p) => { const c = cleanProduct(p), o = {}; Object.keys(c).sort().forEach(k => { o[k] = c[k]; }); return o; };
+  return JSON.stringify((a || []).map(canon)) === JSON.stringify((b || []).map(canon));
+}

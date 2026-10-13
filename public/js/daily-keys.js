@@ -56,7 +56,7 @@ export function rankChoices(choices, typed, unit) {
 
 /*
  * h = { rowOf(td), current(row, kind), text(row, kind), choices(kind, row) -> [{value, label, key, group, blocked, reason}],
- *       pick(row, kind, value or {unit}), editText(td, row, kind, typed), setEditing(on), render() }
+ *       pick(row, kind, value or {unit}), editText(td, row, kind, typed), setEditing(on), render(), warn(text) optional }
  */
 export function bindDailyKeys(tbody, h) {
   injectStyle();
@@ -179,7 +179,12 @@ export function bindDailyKeys(tbody, h) {
         else if (!input.value.trim() && !all) value = ''; // Delete / Backspace then Enter clears the cell
         // A truck or trailer number with no match is kept as typed, like the current app (trailers as T-###); one that matches
         // a unit that cannot be used now (greyed, with why) is not saved as typed: the old one stays (Joe 10/12, 891).
-        else if (unit && input.value.trim() && shown.some(c => c.blocked && endsWith(c, input.value))) value = null;
+        else if (unit && input.value.trim() && shown.some(c => c.blocked && endsWith(c, input.value))) {
+          value = null;
+          // Joe 10/13 (8302, T-965): say why the old unit stayed, instead of putting it back without a word.
+          const b = shown.find(c => c.blocked && endsWith(c, input.value));
+          if (h.warn) h.warn((b.label || input.value.trim()) + ' was not put on' + (b.reason ? ' (' + b.reason + ')' : '') + '. The old one stays. Tick OVR on the line to use it anyway.');
+        }
         else if (unit && input.value.trim()) { const t = input.value.trim().toUpperCase().replace(/\s+/g, ''); value = { unit: kind === 'trailer' ? 'T-' + t.replace(/^T-?/, '') : t }; }
       }
       want = to;
@@ -195,7 +200,8 @@ export function bindDailyKeys(tbody, h) {
       else if (e.key === 'Tab') { e.preventDefault(); const n = next(tbody, td, e.shiftKey ? -1 : 1, true); finish(true, n ? where(n) : here); }
       else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false, here); }
     });
-    input.addEventListener('blur', () => setTimeout(() => finish(false, null), 0));
+    // Joe 10/13: a number typed and then a click somewhere else (Print, another line) is taken, like Excel; an empty box keeps the old one.
+    input.addEventListener('blur', () => setTimeout(() => finish(!!input.value.trim(), null), 0));
     pop.addEventListener('mousedown', e => {
       e.preventDefault();
       const n = e.target.closest('[data-i]');

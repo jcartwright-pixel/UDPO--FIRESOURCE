@@ -1175,6 +1175,52 @@ async function saveProductUpload(tx, db, req, email, stamp, logRef, mode, SaveEr
   return result;
 }
 
+// saveProductSheet (Joe 10/13): the Product Sheet is one list for the plant with a check for each machine a product runs on, and
+// Machine Setup sets one machine's products. Both send the machine lists they change (each is that machine's Quality Check
+// drop-down, kept as before in plantProducts) and, when it changes, the plant's products that run on no machine yet (productSheet).
+function validateProductSheet(input, SaveError) {
+  const facilityId = validFacility(input.facilityId, SaveError);
+  const list = Array.isArray(input.areas) ? input.areas : [];
+  if (list.length > AREA_LIMIT) throw new SaveError('BAD_REQUEST', 'A plant holds up to ' + AREA_LIMIT + ' areas.');
+  const seen = {};
+  const areas = list.map(a => {
+    const x = a && typeof a === 'object' ? a : {}, areaId = text(x.areaId).slice(0, 120);
+    if (!/^[A-Za-z0-9_-]+$/.test(areaId)) throw new SaveError('BAD_REQUEST', 'Pick a machine.');
+    if (seen[areaId]) throw new SaveError('BAD_REQUEST', 'A machine is in the save twice.');
+    seen[areaId] = true;
+    return { areaId, products: productRows(x.products, SaveError) };
+  });
+  const out = { facilityId, areas };
+  if (input.loose !== undefined) out.loose = productRows(input.loose, SaveError);
+  if (!areas.length && !out.loose) throw new SaveError('BAD_REQUEST', 'Nothing to save.');
+  return out;
+}
+async function saveProductSheet(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const found = [];
+  for (const a of req.areas) {
+    const area = await areaOf_(tx, db, a.areaId);
+    if (!area || area.facilityId !== req.facilityId) throw new SaveError('NOT_FOUND', 'That machine is not set up for this plant.');
+    found.push(area);
+  }
+  const refs = req.areas.map(a => db.collection('plantProducts').doc(docId(a.areaId))), had = [];
+  for (const r of refs) had.push(await tx.get(r));
+  const looseRef = db.collection('productSheet').doc(req.facilityId), looseHad = req.loose ? await tx.get(looseRef) : null;
+  // A group typed on a product (or in an uploaded file) that the plant does not have yet is added to its groups.
+  const own = await productSetupOf(tx, db, req.facilityId), groups = own.groups.slice(), addedGroups = [];
+  req.areas.map(a => a.products).concat([req.loose || []]).forEach(list => list.forEach(p => String(p.productGroup || '').split(',').map(g => g.trim()).filter(Boolean).forEach(g => {
+    if (!groups.some(x => x.toUpperCase() === g.toUpperCase())) { groups.push(g); addedGroups.push(g); }
+  })));
+  if (groups.length > GROUP_LIMIT) throw new SaveError('BAD_REQUEST', 'A plant holds up to ' + GROUP_LIMIT + ' groups.');
+  if (addedGroups.length) tx.set(own.ref, { facilityId: req.facilityId, areas: own.areas, groups, updatedAt: stamp, updatedBy: email });
+  req.areas.forEach((a, i) => tx.set(refs[i], { operationId: a.areaId, line: found[i].name, facilityId: req.facilityId, products: a.products, updatedAt: stamp, updatedBy: email, testEdited: true }));
+  if (req.loose) tx.set(looseRef, { facilityId: req.facilityId, products: req.loose, updatedAt: stamp, updatedBy: email });
+  const result = { ok: true, requestId: req.requestId, facilityId: req.facilityId, areas: req.areas.length, addedGroups, message: req.areas.length === 1 && !req.loose ? found[0].name + ': ' + req.areas[0].products.length + ' product' + (req.areas[0].products.length === 1 ? '' : 's') + ' saved.' : 'Product Sheet saved.' };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId,
+    before: req.areas.map((a, i) => ({ area: a.areaId, products: had[i].exists ? had[i].data().products || [] : null })).concat(req.loose ? [{ area: 'loose', products: looseHad.exists ? looseHad.data().products || [] : null }] : []),
+    after: req.areas.map(a => ({ area: a.areaId, products: a.products })).concat(req.loose ? [{ area: 'loose', products: req.loose }] : []), result });
+  return result;
+}
+
 /* ---------- Plant Shifts ---------- */
 
 // savePlantShifts (Joe 10/10): a plant's shifts, Administration > Plant Shifts. Plant Reports count each load for the shift it
@@ -1207,6 +1253,6 @@ async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
-module.exports = { validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+module.exports = { validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateProductSheet, saveProductSheet, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };
