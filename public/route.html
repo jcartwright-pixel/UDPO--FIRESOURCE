@@ -8,7 +8,7 @@
   <!-- Joe 10/11: saved to the home screen from here, the "UD Routes" icon opens this page (the driver's name stays on the phone). -->
   <link rel="manifest" href="route.webmanifest">
   <!-- Joe 10/12: on the Driver Room tablet, installing opens the Driver Station link full screen (its own window). -->
-  <script>if (new URLSearchParams(location.search).get('room') === '1') document.querySelector('link[rel="manifest"]').href = 'driver-station.webmanifest';</script>
+  <script>if (new URLSearchParams(location.search).get('room') === '1') { document.querySelector('link[rel="manifest"]').href = 'driver-station.webmanifest'; document.querySelector('link[rel="apple-touch-icon"]').href = 'img/app-icon/driver-station/apple-touch-icon.png'; }</script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="UD Routes">

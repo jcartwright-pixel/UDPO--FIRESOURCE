@@ -7,6 +7,7 @@ const path = require('node:path');
 // icon, so installing from any screen gives "UD Operations" with the Q check (tools/make-icons.py makes the sizes).
 const PUBLIC = path.join(__dirname, '../../../public');
 const pages = fs.readdirSync(PUBLIC).filter(f => f.endsWith('.html'));
+const STATION_ICON = { 'plant-station.html': 'plant-station', 'garage-station.html': 'garage-station', 'driver-station.html': 'driver-station', 'driver-room.html': 'driver-station' };
 
 test('the app has a name and a 192 and 512 icon Chrome can install and mask', () => {
   const m = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'manifest.webmanifest'), 'utf8'));
@@ -28,7 +29,9 @@ test('every screen links the icon, and every signed-in screen links the app', ()
   pages.forEach(f => {
     const html = fs.readFileSync(path.join(PUBLIC, f), 'utf8');
     if (!html.includes('href="img/app-icon/favicon-32.png"')) bad.push(f + ': favicon');
-    if (!html.includes('href="img/app-icon/apple-touch-icon.png"')) bad.push(f + ': phone icon');
+    // The station apps carry their own picture (Joe 10/13): the same icon with the station's picture in the band.
+    const own = STATION_ICON[f] ? 'href="img/app-icon/' + STATION_ICON[f] + '/apple-touch-icon.png"' : 'href="img/app-icon/apple-touch-icon.png"';
+    if (!html.includes(own)) bad.push(f + ': phone icon');
     // The public driver Check-In and the coded stations (Plant, Garage, Driver Station and the Driver Room Check-In tablet,
     // Joe 10/12) are their own installs: each opens its own page full screen, not the signed-in launcher.
     if (!['route.html', 'plant-station.html', 'driver-room.html', 'driver-station.html', 'garage-station.html'].includes(f) && !html.includes('<link rel="manifest" href="manifest.webmanifest">')) bad.push(f + ': manifest');
@@ -82,5 +85,32 @@ test('installed from a station link, the station opens full screen in its own wi
     m.icons.forEach(i => assert.ok(fs.existsSync(path.join(PUBLIC, i.src)), i.src));
   }
   // The Driver Room tablet's phone screens (route.html?room=1) install the Driver Station link, not the drivers' UD Routes.
-  assert.match(fs.readFileSync(path.join(PUBLIC, 'route.html'), 'utf8'), /get\('room'\) === '1'\) document\.querySelector\('link\[rel="manifest"\]'\)\.href = 'driver-station\.webmanifest'/);
+  const route = fs.readFileSync(path.join(PUBLIC, 'route.html'), 'utf8');
+  assert.match(route, /get\('room'\) === '1'\) \{ document\.querySelector\('link\[rel="manifest"\]'\)\.href = 'driver-station\.webmanifest';/);
+  assert.match(route, /document\.querySelector\('link\[rel="apple-touch-icon"\]'\)\.href = 'img\/app-icon\/driver-station\/apple-touch-icon\.png'/);
+});
+
+// Joe 10/13 "apps for the stations": each station app has its own icon (tools/make-station-icons.py), so a tablet's
+// home screen shows which station it is: the plant for Plant Station, the tractor and trailer for Garage Station, the
+// box truck for the Driver Station (Driver Room Check-In tablet and the TV). UD Routes keeps the United Dairy icon.
+test('each station app has its own icon in every size, different from the others', () => {
+  const sets = { 'plant-station.webmanifest': 'plant-station', 'plant-station-noaccount.webmanifest': 'plant-station',
+    'garage-station.webmanifest': 'garage-station', 'driver-station.webmanifest': 'driver-station' };
+  const seen = {};
+  for (const [file, dir] of Object.entries(sets)) {
+    const m = JSON.parse(fs.readFileSync(path.join(PUBLIC, file), 'utf8'));
+    for (const sizes of ['192x192', '512x512']) {
+      for (const purpose of ['any', 'maskable']) {
+        const icon = m.icons.find(i => i.sizes === sizes && i.purpose === purpose);
+        assert.ok(icon, file + ' ' + sizes + ' ' + purpose);
+        assert.ok(icon.src.startsWith('/img/app-icon/' + dir + '/'), file + ': ' + icon.src);
+        assert.ok(fs.existsSync(path.join(PUBLIC, icon.src)), icon.src);
+      }
+    }
+    seen[dir] = fs.readFileSync(path.join(PUBLIC, 'img/app-icon', dir, 'icon-512.png')).toString('base64');
+    assert.ok(fs.existsSync(path.join(PUBLIC, 'img/app-icon', dir, 'apple-touch-icon.png')), dir + ' iPad icon');
+  }
+  const main = fs.readFileSync(path.join(PUBLIC, 'img/app-icon/icon-512.png')).toString('base64');
+  const all = Object.values(seen).concat(main);
+  assert.equal(new Set(all).size, all.length, 'every station icon differs from the others and from UD Operations');
 });
