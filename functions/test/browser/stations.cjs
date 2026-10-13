@@ -114,14 +114,27 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await dvir.selectOption('#dv-inspection', 'Pre-trip');
     await dvir.selectOption('#dv-truck-items label:nth-child(1) select', 'Defect found');
     assert.equal(await dvir.$eval('#dv-truck-items label:nth-child(1) select', x => x.classList.contains('dv-bad')), true, 'a defect stands out');
-    await dvir.check('#dv-typed');
     const said = async (re) => { await dvir.waitForFunction(r => new RegExp(r).test(document.getElementById('dv-msg').textContent), re.source, { timeout: 5000 }).catch(() => {}); return dvir.textContent('#dv-msg'); };
+    // Joe 10/13: a green Submit at the top (beside Back) and at the bottom (beside Review inspection). With no signature it
+    // goes to the signature box, outlines it and saves nothing.
+    assert.deepEqual(await dvir.$$eval('#step-dvir [data-submit]', b => b.map(x => [x.textContent, getComputedStyle(x).backgroundColor])),
+      [['Submit', 'rgb(27, 127, 59)'], ['Submit', 'rgb(27, 127, 59)']]);
+    await dvir.evaluate(() => scrollTo(0, 0));
+    await dvir.click('#step-dvir .drv-head [data-submit]');
+    assert.match(await said(/Please sign/), /Please sign/);
+    assert.equal(await dvir.$eval('.drv-sign', x => x.classList.contains('dv-need')), true, 'the signature box is outlined');
+    assert.ok(await dvir.$eval('.drv-sign', x => { const r = x.getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; }), 'the screen moved to the signature');
+    await dvir.check('#dv-typed');
+    assert.equal(await dvir.$eval('.drv-sign', x => x.classList.contains('dv-need')), false);
     await dvir.click('#dv-send');
     assert.match(await said(/Describe the defects/), /Describe the defects/);
     await dvir.fill('#dv-tractor', 'Brake pedal soft');
     await dvir.click('#dv-send');
     assert.match(await said(/Review: .* 1 defect\./), /Review: .* 1 defect\./);
-    results.push('DVIR: every item starts as no defect; only the item changed to Defect found counts (red, and it needs its write-up)');
+    // The top Submit saves it.
+    await dvir.click('#step-dvir .drv-head [data-submit]');
+    assert.match(await said(/Inspection saved|Saved on this phone/), /Inspection saved|Saved on this phone/);
+    results.push('DVIR: every item starts as no defect; only the item changed to Defect found counts (red, and it needs its write-up); green Submit at the top and bottom, which goes to the signature when it is missing and otherwise saves');
     assert.deepEqual(phone.errors, []);
     results.push('Drivers\' phone: opens on View Loadout, DVIR and Check-In; View Loadout needs no name, DVIR asks for it once; both fit a 390 wide phone');
 
