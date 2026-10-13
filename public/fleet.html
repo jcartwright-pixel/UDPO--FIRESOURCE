@@ -47,6 +47,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, showError } from './js/app.js';
     import { printSaved } from './js/print-sheet.js';
+    import { plantFor } from './js/pmaint.js';
     import { collection, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
     // The current app's Fleet Service (FleetService.html, 220_V7276_GarageFleetService.gs), Send to Garage puts a PM, reefer
@@ -56,7 +57,14 @@
     const STATUS = { OVERDUE: ['Overdue', 'warn'], AT_GARAGE: ['At garage', 'yes'], DUE_SOON: ['Due soon', 'warn soon'], NO_MILES: ['No miles yet', 'no'], SET_UP: ['Needs start date', 'no'], OK: ['OK', 'yes'] };
     const READ_NAMES = { equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', workOrders: 'work orders', garageTechs: 'technician list' };
     const JOB = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
-    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], orders = [], techs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
+    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], orders = [], techs = [], rawOrders = [], rawTechs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
+    // Joe 10/13: Fleet Service follows the plant you are in (the plant home you came through, as the plant pages do; Uniontown
+    // until someone opens another plant). Units, work orders, the rules and the garage technicians are that plant's; a row saved
+    // before plants were kept (no facility) is Uniontown's.
+    let plant = { id: 'fac_uniontown', name: 'Uniontown' };
+    const plantOf = (x) => String((x && (x.facilityId || x.facility_id)) || '').trim() || 'fac_uniontown';
+    const ours = (x) => plantOf(x) === plant.id;
+    const rulesDoc = () => plant.id === 'fac_uniontown' ? 'fleetRules' : 'fleetRules_' + plant.id;
     const rules = () => Object.assign({}, L.FLEET_RULES, savedRules || {});
     const num = (n) => n === '' || n == null ? '' : Number(n).toLocaleString();
     const when = (s) => { const k = L.localDay(s); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : ''; };
@@ -65,7 +73,7 @@
 
     function units() {
       const seen = {};
-      return equipment.map(e => ({ e, type: L.fleetKind(e.type) })).filter(({ e, type }) => type && e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') &&
+      return equipment.map(e => ({ e, type: L.fleetKind(e.type) })).filter(({ e, type }) => type && e.unit && ours(e) &&
         e.sourcePresent !== false && !L.unitLeased(e) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
         .map(({ e, type }) => ({ unit: String(e.unit).toUpperCase(), type })).filter(u => !seen[u.unit] && (seen[u.unit] = true))
         .sort((a, b) => (a.type === b.type ? 0 : a.type === 'TRUCK' ? -1 : 1) || a.unit.localeCompare(b.unit, undefined, { numeric: true }));
@@ -167,16 +175,16 @@
         const rule = (key, label, unit) => '<label>' + label + '<span class="fs-rule"><input type="number" min="0" step="1" data-rule="' + key + '" value="' + R[key] + '"' + (boss ? '' : ' disabled') + '><small>' + unit + '</small></span></label>';
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           (boss ? '<button type="button" class="primary" id="rules-save">Save Rules</button>' : '<span class="hint">Managers and administrators change the setup.</span>');
-        sheet.innerHTML = '<div class="fleet-split wide-left"><div><h2>Units</h2>' + table([10, 8, 9, 13, 14, 11, 11, 16, 8], ['Unit', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'DOT due', 'Plate expires', 'Notes', ''],
+        sheet.innerHTML = '<div class="fleet-split wide-left"><div><h2>Units · ' + escapeHtml(plant.name) + '</h2>' + table([10, 9, 9, 13, 14, 11, 11, 15, 8], ['Unit', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'DOT due', 'Plate expires', 'Notes', ''],
           due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.trackSet ? (u.tracked ? 'Yes' : 'No') : 'Default') + '</td><td>' + when(u.lastServiceDate) +
             (u.lastServiceMiles != null ? '<small>' + num(u.lastServiceMiles) + ' mi</small>' : u.lastServiceHours != null ? '<small>' + num(u.lastServiceHours) + ' hrs</small>' : '') + '</td><td>' +
             (u.miles != null ? num(u.miles) + ' mi<small>' + when(u.milesDate) + '</small>' : u.currentHours != null ? num(u.currentHours) + ' hrs' : '') + '</td><td>' + when(u.dotDue) + '</td><td>' + when(u.plateExpires) + '</td><td class="wrong">' + escapeHtml(u.notes) + '</td><td>' +
             (boss ? '<button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit</button>' : '') + '</td></tr>').join(''), 'No units.') +
-          '</div><div><h2>Service Rules</h2><div class="fs-rules" id="rules">' +
+          '</div><div><h2>Service Rules · ' + escapeHtml(plant.name) + '</h2><div class="fs-rules" id="rules">' +
           rule('truckMiles', 'Truck PM every', 'miles') + rule('truckWarnMiles', 'Warn this many miles ahead', 'miles') + rule('trailerMonths', 'Reefer service every', 'months') + rule('trailerHours', '... or every', 'reefer hours') +
           rule('trailerWarnDays', 'Warn reefer service', 'days ahead') + rule('dotMonths', 'DOT inspection every', 'months') + rule('dotWarnDays', 'Warn DOT', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead') + '</div>' +
           (savedRules && savedRules.updatedBy ? '<p class="hint">Rules last changed ' + when(savedRules.updatedAt) + ' by ' + escapeHtml(savedRules.updatedBy) + '.</p>' : '<p class="hint">These are the current app\'s rules until someone saves new ones.</p>') +
-          '<h2>Garage Technicians</h2>' + table([50, 50], ['Name', ''], techs.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).map(x => {
+          '<h2>Garage Technicians · ' + escapeHtml(plant.name) + '</h2>' + table([50, 50], ['Name', ''], techs.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).map(x => {
             const on = L.yes(x.active === undefined || x.active === '' ? 'TRUE' : x.active), id = escapeHtml(x.tech_id || x.id);
             return '<tr><td class="strong">' + escapeHtml(x.name || '') + (on ? '' : ' ' + pill(['Off', 'no'])) + '</td><td>' + (boss ? '<button type="button" class="edit" data-tech="' + id + '" data-op="LOGIN">Set login ID</button> <button type="button" class="edit" data-tech="' + id + '" data-op="ACTIVE" data-on="' + (on ? '0' : '1') + '">' + (on ? 'Turn off' : 'Turn on') + '</button>' : '') + '</td></tr>';
           }).join(''), 'No technicians yet.') +
@@ -196,6 +204,7 @@
     const cameFrom = (x) => x.source_from || FROM[String(x.source || '').toUpperCase()] || x.source || '';
     const fixedText = (x) => [x.fixed, x.fixed_note].filter(Boolean).join(' · ');
     let me = null;
+    const pick = () => { orders = rawOrders.filter(ours); techs = rawTechs.filter(ours); };
     const canEdit = () => !!me && L.hasRole(me, L.REORDER_ROLES);
     // A unit's plate number from the fleet sync's text ("External Fleet: year | make | model | VIN | plate | state | Lease: ..."):
     // the part after the 17-character VIN, unless that is the 2-letter state; a "Plate:" label wins when there is one.
@@ -235,14 +244,14 @@
     async function saveRules() {
       const out = {}; document.querySelectorAll('[data-rule]').forEach(i => { out[i.dataset.rule] = Number(i.value); });
       const b = document.getElementById('rules-save'); b.disabled = true; showError('');
-      try { await save('saveFleetRules', { rules: out }); b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save Rules'; b.disabled = false; }, 1500); }
+      try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save Rules'; b.disabled = false; }, 1500); }
       catch (err) { b.disabled = false; showError(err.message); }
     }
     async function addTech() {
       const name = document.getElementById('tech-name').value.trim(), loginId = document.getElementById('tech-login').value.trim();
       if (!name) { showError('Type the technician\'s name'); return; }
       showError('');
-      try { await save('saveGarageTech', { op: 'ADD', name, loginId }); } catch (err) { showError(err.message); }
+      try { await save('saveGarageTech', { op: 'ADD', name, loginId, facilityId: plant.id }); } catch (err) { showError(err.message); }
     }
     // Unit Edit (FleetService.html:141-150): track, last service, reefer hours now, DOT due, plate expires, notes.
     function openUnit(unit) {
@@ -263,7 +272,7 @@
         const fields = { track: g('u-track'), last_service_date: g('u-date'), dot_due: g('u-dot'), plate_expires: g('u-plate'), notes: g('u-notes') };
         if (u.type === 'TRUCK') fields.last_service_miles = g('u-miles'); else { fields.last_service_hours = g('u-hours'); fields.current_hours = g('u-now'); }
         const b = document.getElementById('u-save'); b.disabled = true; showError('');
-        try { await save('saveFleetUnit', { unit: u.unit, unitType: u.type, fields }); closeUnit(); } catch (err) { b.disabled = false; showError(err.message); }
+        try { await save('saveFleetUnit', { unit: u.unit, unitType: u.type, fields, facilityId: plant.id }); closeUnit(); } catch (err) { b.disabled = false; showError(err.message); }
       };
     }
     function closeUnit() { document.getElementById('unit-modal').hidden = document.getElementById('modal-back').hidden = true; }
@@ -326,10 +335,23 @@
       watch('equipment', v => { equipment = v; });
       watch('fleetSetup', v => { setup = v; });
       watch('odometers', v => { odometers = v; });
-      watch('workOrders', v => { orders = v; });
-      watch('garageTechs', v => { techs = v; });
-      onSnapshot(doc(db, 'config', 'fleetRules'), d => { savedRules = d.exists() ? d.data() : null; render(); }, () => {});
-      onSnapshot(doc(db, 'users', String(auth.currentUser && auth.currentUser.email || '').toLowerCase()), d => { me = d.exists() ? d.data() : null; render(); }, () => {});
+      watch('workOrders', v => { rawOrders = v; pick(); });
+      watch('garageTechs', v => { rawTechs = v; pick(); });
+      let stopRules = null;
+      const follow = () => {
+        if (stopRules) stopRules();
+        savedRules = null;
+        stopRules = onSnapshot(doc(db, 'config', rulesDoc()), d => { savedRules = d.exists() ? d.data() : null; render(); }, () => {});
+      };
+      follow();
+      onSnapshot(doc(db, 'users', String(auth.currentUser && auth.currentUser.email || '').toLowerCase()), d => {
+        me = d.exists() ? d.data() : null;
+        const was = plant.id;
+        plant = plantFor(me, new URLSearchParams(location.search).get('plant'));
+        pick();
+        if (plant.id !== was) follow();
+        render();
+      }, () => {});
       render();
     });
   </script>
