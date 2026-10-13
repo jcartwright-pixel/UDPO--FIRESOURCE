@@ -47,7 +47,9 @@
     // Trucks Today (the current app's screen A, Joe 10/9): every route on today's Daily Dispatch with where its truck is now,
     // read from Verizon Connect Fleet every 5 minutes (functions/src/fleetgps.js) and its miles today (every 15 minutes).
     const L = window.UDLogic;
-    const YARD = 'UNIONTOWN', NO_SIGNAL_MINUTES = 30;
+    // Joe's Fleet places for the Uniontown yard (10/13: "Uniontown Branch" and "Uniontown Plant"). Only these exact place names
+    // count as In yard; a street address in the town of Uniontown does not.
+    const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT'], NO_SIGNAL_MINUTES = 30, DEAD_HOURS = 24;
     let mode = 'today', runs = [], gps = [], days = [];
     const key = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     const digits = (s) => String(s || '').replace(/\D/g, '');
@@ -62,14 +64,29 @@
       gps.forEach(t => { const k = key(t.tag); if (!k) return; byKey[k] = t; if (/^\d+$/.test(k)) byDigits[k] = t; });
       return (unit) => { const k = key(unit); return k ? byKey[k] || (/^\d+$/.test(digits(unit)) && byDigits[digits(unit)]) || null : null; };
     }
-    function state(t) {
-      if (!t) return ['nogps', 'Not in Fleet'];
-      if (!t.lastReport || (Date.now() - Date.parse(t.lastReport)) / 60000 > NO_SIGNAL_MINUTES) return ['nosignal', 'No signal'];
-      const where = (String(t.place || '') + ' ' + String(t.address || '')).toUpperCase();
-      if (where.indexOf(YARD) >= 0 && !(t.speedMph > 3)) return ['yard', 'In yard'];
-      return t.speedMph > 3 ? ['road', 'Driving'] : ['stopped', 'Stopped'];
+    // A parked truck with the engine off reports rarely, so an old report is "No signal" only when the engine was on (or the
+    // unit has been silent a whole day, like a unit taken out of service).
+    function state(t, truck) {
+      if (!t) return String(truck || '').trim() ? ['nogps', 'Not in Fleet'] : ['notruck', 'No truck'];
+      const mins = t.lastReport ? (Date.now() - Date.parse(t.lastReport)) / 60000 : Infinity;
+      if (!(mins < DEAD_HOURS * 60) || (t.ignitionOn && mins > NO_SIGNAL_MINUTES)) return ['nosignal', 'No signal'];
+      if (YARD_PLACES.indexOf(String(t.place || '').trim().toUpperCase()) >= 0 && !(t.speedMph > 3)) return ['yard', 'In yard'];
+      return t.speedMph > 3 ? ['road', 'Driving'] : t.ignitionOn ? ['stopped', 'Stopped'] : ['stopped', 'Parked'];
     }
-    const placeCell = (t) => t ? escapeHtml(t.place || t.address || '') + (t.place && t.address ? '<small>' + escapeHtml(t.address) + '</small>' : '') : '';
+    // Fleet sends an address as "US|15401|Pennsylvania|Uniontown|Union St": shown as "Union St, Uniontown, PA 15401".
+    const STATES = { ALABAMA: 'AL', ALASKA: 'AK', ARIZONA: 'AZ', ARKANSAS: 'AR', CALIFORNIA: 'CA', COLORADO: 'CO', CONNECTICUT: 'CT', DELAWARE: 'DE', 'DISTRICT OF COLUMBIA': 'DC', FLORIDA: 'FL', GEORGIA: 'GA', HAWAII: 'HI', IDAHO: 'ID', ILLINOIS: 'IL', INDIANA: 'IN', IOWA: 'IA', KANSAS: 'KS', KENTUCKY: 'KY', LOUISIANA: 'LA', MAINE: 'ME', MARYLAND: 'MD', MASSACHUSETTS: 'MA', MICHIGAN: 'MI', MINNESOTA: 'MN', MISSISSIPPI: 'MS', MISSOURI: 'MO', MONTANA: 'MT', NEBRASKA: 'NE', NEVADA: 'NV', 'NEW HAMPSHIRE': 'NH', 'NEW JERSEY': 'NJ', 'NEW MEXICO': 'NM', 'NEW YORK': 'NY', 'NORTH CAROLINA': 'NC', 'NORTH DAKOTA': 'ND', OHIO: 'OH', OKLAHOMA: 'OK', OREGON: 'OR', PENNSYLVANIA: 'PA', 'RHODE ISLAND': 'RI', 'SOUTH CAROLINA': 'SC', 'SOUTH DAKOTA': 'SD', TENNESSEE: 'TN', TEXAS: 'TX', UTAH: 'UT', VERMONT: 'VT', VIRGINIA: 'VA', WASHINGTON: 'WA', 'WEST VIRGINIA': 'WV', WISCONSIN: 'WI', WYOMING: 'WY' };
+    function address(a) {
+      const p = String(a || '').split('|').map(x => x.trim());
+      if (p.length < 4) return String(a || '');
+      const [, zip, state, city, ...street] = p, st = STATES[String(state).toUpperCase()] || state;
+      return [street.join(' ').trim(), city, (st + ' ' + zip).trim()].filter(Boolean).join(', ');
+    }
+    const placeCell = (t) => { if (!t) return ''; const a = address(t.address); return escapeHtml(t.place || a) + (t.place && a ? '<small>' + escapeHtml(a) + '</small>' : ''); };
+    // Today's miles and first move count from the app's first read that day; when that read came after the morning (the day
+    // GPS was turned on) they say so instead of showing a first move that looks wrong.
+    const late = (d) => { if (!d || !d.since) return false; const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', hourCycle: 'h23' }).format(new Date(d.since))); return h >= 5; };
+    const firstMoveCell = (d) => !d ? '' : late(d) ? (d.firstMove && Date.parse(d.firstMove) - Date.parse(d.since) > 15 * 60000 ? clock(d.firstMove) : '<small>before ' + clock(d.since) + '</small>') : d.firstMove ? clock(d.firstMove) : '';
+    const milesCell = (d) => !d ? '' : (Number(d.miles) || 0).toLocaleString() + (late(d) ? '<small>since ' + clock(d.since) + '</small>' : '');
     const pill = (s) => '<span class="tt-pill tt-' + s[0] + '">' + s[1] + '</span>';
 
     function render() {
@@ -87,23 +104,23 @@
       }
       if (mode === 'today') {
         const rows = L.dailyRows(runs, opDay).filter(r => r.truck || r.driver);
-        const list = rows.map(r => { const t = find(r.truck); return { r, t, s: state(t), d: t ? dayBy[key(t.tag)] : null }; });
+        const list = rows.map(r => { const t = String(r.truck || '').trim() ? find(r.truck) : null; return { r, t, s: state(t, r.truck), d: t ? dayBy[key(t.tag)] : null }; });
         const count = (k) => list.filter(x => x.s[0] === k).length;
-        kpis.innerHTML = [['Routes today', list.length], ['Driving', count('road')], ['Stopped', count('stopped')], ['In yard', count('yard')], ['No signal', count('nosignal')], ['Not in Fleet', count('nogps')]]
+        kpis.innerHTML = [['Routes today', list.length], ['Driving', count('road')], ['Stopped or parked', count('stopped')], ['In yard', count('yard')], ['No signal', count('nosignal')], ['Not in Fleet', count('nogps')], ['No truck', count('notruck')]]
           .map(k => '<div><b>' + k[1] + '</b><span>' + k[0] + '</span></div>').join('');
-        sheet.innerHTML = '<table class="issues tt-board"><colgroup><col style="width:6%"><col style="width:13%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:7%"><col style="width:9%"><col style="width:28%"><col style="width:14%"></colgroup>' +
+        sheet.innerHTML = '<table class="issues tt-board"><colgroup><col style="width:6%"><col style="width:12%"><col style="width:8%"><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:26%"><col style="width:14%"></colgroup>' +
           '<thead><tr><th>Route</th><th>Driver</th><th>Truck</th><th>Dispatch</th><th>First move</th><th>Miles today</th><th>Status</th><th>Where now</th><th>Last report</th></tr></thead><tbody>' +
           (list.map(x => '<tr class="tt-' + x.s[0] + '"><td class="strong">' + escapeHtml(x.r.route || '') + '</td><td>' + escapeHtml(x.r.driver || '') + '</td><td class="strong">' + escapeHtml(x.r.truck || '') + '</td>' +
-            '<td>' + escapeHtml(timeOfDay(x.r.dispatchTime)) + '</td><td>' + (x.d && x.d.firstMove ? clock(x.d.firstMove) : '') + '</td><td>' + (x.d ? x.d.miles.toLocaleString() : '') + '</td>' +
+            '<td>' + escapeHtml(timeOfDay(x.r.dispatchTime)) + '</td><td>' + firstMoveCell(x.d) + '</td><td>' + milesCell(x.d) + '</td>' +
             '<td>' + pill(x.s) + '</td><td>' + placeCell(x.t) + '</td><td>' + (x.t && x.t.lastReport ? clock(x.t.lastReport) + '<small>' + ago(x.t.lastReport) + '</small>' : '') + '</td></tr>').join('') ||
             '<tr><td colspan="9" class="empty">No routes on Daily Dispatch for ' + escapeHtml(shortDate(opDay)) + '.</td></tr>') + '</tbody></table>';
-        foot.textContent = 'In yard = stopped at a place named Uniontown · No signal = no report for ' + NO_SIGNAL_MINUTES + ' minutes · Not in Fleet = the truck number on Daily Dispatch has no Fleet unit of that name · miles and first move come from the odometer, read every 5 minutes.';
+        foot.textContent = 'In yard = at the Fleet place Uniontown Branch or Uniontown Plant · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes.';
         return;
       }
       // All Fleet units, matched to our Equipment Master trucks and trailers (Uniontown).
       const ours = {}; (lists.fleetTrucks || []).forEach(e => { ours[key(e.unit)] = 'Truck'; }); (lists.fleetTrailers || []).forEach(e => { ours[key(e.unit)] = 'Trailer'; });
       const units = gps.slice().sort((a, b) => String(a.tag).localeCompare(String(b.tag), undefined, { numeric: true }))
-        .map(t => ({ t, ours: ours[key(t.tag)] || '', s: state(t), d: dayBy[key(t.tag)] }));
+        .map(t => ({ t, ours: ours[key(t.tag)] || '', s: state(t, t.tag), d: dayBy[key(t.tag)] }));
       const matched = units.filter(u => u.ours).length;
       kpis.innerHTML = [['Fleet units', units.length], ['Our trucks', units.filter(u => u.ours === 'Truck').length], ['Our trailers', units.filter(u => u.ours === 'Trailer').length],
         ['Other units', units.length - matched], ['Reported today', units.filter(u => u.t.lastReport && nyDate(new Date(u.t.lastReport)) === today).length], ['No signal', units.filter(u => u.s[0] === 'nosignal').length]]
@@ -112,7 +129,7 @@
         '<thead><tr><th>Fleet unit</th><th>Ours</th><th>Status</th><th>Where now</th><th>Last report</th><th>Miles today</th><th>Odometer</th><th>Engine hours</th></tr></thead><tbody>' +
         units.map(u => '<tr class="tt-' + u.s[0] + '"><td class="strong">' + escapeHtml(u.t.tag) + '</td><td>' + (u.ours || '<small>not in Equipment</small>') + '</td><td>' + pill(u.s) + '</td><td>' + placeCell(u.t) + '</td>' +
           '<td>' + (u.t.lastReport ? (nyDate(new Date(u.t.lastReport)) === today ? clock(u.t.lastReport) : shortDate(nyDate(new Date(u.t.lastReport)))) + '<small>' + ago(u.t.lastReport) + '</small>' : '') + '</td>' +
-          '<td>' + (u.d ? u.d.miles.toLocaleString() : '') + '</td><td>' + (u.t.odometerMiles != null ? Math.round(u.t.odometerMiles).toLocaleString() : '') + '</td><td>' + (u.t.engineHours != null ? Math.round(u.t.engineHours).toLocaleString() : '') + '</td></tr>').join('') +
+          '<td>' + milesCell(u.d) + '</td><td>' + (u.t.odometerMiles != null ? Math.round(u.t.odometerMiles).toLocaleString() : '') + '</td><td>' + (u.t.engineHours != null ? Math.round(u.t.engineHours).toLocaleString() : '') + '</td></tr>').join('') +
         '</tbody></table>';
       foot.textContent = 'Every unit Verizon Connect Fleet shows, all plants. Ours = the same number in Equipment Master (Uniontown); trailers are named T- plus the number in both.';
     }

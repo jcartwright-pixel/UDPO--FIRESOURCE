@@ -92,6 +92,7 @@ test('Fleet GPS: managers only, the login never comes back, Test says plainly wh
   assert.equal(log.slice(before).filter(l => /rest\/login|\/templates/.test(l)).length, 0);
   day = (await db().collection('gpsDays').doc('2026-10-13_223876').get()).data();
   assert.deepEqual([day.miles, day.firstMove, day.lastMove], [12.4, '2026-10-13T14:15:00.000Z', '2026-10-13T14:15:00.000Z']);
+  assert.equal(day.since, '2026-10-13T14:10:00.000Z', 'today is counted from the first read, so Trucks Today can say so');
   // No new report: nothing is written.
   assert.deepEqual(await pull(db(), o), { trucks: 2, days: 0 });
   // A new New York day starts again from that day's first reading.

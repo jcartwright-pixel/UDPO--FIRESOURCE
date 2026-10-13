@@ -183,7 +183,7 @@ function truckRow(r, at) {
 
 /*
  * Today's miles from the odometer (10/13: the day's GPS points for all 520 Fleet units were too many to read in one go).
- * seen = private/gpsFleetSeen {date, units: {truck: {lr, odo0, odo, first, last}}}: the first odometer read each New York
+ * seen = private/gpsFleetSeen {date, units: {truck: {lr, odo0, odo, first, last, since}}}: the first odometer read each New York
  * day, the latest one, and the first and last read at which it went up. Only units whose report changed are written.
  */
 function advanceDays(seen, trucks, at) {
@@ -193,11 +193,11 @@ function advanceDays(seen, trucks, at) {
     const t = trucks[k], u = units[k] || {}, prev = (seen.units || {})[k] || {};
     if (prev.lr !== t.lastReport || fresh) changedTrucks[k] = t;
     if (t.odometerMiles === null) { units[k] = Object.assign(u, { lr: t.lastReport }); return; }
-    const next = { lr: t.lastReport, odo0: u.odo0 == null ? t.odometerMiles : u.odo0, odo: t.odometerMiles, first: u.first || '', last: u.last || '' };
+    const next = { lr: t.lastReport, odo0: u.odo0 == null ? t.odometerMiles : u.odo0, odo: t.odometerMiles, first: u.first || '', last: u.last || '', since: u.since || at };
     if (u.odo != null && t.odometerMiles - u.odo > 0.2) { next.first = next.first || at; next.last = at; }
     units[k] = next;
     if (fresh || u.odo !== next.odo || !u.lr) {
-      days[date + '_' + k] = { tag: t.tag, date, miles: Math.max(0, Math.round((next.odo - next.odo0) * 10) / 10), firstMove: next.first, lastMove: next.last,
+      days[date + '_' + k] = { tag: t.tag, date, miles: Math.max(0, Math.round((next.odo - next.odo0) * 10) / 10), firstMove: next.first, lastMove: next.last, since: next.since,
         lastPlace: t.place || t.address || '', updatedAt: at };
     }
   });
