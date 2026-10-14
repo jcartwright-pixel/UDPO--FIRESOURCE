@@ -174,6 +174,15 @@
     BLOWMOLD: [['w1', 'Jug 1 g', 'num'], ['w2', 'Jug 2 g', 'num'], ['w3', 'Jug 3 g', 'num'], ['topLoad', 'Top load', 'ok']]
   };
   var CHECK_EVERY = { FILLER: 2, PACK: 2, HTST: 1, BLOWMOLD: 2 };
+  // Why a line stopped, for each kind of line (Joe 10/14 follow-on: "stop reasons for each kind of line"). The fillers keep the
+  // first twelve (REASONS); each list is twelve, the tablet's four rows of three.
+  var STOP_REASONS = {
+    FILLER: REASONS,
+    PACK: ['Waiting on product', 'Box or tote jam', 'Sealer / glue', 'Labeler / coder', 'Out of boxes or film', 'Out of totes or crates', 'Changeover', 'Sanitation / CIP', 'Break or lunch', 'Maintenance called', 'No orders', 'Other'],
+    HTST: ['Divert / low temp', 'Pump or flow problem', 'Waiting on silo / raw milk', 'Tanks full (no room)', 'Changeover / flush', 'Sanitation / CIP', 'Seal or test (inspector)', 'Air, steam or water', 'Break or lunch', 'Maintenance called', 'No orders', 'Other'],
+    BLOWMOLD: ['Mold change', 'Resin feed', 'Leak tester down', 'Trimmer jam', 'Conveyor / bottle jam', 'Heater / temperature', 'Compressed air', 'Filler backed up (jugs full)', 'Cleaning', 'Break or lunch', 'Maintenance called', 'Other']
+  };
+  function stopReasons(kind) { return STOP_REASONS[kind] || REASONS; }
   var DIVERT_REASONS = ['Low temperature', 'Flow too high', 'Startup', 'Power or air', 'Test', 'Other'];
   var LIMITS = { WASTE: 999999, CREW: 30, NOTE: 1000, DIVERTS: 200, CHANGEOVERS: 60, CIPS: 20, CHECK_SLOTS: 30 };
 
@@ -286,8 +295,37 @@
     return out;
   }
 
+  // The weekly line scorecard (Joe 10/14 follow-on): each line's shifts of the week added up (runs = productionRuns docs for the
+  // week, lines = [{ operationId, name }], targetsOf(operationId) = that line's targets, lineDocs = productionLines by id).
+  // Efficiency is weighted by each shift's planned minutes; stop reasons are ranked by minutes lost, across the plant too.
+  function weekScore(runs, lines, targetsOf, lineDocs, nowMs) {
+    var byLine = {}, plantReasons = {};
+    (lines || []).forEach(function (l) { byLine[l.operationId] = { operationId: l.operationId, line: l.name, kind: lineKind(l.name), shifts: 0, made: 0, soFar: 0, downMin: 0, stops: 0, wasteTotal: 0, changeovers: 0, changeoverMin: 0, overStd: 0, cips: 0, reasons: {}, effMin: 0, effSum: 0 }; });
+    (runs || []).forEach(function (r) {
+      var o = byLine[r.operationId];
+      if (!o) return;
+      var end = Math.min(nowMs, when(r.shiftEnd) || nowMs), ld = (lineDocs || {})[r.operationId] || {}, v = lineMore(r, targetsOf(r.operationId), end, o.kind, ld);
+      if (!v.made && !v.stops && !v.wasteTotal && !(r.runs || []).length) return;
+      o.shifts++; o.made += v.made; o.soFar += v.soFar; o.downMin += v.downMin; o.stops += v.stops; o.wasteTotal += v.wasteTotal; o.cips += v.cips.length;
+      v.changeovers.forEach(function (c) { o.changeovers++; o.changeoverMin += c.minutes; if (v.changeoverStd && c.minutes > v.changeoverStd) o.overStd++; });
+      (r.stops || []).forEach(function (x) {
+        var k = text(x.reason) || 'No reason given', m = Math.max(0, Math.round(((x.end ? when(x.end) : end) - when(x.start)) / 60000));
+        o.reasons[k] = (o.reasons[k] || 0) + m; plantReasons[k] = (plantReasons[k] || 0) + m;
+      });
+      if (v.efficiency && v.efficiency.oee !== null && v.efficiency.plannedMin > 0) { o.effMin += v.efficiency.plannedMin; o.effSum += v.efficiency.oee * v.efficiency.plannedMin; }
+    });
+    var rank = function (m) { return Object.keys(m).filter(function (k) { return m[k] > 0; }).sort(function (a, b) { return m[b] - m[a] || a.localeCompare(b); }).map(function (k) { return { reason: k, minutes: m[k] }; }); };
+    var out = Object.keys(byLine).map(function (k) {
+      var o = byLine[k];
+      return { operationId: o.operationId, line: o.line, kind: o.kind, shifts: o.shifts, made: o.made, soFar: o.soFar, pct: o.soFar ? Math.round(o.made / o.soFar * 100) : null, downMin: o.downMin, stops: o.stops, wasteTotal: o.wasteTotal,
+        changeovers: o.changeovers, changeoverAvg: o.changeovers ? Math.round(o.changeoverMin / o.changeovers) : null, overStd: o.overStd, changeoverStd: num(((lineDocs || {})[k] || {}).changeoverMin), cips: o.cips,
+        topReasons: rank(o.reasons).slice(0, 3), oee: o.effMin ? Math.round(o.effSum / o.effMin) : null };
+    });
+    return { lines: out, topLosses: rank(plantReasons).slice(0, 5) };
+  }
+
   return { COUNTERS: COUNTERS, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
-    lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, LIMITS: LIMITS,
-    countAt: countAt, checkDue: checkDue, lineMore: lineMore, hourly: hourly, timeline: timeline };
+    lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
+    countAt: countAt, checkDue: checkDue, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };
 });

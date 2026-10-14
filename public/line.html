@@ -177,7 +177,9 @@
         btn.textContent = co ? (v.kind === 'BLOWMOLD' ? 'MOLD CHANGE DONE' : 'CHANGEOVER DONE') : 'CIP DONE'; btn.className = 'done';
       } else if (v.state === 'STOPPED') {
         st.className = 'lb-status stopped';
-        txt.innerHTML = '<b>LINE STOPPED ' + v.stoppedMin + ' MIN</b> since ' + clock(v.stoppedAt) + '. ' + (v.openReason ? 'Reason: ' + escapeHtml(v.openReason) + '.' : 'Tap why it stopped.');
+        const openStop = v.run && v.run.stops ? v.run.stops[v.stopIndex] : null;
+        txt.innerHTML = '<b>LINE STOPPED ' + v.stoppedMin + ' MIN</b> since ' + clock(v.stoppedAt) + '. ' + (v.openReason ? 'Reason: ' + escapeHtml(v.openReason) + '.' : 'Tap why it stopped.') +
+          (openStop && openStop.woNumber ? ' <b>Work order ' + escapeHtml(openStop.woNumber) + ' sent to maintenance.</b>' : '');
         btn.textContent = 'RUNNING AGAIN'; btn.className = 'run';
         reasonFor = v.stopIndex; chosen = v.openReason;
       } else {
@@ -193,7 +195,7 @@
       const rs = document.getElementById('reasons');
       rs.hidden = reasonFor < 0;
       rs.dataset.stop = reasonFor;
-      rs.innerHTML = reasonFor < 0 ? '' : R.REASONS.map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
+      rs.innerHTML = reasonFor < 0 ? '' : R.stopReasons(v.kind).map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
       drawMoreBoard(v);
     }
     // ---------- Joe 10/14 ("all of your picks", mock-ups C to H): Up next, each hour, six buttons for the kind of line and what they open ----------

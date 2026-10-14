@@ -208,6 +208,15 @@ async function pickFirstProduct(tb) {
     await ht.press('#src-from', 'Tab');
     await ht.click('#mp-close');
     await ht.waitForFunction(() => /From Silo 3/.test(document.getElementById('kind-cards').textContent));
+    // Stop reasons for the HTST (follow-on 1): its own twelve.
+    await ht.click('#status-btn');
+    await ht.waitForFunction(() => document.querySelectorAll('#reasons button').length === 12 && !!document.querySelector('#reasons [data-reason="Pump or flow problem"]'));
+    assert.equal(await ht.$('#reasons [data-reason="Filler jam"]'), null, 'no filler reasons on the HTST');
+    await shot(ht, 'more-tablet-htst-stopped-1024');
+    await ht.click('#reasons [data-reason="Pump or flow problem"]');
+    await ht.waitForSelector('#reasons [data-reason="Pump or flow problem"].on');
+    await ht.click('#status-btn');
+    await ht.waitForFunction(() => /PASTEURIZING/.test(document.getElementById('status-text').textContent));
     await fits(ht, 'the HTST tablet at 1024');
     await bigText(ht, '#kind-cards, #cip-strip, #check-inline, #actions', 'the HTST cards');
     await shot(ht, 'more-tablet-htst-1024');
@@ -237,11 +246,18 @@ async function pickFirstProduct(tb) {
     await bm.press('#mp-body input[data-save="lot"]', 'Tab');
     await bm.click('#mp-close');
     await bm.waitForFunction(() => /2,300/.test(document.getElementById('kind-cards').textContent) && /R-2291/.test(document.getElementById('kind-cards').textContent));
+    await bm.click('#status-btn');
+    await bm.waitForFunction(() => document.querySelectorAll('#reasons button').length === 12 && !!document.querySelector('#reasons [data-reason="Leak tester down"]'));
+    await shot(bm, 'more-tablet-blow-mold-stopped-1024');
+    await bm.click('#reasons [data-reason="Leak tester down"]');
+    await bm.waitForSelector('#reasons [data-reason="Leak tester down"].on');
+    await bm.click('#status-btn');
+    await bm.waitForFunction(() => /LINE RUNNING/.test(document.getElementById('status-text').textContent));
     await fits(bm, 'the Blow Mold tablet at 1024');
     await shot(bm, 'more-tablet-blow-mold-1024');
     assert.deepEqual(bm.errors, []);
     await bm.close();
-    results.push('Blow Mold tablet: leak tester rejects, jugs ahead of the filler and the resin lot');
+    results.push('Stop reasons for each kind of line: the HTST and Blow Mold show their own twelve. Blow Mold tablet: leak tester rejects, jugs ahead of the filler and the resin lot');
 
     // Production Lines (mock-ups A and B).
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
@@ -282,6 +298,63 @@ async function pickFirstProduct(tb) {
     assert.deepEqual(tv.errors, []);
     await tv.close();
     results.push('Production Lines: kind filters, the plant\'s totals with efficiency for managers, crew and up next on each card, one line\'s shift from its card; the TV stays as it was, without efficiency');
+    // Stop to work order (follow-on 4): Maintenance called makes a Plant Maintenance work order, once.
+    const mt = await openPage(browser, 1024, 768, '/line.html?line=' + LINE + '&' + ADMIN);
+    await mt.waitForFunction(() => /LINE RUNNING/.test(document.getElementById('status-text').textContent));
+    await mt.click('#status-btn');
+    await mt.click('#reasons [data-reason="Maintenance called"]');
+    await mt.waitForFunction(() => /Work order M-\d+ sent to maintenance/.test(document.getElementById('status-text').textContent));
+    await shot(mt, 'more-tablet-work-order-1024');
+    const wos = (await db().collection('plantWorkOrders').where('source', '==', 'LINE_TABLET').get()).docs.map(d => d.data());
+    assert.deepEqual([wos.length, wos[0].machine, wos[0].lineDown, wos[0].status], [1, 'GALLON FILLER', 'YES', 'NEW']);
+    await mt.click('#status-btn');
+    await mt.waitForFunction(() => /LINE RUNNING/.test(document.getElementById('status-text').textContent));
+    assert.deepEqual(mt.errors, []);
+    await mt.close();
+    results.push('Stop to work order: Maintenance called on the tablet makes work order M-number for the line, shown on the tablet');
+
+    // The weekly line scorecard (follow-on 3): an earlier shift this week with a 25-minute jam, added to this shift's.
+    const cur = await runOf(LINE, shiftKey);
+    const early = Date.parse(cur.shiftStart) - 8 * 3600000, iso = (m) => new Date(early + m * 60000).toISOString();
+    await db().collection('productionRuns').doc(P.runId(LINE, 'week_test')).set({ operationId: LINE, facilityId: 'fac_uniontown', line: 'GALLON FILLER', shiftKey: 'week_test', date: cur.date, shiftStart: iso(0), shiftEnd: iso(480),
+      product: cur.product, count: 9000, counts: [{ at: iso(470), count: 9000 }], runs: [{ product: cur.product, from: iso(5) }], stops: [{ start: iso(60), end: iso(85), reason: 'Filler jam' }], waste: { 'Bad cap': 8 } });
+    const wk = await openPage(browser, 1536, 864, '/production.html?view=week&' + ADMIN);
+    await wk.waitForFunction(() => /Filler jam 25 min/.test((document.getElementById('week') || {}).textContent || ''));
+    assert.equal(await wk.textContent('#page-title'), 'This Week');
+    assert.equal(await wk.isVisible('#tiles'), false);
+    const gRow = await wk.textContent('#week tr[data-line="' + LINE + '"]');
+    assert.match(gRow, /GALLON FILLER\s*2\s*9,000/, 'two shifts, 9,000 made');
+    assert.match(gRow, /Filler jam 25 min/);
+    assert.match(gRow, /\b20\b/, 'waste 12 + 8');
+    assert.match(await wk.textContent('#week .pd-losses'), /Filler jam 25 min/);
+    assert.match(await wk.textContent('#week thead'), /Efficiency/, 'managers see efficiency');
+    await fits(wk, 'This Week at 1536');
+    await bigText(wk, '#week', 'This Week');
+    await shot(wk, 'more-week-1536');
+    await wk.click('#week [data-week="-7"]');
+    await wk.waitForFunction(() => /week=/.test(location.search) && /No stops this week/.test(document.getElementById('week').textContent));
+    await wk.setViewportSize({ width: 1920, height: 1080 });
+    await wk.click('#week [data-week="0"]');
+    await wk.waitForFunction(() => /Filler jam 25 min/.test(document.getElementById('week').textContent));
+    await fits(wk, 'This Week at 1920');
+    await shot(wk, 'more-week-1920');
+    assert.deepEqual(wk.errors, []);
+    await wk.close();
+    results.push('This Week: each line\'s shifts added up (made, target, stopped and the top reasons, waste, changeovers, efficiency for managers) and the plant\'s biggest losses; last week and back');
+
+    // The end-of-shift production report (follow-on 2) rides on Send Current Report: each line's shift.
+    const mc = await openPage(browser, 1536, 864, '/manager.html?report=1&' + ADMIN);
+    await mc.waitForFunction(() => /Line output/.test((document.getElementById('rp-body') || {}).textContent || ''));
+    const rp = await mc.$eval('#rp-body', e => [...e.querySelectorAll('section')].find(x => /Line output/.test(x.querySelector('h3').textContent)).textContent);
+    assert.match(rp, /Line output · .*Shift/);
+    assert.match(rp, /GALLON FILLER.*stopped \d+ min.*waste 12/s);
+    assert.match(rp, /BLOW MOLD.*waste 46/s);
+    assert.doesNotMatch(rp, /BOXING/, 'a line with nothing this shift is left out');
+    await mc.$eval('#rp-body', e => { const h = [...e.querySelectorAll('h3')].find(x => /Line output/.test(x.textContent)); if (h) h.scrollIntoView(); });
+    await shot(mc, 'more-report-line-output-1536');
+    assert.deepEqual(mc.errors, []);
+    await mc.close();
+    results.push('Send Current Report: a Line output section with each line\'s made against target, stopped minutes and why, waste and changeovers');
     console.log('Plant Production picks browser check passed:\n - ' + results.join('\n - '));
   } finally {
     await browser.close();

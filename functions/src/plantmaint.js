@@ -351,4 +351,4 @@ async function stationStep(db, input, nowMs) {
   });
 }
 
-module.exports = { stationBoard, stationStep, FIXES, validateMachine, saveMachine, validateSend, makeWorkOrder, woIdFor, validatePmTask, savePmTask, validateSendPm, sendPmToMaintenance };
+module.exports = { stationBoard, stationStep, FIXES, validateMachine, saveMachine, validateSend, makeWorkOrder, woIdFor, plantMachines, nextNumber, validatePmTask, savePmTask, validateSendPm, sendPmToMaintenance };
