@@ -92,6 +92,9 @@ test('Fleet GPS: managers only, the login never comes back, Test says plainly wh
   assert.deepEqual((({ date, tag, at, type, speedMph, limitMph, minutes, condition }) => ({ date, tag, at, type, speedMph, limitMph, minutes, condition }))(await alert('A901')),
     { date: '2026-10-13', tag: '223876', at: '2026-10-13T14:01:00.000Z', type: 'SPEEDING', speedMph: 71, limitMph: 55, minutes: 1, condition: 'Over 55' });
   assert.equal((await alert('A902')).type, 'HARSH_BRAKING');
+  // GPS Setup shows how many alerts came in today, so Joe can see this login sees the alerts he set up.
+  s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'status' }, o);
+  assert.deepEqual([s.alertsDate, s.alertsToday, s.alertsError], ['2026-10-13', 3, '']);
   assert.deepEqual([(await alert('A903')).type, (await alert('A903')).tag, (await alert('A903')).minutes], ['IDLE', 'T-635', 25]);
   const t = (await db().collection('gpsTrucks').doc('223876').get()).data();
   assert.equal(t.lastReport, '2026-10-13T14:05:00.000Z');

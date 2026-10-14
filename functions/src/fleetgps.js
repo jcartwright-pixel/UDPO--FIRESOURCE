@@ -307,7 +307,9 @@ async function pullAlerts(db, d, o, token, trucks, at) {
       address: r.Address || '', condition: c.name || c.type || r.TriggerName || '', fleetDriverId: r.DriverId || '', updatedAt: at };
   });
   await writeAll(db, 'gpsAlerts', docs);
-  await ref.set({ alertsUntil: at, alertsError: '', lastAlerts: Object.keys(docs).length }, { merge: true });
+  // How many alerts today so far, for GPS Setup (a quick check that this login sees the alerts set up in Fleet).
+  const today = nyDate(at), alertsToday = (await db.collection('gpsAlerts').where('date', '==', today).count().get()).data().count;
+  await ref.set({ alertsUntil: at, alertsError: '', lastAlerts: Object.keys(docs).length, alertsDate: today, alertsToday }, { merge: true });
   return Object.keys(docs).length;
 }
 function nyMidnight(now) {
@@ -354,7 +356,8 @@ function withDefaults(options) {
 }
 
 const status = (d) => ({ kind: 'fleet', fleet: d.fleet || '', hasUser: !!d.user, hasPassword: !!d.password, lastTest: d.lastTest || null,
-  savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastPull: d.lastPull || '', lastPullError: d.lastPullError || '', lastPullTrucks: d.lastPullTrucks || 0 });
+  savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastPull: d.lastPull || '', lastPullError: d.lastPullError || '', lastPullTrucks: d.lastPullTrucks || 0,
+  alertsDate: d.alertsDate || '', alertsToday: d.alertsToday || 0, alertsError: d.alertsError || '' });
 
 /* The GPS Setup screen's Fleet box. input.op: status | save {fleet, user, password} | clear | test | pull. The caller has
  * already checked the person is a manager or administrator. */

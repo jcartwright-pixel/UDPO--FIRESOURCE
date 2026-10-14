@@ -81,8 +81,11 @@
       $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
       const t = s.lastTest;
       $('last').textContent = t ? 'Last test ' + stamp(t.at) + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
-      $('pulled').textContent = s.lastPullError ? 'Last read failed: ' + s.lastPullError : s.lastPull ? 'Last read ' + stamp(s.lastPull) + ': ' + s.lastPullTrucks + ' trucks.' : '';
+      $('pulled').textContent = s.lastPullError ? 'Last read failed: ' + s.lastPullError : s.lastPull ? 'Last read ' + stamp(s.lastPull) + ': ' + s.lastPullTrucks + ' trucks, ' +
+        (s.alertsError ? 'alerts failed: ' + s.alertsError : alertsToday(s) + ' Fleet alert' + (alertsToday(s) === 1 ? '' : 's') + ' today.') : '';
     }
+    // The count is kept by the read; a count from an earlier New York day means none yet today.
+    const alertsToday = (s) => s.alertsDate === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) ? s.alertsToday : 0;
     // Joe 10/13: Pull now said "Could not reach the GPS settings. Check the network" when the server itself had stopped
     // part way. A server that stopped says so, names the step, and the line under the buttons is read again.
     const STEP = { save: 'saving the login', clear: 'removing the login', test: 'the connection test', pull: 'the GPS read' };
