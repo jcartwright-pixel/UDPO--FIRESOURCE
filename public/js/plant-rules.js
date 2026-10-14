@@ -156,17 +156,47 @@
       list.push({ routeId: text(r.routeId), runId: text(r.runId), route: route, run: run, name: text(r.routeName) });
     });
     list.sort(function (a, b) { return a.route.localeCompare(b.route, undefined, { numeric: true }) || a.run.localeCompare(b.run); });
-    // An as-needed customer (Aldi - Charleston LOAD 1 to 4) is one customer; its first slot names the run.
+    // An as-needed customer (Aldi - Charleston LOAD 1 to 4) is one customer; its first slot names the run, and its runs are
+    // its slots in load-number order (numberLoads puts the day's Load 2 on LOAD 2).
     var out = [], byKey = {};
     list.forEach(function (r) {
-      var m = /^(.*?)[\s-]*LOAD\s*[0-9]+$/i.exec(r.run);
+      var m = /^(.*?)[\s-]*LOAD\s*([0-9]+)$/i.exec(r.run);
       if (!m || !m[1].trim()) { out.push(r); return; }
       var base = m[1].trim(), baseRoute = r.route.replace(/_[0-9]+$/, ''), key = baseRoute + '|' + base.toUpperCase();
-      if (byKey[key]) { byKey[key].slots++; return; }
-      byKey[key] = { routeId: r.routeId, runId: r.runId, route: baseRoute, run: base, name: r.name, grouped: true, slots: 1 };
+      var slot = { routeId: r.routeId, runId: r.runId, route: r.route, run: r.run, n: Number(m[2]) };
+      if (byKey[key]) { byKey[key].slots.push(slot); return; }
+      byKey[key] = { routeId: r.routeId, runId: r.runId, route: baseRoute, run: base, name: r.name, grouped: true, slots: [slot] };
       out.push(byKey[key]);
     });
+    out.forEach(function (c) {
+      if (!c.grouped) return;
+      c.slots.sort(function (a, b) { return a.n - b.n; });
+      c.routeId = c.slots[0].routeId; c.runId = c.slots[0].runId;
+    });
     return out;
+  }
+
+  // Joe 10/14: a customer's loads on one delivery day are numbered by pickup time (Load 1, Load 2, Load 3; one load is Load 1).
+  // An as-needed customer's Load N goes on its LOAD N run (slot), so each load has its own line for a driver, truck and cases;
+  // more loads than runs share the last run (overSlots: add a run on Route Master). `customers` is scheduleCustomers (or the
+  // suppliers); a load whose run is not on the list is numbered with the other loads of the same run.
+  function loadNumberName(name, n) { name = text(name).replace(/[\s-]*LOAD\s*[0-9]+$/i, ''); return n ? name + ' Load ' + n : name; }
+  function numberLoads(entries, customers) {
+    var byRun = {}, groups = {}, out = {};
+    (customers || []).forEach(function (c, i) { (c.slots || [c]).forEach(function (s) { if (s.runId && !(s.runId in byRun)) byRun[s.runId] = i; }); });
+    (entries || []).forEach(function (x) {
+      var c = byRun[x.runId], who = c === undefined ? 'r:' + (x.runId || text(x.route) + '|' + text(x.run).toUpperCase()) : 'c:' + c;
+      (groups[who + '|' + x.date] = groups[who + '|' + x.date] || []).push(x);
+    });
+    Object.keys(groups).forEach(function (k) {
+      var list = groups[k].slice().sort(function (a, b) { return (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99') || text(a.id).localeCompare(text(b.id)); });
+      var c = byRun[list[0].runId] === undefined ? null : customers[byRun[list[0].runId]], slots = c && c.slots && c.slots.length ? c.slots : null;
+      list.forEach(function (x, i) {
+        var s = slots ? slots[Math.min(i, slots.length - 1)] : null;
+        out[x.id] = { loadNo: i + 1, slot: s ? { routeId: s.routeId, runId: s.runId, route: s.route, run: s.run } : null, overSlots: !!slots && i >= slots.length };
+      });
+    });
+    return (entries || []).map(function (x) { return Object.assign({}, x, out[x.id] || { loadNo: 1, slot: null, overSlots: false }); });
   }
 
   // Receiving's suppliers, in the order they were added. Joe 10/13: each can be edited or removed (the same record, rewritten).
@@ -712,7 +742,7 @@
   }
 
   return { unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
-    LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
+    LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,

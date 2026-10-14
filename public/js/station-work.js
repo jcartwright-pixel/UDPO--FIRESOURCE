@@ -85,7 +85,19 @@ export function mountStationWork({ db, box, person, onDraw }) {
   function shipments() {
     if (!boxing()) return [];
     const box = loads();
-    return U.scheduleEntries(sched.SHIPPING, 'SHIPPING').filter(x => (x.loadDate || x.date) === date && !box.some(r => sameRun(r, x))).map(withShown);
+    // Joe 10/14: a customer's loads that day are Load 1, 2, 3 by pickup time, and Load N is Route Master's LOAD N run; only the
+    // load whose run is on the box list is worked there, so the other Charleston loads still show (before, all three were hidden).
+    return numbered().filter(x => (x.loadDate || x.date) === date && (x.overSlots || !box.some(r => sameRun(r, x.slot ? Object.assign({}, x, x.slot) : x)))).map(withShown);
+  }
+  function numbered() {
+    const list = U.scheduleEntries(sched.SHIPPING, 'SHIPPING');
+    return U.numberLoads(list, U.scheduleCustomers(slotRoutes()));
+  }
+  // Route Master's runs; a station-code tablet cannot read them, so it uses the runs on this week's loads.
+  function slotRoutes() {
+    if (routeDocs.length) return routeDocs;
+    const seen = {};
+    return runs.filter(r => r.runId && !seen[r.runId] && (seen[r.runId] = true)).map(r => ({ runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true }));
   }
   // The same customer run: its run ID, or the same route number and run name.
   const up = (v) => String(v || '').trim().toUpperCase();
@@ -137,7 +149,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const rows = all.map((r, i) => ({ r, i })).sort((a, b) => order(a.r) - order(b.r) || a.i - b.i).map(x => x.r);
     const pk = P.withNotePickups(all, pickups), ships = shipments(), box = boxing();
     // A box load the Scheduler marks Carrier is a carrier's load (the Scheduler's line itself is worked on this card).
-    const carried = box ? U.scheduleEntries(sched.SHIPPING, 'SHIPPING').filter(x => (x.loadDate || x.date) === date && x.scheduleType === 'CARRIER') : [];
+    const carried = box ? numbered().filter(x => (x.loadDate || x.date) === date && x.scheduleType === 'CARRIER' && !x.overSlots).map(x => (x.slot ? Object.assign({}, x, x.slot) : x)) : [];
     // Boxing: each scheduled shipment goes in among today's box loads by its pickup time; the box loads keep their order.
     const list = [];
     let si = 0;
@@ -190,13 +202,13 @@ export function mountStationWork({ db, box, person, onDraw }) {
   function schedCard(x, lane) {
     const id = 'sch:' + x.id, st = x.work.state, done = st === 'COMPLETE', going = st === 'WORKING', paused = st === 'PAUSED', ck = canSched(), recv = lane === 'RECEIVING';
     const isOpen = going ? !closed[id] : !!opened[id], by = recv ? '' : hauler(x, x.scheduleType === 'CARRIER');
-    const name = x.run || x.route || 'Plant pickup', status = done ? badge(recv ? 'RECEIVED' : 'COMPLETE', 'done') : paused ? badge('PAUSED', 'paused') : going ? badge(recv ? 'RECEIVING' : 'LOADING', 'going') : badge('WAITING');
+    const name = recv ? x.run || x.route || 'Plant pickup' : U.loadNumberName((x.slot && x.slot.run) || x.run || x.route || 'Plant pickup', x.loadNo), status = done ? badge(recv ? 'RECEIVED' : 'COMPLETE', 'done') : paused ? badge('PAUSED', 'paused') : going ? badge(recv ? 'RECEIVING' : 'LOADING', 'going') : badge('WAITING');
     const startLabel = recv ? 'START RECEIVING' : 'START LOADING';
     const quick = ck && !isOpen && (st === 'WAITING' || paused) ? '<span class="sw-quick">' + btn(paused ? 'RESUME' : startLabel, 'sstart', id, 'primary') + '</span>' : '';
     const detail = [x.pickupTime ? clock(x.pickupTime) : '', x.poNumber ? 'PO ' + x.poNumber : '', x.trailer || 'Trailer not typed yet', x.product, x.cases ? x.cases + ' cases' : ''].filter(Boolean).join(' · ');
     let html = '<article class="sw-card sched ' + (done ? 'done' : paused ? 'paused' : going ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(id) + '">';
     html += recv ? '<div class="sw-head tall" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title"><b>' + escapeHtml(x.route + ' · ' + name) + '</b><small>' + escapeHtml(detail) + '</small></span>'
-      : '<div class="sw-head" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><b class="route">' + escapeHtml(x.route) + '</b><b class="run">' + escapeHtml(name) + who(by) + '</b><span class="truck">' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="trailer">' + escapeHtml(x.trailer || '—') + '</span>';
+      : '<div class="sw-head" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><b class="route">' + escapeHtml(((x.slot && x.slot.route) || x.route || '').replace(/_[0-9]+$/, '')) + '</b><b class="run">' + escapeHtml(name) + who(by) + '</b><span class="truck">' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="trailer">' + escapeHtml(x.trailer || '—') + '</span>';
     html += '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>' + refusal(id);
     if (isOpen) {
       const dis = !ck || done;

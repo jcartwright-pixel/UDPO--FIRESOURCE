@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
   <script src="js/board-rules.js"></script>
+  <script src="js/plant-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page loadout-page">
   <div class="signin" id="signin" hidden>
@@ -36,6 +37,7 @@
           <button type="button" id="next" aria-label="Next day" title="Next day">&#9654;</button>
         </div>
       </div>
+      <div class="field add-load" id="add-load-f" hidden><label>&nbsp;</label><button type="button" id="add-load">+ Add Load</button></div>
       <div class="field day-pin" id="day-pin" hidden><label>&nbsp;</label><button type="button" id="go-today" title="The screen stays on the day you picked until you change it">Go to today</button></div>
       <div class="dayname" id="dayname"></div>
       <div class="hstats" id="hstats"></div>
@@ -75,6 +77,26 @@
     </div>
   </section>
 
+  <!-- Joe 10/14: Add Load on Daily Box Loadout, the Scheduler's own boxes; the load day is the Loadout day. -->
+  <section class="modal wide-modal" id="sched-modal" role="dialog" aria-labelledby="sched-title" hidden>
+    <h2 id="sched-title">Add Load</h2>
+    <div class="modal-grid" id="sched-form">
+      <label>Route / Run<select id="s-route"></select></label>
+      <label>Schedule Type<select id="s-type"><option value="ROUTE">United Dairy Delivery</option><option value="CARRIER">Carrier</option></select></label>
+      <label>Load Date<input id="s-load" type="date"></label>
+      <label>Delivery Date<input id="s-date" type="date"></label>
+      <label>Pickup Time<input id="s-time" type="time"></label>
+      <label>Trailer<input id="s-trailer" list="lo-trailers" autocomplete="off" maxlength="24" placeholder="Pick or type a trailer"></label>
+      <label>PO Number<input id="s-po" maxlength="40" placeholder="Needed for a carrier load"></label>
+      <label>Cases<input id="s-cases" inputmode="numeric" maxlength="6" placeholder="Optional"></label>
+      <label class="wide">Product<input id="s-product" maxlength="80" placeholder="Optional"></label>
+      <label class="wide">Notes<textarea id="s-notes" maxlength="1200"></textarea></label>
+    </div>
+    <p class="hint" id="s-hint">It goes on the Plant Operations Scheduler too, numbered by its pickup time (Load 1, Load 2, ...).</p>
+    <div class="notice error" id="s-error" hidden></div>
+    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="s-save">Save Load</button></div>
+  </section>
+
   <section class="modal" id="week-panel" role="alertdialog" aria-labelledby="week-title" hidden>
     <h2 id="week-title">Change the week?</h2>
     <p id="week-text" class="week-warn"></p>
@@ -99,12 +121,13 @@
     import * as P from './js/plant-core.js';
     import { mountRowDrag } from './js/row-drag.js';
 
-    const L = window.UDLogic;
+    const L = window.UDLogic, R = window.UDPlant;
     const params = new URLSearchParams(location.search);
     let date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
     let area = P.AREAS.indexOf(String(params.get('area') || '').toUpperCase()) >= 0 ? String(params.get('area')).toUpperCase() : 'CASE';
     const today = () => L.operatingDay(new Date());
-    let runs = [], pickups = [], person = null, app = {};
+    let runs = [], pickups = [], person = null, app = {}, schedDocs = [], routeDocs = [];
+    const schedPending = {};      // Scheduler load id -> its work and trailer shown before the server has them
     const pending = {};           // row id -> fields shown before the server has them
     /* The current app's Plant Station SKIP (PlantStation.html:263-269, Joe 10/07: "only to be able to come back to it later"):
        it saves nothing. A load not started moves to the bottom of its group on this screen, marked SKIPPED · COME BACK, until
@@ -126,6 +149,7 @@
       return 'View only: ' + (signedEmail || 'this account') + ' is not allowed to save Case Loadout. In Administration > People & Roles give it the Plant Employee role or allow Update route loading.';
     };
     const canLoad = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading', allowed.savePlantLoad);
+    const canSched = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant', allowed.savePlantSchedule);
     const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 
     function rowsNow() {
@@ -137,11 +161,56 @@
       });
     }
 
+    /* Joe 10/14 ("I should have three loads for Charleston on the boxing side, but it's only showing one"): the Scheduler's
+       Shipping loads for this loadout day (its load date; blank = the delivery day) are on Daily Box Loadout too. A customer's
+       loads on one delivery day are Load 1, 2, 3 by pickup time and Load N is Route Master's LOAD N run: when that run is
+       already a box load today it shows once, as that line, with the Scheduler's PO and pickup time on it. More loads than
+       the customer has LOAD runs share the last one, marked so a slot can be added on Route Master. */
+    const up = (v) => String(v || '').trim().toUpperCase();
+    const sameRun = (a, b) => (a.runId && a.runId === b.runId) || (!!up(a.route) && up(a.route) === up(b.route) && up(a.run) === up(b.run));
+    // Route Master's runs; a station-code tablet cannot read them, so it uses the runs on this week's loads.
+    function slotRoutes() {
+      if (routeDocs.length) return routeDocs;
+      const seen = {};
+      return runs.filter(r => r.runId && !seen[r.runId] && (seen[r.runId] = true)).map(r => ({ runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true }));
+    }
+    function schedToday() {
+      const list = R.scheduleEntries(schedDocs, 'SHIPPING');
+      return R.numberLoads(list, R.scheduleCustomers(slotRoutes())).filter(x => (x.loadDate || x.date) === date).map(x => {
+        const p = schedPending[x.id];
+        return p ? Object.assign({}, x, { trailer: p.trailer !== undefined ? p.trailer : x.trailer, work: Object.assign({}, x.work, p.work) }) : x;
+      });
+    }
+    const slotOf = (x) => (x.slot ? Object.assign({}, x, x.slot) : x);
+    const schedState = (w) => (w.state === 'COMPLETE' ? 'DONE' : w.state === 'WORKING' || w.state === 'PAUSED' ? 'LOADING' : 'WAITING');
+    const clock24 = (t) => { const m = /^(\d{2}):(\d{2})$/.exec(t || ''); if (!m) return t || ''; const h = Number(m[1]); return (h % 12 || 12) + ':' + m[2] + (h < 12 ? ' AM' : ' PM'); };
+    // The box loads with their Scheduler line put on, and the Scheduler loads that are not a box load today.
+    function withSched(live) {
+      const box = live.filter(r => r.area === 'BOXING' && !r.prior), on = {}, extra = [];
+      schedToday().forEach(x => {
+        const r = x.overSlots ? null : box.find(b => sameRun(b, slotOf(x)));
+        if (r && !on[r.id]) { on[r.id] = x; return; }
+        const w = x.work || {}, n = Number(w.count);
+        extra.push({ id: 'sch:' + x.id, sched: x, area: 'BOXING', prior: false, route: (x.slot && x.slot.route) || x.route, run: R.loadNumberName((x.slot && x.slot.run) || x.run || x.route || 'Plant pickup', x.loadNo),
+          driver: x.scheduleType === 'CARRIER' ? 'Carrier' : '', truck: '', trailer: x.trailer, quantity: w.count === '' || w.count === undefined || !isFinite(n) ? null : n,
+          state: schedState(w), paused: w.state === 'PAUSED', startedAt: w.startedAt || '', completedAt: w.completedAt || '' });
+      });
+      extra.sort((a, b) => (a.sched.pickupTime || '99:99').localeCompare(b.sched.pickupTime || '99:99'));
+      return live.map(r => (on[r.id] ? Object.assign({}, r, { schedLine: on[r.id] }) : r)).concat(extra);
+    }
+    // Joe 10/14: the Route column is the route number (905, not 905_2); the Run says which load it is.
+    const routeNo = (route) => String(route || '').replace(/_[0-9]+$/, '');
+    const schedTag = (x) => [x.poNumber ? 'PO ' + x.poNumber : '', x.pickupTime ? clock24(x.pickupTime) : ''].filter(Boolean).join(' · ');
+
     // Joe 10/11: Route 20%, Truck 10%, Trailer 10% and Cases Out 20% narrower; Driver / CVG gets all of that room so a driver's
     // name fits on one line (a name still too long shrinks to fit, see fitDrivers).
     const COLS = {
       // Review item 22 (Joe 10/13): the Start / End column has its heading.
       normal: [['Route', 4.8], ['Run', 9], ['Driver / CVG', 15.6], ['Truck', 8.1], ['Trailer', 8.1], ['', 6.4], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
+      // Joe 10/14 (Daily Box Loadout): Truck, Trailer and Boxes Out 20% narrower, Driver / CVG 30% (on boxes it is usually blank
+      // or Carrier); Route and Run get the room, so "ALDI - CHARLESTON Load 1" is one line. Case and Totes keep their widths
+      // (Joe 10/11: a driver's name on one line there).
+      BOXING: [['Route', 5.6], ['Run', 18.4], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 7], ['', 6]],
       TANKER: [['Route', 5.6], ['Run', 15], ['Driver / CVG', 20], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
     // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
@@ -167,7 +236,7 @@
     let heldMove = null;
 
     function render() {
-      const all = rowsNow(), byArea = {};
+      const live = rowsNow(), all = withSched(live), byArea = {};
       P.AREAS.forEach(a => { byArea[a] = all.filter(r => r.area === a); });
       // Skipped loads go to the bottom of their group (still open from a prior day first, then today).
       const rows = byArea[area].map((r, i) => ({ r, i, k: (r.prior ? 0 : 2) + (isSkipped(r) ? 1 : 0) })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.r);
@@ -176,6 +245,7 @@
       document.title = info.title + ' · Operations';
       document.getElementById('load-date').value = date;
       document.getElementById('day-pin').hidden = date === today();
+      document.getElementById('add-load-f').hidden = !(area === 'BOXING' && canSched());
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       document.getElementById('hstats').innerHTML = [['Runs', c.total, ''], ['Loaded', c.done, 'good'], ['Loading', c.loading, 'warn']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
@@ -189,7 +259,7 @@
       over.hidden = !(limit && nowLoading > limit);
       over.textContent = over.hidden ? '' : nowLoading + ' loading, over the limit of ' + limit + '. Finish or pause one when you can.';
       drawTrailers(rows);
-      const pk = P.withNotePickups(all, pickups);
+      const pk = P.withNotePickups(live, pickups);
       const pu = rows.flatMap(r => P.pickupsFor(r, pk)), puOpen = pu.filter(P.pickupOpen).length;
       const behind = rows.filter(r => P.isBehind(r, today())).length, pct = c.total ? Math.round(c.done * 100 / c.total) : 0;
       document.getElementById('strip').innerHTML =
@@ -201,16 +271,17 @@
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
       const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r) && r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
-      const cols = COLS[area === 'TANKER' ? 'TANKER' : 'normal'];
+      const cols = COLS[area === 'TANKER' || area === 'BOXING' ? area : 'normal'];
       document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
       const edit = canLoad(), dis = edit ? '' : ' disabled';
       const orderIds = ordering ? movable.map(r => r.id) : [];
       // Joe 10/12: a load not yet loaded is dragged up or down by its line (no arrows, no grab dots).
-      const routeCell = (r) => '<td class="strong">' + escapeHtml(r.route) + '</td>';
+      const routeCell = (r) => '<td class="strong">' + escapeHtml(routeNo(r.route)) + '</td>';
       const dragAttrs = (r) => orderIds.indexOf(r.id) < 0 ? '' : ' data-drag="' + r.id + '" tabindex="0" aria-label="Load ' + escapeHtml(r.route + ' ' + r.run) + ', place ' + (orderIds.indexOf(r.id) + 1) + ' of ' + orderIds.length + '. Drag up or down, or Alt and the up or down arrow, to change the loading order"';
       let html = '', lastPrior = null;
       rows.forEach(r => {
+        if (r.sched) { html += schedRowHtml(r); return; }
         if (r.prior !== lastPrior) {
           html += r.prior ? '<tr class="divider prior"><td colspan="' + cols.length + '">PRIOR DAY LOADS · ' + shortDate(r.loadDate) + ' — still open, finish these first</td></tr>'
             : (lastPrior === true ? '<tr class="divider today"><td colspan="' + cols.length + '">TODAY · ' + shortDate(date) + '</td></tr>' : '');
@@ -223,7 +294,9 @@
         const mins = P.minutesTaken(r);
         const skip = isSkipped(r), skipBtn = edit && st !== 'DONE' && st !== 'LOADING' && !skip ? '<button type="button" class="skip" data-skip="' + r.id + '" title="Skip for now and come back to it">Skip</button>' : '';
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
-        const runCell = escapeHtml(r.run) + (skip ? '<span class="skip-tag">SKIPPED · COME BACK</span>' : '');
+        // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
+        const tag = r.schedLine ? schedTag(r.schedLine) : '';
+        const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(r.run) + '</span>' + (skip ? '<span class="skip-tag">SKIPPED · COME BACK</span>' : '');
         const stale = st === 'LOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
         // Review item 22 (Joe 10/13): a load left running past 12 hours shows just "forgot End?" in Total Time; when it started
         // ("Started Wed 3:24 AM · forgot End?") shows on hover, so the line stays one line high.
@@ -263,6 +336,36 @@
     }
 
     function rowById(id) { return rowsNow().find(r => r.id === id); }
+    const schedById = (id) => withSched(rowsNow()).find(r => r.id === id);
+
+    // A Scheduler load's line: trailer and box count typed in, Start and End, and Edit opens its Scheduler boxes.
+    function schedRowHtml(r) {
+      const x = r.sched, st = r.state, edit = canSched(), sdis = edit ? '' : ' disabled';
+      const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + escapeHtml(r.id) + '" value="' + escapeHtml(v) + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : '') + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route + ' ' + r.run) + '"' + sdis + '>';
+      // Its status follows Start and End (the Scheduler line has no status picker).
+      const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'loading' : '') + '" disabled>' + (st === 'DONE' ? '&#10003; Done' : r.paused ? '&#10073;&#10073; Paused' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
+      const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' && !r.paused ? ' end' : '') + '" data-sclock="' + escapeHtml(r.id) + '">' + (st === 'LOADING' && !r.paused ? 'End' : 'Start') + '</button></span>' : '';
+      const mins = P.minutesTaken(r);
+      const over = x.overSlots ? '<span class="skip-tag inline" title="Route Master has no LOAD ' + x.loadNo + ' run for this customer: add one so this load has its own line">NO LOAD ' + x.loadNo + ' RUN</span>' : '';
+      return '<tr class="sched-row' + (st === 'DONE' ? ' done' : st === 'LOADING' ? ' loading' : '') + '" data-row="' + escapeHtml(r.id) + '"><td class="strong">' + escapeHtml(routeNo(r.route)) + '</td>' +
+        '<td><span class="lo-run" title="' + escapeHtml([r.run, x.poNumber ? 'PO ' + x.poNumber : ''].filter(Boolean).join(' · ')) + '">' + escapeHtml(r.run) + '</span></td>' +
+        // A Scheduler load has no driver here: Driver / CVG says Carrier and its PO, or that Route Master needs a LOAD N run.
+        '<td class="lo-driver">' + (over || escapeHtml([r.driver, x.poNumber ? 'PO ' + x.poNumber : ''].filter(Boolean).join(' · '))) + '</td><td></td>' +
+        '<td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td><td>' + escapeHtml(clock24(x.pickupTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td>' +
+        '<td>' + (mins === null ? '' : '<span class="' + (st === 'LOADING' ? 'running' : '') + '">' + P.minutesText(mins) + '</span>') + '</td><td></td>' +
+        '<td><button type="button" class="edit-row" data-sedit="' + escapeHtml(r.id) + '">Edit</button></td></tr>';
+    }
+    // The same save as Plant Station's Boxing card (savePlantSchedule progress): shown at once, put back if refused.
+    let schedChain = Promise.resolve();
+    function saveSched(r, step, fields, work) {
+      const x = r.sched, id = x.id, p = schedPending[id] = Object.assign({ work: {} }, schedPending[id]);
+      Object.assign(p.work, work);
+      if (fields.trailer !== undefined) p.trailer = fields.trailer.toUpperCase();
+      render();
+      schedChain = schedChain.then(() => save('savePlantSchedule', { lane: 'SHIPPING', op: 'progress', id, date: x.date, step, fields }))
+        .then(() => showError(''), e => showError(r.route + ' ' + r.run + ': ' + (e.message || e)))
+        .then(() => { delete schedPending[id]; render(); });
+    }
 
     // Saves a new loading order for today's loads of the shown department: shown at once, put back if refused.
     // Same numbering as the server (actions.js reorder): the loads keep the order numbers they had, smallest first.
@@ -469,11 +572,61 @@
       save('addPickup', { runDocId: row.runDocId, day: row.day, date: row.loadDate, item, quantity, notes, station: station() }).catch(err => { pickups = pickups.filter(p => p !== temp); drawPickups(); render(); showError('Pickup: ' + (err.message || err)); });
     };
 
+    // Add Load / Edit (Joe 10/14): the Scheduler's Save Load, with this Loadout day as the load day and the next day delivering.
+    let schedEditing = null, schedOptions = [];
+    function openSchedLoad(x) {
+      schedEditing = x || null;
+      const list = R.scheduleCustomers(slotRoutes());
+      schedOptions = (x && !list.some(c => c.runId === x.runId) ? [{ routeId: x.routeId, runId: x.runId, route: x.route, run: x.run, name: '' }] : []).concat(list);
+      const pick = x ? schedOptions.findIndex(c => c.runId === x.runId || (c.slots || []).some(s => s.runId === x.runId)) : -1;
+      document.getElementById('s-route').innerHTML = (pick < 0 ? '<option value="">Pick one…</option>' : '') + schedOptions.map((c, i) => '<option value="' + i + '"' + (i === pick ? ' selected' : '') + '>' + escapeHtml([c.route, c.run, c.name].filter(Boolean).join(' · ')) + '</option>').join('');
+      document.getElementById('sched-title').textContent = (x ? 'Edit Load · ' + R.loadNumberName(x.run || x.route, x.loadNo) : 'Add Load · Daily Box Loadout ' + shortDate(date));
+      const put = (id, v) => { document.getElementById(id).value = v || ''; };
+      put('s-type', x ? x.scheduleType : 'ROUTE'); put('s-load', x ? (x.loadDate || x.date) : date); put('s-date', x ? x.date : L.addDays(date, 1));
+      put('s-time', x ? x.pickupTime : ''); put('s-trailer', x ? x.trailer : ''); put('s-po', x ? x.poNumber : ''); put('s-cases', x ? x.cases : ''); put('s-product', x ? x.product : ''); put('s-notes', x ? x.notes : '');
+      document.getElementById('s-error').hidden = true;
+      openModal('sched-modal');
+      document.getElementById(x ? 's-time' : 's-route').focus();
+    }
+    const schedError = (t) => { const e = document.getElementById('s-error'); e.textContent = t; e.hidden = !t; };
+    document.getElementById('add-load').onclick = () => openSchedLoad(null);
+    document.getElementById('s-save').onclick = async () => {
+      const c = schedOptions[Number(document.getElementById('s-route').value)], val = (id) => document.getElementById(id).value.trim();
+      const key = val('s-date'), x = schedEditing;
+      const f = { routeId: c ? c.routeId : '', runId: c ? c.runId : '', route: c ? c.route : '', run: c ? c.run : '', scheduleType: val('s-type'), loadDate: val('s-load'), pickupTime: val('s-time'),
+        trailer: val('s-trailer').toUpperCase(), poNumber: val('s-po'), cases: val('s-cases'), product: val('s-product'), notes: document.getElementById('s-notes').value };
+      // The same checks as the server, so a mistake is fixed in the box.
+      if (!c || document.getElementById('s-route').value === '') return schedError('Pick the route / run.');
+      if (!L.isDateKey(key)) return schedError('Pick the delivery date.');
+      if (!R.time24(f.pickupTime)) return schedError('Enter the pickup time.');
+      if (f.scheduleType === 'CARRIER' && !f.poNumber) return schedError('A carrier load needs its PO number.');
+      if (f.cases && !/^[0-9]{1,6}$/.test(f.cases)) return schedError('Cases must be a whole number.');
+      if (f.loadDate && f.loadDate > key) return schedError('The load date cannot be after the delivery date.');
+      const b = document.getElementById('s-save');
+      b.disabled = true; schedError('');
+      try {
+        await save('savePlantSchedule', { lane: 'SHIPPING', op: 'save', id: x ? x.id : '', date: key, fields: f });
+        closeModals(); showError('');
+      } catch (e) {
+        schedError('Not saved (' + (e.message || e) + '). Check the entries and press Save Load again.');
+      } finally { b.disabled = false; }
+    };
+    document.getElementById('sched-form').addEventListener('input', () => schedError(''));
+    document.getElementById('sched-form').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName !== 'TEXTAREA') { ev.preventDefault(); document.getElementById('s-save').click(); } });
+
     // Typing in the table: Enter or leaving the box saves; arrow keys and Enter move between rows.
     const rowsEl = document.getElementById('rows');
     rowsEl.addEventListener('change', e => {
       const el = e.target.closest('input[data-k]');
       if (!el) return;
+      if (el.dataset.id.indexOf('sch:') === 0) {
+        const r = schedById(el.dataset.id), k = el.dataset.k, v = el.value.trim();
+        if (!r || String(qty(r[k])) === v) return;
+        if (k === 'quantity' && v && !/^\d{1,6}$/.test(v.replace(/,/g, ''))) { showError('Type a whole number for Boxes.'); el.value = qty(r[k]); return; }
+        const f = k === 'quantity' ? { count: v.replace(/,/g, '') } : { trailer: R.trailerText(v) };
+        saveSched(r, 'save', f, k === 'quantity' ? { count: f.count } : {});
+        return;
+      }
       const row = rowById(el.dataset.id);
       if (!row) return;
       const k = el.dataset.k, v = el.value.trim();
@@ -496,6 +649,14 @@
     rowsEl.addEventListener('click', e => {
       const t = e.target.closest('button');
       if (!t) return;
+      if (t.dataset.sclock) {
+        const r = schedById(t.dataset.sclock), now = new Date().toISOString();
+        if (!r) return;
+        if (r.state === 'LOADING' && !r.paused) saveSched(r, 'complete', {}, { state: 'COMPLETE', completedAt: now });
+        else saveSched(r, 'start', {}, { state: 'WORKING', startedAt: r.startedAt || now });
+        return;
+      }
+      if (t.dataset.sedit) { const r = schedById(t.dataset.sedit); if (r) openSchedLoad(r.sched); return; }
       if (t.dataset.state) { const r = rowById(t.dataset.state); if (r && canLoad()) openStatus(t, r); return; }
       if (t.dataset.skip) { (skipped[date] = skipped[date] || {})[t.dataset.skip] = true; keepSkips(); render(); return; }
       if (t.dataset.clock) {
@@ -583,9 +744,11 @@
       watchPerson(db, user, p => {
         person = p; render();
         const key = JSON.stringify([p && p.roles, p && p.email]);
-        if (key !== askedRights) { askedRights = key; allowedSaves(['savePlantLoad']).then(a => { allowed = a; render(); }); }
+        if (key !== askedRights) { askedRights = key; allowedSaves(['savePlantLoad', 'savePlantSchedule']).then(a => { allowed = a; render(); }); }
       });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING)), s => { schedDocs = s.docs.map(d => d.data()); render(); }, () => { schedDocs = []; });
+      onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; });
       onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
         const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));
         ['TRUCK', 'TRAILER'].forEach(t => { units[t] = all.filter(e => e.type === t).map(e => ({ unit: e.unit, down: !!e.status && String(e.status).toUpperCase() !== 'ACTIVE' })); });

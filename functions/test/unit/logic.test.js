@@ -249,3 +249,13 @@ test('Weekly: a plant load marked Not running (plantLoadOff) is off; without the
   const shown = L.weeklyRows([{ id: 'w', weekStart: '2026-10-11', runId: 'run_836', days: { wed: { runs: false, plantLoadOff: true } } }], '2026-10-11')[0];
   assert.equal(L.weeklyCellClass(shown, 'wed', ctx), 'off');
 });
+
+test('weekly: an as-needed customer\'s Scheduler loads go on its LOAD 1, LOAD 2 runs by pickup time (Joe 10/14)', () => {
+  const days = () => Object.fromEntries(L.DAYS.map(p => [p, { runs: false }]));
+  const rows = [1, 2].map(n => ({ runId: 'c905_' + n, route: '905_' + n, run: 'ALDI - CHARLESTON LOAD ' + n, days: days() })).concat([{ runId: 'g892', route: '892', run: 'GARBER', days: days() }]);
+  const pl = (id, pickupTime, runId) => ({ id, runId: runId || 'c905_1', date: '2026-10-15', pickupTime });
+  const ctx = L.weeklyContext(rows, [], [], [pl('a', '09:00'), pl('b', '05:30'), pl('c', '08:05'), pl('g', '07:00', 'g892')]);
+  assert.deepEqual(ctx.plant['c905_1|2026-10-15'].map(e => e.id), ['b']);
+  assert.deepEqual(ctx.plant['c905_2|2026-10-15'].map(e => e.id), ['c', 'a'], 'more loads than LOAD runs share the last one');
+  assert.deepEqual(ctx.plant['g892|2026-10-15'].map(e => e.id), ['g']);
+});
