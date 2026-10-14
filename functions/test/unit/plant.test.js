@@ -324,3 +324,16 @@ test('Manager Center: scheduler, quality, temperature and shift-note numbers, an
   assert.match(r.text, /TEMPERATURES\n {2}Cooler North {2}44\.5°F {2}HIGH \(limit 33–41\)\n {2}Cooler Middle {2}- {2}NO CHECK {2}check due/);
   assert.throws(() => P.validateReport({ subject: '', text: 'x' }, SaveError), /still loading/);
 });
+
+test('report route tiles: the run\'s short name (Joe 10/14)', () => {
+  const n = (route, run) => R.shortRun({ route, run });
+  assert.equal(n('845', 'UT DSD MILK'), 'DSD');
+  assert.equal(n('906', 'LANCASTER'), 'Lancaster');
+  assert.equal(n('6304', 'UT WALMART'), 'Walmart');
+  assert.equal(n('503', 'SUN VALLEY'), 'Sun Valley');
+  assert.equal(n('909', 'MARIETTA LOAD 2'), 'Marietta Load 2');
+  assert.equal(n('8302_1', '8302_1'), '', 'a run named by its number has no short name');
+  assert.equal(n('801', ''), '');
+  assert.equal(R.routeNumber('6301_1'), '6301');
+});
+
