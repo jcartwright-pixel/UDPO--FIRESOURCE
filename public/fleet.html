@@ -129,6 +129,8 @@
             box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td>' + now(r) + '</td><td>' + pill(STATUS[r.worst]) + '</td>' + (garageCol ? '<td>' + send(r) + '</td>' : '') + '</tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
     }
 
+    // A data update that changes nothing on the list leaves it as it is (no redraw: the same lines stay, a hovered or clicked one too).
+    const put = (el, html) => { if (el.shown !== html) { el.innerHTML = html; el.shown = html; } };
     function render() {
       const t = today(), due = L.fleetDue(units(), setup, miles(), open(), savedRules, t), month = t.slice(0, 7), weekAgo = L.weekStart(t);
       const late = due.items.filter(i => i.status === 'OVERDUE').length, soon = due.items.filter(i => i.status === 'DUE_SOON').length, week = done().filter(o => L.localDay(o.completed_at) >= weekAgo);
@@ -142,7 +144,7 @@
           [due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates expiring · 30 days'], [open().length, 'At the garage'], [done().filter(o => L.localDay(o.completed_at).slice(0, 7) === month).length, 'Done this month', 'good']]);
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="garage-station.html">Garage Station</a>';
-        sheet.innerHTML = unitGrid(due, hit);
+        put(sheet, unitGrid(due, hit));
         foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · leased tractors: the lessor handles service.';
       } else if (view === 'work') {
         const o = jobs().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
@@ -153,6 +155,7 @@
         // Delete (managers and administrators, Joe 10/14): the job comes off the Garage Station, after a confirm.
         const del = canEdit(), delBtn = (x) => '<td><button type="button" class="edit" ' + (x.work_order_id ? 'data-del-wo="' + escapeHtml(x.work_order_id) + '"' : 'data-del-wu="' + escapeHtml(x.writeUp) + '"') +
           ' data-del-what="' + escapeHtml(x.unit + ' · ' + String(x.problem || '').slice(0, 80)) + '" title="Take this job off the Garage Station">Delete</button></td>';
+        sheet.shown = null;
         sheet.innerHTML = '<div class="fleet-split"><div><h2>Open Work Orders</h2>' + table(del ? [14, 10, 25, 14, 8, 13, 16] : [14, 12, 34, 14, 12, 14], ['#', 'Unit', "What's wrong", 'Came from', 'Tech', 'Status'].concat(del ? [''] : []),
           o.map(x => '<tr class="clicky" data-unit="' + escapeHtml(x.unit) + '" title="Open ' + escapeHtml(x.unit) + '\'s history"><td class="strong">' + (x.work_order_id ? escapeHtml(x.work_order_id) : '<small title="A driver write-up on the Garage Station with no work order yet">Write-up</small>') + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(cameFrom(x)) +
             '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + pill(JOB[String(x.status).toUpperCase()] || [x.status, 'no']) + '</td>' + (del ? delBtn(x) : '') + '</tr>').join(''), 'No open work orders.') +
@@ -176,7 +179,7 @@
             return '<tr><td>' + when(isOpen ? x.created_at : x.completed_at) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td>' + ({ work: 'Work order', service: 'Service', dot: 'Annual inspection' })[kind] + '</td><td class="wrong">' +
             escapeHtml(x.problem || '') + (x.fixed_note ? '<small>' + escapeHtml(x.fixed_note) + '</small>' : '') + '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' +
             (isOpen ? pill(JOB[String(x.status || 'NEW').toUpperCase()] || [x.status, 'no']) : escapeHtml(x.fixed || '') + (x.safe === 'YES' ? '<small>SAFE' + (x.signed_by ? ' · SIGNED ' + escapeHtml(x.signed_by) : '') + '</small>' : x.signed_by ? '<small>signed ' + escapeHtml(x.signed_by) + '</small>' : '')) + '</td></tr>'; }).join(''), 'Nothing in the garage history yet.');
-        sheet.innerHTML = unit ? '<div class="fleet-split wide-left"><div>' + list + '</div><div>' + factsPanel(unit, due, t) + '</div></div>' : list;
+        put(sheet, unit ? '<div class="fleet-split wide-left"><div>' + list + '</div><div>' + factsPanel(unit, due, t) + '</div></div>' : list);
         foot.textContent = rows.length + (rows.length === 1 ? ' job shown' : ' jobs shown') + (unit ? ' for ' + unit.unit : '') + '.' + (unit ? '' : ' Type one unit\'s number to see its facts.');
       } else {
         k.innerHTML = '';
@@ -194,6 +197,7 @@
         const ours = (u) => '<input type="checkbox" class="fs-ours" data-ours="' + escapeHtml(u.unit) + '" data-type="' + u.type + '" aria-label="' + escapeHtml(u.unit) + ' is ours"' + (u.tracked ? ' checked' : '') + (boss ? '' : ' disabled') + '>';
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           (boss ? '<button type="button" class="primary" id="rules-save">Save Rules</button>' : '<span class="hint">Managers and administrators change the setup.</span>');
+        sheet.shown = null;
         sheet.innerHTML = '<div class="fleet-split fs-setup"><div><h2>Units · ' + escapeHtml(plant.name) + '</h2>' + table([10, 7, 9, 9, 11, 11, 14, 11, 10, 8], ['Unit', 'Ours', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'Annual inspection due', 'Plate expires', 'Notes', ''],
           due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + ours(u) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.trackSet ? (u.tracked ? 'Yes' : 'No') : 'Default') + '</td><td>' + when(u.lastServiceDate) +
             (u.lastServiceMiles != null ? '<small>' + num(u.lastServiceMiles) + ' mi</small>' : u.lastServiceHours != null ? '<small>' + num(u.lastServiceHours) + ' hrs</small>' : '') + '</td><td>' +
