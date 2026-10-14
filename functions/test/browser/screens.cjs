@@ -846,6 +846,13 @@ async function noScroll(page) {
     await otr.fill('.otr-in[data-m="9"][data-k="distribution_cost"]', '400000');
     await otr.press('.otr-in[data-m="9"][data-k="distribution_cost"]', 'Tab');
     await otr.waitForFunction(() => /\$0\.400/.test(document.querySelector('.otr-in[data-m="9"]').closest('tr').textContent), null, { timeout: 5000 });
+    // Joe 10/13: money boxes read like $400,000.00, gallons get commas, and last year's gray numbers show only when asked for.
+    await otr.waitForFunction(() => document.querySelector('.otr-in[data-m="9"][data-k="distribution_cost"]').value === '$400,000.00', null, { timeout: 5000 });
+    assert.equal(await otr.inputValue('.otr-in[data-m="9"][data-k="gallons_sold"]'), '1,000,000');
+    assert.equal(await otr.$$eval('table.otr-fig small', s => s.length), 0, 'no last-year numbers until Compare to last year is ticked');
+    await otr.check('#otr-compare');
+    await otr.waitForFunction(() => document.querySelectorAll('table.otr-fig small').length > 0, null, { timeout: 5000 });
+    await otr.uncheck('#otr-compare');
     const otrSaved = await otr.evaluate(async () => {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('/js/firebase.js');
@@ -871,9 +878,43 @@ async function noScroll(page) {
     await otr.click('.tabs [data-view="cpg"]');
     await otr.waitForSelector('table.otr-cpg');
     assert.match(await otr.textContent('table.otr-cpg'), /\$0\.40000/, 'Cost Per Gallon shows the month typed on Recap');
+    // Joe 10/13: OTR Routes Setup adds a By Date column of his own (Darden) and fixes a run's round-trip miles in Route Master.
+    await otr.click('.tabs [data-view="routes"]');
+    await otr.click('#otr-cols');
+    await otr.fill('#otr-col-new', 'Darden');
+    await otr.click('#otr-col-add');
+    await otr.waitForFunction(() => [...document.querySelectorAll('[data-col="run_t801"] option')].some(o => o.value === 'Darden'), null, { timeout: 5000 });
+    await otr.waitForSelector('[data-col-remove]', { timeout: 5000 });
+    await otr.click('[data-miles="run_t801"]');
+    await otr.fill('[data-miles-in="run_t801"]', '412');
+    await otr.click('[data-miles-save="run_t801"]');
+    await otr.waitForFunction(() => document.querySelector('[data-miles="run_t801"]').textContent === '412', null, { timeout: 5000 });
+    const otrMore = await otr.evaluate(async () => {
+      const { start } = await import('./js/app.js');
+      const { doc, getDoc } = await import('/js/firebase.js');
+      const { db } = await start();
+      for (let i = 0; i < 20; i++) {
+        const c = (await getDoc(doc(db, 'otrColumns', 'DARDEN'))).data(), r = (await getDoc(doc(db, 'routes', 'run_t801'))).data();
+        const miles = r && Object.values(r.days || {}).map(d => d && d.miles).filter(m => m != null);
+        if (c && miles.length && miles.every(m => m === 412)) return { column: c.name, miles };
+        await new Promise(res => setTimeout(res, 250));
+      }
+      return null;
+    });
+    assert.ok(otrMore, 'the Darden column and the 412 miles saved');
+    assert.equal(otrMore.column, 'Darden');
+    await otr.click('.tabs [data-view="bydate"]');
+    await otr.waitForSelector('table.otr-bydate');
+    assert.ok((await otr.$$eval('table.otr-bydate thead th', ths => ths.map(t => t.textContent))).includes('Darden'), 'By Date shows the column added in OTR Routes Setup');
+    await otr.click('.tabs [data-view="routes"]');
+    // The By Date Columns box stays open from before; the button opens or closes it.
+    await otr.waitForSelector('#otr-cols');
+    if (!(await otr.$('.otr-cols'))) await otr.click('#otr-cols');
+    await otr.click('[data-col-remove]');
+    await otr.waitForFunction(() => ![...document.querySelectorAll('[data-col="run_t801"] option')].some(o => o.value === 'Darden'), null, { timeout: 5000 });
     assert.deepEqual(otr.errors, []);
     await otr.close();
-    results.push('Over the Road: a manager ticked 801 (Carrier Pickup) and typed September figures (cost per gallon $0.400); Dashboard and Report open');
+    results.push('Over the Road: a manager ticked 801 (Carrier Pickup) and typed September figures (cost per gallon $0.400); Dashboard and Report open; Darden column added and removed; 801 miles fixed to 412');
     // Driver Scorecard: the month board, a driver's misses, the year and Settings open with no errors; a manager changes a point value.
     const sc = await openPage(browser, 1920, 950, '/scorecard.html?testEmail=manager.test@uniteddairy.com');
     await sc.waitForSelector('.sc-board');

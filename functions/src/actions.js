@@ -31,7 +31,7 @@ const { editDriver, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard
 const { saveDriverException, saveVacation } = require('./actions-dayoff');
 const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
 const { reorderWeek, publishWeek, setWeekReason, resetWeek } = require('./actions-weekly');
-const { saveOtr } = require('./actions-otr');
+const { saveOtr, otrColumnKey } = require('./actions-otr');
 
 const C = M.COLLECTIONS;
 
@@ -295,8 +295,20 @@ function validate(input) {
     } else if (out.op === 'day') {
       out.date = text(input.date, 10); out.destination = OTR.otrNormDest_(input.destination); out.runs = count(input.runs, 'Runs');
       if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
-      if (OTR.OTR_CORE.DESTINATIONS.indexOf(out.destination) < 0) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
+      // A column added in OTR Routes Setup (otrColumns) is checked when the save runs.
+      out.destination = text(out.destination, 60);
+      if (!out.destination) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
       if (out.runs === null) throw new SaveError('BAD_REQUEST', 'Type the number of runs');
+    } else if (out.op === 'column') {
+      // Joe 10/13: a By Date column of his own (an outside carrier such as Darden); renamed or removed only while nothing uses it.
+      out.verb = text(input.verb, 10); out.name = text(input.name, 40);
+      if (['add', 'rename', 'remove'].indexOf(out.verb) < 0) throw new SaveError('BAD_REQUEST', 'Add, rename or remove a column');
+      if (!out.name) throw new SaveError('BAD_REQUEST', 'Type the column name');
+      if (out.verb === 'rename') { out.newName = text(input.newName, 40); if (!out.newName) throw new SaveError('BAD_REQUEST', 'Type the new column name'); }
+      const fixed = n => OTR.OTR_CORE.DESTINATIONS.some(d => otrColumnKey(d) === otrColumnKey(n));
+      if (fixed(out.name) && out.verb !== 'add') throw new SaveError('BAD_REQUEST', out.name + ' is one of the workbook\'s own columns and stays');
+      const made = out.verb === 'add' ? out.name : out.newName;
+      if (made && fixed(made)) throw new SaveError('BAD_REQUEST', made + ' is already a column');
     } else if (out.op === 'comment') {
       // The Comment column of the By Date tab: one note per day ("Lost 5 Walmart Rts"); empty clears it.
       out.date = text(input.date, 10); out.text = text(input.text, 200);
