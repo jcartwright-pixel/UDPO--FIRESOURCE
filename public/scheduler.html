@@ -110,7 +110,9 @@
     function entries() {
       const list = R.scheduleEntries(loads[lane], lane).filter(x => !pending[x.id]);
       Object.keys(pending).forEach(id => { const p = pending[id]; if (p.lane === lane && !p.deleted) list.push(p); });
-      return list.sort((a, b) => a.date.localeCompare(b.date) || (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99'));
+      list.sort((a, b) => a.date.localeCompare(b.date) || (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99'));
+      // Joe 10/14: a customer's loads on one delivery day are numbered by pickup time (Load 1, Load 2, ...).
+      return R.numberLoads(list, catalog());
     }
     function catalog() {
       if (lane === 'RECEIVING') return R.scheduleSuppliers(supplierDocs).concat(pendingSuppliers);
@@ -119,10 +121,11 @@
     function routeFor(x) {
       return catalog().find(r => x.runId ? r.runId === x.runId : r.routeId === x.routeId && r.run === x.run) || {};
     }
-    const entryName = (x) => String(routeFor(x).name || x.run || x.route || 'Plant pickup');
+    const entryName = (x) => R.loadNumberName(String(routeFor(x).name || x.run || x.route || 'Plant pickup'), x.loadNo);
     function titleCase(t) { t = String(t || '').trim(); if (!t || /[a-z]/.test(t)) return t; return t.split(/(\s+)/).map(w => /^\s+$/.test(w) ? w : w.toLowerCase() === 'and' ? 'and' : w.length <= 2 || /[0-9/&]/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase()).join(''); }
     // The day list's run name: the customer's short name plus what the run adds to it (as the current app shows it).
-    function runName(x) {
+    function runName(x) { return R.loadNumberName(runNameOnly(x), x.loadNo); }
+    function runNameOnly(x) {
       const short = String(routeFor(x).name || '').trim(), run = String(x.run || '').trim();
       if (!short) return titleCase(run) || x.route || 'Plant pickup';
       if (!run || run.length <= short.length) return short;

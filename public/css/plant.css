@@ -250,7 +250,7 @@
 .sched-page .sc-by.branch i { background: #15803d; }
 .sched-page .sc-by.carrier i { background: #7e3fbf; }
 .sched-page .sc-load strong, .sched-page .sc-load span, .sched-page .sc-load small { display: block; overflow: hidden; text-overflow: ellipsis; }
-.sched-page .sc-load strong { font-size: 16px; white-space: nowrap; }
+.sched-page .sc-load strong { font-size: 16px; white-space: normal; overflow-wrap: anywhere; }
 .sched-page .sc-load span { font-size: 16px; color: var(--muted); }
 .sched-page .sc-load small { font-size: 16px; color: #8a4b00; font-weight: 700; }
 .sched-page .sc-add { margin-top: auto; min-height: 32px; border: 1px dashed var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
@@ -1191,3 +1191,8 @@
    lines; the band line above the headings is 16px too. */
 .products-page .pm-sheet col.c-mach + col.c-num, .products-page .pm-sheet col.c-group + col.c-num { width: 126px; }
 .products-page .pm-sheet thead tr.pm-band th { font-size: 16px; }
+/* Joe 10/14: a Scheduler load on Daily Box Loadout (its PO and pickup time under the run), and Add Load on the top line. */
+.plant-page .sched-tag { display: block; width: fit-content; margin: 3px auto 0; padding: 2px 8px; border-radius: 6px; background: #e3effb; color: #0b4f8a; font-size: 16px; font-weight: 700; line-height: 1.25; }
+.loadout-page .add-load #add-load { height: 40px; padding: 0 16px; border-radius: 8px; border: 0; background: #0b4f8a; color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.loadout-page .add-load[hidden] { display: none !important; }
+.loadout-page tr.sched-row button.state:disabled { opacity: 1; cursor: default; }

@@ -146,11 +146,27 @@ test('scheduler: customers are Route Master\'s plant runs, an as-needed customer
   const routes = PD.CUSTOMERS.map(r => ({ runId: r.run_id, routeId: r.route_id, route: r.route, run: r.run, routeName: r.route_name, routeStatus: r.route_status, active: r.active === 'TRUE', displayPlant: r.display_plant_distribution === 'TRUE' }));
   const list = R.scheduleCustomers(routes);
   assert.deepEqual(list.map(r => r.route + ' ' + r.run), ['849 SUN VALLEY', '892 GARBER', '905 ALDI - CHARLESTON', '907_1 FAIRMONT TRANSFER', '6302 UT WALMART']);
-  assert.equal(list.find(r => r.route === '905').slots, 2);
+  assert.equal(list.find(r => r.route === '905').slots.length, 2);
   assert.equal(list.find(r => r.route === '905').runId, 'run_c905_1');
   const sup = R.scheduleSuppliers([{ recordId: 'SUP-m1', type: 'PLANT_SUPPLIER', routeId: 'SUP-m1', route: 'S06', run: 'MOUNTAIN STATE SUGAR', notes: 'Mountain Sugar', status: 'ACTIVE' }]);
   assert.deepEqual(sup.map(s => s.route), ['S06'], 'no sample suppliers (Joe 10/13)');
   assert.equal(sup[0].name, 'Mountain Sugar');
+});
+
+test('scheduler: a customer\'s loads on one day are Load 1, 2, 3 by pickup time, Load N on its LOAD N run (Joe 10/14)', () => {
+  const customers = R.scheduleCustomers([1, 2].map(n => ({ runId: 'c905_' + n, routeId: 'rt905', route: '905_' + n, run: 'ALDI - CHARLESTON LOAD ' + n, displayPlant: true }))
+    .concat([{ runId: 'g892', routeId: 'rt892', route: '892', run: 'GARBER', displayPlant: true }]));
+  const e = (id, date, pickupTime, runId) => ({ id, date, pickupTime, runId: runId || 'c905_1', route: '905_1', run: 'ALDI - CHARLESTON LOAD 1' });
+  const out = R.numberLoads([e('a', '2026-10-15', '09:00'), e('b', '2026-10-15', '05:30'), e('c', '2026-10-15', '08:05'), e('d', '2026-10-16', '07:00'), e('g', '2026-10-15', '07:00', 'g892')], customers);
+  const by = Object.fromEntries(out.map(x => [x.id, x]));
+  assert.deepEqual(['b', 'c', 'a'].map(id => by[id].loadNo), [1, 2, 3]);
+  assert.deepEqual(['b', 'c', 'a'].map(id => by[id].slot.runId), ['c905_1', 'c905_2', 'c905_2'], 'the third shares the last slot');
+  assert.deepEqual(['b', 'c', 'a'].map(id => by[id].overSlots), [false, false, true]);
+  assert.equal(by.d.loadNo, 1, 'numbered per delivery day');
+  assert.equal(by.g.loadNo, 1, 'a single load is Load 1');
+  assert.equal(by.g.slot, null, 'a customer with no LOAD runs is numbered on screen only');
+  assert.equal(R.loadNumberName('ALDI - CHARLESTON LOAD 1', 3), 'ALDI - CHARLESTON Load 3');
+  assert.equal(R.loadNumberName('Garber', 1), 'Garber Load 1');
 });
 
 test('scheduler: Save Load checks what the current app checks', () => {

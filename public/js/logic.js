@@ -879,9 +879,35 @@
         dup[k] = (dup[k] || 0) + 1;
       });
     });
-    var plant = {};
-    (plantLoads || []).forEach(function (e) { if (e.runId && e.date) (plant[e.runId + '|' + e.date] = plant[e.runId + '|' + e.date] || []).push(e); });
-    return Object.assign(offCoverContext(drivers, exceptions), { dup: dup, relief: relief, plant: plant });
+    return Object.assign(offCoverContext(drivers, exceptions), { dup: dup, relief: relief, plant: plantByRun(rows, plantLoads) });
+  }
+  // Joe 10/14: an as-needed customer's Scheduler loads on one day (all booked on its LOAD 1 run) are Load 1, 2, 3 by pickup
+  // time, and Load N goes on its LOAD N run; more loads than LOAD runs share the last one (plant-rules.js numberLoads).
+  function plantByRun(rows, plantLoads) {
+    var slots = {}, groupOf = {}, groups = {}, plant = {};
+    (rows || []).forEach(function (r) {
+      var m = /^(.*?)[\s-]*LOAD\s*([0-9]+)$/i.exec(String(r.run || '').trim());
+      if (!r.runId || !m || !m[1].trim()) return;
+      var key = String(r.route || '').trim().replace(/_[0-9]+$/, '') + '|' + m[1].trim().toUpperCase();
+      if (groupOf[r.runId]) return;
+      groupOf[r.runId] = key;
+      (slots[key] = slots[key] || []).push({ runId: r.runId, n: Number(m[2]) });
+    });
+    Object.keys(slots).forEach(function (k) { slots[k].sort(function (a, b) { return a.n - b.n; }); });
+    (plantLoads || []).forEach(function (e) {
+      if (!e.runId || !e.date) return;
+      var k = (groupOf[e.runId] ? 'g:' + groupOf[e.runId] : 'r:' + e.runId) + '|' + e.date;
+      (groups[k] = groups[k] || []).push(e);
+    });
+    Object.keys(groups).forEach(function (k) {
+      var list = groups[k].slice().sort(function (a, b) { return String(a.pickupTime || '99:99').localeCompare(String(b.pickupTime || '99:99')); });
+      var g = groupOf[list[0].runId], s = g ? slots[g] : null;
+      list.forEach(function (e, i) {
+        var runId = s ? s[Math.min(i, s.length - 1)].runId : e.runId;
+        (plant[runId + '|' + e.date] = plant[runId + '|' + e.date] || []).push(e);
+      });
+    });
+    return plant;
   }
 
   /*
