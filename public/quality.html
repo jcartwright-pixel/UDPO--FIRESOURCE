@@ -88,7 +88,9 @@
 
     // The form of one line, as the current app's desktop form. The check of this round (entered since the last report was sent)
     // fills it and is filled in further as each box is left; with none yet the boxes are empty, with the last check small and grey.
-    function roundCheck(line) { const l = line.last || {}; return l.docId && inRound(l.recordedAt, roundStart) && Date.now() - Date.parse(l.recordedAt) < 12 * 3600000 ? l : null; }
+    // Joe 10/14: a check clears from the form when the report is sent or 2 hours after it was entered, whichever comes first
+    // (as Cooler Temperatures); the boxes then start empty with the last check small and grey.
+    function roundCheck(line) { const l = line.last || {}; return l.docId && inRound(l.recordedAt, roundStart) && Date.now() - Date.parse(l.recordedAt) < 2 * 3600000 ? l : null; }
     // Size, as the current app: Totes are always Tote and Raypak the 5-gallon dispenser; other lines pick the package size.
     const SIZES = ['Pint', 'Quart', 'Half gallon', 'Gallon', 'Dispenser'];
     function sizeBox(name, last, old, dis, note, was) {
@@ -152,7 +154,7 @@
       // The form is redrawn when another line is picked or a newer check of this line arrives, not while someone types.
       const typing = document.getElementById('fields').contains(document.activeElement);
       if (line && (!form || form.operationId !== line.operationId || (!typing && !form.busy && formKey(line) !== shownFor))) drawForm(line);
-      document.getElementById('round').textContent = ck ? 'Saves as you go' + (roundStart ? ' · new round since the report at ' + clockOf(roundStart) : '') : '';
+      document.getElementById('round').textContent = ck ? 'Saves as you go · clears after 2 hours or the next report' + (roundStart ? ' · new round since the report at ' + clockOf(roundStart) : '') : '';
       document.getElementById('form').hidden = !line;
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td><b>' + escapeHtml(h.area) + '</b></td><td>' + escapeHtml(h.product || '') + '</td>' +
         '<td class="detail">' + escapeHtml([h.temperature ? 'Temp ' + h.temperature : '', h.cycleTime ? 'Cycle ' + h.cycleTime : '', h.annealerSpeed ? 'Speed ' + h.annealerSpeed : '', U.weightText(h.weights), h.remainingOutput].filter(Boolean).join(' · ')) + '</td>' +

@@ -17,6 +17,7 @@ const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
+const L = require('../../src/logic');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -48,6 +49,11 @@ async function shots(page, name, w) {
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
+  // Joe 10/14: a check clears from the form 2 hours after it was entered (or at the next report): one 3 hours old, one 30 minutes old.
+  const seed = (id, line, product, mins) => db().collection('plantJournal').doc(id).set({ recordId: id, type: 'PRODUCTION_QUALITY', date: L.operatingDay(new Date()), status: 'RUNNING', recordedAt: new Date(Date.now() - mins * 60000).toISOString(),
+    recordedBy: 'supervisor.test@uniteddairy.com', createdInApp: true, payload: { operationId: line, product, status: 'RUNNING', qualityCheck: 'PASS' } });
+  await seed('PRODUCTION_QUALITY_app_seed_old', 'ut_prod_gallon_filler', 'Seed gallon old', 180);
+  await seed('PRODUCTION_QUALITY_app_seed_new', 'ut_prod_htst_1', 'Seed HTST new', 30);
   const browser = await chromium.launch();
   const results = [];
   try {
@@ -70,6 +76,14 @@ async function shots(page, name, w) {
       await page.waitForFunction(() => document.getElementById('form-title').textContent === 'HTST #1 Quality Check');
       assert.deepEqual(await page.$$eval('#fields label, #fields .qc-field > span', l => l.map(x => x.childNodes[0].textContent.trim())), ['Product being run', 'Size', 'Temperature', 'Label / date code', 'Remaining output', 'Overall result', 'Corrective action / notes']);
       await shots(page, 'quality-htst', w);
+      if (w === 1920) {
+        assert.equal(await page.inputValue('.prod-product'), 'Seed HTST new', 'a check 30 minutes old is still in the form');
+        await page.click('[data-line="ut_prod_gallon_filler"]');
+        await page.waitForFunction(() => document.getElementById('form-title').textContent === 'GALLON FILLER Quality Check');
+        assert.equal(await page.inputValue('.prod-product'), '', 'a check 3 hours old has cleared from the form');
+        assert.match(await page.textContent('#fields'), /Last: Seed gallon old/, 'the cleared check shows small and grey');
+        results.push('A check clears from the form 2 hours after it was entered: 30 minutes old still filled in, 3 hours old empty with "Last:" in grey');
+      }
       await page.click('[data-pane="history"]');
       await page.waitForSelector('#pane-history:not([hidden])');
       await fits(page, 'Quality history ' + w + 'x' + h);
