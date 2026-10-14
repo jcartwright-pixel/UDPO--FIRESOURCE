@@ -55,8 +55,8 @@ table.sw-table td.sw-note input::placeholder { color: #9aa9b8; font-weight: 600;
 .sw-check { display: flex; gap: 8px; align-items: flex-start; font-size: 16px; cursor: pointer; }
 .sw-check input { width: 22px; height: 22px; margin: 0; flex: none; }
 .sw-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 16px; font-weight: 800; letter-spacing: .03em; white-space: nowrap; }
-.sw-pill.green { background: #e7f6ec; color: var(--sw-green); } .sw-pill.red { background: #fde8e8; color: var(--sw-red); }
-.sw-pill.amber { background: #fff1dc; color: var(--sw-amber); } .sw-pill.blue { background: var(--band); color: var(--ud-blue); }
+.sw-pill.green { background: var(--pill-good-bg); color: var(--sw-green); } .sw-pill.red { background: var(--pill-red-bg); color: var(--sw-red); }
+.sw-pill.amber { background: var(--pill-amber-bg); color: var(--sw-amber); } .sw-pill.blue { background: var(--pill-blue-bg); color: var(--pill-blue-ink); }
 .sw-empty { padding: 14px; color: var(--muted); font-size: 16px; }
 .sw-foot { padding: 8px 16px 0; color: var(--muted); font-size: 16px; }
 .sw-bigphoto { position: fixed; inset: 0; z-index: 900; background: rgba(0, 0, 0, .8); display: grid; place-items: center; cursor: zoom-out; }

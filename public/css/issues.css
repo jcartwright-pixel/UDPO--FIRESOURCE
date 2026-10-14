@@ -1,0 +1,71 @@
+/* issues.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.issues-page .from-mail { font-weight: 800; white-space: nowrap; }
+.issues-page .link-btn { border: 0; background: none; padding: 0; color: var(--ud-blue); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.issues-page .mail-meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 10px; font-size: 16px; }
+.issues-page .mail-meta dt { font-weight: 800; color: var(--ud-blue-dark); }
+.issues-page .mail-meta dd { margin: 0; }
+.issues-page .mail-text { white-space: pre-wrap; font: inherit; font-size: 16px; background: #f5f8fb; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; max-height: 55vh; overflow: auto; margin: 0; }
+.issue-bar { margin: 0 16px; display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
+.issue-bar #search { margin-left: auto; width: 420px; max-width: 32vw; min-height: 44px; font-size: 16px; }
+.kind-tabs { display: flex; gap: 10px; }
+.kind-tabs button b { margin-left: 8px; display: inline-block; min-width: 26px; padding: 1px 7px; border-radius: 13px; background: #e1ebf5; color: var(--ud-blue-dark); font-size: 16px; text-align: center; }
+.kind-tabs button[aria-selected="true"] { background: #0f2e52; color: #fff; border-color: #0f2e52; }
+.kind-tabs button[aria-selected="true"] b { background: var(--ud-gold); color: #0f2e52; }
+.issue-bar .chips button { min-height: 34px; font-size: 16px; }
+table.old-issues td.wrong { text-align: left; }
+table.old-issues .tick { color: #1d7a3e; font-size: 24px; font-weight: 900; line-height: 1; }
+table.old-issues .dash { color: #8a97a5; font-size: 20px; }
+table.old-issues input[data-review] { width: 26px; height: 26px; cursor: pointer; accent-color: #1d7a3e; }
+table.old-issues .count { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #eef2f6; font-weight: 800; }
+table.old-issues .count.repeat { background: #fdebd3; color: #b45f00; }
+.work-acts { display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.work-acts button:disabled { opacity: .45; cursor: default; }
+.work-acts .ic { width: 44px; padding: 0; font-size: 18px; color: var(--ud-blue-dark); }
+.work-acts .seg { display: inline-flex; }
+.work-acts .seg button { border-radius: 0; }
+.work-acts .seg .seg-l { background: #1f5f9e; color: #fff; border-color: #1f5f9e; border-radius: 9px 0 0 9px; }
+.work-acts .seg .seg-g { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; border-radius: 0 9px 9px 0; }
+.work-acts .to-garage { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; }
+.work-acts .done { background: #eaf7ee; color: #1d7a3e; border-color: #a9d8b8; }
+.work-acts .remove { color: #c62828; border-color: #f0b8b8; font-size: 20px; }
+tr.issue-more p { margin: 6px 0; font-size: 16px; white-space: pre-wrap; }
+@media (max-width: 1500px) {
+  .kind-tabs button { font-size: 16px; padding: 0 12px; min-height: 40px; }
+  .issue-bar #search { width: 260px; }
+  .work-acts { gap: 5px; }
+  .work-acts button { padding: 0 8px; min-height: 34px; font-size: 16px; }
+  .work-acts .ic { width: 34px; }
+}
+.issue-bar .chips { flex-wrap: nowrap; }
+.issue-bar .chips button { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; padding: 0 12px; white-space: nowrap; }
+.issue-bar .chips button b { font-size: 16px; }
+.kind-tabs button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); }
+.kind-tabs button[aria-selected="true"] b { color: var(--ud-blue-dark); }
+/* Truck Issues at 1920 with Windows display scaling (Joe 10/11): Reviewed, Emailed and Garage give up a little width so every
+   Work Actions button, the ✕ included, shows whole, and the top row shrinks the search box instead of running off the edge. */
+.issue-bar #search { flex: 1 1 200px; width: auto; min-width: 150px; max-width: 420px; }
+.issue-bar .kind-tabs, .issue-bar .chips { flex: none; }
+.work-acts { gap: 6px; }
+.work-acts button { flex: none; padding: 0 10px; white-space: nowrap; }
+.work-acts .ic { width: 40px; }
+table.old-issues th { padding-left: 4px; padding-right: 4px; }
+/* Review item 43 (Joe 10/13): Truck Issues' filter buttons are one size: All open / Need review / ... match Trucks / Trailers / Fork Truck. */
+.issue-bar { gap: 10px; }
+.issue-bar .kind-tabs { gap: 6px; }
+.issue-bar .kind-tabs button, .issue-bar .chips button { min-height: 44px; padding: 0 10px; border-radius: 10px; font-size: 16px; font-weight: 800; }
+.issue-bar .kind-tabs button b, .issue-bar .chips button b { margin-left: 6px; font-size: 16px; min-width: 22px; padding: 1px 6px; border-radius: 12px; }
+.issue-bar #search { min-width: 140px; }
+
+/* Trucks Today (trucks.html): one pill per truck's status. */
+.trucks-page .tt-board td small { display: block; color: var(--muted); font-size: 16px; }
+.trucks-page .tt-pill { display: inline-block; padding: 2px 10px; border-radius: 10px; font-weight: 800; font-size: 15px; white-space: nowrap; }
+.trucks-page .tt-road { background: #e3f4e8; color: #1d6b37; }
+.trucks-page .tt-stopped { background: #e7eef7; color: #1d4f86; }
+.trucks-page .tt-yard { background: #eef2f5; color: #4b5b6b; }
+.trucks-page .tt-nosignal { background: #fdecc4; color: #8a5a00; }
+.trucks-page .tt-nogps { background: #fde3df; color: #a8321f; }
+.trucks-page .kpis:has(> div:nth-child(7)) { grid-template-columns: repeat(7, 1fr); }
+.trucks-page .tt-notruck { background: #e8ecf1; color: #44546a; }
+.trucks-page tr.tt-road, .trucks-page tr.tt-stopped, .trucks-page tr.tt-yard, .trucks-page tr.tt-nosignal, .trucks-page tr.tt-nogps, .trucks-page tr.tt-notruck { background: none; color: inherit; }
+.trucks-page .empty a { font-weight: 800; }

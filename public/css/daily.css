@@ -1,0 +1,111 @@
+/* daily.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+input.ovr { width: 15px; height: min(15px, calc(var(--row) - 6px)); margin: 0; vertical-align: middle; cursor: pointer; }
+.move-act { display: flex; align-items: center; gap: 10px; font-size: 16px; color: var(--muted); }
+.down-add { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: end; }
+.down-msg { margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: #fff4e5; color: #7a3d00; border: 1px solid #f0b46a; font-weight: 700; }
+@media print {
+  #print .pgroup td { font-weight: 700; background: #eee !important; }
+}
+.head:has(#print-sheet) #week-begin { width: 118px; min-width: 0; }
+.head:has(#print-sheet) #delivery-day { width: 160px; }
+@media (max-width: 1700px) {
+  .head:has(#print-sheet) #week-begin { width: 118px; }
+  .head:has(#print-sheet) #delivery-day { width: 160px; }
+}
+/* Daily Dispatch, Joe's pick 10/10 (mock-up A): every row a white card with a blue edge, route numbers in blue,
+   delivery-day lines as blue banners, RUNS and Edit as round buttons. Rows still size to fit the window. */
+body.daily-look .sheet { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+body.daily-look table.daily { border-collapse: separate; border-spacing: 0 5px; background: transparent; margin-top: -5px; }
+body.daily-look table.daily thead th { background: #0f2747; color: #fff; letter-spacing: .08em; border: 0; }
+body.daily-look table.daily thead th:first-child { border-radius: 10px 0 0 10px; }
+body.daily-look table.daily thead th:last-child { border-radius: 0 10px 10px 0; }
+body.daily-look table.daily tbody tr:not(.group) td { background: #fff; border: 0; border-top: 1px solid #dfe6ee; border-bottom: 1px solid #dfe6ee; }
+body.daily-look table.daily tbody tr:not(.group) td:first-child { border-left: 5px solid #1f6feb; border-radius: 10px 0 0 10px; }
+body.daily-look table.daily tbody tr:not(.group) td:last-child { border-right: 1px solid #dfe6ee; border-radius: 0 10px 10px 0; }
+body.daily-look table.daily tbody tr:not(.group):hover td { background: #f3f8ff; }
+body.daily-look table.daily td.route { font-weight: 900; color: #0b4fb3; font-size: calc(var(--font) + 2px); }
+body.daily-look table.daily tbody tr.group td { background: linear-gradient(90deg, #1f6feb, #6aa8ff) !important; color: #fff !important; font-weight: 900; letter-spacing: .1em; border-radius: 10px; text-align: left; padding-left: 14px; }
+body.daily-look table.daily td.missing { background: #fff1f0; color: #b3261e; box-shadow: inset 0 0 0 2px #f3b8b3; border-radius: 6px; }
+body.daily-look table.daily button.toggle.on { background: #16a34a; color: #fff; border-radius: 999px; border: 0; font-weight: 900; }
+body.daily-look table.daily button.edit { border-radius: 999px; background: #0f2747; color: #fff; border: 0; }
+body.daily-look table.daily td.pickup { color: #b3261e; font-weight: 900; }
+/* Joe 10/11 (review item 1): Daily Dispatch on a phone. The top boxes wrap onto more lines, and the table keeps every
+   column at readable 16px text: it scrolls sideways with the Route column pinned, and a long day scrolls under a
+   sticky heading. Phones only; laptops and desk screens keep their one-line layout. */
+@media (max-width: 700px) {
+  body.daily-look .head:has(#print-sheet) { flex-wrap: wrap; row-gap: 8px; align-items: flex-end; }
+  body.daily-look .head:has(#print-sheet) .title { flex-basis: 100%; }
+  body.daily-look .head:has(#print-sheet) h1 { font-size: 24px; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head { flex-wrap: wrap; width: 100%; margin-left: 0; justify-content: flex-start; gap: 8px; }
+  body.daily-look .sheet, body.daily-look .sheet.fit-scroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  body.daily-look table.daily { min-width: 1250px; }
+  body.daily-look table.daily td, body.daily-look table.daily th { font-size: 16px !important; height: 44px; }
+  body.daily-look table.daily td.route { font-size: 18px !important; }
+  body.daily-look table.daily thead th { position: sticky; top: 0; z-index: 3; white-space: normal; line-height: 1.1; }
+  body.daily-look table.daily tbody tr:not(.group) td:first-child { position: sticky; left: 0; z-index: 1; }
+  body.daily-look table.daily thead th:first-child { left: 0; z-index: 4; }
+  body.daily-look table.daily col:first-child { width: 84px !important; }
+  body.daily-look table.daily thead th { letter-spacing: .03em; }
+  body.daily-look table.daily tbody tr.group td { overflow: visible; }
+  body.daily-look table.daily tbody tr.group td .gtext { display: inline-block; position: sticky; left: 14px; }
+  body.daily-look .footer { flex-wrap: wrap; }
+}
+/* Daily Dispatch (Joe 10/12): a manager grabs the line itself with the hand and drags it up or down; no grab dots, no arrows.
+   The row being moved is shaded; a blue line shows where it lands (js/row-drag.js, review item 75). */
+body.daily-look table.daily tr.mover td { cursor: grab; }
+body.daily-look table.daily tr.mover td button, body.daily-look table.daily tr.mover td input, body.daily-look table.daily tr.mover td select { cursor: pointer; }
+body.daily-look table.daily tr.row-dragging td { background: #e8f1fa !important; }
+table.daily td.offcover::before { content: attr(data-cover); font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+/* Daily Dispatch, Sunday: the Sunday deliveries already loaded Saturday are shown for reference, a little quieter than
+   what is loading today. */
+body.daily-look table.daily tbody tr.group.loaded.already td { background: linear-gradient(90deg, #64748b, #94a3b8) !important; }
+body.daily-look table.daily tbody tr.group.loaded.already td .gtext, body.daily-look table.daily tbody tr.group.loaded.already td { color: #fff !important; }
+body.daily-look table.daily tbody tr.already:not(.group) td { background: #f6f8fb; }
+body.daily-look table.daily tbody tr.already:not(.group) td:first-child { border-left-color: #94a3b8; }
+.notice.warning.down-loads { margin: 0 16px 8px; background: #fde8e8; color: #9b1c1c; border: 2px solid #ee3e3e; border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.notice.warning.down-loads[hidden] { display: none; }
+.notice.warning.down-loads button { background: #b3261e; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-size: 16px; font-weight: 700; cursor: pointer; }
+/* Review item 1 (Joe 10/13): Daily's top buttons sit on the title line with the date boxes on the right (laptops and desk
+   screens; a phone keeps its wrapped layout). */
+@media (min-width: 701px) {
+  /* With wider letters than Windows' (Linux's DejaVu, which the online checks use) the date boxes drop under the buttons
+     instead of running past the right edge; on Joe's screens they stay on the line. */
+  body.daily-look .head:has(#print-sheet) { flex-wrap: wrap; row-gap: 6px; align-items: flex-end; gap: 10px; }
+  body.daily-look .head:has(#print-sheet) .title { flex: none; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head { margin-left: 0; flex-wrap: nowrap; gap: 6px; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head + .field { margin-left: auto; }
+}
+body.daily-look #delivers { display: none; }
+@media (min-width: 701px) and (max-width: 1899px) {
+  /* Room for one line at 1536: Delivery day shows beside Loadout day, buttons and arrows are a little tighter. */
+  body.daily-look .head:has(#print-sheet) { gap: 8px; }
+  body.daily-look .head:has(#print-sheet) .field:has(#delivery-day) { display: none; }
+  body.daily-look #delivers { display: block; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head :is(button, a.button) { padding: 0 8px; }
+  body.daily-look .head:has(#print-sheet) .coverage { min-width: 0; padding: 1px 6px; }
+  body.daily-look .head:has(#print-sheet) .stepper button { padding: 0 6px; }
+  body.daily-look .head:has(#print-sheet) #week-begin { width: 84px; }
+  body.daily-look .head:has(#print-sheet) #load-day { width: 112px; }
+}
+/* Review item 56 (Joe 10/13): with 16px text Daily's top line still fits at 1536 and 1920: the coverage tile puts DRIVERS
+   COVERED on two short lines beside the percent, the date box labels drop their letter spacing and the date boxes are a
+   little narrower. */
+@media (min-width: 701px) {
+  body.daily-look .head:has(#print-sheet) .coverage { flex-direction: row; align-items: center; gap: 6px; min-width: 0; padding: 1px 8px; }
+  body.daily-look .head:has(#print-sheet) .coverage span { white-space: normal; width: 76px; line-height: 1; text-align: left; letter-spacing: 0; }
+  body.daily-look .head:has(#print-sheet) .field label { letter-spacing: 0; }
+  body.daily-look .head:has(#print-sheet) #week-begin { width: 96px; }
+  body.daily-look .head:has(#print-sheet) #load-day { width: 128px; }
+  body.daily-look .head:has(#print-sheet) #delivery-day { width: 110px; }
+}
+@media (min-width: 701px) and (max-width: 1799px) {
+  body.daily-look .head:has(#print-sheet) { gap: 6px; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head { gap: 5px; }
+  body.daily-look .head:has(#print-sheet) .actions.in-head :is(button, a.button) { padding: 0 6px; }
+  body.daily-look .head:has(#print-sheet) .coverage { padding: 1px 6px; }
+  body.daily-look .head:has(#print-sheet) .coverage span { width: 70px; }
+  body.daily-look .head:has(#print-sheet) .stepper button { padding: 0 4px; }
+  body.daily-look .head:has(#print-sheet) #week-begin { width: 72px; }
+  body.daily-look .head:has(#print-sheet) #load-day { width: 104px; }
+}

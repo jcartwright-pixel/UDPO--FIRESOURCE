@@ -1,0 +1,13 @@
+/* distribution.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.cards.cards4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); max-width: 1500px; }
+@media (max-width: 900px) {
+  .cards.cards4 { grid-template-columns: 1fr; grid-template-rows: none; }
+}
+.cards.cards4 { grid-template-rows: repeat(2, auto); align-content: stretch; }
+@media (max-height: 1000px) {
+  .cards.cards4 { gap: 10px; }
+}
+/* Route Distribution home (review item 16): the Dispatch and Drivers cards carry the current app's quick staffing numbers,
+   Covered % and drivers Available today, as a fifth tile. */
+.card.home4 .dc-metrics.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }

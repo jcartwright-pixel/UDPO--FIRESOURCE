@@ -1,0 +1,21 @@
+/* reportcenter.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+/* Joe 10/11: the Reports module: every report as a card, grouped by where it comes from. */
+.rc-page #rc-groups { padding: 4px 24px 24px; overflow: auto; }
+.rc-group h2 { margin: 14px 0 10px; font-size: 18px; font-weight: 900; color: #0b3d6b; letter-spacing: .02em; }
+.rc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.rc-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 6px 18px rgba(11, 61, 107, .08); color: #0b3d6b; text-decoration: none; transition: transform .12s, box-shadow .12s; }
+.rc-card:hover, .rc-card:focus-visible { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(11, 61, 107, .18); border-color: #1f6feb; }
+.rc-icon { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 58px; height: 58px; border-radius: 12px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
+.rc-icon svg { width: 32px; height: 32px; fill: none; stroke: #0b3d6b; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rc-icon img { max-width: 46px; max-height: 46px; }
+.rc-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rc-text strong { font-size: 18px; font-weight: 900; }
+.rc-text small { color: #4a6b8d; font-size: 16px; }
+.rc-card > b { font-size: 20px; color: #1f6feb; }
+@media (max-width: 1100px) {
+  .rc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .rc-grid { grid-template-columns: 1fr; }
+}

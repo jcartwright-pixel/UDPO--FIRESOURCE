@@ -9,7 +9,7 @@
 .pm-page .pm-kpis span { font-size: 16px; font-weight: 700; color: var(--muted); }
 .pm-page .pm-kpis .red b { color: #c62828; } .pm-page .pm-kpis .amber b { color: #b45f00; } .pm-page .pm-kpis .green b { color: #1d7a3e; } .pm-page .pm-kpis .zero b { color: #9aa8b5; }
 .pm-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 16px; font-weight: 900; letter-spacing: .03em; white-space: nowrap; text-transform: uppercase; }
-.pm-pill.red { background: #fde8e8; color: #b42318; } .pm-pill.amber { background: #fff1dc; color: #8a5200; } .pm-pill.green { background: #e3f4e8; color: #1d6b37; } .pm-pill.blue { background: #e8f0f8; color: var(--ud-blue); } .pm-pill.gray { background: #eef2f5; color: #5a6b7d; }
+.pm-pill.red { background: var(--pill-red-bg); color: var(--pill-red-ink); } .pm-pill.amber { background: var(--pill-amber-bg); color: var(--pill-amber-ink); } .pm-pill.green { background: var(--pill-green-bg); color: var(--pill-green-ink); } .pm-pill.blue { background: var(--pill-blue-bg); color: var(--pill-blue-ink); } .pm-pill.gray { background: var(--pill-gray-bg); color: var(--muted); }
 .pm-page .pm-panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .pm-page .pm-panel > h2 { margin: 0; padding: 10px 16px; font-size: 20px; color: var(--ud-blue-dark); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
 .pm-page .pm-panel > h2 .n { background: #e8f0f8; border-radius: 999px; padding: 1px 10px; font-size: 16px; }
