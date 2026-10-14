@@ -257,13 +257,16 @@
       const info = data.lineInfo[line.operationId] || {}, val = (k) => info[k] === null || info[k] === undefined ? '' : info[k];
       box.innerHTML = '<label>Changeover standard, minutes <input id="setup-co" data-setup="changeoverMin" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('changeoverMin')) + '"' + (ck ? '' : ' disabled') + '></label>' +
         '<label>CIP wash every, hours <input id="setup-cip" data-setup="cipHours" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('cipHours')) + '"' + (ck ? '' : ' disabled') + '></label>' +
-        '<span>The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes. Leave a box empty for none.</span>';
+        // Joe 10/14: the Blow Mold weighs a jug from each of its six heads; the tablet flags a head outside this range.
+        (R.lineKind(line.name) === 'BLOWMOLD' ? [['jugWeightTarget', 'Jug weight target, g'], ['jugWeightLow', 'Lightest, g'], ['jugWeightHigh', 'Heaviest, g']].map(([k, l]) => '<label>' + l + ' <input id="setup-' + k + '" data-setup="' + k + '" inputmode="decimal" maxlength="6" value="' + escapeHtml(val(k)) + '"' + (ck ? '' : ' disabled') + '></label>').join('') : '') +
+        '<span>The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes.' + (R.lineKind(line.name) === 'BLOWMOLD' ? ' The bottle check flags a head\'s jug lighter or heavier than the range.' : '') + ' Leave a box empty for none.</span>';
     }
     document.getElementById('setup').addEventListener('change', async e => {
       const box = e.target.closest('[data-setup]'), line = current();
       if (!box || !line || !canSave()) return;
-      const k = box.dataset.setup, v = box.value.trim(), max = k === 'cipHours' ? 72 : 600, n = Number(v);
-      if (v !== '' && (!isFinite(n) || n < 0 || n > max)) { refuse((k === 'cipHours' ? 'CIP wash every' : 'Changeover standard') + ' must be a number from 0 to ' + max + '. It was not changed.'); box.blur(); render(true); return; }
+      const k = box.dataset.setup, v = box.value.trim(), max = k === 'cipHours' ? 72 : /^jugWeight/.test(k) ? 500 : 600, n = Number(v);
+      const names = { cipHours: 'CIP wash every', changeoverMin: 'Changeover standard', jugWeightTarget: 'Jug weight target', jugWeightLow: 'Lightest jug weight', jugWeightHigh: 'Heaviest jug weight' };
+      if (v !== '' && (!isFinite(n) || n < 0 || n > max)) { refuse(names[k] + ' must be a number from 0 to ' + max + '. It was not changed.'); box.blur(); render(true); return; }
       note = 'Saving…'; render('keep');
       try { await save('saveLineSetup', { operationId: line.operationId, [k]: v }); note = savedText(); showError(''); }
       catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }

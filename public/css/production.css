@@ -303,3 +303,9 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .lb-mach-row .lb-card.lb-flash { border-left-width: 6px; }
 .lb-mach-note { margin: 8px 2px 0; font-size: 16px; font-weight: 600; color: #5b6b7c; }
 @media (max-width: 860px) { .lb-mach-row { gap: 10px; } }
+/* Line tablet: a Blow Mold head's jug outside the weight range (Joe 10/14, six heads in grams). */
+.lb-field.lb-off { color: #c62828; }
+.lb-field.lb-off b { align-self: flex-start; margin-top: 4px; }
+.lb-fields:has(.lb-off) { align-items: flex-start; }
+.lb-field.lb-off .lb-in { border-color: #c62828; background: #fde1e1; color: #c62828; }
+.lb-wrange { margin: 8px 0 0; }

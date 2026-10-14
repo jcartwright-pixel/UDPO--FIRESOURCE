@@ -171,7 +171,9 @@
     FILLER: [['w1', 'Jug 1 lb', 'num'], ['w2', 'Jug 2 lb', 'num'], ['w3', 'Jug 3 lb', 'num'], ['w4', 'Jug 4 lb', 'num'], ['w5', 'Jug 5 lb', 'num'], ['capSeal', 'Cap and seal', 'ok'], ['codeOk', 'Code date readable', 'ok'], ['temp', 'Product temp °F', 'num']],
     PACK: [['capSeal', 'Seal', 'ok'], ['codeOk', 'Code date readable', 'ok'], ['temp', 'Product temp °F', 'num']],
     HTST: [['recorder', 'Recorder °F', 'num'], ['indicating', 'Indicating °F', 'num'], ['pen', 'Pen on time', 'ok'], ['flow', 'Flow GPM', 'num']],
-    BLOWMOLD: [['w1', 'Jug 1 g', 'num'], ['w2', 'Jug 2 g', 'num'], ['w3', 'Jug 3 g', 'num'], ['topLoad', 'Top load', 'ok']]
+    // Joe 10/14: a six-head blow mold, so every check weighs a jug from each of heads 1 to 6 in grams (the Blow Mold quality
+    // check's same six: head1 to head6).
+    BLOWMOLD: [['head1', 'Head 1 g', 'num'], ['head2', 'Head 2 g', 'num'], ['head3', 'Head 3 g', 'num'], ['head4', 'Head 4 g', 'num'], ['head5', 'Head 5 g', 'num'], ['head6', 'Head 6 g', 'num'], ['topLoad', 'Top load', 'ok']]
   };
   var CHECK_EVERY = { FILLER: 2, PACK: 2, HTST: 1, BLOWMOLD: 2 };
   // Why a line stopped, for each kind of line (Joe 10/14 follow-on: "stop reasons for each kind of line"). The fillers keep the
@@ -225,6 +227,13 @@
     if (!isFinite(n) || v.length > 12) return { error: 'Type a number.' };
     if (/Divide$/.test(field)) return n > 0 && n <= 100000 ? { value: n } : { error: 'Divide by must be a number above 0, like 10 when the controller sends 4312 for 431.2.' };
     return Math.abs(n) <= 100000 ? { value: n } : { error: 'Type a number.' };
+  }
+  // A Blow Mold head's jug weight against the line's range on Line Targets (lineDoc.jugWeightLow / jugWeightHigh): 'HEAVY',
+  // 'LIGHT' or ''. Only the head boxes are weighed.
+  function weightFlag(field, value, lineDoc) {
+    if (!/^head\d$/.test(field)) return '';
+    var f = machineFlag(value, (lineDoc || {}).jugWeightLow, (lineDoc || {}).jugWeightHigh);
+    return f === 'HIGH' ? 'HEAVY' : f === 'LOW' ? 'LIGHT' : '';
   }
   // A reading outside its range: 'HIGH', 'LOW' or ''.
   function machineFlag(value, low, high) {
@@ -323,6 +332,7 @@
       diverts: (r.diverts || []).length, lastDivertAt: (r.diverts || []).length ? r.diverts[r.diverts.length - 1].start : text(ld.lastDivertAt),
       source: r.source && typeof r.source === 'object' ? { from: text(r.source.from), to: text(r.source.to) } : { from: '', to: '' },
       machine: machineNow(r, ld, nowMs, kind),
+      jugWeight: { target: num(ld.jugWeightTarget), low: num(ld.jugWeightLow), high: num(ld.jugWeightHigh) },
       lot: text(r.lot), stock: num(r.stock), note: text(r.note), next: ld.next && typeof ld.next === 'object' && text(ld.next.product) ? { product: text(ld.next.product), qty: num(ld.next.qty) } : null
     });
   }
@@ -402,6 +412,6 @@
   return { COUNTERS: COUNTERS, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
     lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
-    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor,
+    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
     countAt: countAt, checkDue: checkDue, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };
 });

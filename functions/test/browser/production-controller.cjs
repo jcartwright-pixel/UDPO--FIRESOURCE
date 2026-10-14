@@ -5,7 +5,8 @@
  *   - Line Targets: Counted by Machine controller; brand, IP address and where each reading is, each box saved as it is left;
  *     the line key; Test read shows the number the line PC read;
  *   - the line PC program (tools/device-bridge, --controller) reading a pretend Modbus controller on this computer;
- *   - the Blow Mold tablet: From the machine with the jug count, speed and temperature, red outside the range;
+ *   - the Blow Mold tablet: From the machine with the jug count, annealer speed and temperature, red outside the range; the
+ *     bottle check weighs a jug from each of the six heads in grams, flagged outside the range on Line Targets;
  *   - Production Lines: the readings on the card, and the line's shift view with the hour by hour.
  * Pictures go to SHOTS_DIR.
  */
@@ -107,6 +108,12 @@ function controller() {
     };
     for (const [k, v] of [['ip', '127.0.0.1'], ['port', String(plc.port)], ['countTag', '40001'], ['speedTag', '40011'], ['speedLow', '65'], ['speedHigh', '75'],
       ['tempTag', '40012'], ['tempDivide', '10'], ['tempLow', '395'], ['tempHigh', '425']]) await type(k, v);
+    // The Blow Mold's jug weight range (Joe 10/14: six heads, in grams), with the changeover and CIP boxes.
+    for (const [k, v] of [['jugWeightTarget', '57'], ['jugWeightLow', '55'], ['jugWeightHigh', '59']]) {
+      await lt.fill('#setup-' + k, v);
+      await lt.press('#setup-' + k, 'Tab');
+      await until(k + ' saved', async () => String((await lineDoc())[k]) === v);
+    }
     // A box typed wrong is refused with what to type.
     await lt.fill('#controller [data-c="ip"]', '127.0.0.300');
     await lt.press('#controller [data-c="ip"]', 'Tab');
@@ -149,7 +156,7 @@ function controller() {
     results.push('Test read: the line PC read the temperature (4,312 ÷ 10 = 431.2°F) and the jug counter from the pretend controller, shown on Line Targets');
 
     // The Blow Mold tablet: From the machine; the temperature is over its range and flashes red; the speed is in range.
-    for (const [w, h] of [[1024, 900], [800, 1180]]) {
+    for (const [w, h] of [[1024, 1180], [800, 1180]]) {
       const bm = await openPage(browser, w, h, '/line.html?line=' + BLOW + '&' + ADMIN);
       await bm.waitForSelector('#machine:not([hidden])');
       await bm.waitForFunction(() => /TOO HOT/.test(document.getElementById('machine').textContent) && /IN RANGE/.test(document.getElementById('machine').textContent));
@@ -161,6 +168,18 @@ function controller() {
       assert.match(await bm.textContent('#kind-cards'), /FROM THE MACHINE/);
       assert.equal(await bm.$('#kind-cards [data-act="count"]'), null, 'no Enter Count: the machine counts');
       assert.match(await bm.textContent('#live'), /Counts from the machine/);
+      // The bottle check: one jug from each of the six heads, in grams; a head outside 55 to 59 g is flagged.
+      assert.deepEqual(await bm.$$eval('#check-inline .lb-field', f => f.map(x => x.firstChild.textContent.trim())), ['Head 1 g', 'Head 2 g', 'Head 3 g', 'Head 4 g', 'Head 5 g', 'Head 6 g', 'Top load']);
+      if (w === 1024) {
+        for (const [h, g] of [[1, '57.1'], [2, '60.2'], [3, '56.8'], [4, '57.4'], [5, '54.6'], [6, '57.0']]) {
+          await bm.fill('#check-inline input[data-field="head' + h + '"]', g);
+          await bm.press('#check-inline input[data-field="head' + h + '"]', 'Tab');
+          await until('head ' + h + ' saved', async () => { const runs = await db().collection('productionRuns').where('operationId', '==', BLOW).get(); return runs.docs.some(d => Object.values(d.data().checks || {}).some(c => c['head' + h] === g)); });
+        }
+      }
+      await bm.waitForFunction(() => /HEAVY/.test(document.getElementById('check-inline').textContent) && /LIGHT/.test(document.getElementById('check-inline').textContent));
+      assert.deepEqual(await bm.$$eval('#check-inline .lb-field.lb-off', f => f.map(x => x.firstChild.textContent.trim())), ['Head 2 g', 'Head 5 g']);
+      assert.match(await bm.textContent('#check-inline'), /Target 57 g\. Range 55 to 59 g\./);
       await fits(bm, 'the Blow Mold tablet at ' + w);
       await bigText(bm, '#machine', 'From the machine');
       await bm.evaluate(() => document.querySelectorAll('.lb-flash').forEach(c => { c.style.animation = 'none'; c.style.background = '#fde1e1'; }));
@@ -168,7 +187,7 @@ function controller() {
       assert.deepEqual(bm.errors, []);
       await bm.close();
     }
-    results.push('Blow Mold tablet (1024 and 800): From the machine with the jug count, annealer speed in range and the temperature flashing TOO HOT; Jugs this shift FROM THE MACHINE with no Enter Count');
+    results.push('Blow Mold tablet (1024 and 800): From the machine with the jug count, annealer speed in range and the temperature flashing TOO HOT; Jugs this shift FROM THE MACHINE with no Enter Count; the bottle check has Head 1 to Head 6 in grams with 60.2 HEAVY and 54.6 LIGHT against 55 to 59 g');
 
     // Production Lines: the card and the line's shift view.
     const pl = await openPage(browser, 1536, 960, '/production.html?' + ADMIN);
@@ -180,6 +199,7 @@ function controller() {
       const dv = await openPage(browser, w, w === 1536 ? 960 : 1080, '/production.html?line=' + BLOW + '&' + ADMIN);
       await dv.waitForFunction(() => /From the machine/.test(document.getElementById('detail').textContent) && /Machine counter/.test(document.getElementById('detail').textContent));
       assert.match(await dv.textContent('#detail'), /Temperature: 431\.2°F now/);
+      assert.match(await dv.textContent('#detail'), /60\.2 HEAVY/, 'the quality checks show the heavy head');
       assert.deepEqual(await dv.$$eval('#detail .pd-box h3', h => h.map(x => x.textContent).filter(t => /Hour by hour|From the machine/.test(t))), ['Hour by hour', 'From the machine']);
       assert.ok((await dv.$$eval('#detail table.pd-t thead th', t => t.map(x => x.textContent))).includes('Temp'), 'the hour by hour has the hour\'s temperature');
       await fits(dv, 'the line shift view at ' + w);

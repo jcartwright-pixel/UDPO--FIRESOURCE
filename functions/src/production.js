@@ -18,7 +18,8 @@
  *   source      the HTST's silo or tank and where it goes;  lot  the Blow Mold's resin lot;  stock  jugs ahead of the filler;
  *   next        what runs next on the line (kept on productionLines, not the shift).
  * saveLineCounter: how a line is counted (TABLET, SENSOR or READER), Line Targets (productionLines/{operationId}).
- * saveLineSetup: the line's changeover standard minutes and hours between CIP washes (Line Targets).
+ * saveLineSetup: the line's changeover standard minutes and hours between CIP washes, and the Blow Mold's jug weight target and
+ *   range in grams (Line Targets).
  * The products, their speeds, targets, UPCs and shelf lives are the plant's Products list (plantProducts), not kept here.
  */
 'use strict';
@@ -286,25 +287,27 @@ async function saveLineCounter(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
+// Line Targets' setup boxes (Joe 10/14): changeover standard, hours between CIP washes, and the Blow Mold's jug weight range.
+const SETUP_KEYS = ['changeoverMin', 'cipHours', 'jugWeightTarget', 'jugWeightLow', 'jugWeightHigh'];
 function validateLineSetup(input, SaveError) {
   const out = { operationId: lineId(input.operationId, SaveError) };
-  [['changeoverMin', 'Changeover standard minutes', 600], ['cipHours', 'Hours between CIP washes', 72]].forEach(([k, label, max]) => {
+  [['changeoverMin', 'Changeover standard minutes', 600], ['cipHours', 'Hours between CIP washes', 72], ['jugWeightTarget', 'Jug weight target grams', 500], ['jugWeightLow', 'Lowest jug weight grams', 500], ['jugWeightHigh', 'Highest jug weight grams', 500]].forEach(([k, label, max]) => {
     if (!(k in input)) return;
     const v = text(input[k]), n = Number(v);
     if (v !== '' && (!isFinite(n) || n < 0 || n > max)) throw new SaveError('BAD_REQUEST', label + ' must be a number from 0 to ' + max + '.');
     out[k] = v === '' ? null : n;
   });
-  if (!('changeoverMin' in out) && !('cipHours' in out)) throw new SaveError('BAD_REQUEST', 'Nothing to save.');
+  if (Object.keys(out).length < 2) throw new SaveError('BAD_REQUEST', 'Nothing to save.');
   return out;
 }
 async function saveLineSetup(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const line = await lineOf(tx, db, req.operationId, SaveError);
   const ref = db.collection('productionLines').doc(docId(req.operationId)), had = await tx.get(ref), before = had.exists ? had.data() : {};
   const set = { operationId: req.operationId, line: line.name, facilityId: line.facilityId, updatedAt: stamp, updatedBy: email };
-  ['changeoverMin', 'cipHours'].forEach(k => { if (k in req) set[k] = req[k]; });
+  SETUP_KEYS.forEach(k => { if (k in req) set[k] = req[k]; });
   tx.set(ref, set, { merge: true });
   const result = { ok: true, requestId: req.requestId, operationId: req.operationId, message: line.name + ' saved.' };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, before: { changeoverMin: before.changeoverMin === undefined ? null : before.changeoverMin, cipHours: before.cipHours === undefined ? null : before.cipHours }, after: set, result });
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, before: Object.fromEntries(SETUP_KEYS.filter(k => k in req).map(k => [k, before[k] === undefined ? null : before[k]])), after: set, result });
   return result;
 }
 

@@ -315,15 +315,17 @@
           const opts = f[0] === 'pen' ? ['ON TIME', 'LATE'] : ['OK', 'NOT OK'];
           return '<label class="lb-field">' + escapeHtml(f[1]) + '<select class="lb-sel" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '"><option value=""></option>' + opts.map(o => '<option' + (o === got ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></label>';
         }
-        return '<label class="lb-field">' + escapeHtml(f[1]) + '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '"></label>';
-      }).join('') + '</div>';
+        // A Blow Mold head's jug outside the weight range on Line Targets: red, with LIGHT or HEAVY.
+        const wf = R.weightFlag(f[0], got, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high });
+        return '<label class="lb-field' + (wf ? ' lb-off' : '') + '">' + escapeHtml(f[1]) + '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '">' + (wf ? '<b class="lb-pill r">' + wf + '</b>' : '') + '</label>';
+      }).join('') + '</div>' + (v.kind === 'BLOWMOLD' && v.jugWeight && (v.jugWeight.low !== null || v.jugWeight.high !== null || v.jugWeight.target !== null) ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.' + (v.jugWeight.target !== null ? ' Target ' + v.jugWeight.target + ' g.' : '') + (v.jugWeight.low !== null || v.jugWeight.high !== null ? ' Range ' + (v.jugWeight.low !== null ? v.jugWeight.low : 'up') + ' to ' + (v.jugWeight.high !== null ? v.jugWeight.high : 'any') + ' g.' : '') + '</p>' : v.kind === 'BLOWMOLD' ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.</p>' : '');
     }
     function checkTable(v) {
       const c = (v.run && v.run.checks) || {}, fields = R.CHECK_FIELDS[v.kind] || [], every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, start = Date.parse((v.run && v.run.shiftStart) || '');
       const slots = Object.keys(c).map(Number).filter(n => !v.check || n !== v.check.slot).sort((a, b) => a - b);
       if (!slots.length) return '<p class="lb-mut">No checks yet this shift.</p>';
       return '<table class="lb-t"><thead><tr><th>Time</th>' + fields.map(f => '<th' + (f[2] === 'num' ? ' class="n"' : '') + '>' + escapeHtml(f[1]) + '</th>').join('') + '<th>By</th></tr></thead><tbody>' +
-        slots.map(n => '<tr><td>' + clock(new Date(start + n * every).toISOString()) + '</td>' + fields.map(f => { const x = String(c[n][f[0]] === undefined ? '' : c[n][f[0]]); return '<td class="' + (f[2] === 'num' ? 'n' : /NOT OK|LATE/.test(x) ? 'lb-bad' : x ? 'lb-ok' : '') + '">' + escapeHtml(x) + '</td>'; }).join('') + '<td>' + escapeHtml(who(c[n].by)) + '</td></tr>').join('') + '</tbody></table>';
+        slots.map(n => '<tr><td>' + clock(new Date(start + n * every).toISOString()) + '</td>' + fields.map(f => { const x = String(c[n][f[0]] === undefined ? '' : c[n][f[0]]), wf = R.weightFlag(f[0], x, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high }); return '<td class="' + (f[2] === 'num' ? 'n' + (wf ? ' lb-bad' : '') : /NOT OK|LATE/.test(x) ? 'lb-bad' : x ? 'lb-ok' : '') + '">' + escapeHtml(x) + (wf ? ' ' + wf : '') + '</td>'; }).join('') + '<td>' + escapeHtml(who(c[n].by)) + '</td></tr>').join('') + '</tbody></table>';
     }
     // What a button opens (mock-ups D, E, F, G, H).
     function drawMore(v) {
