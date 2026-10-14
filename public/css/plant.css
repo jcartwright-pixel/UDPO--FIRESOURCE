@@ -1192,7 +1192,13 @@
 .products-page .pm-sheet col.c-mach + col.c-num, .products-page .pm-sheet col.c-group + col.c-num { width: 126px; }
 .products-page .pm-sheet thead tr.pm-band th { font-size: 16px; }
 /* Joe 10/14: a Scheduler load on Daily Box Loadout (its PO and pickup time under the run), and Add Load on the top line. */
-.plant-page .sched-tag { display: block; width: fit-content; margin: 3px auto 0; padding: 2px 8px; border-radius: 6px; background: #e3effb; color: #0b4f8a; font-size: 16px; font-weight: 700; line-height: 1.25; }
+.plant-page .sched-tag { display: inline-block; padding: 0 6px; border-radius: 6px; background: #e3effb; color: #0b4f8a; font-size: 16px; font-weight: 700; line-height: 1.25; }
 .loadout-page .add-load #add-load { height: 40px; padding: 0 16px; border-radius: 8px; border: 0; background: #0b4f8a; color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .loadout-page .add-load[hidden] { display: none !important; }
 .loadout-page tr.sched-row button.state:disabled { opacity: 1; cursor: default; }
+.plant-page .skip-tag.inline { display: inline-block; margin: 0; }
+/* Joe 10/14: Truck, Trailer and Boxes Out are narrower; their boxes use the cell's whole width so a 6-digit truck still shows. */
+.plant-page.loadout-page table.loadout td:has(> input) { padding-left: 3px; padding-right: 3px; }
+.plant-page.loadout-page table.loadout td > input { padding: 0 2px; }
+/* The unit list still opens on a click in the box (loadout.html), so the narrow box spends no room on the list arrow. */
+.plant-page.loadout-page table.loadout td > input[list]::-webkit-calendar-picker-indicator { display: none !important; }

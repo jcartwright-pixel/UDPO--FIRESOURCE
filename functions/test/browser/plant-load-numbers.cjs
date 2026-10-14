@@ -81,16 +81,28 @@ async function journal(id, ok) {
     const lo = await openPage(browser, 1536, 760, '/loadout.html?date=2026-10-08&area=BOXING&' + MANAGER);
     const row = (id) => '#rows tr[data-row="' + id + '"]';
     await lo.waitForSelector(row('sch:SCHED-a3'), { timeout: 15000 });
-    const runs = await lo.$$eval('#rows tr[data-row]', trs => trs.map(t => t.children[0].textContent + ' ' + t.children[1].textContent));
-    assert.deepEqual(runs, ['907_1 FAIRMONT TRANSFER', '849 SUN VALLEYPO 4471 · 1:00 PM', '905_1 ALDI - CHARLESTON LOAD 15:30 AM',
-      '905_2 ALDI - CHARLESTON Load 2PO AC-2', '905_2 ALDI - CHARLESTON Load 3PO AC-3NO LOAD 3 RUN'],
-    'LOAD 1 shows once as its box load with the Scheduler time; Load 2 and 3 have their own lines; a carrier pickup on a box load shows its PO');
+    const runs = await lo.$$eval('#rows tr[data-row]', trs => trs.map(t => [0, 1, 2].map(i => t.children[i].textContent).join(' | ')));
+    assert.deepEqual(runs, ['907 | FAIRMONT TRANSFER | BRANCH', '849 | SUN VALLEY | CARPENTER, GREGG', '905 | ALDI - CHARLESTON LOAD 1 | CARPENTER, GREGG',
+      '905 | ALDI - CHARLESTON Load 2 | PO AC-2', '905 | ALDI - CHARLESTON Load 3 | NO LOAD 3 RUN'],
+    'Joe 10/14: the route number without _N; LOAD 1 shows once as its box load; Load 2 and 3 have their own lines with the PO under Driver / CVG');
+    assert.equal(await lo.getAttribute(row('2026-10-04__run_c905_1|fri') + ' .lo-run', 'title'), 'ALDI - CHARLESTON LOAD 1 · Scheduler: 5:30 AM', 'the Scheduler time on the box load, on hover');
+    assert.equal(await lo.getAttribute(row('2026-10-04__run_p849|fri') + ' .lo-run', 'title'), 'SUN VALLEY · Scheduler: PO 4471 · 1:00 PM');
+    // Joe 10/14: every line is one line high at 1536 and 1920, the run name whole.
+    for (const w of [1536, 1920]) {
+      await lo.setViewportSize({ width: w, height: w === 1536 ? 760 : 950 });
+      await lo.waitForTimeout(300);
+      const wrapped = await lo.$$eval('#rows tr[data-row]', trs => trs.filter(t => [0, 1, 3, 4, 5].some(i => t.children[i].classList.contains('fit-wrap') || t.children[i].getBoundingClientRect().height > 50)).map(t => t.children[1].textContent));
+      assert.deepEqual(wrapped, [], 'Route, Run, Truck, Trailer and Boxes Out on one line at ' + w);
+      const trucks = await lo.$$eval('#rows input[data-k="truck"]', i => i.filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.value));
+      assert.deepEqual(trucks, [], 'the whole truck number shows at ' + w);
+      await shot(lo, 'box-loadout-numbered-' + w + '.png');
+    }
+    await lo.setViewportSize({ width: 1536, height: 760 });
     assert.equal(await lo.textContent(row('sch:SCHED-a2') + ' td:nth-child(7)'), '8:05 AM');
     assert.equal(await lo.inputValue(row('sch:SCHED-a2') + ' input[data-k="trailer"]'), 'T-962');
     assert.equal(await lo.isVisible('#add-load'), true, '+ Add Load on Daily Box Loadout');
     assert.ok((await lo.$$eval('#rows .sched-tag, #rows .skip-tag, #add-load', els => els.map(e => parseFloat(getComputedStyle(e).fontSize)))).every(n => n >= 16), 'tags and the button are 16px or more');
     assert.ok(await fits(lo), 'Daily Box Loadout fits 1536');
-    await shot(lo, 'box-loadout-numbered-1536.png');
     // Start Load 2, then type its boxes.
     await lo.click(row('sch:SCHED-a2') + ' [data-sclock]');
     await lo.waitForSelector(row('sch:SCHED-a2') + ' button.state.loading');
@@ -127,8 +139,10 @@ async function journal(id, ok) {
     await st.waitForSelector(card('sch:SCHED-a3'), { timeout: 15000 });
     assert.equal(await st.$(card('sch:SCHED-a1')), null, 'Load 1 is worked on the LOAD 1 box load card');
     assert.ok(await st.$(card('2026-10-04__run_c905_1|fri')), 'the LOAD 1 box load is on the list');
+    // Who takes it shows once Route Master is read (Aldi is a branch run).
+    await st.waitForSelector(card('sch:SCHED-a2') + '.by-branch', { timeout: 10000 });
     assert.equal(await st.textContent(card('sch:SCHED-a2') + ' .sw-head .run'), 'ALDI - CHARLESTON Load 2' + 'BRANCH');
-    assert.equal(await st.textContent(card('sch:SCHED-a3') + ' .sw-head .route'), '905_2');
+    assert.equal(await st.textContent(card('sch:SCHED-a3') + ' .sw-head .route'), '905');
     assert.ok(await fits(st), 'the Boxing list fits a 1024 tablet');
     await shot(st, 'station-boxing-numbered-1024.png');
     assert.deepEqual(st.errors, []);

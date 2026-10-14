@@ -208,7 +208,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const detail = [x.pickupTime ? clock(x.pickupTime) : '', x.poNumber ? 'PO ' + x.poNumber : '', x.trailer || 'Trailer not typed yet', x.product, x.cases ? x.cases + ' cases' : ''].filter(Boolean).join(' · ');
     let html = '<article class="sw-card sched ' + (done ? 'done' : paused ? 'paused' : going ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(id) + '">';
     html += recv ? '<div class="sw-head tall" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title"><b>' + escapeHtml(x.route + ' · ' + name) + '</b><small>' + escapeHtml(detail) + '</small></span>'
-      : '<div class="sw-head" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><b class="route">' + escapeHtml((x.slot && x.slot.route) || x.route) + '</b><b class="run">' + escapeHtml(name) + who(by) + '</b><span class="truck">' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="trailer">' + escapeHtml(x.trailer || '—') + '</span>';
+      : '<div class="sw-head" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><b class="route">' + escapeHtml(((x.slot && x.slot.route) || x.route || '').replace(/_[0-9]+$/, '')) + '</b><b class="run">' + escapeHtml(name) + who(by) + '</b><span class="truck">' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="trailer">' + escapeHtml(x.trailer || '—') + '</span>';
     html += '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>' + refusal(id);
     if (isOpen) {
       const dis = !ck || done;
