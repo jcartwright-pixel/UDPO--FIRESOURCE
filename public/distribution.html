@@ -84,7 +84,10 @@
       // Manager card (Joe 10/14): accidents, complaints and PDAs waiting for review; today's scored Fleet alerts on our Uniontown
       // units (the Driver Scorecard's kinds); today's dispatched trucks driving or in the yard, counted like Trucks Today.
       const ours = new Set(data.equipment.map(e => unitKey(e.unit)));
-      const find = gpsIndex(data.gps), states = workingToday(L, data.runs, L.localDay(new Date().toISOString())).filter(r => String(r.truck || '').trim()).map(r => truckState(find(r.truck), r.truck)[0]);
+      const find = gpsIndex(data.gps), sleepers = new Set(data.routes.filter(r => r.sleeper).map(r => r.id)),
+        trucks = [...new Set(workingToday(L, data.runs, L.localDay(new Date().toISOString()), { sleeper: (r, run, day) => !!(day.sleeper || run.sleeper || sleepers.has(r.runId)) })
+          .map(r => String(r.truck || '').trim()).filter(Boolean))], // one truck on two runs (Joe 10/14, RUGG 855 and 856) counts once
+        states = trucks.map(t => truckState(find(t), t)[0]);
       n.mgr = { review: data.review, alerts: data.alerts.filter(a => window.UDScore.scAlertKind_(a.type) && ours.has(unitKey(a.tag))).length,
         road: states.filter(x => x === 'road').length, yard: states.filter(x => x === 'yard').length };
       // Joe 10/12: no "New app" / "Current app" tags on the cards (confusing). Which screens are switched on is seen and
@@ -110,7 +113,7 @@
       onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', L.weeksForLoadDate(today))), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the dispatch'));
       onSnapshot(collection(db, 'drivers'), s => { data.drivers = s.docs.map(d => d.data()); render(); }, fail('the drivers'));
       onSnapshot(collection(db, 'equipment'), s => { data.equipment = s.docs.map(d => d.data()).filter(e => (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location))); render(); }, fail('the units'));
-      onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => d.data()); render(); }, fail('Route Master'));
+      onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('Route Master'));
       onSnapshot(collection(db, 'vacations'), s => { data.vacations = s.docs.map(d => d.data()); render(); }, fail('the vacation schedule'));
       // Review item 73 (Joe 10/13): days off that end this week or later (today's numbers), not every one ever entered.
       onSnapshot(query(collection(db, 'exceptions'), where('endDate', '>=', L.weekStart(today))), s => { data.exceptions = s.docs.map(d => d.data()); render(); }, fail('the days off'));

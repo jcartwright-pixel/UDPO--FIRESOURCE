@@ -32,6 +32,8 @@ const t = (min) => new Date(Date.parse(AT) - min * 60000).toISOString();
   await db().collection('runs').doc('2026-10-04__run_t802').set({ days: { tue: { departureDate: DAY } } }, { merge: true }); // leaves the night before
   // Joe 10/14: a sleeper route (Route Master "Sleeper") left yesterday and is still out: it shows, counting from yesterday.
   await set('t802', 'sun', { runs: true, driver: 'Sam Hill', truck: '900004' });
+  // Joe 10/14 (RUGG, DONALD): a second run today for Pat on the same truck is the same line, counted once.
+  await set('t801', 'sun', { runs: true, driver: 'Pat Smith', truck: '900001', departureDate: DAY, dispatchTime: 900 });
   await db().collection('routes').doc('run_t802').set({ sleeper: true }, { merge: true });
   const b = db().batch();
   [['900001', 52, ''], ['900002', 0, 'Uniontown Branch'], ['900003', 0, 'Uniontown Branch'], ['900004', 60, '']].forEach(([tag, mph, place]) => b.set(db().collection('gpsTrucks').doc(tag),
@@ -66,6 +68,9 @@ const t = (min) => new Date(Date.parse(AT) - min * 60000).toISOString();
       assert.deepEqual(counts.map(c => c[0]).sort(), ['Lee Jones', 'Pat Smith', 'Sam Hill'], 'no line for a driver whose run leaves tomorrow, none for CARRIER');
       const out = Object.fromEntries(await page.$$eval('.tt-board > tbody > tr', a => a.map(r => [r.cells[0].textContent, r.cells[8].textContent])));
       assert.equal(out['Pat Smith'], '9 h 20 mstill out', 'still out: from the yard leave until now');
+      assert.equal(counts.filter(c => c[0] === 'Pat Smith').length, 1, 'two runs on one truck: one line');
+      assert.equal(await page.$$eval('.tt-board > tbody > tr', a => a.find(r => r.cells[0].textContent === 'Pat Smith').cells[6].innerText), '4:00 AM\n3:00 PM', 'both dispatch times');
+      assert.equal(await page.$eval('#kpis div b', b => b.textContent), '3', 'Dispatched today counts Pat once');
       assert.equal(out['Lee Jones'], '4 h 0 mback 1:00 PM', 'back: from the yard leave until the return');
       assert.equal(out['Sam Hill'], '20 h 0 msince yesterday', 'sleeper: counts from yesterday\'s yard leave, across midnight');
       await page.click('.tt-alerts.has');

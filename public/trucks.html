@@ -129,7 +129,15 @@
       }
       if (mode === 'today') {
         const rows = workingToday(L, runs, today, { sleeper: (r, run, day) => !!(day.sleeper || run.sleeper || routeSleeper[r.runId]) });
-        const list = rows.map(r => { const t = String(r.truck || '').trim() ? find(r.truck) : null, d = t ? dayBy[today + '|' + key(t.tag)] : null, trip = tripOf(r, t, dayBy, today), ev = events(t, trip, today); return { r, t, s: state(t, r.truck), d, trip, ev, n: ev.filter(e => e.alert).length, open: opened.has(r.id) }; });
+        // Joe 10/14: a driver with two runs on the same truck (RUGG, DONALD: 855 at 8:00 AM, 856 at 3:00 PM) is one line with
+        // both dispatch times, so his truck's miles, alerts and time out count once (and once in the counts above).
+        const groups = [], byKey = {};
+        rows.forEach(r => { const tk = String(r.truck || '').trim(), k = tk ? String(r.driver || '').trim().toUpperCase() + '|' + key(tk) : r.id;
+          if (byKey[k]) byKey[k].push(r); else groups.push(byKey[k] = [r]); });
+        const list = groups.map(g => { const r = g[0], t = String(r.truck || '').trim() ? find(r.truck) : null, d = t ? dayBy[today + '|' + key(t.tag)] : null, s = state(t, r.truck);
+          let trip = tripOf(r, t, dayBy, today);
+          if (trip.back && (s[0] === 'road' || s[0] === 'stopped')) trip = { out: trip.out }; // back once, out again on the next run
+          const ev = events(t, trip, today); return { r, g, t, s, d, trip, ev, n: ev.filter(e => e.alert).length, open: opened.has(r.id) }; });
         const count = (k) => list.filter(x => x.s[0] === k).length;
         kpis.innerHTML = [['Dispatched today', list.length], ['Driving', count('road')], ['Stopped or parked', count('stopped')], ['In yard', count('yard')], ['No signal', count('nosignal')], ['Not in Fleet', count('nogps')], ['No truck', count('notruck')]]
           .map(k => '<div><b>' + k[1] + '</b><span>' + k[0] + '</span></div>').join('');
@@ -139,13 +147,13 @@
           '<thead><tr><th>Driver</th><th>Truck</th><th>Status</th><th>Where now</th><th>Miles today</th><th>First move</th><th>Dispatch</th><th>Last report</th><th>Time out</th><th>Alerts</th></tr></thead><tbody>' +
           (list.map(x => '<tr class="tt-' + x.s[0] + '"><td class="strong">' + escapeHtml(x.r.driver || '') + '</td><td class="strong">' + escapeHtml(x.r.truck || '') + '</td>' +
             '<td>' + pill(x.s) + '</td><td>' + placeCell(x.t) + '</td><td>' + milesCell(x.d) + '</td><td>' + firstMoveCell(x.d) + '</td>' +
-            '<td>' + escapeHtml(timeOfDay(x.r.dispatchTime)) + '</td><td>' + (x.t && x.t.lastReport ? clock(x.t.lastReport) + '<small>' + ago(x.t.lastReport) + '</small>' : '') + '</td><td>' + tripCell(x.trip, today) + '</td>' +
+            '<td>' + x.g.map(r => escapeHtml(timeOfDay(r.dispatchTime))).filter(Boolean).join('<br>') + '</td><td>' + (x.t && x.t.lastReport ? clock(x.t.lastReport) + '<small>' + ago(x.t.lastReport) + '</small>' : '') + '</td><td>' + tripCell(x.trip, today) + '</td>' +
             '<td><button type="button" class="tt-alerts' + (x.n ? ' has' : '') + '" data-open="' + escapeHtml(x.r.id) + '" aria-expanded="' + x.open + '" title="What Verizon sent today for this driver\'s truck">' + x.n + (x.open ? ' ▴' : ' ▾') + '</button></td></tr>' +
             (x.open ? '<tr class="tt-events"><td colspan="10">' + (x.ev.length ? '<table><thead><tr><th>Time</th><th>Verizon</th><th>Detail</th><th>Where</th></tr></thead><tbody>' +
               x.ev.map(e => '<tr><td>' + clock(e.at) + '</td><td>' + escapeHtml(e.name) + '</td><td>' + escapeHtml(e.detail) + '</td><td>' + escapeHtml(e.where) + '</td></tr>').join('') + '</tbody></table>'
               : '<div class="tt-none">' + (x.t ? 'Nothing from Verizon yet today for truck ' + escapeHtml(x.t.tag) + '.' : 'No Fleet truck on this line, so no Verizon alerts.') + '</div>') + '</td></tr>' : '')).join('') ||
             '<tr><td colspan="10" class="empty">No Daily Dispatch runs leave with one of our drivers on ' + escapeHtml(shortDate(today)) + '.</td></tr>') + '</tbody></table>';
-        foot.textContent = 'In yard = at the Fleet place Uniontown Branch or Uniontown Plant · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes · Time out = from leaving the yard until back, or until now; a sleeper route counts from the day it left · Alerts = Verizon Fleet alerts today for that truck; click the number to see them with the yard leave and return times.';
+        foot.textContent = 'In yard = at the Fleet place Uniontown Branch, Uniontown Plant or Loading Dock · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes · a driver with two runs on one truck is one line with both dispatch times · Time out = from the first yard leave until back, or until now; a sleeper route counts from the day it left · Alerts = Verizon Fleet alerts today for that truck; click the number to see them with the yard leave and return times.';
         return;
       }
       // All Fleet units, matched to our Equipment Master trucks and trailers (Uniontown).
