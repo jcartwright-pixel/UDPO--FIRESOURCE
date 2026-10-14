@@ -44,37 +44,20 @@
     import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
     import { watchLists, lists } from './js/edit.js';
     import { collection, onSnapshot, query, where } from './js/firebase.js';
+    import { NO_SIGNAL_MINUTES, unitKey, gpsIndex, truckState } from './js/gps-state.js';
 
     // Trucks Today (the current app's screen A, Joe 10/9): every route on today's Daily Dispatch with where its truck is now,
     // read from Verizon Connect Fleet every 5 minutes (functions/src/fleetgps.js) and its miles today (every 15 minutes).
     const L = window.UDLogic;
-    // Joe's Fleet places for the Uniontown yard (10/13: "Uniontown Branch" and "Uniontown Plant"). Only these exact place names
-    // count as In yard; a street address in the town of Uniontown does not.
-    const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT'], NO_SIGNAL_MINUTES = 30, DEAD_HOURS = 24;
     let mode = 'today', runs = [], gps = [], days = [], alerts = [];
     const opened = new Set(); // Alerts drop-downs left open, by Daily Dispatch line (kept through the 1-minute redraw)
-    const key = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const digits = (s) => String(s || '').replace(/\D/g, '');
+    // Where each unit is now: js/gps-state.js (shared with the Route Distribution home's Manager card).
+    const key = unitKey, index = () => gpsIndex(gps), state = truckState;
     const nyDate = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
     const clock = (iso) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? d.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
     const ago = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return isNaN(m) ? '' : m < 1 ? 'now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min ago' : (m < 2880 ? '1 day ago' : Math.floor(m / 1440) + ' days ago'); };
     const timeOfDay = (min) => min === null || min === undefined || min === '' ? '' : L.timeText(min);
 
-    // Fleet names a truck "223876" and a trailer "T-635"; ours are the same numbers (trailers stored as T- plus number).
-    function index() {
-      const byKey = {}, byDigits = {};
-      gps.forEach(t => { const k = key(t.tag); if (!k) return; byKey[k] = t; if (/^\d+$/.test(k)) byDigits[k] = t; });
-      return (unit) => { const k = key(unit); return k ? byKey[k] || (/^\d+$/.test(digits(unit)) && byDigits[digits(unit)]) || null : null; };
-    }
-    // A parked truck with the engine off reports rarely, so an old report is "No signal" only when the engine was on (or the
-    // unit has been silent a whole day, like a unit taken out of service).
-    function state(t, truck) {
-      if (!t) return String(truck || '').trim() ? ['nogps', 'Not in Fleet'] : ['notruck', 'No truck'];
-      const mins = t.lastReport ? (Date.now() - Date.parse(t.lastReport)) / 60000 : Infinity;
-      if (!(mins < DEAD_HOURS * 60) || (t.ignitionOn && mins > NO_SIGNAL_MINUTES)) return ['nosignal', 'No signal'];
-      if (YARD_PLACES.indexOf(String(t.place || '').trim().toUpperCase()) >= 0 && !(t.speedMph > 3)) return ['yard', 'In yard'];
-      return t.speedMph > 3 ? ['road', 'Driving'] : t.ignitionOn ? ['stopped', 'Stopped'] : ['stopped', 'Parked'];
-    }
     // Fleet sends an address as "US|15401|Pennsylvania|Uniontown|Union St": shown as "Union St, Uniontown, PA 15401".
     const STATES = { ALABAMA: 'AL', ALASKA: 'AK', ARIZONA: 'AZ', ARKANSAS: 'AR', CALIFORNIA: 'CA', COLORADO: 'CO', CONNECTICUT: 'CT', DELAWARE: 'DE', 'DISTRICT OF COLUMBIA': 'DC', FLORIDA: 'FL', GEORGIA: 'GA', HAWAII: 'HI', IDAHO: 'ID', ILLINOIS: 'IL', INDIANA: 'IN', IOWA: 'IA', KANSAS: 'KS', KENTUCKY: 'KY', LOUISIANA: 'LA', MAINE: 'ME', MARYLAND: 'MD', MASSACHUSETTS: 'MA', MICHIGAN: 'MI', MINNESOTA: 'MN', MISSISSIPPI: 'MS', MISSOURI: 'MO', MONTANA: 'MT', NEBRASKA: 'NE', NEVADA: 'NV', 'NEW HAMPSHIRE': 'NH', 'NEW JERSEY': 'NJ', 'NEW MEXICO': 'NM', 'NEW YORK': 'NY', 'NORTH CAROLINA': 'NC', 'NORTH DAKOTA': 'ND', OHIO: 'OH', OKLAHOMA: 'OK', OREGON: 'OR', PENNSYLVANIA: 'PA', 'RHODE ISLAND': 'RI', 'SOUTH CAROLINA': 'SC', 'SOUTH DAKOTA': 'SD', TENNESSEE: 'TN', TEXAS: 'TX', UTAH: 'UT', VERMONT: 'VT', VIRGINIA: 'VA', WASHINGTON: 'WA', 'WEST VIRGINIA': 'WV', WISCONSIN: 'WI', WYOMING: 'WY' };
     function address(a) {

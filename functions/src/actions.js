@@ -546,7 +546,9 @@ function validate(input) {
 }
 
 const MANAGER_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER', 'SUPERVISOR'];
-async function requireSaver(tx, db, user, roles, action) {
+// The plant a save is for: the plant it names, else Uniontown (the only plant whose data has no plant on it yet).
+const savePlant = (req) => { const id = String(req && (req.facilityId || req.plantId) || ''); return L.PLANTS.some(p => p.id === id) ? id : 'fac_uniontown'; };
+async function requireSaver(tx, db, user, roles, action, plantId) {
   // A Plant Station signed in by its code alone (index.js checked its station): only the plant-floor saves.
   if (user && user.station) {
     if (STATIONS.STATION_ACTIONS.indexOf(action) < 0) throw new SaveError('NOT_ALLOWED', 'A Plant Station with no UD account cannot make this save. Sign in with a United Dairy account.');
@@ -561,6 +563,12 @@ async function requireSaver(tx, db, user, roles, action) {
   const roleOk = L.hasRole(person, roles);
   if (!RIGHTS.saveAllowed(person, action, roleOk, tpl.exists ? tpl.data().templates : null, ex.exists ? ex.data() : null)) {
     throw new SaveError('NOT_ALLOWED', roleOk ? email + ' is not allowed this save (Administration > People & Roles)' : email + ' does not have a role that can make this save (' + roles.join(', ') + ')');
+  }
+  // Joe 10/14: the screens ticked for this person in People & Roles (none ticked yet = every screen, as before).
+  const plant = plantId || 'fac_uniontown';
+  if (!RIGHTS.screenSaveAllowed(person, action, ex.exists ? ex.data() : null, plant)) {
+    const name = (L.PLANTS.find(p => p.id === plant) || {}).name || plant;
+    throw new SaveError('NOT_ALLOWED', email + ' does not have this screen ticked for ' + name + ' (Administration > People & Roles)');
   }
   return person;
 }
@@ -652,11 +660,11 @@ async function resolveAssignment(tx, db, req, stamp, run) {
 // Which of these saves this person may make (Administration > People & Roles counts, not only the role), without saving
 // anything. Joe 10/12: a tablet account with "Update route loading: Allowed" still showed View only, because the screen
 // checked the role alone. Only names in ACTIONS are answered.
-async function checkSaves(db, user, actions) {
-  const out = {};
+async function checkSaves(db, user, actions, facilityId) {
+  const out = {}, plantId = savePlant({ facilityId });
   for (const action of (Array.isArray(actions) ? actions : []).slice(0, 20)) {
     if (!ACTIONS[action]) continue;
-    try { await db.runTransaction(tx => requireSaver(tx, db, user, ACTIONS[action].roles, action)); out[action] = true; } catch (e) { out[action] = false; }
+    try { await db.runTransaction(tx => requireSaver(tx, db, user, ACTIONS[action].roles, action, plantId)); out[action] = true; } catch (e) { out[action] = false; }
   }
   return out;
 }
@@ -675,7 +683,7 @@ async function applyAction(db, user, input, now) {
       return Object.assign({}, prior.result, { repeated: true });
     }
     const mode = await requireTestMode(tx, db, spec.screen);
-    const person = await requireSaver(tx, db, user, spec.roles, req.action);
+    const person = await requireSaver(tx, db, user, spec.roles, req.action, savePlant(input));
     // Joe 10/13: managers may load past the loadout's limit from the Loadout Center; a Plant Station tablet never can.
     req.manager = !(user && user.station) && L.hasRole(person, MANAGER_ROLES);
 

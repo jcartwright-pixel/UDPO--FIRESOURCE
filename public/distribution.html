@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/distribution.css">
   <script src="js/logic.js"></script>
+  <script src="js/sc-core.js"></script>
 </head>
 <body>
   <div class="signin" id="signin" hidden>
@@ -44,15 +45,24 @@
         <div class="dc-head"><span class="dc-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 12l3 3 5-6"/></svg></span><span class="dc-text"><small>Overall</small><strong>Check-ins &amp; Overall</strong><em>Today's deliveries checked in, and anything that needs a look.</em></span></div>
         <div class="dc-links"><a class="dc-link" href="checkins.html"><span>Driver Check-ins</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="conflicts.html"><span>Sheet Conflicts</span><i class="dc-arrow">&rarr;</i></a></div>
         <div class="dc-metrics n4"><span class="dc-metric" data-open="checkins.html"><em>Deliveries</em><b data-n="checkins.deliveries">-</b><small>Today</small></span><span class="dc-metric" data-open="checkins.html"><em>Checked In</em><b data-n="checkins.checkedIn">-</b><small>Done</small></span><span class="dc-metric" data-open="checkins.html"><em>Issues</em><b data-n="checkins.issues" data-alert>-</b><small>With issues</small></span><span class="dc-metric" data-open="conflicts.html"><em>Conflicts</em><b data-n="conflicts.open" data-alert>-</b><small>Open</small></span></div></div>
+      <!-- Joe 10/14 (mock-up A): a Manager card under the four, across the page, for the screens that were only in the menu's
+           Manager Reports, with today's numbers. -->
+      <div class="card dc home4 dc-wide" data-card="scorecard.html" style="--accent:#7b4fa0">
+        <div class="dc-head"><span class="dc-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></span><span class="dc-text"><small>Manager</small><strong>Manager</strong><em>Driver grades, over the road, where the trucks are and the GPS setup.</em></span></div>
+        <div class="dc-links"><a class="dc-link" href="scorecard.html" id="card-scorecard"><span>Driver Scorecard</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="otr.html"><span>Over the Road</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="trucks.html"><span>Trucks Today</span><i class="dc-arrow">&rarr;</i></a><a class="dc-link" href="gps.html"><span>GPS Setup</span><i class="dc-arrow">&rarr;</i></a></div>
+        <div class="dc-metrics n4"><span class="dc-metric" data-open="scorecard.html?tab=incidents"><em>Scorecard</em><b data-n="mgr.review" data-alert>-</b><small>Under review</small></span><span class="dc-metric" data-open="scorecard.html"><em>GPS alerts</em><b data-n="mgr.alerts" data-alert>-</b><small>Today</small></span><span class="dc-metric" data-open="trucks.html"><em>On the road</em><b data-n="mgr.road">-</b><small>Trucks</small></span><span class="dc-metric" data-open="trucks.html"><em>In yard</em><b data-n="mgr.yard">-</b><small>Trucks</small></span></div>
+      </div>
     </div>
   </div>
   <script type="module">
     import { start, requireSignIn, showError, shortDate, shortTime } from './js/app.js';
     import { collection, doc, query, where, limit, onSnapshot } from './js/firebase.js';
+    import { unitKey, gpsIndex, truckState } from './js/gps-state.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
-    const data = { runs: [], drivers: [], equipment: [], routes: [], vacations: [], exceptions: [], conflicts: 0, writeBack: false, app: {} };
+    const data = { runs: [], drivers: [], equipment: [], routes: [], vacations: [], exceptions: [], conflicts: 0, writeBack: false, app: {}, gps: [], alerts: [], review: 0 };
+    const nyDate = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 
     // Numbers update the moment anything changes in the database (no reload, no 30-second checks).
     function render() {
@@ -71,6 +81,12 @@
       // Problems drivers reported at check-in today, by unit kind.
       const said = L.checkinRows(data.runs, today).reduce((a, r) => a.concat(r.issues), []);
       n.issues = { truck: said.filter(x => /^Truck:/.test(x)).length, trailer: said.filter(x => /^Trailer/.test(x)).length, jack: said.filter(x => /^Jack:/.test(x)).length };
+      // Manager card (Joe 10/14): accidents, complaints and PDAs waiting for review; today's scored Fleet alerts on our Uniontown
+      // units (the Driver Scorecard's kinds); today's dispatched trucks driving or in the yard, counted like Trucks Today.
+      const ours = new Set(data.equipment.map(e => unitKey(e.unit)));
+      const find = gpsIndex(data.gps), states = L.dailyRows(data.runs, today).filter(r => String(r.truck || '').trim()).map(r => truckState(find(r.truck), r.truck)[0]);
+      n.mgr = { review: data.review, alerts: data.alerts.filter(a => window.UDScore.scAlertKind_(a.type) && ours.has(unitKey(a.tag))).length,
+        road: states.filter(x => x === 'road').length, yard: states.filter(x => x === 'yard').length };
       // Joe 10/12: no "New app" / "Current app" tags on the cards (confusing). Which screens are switched on is seen and
       // changed only in Administration > Go-Live Switches; a screen not switched on says so on the screen itself.
       const owners = L.screenOwners(data.app);
@@ -98,6 +114,9 @@
       onSnapshot(collection(db, 'vacations'), s => { data.vacations = s.docs.map(d => d.data()); render(); }, fail('the vacation schedule'));
       // Review item 73 (Joe 10/13): days off that end this week or later (today's numbers), not every one ever entered.
       onSnapshot(query(collection(db, 'exceptions'), where('endDate', '>=', L.weekStart(today))), s => { data.exceptions = s.docs.map(d => d.data()); render(); }, fail('the days off'));
+      onSnapshot(collection(db, 'gpsTrucks'), s => { data.gps = s.docs.map(d => d.data()); render(); }, fail('the GPS positions'));
+      onSnapshot(query(collection(db, 'gpsAlerts'), where('date', '==', nyDate(new Date()))), s => { data.alerts = s.docs.map(d => d.data()); render(); }, fail('the GPS alerts'));
+      onSnapshot(query(collection(db, 'driverIncidents'), where('status', '==', 'review')), s => { data.review = s.size; render(); }, fail('the accidents and complaints'));
       onSnapshot(query(collection(db, 'conflicts'), where('open', '==', true), limit(101)), s => { data.conflicts = s.size > 100 ? '100+' : s.size; render(); }, fail('the conflict list'));
       onSnapshot(doc(db, 'config', 'app'), snap => {
         const c = snap.data() || {};
