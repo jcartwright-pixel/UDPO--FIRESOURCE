@@ -64,8 +64,8 @@ async function shots(page, name, w) {
       // Joe 10/12: a legend at the top, and each load colored by who delivers it (Uniontown truck, Branch, Carrier).
       assert.deepEqual(await page.$$eval('#legend .sc-by', s => s.map(x => x.textContent)), ['Uniontown truck', 'Branch', 'Carrier']);
       const by = (sel) => page.$$eval(sel, els => els.map(e => (e.className.match(/by-(\w+)/) || [])[1] + ':' + e.textContent.split(' · ')[0].trim()));
-      assert.deepEqual(await by('[data-day="2026-10-08"] small[class*="by-"]'), ['ut:Walmart DC', 'ut:Garber Farms', 'carrier:Sun Valley'], 'our own runs blue, the carrier load purple');
-      assert.deepEqual(await by('[data-day="2026-10-09"] small[class*="by-"]'), ['branch:Aldi Charleston'], 'a branch run (Route Master coverage BRANCH) green');
+      assert.deepEqual(await by('[data-day="2026-10-08"] small[class*="by-"]'), ['ut:Walmart DC Load 1', 'ut:Garber Farms Load 1', 'carrier:Sun Valley Load 1'], 'our own runs blue, the carrier load purple; Joe 10/14: a single load that day is Load 1');
+      assert.deepEqual(await by('[data-day="2026-10-09"] small[class*="by-"]'), ['branch:Aldi Charleston Load 1'], 'a branch run (Route Master coverage BRANCH) green');
       assert.ok(await page.$eval('.sc-by', e => parseFloat(getComputedStyle(e).fontSize) >= 16), 'the legend reads at 16px or more');
       await fits(page, 'Scheduler month ' + w + 'x' + h);
       if (w === 1920) {
@@ -74,7 +74,7 @@ async function shots(page, name, w) {
         await page.waitForFunction(() => { const f = document.getElementById('print-frame'); return f && f.contentDocument && f.contentDocument.querySelector('.legend'); });
         const printed = await page.evaluate(() => { const d = document.getElementById('print-frame').contentDocument; return { legend: d.querySelector('.legend').textContent, by: [...d.querySelectorAll('small[class^="by-"]')].map(x => x.className + ':' + x.textContent.split(' · ')[0]), html: d.documentElement.outerHTML }; });
         assert.equal(printed.legend, 'Uniontown truckBranchCarrier');
-        assert.deepEqual(printed.by.sort(), ['by-branch:Aldi Charleston', 'by-carrier:Sun Valley', 'by-ut:Garber Farms', 'by-ut:Garber Farms', 'by-ut:Walmart DC', 'by-ut:Walmart DC'], 'Print Monthly colors each load by who delivers it');
+        assert.deepEqual(printed.by.sort(), ['by-branch:Aldi Charleston Load 1', 'by-carrier:Sun Valley Load 1', 'by-ut:Garber Farms Load 1', 'by-ut:Garber Farms Load 1', 'by-ut:Walmart DC Load 1', 'by-ut:Walmart DC Load 1'], 'Print Monthly colors each load by who delivers it');
         if (SHOTS) { const pp = await browser.newPage({ viewport: { width: 1056, height: 816 } }); await pp.setContent(printed.html); await pp.emulateMedia({ media: 'print' }); await pp.screenshot({ path: path.join(SHOTS, 'sched-print-monthly.png') }); await pp.close(); }
       }
       await shots(page, 'sched-month', w);
