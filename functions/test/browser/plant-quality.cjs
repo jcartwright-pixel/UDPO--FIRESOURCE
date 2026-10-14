@@ -83,6 +83,23 @@ async function shots(page, name, w) {
         assert.equal(await page.inputValue('.prod-product'), '', 'a check 3 hours old has cleared from the form');
         assert.match(await page.textContent('#fields'), /Last: Seed gallon old/, 'the cleared check shows small and grey');
         results.push('A check clears from the form 2 hours after it was entered: 30 minutes old still filled in, 3 hours old empty with "Last:" in grey');
+        // Joe 10/14 (A): a product picked from the list waits 4 seconds with Undo before it saves.
+        const gallonChecks = async () => (await db().collection('plantJournal').where('type', '==', 'PRODUCTION_QUALITY').get()).docs.filter(d => (d.data().payload || {}).operationId === 'ut_prod_gallon_filler' && d.id !== 'PRODUCTION_QUALITY_app_seed_old').length;
+        const pick = await page.$eval('select.prod-product', s => [...s.options].find(o => o.value && !/Other/.test(o.textContent)).value);
+        await page.selectOption('select.prod-product', pick);
+        await page.waitForSelector('[data-note="prod-product"] .qc-wait');
+        assert.match(await page.textContent('[data-note="prod-product"]'), /Saving in \d seconds?/);
+        await page.waitForTimeout(1500);
+        assert.equal(await gallonChecks(), 0, 'nothing is saved while the pick waits');
+        await page.click('[data-undo]');
+        assert.equal(await page.inputValue('select.prod-product'), '', 'Undo puts the box back as it was');
+        await page.waitForTimeout(4000);
+        assert.equal(await gallonChecks(), 0, 'an undone pick is never saved');
+        await page.selectOption('select.prod-product', pick);
+        await page.waitForFunction(() => /Saved \d/.test(document.querySelector('[data-note="prod-product"]').textContent), null, { timeout: 10000 });
+        assert.equal(await gallonChecks(), 1, 'the pick saved once its 4 seconds were up');
+        await shots(page, 'quality-product-saved', w);
+        results.push('Product pick: "Saving in 4 seconds" with Undo; Undo puts the box back and saves nothing; left alone it saves after 4 seconds');
       }
       await page.click('[data-pane="history"]');
       await page.waitForSelector('#pane-history:not([hidden])');

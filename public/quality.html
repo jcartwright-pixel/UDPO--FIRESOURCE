@@ -133,6 +133,7 @@
       const keep = form && form.operationId === line.operationId && cur && form.fill.id === cur.docId ? form.fill : null;
       document.querySelectorAll('#fields [data-note]').forEach(n => { if (keep && form.notes[n.dataset.note]) n.textContent = form.notes[n.dataset.note]; });
       form = { operationId: line.operationId, fill: keep || fillIn('saveQualityCheck', save, cur ? cur.docId : ''), started: cur ? cur.recordedAt : '', notes: keep ? form.notes : {} };
+      form.product = readForm(line).product;
       shownFor = formKey(line);
     }
     // The form is drawn again only for another line, a new round, or a check someone else entered.
@@ -171,25 +172,65 @@
       const f = document.getElementById('fields'), v = (c) => { const n = f.querySelector('.' + c); return n ? n.value : ''; };
       const heads = f.querySelectorAll('.prod-head'), weights = {};
       if (heads.length) heads.forEach(x => { weights['head' + x.dataset.head] = x.value; }); else if (f.querySelector('.prod-weights')) weights.result = v('prod-weights');
-      const product = v('prod-product') === OTHER ? v('prod-other').trim() : v('prod-product');
+      const product = form && form.wait ? form.wait.prev : v('prod-product') === OTHER ? v('prod-other').trim() : v('prod-product');
       return { operationId: line.operationId, product, status: v('prod-status'), remainingOutput: f.querySelector('.prod-output') ? v('prod-output') : (line.last && line.last.remainingOutput) || '', qualityCheck: v('prod-quality'),
         tipTest: v('prod-tip'), temperature: v('prod-temperature'), cycleTime: v('prod-cycle'), productSize: v('prod-size'), annealerSpeed: v('prod-annealer-speed'), weights, notes: v('prod-notes') };
     }
     // Each box saves as it is left (a drop-down as soon as it is picked): the first box makes the check, the rest fill it in.
-    document.getElementById('fields').addEventListener('change', async e => {
+    // Joe 10/14 (A): a product picked from the list waits 4 seconds before it saves, with Undo, so a wrong pick never reaches the
+    // history or the report. Every other box still saves as it is left (a product typed in "Other" too: it was typed on purpose).
+    const WAIT_SECONDS = 4;
+    function drawWait(f) {
+      const n = document.querySelector('[data-note="prod-product"]');
+      if (!n || !f.wait) return;
+      n.classList.remove('bad');
+      n.innerHTML = '<span class="qc-wait"><span class="qc-wait-bar"><i style="width:' + Math.round(100 * (WAIT_SECONDS - f.wait.left) / WAIT_SECONDS) + '%"></i></span>' +
+        '<b>Saving in ' + f.wait.left + ' second' + (f.wait.left === 1 ? '' : 's') + '&hellip;</b><button type="button" class="qc-undo" data-undo>Undo</button></span>';
+    }
+    function holdProduct(line, box, size, sizeWas) {
+      const f = form, w = f.wait;
+      if (w) clearInterval(w.timer); else f.busy = (f.busy || 0) + 1;
+      f.wait = { line, prev: w ? w.prev : f.product || '', size, sizeWas: w ? w.sizeWas : sizeWas, sizeSet: size ? size.value : '', left: WAIT_SECONDS };
+      f.wait.timer = setInterval(() => { if (!f.wait) return; f.wait.left--; if (f.wait.left <= 0) commitWait(f); else drawWait(f); }, 1000);
+      drawWait(f);
+    }
+    // The wait is over (or the line is left): the pick saves now.
+    function commitWait(f) {
+      const w = f.wait;
+      if (!w) return;
+      clearInterval(w.timer); f.wait = null; f.busy--;
+      if (form === f) saveBox(w.line, 'prod-product');
+    }
+    function undoWait(f) {
+      const w = f.wait;
+      if (!w) return;
+      clearInterval(w.timer); f.wait = null; f.busy--;
+      const sel = document.querySelector('#fields select.prod-product');
+      if (sel) sel.value = w.prev;
+      if (w.size && w.size.value === w.sizeSet) w.size.value = w.sizeWas;
+      const n = document.querySelector('[data-note="prod-product"]');
+      if (n) n.textContent = f.notes['prod-product'] || '';
+      render();
+    }
+    document.getElementById('fields').addEventListener('click', e => { if (e.target.closest('[data-undo]') && form) undoWait(form); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && form) commitWait(form); });
+    document.getElementById('fields').addEventListener('change', e => {
       const line = current(), box = e.target;
       if (!line || !form || form.operationId !== line.operationId || !canSave()) return;
       // Other (type it): the typing box opens and saves when it is left.
       if (box.matches('select.prod-product')) {
         const other = box.parentNode.querySelector('.prod-other');
         if (other) other.hidden = box.value !== OTHER;
-        if (box.value === OTHER) { other.focus(); return; }
+        if (box.value === OTHER) { if (form.wait) { clearInterval(form.wait.timer); form.wait = null; form.busy--; const n = document.querySelector('[data-note="prod-product"]'); if (n) n.textContent = ''; } other.focus(); return; }
         // The package size follows the product's RedZone type when it is still blank.
-        const p = (products[line.operationId] || []).find(x => x.name === box.value), size = document.querySelector('#fields select.prod-size');
+        const p = (products[line.operationId] || []).find(x => x.name === box.value), size = document.querySelector('#fields select.prod-size'), sizeWas = size ? size.value : '';
         if (p && size && !size.value && sizeFor(p.mfgType)) size.value = sizeFor(p.mfgType);
+        if (box.options.length > 1) { holdProduct(line, box, size, sizeWas); return; }
       }
       if (box.matches('.prod-other') && !box.value.trim()) return;
-      const key = box.classList.contains('prod-head') ? 'prod-head' : box.classList.contains('prod-other') ? 'prod-product' : box.className.split(' ')[0];
+      saveBox(line, box.classList.contains('prod-head') ? 'prod-head' : box.classList.contains('prod-other') ? 'prod-product' : box.className.split(' ')[0]);
+    });
+    async function saveBox(line, key) {
       const fields = readForm(line), noteEl = document.querySelector('[data-note="' + key + '"]');
       const mine = pending[line.operationId] || { type: U.QUALITY_TYPE, recordedAt: form.started || new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, _id: form.fill.id };
       mine.payload = Object.assign({ area: line.name }, fields);
@@ -204,6 +245,7 @@
         const done = await form.fill.send(fields);
         if (done && done.checkId) { mine._id = done.checkId; if (done.recordedAt) mine.recordedAt = done.recordedAt; }
         mine.saved = true;
+        if (form === mineForm) mineForm.product = fields.product;
         showError('');
         // The new check can arrive and redraw the form before the save answers: write to the box's note as it is now.
         const n = document.querySelector('[data-note="' + key + '"]');
@@ -224,10 +266,11 @@
       mineForm.busy--;
       if (form === mineForm && !mineForm.busy) shownFor = formKey(line);
       render();
-    });
+    }
     document.getElementById('lines').addEventListener('click', e => {
       const b = e.target.closest('[data-line]');
       if (!b) return;
+      if (form) commitWait(form); // a pick still waiting saves before the form shows another line
       chosen = b.dataset.line;
       shownFor = '';
       history.replaceState(null, '', '?line=' + encodeURIComponent(chosen));
