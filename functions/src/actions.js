@@ -233,6 +233,8 @@ function validate(input) {
         out.days[p][k] = routeValue(ROUTE_DAY_FIELDS[k], input.days[p][k], L.DAY_NAMES[L.DAYS.indexOf(p)] + ' ' + k);
       });
     });
+    // The screen the save came from: Over the Road's miles box is held on the live app until switched on (actions-routes.js).
+    out.from = input.from === 'otr' ? 'otr' : '';
     if (!out.runId && !(out.fields.route && out.fields.run)) throw new SaveError('BAD_REQUEST', 'A new run needs a Route and a Run / Destination');
     return out;
   }

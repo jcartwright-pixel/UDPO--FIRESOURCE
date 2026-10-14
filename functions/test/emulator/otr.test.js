@@ -60,6 +60,22 @@ test('Over the Road: a manager adds a By Date column (Darden), counts a day in i
   await assert.rejects(save({ op: 'column', verb: 'remove', name: 'Jersey' }), /workbook's own columns/);
 });
 
+test('Over the Road miles: held on the live app until config/app.otrMilesToRouteMaster is on; the Route Editor is not held', async () => {
+  const keep = { R: process.env.READ_UNIONTOWN_SHEETS, S: process.env.SOURCES_JSON, D: process.env.DEMO_DATA };
+  const miles = (from) => applyAction(db(), MANAGER, Object.assign({ action: 'saveRoute', requestId: rid(), runId: 'run_t801', fields: {}, days: { mon: { miles: '412' } } }, from ? { from } : {}), now);
+  try {
+    await miles('otr');
+    assert.equal((await db().collection('routes').doc('run_t801').get()).data().days.mon.miles, 412, 'the test copy saves at once');
+    process.env.READ_UNIONTOWN_SHEETS = '1'; delete process.env.SOURCES_JSON; delete process.env.DEMO_DATA;
+    await assert.rejects(miles('otr'), /not switched on yet/);
+    await miles('');
+    await db().collection('config').doc('app').set({ otrMilesToRouteMaster: { enabled: true } }, { merge: true });
+    await miles('otr');
+  } finally {
+    ['READ_UNIONTOWN_SHEETS', 'SOURCES_JSON', 'DEMO_DATA'].forEach((k, i) => { const v = [keep.R, keep.S, keep.D][i]; if (v === undefined) delete process.env[k]; else process.env[k] = v; });
+  }
+});
+
 test('Driver Scorecard settings: a manager changes a point value and the call-off reasons; a bad number is refused', async () => {
   await assert.rejects(applyAction(db(), DISPATCHER, { action: 'saveScorecard', requestId: rid(), key: 'callOff', value: 5 }, now), /role/);
   await assert.rejects(applyAction(db(), MANAGER, { action: 'saveScorecard', requestId: rid(), key: 'callOff', value: 'x' }, now), /number/);

@@ -36,7 +36,18 @@ function routeValue(kind, v, label) {
 }
 
 // One run's Route Master standards (or a new route / run, created in the new app). One call, one log entry.
+// The production server (the same test as Administration's master-sheet check): it reads and writes the real Uniontown sheets.
+const isProduction = () => process.env.READ_UNIONTOWN_SHEETS === '1' && !process.env.SOURCES_JSON && process.env.DEMO_DATA !== '1';
+
 async function saveRoute(tx, db, req, email, stamp, logRef, mode) {
+  // Over the Road's miles box writes Route Master's <day>_miles; on the live app that waits for Joe's OK
+  // (config/app.otrMilesToRouteMaster.enabled). The Route Editor's own Mileage view is not held.
+  if (req.from === 'otr' && Object.keys(req.days).length && isProduction()) {
+    const cfg = (await tx.get(db.collection(C.config).doc('app'))).data() || {};
+    if (!(cfg.otrMilesToRouteMaster && cfg.otrMilesToRouteMaster.enabled === true)) {
+      throw new SaveError('NOT_ALLOWED', 'Fixing miles from Over the Road is not switched on yet; change them in Route Editor > Mileage');
+    }
+  }
   const id = req.runId || 'run_app_' + M.safeIdPart(String(req.fields.route) + '_' + String(req.fields.run)).toLowerCase().slice(0, 60) + '_' + req.requestId.slice(-6).toLowerCase();
   const ref = db.collection(C.routes).doc(M.safeIdPart(id));
   const snap = await tx.get(ref);

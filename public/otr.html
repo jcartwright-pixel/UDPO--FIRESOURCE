@@ -258,7 +258,9 @@
       } else {
         const dis = edit ? '' : ' disabled';
         // Joe 10/13: the miles are Route Master's (the Route Editor's Mileage view); a wrong number is fixed here and saved there.
-        const milesEdit = edit && L.screenState(lists.app, 'routes').open;
+        // On the live app the miles box waits for Joe's OK (config/app.otrMilesToRouteMaster); the test copy always has it.
+        const testCopy = /sandbox|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
+        const milesEdit = edit && L.screenState(lists.app, 'routes').open && (testCopy || !!(lists.app.otrMilesToRouteMaster && lists.app.otrMilesToRouteMaster.enabled === true));
         bar.innerHTML = '<span class="hint">Tick a run and every day it runs counts in its By Date column. Miles are Route Master\'s' + (milesEdit ? '; click one to fix it' : '') + '. DRAFT miles are not confirmed.</span><span class="spacer"></span>' +
           (edit ? '<button type="button" id="otr-cols"' + (colPanel ? ' aria-expanded="true"' : '') + '>By Date Columns</button>' : '');
         const own = extraCols.filter(c => CORE.DESTINATIONS.indexOf(c.name) < 0), used = {};
@@ -357,7 +359,7 @@
           days.forEach(d => { want[d] = { miles: String(m) }; mine[d] = m; });
           const before = JSON.parse(JSON.stringify(route.days || {}));
           pendingMiles[runId] = mine;
-          saveOptimistic('saveRoute', { runId, fields: {}, days: want }, () => { route.days = route.days || {}; days.forEach(d => { route.days[d] = Object.assign({}, route.days[d], { miles: m }); }); },
+          saveOptimistic('saveRoute', { runId, fields: {}, days: want, from: 'otr' }, () => { route.days = route.days || {}; days.forEach(d => { route.days[d] = Object.assign({}, route.days[d], { miles: m }); }); },
             () => { if (pendingMiles[runId] === mine) delete pendingMiles[runId]; route.days = before; }, render).then(() => { if (pendingMiles[runId] === mine) delete pendingMiles[runId]; });
         };
         sheet.querySelectorAll('[data-miles-save]').forEach(b => { b.onclick = () => saveMiles(b.dataset.milesSave); });
