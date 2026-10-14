@@ -31,7 +31,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Plant Production</span><h1>Production Lines</h1></div>
+      <div class="title"><span class="eyebrow">Plant Production</span><h1 id="page-title">Production Lines</h1></div>
       <div class="hstats" id="hstats"></div>
       <a class="lt-top" id="tv" href="production.html?tv=1" data-top>TV Display</a>
       <a class="lt-top" href="line.html" data-top>Line Tablet</a>
@@ -42,8 +42,13 @@
       <!-- ?tv=1: the TV itself (Joe 10/11, mock-up B): no app header or menu, every line in green, yellow or red. -->
       <div class="pd-tvh"><img src="img/ud-logo.webp" alt="United Dairy"><div><b id="tv-plant">PRODUCTION</b><span id="tv-shift"></span></div><div class="pd-clock" id="tv-clock"></div></div>
       <div class="pd-sub" id="sub"></div>
+      <!-- Joe 10/14 (mock-up A): the kinds of line, the plant's totals; (mock-up B) one line's shift, opened by clicking its card. -->
+      <div class="pd-filters chips" id="filters"></div>
+      <div class="pd-totals" id="totals"></div>
+      <div class="pd-tabs chips" id="tabs" hidden></div>
+      <div class="pd-detail" id="detail" hidden></div>
       <div class="pd-tiles" id="tiles"></div>
-      <div class="pd-legend"><span class="g">&#9679; At or ahead</span><span class="a">&#9679; Up to 10% behind</span><span class="r">&#9679; More than 10% behind or stopped</span><span class="f">&#9679; Speed outside its range</span></div>
+      <div class="pd-legend" id="legend"><span class="g">&#9679; At or ahead</span><span class="a">&#9679; Up to 10% behind</span><span class="r">&#9679; More than 10% behind or stopped</span><span class="f">&#9679; Speed outside its range</span><span class="b">&#9679; Changeover or CIP wash</span></div>
     </div>
   </div>
 
@@ -61,7 +66,15 @@
     const testNow = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && Date.parse(params.get('now') || '') ? Date.parse(params.get('now')) : 0;
     const started = Date.now(), now = () => testNow ? testNow + (Date.now() - started) : Date.now();
     window.udBack = () => { if (tv) { location.search = ''; return true; } return false; };
-    let person = null, data = null, stop = null, db = null, plant = params.get('plant') || '';
+    let person = null, data = null, stop = null, db = null, plant = params.get('plant') || '', lineId = tv ? '' : params.get('line') || '', kindFilter = 'ALL';
+    const R = window.UDProduction, KINDS = [['ALL', 'All lines'], ['FILLER', 'Fillers'], ['HTST', 'HTST'], ['PACK', 'Boxing & Totes'], ['BLOWMOLD', 'Blow Mold'], ['ATTN', 'Needs attention']];
+    // Joe 10/14: line efficiency is for managers only (not the tablets or the TV).
+    const manager = () => !tv && !!person && L.hasRole(person, L.REORDER_ROLES);
+    const clockOf = (iso) => { const x = Date.parse(iso || ''); return isFinite(x) ? new Date(x).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; };
+    const who = (email) => String(email || '').split('@')[0];
+    const latest = (v, field) => { const c = (v.run && v.run.checks) || {}; for (const k of Object.keys(c).map(Number).sort((a, b) => b - a)) if (c[k] && String(c[k][field] || '') !== '') return { value: c[k][field], at: c[k].at }; return null; };
+    // A line needs attention when it is stopped, has a stop with no reason, is off its speed, more than 10% behind, has a check due or is past its CIP hours.
+    const attention = (v) => v.state === 'STOPPED' || v.needReason.length > 0 || v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' || (v.pct !== null && v.pct < 90) || (v.check && !v.check.done && v.state !== 'IDLE') || (v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours) || !!v.diverting;
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
 
     function render() {
@@ -73,16 +86,116 @@
       document.getElementById('tv-clock').textContent = new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
       document.getElementById('sub').textContent = plantName(plant) + ' · ' + shiftText(s) + ' · ' + shortDate(s.date);
       const running = views.filter(v => v.state === 'RUNNING').length, stopped = views.filter(v => v.state === 'STOPPED').length, flagged = views.filter(v => v.speedFlag === 'OVER' || v.speedFlag === 'UNDER').length;
-      document.getElementById('hstats').innerHTML = [['Lines', views.length, ''], ['Running', running, 'good'], ['Stopped', stopped, stopped ? 'bad' : ''], ['Speed off', flagged, flagged ? 'bad' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.getElementById('tiles').innerHTML = views.map(v => {
-        const word = v.state === 'IDLE' ? 'NOT STARTED' : v.state === 'STOPPED' ? 'STOPPED ' + v.stoppedMin + ' MIN' : 'RUNNING';
+      const cos = views.filter(v => v.state === 'CHANGEOVER').length, cips = views.filter(v => v.state === 'CIP').length;
+      document.getElementById('hstats').innerHTML = [['Lines', views.length, ''], ['Running', running, 'good'], ['Stopped', stopped, stopped ? 'bad' : ''], ['Speed off', flagged, flagged ? 'bad' : ''], ['Changeover', cos, cos ? 'blue' : ''], ['CIP wash', cips, cips ? 'blue' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      drawTop(views, t);
+      const shown = views.filter(v => kindFilter === 'ALL' || (kindFilter === 'ATTN' ? attention(v) : v.kind === kindFilter));
+      document.getElementById('tiles').innerHTML = shown.map(v => {
+        const word = v.state === 'IDLE' ? 'NOT STARTED' : v.state === 'STOPPED' ? 'STOPPED ' + v.stoppedMin + ' MIN' : v.state === 'CHANGEOVER' ? 'CHANGEOVER ' + v.changeover.minutes + ' MIN' : v.state === 'CIP' ? 'CIP WASH ' + v.cip.minutes + ' MIN' : v.kind === 'HTST' && v.diverting ? 'IN DIVERT' : 'RUNNING';
         const sp = v.speedFlag === 'OVER' ? 'TOO FAST ' + v.speed + '/MIN' : v.speedFlag === 'UNDER' ? 'TOO SLOW ' + v.speed + '/MIN' : v.speed !== null && v.state === 'RUNNING' ? v.speed + '/MIN' : '';
         const off = v.speedFlag === 'OVER' || v.speedFlag === 'UNDER';
         return '<div class="pd-tile ' + v.color + (off ? ' flash' : '') + '" data-line="' + escapeHtml(v.line.operationId) + '"><div class="pd-name">' + escapeHtml(v.line.name) + '</div><div class="pd-prod">' + escapeHtml(v.product || (v.state === 'IDLE' ? 'Nothing entered this shift' : 'No product picked')) + '</div>' +
           '<div class="pd-made"><b>' + fmt(v.made) + '</b><span>of ' + fmt(v.soFar) + '</span></div>' +
-          '<div class="pd-foot"><span class="pd-pct">' + (v.pct === null ? '–' : v.pct + '%') + '</span>' + (sp ? '<span class="pd-speed' + (off ? ' off' : '') + '">' + sp + '</span>' : '') + '<span>' + word + '</span></div></div>';
+          '<div class="pd-foot"><span class="pd-pct">' + (v.pct === null ? '–' : v.pct + '%') + '</span>' + (sp ? '<span class="pd-speed' + (off ? ' off' : '') + '">' + sp + '</span>' : '') + '<span>' + word + '</span></div>' + (tv ? '' : more(v)) + '</div>';
       }).join('') || '<p class="pd-empty">' + (data.read.setup ? 'No production lines are set up for ' + escapeHtml(plantName(plant)) + '.' : 'Reading the lines…') + '</p>';
     }
+    // The more on each desktop card (mock-up A).
+    function more(v) {
+      const tg = v.target, rows = [], b = (x) => '<b>' + x + '</b>';
+      if (v.kind === 'HTST') {
+        const temp = latest(v, 'recorder'), flow = latest(v, 'flow'), rec = latest(v, 'indicating');
+        rows.push((temp ? 'Temp ' + b(escapeHtml(temp.value) + '°F') + ' &nbsp; ' : '') + (flow ? 'Flow ' + b(escapeHtml(flow.value) + ' GPM') + ' &nbsp; ' : '') + 'Diverts ' + b(v.diverts) + (temp || rec ? ' &nbsp; Recorder checked ' + b(clockOf((temp || rec).at)) : ''));
+        if (v.source.from || v.source.to) rows.push(escapeHtml([v.source.from, v.source.to].filter(Boolean).join(' → ')));
+      } else if (v.speed !== null || (tg && (tg.minSpeed !== null || tg.maxSpeed !== null))) {
+        rows.push('Speed ' + b(v.speed === null ? '—' : v.speed + '/min') + (tg && (tg.minSpeed !== null || tg.maxSpeed !== null) ? ' (' + (tg.minSpeed !== null ? tg.minSpeed : 0) + (tg.maxSpeed !== null ? '–' + tg.maxSpeed : '+') + ')' : '') + (manager() && v.efficiency && v.efficiency.oee !== null ? ' &nbsp; Efficiency ' + b(v.efficiency.oee + '%') : ''));
+      } else if (manager() && v.efficiency && v.efficiency.oee !== null) rows.push('Efficiency ' + b(v.efficiency.oee + '%'));
+      if (v.changeover) rows.push((v.kind === 'BLOWMOLD' ? 'Mold change ' : 'Changeover ') + b(v.changeover.minutes + (v.changeoverStd ? ' of ' + v.changeoverStd : '') + ' min') + (v.changeoverStd ? ' standard' : '') + ' &nbsp; Checklist ' + b(Object.keys(v.changeover.checks).length + ' of ' + (R.CHANGEOVER_CHECKS[v.kind] || []).length));
+      if (v.cip) rows.push('CIP wash ' + b(v.cip.minutes + ' min') + ' since ' + clockOf(v.cip.start));
+      else if (v.cipHours && v.sinceCipHours !== null) rows.push('Since CIP ' + b(v.sinceCipHours + ' of ' + v.cipHours + ' h'));
+      rows.push('<span' + (v.state === 'STOPPED' ? ' class="pd-bad"' : '') + '>Stopped ' + b(v.downMin + ' min') + (v.topReason ? ' · ' + escapeHtml(v.topReason) : '') + '</span>' + (v.wasteTotal ? ' &nbsp; Waste ' + b(fmt(v.wasteTotal)) : '') + (v.kind === 'BLOWMOLD' && v.stock !== null ? ' &nbsp; Jugs ahead ' + b(fmt(v.stock)) : ''));
+      if (v.check && v.state !== 'IDLE') rows.push('Quality check ' + (v.check.done ? b('done') + ' · next ' + clockOf(v.check.next) : '<b class="pd-due">due ' + clockOf(v.check.at) + '</b>'));
+      if (v.crewOn.length) rows.push('Crew: ' + escapeHtml(v.crewOn.join(', ')));
+      if (v.next) rows.push('<span class="pd-next">Next: ' + escapeHtml(v.next.product) + (v.next.qty ? ' · ' + fmt(v.next.qty) : '') + '</span>');
+      return '<div class="pd-bar"><i class="' + (v.color || 'x') + '" style="width:' + Math.min(100, v.pct || 0) + '%"></i></div><div class="pd-more">' + rows.map(r => '<div>' + r + '</div>').join('') + '</div>';
+    }
+    // Filters and the plant's totals (mock-up A), or one line's tabs (mock-up B).
+    function drawTop(views, t) {
+      const one = !!lineId && views.some(v => v.line.operationId === lineId);
+      document.getElementById('filters').hidden = tv || one;
+      document.getElementById('totals').hidden = tv || one;
+      document.getElementById('tiles').hidden = one;
+      document.getElementById('legend').hidden = one;
+      document.getElementById('tabs').hidden = !one;
+      document.getElementById('detail').hidden = !one;
+      document.getElementById('page-title').textContent = one ? views.find(v => v.line.operationId === lineId).line.name : 'Production Lines';
+      if (tv) return;
+      if (one) return drawDetail(views.find(v => v.line.operationId === lineId), views, t);
+      document.getElementById('filters').innerHTML = KINDS.filter(k => k[0] === 'ALL' || k[0] === 'ATTN' || views.some(v => v.kind === k[0]))
+        .map(k => { const n = k[0] === 'ATTN' ? views.filter(attention).length : 0; return '<button type="button" data-kind="' + k[0] + '"' + (kindFilter === k[0] ? ' class="on"' : '') + '>' + escapeHtml(k[1]) + (n ? '<b>' + n + '</b>' : '') + '</button>'; }).join('');
+      const sum = (f) => views.reduce((n, v) => n + (f(v) || 0), 0), effs = views.filter(v => v.efficiency && v.efficiency.oee !== null && v.efficiency.plannedMin > 0);
+      const plantEff = effs.length ? Math.round(effs.reduce((n, v) => n + v.efficiency.oee * v.efficiency.plannedMin, 0) / effs.reduce((n, v) => n + v.efficiency.plannedMin, 0)) : null;
+      const nextCip = views.filter(v => v.cipHours && v.lastCipAt && !v.cip).map(v => ({ v, at: Date.parse(v.lastCipAt) + v.cipHours * 3600000 })).sort((a, b) => a.at - b.at)[0];
+      const boxes = [['Plant made', fmt(sum(v => v.made))], ['Target so far', fmt(sum(v => v.soFar))]];
+      if (manager()) boxes.push(['Efficiency', plantEff === null ? '—' : plantEff + '%']);
+      boxes.push(['Stopped', sum(v => v.downMin) + ' min'], ['Waste', fmt(sum(v => v.wasteTotal))], [nextCip ? 'Next CIP · ' + escapeHtml(nextCip.v.line.name) : 'Next CIP', nextCip ? clockOf(new Date(nextCip.at).toISOString()) : '—']);
+      document.getElementById('totals').innerHTML = boxes.map(x => '<div><span>' + x[0] + '</span><b>' + x[1] + '</b></div>').join('');
+    }
+    // One line's shift (mock-up B): timeline, hour by hour, efficiency, changeovers, stops, waste, quality checks, CIP, crew and notes.
+    function drawDetail(v, views, t) {
+      const run = v.run || {}, mgr = manager();
+      document.getElementById('hstats').innerHTML = [['Made', fmt(v.made), ''], ['Target so far', fmt(v.soFar), ''], mgr ? ['Efficiency', v.efficiency && v.efficiency.oee !== null ? v.efficiency.oee + '%' : '—', 'good'] : null, ['Stopped', v.downMin + ' min', v.downMin ? 'bad' : '']]
+        .filter(Boolean).map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('tabs').innerHTML = '<button type="button" data-tab="">All lines</button>' + views.map(x => '<button type="button" data-tab="' + escapeHtml(x.line.operationId) + '"' + (x.line.operationId === lineId ? ' class="on"' : '') + '>' + escapeHtml(x.line.name) + '</button>').join('');
+      const box = (title, inner, cls) => '<section class="pd-box' + (cls ? ' ' + cls : '') + '"><h3>' + title + '</h3>' + inner + '</section>';
+      // heads: [title, 1 = a number on the right, or 'w' = words that may wrap].
+      const cls = (h) => h[1] === 'w' ? ' class="w"' : h[1] ? ' class="n"' : '';
+      const table = (heads, rows, empty) => rows.length ? '<table class="pd-t"><thead><tr>' + heads.map(h => '<th' + cls(h) + '>' + h[0] + '</th>').join('') + '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map((c, i) => '<td' + cls(heads[i]) + '>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '<p class="pd-none">' + empty + '</p>';
+      // Timeline
+      const segs = R.timeline(run, t), total = segs.reduce((n, x) => n + x.minutes, 0) || 1, start = Date.parse(run.shiftStart || ''), stopAt = Date.parse(run.shiftEnd || '');
+      const ticks = [];
+      if (start && stopAt) for (let a = Math.ceil(start / 3600000) * 3600000; a <= stopAt; a += 3600000) ticks.push('<span style="left:' + ((a - start) / (stopAt - start) * 100) + '%">' + new Date(a).toLocaleTimeString('en-US', { hour: 'numeric' }) + '</span>');
+      const NAMES = { run: 'Running', stop: 'Stopped', co: 'Changeover', cip: 'CIP / sanitation', brk: 'Break', idle: 'Not started' };
+      const tl = segs.length ? '<div class="pd-tl">' + segs.map(x => '<i class="' + x.kind + '" style="width:' + (x.minutes / total * 100) + '%" title="' + (NAMES[x.kind] || 'Still to come') + ' ' + clockOf(x.from) + ', ' + x.minutes + ' min"></i>').join('') + '</div><div class="pd-ticks">' + ticks.join('') + '</div><div class="pd-key">' + Object.keys(NAMES).map(k => '<span><i class="' + k + '"></i>' + NAMES[k] + '</span>').join('') + '</div>' : '<p class="pd-none">Nothing entered on this line this shift.</p>';
+      // Hour by hour
+      const hrs = R.hourly(run, v.targets, t).filter(x => x.past);
+      const hourRows = hrs.map(x => [clockOf(x.from).replace(':00', '') + '–' + clockOf(x.to).replace(':00', ''), escapeHtml(x.products.join(' → ') || '—'), fmt(x.made), fmt(x.target), x.pct === null ? '–' : x.pct, x.stopped]);
+      const eff = v.efficiency;
+      const effBox = mgr ? box('How the shift is going', eff ? '<p class="pd-eff">Running <b>' + (eff.running === null ? '—' : eff.running + '%') + '</b> of the time &nbsp; At speed <b>' + (eff.speed === null ? '—' : eff.speed + '%') + '</b> &nbsp; Good <b>' + (eff.good === null ? '—' : eff.good + '%') + '</b></p><p class="pd-oee">Line efficiency ' + (eff.oee === null ? '—' : eff.oee + '%') + '</p><p class="pd-none">Running time × speed × good product. Changeovers and stops count against running time; CIP washes and breaks do not.</p>' : '<p class="pd-none">Starts with the shift\'s first product.</p>') : '';
+      const coRows = v.changeovers.map(c => [escapeHtml((c.from || '—') + ' → ' + (c.to || '—')), clockOf(c.start), c.end ? c.minutes : c.minutes + ' so far', v.changeoverStd === null ? '–' : v.changeoverStd]);
+      const stopRows = (run.stops || []).map(s => { const m = Math.round(((s.end ? Date.parse(s.end) : t) - Date.parse(s.start)) / 60000); return [clockOf(s.start), s.end ? m : m + ' so far', escapeHtml(s.reason || 'No reason yet'), escapeHtml(who(s.reasonBy || s.by))]; });
+      const wasteRows = Object.keys(v.waste).map(k => [escapeHtml(k), fmt(v.waste[k])]);
+      const fields = R.CHECK_FIELDS[v.kind] || [], every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, checks = run.checks || {};
+      const checkRows = Object.keys(checks).map(Number).sort((a, b) => a - b).map(n => [clockOf(new Date(start + n * every).toISOString())].concat(fields.map(f => { const x = String(checks[n][f[0]] === undefined ? '' : checks[n][f[0]]); return /NOT OK|LATE/.test(x) ? '<b class="pd-bad">' + escapeHtml(x) + '</b>' : escapeHtml(x); }), [escapeHtml(who(checks[n].by))]));
+      const cipRows = v.cips.map(c => [clockOf(c.start), c.end ? clockOf(c.end) : 'washing', c.minutes, c.result === 'FAIL' ? '<b class="pd-bad">Failed</b>' : c.result ? 'Passed' : '']);
+      const crew = v.crew.length ? v.crew.map(c => escapeHtml(c.name) + (c.on ? '' : ' (off)')).join(', ') : 'No one signed on.';
+      const notes = '<p><b>Crew:</b> ' + crew + '</p>' + (v.prevNote ? '<p><b>From last shift' + (v.prevNoteBy ? ' (' + escapeHtml(who(v.prevNoteBy)) + ')' : '') + ':</b> ' + escapeHtml(v.prevNote) + '</p>' : '') + '<p><b>For the next shift:</b> ' + (v.note ? escapeHtml(v.note) : 'no note yet') + '</p>' +
+        (v.kind === 'HTST' ? '<p><b>Silo and tanks:</b> ' + escapeHtml([v.source.from, v.source.to].filter(Boolean).join(' → ') || '—') + ' &nbsp; <b>Diverts:</b> ' + v.diverts + '</p>' : '') + (v.kind === 'BLOWMOLD' ? '<p><b>Resin lot:</b> ' + escapeHtml(v.lot || '—') + ' &nbsp; <b>Jugs ahead:</b> ' + (v.stock === null ? '—' : fmt(v.stock)) + '</p>' : '') +
+        (v.next ? '<p><b>Up next:</b> ' + escapeHtml(v.next.product) + (v.next.qty ? ' · ' + fmt(v.next.qty) : '') + '</p>' : '');
+      document.getElementById('detail').innerHTML = box(escapeHtml(v.line.name) + ' · this shift', tl, 'wide') +
+        '<div class="pd-col">' + box('Hour by hour', table([['Hour'], ['Product', 'w'], ['Made', 1], ['Target', 1], ['%', 1], ['Stopped', 1]], hourRows, 'No hours yet this shift.')) +
+        box('Stops and why', table([['From'], ['Min', 1], ['Why', 'w'], ['Who']], stopRows, 'No stops this shift.')) + box('Waste and rejects', table([['Why', 'w'], ['How many', 1]], wasteRows, 'No waste entered this shift.')) + '</div>' +
+        '<div class="pd-col">' + effBox + box('Changeovers', table([['From → to', 'w'], ['Started'], ['Min', 1], ['Standard', 1]], coRows, 'No changeovers this shift.')) +
+        box('CIP washes', table([['Started'], ['Done'], ['Min', 1], ['Result']], cipRows, v.lastCipAt ? 'None this shift. Last one that passed: ' + shortDate(v.lastCipAt.slice(0, 10)) + ' ' + clockOf(v.lastCipAt) + '.' : 'None this shift.')) +
+        box('Crew and notes', notes) + '</div>' +
+        box('Quality checks', table([['Time']].concat(fields.map(f => [escapeHtml(f[1]), f[2] === 'num' ? 1 : 0])).concat([['By']]), checkRows, 'No checks yet this shift.'), 'wide');
+    }
+    document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (!b) return; kindFilter = b.dataset.kind; render(); });
+    document.getElementById('tiles').addEventListener('click', e => {
+      if (tv) return;
+      const c = e.target.closest('.pd-tile[data-line]');
+      if (!c) return;
+      lineId = c.dataset.line;
+      history.pushState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + '&line=' + encodeURIComponent(lineId) + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
+      render(); document.getElementById('view').scrollTop = 0; window.scrollTo(0, 0);
+    });
+    document.getElementById('tabs').addEventListener('click', e => {
+      const b = e.target.closest('[data-tab]');
+      if (!b) return;
+      lineId = b.dataset.tab;
+      history.replaceState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + (lineId ? '&line=' + encodeURIComponent(lineId) : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
+      render();
+    });
+    window.addEventListener('popstate', () => { lineId = new URLSearchParams(location.search).get('line') || ''; render(); });
     function follow() {
       if (stop) stop();
       data = null;

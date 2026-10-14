@@ -143,6 +143,151 @@
       reader: r.reader && typeof r.reader === 'object' ? r.reader : null };
   }
 
+  // ---------- More for every line (Joe 10/14: "all of your picks", mock-ups A to H) ----------
+  // The kind of line decides its tablet, waste reasons, changeover checklist and quality check (plant-rules lineKey names).
+  function lineKind(name) {
+    var k = text(name).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (/^HTST/.test(k)) return 'HTST';
+    if (k === 'BLOWMOLD') return 'BLOWMOLD';
+    if (k === 'BOXING' || k === 'RAYPAK' || k === 'TOTES') return 'PACK';
+    return 'FILLER';
+  }
+  var KIND_LABEL = { FILLER: 'Fillers', HTST: 'HTST', PACK: 'Boxing & Totes', BLOWMOLD: 'Blow Mold' };
+  var WASTE_REASONS = {
+    FILLER: ['Underfill (scale)', 'Leaker', 'Bad cap', 'Bad label', 'Bad code date', 'Changeover purge', 'Dropped / damaged', 'Other'],
+    PACK: ['Leaker', 'Bad seal', 'Bad label', 'Bad code date', 'Changeover purge', 'Damaged', 'Other'],
+    HTST: ['Startup / flush (gal)', 'Divert (gal)', 'Changeover purge (gal)', 'Other (gal)'],
+    BLOWMOLD: ['Leak tester', 'Thin wall / short shot', 'Bad trim', 'Contaminated', 'Startup', 'Other']
+  };
+  // The changeover checklist (mock-up D); Blow Mold's changeover is its mold change.
+  var CHANGEOVER_CHECKS = {
+    FILLER: [['purge', 'Product line purged', ''], ['labels', 'Labels changed to the new product', ''], ['caps', 'Caps changed (color)', ''], ['code', 'Code date set and read', ''], ['first', 'First jugs checked (fill, cap, label)', 'tap when 5 are good'], ['flush', 'Allergen / flavor flush done', 'only for chocolate to white']],
+    PACK: [['purge', 'Product line purged', ''], ['labels', 'Labels or box changed to the new product', ''], ['code', 'Code date set and read', ''], ['first', 'First units checked (seal, label)', ''], ['flush', 'Allergen / flavor flush done', 'only for chocolate to white']],
+    HTST: [['flush', 'Product flushed (water push)', ''], ['valves', 'Valves set to the new product\'s tanks', ''], ['allergen', 'Allergen / flavor flush done', 'only for chocolate to white'], ['first', 'First product checked (temp, taste, look)', '']],
+    BLOWMOLD: [['mold', 'Mold changed', ''], ['weight', 'Bottle weight checked', ''], ['leak', 'Leak tester checked', '']]
+  };
+  // The quality check each kind records (mock-ups E, G, H): every 2 hours, the HTST chart check every hour.
+  var CHECK_FIELDS = {
+    FILLER: [['w1', 'Jug 1 lb', 'num'], ['w2', 'Jug 2 lb', 'num'], ['w3', 'Jug 3 lb', 'num'], ['w4', 'Jug 4 lb', 'num'], ['w5', 'Jug 5 lb', 'num'], ['capSeal', 'Cap and seal', 'ok'], ['codeOk', 'Code date readable', 'ok'], ['temp', 'Product temp °F', 'num']],
+    PACK: [['capSeal', 'Seal', 'ok'], ['codeOk', 'Code date readable', 'ok'], ['temp', 'Product temp °F', 'num']],
+    HTST: [['recorder', 'Recorder °F', 'num'], ['indicating', 'Indicating °F', 'num'], ['pen', 'Pen on time', 'ok'], ['flow', 'Flow GPM', 'num']],
+    BLOWMOLD: [['w1', 'Jug 1 g', 'num'], ['w2', 'Jug 2 g', 'num'], ['w3', 'Jug 3 g', 'num'], ['topLoad', 'Top load', 'ok']]
+  };
+  var CHECK_EVERY = { FILLER: 2, PACK: 2, HTST: 1, BLOWMOLD: 2 };
+  var DIVERT_REASONS = ['Low temperature', 'Flow too high', 'Startup', 'Power or air', 'Test', 'Other'];
+  var LIMITS = { WASTE: 999999, CREW: 30, NOTE: 1000, DIVERTS: 200, CHANGEOVERS: 60, CIPS: 20, CHECK_SLOTS: 30 };
+
+  function overlap(a, b, c, d) { return Math.max(0, Math.min(b, d) - Math.max(a, c)); }
+  function openOf(list) { return (list || []).filter(function (x) { return x && x.start && !x.end; })[0] || null; }
+  function spanMinutes(list, nowMs, a, b) {
+    return Math.round((list || []).reduce(function (n, x) { var s = when(x.start), e = x.end ? when(x.end) : nowMs; return n + (a === undefined ? Math.max(0, e - s) : overlap(s, e, a, b)); }, 0) / 60000);
+  }
+  // The count made at time t (the last count at or before it; 0 before the first).
+  function countAt(counts, t) {
+    var n = 0;
+    (counts || []).forEach(function (c) { if (when(c.at) <= t && num(c.count) !== null) n = num(c.count); });
+    return n;
+  }
+  // Which check of the shift is now due (every CHECK_EVERY hours from the shift's start), and whether it is done.
+  function checkDue(run, kind, nowMs) {
+    var r = run || {}, start = when(r.shiftStart), every = (CHECK_EVERY[kind] || 2) * 3600000, fields = CHECK_FIELDS[kind] || [];
+    if (!start || nowMs < start) return null;
+    var slot = Math.floor((nowMs - start) / every), at = start + slot * every, got = (r.checks || {})[String(slot)] || {};
+    var done = fields.every(function (f) { return text(got[f[0]]) !== ''; });
+    return { slot: slot, at: new Date(at).toISOString(), next: new Date(at + every).toISOString(), done: done, values: got, filled: fields.filter(function (f) { return text(got[f[0]]) !== ''; }).length, of: fields.length };
+  }
+
+  // Everything mock-ups A to H add for one line this shift (run = productionRuns doc, line = productionLines doc).
+  function lineMore(run, targets, nowMs, kind, lineDoc) {
+    var r = run || {}, ld = lineDoc || {}, base = lineNow(run, targets, nowMs);
+    var co = openOf(r.changeovers), cip = openOf(r.cips), dv = openOf(r.diverts);
+    var waste = r.waste && typeof r.waste === 'object' ? r.waste : {}, wasteTotal = 0;
+    Object.keys(waste).forEach(function (k) { wasteTotal += num(waste[k]) || 0; });
+    // The reason that cost the most minutes this shift.
+    var byReason = {};
+    (r.stops || []).forEach(function (x) { var k = text(x.reason) || 'No reason yet', m = (x.end ? when(x.end) : nowMs) - when(x.start); byReason[k] = (byReason[k] || 0) + Math.max(0, m); });
+    var top = Object.keys(byReason).sort(function (a, b) { return byReason[b] - byReason[a]; })[0] || '';
+    var crewOn = (r.crew || []).filter(function (c) { return c && c.on; });
+    // Line efficiency (OEE): running time x speed x good product, from the line's first product of the shift until now.
+    var runs = (r.runs || []).slice().sort(function (a, b) { return when(a.from) - when(b.from); });
+    var end = Math.min(nowMs, when(r.shiftEnd) || nowMs), first = runs.length ? when(runs[0].from) : 0, eff = null;
+    if (first && end > first) {
+      var cipMin = spanMinutes(r.cips, nowMs, first, end), brk = 0, down = 0;
+      (r.stops || []).forEach(function (x) { var m = overlap(when(x.start), x.end ? when(x.end) : nowMs, first, end) / 60000; if (/break|lunch/i.test(text(x.reason))) brk += m; else down += m; });
+      var planned = (end - first) / 60000 - cipMin - brk, coMin = spanMinutes(r.changeovers, nowMs, first, end), running = Math.max(0, planned - down - coMin);
+      var byName = {}, ideal = 0;
+      (targets || []).forEach(function (t) { byName[t.name.toUpperCase()] = t; });
+      runs.forEach(function (x, i) {
+        var a = when(x.from), b = i + 1 < runs.length ? when(runs[i + 1].from) : end, t = byName[text(x.product).toUpperCase()];
+        if (t && num(t.ratePerMin) && b > a && planned > 0) ideal += num(t.ratePerMin) * ((b - a) / 60000) * (running / Math.max(1, (end - first) / 60000));
+      });
+      var made = base.made, w = Math.min(wasteTotal, made);
+      var avail = planned > 0 ? running / planned : null, perf = ideal > 0 ? made / ideal : null, quality = made > 0 ? (made - w) / made : null;
+      var pct = function (v) { return v === null ? null : Math.round(v * 100); };
+      eff = { running: pct(avail), speed: pct(perf), good: pct(quality), oee: avail === null || perf === null || quality === null ? null : Math.round(avail * Math.min(1, perf) * quality * 100), runningMin: Math.round(running), plannedMin: Math.round(planned) };
+    }
+    var state = base.state, color = base.color;
+    if (state !== 'STOPPED' && cip) { state = 'CIP'; color = 'b'; } else if (state !== 'STOPPED' && co) { state = 'CHANGEOVER'; color = 'b'; }
+    var lastCip = when(cip ? '' : ld.lastCipAt), sinceCip = lastCip ? Math.round((nowMs - lastCip) / 360000) / 10 : null;
+    return Object.assign(base, {
+      kind: kind, state: state, color: color,
+      changeover: co ? { start: co.start, from: text(co.from), to: text(co.to), minutes: Math.round((nowMs - when(co.start)) / 60000), index: (r.changeovers || []).indexOf(co), checks: co.checks || {} } : null,
+      changeovers: (r.changeovers || []).map(function (x) { return { start: x.start, end: x.end || null, from: text(x.from), to: text(x.to), minutes: Math.round(((x.end ? when(x.end) : nowMs) - when(x.start)) / 60000), by: text(x.by) }; }),
+      changeoverStd: num(ld.changeoverMin),
+      cip: cip ? { start: cip.start, minutes: Math.round((nowMs - when(cip.start)) / 60000) } : null,
+      cips: (r.cips || []).map(function (x) { return { start: x.start, end: x.end || null, result: text(x.result), minutes: Math.round(((x.end ? when(x.end) : nowMs) - when(x.start)) / 60000) }; }),
+      sinceCipHours: sinceCip, cipHours: num(ld.cipHours), lastCipAt: text(ld.lastCipAt),
+      waste: waste, wasteTotal: wasteTotal, topReason: top, topReasonMin: top ? Math.round(byReason[top] / 60000) : 0,
+      crew: (r.crew || []).map(function (c) { return { name: text(c.name), on: !!c.on, at: c.at }; }), crewOn: crewOn.map(function (c) { return text(c.name); }),
+      efficiency: eff, check: checkDue(run, kind, nowMs),
+      diverting: dv ? { start: dv.start, reason: text(dv.reason), minutes: Math.round((nowMs - when(dv.start)) / 60000) } : null,
+      diverts: (r.diverts || []).length, lastDivertAt: (r.diverts || []).length ? r.diverts[r.diverts.length - 1].start : text(ld.lastDivertAt),
+      source: r.source && typeof r.source === 'object' ? { from: text(r.source.from), to: text(r.source.to) } : { from: '', to: '' },
+      lot: text(r.lot), stock: num(r.stock), note: text(r.note), next: ld.next && typeof ld.next === 'object' && text(ld.next.product) ? { product: text(ld.next.product), qty: num(ld.next.qty) } : null
+    });
+  }
+
+  // Hour by hour from the shift's start (mock-ups B and C): made, target, % and stopped minutes for each hour up to now.
+  function hourly(run, targets, nowMs) {
+    var r = run || {}, start = when(r.shiftStart), stop = when(r.shiftEnd), out = [];
+    if (!start || !stop) return out;
+    var byName = {};
+    (targets || []).forEach(function (t) { byName[t.name.toUpperCase()] = t; });
+    var runs = (r.runs || []).slice().sort(function (a, b) { return when(a.from) - when(b.from); });
+    for (var a = start; a < stop; a += 3600000) {
+      var b = Math.min(a + 3600000, stop), past = a < nowMs, end = Math.min(b, nowMs), target = 0, names = [];
+      runs.forEach(function (x, i) {
+        var s = when(x.from), e = i + 1 < runs.length ? when(runs[i + 1].from) : stop, t = byName[text(x.product).toUpperCase()], o = overlap(s, e, a, end);
+        if (o > 0) { if (names.indexOf(text(x.product)) < 0) names.push(text(x.product)); if (t) target += t.perHour * o / 3600000; }
+      });
+      var made = past ? Math.max(0, countAt(r.counts, end) - countAt(r.counts, a)) : 0;
+      target = Math.round(target);
+      out.push({ from: new Date(a).toISOString(), to: new Date(b).toISOString(), past: past, now: a <= nowMs && nowMs < b, products: names, made: made, target: target, pct: target ? Math.round(made / target * 100) : null,
+        stopped: past ? Math.round((r.stops || []).reduce(function (n, x) { return n + overlap(when(x.start), x.end ? when(x.end) : nowMs, a, end); }, 0) / 60000) : 0 });
+    }
+    return out;
+  }
+
+  // The shift as coloured pieces (mock-up B): run, stop, brk (break), co (changeover), cip, idle (before the first product), left (still to come).
+  function timeline(run, nowMs) {
+    var r = run || {}, start = when(r.shiftStart), stop = when(r.shiftEnd), out = [];
+    if (!start || !stop) return out;
+    var runs = (r.runs || []).slice().sort(function (a, b) { return when(a.from) - when(b.from); }), first = runs.length ? when(runs[0].from) : Infinity;
+    var inAny = function (list, t) { return (list || []).filter(function (x) { return when(x.start) <= t && t < (x.end ? when(x.end) : nowMs); })[0] || null; };
+    for (var t = start; t < stop; t += 60000) {
+      var k;
+      if (t >= nowMs) k = 'left';
+      else if (inAny(r.cips, t)) k = 'cip';
+      else if (inAny(r.changeovers, t)) k = 'co';
+      else { var st = inAny(r.stops, t); k = st ? (/break|lunch/i.test(text(st.reason)) ? 'brk' : 'stop') : t < first ? 'idle' : 'run'; }
+      var last = out[out.length - 1];
+      if (last && last.kind === k) last.minutes++; else out.push({ kind: k, from: new Date(t).toISOString(), minutes: 1 });
+    }
+    return out;
+  }
+
   return { COUNTERS: COUNTERS, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
-    shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow };
+    shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
+    lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, LIMITS: LIMITS,
+    countAt: countAt, checkDue: checkDue, lineMore: lineMore, hourly: hourly, timeline: timeline };
 });

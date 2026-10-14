@@ -105,6 +105,7 @@ const ACTIONS = Object.freeze({
   // Plant Production (production.js): the line tablet's taps, and how each line is counted (Line Targets).
   saveLineEntry: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveLineCounter: { roles: REORDER_ROLES, screen: 'plant' },
+  saveLineSetup: { roles: REORDER_ROLES, screen: 'plant' },
   // Safety Walkthrough (safety.js): the weekly walk and its issues, each extinguisher's monthly check; a manager or
   // administrator keeps the extinguisher list and the plant's checklist.
   saveSafetyWalk: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
@@ -486,6 +487,7 @@ function validate(input) {
   if (action === 'savePlantShifts') return Object.assign(out, PLANT.validatePlantShifts(input, SaveError));
   if (action === 'saveLineEntry') return Object.assign(out, PROD.validateLineEntry(input, SaveError));
   if (action === 'saveLineCounter') return Object.assign(out, PROD.validateLineCounter(input, SaveError));
+  if (action === 'saveLineSetup') return Object.assign(out, PROD.validateLineSetup(input, SaveError));
   if (action === 'saveSafetyWalk') return Object.assign(out, SAFE.validateWalk(input, SaveError));
   if (action === 'saveSafetyIssue') return Object.assign(out, SAFE.validateIssue(input, SaveError));
   if (action === 'saveExtinguisherCheck') return Object.assign(out, SAFE.validateExtCheck(input, SaveError));
@@ -744,6 +746,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'savePlantShifts') return PLANT.savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLineEntry') return PROD.saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLineCounter') return PROD.saveLineCounter(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveLineSetup') return PROD.saveLineSetup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveSafetyWalk') return SAFE.saveWalk(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveSafetyIssue') return SAFE.saveIssue(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveExtinguisherCheck') return SAFE.saveExtCheck(tx, db, req, email, stamp, logRef, mode, SaveError);
