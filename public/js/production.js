@@ -11,18 +11,26 @@ const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
 // shift changes (checked each minute). nowFn lets a test set the clock.
 export function watchProduction(db, facilityId, cb, fail, nowFn) {
   const now = nowFn || (() => Date.now());
-  const data = { setup: [], products: {}, counters: {}, lineInfo: {}, shifts: [], runs: {}, shift: null, read: { setup: false, products: false } };
+  const data = { setup: [], products: {}, counters: {}, lineInfo: {}, shifts: [], runs: {}, prevRuns: {}, shift: null, prevShift: null, read: { setup: false, products: false } };
   const send = () => {
     const lines = U().productionLines(data.setup.filter(d => plantOf(d) === facilityId));
     cb(Object.assign({}, data, { lines }));
   };
-  let stopRuns = null;
+  let stopRuns = null, stopPrev = null;
   const watchRuns = () => {
     const s = R().shiftNow(data.shifts, now());
     if (data.shift && data.shift.key === s.key) { data.shift = s; return; }
     data.shift = s;
     if (stopRuns) stopRuns();
-    data.runs = {};
+    if (stopPrev) stopPrev();
+    data.runs = {}; data.prevRuns = {};
+    // The shift before this one (Joe 10/14, mock-up F): its notes for this shift.
+    data.prevShift = R().shiftNow(data.shifts, Date.parse(s.start) - 60000);
+    stopPrev = onSnapshot(query(collection(db, 'productionRuns'), where('shiftKey', '==', data.prevShift.key)), q => {
+      data.prevRuns = {};
+      q.docs.forEach(d => { const v = d.data(); if (plantOf(v) === facilityId) data.prevRuns[v.operationId] = v; });
+      send();
+    }, () => {});
     stopRuns = onSnapshot(query(collection(db, 'productionRuns'), where('shiftKey', '==', s.key)), q => {
       data.runs = {};
       q.docs.forEach(d => { const v = d.data(); if (plantOf(v) === facilityId) data.runs[v.operationId] = v; });
@@ -37,14 +45,17 @@ export function watchProduction(db, facilityId, cb, fail, nowFn) {
     onSnapshot(doc(db, 'plantShifts', facilityId), s => { data.shifts = s.exists() ? s.data().shifts || [] : []; watchRuns(); send(); }, () => {})
   ];
   const tick = setInterval(() => { watchRuns(); send(); }, 30000);
-  return () => { clearInterval(tick); subs.forEach(u => u()); if (stopRuns) stopRuns(); };
+  return () => { clearInterval(tick); subs.forEach(u => u()); if (stopRuns) stopRuns(); if (stopPrev) stopPrev(); };
 }
 
 // One line now: the line, its targets (its products), how it is counted and lineNow() for this shift.
 export function lineView(data, line, nowMs) {
   const targets = R().targetsFor(data.products[line.operationId] || []);
   const run = data.runs[line.operationId] || null;
-  const v = Object.assign({ line, targets, counter: data.counters[line.operationId] || 'TABLET', run }, R().lineNow(run, targets, nowMs));
+  // Joe 10/14 (mock-ups A to H): lineMore() adds the changeover, CIP, waste, checks, crew, efficiency and the HTST and Blow Mold readings.
+  const kind = R().lineKind(line.name), prev = (data.prevRuns || {})[line.operationId] || null;
+  const v = Object.assign({ line, targets, counter: data.counters[line.operationId] || 'TABLET', run, prevNote: prev ? String(prev.note || '').trim() : '', prevNoteBy: prev ? prev.noteBy || '' : '' },
+    R().lineMore(run, targets, nowMs, kind, (data.lineInfo || {})[line.operationId] || {}));
   // Before the shift's first tap, today's code is still the shift's day plus the product's shelf life.
   if (!v.expectedCode && v.target && data.shift) v.expectedCode = R().codeDate(data.shift.date, v.target.shelfLifeDays);
   return v;

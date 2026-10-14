@@ -176,7 +176,7 @@ const ACTION_SCREENS = Object.freeze({
   savePlantLoad: ['loadout', 'trailers'], addPickup: ['loadout'], completePickup: ['loadout'], reorderPlantLoads: ['loadout'], saveUnloading: ['unloading', 'returns'],
   completeWash: ['unloading', 'washing'], addReturn: ['returns'], savePlantSchedule: ['scheduler', 'loadout'], saveYardCheck: ['yard'], saveQualityCheck: ['quality'],
   saveShiftNote: ['shiftNotes', 'pmCenter'], saveTemperatureCheck: ['temps'], sendPlantReport: ['manager'],
-  saveMachineProducts: ['lineTargets'], saveLineCounter: ['lineTargets'], saveLineEntry: ['lineTablet'],
+  saveMachineProducts: ['lineTargets'], saveLineCounter: ['lineTargets'], saveLineSetup: ['lineTargets'], saveLineEntry: ['lineTablet'],
   saveSafetyWalk: ['safetyWalk'], saveSafetyIssue: ['safetyIssues'], saveExtinguisherCheck: ['extinguishers'], saveExtinguisher: ['extinguishers'],
   saveFireSystemCheck: ['fire'], saveFireSystem: ['fire'], saveSafetyChecklist: ['safetySetup'],
   saveMachine: ['machinery'], makeWorkOrder: ['pmCenter'], savePmTask: ['pmSchedule'], sendPmToMaintenance: ['pmCenter', 'pmSchedule'], saveReceivingItem: ['receiving'],

@@ -50,6 +50,8 @@
               <tbody id="rows"></tbody>
             </table>
           </div>
+          <!-- Joe 10/14: the line's changeover standard and hours between CIP washes (the production manager sets them). -->
+          <div class="lt-setup" id="setup"></div>
           <!-- Label reader (Joe 10/11): the line PC's key and the sandbox test feed; administrators only (src/reader.js). -->
           <div class="lt-reader" id="reader" hidden></div>
         </section>
@@ -161,6 +163,7 @@
       sel.innerHTML = R.COUNTERS.map(c => opt(c, counter, R.COUNTER_LABEL[c])).join('');
       sel.disabled = !ck;
       drawReader(line, counter);
+      drawSetup(line, ck);
       // Not drawn again while someone types in the list.
       if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
       const cell = (i, k, v, label, cls, ph) => '<td' + (cls ? ' class="' + cls + '"' : '') + '><input data-i="' + i + '" data-k="' + k + '" value="' + escapeHtml(v === null || v === undefined ? '' : v) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' aria-label="' + escapeHtml(label) + '"' + (k === 'upc' ? ' maxlength="20" inputmode="numeric"' : ' inputmode="decimal" maxlength="8"') + dis + '></td>';
@@ -172,6 +175,26 @@
           '<td class="num lt-calc">' + (t.perHour ? fmt(t.perHour) : '') + '</td><td class="num lt-calc">' + (t.perHour ? fmt(Math.round(t.perHour * hours)) : '') + '</td></tr>';
       }).join('') || '<tr><td colspan="10" class="empty">' + escapeHtml(line.name) + ' has no products yet. Products List adds them.</td></tr>';
     }
+
+    // Changeover standard and CIP wash hours (Joe 10/14, mock-ups A, D and G): each box saves as it is left.
+    function drawSetup(line, ck) {
+      const box = document.getElementById('setup');
+      if (box.contains(document.activeElement)) return;
+      const info = data.lineInfo[line.operationId] || {}, val = (k) => info[k] === null || info[k] === undefined ? '' : info[k];
+      box.innerHTML = '<label>Changeover standard, minutes <input id="setup-co" data-setup="changeoverMin" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('changeoverMin')) + '"' + (ck ? '' : ' disabled') + '></label>' +
+        '<label>CIP wash every, hours <input id="setup-cip" data-setup="cipHours" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('cipHours')) + '"' + (ck ? '' : ' disabled') + '></label>' +
+        '<span>The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes. Leave a box empty for none.</span>';
+    }
+    document.getElementById('setup').addEventListener('change', async e => {
+      const box = e.target.closest('[data-setup]'), line = current();
+      if (!box || !line || !canSave()) return;
+      const k = box.dataset.setup, v = box.value.trim(), max = k === 'cipHours' ? 72 : 600, n = Number(v);
+      if (v !== '' && (!isFinite(n) || n < 0 || n > max)) { refuse((k === 'cipHours' ? 'CIP wash every' : 'Changeover standard') + ' must be a number from 0 to ' + max + '. It was not changed.'); box.blur(); render(true); return; }
+      note = 'Saving…'; render('keep');
+      try { await save('saveLineSetup', { operationId: line.operationId, [k]: v }); note = savedText(); showError(''); }
+      catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
+      render(true);
+    });
 
     // The line's whole Products list is saved each time (as on Products); saves go one at a time.
     // A box refused here is counted, so a save that finishes later does not wipe its message.

@@ -63,3 +63,73 @@ test('A manager sets how a line is counted; a dispatcher may not', async () => {
   await assert.rejects(applyAction(db(), { email: MANAGER }, { action: 'saveLineCounter', requestId: rid(), operationId: LINE, counter: 'MAGIC' }), /how this line is counted/);
   await assert.rejects(applyAction(db(), { email: DISPATCHER }, { action: 'saveLineCounter', requestId: rid(), operationId: LINE, counter: 'TABLET' }), /does not have a role/);
 });
+
+// Joe 10/14 ("all of your picks", mock-ups C to H): the tablet's six new buttons save on the same shift record.
+test('Joe 10/14: changeover with its checklist, CIP wash, waste, a quality check, crew, notes and up next', async () => {
+  await tap('product', { product: 'Broughton 2% Gallon', sku: '50305' }, '2026-10-08T10:05:00Z');
+  await tap('changeover', { sub: 'start', to: '' }, '2026-10-08T11:00:00Z');
+  await assert.rejects(tap('changeover', { sub: 'start' }, '2026-10-08T11:01:00Z'), /already in a changeover/);
+  await tap('changeover', { sub: 'to', to: 'GV 2% Gallon' }, '2026-10-08T11:01:00Z');
+  await tap('cocheck', { key: 'purge', done: true }, '2026-10-08T11:03:00Z');
+  await tap('cocheck', { key: 'labels', done: true }, '2026-10-08T11:05:00Z');
+  await tap('cocheck', { key: 'labels', done: false }, '2026-10-08T11:06:00Z');
+  await assert.rejects(tap('cocheck', { key: 'Bad Key' }), /checklist line/);
+  await tap('changeover', { sub: 'done' }, '2026-10-08T11:22:00Z');
+  await assert.rejects(tap('changeover', { sub: 'done' }, '2026-10-08T11:23:00Z'), /not in a changeover/);
+  await tap('cip', { sub: 'start' }, '2026-10-08T12:00:00Z');
+  await tap('cip', { sub: 'done', result: 'PASS' }, '2026-10-08T12:40:00Z');
+  await tap('waste', { reason: 'Leaker', qty: 12 }, '2026-10-08T13:00:00Z');
+  await tap('waste', { reason: 'Bad cap', qty: 3 }, '2026-10-08T13:01:00Z');
+  await tap('waste', { reason: 'Bad cap', qty: 0 }, '2026-10-08T13:02:00Z');
+  await assert.rejects(tap('waste', { reason: 'Leaker', qty: 'a lot' }), /whole number/);
+  await tap('check', { slot: 1, field: 'w1', value: '8.62' }, '2026-10-08T12:10:00Z');
+  await tap('check', { slot: 1, field: 'capSeal', value: 'OK' }, '2026-10-08T12:11:00Z');
+  await assert.rejects(tap('check', { slot: 1, field: 'w2', value: 'heavy' }), /number, or pick OK/);
+  await tap('crew', { name: 'J. Myers', on: true }, '2026-10-08T10:00:00Z');
+  await tap('crew', { name: 'C. Bell', on: true }, '2026-10-08T10:01:00Z');
+  await tap('crew', { name: 'c. bell', on: false }, '2026-10-08T12:00:00Z');
+  await tap('note', { text: 'Valve 14 sticking.' }, '2026-10-08T18:00:00Z');
+  await tap('next', { product: 'GV Whole Gallon', qty: 4000 }, '2026-10-08T18:01:00Z');
+  const r = await run();
+  assert.equal(r.product, 'GV 2% Gallon', 'changeover done switches the product');
+  assert.deepEqual(r.runs.map(x => [x.product, x.from]), [['Broughton 2% Gallon', '2026-10-08T10:05:00.000Z'], ['GV 2% Gallon', '2026-10-08T11:22:00.000Z']]);
+  assert.deepEqual(Object.keys(r.changeovers[0].checks), ['purge']);
+  assert.deepEqual([r.changeovers[0].from, r.changeovers[0].to, r.changeovers[0].end], ['Broughton 2% Gallon', 'GV 2% Gallon', '2026-10-08T11:22:00.000Z']);
+  assert.deepEqual(r.cips.map(c => [c.result, c.end]), [['PASS', '2026-10-08T12:40:00.000Z']]);
+  assert.deepEqual(r.waste, { Leaker: 12 });
+  assert.deepEqual([r.checks['1'].w1, r.checks['1'].capSeal], ['8.62', 'OK']);
+  assert.deepEqual(r.crew.map(c => [c.name, c.on]), [['J. Myers', true], ['C. Bell', false]]);
+  assert.equal(r.note, 'Valve 14 sticking.');
+  const line = (await db().collection('productionLines').doc(LINE).get()).data();
+  assert.equal(line.lastCipAt, '2026-10-08T12:40:00.000Z', 'a CIP wash that passed is the line\'s last CIP');
+  assert.deepEqual([line.next.product, line.next.qty], ['GV Whole Gallon', 4000]);
+  assert.equal(r.next, undefined, 'up next is kept on the line, not the shift');
+});
+
+test('Joe 10/14: the HTST\'s divert, silo and tanks; the Blow Mold\'s resin lot and jugs ahead', async () => {
+  await tap('divert', { sub: 'start', reason: 'Low temperature' }, '2026-10-08T11:00:00Z');
+  await assert.rejects(tap('divert', { sub: 'start', reason: 'Test' }, '2026-10-08T11:01:00Z'), /already in divert/);
+  await tap('divert', { sub: 'forward' }, '2026-10-08T11:04:00Z');
+  await assert.rejects(tap('divert', { sub: 'forward' }, '2026-10-08T11:05:00Z'), /already in forward flow/);
+  await tap('source', { from: 'Silo 3', to: 'Gallon Filler' }, '2026-10-08T11:06:00Z');
+  await tap('lot', { lot: 'R-2291' }, '2026-10-08T11:07:00Z');
+  await tap('stock', { count: 2300 }, '2026-10-08T11:08:00Z');
+  await assert.rejects(tap('stock', { count: '' }), /how many jugs/);
+  const r = await run();
+  assert.deepEqual(r.diverts.map(d => [d.reason, d.start, d.end]), [['Low temperature', '2026-10-08T11:00:00.000Z', '2026-10-08T11:04:00.000Z']]);
+  assert.deepEqual([r.source, r.lot, r.stock], [{ from: 'Silo 3', to: 'Gallon Filler' }, 'R-2291', 2300]);
+  assert.equal((await db().collection('productionLines').doc(LINE).get()).data().lastDivertAt, '2026-10-08T11:00:00.000Z');
+});
+
+test('Joe 10/14: a manager sets the changeover standard and CIP hours; a dispatcher may not', async () => {
+  await applyAction(db(), { email: MANAGER }, { action: 'saveLineCounter', requestId: rid(), operationId: LINE, counter: 'SENSOR' });
+  await applyAction(db(), { email: MANAGER }, { action: 'saveLineSetup', requestId: rid(), operationId: LINE, changeoverMin: '20' });
+  await applyAction(db(), { email: MANAGER }, { action: 'saveLineSetup', requestId: rid(), operationId: LINE, cipHours: '10' });
+  let line = (await db().collection('productionLines').doc(LINE).get()).data();
+  assert.deepEqual([line.changeoverMin, line.cipHours, line.counter], [20, 10, 'SENSOR'], 'each box saves alone and keeps the rest');
+  await applyAction(db(), { email: MANAGER }, { action: 'saveLineSetup', requestId: rid(), operationId: LINE, cipHours: '' });
+  line = (await db().collection('productionLines').doc(LINE).get()).data();
+  assert.deepEqual([line.changeoverMin, line.cipHours], [20, null]);
+  await assert.rejects(applyAction(db(), { email: MANAGER }, { action: 'saveLineSetup', requestId: rid(), operationId: LINE, changeoverMin: '9000' }), /from 0 to 600/);
+  await assert.rejects(applyAction(db(), { email: DISPATCHER }, { action: 'saveLineSetup', requestId: rid(), operationId: LINE, changeoverMin: '15' }), /does not have a role/);
+});
