@@ -125,6 +125,8 @@ const ACTIONS = Object.freeze({
   saveReceivingItem: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
   sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
+  // Fleet Service's Work Orders: Delete takes a job off the Garage Station (garage.js deleteGarageJob, Joe 10/14).
+  deleteGarageJob: { roles: REORDER_ROLES, screen: 'checkIns' },
   // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js). App only (logic.js APP_ONLY).
   saveFleetRules: { roles: REORDER_ROLES, screen: 'fleetSetup' },
   saveFleetUnit: { roles: REORDER_ROLES, screen: 'fleetSetup' },
@@ -493,6 +495,7 @@ function validate(input) {
   if (action === 'savePmTask') return Object.assign(out, PMAINT.validatePmTask(input, SaveError));
   if (action === 'sendPmToMaintenance') return Object.assign(out, PMAINT.validateSendPm(input, SaveError));
   if (action === 'sendToGarage') return GARAGE.validateSend(input, out);
+  if (action === 'deleteGarageJob') return GARAGE.validateDelete(input, out);
   if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(action) >= 0) return GARAGE.validateFleet(action, input, out);
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
@@ -688,6 +691,7 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'setUnitDown' || req.action === 'setUnitUp') return setUnitDown(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'updateIssue') return updateIssue(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'sendToGarage') return GARAGE.sendToGarage(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'deleteGarageJob') return GARAGE.deleteGarageJob(tx, db, req, email, stamp, logRef, mode);
     if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(req.action) >= 0) return GARAGE.saveFleet(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'clearConflict') return clearConflict(tx, db, req, email, stamp, logRef, mode);
     if (DRIVER_ACTIONS.indexOf(req.action) >= 0) return editDriver(tx, db, req, email, stamp, logRef, mode);

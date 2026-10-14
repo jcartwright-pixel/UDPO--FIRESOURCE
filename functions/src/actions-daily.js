@@ -126,7 +126,7 @@ async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
   if (req.step === 'repaired') change = { status: 'COMPLETE', available: 'TRUE', out_of_service: 'FALSE', completed_at: stamp, completed_by: email, resolution: 'COMPLETED', resolution_notes: req.note || '' };
   else if (req.step === 'remove') change = { status: 'REMOVED', resolution: 'REMOVED', resolution_notes: req.note || 'Removed: not a real unit or not a write-up', notes: add('Removed by ' + email + ' at ' + stamp) };
   else if (req.step === 'garage') {
-    if (notes.indexOf('Sent to garage') >= 0) {
+    if (L.garageSent(notes)) {
       // Sent before Garage made work orders: the work order is made now, once.
       if (order && order.created) {
         order.apply(tx);
