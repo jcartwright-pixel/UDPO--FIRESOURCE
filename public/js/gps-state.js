@@ -24,15 +24,17 @@ export function truckState(t, truck) {
 // only when its run leaves today (the Live departure date, else its delivery date) and its driver is one of ours: never
 // CARRIER, OPEN, a blank, or a route an owner or outside carrier covers.
 export const NOT_OURS = /^(|open|carrier|tba|tbd|none|n\/a|na|.*needs driver.*|vacation.*|off)$/i;
-export function workingToday(L, runs, today) {
-  const byId = {}, out = [], seen = {};
+// Joe 10/14: a sleeper route (Route Master "Sleeper", e.g. Jersey) leaves one day and comes back the next, so with
+// opts.sleeper(row, run) it also keeps the sleeper runs that left yesterday. Each line carries leaves (its departure day).
+export function workingToday(L, runs, today, opts = {}) {
+  const byId = {}, out = [], seen = {}, yesterday = L.addDays(today, -1);
   (runs || []).forEach(r => { byId[r.id] = r; });
-  [-2, -1, 0, 1].forEach(n => L.dailyRows(runs, L.addDays(today, n)).forEach(r => {
+  [-3, -2, -1, 0, 1].forEach(n => L.dailyRows(runs, L.addDays(today, n)).forEach(r => {
     if (seen[r.id]) return;
-    const day = (byId[r.runDocId] && byId[r.runDocId].days || {})[r.day] || {};
-    if ((L.dateKey(day.departureDate) || r.deliveryDate) !== today) return;
+    const run = byId[r.runDocId] || {}, day = (run.days || {})[r.day] || {}, leaves = L.dateKey(day.departureDate) || r.deliveryDate;
+    if (leaves !== today && !(leaves === yesterday && opts.sleeper && opts.sleeper(r, run, day))) return;
     if (NOT_OURS.test(String(r.driver || '').trim()) || L.coveredRoute(r)) return;
-    seen[r.id] = true; out.push(r);
+    seen[r.id] = true; out.push(Object.assign({}, r, { leaves }));
   }));
-  return out.sort((a, b) => (a.dispatchTime == null ? 1e9 : a.dispatchTime) - (b.dispatchTime == null ? 1e9 : b.dispatchTime));
+  return out.sort((a, b) => (a.leaves === b.leaves ? 0 : a.leaves < b.leaves ? -1 : 1) || (a.dispatchTime == null ? 1e9 : a.dispatchTime) - (b.dispatchTime == null ? 1e9 : b.dispatchTime));
 }
