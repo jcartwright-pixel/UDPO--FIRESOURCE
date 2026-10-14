@@ -37,6 +37,8 @@ var SC_CORE = Object.freeze({
     // Joe 10/13 rewards ("the better they do, the better the reward on everything"): every area earns cleanDay points for a
     // clean day and streakBonus for every streakDays clean days in a row; back backEarlyMinutes or more before the expected
     // return (without leaving early) earns backEarly more.
+    // Joe 10/14: idling is allowed up to idleAllowMinutes a day in total; a day over it costs `idle` once (not per alert).
+    idleAllowMinutes: 10,
     cleanDay: 1, streakDays: 5, streakBonus: 2, backEarly: 1, backEarlyMinutes: 15,
     // Joe 10/13 truck cleanliness: a manager rates the driver's truck 1 to 5 (about once a month). 5 = +2, 4 = +1, 3 = 0,
     // 2 = -1, 1 = -2 to start (the two "off" numbers are points taken off). cleanOn 1 = on, 0 = off.
@@ -59,11 +61,14 @@ var SC_CORE = Object.freeze({
     // Final written warning, Suspension; 100% for 0-3 months, 66% for 3-6, 33% for 6-9, then gone.
     pdaVerbal: 5, pdaWritten: 10, pdaFinal: 20, pdaSuspension: 30, pdaFade1: 100, pdaFade2: 66, pdaFade3: 33,
     // The Driver's Kiosk Station shows grades only; 1 also shows each driver's reasons.
-    kioskReasons: 0
+    kioskReasons: 0,
+    // Joe 10/14: the scorecard counts from the day the checks really start; a run before this date neither earns nor costs
+    // (check-in, cases, inspections, driving, time, MPG). Call-offs, accidents, complaints and PDAs are entered and still count.
+    countFrom: '2026-10-15'
   }),
   NUMBER_SETTINGS: Object.freeze(['checkinMiss', 'lostCase', 'lostCaseDayCap', 'inspectionDefect', 'inspectionMissing', 'callOff',
     'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'hardTurn', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly', 'backEarlyMinutes',
-    'cleanOn', 'clean5', 'clean4', 'clean3', 'clean2Off', 'clean1Off', 'sleeperIdlePct', 'seatbelt', 'mpgTarget', 'mpgBelowPct', 'mpgLow',
+    'cleanOn', 'clean5', 'clean4', 'clean3', 'clean2Off', 'clean1Off', 'sleeperIdlePct', 'idleAllowMinutes', 'seatbelt', 'mpgTarget', 'mpgBelowPct', 'mpgLow',
     'accidentBase', 'accident1', 'accident2', 'accident3', 'accidentFade1', 'accidentFade2', 'accidentFade3', 'accidentFade4',
     'complaintMinor', 'complaintMajor', 'complaintFade1', 'complaintFade2', 'sickFade1', 'sickFade2', 'sickFade3', 'kioskReasons',
     'pdaVerbal', 'pdaWritten', 'pdaFinal', 'pdaSuspension', 'pdaFade1', 'pdaFade2', 'pdaFade3']),
@@ -80,7 +85,10 @@ var SC_CORE = Object.freeze({
   INCIDENT_STATUS: Object.freeze({ review: 'Under review', counts: 'Reviewed \u2013 counts', notCounted: 'Reviewed \u2013 not counted' }),
   GPS_AREA: Object.freeze({ speeding: 'speeding', hardBrake: 'hardStops', hardAccel: 'hardStops', hardTurn: 'hardStops', idle: 'idling', seatbelt: 'seatbelt' }),
   GPS_WORDS: Object.freeze({ speeding: 'Speeding', hardBrake: 'Hard stop', hardAccel: 'Hard start', hardTurn: 'Hard turn', idle: 'Idling', seatbelt: 'Seatbelt' }),
-  NOT_A_DRIVER: /^(|open|tba|tbd|none|n\/a|na|needs driver|.*needs driver.*|vacation.*|off)$/i
+  // A yard leave this far (minutes) from the run's dispatch time is another trip's; a return later than LATE_MAX_MINUTES past the
+  // expected time is most likely the truck's next trip passing through the yard, not this run coming back.
+  YARD_NEAR_MINUTES: 240, LATE_MAX_MINUTES: 360,
+  NOT_A_DRIVER: /^(|open|tba|tbd|none|n\/a|na|needs driver|.*needs driver.*|vacation.*|off|.*carrier.*)$/i
 });
 
 // ---------- dates ----------
@@ -129,6 +137,7 @@ function scSettings_(saved) {
   // Joe 10/13: the kiosk shows each driver's overall score; areas ticked here show beside it (none to start).
   var areaKeys = SC_CORE.AREAS.map(function (a) { return a[0]; });
   s.kioskAreas = (Array.isArray(saved.kioskAreas) ? saved.kioskAreas : []).filter(function (k) { return areaKeys.indexOf(k) >= 0; });
+  s.countFrom = scKeyOf_(saved.countFrom) || d.countFrom;
   if (!(s.gradeA > s.gradeB && s.gradeB > s.gradeC)) { s.gradeA = d.gradeA; s.gradeB = d.gradeB; s.gradeC = d.gradeC; }
   return s;
 }
@@ -141,8 +150,11 @@ function scGrade_(score, s) { return score >= s.gradeA ? 'A' : score >= s.gradeB
  * liveRows: [{runId, route, run, runs, driver, driverId, casesOut, plantCaseReturn, driverCaseReturn}] (that day's columns of the Live week).
  * events: that day's PLANT_OPERATIONS events [{eventType, payload:{route, run, checks}}].
  * milesByRun: {runId: miles} from Route Master for that weekday.
+ * who (optional, Joe 10/14: only our drivers, only on days they worked): {known: {driverKey: name} from Driver Master, so a
+ * CARRIER or other company's driver is never graded (left out when the list is empty); off: scOffDays_ for drivers out that day,
+ * whose dispatch line is skipped so a driver who did not work is never charged for it}.
  */
-function scBuildDay_(dateKey, liveRows, events, milesByRun) {
+function scBuildDay_(dateKey, liveRows, events, milesByRun, who) {
   var checkins = {}, inspections = {};
   (events || []).forEach(function (e) {
     var p = e && e.payload || {}, k = String(p.route || '').trim() + '|' + String(p.run || '').trim();
@@ -155,16 +167,42 @@ function scBuildDay_(dateKey, liveRows, events, milesByRun) {
   var out = [];
   (liveRows || []).forEach(function (r) {
     if (!scTruthy_(r.runs) || !scIsDriver_(r.driver)) return;
+    var dk = scPersonKey_(r.driverId || r.driver), nk = scPersonKey_(r.driver);
+    if (who && who.known && Object.keys(who.known).length && !who.known[dk] && !who.known[nk]) return;
+    if (who && who.off && (who.off[dk + '|' + dateKey] || who.off[nk + '|' + dateKey])) return;
     var k = String(r.route || '').trim() + '|' + String(r.run || '').trim(), insp = inspections[k] || {done: false, defect: false};
     var casesIn = scNum_(r.plantCaseReturn);
     if (casesIn == null) casesIn = scNum_(r.driverCaseReturn);
-    out.push({date: dateKey, driverKey: scPersonKey_(r.driverId || r.driver), driver: String(r.driver).trim(), route: String(r.route || '').trim(),
+    out.push({date: dateKey, driverKey: dk, driver: String(r.driver).trim(), route: String(r.route || '').trim(),
+      // Joe 10/14: the day the run leaves (Live departure date, else the delivery day): its GPS is that day's (a 4:00 AM run is often loaded the night before).
+      departDate: scDepartDate_(dateKey, r.departure),
       run: String(r.run || '').trim(), runId: String(r.runId || '').trim(), checkedIn: !!checkins[k], inspected: insp.done, defect: insp.defect,
       casesOut: scNum_(r.casesOut), casesIn: casesIn, miles: scNum_((milesByRun || {})[r.runId]) || 0,
       truck: String(r.truck == null ? '' : r.truck).trim(), startTime: String(r.startTime == null ? '' : r.startTime).trim(),
       dispatchMinutes: scMinutesOf_(r.dispatchTime), routeHours: scHoursOf_(r.routeHours), sleeper: scTruthy_(r.sleeper)});
   });
   return out;
+}
+
+/**
+ * Days a driver was out on DRIVER_EXCEPTIONS (any reason: call-off, sick, vacation, off...; not cancelled, cleared, denied or
+ * "available"), as {"DRIVERKEY|yyyy-mm-dd": true}. A dispatch line naming him on such a day is not scored.
+ */
+function scOffDays_(exceptions, start, end) {
+  var out = {};
+  (exceptions || []).forEach(function (x) {
+    var status = scPersonKey_(x.status), reason = scPersonKey_(x.reason_code || x.exception_type);
+    if (!x.driver_id || ['CANCELLED', 'CLEAR', 'AVAILABLE', 'DENIED'].indexOf(status) >= 0 || reason === 'AVAILABLE') return;
+    var a = scKeyOf_(x.start_date), z = scKeyOf_(x.end_date) || a;
+    if (!a) return;
+    for (var d = a < start ? start : a; d <= z && d <= end; d = scAddDays_(d, 1)) out[scPersonKey_(x.driver_id) + '|' + d] = true;
+  });
+  return out;
+}
+
+function scDepartDate_(dateKey, departure) {
+  var k = scKeyOf_(departure);
+  return k && k >= scAddDays_(dateKey, -2) && k <= scAddDays_(dateKey, 1) ? k : dateKey;
 }
 
 /** Call-off days in [start, end] from DRIVER_EXCEPTIONS rows {driver_id, start_date, end_date, exception_type, reason_code, status}. */
@@ -247,6 +285,48 @@ function scClock_(min) {
  * keeps only alerts on those units (matched by letters and digits, the way Trucks Today matches them), so another plant's
  * Fleet units never land under No driver dispatched.
  */
+// A run's start: Daily Dispatch's start time, else its dispatch time (minutes after midnight).
+function scRunStart_(r) { var st = scClockMinutes_(r.startTime); return st != null ? st : r.dispatchMinutes != null ? r.dispatchMinutes : null; }
+
+/**
+ * Joe 10/14: a driver is charged only for alerts while his truck was out on the route: from leaving the yard to coming back.
+ * alertsByDate / gpsByDate: {date: [gpsAlerts]} / {date: [gpsDays]} (New York days); trucksByDate: {date: {UNITKEY: true}} for
+ * the trucks dispatched that day; today: today's date. Returns {date: [alerts]}:
+ *  - an alert before the truck left the yard, or after it came back for the day, is a yard move and is dropped;
+ *  - a sleeper run (Jersey) leaves one day and comes back the next: alerts after midnight until it is back go to the day it
+ *    left (marked carried), when a driver was dispatched in it that day;
+ *  - with no yard leave or return from Fleet that day (or only the first/last move), every alert stays as it was;
+ *  - after the return, today, or when the next day shows it was out overnight again, the alert stays (it may have left again).
+ */
+function scAlertWindows_(alertsByDate, gpsByDate, trucksByDate, today) {
+  var out = {}, idx = {};
+  function ms(v) { var t = v ? new Date(v).getTime() : NaN; return isNaN(t) ? null : t; }
+  function day(date, k) {
+    var key = date + '|' + k;
+    if (!(key in idx)) { idx[key] = null; (gpsByDate[date] || []).forEach(function (g) { if (scUnitKey_(g.tag) === k) idx[key] = g; }); }
+    return idx[key];
+  }
+  function backFirst(g) { var o = g && ms(g.yardOut), i = g && ms(g.yardIn); return i != null && (o == null || i < o); }
+  function put(date, a) { (out[date] = out[date] || []).push(a); }
+  Object.keys(alertsByDate || {}).forEach(function (date) {
+    (alertsByDate[date] || []).forEach(function (a) {
+      var k = scUnitKey_(a.tag), g = k && day(date, k), t = ms(a.at);
+      var o = g ? ms(g.yardOut) : null, i = g ? ms(g.yardIn) : null;
+      if (!g || t == null || (o == null && i == null)) return put(date, a);
+      var back = backFirst(g), prev = scAddDays_(date, -1);
+      if (back && t <= i) return (trucksByDate[prev] || {})[k] ? put(prev, Object.assign({}, a, {carried: true})) : put(date, a);
+      if (o != null && t < o) return;
+      if (i != null && t > i && !(back && o != null)) {
+        var next = scAddDays_(date, 1);
+        if (date >= today || backFirst(day(next, k))) return put(date, a);
+        return;
+      }
+      put(date, a);
+    });
+  });
+  return out;
+}
+
 function scMatchGps_(dateKey, records, gpsDays, alerts, ours) {
   var byTruck = {}, byDigits = {}, unassigned = [], mine = null;
   if (ours) { mine = {}; ours.forEach(function (u) { var k = scUnitKey_(u); if (k) mine[k] = true; }); }
@@ -259,7 +339,7 @@ function scMatchGps_(dateKey, records, gpsDays, alerts, ours) {
     if (dg && dg === k) (byDigits[dg] = byDigits[dg] || []).push(r);
   });
   Object.keys(byTruck).forEach(function (k) {
-    byTruck[k].sort(function (a, b) { return (scClockMinutes_(a.startTime) || 0) - (scClockMinutes_(b.startTime) || 0); });
+    byTruck[k].sort(function (a, b) { return (scRunStart_(a) || 0) - (scRunStart_(b) || 0); });
   });
   function runsFor(tag) {
     var k = scUnitKey_(tag);
@@ -276,9 +356,15 @@ function scMatchGps_(dateKey, records, gpsDays, alerts, ours) {
     if (fuel) r.fuelGallons = (r.fuelGallons || 0) + fuel;
     if (scNum_(g.mpg)) r.mpg = scNum_(g.mpg);
     if (scNum_(g.idleMinutes) != null) r.idleMinutes = scNum_(g.idleMinutes);
-    var out = g.yardOut || g.firstMove || '', back = g.yardIn || g.lastMove || '';
-    r.yardOut = scNyMinutes_(out); r.yardIn = scNyMinutes_(back);
-    r.yardFromMoves = !(g.yardOut || g.yardIn) && !!(out || back);
+    var out = g.yardOut || g.firstMove || '', back = g.yardIn || g.lastMove || '', o = scNyMinutes_(out), b = scNyMinutes_(back);
+    // Joe 10/14 (Time tab): Fleet keeps the day's first yard leave and last return only. They are this run's only when the truck
+    // ran one run that departure day and the leave is near its dispatch; otherwise (two runs, or a late-night run leaving through
+    // the yard) they belong to another trip and the Time area is not graded.
+    var disp = r.dispatchMinutes != null ? r.dispatchMinutes : scRunStart_(r);
+    if (list.length === 1 && o != null && (disp == null || Math.abs(o - disp) <= SC_CORE.YARD_NEAR_MINUTES)) {
+      r.yardOut = o; r.yardIn = b;
+      r.yardFromMoves = !(g.yardOut || g.yardIn) && !!(out || back);
+    }
   });
   var lost = {};
   (alerts || []).forEach(function (a) {
@@ -294,8 +380,10 @@ function scMatchGps_(dateKey, records, gpsDays, alerts, ours) {
       u.alerts.push(item); u.counts[kind]++;
       return;
     }
-    var r = list[0];
-    if (list.length > 1 && item.minutes != null) list.forEach(function (x) { var st = scClockMinutes_(x.startTime); if (st != null && st <= item.minutes) r = x; });
+    // Joe 10/14: one truck, two runs (even the same driver's, like 855 then 856): each alert counts once, on the run that had
+    // started by then; an overnight alert carried back from the next morning goes to the last run.
+    var r = a.carried ? list[list.length - 1] : list[0];
+    if (!a.carried && list.length > 1 && item.minutes != null) list.forEach(function (x) { var st = scRunStart_(x); if (st != null && st <= item.minutes) r = x; });
     r.alerts[kind]++; r.alertList.push(item);
     // Until Fleet's day idle time is read, idling is the sum of the IDLE alerts' minutes.
     if (kind === 'idle' && item.idleMinutes) r.alertIdleMinutes = (r.alertIdleMinutes || 0) + item.idleMinutes;
@@ -368,6 +456,8 @@ function scDayMpg_(d) {
  */
 function scScoreMonth_(days, callOffs, settings, names, opts) {
   var s = settings, by = {};
+  // Joe 10/14: nothing run before Scorecard counted from is graded.
+  if (s.countFrom) days = (days || []).filter(function (d) { return !d.date || d.date >= s.countFrom; });
   names = names || {};
   opts = opts || {};
   var ex = opts.excuses || {}, asOf = opts.asOf || '', start = opts.start || '';
@@ -486,9 +576,16 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
 function scAlertWeight_(kind, d, s) { var w = s[kind] || 0; return kind === 'idle' && d.sleeper ? scRound_(w * s.sleeperIdlePct / 100) : w; }
 // One day's GPS onto a driver's month: points per alert, capped per day. An excused alert costs nothing and is shown as excused.
 function scAddGps_(r, d, s, ex) {
-  var a = d.alerts || {}, list = d.alertList || [], pts = 0, used = 0;
+  var a = d.alerts || {}, all = d.alertList || [], pts = 0, used = 0;
   ex = ex || {};
+  // Joe 10/14: idling is one line a day: the day's total minutes and how many times; it costs only when the day's total (not
+  // excused) is over idleAllowMinutes, or an alert came without its minutes. Each time can still be excused on its own.
+  var list = all.filter(function (x) { return x.kind !== 'idle'; }), idles = all.filter(function (x) { return x.kind === 'idle'; });
+  var idleLive = idles.filter(function (x) { return !ex[scAlertKey_(d.date, x)]; }), idleMin = 0, idleUnknown = false;
+  idleLive.forEach(function (x) { if (x.idleMinutes == null) idleUnknown = true; else idleMin += x.idleMinutes; });
+  var idleOver = idleLive.length > 0 && (idleUnknown || idleMin > s.idleAllowMinutes), idlePts = idleOver ? scAlertWeight_('idle', d, s) : 0;
   list.forEach(function (x) { if (!ex[scAlertKey_(d.date, x)]) pts += scAlertWeight_(x.kind, d, s); });
+  pts += idlePts;
   r.speeding += a.speeding || 0; r.hardBrakes += a.hardBrake || 0; r.hardAccels += a.hardAccel || 0; r.hardTurns += a.hardTurn || 0; r.idles += a.idle || 0; r.seatbelts += a.seatbelt || 0;
   var capped = s.gpsDayCap > 0 ? Math.min(pts, s.gpsDayCap) : pts;
   r.gpsPoints = scRound_(r.gpsPoints + capped);
@@ -501,6 +598,25 @@ function scAddGps_(r, d, s, ex) {
     used += full;
     r.misses.push(miss);
   });
+  if (idles.length) {
+    var total = 0, excusedN = 0, events = idles.map(function (x) {
+      var key = scAlertKey_(d.date, x), e = ex[key];
+      if (e) excusedN++; else total += x.idleMinutes || 0;
+      var m = {date: d.date, what: scAlertText_(x, d.truck), area: 'idling', key: key, points: 0};
+      if (e) m.excused = {reason: e.reason || '', by: e.by || ''};
+      return m;
+    });
+    var cost = s.gpsDayCap > 0 ? scRound_(Math.max(0, Math.min(idlePts, s.gpsDayCap - used))) : idlePts;
+    var line = {date: d.date, area: 'idling', points: cost, minutes: total,
+      what: 'Idling ' + Math.round(total) + ' min total, ' + (idles.length - excusedN) + ' time' + (idles.length - excusedN === 1 ? '' : 's') + (excusedN ? ' (' + excusedN + ' excused)' : '') +
+        (d.truck ? ', truck ' + d.truck : '') + (d.sleeper ? ', sleeper' : '') + (idleOver ? '' : ', within the ' + s.idleAllowMinutes + ' minutes')};
+    if (!idleOver) line.noMiss = true;
+    if (idles.length === 1) {
+      line.key = events[0].key;
+      if (events[0].excused) { line.excused = events[0].excused; line.what = scAlertText_(idles[0], d.truck) + (d.sleeper ? ', sleeper' : ''); }
+    } else line.events = events;
+    if (idleOver || excusedN) r.misses.push(line);
+  }
   if (d.gpsMiles != null) { r.gpsMiles += d.gpsMiles; r.gpsDays++; }
   if (d.idleMinutes != null) r.idleMinutes += d.idleMinutes;
   else if (d.alertIdleMinutes) r.idleMinutes += d.alertIdleMinutes;
@@ -528,7 +644,7 @@ function scAddTime_(r, d, s, ex) {
     if (due - d.yardIn >= s.backEarlyMinutes && !early) {
       r.rewards.push({date: d.date, area: 'time', points: s.backEarly, what: 'Back ' + (due - d.yardIn) + ' min before the expected ' + scClock_(due)});
     }
-    if (d.yardIn - due > s.lateMinutes && miss('late', 'Back at the yard ' + scClock_(d.yardIn) + ', ' + (d.yardIn - due) + ' min past the expected ' + scClock_(due), s.backLate)) r.backLate++;
+    if (d.yardIn - due > s.lateMinutes && d.yardIn - due <= SC_CORE.LATE_MAX_MINUTES && miss('late', 'Back at the yard ' + scClock_(d.yardIn) + ', ' + (d.yardIn - due) + ' min past the expected ' + scClock_(due), s.backLate)) r.backLate++;
   }
 }
 // Averages: MPG from miles and gallons (or Fleet's MPG weighted by miles), the usual yard leave and return times.
@@ -556,7 +672,7 @@ function scAreas_(r, s, on) {
   on = on || {};
   // An excused miss costs nothing and does not spoil the perfect day.
   (r.misses || []).forEach(function (m) {
-    if (m.excused) return;
+    if (m.excused || m.noMiss) return;
     if (m.carried) { carry[m.area] = (carry[m.area] || 0) + (m.points || 0); return; }
     var k = m.area + '|' + m.date; missBy[k] = (missBy[k] || 0) + (m.points || 0);
   });
@@ -664,5 +780,5 @@ function scSummary_(rows, settings, minDays) {
     leader: leader ? leader.driver : ''};
 }
 
-  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scCleanPoints_: scCleanPoints_, scAreaScore_: scAreaScore_, scMinutesOf_: scMinutesOf_, scHoursOf_: scHoursOf_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_, scMonthsBetween_: scMonthsBetween_, scFade_: scFade_, scMissKey_: scMissKey_, scAlertKey_: scAlertKey_, scIncidentPoints_: scIncidentPoints_, scIncidentText_: scIncidentText_, scDayMpg_: scDayMpg_, scAlertWeight_: scAlertWeight_, scPdaStep_: scPdaStep_ };
+  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scCleanPoints_: scCleanPoints_, scAreaScore_: scAreaScore_, scMinutesOf_: scMinutesOf_, scHoursOf_: scHoursOf_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scOffDays_: scOffDays_, scDepartDate_: scDepartDate_, scAlertWindows_: scAlertWindows_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_, scMonthsBetween_: scMonthsBetween_, scFade_: scFade_, scMissKey_: scMissKey_, scAlertKey_: scAlertKey_, scIncidentPoints_: scIncidentPoints_, scIncidentText_: scIncidentText_, scDayMpg_: scDayMpg_, scAlertWeight_: scAlertWeight_, scPdaStep_: scPdaStep_ };
 });

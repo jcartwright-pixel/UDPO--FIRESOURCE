@@ -70,7 +70,7 @@
     let gpsDays = [], gpsAlerts = [], alertsEver = null, gpsSub = null, gpsKey = '', dbRef = null;
     // Joe 10/13: accidents / incidents and complaints (driverIncidents, entered on Driver Roster > Edit), excused GPS misses
     // (scorecardExcuses), the area tab on screen, and ?kiosk=1 for the Driver's Kiosk Station (grades only).
-    let incidents = [], excuses = [], routeSleeper = {}, excuseOpen = '', excuseText = '';
+    let incidents = [], excuses = [], routeSleeper = {}, excuseOpen = '', excuseText = '', idleOpen = '';
     let tab = 'overall';
     const kiosk = new URLSearchParams(location.search).get('kiosk') === '1';
     { const t = new URLSearchParams(location.search).get('tab') || ''; if (t === 'incidents' || CORE.AREAS.some(a => a[0] === t)) tab = t; }
@@ -88,7 +88,7 @@
           casesOut: d.casesOut, plantCaseReturn: d.plantCaseReturn, driverCaseReturn: d.driverCaseReturn, // Joe 10/14: checked in the same way Driver Check-ins counts it: a check-in made in the app (phone, Driver Room station,
           // the answering-service email the app read) or the cases delivered the driver reported (the current app's email intake).
           checkedIn: !!(d.checkinCompletedAt || (d.casesDelivered !== null && d.casesDelivered !== undefined && d.casesDelivered !== '')),
-          truck: d.truck || '', startTime: d.startTime || '',
+          truck: d.truck || '', startTime: d.startTime || '', departure: L.dateKey(d.departureDate) || '',
           // Joe 10/13 Time grade: the day's dispatch time and expected hours, else Route Master's for that weekday.
           dispatchTime: d.dispatchTime || ((routeTimes[p] || {})[run.runId] || {}).dispatchTime, routeHours: d.routeHours || ((routeTimes[p] || {})[run.runId] || {}).hours,
           // Joe 10/13: Route Master's Sleeper yes/no; idling on a sleeper route counts less.
@@ -101,15 +101,22 @@
       // Only our Uniontown units (Equipment Master, the same list Trucks Today matches Fleet against) can wait under No driver
       // dispatched; another plant's Fleet units are left out.
       const ours = (lists.fleetTrucks || []).concat(lists.fleetTrailers || []).map(e => e.unit);
-      Object.keys(byDate).concat(Object.keys(ga)).forEach(date => {
-        if (out[date]) return;
-        const p = L.DAYS[S.scWeekday_(date)], rows = byDate[date] || [];
+      // Joe 10/14: only our drivers (Driver Master; never CARRIER), never on a day off, and only alerts while the truck was out.
+      const ex = exceptions.map(e => Object.assign({}, e.cells || {}, { driver_id: (e.cells || {}).driver_id || e.driverId || '' }));
+      const who = { known: names(), off: S.scOffDays_(ex, '2000-01-01', '2999-12-31') }, trucks = {}, byDepart = {};
+      Object.keys(byDate).forEach(date => {
+        const p = L.DAYS[S.scWeekday_(date)], rows = byDate[date];
         // A check-in typed on Driver Check-ins counts like the phone's ROUTE_CHECKIN event.
         const dayEv = (ev[date] || []).concat(rows.filter(r => r.checkedIn).map(r => ({ eventType: 'ROUTE_CHECKIN', payload: { route: r.route, run: r.run } })));
-        // Each truck's GPS and alerts go to the driver Daily Dispatch put in it that day; the rest wait under No driver dispatched.
-        const m = S.scMatchGps_(date, S.scBuildDay_(date, rows, dayEv, routeMiles[p] || {}), gd[date] || [], ga[date] || [], ours);
-        out[date] = m.records;
-        if (m.unassigned.length) unassigned[date] = m.unassigned;
+        out[date] = S.scBuildDay_(date, rows, dayEv, routeMiles[p] || {}, who);
+        // Joe 10/14: a run's GPS is the day it leaves (most loads leave the day after they are loaded).
+        out[date].forEach(r => { (byDepart[r.departDate] = byDepart[r.departDate] || []).push(r); const k = S.scUnitKey_(r.truck); if (k) (trucks[r.departDate] = trucks[r.departDate] || {})[k] = true; });
+      });
+      const inWindow = S.scAlertWindows_(ga, gd, trucks, today());
+      // Each truck's GPS and alerts go to the driver Daily Dispatch put in it for the run leaving that day; the rest wait under No driver dispatched.
+      [...new Set(Object.keys(byDepart).concat(Object.keys(inWindow)))].forEach(day => {
+        const m = S.scMatchGps_(day, byDepart[day] || [], gd[day] || [], inWindow[day] || [], ours);
+        if (m.unassigned.length) unassigned[day] = m.unassigned;
       });
       return out;
     }
@@ -190,6 +197,8 @@
         const n = (key) => '<input class="sc-n" data-k="' + key + '" value="' + s[key] + '"' + (edit ? '' : ' disabled') + '>';
         sheet.innerHTML = '<div class="sc-set"><section class="otr-card"><h2>What costs points</h2>' +
           '<p><b>Daily check-in</b> ' + n('checkinMiss') + ' points for each run without a check-in</p>' +
+          // Joe 10/14: nothing run before this day costs points (10-15-26 to start); a check-in in the app or by the answering-service email counts.
+          '<p><b>Scorecard counted from</b> <input type="date" id="sc-count-from" value="' + s.countFrom + '"' + (edit ? '' : ' disabled') + '> ' + escapeHtml(shortDate(s.countFrom)) + ' · runs before this day are not graded (check-in, cases, inspections, driving, time, MPG). A check-in in the app or by the answering-service email counts.</p>' +
           '<p><b>Cases out vs in</b> ' + n('lostCase') + ' point per lost case, at most ' + n('lostCaseDayCap') + ' a day</p>' +
           '<p><b>Clean inspections</b> ' + n('inspectionDefect') + ' points per inspection with a defect, ' + n('inspectionMissing') + ' if none done</p>' +
           '<p><b>Attendance</b> ' + n('callOff') + ' points per call-off day</p>' +
@@ -199,7 +208,7 @@
           '<p><b>Hard stops</b> ' + n('hardBrake') + ' points per hard braking alert</p>' +
           '<p><b>Hard starts</b> ' + n('hardAccel') + ' points per hard acceleration alert</p>' +
           '<p><b>Hard turns</b> ' + n('hardTurn') + ' points per harsh cornering alert (left or right)</p>' +
-          '<p><b>Idling</b> ' + n('idle') + ' points per idling alert</p>' +
+          '<p><b>Idling</b> ' + n('idle') + ' points for a day with more than ' + n('idleAllowMinutes') + ' idle minutes in all (each time can be excused)</p>' +
           '<p><b>Seatbelt</b> ' + n('seatbelt') + ' points per seatbelt alert (counted once the trucks send them)</p>' +
           '<p><b>Sleeper idling weight</b> ' + n('sleeperIdlePct') + '% of the idling points on a sleeper route (Route Master "Sleeper")</p>' +
           '<p><b>Most a day</b> ' + n('gpsDayCap') + ' points from driving alerts in one day (0 = no limit)</p>' +
@@ -238,6 +247,9 @@
           const list = [...sheet.querySelectorAll('[data-reason]:checked')].map(x => x.dataset.reason), before = saved.callOffReasons;
           saveOptimistic('saveScorecard', { callOffReasons: list }, () => { saved = Object.assign({}, saved, { callOffReasons: list }); }, () => { saved = Object.assign({}, saved, { callOffReasons: before }); }, render);
         }; });
+        { const c = sheet.querySelector('#sc-count-from'); c.onchange = () => { const before = saved.countFrom, v = c.value;
+          if (!v) { render(); return; }
+          saveOptimistic('saveScorecard', { countFrom: v }, () => { saved = Object.assign({}, saved, { countFrom: v }); }, () => { saved = Object.assign({}, saved, { countFrom: before }); }, render); }; }
         { const c = sheet.querySelector('#sc-clean-on'); c.onchange = () => { const before = saved.cleanOn, v = c.checked ? 1 : 0;
           saveOptimistic('saveScorecard', { key: 'cleanOn', value: v }, () => { saved = Object.assign({}, saved, { cleanOn: v }); }, () => { saved = Object.assign({}, saved, { cleanOn: before }); }, render); }; }
         sheet.querySelectorAll('[data-kiosk-area]').forEach(c => { c.onchange = () => {
@@ -293,14 +305,20 @@
       const earned = (r) => AREAS.map(a => { const o = r.areas && r.areas[a[0]]; return o && o.rewards ? a[1] + ' +' + o.rewards + ' (' + o.clean + ' perfect' + (o.streaks ? ', ' + o.streaks + ' streak' + (o.streaks === 1 ? '' : 's') : '') + (o.extra ? ', back early +' + o.extra : '') + ')' : ''; }).filter(Boolean).join(' · ');
       const who = (email) => escapeHtml(String(email || '').split('@')[0].replace(/[._]/g, ' '));
       // Joe 10/13: a manager can excuse a GPS or Time miss (a hard stop for a deer) with a reason; it then costs nothing.
+      // Joe 10/14: a day with more than one idling alert opens a pop-up listing each time, each with its own Excuse.
+      const popKey = (r, m) => r.driverKey + '|' + m.date + '|' + m.what;
+      const idlePop = (r, m) => '<div class="sc-pop-back"><div class="sc-pop" role="dialog" aria-label="Each idling time"><h3>Idling ' + shortDate(m.date) + '</h3>' +
+        m.events.map(x => missLine(r, Object.assign({ event: true }, x))).join('') + '<div class="sc-pop-foot"><button type="button" class="sc-pop-close">Close</button></div></div></div>';
       const missLine = (r, m) => '<div class="' + (m.excused ? 'sc-excused' : '') + '"><b>' + shortDate(m.date) + '</b> <span class="sc-what">' + escapeHtml(m.what) + '</span>' +
-        (m.carried && m.area === 'attendance' ? ' <small class="sc-carry">from before this period</small>' : '') + ' <span class="sc-pts">−' + pts(m.points) + '</span>' +
+        (m.carried && m.area === 'attendance' ? ' <small class="sc-carry">from before this period</small>' : '') + (m.event ? '' : ' <span class="sc-pts">−' + pts(m.points) + '</span>') +
+        (m.events ? ' <button type="button" class="sc-idle-open" data-pop="' + escapeHtml(popKey(r, m)) + '">Each time (' + m.events.length + ')</button>' + (idleOpen === popKey(r, m) ? idlePop(r, m) : '') : '') +
         (m.excused ? ' <span class="sc-ex">Excused: ' + escapeHtml(m.excused.reason) + (m.excused.by ? ' · ' + who(m.excused.by) : '') + '</span>' + (edit ? ' <button type="button" class="sc-unexcuse" data-key="' + escapeHtml(m.key) + '">Undo excuse</button>' : '')
           : m.key && edit ? (excuseOpen === m.key ? ' <span class="sc-ex-form" data-key="' + escapeHtml(m.key) + '" data-driver="' + escapeHtml(r.driverKey) + '" data-what="' + escapeHtml(m.what) + '"><input type="text" class="sc-ex-reason" maxlength="300" value="' + escapeHtml(excuseText) + '" placeholder="Reason, for example: deer in the road"> <button type="button" class="primary sc-ex-save">Excuse</button> <button type="button" class="sc-ex-cancel">Cancel</button></span>'
             : ' <button type="button" class="sc-excuse" data-key="' + escapeHtml(m.key) + '">Excuse</button>') : '') + '</div>';
       const pendingLine = (p) => '<div class="sc-pending"><b>' + shortDate(p.date) + '</b> ' + escapeHtml(p.what) + ' <span class="sc-review">Under review</span></div>';
       const detail = (r, area) => {
-        const list = (r.misses || []).filter(m => !area || m.area === area), pend = (r.pending || []).filter(p => !area || p.area === area);
+        // Joe 10/14: a miss that costs nothing (No inspection done at 0) is not listed; it still keeps the day from earning a reward.
+        const list = (r.misses || []).filter(m => (!area || m.area === area) && (m.points || m.excused || (m.events && m.events.some(x => x.excused)))), pend = (r.pending || []).filter(p => !area || p.area === area);
         return pend.map(pendingLine).join('') + (list.length ? list.map(m => missLine(r, m)).join('') : pend.length ? '' : 'No misses.');
       };
       // Joe 10/13: one line on how the scoring works, above the board.
@@ -375,6 +393,8 @@
       try { await save('reviewDriverIncident', { incidentId: pick.dataset.id, status: pick.value }); } catch (err) { showError('Could not save the review (' + err.message + ').'); render(); }
     });
     document.getElementById('sheet').addEventListener('click', async e => {
+      const ip = e.target.closest('.sc-idle-open'); if (ip) { idleOpen = ip.dataset.pop; render(); return; }
+      if (e.target.closest('.sc-pop-close') || e.target.classList.contains('sc-pop-back')) { idleOpen = ''; excuseOpen = ''; render(); return; }
       const exb = e.target.closest('.sc-excuse');
       if (exb) { excuseOpen = exb.dataset.key; excuseText = ''; render(); const i = document.querySelector('.sc-ex-reason'); if (i) i.focus(); return; }
       const exf = e.target.closest('.sc-ex-form');

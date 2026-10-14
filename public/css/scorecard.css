@@ -63,3 +63,12 @@ body.sc-kiosk .sc-board thead th { position: sticky; top: 0; z-index: 1; }
 .sc-kiosk-board td, .sc-kiosk-board th { font-size: 22px; }
 .sc-kiosk-board .sc-overall { font-size: 22px; min-width: 110px; }
 .sc-kiosk-board td.strong { font-size: 22px; }
+/* Joe 10/14: each idling time of a day, in a pop-up with its own Excuse. */
+.sc-board .sc-idle-open { height: 32px; padding: 0 10px; font-size: 16px; }
+.sc-pop-back { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(10, 30, 50, .45); padding: 16px; }
+.sc-pop { background: #fff; color: #12385f; border-radius: 12px; padding: 16px 20px; width: min(760px, 100%); max-height: 80vh; overflow-y: auto; text-align: left; white-space: normal; font-size: 16px; line-height: 1.5; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); }
+.sc-pop h3 { margin: 0 0 8px; font-size: 20px; }
+.sc-pop > div { padding: 6px 0; border-bottom: 1px solid #e3ebf2; }
+.sc-pop .sc-pop-foot { border: 0; text-align: right; padding-top: 10px; }
+.sc-pop button { height: 32px; padding: 0 10px; font-size: 16px; }
+.sc-pop .sc-excused .sc-what { text-decoration: line-through; color: #7a8a99; }

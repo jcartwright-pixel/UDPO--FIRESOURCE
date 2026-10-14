@@ -431,6 +431,12 @@ function validate(input) {
       if (out.callOffReasons.some(r => SC.SC_CORE.REASONS.indexOf(r) < 0)) throw new SaveError('BAD_REQUEST', 'Unknown call-off reason');
       return out;
     }
+    // Joe 10/14: Scorecard counted from (a date).
+    if (input.countFrom !== undefined) {
+      out.countFrom = text(input.countFrom, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(out.countFrom) || SC.scKeyOf_(out.countFrom) !== out.countFrom) throw new SaveError('BAD_REQUEST', 'Pick a date');
+      return out;
+    }
     out.key = text(input.key, 40);
     if (SC.SC_CORE.NUMBER_SETTINGS.indexOf(out.key) < 0) throw new SaveError('BAD_REQUEST', 'Unknown setting ' + out.key);
     out.value = Number(String(input.value).trim());
