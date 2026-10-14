@@ -42,7 +42,6 @@
           <select id="status"><option value="ALL">Status: All</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>
           <select id="relief-filter"><option value="ALL">Relief: All</option><option value="YES">Relief</option><option value="NO">Regular</option></select>
           <span class="sort">Sorted by seniority, most senior first</span>
-          <a class="button" id="incidents-link" href="scorecard.html?tab=incidents">Incidents &amp; Complaints</a>
           <button id="remove" class="danger" type="button" disabled>Remove Selected</button>
         </div>
         <div class="sheet">
@@ -58,7 +57,7 @@
             <tbody id="rows"></tbody>
           </table>
         </div>
-        <div class="footer"><span id="count"></span><span>Vacation weeks follow the hire date. Removed drivers stay on the list as Inactive.</span></div>
+        <div class="footer"><span id="count"></span><a id="incidents-link" href="scorecard.html?tab=incidents">Incidents &amp; Complaints list</a><span>Vacation weeks follow the hire date. Removed drivers stay on the list as Inactive.</span></div>
       </div>
       <div class="split-side">
         <div class="summary">
@@ -177,7 +176,7 @@
         '<label class="panel-check"><input id="d-relief" type="checkbox"' + (v.reliefDriver ? ' checked' : '') + '> Relief driver</label>' +
         (r ? '<div class="panel-state"><span>Available</span><span class="status' + (r.active ? '' : ' off') + '">' + (r.active ? 'Active' : 'Inactive') + '</span></div>' : '') +
         '<div class="panel-actions"><button id="d-cancel" type="button">Cancel</button><button id="d-save" class="primary" type="button">Save Driver</button></div>' +
-        (r ? '<div class="inc-box"><h3>Accidents, complaints &amp; PDA</h3><div id="d-inc-list"></div><div class="inc-add"><button type="button" id="d-add-accident">Add accident / incident</button><button type="button" id="d-add-complaint">Add complaint</button><button type="button" id="d-add-pda">Add PDA</button></div><div id="d-inc-form"></div></div>' : '');
+        (r ? '<div class="inc-box"><h3>Accidents, complaints &amp; PDA <a href="scorecard.html?tab=incidents">See all</a></h3><div id="d-inc-list"></div><div class="inc-add"><button type="button" id="d-add-accident">Add accident / incident</button><button type="button" id="d-add-complaint">Add complaint</button><button type="button" id="d-add-pda">Add PDA</button></div><div id="d-inc-form"></div></div>' : '');
       incForm = '';
       render();
       if (r) { paintIncidents(r); document.getElementById('d-add-accident').onclick = () => incidentForm(r, 'accident'); document.getElementById('d-add-complaint').onclick = () => incidentForm(r, 'complaint'); document.getElementById('d-add-pda').onclick = () => incidentForm(r, 'pda'); }

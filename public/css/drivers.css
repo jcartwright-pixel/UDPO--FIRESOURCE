@@ -51,7 +51,8 @@ label.panel-check { display: flex; align-items: center; gap: 8px; text-transform
 .inc-add button { min-height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 .inc-form { display: flex; flex-direction: column; gap: 6px; background: #f7fbfe; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
 .inc-form .panel-actions { margin-top: 4px; }
-.drivers-page #incidents-link { display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.drivers-page #incidents-link { color: var(--ud-blue); font-weight: 700; white-space: nowrap; }
+.inc-box h3 a { font-size: 16px; font-weight: 700; margin-left: 8px; color: var(--ud-blue); }
 .drivers-page .sheet thead th { white-space: normal; line-height: 1.1; overflow-wrap: normal; }
 .inc-form .panel-row > label { min-width: 0; }
 .inc-form input[type=text], .inc-form input[type=date], .inc-form select, .inc-form textarea { width: 100%; min-width: 0; box-sizing: border-box; }
