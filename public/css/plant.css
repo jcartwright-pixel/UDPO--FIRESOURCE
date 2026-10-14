@@ -637,9 +637,12 @@
 .manager-page .mc-report-body li.bad b, .manager-page .mc-report-body li.bad span { color: #b42318; }
 .manager-page .mc-report-body li.warn span { color: #9a5b00; }
 .manager-page .mc-report-body p { margin: 0; color: #5b6775; }
-.manager-page .mc-routes { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; }
+.manager-page .mc-routes { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
 .manager-page .mc-routes span { display: flex; justify-content: space-between; border-radius: 6px; padding: 7px 9px; font-weight: 800; font-size: 16px; }
 .manager-page .mc-routes span i { font-style: normal; font-size: 16px; align-self: center; }
+.manager-page .mc-routes span { gap: 8px; }
+.manager-page .mc-routes span b { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page .mc-routes span small { font-size: 16px; font-weight: 600; }
 .manager-page .mc-routes .ok { background: #e2f4ea; color: #1f7a4d; } .manager-page .mc-routes .behind { background: #b42318; color: #fff; } .manager-page .mc-routes .no { background: #fde8e6; color: #b42318; }
 @media (max-width: 1500px) { .manager-page .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; align-content: start; } .manager-page .mc-card, .manager-page .mc-tiles { min-height: auto; } .manager-page .mc-report { grid-row: 1 / span 3; min-height: 360px; } .manager-page .mc-tile { min-height: 92px; } }
 @media (max-width: 760px) {
@@ -682,6 +685,11 @@
 .plant-page .as-note.bad { color: #b42332; }
 .plant-page .as-last { display: block; margin-top: 3px; font-size: 16px; font-weight: 600; color: #8796a2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quality-page .qc-round { margin-left: auto; font-size: 16px; font-weight: 700; color: var(--muted); }
+/* Joe 10/14 (A): a picked product waits 4 seconds with Undo before it saves. */
+.quality-page .qc-wait { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 6px; padding: 10px 12px; border-radius: 10px; background: #fff7e0; border: 1px solid #f0d38a; color: #7a5200; white-space: normal; }
+.quality-page .qc-wait-bar { flex-basis: 100%; height: 6px; border-radius: 3px; background: #f3e3b5; overflow: hidden; }
+.quality-page .qc-wait-bar i { display: block; height: 100%; background: #d29b00; transition: width 1s linear; }
+.quality-page .qc-undo { font: inherit; font-size: 16px; font-weight: 800; padding: 6px 16px; border-radius: 8px; background: #fff; border: 2px solid #b42332; color: #b42332; cursor: pointer; }
 .temp-page .tp-act .as-note { white-space: normal; line-height: 1.25; }
 /* Manager Center (Joe 10/10, "SEND button runs over"): Edit / Add takes only its width, Send Current Report the rest, and a
    long label wraps inside its button instead of running past the card. */

@@ -8,7 +8,8 @@
  *   - production writes dispatch changes to the real Uniontown Live workbook (Joe 10/12: "Let the new app write
  *     dispatch changes to the real Live sheet."): WRITEBACK_JSON may name that workbook and nothing else. The six real
  *     master lists Joe OK'd on 10/12 are fixed in code (writeback.js REAL_MASTER_LISTS), never named here;
- *   - email only from and to United Dairy addresses.
+ *   - email only from United Dairy addresses; LIVE_EMAIL=1 lets an email reach the people it is meant for (Joe 10/14: "No,
+ *     I want the new email to be live. It's ready."), without it every email goes only to the person who pressed Send.
  *
  *   node tools/production-env.cjs [settings.json]   prints the .env text; PRODUCTION_ENV (KEY=value lines, a GitHub
  *                                                   variable) may add or replace MAIL_FROM / REPORT_TO without a commit
@@ -17,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const ALLOWED = ['READ_UNIONTOWN_SHEETS', 'MAIL_FROM', 'REPORT_TO', 'WRITEBACK_JSON'];
+const ALLOWED = ['READ_UNIONTOWN_SHEETS', 'MAIL_FROM', 'REPORT_TO', 'WRITEBACK_JSON', 'LIVE_EMAIL'];
 const REAL_LIVE = require('../functions/src/sources').UNIONTOWN.live.spreadsheetId;
 const WHY = {
   DEMO_DATA: 'production must show the real sheets, not the made-up ones',
@@ -66,6 +67,7 @@ function productionEnv(settings, extra, sandbox) {
     }
   }
   if (String(env.READ_UNIONTOWN_SHEETS) !== '1') problems.push('READ_UNIONTOWN_SHEETS must be 1: production reads the real Uniontown sheets (read only)');
+  if (env.LIVE_EMAIL !== undefined && ['', '1'].indexOf(String(env.LIVE_EMAIL).trim()) < 0) problems.push('LIVE_EMAIL must be 1 (email goes to the people it is meant for) or empty (only to the person who pressed Send)');
   if (env.MAIL_FROM && !UD.test(String(env.MAIL_FROM).trim())) problems.push('MAIL_FROM must be one @uniteddairy.com address');
   String(env.REPORT_TO || '').split(',').map(s => s.trim()).filter(Boolean).forEach(a => {
     if (!UD.test(a)) problems.push('REPORT_TO address is not @uniteddairy.com: ' + a);

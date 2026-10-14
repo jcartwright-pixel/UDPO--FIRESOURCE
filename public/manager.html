@@ -185,7 +185,9 @@
       const r = report, row = (a, b, k) => '<li class="' + (k || '') + '"><b>' + escapeHtml(a) + '</b><span>' + escapeHtml(b) + '</span></li>';
       const sect = (title, n, k, items, empty) => '<section><h3 class="' + (k || '') + '">' + escapeHtml(title) + (n == null ? '' : '<em>' + escapeHtml(String(n)) + '</em>') + '</h3>' + (items.length ? '<ul>' + items.join('') + '</ul>' : '<p>' + escapeHtml(empty) + '</p>') + '</section>';
       document.getElementById('rp-subject').textContent = r.subject;
-      const loaded = r.loaded.map(z => '<span class="ok">' + escapeHtml(z.route) + '<i>LOADED</i></span>'), notLoaded = r.behind.map(z => '<span class="behind">' + escapeHtml(z.route) + '<i>BEHIND</i></span>').concat(r.nextUp.map(z => '<span class="no">' + escapeHtml(z.route) + '<i>NOT LOADED</i></span>'));
+      // Joe 10/14: a tile is the route number and the run's short name; green is loaded, red is not (only BEHIND has a word).
+      const tile = (z, k, word) => '<span class="' + k + '"><b>' + escapeHtml(U.routeNumber(z.route)) + (U.shortRun(z) ? ' <small>' + escapeHtml(U.shortRun(z)) + '</small>' : '') + '</b>' + (word ? '<i>' + word + '</i>' : '') + '</span>';
+      const loaded = r.loaded.map(z => tile(z, 'ok')), notLoaded = r.behind.map(z => tile(z, 'behind', 'BEHIND')).concat(r.nextUp.map(z => tile(z, 'no')));
       document.getElementById('rp-body').innerHTML =
         '<div class="mc-banner ' + (r.behind.length ? 'bad' : 'good') + '"><b>' + (r.behind.length ? '&#9888; ' + r.behind.length + ' ROUTE' + (r.behind.length === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</b><span>' + escapeHtml(r.dayLabel) + ' · ' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</span></div>' +
         '<section><h3>Routes<em>' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</em></h3>' + (loaded.length ? '<h4 class="good">Loaded (' + loaded.length + ')</h4><div class="mc-routes">' + loaded.join('') + '</div>' : '') +

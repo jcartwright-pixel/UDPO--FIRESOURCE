@@ -686,6 +686,18 @@
     return r;
   }
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
+  // Joe 10/14: the report's route tiles show the route number and a short run name ("845 DSD", "906 Lancaster", "6304 Walmart"),
+  // not LOADED / NOT LOADED (green is loaded, red is not). The plant's two-letter code (UT) and the word MILK are left off, words
+  // with no vowel or a known short name stay capitals (DSD, KTI), the rest are written as names, and at most two words are kept (three when the third is a load number: "Marietta Load 1").
+  var ACRONYMS = ['KTI', 'SAX', 'IGA', 'OTR', 'UDF'];
+  function routeNumber(route) { return text(route).replace(/_\d+$/, ''); }
+  function shortRun(x) {
+    var run = text(x.run), w = run.toUpperCase().split(/[\s_\-·]+/).filter(Boolean);
+    if (!run || routeNumber(run) === routeNumber(x.route)) return '';
+    if (w.length > 1 && /^[A-Z]{2}$/.test(w[0])) w.shift();
+    w = w.filter(function (t) { return t !== 'MILK'; });
+    return w.slice(0, /^\d+$/.test(w[2] || '') ? 3 : 2).map(function (t) { return t.length <= 2 || /\d/.test(t) || !/[AEIOUY]/.test(t) || ACRONYMS.indexOf(t) >= 0 ? t : t.charAt(0) + t.slice(1).toLowerCase(); }).join(' ');
+  }
   function reportText(r) {
     var L = [];
     L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': no route is more than ' + r.behindMinutes + ' minutes past its depart time'));
@@ -727,15 +739,15 @@
       var out = '';
       for (var i = 0; i < list.length; i += 2) out += '<tr>' + [list[i], list[i + 1]].map(function (x) {
         if (!x) return '<td width="50%" style="padding:3px"></td>';
-        return '<td width="50%" style="padding:3px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + x.bg + ';border-radius:6px"><tr><td style="' + F + 'padding:9px 10px;font-size:17px;font-weight:800;color:' + x.fg + '">' + e(x.route) + '</td><td align="right" style="' + F + 'padding:9px 10px;font-size:12px;font-weight:800;color:' + x.fg + '">' + e(x.word) + '</td></tr></table></td>';
+        return '<td width="50%" style="padding:3px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + x.bg + ';border-radius:6px"><tr><td style="' + F + 'padding:9px 10px;font-size:17px;font-weight:800;color:' + x.fg + '">' + e(x.route) + (x.name ? ' <span style="font-weight:600">' + e(x.name) + '</span>' : '') + '</td><td align="right" style="' + F + 'padding:9px 10px;font-size:12px;font-weight:800;color:' + x.fg + '">' + e(x.word) + '</td></tr></table></td>';
       }).join('') + '</tr>';
       return '<tr><td style="padding:2px 11px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + out + '</table></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
     var loaded = (r.loaded || []).slice().sort(function (a, b) { return Number(a.priorDay) - Number(b.priorDay) || a.loadSequence - b.loadSequence || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return { route: x.route, word: 'LOADED', bg: '#e2f4ea', fg: GREEN }; });
-    var notLoaded = (r.behind || []).map(function (x) { return { route: x.route, word: 'BEHIND', bg: RED, fg: '#ffffff' }; })
-      .concat((r.nextUp || []).map(function (x) { return { route: x.route, word: 'NOT LOADED', bg: '#fde8e6', fg: RED }; }));
+      .map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), word: '', bg: '#e2f4ea', fg: GREEN }; });
+    var notLoaded = (r.behind || []).map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), word: 'BEHIND', bg: RED, fg: '#ffffff' }; })
+      .concat((r.nextUp || []).map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), word: '', bg: '#fde8e6', fg: RED }; }));
     var H = [];
     H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : GREEN) + ';color:#ffffff"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
@@ -775,5 +787,5 @@
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
-    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, reportText: reportText, reportHtml: reportHtml };
+    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
 });

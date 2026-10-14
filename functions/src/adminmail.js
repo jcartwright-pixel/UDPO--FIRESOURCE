@@ -2,7 +2,7 @@
  * Every email the new app sends goes through here (Administration > Sent Email Log and its Sending switch).
  *
  *   - Sending OFF (private/emailSettings.sending === false): nothing goes out; the log says BLOCKED ("Stopped (off)").
- *   - Until LIVE_EMAIL=1 is set on the server (production, after Joe says go), an email goes only to the person who pressed
+ *   - Until LIVE_EMAIL=1 is set on the server (production since Joe 10/14, production-settings.json), an email goes only to the person who pressed
  *     the button, never to the addresses it was meant for; the log keeps both. The sandbox never sets LIVE_EMAIL.
  *   - MAIL_FROM unset and no plant mailbox set: nothing goes out (HELD, "Email is not set up").
  *   - From (Joe 10/11): the United Dairy person who pressed Send, from their own mailbox. An email no one pressed
