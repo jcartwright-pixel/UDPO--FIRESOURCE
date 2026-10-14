@@ -183,6 +183,24 @@ test('Driver Check-In Email keeps the original email; Maintenance marks those wr
   assert.deepEqual([typed.fromEmail, typed.emailId], [false, '']);
 });
 
+test('Driver Check-In Email (Joe 10/14): the driver\'s name finds the run when the route is said short, and old unmatched emails get their credit', async () => {
+  await call({ op: 'saveCheckinEmail', enabled: true, sender: 'callcenter@lauttamus.com', recipient: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN' });
+  const mail = (id, body) => ({ id, internalDate: Date.parse('2026-10-05T19:00:00Z'), from: 'Lauttamus Answering Service <CallCenter@lauttamus.com>', to: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN', body });
+  // Lee Casey drives 802 on Monday and says "Route Number: 2".
+  await T.checkinRun(db(), { by: ADMIN.email, readMail: async () => [mail('casey1', 'Name +(UT): Lee Casey\nRoute Number: 2\nHow Many Cases: 300\nHow Many Returned: 12')], now: () => new Date('2026-10-05T20:00:00Z') });
+  const casey = (await db().collection('runs').doc('2026-10-04__run_t802').get()).data().days.mon;
+  assert.ok(casey.checkinCompletedAt, 'Casey is checked in');
+  assert.deepEqual([casey.casesDelivered, casey.driverCaseReturn], [300, 12]);
+  // An email read before this change, kept with no run: the one-time load credits Pat Adams on 801.
+  await db().collection('mailSeen').doc('adams1').set({ at: '2026-10-05T19:05:00.000Z', route: '1', driver: 'Pat Adams', run: '', made: [] });
+  await db().collection('mailCopies').doc('adams1').set({ id: 'adams1', receivedAt: '2026-10-05T19:00:00.000Z', body: 'Name +(UT): Pat Adams\nRoute Number: 1' });
+  const out = await T.recreditMailCheckins(db(), { now: () => new Date('2026-10-14T02:00:00Z') });
+  assert.deepEqual(out, { credited: ['adams1 ' + RUN + '|mon'], still: [] });
+  assert.equal((await db().collection('runs').doc(RUN).get()).data().days.mon.checkinCompletedAt, '2026-10-05T19:00:00.000Z');
+  assert.equal((await db().collection('mailSeen').doc('adams1').get()).data().run, RUN + '|mon');
+  assert.deepEqual(await T.recreditMailCheckins(db(), {}), { credited: [], still: [] }, 'once credited, never again');
+});
+
 test('Refresh Rates: a saved rate is used by the schedule; retired and fixed jobs cannot be changed; reload before saving', async () => {
   const r = await call({ op: 'refreshRates' });
   const job = r.jobs.find(j => j.key === 'checkinMail');
