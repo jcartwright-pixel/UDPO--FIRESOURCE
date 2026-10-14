@@ -888,7 +888,8 @@ async function noScroll(page) {
     await otr.click('[data-miles="run_t801"]');
     await otr.fill('[data-miles-in="run_t801"]', '412');
     await otr.click('[data-miles-save="run_t801"]');
-    await otr.waitForFunction(() => document.querySelector('[data-miles="run_t801"]').textContent === '412', null, { timeout: 5000 });
+    // The routes table is drawn again after the save, so the button can be missing for a moment: wait until it is back with 412.
+    await otr.waitForFunction(() => (document.querySelector('[data-miles="run_t801"]') || {}).textContent === '412', null, { timeout: 5000 });
     const otrMore = await otr.evaluate(async () => {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('/js/firebase.js');
