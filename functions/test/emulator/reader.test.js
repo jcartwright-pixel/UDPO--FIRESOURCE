@@ -170,3 +170,89 @@ test('A test setup for every machine (Joe 10/11): each line at its own full spee
   assert.equal((await boxing()).testFeed, null);
   assert.equal((await db().collection('productionLines').doc(LINE).get()).data().counter, 'TABLET', 'a line switched for the test goes back too');
 });
+
+// A machine's own controller (Joe 10/14, the Blow Mold): the line PC reads the jug count, speed and temperature, READ-ONLY.
+const BLOW = 'ut_prod_blow_mold';
+const blowRun = async () => (await db().collection('productionRuns').doc(P.runId(BLOW, KEY)).get()).data();
+const blowLine = async () => (await db().collection('productionLines').doc(BLOW).get()).data() || {};
+const setup = async (fields) => { for (const [field, value] of Object.entries(fields)) await RD.readerCall(db(), { email: ADMIN }, { op: 'saveController', operationId: BLOW, field, value }, { now: at(0) }); };
+
+test('Controller setup on Line Targets: an administrator\'s, one box at a time, each box checked', async () => {
+  await assert.rejects(RD.readerCall(db(), { email: MANAGER }, { op: 'saveController', operationId: BLOW, field: 'brand', value: 'MODBUS' }), /Only an administrator/);
+  await assert.rejects(setup({ countTag: '40001' }), /Pick the controller's brand first/);
+  await setup({ brand: 'MODBUS', ip: '192.168.10.40', countTag: '40001', speedTag: '40011', speedName: 'Annealer speed', tempTag: '40012', tempDivide: '10', tempLow: '395', tempHigh: '425' });
+  await assert.rejects(setup({ ip: '192.168.10.400' }), /IP address like/);
+  await assert.rejects(setup({ speedTag: 'Jug_Count' }), /register number, like 40001/);
+  const c = (await blowLine()).controller;
+  assert.deepEqual([c.brand, c.ip, c.countTag, c.tempDivide, c.tempHigh, c.speedName], ['MODBUS', '192.168.10.40', '40001', 10, 425, 'Annealer speed']);
+  assert.deepEqual(RD.configOut(c), { brand: 'MODBUS', ip: '192.168.10.40', port: null, slot: null, rack: null, unit: null, wordOrder: 'HIGH_FIRST',
+    readings: { count: { tag: '40001', size: 32 }, speed: { tag: '40011', size: 16 }, temp: { tag: '40012', size: 16 } } });
+  await assert.rejects(RD.readerCall(db(), { email: ADMIN }, { op: 'testRead', operationId: BLOW, reading: 'count' }, { now: at(0) }).then(() => setup({ countTag: '' })).then(() =>
+    RD.readerCall(db(), { email: ADMIN }, { op: 'testRead', operationId: BLOW, reading: 'count' }, { now: at(0) })), /Type where the jug count is first/);
+});
+
+test('Controller readings: jugs made since the last read count on the shift; speed and temperature kept with their flags; Test read answered', async () => {
+  await save('saveLineCounter', { operationId: BLOW, counter: 'CONTROLLER' });
+  await setup({ brand: 'AB', ip: '192.168.10.41', countTag: 'Jug_Count', speedTag: 'Speed', tempTag: 'Temp', tempDivide: '10', tempLow: '395', tempHigh: '425', speedLow: '38', speedHigh: '46' });
+  await RD.readerCall(db(), { email: ADMIN }, { op: 'makeKey', operationId: BLOW, kind: 'CONTROLLER' }, { key: () => 'blow-key-1234567890' });
+  assert.equal(((await db().collection('private').doc('readDevices').get()).data() || {})[BLOW].kind, 'CONTROLLER');
+  const call = (body, min) => RD.handleReads(db(), { authorization: 'Bearer blow-key-1234567890' }, Object.assign({ device: BLOW }, body), { now: at(min) });
+  // The line PC's first call: its setup, nothing counted yet.
+  let [status, out] = await call({ op: 'config' }, 0);
+  assert.equal(status, 200);
+  assert.equal(out.config.brand, 'AB');
+  assert.equal(out.testAsk, null);
+  // The first reading only marks where the machine's counter is: no jugs yet.
+  [, out] = await call({ controller: { count: 1284000, speed: 42, temp: 4100, errors: {} } }, 0);
+  assert.equal(out.count, 0);
+  [, out] = await call({ controller: { count: 1284330, speed: 42, temp: 4312, errors: {} } }, 1);
+  assert.equal(out.count, 330);
+  let r = await blowRun();
+  assert.equal(r.countBy, 'machine controller');
+  assert.deepEqual([r.machine.counter, r.machine.speed, r.machine.temp, r.machine.tempFlag, r.machine.speedFlag], [1284330, 42, 431.2, 'HIGH', '']);
+  assert.equal(r.machine.tempOutSince, new Date(T0 + 60000).toISOString());
+  assert.equal(r.machineLog.length, 2, 'one reading a minute');
+  // The machine's counter was reset: the new number is all new jugs.
+  [, out] = await call({ controller: { count: 25, speed: 30, temp: 4200 } }, 2);
+  assert.equal(out.count, 355);
+  r = await blowRun();
+  assert.deepEqual([r.machine.speedFlag, r.machine.tempFlag, r.machine.tempOutSince], ['LOW', '', '']);
+  // A jump too big to be jugs (a new counter or the wrong tag): counting starts from there instead.
+  [, out] = await call({ controller: { count: 9000000 } }, 3);
+  assert.equal(out.count, 355);
+  // The hour's average speed and temperature, and the shift's low and high.
+  const m = P.machineNow(r, await blowLine(), T0 + 2 * 60000);
+  assert.deepEqual([m.tempMin, m.tempMax, m.tempOutMin, m.speedName], [410, 431.2, 1, 'Speed']);
+  const hr = P.hourly(r, [], T0 + 3 * 60000).find(h => h.now);
+  assert.equal(hr.temp, Math.round((410 + 431.2 + 420) / 3 * 10) / 10);
+  // A read that failed is kept on the line for Line Targets to show.
+  await call({ controller: { errors: { temp: 'No answer from the controller.' } } }, 4);
+  assert.match((await blowLine()).machineError, /temp: No answer/);
+  // Test read: Line Targets asks, the line PC sees the ask with its next call and answers it.
+  await RD.readerCall(db(), { email: ADMIN }, { op: 'testRead', operationId: BLOW, reading: 'temp' }, { now: at(5) });
+  [, out] = await call({ op: 'config' }, 5);
+  assert.deepEqual(out.testAsk, { at: new Date(T0 + 5 * 60000).toISOString(), reading: 'temp' });
+  await call({ test: { askAt: out.testAsk.at, reading: 'temp', value: 4312 } }, 5);
+  assert.deepEqual((await blowLine()).controller.testResult, { askAt: out.testAsk.at, reading: 'temp', value: 4312, error: '', at: new Date(T0 + 5 * 60000).toISOString() });
+});
+
+test('A controller line stops after 3 quiet minutes; a typed line keeps the machine\'s speed and temperature but not its count', async () => {
+  await save('saveLineCounter', { operationId: BLOW, counter: 'CONTROLLER' });
+  await setup({ brand: 'MODBUS', ip: '192.168.10.40', countTag: '40001', tempTag: '40012' });
+  await RD.applyMachine(db(), BLOW, { count: 100 }, { now: at(0) });
+  await RD.applyMachine(db(), BLOW, { count: 160 }, { now: at(1) });
+  await RD.readerMinute(db(), { now: at(3), project: 'demo-ud-distribution' });
+  assert.equal((await blowRun()).stops.length, 0, 'two minutes quiet is not a stop');
+  await RD.readerMinute(db(), { now: at(5), project: 'demo-ud-distribution' });
+  let r = await blowRun();
+  assert.equal(r.stops.length, 1);
+  assert.equal(r.stops[0].start, new Date(T0 + 60000).toISOString(), 'stopped from the last jug');
+  assert.equal(r.stops[0].by, 'machine controller');
+  await RD.applyMachine(db(), BLOW, { count: 170 }, { now: at(6) });
+  assert.ok((await blowRun()).stops[0].end, 'jugs moving again end the stop');
+  await save('saveLineCounter', { operationId: BLOW, counter: 'TABLET' });
+  await RD.applyMachine(db(), BLOW, { count: 500, temp: 415 }, { now: at(7) });
+  r = await blowRun();
+  assert.equal(r.count, 70, 'typed lines are not counted by the controller');
+  assert.equal(r.machine.temp, 415);
+});

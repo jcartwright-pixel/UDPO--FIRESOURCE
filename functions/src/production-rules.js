@@ -18,8 +18,8 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.UDProduction = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
-  var COUNTERS = ['TABLET', 'SENSOR', 'READER'];
-  var COUNTER_LABEL = { TABLET: 'Typed by operator', SENSOR: 'Sensor (counts only)', READER: 'Label reader (counts, product and date)' };
+  var COUNTERS = ['TABLET', 'SENSOR', 'READER', 'CONTROLLER'];
+  var COUNTER_LABEL = { TABLET: 'Typed by operator', SENSOR: 'Sensor (counts only)', READER: 'Label reader (counts, product and date)', CONTROLLER: 'Machine controller (read-only)' };
   // The reasons a line stops (Joe picked the big-button tablet, 10/11).
   var REASONS = ['Changeover', 'Waiting on product', 'Filler jam', 'Caser jam', 'Labeler / coder', 'Cap feed', 'Out of cases or crates', 'Sanitation / CIP', 'Break or lunch', 'Maintenance called', 'No orders', 'Other'];
   var START_SHIFTS = [{ name: 'First Shift', start: '06:00', end: '14:30' }, { name: 'Second Shift', start: '14:00', end: '22:30' }, { name: 'Third Shift', start: '22:00', end: '05:30' }];
@@ -184,6 +184,74 @@
   };
   function stopReasons(kind) { return STOP_REASONS[kind] || REASONS; }
   var DIVERT_REASONS = ['Low temperature', 'Flow too high', 'Startup', 'Power or air', 'Test', 'Other'];
+  // A machine's own controller (Joe 10/14, the Blow Mold): READ-ONLY, and only the three readings Joe named: the jug count,
+  // the speed and the temperature. The line PC (tools/device-bridge) reads them; Line Targets keeps the setup in
+  // productionLines/{id}.controller, one box at a time (controllerField checks each box).
+  var CONTROLLER_BRANDS = [['AB', 'Allen-Bradley ControlLogix / CompactLogix'], ['AB_MICRO', 'Allen-Bradley Micro800'], ['MODBUS', 'Modbus TCP (many brands)'], ['S7', 'Siemens S7']];
+  var CONTROLLER_PORTS = { AB: 44818, AB_MICRO: 44818, MODBUS: 502, S7: 102 };
+  var READINGS = [['count', 'Jug count'], ['speed', 'Speed'], ['temp', 'Temperature']];
+  var TAG_HELP = { AB: 'the tag name as it shows in the controller program, like Jug_Count or Counter1.ACC', AB_MICRO: 'the tag name as it shows in the controller program, like Jug_Count',
+    MODBUS: 'the register number, like 40001, 30001 or HR 100', S7: 'the address, like DB10.DBD4 (4 bytes) or DB10.DBW2 (2 bytes)' };
+  var CONTROLLER_FIELDS = ['brand', 'ip', 'port', 'slot', 'rack', 'unit', 'wordOrder', 'countTag', 'countSize', 'speedName', 'speedTag', 'speedSize', 'speedDivide', 'speedLow', 'speedHigh', 'tempTag', 'tempSize', 'tempDivide', 'tempLow', 'tempHigh'];
+  function tagOk(brand, tag) {
+    var t = text(tag);
+    if (brand === 'MODBUS') return /^(HR|IR)\s*:?\s*\d{1,5}$/i.test(t) || /^[34]\d{4,5}$/.test(t) || /^\d{1,5}$/.test(t);
+    if (brand === 'S7') return /^DB\d{1,5}\.DB[DW]\d{1,5}$/i.test(t.replace(/\s+/g, '')) || /^M[DW]\d{1,5}$/i.test(t.replace(/\s+/g, ''));
+    return t.length <= 200 && /^(Program:[A-Za-z_][A-Za-z0-9_]*\.)?[A-Za-z_][A-Za-z0-9_]*(\[\d+\])*(\.[A-Za-z_][A-Za-z0-9_]*(\[\d+\])*)*$/.test(t);
+  }
+  // One box of the controller setup: { value } to keep (null = empty) or { error } in plain words.
+  function controllerField(field, value, brand) {
+    var v = text(value), n = Number(v), whole = function (lo, hi, what) { return v === '' ? { value: null } : /^\d+$/.test(v) && n >= lo && n <= hi ? { value: n } : { error: what + ' must be a whole number from ' + lo + ' to ' + hi + '.' }; };
+    if (CONTROLLER_FIELDS.indexOf(field) < 0) return { error: 'Unknown controller box.' };
+    if (field === 'brand') return v === '' || CONTROLLER_BRANDS.some(function (b) { return b[0] === v; }) ? { value: v || null } : { error: 'Pick the controller\'s brand.' };
+    if (field === 'ip') {
+      if (v === '') return { value: null };
+      var parts = v.split('.');
+      return parts.length === 4 && parts.every(function (x) { return /^\d{1,3}$/.test(x) && Number(x) <= 255; }) ? { value: v } : { error: 'Type the controller\'s IP address like 192.168.1.20.' };
+    }
+    if (field === 'port') return whole(1, 65535, 'The port');
+    if (field === 'slot') return whole(0, 31, 'The slot');
+    if (field === 'rack') return whole(0, 7, 'The rack');
+    if (field === 'unit') return whole(0, 255, 'The unit id');
+    if (field === 'speedName') return v.length <= 30 ? { value: v || null } : { error: 'Keep the speed\'s name to 30 letters, like Annealer speed.' };
+    if (field === 'wordOrder') return v === '' || v === 'HIGH_FIRST' || v === 'LOW_FIRST' ? { value: v || null } : { error: 'Pick the word order.' };
+    if (/Size$/.test(field)) return v === '' || v === '16' || v === '32' ? { value: v ? Number(v) : null } : { error: 'Pick 16 or 32 bits.' };
+    if (/Tag$/.test(field)) {
+      if (v === '') return { value: null };
+      if (!brand) return { error: 'Pick the controller\'s brand first.' };
+      return tagOk(brand, v) ? { value: v } : { error: 'Type ' + TAG_HELP[brand] + '.' };
+    }
+    if (v === '') return { value: null };
+    if (!isFinite(n) || v.length > 12) return { error: 'Type a number.' };
+    if (/Divide$/.test(field)) return n > 0 && n <= 100000 ? { value: n } : { error: 'Divide by must be a number above 0, like 10 when the controller sends 4312 for 431.2.' };
+    return Math.abs(n) <= 100000 ? { value: n } : { error: 'Type a number.' };
+  }
+  // A reading outside its range: 'HIGH', 'LOW' or ''.
+  function machineFlag(value, low, high) {
+    var v = num(value), lo = num(low), hi = num(high);
+    if (v === null) return '';
+    if (lo !== null && v < lo) return 'LOW';
+    if (hi !== null && v > hi) return 'HIGH';
+    return '';
+  }
+  // What the controller last sent this shift (run.machine), with the line's ranges (lineDoc.controller). Stale after 2 minutes.
+  function machineNow(run, lineDoc, nowMs) {
+    var m = (run || {}).machine, c = ((lineDoc || {}).controller) || {};
+    if (!m || typeof m !== 'object') return null;
+    var at = when(m.at), o = { at: text(m.at), stale: !at || nowMs - at > 120000, counter: num(m.counter), speed: num(m.speed), temp: num(m.temp),
+      speedName: text(c.speedName) || 'Speed', speedLow: num(c.speedLow), speedHigh: num(c.speedHigh), tempLow: num(c.tempLow), tempHigh: num(c.tempHigh), speedOutSince: text(m.speedOutSince), tempOutSince: text(m.tempOutSince), lastMoveAt: text(m.lastMoveAt) };
+    o.speedFlag = machineFlag(o.speed, o.speedLow, o.speedHigh);
+    o.tempFlag = machineFlag(o.temp, o.tempLow, o.tempHigh);
+    var log = Array.isArray(run.machineLog) ? run.machineLog : [];
+    ['speed', 'temp'].forEach(function (k) {
+      var vals = log.map(function (x) { return num(x && x[k]); }).filter(function (x) { return x !== null; });
+      o[k + 'Min'] = vals.length ? Math.min.apply(null, vals) : null;
+      o[k + 'Max'] = vals.length ? Math.max.apply(null, vals) : null;
+      o[k + 'OutMin'] = log.filter(function (x) { return machineFlag(x && x[k], o[k + 'Low'], o[k + 'High']); }).length;
+    });
+    return o;
+  }
+
   var LIMITS = { WASTE: 999999, CREW: 30, NOTE: 1000, DIVERTS: 200, CHANGEOVERS: 60, CIPS: 20, CHECK_SLOTS: 30 };
 
   function overlap(a, b, c, d) { return Math.max(0, Math.min(b, d) - Math.max(a, c)); }
@@ -252,6 +320,7 @@
       diverting: dv ? { start: dv.start, reason: text(dv.reason), minutes: Math.round((nowMs - when(dv.start)) / 60000) } : null,
       diverts: (r.diverts || []).length, lastDivertAt: (r.diverts || []).length ? r.diverts[r.diverts.length - 1].start : text(ld.lastDivertAt),
       source: r.source && typeof r.source === 'object' ? { from: text(r.source.from), to: text(r.source.to) } : { from: '', to: '' },
+      machine: machineNow(r, ld, nowMs),
       lot: text(r.lot), stock: num(r.stock), note: text(r.note), next: ld.next && typeof ld.next === 'object' && text(ld.next.product) ? { product: text(ld.next.product), qty: num(ld.next.qty) } : null
     });
   }
@@ -271,7 +340,11 @@
       });
       var made = past ? Math.max(0, countAt(r.counts, end) - countAt(r.counts, a)) : 0;
       target = Math.round(target);
+      // The machine's speed and temperature (a controller line), the hour's average of its minute readings.
+      var avg = function (k) { var vals = (r.machineLog || []).filter(function (x) { var t = when(x && x.at); return t >= a && t < end; }).map(function (x) { return num(x[k]); }).filter(function (x) { return x !== null; });
+        return vals.length ? Math.round(vals.reduce(function (n, x) { return n + x; }, 0) / vals.length * 10) / 10 : null; };
       out.push({ from: new Date(a).toISOString(), to: new Date(b).toISOString(), past: past, now: a <= nowMs && nowMs < b, products: names, made: made, target: target, pct: target ? Math.round(made / target * 100) : null,
+        speed: past ? avg('speed') : null, temp: past ? avg('temp') : null,
         stopped: past ? Math.round((r.stops || []).reduce(function (n, x) { return n + overlap(when(x.start), x.end ? when(x.end) : nowMs, a, end); }, 0) / 60000) : 0 });
     }
     return out;
@@ -327,5 +400,6 @@
   return { COUNTERS: COUNTERS, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
     lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
+    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow,
     countAt: countAt, checkDue: checkDue, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };
 });
