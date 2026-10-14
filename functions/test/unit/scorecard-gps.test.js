@@ -379,3 +379,9 @@ test('Joe 10/14 Time tab: a late-night departure through the yard is not read as
   assert.equal(S.scDepartDate_(DAY, '2026-09-01'), DAY, 'a stray date is ignored');
   assert.equal(S.scBuildDay_(DAY, [run({ departure: '2026-10-13' })], [], {})[0].departDate, '2026-10-13');
 });
+
+test('Joe 10/14 (live): call-offs before Scorecard counted from do not count, so nobody is left alone on the board by them', () => {
+  const offs = [{ date: '2026-10-07', driverKey: 'D9', reason: 'SICK DAY' }, { date: '2026-10-16', driverKey: 'D8', reason: 'CALLED OFF' }];
+  const rows = S.scScoreMonth_([], offs, S.scSettings_({}), { D8: 'LATE, CALL', D9: 'OLD, CALL' }, { start: '2026-10-01', asOf: '2026-10-20' });
+  assert.deepEqual(rows.filter(r => r.callOffs).map(r => r.driver), ['LATE, CALL']);
+});

@@ -63,7 +63,7 @@ var SC_CORE = Object.freeze({
     // The Driver's Kiosk Station shows grades only; 1 also shows each driver's reasons.
     kioskReasons: 0,
     // Joe 10/14: the scorecard counts from the day the checks really start; a run before this date neither earns nor costs
-    // (check-in, cases, inspections, driving, time, MPG). Call-offs, accidents, complaints and PDAs are entered and still count.
+    // (check-in, cases, inspections, driving, time, MPG, call-offs). Accidents, complaints and PDAs are entered and still count.
     countFrom: '2026-10-15'
   }),
   NUMBER_SETTINGS: Object.freeze(['checkinMiss', 'lostCase', 'lostCaseDayCap', 'inspectionDefect', 'inspectionMissing', 'callOff',
@@ -458,6 +458,8 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
   var s = settings, by = {};
   // Joe 10/14: nothing run before Scorecard counted from is graded.
   if (s.countFrom) days = (days || []).filter(function (d) { return !d.date || d.date >= s.countFrom; });
+  // Joe 10/14 (later): call-offs before it do not count either, so a driver is not left alone on the board by old call-offs.
+  if (s.countFrom) callOffs = (callOffs || []).filter(function (c) { return c.date >= s.countFrom; });
   names = names || {};
   opts = opts || {};
   var ex = opts.excuses || {}, asOf = opts.asOf || '', start = opts.start || '';
