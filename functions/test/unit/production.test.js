@@ -121,3 +121,48 @@ test('Joe 10/14: the quality check due now, each hour made vs target, and the sh
   const tl = P.timeline(run, Date.parse('2026-10-11T12:00:00Z'));
   assert.deepEqual(tl.map(x => [x.kind, x.minutes]), [['run', 90], ['stop', 10], ['run', 20], ['left', 120]]);
 });
+
+test('Joe 10/14 follow-on: stop reasons for each kind of line, twelve each; the fillers keep theirs', () => {
+  assert.deepEqual(P.stopReasons('FILLER'), P.REASONS);
+  ['FILLER', 'PACK', 'HTST', 'BLOWMOLD'].forEach(k => {
+    const r = P.stopReasons(k);
+    assert.equal(r.length, 12, k);
+    assert.equal(new Set(r).size, 12, k + ' has no repeats');
+    assert.ok(r.indexOf('Maintenance called') >= 0 && r.indexOf('Other') >= 0 && r.some(x => /break|lunch/i.test(x)), k + ' has a break reason (not counted against efficiency) and Maintenance called');
+  });
+  assert.ok(P.stopReasons('HTST').indexOf('Divert / low temp') >= 0);
+  assert.ok(P.stopReasons('BLOWMOLD').indexOf('Leak tester down') >= 0);
+});
+
+test('Joe 10/14 follow-on: the Current Report carries each line\'s shift (made, stopped and why, waste, changeovers, efficiency)', () => {
+  const U = require('../../src/plant-rules');
+  const out = U.lineOutput([
+    { line: 'GALLON FILLER', product: 'GV 2% Gallon', made: 6420, soFar: 6300, pct: 102, downMin: 14, stops: 2, topReason: 'Filler jam', wasteTotal: 19, changeovers: 1, changeoverMin: 22, oee: 87, state: 'RUNNING' },
+    { line: 'TOTES', made: 0, soFar: 0, pct: null, downMin: 0, stops: 0, wasteTotal: 0, state: 'IDLE' }]);
+  assert.equal(out.length, 1, 'a line with nothing this shift is left out');
+  assert.equal(U.outputText(out[0]), '6,420 of 6,300 (102%) · stopped 14 min (Filler jam) · waste 19 · 1 changeover 22 min · efficiency 87%');
+  const r = U.plantReport({ loads: [], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '', output: out, outputShift: 'Second Shift 2:00 PM to 10:30 PM' }, Date.parse('2026-10-14T21:00:00Z'));
+  assert.match(r.text, /LINE OUTPUT · Second Shift 2:00 PM to 10:30 PM\n  GALLON FILLER  GV 2% Gallon  6,420 of 6,300 \(102%\)/);
+  const html = U.reportHtml(r, '');
+  assert.match(html, /Line output · Second Shift/);
+  assert.match(html, /GALLON FILLER.*6,420 of 6,300 · stopped 14 min \(Filler jam\).*102%/s);
+  assert.doesNotMatch(U.reportHtml(U.plantReport({ loads: [], lines: [], temps: [] }, Date.now()), ''), /Line output/, 'no section without line output');
+});
+
+test('Joe 10/14 follow-on: the weekly line scorecard adds up each line\'s shifts and ranks the biggest losses', () => {
+  const t = { L1: P.targetsFor([{ name: 'A', ratePerMin: 60, targetPct: 100 }]) };
+  const shift = (key, day, extra) => Object.assign({ operationId: 'L1', shiftKey: key, date: day, shiftStart: day + 'T10:00:00Z', shiftEnd: day + 'T12:00:00Z', product: 'A', count: 6000, runs: [{ product: 'A', from: day + 'T10:00:00Z' }], counts: [{ at: day + 'T12:00:00Z', count: 6000 }], stops: [] }, extra);
+  const runs = [
+    shift('a', '2026-10-11', { stops: [{ start: '2026-10-11T10:30:00Z', end: '2026-10-11T10:50:00Z', reason: 'Filler jam' }], waste: { Leaker: 10 }, changeovers: [{ start: '2026-10-11T11:00:00Z', end: '2026-10-11T11:30:00Z', from: 'A', to: 'A' }] }),
+    shift('b', '2026-10-12', { stops: [{ start: '2026-10-12T10:30:00Z', end: '2026-10-12T10:40:00Z', reason: 'Cap feed' }, { start: '2026-10-12T11:00:00Z', end: '2026-10-12T11:15:00Z', reason: 'Filler jam' }], waste: { Leaker: 5 }, changeovers: [{ start: '2026-10-12T11:30:00Z', end: '2026-10-12T11:40:00Z' }] }),
+    { operationId: 'L2', date: '2026-10-12', runs: [], stops: [] },
+    { operationId: 'NOT_A_LINE', date: '2026-10-12', runs: [{ product: 'A', from: '2026-10-12T10:00:00Z' }] }];
+  const W = P.weekScore(runs, [{ operationId: 'L1', name: 'GALLON FILLER' }, { operationId: 'L2', name: 'TOTES' }], id => t[id] || [], { L1: { changeoverMin: 20 } }, Date.parse('2026-10-14T00:00:00Z'));
+  const g = W.lines.find(x => x.operationId === 'L1');
+  assert.deepEqual([g.shifts, g.made, g.soFar, g.pct, g.downMin, g.stops, g.wasteTotal], [2, 12000, 14400, 83, 45, 3, 15]);
+  assert.deepEqual([g.changeovers, g.changeoverAvg, g.overStd, g.changeoverStd], [2, 20, 1, 20]);
+  assert.deepEqual(g.topReasons, [{ reason: 'Filler jam', minutes: 35 }, { reason: 'Cap feed', minutes: 10 }]);
+  assert.ok(g.oee > 0 && g.oee <= 100);
+  assert.deepEqual(W.lines.find(x => x.operationId === 'L2').shifts, 0, 'a shift with nothing entered is not counted');
+  assert.deepEqual(W.topLosses.map(r => r.reason), ['Filler jam', 'Cap feed']);
+});

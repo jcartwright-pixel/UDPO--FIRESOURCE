@@ -33,6 +33,7 @@
     <div class="head">
       <div class="title"><span class="eyebrow">Plant Production</span><h1 id="page-title">Production Lines</h1></div>
       <div class="hstats" id="hstats"></div>
+      <a class="lt-top" id="week-link" href="production.html?view=week" data-top>This Week</a>
       <a class="lt-top" id="tv" href="production.html?tv=1" data-top>TV Display</a>
       <a class="lt-top" href="line.html" data-top>Line Tablet</a>
       <a class="lt-top" href="linetargets.html" data-top>Line Targets</a>
@@ -47,6 +48,8 @@
       <div class="pd-totals" id="totals"></div>
       <div class="pd-tabs chips" id="tabs" hidden></div>
       <div class="pd-detail" id="detail" hidden></div>
+      <!-- Joe 10/14 follow-on: the weekly line scorecard (production.html?view=week). -->
+      <div class="pd-week" id="week" hidden></div>
       <div class="pd-tiles" id="tiles"></div>
       <div class="pd-legend" id="legend"><span class="g">&#9679; At or ahead</span><span class="a">&#9679; Up to 10% behind</span><span class="r">&#9679; More than 10% behind or stopped</span><span class="f">&#9679; Speed outside its range</span><span class="b">&#9679; Changeover or CIP wash</span></div>
     </div>
@@ -54,7 +57,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate, watchPerson } from './js/app.js';
-    import { doc, onSnapshot } from './js/firebase.js';
+    import { doc, onSnapshot, collection, query, where } from './js/firebase.js';
     import { watchProduction, lineView, fmt, shiftText } from './js/production.js';
     import { plantFor } from './js/pmaint.js';
 
@@ -67,6 +70,7 @@
     const started = Date.now(), now = () => testNow ? testNow + (Date.now() - started) : Date.now();
     window.udBack = () => { if (tv) { location.search = ''; return true; } return false; };
     let person = null, data = null, stop = null, db = null, plant = params.get('plant') || '', lineId = tv ? '' : params.get('line') || '', kindFilter = 'ALL';
+    let weekView = !tv && params.get('view') === 'week', weekOf = params.get('week') || '', weekRuns = [], weekKey = '', stopWeek = null;
     const R = window.UDProduction, KINDS = [['ALL', 'All lines'], ['FILLER', 'Fillers'], ['HTST', 'HTST'], ['PACK', 'Boxing & Totes'], ['BLOWMOLD', 'Blow Mold'], ['ATTN', 'Needs attention']];
     // Joe 10/14: line efficiency is for managers only (not the tablets or the TV).
     const manager = () => !tv && !!person && L.hasRole(person, L.REORDER_ROLES);
@@ -81,6 +85,7 @@
       if (!data) return;
       const t = now(), s = data.shift, views = data.lines.map(l => lineView(data, l, t));
       document.getElementById('tv').href = 'production.html?tv=1&plant=' + encodeURIComponent(plant);
+      document.getElementById('week-link').href = 'production.html?view=week&plant=' + encodeURIComponent(plant);
       document.getElementById('tv-plant').textContent = plantName(plant).toUpperCase() + ' PRODUCTION';
       document.getElementById('tv-shift').textContent = shiftText(s) + ' · ' + shortDate(s.date);
       document.getElementById('tv-clock').textContent = new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -120,7 +125,13 @@
     }
     // Filters and the plant's totals (mock-up A), or one line's tabs (mock-up B).
     function drawTop(views, t) {
-      const one = !!lineId && views.some(v => v.line.operationId === lineId);
+      const one = !weekView && !!lineId && views.some(v => v.line.operationId === lineId);
+      document.getElementById('week').hidden = !weekView;
+      if (weekView) {
+        ['filters', 'totals', 'tiles', 'legend', 'tabs', 'detail'].forEach(id => { document.getElementById(id).hidden = true; });
+        document.getElementById('page-title').textContent = 'This Week';
+        return drawWeek(t);
+      }
       document.getElementById('filters').hidden = tv || one;
       document.getElementById('totals').hidden = tv || one;
       document.getElementById('tiles').hidden = one;
@@ -162,7 +173,7 @@
       const eff = v.efficiency;
       const effBox = mgr ? box('How the shift is going', eff ? '<p class="pd-eff">Running <b>' + (eff.running === null ? '—' : eff.running + '%') + '</b> of the time &nbsp; At speed <b>' + (eff.speed === null ? '—' : eff.speed + '%') + '</b> &nbsp; Good <b>' + (eff.good === null ? '—' : eff.good + '%') + '</b></p><p class="pd-oee">Line efficiency ' + (eff.oee === null ? '—' : eff.oee + '%') + '</p><p class="pd-none">Running time × speed × good product. Changeovers and stops count against running time; CIP washes and breaks do not.</p>' : '<p class="pd-none">Starts with the shift\'s first product.</p>') : '';
       const coRows = v.changeovers.map(c => [escapeHtml((c.from || '—') + ' → ' + (c.to || '—')), clockOf(c.start), c.end ? c.minutes : c.minutes + ' so far', v.changeoverStd === null ? '–' : v.changeoverStd]);
-      const stopRows = (run.stops || []).map(s => { const m = Math.round(((s.end ? Date.parse(s.end) : t) - Date.parse(s.start)) / 60000); return [clockOf(s.start), s.end ? m : m + ' so far', escapeHtml(s.reason || 'No reason yet'), escapeHtml(who(s.reasonBy || s.by))]; });
+      const stopRows = (run.stops || []).map(s => { const m = Math.round(((s.end ? Date.parse(s.end) : t) - Date.parse(s.start)) / 60000); return [clockOf(s.start), s.end ? m : m + ' so far', escapeHtml(s.reason || 'No reason yet') + (s.woNumber ? ' · <a href="pmaint.html">work order ' + escapeHtml(s.woNumber) + '</a>' : ''), escapeHtml(who(s.reasonBy || s.by))]; });
       const wasteRows = Object.keys(v.waste).map(k => [escapeHtml(k), fmt(v.waste[k])]);
       const fields = R.CHECK_FIELDS[v.kind] || [], every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, checks = run.checks || {};
       const checkRows = Object.keys(checks).map(Number).sort((a, b) => a - b).map(n => [clockOf(new Date(start + n * every).toISOString())].concat(fields.map(f => { const x = String(checks[n][f[0]] === undefined ? '' : checks[n][f[0]]); return /NOT OK|LATE/.test(x) ? '<b class="pd-bad">' + escapeHtml(x) + '</b>' : escapeHtml(x); }), [escapeHtml(who(checks[n].by))]));
@@ -179,6 +190,45 @@
         box('Crew and notes', notes) + '</div>' +
         box('Quality checks', table([['Time']].concat(fields.map(f => [escapeHtml(f[1]), f[2] === 'num' ? 1 : 0])).concat([['By']]), checkRows, 'No checks yet this shift.'), 'wide');
     }
+    // The weekly line scorecard (Joe 10/14 follow-on): each line's week, Sunday to Saturday, and the plant's biggest losses.
+    function weekStartOf() { return L.weekStart(weekOf || (data.shift ? data.shift.date : L.operatingDay(new Date()))); }
+    function followWeek() {
+      const from = weekStartOf(), dates = [0, 1, 2, 3, 4, 5, 6].map(n => L.addDays(from, n));
+      if (weekKey === plant + from) return;
+      weekKey = plant + from; weekRuns = [];
+      if (stopWeek) stopWeek();
+      stopWeek = onSnapshot(query(collection(db, 'productionRuns'), where('date', 'in', dates)), q => {
+        weekRuns = q.docs.map(d => d.data()).filter(v => (String(v.facilityId || '').trim() || 'fac_uniontown') === plant);
+        render();
+      }, e => showError('Could not read the week (' + e.message + ').'));
+    }
+    function drawWeek(t) {
+      followWeek();
+      const from = weekStartOf(), to = L.addDays(from, 6), mgr = manager();
+      const W = R.weekScore(weekRuns, data.lines, id => R.targetsFor(data.products[id] || []), data.lineInfo || {}, t);
+      const hrs = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min';
+      const pctCell = (p) => p === null ? '–' : '<b class="' + (p >= 100 ? 'pd-good' : p >= 90 ? 'pd-due' : 'pd-bad') + '">' + p + '%</b>';
+      document.getElementById('hstats').innerHTML = [['Made', fmt(W.lines.reduce((n, x) => n + x.made, 0)), ''], ['Stopped', hrs(W.lines.reduce((n, x) => n + x.downMin, 0)), ''], ['Waste', fmt(W.lines.reduce((n, x) => n + x.wasteTotal, 0)), ''], ['Changeovers', W.lines.reduce((n, x) => n + x.changeovers, 0), '']]
+        .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      document.getElementById('sub').textContent = plantName(plant) + ' · Week of ' + shortDate(from) + ' to ' + shortDate(to);
+      const rows = W.lines.map(x => '<tr data-line="' + escapeHtml(x.operationId) + '"><td class="w"><b>' + escapeHtml(x.line) + '</b></td><td class="n">' + x.shifts + '</td><td class="n">' + fmt(x.made) + '</td><td class="n">' + fmt(x.soFar) + '</td><td class="n">' + pctCell(x.pct) + '</td>' +
+        '<td class="n">' + hrs(x.downMin) + '</td><td class="w">' + (x.topReasons.length ? x.topReasons.map(r => escapeHtml(r.reason) + ' ' + hrs(r.minutes)).join(' · ') : '—') + '</td><td class="n">' + fmt(x.wasteTotal) + '</td>' +
+        '<td class="n">' + (x.changeovers ? x.changeovers + ' · avg ' + x.changeoverAvg + ' min' + (x.changeoverStd ? ' (standard ' + x.changeoverStd + ')' : '') + (x.overStd ? ' · <b class="pd-bad">' + x.overStd + ' over</b>' : '') : '—') + '</td>' +
+        (mgr ? '<td class="n">' + (x.oee === null ? '–' : x.oee + '%') + '</td>' : '') + '</tr>').join('');
+      const losses = W.topLosses.length ? '<ol class="pd-losses">' + W.topLosses.map(r => '<li><b>' + escapeHtml(r.reason) + '</b> ' + hrs(r.minutes) + '</li>').join('') + '</ol>' : '<p class="pd-none">No stops this week.</p>';
+      document.getElementById('week').innerHTML = '<div class="pd-weeknav chips"><button type="button" data-week="-7">Last Week</button><button type="button" data-week="0"' + (weekOf ? '' : ' class="on"') + '>This Week</button><button type="button" data-week="7"' + (weekOf ? '' : ' disabled') + '>Next Week</button></div>' +
+        '<section class="pd-box"><h3>Biggest losses this week</h3>' + losses + '</section>' +
+        '<section class="pd-box"><h3>Each line, ' + shortDate(from) + ' to ' + shortDate(to) + '</h3><table class="pd-t"><thead><tr><th>Line</th><th class="n">Shifts</th><th class="n">Made</th><th class="n">Target</th><th class="n">%</th><th class="n">Stopped</th><th class="w">Top stop reasons</th><th class="n">Waste</th><th class="n">Changeovers</th>' + (mgr ? '<th class="n">Efficiency</th>' : '') + '</tr></thead><tbody>' + rows + '</tbody></table></section>';
+    }
+    document.getElementById('week').addEventListener('click', e => {
+      const b = e.target.closest('[data-week]');
+      if (!b) return;
+      const n = Number(b.dataset.week), today = L.weekStart(data.shift ? data.shift.date : L.operatingDay(new Date()));
+      weekOf = n === 0 ? '' : L.addDays(weekStartOf(), n);
+      if (weekOf && weekOf >= today) weekOf = '';
+      history.replaceState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + '&view=week' + (weekOf ? '&week=' + weekOf : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
+      render();
+    });
     document.getElementById('filters').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (!b) return; kindFilter = b.dataset.kind; render(); });
     document.getElementById('tiles').addEventListener('click', e => {
       if (tv) return;

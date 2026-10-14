@@ -5,7 +5,8 @@
  *   product  the product now running (a new run of the shift starts from now);
  *   count    the total made this shift so far (typed by the operator until a sensor or label reader sends it);
  *   stop     the line stopped (from now);       run     the line is running again (the open stop ends now);
- *   reason   why a stop happened (stopIndex = which stop).
+ *   reason   why a stop happened (stopIndex = which stop). Joe 10/14 follow-on: "Maintenance called" also makes the stop a Plant
+ *            Maintenance work order (plantWorkOrders, M-1001 on, once per stop), so maintenance sees it on the Maintenance Station.
  * The shift is worked out on the tablet (production-rules.js shiftNow) and sent with the entry; times are the server's.
  * More for every line (Joe 10/14: "all of your picks", mock-ups C to H), on the same shift's record:
  *   changeover  start (to = the new product), to (change the new product) or done; cocheck ticks one changeover checklist line (key);
@@ -115,6 +116,24 @@ function validateLineEntry(input, SaveError) {
     if (out.qty !== null && (!Number.isInteger(n) || n < 0 || n > 9999999)) throw new SaveError('BAD_REQUEST', 'Type how many to make, a whole number.');
   }
   return out;
+}
+// A stop with "Maintenance called" becomes the line's work order (Joe 10/14 follow-on), the same as Plant Maintenance's own.
+// Its reads come before any write of the save.
+const MAINT_REASON = 'Maintenance called';
+async function stopWorkOrder(tx, db, req, line, run, stop, email, stamp) {
+  const PM = require('./plantmaint'), MR = require('./pmaint-rules');
+  const ref = db.collection('plantWorkOrders').doc(docId('LS_' + P.runId(req.operationId, req.shift.key) + '_' + req.stopIndex));
+  const had = await tx.get(ref);
+  if (had.exists) return { id: ref.id, woNumber: had.data().woNumber, write: () => {} };
+  const all = await PM.plantMachines(tx, db, line.facilityId), m = MR.findMachine(all, line.name);
+  const num = await PM.nextNumber(tx, db, line.facilityId);
+  const wo = { woNumber: MR.woNumber(num.n), facilityId: line.facilityId, machineId: m ? m.id : '', machine: m ? m.name : line.name, area: m ? m.area || '' : '',
+    problem: line.name + ' stopped at ' + new Date(stop.start).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) + (run.product ? ' running ' + run.product : '') + '. Maintenance called from the line tablet.', notes: '', lineDown: stop.end ? 'NO' : 'YES',
+    type: 'Maintenance Request', urgency: stop.end ? '' : 'HIGH', source: 'LINE_TABLET', sourceRunId: P.runId(req.operationId, req.shift.key), sourceStop: req.stopIndex, sourceShift: req.shift.name || '', sourceAt: stop.start,
+    sourceBy: email, status: 'NEW', labor: [], createdAt: stamp, createdBy: email, updatedAt: stamp, updatedBy: email, testEdited: true };
+  num.write(stamp);
+  tx.set(ref, wo);
+  return { id: ref.id, woNumber: wo.woNumber };
 }
 async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const line = await lineOf(tx, db, req.operationId, SaveError);
@@ -233,6 +252,11 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
     if (!s) throw new SaveError('NOT_FOUND', 'That stop is not on this shift.');
     s.reason = req.reason; s.reasonBy = email;
     message = line.name + ' stop: ' + req.reason + '.';
+    if (req.reason === MAINT_REASON && !s.workOrderId) {
+      const wo = await stopWorkOrder(tx, db, req, line, run, s, email, stamp);
+      s.workOrderId = wo.id; s.woNumber = wo.woNumber;
+      message = line.name + ': work order ' + wo.woNumber + ' sent to maintenance.';
+    }
   }
   if (lineSet) tx.set(lineRef, Object.assign({ operationId: req.operationId, line: line.name, facilityId: line.facilityId, updatedAt: stamp, updatedBy: email }, lineSet), { merge: true });
   if (req.op === 'next') {

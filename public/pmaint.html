@@ -103,7 +103,7 @@
         '<div class="pmc-empty">No breakdowns recorded today.</div>';
       document.getElementById('n-wo').textContent = open.length;
       document.getElementById('orders').innerHTML = open.map(w => '<div class="pmc-item ' + (w.lineDown === 'YES' ? 'red' : w.status === 'PARTS' ? 'amber' : '') + '"><b>' + escapeHtml(w.woNumber + ' · ' + (w.machine || 'Plant')) + '</b> ' + pill(R.statusWord(w.status), WO_CLASS[w.status] || 'gray') +
-        '<p>' + escapeHtml(w.problem || '') + '</p><small>' + escapeHtml([w.source === 'PM' ? 'PM' : w.source === 'SHIFT_NOTES' ? 'Request' : 'Maintenance', stamp(w.createdAt), w.onNow ? w.onNow + ' on it' : w.status === 'NEW' ? 'not started' : ''].filter(Boolean).join(' · ')) + '</small></div>').join('') ||
+        '<p>' + escapeHtml(w.problem || '') + '</p><small>' + escapeHtml([w.source === 'PM' ? 'PM' : w.source === 'SHIFT_NOTES' ? 'Request' : w.source === 'LINE_TABLET' ? 'Line tablet' : 'Maintenance', stamp(w.createdAt), w.onNow ? w.onNow + ' on it' : w.status === 'NEW' ? 'not started' : ''].filter(Boolean).join(' · ')) + '</small></div>').join('') ||
         '<div class="pmc-empty">No open work orders.</div>';
       document.getElementById('n-pm').textContent = due.length;
       document.getElementById('pms').innerHTML = due.map(t => '<div class="pmc-item ' + (t.state === 'LATE' ? 'red' : '') + '"><b>' + escapeHtml(t.machine) + '</b><p>' + escapeHtml(t.task) + '</p><small>' + escapeHtml(R.everyText(t.every, t.unit)) + ' · due ' + day(t.due) +

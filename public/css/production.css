@@ -214,6 +214,15 @@ table.pd-t .n { text-align: right; white-space: nowrap; }
 .pd-key span { display: inline-flex; align-items: center; gap: 6px; }
 .pd-key i { width: 14px; height: 14px; border-radius: 3px; }
 @media (max-width: 1100px) { .pd-detail { grid-template-columns: minmax(0, 1fr); } }
+/* The weekly line scorecard (Joe 10/14 follow-on). */
+.pd-week { display: flex; flex-direction: column; gap: 14px; }
+.pd-week[hidden] { display: none; }
+.pd-weeknav { justify-content: flex-end; }
+.pd-weeknav button { min-height: 40px; padding: 0 16px; border-radius: 9px; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.pd-weeknav button:disabled { opacity: .5; cursor: default; }
+.pd-losses { margin: 0; padding-left: 26px; display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: 18px; }
+.pd-losses b { color: var(--ud-blue-dark); }
+b.pd-good { color: #1d7a3e; }
 /* ?tv=1: the TV on the floor (mock-up B). */
 html:has(body.pd-tv) { background: #06223d; }
 body.pd-tv { background: #06223d; color: #fff; }

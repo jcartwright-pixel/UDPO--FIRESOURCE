@@ -13,6 +13,7 @@
   <script src="js/logic.js"></script>
   <script src="js/board-rules.js"></script>
   <script src="js/plant-rules.js"></script>
+  <script src="js/production-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page manager-page">
   <div class="signin" id="signin" hidden>
@@ -78,13 +79,22 @@
     import * as P from './js/plant-core.js';
     import { watchRound } from './js/autosave.js';
     import { cardClicks } from './js/cards.js';
+    import { watchProduction, lineView, shiftText } from './js/production.js';
+    import { plantFor } from './js/pmaint.js';
     cardClicks(document.getElementById('grid'));
 
     const L = window.UDLogic, U = window.UDPlant;
     const today = () => L.operatingDay(new Date());
     let date = today();
     const data = { sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
-    let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null;
+    let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null, prod = null, stopProd = null;
+    // Joe 10/14 follow-on (end-of-shift production report): each line's shift from the line tablets rides on the Current Report.
+    const lineOutput = () => {
+      if (!prod || !prod.shift) return [];
+      const t = Date.now();
+      return prod.lines.map(l => { const v = lineView(prod, l, t); return { line: l.name, product: v.product, made: v.made, soFar: v.soFar, pct: v.pct, downMin: v.downMin, stops: v.stops, topReason: v.topReason, wasteTotal: v.wasteTotal,
+        changeovers: v.changeovers.length, changeoverMin: v.changeovers.reduce((n, c) => n + c.minutes, 0), oee: v.efficiency ? v.efficiency.oee : null, state: v.state }; });
+    };
     let askReport = new URLSearchParams(location.search).get('report') === '1';
     const canSend = () => maySave(person, L.SAVE_ROLES, app, 'plant');
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : 'None'; };
@@ -115,7 +125,7 @@
       const log = U.shiftLog(journal, now), N = U.managerNotes(log), week = U.shiftLog(data.shift, now, 168);
       const openPickups = P.withNotePickups(loads, data.pickups).filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       // Joe 10/10: only what was checked since the last report was sent goes in; the rest is "Not checked".
-      report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart }, now);
+      report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart, output: lineOutput(), outputShift: prod && prod.shift ? shiftText(prod.shift) : '' }, now);
       const S = U.shiftReport(week, data.roundStart);
       return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N, S };
     }
@@ -200,6 +210,7 @@
         (r.others.length ? sect('Incidents · Safety · Quality', r.others.length, '', r.others.map(d => row(d.equipment || d.type, [d.type, d.entry, U.followLabel(d.status)].filter(Boolean).join(' · '), d.status === 'RESOLVED' ? '' : 'warn')), '') : '') +
         sect('Still to load', r.leftToLoad + ' of ' + r.totalLoads, '', r.behind.concat(r.nextUp).map((z, i) => row((i + 1) + '. ' + U.reportName(z), 'depart ' + (z.depart || '-') + ' · ' + U.statusWord(z.status) + (z.late ? ' · ' + z.late : '') + ((z.truck || z.trailer) ? ' · ' + [z.truck, z.trailer].filter(Boolean).join(' / ') : '') + (z.priorDay ? ' · from yesterday' : ''), z.late ? 'bad' : '')), 'Nothing left to load.') +
         sect('Production', null, '', r.lines.map(l => l.runComplete ? row(l.line, 'RUN COMPLETE ' + l.lastCheckedAt) : row(l.line, [l.product, l.lastCheckedAt ? (l.notChecked ? 'last check ' : 'quality check ') + l.lastCheckedAt + (l.qualityCheck ? ' ' + l.qualityCheck : '') : '', l.status || 'no status'].filter(Boolean).join(' · '), l.flag ? 'bad' : '')), 'No production lines set up.') +
+        ((r.output || []).length ? sect('Line output' + (r.outputShift ? ' · ' + r.outputShift : ''), null, '', r.output.map(o => row(o.line, (o.product ? o.product + ' · ' : '') + U.outputText(o), o.pct !== null && o.pct < 90 ? 'bad' : '')), '') : '') +
         sect('Temperatures', null, '', r.temperatures.map(t => row(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : '') + (t.limit ? ' · limit ' + t.limit : '') + (t.due && t.status !== 'NO CHECK' ? ' · check due' : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.');
     }
 
@@ -269,7 +280,11 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       let timer = null;
       const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 50); };
-      watchPerson(db, user, p => { person = p; later(); }, { withEmail: true });
+      watchPerson(db, user, p => {
+        person = p;
+        if (!stopProd) stopProd = watchProduction(db, plantFor(person, null).id, d => { prod = d; later(); }, () => {});
+        later();
+      }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; later(); });
       onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
       onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});
