@@ -67,7 +67,7 @@ test('Driver Scorecard logic: the screen and the server load the same file; a mi
   const fs = require('fs'), path = require('path');
   assert.equal(fs.readFileSync(path.join(__dirname, '../../src/sc-core.js'), 'utf8'), fs.readFileSync(path.join(__dirname, '../../../public/js/sc-core.js'), 'utf8'));
   const S = require('../../src/sc-core');
-  const s = S.scSettings_({});
+  const s = S.scSettings_({ countFrom: '2026-01-01' });
   const days = S.scBuildDay_('2026-10-05', [{ runId: 'r1', route: '855', run: 'SAL', runs: 'TRUE', driver: 'ADAMS, PAT', driverId: 'd1', casesOut: 500, plantCaseReturn: 497 }], [], {});
   const rows = S.scScoreMonth_(days, [], s, { D1: 'ADAMS, PAT' });
   // Joe 10/13 rewards: a missed check-in costs 4 and 3 lost cases 3; attendance earns 1 for the clean day.

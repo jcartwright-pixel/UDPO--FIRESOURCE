@@ -47,7 +47,7 @@
           <div><span class="eyebrow">Plant Production · Line tablet</span><h1 id="line-name"></h1><div class="lb-sub" id="line-sub"></div></div>
           <span class="lb-live" id="live"></span>
         </div>
-        <div class="lb-cards">
+        <div class="lb-cards" id="std-cards">
           <div class="lb-card"><span class="eyebrow">Running now</span><div class="lb-prod" id="prod"></div><div class="lb-mut" id="prod-sub"></div><div id="prod-pill"></div>
             <button type="button" class="lb-btn" id="change-product">Change Product</button></div>
           <div class="lb-card"><span class="eyebrow">Made this shift</span><div class="lb-big" id="made"></div><div class="lb-mut" id="so-far"></div><div class="lb-bar"><i id="bar"></i></div><div id="vs"></div>
@@ -55,7 +55,13 @@
           <div class="lb-card" id="speed-card"><span class="eyebrow">Speed now</span><div class="lb-big" id="speed"></div><div class="lb-mut" id="speed-sub"></div><div id="speed-flag"></div></div>
           <div class="lb-card"><span class="eyebrow">Stopped this shift</span><div class="lb-big lb-red" id="down"></div><div class="lb-mut" id="down-sub"></div></div>
         </div>
+        <!-- Joe 10/14 (mock-ups G and H): the HTST's and the Blow Mold's own cards in place of the filler's. -->
+        <div class="lb-cards" id="kind-cards" hidden></div>
         <div class="lb-date" id="date-check"></div>
+        <div class="lb-date" id="cip-strip" hidden></div>
+        <div class="lb-strip" id="check-inline" hidden></div>
+        <div class="lb-strip" id="strip" hidden></div>
+        <div class="lb-actions" id="actions"></div>
         <div class="lb-status" id="status"><div id="status-text"></div><button type="button" id="status-btn"></button></div>
         <div class="lb-reasons" id="reasons"></div>
       </section>
@@ -63,6 +69,11 @@
       <section class="lb-pane" id="product-pane" hidden>
         <div class="lb-pane-top"><h2>Pick the product running on <span id="pp-line"></span></h2><input type="search" id="pp-find" placeholder="Find a product or SKU" aria-label="Find a product or SKU"><button type="button" class="lb-btn" id="pp-cancel">Cancel</button></div>
         <div class="lb-products" id="pp-list"></div>
+      </section>
+      <!-- Joe 10/14 (mock-ups D, E, F, G, H): what the six buttons under the cards open. -->
+      <section class="lb-pane" id="more-pane" hidden>
+        <div class="lb-pane-top"><h2 id="mp-title"></h2><span id="mp-badge"></span><button type="button" class="lb-btn" id="mp-close">Close</button></div>
+        <div id="mp-body"></div>
       </section>
       <!-- Enter Count: the total made this shift, from the machine's counter. -->
       <form class="lb-pane" id="count-pane" hidden>
@@ -102,6 +113,7 @@
       document.getElementById('board').hidden = !line || !!pane;
       document.getElementById('product-pane').hidden = pane !== 'product';
       document.getElementById('count-pane').hidden = pane !== 'count';
+      document.getElementById('more-pane').hidden = !MORE[pane];
       document.getElementById('change').hidden = !line;
       document.getElementById('pill').hidden = !line;
       if (!line) {
@@ -113,6 +125,7 @@
       document.getElementById('pill').textContent = line.name + ' · ' + plantName(plant());
       if (pane === 'product') return drawProducts(v);
       if (pane === 'count') return;
+      if (MORE[pane]) return drawMore(v);
       document.getElementById('line-name').textContent = line.name;
       document.getElementById('line-sub').textContent = plantName(plant()).toUpperCase() + ' · ' + shortDate(s.date) + ' · ' + shiftText(s);
       const live = document.getElementById('live');
@@ -144,6 +157,7 @@
       document.getElementById('down-sub').textContent = v.stops + ' stop' + (v.stops === 1 ? '' : 's') + (v.needReason.length ? ' · ' + v.needReason.length + ' need' + (v.needReason.length === 1 ? 's' : '') + ' a reason' : '');
       // Code date check: the label reader's, or what the code should be until one is on the line.
       const rd = v.reader, dc = document.getElementById('date-check');
+      dc.hidden = v.kind === 'HTST' || v.kind === 'BLOWMOLD';
       if (rd && v.counter === 'READER') {
         const ok = rd.dateOk !== false;
         dc.className = 'lb-date ' + (ok ? 'ok' : 'bad');
@@ -155,14 +169,23 @@
       // Running or stopped, and why.
       const st = document.getElementById('status'), btn = document.getElementById('status-btn'), txt = document.getElementById('status-text'), need = v.needReason[0];
       let reasonFor = -1, chosen = '';
-      if (v.state === 'STOPPED') {
+      if (v.state === 'CHANGEOVER' || v.state === 'CIP') {
+        // Joe 10/14 (mock-up D): a changeover or CIP wash counts as that, not as stopped.
+        const co = v.state === 'CHANGEOVER', x = co ? v.changeover : v.cip;
+        st.className = 'lb-status ' + (co ? 'co' : 'cip');
+        txt.innerHTML = '<b>' + (co ? (v.kind === 'BLOWMOLD' ? 'MOLD CHANGE' : 'CHANGEOVER') : 'CIP WASH') + ' RUNNING ' + x.minutes + ' MIN</b> since ' + clock(x.start) + (co && v.changeoverStd ? ' (standard ' + v.changeoverStd + ' min)' : '') + '. The line counts as ' + (co ? 'changeover' : 'CIP') + ', not stopped.';
+        btn.textContent = co ? (v.kind === 'BLOWMOLD' ? 'MOLD CHANGE DONE' : 'CHANGEOVER DONE') : 'CIP DONE'; btn.className = 'done';
+      } else if (v.state === 'STOPPED') {
         st.className = 'lb-status stopped';
         txt.innerHTML = '<b>LINE STOPPED ' + v.stoppedMin + ' MIN</b> since ' + clock(v.stoppedAt) + '. ' + (v.openReason ? 'Reason: ' + escapeHtml(v.openReason) + '.' : 'Tap why it stopped.');
         btn.textContent = 'RUNNING AGAIN'; btn.className = 'run';
         reasonFor = v.stopIndex; chosen = v.openReason;
       } else {
         st.className = 'lb-status ' + (need ? 'needs' : 'running');
-        txt.innerHTML = need ? '<b>STOP AT ' + clock(need.start) + ' (' + need.minutes + ' MIN) NEEDS A REASON.</b> Tap why it stopped.' : '<b>LINE RUNNING</b>' + (v.product ? '' : ' · pick the product running');
+        txt.innerHTML = need ? '<b>STOP AT ' + clock(need.start) + ' (' + need.minutes + ' MIN) NEEDS A REASON.</b> Tap why it stopped.' :
+          v.kind === 'HTST' ? (v.diverting ? '<b>IN DIVERT ' + v.diverting.minutes + ' MIN</b>' + (v.diverting.reason ? ' · ' + escapeHtml(v.diverting.reason) : '') : '<b>PASTEURIZING</b> · forward flow') + (v.product ? '' : ' · pick the product running') :
+          '<b>LINE RUNNING</b>' + (v.product ? '' : ' · pick the product running');
+        if (!need && v.diverting) st.className = 'lb-status needs';
         btn.textContent = 'LINE STOPPED'; btn.className = 'stop';
         reasonFor = need ? need.index : -1;
       }
@@ -171,7 +194,236 @@
       rs.hidden = reasonFor < 0;
       rs.dataset.stop = reasonFor;
       rs.innerHTML = reasonFor < 0 ? '' : R.REASONS.map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
+      drawMoreBoard(v);
     }
+    // ---------- Joe 10/14 ("all of your picks", mock-ups C to H): Up next, each hour, six buttons for the kind of line and what they open ----------
+    // Efficiency stays off the tablet (Joe: managers only).
+    const MORE = { changeover: 1, cip: 1, waste: 1, check: 1, crew: 1, notes: 1, divert: 1, source: 1, lot: 1, stock: 1, next: 1 };
+    const ACTIONS = { FILLER: ['changeover', 'cip', 'waste', 'check', 'crew', 'notes'], PACK: ['changeover', 'cip', 'waste', 'check', 'crew', 'notes'],
+      HTST: ['divert', 'cip', 'source', 'changeover', 'crew', 'notes'], BLOWMOLD: ['changeover', 'lot', 'waste', 'check', 'crew', 'notes'] };
+    let wasteReason = '', coTo = '';
+    // A box is drawn again only when what it shows has changed: a save's own redraw (before the saved value comes back) keeps what was just picked or typed.
+    const drawn = {};
+    const draw = (id, html) => { if (drawn[id] === html || typing(id)) return; drawn[id] = html; document.getElementById(id).innerHTML = html; };
+    const who = (email) => String(email || '').split('@')[0];
+    const typing = (id) => { const a = document.activeElement, box = document.getElementById(id); return !!(a && box && box.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
+    const hourName = (iso) => { const h = new Date(iso).getHours(); return String((h + 11) % 12 + 1); };
+    // The newest reading of one box of the quality checks this shift (the HTST's temperature and flow).
+    function latest(v, field) {
+      const c = (v.run && v.run.checks) || {}, slots = Object.keys(c).map(Number).sort((a, b) => b - a);
+      for (const k of slots) if (c[k] && String(c[k][field] || '') !== '') return { value: c[k][field], at: c[k].at };
+      return null;
+    }
+    function actionText(v, a) {
+      const k = v.kind;
+      if (a === 'changeover') return v.changeover ? [k === 'BLOWMOLD' ? 'Mold Change' : 'Changeover', v.changeover.minutes + ' min running', 'on'] : [k === 'BLOWMOLD' ? 'Mold Change' : 'Changeover', 'start / finish', ''];
+      if (a === 'cip') return [k === 'HTST' ? 'CIP Wash' : 'CIP / Sanitation', v.cip ? 'washing ' + v.cip.minutes + ' min' : v.sinceCipHours !== null ? (v.sinceCipHours < 1 ? 'last under 1 h ago' : 'last ' + v.sinceCipHours + ' h ago') : 'start / finish', v.cip ? 'on' : v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours ? 'warn' : ''];
+      if (a === 'waste') return ['Waste / Rejects', fmt(v.wasteTotal) + ' this shift', ''];
+      if (a === 'check') return ['Quality Check', !v.check ? 'every ' + (R.CHECK_EVERY[k] || 2) + ' hours' : v.check.done ? 'next ' + clock(v.check.next) : 'due ' + clock(v.check.at), v.check && !v.check.done ? 'warn' : ''];
+      if (a === 'crew') return ['Crew', v.crewOn.length + ' signed on', ''];
+      if (a === 'notes') return ['Shift Notes', v.note ? 'note written' : v.prevNote ? '1 from last shift' : 'none yet', ''];
+      if (a === 'divert') return ['Divert', v.diverting ? 'IN DIVERT ' + v.diverting.minutes + ' min' : 'record why', v.diverting ? 'warn' : ''];
+      if (a === 'source') return ['Silo / Tank', v.source.from || 'from and to', ''];
+      if (a === 'lot') return ['Resin Lot', v.lot || 'type the lot', ''];
+      return [a, '', ''];
+    }
+    // The board's new pieces: the HTST and Blow Mold cards, the CIP clock, the hourly check, Up next and each hour, the six buttons.
+    function drawMoreBoard(v) {
+      const k = v.kind, special = k === 'HTST' || k === 'BLOWMOLD', tg = v.target;
+      document.getElementById('std-cards').hidden = special;
+      const kc = document.getElementById('kind-cards');
+      kc.hidden = !special;
+      const madeBits = '<div class="lb-mut">Target so far ' + fmt(v.soFar) + '</div><div class="lb-bar"><i class="c-' + (v.pct === null || v.pct >= 100 ? 'g' : v.pct >= 90 ? 'a' : 'r') + '" style="width:' + Math.min(100, v.pct || 0) + '%"></i></div>' +
+        (v.pct === null ? '' : v.made >= v.soFar ? '<div><span class="lb-pill g">' + fmt(v.made - v.soFar) + ' AHEAD · ' + v.pct + '%</span></div>' : '<div><span class="lb-pill ' + (v.pct >= 90 ? 'a' : 'r') + '">' + fmt(v.behind) + ' BEHIND · ' + v.pct + '%</span></div>');
+      const countBtn = v.counter === 'TABLET' ? '<button type="button" class="lb-btn" data-act="count">Enter Count</button>' : '';
+      const speedLine = v.speed === null ? '' : '<div class="lb-mut">Speed ' + v.speed + ' / min ' + (v.speedFlag === 'OVER' ? '<span class="lb-pill r">TOO FAST</span>' : v.speedFlag === 'UNDER' ? '<span class="lb-pill r">TOO SLOW</span>' : '') + '</div>';
+      if (k === 'BLOWMOLD') {
+        const rej = Number(v.waste['Leak tester'] || 0);
+        kc.innerHTML =
+          '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || 'No product picked') + '</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div><button type="button" class="lb-btn" data-act="product">' + (v.product ? 'Change Product' : 'Pick Product') + '</button></div>' +
+          '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs this shift</span><div class="lb-big">' + fmt(v.made) + '</div>' + madeBits + speedLine + countBtn + '</div>' +
+          '<div class="lb-card"><span class="eyebrow">Leak tester rejects</span><div class="lb-big">' + fmt(rej) + '</div><div class="lb-mut">' + (v.made ? (Math.round(rej / v.made * 1000) / 10) + '% of jugs made' : 'this shift') + '</div><button type="button" class="lb-btn" data-act="waste" data-reason="Leak tester">Enter Rejects</button></div>' +
+          '<div class="lb-card"><span class="eyebrow">Jugs ahead of filler</span><div class="lb-big">' + (v.stock === null ? '—' : fmt(v.stock)) + '</div><div class="lb-mut">' + (v.run && v.run.stockAt ? 'counted ' + clock(v.run.stockAt) : 'not counted this shift') + '</div><button type="button" class="lb-btn" data-act="stock">Enter Jugs</button></div>';
+      } else if (k === 'HTST') {
+        const temp = latest(v, 'recorder'), ind = latest(v, 'indicating'), flow = latest(v, 'flow');
+        kc.innerHTML =
+          '<div class="lb-card"><span class="eyebrow">Running now</span><div class="lb-prod">' + escapeHtml(v.product || 'No product picked') + '</div><div class="lb-mut">' + escapeHtml(v.source.from || v.source.to ? [v.source.from ? 'From ' + v.source.from : '', v.source.to ? 'to ' + v.source.to : ''].filter(Boolean).join(' · ') : 'Silo and tanks not typed') + '</div><button type="button" class="lb-btn" data-act="product">' + (v.product ? 'Change Product' : 'Pick Product') + '</button></div>' +
+          '<div class="lb-card"><span class="eyebrow">Pasteurizing temp</span><div class="lb-big">' + (temp ? escapeHtml(temp.value) + '°F' : '—') + '</div><div class="lb-mut">' + (temp ? 'Recorder at ' + clock(temp.at) + (ind ? ' · indicating ' + escapeHtml(ind.value) + '°F' : '') : 'From the hourly chart check') + '</div><div><span class="lb-pill ' + (v.diverting ? 'r">IN DIVERT' : 'g">FORWARD FLOW') + '</span></div></div>' +
+          '<div class="lb-card"><span class="eyebrow">Flow</span><div class="lb-big">' + (flow ? escapeHtml(flow.value) : '—') + '</div><div class="lb-mut">gallons a minute · ' + fmt(v.made) + ' made this shift</div>' + countBtn + '</div>' +
+          '<div class="lb-card"><span class="eyebrow">Diverts this shift</span><div class="lb-big">' + v.diverts + '</div><div class="lb-mut">' + (v.lastDivertAt ? 'Last divert ' + shortDate(v.lastDivertAt.slice(0, 10)) + ' ' + clock(v.lastDivertAt) : 'No divert recorded') + '</div></div>';
+      }
+      // The CIP clock (mock-up G): hours since the last CIP wash that passed, against the line's hours between washes.
+      const cs = document.getElementById('cip-strip');
+      cs.hidden = !(k === 'HTST' || v.cipHours);
+      if (!cs.hidden) {
+        const of = v.cipHours, h = v.sinceCipHours, cls = v.cip ? 'n' : h === null ? 'a' : of && h >= of ? 'r' : of && h >= of * 0.8 ? 'a' : 'g';
+        cs.className = 'lb-date ' + (cls === 'r' ? 'bad' : cls === 'g' ? 'ok' : '');
+        cs.innerHTML = v.cip ? '<span class="lb-pill n">CIP WASH RUNNING</span><b>' + v.cip.minutes + ' min</b><span>Started ' + clock(v.cip.start) + '.</span>' :
+          '<span class="lb-pill ' + cls + '">' + (h === null ? 'NO CIP WASH RECORDED' : 'SINCE CIP ' + h + ' H') + '</span>' + (of ? '<b>of ' + of + ' h</b>' : '') +
+          '<span>' + (h !== null && of ? 'Next CIP wash about ' + clock(new Date(Date.parse(v.lastCipAt) + of * 3600000).toISOString()) + '. ' : '') + (v.lastCipAt ? 'Last CIP ' + clock(v.lastCipAt) + ', passed.' : 'Tap CIP Wash when one starts.') + '</span>';
+      }
+      // The HTST's hourly chart check and the Blow Mold's bottle check, on the board (mock-ups G and H).
+      const ci = document.getElementById('check-inline');
+      ci.hidden = !special || !v.check;
+      if (!ci.hidden) draw('check-inline', '<div class="lb-box"><h3>' + (k === 'HTST' ? 'Hourly chart check' : 'Bottle check') + ' · ' + clock(v.check.at) + (v.check.done ? ' done' : ' due') + '</h3>' + checkForm(v) + '</div><div class="lb-box"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>');
+      // Up next and each hour (mock-up C).
+      const sp = document.getElementById('strip');
+      sp.hidden = special;
+      if (!special) {
+        const hrs = R.hourly(v.run, v.targets, now()), top = Math.max(1, ...hrs.map(x => Math.max(x.made, x.target)));
+        sp.innerHTML = '<div class="lb-box"><h3>Up next on this line</h3>' + (v.next ? '<div class="lb-next">' + escapeHtml(v.next.product) + (v.next.qty ? ' · ' + fmt(v.next.qty) : '') + '</div>' : '<div class="lb-mut">Nothing set yet.</div>') + '<button type="button" class="lb-btn" data-act="next">Set Next</button></div>' +
+          '<div class="lb-box"><h3>Each hour</h3>' + (hrs.length ? '<div class="lb-hbars">' + hrs.map(x => '<div' + (x.now ? ' class="now"' : '') + ' title="' + fmt(x.made) + ' made' + (x.target ? ' of ' + fmt(x.target) : '') + '"><i class="' + (!x.past ? 'e' : x.pct === null ? (x.made ? '' : 'e') : x.pct >= 100 ? '' : x.pct >= 90 ? 'a' : 'r') + '" style="height:' + (x.past && (x.made || x.target) ? Math.max(6, Math.round(Math.max(x.made, 1) / top * 56)) : 6) + 'px"></i><span>' + hourName(x.from) + '</span></div>').join('') + '</div>' : '<div class="lb-mut">Starts with the shift\'s first product.</div>') + '</div>';
+      }
+      const acts = document.getElementById('actions');
+      acts.innerHTML = (ACTIONS[k] || ACTIONS.FILLER).map(a => { const t = actionText(v, a); return '<button type="button" data-act="' + a + '"' + (t[2] ? ' class="' + t[2] + '"' : '') + '>' + escapeHtml(t[0]) + '<small>' + escapeHtml(t[1]) + '</small></button>'; }).join('');
+    }
+    // One quality check's boxes; each saves when it is left (Review item 38: no Save buttons; drop-downs start blank).
+    function checkForm(v) {
+      const c = v.check;
+      if (!c) return '<p class="lb-mut">The checks start with the shift.</p>';
+      return '<div class="lb-fields">' + (R.CHECK_FIELDS[v.kind] || []).map(f => {
+        const got = c.values[f[0]] === undefined ? '' : String(c.values[f[0]]);
+        if (f[2] === 'ok') {
+          const opts = f[0] === 'pen' ? ['ON TIME', 'LATE'] : ['OK', 'NOT OK'];
+          return '<label class="lb-field">' + escapeHtml(f[1]) + '<select class="lb-sel" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '"><option value=""></option>' + opts.map(o => '<option' + (o === got ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></label>';
+        }
+        return '<label class="lb-field">' + escapeHtml(f[1]) + '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '"></label>';
+      }).join('') + '</div>';
+    }
+    function checkTable(v) {
+      const c = (v.run && v.run.checks) || {}, fields = R.CHECK_FIELDS[v.kind] || [], every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, start = Date.parse((v.run && v.run.shiftStart) || '');
+      const slots = Object.keys(c).map(Number).filter(n => !v.check || n !== v.check.slot).sort((a, b) => a - b);
+      if (!slots.length) return '<p class="lb-mut">No checks yet this shift.</p>';
+      return '<table class="lb-t"><thead><tr><th>Time</th>' + fields.map(f => '<th' + (f[2] === 'num' ? ' class="n"' : '') + '>' + escapeHtml(f[1]) + '</th>').join('') + '<th>By</th></tr></thead><tbody>' +
+        slots.map(n => '<tr><td>' + clock(new Date(start + n * every).toISOString()) + '</td>' + fields.map(f => { const x = String(c[n][f[0]] === undefined ? '' : c[n][f[0]]); return '<td class="' + (f[2] === 'num' ? 'n' : /NOT OK|LATE/.test(x) ? 'lb-bad' : x ? 'lb-ok' : '') + '">' + escapeHtml(x) + '</td>'; }).join('') + '<td>' + escapeHtml(who(c[n].by)) + '</td></tr>').join('') + '</tbody></table>';
+    }
+    // What a button opens (mock-ups D, E, F, G, H).
+    function drawMore(v) {
+      const name = v.line.name, k = v.kind, title = document.getElementById('mp-title'), badge = document.getElementById('mp-badge');
+      let head = '', pill = '', body = '';
+      const productSelect = (save, chosen) => '<select class="lb-sel" data-save="' + save + '"><option value=""></option>' + v.targets.map(p => '<option' + (p.name === chosen ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('') + '</select>';
+      if (pane === 'changeover') {
+        const co = v.changeover, std = v.changeoverStd, word = k === 'BLOWMOLD' ? 'Mold change' : 'Changeover';
+        head = word + ' on ' + name;
+        if (co) pill = '<span class="lb-pill ' + (std && co.minutes > std ? 'r' : 'a') + '">' + co.minutes + ' MIN' + (std ? ' · STANDARD ' + std : '') + '</span>';
+        else if (std) pill = '<span class="lb-pill n">STANDARD ' + std + ' MIN</span>';
+        body = '<div class="lb-fields"><label class="lb-field">From<input class="lb-in wide" value="' + escapeHtml(co ? co.from || '—' : v.product || '—') + '" disabled></label><label class="lb-field">To' + productSelect('co-to', co ? co.to : coTo) + '</label>' +
+          (co ? '<label class="lb-field">Started<input class="lb-in" value="' + escapeHtml(clock(co.start)) + '" disabled></label>' : '') + '</div>';
+        if (co) {
+          body += '<div class="lb-checks">' + (R.CHANGEOVER_CHECKS[k] || []).map(c => { const d = co.checks[c[0]]; const sub = d ? who(d.by) + ' ' + clock(d.at) : c[0] === 'code' && v.expectedCode ? 'should be ' + v.expectedCode : c[2]; return '<button type="button" class="lb-check' + (d ? ' done' : '') + '" data-click="cocheck" data-key="' + c[0] + '" data-done="' + (d ? '0' : '1') + '"><span class="box">' + (d ? '&#10003;' : '') + '</span><span>' + escapeHtml(c[1]) + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span></button>'; }).join('') + '</div>' +
+            '<div class="lb-status needs"><div><b>' + word.toUpperCase() + ' RUNNING</b> · the line counts as ' + word.toLowerCase() + ', not stopped</div><button type="button" class="run" data-click="co-done">' + word.toUpperCase() + ' DONE</button></div>';
+        } else body += '<p class="lb-mut">Pick the product it changes to, then start. The minutes count against the standard set on Line Targets.</p><div class="lb-status running"><div><b>' + word.toUpperCase() + '</b> · starts the clock</div><button type="button" class="stop" data-click="co-start">START ' + word.toUpperCase() + '</button></div>';
+      } else if (pane === 'cip') {
+        head = 'CIP wash on ' + name;
+        const rows = v.cips.length ? '<table class="lb-t"><thead><tr><th>Started</th><th>Done</th><th class="n">Minutes</th><th>Result</th></tr></thead><tbody>' + v.cips.map(c => '<tr><td>' + clock(c.start) + '</td><td>' + (c.end ? clock(c.end) : 'washing') + '</td><td class="n">' + c.minutes + '</td><td class="' + (c.result === 'FAIL' ? 'lb-bad' : c.result ? 'lb-ok' : '') + '">' + escapeHtml(c.result === 'FAIL' ? 'Failed' : c.result ? 'Passed' : '') + '</td></tr>').join('') + '</tbody></table>' : '<p class="lb-mut">No CIP wash this shift.</p>';
+        body = (v.cip ? '<p class="lb-mut">Washing since ' + clock(v.cip.start) + ' (' + v.cip.minutes + ' min). When it is done, tap whether it passed.</p><div class="lb-pick"><button type="button" data-click="cip-pass">Passed</button><button type="button" data-click="cip-fail">Failed</button></div>' :
+          '<p class="lb-mut">' + (v.lastCipAt ? 'Last CIP wash that passed: ' + shortDate(v.lastCipAt.slice(0, 10)) + ' ' + clock(v.lastCipAt) + '. ' : '') + 'The line counts as CIP, not stopped, while it washes.</p><div class="lb-pick"><button type="button" data-click="cip-start">Start CIP Wash</button></div>') + '<div class="lb-box" style="margin-top:12px">' + rows + '</div>';
+      } else if (pane === 'waste') {
+        head = 'Waste and rejects on ' + name;
+        pill = '<span class="lb-pill n">' + fmt(v.wasteTotal) + ' THIS SHIFT</span>';
+        const reasons = R.WASTE_REASONS[k] || R.WASTE_REASONS.FILLER;
+        body = '<div class="lb-pick">' + reasons.map(r => '<button type="button" data-click="waste-reason" data-reason="' + escapeHtml(r) + '"' + (r === wasteReason ? ' class="on"' : '') + '>' + escapeHtml(r) + (v.waste[r] ? '<small>' + fmt(v.waste[r]) + '</small>' : '') + '</button>').join('') + '</div>' +
+          (wasteReason ? '<div class="lb-fields"><label class="lb-field">How many (' + escapeHtml(wasteReason) + ') this shift<input class="lb-in" id="waste-box" inputmode="numeric" maxlength="7" autocomplete="off" data-save="waste" value="' + escapeHtml(v.waste[wasteReason] ? String(v.waste[wasteReason]) : '') + '"></label><span class="lb-mut">Saves when you leave the box. The count shows on Production Lines.</span></div>' : '<p class="lb-mut">Tap the reason, then type how many this shift.</p>');
+      } else if (pane === 'check') {
+        const c = v.check;
+        head = 'Quality check' + (c ? ' · ' + (c.done ? 'next due ' + clock(c.next) : 'due ' + clock(c.at)) : '');
+        if (c) pill = '<span class="lb-pill ' + (c.done ? 'g' : 'a') + '">' + c.filled + ' OF ' + c.of + ' DONE</span>';
+        body = checkForm(v) + '<div class="lb-box" style="margin-top:12px"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>';
+      } else if (pane === 'crew') {
+        head = 'Who is on ' + name;
+        body = '<div class="lb-crew">' + v.crew.map(c => '<button type="button" data-click="crew" data-name="' + escapeHtml(c.name) + '" data-on="' + (c.on ? '0' : '1') + '"' + (c.on ? ' class="on"' : '') + '>' + escapeHtml(c.name) + '<small>' + (c.on ? 'on ' : 'off ') + clock(c.at) + ' · tap for ' + (c.on ? 'off the line' : 'back on') + '</small></button>').join('') + '</div>' +
+          '<div class="lb-fields"><label class="lb-field">Sign on<input class="lb-in wide" maxlength="40" autocomplete="off" data-save="crew-add" placeholder="Type a name"></label><span class="lb-mut">Saves when you leave the box. Tap a name for a break or off the line.</span></div>';
+      } else if (pane === 'notes') {
+        head = 'Shift notes for ' + name;
+        body = (v.prevNote ? '<div class="lb-note"><b>From last shift' + (v.prevNoteBy ? ' (' + escapeHtml(who(v.prevNoteBy)) + ')' : '') + ':</b> ' + escapeHtml(v.prevNote) + '</div>' : '<p class="lb-mut">No note from last shift.</p>') +
+          '<label class="lb-field" style="margin-top:12px">For the next shift<textarea class="lb-ta" maxlength="1000" data-save="note" placeholder="Type a note. It saves when you leave the box.">' + escapeHtml(v.note) + '</textarea></label>';
+      } else if (pane === 'divert') {
+        head = 'Divert on ' + name;
+        if (v.diverting) pill = '<span class="lb-pill r">IN DIVERT ' + v.diverting.minutes + ' MIN</span>';
+        body = v.diverting ? '<p class="lb-mut">In divert since ' + clock(v.diverting.start) + (v.diverting.reason ? ' (' + escapeHtml(v.diverting.reason) + ')' : '') + '.</p><div class="lb-pick"><button type="button" data-click="forward">Back to Forward Flow</button></div>' :
+          '<p class="lb-mut">Tap why it went to divert.</p><div class="lb-pick">' + R.DIVERT_REASONS.map(r => '<button type="button" data-click="divert" data-reason="' + escapeHtml(r) + '">' + escapeHtml(r) + '</button>').join('') + '</div>';
+        body += '<p class="lb-mut">' + v.diverts + ' divert' + (v.diverts === 1 ? '' : 's') + ' this shift.</p>';
+      } else if (pane === 'source') {
+        head = 'Silo and tanks for ' + name;
+        body = '<div class="lb-fields"><label class="lb-field">From (silo or tank)<input class="lb-in wide" maxlength="60" autocomplete="off" data-save="source" id="src-from" value="' + escapeHtml(v.source.from) + '"></label><label class="lb-field">To (filler or tanks)<input class="lb-in wide" maxlength="120" autocomplete="off" data-save="source" id="src-to" value="' + escapeHtml(v.source.to) + '"></label></div><p class="lb-mut">Saves when you leave each box.</p>';
+      } else if (pane === 'lot') {
+        head = 'Resin lot on ' + name;
+        body = '<div class="lb-fields"><label class="lb-field">Resin lot<input class="lb-in wide" maxlength="40" autocomplete="off" data-save="lot" value="' + escapeHtml(v.lot) + '"></label><span class="lb-mut">Saves when you leave the box.</span></div>';
+      } else if (pane === 'stock') {
+        head = 'Jugs ahead of the filler';
+        body = '<div class="lb-fields"><label class="lb-field">Jugs ahead now<input class="lb-in" inputmode="numeric" maxlength="7" autocomplete="off" data-save="stock" value="' + (v.stock === null ? '' : v.stock) + '"></label><span class="lb-mut">Saves when you leave the box.</span></div>';
+      } else if (pane === 'next') {
+        head = 'Up next on ' + name;
+        body = '<div class="lb-fields"><label class="lb-field">Product' + productSelect('next', v.next ? v.next.product : '') + '</label><label class="lb-field">How many<input class="lb-in" id="next-qty" inputmode="numeric" maxlength="7" autocomplete="off" data-save="next" value="' + (v.next && v.next.qty !== null ? v.next.qty : '') + '"></label></div><p class="lb-mut">Saves when you leave each box. Pick the blank line for nothing next.</p>';
+      }
+      title.textContent = head;
+      badge.innerHTML = pill;
+      draw('mp-body', body);
+      document.querySelectorAll('#mp-body button').forEach(b => { b.disabled = busy; });
+    }
+    // A box's save waits for a tap's save still going, so nothing typed is lost.
+    async function queue(op, fields) {
+      while (busy) await new Promise(r => setTimeout(r, 100));
+      return enter(op, fields);
+    }
+    async function saveBox(el) {
+      const f = el.dataset.save, val = el.value.trim();
+      if (f === 'check') {
+        if (val && el.tagName === 'INPUT' && !/^-?\d+(\.\d+)?$/.test(val)) { showError('Type a number, like 8.62.'); return; }
+        return queue('check', { slot: Number(el.dataset.slot), field: el.dataset.field, value: val });
+      }
+      if (f === 'waste') {
+        const n = val.replace(/[,\s]/g, '');
+        if (n && !/^\d+$/.test(n)) { showError('Type how many, digits only.'); return; }
+        return queue('waste', { reason: wasteReason, qty: n ? Number(n) : 0 });
+      }
+      if (f === 'note') return queue('note', { text: el.value });
+      if (f === 'crew-add') { if (!val) return; el.value = ''; return queue('crew', { name: val, on: true }); }
+      if (f === 'source') return queue('source', { from: document.getElementById('src-from').value.trim(), to: document.getElementById('src-to').value.trim() });
+      if (f === 'lot') return queue('lot', { lot: val });
+      if (f === 'stock') {
+        const n = val.replace(/[,\s]/g, '');
+        if (!/^\d+$/.test(n)) { showError('Type how many jugs, digits only.'); return; }
+        return queue('stock', { count: Number(n) });
+      }
+      if (f === 'next') {
+        const box = document.querySelector('#mp-body select[data-save="next"]'), q = document.getElementById('next-qty').value.replace(/[,\s]/g, '');
+        if (q && !/^\d+$/.test(q)) { showError('Type how many to make, digits only.'); return; }
+        return queue('next', { product: box.value, qty: box.value ? q : '' });
+      }
+      if (f === 'co-to') {
+        coTo = el.value;
+        const v = lineView(data, data.lines.find(l => l.operationId === lineId), now());
+        if (v.changeover) return queue('changeover', { sub: 'to', to: el.value });
+      }
+    }
+    ['mp-body', 'check-inline'].forEach(id => document.getElementById(id).addEventListener('change', e => { if (e.target.dataset.save) saveBox(e.target); }));
+    document.getElementById('mp-body').addEventListener('click', e => {
+      const b = e.target.closest('[data-click]');
+      if (!b) return;
+      const c = b.dataset.click;
+      if (c === 'waste-reason') { wasteReason = b.dataset.reason; render(); const box = document.getElementById('waste-box'); if (box) box.focus(); return; }
+      if (c === 'co-start') return enter('changeover', { sub: 'start', to: coTo });
+      if (c === 'co-done') { pane = ''; return enter('changeover', { sub: 'done' }); }
+      if (c === 'cocheck') return enter('cocheck', { key: b.dataset.key, done: b.dataset.done === '1' });
+      if (c === 'cip-start') return enter('cip', { sub: 'start' });
+      if (c === 'cip-pass' || c === 'cip-fail') { pane = ''; return enter('cip', { sub: 'done', result: c === 'cip-pass' ? 'PASS' : 'FAIL' }); }
+      if (c === 'crew') return enter('crew', { name: b.dataset.name, on: b.dataset.on === '1' });
+      if (c === 'divert') return enter('divert', { sub: 'start', reason: b.dataset.reason });
+      if (c === 'forward') return enter('divert', { sub: 'forward' });
+    });
+    // The six buttons, and the HTST and Blow Mold cards' buttons.
+    document.getElementById('board').addEventListener('click', e => {
+      const b = e.target.closest('[data-act]');
+      if (!b) return;
+      const a = b.dataset.act;
+      if (a === 'product') return document.getElementById('change-product').click();
+      if (a === 'count') return document.getElementById('enter-count').click();
+      if (a === 'waste') wasteReason = b.dataset.reason || wasteReason;
+      if (a === 'changeover') coTo = '';
+      pane = a; drawn['mp-body'] = null; render(); window.scrollTo(0, 0);
+    });
+    document.getElementById('mp-close').addEventListener('click', () => { pane = ''; render(); });
     function drawProducts(v) {
       const q = find.trim().toUpperCase();
       document.getElementById('pp-line').textContent = v.line.name;
@@ -194,6 +446,8 @@
     }
     document.getElementById('status-btn').addEventListener('click', () => {
       const v = lineView(data, data.lines.find(l => l.operationId === lineId), now());
+      if (v.state === 'CHANGEOVER') return enter('changeover', { sub: 'done' });
+      if (v.state === 'CIP') { pane = 'cip'; return render(); }
       enter(v.state === 'STOPPED' ? 'run' : 'stop');
     });
     document.getElementById('reasons').addEventListener('click', e => {

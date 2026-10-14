@@ -62,6 +62,10 @@ async function seed(d) {
       yardOut: iso(date, 5, 34 + i * 3), yardIn: iso(date, 14, 5 + i * 6), fuelGallons: Math.round((160 + i * 9) / (6.6 + (i % 3) * 0.4)) });
   }));
   Object.keys(runs).forEach(id => b.set(d.collection('runs').doc(id), runs[id]));
+  // Joe 10/14: only Driver Master drivers are graded, so the sample crew is on the driver list; the sample days (10-1 to 10-12)
+  // come before the go-live start date, so Scorecard counted from is moved back to 10-1 for them.
+  CREW.forEach(c => b.set(d.collection('drivers').doc(c.id), { id: c.id, name: c.name, relief: false, cells: null, seniorityDate: '2020-01-01', days: {} }));
+  b.set(d.collection('scorecard').doc('settings'), { countFrom: '2026-10-01' }, { merge: true });
   const alert = (date, tag, hh, mm, type, extra) => b.set(d.collection('gpsAlerts').doc('sample_' + date + '_' + tag + '_' + hh + mm + '_' + type), Object.assign({ date, tag, at: iso(date, hh, mm), type }, extra || {}));
   alert('2026-10-02', '223896', 9, 14, 'SPEEDING', { speedMph: 71, limitMph: 55, place: 'US-40 W' });
   alert('2026-10-06', '223896', 10, 2, 'SPEEDING', { speedMph: 68, limitMph: 55 });
@@ -163,7 +167,8 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       // FOX's idling on his sleeper route costs a quarter point.
       await sc.click('tr[data-key="DRV_S_FOX"]');
       await sc.waitForFunction(() => /sleeper/.test((document.querySelector('tr.sc-misses') || {}).textContent || ''));
-      assert.match(await sc.textContent('tr.sc-misses'), /Idling \(30 min, 12:00 PM, truck 223898\), sleeper\s*−0\.25/);
+      // Joe 10/14: idling is one line a day with the total minutes and how many times.
+      assert.match(await sc.textContent('tr.sc-misses'), /Idling 30 min total, 1 time, truck 223898, sleeper\s*−0\.25/);
       // Joe 10/13: a tab per area; Speeding lists every driver's speeding.
       assert.deepEqual(await heads(sc, '#cats [data-tab]'), ['Overall', 'Check-in', 'Cases', 'Inspections', 'Attendance', 'Speeding', 'Hard Stops', 'Idling', 'Seatbelt', 'MPG', 'Time', 'Clean', 'Accidents', 'Complaints', 'PDA', 'Incidents']);
       const strip = await sc.$eval('#cats', c => ({ h: c.getBoundingClientRect().height, sw: c.scrollWidth, cw: c.clientWidth }));
@@ -291,6 +296,58 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
         await home.close();
       }
       results.push('Route Distribution home: Manager card (Driver Scorecard, Over the Road, Trucks Today, GPS Setup) with under review, today\'s alerts on our units, and Trucks Today\'s driving and in-yard counts, at 1536 and 1920');
+    }
+    // Joe 10/14: only our drivers (never CARRIER), counted from a start date, idling once a day with each time excusable, and a
+    // late-night departure through the yard is not read as the earlier run coming back. BEFORE=1 takes the same pictures of the old screen.
+    {
+      const b = db().batch(), ws = weekOf('2026-10-05');
+      b.set(db().collection('runs').doc(ws + '__sample_849'), { runId: 'sample_849', route: '849', run: 'DAY', weekStart: ws, days: Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri'].map(p => [p, { runs: true, driver: 'CARRIER', driverId: '', truck: '', dispatchTime: '15:00', casesOut: 300, plantCaseReturn: 300 }])) });
+      b.set(db().collection('gpsAlerts').doc('start_idle_1'), { date: '2026-10-07', tag: '223896', at: iso('2026-10-07', 9, 20), type: 'IDLE', minutes: 12 });
+      b.set(db().collection('gpsAlerts').doc('start_idle_2'), { date: '2026-10-07', tag: '223896', at: iso('2026-10-07', 11, 5), type: 'IDLE', minutes: 9 });
+      // EVANS's truck passed through the yard at 11:40 PM leaving on its next run: Fleet's last "return" that day.
+      b.set(db().collection('gpsDays').doc('2026-10-07_223897'), { yardIn: '2026-10-08T03:40:00.000Z' }, { merge: true });
+      b.set(db().collection('scorecard').doc('settings'), { countFrom: '2026-10-15' }, { merge: true });
+      await b.commit();
+      const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, (BEFORE ? 'before-' : 'after-') + name + '-1536.png') }); };
+      const tab = async (page, t) => { await page.click('#cats [data-tab="' + t + '"]'); await page.waitForTimeout(300); return page.$$eval('.sc-board tbody tr', rows => rows.map(r => r.textContent)); };
+      let sc = await openPage(browser, 1536, 760, '/scorecard.html?month=2026-10&testEmail=manager.test@uniteddairy.com');
+      await sc.waitForSelector('#cats [data-tab="checkin"]');
+      await sc.waitForTimeout(800);
+      for (const t of BEFORE ? ['checkin', 'cases', 'inspection', 'time', 'idling'] : ['checkin', 'cases', 'inspection', 'time']) {
+        const rows = await tab(sc, t);
+        await shot(sc, 'tab-' + t);
+        if (!BEFORE) assert.ok(rows.every(x => !/−\d/.test(x) || /No misses|^\s*$/.test(x)) && !rows.some(x => /Missed daily check-in|short \(out|No inspection done|Back at the yard/.test(x)), t + ': nothing before 10-15-26 costs points: ' + rows.join(' / '));
+      }
+      await sc.close();
+      if (!BEFORE) {
+        await db().collection('scorecard').doc('settings').set({ countFrom: '2026-10-01' }, { merge: true });
+        sc = await openPage(browser, 1536, 760, '/scorecard.html?month=2026-10&testEmail=manager.test@uniteddairy.com');
+        await sc.waitForSelector('.sc-board tr[data-key]');
+        await sc.waitForTimeout(800);
+        assert.ok(!/CARRIER/.test(await sc.textContent('.sc-board')), 'CARRIER is not graded on the board');
+        const cases = await tab(sc, 'cases');
+        assert.ok(!cases.some(x => /CARRIER/.test(x)), 'CARRIER is not on the Cases tab');
+        const time = await tab(sc, 'time');
+        assert.ok(!time.some(x => /11:40 PM/.test(x)), 'the 11:40 PM pass through the yard is not a late return');
+        await shot(sc, 'tab-time-from-10-1');
+        const idle = await tab(sc, 'idling');
+        assert.ok(idle.some(x => /10-7-26 Idling 21 min total, 2 times, truck 223896\s*−1/.test(x)), 'DIAZ 10-7: one line, 21 minutes, 2 times: ' + idle.join(' / '));
+        await shot(sc, 'tab-idling');
+        await sc.click('.sc-idle-open');
+        await sc.waitForSelector('.sc-pop');
+        assert.equal(await sc.$$eval('.sc-pop .sc-excuse', b => b.length), 2, 'each time has its own Excuse');
+        assert.match(await sc.textContent('.sc-pop'), /Idling \(12 min, 9:20 AM, truck 223896\)[\s\S]*Idling \(9 min, 11:05 AM, truck 223896\)/);
+        const box = await sc.$eval('.sc-pop', e => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, font: parseFloat(getComputedStyle(e).fontSize) }; });
+        assert.ok(box.l >= 0 && box.r <= 1536 && box.t >= 0 && box.b <= 760 && box.font >= 16, 'the pop-up fits the window with 16px text');
+        await shot(sc, 'idling-popup');
+        await sc.click('.sc-pop .sc-pop-close');
+        assert.equal(await sc.$('.sc-pop'), null);
+        await sc.click('#cats [data-tab="inspection"]');
+        assert.ok(!/No inspection done/.test(await sc.textContent('.sc-board')), 'a miss that costs 0 is not listed');
+        assert.deepEqual(sc.errors, []);
+        await sc.close();
+        results.push('Driver Scorecard (Joe 10/14): nothing before Scorecard counted from costs points; CARRIER is never graded; idling is one line a day with a pop-up to excuse each time; an 11:40 PM pass through the yard is not a late return');
+      }
     }
     // With no alerts at all the board says so plainly.
     if (!BEFORE) {

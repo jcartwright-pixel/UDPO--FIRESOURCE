@@ -201,6 +201,31 @@ test('Driver Check-In Email (Joe 10/14): the driver\'s name finds the run when t
   assert.deepEqual(await T.recreditMailCheckins(db(), {}), { credited: [], still: [] }, 'once credited, never again');
 });
 
+test('Driver Check-In Email (Joe 10/14): every email in a conversation is read on its own, the morning list included, and nothing is made twice', async () => {
+  await call({ op: 'saveCheckinEmail', enabled: true, sender: 'callcenter@lauttamus.com', recipient: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN' });
+  const mail = (id, at, body) => ({ id, threadId: 'conv1', internalDate: Date.parse(at), from: 'CallCenter@lauttamus.com', to: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN', body });
+  // One Gmail conversation: Pat Adams (801) and Lee Casey (802) each phone in Monday 10/5; Casey's own email never comes,
+  // and the next morning's list names both.
+  const adams = mail('m-adams', '2026-10-05T19:00:00Z', 'Name +(UT): Pat Adams\nRoute Number: 801\nHow Many Cases: 410\nHow Many Returned: 3\nWrite Updefects: trailer door seal torn');
+  const list = mail('m-list', '2026-10-06T12:26:00Z', ['===========0000006405=================', 'Tue 06-Oct-26 08:26a', '======================================',
+    'Mon 05-Oct-26 04:10p TAKEN', 'Mon 05-Oct-26 04:10p DELIVERED', 'Name +(UT): Lee Casey', 'Route #: 2', 'Cases Delivered: 300', 'Cases Returned: 12', 'Write Updefects: horn weak', '',
+    '======================================', 'Mon 05-Oct-26 03:00p TAKEN', 'Mon 05-Oct-26 03:00p DELIVERED', 'Name +(UT): Pat Adams', 'Route Number: 801', 'How Many Cases: 999', '',
+    '===========0000006405================='].join('\n'));
+  const out = await T.checkinRun(db(), { by: ADMIN.email, readMail: async () => [list, adams], now: () => new Date('2026-10-06T13:00:00Z') });
+  assert.match(out.message, /1 check-in read, 1 record added.*2 in the morning list \(1 newly credited\)/);
+  const days = async (id) => (await db().collection('runs').doc(id).get()).data().days.mon;
+  const pat = await days(RUN), lee = await days('2026-10-04__run_t802');
+  assert.deepEqual([pat.casesDelivered, pat.driverCaseReturn], [410, 3], 'his own email wins over the list');
+  assert.ok(pat.checkinCompletedAt);
+  assert.equal(lee.checkinCompletedAt, '2026-10-05T20:10:00.000Z', 'Casey is credited from the list, at the time he phoned (4:10 p.m. New York)');
+  assert.deepEqual([lee.casesDelivered, lee.driverCaseReturn], [300, 12]);
+  assert.deepEqual((await records()).map(r => r.record_id), ['MAIL|m-adams|trailer'], 'write-ups come only from each check-in\'s own email');
+  // Read again: everything already seen, nothing changes.
+  const again = await T.checkinRun(db(), { by: ADMIN.email, readMail: async () => [list, adams], now: () => new Date('2026-10-06T13:10:00Z') });
+  assert.match(again.message, /1 already seen.*\(0 newly credited\)/);
+  assert.equal((await records()).length, 1);
+});
+
 test('Refresh Rates: a saved rate is used by the schedule; retired and fixed jobs cannot be changed; reload before saving', async () => {
   const r = await call({ op: 'refreshRates' });
   const job = r.jobs.find(j => j.key === 'checkinMail');
