@@ -275,9 +275,13 @@
       const sel = x ? { routeId: x.routeId, runId: x.runId } : pick || {};
       const loadDate = x ? (x.loadDate || x.date) : L.addDays(key, -1);
       const options = (x && !list.some(r => r.runId === x.runId && r.routeId === x.routeId) ? [{ routeId: x.routeId, runId: x.runId, route: x.route, run: x.run, name: '(no longer on the list)' }] : []).concat(list);
+      // Joe 10/14: Shipping's Load Type starts as the picked run's Route Master type (Boxes when it has none) and can be changed.
+      const ship = lane !== 'RECEIVING', kind = x ? R.scheduleArea(x, list) : sel.runId ? R.routeLoadType(list, sel.runId) : '';
       openModal('<h2 id="modal-title">' + escapeHtml(dialogTitle(x ? x.id : '', key)) + '</h2><div class="modal-grid sc-form">' +
+        (ship ? '<div class="wide sc-top">' : '') +
         '<label>' + (lane === 'RECEIVING' ? 'Supplier' : 'Route / Run') + '<select id="f-route"' + dis + '>' + (sel.runId ? '' : '<option value="">Pick one…</option>') + options.map((r, i) => '<option value="' + i + '"' + (r.runId === sel.runId && r.routeId === sel.routeId ? ' selected' : '') + '>' + escapeHtml([r.route, r.run, r.name].filter(Boolean).join(' · ')) + '</option>').join('') + '</select></label>' +
         '<label>Schedule Type<select id="f-type"' + dis + '><option value="ROUTE">United Dairy Delivery</option><option value="CARRIER"' + (x && x.scheduleType === 'CARRIER' ? ' selected' : '') + '>Carrier</option></select></label>' +
+        (ship ? '<label>Load Type<select id="f-kind"' + dis + '>' + (kind ? '' : '<option value=""></option>') + R.LOAD_TYPES.map(([v, t]) => '<option value="' + v + '"' + (v === kind ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label></div>' : '') +
         '<div class="wide sc-three"><label>Load Date<input id="f-load" type="date" value="' + escapeHtml(loadDate) + '"' + dis + '></label><label>Delivery Date<input id="f-date" type="date" value="' + escapeHtml(x ? x.date : key) + '"' + dis + '><small>The day you clicked</small></label>' +
         '<label>Pickup Time<input id="f-time" type="time" value="' + escapeHtml(x ? x.pickupTime : '') + '"' + dis + '></label></div>' +
         '<label>Trailer<input id="f-trailer" list="f-trailers" autocomplete="off" maxlength="24" placeholder="Pick or type a trailer" value="' + escapeHtml(x ? x.trailer : '') + '"' + dis + '><datalist id="f-trailers"></datalist><small id="f-trailer-note">Pick from the list or type one</small></label>' +
@@ -287,7 +291,13 @@
         '<label class="wide">Notes<textarea id="f-notes"' + dis + '>' + escapeHtml(x ? x.notes : '') + '</textarea></label></div>' +
         '<div class="notice error sc-err" id="f-error" hidden></div>' +
         '<div class="modal-actions">' + (x && ck ? '<button type="button" class="danger sc-left" id="f-delete">Delete Load</button>' : '') + '<button type="button" data-close>' + (ck ? 'Cancel' : 'Close') + '</button>' + (ck ? '<button type="button" class="primary" id="f-save">Save Load</button>' : '') + '</div>');
-      const loadIn = document.getElementById('f-load'), dateIn = document.getElementById('f-date');
+      const loadIn = document.getElementById('f-load'), dateIn = document.getElementById('f-date'), kindIn = document.getElementById('f-kind');
+      if (kindIn) document.getElementById('f-route').addEventListener('change', ev => {
+        const r = options[Number(ev.target.value)];
+        if (!r) return;
+        kindIn.value = R.routeLoadType(list, r.runId);
+        const blank = kindIn.querySelector('option[value=""]'); if (blank) blank.remove();
+      });
       loadIn.onchange = () => trailers(loadIn.value);
       dateIn.onchange = () => { document.getElementById('modal-title').textContent = dialogTitle(x ? x.id : '', dateIn.value); };
       trailers(loadIn.value || key);
@@ -325,6 +335,7 @@
       const f = { routeId: r ? r.routeId : '', runId: r ? r.runId : '', route: r ? r.route : '', run: r ? r.run : '', scheduleType: document.getElementById('f-type').value,
         loadDate: document.getElementById('f-load').value, pickupTime: document.getElementById('f-time').value, trailer: document.getElementById('f-trailer').value.trim().toUpperCase(),
         poNumber: document.getElementById('f-po').value.trim(), cases: document.getElementById('f-cases').value.trim(), product: document.getElementById('f-product').value.trim(), notes: document.getElementById('f-notes').value };
+      if (document.getElementById('f-kind')) f.loadType = document.getElementById('f-kind').value;
       const key = document.getElementById('f-date').value;
       // The same checks as the server, so a mistake is fixed in the box.
       if (!r) return formError(lane === 'RECEIVING' ? 'Pick the supplier.' : 'Pick the route / run.');
@@ -347,7 +358,7 @@
         delete pending[tmp]; render();
         openLoad(key, x ? x.id : '', r ? { routeId: r.routeId, runId: r.runId } : null);
         const put = (id, v) => { const el = document.getElementById(id); if (el && !el.disabled) el.value = v; };
-        put('f-type', f.scheduleType); put('f-date', key); put('f-load', f.loadDate); put('f-time', f.pickupTime); put('f-trailer', f.trailer); put('f-po', f.poNumber); put('f-cases', f.cases); put('f-product', f.product); put('f-notes', f.notes);
+        put('f-type', f.scheduleType); if (f.loadType) put('f-kind', f.loadType); put('f-date', key); put('f-load', f.loadDate); put('f-time', f.pickupTime); put('f-trailer', f.trailer); put('f-po', f.poNumber); put('f-cases', f.cases); put('f-product', f.product); put('f-notes', f.notes);
         formError('Not saved (' + (e.message || e) + '). Check the entries and press Save Load again.');
       }
     }

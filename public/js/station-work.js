@@ -87,7 +87,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const box = loads();
     // Joe 10/14: a customer's loads that day are Load 1, 2, 3 by pickup time, and Load N is Route Master's LOAD N run; only the
     // load whose run is on the box list is worked there, so the other Charleston loads still show (before, all three were hidden).
-    return numbered().filter(x => (x.loadDate || x.date) === date && (x.overSlots || !box.some(r => sameRun(r, x.slot ? Object.assign({}, x, x.slot) : x)))).map(withShown);
+    // Joe 10/14: only the Scheduler's box loads (Load Type Boxes, or a box run on Route Master).
+    const customers = U.scheduleCustomers(slotRoutes());
+    return numbered().filter(x => (x.loadDate || x.date) === date && U.scheduleArea(x, customers) === 'BOXING' && (x.overSlots || !box.some(r => sameRun(r, x.slot ? Object.assign({}, x, x.slot) : x)))).map(withShown);
   }
   function numbered() {
     const list = U.scheduleEntries(sched.SHIPPING, 'SHIPPING');
@@ -97,7 +99,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   function slotRoutes() {
     if (routeDocs.length) return routeDocs;
     const seen = {};
-    return runs.filter(r => r.runId && !seen[r.runId] && (seen[r.runId] = true)).map(r => ({ runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true }));
+    return runs.filter(r => r.runId && !seen[r.runId] && (seen[r.runId] = true)).map(r => ({ runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true, loadType: r.loadType || (r.masterShow && r.masterShow.loadType) || '' }));
   }
   // The same customer run: its run ID, or the same route number and run name.
   const up = (v) => String(v || '').trim().toUpperCase();

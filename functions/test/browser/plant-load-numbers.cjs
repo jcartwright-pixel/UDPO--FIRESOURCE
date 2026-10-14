@@ -6,7 +6,8 @@
  *   - the Scheduler names them Load 1, 2, 3 by pickup time;
  *   - Daily Box Loadout shows LOAD 1 once (the Live line, with the Scheduler's pickup time on it), Load 2 and Load 3 as their
  *     own lines (Load 3 marked: Aldi has only two LOAD runs on Route Master); Start, the box count and + Add Load save;
- *   - Plant Station's Boxing list shows Load 2 and Load 3 (before, all three were hidden behind the LOAD 1 box load).
+ *   - Plant Station's Boxing list shows Load 2 and Load 3 (before, all three were hidden behind the LOAD 1 box load);
+ *   - each Scheduler load has a Load Type (Route Master's unless changed) and shows only on that loadout, once.
  * With SHOTS_DIR=<folder> it also saves pictures.
  */
 const assert = require('node:assert/strict');
@@ -29,6 +30,11 @@ const NOW = '2026-10-08T14:00:00Z';
 const a1 = PD.SCHEDULE.find(r => r.record_id === 'SCHED-a1');
 const more = (id, p) => Object.assign({}, a1, { record_id: id, payload_json: JSON.stringify(Object.assign(JSON.parse(a1.payload_json), p)) });
 PD.SCHEDULE.push(more('SCHED-a3', { pickupTime: '09:00', trailer: '', poNumber: 'AC-3' }), more('SCHED-a2', { pickupTime: '08:05', trailer: 'T-962', poNumber: 'AC-2' }));
+// Joe 10/14 ("It should only show box loads"): Peck is a case customer on Route Master (812, Case Loadout) with two Friday loads:
+// Load 1 is its case run on Live that day (once, on Daily Case Loadout); Load 2's Load Type was changed to Totes.
+PD.CUSTOMERS.push({ coverage_type: 'UNITED DAIRY', route_id: 'rte_p812', run_id: 'run_p812', route: '812', route_name: 'Peck', run: 'UT DSD MILK', load_type: 'Case Loadout', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' });
+const onPeck = (id, p) => Object.assign({}, a1, { record_id: id, route_id: 'rte_p812', run_id: 'run_p812', route: '812', run: 'UT DSD MILK', payload_json: JSON.stringify(Object.assign({ loadDate: '2026-10-08', scheduleType: 'ROUTE' }, p)) });
+PD.SCHEDULE.push(onPeck('SCHED-k1', { pickupTime: '08:05', poNumber: '1015262' }), onPeck('SCHED-k2', { pickupTime: '11:00', poNumber: 'PK-2', loadType: 'TOTES' }));
 
 async function openPage(browser, width, height, url, touch) {
   const page = await browser.newPage(Object.assign(touch ? { viewport: { width, height }, hasTouch: true, isMobile: true } : { viewport: { width, height } }, { serviceWorkers: 'block' }));
@@ -76,6 +82,22 @@ async function journal(id, ok) {
       await sc.close();
     }
     results.push('Scheduler: three Aldi Charleston loads on one day are Load 1, 2, 3 by pickup time; the whole name shows at 1536 and 1920');
+    // Edit Load: Load Type is Route Master's (Case for Peck) unless it was changed (Totes); picking a run fills in its type.
+    const sk = await openPage(browser, 1536, 760, '/scheduler.html?view=week&date=2026-10-08&' + MANAGER);
+    await sk.waitForSelector('.sc-load[data-edit="SCHED-k1"]', { timeout: 15000 });
+    await sk.click('.sc-load[data-edit="SCHED-k1"]');
+    assert.equal(await sk.inputValue('#f-kind'), 'CASE', 'Peck Load 1 is a case load (Route Master)');
+    assert.deepEqual(await sk.$$eval('#f-kind option', o => o.map(x => x.textContent)), ['Case', 'Totes', 'Boxes', 'Tanker']);
+    assert.ok(await sk.$eval('#f-kind', e => parseFloat(getComputedStyle(e).fontSize) >= 16 && e.getBoundingClientRect().width >= 120), 'Load Type is 16px and wide enough');
+    await shot(sk, 'scheduler-load-type-1536.png');
+    await sk.click('#modal [data-close]');
+    await sk.click('.sc-load[data-edit="SCHED-k2"]');
+    assert.equal(await sk.inputValue('#f-kind'), 'TOTES', 'a changed Load Type stays');
+    await sk.selectOption('#f-route', { label: '905 · ALDI - CHARLESTON · Aldi Charleston' });
+    assert.equal(await sk.inputValue('#f-kind'), 'BOXING', 'picking a run fills in its Route Master type (none = Boxes)');
+    assert.deepEqual(sk.errors, []);
+    await sk.close();
+    results.push('Scheduler: Load Type on Add / Edit Load, filled in from Route Master for the picked run and changeable');
 
     // Daily Box Loadout, Thursday 10-08.
     const lo = await openPage(browser, 1536, 760, '/loadout.html?date=2026-10-08&area=BOXING&' + MANAGER);
@@ -118,7 +140,10 @@ async function journal(id, ok) {
     assert.equal(await lo.inputValue('#s-date'), '2026-10-09');
     await lo.click('#s-save');
     assert.equal(await lo.textContent('#s-error'), 'Pick the route / run.');
+    await lo.selectOption('#s-route', { label: '812 · UT DSD MILK · Peck' });
+    assert.equal(await lo.inputValue('#s-kind'), 'CASE', 'Load Type from Route Master');
     await lo.selectOption('#s-route', { label: '905 · ALDI - CHARLESTON · Aldi Charleston' });
+    assert.equal(await lo.inputValue('#s-kind'), 'BOXING');
     await lo.fill('#s-time', '10:30');
     assert.equal(await lo.isVisible('#s-error'), false, 'the message goes once the box is filled in');
     await shot(lo, 'box-loadout-add-load-1536.png');
@@ -127,9 +152,22 @@ async function journal(id, ok) {
     await lo.waitForFunction(() => [...document.querySelectorAll('#rows tr[data-row^="sch:"] td:nth-child(2)')].some(td => /Load 4/.test(td.textContent)), null, { timeout: 15000 });
     const added = (await db().collection('plantJournal').where('type', '==', 'PLANT_SCHEDULE').get()).docs.map(d => d.data()).find(d => d.createdInApp && d.payload && d.payload.pickupTime === '10:30');
     assert.ok(added, 'the new load is on the Scheduler');
-    assert.deepEqual([added.date, added.payload.loadDate, added.runId], ['2026-10-09', '2026-10-08', 'run_c905_1']);
+    assert.deepEqual([added.date, added.payload.loadDate, added.runId, added.payload.loadType], ['2026-10-09', '2026-10-08', 'run_c905_1', 'BOXING']);
     await lo.click('#areas [data-area="CASE"]');
     assert.equal(await lo.isVisible('#add-load'), false, 'Add Load is on Daily Box Loadout only');
+    // Joe 10/14: Peck's Load 1 is its case run's line on Daily Case Loadout, once, with the Scheduler's PO and time on hover;
+    // Load 2 (changed to Totes) is on Daily Tote Loadout; neither is on Boxes.
+    await lo.waitForSelector(row('2026-10-04__run_p812|fri'));
+    assert.equal(await lo.getAttribute(row('2026-10-04__run_p812|fri') + ' .lo-run', 'title'), 'UT DSD MILK · Scheduler: PO 1015262 · 8:05 AM');
+    assert.deepEqual(await lo.$$eval('#rows tr[data-row]', trs => trs.filter(t => t.children[0].textContent === '812').length), 1, 'Peck Load 1 shows once on Case Loadout');
+    assert.equal(await lo.$('#rows tr[data-row^="sch:"]'), null, 'no Scheduler-only lines on Case Loadout');
+    await shot(lo, 'case-loadout-scheduler-1536.png');
+    await lo.click('#areas [data-area="TOTES"]');
+    await lo.waitForSelector(row('sch:SCHED-k2'));
+    assert.equal(await lo.$eval(row('sch:SCHED-k2'), t => [0, 1, 2].map(i => t.children[i].textContent).join(' | ')), '812 | UT DSD MILK Load 2 | PO PK-2');
+    await lo.click('#areas [data-area="TANKER"]');
+    await lo.waitForSelector('#rows tr[data-row]');
+    assert.equal(await lo.$('#rows tr[data-row^="sch:"]'), null, 'no Scheduler loads on Tanker Loadout');
     assert.deepEqual(lo.errors, []);
     results.push('Daily Box Loadout: + Add Load saves a Scheduler load for the next day, loaded today; it shows as Load 4');
 
@@ -139,6 +177,7 @@ async function journal(id, ok) {
     await st.waitForSelector(card('sch:SCHED-a3'), { timeout: 15000 });
     assert.equal(await st.$(card('sch:SCHED-a1')), null, 'Load 1 is worked on the LOAD 1 box load card');
     assert.ok(await st.$(card('2026-10-04__run_c905_1|fri')), 'the LOAD 1 box load is on the list');
+    assert.deepEqual([await st.$(card('sch:SCHED-k1')), await st.$(card('sch:SCHED-k2'))], [null, null], 'case and tote Scheduler loads are not on the Boxing list');
     // Who takes it shows once Route Master is read (Aldi is a branch run).
     await st.waitForSelector(card('sch:SCHED-a2') + '.by-branch', { timeout: 10000 });
     assert.equal(await st.textContent(card('sch:SCHED-a2') + ' .sw-head .run'), 'ALDI - CHARLESTON Load 2' + 'BRANCH');
