@@ -22,6 +22,18 @@ test('yard out and in: first time seen out of Uniontown Branch / Plant, last tim
   assert.deepEqual([d.yardOut, d.yardIn], ['', ''], 'never seen in the yard: no leave time');
 });
 
+// Joe 10/14 (Praster "back at 11:40 PM" while leaving): the Loading Dock is the yard, so dock to Uniontown Branch is no return.
+test('yard: parked at the Loading Dock, through Uniontown Branch on the way out, is a leave and not a return', () => {
+  const truck = (place) => ({ '223877': { tag: '223877', lastReport: String(Math.random()), place, odometerMiles: 100 } });
+  let seen = {};
+  const step = (place, at) => { const r = advanceDays(seen, truck(place), at); seen = r.seen; return r.days['2026-10-14_223877']; };
+  step('Loading Dock', '2026-10-14T23:00:00.000Z');
+  let d = step('Uniontown Branch', '2026-10-14T23:40:00.000Z');
+  assert.ok(!d || !d.yardIn, 'dock to Branch is not a return');
+  d = step('', '2026-10-14T23:45:00.000Z');
+  assert.deepEqual([d.yardOut, d.yardIn], ['2026-10-14T23:45:00.000Z', '']);
+});
+
 test('alert kinds from the Fleet condition', () => {
   assert.equal(alertType({ name: 'Over 55', type: 'PostedSpeedCondition' }, {}), 'SPEEDING');
   assert.equal(alertType({ name: 'Hard stop', type: 'DiagnosticBooleanCondition' }, { TriggerName: 'HarshBraking' }), 'HARSH_BRAKING');
