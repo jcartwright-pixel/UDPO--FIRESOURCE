@@ -331,17 +331,50 @@ function parseCheckinEmail(body) {
   };
 }
 
-// The run a check-in is for: that route, on the message's operating day (or the day before), the driver's own run first.
+// The run a check-in is for, on the message's operating day (or the day before). Joe 10/14: drivers phone the answering
+// service and the route comes back as they said it ("8" for 808, "12" for 812, "892-901", "6301" for 6301_1), sometimes
+// wrong, so the driver's own name decides first: the run Dispatch put that driver on (the one whose route matches the words,
+// if they drove more than one). Only when no run that day names the driver does the route alone pick it.
+const mailWords = (v) => String(v || '').toUpperCase().replace(/[^A-Z ,]+/g, ' ').split(/[\s,]+/).filter(w => w.length > 1);
+// 2 = every word of the emailed name is in the dispatched name ("Rogie Barrow" / "BARROW, ROGIE"); 1 = the last name is and the
+// first letters agree ("Mike Gregory" / "GREGORY, MICHAEL"); 0 = not this driver.
+function nameScore(emailed, dispatched) {
+  const e = mailWords(emailed), d = mailWords(dispatched);
+  if (!e.length || !d.length) return 0;
+  if (e.every(w => d.indexOf(w) >= 0)) return 2;
+  const last = e[e.length - 1], first = e[0];
+  return e.length > 1 && last.length > 2 && d.indexOf(last) >= 0 && d.some(w => w !== last && w[0] === first[0]) ? 1 : 0;
+}
+const routeKey = (v) => String(v || '').trim().toUpperCase().replace(/^ROUTE\s*#?\s*/, '').replace(/^0+(?=\d)/, '');
+// 2 = the route as typed (or one of several typed: "892-901"); 1 = only its last digits ("8" for 808); 0 = no.
+function routeScore(typed, run) {
+  const names = [run.route, run.streamId].map(routeKey).filter(Boolean);
+  names.slice().forEach(n => { const b = n.split('_')[0]; if (b && names.indexOf(b) < 0) names.push(b); });
+  const parts = [routeKey(typed)].concat(routeKey(typed).split(/[\s,/&+-]+|\bAND\b/)).map(routeKey).filter(Boolean);
+  if (parts.some(t => names.indexOf(t) >= 0)) return 2;
+  return parts.some(t => /^\d{1,2}$/.test(t) && names.some(n => /^\d{3,}$/.test(n) && n.endsWith(t.padStart(2, '0')))) ? 1 : 0;
+}
+// candidates: [{id, route, streamId, driver}] for one day. Returns {id, score}; id '' when none fits.
+function pickMailRun(candidates, route, driver) {
+  let best = { id: '', score: 0 };
+  candidates.forEach(c => {
+    const n = nameScore(driver, c.driver), r = routeScore(route, c);
+    // The driver's name outranks the route; with no name match only the route as typed counts (never its last digits alone).
+    const score = n ? n * 10 + r : r === 2 ? 1 : 0;
+    if (score > best.score) best = { id: c.id, score };
+  });
+  return best;
+}
 async function findRun(db, route, driver, date) {
-  const want = String(route).trim().replace(/^0+(?=\d)/, '').toUpperCase(), name = String(driver).trim().toUpperCase();
+  let found = null;
+  // The operating day first; the day before only when it fits better (a driver calling in after the 6 a.m. roll).
   for (const d of [date, L.addDays(date, -1)]) {
     const p = L.dayPrefix(d), snap = await db.collection(C.runs).where('weekStart', '==', L.weekStart(d)).get();
-    const hits = snap.docs.filter(s => { const r = s.data(), day = r.days && r.days[p]; return day && day.runs && [r.route, r.streamId].some(x => String(x || '').trim().replace(/^0+(?=\d)/, '').toUpperCase() === want); });
-    if (!hits.length) continue;
-    const mine = hits.find(s => { const n = String(s.data().days[p].driver || '').toUpperCase(); return n && name && name.split(/[\s,]+/).filter(Boolean).every(w => n.indexOf(w) >= 0); }) || hits[0];
-    return { snap: mine, day: p, date: d };
+    const docs = snap.docs.filter(s => { const day = s.data().days && s.data().days[p]; return day && day.runs; });
+    const best = pickMailRun(docs.map(s => ({ id: s.id, route: s.data().route, streamId: s.data().streamId, driver: s.data().days[p].driver })), route, driver);
+    if (best.id && (!found || best.score > found.score)) found = { snap: docs.find(s => s.id === best.id), day: p, date: d, score: best.score };
   }
-  return null;
+  return found;
 }
 
 async function saveMailCheckin(db, msg, c, sender, stamp) {
@@ -395,6 +428,45 @@ async function saveMailCheckin(db, msg, c, sender, stamp) {
       receivedAt: Number(msg.internalDate) ? new Date(Number(msg.internalDate)).toISOString() : stamp, body: String(msg.body || '').slice(0, 20000), route: c.route, driver: c.driver, records: made, savedAt: stamp });
     return { made, review, run: !!hit };
   });
+}
+
+/*
+ * Joe 10/14: check-in emails read before the driver's name decided the run (findRun) stayed with no run, so the driver got no
+ * check-in credit. Each such email still kept (mailCopies) is matched again; a run found gets the check-in time (the email's)
+ * and the cases where none are there yet. Write-ups are not made again. Returns {credited, still}.
+ */
+async function recreditMailCheckins(db, opts) {
+  const o = opts || {}, stamp = (o.now ? o.now() : new Date()).toISOString();
+  const seen = (await db.collection('mailSeen').get()).docs.filter(s => !s.data().run);
+  const credited = [], still = [];
+  for (const s of seen) {
+    const copy = await read(db.collection('mailCopies').doc(s.id));
+    const c = copy && parseCheckinEmail(copy.body);
+    if (!c || c.digest) { still.push(s.id); continue; }
+    const at = copy.receivedAt || s.data().at || stamp;
+    const hit = await findRun(db, c.route, c.driver, c.taken || L.operatingDay(new Date(Date.parse(at) || Date.now())));
+    if (!hit) { still.push(s.id); continue; }
+    const by = 'EMAIL · ' + c.driver;
+    await db.runTransaction(async tx => {
+      const mode = await (require('./actions').requireTestMode)(tx, db, 'checkIns');
+      const runSnap = await tx.get(hit.snap.ref);
+      if (!runSnap.exists) return;
+      const run = runSnap.data(), d = run.days[hit.day] || {}, after = {};
+      if (c.casesDelivered !== null && (d.casesDelivered === null || d.casesDelivered === undefined)) after.casesDelivered = c.casesDelivered;
+      if (c.driverCaseReturn !== null && (d.driverCaseReturn === null || d.driverCaseReturn === undefined)) after.driverCaseReturn = c.driverCaseReturn;
+      if (!d.checkinCompletedAt) after.checkinCompletedAt = at;
+      if (Object.keys(after).length) {
+        const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp };
+        Object.keys(after).forEach(k => { update['days.' + hit.day + '.' + k] = after[k]; });
+        update['days.' + hit.day + '.updatedAt'] = stamp; update['days.' + hit.day + '.updatedBy'] = by;
+        tx.update(runSnap.ref, update);
+        if (mode.writeBack) require('./actions').queueSheetCells(tx, db, rid('mailredo'), '', run, hit.snap.id, hit.day, after, stamp, by);
+      }
+      tx.update(s.ref, { run: hit.snap.id + '|' + hit.day, recreditedAt: stamp });
+    });
+    credited.push(s.id + ' ' + hit.snap.id + '|' + hit.day);
+  }
+  return { credited, still };
 }
 
 /*
@@ -1023,4 +1095,4 @@ const OPS = {
   dateConvert: (db, email, input, stamp, d) => dateConvert(db, email, input, stamp, { sheets: d.sheets && d.sheets(), sources: d.sources })
 };
 
-module.exports = { OPS, repairSweep, sendOneRepair, afterSave, lessorOf, checkinRun, parseCheckinEmail, jobDue, archiveCompleted, preflight, updateLive, toSerial, cellKind, sheetCatalog, JOBS, CHECKIN_STANDARD };
+module.exports = { OPS, repairSweep, sendOneRepair, afterSave, lessorOf, checkinRun, parseCheckinEmail, pickMailRun, recreditMailCheckins, jobDue, archiveCompleted, preflight, updateLive, toSerial, cellKind, sheetCatalog, JOBS, CHECKIN_STANDARD };

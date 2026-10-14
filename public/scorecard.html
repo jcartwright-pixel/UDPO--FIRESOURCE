@@ -85,7 +85,9 @@
         const d = run.days && run.days[p]; if (!d) return;
         const date = L.addDays(run.weekStart, i);
         (byDate[date] = byDate[date] || []).push({ runId: run.runId, route: run.route, run: run.run, runs: d.runs ? 'TRUE' : '', driver: d.driver || '', driverId: d.driverId || '',
-          casesOut: d.casesOut, plantCaseReturn: d.plantCaseReturn, driverCaseReturn: d.driverCaseReturn, checkedIn: !!d.checkinCompletedAt,
+          casesOut: d.casesOut, plantCaseReturn: d.plantCaseReturn, driverCaseReturn: d.driverCaseReturn, // Joe 10/14: checked in the same way Driver Check-ins counts it: a check-in made in the app (phone, Driver Room station,
+          // the answering-service email the app read) or the cases delivered the driver reported (the current app's email intake).
+          checkedIn: !!(d.checkinCompletedAt || (d.casesDelivered !== null && d.casesDelivered !== undefined && d.casesDelivered !== '')),
           truck: d.truck || '', startTime: d.startTime || '',
           // Joe 10/13 Time grade: the day's dispatch time and expected hours, else Route Master's for that weekday.
           dispatchTime: d.dispatchTime || ((routeTimes[p] || {})[run.runId] || {}).dispatchTime, routeHours: d.routeHours || ((routeTimes[p] || {})[run.runId] || {}).hours,

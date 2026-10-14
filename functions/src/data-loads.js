@@ -228,13 +228,27 @@ async function loadGarageOrdersOnce(db, opts) {
   });
 }
 
+const MAIL_CHECKINS_ID = 'mail-checkin-credit-2026-10-14';
+// Joe 10/14: answering-service check-ins that found no run (the route said "8" for 808, or wrong) get their credit now that the
+// driver's name picks the run (admintools.recreditMailCheckins). Test copy only until Joe names it for live.
+async function loadMailCheckinsOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
+  const mark = db.collection('dataLoads').doc(MAIL_CHECKINS_ID);
+  const m = await mark.get();
+  if (m.exists && m.data().status === 'DONE') return { skipped: true };
+  const out = await require('./admintools').recreditMailCheckins(db, { now: () => now });
+  await mark.set({ status: 'DONE', doneAt: stamp, what: 'Check-in credit for answering-service emails that found no run (Joe 10/14)', credited: out.credited, still: out.still });
+  return { credited: out.credited.length, still: out.still.length };
+}
+
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;
 }
 
-module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID };
+module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID };
