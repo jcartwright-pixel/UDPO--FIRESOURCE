@@ -126,7 +126,11 @@ test('Email Senders: email comes from whoever pressed Send; no one pressed = the
   assert.deepEqual(first.plants.map(p => [p.plant, p.address]), [['Uniontown', ''], ['Charleston', ''], ['Martins Ferry', '']]);
   assert.deepEqual([first.standard, first.fromWho], ['joe@uniteddairy.com', 'PERSON']);
   await assert.rejects(call({ op: 'saveEmailSenders', senders: { fac_charleston: { address: 'ops@gmail.com' } } }), /not a United Dairy email address/);
-  await assert.rejects(call({ op: 'saveEmailSenders', senders: { fac_charleston: { address: '', name: 'Charleston Ops' } } }), /type the email address/);
+  // Joe 10/14: an empty address never stops Save. A name alone is kept (the name on the standard sender's email); an email
+  // address typed as the name is left out, and the message says to type it in Send emails from instead.
+  const nameOnly = await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: '', name: 'utplantmgmt@uniteddairy.com' }, fac_charleston: { address: '', name: 'Charleston Ops' } } }, null, deps);
+  assert.match(nameOnly.message, /^Saved\. Uniontown: "Name people see" takes a name, not an email address.*type it in "Send emails from"/);
+  assert.deepEqual(nameOnly.plants.map(p => [p.address, p.senderName]), [['', ''], ['', 'Charleston Ops'], ['', '']]);
   const out = await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' },
     fac_charleston: { address: 'charleston.operations@uniteddairy.com', name: '' } } }, null, deps);
   assert.deepEqual(out.plants.map(p => [p.address, p.senderName]), [['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations'], ['charleston.operations@uniteddairy.com', ''], ['', '']]);
@@ -143,6 +147,12 @@ test('Email Senders: email comes from whoever pressed Send; no one pressed = the
   await mail('M', 'fac_martins_ferry', { by: '', testTo: 'boss@uniteddairy.com' });
   assert.deepEqual(sent.slice(1).map(m => [m.from, m.fromName]), [['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations'],
     ['charleston.operations@uniteddairy.com', 'United Dairy Plant Operations'], ['joe@uniteddairy.com', 'United Dairy Operations']]);
+  // A plant with only a name: the standard sender, under that name.
+  await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' },
+    fac_charleston: { address: 'charleston.operations@uniteddairy.com', name: '' }, fac_martins_ferry: { address: '', name: 'Martins Ferry Ops' } } }, null, deps);
+  await mail('M2', 'fac_martins_ferry', { by: '', testTo: 'boss@uniteddairy.com' });
+  assert.deepEqual([sent[4].from, sent[4].fromName], ['joe@uniteddairy.com', 'Martins Ferry Ops']);
+  sent.pop();
   // Send Current Report comes from the person who pressed it, or the plant address when Email Senders says so.
   const { mailReport } = require('../../src/reportmail');
   const ref = db().collection('plantReports').doc('r1');

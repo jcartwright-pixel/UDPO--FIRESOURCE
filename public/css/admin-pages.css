@@ -68,6 +68,11 @@
 .ap-msg { flex: none; padding: 8px 12px; border-radius: 8px; background: #eef5fc; color: #0b3d6b; font-weight: 700; }
 .ap-msg.bad { background: #fdecea; color: #b42318; }
 .ap-msg.good { background: #e3f3e8; color: #1c6b3a; }
+.ap-msg.warn { background: #fff4d6; color: #7a4b00; }
+.ap input.es-unsaved { border-color: #d99a00; background: #fffaeb; }
+.ap-t td .ap-chip[data-unsaved] { display: inline-block; margin-bottom: 4px; }
+.ap-t td .ap-chip[data-unsaved][hidden] { display: none; }
+.ap-t td small[hidden] { display: none; }
 .ap-msg[hidden] { display: none; }
 .ap-scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid #e6ecf2; border-radius: 10px; background: #fff; }
 .ap-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(420px, 1fr) minmax(460px, 1.15fr); gap: 12px; }

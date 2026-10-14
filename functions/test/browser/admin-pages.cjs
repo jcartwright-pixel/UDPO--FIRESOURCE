@@ -178,6 +178,17 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     assert.deepEqual(await p.$$eval('#es-rows td:first-child', t => t.map(x => x.textContent)), ['Uniontown', 'Charleston', 'Martins Ferry']);
     assert.equal(await p.inputValue('#es-who'), 'PERSON', 'the standard: from whoever presses Send');
     await shot(p, 'email-senders-before-1920.png');
+    // Joe 10/14: no gray hint text inside the boxes (it looked like a saved address); an empty box says what it means under it.
+    assert.equal(await p.$$eval('#es-rows input', x => x.filter(i => i.placeholder).length), 0);
+    assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_uniontown"] small[data-empty="addr"]'), true);
+    // Only a name, and an email address typed as the name: Save works, with a note, and a changed box is marked until Save.
+    await p.fill('[data-name="fac_uniontown"]', 'utplantmgmt@uniteddairy.com');
+    assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_uniontown"] [data-unsaved]'), true);
+    assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_charleston"] [data-unsaved]'), false);
+    await p.click('#es-save');
+    await p.waitForFunction(() => /^Saved\. Uniontown: "Name people see" takes a name/.test(document.querySelector('#view .ap-msg').textContent));
+    assert.equal(await p.inputValue('[data-name="fac_uniontown"]'), '');
+    assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_uniontown"] [data-unsaved]'), false);
     await p.fill('[data-addr="fac_uniontown"]', 'uniontown.operations@uniteddairy.com');
     await p.fill('[data-name="fac_uniontown"]', 'United Dairy Uniontown Operations');
     await p.fill('[data-addr="fac_charleston"]', 'charleston.operations@uniteddairy.com');
@@ -185,7 +196,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await p.selectOption('#es-who', 'PLANT');
     await p.click('#es-save');
     await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
-    await p.waitForSelector('#es-rows td small');
+    await p.waitForSelector('#es-rows td:last-child small');
     assert.equal(await p.inputValue('[data-addr="fac_uniontown"]'), 'uniontown.operations@uniteddairy.com');
     assert.equal(await p.inputValue('#es-who'), 'PLANT');
     const es = (await db().collection('private').doc('emailSettings').get()).data();
