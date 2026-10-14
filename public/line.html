@@ -188,7 +188,7 @@
         st.className = 'lb-status ' + (need ? 'needs' : 'running');
         txt.innerHTML = need ? '<b>STOP AT ' + clock(need.start) + ' (' + need.minutes + ' MIN) NEEDS A REASON.</b> Tap why it stopped.' :
           v.kind === 'HTST' ? (v.diverting ? '<b>IN DIVERT ' + v.diverting.minutes + ' MIN</b>' + (v.diverting.reason ? ' · ' + escapeHtml(v.diverting.reason) : '') : '<b>PASTEURIZING</b> · forward flow') + (v.product ? '' : ' · pick the product running') :
-          '<b>LINE RUNNING</b>' + (v.product ? '' : ' · pick the product running');
+          '<b>LINE RUNNING</b>' + (v.product || v.targets.length === 1 ? '' : ' · pick the product running');
         if (!need && v.diverting) st.className = 'lb-status needs';
         btn.textContent = 'LINE STOPPED'; btn.className = 'stop';
         reasonFor = need ? need.index : -1;
@@ -267,7 +267,9 @@
       if (k === 'BLOWMOLD') {
         const rej = Number(v.waste['Leak tester'] || 0);
         kc.innerHTML =
-          '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || 'No product picked') + '</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div><button type="button" class="lb-btn" data-act="product">' + (v.product ? 'Change Product' : 'Pick Product') + '</button></div>' +
+          // Joe 10/14: the Blow Mold makes only gallon jugs; with one product on its list there is nothing to pick.
+          (v.targets.length === 1 ? '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || v.targets[0].name) + '</div><div class="lb-mut">The only product made here</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div></div>' :
+          '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || 'No product picked') + '</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div><button type="button" class="lb-btn" data-act="product">' + (v.product ? 'Change Product' : 'Pick Product') + '</button></div>') +
           '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs this shift</span><div class="lb-big">' + fmt(v.made) + '</div>' + madeBits + speedLine + fromMachine + countBtn + '</div>' +
           '<div class="lb-card"><span class="eyebrow">Leak tester rejects</span><div class="lb-big">' + fmt(rej) + '</div><div class="lb-mut">' + (v.made ? (Math.round(rej / v.made * 1000) / 10) + '% of jugs made' : 'this shift') + '</div><button type="button" class="lb-btn" data-act="waste" data-reason="Leak tester">Enter Rejects</button></div>' +
           '<div class="lb-card"><span class="eyebrow">Jugs ahead of filler</span><div class="lb-big">' + (v.stock === null ? '—' : fmt(v.stock)) + '</div><div class="lb-mut">' + (v.run && v.run.stockAt ? 'counted ' + clock(v.run.stockAt) : 'not counted this shift') + '</div><button type="button" class="lb-btn" data-act="stock">Enter Jugs</button></div>';

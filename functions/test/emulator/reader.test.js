@@ -256,3 +256,19 @@ test('A controller line stops after 3 quiet minutes; a typed line keeps the mach
   assert.equal(r.count, 70, 'typed lines are not counted by the controller');
   assert.equal(r.machine.temp, 415);
 });
+
+test('The Blow Mold makes only gallon jugs (Joe 10/14): a new shift starts on its one product, from the tablet or the machine', async () => {
+  await save('saveMachineProducts', { operationId: BLOW, products: [{ name: 'Gallon Jug', sku: 'Gallon Jug', ratePerMin: 50, targetPct: 75.05 }] });
+  await save('saveLineEntry', { operationId: BLOW, op: 'stop', shift: RD.plantShift(null, T0) });
+  let r = await blowRun();
+  assert.equal(r.product, 'Gallon Jug');
+  assert.equal(r.runs[0].by, 'only product');
+  await db().collection('productionRuns').doc(P.runId(BLOW, KEY)).delete();
+  await save('saveLineCounter', { operationId: BLOW, counter: 'CONTROLLER' });
+  await RD.applyMachine(db(), BLOW, { count: 10, temp: 410 }, { now: at(0) });
+  r = await blowRun();
+  assert.equal(r.product, 'Gallon Jug');
+  // A line with more than one product still has the operator pick.
+  await save('saveLineEntry', { operationId: LINE, op: 'stop', shift: RD.plantShift(null, T0) });
+  assert.equal((await run()).product, '');
+});

@@ -136,6 +136,15 @@ async function stopWorkOrder(tx, db, req, line, run, stop, email, stamp) {
   tx.set(ref, wo);
   return { id: ref.id, woNumber: wo.woNumber };
 }
+// A Blow Mold shift starts on the line's one product (the plant's Products list gives it only Gallon Jug).
+async function onlyProduct(tx, db, operationId, line, run, stamp) {
+  if (P.lineKind(line.name) !== 'BLOWMOLD' || run.product) return;
+  const snap = await tx.get(db.collection('plantProducts').doc(docId(operationId)));
+  const targets = P.targetsFor(snap.exists ? snap.data().products : []);
+  if (targets.length !== 1) return;
+  run.product = targets[0].name; run.sku = text(targets[0].sku);
+  run.runs.push({ product: run.product, sku: run.sku, from: stamp, by: 'only product' });
+}
 async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const line = await lineOf(tx, db, req.operationId, SaveError);
   const ref = db.collection('productionRuns').doc(docId(P.runId(req.operationId, req.shift.key))), had = await tx.get(ref);
@@ -143,6 +152,8 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
   const run = before ? JSON.parse(JSON.stringify(before)) : { operationId: req.operationId, line: line.name, facilityId: line.facilityId, shiftKey: req.shift.key, shiftName: req.shift.name,
     date: req.shift.date, shiftStart: req.shift.start, shiftEnd: req.shift.end, product: '', sku: '', count: 0, counts: [], runs: [], stops: [], createdAt: stamp, createdBy: email };
   ['counts', 'runs', 'stops', 'changeovers', 'cips', 'crew', 'diverts'].forEach(k => { if (!Array.isArray(run[k])) run[k] = []; });
+  // Joe 10/14: the Blow Mold makes only gallon jugs, so its one product runs from the shift's first entry without a pick.
+  if (!before && req.op !== 'product') await onlyProduct(tx, db, req.operationId, line, run, stamp);
   if (!run.waste || typeof run.waste !== 'object') run.waste = {};
   if (!run.checks || typeof run.checks !== 'object') run.checks = {};
   const lineRef = db.collection('productionLines').doc(docId(req.operationId));
@@ -311,4 +322,4 @@ async function saveLineSetup(tx, db, req, email, stamp, logRef, mode, SaveError)
   return result;
 }
 
-module.exports = { validateLineEntry, saveLineEntry, validateLineCounter, saveLineCounter, validateLineSetup, saveLineSetup };
+module.exports = { onlyProduct, validateLineEntry, saveLineEntry, validateLineCounter, saveLineCounter, validateLineSetup, saveLineSetup };

@@ -166,6 +166,7 @@ async function applyMachine(db, id, r, opts) {
     const shifts = await tx.get(db.collection('plantShifts').doc(docId(line.facilityId)));
     const shift = plantShift(shifts.exists ? shifts.data().shifts : null, ms);
     const ref = db.collection('productionRuns').doc(docId(P.runId(id, shift.key))), had = await tx.get(ref);
+    const productsSnap = had.exists ? null : await tx.get(db.collection('plantProducts').doc(docId(id)));
     const scale = (v, d) => (v === null ? null : Math.round(v / (numOrNull(d) > 0 ? numOrNull(d) : 1) * 10) / 10);
     const value = numOrNull(r.count), speed = scale(numOrNull(r.speed), cfg.speedDivide), temp = scale(numOrNull(r.temp), cfg.tempDivide);
     const last = ld.machineLast && numOrNull(ld.machineLast.value) !== null ? numOrNull(ld.machineLast.value) : null;
@@ -183,6 +184,9 @@ async function applyMachine(db, id, r, opts) {
     if (had.exists || delta > 0 || speed !== null || temp !== null) {
       const run = had.exists ? had.data() : machineRun(id, line, shift, stamp);
       ['counts', 'runs', 'stops'].forEach(k => { if (!Array.isArray(run[k])) run[k] = []; });
+      // Joe 10/14: the Blow Mold makes only gallon jugs, so a new shift starts on its one product.
+      const only = productsSnap ? P.targetsFor(productsSnap.exists ? productsSnap.data().products : []) : [];
+      if (!had.exists && only.length === 1 && P.lineKind(line.name) === 'BLOWMOLD') { run.product = only[0].name; run.sku = text(only[0].sku); run.runs.push({ product: run.product, sku: run.sku, from: stamp, by: 'only product' }); }
       const m = Object.assign({}, run.machine || {}), log = Array.isArray(run.machineLog) ? run.machineLog : [];
       const sf = P.machineFlag(speed, cfg.speedLow, cfg.speedHigh), tf = P.machineFlag(temp, cfg.tempLow, cfg.tempHigh);
       const lastLog = log[log.length - 1], logDue = !lastLog || ms - when(lastLog.at) >= 60000;

@@ -168,6 +168,10 @@ function controller() {
       assert.match(await bm.textContent('#kind-cards'), /FROM THE MACHINE/);
       assert.equal(await bm.$('#kind-cards [data-act="count"]'), null, 'no Enter Count: the machine counts');
       assert.match(await bm.textContent('#live'), /Counts from the machine/);
+      // Joe 10/14: the Blow Mold makes only gallon jugs, so its one product is running with nothing to pick.
+      assert.match(await bm.textContent('#kind-cards'), /Gallon Jug\s*The only product made here/);
+      assert.equal(await bm.$('#kind-cards [data-act="product"]'), null, 'no Pick Product on the Blow Mold');
+      assert.doesNotMatch(await bm.textContent('#status-text'), /pick the product/);
       // The bottle check: one jug from each of the six heads, in grams; a head outside 55 to 59 g is flagged.
       assert.deepEqual(await bm.$$eval('#check-inline .lb-field', f => f.map(x => x.firstChild.textContent.trim())), ['Head 1 g', 'Head 2 g', 'Head 3 g', 'Head 4 g', 'Head 5 g', 'Head 6 g', 'Top load']);
       if (w === 1024) {
@@ -187,7 +191,7 @@ function controller() {
       assert.deepEqual(bm.errors, []);
       await bm.close();
     }
-    results.push('Blow Mold tablet (1024 and 800): From the machine with the jug count, annealer speed in range and the temperature flashing TOO HOT; Jugs this shift FROM THE MACHINE with no Enter Count; the bottle check has Head 1 to Head 6 in grams with 60.2 HEAVY and 54.6 LIGHT against 55 to 59 g');
+    results.push('Blow Mold tablet (1024 and 800): From the machine with the jug count, annealer speed in range and the temperature flashing TOO HOT; Jugs this shift FROM THE MACHINE with no Enter Count; Gallon Jug running with no Pick Product; the bottle check has Head 1 to Head 6 in grams with 60.2 HEAVY and 54.6 LIGHT against 55 to 59 g');
 
     // Production Lines: the card and the line's shift view.
     const pl = await openPage(browser, 1536, 960, '/production.html?' + ADMIN);
