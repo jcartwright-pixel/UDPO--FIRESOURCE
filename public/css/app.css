@@ -607,10 +607,10 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
 .gps-page .gps-check td { padding: 7px 8px; border: 0; border-bottom: 1px solid var(--line); vertical-align: middle; text-align: left; }
 .gps-page .gps-check tr.not-yet td { color: var(--muted); }
 .gps-page .gps-mark { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-weight: 900; font-size: 16px; }
-.gps-page .gps-mark.ok { background: #e3f4e8; color: #1d6b37; }
-.gps-page .gps-mark.bad { background: #fde3df; color: #a8321f; }
-.gps-page .gps-mark.wait { background: #fdecc4; color: #8a5a00; }
-.gps-page .gps-mark.none { background: #eef2f5; color: #6b7c8c; }
+.gps-page .gps-mark.ok { background: var(--pill-green-bg); color: var(--pill-green-ink); }
+.gps-page .gps-mark.bad { background: var(--pill-red-bg); color: var(--pill-red-ink); }
+.gps-page .gps-mark.wait { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
+.gps-page .gps-mark.none { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
 .gps-page .gps-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 16px; }
 
 /* One app, not page after page (Joe 10/9): the page colour shows while a screen loads (no white flash), and Chrome
