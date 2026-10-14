@@ -49,7 +49,7 @@
     import { start, requireSignIn, save, escapeHtml, shortDate, showError, watchPerson } from './js/app.js';
     import { printSaved } from './js/print-sheet.js';
     import { plantFor } from './js/pmaint.js';
-    import { collection, doc, onSnapshot } from './js/firebase.js';
+    import { collection, doc, onSnapshot, httpsCallable } from './js/firebase.js';
 
     // The current app's Fleet Service (FleetService.html, 220_V7276_GarageFleetService.gs), Send to Garage puts a PM, reefer
     // service or DOT inspection on the Garage Station (garage.js). Fleet Service Setup changes the rules (config/fleetRules), each
@@ -81,6 +81,10 @@
     }
     const miles = () => L.latestReadings(odometers, gps);
     const open = () => orders.filter(o => String(o.status || 'NEW').toUpperCase() !== 'DONE');
+    // Joe 10/14: the Garage Station also lists write-ups that have no work order yet; the office sees the same list (garage.js
+    // officeJobs), and managers can Delete any of them. Uniontown's garage only.
+    let waiting = [];
+    const jobs = () => open().concat(plant.id === 'fac_uniontown' ? waiting.map(j => ({ work_order_id: '', writeUp: j.writeUp, unit: j.unit, problem: j.problem, source_from: j.from, techs: '', status: 'NEW', created_at: j.createdAt })) : []);
     const done = () => orders.filter(o => String(o.status).toUpperCase() === 'DONE').sort((a, b) => String(b.completed_at || '').localeCompare(String(a.completed_at || '')));
     // Polish item 7 (Joe 10/11): a zero is plain grey.
     const kpis = (list) => list.map(([n, label, c]) => '<div class="' + (c && parseFloat(n) > 0 ? c : parseFloat(n) === 0 ? 'zero' : '') + '"><b>' + n + '</b><span>' + label + '</span></div>').join('');
@@ -129,7 +133,7 @@
       const t = today(), due = L.fleetDue(units(), setup, miles(), open(), savedRules, t), month = t.slice(0, 7), weekAgo = L.weekStart(t);
       const late = due.items.filter(i => i.status === 'OVERDUE').length, soon = due.items.filter(i => i.status === 'DUE_SOON').length, week = done().filter(o => L.localDay(o.completed_at) >= weekAgo);
       document.getElementById('tab-due').textContent = late || '';
-      document.getElementById('tab-work').textContent = open().length || '';
+      document.getElementById('tab-work').textContent = jobs().length || '';
       document.querySelectorAll('.tabs [data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
       const bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot'), k = document.getElementById('kpis');
       const q = search.toUpperCase(), hit = (u) => !q || String(u).toUpperCase().indexOf(q) >= 0;
@@ -141,18 +145,21 @@
         sheet.innerHTML = unitGrid(due, hit);
         foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · leased tractors: the lessor handles service.';
       } else if (view === 'work') {
-        const o = open().slice().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
+        const o = jobs().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
           [o.filter(x => String(x.source).toUpperCase() === 'OFFICE').length, 'Sent from office'], [week.length, 'Finished · this week', 'good'], [Math.round(mins / 6) / 10, 'Mechanic hours · this week']]);
         bar.innerHTML = '<span class="hint">Click a row to see that unit\'s history.</span><span class="spacer"></span><a class="button" href="garage.html">Garage Work Orders</a><a class="button" href="garage-station.html">Garage Station</a>';
         // As the current app: Working, then Sent from the office, then Waiting on parts, then New; a row opens the unit's History.
-        sheet.innerHTML = '<div class="fleet-split"><div><h2>Open Work Orders</h2>' + table([14, 12, 34, 14, 12, 14], ['#', 'Unit', "What's wrong", 'Came from', 'Tech', 'Status'],
-          o.map(x => '<tr class="clicky" data-unit="' + escapeHtml(x.unit) + '" title="Open ' + escapeHtml(x.unit) + '\'s history"><td class="strong">' + escapeHtml(x.work_order_id) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(cameFrom(x)) +
-            '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + pill(JOB[String(x.status).toUpperCase()] || [x.status, 'no']) + '</td></tr>').join(''), 'No open work orders.') +
+        // Delete (managers and administrators, Joe 10/14): the job comes off the Garage Station, after a confirm.
+        const del = canEdit(), delBtn = (x) => '<td><button type="button" class="edit" ' + (x.work_order_id ? 'data-del-wo="' + escapeHtml(x.work_order_id) + '"' : 'data-del-wu="' + escapeHtml(x.writeUp) + '"') +
+          ' data-del-what="' + escapeHtml(x.unit + ' · ' + String(x.problem || '').slice(0, 80)) + '" title="Take this job off the Garage Station">Delete</button></td>';
+        sheet.innerHTML = '<div class="fleet-split"><div><h2>Open Work Orders</h2>' + table(del ? [15, 11, 26, 15, 8, 13, 12] : [14, 12, 34, 14, 12, 14], ['#', 'Unit', "What's wrong", 'Came from', 'Tech', 'Status'].concat(del ? [''] : []),
+          o.map(x => '<tr class="clicky" data-unit="' + escapeHtml(x.unit) + '" title="Open ' + escapeHtml(x.unit) + '\'s history"><td class="strong">' + (x.work_order_id ? escapeHtml(x.work_order_id) : '<small title="A driver write-up on the Garage Station with no work order yet">Write-up</small>') + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(cameFrom(x)) +
+            '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + pill(JOB[String(x.status).toUpperCase()] || [x.status, 'no']) + '</td>' + (del ? delBtn(x) : '') + '</tr>').join(''), 'No open work orders.') +
           '</div><div><h2>What the Mechanics Did · This Week (Sun-Sat)</h2>' + table([12, 12, 22, 28, 14, 12], ['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours'],
           week.map(x => '<tr class="clicky" data-unit="' + escapeHtml(x.unit) + '"><td>' + when(x.completed_at) + '</td><td class="strong">' + escapeHtml(x.unit) + '</td><td class="wrong">' + escapeHtml(x.problem || '') + '</td><td class="wrong">' + escapeHtml(fixedText(x)) +
             '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td></tr>').join(''), 'Nothing finished this week yet.') + '</div></div>';
-        foot.textContent = orders.length + (orders.length === 1 ? ' work order' : ' work orders') + ' from the garage list.';
+        foot.textContent = orders.length + (orders.length === 1 ? ' work order' : ' work orders') + ' from the garage list' + (waiting.length && plant.id === 'fac_uniontown' ? ', and ' + waiting.length + (waiting.length === 1 ? ' write-up' : ' write-ups') + ' on the Garage Station with no work order yet' : '') + '.';
       } else if (view === 'history') {
         k.innerHTML = '';
         bar.innerHTML = '<input type="search" id="search" placeholder="Type a truck or trailer number" aria-label="Find" value="' + escapeHtml(search) + '"><div class="chips">' +
@@ -341,6 +348,15 @@
         } catch (err) { showError(err.message); }
         return;
       }
+      const dl = e.target.closest('[data-del-wo],[data-del-wu]');
+      if (dl) {
+        const wo = dl.dataset.delWo || '';
+        if (!confirm('Delete ' + (wo ? 'work order ' + wo : 'this job') + ' (' + dl.dataset.delWhat + ')?\n\nIt comes off the Garage Station. A driver write-up stays open on Truck Issues; press Garage there to send it again.')) return;
+        dl.disabled = true; showError('');
+        try { await save('deleteGarageJob', wo ? { workOrderId: wo } : { writeUp: dl.dataset.delWu }); await loadWaiting(); render(); }
+        catch (err) { dl.disabled = false; showError(err.message); }
+        return;
+      }
       const wr = e.target.closest('tr[data-unit]'); if (wr && view === 'work') { view = 'history'; search = wr.dataset.unit; kindFilter = ''; render(); return; }
       const b = e.target.closest('[data-send]');
       if (!b) return;
@@ -350,6 +366,12 @@
     });
     window.udBack = () => { if (view !== 'due' || search) { view = 'due'; search = ''; render(); return true; } return false; };
 
+    // The write-ups on the Garage Station with no work order yet (garage.js officeJobs); read again every minute.
+    async function loadWaiting() {
+      try { const r = await httpsCallable((await start()).functions, 'garage')({ op: 'office' }); waiting = (r.data && r.data.jobs) || []; } catch (err) { /* the work orders still show */ }
+    }
+    setInterval(() => loadWaiting().then(render), 60000);
+
     requireSignIn(async (user) => {
       const { db, auth } = await start();
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); render(); }, e => showError('Could not read the ' + (READ_NAMES[name] || 'garage list') + ' (' + e.message + '). Check the network and reload the page.'));
@@ -357,7 +379,7 @@
       watch('fleetSetup', v => { setup = v; });
       watch('odometers', v => { odometers = v; });
       watch('gpsTrucks', v => { gps = v; });
-      watch('workOrders', v => { rawOrders = v; pick(); });
+      watch('workOrders', v => { rawOrders = v; pick(); loadWaiting().then(render); });
       watch('garageTechs', v => { rawTechs = v; pick(); });
       let stopRules = null;
       const follow = () => {
