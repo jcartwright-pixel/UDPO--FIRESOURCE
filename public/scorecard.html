@@ -146,7 +146,8 @@
 
     function board(s) {
       const t = today(), yesterday = S.scAddDays_(t, -1), days = allDays(routeMiles), ex = exceptions.map(e => Object.assign({}, e.cells || {}, { driver_id: (e.cells || {}).driver_id || e.driverId || '' }));
-      const lost = (a, z) => Object.keys(unassigned).filter(d => d >= a && d <= z).sort().reduce((l, d) => l.concat(unassigned[d]), []);
+      // Joe 10/14: No driver dispatched starts at Scorecard counted from too.
+      const lost = (a, z) => Object.keys(unassigned).filter(d => d >= a && d <= z && d >= s.countFrom).sort().reduce((l, d) => l.concat(unassigned[d]), []);
       const exMap = {};
       excuses.forEach(x => { if (x.key) exMap[x.key] = { reason: x.reason || '', by: x.by || '' }; });
       // Accidents (12 months), PDAs (9), complaints (6) and call-offs (3) look back past the period, fading as they age.
@@ -198,7 +199,7 @@
         sheet.innerHTML = '<div class="sc-set"><section class="otr-card"><h2>What costs points</h2>' +
           '<p><b>Daily check-in</b> ' + n('checkinMiss') + ' points for each run without a check-in</p>' +
           // Joe 10/14: nothing run before this day costs points (10-15-26 to start); a check-in in the app or by the answering-service email counts.
-          '<p><b>Scorecard counted from</b> <input type="date" id="sc-count-from" value="' + s.countFrom + '"' + (edit ? '' : ' disabled') + '> ' + escapeHtml(shortDate(s.countFrom)) + ' · runs before this day are not graded (check-in, cases, inspections, driving, time, MPG). A check-in in the app or by the answering-service email counts.</p>' +
+          '<p><b>Scorecard counted from</b> <input type="date" id="sc-count-from" value="' + s.countFrom + '"' + (edit ? '' : ' disabled') + '> ' + escapeHtml(shortDate(s.countFrom)) + ' · runs before this day are not graded (check-in, cases, inspections, driving, time, MPG, call-offs). A check-in in the app or by the answering-service email counts.</p>' +
           '<p><b>Cases out vs in</b> ' + n('lostCase') + ' point per lost case, at most ' + n('lostCaseDayCap') + ' a day</p>' +
           '<p><b>Clean inspections</b> ' + n('inspectionDefect') + ' points per inspection with a defect, ' + n('inspectionMissing') + ' if none done</p>' +
           '<p><b>Attendance</b> ' + n('callOff') + ' points per call-off day</p>' +
@@ -324,7 +325,8 @@
       // Joe 10/13: one line on how the scoring works, above the board.
       const how = '<p class="sc-how" id="sc-how"><b>How scoring works:</b> each area earns +' + s.cleanDay + ' for a perfect day (no miss in it) and +' + s.streakBonus + ' for every ' + s.streakDays + ' perfect days in a row, and loses the Settings points for each miss; its grade goes by points per day worked (perfect every day = 100; A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+). Accidents (12 months), PDAs (9 months), complaints (6 months) and call-offs (3 months) count past the period shown, fading as they age; accidents and complaints count once a manager reviews them. Overall is the average of the area grades.</p>';
       const shown = b.rows.filter(r => r.runDays || r.callOffs);
-      const empty = (cols) => '<tr><td colspan="' + cols + '" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.</td></tr>';
+      // Joe 10/14: before Scorecard counted from, say why the board is empty.
+      const empty = (cols) => '<tr><td colspan="' + cols + '" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.' + (b.through < s.countFrom ? ' The scorecard counts from ' + shortDate(s.countFrom) + ' (Settings).' : '') + '</td></tr>';
       // The area tabs: one row per driver with that area's grade, its numbers and each miss in it.
       const areaTable = (key) => {
         const a = CORE.AREAS.find(x => x[0] === key), rows = shown.slice().sort((x, y) => ((y.areas[key] || {}).score ?? -1) - ((x.areas[key] || {}).score ?? -1) || (x.driver < y.driver ? -1 : 1));
@@ -374,7 +376,7 @@
       const TAB = { fuel: 'MPG', cleanliness: 'Clean', incidents: 'Incidents' };
       cats.innerHTML = [['overall', 'Overall']].concat(AREAS).concat([['incidents', 'Incidents & Complaints']]).map(a => '<button type="button" role="tab" data-tab="' + a[0] + '" title="' + escapeHtml(a[1]) + '" aria-selected="' + (tab === a[0]) + '">' + escapeHtml(TAB[a[0]] || a[1]) + '</button>').join('');
       sheet.innerHTML = tab === 'incidents' ? incidentTable() : tab !== 'overall' && AREAS.some(a => a[0] === tab) ? how + areaTable(tab) : how + overall();
-      foot.textContent = 'Through ' + shortDate(b.through) + ' · green = no misses, red = cost points · days counted: ' + (b.days.length ? shortDate(b.days[0]) + ' to ' + shortDate(b.days[b.days.length - 1]) + ' (the copied Live weeks)' : 'none') + ' · click a driver for the details, rewards and each miss.';
+      foot.textContent = 'Through ' + shortDate(b.through) + ' · counted from ' + shortDate(s.countFrom) + ' (Settings) · green = no misses, red = cost points · click a driver for the details, rewards and each miss.';
       document.getElementById('prev').onclick = () => { if (mode === 'year') year--; else if (mode === 'week') weekStart = S.scAddDays_(weekStart, -7); else if (--month < 1) { month = 12; year--; } open = ''; render(); };
       document.getElementById('next').onclick = () => { if (mode === 'year') year++; else if (mode === 'week') weekStart = S.scAddDays_(weekStart, 7); else if (++month > 12) { month = 1; year++; } open = ''; render(); };
       document.getElementById('sc-print').onclick = () => {

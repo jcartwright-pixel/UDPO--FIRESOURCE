@@ -313,6 +313,21 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       let sc = await openPage(browser, 1536, 760, '/scorecard.html?month=2026-10&testEmail=manager.test@uniteddairy.com');
       await sc.waitForSelector('#cats [data-tab="checkin"]');
       await sc.waitForTimeout(800);
+      // Joe 10/14 (live): before the start date one driver with an old call-off was alone on the board and read as "stuck"
+      // on him. Now nobody is listed, the board says why, No driver dispatched starts at the start date too, and Week / Month switch.
+      if (!BEFORE) {
+        assert.equal(await sc.$$eval('.sc-board tr[data-key]', r => r.length), 0, 'no driver is listed from call-offs before 10-15-26');
+        assert.match(await sc.textContent('.sc-board'), /The scorecard counts from 10-15-26 \(Settings\)/);
+        assert.equal(await sc.$('#unassigned'), null, 'No driver dispatched starts at the start date');
+        const foot = await sc.textContent('#foot');
+        assert.match(foot, /counted from 10-15-26 \(Settings\)/);
+        assert.ok(!/copied Live weeks/.test(foot), 'the footer no longer talks about copied Live weeks');
+        await shot(sc, 'board-before-start');
+        await sc.click('[data-mode="week"]');
+        await sc.waitForFunction(() => /Week of/.test(document.body.textContent));
+        await sc.click('[data-mode="month"]');
+        await sc.waitForFunction(() => /Oct 26/.test(document.body.textContent));
+      }
       for (const t of BEFORE ? ['checkin', 'cases', 'inspection', 'time', 'idling'] : ['checkin', 'cases', 'inspection', 'time']) {
         const rows = await tab(sc, t);
         await shot(sc, 'tab-' + t);
