@@ -144,7 +144,8 @@
         const d = Number(c[k + 'Divide']) > 0 ? Number(c[k + 'Divide']) : 1, unit = k === 'temp' ? '°F' : k === 'speed' ? ' a minute' : ' on the machine\'s counter';
         return '<span class="lt-good"><b>' + fmt(r.value) + '</b>' + (d !== 1 ? ' ÷ ' + d + ' = <b>' + (Math.round(r.value / d * 10) / 10) + '</b>' : '') + escapeHtml(unit) + ' · read ' + escapeHtml(dateTimeText(r.at)) + '</span>';
       };
-      const names = { count: 'Jug count', speed: c.speedName || 'Speed', temp: 'Temperature (°F)' };
+      const kind = R.lineKind(line.name), speedDefault = R.speedNameFor(kind, {});
+      const names = { count: 'Jug count', speed: R.speedNameFor(kind, c), temp: 'Temperature (°F)' };
       const modbus = brand === 'MODBUS';
       const row = (k) => '<tr><th>' + escapeHtml(names[k]) + '</th><td><input data-c="' + k + 'Tag" value="' + escapeHtml(ctrlVal(c, k + 'Tag')) + '" aria-label="Where the ' + escapeHtml(names[k].toLowerCase()) + ' is"' + (brand ? '' : ' disabled') + '></td>' +
         (modbus ? '<td><select data-c="' + k + 'Size" aria-label="Size of the ' + escapeHtml(names[k].toLowerCase()) + '"><option value=""></option>' + [['16', '16 bits'], ['32', '32 bits']].map(o => opt(o[0], String(ctrlVal(c, k + 'Size')), o[1])).join('') + '</select></td>' : '') +
@@ -156,7 +157,7 @@
         '<div class="lt-cgrid">' + sel('brand', 'Brand', R.CONTROLLER_BRANDS) + inp('ip', 'IP address') + inp('port', 'Port' + (port ? ' (empty = ' + port + ')' : '')) +
           (brand === 'AB' ? inp('slot', 'Slot (empty = 0)') : '') + (brand === 'S7' ? inp('rack', 'Rack (empty = 0)') + inp('slot', 'Slot (empty = 1)') : '') +
           (modbus ? inp('unit', 'Unit id (empty = 1)') + sel('wordOrder', 'Word order (empty = high first)', [['HIGH_FIRST', 'High word first'], ['LOW_FIRST', 'Low word first']]) : '') +
-          inp('speedName', 'Speed is called (empty = Speed)', 'wide') + '</div>' +
+          inp('speedName', 'Speed is called (empty = ' + speedDefault + ')', 'wide') + '</div>' +
         '<div class="lt-scroll"><table class="loadout lt-ctable"><colgroup><col style="width:15%"><col style="width:16%">' + (modbus ? '<col style="width:9%">' : '') + '<col style="width:9%"><col style="width:9%"><col style="width:9%"><col></colgroup><thead><tr><th>Reading</th><th>Where it is</th>' + (modbus ? '<th>Size</th>' : '') + '<th>Divide by</th><th>Low</th><th>High</th><th>Test read</th></tr></thead><tbody>' +
           ['count', 'speed', 'temp'].map(row).join('') + '</tbody></table></div>' +
         '<p class="lt-note">' + (brand ? 'Where it is: ' + escapeHtml(R.TAG_HELP[brand]) + '. ' : 'Pick the brand first (it is on the controller\'s nameplate). ') + 'Divide by: 10 when the controller sends 4312 for 431.2. Low and high: the line tablet flashes the reading red outside them. Empty boxes are left out.</p>' +

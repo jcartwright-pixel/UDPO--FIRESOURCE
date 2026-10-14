@@ -57,7 +57,7 @@ async function until(what, fn) {
 // A pretend Modbus controller: holding registers 0-1 the jug count (32 bits), 10 the speed, 11 the temperature in tenths.
 // It answers read requests only; anything else is refused and remembered, so the test can show nothing was ever written.
 function controller() {
-  const regs = { 0: 19, 1: 39978, 10: 42, 11: 4312 }, writes = [];
+  const regs = { 0: 19, 1: 39978, 10: 70, 11: 4312 }, writes = [];
   const server = net.createServer(sock => {
     let buf = Buffer.alloc(0);
     sock.on('data', d => {
@@ -96,6 +96,7 @@ function controller() {
     await lt.waitForSelector('#controller:not([hidden]) [data-c="brand"]');
     assert.equal(await lt.inputValue('#controller [data-c="brand"]'), '', 'the brand starts blank');
     assert.equal(await lt.textContent('#counter-pill'), 'Counts from the machine');
+    assert.match(await lt.textContent('#controller'), /Speed is called \(empty = Annealer speed\)/, 'Joe 10/14: the Blow Mold\'s speed is the annealer speed');
     await lt.selectOption('#controller [data-c="brand"]', 'MODBUS');
     await until('brand saved', async () => ((await lineDoc()).controller || {}).brand === 'MODBUS');
     const type = async (k, v) => {
@@ -104,7 +105,7 @@ function controller() {
       await lt.press('#controller [data-c="' + k + '"]', 'Tab');
       await until(k + ' saved', async () => String(((await lineDoc()).controller || {})[k]) === v);
     };
-    for (const [k, v] of [['ip', '127.0.0.1'], ['port', String(plc.port)], ['countTag', '40001'], ['speedTag', '40011'], ['speedLow', '38'], ['speedHigh', '46'],
+    for (const [k, v] of [['ip', '127.0.0.1'], ['port', String(plc.port)], ['countTag', '40001'], ['speedTag', '40011'], ['speedLow', '65'], ['speedHigh', '75'],
       ['tempTag', '40012'], ['tempDivide', '10'], ['tempLow', '395'], ['tempHigh', '425']]) await type(k, v);
     // A box typed wrong is refused with what to type.
     await lt.fill('#controller [data-c="ip"]', '127.0.0.300');
@@ -153,7 +154,7 @@ function controller() {
       await bm.waitForSelector('#machine:not([hidden])');
       await bm.waitForFunction(() => /TOO HOT/.test(document.getElementById('machine').textContent) && /IN RANGE/.test(document.getElementById('machine').textContent));
       const tiles = await bm.$$eval('#machine .lb-card', cs => cs.map(c => [c.querySelector('.eyebrow').textContent, c.classList.contains('lb-flash')]));
-      assert.deepEqual(tiles, [['Jug count', false], ['Speed', false], ['Temperature', true]]);
+      assert.deepEqual(tiles, [['Jug count', false], ['Annealer speed', false], ['Temperature', true]]);
       assert.match(await bm.textContent('#machine'), /431\.2°F/);
       await bm.waitForFunction(() => /COUNTING/.test(document.getElementById('machine').textContent), null, { timeout: 15000 });
       assert.match(await bm.textContent('#machine'), /Range 395°F to 425°F/);
@@ -167,7 +168,7 @@ function controller() {
       assert.deepEqual(bm.errors, []);
       await bm.close();
     }
-    results.push('Blow Mold tablet (1024 and 800): From the machine with the jug count, speed in range and the temperature flashing TOO HOT; Jugs this shift FROM THE MACHINE with no Enter Count');
+    results.push('Blow Mold tablet (1024 and 800): From the machine with the jug count, annealer speed in range and the temperature flashing TOO HOT; Jugs this shift FROM THE MACHINE with no Enter Count');
 
     // Production Lines: the card and the line's shift view.
     const pl = await openPage(browser, 1536, 960, '/production.html?' + ADMIN);

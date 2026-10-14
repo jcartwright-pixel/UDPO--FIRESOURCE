@@ -235,11 +235,13 @@
     return '';
   }
   // What the controller last sent this shift (run.machine), with the line's ranges (lineDoc.controller). Stale after 2 minutes.
-  function machineNow(run, lineDoc, nowMs) {
+  // Joe 10/14: on the Blow Mold the speed is the annealer speed (like 70), unless Line Targets names it otherwise.
+  function speedNameFor(kind, c) { return text((c || {}).speedName) || (kind === 'BLOWMOLD' ? 'Annealer speed' : 'Speed'); }
+  function machineNow(run, lineDoc, nowMs, kind) {
     var m = (run || {}).machine, c = ((lineDoc || {}).controller) || {};
     if (!m || typeof m !== 'object') return null;
     var at = when(m.at), o = { at: text(m.at), stale: !at || nowMs - at > 120000, counter: num(m.counter), speed: num(m.speed), temp: num(m.temp),
-      speedName: text(c.speedName) || 'Speed', speedLow: num(c.speedLow), speedHigh: num(c.speedHigh), tempLow: num(c.tempLow), tempHigh: num(c.tempHigh), speedOutSince: text(m.speedOutSince), tempOutSince: text(m.tempOutSince), lastMoveAt: text(m.lastMoveAt) };
+      speedName: speedNameFor(kind, c), speedLow: num(c.speedLow), speedHigh: num(c.speedHigh), tempLow: num(c.tempLow), tempHigh: num(c.tempHigh), speedOutSince: text(m.speedOutSince), tempOutSince: text(m.tempOutSince), lastMoveAt: text(m.lastMoveAt) };
     o.speedFlag = machineFlag(o.speed, o.speedLow, o.speedHigh);
     o.tempFlag = machineFlag(o.temp, o.tempLow, o.tempHigh);
     var log = Array.isArray(run.machineLog) ? run.machineLog : [];
@@ -320,7 +322,7 @@
       diverting: dv ? { start: dv.start, reason: text(dv.reason), minutes: Math.round((nowMs - when(dv.start)) / 60000) } : null,
       diverts: (r.diverts || []).length, lastDivertAt: (r.diverts || []).length ? r.diverts[r.diverts.length - 1].start : text(ld.lastDivertAt),
       source: r.source && typeof r.source === 'object' ? { from: text(r.source.from), to: text(r.source.to) } : { from: '', to: '' },
-      machine: machineNow(r, ld, nowMs),
+      machine: machineNow(r, ld, nowMs, kind),
       lot: text(r.lot), stock: num(r.stock), note: text(r.note), next: ld.next && typeof ld.next === 'object' && text(ld.next.product) ? { product: text(ld.next.product), qty: num(ld.next.qty) } : null
     });
   }
@@ -400,6 +402,6 @@
   return { COUNTERS: COUNTERS, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
     lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
-    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow,
+    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor,
     countAt: countAt, checkDue: checkDue, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };
 });
