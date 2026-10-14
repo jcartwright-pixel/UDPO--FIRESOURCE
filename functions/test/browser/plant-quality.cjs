@@ -100,6 +100,29 @@ async function shots(page, name, w) {
         assert.equal(await gallonChecks(), 1, 'the pick saved once its 4 seconds were up');
         await shots(page, 'quality-product-saved', w);
         results.push('Product pick: "Saving in 4 seconds" with Undo; Undo puts the box back and saves nothing; left alone it saves after 4 seconds');
+        // Joe 10/14 (Run Complete, A): the line is done for the shift; Undo takes a mistaken press back; Start Next Run opens a new run.
+        const lastGallon = async () => (await db().collection('plantJournal').where('type', '==', 'PRODUCTION_QUALITY').get()).docs.map(d => d.data()).filter(d => (d.payload || {}).operationId === 'ut_prod_gallon_filler').sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0];
+        const doneTile = '[data-line="ut_prod_gallon_filler"] .qc-done-chip';
+        await page.click('#run-done');
+        await page.waitForSelector('#fields .qc-done');
+        assert.match(await page.textContent('#fields .qc-done'), /GALLON FILLER run complete · \d{1,2}:\d\d [AP]M[\s\S]*No checks are due/);
+        assert.ok(await page.isVisible(doneTile), 'the line says DONE in the list');
+        assert.equal(await page.isVisible('#run-done'), false);
+        for (let i = 0; i < 50 && ((await lastGallon()) || {}).status !== 'FINISHED'; i++) await page.waitForTimeout(100);
+        assert.equal((await lastGallon()).status, 'FINISHED');
+        if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'quality-run-complete-1920.png'), scale: 'css' });
+        await page.click('[data-undo-done]');
+        await page.waitForSelector('#fields select.prod-product');
+        assert.equal(await page.$(doneTile), null, 'Undo: the line is open again');
+        for (let i = 0; i < 50 && !((await lastGallon()).payload || {}).undone; i++) await page.waitForTimeout(100);
+        assert.equal((await lastGallon()).payload.undone, true, 'the mistaken press is marked undone');
+        await page.click('#run-done');
+        await page.waitForSelector('#fields .qc-done');
+        await page.click('[data-next]');
+        await page.waitForSelector('#fields select.prod-product');
+        assert.equal(await page.inputValue('select.prod-product'), '', 'Start Next Run: the boxes start empty');
+        assert.equal(await page.$(doneTile), null);
+        results.push('Run Complete: the line shows done with no form and DONE in the list; Undo opens it again (check marked undone); Start Next Run starts empty boxes');
       }
       await page.click('[data-pane="history"]');
       await page.waitForSelector('#pane-history:not([hidden])');

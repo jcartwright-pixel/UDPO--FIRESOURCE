@@ -685,6 +685,15 @@
 .plant-page .as-note.bad { color: #b42332; }
 .plant-page .as-last { display: block; margin-top: 3px; font-size: 16px; font-weight: 600; color: #8796a2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quality-page .qc-round { margin-left: auto; font-size: 16px; font-weight: 700; color: var(--muted); }
+/* Joe 10/14 (Run Complete, A): the line is done for the shift. */
+.quality-page .qc-done-btn { font: inherit; font-size: 16px; font-weight: 800; padding: 9px 18px; border-radius: 9px; border: 0; background: #0b3d6e; color: #fff; cursor: pointer; }
+.quality-page .qc-done { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 18px 20px; border-radius: 12px; background: #eef2f6; border: 1px solid #cdd7e1; color: #24384d; font-size: 16px; }
+.quality-page .qc-done b { flex-basis: 100%; font-size: 22px; color: #0b3d6e; }
+.quality-page .qc-done p { margin: 0; flex-basis: 100%; font-weight: 600; color: #4a5d70; }
+.quality-page .qc-done button { font: inherit; font-size: 16px; font-weight: 800; padding: 9px 18px; border-radius: 9px; cursor: pointer; }
+.quality-page .qc-done .qc-next { background: #0b3d6e; color: #fff; border: 0; }
+.quality-page .qc-done .qc-undo { background: #fff; color: #b42332; border: 2px solid #b42332; }
+.quality-page .qc-done-chip { font-style: normal; padding: 0 7px; border-radius: 999px; background: #e3e8ee; color: #4a5d70; font-size: 16px; font-weight: 800; }
 /* Joe 10/14 (A): a picked product waits 4 seconds with Undo before it saves. */
 .quality-page .qc-wait { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 6px; padding: 10px 12px; border-radius: 10px; background: #fff7e0; border: 1px solid #f0d38a; color: #7a5200; white-space: normal; }
 .quality-page .qc-wait-bar { flex-basis: 100%; height: 6px; border-radius: 3px; background: #f3e3b5; overflow: hidden; }

@@ -39,7 +39,7 @@
         <aside class="qc-lines" aria-label="Production lines"><h2>Lines</h2><div id="lines"></div></aside>
         <section class="qc-form" id="form">
           <div class="qc-top"><h2 id="form-title">Quality Check</h2><span class="qc-last" id="form-last"></span>
-            <span class="qc-round" id="round"></span></div>
+            <span class="qc-round" id="round"></span><button type="button" class="qc-done-btn" id="run-done" hidden>&#10003; Run Complete</button></div>
           <div class="qc-fields" id="fields"></div>
         </section>
       </div>
@@ -90,7 +90,11 @@
     // fills it and is filled in further as each box is left; with none yet the boxes are empty, with the last check small and grey.
     // Joe 10/14: a check clears from the form when the report is sent or 2 hours after it was entered, whichever comes first
     // (as Cooler Temperatures); the boxes then start empty with the last check small and grey.
-    function roundCheck(line) { const l = line.last || {}; return l.docId && inRound(l.recordedAt, roundStart) && Date.now() - Date.parse(l.recordedAt) < 2 * 3600000 ? l : null; }
+    function roundCheck(line) { const l = line.last || {}; return l.docId && l.status !== 'FINISHED' && inRound(l.recordedAt, roundStart) && Date.now() - Date.parse(l.recordedAt) < 2 * 3600000 ? l : null; }
+    // Joe 10/14 (Run Complete, A): a line pressed Run Complete is done for that shift: no form, no checks due, until Start Next Run
+    // or the next shift. Undo takes a press made by mistake back.
+    const restarted = {};
+    const isDone = (line) => !!line && U.lineDone(line.last, Date.now()) && restarted[line.operationId] !== line.last.docId;
     // Size, as the current app: Totes are always Tote and Raypak the 5-gallon dispenser; other lines pick the package size.
     const SIZES = ['Pint', 'Quart', 'Half gallon', 'Gallon', 'Dispenser'];
     function sizeBox(name, last, old, dis, note, was) {
@@ -109,7 +113,18 @@
         (cur && !known ? '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>' : '') + '<option value="' + OTHER + '">Other (type it)</option></select>' +
         '<input class="prod-other" aria-label="Other product" placeholder="Type the product" maxlength="120" hidden' + dis + '>' + note('prod-product') + was(old.product) + '</label>';
     }
+    function drawDone(line) {
+      const l = line.last, ck = canSave();
+      document.getElementById('form-title').textContent = line.name + ' Quality Check';
+      document.getElementById('form-last').textContent = '';
+      document.getElementById('fields').innerHTML = '<div class="qc-done wide"><b>&#10003; ' + escapeHtml(line.name) + ' run complete · ' + escapeHtml(clockOf(l.recordedAt)) + (l.recordedBy ? ' · ' + escapeHtml(initials(l.recordedBy)) : '') + '</b>' +
+        '<p>No checks are due on this line until the next run starts. The next shift starts it again on its own.</p>' +
+        (ck ? '<button type="button" class="qc-next" data-next>Start Next Run</button><button type="button" class="qc-undo" data-undo-done>Undo · pressed by mistake</button>' : '') + '</div>';
+      form = { operationId: line.operationId, fill: fillIn('saveQualityCheck', save, ''), started: '', notes: {}, done: true };
+      shownFor = formKey(line);
+    }
     function drawForm(line) {
+      if (isDone(line)) return drawDone(line);
       const ck = canSave(), cur = roundCheck(line), old = line.last || {}, last = cur || {}, w = last.weights || {}, ow = old.weights || {}, skip = U.qualitySkip(line.name), blow = U.isBlowMold(line.name), htst = U.isHtst(line.name), dis = ck ? '' : ' disabled';
       const by = old.recordedAt ? ' · ' + clockOf(old.recordedAt) + (old.recordedBy ? ' · ' + initials(old.recordedBy) : '') : '';
       const was = (v) => !cur && (old.recordedAt || old.fromSheet) && String(v || '') !== '' ? '<small class="as-last">Last: ' + escapeHtml(String(v)) + by + '</small>' : '';
@@ -137,7 +152,7 @@
       shownFor = formKey(line);
     }
     // The form is drawn again only for another line, a new round, or a check someone else entered.
-    function formKey(line) { const cur = roundCheck(line); return line.operationId + '|' + roundStart + '|' + (cur && (!form || form.fill.id !== cur.docId) ? cur.docId : form && form.operationId === line.operationId ? form.fill.id : ''); }
+    function formKey(line) { const cur = roundCheck(line); return line.operationId + '|' + (isDone(line) ? 'done:' + line.last.docId : '') + '|' + roundStart + '|' + (cur && (!form || form.fill.id !== cur.docId) ? cur.docId : form && form.operationId === line.operationId ? form.fill.id : ''); }
 
     function render() {
       if (window.matchMedia('(max-width: 760px)').matches) pane = 'current'; // phones: the check only, no history tab
@@ -150,11 +165,12 @@
       document.getElementById('pane-current').hidden = pane !== 'current';
       document.getElementById('pane-history').hidden = pane !== 'history';
       document.getElementById('lines').innerHTML = all.map(l => '<button type="button" data-line="' + escapeHtml(l.operationId) + '" class="' + (line && l.operationId === line.operationId ? 'active' : '') + '">' +
-        '<i class="qc-dot st-' + String(l.last.status || 'NONE').toLowerCase() + '" title="' + escapeHtml(RESULT[l.last.status] || 'No check yet') + '"></i><span>' + escapeHtml(l.name) + '</span><b title="Checks in the last 24 hours">' + l.today + '</b>' + (U.isHtst(l.name) && l.last.status ? htstLine(l.last) : '') + '</button>').join('') ||
+        '<i class="qc-dot st-' + String(l.last.status || 'NONE').toLowerCase() + '" title="' + escapeHtml(RESULT[l.last.status] || 'No check yet') + '"></i><span>' + escapeHtml(l.name) + '</span>' + (isDone(l) ? '<i class="qc-done-chip">DONE</i>' : '') + '<b title="Checks in the last 24 hours">' + l.today + '</b>' + (U.isHtst(l.name) && l.last.status ? htstLine(l.last) : '') + '</button>').join('') ||
         '<p class="empty">' + (setupRead ? 'No production lines are set up for this plant.' : 'Loading the production lines…') + '</p>';
       // The form is redrawn when another line is picked or a newer check of this line arrives, not while someone types.
-      const typing = document.getElementById('fields').contains(document.activeElement);
+      const typing = document.getElementById('fields').contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
       if (line && (!form || form.operationId !== line.operationId || (!typing && !form.busy && formKey(line) !== shownFor))) drawForm(line);
+      document.getElementById('run-done').hidden = !ck || !line || isDone(line) || !!(form && form.busy);
       document.getElementById('round').textContent = ck ? 'Saves as you go · clears after 2 hours or the next report' + (roundStart ? ' · new round since the report at ' + clockOf(roundStart) : '') : '';
       document.getElementById('form').hidden = !line;
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td><b>' + escapeHtml(h.area) + '</b></td><td>' + escapeHtml(h.product || '') + '</td>' +
@@ -232,7 +248,7 @@
     });
     async function saveBox(line, key) {
       const fields = readForm(line), noteEl = document.querySelector('[data-note="' + key + '"]');
-      const mine = pending[line.operationId] || { type: U.QUALITY_TYPE, recordedAt: form.started || new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, _id: form.fill.id };
+      const mine = (pending[line.operationId] && !pending[line.operationId].runDone && pending[line.operationId]) || { type: U.QUALITY_TYPE, recordedAt: form.started || new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, _id: form.fill.id };
       mine.payload = Object.assign({ area: line.name }, fields);
       if (!form.started) form.started = mine.recordedAt;
       pending[line.operationId] = mine;
@@ -267,6 +283,31 @@
       if (form === mineForm && !mineForm.busy) shownFor = formKey(line);
       render();
     }
+    // Run Complete saves a Finished check for the line (the product it was running); Undo marks that check undone.
+    async function runDone(line, undo) {
+      const l = line.last || {}, id = undo ? l.docId : '';
+      const mine = { runDone: true, type: U.QUALITY_TYPE, recordedAt: undo ? l.recordedAt : new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, _id: id,
+        payload: { operationId: line.operationId, area: line.name, product: l.product || '', status: 'FINISHED', notes: 'Run complete', undone: !!undo } };
+      pending[line.operationId] = mine;
+      render();
+      try {
+        const done = await save('saveQualityCheck', Object.assign({ operationId: line.operationId, product: l.product || '', status: 'FINISHED', notes: 'Run complete' }, undo ? { checkId: id, undone: true } : {}));
+        if (done && done.checkId) { mine._id = done.checkId; if (done.recordedAt) mine.recordedAt = done.recordedAt; }
+        mine.saved = true;
+        showError('');
+      } catch (err) {
+        delete pending[line.operationId];
+        showError(line.name + ': ' + (err.message || err));
+      }
+      render();
+    }
+    document.getElementById('run-done').addEventListener('click', () => { const line = current(); if (line && canSave()) { if (form) commitWait(form); runDone(line, false); } });
+    document.getElementById('fields').addEventListener('click', e => {
+      const line = current();
+      if (!line || !canSave()) return;
+      if (e.target.closest('[data-next]')) { restarted[line.operationId] = line.last.docId; shownFor = ''; render(); }
+      if (e.target.closest('[data-undo-done]')) runDone(line, true);
+    });
     document.getElementById('lines').addEventListener('click', e => {
       const b = e.target.closest('[data-line]');
       if (!b) return;
