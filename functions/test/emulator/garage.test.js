@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { db, clear } = require('./helpers');
 const { runTransfer } = require('../../src/transfer');
 const { applyAction } = require('../../src/actions');
-const { garageCall, loginHash } = require('../../src/garage');
+const { garageCall, loginHash, engineCodeOrders } = require('../../src/garage');
 const F = require('../fixtures/fake-sheets');
 
 // The Garage Station (garage.js): Joe 10/10, mechanics have no email; they tap their name and type their login ID.
@@ -59,6 +59,29 @@ test('jobs: real write-ups of our own units, down ones first; a leased truck onl
 });
 
 const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+test('engine codes from Verizon Fleet: one work order per truck and code, counted once per alert, a new one after it is completed', async () => {
+  const f = (id, tag, code, at) => ({ alertId: id, tag, code, fmiText: 'Erratic or wrong data', at });
+  let r = await engineCodeOrders(db(), [f('A1', '900001', '791:2', '2026-10-06T13:00:00Z'), f('A2', '900001', '791:2', '2026-10-06T13:20:00Z'),
+    f('A3', '223876', '791:2', '2026-10-06T13:00:00Z'), f('A4', 'T-901', '100:1', '2026-10-06T13:00:00Z'), f('A5', '555555', '100:1', '2026-10-06T13:00:00Z')], '2026-10-06T13:30:00Z');
+  assert.deepEqual(r, { made: 1, counted: 0 }, 'a leased truck, a trailer and a unit not ours make none');
+  const tom = await garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213' }, now());
+  let job = (await garageCall(db(), { op: 'read', tokens: [tom.token] }, now())).jobs.find(j => j.source === 'FLEET');
+  assert.deepEqual([job.unit, job.problem, job.from, job.category, job.canRun], ['900001', 'Engine code 791:2 · Erratic or wrong data · came on 2 times', 'Verizon Fleet', 'Engine', true]);
+  // Read again (the next read starts 10 minutes back), plus one new alert: counted on the same work order.
+  r = await engineCodeOrders(db(), [f('A2', '900001', '791:2', '2026-10-06T13:20:00Z'), f('A6', '900001', '791:2', '2026-10-06T13:40:00Z')], '2026-10-06T13:45:00Z');
+  assert.deepEqual(r, { made: 0, counted: 1 });
+  job = (await garageCall(db(), { op: 'read', tokens: [tom.token] }, now())).jobs.find(j => j.source === 'FLEET');
+  assert.equal(job.problem, 'Engine code 791:2 · Erratic or wrong data · came on 3 times');
+  // Completed on the Garage Station; the code coming on again makes a new work order.
+  const step = (fields) => garageCall(db(), Object.assign({ op: 'step', tokens: [tom.token], requestId: rid() }, fields), now(5));
+  await step({ step: 'START', id: job.id });
+  await step({ step: 'DONE', id: job.id, fixed: 'Repaired', safe: true, signature: SIG });
+  assert.equal((await db().collection('workOrders').doc(job.id).get()).data().status, 'DONE');
+  r = await engineCodeOrders(db(), [f('A6', '900001', '791:2', '2026-10-06T13:40:00Z'), f('A7', '900001', '791:2', '2026-10-07T08:00:00Z')], '2026-10-07T08:05:00Z');
+  assert.deepEqual(r, { made: 1, counted: 0 });
+});
+
 
 test('Start, Need Parts, a helper, Done with a signature: the write-up is repaired and the job keeps who and what', async () => {
   await db().collection('odometers').doc('o1').set({ unit: '900001', miles: 412000, date: '2026-10-05', at: '2026-10-05T09:00:00Z' });

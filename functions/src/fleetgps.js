@@ -342,6 +342,12 @@ async function readAlerts(db, d, o, token, trucks, since, until, at) {
     if (type === 'FAULT') Object.assign(docs[safeIdPart('A' + r.AlertId)], dtc(r.TriggerValue), { triggerValue: String(r.TriggerValue || '').trim() });
   });
   await writeAll(db, 'gpsAlerts', docs);
+  // Joe 10/14 (mock-up A): each engine code from the last two days goes on the garage list as a work order (garage.js).
+  const recent = Date.parse(at) - 2 * 86400000;
+  const faults = Object.keys(docs).map(id => Object.assign({ alertId: id }, docs[id])).filter(a => a.type === 'FAULT' && a.code && Date.parse(a.at) >= recent);
+  if (faults.length) {
+    try { await require('./garage').engineCodeOrders(db, faults, at); } catch (e) { console.error('fleetGps engine codes', e); }
+  }
   return Object.keys(docs).length;
 }
 function nyMidnight(now) {

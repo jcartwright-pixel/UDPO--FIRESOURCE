@@ -113,7 +113,7 @@ function writeUpFrom(r) {
 const canRunGuess = (s) => !/OUT OF SERVICE|\bOOS\b|CAN.?T RUN|DOWN/i.test(String(s || ''));
 const writeUpKey = (r) => (KIND_KEYS[String(r.kind).toUpperCase()] || 'trucks') + '|' + r.record_id;
 const unitType = (v) => { const t = String(v || '').toUpperCase(); return t === 'TRAILER' || t === 'FORK_TRUCK' ? t : 'TRUCK'; };
-const FROM = { OFFICE: 'Office (Fleet Service)', TECH: 'Garage', WRITE_UP: 'Equipment Issues' };
+const FROM = { OFFICE: 'Office (Fleet Service)', TECH: 'Garage', WRITE_UP: 'Equipment Issues', FLEET: 'Verizon Fleet' };
 // A work order's labour: one entry per mechanic per clock (start, end, minutes); an open one has no end yet (job-clock.js).
 const { laborOf, joinNames } = CLOCK;
 
@@ -349,7 +349,7 @@ async function step(db, input, nowMs) {
     // DONE needs the write-up (to mark it repaired), the newest odometer and Fleet Service's row, read before any write.
     let odometer = null, gpsHours = null, setupRef = null, setup = null, rules = fleetRules(null);
     if (req.op === 'DONE' && req.safe) {
-      if (order.source_id && !writeUp) { writeUpRef = db.collection(C.maintenance).doc(MAINT.docId(order.source_id)); const w = await tx.get(writeUpRef); writeUp = w.exists ? w.data() : null; }
+      if (order.source_id && order.source !== 'FLEET' && !writeUp) { writeUpRef = db.collection(C.maintenance).doc(MAINT.docId(order.source_id)); const w = await tx.get(writeUpRef); writeUp = w.exists ? w.data() : null; }
       // Joe 10/13: the newer of the driver's DVIR odometer and Verizon Connect Fleet's (gpsTrucks); a trailer's GPS hours are its reefer hours.
       const unitKey = String(order.unit).toUpperCase().replace(/\s+/g, ''), gpsId = M.safeIdPart(unitKey);
       const gps = gpsId ? await tx.get(db.collection('gpsTrucks').doc(gpsId)) : null;
@@ -453,6 +453,54 @@ async function writeUpOrderStep(tx, db, r, issueStep, email, stamp) {
     t.update(p.ref, Object.assign({ status: 'DONE', completed_at: stamp, completed_by: email, fixed_note: how, can_run: 'YES', updated_at: stamp, updated_by: email, testEdited: true, editedAt: stamp }, p.moved.laborFields(p.labor)));
     CLOCK.applyWrites(t, p.moved.writes);
   }) };
+}
+
+/*
+ * Joe 10/13-14 (mock-up A): an engine fault code from Verizon Fleet (a DTC alert, fleetgps.js) becomes a work order on the
+ * Garage Station by itself: one per truck and code (source FLEET, source_id "<unit>|<code>"). The same code coming on again
+ * while that work order is open counts on it instead of making another; once it is completed, the code coming on again makes
+ * a new one. Each alert counts once (code_alerts), however many times it is read. Only our garage's own units; a leased
+ * truck goes to the lessor, as its write-ups do. faults: [{alertId, tag, code, fmiText, at}].
+ */
+const CODE_ALERTS_KEPT = 50;
+async function engineCodeOrders(db, faults, stamp) {
+  const list = (faults || []).filter(f => f && f.alertId && f.tag && f.code);
+  if (!list.length) return { made: 0, counted: 0 };
+  const units = garageUnits((await db.collection(C.equipment).get()).docs.map(d => d.data()));
+  const groups = {};
+  list.forEach(f => {
+    const m = matchUnit(units.filter(u => u.type === 'TRUCK'), f.tag);
+    if (m.error || m.unit.leased) return;
+    const sid = m.unit.unit + '|' + f.code;
+    (groups[sid] = groups[sid] || { unit: m.unit, code: f.code, fmiText: f.fmiText || '', faults: [] }).faults.push(f);
+  });
+  let made = 0, counted = 0;
+  for (const sid of Object.keys(groups)) {
+    const g = groups[sid];
+    await db.runTransaction(async tx => {
+      const docs = (await tx.get(db.collection(WORK_ORDERS).where('source_id', '==', sid))).docs.filter(d => d.data().source === 'FLEET');
+      const seen = {}; docs.forEach(d => (d.data().code_alerts || []).forEach(id => { seen[id] = true; }));
+      const fresh = g.faults.filter(f => !seen[f.alertId]).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+      if (!fresh.length) return;
+      const open = docs.find(d => String(d.data().status || 'NEW').toUpperCase() !== 'DONE');
+      const last = fresh[fresh.length - 1].at;
+      const what = 'Engine code ' + g.code + (g.fmiText ? ' · ' + g.fmiText : '');
+      if (open) {
+        const o = open.data(), n = (Number(o.code_count) || 1) + fresh.length;
+        tx.update(open.ref, { code_count: n, code_last: last > (o.code_last || '') ? last : o.code_last, problem: what + ' · came on ' + n + ' times',
+          code_alerts: (o.code_alerts || []).concat(fresh.map(f => f.alertId)).slice(-CODE_ALERTS_KEPT), updated_at: stamp, updated_by: 'Verizon Fleet' });
+        counted += fresh.length;
+        return;
+      }
+      const id = newOrderId(), n = fresh.length;
+      tx.set(db.collection(WORK_ORDERS).doc(docId(id)), { work_order_id: id, facility_id: FACILITY, unit: g.unit.unit, unit_type: 'TRUCK', problem: what + (n > 1 ? ' · came on ' + n + ' times' : ''),
+        category: 'Engine', can_run: 'YES', source: 'FLEET', source_from: FROM.FLEET, source_kind: 'codes', source_id: sid, service_key: '', status: 'NEW', created_at: fresh[0].at || stamp,
+        created_by: 'Verizon Fleet', started_at: '', techs: '', parts_at: '', fixed: '', fixed_note: '', safe: '', signed_by: '', signature: '', completed_at: '', minutes: '', odometer: '',
+        code: g.code, code_count: n, code_last: last, code_alerts: fresh.map(f => f.alertId).slice(-CODE_ALERTS_KEPT), updated_at: stamp, updated_by: 'Verizon Fleet', version: 1, createdInApp: true });
+      made++;
+    });
+  }
+  return { made, counted };
 }
 
 /*
@@ -670,4 +718,4 @@ async function garageCall(db, input, now, caller) {
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, LOGINS };
+module.exports = { G, engineCodeOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, LOGINS };
