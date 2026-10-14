@@ -637,9 +637,12 @@
 .manager-page .mc-report-body li.bad b, .manager-page .mc-report-body li.bad span { color: #b42318; }
 .manager-page .mc-report-body li.warn span { color: #9a5b00; }
 .manager-page .mc-report-body p { margin: 0; color: #5b6775; }
-.manager-page .mc-routes { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; }
+.manager-page .mc-routes { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
 .manager-page .mc-routes span { display: flex; justify-content: space-between; border-radius: 6px; padding: 7px 9px; font-weight: 800; font-size: 16px; }
 .manager-page .mc-routes span i { font-style: normal; font-size: 16px; align-self: center; }
+.manager-page .mc-routes span { gap: 8px; }
+.manager-page .mc-routes span b { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page .mc-routes span small { font-size: 16px; font-weight: 600; }
 .manager-page .mc-routes .ok { background: #e2f4ea; color: #1f7a4d; } .manager-page .mc-routes .behind { background: #b42318; color: #fff; } .manager-page .mc-routes .no { background: #fde8e6; color: #b42318; }
 @media (max-width: 1500px) { .manager-page .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; align-content: start; } .manager-page .mc-card, .manager-page .mc-tiles { min-height: auto; } .manager-page .mc-report { grid-row: 1 / span 3; min-height: 360px; } .manager-page .mc-tile { min-height: 92px; } }
 @media (max-width: 760px) {

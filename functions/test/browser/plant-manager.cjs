@@ -129,7 +129,9 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
     await page.click('.mc-preview');
     await page.waitForSelector('#modal:not([hidden])');
     const body = await page.textContent('#rp-body');
-    assert.match(body, new RegExp(seed.behind + ' ROUTES? BEHIND[\\s\\S]*Loaded \\(1\\)501[\\s\\S]*Not loaded \\(3\\)502BEHIND503(BEHIND|NOT LOADED)504(BEHIND|NOT LOADED)'));
+    // Joe 10/14: each tile is the route number and the run's short name; only BEHIND has a word (green is loaded, red is not).
+    assert.match(body, new RegExp(seed.behind + ' ROUTES? BEHIND[\\s\\S]*Loaded \\(1\\)501 Akron[\\s\\S]*Not loaded \\(3\\)502 CantonBEHIND503 Massillon(BEHIND)?504 Wooster(BEHIND)?Routes behind'));
+    assert.doesNotMatch((await page.$$eval('#rp-body .mc-routes', d => d.map(x => x.textContent))).join(' '), /LOADED/, 'the route tiles have no LOADED / NOT LOADED words');
     assert.match(body, /Pickups open1PICKUP 503 MASSILLON3 cases Chocolate milk/);
     assert.match(body, /Plant breakdowns1Palletizer/);
     assert.match(body, /Cooler North44°F · HIGH · limit 33–41/);
