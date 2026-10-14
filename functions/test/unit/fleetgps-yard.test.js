@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { advanceDays, alertType } = require('../../src/fleetgps');
+const { advanceDays, alertType, dtc } = require('../../src/fleetgps');
 
 // Joe 10/13 (scorecard): left the yard and back, from the Fleet place on each 5-minute read.
 test('yard out and in: first time seen out of Uniontown Branch / Plant, last time seen back; a Uniontown street is not the yard', () => {
@@ -43,4 +43,10 @@ test('alert kinds from the Fleet condition', () => {
     assert.equal(alertType({ name: n, type: 'Event Diagnostic' }, {}), t);
   }
   assert.equal(alertType({ name: 'Maintenance due', type: 'MaintenanceCondition' }, {}), 'OTHER');
+});
+
+test('engine fault codes from Fleet\'s DTC trigger value', () => {
+  assert.deepEqual(dtc(': 791:2(126)'), { spn: 791, fmi: 2, source: 126, code: '791:2', fmiText: 'Erratic or wrong data' });
+  assert.deepEqual(dtc('3251:31'), { spn: 3251, fmi: 31, source: null, code: '3251:31', fmiText: 'Condition is present' });
+  assert.deepEqual(dtc(''), {});
 });
