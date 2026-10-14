@@ -50,6 +50,7 @@
         <div class="gps-result" id="result" hidden></div>
         <p class="hint" id="last"></p>
         <p class="hint" id="pulled"></p>
+        <p class="hint" id="history"></p>
         <p class="hint"><a href="trucks.html">Open Trucks Today</a></p>
       </section>
       <section class="gps-card wide">
@@ -83,7 +84,14 @@
       $('last').textContent = t ? 'Last test ' + stamp(t.at) + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
       $('pulled').textContent = s.lastPullError ? 'Last read failed: ' + s.lastPullError : s.lastPull ? 'Last read ' + stamp(s.lastPull) + ': ' + s.lastPullTrucks + ' trucks, ' +
         (s.alertsError ? 'alerts failed: ' + s.alertsError : alertsToday(s) + ' Fleet alert' + (alertsToday(s) === 1 ? '' : 's') + ' today.') : '';
+      // Joe 10/14: this week's history, read once, a part every 5 minutes.
+      const h = s.history;
+      $('history').textContent = !h ? '' : h.finishedAt ? 'This week\'s history (' + dayRange(h.days) + ') read in full ' + stamp(h.finishedAt) + '.'
+        : h.stopped ? 'This week\'s history stopped: ' + h.error + ' Save the login again to try once more.'
+        : 'Reading this week\'s history (' + dayRange(h.days) + '): ' + h.done + ' of ' + h.total + ' parts done' + (h.error ? '. Last try failed: ' + h.error : '') + '. It goes on every 5 minutes.';
     }
+    const dayRange = (days) => days && days.length ? shortDay(days[0]) + ' to ' + shortDay(days[days.length - 1]) : '';
+    const shortDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };
     // The count is kept by the read; a count from an earlier New York day means none yet today.
     const alertsToday = (s) => s.alertsDate === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) ? s.alertsToday : 0;
     // Joe 10/13: Pull now said "Could not reach the GPS settings. Check the network" when the server itself had stopped

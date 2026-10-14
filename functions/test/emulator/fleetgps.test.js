@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { db, clear } = require('./helpers');
 const { runTransfer } = require('../../src/transfer');
 const { gpsCall } = require('../../src/gps');
-const { pull } = require('../../src/fleetgps');
+const { pull, history } = require('../../src/fleetgps');
 const F = require('../fixtures/fake-sheets');
 
 const ADMIN = { email: 'admin.test@uniteddairy.com' };
@@ -46,6 +46,12 @@ function fleet(log, opts) {
     if (url.startsWith(BASE + '/execute?template=UDPO_Conditions')) {
       log.push('conditions ' + new URL(url).searchParams.get('Ids'));
       return reply(200, 'ConditionId,Name,ConditionType\r\nC1,Over 55,PostedSpeedCondition\r\nC2,Hard stop,DiagnosticBooleanCondition\r\nC3,Idling 20 min,IdleCondition\r\n');
+    }
+    if (url.startsWith(BASE + '/execute?template=UDPO_UnitDayPoints')) {
+      const q = new URL(url).searchParams;
+      log.push('points ' + q.get('Since') + ' to ' + q.get('Until') + ' ' + q.get('Ids'));
+      const pts = (opts.points || {})[q.get('Since').slice(0, 10)] || [];
+      return reply(200, 'UnitId,Time,Lat,Lon,Address,MilesDelta\r\n' + pts.map(p => p.join(',')).join('\r\n'));
     }
     if (url.startsWith(BASE + '/execute?template=UDPO_TrucksNow')) {
       if (opts.many) return reply(200, 'UnitId,Tag,LastReport,Lat,Lon,Address,Place,SpeedMph,IgnitionOn,OdometerMiles,EngineHours,Driver,Active\r\n'
@@ -163,4 +169,70 @@ test('Fleet GPS: a day record written in parts keeps its miles when only the yar
   await pull(db(), o);
   const day = (await db().collection('gpsDays').doc('2026-10-13_T-635').get()).data();
   assert.deepEqual([day.miles, day.firstMove, day.idleMinutes, day.yardOut], [12.4, '2026-10-13T09:00:00.000Z', 5, '2026-10-13T14:10:00.000Z']);
+});
+
+test('Fleet GPS: this week\'s history is read once, a part each run, and today is joined to the live read', async () => {
+  const log = [], state = { odo: { a: 412345.6, at: '2026-10-13 14:05:00' }, points: {
+    // Monday 10/12: out of the yard at 10:30, back at 20:00 (UTC).
+    '2026-10-12': [['11', '2026-10-12 10:00:00', 39.99, -81.1, 'Yard', 0], ['11', '2026-10-12 10:30:00', 40.2, -81.0, 'Akron', 12.5],
+      ['11', '2026-10-12 18:00:00', 40.3, -81.2, 'Canton', 20], ['11', '2026-10-12 20:00:00', 39.991, -81.1, 'Yard', 3.1]],
+    // Today: 8 miles before the live read began at 14:10, and 5 after it (the live read's own).
+    '2026-10-13': [['11', '2026-10-13 11:00:00', 39.99, -81.1, 'Yard', 0], ['11', '2026-10-13 11:30:00', 40.2, -81.0, 'Akron', 8],
+      ['11', '2026-10-13 14:30:00', 40.3, -81.0, 'Akron', 5]] } };
+  const clock = { now: new Date('2026-10-13T14:10:00Z') };
+  const o = { fetch: fleet(log, state), base: BASE, now: () => clock.now, sleep: async () => {} };
+  assert.deepEqual(await history(db(), o), { skipped: 'no login' });
+  await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
+  assert.deepEqual(await history(db(), o), { skipped: 'no trucks read yet' });
+  await pull(db(), o);
+  // Only Uniontown's Equipment Master trucks; the truck stands at a yard place now, which is where the yard is.
+  await db().collection('equipment').doc('e1').set({ type: 'TRUCK', unit: '223876', facilityId: 'fac_uniontown', location: 'Uniontown' });
+  await db().collection('equipment').doc('e2').set({ type: 'TRUCK', unit: 'T-635', location: 'Marietta' });
+  await db().collection('gpsTrucks').doc('223876').set({ place: 'Uniontown Branch' }, { merge: true });
+
+  clock.now = new Date('2026-10-13T14:20:00Z');
+  let r = await history(db(), Object.assign({}, o, { budgetMs: 1e9 }));
+  assert.deepEqual(r, { steps: 6, done: 6, total: 6, finished: true });
+  assert.ok(log.indexOf('alerts 2026-10-11 04:00:00 to 2026-10-12 04:00:00') >= 0, 'Sunday\'s alerts');
+  assert.ok(log.indexOf('alerts 2026-10-13 04:00:00 to 2026-10-13 14:20:00') >= 0, 'today\'s alerts up to now');
+  assert.ok(log.indexOf('points 2026-10-12 04:00:00 to 2026-10-13 04:00:00 11') >= 0, 'one day\'s points for our trucks only');
+  const day = async (id) => (await db().collection('gpsDays').doc(id).get()).data();
+  assert.equal(await day('2026-10-11_223876'), undefined, 'no points, no record');
+  const mon = await day('2026-10-12_223876');
+  assert.deepEqual([mon.miles, mon.firstMove, mon.lastMove, mon.yardOut, mon.yardIn, mon.lastPlace, mon.history],
+    [35.6, '2026-10-12T10:30:00.000Z', '2026-10-12T20:00:00.000Z', '2026-10-12T10:30:00.000Z', '2026-10-12T20:00:00.000Z', 'Yard', true]);
+  let tue = await day('2026-10-13_223876');
+  assert.deepEqual([tue.miles, tue.firstMove, tue.yardOut, tue.since], [8, '2026-10-13T11:30:00.000Z', '2026-10-13T11:30:00.000Z', '2026-10-13T04:00:00.000Z']);
+  // The live read carries on from the whole day's total.
+  clock.now = new Date('2026-10-13T14:40:00Z'); state.odo = { a: 412350.6, at: '2026-10-13 14:39:00' };
+  await pull(db(), o);
+  tue = await day('2026-10-13_223876');
+  assert.deepEqual([tue.miles, tue.firstMove, tue.since], [13, '2026-10-13T11:30:00.000Z', '2026-10-13T04:00:00.000Z']);
+  // Read once: nothing more is asked of Fleet, and GPS Setup says it is done.
+  const before = log.length;
+  assert.deepEqual(await history(db(), o), { skipped: 'done' });
+  assert.equal(log.length, before);
+  const s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'status' }, o);
+  assert.deepEqual([s.history.done, s.history.total, s.history.days, s.history.finishedAt], [6, 6, ['2026-10-11', '2026-10-12', '2026-10-13'], '2026-10-13T14:20:00.000Z']);
+});
+
+test('Fleet GPS: the history goes a part at a time and stops after three failures in a row', async () => {
+  const log = [], clock = { now: new Date('2026-10-13T14:10:00Z') };
+  const o = { fetch: fleet(log, {}), base: BASE, now: () => clock.now, sleep: async () => {} };
+  await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
+  await pull(db(), o);
+  await db().collection('equipment').doc('e1').set({ type: 'TRUCK', unit: '223876' });
+  // A run with no time left does nothing but set up the list.
+  let r = await history(db(), Object.assign({}, o, { budgetMs: -1 }));
+  assert.deepEqual(r, { steps: 0, done: 0, total: 6, finished: false });
+  const bad = Object.assign({}, o, { fetch: async (url, init) => /UnitDayPoints|UDPO_Alerts/.test(url) ? reply(500, 'boom') : fleet(log, {})(url, init) });
+  for (let i = 0; i < 3; i++) assert.match((await history(db(), bad)).error, /answered 500/);
+  assert.deepEqual(await history(db(), o), { skipped: 'stopped' });
+  const s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'status' }, o);
+  assert.equal(s.history.stopped, true);
+  // Saving the login again gives it another go.
+  clock.now = new Date('2026-10-13T15:00:00Z');
+  await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'save', password: 'pw' }, o);
+  r = await history(db(), Object.assign({}, o, { budgetMs: 1e9 }));
+  assert.equal(r.finished, true);
 });

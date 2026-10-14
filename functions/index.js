@@ -376,6 +376,9 @@ exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'Americ
 exports.fleetGpsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 240, maxInstances: 1, memory: '512MiB' }, async () => {
   const r = await FLEETGPS.pull(db);
   if (r && r.error) console.error('fleetGps', r.error);
+  // Joe 10/14: this week's history, read once, a part each run after the live read.
+  const h = await FLEETGPS.history(db, { budgetMs: 150000 });
+  if (h && h.error) console.error('fleetGps history', h.error);
 });
 
 // MOCREO sensors (src/mocreo.js): the key is read each run, so the sync starts by itself once a key is saved and tested.

@@ -67,7 +67,20 @@ const TEMPLATES = Object.freeze({
     '[Output]',
     'ConditionId = Input.Id',
     'Name = Input.Name',
-    'ConditionType = Input.ConditionType', ''].join('\r\n') }
+    'ConditionType = Input.ConditionType', ''].join('\r\n') },
+  // Joe 10/14 ("pull in the history for at least this week"): one day's GPS points for a few units at a time (all 520 units'
+  // points at once were too many, 10/13).
+  unitPoints: { name: 'UDPO_UnitDayPoints', text: [
+    '[Template]', 'TemplateVersion = 1.0', 'TableID = Point-2.0', 'TemplateName = UDPO_UnitDayPoints', 'Intent = Retrieve', '',
+    '[User]', 'Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"', 'Ids(Set<Text>) = "Ids"', '',
+    '[Filter]', 'Time = Between(Since, Until)', 'UnitId = In(Ids)', '',
+    '[Output]',
+    'UnitId = Input.UnitId',
+    'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time',
+    'Lat = Input.Lat',
+    'Lon = Input.Lon',
+    'Address = Input.Address',
+    'MilesDelta(mile) = Input.OdometerDelta', ''].join('\r\n') }
 });
 // Joe's Fleet places for the Uniontown yard (10/13).
 const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT'];
@@ -282,7 +295,16 @@ async function pullAlerts(db, d, o, token, trucks, at) {
   // on the first read.
   const since = d.alertsUntil ? new Date(Math.max(Date.parse(d.alertsUntil) - 10 * 60000, Date.parse(midnight) - 0)) : new Date(midnight);
   if (!d.alertTemplatesReady) { await ensureTemplates(d, o, token, [TEMPLATES.alerts, TEMPLATES.conditions]); await ref.set({ alertTemplatesReady: true }, { merge: true }); }
-  const rows = (await execute(d, o, token, TEMPLATES.alerts.name, { Since: fleetTime(since), Until: fleetTime(now) })).filter(r => r.AlertId);
+  const n = await readAlerts(db, d, o, token, trucks, since, now, at);
+  // How many alerts today so far, for GPS Setup (a quick check that this login sees the alerts set up in Fleet).
+  const today = nyDate(at), alertsToday = (await db.collection('gpsAlerts').where('date', '==', today).count().get()).data().count;
+  await ref.set({ alertsUntil: at, alertsError: '', lastAlerts: n, alertsDate: today, alertsToday }, { merge: true });
+  return n;
+}
+
+/** Fleet's alerts raised between two times, written to gpsAlerts (an alert read twice is the same document). */
+async function readAlerts(db, d, o, token, trucks, since, until, at) {
+  const rows = (await execute(d, o, token, TEMPLATES.alerts.name, { Since: fleetTime(since), Until: fleetTime(until) })).filter(r => r.AlertId);
   const condRef = db.collection('private').doc('gpsFleetConditions'), known = ((await condRef.get()).data() || {}).list || {};
   const missing = [...new Set(rows.map(r => r.ConditionId).filter(id => id && !known[id]))];
   if (missing.length) {
@@ -307,9 +329,6 @@ async function pullAlerts(db, d, o, token, trucks, at) {
       address: r.Address || '', condition: c.name || c.type || r.TriggerName || '', fleetDriverId: r.DriverId || '', updatedAt: at };
   });
   await writeAll(db, 'gpsAlerts', docs);
-  // How many alerts today so far, for GPS Setup (a quick check that this login sees the alerts set up in Fleet).
-  const today = nyDate(at), alertsToday = (await db.collection('gpsAlerts').where('date', '==', today).count().get()).data().count;
-  await ref.set({ alertsUntil: at, alertsError: '', lastAlerts: Object.keys(docs).length, alertsDate: today, alertsToday }, { merge: true });
   return Object.keys(docs).length;
 }
 function nyMidnight(now) {
@@ -351,11 +370,143 @@ async function pull(db, options) {
   }
 }
 
+/*
+ * Joe 10/14: "pull in the history for at least this week ... that way we know it works." A one-time read, a little each
+ * 5-minute run (after the live read), of this week from Sunday:
+ *   1. Fleet's alerts for each day (into gpsAlerts, the same documents the live read writes).
+ *   2. Each Uniontown Equipment Master truck's GPS points, one day and HISTORY_UNITS trucks per Fleet call, turned into that
+ *      day's gpsDays record: miles, first and last movement, yard leave and return times, last place.
+ * Days before today are written whole. Today is joined to the live read: the miles and first move from before the live read
+ * started are added to it (private/gpsFleetSeen), so the live read carries on from the whole day's total.
+ * Progress is kept in private/gpsFleetHistory {days, alertDays, queue, total, done, error, finishedAt}; GPS Setup shows it.
+ * The yard is where the trucks Fleet now shows at Uniontown Branch / Uniontown Plant stand (points carry no place name),
+ * within YARD_MILES of them.
+ */
+const HISTORY_UNITS = 5, YARD_MILES = 0.25, HISTORY_TRIES = 3;
+const addDays = (date, n) => { const t = new Date(date + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+function weekDays(at) {
+  const today = nyDate(at), dow = new Date(today + 'T12:00:00Z').getUTCDay(), start = addDays(today, -(dow || 7));
+  const out = []; for (let x = start; x <= today; x = addDays(x, 1)) out.push(x);
+  return out;
+}
+function milesApart(a, b) {
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+/** One unit's points for part of a day (sorted by time) as that day's record. */
+function daySummary(points, yards) {
+  let miles = 0, first = '', last = '', wasYard = null, yardOut = '', yardIn = '';
+  points.forEach(p => {
+    const dm = num(p.MilesDelta) || 0;
+    if (dm > 0 && dm < 200) miles += dm;
+    if (dm >= 0.05) { first = first || p.at; last = p.at; }
+    const lat = num(p.Lat), lon = num(p.Lon);
+    if (lat === null || lon === null || !yards.length) return;
+    const yard = yards.some(y => milesApart(y, { lat, lon }) <= YARD_MILES);
+    if (wasYard === true && !yard && !yardOut) yardOut = p.at;
+    if (wasYard === false && yard) yardIn = p.at;
+    wasYard = yard;
+  });
+  const lastPoint = points[points.length - 1] || {};
+  return { miles: Math.round(miles * 10) / 10, firstMove: first, lastMove: last, yardOut, yardIn, lastPlace: lastPoint.Address || '' };
+}
+
+async function startHistory(db, at) {
+  const trucks = (await db.collection('gpsTrucks').get()).docs.map(x => x.data());
+  if (!trucks.length) return null;
+  const byKey = {}; trucks.forEach(t => { if (t.unitId) byKey[truckKey(t.tag)] = t; });
+  // Uniontown's trucks, as the Equipment screen lists them (edit.js: facility Uniontown or blank, location Uniontown or blank).
+  const units = (await db.collection('equipment').get()).docs.map(x => x.data())
+    .filter(e => e.type === 'TRUCK' && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)))
+    .map(e => byKey[truckKey(e.unit)]).filter(Boolean);
+  const ids = [...new Set(units.map(t => t.unitId))].sort();
+  const yards = trucks.filter(t => inYard(t) && t.lat !== null && t.lon !== null && t.lat !== undefined).map(t => ({ lat: t.lat, lon: t.lon }));
+  const days = weekDays(at), queue = [];
+  days.forEach(date => { for (let i = 0; i < ids.length; i += HISTORY_UNITS) queue.push({ date, ids: ids.slice(i, i + HISTORY_UNITS) }); });
+  return { startedAt: at, days, alertDays: days.slice(), queue, total: days.length + queue.length, done: 0, units: ids.length, yards: yards.slice(0, 40),
+    error: '', tries: 0, finishedAt: '' };
+}
+
+async function history(db, options) {
+  const o = withDefaults(options), began = o.now().getTime(), budget = o.budgetMs || 150000;
+  const ref = db.collection('private').doc('gpsFleet'), hRef = db.collection('private').doc('gpsFleetHistory');
+  const d = (await ref.get()).data() || {};
+  if (!d.fleet || !d.user || !d.password) return { skipped: 'no login' };
+  let h = (await hRef.get()).data();
+  if (!h) { h = await startHistory(db, o.now().toISOString()); if (!h) return { skipped: 'no trucks read yet' }; await hRef.set(h); }
+  // A login saved after the history stopped gets another go.
+  if (h.tries >= HISTORY_TRIES && d.savedAt && h.errorAt && d.savedAt > h.errorAt) h.tries = 0;
+  if (h.finishedAt || h.tries >= HISTORY_TRIES) return { skipped: h.finishedAt ? 'done' : 'stopped' };
+  const tagOf = {}; (await db.collection('gpsTrucks').get()).docs.forEach(x => { const t = x.data(); if (t.unitId) tagOf[t.unitId] = t; });
+  const trucksById = {}; Object.keys(tagOf).forEach(id => { trucksById[truckKey(tagOf[id].tag)] = tagOf[id]; });
+  let steps = 0;
+  try {
+    const token = await key(ref, d, o, false);
+    if (!d.historyTemplatesReady) {
+      await ensureTemplates(d, o, token, [TEMPLATES.alerts, TEMPLATES.conditions, TEMPLATES.unitPoints]);
+      await ref.set({ historyTemplatesReady: true, alertTemplatesReady: true }, { merge: true });
+    }
+    while ((h.alertDays.length || h.queue.length) && o.now().getTime() - began < budget) {
+      const at = o.now().toISOString(), now = new Date(at);
+      if (h.alertDays.length) {
+        const date = h.alertDays[0], from = new Date(nyMidnight(new Date(date + 'T16:00:00Z'))), to = new Date(nyMidnight(new Date(addDays(date, 1) + 'T16:00:00Z')));
+        await readAlerts(db, d, o, token, trucksById, from, to < now ? to : now, at);
+        h.alertDays.shift();
+      } else {
+        const item = h.queue[0];
+        await historyDay(db, d, o, token, item, tagOf, h.yards || [], at);
+        h.queue.shift();
+      }
+      h.done++; h.tries = 0; h.error = ''; steps++;
+      if (!h.alertDays.length && !h.queue.length) h.finishedAt = at;
+      await hRef.set(h);
+    }
+    return { steps, done: h.done, total: h.total, finished: !!h.finishedAt };
+  } catch (e) {
+    if (!(e instanceof FleetError)) console.error('fleetGps history', e);
+    await hRef.set({ error: short(e.message), tries: (h.tries || 0) + 1, errorAt: o.now().toISOString() }, { merge: true });
+    return { steps, error: short(e.message) };
+  }
+}
+
+/** One queue item: one day's points for a few trucks, into gpsDays (today: joined to the live read). */
+async function historyDay(db, d, o, token, item, tagOf, yards, at) {
+  const now = new Date(at), from = new Date(nyMidnight(new Date(item.date + 'T16:00:00Z'))), next = new Date(nyMidnight(new Date(addDays(item.date, 1) + 'T16:00:00Z')));
+  const to = next < now ? next : now;
+  const rows = await execute(d, o, token, TEMPLATES.unitPoints.name, { Since: fleetTime(from), Until: fleetTime(to), Ids: item.ids.join(',') });
+  const byUnit = {};
+  rows.forEach(r => { const t = utcIso(r.Time); if (t && r.UnitId) (byUnit[r.UnitId] = byUnit[r.UnitId] || []).push(Object.assign({ at: t }, r)); });
+  const seenRef = db.collection('private').doc('gpsFleetSeen'), seen = (await seenRef.get()).data() || {};
+  const live = seen.date === item.date, units = Object.assign({}, seen.units || {}), docs = {};
+  item.ids.forEach(id => {
+    const t = tagOf[id]; if (!t || !byUnit[id]) return;
+    const k = truckKey(t.tag), u = units[k];
+    let pts = byUnit[id].sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
+    if (live && u && u.history) return;
+    if (live && u && u.since) {
+      // Today: only the part before the live read began, added to what the live read keeps.
+      pts = pts.filter(p => p.at < u.since);
+      const s = daySummary(pts, yards);
+      const v = Object.assign({}, u, { since: from.toISOString(), first: s.firstMove || u.first || '', last: u.last || s.lastMove || '', yardOut: s.yardOut || u.yardOut || '', history: true });
+      if (v.odo0 != null) v.odo0 = Math.round((v.odo0 - s.miles) * 10) / 10;
+      units[k] = v;
+      docs[item.date + '_' + k] = { tag: t.tag, date: item.date, since: v.since, firstMove: v.first, lastMove: v.last, yardOut: v.yardOut, yardIn: v.yardIn || '', history: true, updatedAt: at,
+        miles: v.odo != null && v.odo0 != null ? Math.max(0, Math.round((v.odo - v.odo0) * 10) / 10) : s.miles };
+      return;
+    }
+    const s = daySummary(pts, yards);
+    docs[item.date + '_' + k] = Object.assign({ tag: t.tag, date: item.date, since: from.toISOString(), history: true, updatedAt: at }, s);
+  });
+  if (live) await seenRef.set(Object.assign({}, seen, { units }));
+  await writeAll(db, 'gpsDays', docs, true);
+}
+
 function withDefaults(options) {
   return Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date(), sleep: (ms) => new Promise(r => setTimeout(r, ms)), base: '' }, options || {});
 }
 
-const status = (d) => ({ kind: 'fleet', fleet: d.fleet || '', hasUser: !!d.user, hasPassword: !!d.password, lastTest: d.lastTest || null,
+const status = (d, h) => ({ history: h ? { done: h.done || 0, total: h.total || 0, days: h.days || [], finishedAt: h.finishedAt || '', error: h.error || '', stopped: (h.tries || 0) >= HISTORY_TRIES } : null, kind: 'fleet', fleet: d.fleet || '', hasUser: !!d.user, hasPassword: !!d.password, lastTest: d.lastTest || null,
   savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastPull: d.lastPull || '', lastPullError: d.lastPullError || '', lastPullTrucks: d.lastPullTrucks || 0,
   alertsDate: d.alertsDate || '', alertsToday: d.alertsToday || 0, alertsError: d.alertsError || '' });
 
@@ -366,13 +517,14 @@ async function fleetCall(db, email, input, options) {
   const ref = db.collection('private').doc('gpsFleet');
   const d = (await ref.get()).data() || {};
   const op = String(input.op || 'status');
-  if (op === 'status') return status(d);
+  const hist = async () => (await db.collection('private').doc('gpsFleetHistory').get()).data();
+  if (op === 'status') return status(d, await hist());
   if (op === 'save') {
     const next = Object.assign({}, d);
     if (String(input.fleet || '').trim()) next.fleet = cleanFleet(input.fleet);
     if (String(input.user || '').trim()) next.user = String(input.user).trim().slice(0, 200);
     if (String(input.password || '')) next.password = String(input.password).slice(0, 200);
-    Object.assign(next, { savedAt: o.now().toISOString(), savedBy: email, lastTest: null, token: '', tokenUntil: '', templatesReady: false, alertTemplatesReady: false });
+    Object.assign(next, { savedAt: o.now().toISOString(), savedBy: email, lastTest: null, token: '', tokenUntil: '', templatesReady: false, alertTemplatesReady: false, historyTemplatesReady: false });
     await ref.set(next);
     return status(next);
   }
@@ -405,9 +557,9 @@ async function fleetCall(db, email, input, options) {
   if (op === 'pull') {
     const r = await pull(db, options);
     const fresh = (await ref.get()).data() || {};
-    return Object.assign(status(fresh), { pulled: r });
+    return Object.assign(status(fresh, await hist()), { pulled: r });
   }
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
-module.exports = { fleetCall, pull, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { fleetCall, pull, history, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
