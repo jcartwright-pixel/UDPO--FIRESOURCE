@@ -49,7 +49,8 @@
     // Trucks Today (the current app's screen A, Joe 10/9): every route on today's Daily Dispatch with where its truck is now,
     // read from Verizon Connect Fleet every 5 minutes (functions/src/fleetgps.js) and its miles today (every 15 minutes).
     const L = window.UDLogic;
-    let mode = 'today', runs = [], gps = [], days = [];
+    let mode = 'today', runs = [], gps = [], days = [], alerts = [];
+    const opened = new Set(); // Alerts drop-downs left open, by Daily Dispatch line (kept through the 1-minute redraw)
     // Where each unit is now: js/gps-state.js (shared with the Route Distribution home's Manager card).
     const key = unitKey, index = () => gpsIndex(gps), state = truckState;
     const nyDate = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
@@ -71,6 +72,28 @@
     const late = (d) => { if (!d || !d.since) return false; const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', hourCycle: 'h23' }).format(new Date(d.since))); return h >= 5; };
     const firstMoveCell = (d) => !d ? '' : late(d) ? (d.firstMove && Date.parse(d.firstMove) - Date.parse(d.since) > 15 * 60000 ? clock(d.firstMove) : '<small>before ' + clock(d.since) + '</small>') : d.firstMove ? clock(d.firstMove) : '';
     const milesCell = (d) => !d ? '' : (Number(d.miles) || 0).toLocaleString() + (late(d) ? '<small>since ' + clock(d.since) + '</small>' : '');
+    // Joe 10/14 (mock-up B): everything Verizon sent today for the driver's truck, in time order, with the yard leave and return.
+    const ALERT_NAMES = { SPEEDING: 'Speeding', HARSH_BRAKING: 'Harsh braking', HARSH_ACCEL: 'Harsh acceleration', HARSH_TURN: 'Harsh cornering', IDLE: 'Excessive idling',
+      SEATBELT: 'Seatbelt', FAULT: 'Engine code', DVIR_FAILED: 'DVIR failed', HOS: 'Hours of service' };
+    function alertName(a) {
+      const c = String(a.condition || '').trim();
+      if (a.type === 'SPEEDING' && /\b80\b/.test(c)) return 'Speeding over 80';
+      if (a.type === 'HOS' && c) return 'Hours of service · ' + c;
+      return ALERT_NAMES[a.type] || c || 'Alert';
+    }
+    function alertDetail(a) {
+      if (a.type === 'SPEEDING' && a.speedMph) return Math.round(a.speedMph) + (a.limitMph ? ' in a ' + Math.round(a.limitMph) : '') + ' mph';
+      if (a.type === 'IDLE' && a.minutes) return a.minutes + ' min';
+      if (a.type === 'FAULT' && a.code) return a.code + (a.fmiText ? ' · ' + a.fmiText : '');
+      if (a.type === 'SEATBELT' && a.speedMph) return 'at ' + Math.round(a.speedMph) + ' mph';
+      return '';
+    }
+    function events(t, d) {
+      const list = t ? alerts.filter(a => key(a.tag) === key(t.tag)).map(a => ({ at: a.at, name: alertName(a), detail: alertDetail(a), where: a.place || address(a.address), alert: true })) : [];
+      if (d && d.yardOut) list.push({ at: d.yardOut, name: 'Left the yard', detail: '', where: '' });
+      if (d && d.yardIn && d.yardIn > (d.yardOut || '')) list.push({ at: d.yardIn, name: 'Back in the yard', detail: '', where: '' });
+      return list.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    }
     const pill = (s) => '<span class="tt-pill tt-' + s[0] + '">' + s[1] + '</span>';
 
     function render() {
@@ -88,19 +111,23 @@
       }
       if (mode === 'today') {
         const rows = L.dailyRows(runs, opDay).filter(r => r.truck || r.driver);
-        const list = rows.map(r => { const t = String(r.truck || '').trim() ? find(r.truck) : null; return { r, t, s: state(t, r.truck), d: t ? dayBy[key(t.tag)] : null }; });
+        const list = rows.map(r => { const t = String(r.truck || '').trim() ? find(r.truck) : null, d = t ? dayBy[key(t.tag)] : null, ev = events(t, d); return { r, t, s: state(t, r.truck), d, ev, n: ev.filter(e => e.alert).length, open: opened.has(r.id) }; });
         const count = (k) => list.filter(x => x.s[0] === k).length;
         kpis.innerHTML = [['Dispatched today', list.length], ['Driving', count('road')], ['Stopped or parked', count('stopped')], ['In yard', count('yard')], ['No signal', count('nosignal')], ['Not in Fleet', count('nogps')], ['No truck', count('notruck')]]
           .map(k => '<div><b>' + k[1] + '</b><span>' + k[0] + '</span></div>').join('');
         // Joe 10/13: the driver and the truck are evaluated together (the driver Daily Dispatch put on that truck), so they
-        // lead; the route stays, last.
-        sheet.innerHTML = '<table class="issues tt-board"><colgroup><col style="width:13%"><col style="width:8%"><col style="width:9%"><col style="width:25%"><col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:13%"><col style="width:7%"></colgroup>' +
-          '<thead><tr><th>Driver</th><th>Truck</th><th>Status</th><th>Where now</th><th>Miles today</th><th>First move</th><th>Dispatch</th><th>Last report</th><th>Route</th></tr></thead><tbody>' +
+        // lead; the route stays, then the Alerts drop-down (Joe 10/14, mock-up B).
+        sheet.innerHTML = '<table class="issues tt-board"><colgroup><col style="width:13%"><col style="width:7%"><col style="width:9%"><col style="width:21%"><col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:12%"><col style="width:6%"><col style="width:7%"></colgroup>' +
+          '<thead><tr><th>Driver</th><th>Truck</th><th>Status</th><th>Where now</th><th>Miles today</th><th>First move</th><th>Dispatch</th><th>Last report</th><th>Route</th><th>Alerts</th></tr></thead><tbody>' +
           (list.map(x => '<tr class="tt-' + x.s[0] + '"><td class="strong">' + escapeHtml(x.r.driver || '') + '</td><td class="strong">' + escapeHtml(x.r.truck || '') + '</td>' +
             '<td>' + pill(x.s) + '</td><td>' + placeCell(x.t) + '</td><td>' + milesCell(x.d) + '</td><td>' + firstMoveCell(x.d) + '</td>' +
-            '<td>' + escapeHtml(timeOfDay(x.r.dispatchTime)) + '</td><td>' + (x.t && x.t.lastReport ? clock(x.t.lastReport) + '<small>' + ago(x.t.lastReport) + '</small>' : '') + '</td><td>' + escapeHtml(x.r.route || '') + '</td></tr>').join('') ||
-            '<tr><td colspan="9" class="empty">No routes on Daily Dispatch for ' + escapeHtml(shortDate(opDay)) + '.</td></tr>') + '</tbody></table>';
-        foot.textContent = 'In yard = at the Fleet place Uniontown Branch or Uniontown Plant · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes.';
+            '<td>' + escapeHtml(timeOfDay(x.r.dispatchTime)) + '</td><td>' + (x.t && x.t.lastReport ? clock(x.t.lastReport) + '<small>' + ago(x.t.lastReport) + '</small>' : '') + '</td><td>' + escapeHtml(x.r.route || '') + '</td>' +
+            '<td><button type="button" class="tt-alerts' + (x.n ? ' has' : '') + '" data-open="' + escapeHtml(x.r.id) + '" aria-expanded="' + x.open + '" title="What Verizon sent today for this driver\'s truck">' + x.n + (x.open ? ' ▴' : ' ▾') + '</button></td></tr>' +
+            (x.open ? '<tr class="tt-events"><td colspan="10">' + (x.ev.length ? '<table><thead><tr><th>Time</th><th>Verizon</th><th>Detail</th><th>Where</th></tr></thead><tbody>' +
+              x.ev.map(e => '<tr><td>' + clock(e.at) + '</td><td>' + escapeHtml(e.name) + '</td><td>' + escapeHtml(e.detail) + '</td><td>' + escapeHtml(e.where) + '</td></tr>').join('') + '</tbody></table>'
+              : '<div class="tt-none">' + (x.t ? 'Nothing from Verizon yet today for truck ' + escapeHtml(x.t.tag) + '.' : 'No Fleet truck on this line, so no Verizon alerts.') + '</div>') + '</td></tr>' : '')).join('') ||
+            '<tr><td colspan="10" class="empty">No routes on Daily Dispatch for ' + escapeHtml(shortDate(opDay)) + '.</td></tr>') + '</tbody></table>';
+        foot.textContent = 'In yard = at the Fleet place Uniontown Branch or Uniontown Plant · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes · Alerts = Verizon Fleet alerts today for that truck; click the number to see them with the yard leave and return times.';
         return;
       }
       // All Fleet units, matched to our Equipment Master trucks and trailers (Uniontown).
@@ -120,6 +147,7 @@
       foot.textContent = 'Every unit Verizon Connect Fleet shows, all plants. Ours = the same number in Equipment Master (Uniontown); trailers are named T- plus the number in both.';
     }
 
+    document.getElementById('sheet').addEventListener('click', e => { const b = e.target.closest('[data-open]'); if (!b) return; const k = b.dataset.open; if (opened.has(k)) opened.delete(k); else opened.add(k); render(); });
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b) { mode = b.dataset.mode; render(); } });
     window.udBack = () => { if (mode !== 'today') { mode = 'today'; render(); return true; } return false; };
     setInterval(render, 60000); // "min ago" stays true between reads
@@ -127,12 +155,13 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
-      const NAMES = { runs: 'the dispatch runs', gpsTrucks: 'the GPS positions', gpsDays: 'the GPS miles' };
+      const NAMES = { runs: 'the dispatch runs', gpsTrucks: 'the GPS positions', gpsDays: 'the GPS miles', gpsAlerts: 'the Verizon alerts' };
       const watch = (name, set, q) => onSnapshot(q || collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + NAMES[name] + ' (' + e.message + '). Check the network and reload the page.'));
       watch('runs', v => { runs = v; });
       watch('gpsTrucks', v => { gps = v; });
       // Only today's miles (the collection keeps every day).
       watch('gpsDays', v => { days = v; }, query(collection(db, 'gpsDays'), where('date', '==', nyDate(new Date()))));
+      watch('gpsAlerts', v => { alerts = v; }, query(collection(db, 'gpsAlerts'), where('date', '==', nyDate(new Date()))));
     });
   </script>
 </body>
