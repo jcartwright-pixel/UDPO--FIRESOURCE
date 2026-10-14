@@ -11,10 +11,18 @@ const dvir = (route, run) => ({ eventType: 'DVIR', payload: { route, run, checks
 
 test('GPS starting weights: speeding 2, hard stop 2, hard start 1, idling 1, at most 10 a day; Settings can change each', () => {
   const s = S.scSettings_({});
-  assert.deepEqual([s.speeding, s.hardBrake, s.hardAccel, s.idle, s.gpsDayCap], [2, 2, 1, 1, 10]);
+  assert.deepEqual([s.speeding, s.hardBrake, s.hardAccel, s.hardTurn, s.idle, s.gpsDayCap], [2, 2, 1, 1, 1, 10]);
   assert.equal(S.scSettings_({ speeding: 5 }).speeding, 5);
   assert.equal(S.scSettings_({ speeding: 'abc' }).speeding, 2, 'a typo falls back to the starting weight');
-  ['speeding', 'hardBrake', 'hardAccel', 'idle', 'gpsDayCap'].forEach(k => assert.ok(S.SC_CORE.NUMBER_SETTINGS.includes(k), k + ' saves like the other numbers'));
+  ['speeding', 'hardBrake', 'hardAccel', 'hardTurn', 'idle', 'gpsDayCap'].forEach(k => assert.ok(S.SC_CORE.NUMBER_SETTINGS.includes(k), k + ' saves like the other numbers'));
+});
+
+test('harsh cornering (left or right) counts under Hard Stops, 1 point by default', () => {
+  ['HARSH_TURN', 'Harsh Cornering', 'Harsh Turn Left', 'HARSH_CORNERING_RIGHT'].forEach(t => assert.equal(S.scAlertKind_(t), 'hardTurn', t));
+  assert.equal(S.SC_CORE.GPS_AREA.hardTurn, 'hardStops');
+  assert.equal(S.scAlertText_({ kind: 'hardTurn', minutes: 600 }, ''), 'Hard turn (10:00 AM)');
+  assert.equal(S.scAlertWeight_('hardTurn', {}, S.scSettings_({})), 1);
+  assert.equal(S.scAlertWeight_('hardTurn', {}, S.scSettings_({ hardTurn: 3 })), 3);
 });
 
 test('alerts go to the driver Daily Dispatch put in that truck, not the driver Fleet shows; a truck with no driver is kept', () => {
@@ -25,13 +33,14 @@ test('alerts go to the driver Daily Dispatch put in that truck, not the driver F
     { tag: '223894', at: '2026-10-14T15:00:00Z', type: 'Harsh Braking' },
     { tag: '223894', at: '2026-10-14T15:30:00Z', type: 'HARSH_ACCEL' },
     { tag: '223894', at: '2026-10-14T16:00:00Z', type: 'IDLE', minutes: 25 },
+    { tag: '223894', at: '2026-10-14T16:20:00Z', type: 'HARSH_TURN' },
     { tag: '229999', at: '2026-10-14T13:00:00Z', type: 'SPEEDING', speedMph: 70, limitMph: 55 },
     { tag: '223893', at: '2026-10-14T13:00:00Z', type: 'FAULT_CODE' }
   ];
   const m = S.scMatchGps_(DAY, days, [{ tag: '223893', miles: 182.4, yardOut: '2026-10-14T09:40:00Z', yardIn: '2026-10-14T19:05:00Z', fuelGallons: 26 }], alerts);
   const pat = m.records.find(r => r.driver === 'ADAMS, PAT'), lee = m.records.find(r => r.driver === 'BAKER, LEE');
-  assert.deepEqual(pat.alerts, { speeding: 1, hardBrake: 0, hardAccel: 0, idle: 0, seatbelt: 0 }, 'the fault code is not scored');
-  assert.deepEqual(lee.alerts, { speeding: 0, hardBrake: 1, hardAccel: 1, idle: 1, seatbelt: 0 }, '"223 894" on Daily Dispatch is Fleet unit 223894');
+  assert.deepEqual(pat.alerts, { speeding: 1, hardBrake: 0, hardAccel: 0, hardTurn: 0, idle: 0, seatbelt: 0 }, 'the fault code is not scored');
+  assert.deepEqual(lee.alerts, { speeding: 0, hardBrake: 1, hardAccel: 1, hardTurn: 1, idle: 1, seatbelt: 0 }, '"223 894" on Daily Dispatch is Fleet unit 223894');
   assert.equal(pat.gpsMiles, 182.4);
   assert.equal(S.scClock_(pat.yardOut), '5:40 AM', 'yard leave in New York time');
   assert.equal(S.scClock_(pat.yardIn), '3:05 PM');
@@ -48,7 +57,7 @@ test('alerts go to the driver Daily Dispatch put in that truck, not the driver F
   const p = rows.find(r => r.driver === 'ADAMS, PAT'), l = rows.find(r => r.driver === 'BAKER, LEE');
   assert.equal(p.areas.speeding.points, -2, 'one speeding alert costs 2');
   assert.deepEqual([p.areas.hardStops.points, p.areas.idling.points], [1, 1], 'a clean day earns 1');
-  assert.deepEqual([l.areas.hardStops.points, l.areas.idling.points, l.areas.speeding.points], [-3, -1, 1], 'hard stop 2 + hard start 1, idling 1');
+  assert.deepEqual([l.areas.hardStops.points, l.areas.idling.points, l.areas.speeding.points], [-4, -1, 1], 'hard stop 2 + hard start 1 + hard turn 1, idling 1');
   assert.equal(l.idleMinutes, 25, 'idle time from the IDLE alerts\' minutes until Fleet sends a day total');
   assert.equal(p.truck, '223893');
   assert.equal(p.mpg, 7, '182.4 miles on 26 gallons');

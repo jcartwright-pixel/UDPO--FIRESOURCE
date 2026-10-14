@@ -16,7 +16,7 @@
  *
  * Joe 10/13 (GPS): driving habits come from Verizon Connect Fleet (gpsDays and gpsAlerts, read every 5 minutes). What counts is
  * the TRUCK plus the driver Daily Dispatch put in that truck that day, never the driver Fleet shows. Speeding, hard stops
- * (harsh braking), hard starts (harsh acceleration) and idling each cost points (a day's GPS points are capped); miles, MPG
+ * (harsh braking), hard starts (harsh acceleration), hard turns (harsh cornering) and idling each cost points (a day's GPS points are capped); miles, MPG
  * and yard leave / return times are shown. An alert on a truck nobody was dispatched in is kept as "No driver dispatched".
  */
 var SC_CORE = Object.freeze({
@@ -30,7 +30,7 @@ var SC_CORE = Object.freeze({
     callOffReasons: ['CALLED OFF', 'SICK DAY', 'UNPAID DAY', 'OTHER'],
     gradeA: 93, gradeB: 85, gradeC: 75, monthMinDays: 15,
     // Joe 10/13 GPS starting weights (he adjusts them on Settings): points per alert, at most gpsDayCap a day (0 = no cap).
-    speeding: 2, hardBrake: 2, hardAccel: 1, idle: 1, gpsDayCap: 10,
+    speeding: 2, hardBrake: 2, hardAccel: 1, hardTurn: 1, idle: 1, gpsDayCap: 10,
     // Joe 10/13 Time grade: leaving the yard more than earlyMinutes before dispatch, or back more than lateMinutes past
     // dispatch plus the route's expected hours, costs leftEarly / backLate points. A day with no GPS yard time is not scored.
     earlyMinutes: 15, lateMinutes: 30, leftEarly: 1, backLate: 1,
@@ -62,12 +62,12 @@ var SC_CORE = Object.freeze({
     kioskReasons: 0
   }),
   NUMBER_SETTINGS: Object.freeze(['checkinMiss', 'lostCase', 'lostCaseDayCap', 'inspectionDefect', 'inspectionMissing', 'callOff',
-    'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly', 'backEarlyMinutes',
+    'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'hardTurn', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly', 'backEarlyMinutes',
     'cleanOn', 'clean5', 'clean4', 'clean3', 'clean2Off', 'clean1Off', 'sleeperIdlePct', 'seatbelt', 'mpgTarget', 'mpgBelowPct', 'mpgLow',
     'accidentBase', 'accident1', 'accident2', 'accident3', 'accidentFade1', 'accidentFade2', 'accidentFade3', 'accidentFade4',
     'complaintMinor', 'complaintMajor', 'complaintFade1', 'complaintFade2', 'sickFade1', 'sickFade2', 'sickFade3', 'kioskReasons',
     'pdaVerbal', 'pdaWritten', 'pdaFinal', 'pdaSuspension', 'pdaFade1', 'pdaFade2', 'pdaFade3']),
-  GPS_KINDS: Object.freeze(['speeding', 'hardBrake', 'hardAccel', 'idle', 'seatbelt']),
+  GPS_KINDS: Object.freeze(['speeding', 'hardBrake', 'hardAccel', 'hardTurn', 'idle', 'seatbelt']),
   // Joe 10/13 (later): the board shows one grade per area and the overall score; the details are one click away.
   AREAS: Object.freeze([['checkin', 'Check-in'], ['cases', 'Cases'], ['inspection', 'Inspections'], ['attendance', 'Attendance'],
     ['speeding', 'Speeding'], ['hardStops', 'Hard Stops'], ['idling', 'Idling'], ['seatbelt', 'Seatbelt'], ['fuel', 'Fuel MPG'], ['time', 'Time'],
@@ -78,8 +78,8 @@ var SC_CORE = Object.freeze({
   INCIDENT_AREA: Object.freeze({ accident: 'accidents', complaint: 'complaints', pda: 'pda' }),
   ACCIDENT_CLASSES: Object.freeze([[1, '1st degree', 'Minor'], [2, '2nd degree', 'Damage'], [3, '3rd degree', 'Total loss']]),
   INCIDENT_STATUS: Object.freeze({ review: 'Under review', counts: 'Reviewed \u2013 counts', notCounted: 'Reviewed \u2013 not counted' }),
-  GPS_AREA: Object.freeze({ speeding: 'speeding', hardBrake: 'hardStops', hardAccel: 'hardStops', idle: 'idling', seatbelt: 'seatbelt' }),
-  GPS_WORDS: Object.freeze({ speeding: 'Speeding', hardBrake: 'Hard stop', hardAccel: 'Hard start', idle: 'Idling', seatbelt: 'Seatbelt' }),
+  GPS_AREA: Object.freeze({ speeding: 'speeding', hardBrake: 'hardStops', hardAccel: 'hardStops', hardTurn: 'hardStops', idle: 'idling', seatbelt: 'seatbelt' }),
+  GPS_WORDS: Object.freeze({ speeding: 'Speeding', hardBrake: 'Hard stop', hardAccel: 'Hard start', hardTurn: 'Hard turn', idle: 'Idling', seatbelt: 'Seatbelt' }),
   NOT_A_DRIVER: /^(|open|tba|tbd|none|n\/a|na|needs driver|.*needs driver.*|vacation.*|off)$/i
 });
 
@@ -193,6 +193,8 @@ function scAlertKind_(type) {
   if (/SPEED/.test(t)) return 'speeding';
   if (/BRAK|HARD.?STOP/.test(t)) return 'hardBrake';
   if (/ACCEL|HARD.?START/.test(t)) return 'hardAccel';
+  // Joe 10/14: harsh cornering (left or right) counts under Hard Stops too.
+  if (/CORNER|TURN/.test(t)) return 'hardTurn';
   if (/IDL/.test(t)) return 'idle';
   if (/SEAT.?BELT|BELT/.test(t)) return 'seatbelt';
   return '';
@@ -250,7 +252,7 @@ function scMatchGps_(dateKey, records, gpsDays, alerts, ours) {
   if (ours) { mine = {}; ours.forEach(function (u) { var k = scUnitKey_(u); if (k) mine[k] = true; }); }
   (records || []).forEach(function (r) {
     var k = scUnitKey_(r.truck);
-    r.alerts = {speeding: 0, hardBrake: 0, hardAccel: 0, idle: 0, seatbelt: 0}; r.alertList = [];
+    r.alerts = {speeding: 0, hardBrake: 0, hardAccel: 0, hardTurn: 0, idle: 0, seatbelt: 0}; r.alertList = [];
     if (!k) return;
     (byTruck[k] = byTruck[k] || []).push(r);
     var dg = k.replace(/\D/g, '');
@@ -288,7 +290,7 @@ function scMatchGps_(dateKey, records, gpsDays, alerts, ours) {
     if (!list) {
       if (mine && !mine[scUnitKey_(a.tag)]) return;
       var key = scUnitKey_(a.tag) || '?', u = lost[key] || (lost[key] = {date: dateKey, truck: String(a.tag || '').trim() || '(no unit name)', alerts: [],
-        counts: {speeding: 0, hardBrake: 0, hardAccel: 0, idle: 0, seatbelt: 0}});
+        counts: {speeding: 0, hardBrake: 0, hardAccel: 0, hardTurn: 0, idle: 0, seatbelt: 0}});
       u.alerts.push(item); u.counts[kind]++;
       return;
     }
@@ -375,7 +377,7 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
   function get(key, name) {
     return by[key] || (by[key] = {driverKey: key, driver: names[key] || name || key, routes: {}, runDays: 0, dates: {}, checkins: 0, missedCheckins: 0,
       casesOut: 0, casesIn: 0, lostCases: 0, lostPoints: 0, inspected: 0, defects: 0, notInspected: 0, callOffs: 0, miles: 0, misses: [],
-      trucks: {}, speeding: 0, hardBrakes: 0, hardAccels: 0, idles: 0, seatbelts: 0, idleMinutes: 0, gpsPoints: 0, gpsMiles: 0, gpsDays: 0, fuelGallons: 0, fuelMiles: 0, mpgMiles: 0, leftEarly: 0, backLate: 0,
+      trucks: {}, speeding: 0, hardBrakes: 0, hardAccels: 0, hardTurns: 0, idles: 0, seatbelts: 0, idleMinutes: 0, gpsPoints: 0, gpsMiles: 0, gpsDays: 0, fuelGallons: 0, fuelMiles: 0, mpgMiles: 0, leftEarly: 0, backLate: 0,
       mpgSum: 0, yardOuts: [], yardIns: [], yardFromMoves: false, scored: {}, rewards: [], pending: [], lowMpgDays: 0});
   }
   // Fuel: each truck's own average MPG over the period (all its drivers), unless Settings has a target.
@@ -487,7 +489,7 @@ function scAddGps_(r, d, s, ex) {
   var a = d.alerts || {}, list = d.alertList || [], pts = 0, used = 0;
   ex = ex || {};
   list.forEach(function (x) { if (!ex[scAlertKey_(d.date, x)]) pts += scAlertWeight_(x.kind, d, s); });
-  r.speeding += a.speeding || 0; r.hardBrakes += a.hardBrake || 0; r.hardAccels += a.hardAccel || 0; r.idles += a.idle || 0; r.seatbelts += a.seatbelt || 0;
+  r.speeding += a.speeding || 0; r.hardBrakes += a.hardBrake || 0; r.hardAccels += a.hardAccel || 0; r.hardTurns += a.hardTurn || 0; r.idles += a.idle || 0; r.seatbelts += a.seatbelt || 0;
   var capped = s.gpsDayCap > 0 ? Math.min(pts, s.gpsDayCap) : pts;
   r.gpsPoints = scRound_(r.gpsPoints + capped);
   list.forEach(function (x) {
@@ -612,7 +614,7 @@ function scRank_(rows) {
 /** Year: the score is the average of the months he drove; counts are added up. months: [{month, rows}] */
 function scScoreYear_(months, settings) {
   var by = {}, sums = ['runDays', 'daysWorked', 'checkins', 'missedCheckins', 'casesOut', 'casesIn', 'lostCases', 'inspected', 'defects',
-    'notInspected', 'callOffs', 'miles', 'speeding', 'hardBrakes', 'hardAccels', 'idles', 'seatbelts', 'idleMinutes', 'gpsPoints', 'gpsMiles', 'gpsDays', 'fuelGallons', 'leftEarly', 'backLate'];
+    'notInspected', 'callOffs', 'miles', 'speeding', 'hardBrakes', 'hardAccels', 'hardTurns', 'idles', 'seatbelts', 'idleMinutes', 'gpsPoints', 'gpsMiles', 'gpsDays', 'fuelGallons', 'leftEarly', 'backLate'];
   (months || []).forEach(function (m) {
     var leader = scLeader_(m.rows, settings);
     m.rows.forEach(function (r) {

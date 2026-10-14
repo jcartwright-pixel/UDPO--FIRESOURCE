@@ -196,6 +196,7 @@
           '<p><b>Speeding</b> ' + n('speeding') + ' points per speeding alert</p>' +
           '<p><b>Hard stops</b> ' + n('hardBrake') + ' points per hard braking alert</p>' +
           '<p><b>Hard starts</b> ' + n('hardAccel') + ' points per hard acceleration alert</p>' +
+          '<p><b>Hard turns</b> ' + n('hardTurn') + ' points per harsh cornering alert (left or right)</p>' +
           '<p><b>Idling</b> ' + n('idle') + ' points per idling alert</p>' +
           '<p><b>Seatbelt</b> ' + n('seatbelt') + ' points per seatbelt alert (counted once the trucks send them)</p>' +
           '<p><b>Sleeper idling weight</b> ' + n('sleeperIdlePct') + '% of the idling points on a sleeper route (Route Master "Sleeper")</p>' +
@@ -269,7 +270,7 @@
         r.casesOut ? 'cases ' + r.casesOut.toLocaleString() + ' out / ' + r.casesIn.toLocaleString() + ' in' : 'cases not recorded',
         r.inspected + ' clean inspection' + (r.inspected === 1 ? '' : 's') + (r.defects ? ', ' + r.defects + ' with a defect' : '') + (r.notInspected ? ', ' + r.notInspected + ' not done' : ''),
         r.callOffs ? r.callOffs + ' call-off' + (r.callOffs === 1 ? '' : 's') : 'perfect attendance',
-        (r.speeding || 0) + ' speeding, ' + (r.hardBrakes || 0) + ' hard stop' + (r.hardBrakes === 1 ? '' : 's') + ', ' + (r.hardAccels || 0) + ' hard start' + (r.hardAccels === 1 ? '' : 's') + ', ' + (r.idles || 0) + ' idling' + (r.idleMinutes ? ' (' + Math.round(r.idleMinutes) + ' min)' : '') + (r.seatbelts ? ', ' + r.seatbelts + ' seatbelt' : ''),
+        (r.speeding || 0) + ' speeding, ' + (r.hardBrakes || 0) + ' hard stop' + (r.hardBrakes === 1 ? '' : 's') + ', ' + (r.hardAccels || 0) + ' hard start' + (r.hardAccels === 1 ? '' : 's') + (r.hardTurns ? ', ' + r.hardTurns + ' hard turn' + (r.hardTurns === 1 ? '' : 's') : '') + ', ' + (r.idles || 0) + ' idling' + (r.idleMinutes ? ' (' + Math.round(r.idleMinutes) + ' min)' : '') + (r.seatbelts ? ', ' + r.seatbelts + ' seatbelt' : ''),
         r.gpsMiles ? Math.round(r.gpsMiles).toLocaleString() + ' GPS miles' : r.miles ? r.miles.toLocaleString() + ' planned miles' : '',
         'MPG ' + (r.mpg ? r.mpg.toFixed(1) : 'coming'),
         (r.leftEarly || r.backLate) ? 'left early ' + r.leftEarly + ', back late ' + r.backLate : '',

@@ -72,6 +72,7 @@ async function seed(d) {
   alert('2026-10-05', '223898', 7, 45, 'HARSH_ACCEL');
   alert('2026-10-08', '229001', 13, 20, 'SPEEDING', { speedMph: 66, limitMph: 45 });
   alert('2026-10-08', '229001', 13, 31, 'HARSH_BRAKING');
+  alert('2026-10-08', '229001', 13, 35, 'HARSH_TURN');
   // 229001 is ours (Uniontown, Equipment Master); 551234 is another plant's Fleet unit and stays off No driver dispatched.
   b.set(d.collection('equipment').doc('veh_truck_229001'), { id: 'veh_truck_229001', unit: '229001', type: 'TRUCK', facilityId: 'fac_uniontown', location: 'UNIONTOWN', status: 'ACTIVE' });
   alert('2026-10-08', '551234', 13, 40, 'SPEEDING', { speedMph: 70, limitMph: 45 });
@@ -128,6 +129,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       assert.match(await sc.textContent('#kpis'), /Average driver score/);
       assert.match(await sc.textContent('#sc-how'), /Accidents \(12 months\), PDAs \(9 months\), complaints \(6 months\) and call-offs \(3 months\) count past the period shown/);
       assert.match(await sc.textContent('#unassigned'), /No driver dispatched[\s\S]*10-8-26\s*229001\s*Speeding \(66 mph in a 45/, 'the alert on a truck with no driver is kept for a manager');
+      assert.match(await sc.textContent('#unassigned'), /Hard turn \(1:35 PM/, 'harsh cornering is listed as a hard turn');
       assert.doesNotMatch(await sc.textContent('#unassigned'), /551234/, 'another plant\'s Fleet unit is not under No driver dispatched');
       const fit = await sc.evaluate(() => ({ table: document.querySelector('.sc-board').scrollWidth, box: document.querySelector('#sheet').clientWidth,
         small: [...document.querySelectorAll('.sc-board td, .sc-board th, .sc-board small')].filter(e => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).length }));
@@ -192,7 +194,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
         if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-week-' + w + '.png') });
         await sc.click('.tabs [data-mode="settings"]');
         await sc.waitForSelector('.sc-n[data-k="speeding"]');
-        assert.deepEqual(await sc.$$eval('.sc-n[data-k="speeding"], .sc-n[data-k="hardBrake"], .sc-n[data-k="hardAccel"], .sc-n[data-k="idle"], .sc-n[data-k="gpsDayCap"]', l => l.map(x => x.value)), ['2', '2', '1', '1', '10']);
+        assert.deepEqual(await sc.$$eval('.sc-n[data-k="speeding"], .sc-n[data-k="hardBrake"], .sc-n[data-k="hardAccel"], .sc-n[data-k="hardTurn"], .sc-n[data-k="idle"], .sc-n[data-k="gpsDayCap"]', l => l.map(x => x.value)), ['2', '2', '1', '1', '1', '10']);
         assert.deepEqual(await sc.$$eval('.sc-n[data-k="sleeperIdlePct"], .sc-n[data-k="accidentBase"], .sc-n[data-k="accident2"], .sc-n[data-k="complaintMajor"], .sc-n[data-k="sickFade2"]', l => l.map(x => x.value)), ['66', '25', '15', '2', '10']);
         assert.equal(await sc.$eval('#sc-kiosk-reasons', c => c.checked), false, 'Show reasons on kiosk starts off');
         assert.equal(await sc.$$eval('[data-kiosk-area]', l => l.length), AREA_HEADS.length - 3, 'every area can be ticked for the kiosk');
