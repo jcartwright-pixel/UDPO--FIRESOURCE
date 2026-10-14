@@ -240,8 +240,15 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await ps.click('#change');
     await ps.click('[data-station="CASE_UNLOADING"]');
     assert.deepEqual(await ps.$$eval('.ps-tab b', b => b.map(x => x.textContent)), ['Unloading', 'Washing', 'Returns']);
+    // Joe 10/14: the Tote Loadout station loads, unloads and washes.
+    await ps.click('#change');
+    await ps.click('[data-station="TOTES"]');
+    await ps.waitForFunction(() => document.querySelectorAll('.ps-tab b').length === 3);
+    assert.deepEqual(await ps.evaluate(() => [...document.querySelectorAll('.ps-tab b')].map(x => x.textContent)), ['Loading', 'Unloading', 'Washing'], 'Tote Loadout has Loading, Unloading and Washing');
+    await ps.click('[data-view="washing"]');
+    await ps.waitForSelector('#work .sw-panel-head h2:text-is("Washing")');
     assert.deepEqual(ps.errors, []);
-    results.push('Plant Station: a tablet picks its station once; Case Loadout shows Loading only, Case Unloading shows Unloading, Washing and Returns');
+    results.push('Plant Station: a tablet picks its station once; Case Loadout shows Loading only, Case Unloading shows Unloading, Washing and Returns, Tote Loadout shows Loading, Unloading and Washing');
     // Joe 10/10: the Plant Station is a tablet screen: a slim header with Back and Home, no desktop side menu.
     const tab = await openPage(browser, 1280, 800, '/plant-station.html' + MANAGER, clock);
     await tab.waitForSelector('[data-station="CASE_UNLOADING"]');
