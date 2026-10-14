@@ -39,5 +39,8 @@ test('alert kinds from the Fleet condition', () => {
   assert.equal(alertType({ name: 'DVIR FAILED', type: 'Inspection Failure' }, {}), 'DVIR_FAILED');
   assert.equal(alertType({ name: 'HOS Warning', type: 'HoS Warning X Minutes' }, {}), 'HOS');
   assert.equal(alertType({ name: 'Violation', type: 'HoS Violation' }, {}), 'HOS');
+  for (const [n, t] of [['Harsh Braking', 'HARSH_BRAKING'], ['Harsh Acceleration', 'HARSH_ACCEL'], ['Harsh Cornering Left', 'HARSH_TURN'], ['Harsh Turn', 'HARSH_TURN']]) {
+    assert.equal(alertType({ name: n, type: 'Event Diagnostic' }, {}), t);
+  }
   assert.equal(alertType({ name: 'Maintenance due', type: 'MaintenanceCondition' }, {}), 'OTHER');
 });
