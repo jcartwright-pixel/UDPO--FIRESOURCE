@@ -16,6 +16,8 @@ test('the production settings in the repository pass, read the real sheets and w
   const { env, problems } = P.productionEnv(settings, '', sandbox);
   assert.deepEqual(problems, []);
   assert.equal(env.READ_UNIONTOWN_SHEETS, '1');
+  // Joe 10/14: live email goes to the people it is meant for.
+  assert.equal(env.LIVE_EMAIL, '1');
   assert.deepEqual(JSON.parse(env.WRITEBACK_JSON), { spreadsheetId: REAL_LIVE });
   assert.match(P.envText(env), new RegExp('^WRITEBACK_JSON=\\{"spreadsheetId":"' + REAL_LIVE + '"\\}$', 'm'));
 });
@@ -34,6 +36,7 @@ test('production refuses a write-back to any other sheet, the made-up sheets and
     'READ_UNIONTOWN_SHEETS=0',
     'MAIL_FROM=someone@gmail.com',
     'REPORT_TO=a@uniteddairy.com, b@example.com',
+    'LIVE_EMAIL=yes',
     'SOMETHING_ELSE=1'
   ];
   bad.forEach(line => assert.ok(P.productionEnv(settings, line, sandbox).problems.length > 0, line + ' is refused'));
