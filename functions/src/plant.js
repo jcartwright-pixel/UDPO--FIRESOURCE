@@ -847,7 +847,10 @@ function validateQuality(input, SaveError) {
   out.weights = {};
   Object.keys(w).forEach(k => { if (/^(result|head[1-6])$/.test(k)) out.weights[k] = text(w[k]).slice(0, 80); });
   // Joe 10/10: no Record button. Each box saves as it is left: the first save is the check, later ones fill in the same check.
+  // Joe 10/14: Undo on a Run Complete pressed by mistake takes that check off the line (it stays in the change log).
+  out.undone = input.undone === true;
   out.checkId = text(input.checkId).slice(0, 150);
+  if (out.undone && !out.checkId) throw new SaveError('BAD_REQUEST', 'Undo needs the check to take back');
   if (out.checkId && !/^PRODUCTION_QUALITY_app_[A-Za-z0-9]+$/.test(out.checkId)) throw new SaveError('BAD_REQUEST', 'checkId is not a quality check');
   return out;
 }
@@ -861,6 +864,7 @@ async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const record = { operationId: req.operationId, area: d.name, product: req.product, status: req.status, remainingOutput: req.remainingOutput, qualityCheck: req.qualityCheck,
     tipTest: req.tipTest, temperature: req.temperature, cycleTime: req.cycleTime, productSize: req.productSize, annealerSpeed: req.annealerSpeed, weights: req.weights, notes: req.notes,
     facilityId: d.facilityId || 'fac_uniontown' };
+  if (req.undone) record.undone = true;
   if (req.checkId) {
     const ref = db.collection('plantJournal').doc(req.checkId), had = await tx.get(ref), old = had.exists ? had.data() : null;
     if (!old || old.type !== R.QUALITY_TYPE || (old.payload || {}).operationId !== req.operationId) throw new SaveError('NOT_FOUND', 'That quality check is no longer open. Enter it again.');

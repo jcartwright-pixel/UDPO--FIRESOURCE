@@ -428,9 +428,17 @@
     (journal || []).forEach(function (d) {
       if (text(d.type).toUpperCase() !== QUALITY_TYPE) return;
       var p = payloadOf(d);
+      if (p.undone) return; // a Run Complete pressed by mistake and undone
+
       out.push(Object.assign({}, p, { operationId: text(p.operationId), area: text(p.area), status: text(p.status).toUpperCase(), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), inApp: true, docId: text(d._id) }));
     });
     return out.sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
+  }
+  // Joe 10/14 (Run Complete, A): a line whose last check is Finished is done for the shift it was pressed in; the next shift
+  // (or Start Next Run) opens it again.
+  function lineDone(last, nowMs) {
+    var t = when((last || {}).recordedAt);
+    return !!t && text(last.status).toUpperCase() === 'FINISHED' && nowMs - t < 12 * 3600000 && shiftAt(t) === shiftAt(nowMs);
   }
   // Each line with its last check and the number of checks in the last 24 hours.
   function qualityLines(setup, journal, lineStatus, nowMs) {
@@ -665,6 +673,7 @@
     var since = when(input.roundStart) || 0, stale = function (at) { return !!since && (!at || when(at) <= since); };
     var lines = (input.lines || []).map(function (l) {
       var x = l.last || {}, status = text(x.status).toUpperCase(), check = text(x.qualityCheck).toUpperCase();
+      if (lineDone(x, nowMs)) return { line: l.name, status: 'RUN COMPLETE', product: text(x.product), qualityCheck: '', lastCheckedAt: clockOf(x.recordedAt), notes: '', flag: false, runComplete: true };
       if (stale(x.recordedAt)) return { line: l.name, status: 'NOT CHECKED', product: '', qualityCheck: '', lastCheckedAt: x.recordedAt ? clockOf(x.recordedAt) : '', notes: '', flag: false, notChecked: true };
       return { line: l.name, status: status, product: text(x.product), qualityCheck: check, lastCheckedAt: x.recordedAt ? clockOf(x.recordedAt) : '', notes: text(x.notes), flag: status === 'DOWN' || check === 'FAIL' };
     });
@@ -717,7 +726,7 @@
     L.push('');
     L.push('PRODUCTION');
     if (!r.lines.length) L.push('  No production lines set up');
-    r.lines.forEach(function (l) { L.push('  ' + l.line + '  ' + (l.status || 'no status') + (l.product ? '  ' + l.product : '') + (l.lastCheckedAt ? (l.notChecked ? '  last check ' : '  quality check ') + l.lastCheckedAt + (l.qualityCheck ? ' ' + l.qualityCheck : '') : '') + (l.flag && l.notes ? '  (' + l.notes + ')' : '')); });
+    r.lines.forEach(function (l) { if (l.runComplete) { L.push('  ' + l.line + '  RUN COMPLETE ' + l.lastCheckedAt); return; } L.push('  ' + l.line + '  ' + (l.status || 'no status') + (l.product ? '  ' + l.product : '') + (l.lastCheckedAt ? (l.notChecked ? '  last check ' : '  quality check ') + l.lastCheckedAt + (l.qualityCheck ? ' ' + l.qualityCheck : '') : '') + (l.flag && l.notes ? '  (' + l.notes + ')' : '')); });
     L.push('');
     L.push('TEMPERATURES');
     if (!r.temperatures.length) L.push('  No temperature locations set up');
@@ -768,7 +777,7 @@
     if (others.length) { H.push(head('Incidents · Safety · Quality', others.length)); H.push(rows(others.map(function (d) { return [d.equipment || d.type, e(d.entry || '') + ' <span style="color:' + GREY + '">' + e(d.type) + '</span> ' + pill(followWord(d.status), d.status === 'RESOLVED' ? '#e2f4ea' : d.status === 'MONITOR' ? '#fff1d6' : '#fde8e6', d.status === 'RESOLVED' ? GREEN : d.status === 'MONITOR' ? '#9a5b00' : RED)]; }))); }
     H.push(head('Production'));
     if (!lines.length) H.push(plain('No production lines set up.'));
-    else H.push(rows(lines.map(function (l) { return [l.line, (l.product ? e(l.product) + ' ' : '') + (l.qualityCheck ? pill('QC ' + l.qualityCheck, l.qualityCheck === 'FAIL' ? '#fde8e6' : '#e2f4ea', l.qualityCheck === 'FAIL' ? RED : GREEN) + ' ' : '') + (l.notChecked ? pill('NOT CHECKED', '#fff1d6', '#9a5b00') : l.status ? pill(l.status, l.flag ? '#fde8e6' : '#eef1f4', l.flag ? RED : GREY) : 'no status')]; })));
+    else H.push(rows(lines.map(function (l) { if (l.runComplete) return [l.line, pill('RUN COMPLETE ' + l.lastCheckedAt, '#eef1f4', GREY)]; return [l.line, (l.product ? e(l.product) + ' ' : '') + (l.qualityCheck ? pill('QC ' + l.qualityCheck, l.qualityCheck === 'FAIL' ? '#fde8e6' : '#e2f4ea', l.qualityCheck === 'FAIL' ? RED : GREEN) + ' ' : '') + (l.notChecked ? pill('NOT CHECKED', '#fff1d6', '#9a5b00') : l.status ? pill(l.status, l.flag ? '#fde8e6' : '#eef1f4', l.flag ? RED : GREY) : 'no status')]; })));
     H.push(head('Temperatures'));
     if (!temps.length) H.push(plain('No temperature locations set up.'));
     else H.push(rows(temps.map(function (t) { var ok = t.status === 'OK', due = t.due || t.status === 'NO CHECK'; if (t.notChecked) return [t.location, pill('NOT CHECKED', '#fff1d6', '#9a5b00')]; return [t.location, (t.reading !== '' && t.reading !== undefined ? e(t.reading) + '&deg;F ' : '&ndash; ') + (t.flag ? pill(t.status, '#fde8e6', RED) : due ? pill(t.status === 'NO CHECK' ? 'CHECK DUE' : t.status + ' · CHECK DUE', '#fff1d6', '#9a5b00') : pill(t.status || '-', ok ? '#e2f4ea' : '#eef1f4', ok ? GREEN : GREY))]; })));
@@ -784,7 +793,7 @@
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
-    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
+    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
     REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
