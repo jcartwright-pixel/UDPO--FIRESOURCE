@@ -4,6 +4,8 @@
 'use strict';
 
 const M = require('./model');
+const OTR = require('./otr-core');
+const { SaveError } = require('./actions-common');
 
 /*
  * Over the Road: the module's own records (the current app keeps them in its "UDPO OTR Report" workbook, never in Route Master):
@@ -38,6 +40,11 @@ async function saveOtr(tx, db, req, email, stamp, logRef, mode) {
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, op: 'import', months: req.months.length, days: req.daily.length, comments: req.comments.length, result });
     return result;
   }
+  if (req.op === 'column') return saveOtrColumn(tx, db, req, email, stamp, logRef, mode);
+  if (req.op === 'day' && OTR.OTR_CORE.DESTINATIONS.indexOf(req.destination) < 0) {
+    const col = await tx.get(db.collection('otrColumns').doc(otrColumnKey(req.destination)));
+    if (!col.exists || col.data().name !== req.destination) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
+  }
   let ref, data;
   if (req.op === 'route') { ref = db.collection('otrRoutes').doc(M.safeIdPart(req.runId)); data = { runId: req.runId, include: req.include, destination: req.destination, deliveredBy: req.deliveredBy || '' }; }
   else if (req.op === 'comment') { ref = db.collection('otrComments').doc(req.date); data = { date: req.date, text: req.text, source: 'MANUAL' }; }
@@ -50,4 +57,37 @@ async function saveOtr(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { saveOtr };
+// The id of a By Date column of Joe's own: its name in capitals with letters and numbers only ("Darden" -> DARDEN).
+function otrColumnKey(name) { return M.safeIdPart(String(name || '').toUpperCase().replace(/[^A-Z0-9&]/g, '').replace(/&/g, 'AND')) || 'COLUMN'; }
+async function saveOtrColumn(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection('otrColumns').doc(otrColumnKey(req.name)), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+  const meta = { updatedAt: stamp, updatedBy: email, testEdited: mode.mode === 'test' };
+  let toRef = null, toSnap = null;
+  if (req.verb === 'rename') { toRef = db.collection('otrColumns').doc(otrColumnKey(req.newName)); toSnap = toRef.path === ref.path ? null : await tx.get(toRef); }
+  if (req.verb !== 'add') {
+    if (!before) throw new SaveError('NOT_FOUND', req.name + ' is not a column you added');
+    // In use: a run counts in it, or a day has runs typed or imported under it.
+    const [usedBy, days] = await Promise.all([
+      tx.get(db.collection('otrRoutes').where('destination', '==', before.name).limit(1)),
+      tx.get(db.collection('otrDaily').where('destination', '==', before.name).limit(1))]);
+    if (!usedBy.empty) throw new SaveError('BAD_REQUEST', before.name + ' is picked for a run in OTR Routes Setup; pick another column for that run first');
+    if (!days.empty && days.docs[0].data().runs) throw new SaveError('BAD_REQUEST', before.name + ' has runs on the By Date tab, so it stays');
+  }
+  let after = null;
+  if (req.verb === 'add') {
+    if (before) throw new SaveError('BAD_REQUEST', before.name + ' is already a column');
+    after = { name: req.name, createdAt: stamp, createdBy: email };
+    tx.set(ref, Object.assign({}, after, meta));
+  } else if (req.verb === 'rename') {
+    if (toSnap && toSnap.exists) throw new SaveError('BAD_REQUEST', toSnap.data().name + ' is already a column');
+    after = Object.assign({}, before, { name: req.newName });
+    if (toRef.path === ref.path) tx.set(ref, Object.assign({ name: req.newName }, meta), { merge: true });
+    else { tx.delete(ref); tx.set(toRef, Object.assign({}, after, meta)); }
+  } else tx.delete(ref);
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, op: 'column', verb: req.verb, doc: ref.path, before, after, result });
+  return result;
+}
+
+
+module.exports = { saveOtr, otrColumnKey };

@@ -74,3 +74,21 @@ table.otr-fuel { width: 560px; margin-top: 14px; }
   #print.otr-print .vh { writing-mode: vertical-rl; transform: rotate(180deg); }
   #print.otr-print table.otr-fuel { width: 40%; margin-top: 8px; }
 }
+/* Joe 10/13: round-trip miles fixed in place (saved in Route Master), and By Date columns of his own. */
+.otr-setup button.otr-miles { min-width: 90px; min-height: 38px; padding: 0 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; font: inherit; font-size: 16px; color: inherit; cursor: pointer; text-decoration: underline dotted #8aa4bd; text-underline-offset: 4px; }
+.otr-setup button.otr-miles:hover, .otr-setup button.otr-miles:focus-visible { border-color: #b7c9d8; background: #fff; color: var(--ud-blue); text-decoration: underline; }
+.otr-miles-edit { display: inline-flex; align-items: center; gap: 6px; }
+.otr-miles-edit input, .otr-cols input.otr-col-in { width: 96px; height: 38px; box-sizing: border-box; border: 1px solid var(--ud-blue); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; text-align: right; }
+.otr-cols input.otr-col-in { width: 220px; text-align: left; }
+.otr-miles-edit button, .otr-cols button { min-height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.otr-miles-edit button.primary, .otr-cols button.primary { background: var(--ud-blue); color: #fff; }
+.otr-cols td { vertical-align: middle; }
+.otr-compare { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; color: var(--ud-blue); white-space: nowrap; cursor: pointer; }
+/* Joe 10/13: Import sits at the far right of the tab row, set apart from the tabs. */
+.head .actions.in-head.otr-head-act { margin-left: auto; padding-left: 32px; gap: 8px; }
+.head .actions.in-head.otr-head-act button { width: auto; min-width: 0; height: 44px; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 2px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; line-height: 1; }
+.head .actions.in-head.otr-head-act button.primary { background: var(--ud-blue); color: #fff; }
+.head .actions.in-head.otr-head-act button:disabled { opacity: .55; cursor: not-allowed; }
+.otr-compare input { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; }
+.otr-col-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.otr-col-add label { font-weight: 700; font-size: 16px; }
