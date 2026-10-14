@@ -72,6 +72,9 @@ async function seed(d) {
   alert('2026-10-05', '223898', 7, 45, 'HARSH_ACCEL');
   alert('2026-10-08', '229001', 13, 20, 'SPEEDING', { speedMph: 66, limitMph: 45 });
   alert('2026-10-08', '229001', 13, 31, 'HARSH_BRAKING');
+  // 229001 is ours (Uniontown, Equipment Master); 551234 is another plant's Fleet unit and stays off No driver dispatched.
+  b.set(d.collection('equipment').doc('veh_truck_229001'), { id: 'veh_truck_229001', unit: '229001', type: 'TRUCK', facilityId: 'fac_uniontown', location: 'UNIONTOWN', status: 'ACTIVE' });
+  alert('2026-10-08', '551234', 13, 40, 'SPEEDING', { speedMph: 70, limitMph: 45 });
   // Truck cleanliness, rated once this month: HALL's truck spotless (5), DIAZ's dirty (2).
   b.set(d.collection('scorecardRatings').doc('DRV_S_ADAMS_2026-10-09'), { kind: 'cleanliness', driverKey: 'DRV_S_ADAMS', driver: 'HALL, PAT', date: '2026-10-09', rating: 5, truck: '223893', note: '' });
   b.set(d.collection('scorecardRatings').doc('DRV_S_DIAZ_2026-10-09'), { kind: 'cleanliness', driverKey: 'DRV_S_DIAZ', driver: 'DIAZ, RAY', date: '2026-10-09', rating: 2, truck: '223896', note: 'trash in the cab' });
@@ -125,6 +128,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       assert.match(await sc.textContent('#kpis'), /Average driver score/);
       assert.match(await sc.textContent('#sc-how'), /Accidents \(12 months\), PDAs \(9 months\), complaints \(6 months\) and call-offs \(3 months\) count past the period shown/);
       assert.match(await sc.textContent('#unassigned'), /No driver dispatched[\s\S]*10-8-26\s*229001\s*Speeding \(66 mph in a 45/, 'the alert on a truck with no driver is kept for a manager');
+      assert.doesNotMatch(await sc.textContent('#unassigned'), /551234/, 'another plant\'s Fleet unit is not under No driver dispatched');
       const fit = await sc.evaluate(() => ({ table: document.querySelector('.sc-board').scrollWidth, box: document.querySelector('#sheet').clientWidth,
         small: [...document.querySelectorAll('.sc-board td, .sc-board th, .sc-board small')].filter(e => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).length }));
       assert.ok(fit.table <= fit.box + 1, 'the table fits across at ' + w + ': ' + JSON.stringify(fit));

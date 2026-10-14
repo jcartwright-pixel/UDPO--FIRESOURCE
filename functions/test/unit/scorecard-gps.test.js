@@ -36,6 +36,13 @@ test('alerts go to the driver Daily Dispatch put in that truck, not the driver F
   assert.equal(S.scClock_(pat.yardOut), '5:40 AM', 'yard leave in New York time');
   assert.equal(S.scClock_(pat.yardIn), '3:05 PM');
   assert.deepEqual(m.unassigned.map(u => [u.truck, u.counts.speeding]), [['229999', 1]], 'No driver dispatched: kept for a manager');
+  // With nobody dispatched, only our Uniontown units wait under No driver dispatched: 223893 and 229999 (as "229 999" in
+  // Equipment Master) are ours; 223894 is not on the list and 551234 is another plant's.
+  const both = alerts.concat([{ tag: '551234', at: '2026-10-14T14:00:00Z', type: 'SPEEDING', speedMph: 66, limitMph: 45 }]);
+  const mineOnly = S.scMatchGps_(DAY, S.scBuildDay_(DAY, [], [], {}), [], both, ['223893', '229 999', 'T-100']);
+  assert.deepEqual(mineOnly.unassigned.map(u => u.truck), ['223893', '229999'], 'another plant\'s Fleet unit is left out of No driver dispatched');
+  assert.deepEqual(S.scMatchGps_(DAY, [], [], both, []).unassigned, [], 'no Uniontown units listed: nothing waits');
+  assert.deepEqual(S.scMatchGps_(DAY, [], [], both).unassigned.map(u => u.truck), ['223893', '223894', '229999', '551234'], 'no list given: every unit, as before');
 
   const rows = S.scScoreMonth_(m.records, [], S.scSettings_({}), {});
   const p = rows.find(r => r.driver === 'ADAMS, PAT'), l = rows.find(r => r.driver === 'BAKER, LEE');

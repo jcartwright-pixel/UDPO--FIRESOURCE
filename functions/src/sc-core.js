@@ -241,10 +241,13 @@ function scClock_(min) {
  * alerts: that day's gpsAlerts [{tag, at, type, speedMph, limitMph, minutes, place}].
  * A truck that ran two dispatched runs that day gives each alert to the run that had started by then (the earliest run
  * before any had started), and its miles and yard times to its first run. Alerts on a truck no driver was dispatched in come
- * back in `unassigned`, never dropped.
+ * back in `unassigned`, never dropped. ours (optional): our Uniontown Equipment Master unit names; when given, `unassigned`
+ * keeps only alerts on those units (matched by letters and digits, the way Trucks Today matches them), so another plant's
+ * Fleet units never land under No driver dispatched.
  */
-function scMatchGps_(dateKey, records, gpsDays, alerts) {
-  var byTruck = {}, byDigits = {}, unassigned = [];
+function scMatchGps_(dateKey, records, gpsDays, alerts, ours) {
+  var byTruck = {}, byDigits = {}, unassigned = [], mine = null;
+  if (ours) { mine = {}; ours.forEach(function (u) { var k = scUnitKey_(u); if (k) mine[k] = true; }); }
   (records || []).forEach(function (r) {
     var k = scUnitKey_(r.truck);
     r.alerts = {speeding: 0, hardBrake: 0, hardAccel: 0, idle: 0, seatbelt: 0}; r.alertList = [];
@@ -283,6 +286,7 @@ function scMatchGps_(dateKey, records, gpsDays, alerts) {
       place: String(a.place || ''), tag: String(a.tag || '')};
     var list = runsFor(a.tag);
     if (!list) {
+      if (mine && !mine[scUnitKey_(a.tag)]) return;
       var key = scUnitKey_(a.tag) || '?', u = lost[key] || (lost[key] = {date: dateKey, truck: String(a.tag || '').trim() || '(no unit name)', alerts: [],
         counts: {speeding: 0, hardBrake: 0, hardAccel: 0, idle: 0, seatbelt: 0}});
       u.alerts.push(item); u.counts[kind]++;

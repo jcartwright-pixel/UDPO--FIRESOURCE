@@ -47,7 +47,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate, save } from './js/app.js';
-    import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
+    import { watchLists, lists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
     import { collection, doc, onSnapshot, query, where, limit } from './js/firebase.js';
 
     // The current app's Driver Scorecard (screen A, 224/225_V7279): one table of every driver for the month or the year.
@@ -95,13 +95,16 @@
       gpsDays.forEach(g => { (gd[g.date] = gd[g.date] || []).push(g); });
       gpsAlerts.forEach(a => { (ga[a.date] = ga[a.date] || []).push(a); });
       unassigned = {};
+      // Only our Uniontown units (Equipment Master, the same list Trucks Today matches Fleet against) can wait under No driver
+      // dispatched; another plant's Fleet units are left out.
+      const ours = (lists.fleetTrucks || []).concat(lists.fleetTrailers || []).map(e => e.unit);
       Object.keys(byDate).concat(Object.keys(ga)).forEach(date => {
         if (out[date]) return;
         const p = L.DAYS[S.scWeekday_(date)], rows = byDate[date] || [];
         // A check-in typed on Driver Check-ins counts like the phone's ROUTE_CHECKIN event.
         const dayEv = (ev[date] || []).concat(rows.filter(r => r.checkedIn).map(r => ({ eventType: 'ROUTE_CHECKIN', payload: { route: r.route, run: r.run } })));
         // Each truck's GPS and alerts go to the driver Daily Dispatch put in it that day; the rest wait under No driver dispatched.
-        const m = S.scMatchGps_(date, S.scBuildDay_(date, rows, dayEv, routeMiles[p] || {}), gd[date] || [], ga[date] || []);
+        const m = S.scMatchGps_(date, S.scBuildDay_(date, rows, dayEv, routeMiles[p] || {}), gd[date] || [], ga[date] || [], ours);
         out[date] = m.records;
         if (m.unassigned.length) unassigned[date] = m.unassigned;
       });
@@ -328,7 +331,7 @@
           (open === r.driverKey ? '<tr class="sc-misses"><td></td><td colspan="' + (AREAS.length + 2) + '"><div class="sc-facts">' + facts(r) + '</div>' + (s.cleanOn ? rateBox(r) : '') + (earned(r) ? '<div class="sc-earned">Rewards: ' + earned(r) + ' · total ' + (r.points > 0 ? '+' : '') + pts(r.points) + ' points</div>' : '') + detail(r, '') + '</td></tr>' : '')).join('') ||
           empty(AREAS.length + 3)) + '</tbody></table>' +
         // Joe 10/13: an alert on a truck nobody was dispatched in is never dropped; a manager puts the driver on Daily Dispatch.
-        (b.unassigned.length ? '<div id="unassigned" class="sc-lost"><h2>No driver dispatched</h2><p class="hint">These trucks had alerts on a day no driver was in them on Daily Dispatch. Put the driver in the truck on Daily Dispatch for that day and the alerts move to that driver.</p>' +
+        (b.unassigned.length ? '<div id="unassigned" class="sc-lost"><h2>No driver dispatched</h2><p class="hint">These Uniontown trucks had alerts on a day no driver was in them on Daily Dispatch. Put the driver in the truck on Daily Dispatch for that day and the alerts move to that driver.</p>' +
           '<table class="issues"><colgroup><col style="width:12%"><col style="width:14%"><col style="width:74%"></colgroup><thead><tr><th>Date</th><th>Truck</th><th>Alerts</th></tr></thead><tbody>' +
           b.unassigned.map(u => '<tr><td>' + shortDate(u.date) + '</td><td class="strong">' + escapeHtml(u.truck) + '</td><td class="sc-lost-list">' + u.alerts.map(a => escapeHtml(S.scAlertText_(a, ''))).join('<br>') + '</td></tr>').join('') +
           '</tbody></table></div>' : '');
