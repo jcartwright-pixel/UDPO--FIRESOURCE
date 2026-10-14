@@ -32,6 +32,11 @@ test('Equipment Issues: To garage once, Repaired takes it off the open list, Rem
   await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'garage' });
   const twice = await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'garage' });
   assert.match(twice.message, /Already sent/);
+  // Joe 10/14: Garage makes the write-up's work order (Garage Station, Fleet Service, the hub's Garage count), once.
+  let orders = (await db().collection('workOrders').get()).docs.map(d => d.data());
+  assert.equal(orders.length, 1, 'one work order, however many times it is sent');
+  assert.deepEqual([orders[0].source, orders[0].source_kind, orders[0].source_id, orders[0].status, orders[0].problem, orders[0].sent_by], ['WRITE_UP', 'trucks', truck.recordId, 'NEW', 'Check engine light', DISPATCHER.email]);
+  assert.equal(twice.workOrderId, orders[0].work_order_id);
   open = L.issueRows(await records(), 'TRUCK');
   assert.equal(open[0].atGarage, true);
   assert.equal((open[0].garageBy), DISPATCHER.email);
@@ -46,6 +51,8 @@ test('Equipment Issues: To garage once, Repaired takes it off the open list, Rem
   assert.equal(done.completed_by, DISPATCHER.email);
   assert.equal(done.resolution_notes, 'New sensor');
   assert.equal(L.issueRows(all, 'TRUCK').repairedLast30, 1);
+  orders = (await db().collection('workOrders').get()).docs.map(d => d.data());
+  assert.deepEqual([orders.length, orders[0].status, orders[0].completed_by, orders[0].fixed_note], [1, 'DONE', DISPATCHER.email, 'Marked repaired on Truck Issues'], 'Repaired closes the work order too');
 
   const jack = L.issueRows(all, 'FORK_TRUCK')[0];
   await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: jack.recordId, step: 'remove', note: 'Not ours' });
@@ -68,4 +75,29 @@ test('Equipment Issues: repeat reports on one unit within 90 days count up; text
   assert.equal(n.needReview, 1);
   assert.equal(n.repeat, 2);
   assert.equal(n.oldestDays, 18);
+});
+
+test('Truck Issues Garage and the Garage Station: one work order per write-up; Remove closes it and stops a running clock; sent before work orders gets one', async () => {
+  await applyAction(db(), DISPATCHER, { action: 'saveCheckIn', requestId: rid(), runDocId: RUN, day: 'mon', casesDelivered: 400, tractorIssues: 'Mirror cracked' });
+  const truck = L.issueRows(await records(), 'TRUCK')[0];
+  const sent = await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'garage' });
+  const ref = db().collection('workOrders').doc(sent.workOrderId);
+  // A mechanic's clock is running on it when the office removes the write-up.
+  await ref.update({ status: 'WORKING', labor: [{ tech_id: 'TECH-JT', name: 'JT', start: '2026-10-09T11:00:00.000Z', end: '', minutes: 0 }], on_now: 'JT' });
+  await db().collection('garageClocks').doc('TECH-JT').set({ techId: 'TECH-JT', name: 'JT', workOrderId: sent.workOrderId, since: '2026-10-09T11:00:00.000Z' });
+  const gone = await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'remove', note: 'Duplicate' });
+  assert.deepEqual(gone.workOrdersClosed, [sent.workOrderId]);
+  const o = (await ref.get()).data();
+  assert.deepEqual([o.status, o.fixed_note, o.on_now, !!o.labor[0].end], ['DONE', 'Write-up removed on Truck Issues', '', true]);
+  assert.equal((await db().collection('garageClocks').doc('TECH-JT').get()).exists, false, 'the clock stops');
+
+  // A write-up marked "Sent to garage" before Garage made work orders: sending again makes its one work order.
+  const old = { recordId: 'TRK-OLD-1' };
+  await db().collection('maintenance').doc(old.recordId).set({ record_id: old.recordId, kind: 'TRUCK', truck_number: '223881', issue_details: 'Horn out', status: 'OPEN', opened_at: '2026-10-08T09:00:00Z',
+    notes: 'Sent to garage 2026-10-08T10:00:00Z by dispatch.test@uniteddairy.com' });
+  const again = await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: old.recordId, step: 'garage' });
+  assert.match(again.message, /Already sent to the garage\. Work order WO-[0-9A-F]{8} made\./);
+  const third = await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: old.recordId, step: 'garage' });
+  assert.equal(third.message, 'Already sent to the garage.');
+  assert.equal((await db().collection('workOrders').where('source_id', '==', old.recordId).get()).size, 1);
 });
