@@ -11,7 +11,7 @@
 .lt-form { display: flex; flex-direction: column; }
 .lt-form .qc-top { flex-wrap: nowrap; }
 .lt-pill { padding: 4px 12px; border-radius: 999px; font-size: 16px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
-.lt-pill.auto { background: #e2f4ea; color: #1d6b3a; } .lt-pill.typed { background: #e8f0f8; color: var(--ud-blue); }
+.lt-pill.auto { background: #e2f4ea; color: #1d6b3a; } .lt-pill.typed { background: var(--pill-blue-bg); color: var(--pill-blue-ink); }
 .lt-counter { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; color: var(--muted); white-space: nowrap; }
 .lt-counter select { height: 38px; border: 2px solid #9fb3c8; border-radius: 9px; font: inherit; font-size: 16px; font-weight: 800; color: var(--ud-blue-dark); padding: 0 8px; background: #fff; }
 .lt-page .qc-form .qc-last { margin-left: 0; }
@@ -47,7 +47,7 @@
 .lb-bar i { display: block; height: 100%; }
 .lb-bar i.c-g { background: #1d7a3e; } .lb-bar i.c-a { background: #b86e00; } .lb-bar i.c-r { background: #c62828; }
 .lb-pill { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 16px; font-weight: 900; letter-spacing: .03em; }
-.lb-pill.g { background: #e7f6ec; color: #1d7a3e; } .lb-pill.a { background: #fff1dc; color: #9a5b00; } .lb-pill.r { background: #fde8e8; color: #b42318; } .lb-pill.n { background: #e8f0f8; color: var(--ud-blue); }
+.lb-pill.g { background: var(--pill-good-bg); color: var(--pill-good-ink); } .lb-pill.a { background: var(--pill-amber-bg); color: #9a5b00; } .lb-pill.r { background: var(--pill-red-bg); color: var(--pill-red-ink); } .lb-pill.n { background: var(--pill-blue-bg); color: var(--pill-blue-ink); }
 .lb-btn { margin-top: auto; align-self: flex-start; min-height: 48px; padding: 0 18px; border: 2px solid #9fb3c8; border-radius: 10px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 18px; font-weight: 800; cursor: pointer; }
 .lb-btn.green { background: #1c7c4a; border-color: #1c7c4a; color: #fff; }
 .lb-btn[hidden] { display: none; }

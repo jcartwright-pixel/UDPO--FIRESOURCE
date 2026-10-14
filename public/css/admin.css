@@ -1,0 +1,16 @@
+/* admin.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.admin-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; padding: 4px 16px 16px; }
+.admin-card { display: flex; flex-direction: column; gap: 6px; min-height: 120px; padding: 18px; background: #fff; border: 1px solid #d5e1eb; border-top: 4px solid #1976d2; border-radius: 14px; color: #123f70; text-decoration: none; box-shadow: 0 6px 18px rgba(18,63,112,.06); }
+.admin-card:hover { box-shadow: 0 10px 24px rgba(18,63,112,.14); transform: translateY(-1px); }
+.admin-card strong { font-size: 19px; }
+.admin-card.ext { border-top-color: #9aa9b8; }
+.admin-card em { margin-top: auto; font-style: normal; font-size: 16px; font-weight: 700; color: #7a8a99; }
+@media (max-width: 1500px) {
+  .admin-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 1100px) {
+  .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Polish item 2 (Joe 10/11): the screen an old-app Dispatch Administration card opens, in small grey under its words. */
+.admin-card .admin-opens { display: block; margin-top: 6px; font-style: normal; font-size: 16px; font-weight: 700; color: #6b7a89; }

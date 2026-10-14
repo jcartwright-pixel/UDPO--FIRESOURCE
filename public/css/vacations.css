@@ -1,0 +1,45 @@
+/* vacations.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.vac-form { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr 1.3fr 1.6fr auto; gap: 8px; align-items: end; margin: 0 16px 10px; background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 10px; padding: 10px 12px; }
+.vac-form label { display: grid; gap: 4px; font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.form-buttons { display: flex; gap: 6px; }
+.form-buttons button, .actions > button#cal-prev, .actions > button#cal-next { min-height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.t-vacation { background: #dcecff; color: #0b4f8a; }
+.t-personal { background: #efe5ff; color: #5b3a9b; }
+.t-sick { background: #ffe5d6; color: #9a4b00; }
+.t-bereavement { background: #e6e9ee; color: #3b4652; }
+.t-unpaid { background: #fdecc4; color: #7a5600; }
+.cal-title { margin: 0; min-width: 190px; text-align: center; color: var(--ud-blue-dark); font-size: 22px; }
+.cal-key { display: inline-flex; gap: 10px; font-size: 16px; color: var(--muted); font-weight: 600; }
+.cal-key i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+.calendar .cday { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; cursor: pointer; min-height: 0; }
+.calendar .cday:hover { outline: 2px solid var(--ud-gold); outline-offset: -2px; }
+.calendar .cday.today { border: 2px solid var(--ud-blue); }
+.calendar .cday.full { background: #fff6f5; }
+.calendar .cday span.more { background: none; color: var(--muted); }
+.day-body { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; }
+.day-list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; }
+.day-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.day-row.pending { border-style: dashed; }
+.modal.wide-modal#day-modal { width: min(860px, calc(100vw - 32px)); }
+.calendar .cday { gap: 3px; }
+.calendar .cday b { font-size: clamp(16px, 1.8vh, 19px); }
+.cal-key { font-size: 16px; }
+.vac-view { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+#day-modal .notice.error { margin: 0 0 10px; }
+@media print {
+  body:has(#print .vac-print) { background: #fff !important; }
+  #print .vac-print-sub { margin: 0 0 8px; font-size: 12px; }
+  #print table.vac-print { width: 100%; font-size: 12px; }
+  #print table.vac-print :is(td, th):is(:first-child, :last-child) { text-align: left; }
+}
+.day-row .day-acts { display: inline-flex; gap: 4px; flex: none; }
+.day-row .day-acts button { min-height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.day-row.editing { border-color: var(--ud-blue); box-shadow: inset 4px 0 0 var(--ud-blue); }
+.day-row > div { min-width: 0; flex: 1; }
+.calendar .cday span[data-vac-id]:hover { outline: 2px solid var(--ud-blue); outline-offset: -1px; }
+.modal.wide-modal#day-modal { width: min(1040px, calc(100vw - 32px)); }
+#day-modal .day-body { grid-template-columns: 1.15fr 1fr; }
+#day-modal .day-row { flex-wrap: wrap; }
+#day-modal .day-row > div:first-child { flex: 1 1 200px; }
+#day-modal .day-row b { white-space: nowrap; margin-right: 6px; }

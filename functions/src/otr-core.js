@@ -543,13 +543,14 @@ function otrImportBatches_(merged, monthsPer, daysPer) {
  * Returns {year, months:[{label, y, py}], rows:[{name, cells:[[cur, prior]]}], totals:[[cur, prior]], diff:[n|null],
  *          extra:[{name, key, cells}], ytd:{current, prior, through}, latest:{label, current, prior}|null, busiest:[names]}.
  */
-function otrMonthRecap_(year, todayKey, daily, monthHistory, figures) {
+function otrMonthRecap_(year, todayKey, daily, monthHistory, figures, columns) {
   var today = otrParseKey_(todayKey);
   var byYear = {};
   [year - 2, year - 1, year].forEach(function (y) { byYear[y] = otrMonthRuns_(daily, monthHistory, y); });
   var months = [{label: 'Dec', y: year - 1, m: 12}].concat(OTR_CORE.MONTHS.map(function (n, i) { return {label: n, y: year, m: i + 1}; }));
   months.forEach(function (c) { c.py = c.y - 1; c.reached = c.y < today.y || (c.y === today.y && c.m <= today.m); });
-  var names = OTR_CORE.DESTINATIONS.slice();
+  // columns: the By Date columns shown (the workbook's, then any Joe added); a column always has its row, empty or not.
+  var names = (columns && columns.length ? columns : OTR_CORE.DESTINATIONS).slice();
   [year - 2, year - 1, year].forEach(function (y) { Object.keys(byYear[y]).forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); }); });
   function runs(n, y, m) { var a = byYear[y] && byYear[y][n]; return a ? (a[m - 1] || 0) : 0; }
   var totals = months.map(function () { return [0, 0]; });
@@ -561,7 +562,7 @@ function otrMonthRecap_(year, todayKey, daily, monthHistory, figures) {
       return [cur, prior];
     });
     return {name: n, cells: cells, any: cells.some(function (p) { return p[0] || p[1]; })};
-  }).filter(function (r) { return r.any || OTR_CORE.DESTINATIONS.indexOf(r.name) >= 0; });
+  }).filter(function (r) { return r.any || OTR_CORE.DESTINATIONS.indexOf(r.name) >= 0 || (columns || []).indexOf(r.name) >= 0; });
   months.forEach(function (c, i) { if (!c.reached) totals[i][0] = null; });
   var fm = otrFigureMap_(figures);
   var extra = [{name: 'Fuel Used', key: 'fuel_used_gal'}, {name: 'Miles Driven', key: 'miles'}, {name: 'Tank fills', key: 'fuel_fills'}].map(function (x) {

@@ -32,6 +32,11 @@ service cloud.firestore {
     match /config/fleetRules { allow read: if activeUser(); }
     // MOCREO cooler sensors (server only writes them).
     match /sensors/{id} { allow read: if activeUser(); }
+    // Verizon Connect Fleet GPS (written by the server; the login stays in private/gpsFleet).
+    match /gpsTrucks/{id} { allow read: if activeUser(); }
+    match /gpsDays/{id} { allow read: if activeUser(); }
+    // Fleet alerts (speeding, harsh braking, idling) for the Driver Scorecard; the server writes them.
+    match /gpsAlerts/{id} { allow read: if activeUser(); }
     // Thermometer locations changed in Administration > MOCREO & Sensors (the server writes them; the key stays in private/).
     match /tempLocations/{id} { allow read: if activeUser(); }
     match /weeks/{id} { allow read: if activeUser(); }
@@ -56,10 +61,17 @@ service cloud.firestore {
     match /otrMonthly/{id} { allow read: if activeUser(); }
     match /otrMonthRuns/{id} { allow read: if activeUser(); }
     match /otrComments/{id} { allow read: if activeUser(); }
+    // By Date columns Joe adds in OTR Routes Setup (an outside carrier such as Darden).
+    match /otrColumns/{id} { allow read: if activeUser(); }
     match /plantEvents/{id} { allow read: if activeUser(); }
     // The drivers' DVIR inspections (phone.js), one per trailer.
     match /dvirs/{id} { allow read: if activeUser(); }
     match /scorecard/{id} { allow read: if activeUser(); }
+    // Joe 10/13: truck cleanliness ratings (the server writes them through rateTruckClean).
+    match /scorecardRatings/{id} { allow read: if activeUser(); }
+    // Joe 10/13: accidents / incidents and complaints, and excused GPS misses (the server writes them).
+    match /driverIncidents/{id} { allow read: if activeUser(); }
+    match /scorecardExcuses/{id} { allow read: if activeUser(); }
     match /opsAssignments/{id} { allow read: if activeUser(); }
     // The plant side: the plant journal, pickups, and the wash and returns lists.
     match /plantJournal/{id} { allow read: if activeUserOrStation(); }
@@ -69,6 +81,9 @@ service cloud.firestore {
     // The production lines, temperature locations and the lines' last checks.
     match /plantSetup/{id} { allow read: if activeUser(); }
     match /plantProducts/{id} { allow read: if activeUserOrStation(); }
+    // Receiving scan-in: each scan on a delivery, and what the plant receives (saved only through save).
+    match /receivingScans/{id} { allow read: if activeUserOrStation(); }
+    match /receivingItems/{id} { allow read: if activeUserOrStation(); }
     // Each plant's own product areas and groups (Administration > Products).
     match /productSetup/{id} { allow read: if activeUserOrStation(); }
     // Joe 10/13: the plant's products that run on no machine yet (the Product Sheet's lines with no check).

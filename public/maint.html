@@ -9,6 +9,7 @@
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Fleet &amp; Maintenance · Operations</title>
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/maint.css">
   <script src="js/logic.js"></script>
 </head>
 <body class="fill issues-page hub-page">
@@ -58,7 +59,7 @@
     const L = window.UDLogic;
     const KINDS = [['TRUCK', 'Truck Issues', 'maintenance-tractor-v1-560.webp', 'Truck'], ['TRAILER', 'Trailer Issues', 'maintenance-trailer-v1-560.webp', 'Trailer'],
       ['FORK_TRUCK', 'Fork Truck / Pallet Jack Issues', 'forklift-truck-v1-560.webp', 'Fork truck']];
-    const data = { maintenance: [], workOrders: [], equipment: [], fleetSetup: [], odometers: [] };
+    const data = { maintenance: [], workOrders: [], equipment: [], fleetSetup: [], odometers: [], gpsTrucks: [] };
     let rules = null; // Fleet Service Setup's rules (config/fleetRules), over the defaults
     const now = () => Date.now();
     const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
@@ -69,11 +70,7 @@
         e.sourcePresent !== false && !L.unitLeased(e) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
         .map(({ e, type }) => ({ unit: String(e.unit).toUpperCase(), type })).filter(u => !seen[u.unit] && (seen[u.unit] = true));
     }
-    function miles() {
-      const out = {};
-      data.odometers.forEach(o => { const u = String(o.unit || '').toUpperCase(); if (u && (!out[u] || String(o.at) > String(out[u].at))) out[u] = o; });
-      return out;
-    }
+    const miles = () => L.latestReadings(data.odometers, data.gpsTrucks);
     // Polish item 7 (Joe 10/11): a zero is plain grey; the warning colour shows only when there is something to look at.
     const tile = (n, label, href, cls) => '<a class="hub-tile' + (cls && parseFloat(n) > 0 ? ' ' + cls : parseFloat(n) === 0 ? ' zero' : '') + '" href="' + href + '"><b>' + n + '</b><span>' + label + '</span></a>';
 
@@ -113,7 +110,7 @@
     requireSignIn(async () => {
       const { db } = await start();
       onSnapshot(doc(db, 'config', 'fleetRules'), s => { rules = s.exists() ? s.data() : null; render(); }, () => {});
-      Object.keys(data).forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the ' + ({ maintenance: 'write-ups', workOrders: 'work orders', equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles' })[name] + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
+      Object.keys(data).forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the ' + ({ maintenance: 'write-ups', workOrders: 'work orders', equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours' })[name] + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
       render();
     });
   </script>

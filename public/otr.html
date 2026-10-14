@@ -9,6 +9,7 @@
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Over the Road · Operations</title>
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/otr.css">
   <script src="js/logic.js"></script>
   <script src="js/otr-core.js"></script>
 </head>
@@ -35,6 +36,8 @@
         <button type="button" role="tab" data-view="cpg" aria-selected="false">Cost Per Gallon</button>
         <button type="button" role="tab" data-view="routes" aria-selected="false">OTR Routes Setup</button>
       </div>
+      <!-- Joe 10/13: the import button sits in the tab row, on the far right, where it is seen. -->
+      <div class="actions in-head otr-head-act" id="head-act"></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
@@ -46,7 +49,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, save } from './js/app.js';
-    import { watchLists, forScreen, modeLabel, canManage, saveOptimistic } from './js/edit.js';
+    import { watchLists, forScreen, modeLabel, canManage, saveOptimistic, lists } from './js/edit.js';
     import { collection, onSnapshot, query, where } from './js/firebase.js';
 
     // The current app's Over the Road module (OverTheRoad.html, 221/222_V7276): every run of a route ticked for the report is one
@@ -57,21 +60,27 @@
     // Joe 10/11: the tabs are his OTR Trips workbook's four sheets (By Date, Recap, Month Recap, Cost Per Gallon), each laid out
     // like the sheet, with the year-to-date answers and a trend picture on top (his pick B).
     let view = ['dash', 'bydate', 'figures', 'report', 'cpg', 'routes'].indexOf(q.get('view')) >= 0 ? q.get('view') : 'dash';
-    let routes = [], picks = {}, pendingRoutes = {}, runs = [], daily = [], monthly = [], monthRuns = [], comments = [], year = Number(L.operatingDay(new Date()).slice(0, 4)), copied = '';
+    let compareLY = (() => { try { return localStorage.getItem('otrCompareLY') === '1'; } catch (e) { return false; } })();
+    let routes = [], picks = {}, pendingRoutes = {}, extraCols = [], colPanel = false, colFor = '', renaming = '', milesFor = '', pendingMiles = {}, runs = [], daily = [], monthly = [], monthRuns = [], comments = [], year = Number(L.operatingDay(new Date()).slice(0, 4)), copied = '';
     let ym = L.operatingDay(new Date()).slice(0, 7);
     const money = (v) => v == null ? '' : '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
     const cents = (v) => v == null ? '–' : '$' + Number(v).toFixed(3);
     const n0 = (v) => v == null ? '' : Number(v).toLocaleString();
+    // Joe 10/13: money in the Recap boxes reads $732,421.45; gallons and other counts get commas.
+    const dollars = (v) => v == null || v === '' || !Number.isFinite(Number(v)) ? '' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const commas = (v) => v == null || v === '' || !Number.isFinite(Number(v)) ? '' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
     // Joe 10/10: the run is the destination; the setup only says who takes it (a carrier picks it up, or United Dairy delivers).
     const DELIVERED_BY = ['Carrier Pickup', 'United Dairy Delivered'];
+    // Joe 10/13: By Date columns of his own (an outside carrier such as Darden) come after the workbook's, in the order added.
+    const DESTS = () => CORE.DESTINATIONS.concat(extraCols.map(c => c.name).filter(n => CORE.DESTINATIONS.indexOf(n) < 0));
     function otrRoutes() {
       return O.otrRouteList_(routes.filter(r => L.masterActive(r)).map(r => {
         const p = picks[r.id] || {}, miles = {};
         L.DAYS.forEach(d => { miles[d] = r.days && r.days[d] ? r.days[d].miles : ''; });
         // The By Date column the run counts in: picked in OTR Routes Setup, else the column named like the run ("PECK" counts as Peck).
         const named = O.otrNormDest_(r.run);
-        return { runId: r.id, route: r.route, run: r.run, include: p.include ? 'TRUE' : '', destination: p.destination || (CORE.DESTINATIONS.indexOf(named) >= 0 ? named : ''), miles };
+        return { runId: r.id, route: r.route, run: r.run, include: p.include ? 'TRUE' : '', destination: p.destination || (DESTS().indexOf(named) >= 0 ? named : ''), miles, days: r.days || {} };
       })).map(x => Object.assign(x, { deliveredBy: (picks[x.runId] || {}).deliveredBy || '' }));
     }
     // Each date in the copied Live weeks, counted the current app's way (otrCountDay_).
@@ -107,6 +116,7 @@
       const edit = canManage();
       { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Counts from the dispatch sheet'; }
       document.querySelectorAll('.tabs [data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
+      document.getElementById('head-act').innerHTML = view === 'bydate' ? importBar('Import Workbook') : view === 'figures' ? importBar('Import From Accounting') : '';
       const bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
       if (view === 'dash') {
         const dash = O.otrDashboard_(today, merged, todayCount, monthly), c = dash.costPerGallon;
@@ -126,19 +136,19 @@
         const months = []; for (let k = today.slice(0, 7); k >= first; k = prevMonth(k)) months.push(k);
         if (months.indexOf(ym) < 0) months.push(ym);
         const keys = []; for (let d = 1; d <= last; d++) keys.push(O.otrDateKey_(yy, mm, d));
-        const extra = []; keys.forEach(k => Object.keys(merged[k] || {}).forEach(n => { if (CORE.DESTINATIONS.indexOf(n) < 0 && extra.indexOf(n) < 0 && merged[k][n]) extra.push(n); }));
-        const cols = CORE.DESTINATIONS.concat(extra), note = {}, tot = cols.map(() => 0);
+        const extra = []; keys.forEach(k => Object.keys(merged[k] || {}).forEach(n => { if (DESTS().indexOf(n) < 0 && extra.indexOf(n) < 0 && merged[k][n]) extra.push(n); }));
+        const cols = DESTS().concat(extra), note = {}, tot = cols.map(() => 0);
         comments.forEach(c => { if (c.date && c.date.slice(0, 7) === ym) note[c.date] = c.text || ''; });
         const monthTotal = (k) => Object.keys(merged).reduce((s, d) => d.slice(0, 7) === k && d <= today ? s + O.otrSum_(Object.values(merged[d])) : s, 0);
         const lastYear = (yy - 1) + '-' + String(mm).padStart(2, '0'), shownTotal = monthTotal(ym), lyTotal = monthTotal(lastYear);
         bar.innerHTML = '<select id="ym" aria-label="Month">' + months.map(k => '<option value="' + k + '"' + (k === ym ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
-          '<span class="hint">Today\'s row fills from the dispatch board. Type a number to fix a day; it saves by itself.</span><span class="spacer"></span>' + importBar('Import Workbook') + '<button type="button" id="print-sheet-otr">Print</button>';
+          '<span class="hint">Today\'s row fills from the dispatch board. Type a number to fix a day; it saves by itself.</span><span class="spacer"></span>' + importHint() + '<button type="button" id="print-sheet-otr">Print</button>';
         const rows = keys.map(k => {
           const v = merged[k] || {}, future = k > today, sum = O.otrSum_(cols.map(n => v[n] || 0));
           cols.forEach((n, i) => { tot[i] += v[n] || 0; });
           const cells = cols.map(n => {
             const x = v[n] || 0;
-            if (!edit || future || CORE.DESTINATIONS.indexOf(n) < 0) return '<td class="' + (x ? '' : 'z') + '">' + (x || '') + '</td>';
+            if (!edit || future || DESTS().indexOf(n) < 0) return '<td class="' + (x ? '' : 'z') + '">' + (x || '') + '</td>';
             return '<td><input class="otr-day" inputmode="numeric" data-fk="d|' + k + '|' + escapeHtml(n) + '" data-date="' + k + '" data-dest="' + escapeHtml(n) + '" value="' + (x || '') + '" aria-label="' + escapeHtml(n + ' ' + O.otrShortDate_(k)) + '"></td>';
           }).join('');
           return '<tr class="' + (O.otrWeekday_(k) === 0 && k.slice(8) !== '01' ? 'wk ' : '') + (k === today ? 'today' : '') + '"><td class="l"><b>' + ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][O.otrWeekday_(k)] + '</b> ' + dash(k) + '</td>' + cells +
@@ -171,7 +181,7 @@
         }; });
       } else if (view === 'report') {
         // The Month Recap tab: trips per destination, last December then January to December, this year beside last year.
-        const r = O.otrMonthRecap_(year, today, merged, monthRuns, monthly), M = CORE.MONTHS;
+        const r = O.otrMonthRecap_(year, today, merged, monthRuns, monthly, DESTS()), M = CORE.MONTHS;
         bar.innerHTML = '<button type="button" class="primary" id="print-sheet-otr">Print</button><span class="hint">Counted from By Date, nothing to type. Prints on one landscape page.</span><span class="spacer"></span>' + yearPick([0, -1, -2]);
         const pair = (p, i) => (i ? '<td class="gap"></td>' : '') + '<td class="' + (p[0] === 0 ? 'z' : '') + '">' + (p[0] == null ? '' : p[0]) + '</td><td class="ly">' + (p[1] == null ? '' : p[1]) + '</td>';
         const head = '<tr><th class="l" rowspan="2">Trip</th>' + r.months.map((m, i) => (i ? '<th class="gap" rowspan="2"></th>' : '') + '<th colspan="2">' + m.label + '</th>').join('') + '</tr><tr class="sub">' + r.months.map(m => '<th>' + m.y + '</th><th>' + m.py + '</th>').join('') + '</tr>';
@@ -214,21 +224,26 @@
       } else if (view === 'figures') {
         // The Recap tab: the money sheet, a row a month. Type a number and it saves; Import From Accounting fills the month.
         const fm = O.otrFigureMap_(monthly), dis = edit ? '' : ' disabled';
-        bar.innerHTML = importBar('Import From Accounting') + '<span class="hint">Type a month\'s number; it saves by itself. Gray = last year.</span><span class="spacer"></span>' + yearPick([1, 0, -1, -2]);
+        // Joe 10/13: last year's numbers stay out of the way unless he asks for them.
+        bar.innerHTML = importHint() + '<span class="hint">Type a month\'s number; it saves by itself.' + (compareLY ? ' Gray = ' + (year - 1) + '.' : '') + '</span><span class="spacer"></span>' +
+          '<label class="otr-compare"><input type="checkbox" id="otr-compare"' + (compareLY ? ' checked' : '') + '> Compare to last year</label>' + yearPick([1, 0, -1, -2]);
         const COLS = [['miles', 'Miles'], ['fuel_fills', 'Fuel Fills'], ['fuel_used_gal', 'Fuel Used'], ['distribution_cost', 'Del Cost'], ['gallons_sold', 'Gallons Sold'], ['employee_cost', 'Employee Cost'], ['epg', 'Employee Cost Per Gal'], ['fuel_cost', 'FUEL COST'], ['cpg', 'Cost per gallon']];
         const isMoney = (k) => (CORE.FIGURES.find(f => f.key === k) || {}).money;
         sheet.innerHTML = importPreview() + '<table class="issues otr-fig"><thead><tr><th>Month</th>' + COLS.map(c => '<th>' + c[1] + '</th>').join('') + '</tr></thead><tbody>' +
           CORE.MONTHS.map((m, i) => {
             const cur = fm[year + '-' + (i + 1)] || {}, ly = fm[(year - 1) + '-' + (i + 1)] || {};
             const epg = (r) => r.employee_cost != null && r.gallons_sold ? '$' + (r.employee_cost / r.gallons_sold).toFixed(3) : '';
+            const gray = (t) => compareLY ? '<small>' + t + '</small>' : '';
             return '<tr><td class="strong">' + m + ' ' + year + '</td>' + COLS.map(([k, label]) => {
-              if (k === 'epg') return '<td class="strong">' + epg(cur) + '<small>' + epg(ly) + '</small></td>';
-              if (k === 'cpg') return '<td class="strong">' + (O.otrCostPerGallon_(cur) == null ? '' : cents(O.otrCostPerGallon_(cur))) + '<small>' + (O.otrCostPerGallon_(ly) == null ? '' : cents(O.otrCostPerGallon_(ly))) + '</small></td>';
-              return '<td><input class="otr-in" inputmode="decimal" data-fk="f|' + year + '|' + (i + 1) + '|' + k + '" aria-label="' + escapeHtml(m + ' ' + year + ' ' + label) + '" data-m="' + (i + 1) + '" data-k="' + k + '" value="' + escapeHtml(cur[k] == null ? '' : cur[k]) + '"' + dis + '><small>' + (ly[k] == null ? '' : (isMoney(k) ? money(ly[k]) : n0(ly[k]))) + '</small></td>';
+              if (k === 'epg') return '<td class="strong">' + epg(cur) + gray(epg(ly)) + '</td>';
+              if (k === 'cpg') return '<td class="strong">' + (O.otrCostPerGallon_(cur) == null ? '' : cents(O.otrCostPerGallon_(cur))) + gray(O.otrCostPerGallon_(ly) == null ? '' : cents(O.otrCostPerGallon_(ly))) + '</td>';
+              const fmt = isMoney(k) ? dollars : commas;
+              return '<td><input class="otr-in" inputmode="decimal" data-fk="f|' + year + '|' + (i + 1) + '|' + k + '" aria-label="' + escapeHtml(m + ' ' + year + ' ' + label) + '" data-m="' + (i + 1) + '" data-k="' + k + '" value="' + escapeHtml(fmt(cur[k])) + '"' + dis + '>' + gray(ly[k] == null ? '' : (isMoney(k) ? dollars(ly[k]) : commas(ly[k]))) + '</td>';
             }).join('') + '</tr>';
           }).join('') + '</tbody></table>';
         foot.textContent = 'Del Cost, Employee Cost and FUEL COST come from P&L Expenses by Dept; Gallons Sold from Gallon Comparison. Cost per gallon = Del Cost ÷ Gallons Sold.';
         wireYear(); wireImport();
+        document.getElementById('otr-compare').onchange = (e) => { compareLY = e.target.checked; try { localStorage.setItem('otrCompareLY', compareLY ? '1' : '0'); } catch (x) { /* private window */ } render(); };
         sheet.querySelectorAll('.otr-in').forEach(inp => { inp.onchange = () => {
           const m = Number(inp.dataset.m), key = inp.dataset.k, value = inp.value.trim();
           let rec = monthly.find(x => Number(x.year) === year && Number(x.month) === m), made = false, before = rec ? rec[key] : undefined;
@@ -242,11 +257,35 @@
         }; });
       } else {
         const dis = edit ? '' : ' disabled';
-        bar.innerHTML = '<span class="hint">Tick a run and every day it runs counts in its By Date column. Miles come from Route Master; DRAFT miles are not confirmed and not saved.</span>';
-        sheet.innerHTML = '<table class="issues otr-setup"><colgroup><col style="width:7%"><col style="width:9%"><col style="width:24%"><col style="width:22%"><col style="width:22%"><col style="width:16%"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Run</th><th>Delivered By</th><th>By Date column</th><th>Round-trip miles</th></tr></thead><tbody>' +
+        // Joe 10/13: the miles are Route Master's (the Route Editor's Mileage view); a wrong number is fixed here and saved there.
+        // On the live app the miles box waits for Joe's OK (config/app.otrMilesToRouteMaster); the test copy always has it.
+        const testCopy = /sandbox|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
+        const milesEdit = edit && L.screenState(lists.app, 'routes').open && (testCopy || !!(lists.app.otrMilesToRouteMaster && lists.app.otrMilesToRouteMaster.enabled === true));
+        bar.innerHTML = '<span class="hint">Tick a run and every day it runs counts in its By Date column. Miles are Route Master\'s' + (milesEdit ? '; click one to fix it' : '') + '. DRAFT miles are not confirmed.</span><span class="spacer"></span>' +
+          (edit ? '<button type="button" id="otr-cols"' + (colPanel ? ' aria-expanded="true"' : '') + '>By Date Columns</button>' : '');
+        const own = extraCols.filter(c => CORE.DESTINATIONS.indexOf(c.name) < 0), used = {};
+        list.forEach(r => { if (r.destination) used[r.destination] = (used[r.destination] || 0) + 1; });
+        const panel = !edit || !colPanel ? '' : '<div class="otr-import otr-cols"><b>By Date columns you added</b>' +
+          '<p>The workbook\'s ' + CORE.DESTINATIONS.length + ' columns always stay. A column you added can be renamed or removed while no run uses it.</p>' +
+          (own.length ? '<table><tbody>' + own.map(c => '<tr><td>' + (renaming === c.id ? '<input class="otr-col-in" data-fk="cr|' + escapeHtml(c.id) + '" data-rename="' + escapeHtml(c.id) + '" value="' + escapeHtml(c.name) + '" maxlength="40" aria-label="' + escapeHtml('New name for ' + c.name) + '">' : '<b>' + escapeHtml(c.name) + '</b>') + '</td><td>' +
+            (used[c.name] ? 'Used by ' + used[c.name] + (used[c.name] === 1 ? ' run' : ' runs') : 'Not used yet') + '</td><td>' +
+            (renaming === c.id ? '<button type="button" class="primary" data-col-save="' + escapeHtml(c.id) + '">Save</button> <button type="button" data-col-cancel>Cancel</button>'
+              : used[c.name] ? '' : '<button type="button" data-col-rename="' + escapeHtml(c.id) + '">Rename</button> <button type="button" data-col-remove="' + escapeHtml(c.id) + '">Remove</button>') + '</td></tr>').join('') + '</tbody></table>'
+            : '<p>None yet.</p>') +
+          '<div class="otr-col-add"><label for="otr-col-new">New column' + (colFor ? ' for ' + escapeHtml((list.find(x => x.runId === colFor) || {}).run || '') : '') + '</label><input id="otr-col-new" class="otr-col-in" data-fk="cn" maxlength="40" placeholder="Name, like Darden" autocomplete="off">' +
+          '<button type="button" class="primary" id="otr-col-add">Add Column</button><button type="button" id="otr-col-close">Close</button></div></div>';
+        const milesCell = (r) => {
+          const shown = r.miles ? n0(r.miles) : r.draftMiles ? n0(r.draftMiles) + ' <span class="pill warn">DRAFT</span>' : '';
+          if (!milesEdit) return shown;
+          if (milesFor === r.runId) return '<span class="otr-miles-edit"><input class="otr-miles-in" inputmode="numeric" data-fk="m|' + escapeHtml(r.runId) + '" data-miles-in="' + escapeHtml(r.runId) + '" value="' + (r.miles || r.draftMiles || '') + '" aria-label="' + escapeHtml('Round-trip miles for ' + r.route + ' ' + r.run) + '">' +
+            '<button type="button" class="primary" data-miles-save="' + escapeHtml(r.runId) + '">Save</button><button type="button" data-miles-cancel>Cancel</button></span>';
+          return '<button type="button" class="otr-miles" data-miles="' + escapeHtml(r.runId) + '" title="' + escapeHtml('Fix the round-trip miles for ' + r.route + ' ' + r.run + ' (saved in Route Master)') + '">' + (shown || 'Add miles') + '</button>';
+        };
+        sheet.innerHTML = panel + '<table class="issues otr-setup"><colgroup><col style="width:7%"><col style="width:9%"><col style="width:22%"><col style="width:21%"><col style="width:21%"><col style="width:20%"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Run</th><th>Delivered By</th><th>By Date column</th><th>Round-trip miles</th></tr></thead><tbody>' +
           list.map(r => '<tr' + (r.include ? ' class="otr-on"' : '') + '><td><input type="checkbox" aria-label="' + escapeHtml('Include ' + r.route + ' ' + r.run) + '" data-inc="' + escapeHtml(r.runId) + '"' + (r.include ? ' checked' : '') + dis + '></td><td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td><td><select aria-label="' + escapeHtml('Delivered by for ' + r.route + ' ' + r.run) + '" data-by="' + escapeHtml(r.runId) + '"' + dis + '><option value="">Choose who delivers</option>' +
             DELIVERED_BY.map(d => '<option' + (d === r.deliveredBy ? ' selected' : '') + '>' + escapeHtml(d) + '</option>').join('') + '</select></td><td><select aria-label="' + escapeHtml('By Date column for ' + r.route + ' ' + r.run) + '" data-col="' + escapeHtml(r.runId) + '"' + dis + '><option value="">Choose a column</option>' +
-            CORE.DESTINATIONS.concat(CORE.DESTINATIONS.indexOf(r.destination) < 0 && r.destination ? [r.destination] : []).map(d => '<option value="' + escapeHtml(d) + '"' + (d === r.destination ? ' selected' : '') + '>' + escapeHtml(d) + '</option>').join('') + '</select></td><td>' + (r.miles ? n0(r.miles) : r.draftMiles ? n0(r.draftMiles) + ' <span class="pill warn">DRAFT</span>' : '') + '</td></tr>').join('') + '</tbody></table>';
+            DESTS().concat(DESTS().indexOf(r.destination) < 0 && r.destination ? [r.destination] : []).map(d => '<option value="' + escapeHtml(d) + '"' + (d === r.destination ? ' selected' : '') + '>' + escapeHtml(d) + '</option>').join('') +
+            (edit ? '<option value="__add__">+ Add column…</option>' : '') + '</select></td><td>' + milesCell(r) + '</td></tr>').join('') + '</tbody></table>';
         foot.textContent = list.filter(r => r.include).length + ' of ' + list.length + ' active runs are on the OTR report.';
         const saveRoute = (r, include, deliveredBy, column) => {
           const runId = r.runId, destination = column || r.destination, before = picks[runId] ? Object.assign({}, picks[runId]) : null;
@@ -258,8 +297,73 @@
         sheet.querySelectorAll('[data-inc]').forEach(c => { c.onchange = () => { const r = list.find(x => x.runId === c.dataset.inc); if (c.checked && !r.deliveredBy) { c.checked = false; showError('Choose who delivers ' + r.route + ' ' + r.run + ' before including it.'); return; }
           if (c.checked && !r.destination) { c.checked = false; showError('Choose the By Date column for ' + r.route + ' ' + r.run + ' before including it.'); return; } showError(''); saveRoute(r, c.checked, r.deliveredBy); }; });
         // Joe 10/11: each run counts in one of the By Date columns of his workbook; the run's name picks it when it matches.
-        sheet.querySelectorAll('[data-col]').forEach(s => { s.onchange = () => { const r = list.find(x => x.runId === s.dataset.col); if (!s.value && r.include) { showError('Untick ' + r.route + ' before clearing its By Date column.'); render(); return; } showError(''); saveRoute(r, r.include, r.deliveredBy, s.value); }; });
+        sheet.querySelectorAll('[data-col]').forEach(s => { s.onchange = () => { const r = list.find(x => x.runId === s.dataset.col);
+          if (s.value === '__add__') { colPanel = true; colFor = r.runId; render(); const n = document.getElementById('otr-col-new'); if (n) { n.focus(); n.scrollIntoView({ block: 'nearest' }); } return; }
+          if (!s.value && r.include) { showError('Untick ' + r.route + ' before clearing its By Date column.'); render(); return; } showError(''); saveRoute(r, r.include, r.deliveredBy, s.value); }; });
         sheet.querySelectorAll('[data-by]').forEach(s => { s.onchange = () => { const r = list.find(x => x.runId === s.dataset.by); if (!s.value && r.include) { showError('Untick ' + r.route + ' before clearing who delivers it.'); render(); return; } saveRoute(r, r.include, s.value); }; });
+        // By Date columns of Joe's own: add, rename, remove (the server refuses a rename or remove while a run or a day uses it).
+        const colsBtn = document.getElementById('otr-cols');
+        if (colsBtn) colsBtn.onclick = () => { colPanel = !colPanel; colFor = ''; renaming = ''; render(); };
+        const close = document.getElementById('otr-col-close');
+        if (close) close.onclick = () => { colPanel = false; colFor = ''; renaming = ''; render(); };
+        const colSave = (fields, apply, undo) => saveOptimistic('saveOtr', Object.assign({ op: 'column' }, fields), apply, undo, render);
+        const addCol = () => {
+          const box = document.getElementById('otr-col-new'), name = box.value.trim().replace(/\s+/g, ' ');
+          if (!name) { showError('Type the name of the new column.'); box.focus(); return; }
+          if (DESTS().some(d => d.toUpperCase() === name.toUpperCase())) { showError(name + ' is already a column.'); box.focus(); return; }
+          showError('');
+          const temp = { id: 'new-' + Date.now(), name, createdAt: new Date().toISOString() }, forRun = list.find(x => x.runId === colFor);
+          box.value = '';
+          colSave({ verb: 'add', name }, () => { extraCols = extraCols.concat([temp]); colFor = ''; }, () => { extraCols = extraCols.filter(c => c !== temp); }).then(ok => {
+            // Added from a run's drop-down: that run counts in the new column.
+            if (ok && forRun) saveRoute(forRun, forRun.include, forRun.deliveredBy, name);
+          });
+        };
+        const addBtn = document.getElementById('otr-col-add');
+        if (addBtn) addBtn.onclick = addCol;
+        const newBox = document.getElementById('otr-col-new');
+        if (newBox) newBox.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); addCol(); } if (e.key === 'Escape') { colPanel = false; colFor = ''; render(); } };
+        sheet.querySelectorAll('[data-col-rename]').forEach(b => { b.onclick = () => { renaming = b.dataset.colRename; render(); const i = sheet.querySelector('[data-rename]'); if (i) { i.focus(); i.select(); } }; });
+        sheet.querySelectorAll('[data-col-cancel]').forEach(b => { b.onclick = () => { renaming = ''; render(); }; });
+        const renameCol = (id) => {
+          const c = extraCols.find(x => x.id === id), box = sheet.querySelector('[data-rename="' + CSS.escape(id) + '"]'), newName = box ? box.value.trim().replace(/\s+/g, ' ') : '';
+          if (!c) return;
+          if (!newName) { showError('Type the new name for ' + c.name + '.'); return; }
+          if (newName !== c.name && DESTS().some(d => d.toUpperCase() === newName.toUpperCase() && d !== c.name)) { showError(newName + ' is already a column.'); return; }
+          showError(''); renaming = '';
+          if (newName === c.name) { render(); return; }
+          const old = c.name;
+          colSave({ verb: 'rename', name: old, newName }, () => { c.name = newName; }, () => { c.name = old; });
+        };
+        sheet.querySelectorAll('[data-col-save]').forEach(b => { b.onclick = () => renameCol(b.dataset.colSave); });
+        sheet.querySelectorAll('[data-rename]').forEach(i => { i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); renameCol(i.dataset.rename); } if (e.key === 'Escape') { renaming = ''; render(); } }; });
+        sheet.querySelectorAll('[data-col-remove]').forEach(b => { b.onclick = () => {
+          const c = extraCols.find(x => x.id === b.dataset.colRemove), at = extraCols.indexOf(c);
+          if (!c) return;
+          colSave({ verb: 'remove', name: c.name }, () => { extraCols = extraCols.filter(x => x !== c); }, () => { extraCols.splice(at, 0, c); });
+        }; });
+        // Round-trip miles: a click opens the box; Save writes the miles on every day the run runs in Route Master.
+        sheet.querySelectorAll('[data-miles]').forEach(b => { b.onclick = () => { milesFor = b.dataset.miles; render(); const i = sheet.querySelector('[data-miles-in]'); if (i) { i.focus(); i.select(); } }; });
+        sheet.querySelectorAll('[data-miles-cancel]').forEach(b => { b.onclick = () => { milesFor = ''; showError(''); render(); }; });
+        const saveMiles = (runId) => {
+          const r = list.find(x => x.runId === runId), box = sheet.querySelector('[data-miles-in="' + CSS.escape(runId) + '"]'), t = box ? box.value.trim().replace(/,/g, '') : '';
+          const m = Number(t);
+          if (!/^\d+$/.test(t) || m < 1 || m > 5000) { showError('Type the round-trip miles for ' + r.route + ' ' + r.run + ' as a whole number (1 to 5,000).'); if (box) box.focus(); return; }
+          showError(''); milesFor = '';
+          const route = routes.find(x => x.id === runId);
+          if (!route || m === r.miles) { render(); return; }
+          // The days the run runs (or already has miles); a run with none gets every day, as the Mileage view would.
+          let days = L.DAYS.filter(d => route.days && route.days[d] && (route.days[d].active === true || (route.days[d].miles != null && route.days[d].miles !== '')));
+          if (!days.length) days = L.DAYS.slice();
+          const want = {}, mine = {};
+          days.forEach(d => { want[d] = { miles: String(m) }; mine[d] = m; });
+          const before = JSON.parse(JSON.stringify(route.days || {}));
+          pendingMiles[runId] = mine;
+          saveOptimistic('saveRoute', { runId, fields: {}, days: want, from: 'otr' }, () => { route.days = route.days || {}; days.forEach(d => { route.days[d] = Object.assign({}, route.days[d], { miles: m }); }); },
+            () => { if (pendingMiles[runId] === mine) delete pendingMiles[runId]; route.days = before; }, render).then(() => { if (pendingMiles[runId] === mine) delete pendingMiles[runId]; });
+        };
+        sheet.querySelectorAll('[data-miles-save]').forEach(b => { b.onclick = () => saveMiles(b.dataset.milesSave); });
+        sheet.querySelectorAll('[data-miles-in]').forEach(i => { i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); saveMiles(i.dataset.milesIn); } if (e.key === 'Escape') { milesFor = ''; render(); } }; });
       }
       bar.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { view = b.dataset.go; render(); }; });
       sheet.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { view = b.dataset.go; render(); }; });
@@ -308,9 +412,10 @@
     // Import (By Date: Import Workbook; Recap: Import From Accounting) - the same reader takes the OTR Trips workbook or the accounting zip.
     function importBar(label) {
       const edit = canManage();
-      return imp && imp.merged ? '<button type="button" class="primary" id="imp-use"' + (imp.busy || !edit ? ' disabled' : '') + '>' + (imp.busy || 'Use These Numbers') + '</button><button type="button" id="imp-cancel"' + (imp.busy ? ' disabled' : '') + '>Cancel</button><span class="hint">Check what was found in ' + escapeHtml(imp.file) + ', then press Use These Numbers.</span>'
+      return imp && imp.merged ? '<button type="button" class="primary" id="imp-use"' + (imp.busy || !edit ? ' disabled' : '') + '>' + (imp.busy || 'Use These Numbers') + '</button><button type="button" id="imp-cancel"' + (imp.busy ? ' disabled' : '') + '>Cancel</button>'
         : '<button type="button" id="imp-pick"' + (edit && !(imp && imp.busy) ? '' : ' disabled') + '>' + (imp && imp.busy ? escapeHtml(imp.busy) : label) + '</button><input type="file" id="imp-file" accept=".zip,.xlsx,.xls" hidden>';
     }
+    function importHint() { return imp && imp.merged ? '<span class="hint">Check what was found in ' + escapeHtml(imp.file) + ', then press Use These Numbers.</span>' : ''; }
     function importPreview() {
       return imp && imp.merged ? '<div class="otr-import"><b>Found in ' + escapeHtml(imp.file) + '</b>' + (imp.merged.summary.length ? '<table><tbody>' + imp.merged.summary.map(l => '<tr><td class="strong">' + escapeHtml(l.what) + '</td><td>' + escapeHtml(l.count) + '</td><td>' + escapeHtml(l.from) + ' – ' + escapeHtml(l.to) + '</td><td>' + (l.changed ? l.changed + ' differ from what is saved' : l.total != null ? n0(l.total) + ' runs' : '') + '</td></tr>').join('') + '</tbody></table>' : '<p>Nothing was found in this file. Use your OTR Trips workbook (By Date, Recap) or the accounting package zip (P&amp;L Expenses by Dept, Gallon Comparison).</p>') + '</div>' : '';
     }
@@ -384,20 +489,22 @@
       } catch (e) { imp = Object.assign({}, imp, { busy: '' }); showError(e.message || String(e)); }
       render();
     }
-    document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; render(); } });
+    document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { if (b.dataset.view !== view) showError(''); view = b.dataset.view; render(); } });
     window.udBack = () => { if (view !== 'dash') { view = 'dash'; render(); return true; } return false; };
 
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + name + ': ' + e.message));
-      watch('routes', v => { routes = v; });
+      // Miles still saving stay on screen when a Route Master update lands first.
+      watch('routes', v => { routes = v; Object.keys(pendingMiles).forEach(id => { const r = routes.find(x => x.id === id); if (r) { r.days = Object.assign({}, r.days); Object.keys(pendingMiles[id]).forEach(d => { r.days[d] = Object.assign({}, r.days[d], { miles: pendingMiles[id][d] }); }); } }); });
       watch('runs', v => { runs = v; });
       watch('otrRoutes', v => { picks = {}; v.forEach(p => { picks[p.runId] = { include: p.include === true, destination: p.destination || '', deliveredBy: p.deliveredBy || '' }; }); Object.keys(pendingRoutes).forEach(id => { picks[id] = pendingRoutes[id]; }); });
       dbRef = db; needDays();
       watch('otrMonthly', v => { monthly = v; pendingFigures.forEach(put => put()); });
       watch('otrMonthRuns', v => { monthRuns = v; });
       watch('otrComments', v => { comments = v; });
+      watch('otrColumns', v => { extraCols = v.filter(c => c.name).sort((a, b) => String(a.createdAt || '') < String(b.createdAt || '') ? -1 : 1); });
     });
   </script>
 </body>

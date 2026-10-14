@@ -1,0 +1,58 @@
+/* maint.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.hub-page .head .hub-tiles { margin-left: auto; }
+.hub-tiles > a.button { gap: 6px; max-width: 150px !important; min-width: 120px !important; }
+.hub-tiles > a.button img { width: 34px; height: 30px; object-fit: contain; flex: none; }
+.hub-view { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; padding-bottom: 14px; }
+.hub-page .kpis b { font-size: 34px; }
+.hub-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin: 0 16px; align-items: start; }
+.hub-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.hub-card { background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.hub-card.garage { border-top-color: #1d7a3e; }
+.hub-card-head { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; }
+.hub-card-head:hover strong { text-decoration: underline; }
+.hub-big { display: flex; flex-direction: column; align-items: flex-end; }
+.hub-big b { font-size: 44px; line-height: 1; color: var(--ud-blue-dark); }
+.hub-tiles4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.hub-tile { background: var(--band); border-radius: 9px; padding: 8px 4px; text-align: center; text-decoration: none; color: var(--ink); display: flex; flex-direction: column; gap: 2px; min-height: 64px; justify-content: center; }
+.hub-tile:hover { background: #d8e6f3; }
+.hub-tile b { font-size: 24px; color: var(--ud-blue-dark); line-height: 1.05; }
+.hub-tile.warn b { color: #b45f00; }
+.hub-tile.good b { color: #1d7a3e; }
+.hub-latest { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.hub-latest h2 { margin: 0; padding: 12px 16px; font-size: 18px; color: var(--ud-blue-dark); background: var(--band); }
+.hub-latest table { width: 100%; table-layout: fixed; }
+.hub-latest tbody tr { cursor: pointer; }
+.hub-latest td.wrong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.issues-page .hub-latest table.issues th { height: 40px; }
+@media (max-width: 1500px) {
+  .hub-body { grid-template-columns: 1fr; }
+  .hub-card-head { grid-template-columns: 72px 1fr auto; }
+}
+.hub-tiles > a.button { max-width: none !important; min-width: var(--top-btn-w, 0) !important; width: var(--top-btn-w, auto) !important; }
+.hub-tiles > a.button span { white-space: nowrap; }
+/* Review item 42 (Joe 10/13): Fleet & Maintenance. The four cards sit two by two on the left; each small tile is a wide line with
+   a bigger number and a 16px label on one line (two tiles to a row); Latest write-ups runs the full height on the right. */
+@media (min-width: 1200px) {
+  .hub-page .hub-view { overflow: hidden; }
+  .hub-page .hub-body { flex: 1 0 auto; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); align-items: stretch; min-height: 0; }
+  .hub-page .hub-cards { align-content: start; }
+  .hub-page .hub-latest { contain: size; overflow: auto; }
+  .hub-page .hub-latest h2 { position: sticky; top: 0; z-index: 2; }
+  .hub-page .hub-latest table.issues thead th { position: sticky; top: 48px; z-index: 1; }
+  /* The narrower list: room for a six-digit unit and "Fork truck". */
+  .hub-page .hub-latest col:nth-child(1) { width: 21% !important; }
+  .hub-page .hub-latest col:nth-child(2) { width: 18% !important; }
+  .hub-page .hub-latest col:nth-child(3) { width: 39% !important; }
+  .hub-page .hub-latest col:nth-child(4) { width: 22% !important; }
+}
+.hub-page .hub-card-head { grid-template-columns: 72px 1fr auto; }
+.hub-page .hub-card-head img, .hub-page .hub-wrench { width: 72px; height: 58px; }
+.hub-page .hub-tiles4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.hub-page .hub-tile { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; min-height: 42px; padding: 4px 10px; text-align: left; }
+.hub-page .hub-tile b { font-size: 26px; min-width: 30px; text-align: right; flex: none; }
+.hub-page .hub-tile span { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #415264; }
+.hub-latest table.issues thead th { position: sticky; top: 0; z-index: 1; }
+@media (max-width: 1199.98px) {
+  .hub-page .hub-latest { overflow: clip; }
+}

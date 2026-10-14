@@ -1,0 +1,59 @@
+/* drivers.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.split-main { min-width: 0; }
+.split-side { display: flex; flex-direction: column; gap: 10px; height: calc(100vh - 158px); min-height: 0; }
+.summary .m-active { background: #16a34a14; }
+.summary .m-active b { color: #16a34a; }
+.summary .m-relief { background: #d9770614; }
+.summary .m-relief b { color: #d97706; }
+.summary .m-inactive { background: #64748b14; }
+.summary .m-inactive b { color: #64748b; }
+.panel-empty { margin: auto; text-align: center; color: var(--muted); font-weight: 500; line-height: 1.5; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; }
+.panel-head h2 { margin: 0; font-size: 20px; color: var(--ud-blue-dark); }
+.panel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.panel-facts { display: flex; justify-content: space-between; }
+label.panel-check { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 16px; color: var(--ink); letter-spacing: 0; }
+.panel-state { display: flex; justify-content: space-between; align-items: center; background: var(--band); border-radius: 8px; padding: 6px 10px; }
+.panel-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: auto; }
+@media (max-height: 720px) {
+  .split-side { height: calc(100vh - 138px); }
+}
+.drivers-page { --row: 40px; --font: 17px; }
+.drivers-page .split .sheet { overflow: auto; }
+.drivers-page .sheet td.name { cursor: pointer; }
+.drivers-page .sheet td.name:hover { text-decoration: underline; }
+.drivers-page button.edit, .drivers-page input.truck { font-size: 16px; height: 34px; max-height: none; }
+.relief-yes { display: inline-block; padding: 2px 12px; border-radius: 10px; background: #dff4f1; color: #0b6b5e; font-size: 16px; font-weight: 800; text-transform: uppercase; }
+.drivers-page .panel-empty { font-size: 16px; }
+.drivers-page .panel label, .drivers-page .panel-check { font-size: 16px; }
+/* Relief has its own column on the Driver Roster, so the small tag beside the name is not shown. */
+.drivers-page td.name .chip { display: none; }
+@media (max-width: 1500px) {
+  .drivers-page .sheet thead th { font-size: 16px; padding: 0 4px; letter-spacing: 0; white-space: normal; line-height: 1.1; }
+  .drivers-page .sheet td.name { font-size: 16px; }
+  .drivers-page .sheet td .status, .drivers-page .sheet td .pill { font-size: 16px; padding: 2px 6px; }
+  .drivers-page button.edit, .drivers-page input.truck { font-size: 16px; height: 30px; }
+}
+.drivers-page { --font: 17px; }
+.split.closed .split-side { order: -1; height: auto; }
+/* Joe 10/13 Driver Roster: accidents and complaints counts and entry under Edit. */
+.drivers-page .panel { overflow-y: auto; }
+.drivers-page td.inc-count { text-align: center; white-space: normal; line-height: 1.1; }
+.drivers-page .inc-n { color: #b42318; }
+.inc-review { color: #8a5a00; font-weight: 700; font-size: 16px; }
+.inc-box { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.inc-box h3, .inc-form h3 { margin: 0; font-size: 17px; color: var(--ud-blue-dark); }
+.inc-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 6px; background: #f4f8fb; font-size: 16px; }
+.inc-item.inc-pending { background: #fff6e0; color: #8a5a00; }
+.inc-item select { margin-left: auto; height: 34px; font: inherit; font-size: 16px; }
+.inc-add { display: flex; gap: 6px; flex-wrap: wrap; }
+.inc-add button { min-height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.inc-form { display: flex; flex-direction: column; gap: 6px; background: #f7fbfe; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.inc-form .panel-actions { margin-top: 4px; }
+.drivers-page #incidents-link { color: var(--ud-blue); font-weight: 700; white-space: nowrap; }
+.inc-box h3 a { font-size: 16px; font-weight: 700; margin-left: 8px; color: var(--ud-blue); }
+.drivers-page .sheet thead th { white-space: normal; line-height: 1.1; overflow-wrap: normal; }
+.inc-form .panel-row > label { min-width: 0; }
+.inc-form input[type=text], .inc-form input[type=date], .inc-form select, .inc-form textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.inc-item .inc-state { margin-left: auto; color: #4a5b6c; font-weight: 700; }

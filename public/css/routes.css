@@ -1,0 +1,81 @@
+/* routes.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.selectors { display: flex; gap: 10px; }
+.selectors label { display: grid; gap: 3px; font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.selectors select, #active-filter, #seq-day { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; background: #fff; color: var(--ink); min-width: 150px; }
+.seq-day { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+table.routes td.norun { background: #eef2f6 !important; }
+table.routes td.pick-one { height: 120px; }
+/* Route Editor: readable rows and print; the grid scrolls inside its box with the headings fixed on top. */
+.routes-page { --row: 40px; --font: 16px; }
+.routes-page .sheet#sheet { overflow: auto; }
+.routes-page table.routes thead th { position: sticky; top: 0; z-index: 2; }
+.routes-page table.routes.days td:has(> button[data-runday]) { padding: 3px 4px; }
+.routes-page table.routes.days button[data-runday] { width: 100%; height: 32px; border-radius: 7px; font-size: 16px; font-weight: 800; }
+.routes-page table.routes.days td:has(> button[data-runday]:not(.on)) { background: #171c20; }
+.routes-page table.routes.days button[data-runday]:not(.on) { background: #171c20; color: #9aa7b3; border-color: #171c20; }
+.routes-page table.routes.days button[data-runday].on { background: #f4f8fb; color: #0e3a62; border: 1px solid #bfd1e0; }
+/* Route Editor · Show / Hide Rules: each true/false the screens read, as a clear YES / NO / BLANK. */
+.routes-page table.routes.rules td:has(> button.rule) { padding: 3px 6px; }
+.routes-page table.routes.rules button.rule { width: 100%; height: 32px; border-radius: 7px; font-size: 16px; font-weight: 800; border: 1px solid transparent; cursor: pointer; }
+.routes-page table.routes.rules button.rule:disabled { cursor: default; }
+.routes-page table.routes.rules button.rule.yes { background: #e3f3e8; color: #1c6b3a; border-color: #a9d8b8; }
+.routes-page table.routes.rules button.rule.no { background: #171c20; color: #e8edf2; border-color: #171c20; }
+.routes-page table.routes.rules button.rule.blank { background: #f1f3f5; color: #7a8794; border: 1px dashed #b7c2cc; }
+.routes-page table.routes.rules b.shown { color: #1c6b3a; }
+.routes-page table.routes.rules b.off { color: #b3261e; }
+.routes-page table.routes.rules td.why { text-align: left; white-space: normal; font-size: var(--font); }
+.routes-page { --font: 16px; }
+.routes-page table.routes.days button[data-runday].on { background: #e3f3e8; color: #1c6b3a; border: 1px solid #a9d8b8; }
+.routes-page table.routes.days button.edit-route { width: 100%; max-width: 130px; font-weight: 800; background: #fff; color: var(--ud-blue); border: 1px solid #1d5b91; }
+.routes-page table.routes.days button.edit-route:hover { background: #1d5b91; color: #fff; }
+table.day-table { table-layout: fixed; }
+table.day-table tr.off td:not(:nth-child(2)) { background: #f1f3f5 !important; color: #7a8794; }
+table.day-table input.dcell { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 7px; text-align: center; font: inherit; color: var(--ink); background: #fff; }
+table.day-table input.dcell:focus { border-color: var(--ud-blue); outline: none; }
+table.day-table button[data-runday] { width: 100%; height: 34px; border-radius: 7px; font-weight: 800; font-size: 16px; border: 1px solid #171c20; background: #171c20; color: #e8edf2; cursor: pointer; }
+table.day-table button[data-runday].on { background: #e3f3e8; color: #1c6b3a; border-color: #a9d8b8; }
+.day-table input.dcell::placeholder { color: #9aa7b4; font-style: italic; font-weight: 400; }
+/* Route Editor tools (old Route Editor, review item 14): Recap totals, Load Order up / down, Route Details for many runs. */
+.routes-page .recap-totals { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 0 16px 8px; }
+.routes-page .recap-totals > div { padding: 10px 8px; text-align: center; background: #edf6ff; border: 1px solid #c6dced; border-radius: 12px; color: #0e3a62; }
+.routes-page .recap-totals strong { display: block; font-size: 28px; line-height: 1.1; }
+.routes-page .recap-totals span { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.routes-page .recap-totals p { grid-column: 1 / -1; margin: 0; font-size: 16px; color: var(--muted); }
+.routes-page .recap-totals[hidden] { display: none; }
+.routes-page table.routes.recap tfoot td { text-align: center; position: sticky; bottom: 0; z-index: 1; background: #e3edf6; font-weight: 800; color: #0e3a62; border-top: 2px solid #9fbbe0; }
+.routes-page table.routes.seq td.move { padding: 3px 4px; white-space: nowrap; }
+.routes-page table.routes.many td:has(> select.rf) { padding: 3px 4px; }
+.routes-page table.routes.many select.rf { width: 100%; height: 34px; border: 1px solid #c5d3df; border-radius: 6px; font: inherit; font-weight: 700; color: var(--ink); background: #fff; }
+.routes-page table.routes.many input[type="checkbox"].rf { width: 22px; height: 22px; margin: 0; cursor: pointer; accent-color: #0e4f87; }
+.routes-page table.routes.many input[type="checkbox"].rf:disabled { cursor: default; }
+.routes-page .name-help { margin: 0 16px 8px; padding: 8px 12px; background: #edf6ff; border: 1px solid #c6dced; border-radius: 10px; color: #0e3a62; font-size: 16px; font-weight: 600; line-height: 1.35; }
+.routes-page .name-help b { font-weight: 800; }
+table.routes td.name-cell { padding: 2px 4px; text-align: left; }
+table.routes caption.name-help { caption-side: top; text-align: left; margin: 0 0 8px; }
+table.routes td.screen-name { text-align: left; color: var(--ud-blue); }
+/* Review item 7 (Joe 10/13): the Route Editor's top line holds the title, the buttons and then the filters on the right. */
+@media (min-width: 701px) {
+  .routes-page .head { flex-wrap: nowrap; align-items: flex-end; gap: 10px; }
+  .routes-page .head .title { flex: none; }
+  .routes-page .head .actions.in-head.top-row { order: 2; margin-left: 0; flex-wrap: nowrap; }
+  .routes-page .head .selectors { order: 3; margin-left: auto; flex: none; }
+  .routes-page .head .selectors select, .routes-page #active-filter { min-width: 0; }
+  .routes-page #route-select { width: 130px; }
+  .routes-page #run-select { width: 150px; }
+  .routes-page #view-select { width: 196px; }
+  .routes-page #active-filter { width: 140px; }
+}
+.routes-page table.routes.days button[data-runday] { padding: 0 2px; white-space: nowrap; letter-spacing: -.01em; }
+/* Review item 56 (Joe 10/13): with 16px text, Route Days' Show / Hide Rules top line ran past the edge on a laptop (1366), so the
+   four buttons lost their even width. "Only runs hidden on Weekly" now sits on two short lines beside its box. */
+.routes-page #hidden-box { max-width: 190px; white-space: normal; line-height: 1.15; }
+.routes-page #hidden-box input { flex: none; }
+/* Review item 56 follow-up: with the online checker's wider letters, Load Order's Day box pushed the even buttons past the
+   right edge at 1366. On a laptop Route Days' buttons keep a little less padding and the Day word sits above its box. */
+@media (max-width: 1500px) {
+  .routes-page .head .actions.in-head.top-row .actions.tiles > :is(button, a.button), .routes-page .actions.tiles > :is(button, a.button) { padding: 0 8px; }
+  .routes-page #seq-day-box { flex-direction: column; align-items: flex-start; gap: 0; line-height: 1; }
+  .routes-page #seq-day { height: 30px; }
+  .routes-page #hidden-box { max-width: 170px; }
+}

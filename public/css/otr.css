@@ -1,0 +1,94 @@
+/* otr.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.otr-dash { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; padding: 4px; }
+.otr-card.wide { grid-column: 1 / -1; }
+.otr-big { font-size: 56px; font-weight: 800; color: #123f70; line-height: 1; }
+.otr-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+.otr-week div { display: flex; flex-direction: column; align-items: center; padding: 10px; border: 1px solid #d5e1eb; border-radius: 10px; }
+.otr-week div.today { background: #e3f3e8; border-color: #a9d8b8; }
+.otr-fig input.otr-in { width: 100%; height: 32px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: right; padding: 0 6px; font: inherit; font-size: 16px; }
+#otr-report h2 { margin: 4px; font-size: 18px; color: var(--ud-blue); }
+.otr-page .actions select { min-height: 38px; padding: 0 10px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-weight: 700; }
+.otr-setup select { box-sizing: border-box; width: 88%; max-width: 380px; height: 40px; padding: 0 36px 0 12px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-size: 16px; font-weight: 700; color: var(--ud-blue); text-align: left; cursor: pointer;
+  appearance: none; -webkit-appearance: none; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%230b4f8a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.otr-setup select:hover { border-color: var(--ud-blue); }
+.otr-setup select:focus { border-color: var(--ud-blue); outline: 2px solid #3978aa55; outline-offset: 1px; }
+.otr-setup select:has(option[value=""]:checked) { color: #6b7d8f; font-weight: 600; }
+.otr-setup select option { color: var(--ink); font-weight: 600; }
+.otr-setup select:disabled { background-color: #eef2f6; color: #7a8797; cursor: not-allowed; }
+.otr-setup input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; vertical-align: middle; }
+.otr-import { margin: 6px 6px 10px; padding: 10px 14px; border: 1px solid #a9c4dc; border-radius: 10px; background: #eef5fb; }
+.otr-import b { color: var(--ud-blue); font-size: 16px; }
+.otr-import table { width: auto; margin-top: 6px; border-collapse: collapse; }
+.otr-import td { padding: 3px 14px 3px 0; font-size: 16px; text-align: left; border: 0; height: auto; }
+.otr-page .hint { font-size: 16px; }
+.otr-page .sheet:has(.otr-sheet) { background: transparent; border: 0; }
+.otr-kc { display: flex; gap: 12px; margin: 0 0 12px; }
+.otr-kc.grid { display: grid; grid-template-columns: 1fr 1fr; flex: 1; margin: 0; }
+.otr-kd { flex: 1; min-height: 84px; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; padding: 10px 14px; }
+.otr-kd b { display: block; font-size: 16px; font-weight: 600; color: #36475a; }
+.otr-kd .big { font-size: 28px; font-weight: 800; color: #0b2540; }
+.otr-kd .big.bad { color: #c62828; }
+.otr-kd .vs { font-size: 16px; color: #5b6b7d; }
+.otr-kd .bad { color: #c62828; font-weight: 700; }
+.otr-kd .good { color: #2b8a3e; font-weight: 700; }
+.otr-top { display: flex; gap: 14px; align-items: stretch; margin: 0 0 12px; }
+svg.otr-trend { width: 560px; flex: none; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; }
+svg.otr-trend text { font-size: 16px; fill: #5b6b7d; }
+svg.otr-trend text.t { font-weight: 700; fill: #0b2540; }
+svg.otr-trend text.k { font-weight: 700; }
+svg.otr-trend line { stroke: #e3e8ef; }
+svg.otr-trend path { fill: none; stroke-width: 4; }
+svg.otr-trend .cur { stroke: var(--ud-blue); fill: var(--ud-blue); }
+svg.otr-trend path.cur, svg.otr-trend path.ly { fill: none; }
+svg.otr-trend .ly { stroke: #9aa8b8; fill: #9aa8b8; }
+.otr-trend.empty { width: 560px; padding: 14px; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; color: var(--muted); }
+table.otr-sheet { border-collapse: collapse; background: #fff; font-size: 16px; width: 100%; table-layout: fixed; }
+table.otr-sheet thead { position: sticky; top: 0; z-index: 2; }
+body.fill .scroll-list table.otr-sheet thead th { position: static; }
+table.otr-sheet thead tr.sub th { background: #2f6aa0; font-weight: 600; padding: 4px 0; text-overflow: clip; }
+.otr-page .otr-fig input.otr-in { font-size: 16px; }
+table.otr-sheet .l { text-align: left; padding-left: 8px; }
+table.otr-sheet tr.wk td { border-top: 3px solid #074c84; }
+table.otr-sheet tr.tot td { background: #e8eef6; font-weight: 800; }
+table.otr-sheet tr.today td { background: #fff6d6; }
+table.otr-sheet td.neg { color: #c62828; font-weight: 700; }
+table.otr-sheet td.pos { color: #2b8a3e; font-weight: 700; }
+table.otr-sheet td.ly { color: #5b6b7d; }
+table.otr-sheet .gap { background: #f4f6f9; border-color: #f4f6f9; padding: 0; }
+table.otr-bydate .vh { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; display: inline-block; text-align: left; }
+table.otr-bydate td.l { padding-left: 8px; }
+table.otr-bydate input { width: 100%; height: 34px; border: 0; background: transparent; text-align: center; font: inherit; font-size: 16px; }
+table.otr-bydate input.otr-note { text-align: left; padding: 0 6px; }
+table.otr-bydate input:focus { outline: 2px solid var(--ud-blue); outline-offset: -2px; background: #fff; }
+table.otr-fuel { width: 560px; margin-top: 14px; }
+.otr-print-title { display: none; }
+@media print {
+  #print.otr-print .otr-kc, #print.otr-print .otr-top > :not(.otr-kc) { display: none; }
+  #print.otr-print .otr-top { display: none; }
+  #print.otr-print .otr-print-title { display: block; }
+  #print.otr-print table { width: 100%; table-layout: fixed; font-size: 10px; }
+  #print.otr-print th, #print.otr-print td { padding: 1px 2px; text-align: center; }
+  #print.otr-print .gap { border: 0; width: 3px; }
+  #print.otr-print input { border: 0; width: 100%; font: inherit; text-align: center; background: none; }
+  #print.otr-print .vh { writing-mode: vertical-rl; transform: rotate(180deg); }
+  #print.otr-print table.otr-fuel { width: 40%; margin-top: 8px; }
+}
+/* Joe 10/13: round-trip miles fixed in place (saved in Route Master), and By Date columns of his own. */
+.otr-setup button.otr-miles { min-width: 90px; min-height: 38px; padding: 0 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; font: inherit; font-size: 16px; color: inherit; cursor: pointer; text-decoration: underline dotted #8aa4bd; text-underline-offset: 4px; }
+.otr-setup button.otr-miles:hover, .otr-setup button.otr-miles:focus-visible { border-color: #b7c9d8; background: #fff; color: var(--ud-blue); text-decoration: underline; }
+.otr-miles-edit { display: inline-flex; align-items: center; gap: 6px; }
+.otr-miles-edit input, .otr-cols input.otr-col-in { width: 96px; height: 38px; box-sizing: border-box; border: 1px solid var(--ud-blue); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; text-align: right; }
+.otr-cols input.otr-col-in { width: 220px; text-align: left; }
+.otr-miles-edit button, .otr-cols button { min-height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.otr-miles-edit button.primary, .otr-cols button.primary { background: var(--ud-blue); color: #fff; }
+.otr-cols td { vertical-align: middle; }
+.otr-compare { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; color: var(--ud-blue); white-space: nowrap; cursor: pointer; }
+/* Joe 10/13: Import sits at the far right of the tab row, set apart from the tabs. */
+.head .actions.in-head.otr-head-act { margin-left: auto; padding-left: 32px; gap: 8px; }
+.head .actions.in-head.otr-head-act button { width: auto; min-width: 0; height: 44px; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 2px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; line-height: 1; }
+.head .actions.in-head.otr-head-act button.primary { background: var(--ud-blue); color: #fff; }
+.head .actions.in-head.otr-head-act button:disabled { opacity: .55; cursor: not-allowed; }
+.otr-compare input { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; }
+.otr-col-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.otr-col-add label { font-weight: 700; font-size: 16px; }

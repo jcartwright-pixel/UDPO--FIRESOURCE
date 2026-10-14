@@ -113,14 +113,14 @@ async function cameraShot(page, color) {
     await mg.close();
     results.push('Safety Walkthrough is administrators only while it is being built (a manager is refused every screen)');
 
-    // The plant home: seven cards, Safety Walkthrough next to Reports, all on one screen at 1536 and 1920.
+    // The plant home: seven cards, Safety Walkthrough next to Reports, all on one screen at 1536 and 1920 (Joe 10/13: eight, with Inventory, still two rows).
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
       const home = await openPage(browser, w, h, '/index.html?' + ADMIN);
       await home.evaluate(() => sessionStorage.setItem('udPlant', 'fac_uniontown'));
       await home.goto(HOSTING + '/index.html?' + ADMIN);
       await home.waitForSelector('.launch-card[data-side="safety"]');
       await home.waitForTimeout(400);
-      assert.deepEqual(await home.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports', 'safety']);
+      assert.deepEqual(await home.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'distribution', 'fleet', 'reports', 'safety', 'inventory']);
       assert.equal(await home.$eval('.launch-card[data-side="safety"]', c => c.classList.contains('building') && !!c.querySelector('.uc-banner') && !!c.querySelector('svg.launch-icon')), true, 'the card has its icon and the Under Construction banner');
       const box = await home.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.launch-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight, tops: [...new Set([...document.querySelectorAll('.launch-card')].map(c => Math.round(c.getBoundingClientRect().top)))].length }));
       assert.ok(box.bottom <= box.inner, 'the seven cards fit ' + w + ': ' + JSON.stringify(box));
@@ -343,8 +343,10 @@ async function cameraShot(page, color) {
     await la.waitForSelector('#rows tr.sw-place-row');
     assert.deepEqual(await la.$$eval('#rows tr.sw-place-row input[data-k="name"]', i => i.map(x => x.value)), ['Plant', 'Garage', 'Office', 'Yard']);
     assert.match(await la.textContent('#counts'), /4 areas · 21 sub-areas · the starting list/);
-    // Review item 31 (Joe 10/13): no plant drop-down inside a plant; the plant's name is in the heading.
-    assert.equal(await la.$('#plant'), null, 'no plant drop-down on Location Areas');
+    // Joe 10/13 (A): a location picker at the top right (his own exception to review item 31 for this screen); it starts on
+    // the plant he came in from, named in the heading too.
+    assert.deepEqual(await la.$$eval('#plant option', o => o.map(x => x.textContent)), ['Uniontown', 'Charleston', 'Martins Ferry']);
+    assert.equal(await la.$eval('#plant', s => s.value), UT);
     assert.equal(await la.textContent('#plant-name'), 'Uniontown');
     const locsNow = async () => S.locations((await db().collection('locationAreas').doc(UT).get()).data() || null);
     const laUntil = async (ok, what) => { for (let i = 0; i < 40; i++) { if (ok(await locsNow())) return; await la.waitForTimeout(250); } assert.fail(what); };
@@ -384,9 +386,36 @@ async function cameraShot(page, color) {
     await la.setViewportSize({ width: 1920, height: 1080 });
     await fits(la, 'Location Areas at 1920');
     await shot(la, 'location-areas-1920');
+    // Joe 10/13 (A): each location has its own areas. Charleston starts empty with + Add area; adding one saves to
+    // Charleston only, and Uniontown's areas are as they were.
+    await la.setViewportSize({ width: 1536, height: 864 });
+    const utBefore = JSON.stringify(await locsNow());
+    await la.selectOption('#plant', 'fac_charleston');
+    await la.waitForFunction(() => /No areas for Charleston yet/.test(document.getElementById('rows').textContent));
+    assert.equal(await la.textContent('#plant-name'), 'Charleston');
+    assert.match(await la.textContent('#counts'), /^0 areas · 0 sub-areas$/);
+    assert.match(la.url(), /plant=fac_charleston/);
+    await shot(la, 'location-areas-charleston-empty-1536');
+    await la.fill('#rows tr[data-newarea] input', 'Plant');
+    await la.press('#rows tr[data-newarea] input', 'Tab');
+    await la.waitForSelector('#rows tr[data-newsub][data-a="0"] input');
+    await la.fill('#rows tr[data-newsub][data-a="0"] input', 'Receiving');
+    await la.press('#rows tr[data-newsub][data-a="0"] input', 'Tab');
+    const chLocs = async () => S.locations((await db().collection('locationAreas').doc('fac_charleston').get()).data() || null, 'fac_charleston');
+    for (let i = 0; i < 40 && JSON.stringify((await chLocs()).map(a => [a.name, a.subs.map(x => x.name)])) !== '[["Plant",["Receiving"]]]'; i++) await la.waitForTimeout(250);
+    assert.deepEqual((await chLocs()).map(a => [a.name, a.subs.map(x => x.name), a.off]), [['Plant', ['Receiving'], false]], 'Charleston has only its own area, nothing from Uniontown');
+    assert.equal(JSON.stringify(await locsNow()), utBefore, 'Uniontown\'s areas are unchanged');
+    await la.waitForSelector('#rows tr.sw-sub-row[data-drag] input[value="Receiving"]');
+    assert.match(await la.textContent('#counts'), /^1 area · 1 sub-area$/, 'one area and one sub-area are counted in the singular');
+    await fits(la, 'Location Areas for Charleston at 1536');
+    await shot(la, 'location-areas-charleston-1536');
+    await la.selectOption('#plant', UT);
+    await la.waitForFunction(() => document.querySelectorAll('#rows tr.sw-place-row').length === 4);
+    assert.equal(await la.evaluate(() => sessionStorage.getItem('udPlant')), UT, 'picking a location here does not change the plant the app is working in');
     assert.deepEqual(la.errors, []);
     await la.close();
     results.push('Location Areas (Plant, Garage, Office, Yard): a sub-area renamed by typing over it, + Add sub-area, dragging a line (mouse and Alt+Up) and turning one off all save; it fits 1536 and 1920');
+    results.push('Location Areas location picker (Joe 10/13, A): Uniontown, Charleston, Martins Ferry; Charleston starts empty, its first area and sub-area save to Charleston only, Uniontown is unchanged, and the plant the app works in stays Uniontown');
 
     // Checklist Setup follows Location Areas (names, order, turned off) and Move to puts an item in another sub-area.
     const cs = await openPage(browser, 1536, 864, '/safety-setup.html?' + ADMIN);

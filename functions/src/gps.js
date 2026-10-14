@@ -11,6 +11,7 @@
 
 const L = require('./logic');
 const { COLLECTIONS: C, safeIdPart } = require('./model');
+const FLEET = require('./fleetgps');
 
 const DEFAULT_BASE = 'https://fim.api.us.fleetmatics.com';
 const ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER'];
@@ -69,11 +70,15 @@ async function test(d, vehicle, fetchFn) {
   return { ok: true, step: 'vehicle', message: 'Connected. Login and App ID work, and Fleetmatics answered for vehicle ' + v + '.' };
 }
 
-/* input.op: status | save {user, password, appId, baseUrl} | clear | test {vehicle} */
+/* input.op: status | save {user, password, appId, baseUrl} | clear | test {vehicle}; with kind: 'fleet', the Fleet box (fleetgps.js) */
 async function gpsCall(db, user, input, options) {
   input = input || {};
   const o = Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date(), local: false }, options || {});
   const email = await adminOnly(db, user);
+  // Verizon Connect Fleet (the old Telogis, which United Dairy is on): src/fleetgps.js.
+  if (input.kind === 'fleet') {
+    try { return await FLEET.fleetCall(db, email, input, options); } catch (e) { throw e instanceof FLEET.FleetError ? new GpsError(e.code === 'BAD_REQUEST' ? 'BAD_REQUEST' : 'FAILED', e.message) : e; }
+  }
   const ref = db.collection('private').doc('gps');
   const d = (await ref.get()).data() || {};
   const op = String(input.op || 'status');

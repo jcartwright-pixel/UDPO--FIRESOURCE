@@ -135,8 +135,6 @@ td.issue { color: var(--pickup); }
 .split { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; padding: 0 16px; }
 .split .sheet { margin: 0; }
 .split .footer { padding: 6px 0; }
-.split-main { min-width: 0; }
-.split-side { display: flex; flex-direction: column; gap: 10px; height: calc(100vh - 158px); min-height: 0; }
 .filters { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .filters input, .filters select { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; background: #fff; color: var(--ink); }
 .filters input { flex: 1; min-width: 140px; }
@@ -148,31 +146,20 @@ button:disabled { opacity: .5; cursor: default; }
 .summary { display: flex; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
 .summary div { flex: 1; text-align: center; border-radius: 8px; padding: 6px 2px; font-size: 16px; color: var(--muted); text-transform: uppercase; }
 .summary b { display: block; font-size: 26px; line-height: 1.1; }
-.summary .m-active { background: #16a34a14; } .summary .m-active b { color: #16a34a; }
-.summary .m-relief { background: #d9770614; } .summary .m-relief b { color: #d97706; }
-.summary .m-inactive { background: #64748b14; } .summary .m-inactive b { color: #64748b; }
 .panel { flex: 1; min-height: 0; background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
-.panel-empty { margin: auto; text-align: center; color: var(--muted); font-weight: 500; line-height: 1.5; }
-.panel-head { display: flex; justify-content: space-between; align-items: baseline; }
-.panel-head h2 { margin: 0; font-size: 20px; color: var(--ud-blue-dark); }
 .panel-head span { color: var(--muted); }
 .panel label { display: grid; gap: 3px; font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .panel input[type=text], .panel input[type=date], .panel select, .panel textarea { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; color: var(--ink); }
 .panel textarea { height: 60px; padding: 6px 8px; resize: none; }
-.panel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.panel-facts { display: flex; justify-content: space-between; }
-label.panel-check { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 16px; color: var(--ink); letter-spacing: 0; }
-.panel-state { display: flex; justify-content: space-between; align-items: center; background: var(--band); border-radius: 8px; padding: 6px 10px; }
-.panel-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: auto; }
 .panel-actions button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 .panel-actions button.primary { background: var(--ud-blue); color: #fff; border: 0; }
 td.name { font-weight: 800; }
 td small { color: var(--muted); font-weight: 500; }
-.chip { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 9px; background: #fdecc4; color: #8a5a00; font-size: 16px; font-weight: 800; vertical-align: middle; }
+.chip { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 9px; background: var(--pill-warn-bg); color: var(--pill-warn-ink); font-size: 16px; font-weight: 800; vertical-align: middle; }
 tr.off td { background: #fff8e6 !important; color: #7a8797; }
 tr.editing td { background: #e4efff !important; }
 span.status { display: inline-block; padding: 0 10px; border-radius: 12px; background: #dcf3e4; color: #11703a; font-size: var(--font); }
-span.status.off { background: #fdecc4; color: #8a5a00; }
+span.status.off { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
 button.switch { width: 42px; height: 22px; border: 0; border-radius: 12px; background: #cfd8e2; position: relative; cursor: pointer; vertical-align: middle; }
 button.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0003; }
 button.switch.on { background: #16a34a; } button.switch.on::after { left: 23px; }
@@ -190,9 +177,8 @@ button.warn { background: #fff4e5; color: #9a4b00; border: 1px solid #f0b46a; bo
 table.daily td.strong { font-weight: 700; }
 table.daily button.toggle { font-size: var(--font); }
 td.left { text-align: left; padding-left: 8px; }
-input.ovr { width: 15px; height: min(15px, calc(var(--row) - 6px)); margin: 0; vertical-align: middle; cursor: pointer; }
 table.daily button.toggle, table.daily button.edit { line-height: 1; padding-top: 0; padding-bottom: 0; }
-.modal-back { position: fixed; inset: 0; background: #0b1f3366; z-index: 20; }
+.modal-back { z-index: 20; }
 .modal { position: fixed; z-index: 21; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; background: #fff; border-radius: 12px; border-top: 6px solid var(--ud-blue); padding: 16px 18px; box-shadow: 0 18px 50px #0004; }
 .modal.wide-modal { width: min(760px, calc(100vw - 32px)); }
 .modal h2 { margin: 0 0 12px; color: var(--ud-blue-dark); font-size: 20px; }
@@ -204,12 +190,9 @@ table.daily button.toggle, table.daily button.edit { line-height: 1; padding-top
 .modal input:not([type=checkbox]), .modal select, .modal textarea { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; color: var(--ink); background: #fff; }
 .modal input:disabled, .modal select:disabled, .modal textarea:disabled { background: #eef2f6; color: #7a8797; }
 .modal textarea { height: 64px; padding: 6px 8px; resize: none; }
-.move-act { display: flex; align-items: center; gap: 10px; font-size: 16px; color: var(--muted); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .modal-actions button, .down-add button, .down-list button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 .modal-actions button.primary { background: var(--ud-blue); color: #fff; border: 0; }
-.down-add { display: grid; grid-template-columns: 160px 1fr auto; gap: 10px; align-items: end; }
-.down-msg { margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: #fff4e5; color: #7a3d00; border: 1px solid #f0b46a; font-weight: 700; }
 .down-add button.warn { background: #fff4e5; color: #9a4b00; border-color: #f0b46a; }
 .down-list { margin-top: 12px; max-height: calc(100vh - 300px); overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
 .down-list table { font-size: 16px; }
@@ -223,7 +206,6 @@ table.daily button.toggle, table.daily button.edit { line-height: 1; padding-top
   #print h2 { margin: 0 0 4px; font-size: 16px; }
   #print table { table-layout: auto; font-size: 11px; }
   #print th, #print td { border: 1px solid #000; padding: 3px 4px; height: auto; color: #000; background: #fff !important; }
-  #print .pgroup td { font-weight: 700; background: #eee !important; }
   @page { size: landscape; margin: 10mm; }
 }
 
@@ -260,7 +242,6 @@ button.override.on { background: #fff4e5; color: #9a4b00; border-color: #f0b46a;
 .board button.avail { width: 100%; height: calc(var(--row) - 4px); border: 0; background: none; font: inherit; font-size: var(--font); color: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .board button.avail:hover { outline: 2px solid var(--ud-gold); outline-offset: -2px; }
 .modal-context { margin: -6px 0 12px; color: var(--muted); font-weight: 600; }
-#days-rows button.toggle { height: 28px; }
 @media (max-width: 1500px) { .actions { gap: 6px; } .actions button, .tabs button { font-size: 16px; padding: 0 10px; min-height: 34px; } .legend { gap: 8px; font-size: 16px; } }
 
 /* Vacation Schedule: the page is one window high; a long list scrolls inside its box, never the page. */
@@ -275,54 +256,29 @@ body.fill .scroll-list thead th { position: sticky; top: 0; z-index: 1; }
 .chips button b { margin-left: 8px; display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: #0b4f8a1a; font-size: 16px; }
 .chips button.on b { background: #ffffff33; }
 .hint { color: var(--muted); font-size: 16px; font-weight: 600; }
-.vac-form { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr 1.3fr 1.6fr auto; gap: 8px; align-items: end; margin: 0 16px 10px; background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 10px; padding: 10px 12px; }
-.vac-form label { display: grid; gap: 4px; font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
 .vac-form input, .vac-form select { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; color: var(--ink); background: #fff; min-width: 0; }
-.form-buttons { display: flex; gap: 6px; }
-.form-buttons button, .actions > button#cal-prev, .actions > button#cal-next { min-height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 .form-buttons button.primary { background: var(--ud-blue); color: #fff; border: 0; }
 .type { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 9px; font-size: 16px; font-weight: 700; vertical-align: middle; }
-.t-vacation { background: #dcecff; color: #0b4f8a; } .t-personal { background: #efe5ff; color: #5b3a9b; } .t-sick { background: #ffe5d6; color: #9a4b00; }
-.t-bereavement { background: #e6e9ee; color: #3b4652; } .t-unpaid { background: #fdecc4; color: #7a5600; }
 .vstatus { display: inline-block; padding: 0 10px; border-radius: 12px; font-size: 16px; font-weight: 700; background: #e6e9ee; color: #3b4652; }
-.vstatus.s-approved { background: #dcf3e4; color: #11703a; } .vstatus.s-pending { background: #fdecc4; color: #8a5a00; } .vstatus.s-denied, .vstatus.s-cancelled { background: #fde8e8; color: #9b1c1c; }
-.cal-title { margin: 0; min-width: 190px; text-align: center; color: var(--ud-blue-dark); font-size: 22px; }
+.vstatus.s-approved { background: #dcf3e4; color: #11703a; } .vstatus.s-pending { background: var(--pill-warn-bg); color: var(--pill-warn-ink); } .vstatus.s-denied, .vstatus.s-cancelled { background: #fde8e8; color: #9b1c1c; }
 #cal-month, #print-who { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; background: #fff; }
-.cal-key { display: inline-flex; gap: 10px; font-size: 16px; color: var(--muted); font-weight: 600; }
 .cal-key span { display: inline-flex; align-items: center; gap: 4px; }
-.cal-key i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
 .calendar { flex: 1; min-height: 0; margin: 0 16px; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 28px repeat(var(--weeks, 5), minmax(0, 1fr)); gap: 4px; }
 .calendar .dow { background: var(--ud-blue); color: #fff; font-weight: 700; font-size: 16px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
-.calendar .cday { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; cursor: pointer; min-height: 0; }
-.calendar .cday:hover { outline: 2px solid var(--ud-gold); outline-offset: -2px; }
-.calendar .cday.today { border: 2px solid var(--ud-blue); }
-.calendar .cday.full { background: #fff6f5; }
 .calendar .cday b { color: var(--ud-blue-dark); font-size: 16px; }
 .calendar .cday span { font-size: 16px; font-weight: 700; border-radius: 4px; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.calendar .cday span.more { background: none; color: var(--muted); }
-.day-body { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; }
 .day-body h3 { margin: 0 0 8px; color: var(--ud-blue-dark); font-size: 16px; }
-.day-list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; }
-.day-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
-.day-row.pending { border-style: dashed; }
 .day-row small { display: block; color: var(--muted); font-weight: 500; }
-.modal.wide-modal#day-modal { width: min(860px, calc(100vw - 32px)); }
 .vac-form[hidden], form[hidden] { display: none; }
 
 /* Route Editor */
-.selectors { display: flex; gap: 10px; }
-.selectors label { display: grid; gap: 3px; font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
-.selectors select, #active-filter, #seq-day { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; background: #fff; color: var(--ink); min-width: 150px; }
-.seq-day { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
 table.routes td small { display: block; color: var(--muted); font-weight: 500; font-size: var(--font); }
-table.routes td.norun { background: #eef2f6 !important; }
 table.routes input.cell { width: 100%; height: calc(var(--row) - 6px); max-height: 34px; border: 1px solid transparent; border-radius: 6px; background: transparent; font: inherit; text-align: center; color: var(--ink); }
 table.routes input.cell:focus { border-color: var(--ud-blue); background: #fff; outline: none; }
 table.routes input.cell:not([readonly]):hover { border-color: #bcd0e3; }
 table.routes input.cell.picked { background: #e8f0fb; border-color: #9fbbe0; }
 table.routes button.toggle { font-size: var(--font); }
 table.routes td.details-cell { height: auto; padding: 16px; white-space: normal; text-align: left; }
-table.routes td.pick-one { height: 120px; }
 form.details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; }
 form.details .wide { grid-column: 1 / 4; }
 form.details label { display: grid; gap: 4px; font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
@@ -383,7 +339,6 @@ body.phone .notice { margin: 12px 16px 0; }
   .brand img { width: 128px; height: 42px; }
   .brand strong { font-size: 18px; }
   .brand small { margin-top: 2px; font-size: 16px; }
-  .split-side { height: calc(100vh - 138px); }
 }
 
 /* Weekly Dispatch, laid out like the current app's Weekly screen (WeeklyDispatch.html): the buttons on the right,
@@ -393,19 +348,7 @@ body.weekly-page { background: #eef3f7; }
 .weekly-page .head { padding: 8px 16px 2px; align-items: center; }
 .weekly-page .actions { padding: 0 16px 8px; }
 .weekly-page .actions button { min-height: 42px; border-radius: 10px; }
-.wk-summary { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 16px 8px; padding: 6px 14px; background: #fff; border: 1px solid #d2dde6; border-radius: 14px; }
-.wk-summary .field { flex-direction: row; align-items: center; gap: 10px; }
-.wk-summary .field label { font-size: 16px; font-weight: 800; color: #536b81; }
-.wk-summary .stepper input { font-size: 19px; }
-.wk-summary .legend { margin-left: 0; flex: 1; flex-wrap: wrap; gap: 10px; font-size: 16px; font-weight: 800; color: #294a69; }
 .wk-summary .legend i { width: 26px; height: 16px; border-radius: 5px; border: 2px solid #bfd1e0; box-sizing: border-box; }
-.wk-summary .legend i.assigned { background: #f4f8fb; } .wk-summary .legend i.relief { background: #dff4f1; }
-.wk-summary .legend i.needs { background: #ffd32e; border-color: #e1ae00; } .wk-summary .legend i.vacation-needs { background: #f5c6c8; border-color: #ee3e3e; }
-.wk-summary .legend i.plant { background: #ffd32e; border: 2px dashed #c2410c; } .wk-summary .legend i.conflict { background: #f4f8fb; border-color: #ef4545; }
-.wk-summary .legend i.off { background: #171c20; border-color: #171c20; }
-.wk-summary .override { min-height: 32px; padding: 0 14px; border-radius: 16px; }
-.wk-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0 16px; background: #fff; border: 1px solid #d0dce5; border-radius: 14px; }
-.wk-panel h2 { margin: 0; padding: 8px 24px 10px; color: #123f70; font-size: 19px; font-weight: 500; }
 .weekly-page .sheet.week { margin: 0; border: 0; border-radius: 0; overflow: visible; }
 .weekly-page .week table { min-width: 1120px; }
 .weekly-page .week th { position: sticky; top: 0; z-index: 2; height: auto; padding: 8px 6px; background: #194a7e; color: #fff; font-size: 16px; line-height: 1.08; text-transform: uppercase; border-right: 1px solid #d6e1e9; }
@@ -413,12 +356,6 @@ body.weekly-page { background: #eef3f7; }
 .weekly-page .week th.today { background: #0f3a66; box-shadow: inset 0 -4px 0 var(--ud-gold); }
 .weekly-page .week td { height: 44px; padding: 0; border: 1px solid #bfd0df; color: #0d365d; font-size: 16px; white-space: nowrap; }
 .weekly-page .week tbody td.strong { padding: 0 8px; background: #fff; text-align: center; font-size: 16px; font-weight: 900; }
-.weekly-page #routes-sheet td.day { background: #171c20 !important; box-shadow: none; outline: 0; }
-.weekly-page #routes-sheet td.day:not(.off) { position: relative; padding: 0 9px; text-align: center; color: #0e3a62; font-size: 16px; font-weight: 850; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
-.weekly-page #routes-sheet td.day:not(.off)::before { content: ""; position: absolute; inset: 3px; border: 1px solid #bfd1e0; border-radius: 7px; background: #f4f8fb; }
-.weekly-page #routes-sheet td.day:not(.off) > * { position: relative; }
-.weekly-page #routes-sheet td.day .nm { display: block; }
-.weekly-page #routes-sheet td.day .unit { display: block; margin: 1px 0 0; color: #5d7286; font-size: 16px; font-weight: 700; }
 .weekly-page #routes-sheet td.c-relief::before { background: #dff4f1 !important; }
 .weekly-page #routes-sheet td.c-needs::before { background: #ffd32e !important; border: 2px solid #e1ae00 !important; }
 .weekly-page #routes-sheet td.c-plant::before { background: #ffd32e !important; border: 2px dashed #c2410c !important; }
@@ -429,11 +366,6 @@ body.weekly-page { background: #eef3f7; }
 .weekly-page #routes-sheet td.c-carrier::before { background: #bcd9ff !important; border: 2px solid #4a8fe0 !important; }
 .weekly-page #routes-sheet td.c-open::before { background: #e6defa !important; border: 2px solid #9b86d6 !important; }
 .weekly-page #routes-sheet td.c-coverage::before { background: #e7edf3 !important; }
-.weekly-page #routes-sheet td.c-coverage { color: #536b81 !important; }
-.weekly-page #routes-sheet td.editable { cursor: pointer; }
-.weekly-page #routes-sheet td.editable:not(.off):hover::before { outline: 2px solid var(--ud-gold); outline-offset: -1px; }
-.weekly-page #routes-sheet td.off.editable:hover { box-shadow: inset 0 0 0 2px var(--ud-gold); }
-.wk-divider { padding: 9px 14px; background: #f4f7fa; color: #0e3a62; text-align: center; font-size: 17px; font-weight: 900; border-top: 3px solid #1d5b91; }
 .weekly-page .board th { background: #e6eef5; color: #0e3a62; border-bottom: 2px solid #1d5b91; }
 .weekly-page .board td { height: 34px; font-size: 16px; font-weight: 850; text-align: center; }
 .weekly-page .board td.strong { font-size: 16px; }
@@ -449,14 +381,10 @@ body.weekly-page { background: #eef3f7; }
 .weekly-page .board button.avail { display: block; width: 100%; min-height: 32px; margin: 0; padding: 3px 6px; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; white-space: normal; line-height: 1.15; box-shadow: none; }
 .weekly-page .board button.avail:hover, .weekly-page .board button.avail:focus-visible { background: #dceaf5; color: #0e3a62; outline: 2px solid #3978aa; outline-offset: -2px; }
 .weekly-page .footer { padding: 4px 16px 6px; }
-@media (max-height: 720px) { .weekly-page .actions button { min-height: 34px; } .wk-summary { padding: 3px 12px; margin-bottom: 6px; } .wk-panel h2 { padding: 4px 20px 6px; font-size: 17px; } }
+@media (max-height: 720px) { .weekly-page .actions button { min-height: 34px; } }
 /* Like the current Weekly grid: the cell shows the driver only (truck and trailer are in the cell's tooltip and the editor),
    with a drop-down arrow, and the Driver Assignment Board wraps long run names. */
-.weekly-page #routes-sheet td.day .unit { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.weekly-page #routes-sheet td.day.editable:not(.off)::after { content: "\25BE"; position: absolute; top: 50%; right: 11px; transform: translateY(-50%); color: #0e3a62; font-size: 16px; }
-.weekly-page #routes-sheet td.day:not(.off) { padding-right: 22px; font-size: 16px; }
 .weekly-page .board td { white-space: normal; }
-.weekly-page .wk-scroll { scrollbar-gutter: stable; }
 /* Current board: a working day is blacked out, except on relief drivers, whose working days stay light. */
 .weekly-page .board tr.relief td.b-assigned, .weekly-page .board tr.relief td.b-booked { background: #dff4f1 !important; color: #0e3a62; }
 /* Joe 10/9: no TEST COPY box on the pages (the words stay for screen readers and the checks); Daily's buttons sit up beside the day pickers. */
@@ -465,37 +393,16 @@ body.weekly-page { background: #eef3f7; }
 .head .actions.in-head { margin-left: auto; padding: 0; align-self: flex-end; justify-content: flex-end; }
 
 /* Driver Roster: taller rows and larger print; the list scrolls inside its box under a fixed header. */
-.drivers-page { --row: 40px; --font: 17px; }
-.drivers-page .split .sheet { overflow: auto; }
 .drivers-page .sheet thead th { position: sticky; top: 0; z-index: 1; height: 46px; font-size: 16px; }
 .drivers-page .sheet tbody td { font-size: 17px; }
-.drivers-page .sheet td.name { cursor: pointer; }
-.drivers-page .sheet td.name:hover { text-decoration: underline; }
-.drivers-page button.edit, .drivers-page input.truck { font-size: 16px; height: 34px; max-height: none; }
-.relief-yes { display: inline-block; padding: 2px 12px; border-radius: 10px; background: #dff4f1; color: #0b6b5e; font-size: 16px; font-weight: 800; text-transform: uppercase; }
-.drivers-page .panel-empty { font-size: 16px; }
 
 /* Vacation calendar: larger names and day numbers. */
-.calendar .cday { gap: 3px; }
-.calendar .cday b { font-size: clamp(16px, 1.8vh, 19px); }
 .calendar .cday span { font-size: clamp(16px, 1.6vh, 17px); line-height: 1.35; padding: 1px 8px; }
 .calendar .dow { font-size: 16px; }
-.cal-key { font-size: 16px; }
 .drivers-page .panel input[type="text"], .drivers-page .panel input[type="date"] { font-size: 16px; height: 40px; }
-.drivers-page .panel label, .drivers-page .panel-check { font-size: 16px; }
 
-/* Route Editor: readable rows and print; the grid scrolls inside its box with the headings fixed on top. */
-.routes-page { --row: 40px; --font: 16px; }
-.routes-page .sheet#sheet { overflow: auto; }
-.routes-page table.routes thead th { position: sticky; top: 0; z-index: 2; }
-.routes-page table.routes.days td:has(> button[data-runday]) { padding: 3px 4px; }
-.routes-page table.routes.days button[data-runday] { width: 100%; height: 32px; border-radius: 7px; font-size: 16px; font-weight: 800; }
-.routes-page table.routes.days td:has(> button[data-runday]:not(.on)) { background: #171c20; }
-.routes-page table.routes.days button[data-runday]:not(.on) { background: #171c20; color: #9aa7b3; border-color: #171c20; }
-.routes-page table.routes.days button[data-runday].on { background: #f4f8fb; color: #0e3a62; border: 1px solid #bfd1e0; }
 
 /* Route Distribution home: four cards, each a doorway with its screens listed inside. */
-.cards.cards4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); max-width: 1500px; }
 .card.home4 .dc-text strong { font-size: clamp(20px, 2.8vh, 26px); }
 .card.home4 .dc-text em { font-size: 16px; }
 .dc-links { display: grid; grid-auto-rows: minmax(44px, 54px); gap: 8px; padding: 6px 14px 10px; }
@@ -506,18 +413,7 @@ body.weekly-page { background: #eef3f7; }
 .card.home4:hover { box-shadow: 0 7px 18px rgba(13,52,87,.075); }
 .card.home4 .dc-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .card .owner.ext { background: #fff4d9; color: #8a5a00; border-color: #f0d48a; }
-@media (max-width: 900px) { .cards.cards4 { grid-template-columns: 1fr; grid-template-rows: none; } }
 
-/* Route Editor · Show / Hide Rules: each true/false the screens read, as a clear YES / NO / BLANK. */
-.routes-page table.routes.rules td:has(> button.rule) { padding: 3px 6px; }
-.routes-page table.routes.rules button.rule { width: 100%; height: 32px; border-radius: 7px; font-size: 16px; font-weight: 800; border: 1px solid transparent; cursor: pointer; }
-.routes-page table.routes.rules button.rule:disabled { cursor: default; }
-.routes-page table.routes.rules button.rule.yes { background: #e3f3e8; color: #1c6b3a; border-color: #a9d8b8; }
-.routes-page table.routes.rules button.rule.no { background: #171c20; color: #e8edf2; border-color: #171c20; }
-.routes-page table.routes.rules button.rule.blank { background: #f1f3f5; color: #7a8794; border: 1px dashed #b7c2cc; }
-.routes-page table.routes.rules b.shown { color: #1c6b3a; }
-.routes-page table.routes.rules b.off { color: #b3261e; }
-.routes-page table.routes.rules td.why { text-align: left; white-space: normal; font-size: var(--font); }
 
 /* Left menu (Joe, 10/9): the same on every screen; the header keeps the logo, the user and Sign out. */
 body.has-side .topbar > a:not(.brand):not(#to-conflicts) { display: none; }
@@ -555,7 +451,6 @@ body:not(.side-open) .sidemenu .side-version { display: none; }
 
 /* Home on any screen (Joe, 10/9, smaller laptop): cards take the room there is and never cut off. */
 body.has-side #screen.home-screen .side-main { overflow: auto; }
-.cards.cards4 { grid-template-rows: repeat(2, auto); align-content: stretch; }
 .card.home4 { overflow: visible; min-height: min-content; }
 @media (max-height: 1000px) {
   .card.home4 .dc-text em { display: none; }
@@ -565,7 +460,6 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
   .card.home4 .dc-link { font-size: 16px; }
   .card.home4 .dc-metrics { grid-auto-rows: minmax(58px, 96px); gap: 7px; padding: 2px 12px 10px; }
   .home-screen .dtitle { padding-top: 8px; padding-bottom: 8px; }
-  .cards.cards4 { gap: 10px; }
 }
 @media (max-height: 800px) {
   .card.home4 .dc-links { grid-auto-rows: 36px; }
@@ -582,8 +476,6 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .weekly-page .head .actions.in-head button { white-space: nowrap; min-height: 38px; padding: 0 11px; font-size: 16px; }
 .weekly-page .head .tabs button { white-space: nowrap; }
 .weekly-page .week td { height: 40px; }
-.weekly-page #routes-sheet td.day:not(.off) { padding: 0 17px 0 6px; font-size: clamp(16px, .72vw, 16px); letter-spacing: -.02em; }
-.weekly-page #routes-sheet td.day.editable:not(.off)::after { right: 7px; font-size: 16px; }
 @media (max-width: 1500px) {
   .weekly-page .head { flex-wrap: wrap; }
   .weekly-page .head .actions.in-head { margin-left: 0; width: 100%; justify-content: flex-start; }
@@ -593,15 +485,9 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .topbar .who.initials { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.45); color: #fff; font-size: 16px; font-weight: 800; letter-spacing: .02em; }
 .topbar .who.initials { cursor: pointer; }
 .topbar .who.initials.open { width: auto; max-width: 70vw; padding: 0 14px; border-radius: 19px; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Relief has its own column on the Driver Roster, so the small tag beside the name is not shown. */
-.drivers-page td.name .chip { display: none; }
 /* Driver Roster on laptops: smaller type so every heading and name fits. */
 @media (max-width: 1500px) {
-  .drivers-page .sheet thead th { font-size: 16px; padding: 0 4px; letter-spacing: 0; white-space: normal; line-height: 1.1; }
   .drivers-page .sheet tbody td { font-size: 16px; padding: 0 5px; }
-  .drivers-page .sheet td.name { font-size: 16px; }
-  .drivers-page .sheet td .status, .drivers-page .sheet td .pill { font-size: 16px; padding: 2px 6px; }
-  .drivers-page button.edit, .drivers-page input.truck { font-size: 16px; height: 30px; }
 }
 .routes-page button.rule small { display: block; font-size: 16px; font-weight: 700; color: #c7d3de; text-transform: lowercase; line-height: 1; }
 /* Equipment Issues */
@@ -620,15 +506,9 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .issues-page table.issues td.wrong { white-space: normal; line-height: 1.25; font-weight: 600; color: #12324f; }
 .issues-page table.issues tr.review > td { background: #fff8ec; }
 .issues-page .pill { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 16px; font-weight: 800; white-space: nowrap; }
-.issues-page .pill.yes { background: #e3f4e8; color: #1d6b37; }
-.issues-page .pill.no { background: #eef2f5; color: #6b7c8c; }
-.issues-page .pill.warn { background: #fdecc4; color: #8a5a00; }
-.issues-page .from-mail { font-weight: 800; white-space: nowrap; }
-.issues-page .link-btn { border: 0; background: none; padding: 0; color: var(--ud-blue); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
-.issues-page .mail-meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 10px; font-size: 16px; }
-.issues-page .mail-meta dt { font-weight: 800; color: var(--ud-blue-dark); }
-.issues-page .mail-meta dd { margin: 0; }
-.issues-page .mail-text { white-space: pre-wrap; font: inherit; font-size: 16px; background: #f5f8fb; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; max-height: 55vh; overflow: auto; margin: 0; }
+.issues-page .pill.yes { background: var(--pill-green-bg); color: var(--pill-green-ink); }
+.issues-page .pill.no { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
+.issues-page .pill.warn { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
 .issues-page .count { display: inline-grid; place-items: center; min-width: 28px; height: 28px; border-radius: 14px; background: #eef2f5; font-weight: 800; }
 .issues-page .count.repeat { background: #fde3df; color: #a8321f; }
 .issues-page .work { display: inline-flex; flex-wrap: nowrap; gap: 4px; justify-content: center; }
@@ -650,37 +530,11 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .dc-links:has(> .dc-link:nth-child(4)) .owner.ext::after { content: "\2197  current app"; font-size: 16px; }
 @media (max-width: 1500px) { .dc-links:has(> .dc-link:nth-child(4)) .owner.ext::after { content: "\2197"; font-size: 16px; } }
 /* Driver Assignment Board: a day changed by hand this week (route_override) is light blue, as in the current app. */
-.weekly-page .board td.b-extra, .weekly-page .board tr.relief td.b-extra { background: #d9ebfb !important; color: #000 !important; }
 .legend i.extra { background: #d9ebfb; border: 1px solid #9cc4ea; }
 /* Route Week Override (the current app's screen, look B): grid on the left, the week's changes on the right. */
-.routeweek-page .rw-shell { display: grid !important; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; padding: 0 16px 12px; }
-.routeweek-page .rw-grid { margin: 0; min-height: 0; overflow: auto; }
-.routeweek-page table.rw th small { display: block; font-size: 16px; font-weight: 600; opacity: .8; }
 .routeweek-page table.rw td { height: 38px; padding: 2px 4px; font-size: 16px; }
 .routeweek-page table.rw tr.first > td { border-top: 2px solid #c9d8e7; }
-.routeweek-page .rw-day { width: 94%; min-height: 28px; border: 0; border-radius: 13px; background: #e3f5ee; color: #0f7b5f; font: inherit; font-size: 16px; font-weight: 900; white-space: nowrap; cursor: pointer; }
-.routeweek-page .rw-day.off { background: #fde8e6; color: #c0392b; }
-.routeweek-page .rw-day.over { background: repeating-linear-gradient(135deg, #fff3dc 0 6px, #ffe6b3 6px 12px); color: #8a5a00; box-shadow: inset 0 0 0 2px #f2b632; }
-.routeweek-page .rw-day:disabled { cursor: default; }
-.routeweek-page .rw-side { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-.routeweek-page .rw-week { display: flex; align-items: center; gap: 10px; }
-.routeweek-page .rw-week > div { flex: 1; text-align: center; }
-.routeweek-page .rw-week b { display: block; font-size: 20px; color: var(--ud-blue); }
-.routeweek-page .rw-week small { color: var(--muted); font-weight: 700; }
-.routeweek-page .rw-week button { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ud-blue); cursor: pointer; }
-.routeweek-page .rw-reason { display: flex; flex-direction: column; gap: 4px; font-size: 16px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
-.routeweek-page .rw-reason textarea { font: inherit; font-size: 16px; text-transform: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; resize: vertical; color: #12324f; }
-.routeweek-page .rw-counts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.routeweek-page .rw-counts div { background: #f4f8fb; border-radius: 10px; padding: 8px; text-align: center; }
-.routeweek-page .rw-counts b { display: block; font-size: 28px; color: #8a5a00; }
 .routeweek-page .rw-counts span { font-size: 16px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
-.routeweek-page .rw-filter { display: grid; grid-template-columns: 1fr 1fr; }
-.routeweek-page .rw-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
-.routeweek-page .rw-list > div { display: flex; justify-content: space-between; gap: 8px; font-size: 16px; padding: 6px 8px; border-radius: 8px; background: #fbfcfd; border: 1px solid #edf1f5; }
-.routeweek-page .rw-list em { font-style: normal; font-weight: 900; }
-.routeweek-page .rw-list em.on { color: #0f7b5f; } .routeweek-page .rw-list em.off { color: #c0392b; }
-.routeweek-page .rw-list .empty { color: var(--muted); text-align: center; padding: 18px 0; border: 0; background: none; }
-@media (max-width: 1500px) { .routeweek-page .rw-shell { grid-template-columns: minmax(0, 1fr) 290px; } .routeweek-page .rw-day { font-size: 16px; } }
 
 /* Joe 10/9: the side menu folds to icons on any screen (the button at its top), row lines are clearer, and table print
    matches the Route Editor (16px) everywhere; a cell too narrow for its text shrinks it to fit (app.js fitCells). */
@@ -692,12 +546,9 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
   body.side-folded .side-group + a, body.side-folded .sidemenu a:first-of-type { margin-top: 6px; }
 }
 :root { --font: 16px; }
-.drivers-page { --font: 17px; }
-.routes-page { --font: 16px; }
 tbody td { border-bottom: 1px solid #a9bbcd; }
 .weekly-page .week td { border-color: #9fb3c7; font-size: 16px; }
 .weekly-page .week tbody td.strong { font-size: 17px; }
-.weekly-page #routes-sheet td.day:not(.off) { font-size: 16px; letter-spacing: 0; }
 .weekly-page .board td { font-size: 16px; }
 .weekly-page .board td.strong { font-size: 16px; }
 .issues-page table.issues td { font-size: 16px; }
@@ -705,19 +556,10 @@ tbody td { border-bottom: 1px solid #a9bbcd; }
 
 /* Route Days (Joe 10/9): RUNS is green like the current app; Edit Route opens the Route Editor form; the Holiday Week
    Editor is one click away. */
-.routes-page table.routes.days button[data-runday].on { background: #e3f3e8; color: #1c6b3a; border: 1px solid #a9d8b8; }
-.routes-page table.routes.days button.edit-route { width: 100%; max-width: 130px; font-weight: 800; background: #fff; color: var(--ud-blue); border: 1px solid #1d5b91; }
-.routes-page table.routes.days button.edit-route:hover { background: #1d5b91; color: #fff; }
 .actions a.button { display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font-weight: 700; text-decoration: none; white-space: nowrap; }
 .actions a.button:hover { background: #e8f0fb; }
 h3.day-title { margin: 18px 0 8px; font-size: 16px; color: var(--ud-blue); text-transform: uppercase; letter-spacing: .05em; }
-table.day-table { table-layout: fixed; }
 table.day-table td { height: 42px; padding: 3px 5px; }
-table.day-table tr.off td:not(:nth-child(2)) { background: #f1f3f5 !important; color: #7a8794; }
-table.day-table input.dcell { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 7px; text-align: center; font: inherit; color: var(--ink); background: #fff; }
-table.day-table input.dcell:focus { border-color: var(--ud-blue); outline: none; }
-table.day-table button[data-runday] { width: 100%; height: 34px; border-radius: 7px; font-weight: 800; font-size: 16px; border: 1px solid #171c20; background: #171c20; color: #e8edf2; cursor: pointer; }
-table.day-table button[data-runday].on { background: #e3f3e8; color: #1c6b3a; border-color: #a9d8b8; }
 
 /* Side menu (Joe 10/9): only the sections; each opens a fly-out with its screens on hover or tap. */
 .sidemenu { --side: 200px; }
@@ -754,12 +596,21 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
 .gps-page .gps-buttons button.big { min-height: 48px; font-size: 17px; padding: 0 28px; }
 .gps-page .gps-buttons button.armed { background: #b45309; border-color: #b45309; color: #fff; }
 .gps-page .pill { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 16px; font-weight: 800; }
-.gps-page .pill.yes { background: #e3f4e8; color: #1d6b37; }
-.gps-page .pill.warn { background: #fdecc4; color: #8a5a00; }
-.gps-page .pill.no { background: #eef2f5; color: #6b7c8c; }
+.gps-page .pill.yes { background: var(--pill-green-bg); color: var(--pill-green-ink); }
+.gps-page .pill.warn { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
+.gps-page .pill.no { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
 .gps-page .gps-result { padding: 14px 16px; border-radius: 10px; font-size: 17px; background: #eef2f6; color: var(--ink); }
-.gps-page .gps-result.ok { background: #e3f4e8; color: #1d6b37; border: 1px solid #a9d8b8; }
+.gps-page .gps-result.ok { background: var(--pill-green-bg); color: var(--pill-green-ink); border: 1px solid #a9d8b8; }
 .gps-page .gps-result.bad { background: #fde3df; color: #a8321f; border: 1px solid #f0b4aa; }
+.gps-page .gps-check { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+.gps-page .gps-check th { text-align: left; font-size: 16px; color: var(--muted); font-weight: 800; padding: 6px 8px; border-bottom: 2px solid var(--line); position: sticky; top: 0; background: #fff; }
+.gps-page .gps-check td { padding: 7px 8px; border: 0; border-bottom: 1px solid var(--line); vertical-align: middle; text-align: left; }
+.gps-page .gps-check tr.not-yet td { color: var(--muted); }
+.gps-page .gps-mark { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-weight: 900; font-size: 16px; }
+.gps-page .gps-mark.ok { background: var(--pill-green-bg); color: var(--pill-green-ink); }
+.gps-page .gps-mark.bad { background: var(--pill-red-bg); color: var(--pill-red-ink); }
+.gps-page .gps-mark.wait { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
+.gps-page .gps-mark.none { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
 .gps-page .gps-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 16px; }
 
 /* One app, not page after page (Joe 10/9): the page colour shows while a screen loads (no white flash), and Chrome
@@ -773,174 +624,44 @@ html { background: var(--page); }
 @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
 
 /* Driver Weekly Template */
-.template-page table.tpl { table-layout: fixed; }
-.template-page .tpl td { vertical-align: top; padding: 6px; }
 .template-page .tpl tr.tpl-group td { background: #dfeaf3; color: #123f70; font-weight: 800; font-size: 16px; padding: 7px 10px; }
-.template-page .tcell select { width: 100%; height: 32px; border: 1px solid #b7c9d8; border-radius: 7px; background: #fff; font-weight: 700; font-size: 16px; }
-.template-page .tcell.on { background: #e3f3e8; }
-.template-page .tcell.off { background: #fff1e2; }
-.template-page .tcell.changed { box-shadow: inset 0 0 0 2px #7fb2e5; background-color: #e8f2fd; }
-.template-page .run-line { display: flex; gap: 4px; margin-top: 5px; }
-.template-page .run-line select { flex: 1; min-width: 0; }
-.template-page .mini { border: 1px solid #b9c9d7; background: #fff; border-radius: 6px; padding: 3px 6px; font-size: 16px; font-weight: 700; color: #175b92; cursor: pointer; }
-.template-page .mini:disabled { opacity: .45; cursor: default; }
-.template-page .tpl-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.template-page .tpl-copy { padding: 6px 12px; border: 1px solid #b9d8c3; border-radius: 999px; background: #edf9f0; color: #17683a; font-weight: 800; font-size: 16px; }
-.template-page .tpl-dirty { color: #175b92; font-weight: 800; }
-/* One quiet line of cell tools; they show on hover or while the cell has focus (always on touch screens). */
-.template-page .tpl-tools { flex-wrap: nowrap; gap: 3px; margin-top: 5px; visibility: hidden; }
-.template-page .tpl-tools .mini { font-size: 16px; padding: 2px 4px; white-space: nowrap; }
-.template-page .tcell:hover .tpl-tools, .template-page .tcell:focus-within .tpl-tools { visibility: visible; }
-@media (hover: none) { .template-page .tpl-tools { visibility: visible; } }
 
 /* Dispatch Administration: the current app's cards, as links in this window */
-.admin-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; padding: 4px 16px 16px; }
-.admin-card { display: flex; flex-direction: column; gap: 6px; min-height: 120px; padding: 18px; background: #fff; border: 1px solid #d5e1eb; border-top: 4px solid #1976d2; border-radius: 14px; color: #123f70; text-decoration: none; box-shadow: 0 6px 18px rgba(18,63,112,.06); }
-.admin-card:hover { box-shadow: 0 10px 24px rgba(18,63,112,.14); transform: translateY(-1px); }
-.admin-card strong { font-size: 19px; }
 .admin-card span { color: #60798f; line-height: 1.4; font-size: 16px; }
-.admin-card.ext { border-top-color: #9aa9b8; }
-.admin-card em { margin-top: auto; font-style: normal; font-size: 16px; font-weight: 700; color: #7a8a99; }
-@media (max-width: 1500px) { .admin-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (max-width: 1100px) { .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-/* Fleet Service */
-.fleet-page .tabs b { margin-left: 6px; color: #c62828; }
-.fleet-page .tabs button[aria-selected="true"] b { color: #ffd7d7; }
-.fleet-page .pill.soon { background: #fff4d6; color: #8a5a00; border-color: #f0d38a; }
-.fleet-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.fleet-split.wide-left { grid-template-columns: 3fr 1fr; }
-.fleet-split h2 { margin: 6px 4px 8px; font-size: 17px; color: var(--ud-blue); }
-@media (max-width: 1200px) { .fleet-split, .fleet-split.wide-left { grid-template-columns: 1fr; } }
-.fleet-split h2 small { color: var(--muted); font-size: 16px; font-weight: 600; margin-left: 6px; }
 /* Fleet Service Setup: the service rules, Add Technician, and History's unit facts. */
-.fs-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin: 0 4px 6px; }
-.fs-rules label { display: grid; gap: 3px; font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
-.fs-rule { display: flex; align-items: center; gap: 6px; }
-.fs-rule input { width: 96px; height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; }
 .fs-rule small { text-transform: none; letter-spacing: 0; font-weight: 600; }
-.fs-addtech { display: flex; gap: 6px; margin: 8px 4px; }
-.fs-addtech input { flex: 1; min-width: 0; height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; }
 table.fs-facts th { text-align: left; width: 48%; color: var(--muted); font-weight: 700; }
-.fleet-page tr.clicky { cursor: pointer; }
-.fleet-page .head .tabs { flex: none; }
 .fleet-page .head .tabs button { white-space: nowrap; }
 .fleet-page tr.clicky:hover td { background: #eef5fb; }
 
 /* Over the Road */
-.otr-dash { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; padding: 4px; }
 .otr-card { background: #fff; border: 1px solid #d5e1eb; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
-.otr-card.wide { grid-column: 1 / -1; }
 .otr-card h2 { margin: 0; font-size: 18px; color: var(--ud-blue); }
 .otr-card p { margin: 0; color: var(--muted); }
 .otr-card > button { align-self: flex-start; }
-.otr-big { font-size: 56px; font-weight: 800; color: #123f70; line-height: 1; }
-.otr-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
-.otr-week div { display: flex; flex-direction: column; align-items: center; padding: 10px; border: 1px solid #d5e1eb; border-radius: 10px; }
-.otr-week div.today { background: #e3f3e8; border-color: #a9d8b8; }
 .otr-week span { font-size: 28px; font-weight: 800; color: #123f70; }
-.otr-fig input.otr-in { width: 100%; height: 32px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: right; padding: 0 6px; font: inherit; font-size: 16px; }
 .otr-fig small, .otr-fig td small { display: block; color: #8a99a8; font-size: 16px; }
 tr.otr-on td { background: #e3f3e8; }
-#otr-report h2 { margin: 4px; font-size: 18px; color: var(--ud-blue); }
 .otr-card > button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #1d5b91; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
-.otr-page .actions select { min-height: 38px; padding: 0 10px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-weight: 700; }
 /* OTR Routes Setup: destination drop-downs and Include boxes sized to the row, like the other table pickers. */
-.otr-setup select { box-sizing: border-box; width: 88%; max-width: 380px; height: 40px; padding: 0 36px 0 12px; border: 1px solid #b7c9d8; border-radius: 8px; font: inherit; font-size: 16px; font-weight: 700; color: var(--ud-blue); text-align: left; cursor: pointer;
-  appearance: none; -webkit-appearance: none; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%230b4f8a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center; }
-.otr-setup select:hover { border-color: var(--ud-blue); }
-.otr-setup select:focus { border-color: var(--ud-blue); outline: 2px solid #3978aa55; outline-offset: 1px; }
-.otr-setup select:has(option[value=""]:checked) { color: #6b7d8f; font-weight: 600; }
-.otr-setup select option { color: var(--ink); font-weight: 600; }
-.otr-setup select:disabled { background-color: #eef2f6; color: #7a8797; cursor: not-allowed; }
-.otr-setup input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; vertical-align: middle; }
 .otr-setup input[type=checkbox]:disabled { cursor: not-allowed; }
-.otr-import { margin: 6px 6px 10px; padding: 10px 14px; border: 1px solid #a9c4dc; border-radius: 10px; background: #eef5fb; }
-.otr-import b { color: var(--ud-blue); font-size: 16px; }
-.otr-import table { width: auto; margin-top: 6px; border-collapse: collapse; }
-.otr-import td { padding: 3px 14px 3px 0; font-size: 16px; text-align: left; border: 0; height: auto; }
 .otr-import p { margin: 6px 0 0; color: var(--muted); }
 /* Over the Road 10/11: Joe's OTR Trips workbook tabs (By Date, Month Recap, Cost Per Gallon), laid out like the sheets, 16px. */
-.otr-page .hint { font-size: 16px; }
-.otr-page .sheet:has(.otr-sheet) { background: transparent; border: 0; }
-.otr-kc { display: flex; gap: 12px; margin: 0 0 12px; }
-.otr-kc.grid { display: grid; grid-template-columns: 1fr 1fr; flex: 1; margin: 0; }
-.otr-kd { flex: 1; min-height: 84px; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; padding: 10px 14px; }
-.otr-kd b { display: block; font-size: 16px; font-weight: 600; color: #36475a; }
-.otr-kd .big { font-size: 28px; font-weight: 800; color: #0b2540; }
-.otr-kd .big.bad { color: #c62828; }
-.otr-kd .vs { font-size: 16px; color: #5b6b7d; }
-.otr-kd .bad { color: #c62828; font-weight: 700; }
-.otr-kd .good { color: #2b8a3e; font-weight: 700; }
-.otr-top { display: flex; gap: 14px; align-items: stretch; margin: 0 0 12px; }
-svg.otr-trend { width: 560px; flex: none; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; }
-svg.otr-trend text { font-size: 16px; fill: #5b6b7d; }
-svg.otr-trend text.t { font-weight: 700; fill: #0b2540; }
-svg.otr-trend text.k { font-weight: 700; }
-svg.otr-trend line { stroke: #e3e8ef; }
-svg.otr-trend path { fill: none; stroke-width: 4; }
-svg.otr-trend .cur { stroke: var(--ud-blue); fill: var(--ud-blue); }
-svg.otr-trend path.cur, svg.otr-trend path.ly { fill: none; }
-svg.otr-trend .ly { stroke: #9aa8b8; fill: #9aa8b8; }
-.otr-trend.empty { width: 560px; padding: 14px; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; color: var(--muted); }
-table.otr-sheet { border-collapse: collapse; background: #fff; font-size: 16px; width: 100%; table-layout: fixed; }
 table.otr-sheet th, table.otr-sheet td { border: 1px solid #d3dae3; padding: 4px; height: auto; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-table.otr-sheet thead { position: sticky; top: 0; z-index: 2; }
-body.fill .scroll-list table.otr-sheet thead th { position: static; }
 table.otr-sheet thead th { background: #074c84; color: #fff; font-weight: 700; text-transform: none; letter-spacing: 0; font-size: 16px; white-space: normal; line-height: 1.15; vertical-align: bottom; }
-table.otr-sheet thead tr.sub th { background: #2f6aa0; font-weight: 600; padding: 4px 0; text-overflow: clip; }
 .otr-page .otr-fig small, .otr-page .otr-fig td small { font-size: 16px; }
-.otr-page .otr-fig input.otr-in { font-size: 16px; }
-table.otr-sheet .l { text-align: left; padding-left: 8px; }
-table.otr-sheet tr.wk td { border-top: 3px solid #074c84; }
-table.otr-sheet tr.tot td { background: #e8eef6; font-weight: 800; }
-table.otr-sheet tr.today td { background: #fff6d6; }
 table.otr-sheet td.z { color: #b3bcc7; }
-table.otr-sheet td.neg { color: #c62828; font-weight: 700; }
-table.otr-sheet td.pos { color: #2b8a3e; font-weight: 700; }
-table.otr-sheet td.ly { color: #5b6b7d; }
-table.otr-sheet .gap { background: #f4f6f9; border-color: #f4f6f9; padding: 0; }
 table.otr-sheet small.otr-by { display: block; font-size: 16px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 table.otr-bydate th.vh-th { height: 150px; }
-table.otr-bydate .vh { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; display: inline-block; text-align: left; }
 table.otr-bydate td { padding: 0; height: 36px; }
-table.otr-bydate td.l { padding-left: 8px; }
-table.otr-bydate input { width: 100%; height: 34px; border: 0; background: transparent; text-align: center; font: inherit; font-size: 16px; }
-table.otr-bydate input.otr-note { text-align: left; padding: 0 6px; }
-table.otr-bydate input:focus { outline: 2px solid var(--ud-blue); outline-offset: -2px; background: #fff; }
-table.otr-fuel { width: 560px; margin-top: 14px; }
-.otr-print-title { display: none; }
-@media print {
-  #print.otr-print .otr-kc, #print.otr-print .otr-top > :not(.otr-kc) { display: none; }
-  #print.otr-print .otr-top { display: none; }
-  #print.otr-print .otr-print-title { display: block; }
-  #print.otr-print table { width: 100%; table-layout: fixed; font-size: 10px; }
-  #print.otr-print th, #print.otr-print td { padding: 1px 2px; text-align: center; }
-  #print.otr-print .gap { border: 0; width: 3px; }
-  #print.otr-print input { border: 0; width: 100%; font: inherit; text-align: center; background: none; }
-  #print.otr-print .vh { writing-mode: vertical-rl; transform: rotate(180deg); }
-  #print.otr-print table.otr-fuel { width: 40%; margin-top: 8px; }
-}
 
 /* Driver Scorecard */
 .sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
-.sc.g-A { background: #e3f3e8; color: #1c6b3a; } .sc.g-B { background: #e6f0fb; color: #1d5b91; }
-.sc.g-C { background: #fff4d6; color: #8a5a00; } .sc.g-D { background: #fde8e8; color: #b42318; }
 .sc-board td.sc-ok { color: #1c6b3a; } .sc-board td.sc-bad { color: #b42318; font-weight: 700; }
-.sc-board td small, .sc-board th small { display: block; font-size: 16px; font-weight: 600; }
 .sc-board th.later, .sc-board td.later { color: #9aa9b8; }
-.sc-board tr[data-key] { cursor: pointer; }
-.sc-board tr.sc-open td { background: #e8f2fd; }
 .sc-board tr.sc-misses td { text-align: left; background: #f7fbfe; font-size: 16px; }
-.sc-board tr.sc-misses div { padding: 2px 0; }
-.sc-pts { color: #b42318; font-weight: 800; }
 .sc-period { font-size: 18px; color: var(--ud-blue); min-width: 170px; text-align: center; }
-.sc-set { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; padding: 4px; }
-.sc-set p { color: inherit; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.sc-set p.later { color: #9aa9b8; }
-.sc-n { width: 64px; height: 34px; border: 1px solid #b7c9d8; border-radius: 6px; text-align: center; font: inherit; font-weight: 700; }
-.sc-reasons { display: flex; flex-wrap: wrap; gap: 14px; }
-.sc-set .otr-card > button { align-self: flex-end; }
 
 /* Driver Assignment Board (Joe 10/10): the day box grows to fit; each run is on its own line and never split. The tab names never cut. */
 .weekly-page .board button.avail { height: auto; overflow: visible; }
@@ -966,14 +687,10 @@ table.otr-fuel { width: 560px; margin-top: 14px; }
 .head:has(#print-sheet) .coverage span { font-size: 16px; line-height: 1.1; letter-spacing: .03em; }
 .head:has(#print-sheet) .actions.in-head { align-self: flex-end; }
 /* Joe 10/11: Week Beginning a little narrower, Loadout Day shows only the weekday, Delivery Day a little wider (one day name). */
-.head:has(#print-sheet) #week-begin { width: 118px; min-width: 0; }
 .head:has(#print-sheet) #load-day { width: 140px; min-width: 0; }
-.head:has(#print-sheet) #delivery-day { width: 160px; }
 @media (max-width: 1700px) {
   .head:has(#print-sheet) .field .stepper input, .head:has(#print-sheet) .field .stepper select { min-width: 0; width: 150px; }
-  .head:has(#print-sheet) #week-begin { width: 118px; }
   .head:has(#print-sheet) #load-day { width: 140px; }
-  .head:has(#print-sheet) #delivery-day { width: 160px; }
   .head:has(#print-sheet) h1 { font-size: 26px; }
   .head:has(#print-sheet) .coverage { width: 82px; }
 }
@@ -997,17 +714,10 @@ table.otr-fuel { width: 560px; margin-top: 14px; }
 .side-flyouts a.on { background: #fff; color: #0b3d6b; }
 @media print { .side-flyouts { display: none !important; } }
 /* Equipment (Joe 10/10): Sun to Sat show each unit's default runs; today's column is marked. */
-th.eq-day, td.eq-day { padding-left: 2px !important; padding-right: 2px !important; font-size: 16px; text-align: center; white-space: normal; line-height: 1.1; }
-th.eq-day { text-transform: uppercase; }
-td.eq-day.today { background: #fff8e1; }
 td.eq-day.busy { color: #b3261e; font-weight: 800; }
-td.eq-day { font-size: 16px; font-weight: 800; overflow: visible !important; text-overflow: clip !important; }
-td.eq-day span { display: block; white-space: nowrap; }
 
 /* Equipment: Sync fleet list tile with the last sync beside it. */
 .head .actions.fleet-sync { display: flex; align-items: center; gap: 10px; flex: none; }
-.head .actions.fleet-sync #fleet-synced { font-size: 16px; color: #44515e; max-width: 260px; line-height: 1.25; }
-.head .actions.fleet-sync #fleet-synced.bad { color: #b3261e; font-weight: 600; }
 
 /* Route Editor: the action buttons are square, word-wrapped tiles in one row, like Daily and Weekly. */
 .actions.tiles { flex-wrap: nowrap; align-items: center; gap: 6px; }
@@ -1017,63 +727,25 @@ td.eq-day span { display: block; white-space: nowrap; }
   white-space: normal; line-height: 1.12; font-size: 16px; font-weight: 800; text-align: center; overflow-wrap: normal; hyphens: none;
 }
 @media (max-width: 1500px) { .actions.tiles > button, .actions.tiles > a.button { font-size: 16px; } }
-.day-table input.dcell::placeholder { color: #9aa7b4; font-style: italic; font-weight: 400; }
 .day-table td.day-notes { min-width: 160px; }
 
 /* Driver Weekly Template laid out like the current app's (Joe 10/10, old-screen picture): relief drivers first, names bold on
    the left, section lines on the left, every day shows + Add Run and Copy / Paste / Paste + Add, Save Template green top right. */
-.template-page .tpl-bar { align-items: center; gap: 10px; }
-.template-page .tpl-about { flex: 1; color: #4a5a6a; font-size: 16px; }
-.template-page button.go { background: #1f7a3a; border-color: #1f7a3a; color: #fff; font-weight: 800; }
 .template-page button.go:disabled { background: #8fbf9e; border-color: #8fbf9e; color: #fff; }
 .template-page .tpl tr.tpl-group td { text-align: left; text-transform: uppercase; letter-spacing: .04em; font-size: 16px; }
-.template-page .tpl td.tpl-name { text-align: left; font-weight: 900; font-size: 16px; color: #14202c; padding: 10px 8px; }
-.template-page .tcell.on { background: transparent; }
-.template-page .tcell select { height: 36px; font-size: 16px; }
-.template-page .tcell .tpl-add { display: block; margin: 7px 0 4px; padding: 0; border: 0; background: none; color: #175b92; font-weight: 800; font-size: 16px; cursor: pointer; }
-.template-page .tcell .tpl-add:disabled { color: #9aa9b7; cursor: default; }
-.template-page .tpl-tools, .template-page .tcell:hover .tpl-tools { visibility: visible; display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 4px; margin-top: 4px; }
-.template-page .tpl-tools .mini { font-size: 16px; padding: 6px 2px; white-space: normal; line-height: 1.1; color: #175b92; }
 
 /* Fleet & Maintenance hub (Joe 10/10, the current app's hub picture): count strip, four cards with pictures from the
    United Dairy icon library and their counts, the latest write-ups on the right. Every number opens its list in this window. */
-.hub-page .head .hub-tiles { margin-left: auto; }
-.hub-tiles > a.button { gap: 6px; max-width: 150px !important; min-width: 120px !important; }
-.hub-tiles > a.button img { width: 34px; height: 30px; object-fit: contain; flex: none; }
-.hub-view { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; padding-bottom: 14px; }
 .hub-page .kpis div { align-items: center; text-align: center; padding: 12px 10px; }
-.hub-page .kpis b { font-size: 34px; }
-.hub-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin: 0 16px; align-items: start; }
-.hub-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.hub-card { background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.hub-card.garage { border-top-color: #1d7a3e; }
-.hub-card-head { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; }
 .hub-card-head img { width: 96px; height: 76px; object-fit: contain; }
 .hub-card-head strong { font-size: 21px; line-height: 1.15; color: var(--ud-blue-dark); }
-.hub-card-head:hover strong { text-decoration: underline; }
-.hub-big { display: flex; flex-direction: column; align-items: flex-end; }
-.hub-big b { font-size: 44px; line-height: 1; color: var(--ud-blue-dark); }
 .hub-big small { font-size: 16px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .hub-wrench { width: 96px; height: 76px; border-radius: 12px; background: #e3f4e8; display: grid; place-items: center; }
 .hub-wrench svg { width: 46px; height: 46px; fill: none; stroke: #1d7a3e; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.hub-tiles4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.hub-tile { background: var(--band); border-radius: 9px; padding: 8px 4px; text-align: center; text-decoration: none; color: var(--ink); display: flex; flex-direction: column; gap: 2px; min-height: 64px; justify-content: center; }
-.hub-tile:hover { background: #d8e6f3; }
-.hub-tile b { font-size: 24px; color: var(--ud-blue-dark); line-height: 1.05; }
 .hub-tile span { font-size: 16px; font-weight: 700; color: var(--muted); line-height: 1.15; }
-.hub-tile.warn b { color: #b45f00; }
-.hub-tile.good b { color: #1d7a3e; }
-.hub-latest { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.hub-latest h2 { margin: 0; padding: 12px 16px; font-size: 18px; color: var(--ud-blue-dark); background: var(--band); }
-.hub-latest table { width: 100%; table-layout: fixed; }
-.hub-latest tbody tr { cursor: pointer; }
-.hub-latest td.wrong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Joe 10/10: the hub fits his screen with no scrolling: eleven write-ups, each a little shorter, ending in line with the cards. */
 .issues-page .hub-latest table.issues td { height: 40px; padding-top: 3px; padding-bottom: 3px; line-height: 1.15; }
-.issues-page .hub-latest table.issues th { height: 40px; }
 @media (max-width: 1500px) {
-  .hub-body { grid-template-columns: 1fr; }
-  .hub-card-head { grid-template-columns: 72px 1fr auto; }
   .hub-card-head img, .hub-wrench { width: 72px; height: 58px; }
 }
 .dc-icon.pic { background: #fff; border: 1px solid var(--line); }
@@ -1084,43 +756,11 @@ td.eq-day span { display: block; white-space: nowrap; }
    the envelope, Lessor | Garage (trucks) or To garage, Repaired and the red X. */
 .issues-page .head .title small a { color: var(--ud-blue); text-decoration: none; }
 .issues-page .head .title small a:hover { text-decoration: underline; }
-.issue-bar { margin: 0 16px; display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
-.issue-bar #search { margin-left: auto; width: 420px; max-width: 32vw; min-height: 44px; font-size: 16px; }
-.kind-tabs { display: flex; gap: 10px; }
 .kind-tabs button { min-height: 46px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; white-space: nowrap; }
-.kind-tabs button b { margin-left: 8px; display: inline-block; min-width: 26px; padding: 1px 7px; border-radius: 13px; background: #e1ebf5; color: var(--ud-blue-dark); font-size: 16px; text-align: center; }
-.kind-tabs button[aria-selected="true"] { background: #0f2e52; color: #fff; border-color: #0f2e52; }
-.kind-tabs button[aria-selected="true"] b { background: var(--ud-gold); color: #0f2e52; }
-.issue-bar .chips button { min-height: 34px; font-size: 16px; }
 table.old-issues thead th { background: #0f2e52; color: #fff; text-align: center; }
 table.old-issues td { text-align: center; }
-table.old-issues td.wrong { text-align: left; }
-table.old-issues .tick { color: #1d7a3e; font-size: 24px; font-weight: 900; line-height: 1; }
-table.old-issues .dash { color: #8a97a5; font-size: 20px; }
-table.old-issues input[data-review] { width: 26px; height: 26px; cursor: pointer; accent-color: #1d7a3e; }
-table.old-issues .count { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #eef2f6; font-weight: 800; }
-table.old-issues .count.repeat { background: #fdebd3; color: #b45f00; }
-.work-acts { display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 .work-acts button { min-height: 40px; padding: 0 12px; border-radius: 9px; font: inherit; font-weight: 800; cursor: pointer; border: 1px solid var(--line); background: #fff; white-space: nowrap; }
-.work-acts button:disabled { opacity: .45; cursor: default; }
-.work-acts .ic { width: 44px; padding: 0; font-size: 18px; color: var(--ud-blue-dark); }
-.work-acts .seg { display: inline-flex; }
-.work-acts .seg button { border-radius: 0; }
-.work-acts .seg .seg-l { background: #1f5f9e; color: #fff; border-color: #1f5f9e; border-radius: 9px 0 0 9px; }
-.work-acts .seg .seg-g { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; border-radius: 0 9px 9px 0; }
-.work-acts .to-garage { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; }
-.work-acts .done { background: #eaf7ee; color: #1d7a3e; border-color: #a9d8b8; }
-.work-acts .remove { color: #c62828; border-color: #f0b8b8; font-size: 20px; }
 tr.issue-more > td { background: #f6f9fc; text-align: left; padding: 10px 16px; font-weight: 600; }
-tr.issue-more p { margin: 6px 0; font-size: 16px; white-space: pre-wrap; }
-@media (max-width: 1500px) {
-  .kind-tabs button { font-size: 16px; padding: 0 12px; min-height: 40px; }
-  .issue-bar #search { width: 260px; }
-  .work-acts { gap: 5px; } .work-acts button { padding: 0 8px; min-height: 34px; font-size: 16px; } .work-acts .ic { width: 34px; }
-}
-.issue-bar .chips { flex-wrap: nowrap; }
-.issue-bar .chips button { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; padding: 0 12px; white-space: nowrap; }
-.issue-bar .chips button b { font-size: 16px; }
 
 /* One theme (Joe 10/10): every screen title starts with the same tile (a United Dairy icon library picture or a line icon),
    every count strip is centered like the current app's, and every table head and list button uses the same blue. */
@@ -1130,19 +770,13 @@ tr.issue-more p { margin: 6px 0; font-size: 16px; white-space: pre-wrap; }
 .title-pic svg { width: 22px; height: 22px; fill: none; stroke: var(--ud-blue); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .issues-page .kpis div { align-items: center; text-align: center; }
 table.old-issues thead th { background: var(--ud-blue); }
-.kind-tabs button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); }
-.kind-tabs button[aria-selected="true"] b { color: var(--ud-blue-dark); }
 
 /* Operational Assignments, Dispatch Settings and "being built" pages (Joe 10/10: nothing opens the old program). */
-.ops-note { margin: 0 16px 10px; color: #44515e; font-size: 16px; }
-.ops-sheet { max-width: 980px; }
 table.ops th, table.ops td { text-align: center; height: 48px; border-bottom: 1px solid var(--line); }
 table.ops thead th { background: var(--ud-blue); color: #fff; }
 table.ops td.strong { font-weight: 800; font-size: 17px; }
 table.ops td.muted { color: var(--muted); font-size: 16px; }
 table.ops tr.off td.strong { color: var(--muted); text-decoration: line-through; }
-table.ops input.ops-seq { width: 80px; height: 34px; text-align: center; font-size: 16px; }
-table.ops tr.adding input#new-name { width: 90%; }
 table.ops button.toggle { min-width: 70px; }
 .set-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 0 16px 16px; }
 .set-card, .soon-card { background: #fff; border: 1px solid #d5e1eb; border-top: 4px solid var(--ud-blue); border-radius: 14px; padding: 14px 18px; }
@@ -1155,49 +789,16 @@ table.set thead th { background: var(--ud-blue); color: #fff; }
 @media (max-width: 1100px) { .set-grid { grid-template-columns: 1fr; } }
 
 /* Fleet Service, mock-up A (Joe 10/10): one row per unit, colored words with a thin colored edge on each service cell. */
-table.fs-grid td.gc { text-align: left; padding: 6px 10px; white-space: normal; border-left: 5px solid transparent; }
-table.fs-grid td.gc b { display: block; font-size: 16px; }
-table.fs-grid td.gc small { display: block; font-size: 16px; color: #5a6b7d; }
-table.fs-grid td.gc.OVERDUE { border-left-color: #c62828; } table.fs-grid td.gc.OVERDUE b { color: #c62828; }
-table.fs-grid td.gc.DUE_SOON { border-left-color: #e5891a; } table.fs-grid td.gc.DUE_SOON b { color: #b45f00; }
-table.fs-grid td.gc.OK b { color: #1d7a3e; }
-table.fs-grid td.gc.SET_UP b, table.fs-grid td.gc.NO_MILES b { color: #5a6b7d; font-style: italic; }
-table.fs-grid td.gc.AT_GARAGE { border-left-color: #1f5f9e; } table.fs-grid td.gc.AT_GARAGE b { color: #1f5f9e; }
-.fs-legend { display: flex; align-items: center; margin: 0 0 8px; font-size: 16px; font-weight: 700; }
-.fs-legend em { margin-left: auto; font-style: normal; color: #5a6b7d; }
+table.fs-grid td.gc.OVERDUE { border-left-color: #c62828; }
+table.fs-grid td.gc.DUE_SOON { border-left-color: #e5891a; }
 
-/* Daily Dispatch, Joe's pick 10/10 (mock-up A): every row a white card with a blue edge, route numbers in blue,
-   delivery-day lines as blue banners, RUNS and Edit as round buttons. Rows still size to fit the window. */
-body.daily-look .sheet { background: transparent; border: 0; box-shadow: none; overflow: visible; }
-body.daily-look table.daily { border-collapse: separate; border-spacing: 0 5px; background: transparent; margin-top: -5px; }
-body.daily-look table.daily thead th { background: #0f2747; color: #fff; letter-spacing: .08em; border: 0; }
-body.daily-look table.daily thead th:first-child { border-radius: 10px 0 0 10px; }
-body.daily-look table.daily thead th:last-child { border-radius: 0 10px 10px 0; }
-body.daily-look table.daily tbody tr:not(.group) td { background: #fff; border: 0; border-top: 1px solid #dfe6ee; border-bottom: 1px solid #dfe6ee; }
-body.daily-look table.daily tbody tr:not(.group) td:first-child { border-left: 5px solid #1f6feb; border-radius: 10px 0 0 10px; }
-body.daily-look table.daily tbody tr:not(.group) td:last-child { border-right: 1px solid #dfe6ee; border-radius: 0 10px 10px 0; }
-body.daily-look table.daily tbody tr:not(.group):hover td { background: #f3f8ff; }
-body.daily-look table.daily td.route { font-weight: 900; color: #0b4fb3; font-size: calc(var(--font) + 2px); }
-body.daily-look table.daily tbody tr.group td { background: linear-gradient(90deg, #1f6feb, #6aa8ff) !important; color: #fff !important; font-weight: 900; letter-spacing: .1em; border-radius: 10px; text-align: left; padding-left: 14px; }
-body.daily-look table.daily td.missing { background: #fff1f0; color: #b3261e; box-shadow: inset 0 0 0 2px #f3b8b3; border-radius: 6px; }
-body.daily-look table.daily button.toggle.on { background: #16a34a; color: #fff; border-radius: 999px; border: 0; font-weight: 900; }
-body.daily-look table.daily button.edit { border-radius: 999px; background: #0f2747; color: #fff; border: 0; }
-body.daily-look table.daily td.pickup { color: #b3261e; font-weight: 900; }
 
 /* Joe 10/10: Home is the old app's launcher: one big picture card per side (Route Distribution, Plant Operations, Fleet & Maintenance). */
-.launch-title { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 4px 16px; margin: 18px 24px; }
 .launch-title h1 { margin: 0; font-size: 30px; font-weight: 900; color: #0b3d6b; }
 .launch-title p { margin: 0; grid-column: 1; color: #4a6b8d; font-size: 16px; }
-.launch-title #today { grid-column: 2; grid-row: 1 / span 2; align-self: center; padding: 8px 16px; border-radius: 10px; background: #eef5fc; color: #0b3d6b; font-weight: 800; }
-.launch-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin: 0 24px 24px; }
-.launch-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 22px 22px; border-radius: 18px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 8px 24px rgba(11, 61, 107, .10); color: #0b3d6b; text-decoration: none; text-align: center; transition: transform .12s, box-shadow .12s; }
-.launch-card:hover, .launch-card:focus-visible { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(11, 61, 107, .20); border-color: #1f6feb; }
-.launch-art { display: flex; align-items: center; justify-content: center; width: 100%; height: clamp(150px, 26vh, 260px); border-radius: 14px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
 .launch-art img { max-width: 78%; max-height: 88%; object-fit: contain; }
 .launch-card strong { font-size: 24px; font-weight: 900; margin-top: 6px; }
 .launch-card small { color: #4a6b8d; font-size: 16px; min-height: 2.6em; }
-.launch-card b { margin-top: 4px; padding: 10px 22px; border-radius: 999px; background: #0f2747; color: #fff; font-size: 16px; }
-@media (max-width: 900px) { .launch-grid { grid-template-columns: 1fr; } .launch-art { height: 140px; } }
 /* A side's name sits under Back and Home, so it is plain which side the menu belongs to. */
 .sidemenu a.side-name { margin-bottom: 6px; border-bottom: 1px solid #ffffff33; border-radius: 9px 9px 0 0; font-size: 16px; font-weight: 900; }
 /* Long screen names wrap onto a second line instead of being cut off. */
@@ -1238,94 +839,28 @@ body:not(.is-admin) .sidemenu a[href="administration.html"] { display: none; }
 /* The Administration Center: every item of the current app's Administration, grouped, same-size tiles. */
 
 /* The all-plants overview (the current app's Company Home): banner, six numbers, one card per plant. */
-.company-page #screen { background: #f3f6fa; }
-.co-hero { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 16px 16px 14px; padding: 22px 28px; border-radius: 18px; background: linear-gradient(100deg, #1768c6, #6fb0ef); color: #fff; box-shadow: 0 10px 26px rgba(23, 104, 198, .25); }
 .co-hero h1 { margin: 0; font-size: 32px; font-weight: 900; }
 .co-hero p { margin: 4px 0 0; font-size: 16px; opacity: .92; }
-.co-date { display: flex; flex-direction: column; align-items: center; padding: 10px 22px; border-radius: 12px; background: #fff; color: #0b3d6b; }
 .co-date small { font-size: 16px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #5a6b7d; }
 .co-date b { font-size: 18px; font-weight: 900; }
-.co-plants { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0 16px 24px; }
-.co-plant { display: flex; flex-direction: column; border-radius: 16px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 6px 18px rgba(11, 61, 107, .10); color: #0b3d6b; text-decoration: none; overflow: hidden; transition: transform .12s, box-shadow .12s; }
-.co-plant:hover, .co-plant:focus-visible { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(11, 61, 107, .18); }
-.co-plant header { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px; padding: 14px 18px; background: #0f2747; color: #fff; }
-.co-plant header .dot { width: 12px; height: 12px; border-radius: 50%; background: #20ad54; }
-.co-plant.planned header .dot { background: #9aa8b5; }
-.co-plant header strong { text-align: center; font-size: 20px; font-weight: 900; }
-.co-plant header em { font-style: normal; font-size: 16px; font-weight: 900; padding: 3px 10px; border-radius: 999px; background: #8996a3; color: #fff; }
-.co-plant header em.on { background: #20ad54; }
-.co-plant header span { font-size: 20px; }
-.co-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 14px 16px 6px; }
-.co-cell { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 10px; background: #f3f8ff; }
 .co-cell span { font-size: 16px; font-weight: 800; color: #4a6b8d; text-transform: uppercase; letter-spacing: .04em; }
 .co-cell b { font-size: 22px; font-weight: 900; }
-.co-cell.good b { color: #0c9a4b; } .co-cell.bad b { color: #b3261e; } .co-cell.warn b { color: #b86b00; }
-.co-recent { padding: 6px 16px 10px; }
-.co-recent h3 { margin: 6px 0; font-size: 16px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: #4a6b8d; }
-.co-act { display: grid; grid-template-columns: 150px 1fr auto auto; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid #edf1f5; font-size: 16px; }
 .co-act span { font-weight: 800; color: #4a6b8d; }
-.co-act b { font-weight: 900; } .co-act b.none { color: #8996a3; font-weight: 700; }
-.co-act i { font-style: normal; color: #4a6b8d; }
-.co-act time { font-weight: 800; }
-.co-plant footer { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 12px 18px; background: #eef5fc; font-weight: 800; }
-.co-plant footer b { font-size: 18px; }
-.co-plant footer em { margin-left: auto; font-style: normal; color: #1f6feb; }
-.co-soon { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; flex: 1; min-height: 260px; padding: 24px; text-align: center; color: #5a6b7d; }
+.co-act b { font-weight: 900; }
 .co-soon b { font-size: 20px; color: #0b3d6b; }
-.co-plant.planned { opacity: .92; }
-@media (max-width: 1200px) { .co-plants { grid-template-columns: 1fr; } }
 
 /* Joe 10/10: Administration like the current app's tab, only better: every item in a menu on the left, the item opens on the right. */
 body.embed .topbar, body.embed .sidemenu, body.embed .side-flyouts { display: none !important; }
 body.embed .side-main { margin-left: 0 !important; }
-.adm-shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; gap: 14px; padding: 12px 16px 14px; }
-.adm-shell[hidden] { display: none; }
-.adm-shell > .soon-card { grid-column: 1 / -1; }
-.adm-nav { min-height: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #dfe6ee; border-radius: 14px; box-shadow: 0 4px 14px rgba(11, 61, 107, .06); overflow: hidden; }
-.adm-nav-head { padding: 14px 14px 10px; border-bottom: 1px solid #e6ecf2; display: flex; flex-direction: column; gap: 10px; }
 .adm-nav-head h1 { margin: 0; font-size: 22px; font-weight: 900; color: #0b3d6b; }
-.adm-nav-head input { min-height: 40px; padding: 0 12px; border: 1px solid #cfd9e3; border-radius: 9px; font: inherit; }
-.adm-nav-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px 12px; }
-.adm-nav-group h2 { margin: 12px 8px 4px; font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; color: #5a6b7d; }
-.adm-item { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 5px 8px; border: 0; border-radius: 9px; background: none; color: #0b3d6b; font: inherit; font-size: 16px; font-weight: 700; text-align: left; cursor: pointer; }
-.adm-item:hover { background: #eef5fc; }
-.adm-item.on { background: #0b3d6b; color: #fff; }
-.adm-item .adm-name { flex: 1; min-width: 0; }
-.adm-item em { flex: none; font-style: normal; font-size: 16px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: #f1f3f5; color: #6a7885; }
-.adm-item.on em { background: rgba(255, 255, 255, .18); color: #fff; }
-.adm-ic { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
 .adm-ic img { max-width: 28px; max-height: 24px; object-fit: contain; }
-.adm-ic svg { width: 19px; height: 19px; fill: none; stroke: #1f6feb; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.adm-ic.big { width: 48px; height: 48px; border-radius: 12px; }
-.adm-ic.big img { max-width: 42px; max-height: 36px; }
 .adm-ic.big svg { width: 26px; height: 26px; }
-.adm-none { margin: 14px 8px; color: #5a6b7d; }
-.adm-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #dfe6ee; border-radius: 14px; box-shadow: 0 4px 14px rgba(11, 61, 107, .06); overflow: hidden; }
-.adm-panel-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid #e6ecf2; background: linear-gradient(180deg, #f7fafd, #fff); }
-.adm-panel-head > div:not(.adm-actions) { flex: 1; min-width: 0; }
-.adm-panel-head h2 { margin: 0; font-size: 20px; font-weight: 900; color: #0b3d6b; }
 .adm-panel-head small { display: block; color: #4a6b8d; font-size: 16px; line-height: 1.35; }
-.adm-actions { flex: none; display: flex; gap: 8px; }
 .adm-actions .button { min-height: 40px; min-width: 170px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: #0b3d6b; color: #fff; font-weight: 800; text-decoration: none; }
-.adm-actions .button:hover { background: #1f6feb; }
 body.embed .head > .title { display: none; }
-.adm-state { font-size: 16px; font-weight: 800; padding: 6px 14px; border-radius: 999px; background: #f1f3f5; color: #6a7885; }
-.adm-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: #f2f5f9; }
-.adm-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; overflow: hidden; }
 .adm-view .scroll-list { flex: 1; min-height: 0; overflow: auto; border: 1px solid #e6ecf2; border-radius: 10px; }
 .adm-view .scroll-list thead th { position: sticky; top: 0; z-index: 1; }
-.adm-table { width: 100%; border-collapse: collapse; font-size: 16px; }
-.adm-table th { background: #0b3d6b; color: #fff; text-align: center; padding: 9px 10px; font-size: 16px; text-transform: uppercase; letter-spacing: .03em; }
-.adm-table td { text-align: center; padding: 8px 10px; border-bottom: 1px solid #e6ecf2; }
-.adm-table td.strong { font-weight: 800; color: #0b3d6b; }
-.adm-table .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 16px; font-weight: 800; }
-.adm-table .pill.good { background: #e3f3e8; color: #1c6b3a; }
-.adm-table .pill.muted { background: #f1f3f5; color: #6a7885; }
-.adm-loading { color: #5a6b7d; }
-.adm-soon { margin: 30px auto; max-width: 620px; text-align: center; padding: 28px; border: 1px dashed #c9d5e1; border-radius: 14px; background: #f9fbfd; }
-.adm-soon h3 { margin: 0 0 8px; font-size: 20px; color: #0b3d6b; }
 .adm-soon p { margin: 6px 0; color: #34495e; }
-@media (max-width: 900px) { .adm-shell { grid-template-columns: 1fr; } .adm-nav { max-height: 40vh; } }
 
 /* Phones (360-480 wide): the header title wraps beside a smaller logo and never runs under the initials or Sign out. */
 @media (max-width: 480px) {
@@ -1345,40 +880,14 @@ body.embed .head > .title { display: none; }
 /* Joe 10/10: a whole card opens its screen; a line or number inside opens that screen. */
 [data-card], [data-open] { cursor: pointer; }
 [data-open]:hover { background-color: rgba(31, 111, 235, .08); border-radius: 8px; }
-.co-plant header a { color: #fff; text-decoration: none; text-align: center; }
-.co-plant footer > a { margin-left: auto; color: #1f6feb; text-decoration: none; }
-.co-plant footer > a:hover { text-decoration: underline; }
-.co-plant footer > span { padding: 2px 6px; }
 
 /* Weekly Dispatch (Joe 10/10): names never run into the drop-down arrow; a day marked not running that still holds a
    driver shows the driver, light and dashed, never black; the editor says why truck and trailer wait for a driver. */
-.weekly-page #routes-sheet td.day .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.weekly-page #routes-sheet td.day.c-notrun { color: #5d7286; }
-.weekly-page #routes-sheet td.day.c-notrun::before { background: #eef1f4; border: 1px dashed #9aa9b7; }
-.weekly-page #routes-sheet td.day .notrun { display: block; margin-top: 1px; font-style: normal; font-size: 16px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #a35b00; }
 .popover select:disabled { background: #f1f3f5; color: #6b7785; cursor: not-allowed; }
 
-/* Route Run Days (Joe 10/10): a little wider so every route and run reads in full; day over date like the board;
-   all seven days fit with no sideways scrollbar. */
-.modal.wide-modal#days-modal { width: min(960px, calc(100vw - 32px)); }
-#days-modal .down-list { overflow-x: hidden; }
-#days-modal .down-list table { width: 100%; table-layout: fixed; }
-#days-modal thead th { line-height: 1.15; padding: 6px 2px; }
-#days-modal thead th small { display: block; font-size: 16px; font-weight: 700; letter-spacing: .03em; opacity: .85; }
-#days-modal thead th:nth-child(1) { width: 62px; }
-#days-modal thead th:nth-child(2) { width: 200px; }
-#days-modal tbody td { padding: 0 3px; }
-#days-modal tbody td:nth-child(2) { text-align: left; padding-left: 8px; }
-#days-modal #days-rows button.toggle { width: 100%; max-width: 84px; padding: 0 4px; }
-/* Weekly (Joe 10/10): the driver drop-down opens right on the clicked box, like the current screen. */
-.popover.cell-pick { display: block; padding: 0; border: 0; border-radius: 7px; background: transparent; box-shadow: 0 0 0 2px var(--ud-gold), 0 6px 18px rgba(0,0,0,.25); }
-.popover.cell-pick select { width: 100%; height: 100%; border: 1px solid #bfd1e0; border-radius: 7px; background: #fff; color: #0e3a62; text-align: center; text-align-last: center; font-size: 16px; font-weight: 850; }
 
 /* Vacation Schedule (Joe 10/10): one View drop-down in place of the five filter buttons, and Print for the list shown. */
-.vac-view { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
 .vac-view select { height: 38px; min-width: 190px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--ud-blue); background: #fff; cursor: pointer; }
-#day-modal .notice.error { margin: 0 0 10px; }
-@media print { body:has(#print .vac-print) { background: #fff !important; } #print .vac-print-sub { margin: 0 0 8px; font-size: 12px; } #print table.vac-print { width: 100%; font-size: 12px; } #print table.vac-print :is(td, th):is(:first-child, :last-child) { text-align: left; } }
 
 /* Readable tables (Joe 10/10): Daily, Driver Check-ins and Sheet Conflicts keep 16px rows; a busy day scrolls inside the table. */
 .sheet.fit-scroll { overflow-y: auto !important; overflow-x: hidden; }
@@ -1409,76 +918,21 @@ body.side-folded .sidemenu .side-toggle { align-self: center; margin: 2px 0 6px;
   body.has-side .topbar:has(.test-copy-badge) .hdr-nav { flex: 1 1 calc(100% - 120px); }
 }
 
-/* Joe 10/11 (review item 1): Daily Dispatch on a phone. The top boxes wrap onto more lines, and the table keeps every
-   column at readable 16px text: it scrolls sideways with the Route column pinned, and a long day scrolls under a
-   sticky heading. Phones only; laptops and desk screens keep their one-line layout. */
-@media (max-width: 700px) {
-  body.daily-look .head:has(#print-sheet) { flex-wrap: wrap; row-gap: 8px; align-items: flex-end; }
-  body.daily-look .head:has(#print-sheet) .title { flex-basis: 100%; }
-  body.daily-look .head:has(#print-sheet) h1 { font-size: 24px; }
-  body.daily-look .head:has(#print-sheet) .actions.in-head { flex-wrap: wrap; width: 100%; margin-left: 0; justify-content: flex-start; gap: 8px; }
-  body.daily-look .sheet, body.daily-look .sheet.fit-scroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-  body.daily-look table.daily { min-width: 1250px; }
-  body.daily-look table.daily td, body.daily-look table.daily th { font-size: 16px !important; height: 44px; }
-  body.daily-look table.daily td.route { font-size: 18px !important; }
-  body.daily-look table.daily thead th { position: sticky; top: 0; z-index: 3; white-space: normal; line-height: 1.1; }
-  body.daily-look table.daily tbody tr:not(.group) td:first-child { position: sticky; left: 0; z-index: 1; }
-  body.daily-look table.daily thead th:first-child { left: 0; z-index: 4; }
-  body.daily-look table.daily col:first-child { width: 84px !important; }
-  body.daily-look table.daily thead th { letter-spacing: .03em; }
-  body.daily-look table.daily tbody tr.group td { overflow: visible; }
-  body.daily-look table.daily tbody tr.group td .gtext { display: inline-block; position: sticky; left: 14px; }
-  body.daily-look .footer { flex-wrap: wrap; }
-}
 
 /* Table text (Joe's standing rule, 10/10): tables keep about 16px text and scroll under a sticky header; they never shrink
    text to fit. A cell whose text still does not fit at 15px wraps onto a second line instead of being cut off. */
 td.fit-wrap, td.fit-wrap * { white-space: normal !important; text-overflow: clip !important; overflow-wrap: break-word; }
-.weekly-page #routes-sheet td.day.fit-wrap .nm { line-height: 1.05; }
-.weekly-page #routes-sheet td.day:not(.off) { font-size: 16px; }
 .weekly-page .week th small { font-size: 16px; }
-.weekly-page #routes-sheet td.day .notrun { font-size: 16px; }
 .weekly-page .board td { font-size: 16px; }
 .weekly-page .board td.strong { font-size: 16px; }
 .weekly-page .board td.day.many { font-size: 16px; }
-.weekly-page #routes-sheet td.day.editable:not(.off)::after { font-size: 16px; }
 /* Equipment: the day columns show the run each unit is on at the same size as the rest of the row. */
-th.eq-day { font-size: 16px; }
-td.eq-day { font-size: 16px; }
 .equipment-page span.tag, table td span.tag { font-size: 16px; }
 table td button.warn { font-size: 16px; }
 /* Vacation calendar day box: Edit and Remove on each entry (Remove asks twice); a name on the calendar opens it to edit. */
-.day-row .day-acts { display: inline-flex; gap: 4px; flex: none; }
-.day-row .day-acts button { min-height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
 .day-row .day-acts button.danger { color: #b3261e; border-color: #e7b4b0; }
 .day-row .day-acts button.armed { background: #b3261e; color: #fff; border-color: #b3261e; }
-.day-row.editing { border-color: var(--ud-blue); box-shadow: inset 4px 0 0 var(--ud-blue); }
-.day-row > div { min-width: 0; flex: 1; }
-.calendar .cday span[data-vac-id]:hover { outline: 2px solid var(--ud-blue); outline-offset: -1px; }
-.modal.wide-modal#day-modal { width: min(1040px, calc(100vw - 32px)); }
-#day-modal .day-body { grid-template-columns: 1.15fr 1fr; }
-#day-modal .day-row { flex-wrap: wrap; }
-#day-modal .day-row > div:first-child { flex: 1 1 200px; }
-#day-modal .day-row b { white-space: nowrap; margin-right: 6px; }
 
-/* Route Distribution home (review item 16): the Dispatch and Drivers cards carry the current app's quick staffing numbers,
-   Covered % and drivers Available today, as a fifth tile. */
-.card.home4 .dc-metrics.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-/* Route Editor tools (old Route Editor, review item 14): Recap totals, Load Order up / down, Route Details for many runs. */
-.routes-page .recap-totals { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 0 16px 8px; }
-.routes-page .recap-totals > div { padding: 10px 8px; text-align: center; background: #edf6ff; border: 1px solid #c6dced; border-radius: 12px; color: #0e3a62; }
-.routes-page .recap-totals strong { display: block; font-size: 28px; line-height: 1.1; }
-.routes-page .recap-totals span { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
-.routes-page .recap-totals p { grid-column: 1 / -1; margin: 0; font-size: 16px; color: var(--muted); }
-.routes-page .recap-totals[hidden] { display: none; }
-.routes-page table.routes.recap tfoot td { text-align: center; position: sticky; bottom: 0; z-index: 1; background: #e3edf6; font-weight: 800; color: #0e3a62; border-top: 2px solid #9fbbe0; }
-.routes-page table.routes.seq td.move { padding: 3px 4px; white-space: nowrap; }
-.routes-page table.routes.many td:has(> select.rf) { padding: 3px 4px; }
-.routes-page table.routes.many select.rf { width: 100%; height: 34px; border: 1px solid #c5d3df; border-radius: 6px; font: inherit; font-weight: 700; color: var(--ink); background: #fff; }
-.routes-page table.routes.many input[type="checkbox"].rf { width: 22px; height: 22px; margin: 0; cursor: pointer; accent-color: #0e4f87; }
-.routes-page table.routes.many input[type="checkbox"].rf:disabled { cursor: default; }
-/* Route Week Override: Reset asks twice (the button turns orange and says Click Again). */
-.routeweek-page #reset.armed { background: #b45309; color: #fff; border-color: #b45309; }
 /* Improvements 10/10: an error stays readable above an open pop-up's dimmed backdrop. */
 .notice.error:not([hidden]) { position: relative; z-index: 30; }
 /* Joe 10/11 (polish pass, item 1): the top buttons keep their words on one line, all the same height; each button is as wide
@@ -1498,8 +952,6 @@ table td button.warn { font-size: 16px; }
 @media (max-width: 1700px) { .head:has(#print-sheet) .coverage { width: auto; } }
 .head:has(.actions.in-head) { flex-wrap: wrap; row-gap: 8px; }
 .head .actions.in-head { margin-left: auto; }
-.hub-tiles > a.button { max-width: none !important; min-width: var(--top-btn-w, 0) !important; width: var(--top-btn-w, auto) !important; }
-.hub-tiles > a.button span { white-space: nowrap; }
 .head .actions.in-head.top-row :is(#prev, #next) { height: 42px; min-height: 42px; }
 body .head :is(.sc-btn, .tp-btn, .sc-today):not(.small) { height: 42px; min-height: 42px; white-space: nowrap; }
 /* Polish item 7 (Joe 10/11): a zero count is plain grey, never orange or red. */
@@ -1508,14 +960,6 @@ body.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: var(-
 .temp-page .head .actions.in-head.top-row > .tp-btn { width: var(--top-btn-w, auto); min-width: var(--top-btn-w, 0); height: 42px; min-height: 42px; }
 .head:has(#print-sheet) { flex-wrap: wrap; }
 
-/* Fleet Service report: the Reviewed by / Date line under the week's work (the current app's sign-off). */
-#print .print-sign { margin: 18px 0 6px; font-weight: 700; }
-/* Weekly: the Publish note and the read-only / preview notes (Joe 10/11, review item 6). */
-.wk-note { margin: 0 16px 8px; padding: 8px 14px; border-radius: 10px; font-size: 16px; font-weight: 600; }
-.wk-note.warn { background: #fff4d6; color: #6b4b00; border: 1px solid #f0d58a; }
-.wk-note.good { background: #e3f4e8; color: #1d5b2f; border: 1px solid #a9d8b6; }
-/* Polish item 2 (Joe 10/11): the screen an old-app Dispatch Administration card opens, in small grey under its words. */
-.admin-card .admin-opens { display: block; margin-top: 6px; font-style: normal; font-size: 16px; font-weight: 700; color: #6b7a89; }
 /* Polish 13: status tags read in normal case ("Approved", "Manual only"); the stored words stay as they are. */
 span.status, .vstatus, .temp-page .tp-status, .nice-case { display: inline-block; text-transform: lowercase; }
 span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-letter, .nice-case::first-letter { text-transform: uppercase; }
@@ -1525,11 +969,6 @@ span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-
 /* Polish 11: Fleet Service tabs even and on one line (an empty count no longer pads a tab), and the long subtitle wraps under
    under the title. */
 .issues-page .tabs button b:empty { display: none; }
-.fleet-page .head .tabs { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
-.fleet-page .head .tabs button { white-space: nowrap; height: 42px; min-height: 42px; }
-.fleet-page .head .title { flex: 1 1 300px; min-width: 260px; }
-.fleet-page .head .title small { white-space: normal; display: block; }
-.fleet-page .head .title h1 { white-space: nowrap; }
 /* Polish 23: on a phone the header never squeezes the app name into a one-letter column (Phone Screens, Garage Station):
    with the Administration button (or on the garage tablet) the logo stands alone, and buttons keep their words on one line. */
 @media (max-width: 480px) {
@@ -1540,58 +979,19 @@ span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-
 /* Polish 16: the no-connection bar. */
 .offline-bar { position: sticky; top: 0; z-index: 1000; background: #fff3c4; color: #6b4d00; border-bottom: 2px solid #e5b800; padding: 10px 16px; font-size: 16px; font-weight: 800; text-align: center; }
 .offline-bar[hidden] { display: none; }
-/* Joe 10/11: the plant home stays blank for the moment it takes to know whether this person starts on the all-plants overview. */
-body.deciding #screen { visibility: hidden; }
 
-/* Daily Dispatch (Joe 10/12): a manager grabs the line itself with the hand and drags it up or down; no grab dots, no arrows.
-   The row being moved is shaded; a blue line shows where it lands (js/row-drag.js, review item 75). */
-body.daily-look table.daily tr.mover td { cursor: grab; }
-body.daily-look table.daily tr.mover td button, body.daily-look table.daily tr.mover td input, body.daily-look table.daily tr.mover td select { cursor: pointer; }
-body.daily-look table.daily tr.row-dragging td { background: #e8f1fa !important; }
 /* Weekly Dispatch: the same grab-and-drag (Joe 10/12). A finger drags from the Route or Run box; the rest of the line scrolls. */
 .weekly-page #rows tr.mover td { cursor: grab; }
 .weekly-page #rows tr.row-dragging td { background: #e8f1fa !important; }
 .weekly-page #rows tr.mover td:nth-child(-n+2), body.daily-look table.daily tr.mover td:nth-child(-n+2) { touch-action: none; }
 
-/* Truck Issues at 1920 with Windows display scaling (Joe 10/11): Reviewed, Emailed and Garage give up a little width so every
-   Work Actions button, the ✕ included, shows whole, and the top row shrinks the search box instead of running off the edge. */
-.issue-bar #search { flex: 1 1 200px; width: auto; min-width: 150px; max-width: 420px; }
-.issue-bar .kind-tabs, .issue-bar .chips { flex: none; }
-.work-acts { gap: 6px; }
-.work-acts button { flex: none; padding: 0 10px; white-space: nowrap; }
-.work-acts .ic { width: 40px; }
-table.old-issues th { padding-left: 4px; padding-right: 4px; }
 
 /* Joe 10/11: a load whose regular driver is off that day (vacation, sick, unpaid...) is red until someone covers it. The
    words come from data-cover so the cell itself stays empty for typing a driver. */
 body.daily-look table.daily td.missing.offcover, table.daily td.missing.offcover { background: #f5c6c8 !important; color: #9b1c3a; box-shadow: inset 0 0 0 2px #ee3e3e; font-weight: 800; }
-table.daily td.offcover::before { content: attr(data-cover); font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 
-/* Daily Dispatch, Sunday: the Sunday deliveries already loaded Saturday are shown for reference, a little quieter than
-   what is loading today. */
-body.daily-look table.daily tbody tr.group.loaded.already td { background: linear-gradient(90deg, #64748b, #94a3b8) !important; }
-body.daily-look table.daily tbody tr.group.loaded.already td .gtext, body.daily-look table.daily tbody tr.group.loaded.already td { color: #fff !important; }
-body.daily-look table.daily tbody tr.already:not(.group) td { background: #f6f8fb; }
-body.daily-look table.daily tbody tr.already:not(.group) td:first-child { border-left-color: #94a3b8; }
 
-/* Joe 10/11: six cards after picking a plant, three to a row; the pictures shrink so both rows fit a 1920x1080 or 1536x864 screen. */
-.launch-grid.six { gap: 18px; }
-.launch-grid.six .launch-card { padding: 16px 18px 16px; gap: 6px; }
-.launch-grid.six .launch-art { height: clamp(110px, calc((100vh - 560px) / 2), 230px); }
-.launch-grid.six .launch-card strong { font-size: 22px; margin-top: 2px; }
-.launch-grid.six .launch-card small { min-height: 2.4em; }
-.launch-art svg.launch-icon { width: auto; height: 70%; fill: none; stroke: #0b3d6b; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
-.launch-art { position: relative; overflow: hidden; }
-.launch-card.building .launch-art img, .launch-card.building .launch-art svg { opacity: .55; }
-/* Joe 10/11: Plant Production and Plant Maintenance use his own pictures with the banner already on them, at full colour.
-   The clean pictures (plant-production-v1-*, plant-maintenance-v1-*) are kept in the library for when those modules are built. */
-.launch-card.banner-pic .launch-art img { opacity: 1; }
 /* Joe 10/11: Under Construction modules open only for Administrators; anyone else sees the card but cannot open it. */
-.launch-card .uc-admin-only { display: none; }
-body:not(.is-admin) .launch-card.building { cursor: not-allowed; }
-body:not(.is-admin) .launch-card.building:hover, body:not(.is-admin) .launch-card.building:focus-visible { transform: none; }
-body:not(.is-admin) .launch-card.building .open-text { display: none; }
-body:not(.is-admin) .launch-card.building .uc-admin-only { display: inline-block; background: #e6ebf1; color: #4a5a6b; }
 body:not(.is-admin) .sidemenu a[data-building], body:not(.is-admin) .side-flyouts a[data-building] { opacity: .5; pointer-events: none; }
 body.uc-locked #screen > :not(.topbar):not(.uc-refused) { display: none !important; }
 .uc-refused .button { display: inline-flex; align-items: center; height: 44px; padding: 0 22px; border-radius: 999px; background: #0f2747; color: #fff; font-weight: 800; font-size: 16px; text-decoration: none; }
@@ -1599,37 +999,9 @@ body.uc-locked #screen > :not(.topbar):not(.uc-refused) { display: none !importa
   box-shadow: 0 10px 30px rgba(11, 61, 107, .12); text-align: center; color: #0b3d6b; }
 .uc-refused h1 { margin: 0 0 12px; font-size: 26px; }
 .uc-refused p { margin: 0 0 22px; font-size: 18px; color: #3b4b5c; }
-.uc-banner { position: absolute; left: -12%; right: -12%; top: 50%; transform: translateY(-50%) rotate(-9deg); padding: 9px 0; text-align: center;
-  background: #ffc61a; color: #1b1b1b; font-size: 20px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase;
-  border-top: 7px solid transparent; border-bottom: 7px solid transparent;
-  border-image: repeating-linear-gradient(45deg, #1b1b1b 0 12px, #ffc61a 12px 24px) 7; box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
-/* Joe 10/11: the Reports module: every report as a card, grouped by where it comes from. */
-.rc-page #rc-groups { padding: 4px 24px 24px; overflow: auto; }
-.rc-group h2 { margin: 14px 0 10px; font-size: 18px; font-weight: 900; color: #0b3d6b; letter-spacing: .02em; }
-.rc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.rc-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 6px 18px rgba(11, 61, 107, .08); color: #0b3d6b; text-decoration: none; transition: transform .12s, box-shadow .12s; }
-.rc-card:hover, .rc-card:focus-visible { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(11, 61, 107, .18); border-color: #1f6feb; }
-.rc-icon { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 58px; height: 58px; border-radius: 12px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
-.rc-icon svg { width: 32px; height: 32px; fill: none; stroke: #0b3d6b; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.rc-icon img { max-width: 46px; max-height: 46px; }
-.rc-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.rc-text strong { font-size: 18px; font-weight: 900; }
-.rc-text small { color: #4a6b8d; font-size: 16px; }
-.rc-card > b { font-size: 20px; color: #1f6feb; }
-@media (max-width: 1100px) { .rc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 700px) { .rc-grid { grid-template-columns: 1fr; } }
 
-/* Joe 10/12: seven cards after picking a plant (Safety Walkthrough next to Reports), four to a row (mock-up A). */
-.launch-grid.six.seven { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.launch-grid.six.seven .launch-card { padding: 14px 14px 14px; }
-.launch-grid.six.seven .launch-card strong { font-size: 21px; }
-@media (max-width: 1200px) { .launch-grid.six.seven { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 900px) { .launch-grid.six.seven { grid-template-columns: 1fr; } }
 
 /* Joe 10/12: a down truck or trailer still on a load (Daily Dispatch banner; Weekly unit text). */
-.notice.warning.down-loads { margin: 0 16px 8px; background: #fde8e8; color: #9b1c1c; border: 2px solid #ee3e3e; border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
-.notice.warning.down-loads[hidden] { display: none; }
-.notice.warning.down-loads button { background: #b3261e; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-size: 16px; font-weight: 700; cursor: pointer; }
 .week td.day .unit .unit-down { color: #b3261e; font-weight: 800; }
 
 /* Joe 10/12: Daily Dispatch keeps the picked day; "Go to today" shows when it is not today. The week-change warning. */
@@ -1652,36 +1024,15 @@ body.row-drag-on, body.row-drag-on * { cursor: grabbing !important; user-select:
 .row-drop-line { position: absolute; height: 3px; background: #1f6feb; z-index: 60; pointer-events: none; }
 
 /* Equipment: fleet list sync preview (Joe 10/12). Text 16px; the list scrolls under a sticky head. */
-.fp-modal { width: min(1180px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 10px; font-size: 16px; }
-.fp-modal h2 { margin: 0; }
-.fp-note { margin: 0; color: #44515e; }
-.fp-sum { display: flex; flex-wrap: wrap; gap: 8px 24px; }
-.fp-sum div b { margin-right: 8px; color: var(--ud-blue-dark); }
-.fp-sum .bad { color: #b3261e; }
-.fp-modal .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.fp-modal .chip { min-height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
-.fp-modal .chip.on { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
-.fp-list { max-height: calc(100vh - 330px); min-height: 160px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; -webkit-overflow-scrolling: touch; }
-.fp-list table { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: fixed; }
-.fp-list th { position: sticky; top: 0; background: var(--ud-blue-dark, #0b3a66); color: #fff; text-align: left; padding: 8px 10px; font-size: 16px; }
-.fp-list td { padding: 6px 10px; border-top: 1px solid var(--line); text-align: left; overflow-wrap: break-word; white-space: normal; text-overflow: clip; overflow: visible; }
 .fp-list tr.fp-inactive td:nth-child(3) { color: #b3261e; font-weight: 700; }
-.fp-list tr.fp-back td:nth-child(3), .fp-list tr.fp-added td:nth-child(3) { color: #1b7a3a; font-weight: 700; }
-.fp-modal .modal-actions { margin-top: 0; }
-.fp-modal .modal-actions button { font-size: 16px; }
 
 /* Route names (Joe 10/12): Route, Route Name and Run Name typed over in the Route Editor's own columns. */
-.routes-page .name-help { margin: 0 16px 8px; padding: 8px 12px; background: #edf6ff; border: 1px solid #c6dced; border-radius: 10px; color: #0e3a62; font-size: 16px; font-weight: 600; line-height: 1.35; }
-.routes-page .name-help b { font-weight: 800; }
-table.routes td.name-cell { padding: 2px 4px; text-align: left; }
 table.routes input.nm { width: 100%; height: calc(var(--row) - 6px); border: 1px solid transparent; border-radius: 6px; background: transparent; font: inherit; color: inherit; padding: 0 6px; text-overflow: ellipsis; }
 table.routes input.nm:not([readonly]) { cursor: text; }
 table.routes input.nm:not([readonly]):hover { border-color: #bcd0e3; }
 table.routes input.nm:focus { border-color: var(--ud-blue); background: #fff; color: var(--ink); outline: none; }
-table.routes caption.name-help { caption-side: top; text-align: left; margin: 0 0 8px; }
 table.routes input.nm:not([readonly]) { border-color: #bcd0e3; background: #fff; }
 table.routes td.locked { background: #e3e7ec; color: #333; }
-table.routes td.screen-name { text-align: left; color: var(--ud-blue); }
 
 /* Loadout Center: more loads loading than the loadout's limit (a manager went past it). */
 .notice.warning.over-limit { margin: 0 16px 8px; background: #fff4d6; color: #7a4b00; border: 2px solid #f0b429; border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; }
@@ -1690,49 +1041,11 @@ table.routes td.screen-name { text-align: left; color: var(--ud-blue); }
 /* Review item 2 (Joe 10/13): date boxes read 10-8-26 (app.js dressDate). */
 input[type="date"].ud-date-dressed::-webkit-datetime-edit { color: transparent; }
 .ud-date-face { position: absolute; z-index: 1; display: flex; align-items: center; pointer-events: none; white-space: nowrap; overflow: hidden; color: inherit; }
-/* Review item 1 (Joe 10/13): Daily's top buttons sit on the title line with the date boxes on the right (laptops and desk
-   screens; a phone keeps its wrapped layout). */
-@media (min-width: 701px) {
-  /* With wider letters than Windows' (Linux's DejaVu, which the online checks use) the date boxes drop under the buttons
-     instead of running past the right edge; on Joe's screens they stay on the line. */
-  body.daily-look .head:has(#print-sheet) { flex-wrap: wrap; row-gap: 6px; align-items: flex-end; gap: 10px; }
-  body.daily-look .head:has(#print-sheet) .title { flex: none; }
-  body.daily-look .head:has(#print-sheet) .actions.in-head { margin-left: 0; flex-wrap: nowrap; gap: 6px; }
-  body.daily-look .head:has(#print-sheet) .actions.in-head + .field { margin-left: auto; }
-}
-body.daily-look #delivers { display: none; }
-@media (min-width: 701px) and (max-width: 1899px) {
-  /* Room for one line at 1536: Delivery day shows beside Loadout day, buttons and arrows are a little tighter. */
-  body.daily-look .head:has(#print-sheet) { gap: 8px; }
-  body.daily-look .head:has(#print-sheet) .field:has(#delivery-day) { display: none; }
-  body.daily-look #delivers { display: block; }
-  body.daily-look .head:has(#print-sheet) .actions.in-head :is(button, a.button) { padding: 0 8px; }
-  body.daily-look .head:has(#print-sheet) .coverage { min-width: 0; padding: 1px 6px; }
-  body.daily-look .head:has(#print-sheet) .stepper button { padding: 0 6px; }
-  body.daily-look .head:has(#print-sheet) #week-begin { width: 84px; }
-  body.daily-look .head:has(#print-sheet) #load-day { width: 112px; }
-}
-/* Review item 12 (Joe 10/13): one Copy / Paste / Paste + Add per driver line, under the driver's name. */
-.template-page td.tpl-name .tpl-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; visibility: visible; }
-.template-page td.tpl-name .tpl-tools .mini { font-size: 16px; padding: 6px 8px; white-space: nowrap; line-height: 1.1; }
 /* Review item 11 (Joe 10/13): Driver Check-ins' New phone code is a normal-size button. */
 .footer button#new-code { font-size: 16px; height: 40px; padding: 0 16px; border-radius: 9px; align-self: center; }
-/* Review item 6 (Joe 10/13): Route Week Override's day boxes read RUNS or OFF on one line at readable size. */
-.routeweek-page .rw-day, .routeweek-page .rw-shell .rw-day { font-size: 16px; min-height: 32px; }
-/* Review item 7 (Joe 10/13): the Route Editor's top line holds the title, the buttons and then the filters on the right. */
-@media (min-width: 701px) {
-  .routes-page .head { flex-wrap: nowrap; align-items: flex-end; gap: 10px; }
-  .routes-page .head .title { flex: none; }
-  .routes-page .head .actions.in-head.top-row { order: 2; margin-left: 0; flex-wrap: nowrap; }
-  .routes-page .head .selectors { order: 3; margin-left: auto; flex: none; }
-  .routes-page .head .selectors select, .routes-page #active-filter { min-width: 0; }
-  .routes-page #route-select { width: 130px; } .routes-page #run-select { width: 150px; } .routes-page #view-select { width: 196px; }
-  .routes-page #active-filter { width: 140px; }
-}
 /* Review items 9 and 10 (Joe 10/13): Driver Roster. With no driver open the list takes the full width and the three counts
    sit in a strip above it; Edit or + Add Driver opens the panel on the right as before. */
 .split.closed { grid-template-columns: minmax(0, 1fr); }
-.split.closed .split-side { order: -1; height: auto; }
 .split.closed .panel { display: none; }
 .split.closed .summary { padding: 4px 6px; }
 .split.closed .summary div { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 4px 8px; font-size: 16px; }
@@ -1745,62 +1058,15 @@ body.daily-look #delivers { display: none; }
   body:is(.plant-page, .ta-page).has-side .side-main { margin-left: 0; }
 }
 
-/* Review item 51 (Joe 10/13): the Administration side menu is words only (no icons); its words are 16px. */
-.adm-item { font-size: 16px; min-height: 38px; padding: 5px 12px; }
-/* Review item 52 (Joe 10/13): People & Roles' email never breaks mid-word (only after the @, when it must). */
-.people-table { table-layout: fixed; }
-.people-table td.email { overflow-wrap: normal; word-break: normal; }
-/* Review item 20 (Joe 10/13): a plant still being built is one short line under its title, not a tall empty box. */
-.co-plant.planned { align-self: start; }
-.co-plant.planned .co-soon { display: block; flex: none; min-height: 0; margin: 0; padding: 12px 18px; text-align: left; font-size: 16px; color: #5a6b7d; }
-.co-plant.planned .co-soon b { font-size: 16px; }
 
-/* Review item 40 (Joe 10/13): Equipment's last column has a heading (Action) and room for "Put down" / "Back in service" on one line. */
-th.eq-act { white-space: nowrap; }
-td.eq-act > button { white-space: nowrap; padding: 0 10px; }
 
-/* Review item 41 (Joe 10/13): Fleet Service's "N of N units need something" sits in from the right edge, and the grey helper
-   text (under each due date, the line above the grid and the line at the bottom) is 16px. */
-.fleet-page .fs-legend { font-size: 16px; padding: 0 12px; margin-top: 4px; }
-.fleet-page table.fs-grid td.gc small { font-size: 16px; }
-.fleet-page .foot { font-size: 16px; }
-.fleet-page table.fs-grid .pill { font-size: 16px; white-space: nowrap; }
 
-/* Review item 42 (Joe 10/13): Fleet & Maintenance. The four cards sit two by two on the left; each small tile is a wide line with
-   a bigger number and a 16px label on one line (two tiles to a row); Latest write-ups runs the full height on the right. */
-@media (min-width: 1200px) {
-  .hub-page .hub-view { overflow: hidden; }
-  .hub-page .hub-body { flex: 1 0 auto; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); align-items: stretch; min-height: 0; }
-  .hub-page .hub-cards { align-content: start; }
-  .hub-page .hub-latest { contain: size; overflow: auto; }
-  .hub-page .hub-latest h2 { position: sticky; top: 0; z-index: 2; }
-  .hub-page .hub-latest table.issues thead th { position: sticky; top: 48px; z-index: 1; }
-  /* The narrower list: room for a six-digit unit and "Fork truck". */
-  .hub-page .hub-latest col:nth-child(1) { width: 21% !important; } .hub-page .hub-latest col:nth-child(2) { width: 18% !important; }
-  .hub-page .hub-latest col:nth-child(3) { width: 39% !important; } .hub-page .hub-latest col:nth-child(4) { width: 22% !important; }
-}
-.hub-page .hub-card-head { grid-template-columns: 72px 1fr auto; }
-.hub-page .hub-card-head img, .hub-page .hub-wrench { width: 72px; height: 58px; }
-.hub-page .hub-tiles4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.hub-page .hub-tile { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; min-height: 42px; padding: 4px 10px; text-align: left; }
-.hub-page .hub-tile b { font-size: 26px; min-width: 30px; text-align: right; flex: none; }
-.hub-page .hub-tile span { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #415264; }
 
-/* Review item 43 (Joe 10/13): Truck Issues' filter buttons are one size: All open / Need review / ... match Trucks / Trailers / Fork Truck. */
-.issue-bar { gap: 10px; }
-.issue-bar .kind-tabs { gap: 6px; }
-.issue-bar .kind-tabs button, .issue-bar .chips button { min-height: 44px; padding: 0 10px; border-radius: 10px; font-size: 16px; font-weight: 800; }
-.issue-bar .kind-tabs button b, .issue-bar .chips button b { margin-left: 6px; font-size: 16px; min-width: 22px; padding: 1px 6px; border-radius: 12px; }
-.issue-bar #search { min-width: 140px; }
 
 /* Review item 45 (Joe 10/13): plant Work Orders' search box is wide enough for "Find a machine, problem or mechanic". */
 .pmw-page #search { width: 400px; max-width: 40vw; }
 /* Fleet Service Setup (Joe 10/13): the rule labels, their units and the Add Technician boxes at the 16px everything else uses. */
-.fs-rules label { font-size: 16px; letter-spacing: .02em; }
 .fs-rule small { font-size: 16px; }
-.fs-rule input { font-size: 16px; height: 38px; }
-.fs-addtech input, .fs-addtech button { font-size: 16px; min-height: 40px; }
-.fleet-page table.issues td, .fleet-page table.issues th { font-size: 16px; }
 
 /* Review item 56 (Joe 10/13): no on-screen text under 16px. The page's base text is 16px (--font above) and every size under
    16px was raised to 16px. These zero-weight defaults also lift what the browser itself draws small: buttons and boxes
@@ -1812,58 +1078,32 @@ td.eq-act > button { white-space: nowrap; padding: 0 10px; }
    and (on a narrow screen) Latest write-ups scroll with the page, so their boxes clip their rounded corners without becoming a
    scroll box of their own (overflow: clip), and the heading row sticks to the top of the page's scroll area. Down Trucks /
    Trailers (Daily), Route Run Days (Weekly) and MOCREO's Thermometers scroll inside their own box. */
-.ops-page .ops-sheet { overflow: clip; }
 table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .down-list thead th { position: sticky; top: 0; z-index: 2; }
-.hub-latest table.issues thead th { position: sticky; top: 0; z-index: 1; }
-@media (max-width: 1199.98px) { .hub-page .hub-latest { overflow: clip; } }
 .mocreo-page .mc-table thead th { position: sticky; top: 0; z-index: 2; }
 
-/* Review item 56 (Joe 10/13): with 16px text Daily's top line still fits at 1536 and 1920: the coverage tile puts DRIVERS
-   COVERED on two short lines beside the percent, the date box labels drop their letter spacing and the date boxes are a
-   little narrower. */
-@media (min-width: 701px) {
-  body.daily-look .head:has(#print-sheet) .coverage { flex-direction: row; align-items: center; gap: 6px; min-width: 0; padding: 1px 8px; }
-  body.daily-look .head:has(#print-sheet) .coverage span { white-space: normal; width: 76px; line-height: 1; text-align: left; letter-spacing: 0; }
-  body.daily-look .head:has(#print-sheet) .field label { letter-spacing: 0; }
-  body.daily-look .head:has(#print-sheet) #week-begin { width: 96px; }
-  body.daily-look .head:has(#print-sheet) #load-day { width: 128px; }
-  body.daily-look .head:has(#print-sheet) #delivery-day { width: 110px; }
-}
 /* The header line "UNITED DAIRY · ..." is 16px now; its letter spacing comes down so the header buttons keep their room. */
 .brand small { letter-spacing: .05em; }
 /* Route Days: DOES NOT RUN stays on one line in its day box at 16px. */
-.routes-page table.routes.days button[data-runday] { padding: 0 2px; white-space: nowrap; letter-spacing: -.01em; }
-@media (min-width: 701px) and (max-width: 1799px) {
-  body.daily-look .head:has(#print-sheet) { gap: 6px; }
-  body.daily-look .head:has(#print-sheet) .actions.in-head { gap: 5px; }
-  body.daily-look .head:has(#print-sheet) .actions.in-head :is(button, a.button) { padding: 0 6px; }
-  body.daily-look .head:has(#print-sheet) .coverage { padding: 1px 6px; }
-  body.daily-look .head:has(#print-sheet) .coverage span { width: 70px; }
-  body.daily-look .head:has(#print-sheet) .stepper button { padding: 0 4px; }
-  body.daily-look .head:has(#print-sheet) #week-begin { width: 72px; }
-  body.daily-look .head:has(#print-sheet) #load-day { width: 104px; }
+/* Review item 83 (Joe 10/13): the status-pill colours and the pop-up backdrop were each written about six times across the
+   style sheets. Each colour pair is written once here and every pill points at it (Issues, GPS, Shift Notes, Plant Maintenance,
+   Line Targets, the line board, Safety); each pill keeps its own size and shape. */
+:root {
+  --pill-green-bg: #e3f4e8; --pill-green-ink: #1d6b37;
+  --pill-good-bg: var(--runs-bg); --pill-good-ink: var(--runs-ink);
+  --pill-amber-bg: #fff1dc; --pill-amber-ink: #8a5200;
+  --pill-warn-bg: #fdecc4; --pill-warn-ink: #8a5a00;
+  --pill-red-bg: #fde8e8; --pill-red-ink: #b42318;
+  --pill-blue-bg: var(--band); --pill-blue-ink: var(--ud-blue);
+  --pill-gray-bg: #eef2f5; --pill-gray-ink: #6b7c8c;
+  --pop-backdrop: rgba(10, 30, 50, .45);
 }
-/* Review item 56 (Joe 10/13): with 16px text, Route Days' Show / Hide Rules top line ran past the edge on a laptop (1366), so the
-   four buttons lost their even width. "Only runs hidden on Weekly" now sits on two short lines beside its box. */
-.routes-page #hidden-box { max-width: 190px; white-space: normal; line-height: 1.15; }
-.routes-page #hidden-box input { flex: none; }
-/* Review item 56 follow-up: with the online checker's wider letters, Load Order's Day box pushed the even buttons past the
-   right edge at 1366. On a laptop Route Days' buttons keep a little less padding and the Day word sits above its box. */
-@media (max-width: 1500px) {
-  .routes-page .head .actions.in-head.top-row .actions.tiles > :is(button, a.button), .routes-page .actions.tiles > :is(button, a.button) { padding: 0 8px; }
-  .routes-page #seq-day-box { flex-direction: column; align-items: flex-start; gap: 0; line-height: 1; }
-  .routes-page #seq-day { height: 30px; }
-  .routes-page #hidden-box { max-width: 170px; }
-}
-/* Fleet Service Setup (Joe 10/13): more room for the Service Rules side, the Ours tick and the Trucks / Trailers pick. */
-.fleet-split.fs-setup { grid-template-columns: 1.45fr 1fr; }
-@media (max-width: 1200px) { .fleet-split.fs-setup { grid-template-columns: 1fr; } }
-.fs-setup input.fs-ours { width: 24px; height: 24px; cursor: pointer; accent-color: #1d7a3e; }
-.fs-type { display: flex; align-items: center; gap: 10px; margin: 0 4px 10px; font-size: 16px; font-weight: 700; color: var(--ud-blue-dark); }
-.fs-type select { height: 40px; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; background: #fff; }
-.fs-setup .fs-rule input { width: 110px; }
-/* Joe 10/13: "Annual Inspection" is longer than "DOT"; each tab takes its own width so the tabs still sit beside the title. */
-.fleet-page .head .tabs { grid-auto-columns: auto; }
-.fleet-page .head .tabs button { padding: 0 16px; }
-.fleet-page .head .title { min-width: 400px; }
+/* One pop-up backdrop: it covers the whole window and dims the screen behind. Each pop-up keeps its own stacking and how it
+   centres its box (admin-pages.css, plant.css, returns.html). The Daily-style pop-ups (.modal-back under .modal) keep their
+   lighter dim. */
+.modal-back, .ap-modal, .manager-page .mc-modal, .products-page .pm-edit-back, .returns-page .rt-modal { position: fixed; inset: 0; background: var(--pop-backdrop); }
+.modal-back { background: #0b1f3366; }
+
+/* DVIR: the odometer filled from GPS says so under the box. */
+.dv-odo-note { display: block; font-size: 16px; color: #2e6b3a; font-weight: 600; min-height: 0; }
+.dv-odo-note:empty { display: none; }

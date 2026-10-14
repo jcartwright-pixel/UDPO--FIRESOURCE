@@ -581,6 +581,25 @@
     if (type === 'TRAILER' && rules[own] !== undefined && rules[own] !== null && rules[own] !== '' && isFinite(n)) return n;
     return rules[key] !== undefined && rules[key] !== null && rules[key] !== '' ? Number(rules[key]) : FLEET_RULES[key];
   }
+  // Joe 10/13: miles and reefer hours also come from Verizon Connect Fleet (gpsTrucks, read every 5 minutes). Per unit, the
+  // newer of the drivers' DVIR odometer and the GPS odometer is "miles now"; a trailer's GPS engine hours are its reefer hours.
+  function latestReadings(odometers, gps) {
+    var out = {}, key = function (u) { return String(u || '').trim().toUpperCase().replace(/\s+/g, ''); };
+    var newer = function (a, b) { return (Date.parse(a) || 0) > (Date.parse(b) || 0); };
+    (odometers || []).forEach(function (o) {
+      var u = key(o.unit);
+      var at = String(o.at || o.date || '');
+      if (u && (!out[u] || newer(at, out[u].at))) out[u] = { miles: fleetNumber(o.miles), date: dateKey(o.date) || localDay(o.at), at: at, source: 'DVIR' };
+    });
+    (gps || []).forEach(function (t) {
+      var u = key(t.tag), miles = fleetNumber(t.odometerMiles), hours = fleetNumber(t.engineHours);
+      if (!u || !t.lastReport) return;
+      var row = out[u] || (out[u] = { miles: null, date: '', at: '', source: '' });
+      if (miles > 0 && newer(t.lastReport, row.at)) Object.assign(row, { miles: Math.round(miles), date: localDay(t.lastReport), at: t.lastReport, source: 'GPS' });
+      if (hours > 0) { row.hours = Math.round(hours); row.hoursDate = localDay(t.lastReport); }
+    });
+    return out;
+  }
   function fleetDue(units, setup, miles, openJobs, rules, today) {
     rules = Object.assign({}, FLEET_RULES, rules || {});
     var setupBy = {}, openBy = {}, items = [], out = [];
@@ -588,10 +607,12 @@
     (openJobs || []).forEach(function (j) { if (j.service_key) openBy[String(j.unit).toUpperCase() + '|' + j.service_key] = j; });
     (units || []).forEach(function (u) {
       var s = setupBy[String(u.unit).toUpperCase()] || {}, trackRaw = String(s.track || '').trim(), tracked = trackRaw ? yes(trackRaw) : true;
-      var odo = u.type === 'TRUCK' ? (miles || {})[String(u.unit).toUpperCase()] : null;
+      var read = (miles || {})[String(u.unit).toUpperCase()], odo = u.type === 'TRUCK' ? read : null, gpsHours = u.type === 'TRAILER' && read && read.hours > 0 ? read.hours : null;
       var row = { unit: u.unit, type: u.type, tracked: tracked, trackSet: trackRaw ? (yes(trackRaw) ? 'YES' : 'NO') : '', miles: odo ? odo.miles : null, milesDate: odo ? odo.date : '',
-        lastServiceDate: dateKey(s.last_service_date), lastServiceMiles: fleetNumber(s.last_service_miles), lastServiceHours: fleetNumber(s.last_service_hours),
-        currentHours: fleetNumber(s.current_hours), dotDue: dateKey(s.dot_due), plateExpires: dateKey(s.plate_expires), notes: String(s.notes || '') };
+        milesSource: odo ? odo.source || '' : '', lastServiceDate: dateKey(s.last_service_date), lastServiceMiles: fleetNumber(s.last_service_miles), lastServiceHours: fleetNumber(s.last_service_hours),
+        // A typed "reefer hours now" stands until Fleet reports the trailer's hours.
+        currentHours: gpsHours != null ? gpsHours : fleetNumber(s.current_hours), hoursSource: gpsHours != null ? 'GPS' : '', hoursDate: gpsHours != null ? read.hoursDate : '',
+        dotDue: dateKey(s.dot_due), plateExpires: dateKey(s.plate_expires), notes: String(s.notes || '') };
       out.push(row);
       if (!tracked) return;
       function push(key, what, dueAt, now, left, status, last) {
@@ -1087,7 +1108,7 @@
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
-    fleetDue: fleetDue, fleetRule: fleetRule, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
+    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,

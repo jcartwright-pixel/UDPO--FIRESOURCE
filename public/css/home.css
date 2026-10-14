@@ -1,0 +1,46 @@
+/* index.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
+   app.css, so they still come after every shared rule. */
+.launch-title { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 4px 16px; margin: 18px 24px; }
+.launch-title #today { grid-column: 2; grid-row: 1 / span 2; align-self: center; padding: 8px 16px; border-radius: 10px; background: #eef5fc; color: #0b3d6b; font-weight: 800; }
+.launch-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin: 0 24px 24px; }
+.launch-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 22px 22px; border-radius: 18px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 8px 24px rgba(11, 61, 107, .10); color: #0b3d6b; text-decoration: none; text-align: center; transition: transform .12s, box-shadow .12s; }
+.launch-card:hover, .launch-card:focus-visible { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(11, 61, 107, .20); border-color: #1f6feb; }
+.launch-art { display: flex; align-items: center; justify-content: center; width: 100%; height: clamp(150px, 26vh, 260px); border-radius: 14px; background: linear-gradient(180deg, #eef5fc, #dbe9f7); }
+.launch-card b { margin-top: 4px; padding: 10px 22px; border-radius: 999px; background: #0f2747; color: #fff; font-size: 16px; }
+@media (max-width: 900px) {
+  .launch-grid { grid-template-columns: 1fr; }
+  .launch-art { height: 140px; }
+}
+/* Joe 10/11: the plant home stays blank for the moment it takes to know whether this person starts on the all-plants overview. */
+body.deciding #screen { visibility: hidden; }
+/* Joe 10/11: six cards after picking a plant, three to a row; the pictures shrink so both rows fit a 1920x1080 or 1536x864 screen. */
+.launch-grid.six { gap: 18px; }
+.launch-grid.six .launch-card { padding: 16px 18px 16px; gap: 6px; }
+.launch-grid.six .launch-art { height: clamp(110px, calc((100vh - 560px) / 2), 230px); }
+.launch-grid.six .launch-card strong { font-size: 22px; margin-top: 2px; }
+.launch-grid.six .launch-card small { min-height: 2.4em; }
+.launch-art svg.launch-icon { width: auto; height: 70%; fill: none; stroke: #0b3d6b; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.launch-art { position: relative; overflow: hidden; }
+.launch-card.building .launch-art img, .launch-card.building .launch-art svg { opacity: .55; }
+/* Joe 10/11: Plant Production and Plant Maintenance use his own pictures with the banner already on them, at full colour.
+   The clean pictures (plant-production-v1-*, plant-maintenance-v1-*) are kept in the library for when those modules are built. */
+.launch-card.banner-pic .launch-art img { opacity: 1; }
+.launch-card .uc-admin-only { display: none; }
+body:not(.is-admin) .launch-card.building { cursor: not-allowed; }
+body:not(.is-admin) .launch-card.building:hover, body:not(.is-admin) .launch-card.building:focus-visible { transform: none; }
+body:not(.is-admin) .launch-card.building .open-text { display: none; }
+body:not(.is-admin) .launch-card.building .uc-admin-only { display: inline-block; background: #e6ebf1; color: #4a5a6b; }
+.uc-banner { position: absolute; left: -12%; right: -12%; top: 50%; transform: translateY(-50%) rotate(-9deg); padding: 9px 0; text-align: center;
+  background: #ffc61a; color: #1b1b1b; font-size: 20px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase;
+  border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+  border-image: repeating-linear-gradient(45deg, #1b1b1b 0 12px, #ffc61a 12px 24px) 7; box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
+/* Joe 10/12: seven cards after picking a plant (Safety Walkthrough next to Reports), four to a row (mock-up A). */
+.launch-grid.six.seven { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.launch-grid.six.seven .launch-card { padding: 14px 14px 14px; }
+.launch-grid.six.seven .launch-card strong { font-size: 21px; }
+@media (max-width: 1200px) {
+  .launch-grid.six.seven { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .launch-grid.six.seven { grid-template-columns: 1fr; }
+}

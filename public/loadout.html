@@ -253,7 +253,8 @@
       fitDrivers();
       if (held) { const g = document.querySelector('#rows tr[data-drag="' + CSS.escape(held) + '"]'); if (g) g.focus(); }
       heldMove = null;
-      if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { el.value = focused[2]; el.focus(); } }
+      // What was typed stays, unless it is what the box now shows in other letters (tba saved as TBA).
+      if (focused) { const el = document.querySelector('input[data-id="' + focused[0] + '"][data-k="' + focused[1] + '"]'); if (el) { if (el.value.trim().toUpperCase() !== focused[2].trim().toUpperCase()) el.value = focused[2]; el.focus(); } }
       document.getElementById('foot').textContent = c.total + ' loads. ' + (edit ? 'Type a truck, trailer or count and press Enter; Start and End time the load.' + (ordering ? ' Drag a load up or down by its line to change this day\'s loading order.' : '') : viewOnlyWhy()) + ' Changes from the sheets show here within about a minute.';
       const s = L.screenState(app, 'plantLoading');
       goLiveNote(s.live && s.owner !== 'new');
@@ -484,9 +485,12 @@
       const el = e.target.closest('input[data-k]');
       if (!el || ['Enter', 'ArrowDown', 'ArrowUp'].indexOf(e.key) < 0) return;
       e.preventDefault();
-      const all = [...rowsEl.querySelectorAll('input[data-k="' + el.dataset.k + '"]')], i = all.indexOf(el);
+      const all = [...rowsEl.querySelectorAll('input[data-k="' + el.dataset.k + '"]')], i = all.indexOf(el), to = all[i + (e.key === 'ArrowUp' ? -1 : 1)];
+      // The save draws the table again, so the next box is found again after it (the old one is no longer on the page);
+      // otherwise the cursor stayed in the box just saved, still showing what was typed (tba, not TBA).
+      const toId = to && to.dataset.id;
       el.dispatchEvent(new Event('change', { bubbles: true }));
-      const next = all[i + (e.key === 'ArrowUp' ? -1 : 1)];
+      const next = toId && rowsEl.querySelector('input[data-id="' + CSS.escape(toId) + '"][data-k="' + el.dataset.k + '"]');
       if (next) { next.focus(); next.select(); }
     });
     rowsEl.addEventListener('click', e => {

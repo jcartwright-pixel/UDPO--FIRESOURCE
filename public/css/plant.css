@@ -123,7 +123,7 @@
 .plant-page .chk { font-weight: 800; white-space: nowrap; }
 .plant-page .chk.ok { color: var(--runs-ink); }
 .plant-page .chk.na { color: #9aa8b6; font-weight: 700; }
-.plant-page .pill { display: inline-block; min-width: 92px; padding: 5px 10px; border-radius: 14px; font-size: 16px; font-weight: 800; border: 1px solid var(--line); background: #eef2f5; color: #516273; }
+.plant-page .pill { display: inline-block; min-width: 92px; padding: 5px 10px; border-radius: 14px; font-size: 16px; font-weight: 800; border: 1px solid var(--line); background: var(--pill-gray-bg); color: #516273; }
 .plant-page .pill.run { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
 .plant-page .pill.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
 .plant-page .pill.ret, .plant-page .pill.pend { background: #fde5e3; color: #b42332; border-color: #f2b8b2; }
@@ -605,7 +605,7 @@
 .manager-page .mc-btn { flex: 1; min-width: 150px; height: 42px; border-radius: 9px; border: 1px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; padding: 0 12px; }
 .manager-page .mc-btn.send { background: #c62828; border-color: #c62828; color: #fff; }
 .manager-page .mc-btn[hidden] { display: none; }
-.manager-page .mc-modal { position: fixed; inset: 0; z-index: 50; background: rgba(10, 30, 50, .45); display: grid; place-items: center; padding: 16px; }
+.manager-page .mc-modal { z-index: 50; display: grid; place-items: center; padding: 16px; }
 .manager-page .mc-modal[hidden] { display: none; }
 .manager-page .mc-dialog { width: min(760px, 100%); max-height: 100%; overflow: auto; background: #fff; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
 .manager-page .mc-dhead { display: flex; flex-direction: column-reverse; gap: 10px; }
@@ -902,7 +902,7 @@
 .products-page .pm-dots:hover, .products-page .pm-dots:focus-visible { background: var(--ud-blue-dark); color: #fff; }
 .products-page .pm-name em { font-style: normal; color: var(--muted); }
 .products-page .pm-check .pm-val { color: #9a5b00; font-weight: 800; }
-.products-page .pm-edit-back { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(7, 32, 58, .45); }
+.products-page .pm-edit-back { z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .products-page .pm-edit-back[hidden] { display: none; }
 .products-page .pm-edit { width: min(860px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, .3); padding: 18px 22px 16px; box-sizing: border-box; }
 .products-page .pm-edit-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
@@ -927,8 +927,8 @@
 .shift-page .sn-down input { height: 38px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; }
 .shift-page .sn-down .sn-fixbox { flex: 1 1 260px; min-width: 0; }
 .shift-page .sn-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
-.shift-page .sn-pill.red { background: #fde8e8; color: #b42318; } .shift-page .sn-pill.green { background: #e3f4e8; color: #1d6b37; }
-.shift-page .sn-pill.amber { background: #fff1dc; color: #8a5200; } .shift-page .sn-pill.blue { background: #e8f0f8; color: var(--ud-blue); }
+.shift-page .sn-pill.red { background: var(--pill-red-bg); color: var(--pill-red-ink); } .shift-page .sn-pill.green { background: var(--pill-green-bg); color: var(--pill-green-ink); }
+.shift-page .sn-pill.amber { background: var(--pill-amber-bg); color: var(--pill-amber-ink); } .shift-page .sn-pill.blue { background: var(--pill-blue-bg); color: var(--pill-blue-ink); }
 @media (max-width: 1400px) { .shift-page .qc-fields .half { grid-column: span 1; } }
 
 /* Joe 10/12 ("mobile looks wrong and I can't edit"): on a phone the Loadout Center was a desk table squeezed into a strip a
@@ -963,6 +963,7 @@
 }
 /* Joe 10/13: the Scheduler's Suppliers list (Receiving). */
 .sched-page .sc-supnote { margin: 0 0 12px; font-size: 16px; color: var(--muted); }
+.sched-page .sc-suppaste { width: 100%; min-height: 320px; box-sizing: border-box; font: inherit; font-size: 18px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; resize: vertical; }
 .sched-page .sc-suplist { max-height: 60vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
 .sched-page .sc-suptable { width: 100%; border-collapse: collapse; font-size: 16px; }
 .sched-page .sc-suptable th { position: sticky; top: 0; background: var(--ud-blue); color: #fff; text-align: left; padding: 8px 12px; font-size: 16px; font-weight: 800; }

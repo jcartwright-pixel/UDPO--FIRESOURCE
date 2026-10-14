@@ -14,28 +14,30 @@ const L = require('./logic');
 const M = require('./model');
 const { queueMaster } = require('./masterwrite');
 const MAINT = require('./maintenance');
-const SWITCH = require('./switch');
-const OTR = require('./otr-core');
-const SC = require('./sc-core');
 const PLANT = require('./plant');
 const PROD = require('./production');
+const OTR = require('./otr-core');
+const SC = require('./sc-core');
 const SAFE = require('./safety');
 const PMAINT = require('./plantmaint');
+const RECV = require('./receiving');
 const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
-const ROLL = require('./weekroll');
 const STATIONS = require('./stations');
-const BOARD = require('./board-rules');
+// Each screen's saves are in their own file (review item 81, Joe 10/13); this file checks, routes and logs every save.
+const { SaveError, text, requireTestMode, queueSheetCells, queueLoadoutHistory } = require('./actions-common');
+const { moveRun, setUnitDown, updateIssue, reorder } = require('./actions-daily');
+const { editDriver, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
+const { saveDriverException, saveVacation } = require('./actions-dayoff');
+const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
+const { reorderWeek, publishWeek, setWeekReason, resetWeek } = require('./actions-weekly');
+const { saveOtr, otrColumnKey } = require('./actions-otr');
 
 const C = M.COLLECTIONS;
 
 const SAVE_ROLES = L.SAVE_ROLES;
 const REORDER_ROLES = L.REORDER_ROLES;
 const DRIVER_ROLES = L.DRIVER_ROLES;
-
-class SaveError extends Error {
-  constructor(code, message, details) { super(message); this.code = code; this.details = details || null; }
-}
 
 const ACTIONS = Object.freeze({
   assignDriver: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
@@ -69,6 +71,12 @@ const ACTIONS = Object.freeze({
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
   saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  // Joe 10/13: a manager rates a driver's truck cleanliness 1 to 5 on the Driver Scorecard.
+  rateTruckClean: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  // Joe 10/13: accidents / incidents and complaints (Driver Roster > Edit), reviewed by a manager; an excused GPS miss.
+  addDriverIncident: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  reviewDriverIncident: { roles: DRIVER_ROLES, screen: 'scorecard' },
+  excuseScorecardMiss: { roles: DRIVER_ROLES, screen: 'scorecard' },
   saveOpsAssignment: { roles: DRIVER_ROLES, screen: 'opsAssignments' },
   // The plant side (plant.js): Loadout Center loads and pickups. The Plant Distribution screens are their own switch (Plant Loading).
   savePlantLoad: { roles: PLANT.PLANT_ROLES, screen: 'plantLoading' },
@@ -112,6 +120,9 @@ const ACTIONS = Object.freeze({
   makeWorkOrder: { roles: L.SAVE_ROLES, screen: 'plant' },
   savePmTask: { roles: REORDER_ROLES, screen: 'plant' },
   sendPmToMaintenance: { roles: REORDER_ROLES, screen: 'plant' },
+  // Receiving scan-in (receiving.js): each scan on a delivery, and the list of what the plant receives.
+  saveReceivingScan: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
+  saveReceivingItem: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
   sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
   // Fleet Service Setup: the service rules, each unit's dates, and the garage technicians (garage.js). App only (logic.js APP_ONLY).
@@ -139,8 +150,6 @@ function count(v, label) {
   if (!Number.isInteger(n) || n < 0 || n > 99999) throw new SaveError('BAD_REQUEST', label + ' must be a whole number from 0 to 99999');
   return n;
 }
-
-function text(v, max) { return String(v === null || v === undefined ? '' : v).trim().slice(0, max || 200); }
 
 function validate(input) {
   input = input || {};
@@ -224,6 +233,8 @@ function validate(input) {
         out.days[p][k] = routeValue(ROUTE_DAY_FIELDS[k], input.days[p][k], L.DAY_NAMES[L.DAYS.indexOf(p)] + ' ' + k);
       });
     });
+    // The screen the save came from: Over the Road's miles box is held on the live app until switched on (actions-routes.js).
+    out.from = input.from === 'otr' ? 'otr' : '';
     if (!out.runId && !(out.fields.route && out.fields.run)) throw new SaveError('BAD_REQUEST', 'A new run needs a Route and a Run / Destination');
     return out;
   }
@@ -286,8 +297,20 @@ function validate(input) {
     } else if (out.op === 'day') {
       out.date = text(input.date, 10); out.destination = OTR.otrNormDest_(input.destination); out.runs = count(input.runs, 'Runs');
       if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
-      if (OTR.OTR_CORE.DESTINATIONS.indexOf(out.destination) < 0) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
+      // A column added in OTR Routes Setup (otrColumns) is checked when the save runs.
+      out.destination = text(out.destination, 60);
+      if (!out.destination) throw new SaveError('BAD_REQUEST', 'Pick a destination from the list');
       if (out.runs === null) throw new SaveError('BAD_REQUEST', 'Type the number of runs');
+    } else if (out.op === 'column') {
+      // Joe 10/13: a By Date column of his own (an outside carrier such as Darden); renamed or removed only while nothing uses it.
+      out.verb = text(input.verb, 10); out.name = text(input.name, 40);
+      if (['add', 'rename', 'remove'].indexOf(out.verb) < 0) throw new SaveError('BAD_REQUEST', 'Add, rename or remove a column');
+      if (!out.name) throw new SaveError('BAD_REQUEST', 'Type the column name');
+      if (out.verb === 'rename') { out.newName = text(input.newName, 40); if (!out.newName) throw new SaveError('BAD_REQUEST', 'Type the new column name'); }
+      const fixed = n => OTR.OTR_CORE.DESTINATIONS.some(d => otrColumnKey(d) === otrColumnKey(n));
+      if (fixed(out.name) && out.verb !== 'add') throw new SaveError('BAD_REQUEST', out.name + ' is one of the workbook\'s own columns and stays');
+      const made = out.verb === 'add' ? out.name : out.newName;
+      if (made && fixed(made)) throw new SaveError('BAD_REQUEST', made + ' is already a column');
     } else if (out.op === 'comment') {
       // The Comment column of the By Date tab: one note per day ("Lost 5 Walmart Rts"); empty clears it.
       out.date = text(input.date, 10); out.text = text(input.text, 200);
@@ -339,7 +362,68 @@ function validate(input) {
     if (!Number.isInteger(out.sequence) || out.sequence < 1 || out.sequence > 999) throw new SaveError('BAD_REQUEST', 'Order must be a whole number from 1 to 999');
     return out;
   }
+  if (action === 'rateTruckClean') {
+    out.driverKey = text(input.driverKey, 80).toUpperCase();
+    out.driver = text(input.driver, 80);
+    out.date = text(input.date);
+    out.rating = Number(input.rating);
+    out.truck = text(input.truck, 20);
+    out.note = text(input.note, 300);
+    if (!out.driverKey) throw new SaveError('BAD_REQUEST', 'Pick the driver');
+    if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'date must be yyyy-mm-dd');
+    if (!Number.isInteger(out.rating) || out.rating < 1 || out.rating > 5) throw new SaveError('BAD_REQUEST', 'Pick a rating from 1 to 5');
+    return out;
+  }
+  if (action === 'addDriverIncident') {
+    out.kind = text(input.kind, 20);
+    if (['accident', 'complaint', 'pda'].indexOf(out.kind) < 0) throw new SaveError('BAD_REQUEST', 'kind must be accident, complaint or pda');
+    out.driverKey = text(input.driverKey, 80).toUpperCase();
+    out.driver = text(input.driver, 80);
+    out.date = text(input.date);
+    out.type = text(input.type, 80);
+    out.note = text(input.note, 500);
+    if (!out.driverKey) throw new SaveError('BAD_REQUEST', 'Pick the driver');
+    if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'Pick the date');
+    if (out.kind === 'pda') {
+      out.step = text(input.step, 20);
+      if (SC.SC_CORE.PDA_STEPS.map(k => k[0]).indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'Pick the PDA step');
+      out.reason = text(input.reason, 120);
+    } else if (out.kind === 'accident') {
+      out.accidentClass = Number(input.accidentClass);
+      if ([1, 2, 3].indexOf(out.accidentClass) < 0) throw new SaveError('BAD_REQUEST', 'Pick 1st, 2nd or 3rd degree');
+      out.truck = text(input.truck, 20);
+      out.preventable = input.preventable === true || input.preventable === 'yes';
+    } else {
+      out.source = text(input.source, 20) === 'other' ? 'other' : 'customer';
+      out.customer = text(input.customer, 80);
+      out.severity = text(input.severity, 10).toLowerCase();
+      if (['minor', 'major'].indexOf(out.severity) < 0) throw new SaveError('BAD_REQUEST', 'Pick Minor or Major');
+    }
+    return out;
+  }
+  if (action === 'reviewDriverIncident') {
+    out.incidentId = text(input.incidentId, 120);
+    out.status = text(input.status, 20);
+    if (!out.incidentId) throw new SaveError('BAD_REQUEST', 'Pick the entry');
+    if (['review', 'counts', 'notCounted'].indexOf(out.status) < 0) throw new SaveError('BAD_REQUEST', 'status must be review, counts or notCounted');
+    return out;
+  }
+  if (action === 'excuseScorecardMiss') {
+    out.key = text(input.key, 300);
+    out.reason = text(input.reason, 300);
+    out.undo = input.undo === true;
+    out.driverKey = text(input.driverKey, 80).toUpperCase();
+    out.what = text(input.what, 300);
+    if (!/^(gps|time)\|\d{4}-\d{2}-\d{2}\|/.test(out.key)) throw new SaveError('BAD_REQUEST', 'Only a GPS or Time miss can be excused');
+    if (!out.undo && !out.reason) throw new SaveError('BAD_REQUEST', 'Type the reason');
+    return out;
+  }
   if (action === 'saveScorecard') {
+    if (Array.isArray(input.kioskAreas)) {
+      out.kioskAreas = [...new Set(input.kioskAreas.map(k => text(k, 40)))];
+      if (out.kioskAreas.some(k => !SC.SC_CORE.AREAS.some(a => a[0] === k))) throw new SaveError('BAD_REQUEST', 'Unknown scorecard area');
+      return out;
+    }
     if (Array.isArray(input.callOffReasons)) {
       out.callOffReasons = [...new Set(input.callOffReasons.map(r => text(r, 40).toUpperCase()))];
       if (out.callOffReasons.some(r => SC.SC_CORE.REASONS.indexOf(r) < 0)) throw new SaveError('BAD_REQUEST', 'Unknown call-off reason');
@@ -400,6 +484,8 @@ function validate(input) {
   if (action === 'saveExtinguisher') return Object.assign(out, SAFE.validateExtinguisher(input, SaveError));
   if (action === 'saveFireSystemCheck') return Object.assign(out, SAFE.validateFireCheck(input, SaveError));
   if (action === 'saveFireSystem') return Object.assign(out, SAFE.validateFireSystem(input, SaveError));
+  if (action === 'saveReceivingScan') return Object.assign(out, RECV.validateReceiving(input, SaveError));
+  if (action === 'saveReceivingItem') return Object.assign(out, RECV.validateReceivingItem(input, SaveError));
   if (action === 'saveSafetyChecklist') return Object.assign(out, SAFE.validateChecklist(input, SaveError));
   if (action === 'saveLocationAreas') return Object.assign(out, SAFE.validateLocations(input, SaveError));
   if (action === 'saveMachine') return Object.assign(out, PMAINT.validateMachine(input, SaveError));
@@ -474,13 +560,6 @@ async function requireSaver(tx, db, user, roles, action) {
     throw new SaveError('NOT_ALLOWED', roleOk ? email + ' is not allowed this save (Administration > People & Roles)' : email + ' does not have a role that can make this save (' + roles.join(', ') + ')');
   }
   return person;
-}
-
-// Whether this screen may save in Operations (switch.js): every screen while it is a test copy, then only
-// the screens an administrator moved to the new app.
-async function requireTestMode(tx, db, screen) {
-  const snap = await tx.get(db.collection(C.config).doc('app'));
-  return SWITCH.screenMode(snap.exists ? snap.data() : {}, screen, (code, message) => new SaveError(code, message));
 }
 
 // The driver's own truck on a day he is put on (current app 7.0.267, udpoV7267DriverOwnTruck_). after gets truckId / truck when it
@@ -564,71 +643,6 @@ async function resolveAssignment(tx, db, req, stamp, run) {
   return { driverNotes: req.note };
 }
 
-// Sheet column suffix for each day field the saves change (the reverse of model.DAY_FIELDS).
-const COLUMN_FOR = {}, TIME_FIELDS = {};
-// Kept in the new app only (the Live sheet has no column for them): who a day was for before the driver went off, and why.
-// checkinTruck / checkinTrailer / moreTrailers: the units the driver corrected on the phone and the drop-and-hook trailers (no Live column).
-const APP_ONLY = {};
-M.APP_ONLY_DAY_FIELDS.forEach(f => { APP_ONLY[f] = true; });
-M.DAY_FIELDS.forEach(([field, suffix, kind]) => { COLUMN_FOR[field] = suffix; if (kind === 'time') TIME_FIELDS[field] = true; });
-// A day's "changed by hand" marks (the current app's <day>_equipment_override / _dispatch_time_override): a Route Master or
-// Driver Master save that reaches the Live weeks leaves those cells alone (D6).
-COLUMN_FOR.equipmentOverride = 'equipment_override';
-COLUMN_FOR.dispatchTimeOverride = 'dispatch_time_override';
-
-/*
- * The write-back queue: each save also adds the sheet cells it changes, in the same transaction, so a save
- * can never be in the database without its sheet update waiting (see writeback.js). Cells are named by
- * column; the row is found by run_id when it is written, never by row number.
- */
-function queueSheetCells(tx, db, requestId, part, run, runDocId, day, values, stamp, email) {
-  queueCells(tx, db, requestId, part, run, runDocId, dayCells(day, values, stamp, email), stamp, email);
-}
-// One queued row: `cells` may hold several days and the run's own columns; extra.append = a run new to the Live tab.
-function queueCells(tx, db, requestId, part, run, runDocId, cells, stamp, email, extra) {
-  const days = L.DAYS.filter(p => run.days && run.days[p] && run.days[p].runs);
-  tx.set(db.collection(C.outbox).doc(requestId + (part ? '-' + part : '')), Object.assign({
-    status: 'pending', at: stamp, by: email, requestId, runDocId, tab: run.sourceTab, weekStart: run.weekStart,
-    match: { runId: run.runId || '', route: run.route || '', run: run.run || '', days }, cells
-  }, extra || {}));
-}
-/*
- * LOADOUT HISTORY (the current app's udpoV7197RecordLoadoutHistory_): when a load is saved Done, or a Done load is corrected,
- * one row per run_id|load_date in that tab of the Live workbook, so the week tab's loading cells can be cleared later without
- * losing when the route was loaded. Written by writeback.js (the row found by history_key, else added under the last).
- */
-const HISTORY_FIELDS = ['completeTime', 'loadStatus', 'casesOut', 'loadTemperature', 'plantStartedAt'];
-function queueLoadoutHistory(tx, db, req, run, d, after, stamp, email) {
-  const t = (v) => v === null || v === undefined ? '' : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v);
-  const complete = t(d.completeTime), status = t(d.loadStatus).toUpperCase();
-  if (!complete && status !== 'COMPLETE') return;
-  if (!HISTORY_FIELDS.some(k => after[k] !== undefined)) return;
-  const delivery = L.addDays(run.weekStart, L.DAYS.indexOf(req.day));
-  const offset = d.loadDayOffset === null || d.loadDayOffset === undefined || d.loadDayOffset === '' ? -1 : Number(d.loadDayOffset);
-  const loadDate = L.dateKey(d.loadDate) || L.addDays(delivery, offset), key = (run.runId || '') + '|' + loadDate;
-  tx.set(db.collection(C.outbox).doc(req.requestId + '-h'), {
-    status: 'pending', at: stamp, by: email, requestId: req.requestId, history: true, key, runDocId: req.runDocId,
-    row: { archived_at: stamp, reason: 'Loadout completed', live_tab: run.sourceTab || '', live_row: t(run.sheetRow), route: t(run.route), run_id: t(run.runId), run: t(run.run),
-      load_date: loadDate, delivery_date: L.dateKey(d.deliveryDate) || delivery, cases_out: t(d.casesOut), complete_time: complete, load_status: status, loaded_complete: t(d.loadedComplete),
-      load_temperature: t(d.loadTemperature), written_by: email, source_note: '', source_written_at: '', history_key: key, started_at: t(d.plantStartedAt) }
-  });
-}
-function dayCells(day, values, stamp, email) {
-  const cells = {};
-  Object.keys(values).forEach(field => {
-    if (APP_ONLY[field]) return;
-    if (!COLUMN_FOR[field]) throw new Error('No sheet column for ' + field);
-    let v = values[field];
-    if (TIME_FIELDS[field]) v = L.timeText(v);
-    if (typeof v === 'boolean') v = v ? 'TRUE' : 'FALSE';
-    // Numbers stay numbers so the sheet keeps them as numbers; everything else is written as plain text.
-    cells[day + '_' + COLUMN_FOR[field]] = v === null || v === undefined ? '' : typeof v === 'number' ? v : String(v);
-  });
-  cells[day + '_updated_at'] = stamp;
-  cells[day + '_updated_by'] = email;
-  return cells;
-}
-
 /*
  * Runs one save. user = the signed-in person ({email}). Returns {ok, requestId, runs:[{runDocId, rev}], repeated}.
  */
@@ -685,6 +699,10 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveScorecard') return saveScorecard(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'rateTruckClean') return rateTruckClean(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'addDriverIncident') return addDriverIncident(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'reviewDriverIncident') return reviewDriverIncident(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'excuseScorecardMiss') return excuseScorecardMiss(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOpsAssignment') return saveOpsAssignment(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'publishWeek') return publishWeek(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'resetWeek') return resetWeek(tx, db, req, email, stamp, logRef, mode);
@@ -720,6 +738,8 @@ async function applyAction(db, user, input, now) {
     if (req.action === 'makeWorkOrder') return PMAINT.makeWorkOrder(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePmTask') return PMAINT.savePmTask(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'sendPmToMaintenance') return PMAINT.sendPmToMaintenance(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveReceivingScan') return RECV.saveReceiving(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveReceivingItem') return RECV.saveReceivingItem(tx, db, req, email, stamp, logRef, mode, SaveError);
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);
@@ -770,896 +790,6 @@ async function applyAction(db, user, input, now) {
 // Each new maintenance record also goes to its tab of the sandbox Live workbook when the write-back is on.
 function maintQueue(tx, db, mode, requestId, stamp, email) {
   return (ref, r) => queueMaster(tx, db, mode, requestId, 'm' + r.kind, ref, r.record_id, r, true, stamp, email, MAINT.LISTS[r.kind]);
-}
-
-/*
- * MOVE TO ANOTHER DAY (Daily edit, udpoV7273MoveDailyRun_): the run is turned on for the new day with nothing
- * assigned, and the old day becomes NO RUN with its driver, truck and trailer cleared. Both in one save.
- */
-async function moveRun(tx, db, req, email, stamp, logRef, mode) {
-  const fromRef = db.collection(C.runs).doc(req.runDocId);
-  const fromSnap = await tx.get(fromRef);
-  if (!fromSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer on the Live sheet');
-  const from = fromSnap.data();
-  if (!from.days || !from.days[req.day] || !from.days[req.day].runs) throw new SaveError('NOT_FOUND', from.route + ' ' + from.run + ' does not run that day');
-  if (req.expectedRev !== undefined && req.expectedRev !== from.rev) throw new SaveError('CHANGED', from.route + ' ' + from.run + ' was changed by someone else; the screen now shows the latest', { rev: from.rev });
-  const fromDate = L.addDays(from.weekStart, L.DAYS.indexOf(req.day));
-  if (req.toDate === fromDate) throw new SaveError('BAD_REQUEST', 'Pick a different day');
-  const toWeek = L.weekStart(req.toDate), toDay = L.dayPrefix(req.toDate);
-  let toRef = fromRef, to = from;
-  if (toWeek !== from.weekStart) {
-    const found = await tx.get(db.collection(C.runs).where('weekStart', '==', toWeek).where('runId', '==', from.runId).limit(5));
-    if (found.empty) throw new SaveError('NOT_FOUND', 'The week of ' + toWeek + ' is not one of the Live weeks, or ' + from.route + ' is not on it');
-    toRef = found.docs[0].ref; to = found.docs[0].data();
-  }
-  const cleared = { runs: false, driverId: '', driver: '', truckId: '', truck: '', trailerId: '', trailer: '' };
-  const fromUpdate = { rev: from.rev + 1, testEdited: true, editedAt: stamp };
-  Object.keys(cleared).forEach(k => { fromUpdate['days.' + req.day + '.' + k] = cleared[k]; });
-  const turnedOn = { runs: true };
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  if (toRef === fromRef) {
-    fromUpdate['days.' + toDay + '.runs'] = true;
-    tx.update(fromRef, fromUpdate);
-    result.runs.push({ runDocId: req.runDocId, rev: from.rev + 1 });
-  } else {
-    tx.update(fromRef, fromUpdate);
-    tx.update(toRef, { rev: to.rev + 1, testEdited: true, editedAt: stamp, ['days.' + toDay + '.runs']: true });
-    result.runs.push({ runDocId: req.runDocId, rev: from.rev + 1 }, { runDocId: toRef.id, rev: to.rev + 1 });
-  }
-  if (mode.writeBack) {
-    queueSheetCells(tx, db, req.requestId, '001', from, req.runDocId, req.day, cleared, stamp, email);
-    queueSheetCells(tx, db, req.requestId, '002', to, toRef.id, toDay, turnedOn, stamp, email);
-  }
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before: { date: fromDate }, after: { date: req.toDate, runDocId: toRef.id }, result });
-  return result;
-}
-
-/*
- * Down Trucks / Trailers (Daily, 216_V7267_DownTrucks.gs): the unit is marked DOWN with the reason and taken off
- * every load from today on in the copied Live weeks. Back in service puts it back to ACTIVE. Equipment Master is
- * not written yet (test copy).
- */
-async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
-  const ref = db.collection(C.equipment).doc(M.safeIdPart(req.equipmentId));
-  const snap = await tx.get(ref);
-  if (!snap.exists) throw new SaveError('NOT_FOUND', req.equipmentId + ' is not in Equipment Master');
-  const unit = snap.data();
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  if (req.action === 'setUnitUp') {
-    tx.update(ref, { status: 'ACTIVE', notes: '', downSince: '', testEdited: true, editedAt: stamp, editedBy: email });
-    queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'ACTIVE', notes: '' }, false, stamp, email);
-    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' }, after: { status: 'ACTIVE' }, result });
-    return result;
-  }
-  if (req.clearOnly && !L.unitOff(unit)) throw new SaveError('CHANGED', unit.unit + ' is not on the down list any more');
-  // The server's operating day (it rolls at 6 AM), never the tablet's (review item 71).
-  const today = L.operatingDay(new Date(stamp));
-  const weeks = [L.weekStart(today), L.addDays(L.weekStart(today), 7)];
-  const runs = await tx.get(db.collection(C.runs).where('weekStart', 'in', weeks));
-  const idKey = unit.type === 'TRAILER' ? 'trailerId' : 'truckId', textKey = unit.type === 'TRAILER' ? 'trailer' : 'truck';
-  const removed = [], taken = [], kept = [];
-  runs.docs.forEach(r => {
-    const run = r.data(), update = {}, cells = {};
-    L.DAYS.forEach((p, i) => {
-      const d = run.days && run.days[p];
-      if (!d || d[idKey] !== unit.id || L.addDays(run.weekStart, i) < today) return;
-      // A load already loaded keeps its unit: the product is on that trailer (review item 71).
-      if (BOARD.boardState(d) === 'LOADED') { kept.push({ route: String(run.route || ''), run: String(run.run || ''), date: L.addDays(run.weekStart, i) }); return; }
-      update['days.' + p + '.' + idKey] = ''; update['days.' + p + '.' + textKey] = '';
-      cells[p] = true;
-      removed.push(run.route + ' ' + L.addDays(run.weekStart, i));
-      taken.push({ route: String(run.route || ''), run: String(run.run || ''), date: L.addDays(run.weekStart, i) });
-    });
-    if (!Object.keys(update).length) return;
-    tx.update(r.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp }));
-    result.runs.push({ runDocId: r.id, rev: run.rev + 1 });
-    // Each part is named by the whole run ID (its week too), so the same run in this week and next never shares one (review item 65).
-    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id + '-' + p + i, run, r.id, p, { [idKey]: '', [textKey]: '' }, stamp, email));
-  });
-  const downNote = req.reason ? 'DOWN: ' + req.reason : 'DOWN';
-  if (!req.clearOnly) {
-    tx.update(ref, { status: 'DOWN', notes: downNote, downSince: stamp, testEdited: true, editedAt: stamp, editedBy: email });
-    queueMaster(tx, db, mode, req.requestId, 'unit', ref, unit.id, { status: 'DOWN', notes: downNote }, false, stamp, email);
-  }
-  result.removedFrom = removed;
-  result.taken = taken.sort((a, b) => a.date.localeCompare(b.date) || a.route.localeCompare(b.route, undefined, { numeric: true }));
-  if (kept.length) result.keptOnLoaded = kept;
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, equipmentId: unit.id, before: { status: unit.status, notes: unit.notes || '' },
-    after: req.clearOnly ? { status: unit.status, clearOnly: true, removedFrom: removed } : { status: 'DOWN', reason: req.reason, removedFrom: removed }, result });
-  return result;
-}
-
-/*
- * Equipment Issues buttons (036_V740_MaintenanceRepositoryService.gs): Repaired, Reviewed, Remove and To garage, each one save on
- * the write-up. Repaired: COMPLETE, available, not out of service, completed at / by. Remove keeps the row as REMOVED with who and
- * when (never deleted). To garage adds one note, once. Reviewed only moves a NEEDS_REVIEW write-up that has text to OPEN.
- */
-async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
-  const ref = db.collection(C.maintenance).doc(MAINT.docId(req.recordId));
-  const snap = await tx.get(ref);
-  if (!snap.exists) throw new SaveError('NOT_FOUND', 'That write-up is no longer on the list');
-  const r = snap.data(), notes = String(r.notes || '').trim(), add = (line) => (notes ? notes + '\n' : '') + line;
-  let change;
-  if (req.step === 'repaired') change = { status: 'COMPLETE', available: 'TRUE', out_of_service: 'FALSE', completed_at: stamp, completed_by: email, resolution: 'COMPLETED', resolution_notes: req.note || '' };
-  else if (req.step === 'remove') change = { status: 'REMOVED', resolution: 'REMOVED', resolution_notes: req.note || 'Removed: not a real unit or not a write-up', notes: add('Removed by ' + email + ' at ' + stamp) };
-  else if (req.step === 'garage') {
-    if (notes.indexOf('Sent to garage') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the garage.' };
-    change = { notes: add('Sent to garage ' + stamp + ' by ' + email) };
-  } else if (req.step === 'lessor') {
-    // Joe 10/10: a truck write-up goes to our garage or to the company that leases the truck. This marks it sent to the lessor
-    // (named in the note) once; the email itself goes out after the save (admintools.afterSave, Administration > Repair Email).
-    if (String(r.kind || '').toUpperCase() !== 'TRUCK') throw new SaveError('NOT_ALLOWED', 'Only a truck write-up goes to a lessor');
-    const lessor = String(req.note || '').replace(/[\n|]+/g, ' ').trim().slice(0, 40);
-    if (!lessor) throw new SaveError('BAD_REQUEST', 'Say which lessor');
-    if (notes.indexOf('Sent to lessor') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the lessor.' };
-    change = { notes: add('Sent to lessor ' + lessor + ' ' + stamp + ' by ' + email) };
-  } else {
-    if (String(r.status || '').toUpperCase() !== 'NEEDS_REVIEW') throw new SaveError('NOT_ALLOWED', 'Only a write-up that needs review can be marked reviewed');
-    if (L.noWriteUp(r.issue_details)) throw new SaveError('NOT_ALLOWED', 'Add what is wrong before marking it reviewed');
-    change = { status: 'OPEN', notes: add('Reviewed by ' + email + ' at ' + stamp) };
-  }
-  Object.assign(change, { updated_at: stamp, updated_by: email });
-  tx.update(ref, Object.assign({}, change, { testEdited: true, editedAt: stamp, editedBy: email }));
-  const list = MAINT.LISTS[String(r.kind || '').toUpperCase()];
-  if (list) queueMaster(tx, db, mode, req.requestId, 'issue', ref, r.record_id, r.createdInApp ? Object.assign({}, r, change) : change, !!r.createdInApp, stamp, email, list);
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  const before = {}; Object.keys(change).forEach(k => { before[k] = r[k] === undefined ? null : r[k]; });
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, recordId: r.record_id, before, after: change, result });
-  return result;
-}
-
-// Same rule as udpoV754SaveDailyLoadSequence_: the new order reuses the load-order numbers the loads already
-// had (smallest first); if those are missing or repeated, the loads are numbered 5, 10, 15, ...
-async function reorder(tx, db, req, email, stamp, logRef, mode) {
-  const refs = {}, runs = {};
-  req.order.forEach(item => { refs[item.runDocId] = db.collection(C.runs).doc(item.runDocId); });
-  const ids = Object.keys(refs);
-  const snaps = await tx.getAll(...ids.map(id => refs[id]));
-  snaps.forEach((snap, i) => {
-    if (!snap.exists) throw new SaveError('NOT_FOUND', 'A load in the list is no longer on the Live sheet');
-    runs[ids[i]] = snap.data();
-  });
-  const targets = req.order.map(item => {
-    const run = runs[item.runDocId], day = run.days && run.days[item.day];
-    if (!day || !day.runs || !L.loadBlocksFor(Object.assign({}, run, { id: item.runDocId }), req.loadDate).some(b => b.prefix === item.day)) {
-      throw new SaveError('NOT_FOUND', run.route + ' ' + run.run + ' does not load on ' + req.loadDate);
-    }
-    return { item, run, seq: L.effectiveSequence(day) };
-  });
-  let slots = targets.map(t => t.seq).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
-  slots = slots.filter((v, i) => slots.indexOf(v) === i);
-  if (slots.length !== targets.length) slots = targets.map((_, i) => (i + 1) * 5);
-  const updates = {}, before = [], after = [];
-  targets.forEach((t, i) => {
-    if (mode.writeBack) queueSheetCells(tx, db, req.requestId, String(i + 1).padStart(3, '0'), t.run, t.item.runDocId, t.item.day, { loadSequenceOverride: slots[i] }, stamp, email);
-    const u = updates[t.item.runDocId] = updates[t.item.runDocId] || {};
-    u['days.' + t.item.day + '.loadSequenceOverride'] = slots[i];
-    u['days.' + t.item.day + '.updatedAt'] = stamp;
-    u['days.' + t.item.day + '.updatedBy'] = email;
-    before.push({ runDocId: t.item.runDocId, day: t.item.day, loadSequence: t.seq });
-    after.push({ runDocId: t.item.runDocId, day: t.item.day, loadSequence: slots[i] });
-  });
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  Object.keys(updates).forEach(id => {
-    const rev = runs[id].rev + 1;
-    tx.update(refs[id], Object.assign(updates[id], { rev, testEdited: true, editedAt: stamp }));
-    result.runs.push({ runDocId: id, rev });
-  });
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, loadDate: req.loadDate, before, after, result });
-  return result;
-}
-
-/*
- * Driver list edits (the Employee Information screen): assigned truck, available, relief. With the write-back on they
- * also go to the sandbox copy of DRIVERS_MASTER (masterwrite.js); as with runs, the sheet wins again the next time
- * that driver's row changes in DRIVERS_MASTER.
- */
-async function editDriver(tx, db, req, email, stamp, logRef, mode) {
-  const ref = db.collection(C.drivers).doc(M.safeIdPart(req.driverId));
-  const snap = await tx.get(ref);
-  if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
-  const d = snap.data();
-  let after;
-  if (req.action === 'setDriverTruck') {
-    if (!req.equipmentId) after = { defaultTruckId: '' };
-    else {
-      const unit = await tx.get(db.collection(C.equipment).doc(M.safeIdPart(req.equipmentId)));
-      if (!unit.exists) throw new SaveError('NOT_FOUND', req.equipmentId + ' is not in Equipment Master');
-      const e = unit.data();
-      if (e.type !== 'TRUCK') throw new SaveError('BAD_REQUEST', e.unit + ' is a ' + e.type + ', not a TRUCK');
-      if (e.status === 'INACTIVE') throw new SaveError('NOT_ALLOWED', e.unit + ' is INACTIVE in Equipment Master');
-      after = { defaultTruckId: e.id };
-    }
-  } else if (req.action === 'setDriverAvailable') {
-    after = { status: req.available ? 'ACTIVE' : 'INACTIVE', unavailableReason: req.available ? '' : (req.reason || 'Not available') };
-  } else {
-    after = { reliefDriver: req.relief };
-  }
-  // D6: a new assigned truck follows the driver onto the Current and Next Live weeks (driverToLive).
-  const live = req.action === 'setDriverTruck' && after.defaultTruckId ? await liveRead(tx, db, '') : null;
-  const before = {};
-  Object.keys(after).forEach(k => { before[k] = d[k] === undefined ? null : d[k]; });
-  tx.update(ref, Object.assign({}, after, { testEdited: true, editedAt: stamp, editedBy: email }));
-  queueMaster(tx, db, mode, req.requestId, '', ref, d.id, after, false, stamp, email);
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  if (live) { result.liveWeeks = { updated: 0, added: 0, warnings: [] }; driverToLive(tx, db, mode, req, stamp, email, { id: d.id, name: '' }, after.defaultTruckId, live, result); }
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: d.id, before, after, result });
-  return result;
-}
-
-// The truck typed on the driver list ("900001") is the unit number of an active truck in Equipment Master.
-async function truckByUnit(tx, db, unit) {
-  if (!unit) return '';
-  const snap = await tx.get(db.collection(C.equipment).where('unit', '==', unit).limit(5));
-  const truck = snap.docs.map(d => d.data()).find(e => e.type === 'TRUCK');
-  if (!truck) throw new SaveError('NOT_FOUND', unit + ' is not a truck in Equipment Master');
-  if (truck.status === 'INACTIVE') throw new SaveError('NOT_ALLOWED', unit + ' is INACTIVE in Equipment Master');
-  return truck.id;
-}
-
-// The Edit / Add Driver panel: name, hire date, seniority date, assigned truck, relief. Same rules as
-// udpoV780DriverRosterSave_; a new driver starts ACTIVE. Test copy only: DRIVERS_MASTER is not written yet.
-async function saveDriver(tx, db, req, email, stamp, logRef, mode) {
-  let ref, existing = null;
-  if (req.driverId) {
-    ref = db.collection(C.drivers).doc(M.safeIdPart(req.driverId));
-    const snap = await tx.get(ref);
-    if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
-    existing = snap.data();
-  }
-  const truckId = await truckByUnit(tx, db, req.truck);
-  // D6: an existing driver's name and own truck reach the Current and Next Live weeks (driverToLive).
-  const live = existing ? await liveRead(tx, db, '') : null;
-  const after = { name: req.name, hireDate: req.hireDate, seniorityDate: req.seniorityDate, defaultTruckId: truckId, reliefDriver: req.relief };
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  if (existing) {
-    result.liveWeeks = { updated: 0, added: 0, warnings: [] };
-    driverToLive(tx, db, mode, req, stamp, email, { id: existing.id, name: req.name }, truckId, live, result);
-    const before = {};
-    Object.keys(after).forEach(k => { before[k] = existing[k] === undefined ? null : existing[k]; });
-    tx.update(ref, Object.assign({}, after, { testEdited: true, editedAt: stamp, editedBy: email }));
-    queueMaster(tx, db, mode, req.requestId, '', ref, existing.id, after, false, stamp, email);
-    result.driverId = existing.id;
-    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: existing.id, before, after, result });
-    return result;
-  }
-  const id = 'drv_' + req.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40) + '_' + req.requestId.slice(-6).toLowerCase();
-  ref = db.collection(C.drivers).doc(M.safeIdPart(id));
-  const created = Object.assign({ id, status: 'ACTIVE', employmentStatus: 'ACTIVE', unavailableReason: '', createdInApp: true, testEdited: true, createdAt: stamp, createdBy: email }, after);
-  tx.set(ref, created);
-  queueMaster(tx, db, mode, req.requestId, '', ref, id, Object.assign({ status: 'ACTIVE', employmentStatus: 'ACTIVE' }, after), true, stamp, email);
-  result.driverId = id;
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: id, before: null, after: created, result });
-  return result;
-}
-
-// Remove Selected: the drivers stay in the list as INACTIVE, never deleted (same as udpoV780DriverRosterRemove_).
-async function removeDrivers(tx, db, req, email, stamp, logRef, mode) {
-  const refs = req.driverIds.map(id => db.collection(C.drivers).doc(M.safeIdPart(id)));
-  const snaps = await tx.getAll(...refs);
-  const before = [];
-  snaps.forEach((snap, i) => {
-    if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverIds[i] + ' is not in Driver Master');
-    before.push({ driverId: req.driverIds[i], status: snap.data().status || '' });
-  });
-  refs.forEach((ref, i) => {
-    tx.update(ref, { status: 'INACTIVE', unavailableReason: 'Removed from operational roster', testEdited: true, editedAt: stamp, editedBy: email });
-    queueMaster(tx, db, mode, req.requestId, String(i), ref, snaps[i].data().id || req.driverIds[i], { status: 'INACTIVE', unavailableReason: 'Removed from operational roster' }, false, stamp, email);
-  });
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: { status: 'INACTIVE' }, result });
-  return result;
-}
-
-async function requireDriver(tx, db, driverId) {
-  const snap = await tx.get(db.collection(C.drivers).doc(M.safeIdPart(driverId)));
-  if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + driverId + ' is not in Driver Master');
-  return snap.data();
-}
-
-/*
- * D6: Route Master and Driver Master saves reach the Current and Next Live weeks, as the current app's 7.0.267 does (Joe 10/5: "when i
- * change and add a run on the route change menu it should add to the live sheet and the route master"; udpoV7267RouteMasterToLive_ and
- * udpoV7267DriverMasterToLive_, 207_V780_HybridDataRouters.gs). Only days not loaded yet (load day today or later). A day changed by
- * hand keeps it: route_override keeps RUNS, the time overrides keep the times, route_hours_override the hours, equipment_override the
- * truck and trailer. Reads first (liveRead), then the writes (writeLive), as a transaction needs.
- */
-const OVERRIDE_DAY = { route_override: 'routeOverride', equipment_override: 'equipmentOverride', dispatch_time_override: 'dispatchTimeOverride' };
-const byHand = (run, p, col) => L.yes(((run.days && run.days[p]) || {})[OVERRIDE_DAY[col]]) || L.yes((run.cells || {})[p + '_' + col]);
-const loadDay = (week, p, offset) => L.addDays(week, L.DAYS.indexOf(p) + (Number.isFinite(Number(offset)) && offset !== null && offset !== '' ? Number(offset) : 0));
-const LIVE_RUN_COLUMNS = {};
-M.RUN_FIELDS.forEach(([field, col]) => { if (M.APP_ONLY_RUN_FIELDS.indexOf(field) < 0) LIVE_RUN_COLUMNS[field] = col; });
-
-// runId given: that run's Live rows; else every run of the two weeks.
-async function liveRead(tx, db, runId) {
-  const cfg = await tx.get(db.collection(C.config).doc('app'));
-  const w = (cfg.exists && cfg.data().liveWeeks) || {};
-  const weeks = [w.current, w.next].filter(Boolean);
-  const [runSnap, eqSnap] = await Promise.all([weeks.length ? tx.get(runId ? db.collection(C.runs).where('runId', '==', runId) : db.collection(C.runs).where('weekStart', 'in', weeks)) : null,
-    tx.get(db.collection(C.equipment))]);
-  const units = eqSnap.docs.map(d => d.data());
-  const unit = (v, type) => { const k = String(v || '').trim().toUpperCase(); return k ? units.find(e => e.type === type && (String(e.id).toUpperCase() === k || String(e.unit).toUpperCase() === k)) || null : null; };
-  // Route names (Joe 10/12) reach the Previous week too, and stream_id / route / route_run_type as well, only once
-  // config/app.routeNamesLive.enabled is on (Joe's typed OK for those Live columns and tabs).
-  const namesLive = !!(cfg.exists && cfg.data().routeNamesLive && cfg.data().routeNamesLive.enabled === true);
-  const previous = runId && namesLive && w.previous && runSnap ? runSnap.docs.filter(s => s.data().weekStart === w.previous && s.data().sourceTab === M.LIVE_TABS.previous) : [];
-  return { weeks, runs: runSnap ? runSnap.docs.filter(s => weeks.indexOf(s.data().weekStart) >= 0) : [], previous, namesLive, unit, tabs: { [w.current]: M.LIVE_TABS.current, [w.next]: M.LIVE_TABS.next } };
-}
-
-// One Live run's changes ({run: {field: v}, days: {p: {field: v}}}) as one update and, with the write-back on, one queued row.
-function writeLive(tx, db, mode, req, stamp, email, snap, run, ch, result) {
-  const ps = Object.keys(ch.days).filter(p => Object.keys(ch.days[p]).length);
-  if (!ps.length && !Object.keys(ch.run).length) return;
-  const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp }, cells = {};
-  Object.keys(ch.run).forEach(k => { const v = ch.run[k]; update[k] = v; if (!LIVE_RUN_COLUMNS[k]) return; cells[LIVE_RUN_COLUMNS[k]] = typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v); });
-  ps.forEach(p => {
-    Object.keys(ch.days[p]).forEach(k => { update['days.' + p + '.' + k] = ch.days[p][k]; });
-    update['days.' + p + '.updatedAt'] = stamp; update['days.' + p + '.updatedBy'] = email;
-    Object.assign(cells, dayCells(p, ch.days[p], stamp, email));
-  });
-  tx.update(snap.ref, update);
-  if (mode.writeBack) queueCells(tx, db, req.requestId, 'L' + result.runs.length, run, snap.id, cells, stamp, email);
-  result.runs.push({ runDocId: snap.id, rev: run.rev + 1 });
-  result.liveWeeks.updated++;
-}
-
-const hoursNumber = (h) => { const t = String(h == null ? '' : h).trim(), m = t.match(/^(\d{1,2}):(\d{2})$/); const n = m ? Number(m[1]) + Number(m[2]) / 60 : Number(t); return t && Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
-
-// One run's Route Master standards into its Live rows of the two weeks; a run with no Live row in a week gets one.
-// Route names (Joe 10/12): Route Name and Run follow Route Master into the Live rows; with config/app.routeNamesLive on, so do
-// stream_id, route and route_run_type, and the Previous week gets the names too (names only). A name this save set goes
-// across even when blank (a Run left empty when Run Type says Load 1); others only when Route Master has one.
-const LIVE_NAME_FIELDS = ['routeName', 'run'], LIVE_MORE_NAMES = ['streamId', 'route', 'routeRunType'];
-function liveNames(m, run, req, live) {
-  const out = {}, set = (req && req.fields) || {};
-  LIVE_NAME_FIELDS.concat(live.namesLive ? LIVE_MORE_NAMES : []).forEach(f => {
-    const v = String(m[f] == null ? '' : m[f]).trim();
-    if ((v || f in set) && String(run[f] == null ? '' : run[f]).trim() !== v) out[f] = v;
-  });
-  return out;
-}
-function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
-  const today = L.operatingDay(new Date(stamp));
-  (live.previous || []).forEach(s => { const ch = liveNames(m, s.data(), req, live); if (Object.keys(ch).length) writeLive(tx, db, mode, req, stamp, email, s, s.data(), { run: ch, days: {} }, result); });
-  live.weeks.forEach(week => {
-    const rows = live.runs.filter(s => s.data().weekStart === week);
-    if (!rows.length) return addLiveRun(tx, db, mode, req, stamp, email, m, live, week, today, result);
-    const changes = rows.map(() => ({ run: {}, days: {} }));
-    rows.forEach((s, i) => { const run = s.data();
-      // 7.0.272: who runs it follows Route Master too (route name, run, Run By).
-      Object.assign(changes[i].run, liveNames(m, run, req, live));
-      ['coverageType', 'coverageOwner'].forEach(f => { const v = String(m[f] || '').trim(); if (v && String(run[f] || '').trim() !== v) changes[i].run[f] = v; });
-      // Joe 10/12 (907 / 950): Show on Daily Dispatch switched in the Route Editor reaches the Current and Next weeks' rows too,
-      // since Daily reads the week's own flag (a FALSE there hides the run whatever Route Master says).
-      if (req && req.fields && typeof req.fields.displayDaily === 'boolean' && run.displayDaily !== req.fields.displayDaily) changes[i].run.displayDaily = req.fields.displayDaily;
-      // Joe 10/12 (typed OK): the driver Route app switch (phone View Loadout, Driver Room board, check-in) reaches the two weeks' rows too,
-      // since those screens read the week's own display_mobile_route first.
-      if (req && req.fields && typeof req.fields.displayMobile === 'boolean' && run.displayMobileRoute !== req.fields.displayMobile) changes[i].run.displayMobileRoute = req.fields.displayMobile;
-    });
-    L.DAYS.forEach(p => {
-      // A run on two rows (one per set of days): the day belongs to the row that runs it, else the first row.
-      let i = rows.findIndex(s => ((s.data().days || {})[p] || {}).runs);
-      if (i < 0) i = 0;
-      const run = rows[i].data(), day = (run.days || {})[p] || {}, want = (m.days || {})[p] || {}, ch = {};
-      if (loadDay(week, p, day.loadDayOffset) < today) return;
-      // Joe 10/10: a day with a driver always runs, so Route Master never turns such a day off.
-      if (!byHand(run, p, 'route_override') && !!day.runs !== !!want.active && (want.active || !day.driver)) ch.runs = !!want.active;
-      if (want.dispatchTime !== null && want.dispatchTime !== undefined) {
-        if (!byHand(run, p, 'dispatch_time_override') && day.dispatchTime !== want.dispatchTime) ch.dispatchTime = want.dispatchTime;
-        if (!byHand(run, p, 'start_time_override') && day.startTime !== want.dispatchTime) ch.startTime = want.dispatchTime;
-      }
-      const hours = hoursNumber(want.hours);
-      if (hours !== null && !byHand(run, p, 'route_hours_override') && day.routeHours !== hours) ch.routeHours = hours;
-      if (!byHand(run, p, 'equipment_override')) [['tractor', 'TRUCK', 'truckId', 'truck'], ['trailer', 'TRAILER', 'trailerId', 'trailer']].forEach(([f, type, idF, unitF]) => {
-        const u = live.unit(want[f], type);
-        if (!u || L.unitOff(u) || String(day[idF] || '').toUpperCase() === String(u.id).toUpperCase()) return;
-        ch[idF] = u.id; ch[unitF] = u.unit;
-      });
-      changes[i].days[p] = ch;
-    });
-    rows.forEach((s, i) => writeLive(tx, db, mode, req, stamp, email, s, s.data(), changes[i], result));
-  });
-}
-
-// A run Route Master has but the Live week does not: a new Live row from Route Master; days already loaded do not run.
-function addLiveRun(tx, db, mode, req, stamp, email, m, live, week, today, result) {
-  if (!L.masterActive(m) || !m.id) return;
-  // A run with no day left to run that week (a new run with no days ticked yet) gets its Live row from the save that ticks one.
-  if (!L.DAYS.some(p => { const want = (m.days || {})[p] || {}; return want.active && loadDay(week, p, Number.isFinite(want.loadDayOffset) ? want.loadDayOffset : null) >= today; })) return;
-  const run = { weekStart: week, sourceTab: live.tabs[week], sheetRow: null, addedFromRouteMaster: true, weekOrder: m.weekOrder === undefined ? null : m.weekOrder,
-    weeklyShowMaster: typeof m.displayWeekly === 'boolean' ? m.displayWeekly : null, masterShow: { daily: m.displayDaily === undefined ? null : m.displayDaily, mobile: m.displayMobile === undefined ? null : m.displayMobile, loadType: m.loadType || '' },
-    days: {}, cells: {}, rev: Date.parse(stamp), testEdited: true, editedAt: stamp };
-  M.RUN_FIELDS.forEach(([f, , kind]) => { run[f] = kind === 'flag' ? null : ''; });
-  Object.assign(run, { facilityId: m.facilityId || '', streamId: m.streamId || '', routeId: m.routeId || '', route: m.route || '', routeName: m.routeName || '', runId: m.id, run: m.run || '',
-    routeRunType: m.routeRunType || '', loadType: m.loadType || '', movementType: m.movementType || '', coverageType: m.coverageType || '', coverageOwner: m.coverageOwner || '',
-    dedicatedType: m.dedicatedType || '', routeStatus: 'ACTIVE', active: true, displayDaily: m.displayDaily === undefined ? null : m.displayDaily,
-    displayWeekly: m.displayWeekly === undefined ? null : m.displayWeekly, displayPlant: m.displayPlant === undefined ? null : m.displayPlant, displayMobileRoute: m.displayMobile === undefined ? null : m.displayMobile });
-  const cells = { week_start_date: week };
-  Object.keys(LIVE_RUN_COLUMNS).forEach(f => { if (run[f] !== null && run[f] !== '') cells[LIVE_RUN_COLUMNS[f]] = typeof run[f] === 'boolean' ? (run[f] ? 'TRUE' : 'FALSE') : String(run[f]); });
-  L.DAYS.forEach(p => {
-    const want = (m.days || {})[p] || {}, day = {};
-    M.DAY_FIELDS.forEach(([f, , kind]) => { day[f] = kind === 'yes' ? false : kind === 'text' ? '' : null; });
-    const truck = live.unit(want.tractor, 'TRUCK'), trailer = live.unit(want.trailer, 'TRAILER'), offset = Number.isFinite(want.loadDayOffset) ? want.loadDayOffset : null;
-    Object.assign(day, { runs: !!want.active && loadDay(week, p, offset) >= today, loadSequence: want.loadOrder == null ? null : want.loadOrder, deliveryDate: L.addDays(week, L.DAYS.indexOf(p)),
-      loadDayOffset: offset, loadDate: loadDay(week, p, offset), dispatchTime: want.dispatchTime == null ? null : want.dispatchTime, startTime: want.dispatchTime == null ? null : want.dispatchTime,
-      routeHours: hoursNumber(want.hours), miles: want.miles == null ? null : want.miles,
-      truckId: truck ? truck.id : '', truck: truck ? truck.unit : '', trailerId: trailer ? trailer.id : '', trailer: trailer ? trailer.unit : '' });
-    run.days[p] = day;
-    M.DAY_FIELDS.forEach(([f, suffix]) => { const v = day[f]; if (v === null || v === '' || (v === false && f !== 'runs')) return; cells[p + '_' + suffix] = typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : TIME_FIELDS[f] ? L.timeText(v) : v; });
-  });
-  const id = M.runDocId(week, m.id);
-  tx.set(db.collection(C.runs).doc(id), run);
-  if (mode.writeBack) queueCells(tx, db, req.requestId, 'A' + week, Object.assign({}, run, { days: {} }), id, cells, stamp, email, { append: true });
-  result.runs.push({ runDocId: id, rev: run.rev });
-  result.liveWeeks.added++;
-}
-
-// A Driver Master save: the Live name follows Driver Master, and the driver's own truck goes on the days he drives, unless the day's
-// equipment was picked by hand, the truck is down, or it is already on another run that day (udpoV7267DriverOwnTruck_).
-function driverToLive(tx, db, mode, req, stamp, email, d, truckId, live, result) {
-  const today = L.operatingDay(new Date(stamp)), truck = truckId ? live.unit(truckId, 'TRUCK') : null, warn = (t) => { if (result.liveWeeks.warnings.indexOf(t) < 0) result.liveWeeks.warnings.push(t); };
-  const rows = live.runs.map(s => ({ s, run: s.data(), ch: { run: {}, days: {} } }));
-  rows.forEach(x => L.DAYS.forEach(p => {
-    const day = (x.run.days || {})[p] || {};
-    if (day.driverId !== d.id || loadDay(x.run.weekStart, p, day.loadDayOffset) < today) return;
-    const ch = {};
-    if (d.name && day.driver !== d.name) ch.driver = d.name;
-    if (truckId && day.runs && !byHand(x.run, p, 'equipment_override') && day.truckId !== truckId) {
-      if (!truck) warn(d.name + "'s truck " + truckId + ' is not in Equipment Master; the route\'s truck was kept.');
-      else if (L.unitOff(truck)) warn(d.name + "'s truck " + truck.unit + ' is ' + L.unitOffWhy(truck) + '; the route\'s truck was kept.');
-      else {
-        const on = (o) => { const od = Object.assign({}, (o.run.days || {})[p], o.ch.days[p]); return od.runs && (od.truckId === truck.id || (!!truck.unit && od.truck === truck.unit)); };
-        const other = rows.find(o => o !== x && o.run.weekStart === x.run.weekStart && on(o));
-        if (other) warn(d.name + "'s truck " + truck.unit + ' is already on route ' + other.run.route + ' ' + (other.run.run || '') + ' on ' + L.addDays(x.run.weekStart, L.DAYS.indexOf(p)) + '; the route\'s truck was kept.');
-        else { ch.truckId = truck.id; ch.truck = truck.unit; }
-      }
-    }
-    if (Object.keys(ch).length) x.ch.days[p] = ch;
-  }));
-  rows.forEach(x => writeLive(tx, db, mode, req, stamp, email, x.s, x.run, x.ch, result));
-}
-
-/* ---------- Route Editor (Route Master copy; ROUTES_MASTER itself is not written yet) ---------- */
-const ROUTE_FIELDS = { route: 'text', routeName: 'text', run: 'text', streamId: 'text', routeRunType: 'text', routeCode: 'text', loadType: 'text', movementType: 'text', coverageOwner: 'text', coverageType: 'text',
-  departureDay: 'text', routeNotes: 'text', weekOrder: 'number', active: 'bool', sleeper: 'bool', dropAndHook: 'bool', displayDaily: 'bool',
-  displayWeekly: 'bool', displayPlant: 'bool', displayMobile: 'bool', displayRouteMaster: 'bool', routeStatus: 'text' };
-const ROUTE_DAY_FIELDS = { active: 'bool', dispatchTime: 'time', loadOrder: 'number', miles: 'number', hours: 'hours', loadDayOffset: 'offset',
-  forklift: 'unit', tractor: 'unit', trailer: 'trailer', notes: 'text' };
-function routeValue(kind, v, label) {
-  if (kind === 'bool') return v === true;
-  const t = text(v, 300);
-  if (kind === 'text') return t;
-  if (kind === 'unit') return t.toUpperCase();
-  if (kind === 'trailer') return !t ? '' : /^T-/i.test(t) ? t.toUpperCase() : 'T-' + t.toUpperCase(); // "T- is added", as on the current screen
-  if (t === '') return null;
-  if (kind === 'time') { const m = L.minutesOfDay(/^\d{1,2}\s*[AaPp][Mm]$/.test(t) ? t.replace(/\s*([AaPp][Mm])$/, ':00 $1') : t); if (m === null) throw new SaveError('BAD_REQUEST', label + ' must look like 5 AM or 5:30 PM'); return m; }
-  if (kind === 'hours') { if (!/^\d{1,2}(:\d{2})?$|^\d+(\.\d+)?$/.test(t)) throw new SaveError('BAD_REQUEST', label + ' must be hours:minutes or a decimal'); return t; }
-  const n = Number(t);
-  if (!Number.isFinite(n)) throw new SaveError('BAD_REQUEST', label + ' must be a number');
-  if (kind === 'offset' && (n > 0 || n < -6 || !Number.isInteger(n))) throw new SaveError('BAD_REQUEST', label + ' must be 0 (same day) to -6');
-  return n;
-}
-
-// One run's Route Master standards (or a new route / run, created in the new app). One call, one log entry.
-async function saveRoute(tx, db, req, email, stamp, logRef, mode) {
-  const id = req.runId || 'run_app_' + M.safeIdPart(String(req.fields.route) + '_' + String(req.fields.run)).toLowerCase().slice(0, 60) + '_' + req.requestId.slice(-6).toLowerCase();
-  const ref = db.collection(C.routes).doc(M.safeIdPart(id));
-  const snap = await tx.get(ref);
-  if (req.runId && !snap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer in the Route Master copy');
-  const before = snap.exists ? snap.data() : null;
-  // Show Weekly flipped in the Route Editor: the copied Live runs of this run carry Route Master's answer (weeklyShowMaster,
-  // transfer.js), so Weekly follows at once instead of after the next copy. Reads come before any write in a transaction.
-  const weeklyRuns = snap.exists && typeof req.fields.displayWeekly === 'boolean'
-    ? (await tx.get(db.collection(C.runs).where('runId', '==', before.id || id))).docs : [];
-  const update = Object.assign({}, req.fields, { testEdited: true, editedAt: stamp, editedBy: email });
-  Object.keys(req.days).forEach(p => Object.keys(req.days[p]).forEach(k => { update['days.' + p + '.' + k] = req.days[p][k]; }));
-  if (snap.exists) {
-    tx.update(ref, update);
-    weeklyRuns.forEach(d => tx.update(d.ref, { weeklyShowMaster: req.fields.displayWeekly }));
-    queueMaster(tx, db, mode, req.requestId, '', ref, before.id || id, Object.assign({}, req.fields, { days: req.days }), false, stamp, email);
-  } else {
-    const days = {};
-    L.DAYS.forEach(p => { days[p] = Object.assign({ active: false, dispatchTime: null, loadOrder: null, miles: null, hours: '', loadDayOffset: null, forklift: '', tractor: '', trailer: '', notes: '' }, req.days[p] || {}); });
-    const made = Object.assign({ id, routeId: 'rte_app_' + M.safeIdPart(String(req.fields.route)).toLowerCase(), routeStatus: 'ACTIVE', active: true, displayDaily: true, displayWeekly: true,
-      displayPlant: true, displayMobile: true, displayRouteMaster: true, createdInApp: true, createdAt: stamp, createdBy: email }, req.fields, { days, testEdited: true, editedAt: stamp, editedBy: email });
-    tx.set(ref, made);
-    const { createdInApp, createdAt, createdBy, testEdited, editedAt, editedBy, id: madeId, ...sheetFields } = made;
-    queueMaster(tx, db, mode, req.requestId, '', ref, id, sheetFields, true, stamp, email);
-  }
-  // D6: the Current and Next Live weeks follow in their own step once this save is in (routeLiveFollow).
-  const result = { ok: true, requestId: req.requestId, runs: [], runId: id, liveWeeks: { updated: 0, added: 0, warnings: [] } };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runId: id, before: before ? { fields: Object.keys(req.fields).reduce((o, k) => Object.assign(o, { [k]: before[k] === undefined ? null : before[k] }), {}) } : null, after: { fields: req.fields, days: req.days }, result });
-  return result;
-}
-
-// D6, after a Route Master save is in: the run's Live rows of the Current and Next weeks follow, in their own transaction, so
-// several quick Route Editor saves (block fill, paste) never wait on each other's Live rows. It reads the run as saved last.
-async function routeLiveFollow(db, req, email, stamp, result) {
-  try {
-    const live = await db.runTransaction(async (tx) => {
-      const mode = await requireTestMode(tx, db, ACTIONS.saveRoute.screen);
-      const snap = await tx.get(db.collection(C.routes).doc(M.safeIdPart(result.runId)));
-      if (!snap.exists) return null;
-      const m = Object.assign({ id: result.runId }, snap.data());
-      const weeks = await liveRead(tx, db, m.id);
-      const out = { runs: [], liveWeeks: { updated: 0, added: 0, warnings: [] } };
-      routeToLive(tx, db, mode, req, stamp, email, m, weeks, out);
-      return out;
-    });
-    if (live) { result.runs = result.runs.concat(live.runs); result.liveWeeks = live.liveWeeks; }
-  } catch (e) {
-    result.liveWeeks.warnings.push('Route Master is saved, but the Current and Next weeks did not update (' + (e.message || e) + '). Save the run again to retry.');
-  }
-}
-
-// Load Order (drag) for one weekday: the runs in their new order get 10, 20, 30 ...
-async function reorderRouteDay(tx, db, req, email, stamp, logRef, mode) {
-  const refs = req.runIds.map(id => db.collection(C.routes).doc(M.safeIdPart(id)));
-  const snaps = await Promise.all(refs.map(r => tx.get(r)));
-  snaps.forEach((s, i) => { if (!s.exists) throw new SaveError('NOT_FOUND', req.runIds[i] + ' is no longer in the Route Master copy'); });
-  const before = snaps.map(s => ({ runId: s.id, loadOrder: ((s.data().days || {})[req.day] || {}).loadOrder === undefined ? null : s.data().days[req.day].loadOrder }));
-  refs.forEach((r, i) => {
-    tx.update(r, { ['days.' + req.day + '.loadOrder']: (i + 1) * 10, testEdited: true, editedAt: stamp, editedBy: email });
-    queueMaster(tx, db, mode, req.requestId, String(i), r, snaps[i].data().id || req.runIds[i], { ['days.' + req.day + '.loadOrder']: (i + 1) * 10 }, false, stamp, email);
-  });
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, day: req.day, before, after: req.runIds.map((id, i) => ({ runId: id, loadOrder: (i + 1) * 10 })), result });
-  return result;
-}
-
-/*
- * Weekly Dispatch order (Joe 10/12, "grab the line and move it"): the routes in their new order get route_week_display
- * 10, 20, 30... in Route Master, and the runs of this week and the weeks after it take the same order at once, so Weekly
- * shows it before the next copy. Runs not in the list keep theirs.
- */
-async function reorderWeek(tx, db, req, email, stamp, logRef, mode) {
-  const refs = req.runIds.map(id => db.collection(C.routes).doc(M.safeIdPart(id)));
-  const [snaps, runSnap] = await Promise.all([Promise.all(refs.map(r => tx.get(r))), tx.get(db.collection(C.runs).where('weekStart', '>=', req.weekStart))]);
-  snaps.forEach((s, i) => { if (!s.exists) throw new SaveError('NOT_FOUND', req.runIds[i] + ' is no longer in the Route Master copy'); });
-  const before = snaps.map(s => ({ runId: s.id, weekOrder: s.data().weekOrder === undefined ? null : s.data().weekOrder }));
-  const order = {};
-  refs.forEach((r, i) => {
-    order[snaps[i].id] = (i + 1) * 10;
-    tx.update(r, { weekOrder: (i + 1) * 10, testEdited: true, editedAt: stamp, editedBy: email });
-    queueMaster(tx, db, mode, req.requestId, String(i), r, snaps[i].data().id || req.runIds[i], { weekOrder: (i + 1) * 10 }, false, stamp, email);
-  });
-  runSnap.docs.forEach(d => {
-    const id = M.safeIdPart(String(d.data().runId || ''));
-    if (order[id] !== undefined && d.data().weekOrder !== order[id]) tx.update(d.ref, { weekOrder: order[id] });
-  });
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before, after: req.runIds.map((id, i) => ({ runId: id, weekOrder: (i + 1) * 10 })), result });
-  return result;
-}
-
-/*
- * Publish to Daily Dispatch. In the new app Weekly and Daily read the same runs, so every Weekly pick is already on
- * Daily. Publishing the Live Next week moves the weeks on (weekroll.js); publishing another week records that it was
- * checked and sent (who and when), which the Weekly header shows.
- */
-async function publishWeek(tx, db, req, email, stamp, logRef, mode) {
-  // Joe 10/11 (review item 6): publishing the Live Next week moves the weeks on and builds the new Next week, as the current app does.
-  const live = ((await tx.get(db.collection(C.config).doc('app'))).data() || {}).liveWeeks || {};
-  if (live.next && req.weekStart === live.next) return ROLL.publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveError);
-  const ref = db.collection(C.weeks).doc(req.weekStart);
-  const snap = await tx.get(ref);
-  if (!snap.exists) throw new SaveError('NOT_FOUND', 'The week of ' + req.weekStart + ' is not one of the copied Live weeks');
-  const before = { publishedAt: snap.data().publishedAt || '', publishedBy: snap.data().publishedBy || '' };
-  tx.update(ref, { publishedAt: stamp, publishedBy: email });
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before, after: { publishedAt: stamp, publishedBy: email }, result });
-  return result;
-}
-
-/*
- * Driver Weekly Template (udpoV780DriverWeeklyTemplateSave_): one driver's normal day in Driver Master: Available, Off, or the
- * runs they drive (more than one allowed). A run must be active in Route Master and run that day, and belongs to one driver a day.
- * Then, like the current save (udpoV7267DriverMasterToLive_), the copied Live weeks from this week on take the new driver on
- * those days, except days someone changed by hand (route_override).
- */
-async function saveDriverTemplate(tx, db, req, email, stamp, logRef, mode) {
-  const ref = db.collection(C.drivers).doc(M.safeIdPart(req.driverId));
-  const snap = await tx.get(ref);
-  if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
-  const d = snap.data(), p = req.day, today = L.operatingDay(new Date(stamp));
-  const [routeSnap, driverSnap, runSnap] = await Promise.all([tx.get(db.collection(C.routes)), tx.get(db.collection(C.drivers)),
-    tx.get(db.collection(C.runs).where('weekStart', '>=', L.weekStart(today)))]);
-  const routes = {};
-  routeSnap.docs.forEach(s => { const r = s.data(); routes[r.id || s.id] = r; });
-  const assignments = req.runIds.map((runId, i) => {
-    const r = routes[runId];
-    if (!r || !L.masterActive(r)) throw new SaveError('NOT_FOUND', 'Run ' + runId + ' is not an active run in Route Master');
-    if (!(r.days && r.days[p] && r.days[p].active)) throw new SaveError('NOT_ALLOWED', r.route + ' ' + (r.run || '') + ' does not run on ' + L.DAY_NAMES[L.DAYS.indexOf(p)]);
-    driverSnap.docs.forEach(o => {
-      const other = o.data();
-      if (other.id === d.id) return;
-      let list = [];
-      try { list = JSON.parse((other.cells && other.cells[p + '_assignments_json']) || '[]'); } catch (e) { list = []; }
-      if ((Array.isArray(list) ? list : [list]).some(a => (typeof a === 'string' ? a : a && (a.runId || a.run_id)) === runId)) throw new SaveError('CHANGED', r.route + ' on ' + L.DAY_NAMES[L.DAYS.indexOf(p)] + ' is already ' + other.name + "'s run");
-    });
-    return { slot: i + 1, runId, routeId: r.routeId || '', status: 'ASSIGNMENT' };
-  });
-  const cells = { [p + '_available']: req.status === 'OFF' ? 'FALSE' : 'TRUE', [p + '_assignments_json']: JSON.stringify(assignments), [p + '_default_route_id']: assignments.length ? assignments[0].routeId : '' };
-  const before = {}, update = { testEdited: true, editedAt: stamp, editedBy: email }, fields = {};
-  Object.keys(cells).forEach(k => { before[k] = d.cells && d.cells[k] !== undefined ? d.cells[k] : null; update['cells.' + k] = cells[k]; fields['cells.' + k] = cells[k]; });
-  tx.update(ref, update);
-  queueMaster(tx, db, mode, req.requestId, '', ref, d.id, fields, false, stamp, email);
-  // The copied Live weeks from today on take the template on that day, unless the day was changed by hand.
-  const result = { ok: true, requestId: req.requestId, runs: [] }, mine = new Set(req.runIds), live = [];
-  runSnap.docs.forEach(s => {
-    const run = s.data(), day = run.days && run.days[p], date = L.addDays(run.weekStart, L.DAYS.indexOf(p));
-    if (!day || date < today || L.yes(day.routeOverride)) return;
-    let after = null;
-    if (mine.has(run.runId) && day.runs && day.driverId !== d.id) after = { driverId: d.id, driver: d.name };
-    else if (!mine.has(run.runId) && day.driverId === d.id) after = { driverId: '', driver: '' };
-    if (!after) return;
-    tx.update(s.ref, { ['days.' + p + '.driverId']: after.driverId, ['days.' + p + '.driver']: after.driver, rev: run.rev + 1, testEdited: true, editedAt: stamp });
-    if (mode.writeBack) queueSheetCells(tx, db, req.requestId, 't' + result.runs.length, run, s.id, p, after, stamp, email);
-    result.runs.push({ runDocId: s.id, rev: run.rev + 1 });
-    live.push(run.route + ' ' + date);
-  });
-  result.liveDays = live;
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: d.id, day: p, before, after: cells, liveDays: live, result });
-  return result;
-}
-
-/*
- * Over the Road: the module's own records (the current app keeps them in its "UDPO OTR Report" workbook, never in Route Master):
- * otrRoutes (which runs count and where they go), otrMonthly (a month's figures), otrDaily (a day's count typed by hand, which wins
- * over the count from the dispatch sheet).
- */
-async function saveOtr(tx, db, req, email, stamp, logRef, mode) {
-  if (req.op === 'import') {
-    // Imported numbers fill their months (typed figures for other keys stay); imported day counts never replace a typed one.
-    const monthRefs = req.months.map(m => db.collection('otrMonthly').doc(m.year + '-' + String(m.month).padStart(2, '0')));
-    const dayRefs = req.daily.map(d => db.collection('otrDaily').doc(d.date + '__' + M.safeIdPart(d.destination)));
-    const noteRefs = req.comments.map(c => db.collection('otrComments').doc(c.date));
-    const daySnaps = dayRefs.length ? await tx.getAll(...dayRefs) : [];
-    const noteSnaps = noteRefs.length ? await tx.getAll(...noteRefs) : [];
-    const meta = { updatedAt: stamp, updatedBy: email, testEdited: mode.mode === 'test' };
-    req.months.forEach((m, i) => tx.set(monthRefs[i], Object.assign({}, m, { source: 'IMPORT' }, meta), { merge: true }));
-    let kept = 0;
-    req.daily.forEach((d, i) => {
-      const old = daySnaps[i].exists ? daySnaps[i].data() : null;
-      if (old && String(old.source || '').toUpperCase() === 'MANUAL') { kept++; return; }
-      tx.set(dayRefs[i], Object.assign({}, d, { source: 'IMPORT' }, meta), { merge: true });
-    });
-    let notesSaved = 0;
-    req.comments.forEach((c, i) => {
-      const old = noteSnaps[i].exists ? noteSnaps[i].data() : null;
-      if (old && String(old.source || '').toUpperCase() === 'MANUAL') return;
-      notesSaved++;
-      tx.set(noteRefs[i], Object.assign({}, c, { source: 'IMPORT' }, meta), { merge: true });
-    });
-    const result = { ok: true, requestId: req.requestId, runs: [], months: req.months.length, days: req.daily.length - kept, keptTyped: kept };
-    if (req.comments.length) result.comments = notesSaved;
-    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, op: 'import', months: req.months.length, days: req.daily.length, comments: req.comments.length, result });
-    return result;
-  }
-  let ref, data;
-  if (req.op === 'route') { ref = db.collection('otrRoutes').doc(M.safeIdPart(req.runId)); data = { runId: req.runId, include: req.include, destination: req.destination, deliveredBy: req.deliveredBy || '' }; }
-  else if (req.op === 'comment') { ref = db.collection('otrComments').doc(req.date); data = { date: req.date, text: req.text, source: 'MANUAL' }; }
-  else if (req.op === 'figure') { ref = db.collection('otrMonthly').doc(req.year + '-' + String(req.month).padStart(2, '0')); data = { year: req.year, month: req.month, [req.key]: req.value, source: 'TYPED' }; }
-  else { ref = db.collection('otrDaily').doc(req.date + '__' + M.safeIdPart(req.destination)); data = { date: req.date, destination: req.destination, runs: req.runs, source: 'MANUAL' }; }
-  const snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
-  tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email, testEdited: mode.mode === 'test' }), { merge: true });
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, op: req.op, doc: ref.path, before, after: data, result });
-  return result;
-}
-
-// Driver Scorecard settings: scorecard/settings, read by the screen with the current app's defaults under it (scSettings_).
-async function saveScorecard(tx, db, req, email, stamp, logRef, mode) {
-  const ref = db.collection('scorecard').doc('settings'), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
-  const data = req.callOffReasons ? { callOffReasons: req.callOffReasons } : { [req.key]: req.value };
-  tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email }), { merge: true });
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
-  return result;
-}
-
-// Operational Assignments: opsAssignments/{NAME}, read by the screen and the driver lists with the current app's four under it.
-async function saveOpsAssignment(tx, db, req, email, stamp, logRef, mode) {
-  const ref = db.collection('opsAssignments').doc(M.safeIdPart(L.opsKey(req.assignment))), snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
-  const data = { assignment: req.assignment, active: req.active, sequence: req.sequence };
-  tx.set(ref, Object.assign({}, data, { updatedAt: stamp, updatedBy: email, testEdited: mode.mode === 'test' }));
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: data, result });
-  return result;
-}
-
-// Route Week Override's reason for the week's changes (the current app keeps it with the week's overrides).
-async function setWeekReason(tx, db, req, email, stamp, logRef, mode) {
-  const ref = db.collection(C.weeks).doc(req.weekStart);
-  const snap = await tx.get(ref);
-  if (!snap.exists) throw new SaveError('NOT_FOUND', 'The week of ' + req.weekStart + ' is not one of the copied Live weeks');
-  const before = { overrideReason: snap.data().overrideReason || '' }, after = { overrideReason: req.reason, overrideReasonBy: email, overrideReasonAt: stamp };
-  tx.update(ref, after);
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before, after, result });
-  return result;
-}
-
-/*
- * Reset Week (the current Weekly button, udpoV780ResetWeeklyDispatch_): every copied run of the week is rebuilt from
- * Route Master (which days run) and Driver Master (the standard driver for each day), whether or not the week was
- * published. Trucks, trailers and notes stay. A day's route override is cleared. One call, one log entry with every
- * day it changed.
- */
-const RESET_FIELDS = ['runs', 'driverId', 'driver', 'intendedDriverId', 'intendedDriver', 'driverExceptionStatus'];
-async function resetWeek(tx, db, req, email, stamp, logRef, mode) {
-  const runSnaps = (await tx.get(db.collection(C.runs).where('weekStart', '==', req.weekStart))).docs;
-  if (!runSnaps.length) throw new SaveError('NOT_FOUND', 'The week of ' + req.weekStart + ' is not one of the copied Live weeks');
-  const [routeSnap, driverSnap, exSnap] = await Promise.all([tx.get(db.collection(C.routes)), tx.get(db.collection(C.drivers)),
-    tx.get(db.collection(C.exceptions).where('endDate', '>=', req.weekStart))]);
-  const routes = {};
-  routeSnap.docs.forEach(d => { const r = d.data(); if (r.id) routes[r.id] = r; });
-  const slots = L.standardDrivers(driverSnap.docs.map(d => d.data())), exceptions = exSnap.docs.map(d => d.data());
-  const result = { ok: true, requestId: req.requestId, runs: [] }, changes = [];
-  let part = 0;
-  runSnaps.forEach(snap => {
-    const run = snap.data(), plan = L.resetWeekPlan(run, routes[run.runId], slots, exceptions);
-    if (!plan) return;
-    const update = {};
-    L.DAYS.forEach(p => {
-      const was = (run.days && run.days[p]) || {}, want = plan[p], after = {};
-      RESET_FIELDS.forEach(k => { if ((was[k] === undefined ? (k === 'runs' ? false : '') : was[k]) !== want[k] && !(k !== 'runs' && !was[k] && !want[k])) after[k] = want[k]; });
-      if (L.yes(was.routeOverride)) after.routeOverride = 'FALSE';
-      if (!Object.keys(after).length) return;
-      Object.keys(after).forEach(k => { update['days.' + p + '.' + k] = after[k]; });
-      update['days.' + p + '.updatedAt'] = stamp;
-      update['days.' + p + '.updatedBy'] = email;
-      changes.push({ runDocId: snap.id, day: p, before: Object.keys(after).reduce((o, k) => Object.assign(o, { [k]: was[k] === undefined ? null : was[k] }), {}), after });
-      if (mode.writeBack) queueSheetCells(tx, db, req.requestId, 'r' + (part++), run, snap.id, p, after, stamp, email);
-    });
-    if (!Object.keys(update).length) return;
-    tx.update(snap.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp }));
-    result.runs.push({ runDocId: snap.id, rev: run.rev + 1 });
-  });
-  result.changedDays = changes.length;
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, changes, result });
-  return result;
-}
-
-// The copied Live weeks a day-off range touches (none for a range longer than ten weeks: runs exist for three weeks only).
-async function runsForDays(tx, db, startDate, endDate) {
-  const weeks = [];
-  for (let w = L.weekStart(startDate); w <= endDate && weeks.length < 10; w = L.addDays(w, 7)) weeks.push(w);
-  if (!weeks.length || L.weekStart(endDate) > weeks[weeks.length - 1]) return [];
-  return (await tx.get(db.collection(C.runs).where('weekStart', 'in', weeks))).docs;
-}
-
-/*
- * The same as the current Weekly board and Daily Call-Off: a driver who is off comes off the runs they had on those
- * days, and the day shows who it was for (intendedDriver) and why (driverExceptionStatus, e.g. VACATION, so Weekly
- * shows "Vacation - Needs Driver"). Return Available puts them back where nobody was picked in the meantime.
- */
-function freeRunsForDayOff(tx, db, req, runSnaps, driver, reasonCode, stamp, email, mode, result) {
-  runSnaps.forEach(r => {
-    const run = r.data(), update = {}, cells = {};
-    L.DAYS.forEach((p, i) => {
-      const d = run.days && run.days[p], date = L.addDays(run.weekStart, i);
-      if (!d || !d.runs || date < req.startDate || date > req.endDate) return;
-      if (reasonCode && d.driverId === driver.id) {
-        Object.assign(update, { ['days.' + p + '.driverId']: '', ['days.' + p + '.driver']: '', ['days.' + p + '.intendedDriverId']: driver.id,
-          ['days.' + p + '.intendedDriver']: driver.name, ['days.' + p + '.driverExceptionStatus']: reasonCode });
-        cells[p] = { driverId: '', driver: '' };
-      } else if (!reasonCode && d.intendedDriverId === driver.id && !d.driverId) {
-        Object.assign(update, { ['days.' + p + '.driverId']: driver.id, ['days.' + p + '.driver']: driver.name, ['days.' + p + '.intendedDriverId']: '',
-          ['days.' + p + '.intendedDriver']: '', ['days.' + p + '.driverExceptionStatus']: '' });
-        cells[p] = { driverId: driver.id, driver: driver.name };
-      }
-    });
-    if (!Object.keys(update).length) return;
-    tx.update(r.ref, Object.assign(update, { rev: run.rev + 1, testEdited: true, editedAt: stamp }));
-    result.runs.push({ runDocId: r.id, rev: run.rev + 1 });
-    // Each part is named by the whole run ID (its week too), so the same run in this week and next never shares one (review item 65).
-    if (mode.writeBack) Object.keys(cells).forEach((p, i) => queueSheetCells(tx, db, req.requestId, r.id + '-' + p + i, run, r.id, p, cells[p], stamp, email));
-  });
-}
-
-// Exception type and reason for a day off, as Daily Dispatch > Driver Call-Off stores them (desktopUiSaveDriverExceptionGuardedV768_).
-function exceptionValues(reason) {
-  if (reason === 'VACATION') return { type: 'VACATION', status: 'APPROVED', reasonCode: 'VACATION' };
-  if (['SICK DAY', 'BEREAVEMENT', 'UNPAID DAY'].indexOf(reason) >= 0) return { type: reason, status: 'UNAVAILABLE', reasonCode: reason };
-  return { type: 'UNAVAILABLE', status: 'UNAVAILABLE', reasonCode: reason };
-}
-
-/*
- * Driver Call-Off (Daily) and Driver availability (Weekly board). UNAVAILABLE adds a day-off entry. AVAILABLE
- * ("Return Available") frees only the days given: an entry inside them is cancelled, one that starts before keeps
- * its earlier days, one that ends after keeps its later days, one around them keeps both sides. Test copy only.
- */
-async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
-  const driver = await requireDriver(tx, db, req.driverId);
-  const result = { ok: true, requestId: req.requestId, runs: [] };
-  const mine = await tx.get(db.collection(C.exceptions).where('driverId', '==', driver.id));
-  const runSnaps = await runsForDays(tx, db, req.startDate, req.endDate);
-  freeRunsForDayOff(tx, db, req, runSnaps, driver, req.status === 'UNAVAILABLE' ? exceptionValues(req.reason).reasonCode : '', stamp, email, mode, result);
-  if (req.status === 'UNAVAILABLE') {
-    const id = 'dav_' + req.requestId.slice(-12).toLowerCase();
-    const v = exceptionValues(req.reason);
-    const doc = { id, driverId: driver.id, startDate: req.startDate, endDate: req.endDate, type: v.type, status: v.status, reasonCode: v.reasonCode,
-      notes: req.note, createdInApp: true, createdAt: stamp, createdBy: email, updatedAt: stamp, updatedBy: email };
-    const exRef = db.collection(C.exceptions).doc(id);
-    tx.set(exRef, doc);
-    queueMaster(tx, db, mode, req.requestId, 'ex', exRef, id, { driverId: doc.driverId, startDate: doc.startDate, endDate: doc.endDate, type: doc.type, status: doc.status, reasonCode: doc.reasonCode, notes: doc.notes }, true, stamp, email);
-    result.exceptionId = id;
-    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before: null, after: doc, result });
-    return result;
-  }
-  const changed = [];
-  const note = 'Available ' + req.startDate + (req.endDate !== req.startDate ? ' - ' + req.endDate : '') + ' from Dispatch';
-  mine.docs.forEach((snap, n) => {
-    const e = snap.data(), a = e.startDate, z = e.endDate || e.startDate;
-    if (!a || z < req.startDate || a > req.endDate || ['CANCELLED', 'CLEARED', 'DENIED'].indexOf(String(e.status).toUpperCase()) >= 0) return;
-    const base = { updatedAt: stamp, updatedBy: email, testEdited: true };
-    if (a >= req.startDate && z <= req.endDate) {
-      tx.update(snap.ref, Object.assign(base, { status: 'CANCELLED', decisionNotes: 'Returned available from Dispatch' }));
-      queueMaster(tx, db, mode, req.requestId, 'ex' + n, snap.ref, e.id || snap.id, { status: 'CANCELLED', decisionNotes: 'Returned available from Dispatch' }, false, stamp, email);
-    } else {
-      const kept = Object.assign({ decisionNotes: note }, a < req.startDate ? { endDate: L.addDays(req.startDate, -1) } : { startDate: L.addDays(req.endDate, 1) });
-      tx.update(snap.ref, Object.assign(base, kept));
-      queueMaster(tx, db, mode, req.requestId, 'ex' + n, snap.ref, e.id || snap.id, kept, false, stamp, email);
-      if (a < req.startDate && z > req.endDate) {
-        const id = String(snap.id) + '_' + req.requestId.slice(-8).toLowerCase(), later = db.collection(C.exceptions).doc(id);
-        const split = Object.assign({}, e, base, { id, startDate: L.addDays(req.endDate, 1), endDate: z, decisionNotes: note, createdInApp: true });
-        tx.set(later, split);
-        queueMaster(tx, db, mode, req.requestId, 'exs' + n, later, id, { driverId: split.driverId, startDate: split.startDate, endDate: split.endDate, type: split.type, status: split.status,
-          reasonCode: split.reasonCode, notes: split.notes, decisionNotes: note, facilityId: split.facilityId }, true, stamp, email);
-      }
-    }
-    changed.push({ id: snap.id, startDate: a, endDate: z, status: e.status });
-  });
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before: changed, after: { available: [req.startDate, req.endDate] }, result });
-  return result;
-}
-
-/*
- * Vacation Schedule entry (same rules as udpoV780VacationSave_): at most 3 drivers off a day, 2 in a holiday week;
- * a driver's own other entries do not count against them. An approved entry also puts the days off on Dispatch
- * (the vsched_ exception, as udpoV7277MirrorVacationToExceptions_ does); any other status cancels that.
- */
-const usDay = (key) => { const [y, m, d] = String(key).split('-'); return Number(m) + '/' + Number(d) + '/' + y; };
-const VACATION_EXCEPTION = { VACATION: ['VACATION', 'VACATION'], SICK: ['SICK DAY', 'SICK DAY'], BEREAVEMENT: ['BEREAVEMENT', 'BEREAVEMENT'], UNPAID: ['UNPAID DAY', 'UNPAID DAY'], PERSONAL: ['UNAVAILABLE', 'PERSONAL DAY'] };
-async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
-  const driver = await requireDriver(tx, db, req.driverId);
-  const id = req.vacationId || 'vac_' + req.requestId.slice(-16).toLowerCase();
-  const ref = db.collection(C.vacations).doc(M.safeIdPart(id));
-  const existing = await tx.get(ref);
-  if (req.vacationId && !existing.exists) throw new SaveError('NOT_FOUND', 'That vacation entry no longer exists');
-  const vsRef = db.collection(C.exceptions).doc(M.safeIdPart('vsched_' + id));
-  const vsSnap = await tx.get(vsRef);
-  // The same driver cannot be off twice for the same day (the current app refuses it: "X is already off ... Edit that entry instead").
-  if (req.status !== 'CANCELLED' && req.status !== 'DENIED') {
-    const mine = await tx.get(db.collection(C.vacations).where('driverId', '==', driver.id));
-    const clash = mine.docs.map(d => Object.assign({ docId: d.id }, d.data())).find(v => v.docId !== ref.id && v.status !== 'CANCELLED' && v.status !== 'DENIED' && v.startDate && v.startDate <= req.endDate && (v.endDate || v.startDate) >= req.startDate);
-    if (clash) throw new SaveError('NOT_ALLOWED', (driver.name || driver.id) + ' is already off ' + usDay(clash.startDate) + (clash.endDate && clash.endDate !== clash.startDate ? ' – ' + usDay(clash.endDate) : '') + '. Edit that entry instead.');
-  }
-  if (req.status === 'APPROVED') {
-    const approved = await tx.get(db.collection(C.vacations).where('status', '==', 'APPROVED'));
-    const others = approved.docs.map(d => Object.assign({ docId: d.id }, d.data())).filter(v => v.docId !== ref.id && v.driverId !== driver.id && v.startDate && (v.endDate || v.startDate) >= req.startDate && v.startDate <= req.endDate);
-    for (let day = req.startDate; day <= req.endDate; day = L.addDays(day, 1)) {
-      const off = L.vacationsOn(others, day).length, limit = L.dayLimit(day);
-      if (off >= limit.maxOff) {
-        throw new SaveError('NOT_ALLOWED', 'Vacation date ' + day + ' is FULL' + (limit.label ? ' during ' + limit.label + ' week. ' + off + ' employees are already scheduled off and the holiday limit is ' + limit.maxOff : '. ' + off + ' employees are already scheduled off') + '; no additional vacation can be added.');
-      }
-    }
-  }
-  const before = existing.exists ? existing.data() : null;
-  const doc = { id, driverId: driver.id, startDate: req.startDate, endDate: req.endDate, status: req.status, vacationType: req.type, notes: req.notes, notificationEmail: req.email, updatedAt: stamp, updatedBy: email, testEdited: true };
-  if (!existing.exists) Object.assign(doc, { createdInApp: true, createdAt: stamp, createdBy: email });
-  tx.set(ref, doc, { merge: true });
-  queueMaster(tx, db, mode, req.requestId, 'vac', ref, id, { driverId: doc.driverId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status, vacationType: doc.vacationType, notes: doc.notes }, !existing.exists, stamp, email);
-  const pair = VACATION_EXCEPTION[req.type], approved = req.status === 'APPROVED';
-  const mirror = { id: 'vsched_' + id, driverId: driver.id, startDate: req.startDate, endDate: req.endDate, type: pair[0], reasonCode: pair[1],
-    status: !approved ? 'CANCELLED' : pair[0] === 'VACATION' ? 'APPROVED' : 'UNAVAILABLE', notes: 'Vacation Schedule' + (req.notes ? ': ' + req.notes : '') };
-  tx.set(vsRef, Object.assign({}, mirror, { updatedAt: stamp, updatedBy: email, testEdited: true }), { merge: true });
-  const { id: mirrorId, ...mirrorFields } = mirror;
-  queueMaster(tx, db, mode, req.requestId, 'vsched', vsRef, mirrorId, mirrorFields, !vsSnap.exists, stamp, email);
-  const result = { ok: true, requestId: req.requestId, runs: [], vacationId: id };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before, after: doc, result });
-  return result;
 }
 
 // Someone checked a sheet conflict (and fixed the sheet or the app by hand): it leaves the open list, kept for the record.

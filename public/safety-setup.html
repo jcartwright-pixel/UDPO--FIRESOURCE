@@ -70,7 +70,7 @@
       document.getElementById('areas-link').href = 'location-areas.html?plant=' + encodeURIComponent(plant);
       const set = canSetUp(person, app), dis = set ? '' : ' disabled', list = areas(), P = S.places(list);
       const on = list.reduce((n, a) => n + (a.off ? 0 : a.items.filter(i => !i.off).length), 0);
-      document.getElementById('counts').textContent = P.length + ' areas · ' + list.length + ' sub-areas · ' + on + ' items on the walk' + (setup && setup.areas ? '' : ' · the starting list');
+      document.getElementById('counts').textContent = P.length + ' areas · ' + list.length + ' sub-areas · ' + on + ' items on the walk' + (setup && setup.areas || S.startsEmpty(plant) ? '' : ' · the starting list');
       document.getElementById('foot').textContent = set ? 'Each box saves as you leave it. Monthly items are on the first walk of each month. Type in a sub-area\'s empty row to add an item. Areas and sub-areas are added, renamed, put in order and turned off on Location Areas.' : 'View only. A manager or administrator changes the checklist.';
       if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
       const moveTo = (ai) => '<select data-k="move" aria-label="Move to another sub-area"' + dis + '><option value="">Move to…</option>' + P.map(p => '<optgroup label="' + escapeHtml(p.name) + '">' + p.areas.map(a => { const j = list.indexOf(a); return j === ai ? '' : '<option value="' + j + '">' + escapeHtml(a.name) + (a.off ? ' (off)' : '') + '</option>'; }).join('') + '</optgroup>').join('') + '</select>';
