@@ -163,7 +163,11 @@
       if (rd && v.counter === 'READER') {
         const ok = rd.dateOk !== false;
         dc.className = 'lb-date ' + (ok ? 'ok' : 'bad');
-        dc.innerHTML = '<span class="lb-pill ' + (ok ? 'g' : 'r') + '">' + (ok ? 'CODE DATE OK' : 'CODE DATE WRONG') + '</span><b>' + escapeHtml(rd.lastDate || v.expectedCode || '') + '</b><span>' + escapeHtml([v.expectedCode ? 'should be ' + v.expectedCode : '', rd.read !== undefined ? fmt(rd.read) + ' of ' + fmt(v.made) + ' jugs read' : '', rd.unreadable ? fmt(rd.unreadable) + ' unreadable' : '', rd.lastMissingAt ? 'last missing date ' + clock(rd.lastMissingAt) : ''].filter(Boolean).join(' · ')) + '</span>';
+        // Joe 10/14: the UPC on the jug confirms the product running; a label that is not one of this line's products is wrong.
+        const wrong = rd.lastUpc && rd.lastUpc === rd.lastUnknownUpc;
+        if (wrong) dc.className = 'lb-date bad';
+        dc.innerHTML = (wrong ? '<span class="lb-pill r">WRONG LABEL</span><b>UPC ' + escapeHtml(rd.lastUnknownUpc) + '</b><span>is not one of this line\'s products (Line Targets). ' + fmt(rd.unknown) + ' jug' + (rd.unknown === 1 ? '' : 's') + ' this shift · since ' + escapeHtml(clock(rd.lastUnknownAt)) + '</span>' :
+          v.product ? '<span class="lb-pill g">LABEL MATCHES</span><b>' + escapeHtml(v.product) + '</b>' : '') + (wrong ? '' : '<span class="lb-pill ' + (ok ? 'g' : 'r') + '">' + (ok ? 'CODE DATE OK' : 'CODE DATE WRONG') + '</span><b>' + escapeHtml(rd.lastDate || v.expectedCode || '') + '</b><span>' + escapeHtml([v.expectedCode ? 'should be ' + v.expectedCode : '', rd.read !== undefined ? fmt(rd.read) + ' of ' + fmt(v.made) + ' jugs read' : '', rd.unreadable ? fmt(rd.unreadable) + ' unreadable' : '', rd.lastMissingAt ? 'last missing date ' + clock(rd.lastMissingAt) : ''].filter(Boolean).join(' · ')) + '</span>');
       } else {
         dc.className = 'lb-date wait';
         dc.innerHTML = '<span class="lb-pill n">CODE DATE CHECK</span><b>' + escapeHtml(v.expectedCode || '—') + '</b><span>' + (v.expectedCode ? 'is today\'s code for this product. ' : 'Set the product\'s shelf life on Line Targets to see today\'s code. ') + 'The label reader checks every jug once it is on this line.</span>';

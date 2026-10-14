@@ -20,6 +20,9 @@ const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
+const P = require('../../src/production-rules');
+const RD = require('../../src/reader');
+const { applyAction } = require('../../src/actions');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const DOOR = 'http://127.0.0.1:5001/demo-ud-distribution/us-east4/deviceReads';
@@ -213,6 +216,31 @@ function controller() {
     }
     results.push('Production Lines: Temp 431.2°F TOO HOT on the Blow Mold card, which is under Needs attention; the shift view has From the machine and the hour\'s speed and temperature');
     assert.deepEqual(plc.writes, [], 'nothing but reads was ever sent to the controller');
+
+    // The Gallon Filler (Joe 10/14: a counter and a UPC scanner): the label confirms the product running, a wrong label is flagged.
+    const FILLER = 'ut_prod_gallon_filler';
+    let n = 0;
+    const save = (action, fields) => applyAction(db(), { email: 'admin.test@uniteddairy.com' }, Object.assign({ action, requestId: 'filler-' + (++n) + '-' + Date.now() }, fields));
+    await save('saveMachineProducts', { operationId: FILLER, products: [{ name: 'Broughton 2% Gallon', sku: '50305', upc: '070852503050', shelfLifeDays: 17, ratePerMin: 74, targetPct: 57.3 }] });
+    await save('saveLineCounter', { operationId: FILLER, counter: 'READER' });
+    const code = P.codeDate(RD.plantShift(null, Date.now()).date, 17);
+    await RD.applyReads(db(), FILLER, Array.from({ length: 40 }, () => ({ upc: '070852503050', date: code })));
+    const gf = await openPage(browser, 1024, 900, '/line.html?line=' + FILLER + '&' + ADMIN);
+    await gf.waitForFunction(() => /LABEL MATCHES/.test(document.getElementById('date-check').textContent) && /CODE DATE OK/.test(document.getElementById('date-check').textContent));
+    await shot(gf, 'gallon-filler-label-matches-1024');
+    await RD.applyReads(db(), FILLER, [{ upc: '070852599999', date: code }, { upc: '070852599999', date: code }]);
+    await gf.waitForFunction(() => /WRONG LABEL\s*UPC 070852599999/.test(document.getElementById('date-check').textContent));
+    assert.match(await gf.textContent('#date-check'), /2 jugs this shift/);
+    await fits(gf, 'the Gallon Filler tablet');
+    await shot(gf, 'gallon-filler-wrong-label-1024');
+    assert.deepEqual(gf.errors, []);
+    await gf.close();
+    const pl2 = await openPage(browser, 1536, 960, '/production.html?' + ADMIN);
+    await pl2.waitForFunction(id => /WRONG LABEL UPC 070852599999/.test((document.querySelector('.pd-tile[data-line="' + id + '"]') || {}).textContent || ''), FILLER);
+    await pl2.click('#filters [data-kind="ATTN"]');
+    await pl2.waitForSelector('.pd-tile[data-line="' + FILLER + '"]');
+    await pl2.close();
+    results.push('Gallon Filler label reader: LABEL MATCHES the product running; a UPC not on its products is WRONG LABEL on the tablet and on Production Lines, under Needs attention');
     results.push('Read-only: the pretend controller got only read requests');
   } finally {
     if (bridge) bridge.kill();

@@ -104,7 +104,8 @@ async function applyReads(db, operationId, reads, opts) {
       if (!upc && !named) { rd.unreadable++; return; }
       rd.read++;
       rd.lastUpc = upc;
-      if (!t) { rd.unknown++; rd.lastUnknownUpc = upc; return; }
+      // A label that is not one of this line's products: the tablet flags a wrong label (Joe 10/14).
+      if (!t) { rd.unknown++; rd.lastUnknownUpc = upc; rd.lastUnknownAt = stamp; return; }
       // A new product on the line: a new run from now, as when the operator picks it on the tablet.
       if (!current || current.name !== t.name) {
         if (run.runs.length < RUN_LIMIT) run.runs.push({ product: t.name, sku: text(t.sku), from: stamp, by: BY });

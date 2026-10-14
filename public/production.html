@@ -78,7 +78,7 @@
     const who = (email) => String(email || '').split('@')[0];
     const latest = (v, field) => { const c = (v.run && v.run.checks) || {}; for (const k of Object.keys(c).map(Number).sort((a, b) => b - a)) if (c[k] && String(c[k][field] || '') !== '') return { value: c[k][field], at: c[k].at }; return null; };
     // A line needs attention when it is stopped, has a stop with no reason, is off its speed, more than 10% behind, has a check due or is past its CIP hours.
-    const attention = (v) => v.state === 'STOPPED' || v.needReason.length > 0 || v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' || (v.pct !== null && v.pct < 90) || (v.check && !v.check.done && v.state !== 'IDLE') || (v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours) || !!v.diverting || !!(v.machine && (v.machine.speedFlag || v.machine.tempFlag));
+    const attention = (v) => v.state === 'STOPPED' || v.needReason.length > 0 || v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' || (v.pct !== null && v.pct < 90) || (v.check && !v.check.done && v.state !== 'IDLE') || (v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours) || !!v.diverting || !!(v.machine && (v.machine.speedFlag || v.machine.tempFlag)) || !!(v.reader && v.reader.lastUpc && v.reader.lastUpc === v.reader.lastUnknownUpc);
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
 
     function render() {
@@ -114,6 +114,8 @@
       } else if (v.speed !== null || (tg && (tg.minSpeed !== null || tg.maxSpeed !== null))) {
         rows.push('Speed ' + b(v.speed === null ? '—' : v.speed + '/min') + (tg && (tg.minSpeed !== null || tg.maxSpeed !== null) ? ' (' + (tg.minSpeed !== null ? tg.minSpeed : 0) + (tg.maxSpeed !== null ? '–' + tg.maxSpeed : '+') + ')' : '') + (manager() && v.efficiency && v.efficiency.oee !== null ? ' &nbsp; Efficiency ' + b(v.efficiency.oee + '%') : ''));
       } else if (manager() && v.efficiency && v.efficiency.oee !== null) rows.push('Efficiency ' + b(v.efficiency.oee + '%'));
+      // The label reader (Joe 10/14): the UPC on the jugs is not one of this line's products.
+      if (v.reader && v.reader.lastUpc && v.reader.lastUpc === v.reader.lastUnknownUpc) rows.push('<b class="pd-bad">WRONG LABEL</b> UPC ' + escapeHtml(v.reader.lastUnknownUpc));
       // From the machine's controller (Joe 10/14): speed and temperature, red outside the range set on Line Targets.
       const m = v.machine;
       if (m && (m.speed !== null || m.temp !== null)) {
