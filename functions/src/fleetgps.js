@@ -286,6 +286,17 @@ function alertType(c, r) {
   if (/HOS(WARN|VIOL)|HOURSOFSERVICE/.test(s)) return 'HOS';
   return 'OTHER';
 }
+// J1939 failure mode (FMI), the standard meanings, short.
+const FMI = ['Too high', 'Too low', 'Erratic or wrong data', 'Voltage too high', 'Voltage too low', 'Current too low or open circuit', 'Current too high or short',
+  'Not responding right', 'Wrong frequency or pulse', 'Updating too slowly', 'Changing too fast', 'Cause not known', 'Bad part or device', 'Out of calibration',
+  'Special instructions', 'Slightly too high', 'Too high', 'Slightly too low', 'Too low', 'Network data error', 'Drifted high', 'Drifted low'];
+/** A fault code from Fleet's trigger value (": 791:2(126)" = SPN 791, FMI 2, from controller 126), or nothing. */
+function dtc(v) {
+  const m = /(\d+)\s*:\s*(\d+)(?:\s*\(\s*(\d+)\s*\))?/.exec(String(v || ''));
+  if (!m) return {};
+  const fmi = Number(m[2]);
+  return { spn: Number(m[1]), fmi, source: m[3] ? Number(m[3]) : null, code: m[1] + ':' + m[2], fmiText: fmi === 31 ? 'Condition is present' : FMI[fmi] || '' };
+}
 const fleetTime = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 
 async function pullAlerts(db, d, o, token, trucks, at) {
@@ -327,8 +338,16 @@ async function readAlerts(db, d, o, token, trucks, since, until, at) {
       speedMph: num(r.SpeedMph), limitMph: num(r.LimitMph), minutes: isFinite(off) && off > on ? Math.round((off - on) / 60000) : null,
       place: t && t.lastReport && Math.abs(Date.parse(t.lastReport) - Date.parse(when)) < 10 * 60000 ? t.place || '' : '',
       address: r.Address || '', condition: c.name || c.type || r.TriggerName || '', fleetDriverId: r.DriverId || '', updatedAt: at };
+    // Joe 10/13: engine fault codes for the garage. Fleet's DTC alert sends the code as its trigger value, ": 791:2(126)".
+    if (type === 'FAULT') Object.assign(docs[safeIdPart('A' + r.AlertId)], dtc(r.TriggerValue), { triggerValue: String(r.TriggerValue || '').trim() });
   });
   await writeAll(db, 'gpsAlerts', docs);
+  // Joe 10/14 (mock-up A): each engine code from the last two days goes on the garage list as a work order (garage.js).
+  const recent = Date.parse(at) - 2 * 86400000;
+  const faults = Object.keys(docs).map(id => Object.assign({ alertId: id }, docs[id])).filter(a => a.type === 'FAULT' && a.code && Date.parse(a.at) >= recent);
+  if (faults.length) {
+    try { await require('./garage').engineCodeOrders(db, faults, at); } catch (e) { console.error('fleetGps engine codes', e); }
+  }
   return Object.keys(docs).length;
 }
 function nyMidnight(now) {
@@ -592,4 +611,4 @@ async function fleetCall(db, email, input, options) {
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
-module.exports = { fleetCall, pull, history, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { fleetCall, pull, history, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
