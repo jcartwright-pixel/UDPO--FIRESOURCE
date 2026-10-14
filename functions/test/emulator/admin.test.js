@@ -166,6 +166,30 @@ test('Email Senders: email comes from whoever pressed Send; no one pressed = the
   assert.equal(sent[5].from, 'uniontown.operations@uniteddairy.com');
 });
 
+test('Send Current Report in live mode goes to the plant group from Manager Report Recipients (Joe 10/14)', async () => {
+  const { mailReport } = require('../../src/reportmail');
+  const sent = [];
+  const send = { env: { MAIL_FROM: 'joe@uniteddairy.com' }, sendMail: async (m) => { sent.push(m); return { to: m.to }; } };
+  await call({ op: 'saveReportGroup', facilityId: 'fac_uniontown', name: 'Plant Management', recipients: 'a@uniteddairy.com, b@uniteddairy.com' });
+  const ref = db().collection('plantReports').doc('rg1');
+  // The Manager Center saves the report with groupName "Plant Managers"; the plant's only group gets it.
+  const report = { status: 'SENDING', subject: 'Report', text: 't', by: 'boss@uniteddairy.com', mode: 'live', groupName: 'Plant Managers' };
+  await ref.set(report);
+  assert.equal(await mailReport(ref, report, send), 'SENT');
+  assert.deepEqual(sent[0].to, ['a@uniteddairy.com', 'b@uniteddairy.com']);
+  const saved = (await ref.get()).data();
+  assert.deepEqual([saved.testCopy, saved.groupName], [false, 'Plant Management']);
+  // A group named exactly so wins when the plant has more than one.
+  await call({ op: 'saveReportGroup', facilityId: 'fac_uniontown', name: 'Plant Managers', recipients: 'c@uniteddairy.com' });
+  await ref.set(report);
+  await mailReport(ref, report, send);
+  assert.deepEqual(sent[1].to, ['c@uniteddairy.com']);
+  // Test mode: only the person who pressed Send.
+  await ref.set(Object.assign({}, report, { mode: 'test' }));
+  await mailReport(ref, Object.assign({}, report, { mode: 'test' }), send);
+  assert.deepEqual(sent[2].to, ['boss@uniteddairy.com']);
+});
+
 test('Route Distribution code: new code shown to administrators, turned off and on', async () => {
   const out = await call({ op: 'routeCodeNew' });
   assert.match(out.code, /^[A-Z2-9]{6}$/);
