@@ -27,6 +27,11 @@
  * Service Setup's Save writes them (garage.js saveFleetUnit). Joe then changes each to the real last service on Fleet Service
  * Setup. A unit that already has a number keeps it; a unit Fleet has no reading for is left blank. It waits (tries again next
  * run) until a GPS read has brought in odometers. The marker lists every unit and number it set, for undoing by hand.
+ *
+ * garage-work-orders-2026-10-14 (Joe 10/14, "this says two at the garage, so I should be able to go into the garage and see two
+ * work orders"): Truck Issues' Garage button now makes the write-up's work order (garage.js writeUpOrderStep). Every open truck,
+ * trailer or fork truck write-up already marked "Sent to garage" before that gets its work order the same way, one per write-up
+ * (one already there is kept). TEST COPY ONLY: on the live app it does nothing and leaves no marker until Joe OKs it by name.
  */
 const crypto = require('crypto');
 const L = require('./logic');
@@ -197,13 +202,37 @@ async function loadFleetStartMilesOnce(db, opts) {
   });
 }
 
+const GARAGE_ORDERS_ID = 'garage-work-orders-2026-10-14';
+const CLOSED = /^(COMPLETE|COMPLETED|CLOSED|RESOLVED|REPAIRED|REMOVED)$/i;
+const projectId = () => process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
+async function loadGarageOrdersOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
+  const mark = db.collection('dataLoads').doc(GARAGE_ORDERS_ID);
+  return db.runTransaction(async tx => {
+    const m = await tx.get(mark);
+    if (m.exists && m.data().status === 'DONE') return { skipped: true };
+    const sent = (await tx.get(db.collection('maintenance').where('kind', 'in', ['TRUCK', 'TRAILER', 'FORK_TRUCK']))).docs.map(d => d.data())
+      .filter(r => r.record_id && String(r.notes || '').indexOf(GARAGE.G.GARAGE_MARK) >= 0 && !CLOSED.test(String(r.status || '').trim()));
+    const steps = [];
+    for (const r of sent) steps.push({ r, step: await GARAGE.writeUpOrderStep(tx, db, r, 'garage', BY, stamp) });
+    const made = [], kept = [];
+    steps.forEach(({ r, step }) => {
+      if (!step) return;
+      if (step.created) { step.apply(tx); made.push(step.workOrderId + ' ' + r.record_id); } else kept.push(step.workOrderId + ' ' + r.record_id);
+    });
+    tx.set(mark, { status: 'DONE', doneAt: stamp, what: 'Garage work orders for write-ups already sent to the garage (Joe 10/14)', made, kept });
+    return { made: made.length, kept: kept.length };
+  });
+}
+
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;
 }
 
-module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID };
+module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID };

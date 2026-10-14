@@ -113,18 +113,29 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
 /*
  * Equipment Issues buttons (036_V740_MaintenanceRepositoryService.gs): Repaired, Reviewed, Remove and To garage, each one save on
  * the write-up. Repaired: COMPLETE, available, not out of service, completed at / by. Remove keeps the row as REMOVED with who and
- * when (never deleted). To garage adds one note, once. Reviewed only moves a NEEDS_REVIEW write-up that has text to OPEN.
+ * when (never deleted). To garage adds one note, once, and makes the write-up's Garage work order (Joe 10/14). Reviewed only moves a NEEDS_REVIEW write-up that has text to OPEN.
  */
 async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection(C.maintenance).doc(MAINT.docId(req.recordId));
   const snap = await tx.get(ref);
   if (!snap.exists) throw new SaveError('NOT_FOUND', 'That write-up is no longer on the list');
   const r = snap.data(), notes = String(r.notes || '').trim(), add = (line) => (notes ? notes + '\n' : '') + line;
+  // Joe 10/14: Garage makes the write-up's work order; Repaired and Remove close it (garage.js writeUpOrderStep, reads first).
+  const order = await require('./garage').writeUpOrderStep(tx, db, r, req.step, email, stamp);
   let change;
   if (req.step === 'repaired') change = { status: 'COMPLETE', available: 'TRUE', out_of_service: 'FALSE', completed_at: stamp, completed_by: email, resolution: 'COMPLETED', resolution_notes: req.note || '' };
   else if (req.step === 'remove') change = { status: 'REMOVED', resolution: 'REMOVED', resolution_notes: req.note || 'Removed: not a real unit or not a write-up', notes: add('Removed by ' + email + ' at ' + stamp) };
   else if (req.step === 'garage') {
-    if (notes.indexOf('Sent to garage') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the garage.' };
+    if (notes.indexOf('Sent to garage') >= 0) {
+      // Sent before Garage made work orders: the work order is made now, once.
+      if (order && order.created) {
+        order.apply(tx);
+        const made = { ok: true, requestId: req.requestId, runs: [], workOrderId: order.workOrderId, message: 'Already sent to the garage. Work order ' + order.workOrderId + ' made.' };
+        tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, recordId: r.record_id, before: {}, after: { workOrderId: order.workOrderId }, result: made });
+        return made;
+      }
+      return Object.assign({ ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the garage.' }, order ? { workOrderId: order.workOrderId } : {});
+    }
     change = { notes: add('Sent to garage ' + stamp + ' by ' + email) };
   } else if (req.step === 'lessor') {
     // Joe 10/10: a truck write-up goes to our garage or to the company that leases the truck. This marks it sent to the lessor
@@ -144,6 +155,11 @@ async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
   const list = MAINT.LISTS[String(r.kind || '').toUpperCase()];
   if (list) queueMaster(tx, db, mode, req.requestId, 'issue', ref, r.record_id, r.createdInApp ? Object.assign({}, r, change) : change, !!r.createdInApp, stamp, email, list);
   const result = { ok: true, requestId: req.requestId, runs: [] };
+  if (order) {
+    order.apply(tx);
+    result.workOrderId = order.workOrderId;
+    if (order.closed) result.workOrdersClosed = order.closed;
+  }
   const before = {}; Object.keys(change).forEach(k => { before[k] = r[k] === undefined ? null : r[k]; });
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, recordId: r.record_id, before, after: change, result });
   return result;

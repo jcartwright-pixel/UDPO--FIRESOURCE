@@ -99,3 +99,22 @@ test('Fleet Service starting miles load once from the GPS odometers: a typed num
   assert.deepEqual(mark.set.map(x => x.unit), ['223893', 'T-2893']);
   assert.deepEqual((await DL.runDataLoads(d, { now: tick }))[DL.FLEET_MILES_ID], { skipped: true });
 });
+
+test('Garage work orders load (test copy only): each open write-up already sent to the garage gets one work order, once', async () => {
+  await clear();
+  const d = db(), w = (id, extra) => d.collection('maintenance').doc(id).set(Object.assign({ record_id: id, kind: 'TRUCK', truck_number: '223881', issue_details: 'Clearance light out', status: 'OPEN', opened_at: '2026-10-13T12:00:00Z' }, extra));
+  await w('TRK-A', { notes: 'Sent to garage 2026-10-13T13:00:00Z by joe' });
+  await w('TRK-B', { notes: 'Sent to garage 2026-10-13T13:00:00Z by joe', truck_number: '223879' });
+  await w('TRK-C', { notes: 'Sent to garage 2026-10-13T13:00:00Z by joe', status: 'COMPLETE' });
+  await w('TRK-D', { notes: '' });
+  await d.collection('workOrders').doc('WO-KEPT0001').set({ work_order_id: 'WO-KEPT0001', source: 'WRITE_UP', source_kind: 'trucks', source_id: 'TRK-B', status: 'WORKING' });
+  assert.match((await DL.runDataLoads(d, { now: tick }))[DL.GARAGE_ORDERS_ID].skipped, /test copy only/, 'nothing on the live app');
+  assert.equal((await d.collection('dataLoads').doc(DL.GARAGE_ORDERS_ID).get()).exists, false);
+  const r = (await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.GARAGE_ORDERS_ID];
+  assert.deepEqual(r, { made: 1, kept: 1 });
+  const orders = (await d.collection('workOrders').get()).docs.map(x => x.data());
+  assert.deepEqual(orders.map(o => o.source_id).sort(), ['TRK-A', 'TRK-B']);
+  const made = orders.find(o => o.source_id === 'TRK-A');
+  assert.deepEqual([made.unit, made.unit_type, made.status, made.problem], ['223881', 'TRUCK', 'NEW', 'Clearance light out']);
+  assert.deepEqual((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.GARAGE_ORDERS_ID], { skipped: true });
+});
