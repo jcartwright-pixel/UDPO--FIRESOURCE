@@ -20,6 +20,8 @@ test.before(async () => {
     await setDoc(doc(ctx.firestore(), 'actions/x'), { by: 'joe@uniteddairy.com' });
     await setDoc(doc(ctx.firestore(), 'conflicts/c1'), { open: true, at: '2026-10-09T12:00:00.000Z' });
     await setDoc(doc(ctx.firestore(), 'outbox/o1'), { status: 'pending' });
+    await setDoc(doc(ctx.firestore(), 'personRights/joe@uniteddairy.com'), { screenAccess: { fac_uniontown: ['daily'] } });
+    await setDoc(doc(ctx.firestore(), 'personRights/other@uniteddairy.com'), { screenAccess: null });
   });
 });
 test.after(async () => { if (env) await env.cleanup(); });
@@ -82,4 +84,12 @@ test('a no-account Plant Station reads only the plant-floor lists, while On and 
   await assertFails(getDoc(doc(station('v0'), 'runs/2026-10-04__run_t801')));
   await setAccess({ on: false, keys: { case: 'v1' } });
   await assertFails(getDoc(doc(station('v1'), 'runs/2026-10-04__run_t801')));
+});
+
+// Joe 10/14: each person reads their own ticked screens (People & Roles) so their Home and menu show only those; nobody else's.
+test('a person reads only their own ticked screens', async () => {
+  await assertSucceeds(getDoc(doc(ud(), 'personRights/joe@uniteddairy.com')));
+  await assertFails(getDoc(doc(ud(), 'personRights/other@uniteddairy.com')));
+  await assertFails(getDocs(collection(ud(), 'personRights')));
+  await assertFails(setDoc(doc(ud(), 'personRights/joe@uniteddairy.com'), { screenAccess: null }));
 });

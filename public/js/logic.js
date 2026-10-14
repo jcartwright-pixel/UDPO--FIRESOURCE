@@ -1127,7 +1127,83 @@
     return /^(?:y|ye|yes|yep|yeah|ytes|ye s)$/.test(t);
   }
 
+  // Joe 10/14 (mock-up A): which screens each person may see, ticked per plant in People & Roles. The areas are the Home
+  // cards (app.js SIDES) and their screens (app.js MENU); a screen may be listed on two cards (Driver Scorecard is on Route
+  // Distribution and on Reports), and ticking either opens its page. A person with no ticks saved (null) sees every screen
+  // their role allows, as before; an Administrator always sees everything. A page no screen lists (Home, the all-plants
+  // overview, Administration, the stations) is not decided by these ticks.
+  var SCREEN_AREAS = [
+    { key: 'plant', name: 'Plant Distribution', home: 'manager.html', screens: [
+      ['manager', 'Manager Center', ['manager.html']], ['plantDepts', 'Plant Departments', ['plant.html']], ['loadout', 'Loadout Center', ['loadout.html']],
+      ['unloading', 'Unloading & Washing', ['unloading.html']], ['returns', 'Product Returns', ['returns.html']], ['washing', 'Truck Washing', ['washing.html']],
+      ['trailers', 'Trailer Assignments', ['trailers.html']], ['scheduler', 'Plant Operations Scheduler', ['scheduler.html']], ['shiftNotes', 'Shift Notes', ['shiftnotes.html']],
+      ['quality', 'Quality Checks', ['quality.html']], ['temps', 'Cooler Temperature', ['temps.html']], ['yard', 'Yard Checks', ['yard.html']]] },
+    { key: 'production', name: 'Plant Production', home: 'production.html', screens: [
+      ['lines', 'Production Lines and Production TV', ['production.html']], ['lineTablet', 'Line Tablet', ['line.html']], ['lineTargets', 'Line Targets', ['linetargets.html']]] },
+    { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', screens: [
+      ['pmCenter', 'Maintenance Center', ['pmaint.html']], ['machinery', 'Machinery', ['machinery.html']], ['pmWorkOrders', 'Work Orders', ['pmworkorders.html']],
+      ['pmSchedule', 'PM Schedule', ['pmschedule.html']], ['maintStation', 'Maintenance Station', ['maint-station.html']]] },
+    { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', screens: [
+      ['daily', 'Daily Dispatch', ['daily.html']], ['weekly', 'Weekly Dispatch and Driver Assignment Board', ['weekly.html']], ['routes', 'Route Editor', ['routes.html']],
+      ['routeWeek', 'Route Week Override', ['routeweek.html']], ['drivers', 'Driver Roster', ['drivers.html']], ['template', 'Driver Weekly Template', ['template.html']],
+      ['vacations', 'Vacation Schedule', ['vacations.html']], ['checkins', 'Driver Check-ins', ['checkins.html']], ['driverStation', 'Driver Station', ['driver-station.html']],
+      ['conflicts', 'Sheet Conflicts', ['conflicts.html']], ['scorecard', 'Driver Scorecard', ['scorecard.html']], ['otr', 'Over the Road', ['otr.html']],
+      ['trucksToday', 'Trucks Today', ['trucks.html']], ['gpsSetup', 'GPS Setup', ['gps.html']], ['dispatchAdmin', 'Dispatch Administration', ['admin.html']],
+      ['ops', 'Operational Assignments', ['ops.html']], ['printLayouts', 'Print Layouts', ['print.html']], ['dispatchSettings', 'Dispatch Settings', ['settings.html']]] },
+    { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', screens: [
+      ['equipment', 'Equipment', ['equipment.html']], ['issues', 'Truck, Trailer and Fork Truck Issues', ['issues.html']], ['garage', 'Garage Work Orders', ['garage.html']],
+      ['fleetService', 'Fleet Service', ['fleet.html']], ['garageStation', 'Garage Station', ['garage-station.html']]] },
+    { key: 'reports', name: 'Reports', home: 'reportcenter.html', screens: [
+      ['plantReports', 'Plant Reports', ['reports.html']], ['shiftReports', 'Shift Reports', ['shiftreports.html']], ['plantTv', 'Plant Performance TV', ['plant-kiosk.html']],
+      ['rScorecard', 'Driver Scorecard', ['scorecard.html']], ['rOtr', 'Over the Road', ['otr.html']], ['rTrucksToday', 'Trucks Today', ['trucks.html']],
+      ['rFleetService', 'Fleet Service Report', ['fleet.html']]] },
+    { key: 'safety', name: 'Safety Walkthrough', home: 'safety.html', screens: [
+      ['safetyWalk', 'Weekly Walk', ['safety.html']], ['safetyIssues', 'Open Issues', ['safety-issues.html']], ['extinguishers', 'Fire Extinguishers', ['extinguishers.html']],
+      ['fire', 'Fire Alarm, Fire Suppression and Escape Plan', ['safety-fire.html']], ['pastWalks', 'Past Walks', ['safety-walks.html']], ['safetySetup', 'Checklist Setup', ['safety-setup.html']]] },
+    { key: 'inventory', name: 'Inventory', home: 'inventory.html', screens: [['receiving', 'Receiving Log', ['inventory.html']]] }
+  ];
+  var SCREEN_KEYS = [];
+  SCREEN_AREAS.forEach(function (a) { a.screens.forEach(function (s) { SCREEN_KEYS.push(s[0]); }); });
+  function pageName(href) { return String(href || '').split(/[?#]/)[0].split('/').pop() || 'index.html'; }
+  // Whether these ticks decide this page at all (a page no screen lists, and no card's first page, stays as before).
+  function pageGated(href) {
+    var page = pageName(href);
+    return SCREEN_AREAS.some(function (a) { return a.home === page || a.screens.some(function (s) { return s[2].indexOf(page) >= 0; }); });
+  }
+  // access = the person's saved ticks ({plantId: [screen keys]}) or null. Not ticks yet = every screen, as before.
+  function screenLimited(person, access) { return !!(access && typeof access === 'object' && !isAdmin(person)); }
+  function screensFor(person, access, plantId) {
+    if (!screenLimited(person, access)) return SCREEN_KEYS.slice();
+    if (plantsFor(person).indexOf(plantId) < 0) return [];
+    var list = Array.isArray(access[plantId]) ? access[plantId] : [];
+    return SCREEN_KEYS.filter(function (k) { return list.indexOf(k) >= 0; });
+  }
+  function areaAllowed(person, access, plantId, areaKey) {
+    var a = SCREEN_AREAS.filter(function (x) { return x.key === areaKey; })[0];
+    if (!a || !screenLimited(person, access)) return true;
+    var mine = screensFor(person, access, plantId);
+    return a.screens.some(function (s) { return mine.indexOf(s[0]) >= 0; });
+  }
+  // A page opens when a ticked screen shows it, or it is the first page of a card with a ticked screen.
+  function pageAllowed(person, access, plantId, href) {
+    if (!screenLimited(person, access) || !pageGated(href)) return true;
+    var page = pageName(href), mine = screensFor(person, access, plantId);
+    return SCREEN_AREAS.some(function (a) {
+      return a.screens.some(function (s) { return mine.indexOf(s[0]) >= 0 && (s[2].indexOf(page) >= 0 || a.home === page); });
+    });
+  }
+  // Start from a job (People & Roles): the screens each kind of job usually needs; Joe can tick more or fewer after.
+  var SCREEN_JOBS = [
+    { key: 'plantMaint', name: 'Plant Maintenance Manager', screens: ['pmCenter', 'machinery', 'pmWorkOrders', 'pmSchedule', 'maintStation', 'plantReports', 'shiftReports'] },
+    { key: 'plantManager', name: 'Plant Manager (no Scheduler)', screens: ['manager', 'plantDepts', 'loadout', 'unloading', 'returns', 'washing', 'trailers', 'shiftNotes', 'quality', 'temps', 'yard', 'plantReports', 'shiftReports', 'plantTv'] },
+    { key: 'plantSupervisor', name: 'Plant Supervisor (with Scheduler)', screens: ['manager', 'plantDepts', 'loadout', 'unloading', 'returns', 'washing', 'trailers', 'scheduler', 'shiftNotes', 'quality', 'temps', 'yard', 'plantReports', 'shiftReports', 'plantTv'] },
+    { key: 'garage', name: 'Garage Manager', screens: ['equipment', 'issues', 'garage', 'fleetService', 'garageStation', 'rFleetService'] },
+    { key: 'dispatcher', name: 'Dispatcher', screens: ['daily', 'weekly', 'routeWeek', 'drivers', 'template', 'vacations', 'checkins', 'driverStation', 'conflicts', 'trucksToday', 'equipment', 'issues'] }
+  ];
+
   return {
+    SCREEN_AREAS: SCREEN_AREAS, SCREEN_KEYS: SCREEN_KEYS, SCREEN_JOBS: SCREEN_JOBS, pageName: pageName, pageGated: pageGated, screenLimited: screenLimited, screensFor: screensFor,
+    areaAllowed: areaAllowed, pageAllowed: pageAllowed,
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
