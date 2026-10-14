@@ -251,6 +251,47 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       results.push('Driver Scorecard: area tabs, Incidents & Complaints, excused miss, sleeper idling, kiosk grades only, Driver Roster accidents and complaints');
     }
     if (!BEFORE) results.push('Driver Scorecard GPS: alerts on the dispatched driver, No driver dispatched kept, Week view, GPS weights on Settings, fits at 1536 and 1920');
+    // Joe 10/14 (mock-up A): the Route Distribution home has a Manager card across the page, under the four cards, with Driver
+    // Scorecard, Over the Road, Trucks Today and GPS Setup and today's numbers. Nothing on the four cards is taken away.
+    if (!BEFORE) {
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const now = new Date().toISOString(), b = db().batch();
+      // Two scored alerts on our 229001 today; an engine code (not scored) on it and an alert on another plant's unit don't count.
+      [['SPEEDING', '229001'], ['HARSH_TURN', '229001'], ['FAULT_CODE', '229001'], ['SPEEDING', '551234']].forEach(([type, tag], i) =>
+        b.set(db().collection('gpsAlerts').doc('home_' + i), { date: today, tag, at: now, type }));
+      b.set(db().collection('gpsTrucks').doc('223893'), { tag: '223893', lastReport: now, updatedAt: now, ignitionOn: true, speedMph: 48, place: '' });
+      b.set(db().collection('gpsTrucks').doc('223894'), { tag: '223894', lastReport: now, updatedAt: now, ignitionOn: false, speedMph: 0, place: 'Uniontown Branch' });
+      await b.commit();
+      const review = (await db().collection('driverIncidents').where('status', '==', 'review').get()).size;
+      const tt = await openPage(browser, 1536, 760, '/trucks.html?testEmail=manager.test@uniteddairy.com');
+      await tt.waitForSelector('#kpis b');
+      const kpi = await tt.$$eval('#kpis div', d => Object.fromEntries(d.map(x => [x.querySelector('span').textContent, x.querySelector('b').textContent])));
+      await tt.close();
+      for (const [w, h] of [[1536, 760], [1920, 960]]) {
+        const home = await openPage(browser, w, h, '/distribution.html?testEmail=manager.test@uniteddairy.com');
+        await home.waitForFunction(() => { const x = document.querySelector('[data-n="mgr.alerts"]'); return x && x.textContent === '2'; }, null, { timeout: 15000 });
+        assert.deepEqual(await home.$$eval('.dc-wide .dc-link span', l => l.map(x => x.textContent)), ['Driver Scorecard', 'Over the Road', 'Trucks Today', 'GPS Setup']);
+        assert.deepEqual(await home.$$eval('.dc-wide .dc-link', l => l.map(x => x.getAttribute('href'))), ['scorecard.html', 'otr.html', 'trucks.html', 'gps.html']);
+        assert.deepEqual(await home.$$eval('.dc-wide .dc-metric', l => l.map(x => x.querySelector('em').textContent + ' ' + x.querySelector('b').textContent + ' ' + x.querySelector('small').textContent)),
+          ['Scorecard ' + review + ' Under review', 'GPS alerts 2 Today', 'On the road ' + kpi['Driving'] + ' Trucks', 'In yard ' + kpi['In yard'] + ' Trucks'], 'the same counts as Trucks Today');
+        assert.equal(await home.$$eval('.cards4 > .card', c => c.length), 5, 'the four cards stay and the Manager card is added');
+        assert.deepEqual(await home.$$eval('.cards4 > .card:not(.dc-wide) .dc-link span', l => l.map(x => x.textContent)), ['Daily Dispatch', 'Weekly Dispatch', 'Route Editor', 'Driver Roster', 'Driver Weekly Template', 'Vacation Schedule',
+          'Fleet & Maintenance', 'Equipment', 'Equipment Issues', 'Garage Work Orders', 'Fleet Service', 'Driver Check-ins', 'Sheet Conflicts'], 'nothing taken off the four cards');
+        const g = await home.evaluate(() => { const c = [...document.querySelectorAll('.cards4 > .card')].map(x => x.getBoundingClientRect()); const l = [...document.querySelectorAll('.dc-wide .dc-link')].map(x => x.getBoundingClientRect());
+          return { wide: Math.round(c[4].width), two: Math.round(c[1].right - c[0].left), below: c[4].top >= Math.max(c[2].bottom, c[3].bottom) - 1, oneLine: l.every(x => Math.abs(x.top - l[0].top) < 2), side: document.documentElement.scrollWidth > innerWidth + 1,
+            small: [...document.querySelectorAll('.dc-wide .dc-link, .dc-wide .dc-metric em')].filter(x => parseFloat(getComputedStyle(x).fontSize) < 16).length }; });
+        assert.ok(g.below && Math.abs(g.wide - g.two) <= 2 && g.oneLine && !g.side && !g.small, 'the Manager card runs across under the four cards, links on one line, text 16px+, at ' + w + ': ' + JSON.stringify(g));
+        if (SHOTS) {
+          await home.screenshot({ path: path.join(SHOTS, 'after-home-manager-' + w + '.png') });
+          await home.evaluate(() => { const m = document.querySelector('.side-main'); if (m) m.scrollTop = m.scrollHeight; });
+          await home.screenshot({ path: path.join(SHOTS, 'after-home-manager-' + w + '-scrolled.png') });
+        }
+        assert.deepEqual(home.errors, []);
+        if (w === 1536) { await Promise.all([home.waitForURL(/scorecard\.html$/), home.click('#card-scorecard')]); }
+        await home.close();
+      }
+      results.push('Route Distribution home: Manager card (Driver Scorecard, Over the Road, Trucks Today, GPS Setup) with under review, today\'s alerts on our units, and Trucks Today\'s driving and in-yard counts, at 1536 and 1920');
+    }
     // With no alerts at all the board says so plainly.
     if (!BEFORE) {
       const all = await db().collection('gpsAlerts').get();

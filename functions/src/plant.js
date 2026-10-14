@@ -649,6 +649,9 @@ function validateSchedule(input, SaveError) {
   if (!out.pickupTime) throw new SaveError('BAD_REQUEST', 'Enter the pickup time.');
   out.scheduleType = text(f.scheduleType || 'ROUTE').toUpperCase();
   if (['ROUTE', 'CARRIER'].indexOf(out.scheduleType) < 0) throw new SaveError('BAD_REQUEST', 'Schedule Type must be Carrier or United Dairy Delivery');
+  // Joe 10/14: a Shipping load's Load Type (Case, Totes, Boxes, Tanker); blank takes its run's Route Master type.
+  out.loadType = R.loadArea(f.loadType);
+  if (text(f.loadType) && !out.loadType) throw new SaveError('BAD_REQUEST', 'Load Type must be Case, Totes, Boxes or Tanker');
   out.poNumber = text(f.poNumber).slice(0, 40);
   if (out.scheduleType === 'CARRIER' && !out.poNumber) throw new SaveError('BAD_REQUEST', 'A carrier load needs its PO number.');
   out.cases = text(f.cases);
@@ -758,6 +761,7 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
     if (trailer) { const u = MAINT.resolveUnit(trailer, 'TRAILER', equipment); trailer = !u.resolved && /^\d+$/.test(u.unit) ? 'T-' + u.unit : u.unit; }
     const payload = { pickupTime: req.pickupTime, loadDate: req.loadDate, trailer, scheduleType: req.scheduleType, carrier: req.scheduleType === 'CARRIER', poNumber: req.poNumber,
       cases: req.cases, product: req.product, notes: req.notes };
+    if (req.lane === 'SHIPPING' && req.loadType) payload.loadType = req.loadType;
     rec = { recordId: id, type, date: req.date, status: 'SCHEDULED', routeId: req.routeId, runId: req.runId, route: req.route, run: req.run, trailer, notes: req.notes,
       area: req.lane === 'RECEIVING' ? 'RECEIVING' : 'SCHEDULER', payload, facilityId: (had && had.facilityId) || 'fac_uniontown' };
   }

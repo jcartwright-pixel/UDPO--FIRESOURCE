@@ -63,7 +63,7 @@ async function templatesOf(db) {
 
 function personRevision(p, ex) {
   return crypto.createHash('sha256').update(JSON.stringify([p ? [p.name || '', p.status || '', (p.roles || []).slice().sort(), (p.facilities || []).slice().sort()] : null,
-    ex ? [(ex.grants || []).slice().sort(), (ex.denials || []).slice().sort()] : null])).digest('hex').slice(0, 16);
+    ex ? [(ex.grants || []).slice().sort(), (ex.denials || []).slice().sort()].concat(ex.screenAccess ? [ex.screenAccess] : []) : null])).digest('hex').slice(0, 16);
 }
 
 async function people(db) {
@@ -73,10 +73,10 @@ async function people(db) {
   const list = snap.docs.map(d => {
     const p = d.data(), e = ex[d.id] || null;
     return { email: d.id, name: p.name || '', status: p.status || '', roles: p.roles || [], facilities: p.facilities || [], grants: e ? e.grants || [] : [], denials: e ? e.denials || [] : [],
-      updatedAt: (e && e.updatedAt) || (p.cells && p.cells.updated_at) || '', updatedBy: (e && e.updatedBy) || (p.cells && p.cells.updated_by) || '', primary: L.PRIMARY_ADMINS.indexOf(d.id) >= 0,
+      screenAccess: e && e.screenAccess ? e.screenAccess : null, updatedAt: (e && e.updatedAt) || (p.cells && p.cells.updated_at) || '', updatedBy: (e && e.updatedBy) || (p.cells && p.cells.updated_by) || '', primary: L.PRIMARY_ADMINS.indexOf(d.id) >= 0,
       revision: personRevision(p, e), rights: R.effectiveRights(p, tpl.templates, e) };
   });
-  return { people: list, catalog: R.CATALOG, roles: tpl.roles, defaults: R.DEFAULTS, templates: tpl.templates, plants: L.PLANTS, newRevision: personRevision(null, null) };
+  return { people: list, catalog: R.CATALOG, screenAreas: L.SCREEN_AREAS, screenJobs: L.SCREEN_JOBS, roles: tpl.roles, defaults: R.DEFAULTS, templates: tpl.templates, plants: L.PLANTS, newRevision: personRevision(null, null) };
 }
 
 // The sandbox's own Users sheet copy (WRITEBACK_JSON.masters.users, a copy, never the real Users sheet): People & Roles
@@ -105,6 +105,9 @@ async function savePerson(db, email, input, stamp, deps) {
   if (grants.some(c => denials.indexOf(c) >= 0)) fail('BAD_REQUEST', 'A right cannot be both Allow and Deny.');
   const admin = roles.indexOf('ADMINISTRATOR') >= 0;
   if (admin && (grants.length || denials.length)) fail('BAD_REQUEST', 'An Administrator has every right; take the exceptions off first (Use Role Defaults).');
+  // Joe 10/14: the screens this person may see, ticked per plant (left out = unchanged; null = every screen their role allows).
+  const screenAccess = R.cleanScreenAccess(input.screenAccess, L.PLANTS.map(p => p.id));
+  if (screenAccess === undefined && input.screenAccess !== undefined) fail('BAD_REQUEST', 'The ticked screens could not be read. Reload this person and tick them again.');
   if (L.PRIMARY_ADMINS.indexOf(target) >= 0 && (!admin || status !== 'ACTIVE')) fail('NOT_ALLOWED', 'The primary administrator must stay an Administrator and Enabled.');
   if (target === email && (!admin || status !== 'ACTIVE')) fail('NOT_ALLOWED', 'You cannot remove your own Administrator role or disable yourself. Use another administrator to change this account.');
 
@@ -124,11 +127,12 @@ async function savePerson(db, email, input, stamp, deps) {
     const fields = { name, status, roles, facilities: admin && facilities.length === 0 ? ['*'] : facilities, 'cells.version': String(version) };
     if (!before) Object.assign(fields, { 'cells.id': id, 'cells.created_at': stamp, 'cells.created_by': email });
     tx.set(ref, { name, status, roles, facilities: fields.facilities, updatedAt: stamp, updatedBy: email, cells: Object.assign({}, before ? before.cells : {}, { email: target, id }) }, { merge: true });
-    tx.set(exRef, { grants, denials, updatedAt: stamp, updatedBy: email });
+    const keepScreens = input.screenAccess === undefined ? (exBefore && exBefore.screenAccess) || null : admin ? null : screenAccess;
+    tx.set(exRef, { grants, denials, screenAccess: keepScreens, updatedAt: stamp, updatedBy: email });
     queueMaster(tx, db, mode, 'person-' + crypto.randomBytes(8).toString('hex'), '', ref, target, fields, !before, stamp, email, 'users');
     tx.set(db.collection(M.COLLECTIONS.actions).doc('adm-' + crypto.randomBytes(8).toString('hex')), { action: 'savePerson', by: email, at: stamp, person: target,
-      before: before ? { name: before.name, status: before.status, roles: before.roles, facilities: before.facilities, grants: exBefore ? exBefore.grants : [], denials: exBefore ? exBefore.denials : [] } : null,
-      after: { name, status, roles, facilities: fields.facilities, grants, denials } });
+      before: before ? { name: before.name, status: before.status, roles: before.roles, facilities: before.facilities, grants: exBefore ? exBefore.grants : [], denials: exBefore ? exBefore.denials : [], screenAccess: exBefore ? exBefore.screenAccess || null : null } : null,
+      after: { name, status, roles, facilities: fields.facilities, grants, denials, screenAccess: keepScreens } });
     return { ok: true, message: 'Person access saved.', email: target };
   });
 }
@@ -355,23 +359,28 @@ async function setSending(db, email, input, stamp) {
 async function emailSenders(db, deps) {
   const s = await emailSettings(db), env = (deps && deps.env) || process.env;
   return { standard: String(env.MAIL_FROM || '').trim(), fromWho: s.fromWho, sending: s.sending,
-    plants: L.PLANTS.map(p => { const x = s.senders[p.id] || {}; return { id: p.id, plant: p.name, address: x.address || '', senderName: x.address ? x.name || '' : '', changedAt: x.changedAt || '', changedBy: x.changedBy || '' }; }) };
+    plants: L.PLANTS.map(p => { const x = s.senders[p.id] || {}; return { id: p.id, plant: p.name, address: x.address || '', senderName: x.name || '', changedAt: x.changedAt || '', changedBy: x.changedBy || '' }; }) };
 }
 
+// Joe 10/14: an empty "Send emails from" means the standard sender and never stops Save. A name with no address is the
+// name people see on the standard sender's email. An email address typed as the name is not a name: it is left out and
+// the message says where it goes instead.
 async function saveEmailSenders(db, email, input, stamp, deps) {
-  const before = await emailSettings(db), senders = {};
+  const before = await emailSettings(db), senders = {}, notes = [];
   const given = input.senders || {};
   L.PLANTS.forEach(p => {
-    const g = given[p.id] || {}, raw = text(g.address, 120).toLowerCase(), name = text(g.name, 80).replace(/[<>"\r\n]/g, '');
+    const g = given[p.id] || {}, raw = text(g.address, 120).toLowerCase();
+    let name = text(g.name, 80).replace(/[<>"\r\n]/g, '');
     if (raw && !ourAddress(raw)) fail('BAD_REQUEST', p.name + ': "' + raw + '" is not a United Dairy email address (it must end in ' + DOMAIN + ').');
-    if (name && !raw) fail('BAD_REQUEST', p.name + ': type the email address the name goes with, or clear the name.');
+    if (/@/.test(name)) { notes.push(p.name + ': "Name people see" takes a name, not an email address, so it was left empty.' +
+      (raw ? '' : ' To send ' + p.name + '\'s automatic email from ' + name + ', type it in "Send emails from".')); name = ''; }
     const was = before.senders[p.id] || {};
     const same = (was.address || '') === raw && (was.name || '') === name;
     senders[p.id] = { address: raw, name, changedAt: same ? was.changedAt || '' : stamp, changedBy: same ? was.changedBy || '' : email };
   });
   const fromWho = input.fromWho === 'PLANT' ? 'PLANT' : 'PERSON';
   await db.collection('private').doc('emailSettings').set({ senders, fromWho, sendersChangedAt: stamp, sendersChangedBy: email }, { merge: true });
-  return Object.assign({ ok: true, message: 'Saved.' }, await emailSenders(db, deps));
+  return Object.assign({ ok: true, message: ['Saved.'].concat(notes).join(' ') }, await emailSenders(db, deps));
 }
 
 /* ---------- Remaining Repair Items ---------- */

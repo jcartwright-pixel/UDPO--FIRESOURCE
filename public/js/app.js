@@ -144,6 +144,71 @@ function refuseBuilding(side) {
   document.body.classList.add('uc-locked');
   if (bar) bar.after(box); else (screen || document.body).appendChild(box);
 }
+// Joe 10/14 (People & Roles, mock-up A): the screens ticked for this person, per plant (logic.js SCREEN_AREAS), known once
+// the Users list is read and kept for this tab. Nothing ticked yet (null) = every screen, as before; Administrators see all.
+function readJson(key) { try { return JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (e) { return null; } }
+function signedPerson() {
+  let admin = false;
+  try { admin = sessionStorage.getItem('udAdmin') === '1'; } catch (e) { /* no storage */ }
+  const plants = readJson('udPlants');
+  return { status: 'ACTIVE', roles: admin ? ['ADMINISTRATOR'] : [], facilities: Array.isArray(plants) ? plants : [] };
+}
+// The plant this tab is working in: the one picked on the overview or a plant's home, else the person's first plant.
+export function currentPlant() {
+  const plants = readJson('udPlants');
+  let picked = '';
+  try { picked = sessionStorage.getItem('udPlant') || ''; } catch (e) { /* no storage */ }
+  return Array.isArray(plants) && plants.length ? (plants.indexOf(picked) >= 0 ? picked : plants[0]) : 'fac_uniontown';
+}
+export function mayOpenPage(href, plantId) {
+  const L = window.UDLogic;
+  return !L || !L.pageAllowed || L.pageAllowed(signedPerson(), readJson('udScreens'), plantId || currentPlant(), href);
+}
+function mayOpenArea(key, plantId) {
+  const L = window.UDLogic;
+  return !L || !L.areaAllowed || L.areaAllowed(signedPerson(), readJson('udScreens'), plantId || currentPlant(), key);
+}
+// Home cards, menu links and any link or card on a screen that leads to a screen not ticked are hidden (the screen itself
+// is refused too, below, so a bookmark or a typed address does not open it either).
+let screensLimited = 0;
+function limitScreens() {
+  screensLimited = 0;
+  const L = window.UDLogic;
+  if (!L || !L.screenLimited || !L.screenLimited(signedPerson(), readJson('udScreens'))) {
+    document.querySelectorAll('[data-screen-off]').forEach(el => { el.hidden = false; el.removeAttribute('data-screen-off'); });
+    return;
+  }
+  const off = (el, hide) => {
+    if (hide) { if (!el.hidden) { el.hidden = true; el.setAttribute('data-screen-off', '1'); } } else if (el.hasAttribute('data-screen-off')) { el.hidden = false; el.removeAttribute('data-screen-off'); }
+  };
+  document.querySelectorAll('a[data-side]').forEach(el => off(el, !mayOpenArea(el.dataset.side, el.dataset.plant)));
+  document.querySelectorAll('.sidemenu a[href]:not([data-side]), .side-flyouts a[href]:not([data-side]), #screen .side-main a[href]:not([data-side]), #screen [data-card], #screen [data-open]').forEach(el => {
+    // A card named by a word (Manager Center's data-card="sched") goes by the screen its bar opens (data-href).
+    const card = el.dataset.card && /\.html/.test(el.dataset.card) ? el.dataset.card : el.dataset.href || '';
+    const href = el.getAttribute('href') || el.dataset.open || card;
+    if (/^(https?:|#|mailto:|tel:|javascript:)/.test(href)) return;
+    off(el, !mayOpenPage(href));
+  });
+  // A group on the Reports page with no report left goes too.
+  document.querySelectorAll('#screen .rc-group').forEach(g => off(g, ![...g.querySelectorAll('a[href]')].some(a => !a.hidden)));
+  // A menu section whose screens are all hidden goes too.
+  document.querySelectorAll('.sidemenu .side-sec:not(.side-plant)').forEach(sec => {
+    const fly = sec._fly || sec.querySelector('.flyout');
+    off(sec, !!fly && ![...fly.querySelectorAll('a[href]')].some(a => !a.hidden));
+  });
+}
+new MutationObserver(() => { if (!screensLimited) screensLimited = requestAnimationFrame(limitScreens); }).observe(document.documentElement, { childList: true, subtree: true });
+function refuseScreen() {
+  if (document.getElementById('uc-refused')) return;
+  const box = document.createElement('section');
+  box.id = 'uc-refused';
+  box.className = 'uc-refused screen-refused';
+  box.setAttribute('role', 'alert');
+  box.innerHTML = '<h1>You don\'t have access to this screen</h1><p>Ask an administrator to tick it for you in Administration &gt; People &amp; Roles.</p><a class="button" href="index.html">Home</a>';
+  const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
+  document.body.classList.add('uc-locked');
+  if (bar) bar.after(box); else (screen || document.body).appendChild(box);
+}
 // Joe 10/11: "how can I tell what version this is? And if this is sandbox or not." version.json is written by the deploy
 // (tools/stamp-version.cjs) and read fresh, never from a cache, so the line always names what is really on screen.
 let versionAsk = null;
@@ -236,6 +301,7 @@ function addSideMenu() {
   limitPlants();
   const flyOf = (sec) => sec._fly;
   nav.querySelectorAll('.side-sec').forEach(sec => { sec._fly = sec.querySelector('.flyout'); sec._fly._sec = sec; layer.appendChild(sec._fly); });
+  limitScreens();
   const shut = (x) => { x.classList.remove('open'); flyOf(x).classList.remove('open'); x.querySelector('.side-sec-btn').setAttribute('aria-expanded', 'false'); };
   const close = (except) => nav.querySelectorAll('.side-sec.open').forEach(x => { if (x !== except) shut(x); });
   const openSec = (sec) => {
@@ -473,17 +539,19 @@ function plantHomeBack() {
   const here = location.pathname.split('/').pop() || 'index.html', home = document.getElementById('go-home');
   if (here === 'index.html' && home && multiPlant() && !document.getElementById('go-back')) home.before(backButton());
 }
-function noteAccess(person) {
+function noteAccess(person, screens) {
   const L = window.UDLogic;
   if (!L || !L.plantsFor) return;
   try {
     sessionStorage.setItem('udMulti', L.plantsFor(person).length > 1 ? '1' : '0');
     sessionStorage.setItem('udAdmin', L.isAdmin(person) ? '1' : '0');
     sessionStorage.setItem('udPlants', JSON.stringify(L.plantsFor(person)));
+    if (screens !== undefined) sessionStorage.setItem('udScreens', JSON.stringify(screens));
   } catch (e) { /* no storage */ }
   document.body.classList.toggle('is-admin', L.isAdmin(person));
   plantHomeBack();
   limitPlants();
+  limitScreens();
 }
 // The Administration button shows only to Administrators (the screens check again).
 try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add('is-admin'); } catch (e) { /* no storage */ }
@@ -604,6 +672,8 @@ export async function requireSignIn(ready) {
   let knownAdmin = false;
   try { knownAdmin = sessionStorage.getItem('udAdmin') === '1'; } catch (e) { /* no storage */ }
   if (building && !knownAdmin) known = '';
+  const here = location.pathname.split('/').pop() || 'index.html';
+  if (!mayOpenPage(here)) known = '';
   if (known) { gate.hidden = true; screen.hidden = false; }
   const { auth } = await start();
   const showWho = (user) => {
@@ -687,7 +757,17 @@ export async function requireSignIn(ready) {
       return;
     }
     remember(email);
-    noteAccess(Object.assign({ email }, entry.data()));
+    // Joe 10/14: the screens ticked for this person (People & Roles). A read that fails keeps what this tab already knew;
+    // the server still refuses saves on a screen not ticked.
+    const ticks = await getDoc(doc(db, 'personRights', email)).then(d => (d.exists() && d.data().screenAccess) || null).catch(() => undefined);
+    noteAccess(Object.assign({ email }, entry.data()), ticks);
+    if (!mayOpenPage(here)) {
+      gate.hidden = true;
+      screen.hidden = false;
+      showWho(user);
+      refuseScreen();
+      return;
+    }
     if (building && !mayOpenBuilding(Object.assign({ email }, entry.data()))) {
       gate.hidden = true;
       screen.hidden = false;

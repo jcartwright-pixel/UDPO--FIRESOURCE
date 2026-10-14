@@ -265,6 +265,8 @@
 .sched-page table.sc-table td.run, .sched-page table.sc-table td.txt { text-align: left; }
 .sched-page .sc-dayadd { display: flex; justify-content: flex-start; }
 /* The boxes */
+.sched-page .sc-modal .sc-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, .9fr); gap: 10px 12px; }
+.sched-page .sc-modal .sc-top label, .sched-page .sc-modal .sc-top select { min-width: 0; width: 100%; }
 .sched-page .sc-modal .sc-three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 12px; }
 .sched-page .sc-modal label small { text-transform: none; letter-spacing: 0; font-weight: 600; }
 .sched-page .sc-modal .sc-left { margin-right: auto; }

@@ -53,7 +53,7 @@ function senderFor(settings, facilityId, env, fallbackName, person) {
   if (person && ourAddress(person.email)) return { from: ourAddress(person.email), fromName: String(person.name || ''), how: 'person' };
   const s = ((settings && settings.senders) || {})[facilityId || 'fac_uniontown'] || {};
   if (s.address) return { from: s.address, fromName: s.name || fallbackName || PLANT_NAME, how: 'plant' };
-  return { from: String((env || {}).MAIL_FROM || '').trim(), fromName: fallbackName || PLANT_NAME, how: 'default' };
+  return { from: String((env || {}).MAIL_FROM || '').trim(), fromName: s.name || fallbackName || PLANT_NAME, how: 'default' };
 }
 
 /*
