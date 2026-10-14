@@ -140,7 +140,7 @@
       out.push({ id: id, date: d.date, routeId: d.routeId || '', runId: d.runId || '', route: d.route || '', run: d.run || '', pickupTime: time24(p.pickupTime) || text(p.pickupTime),
         scheduleType: text(p.scheduleType).toUpperCase() === 'CARRIER' || p.carrier === true ? 'CARRIER' : 'ROUTE', loadDate: text(p.loadDate), trailer: text(p.trailer),
         poNumber: text(p.poNumber), cases: text(p.cases), product: text(p.product), notes: text(p.notes || d.notes), status: text(d.status).toUpperCase() || 'SCHEDULED',
-        inApp: !!d.createdInApp, work: workOf(p.work) });
+        loadType: loadArea(p.loadType), inApp: !!d.createdInApp, work: workOf(p.work) });
     });
     return out.sort(function (a, b) { return a.date.localeCompare(b.date) || (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99'); });
   }
@@ -153,7 +153,7 @@
       if ((status && status !== 'ACTIVE') || r.active === false || r.displayPlant !== true) return;
       var route = text(r.routeCode || r.route), run = text(r.run);
       if (!route && !run) return;
-      list.push({ routeId: text(r.routeId), runId: text(r.runId), route: route, run: run, name: text(r.routeName) });
+      list.push({ routeId: text(r.routeId), runId: text(r.runId), route: route, run: run, name: text(r.routeName), loadType: loadArea(r.loadType) });
     });
     list.sort(function (a, b) { return a.route.localeCompare(b.route, undefined, { numeric: true }) || a.run.localeCompare(b.run); });
     // An as-needed customer (Aldi - Charleston LOAD 1 to 4) is one customer; its first slot names the run, and its runs are
@@ -163,18 +163,42 @@
       var m = /^(.*?)[\s-]*LOAD\s*([0-9]+)$/i.exec(r.run);
       if (!m || !m[1].trim()) { out.push(r); return; }
       var base = m[1].trim(), baseRoute = r.route.replace(/_[0-9]+$/, ''), key = baseRoute + '|' + base.toUpperCase();
-      var slot = { routeId: r.routeId, runId: r.runId, route: r.route, run: r.run, n: Number(m[2]) };
+      var slot = { routeId: r.routeId, runId: r.runId, route: r.route, run: r.run, n: Number(m[2]), loadType: r.loadType };
       if (byKey[key]) { byKey[key].slots.push(slot); return; }
-      byKey[key] = { routeId: r.routeId, runId: r.runId, route: baseRoute, run: base, name: r.name, grouped: true, slots: [slot] };
+      byKey[key] = { routeId: r.routeId, runId: r.runId, route: baseRoute, run: base, name: r.name, loadType: r.loadType, grouped: true, slots: [slot] };
       out.push(byKey[key]);
     });
     out.forEach(function (c) {
       if (!c.grouped) return;
       c.slots.sort(function (a, b) { return a.n - b.n; });
-      c.routeId = c.slots[0].routeId; c.runId = c.slots[0].runId;
+      c.routeId = c.slots[0].routeId; c.runId = c.slots[0].runId; c.loadType = c.slots[0].loadType || c.loadType;
     });
     return out;
   }
+
+  /* Joe 10/14 ("It should only show box loads ... always put the default in and then let the user change it"): a Shipping load
+     has a Load Type (Case, Totes, Boxes, Tanker), filled in from Route Master's load_type for the picked run and changeable on
+     Add / Edit Load. Each Daily Loadout shows the Scheduler loads of its own type. A load saved before it had one takes its run's
+     Route Master type; a run with no type there is a box load (as before). */
+  var LOAD_TYPES = [['CASE', 'Case'], ['TOTES', 'Totes'], ['BOXING', 'Boxes'], ['TANKER', 'Tanker']];
+  function loadArea(t) {
+    t = text(t).toUpperCase();
+    if (t === 'CASE LOADOUT' || t === 'CASE') return 'CASE';
+    if (t === 'TOTE' || t === 'TOTES' || t === 'TOTE LOADOUT') return 'TOTES';
+    if (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT') return 'BOXING';
+    if (t === 'TANKER' || t === 'TANKER LOADOUT') return 'TANKER';
+    return '';
+  }
+  // The Route Master type of a customer's run (a LOAD N run's own type, else its customer's), or Boxes.
+  function routeLoadType(customers, runId) {
+    var hit = '';
+    (customers || []).some(function (c) {
+      return (c.slots || [c]).some(function (s) { if (runId && s.runId === runId) { hit = s.loadType || c.loadType || ''; return true; } return false; });
+    });
+    return hit || 'BOXING';
+  }
+  // A numbered load's type: its own, else its LOAD N run's on Route Master.
+  function scheduleArea(x, customers) { return x.loadType || routeLoadType(customers, (x.slot && x.slot.runId) || x.runId); }
 
   // Joe 10/14: a customer's loads on one delivery day are numbered by pickup time (Load 1, Load 2, Load 3; one load is Load 1).
   // An as-needed customer's Load N goes on its LOAD N run (slot), so each load has its own line for a driver, truck and cases;
@@ -743,7 +767,7 @@
 
   return { unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
-    scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
+    scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,

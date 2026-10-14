@@ -96,7 +96,8 @@
     const STATIONS = [
       { id: 'CASE', label: 'Case Loadout', what: 'Case loading only (unloading is the Case Unloading station)', area: 'CASE', views: ['loading'] },
       { id: 'CASE_UNLOADING', label: 'Case Unloading', what: 'Case unloading, product returns and trailer washing (no loading)', area: 'CASE', views: ['unloading', 'washing', 'returns'] },
-      { id: 'TOTES', label: 'Tote Loadout', what: 'Tote loading and tote unloading', area: 'TOTES', views: ['loading', 'unloading'] },
+      // Joe 10/14: the tote station also washes trailers, as the tote crew does today.
+      { id: 'TOTES', label: 'Tote Loadout', what: 'Tote loading, tote unloading and trailer washing', area: 'TOTES', views: ['loading', 'unloading', 'washing'] },
       // Joe 10/12: Boxing loads its box loads and every carrier and branch shipment on one list (Shipping / Loadout), and
       // receives the suppliers' deliveries (Receiving); it does not unload.
       { id: 'BOXING', label: 'Boxing Loadout', what: 'Box loads, carrier and branch shipments, and receiving', area: 'BOXING', views: ['loading', 'receiving'] },

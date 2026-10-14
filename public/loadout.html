@@ -83,13 +83,14 @@
     <div class="modal-grid" id="sched-form">
       <label>Route / Run<select id="s-route"></select></label>
       <label>Schedule Type<select id="s-type"><option value="ROUTE">United Dairy Delivery</option><option value="CARRIER">Carrier</option></select></label>
+      <label>Load Type<select id="s-kind"></select></label>
       <label>Load Date<input id="s-load" type="date"></label>
       <label>Delivery Date<input id="s-date" type="date"></label>
       <label>Pickup Time<input id="s-time" type="time"></label>
       <label>Trailer<input id="s-trailer" list="lo-trailers" autocomplete="off" maxlength="24" placeholder="Pick or type a trailer"></label>
       <label>PO Number<input id="s-po" maxlength="40" placeholder="Needed for a carrier load"></label>
       <label>Cases<input id="s-cases" inputmode="numeric" maxlength="6" placeholder="Optional"></label>
-      <label class="wide">Product<input id="s-product" maxlength="80" placeholder="Optional"></label>
+      <label>Product<input id="s-product" maxlength="80" placeholder="Optional"></label>
       <label class="wide">Notes<textarea id="s-notes" maxlength="1200"></textarea></label>
     </div>
     <p class="hint" id="s-hint">It goes on the Plant Operations Scheduler too, numbered by its pickup time (Load 1, Load 2, ...).</p>
@@ -172,7 +173,7 @@
     function slotRoutes() {
       if (routeDocs.length) return routeDocs;
       const seen = {};
-      return runs.filter(r => r.runId && !seen[r.runId] && (seen[r.runId] = true)).map(r => ({ runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true }));
+      return runs.filter(r => r.runId && !seen[r.runId] && (seen[r.runId] = true)).map(r => ({ runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true, loadType: r.loadType || (r.masterShow && r.masterShow.loadType) || '' }));
     }
     function schedToday() {
       const list = R.scheduleEntries(schedDocs, 'SHIPPING');
@@ -184,14 +185,16 @@
     const slotOf = (x) => (x.slot ? Object.assign({}, x, x.slot) : x);
     const schedState = (w) => (w.state === 'COMPLETE' ? 'DONE' : w.state === 'WORKING' || w.state === 'PAUSED' ? 'LOADING' : 'WAITING');
     const clock24 = (t) => { const m = /^(\d{2}):(\d{2})$/.exec(t || ''); if (!m) return t || ''; const h = Number(m[1]); return (h % 12 || 12) + ':' + m[2] + (h < 12 ? ' AM' : ' PM'); };
-    // The box loads with their Scheduler line put on, and the Scheduler loads that are not a box load today.
+    // Each loadout's loads with their Scheduler line put on, and the Scheduler loads of that load type that are not one of its
+    // loads today (Joe 10/14: a case trailer on the dispatch sheet shows once, on Case Loadout, not again on Boxes).
     function withSched(live) {
-      const box = live.filter(r => r.area === 'BOXING' && !r.prior), on = {}, extra = [];
+      const on = {}, extra = [], customers = R.scheduleCustomers(slotRoutes());
       schedToday().forEach(x => {
-        const r = x.overSlots ? null : box.find(b => sameRun(b, slotOf(x)));
-        if (r && !on[r.id]) { on[r.id] = x; return; }
+        const kind = R.scheduleArea(x, customers);
+        const r = x.overSlots ? null : live.find(b => b.area === kind && !b.prior && !on[b.id] && sameRun(b, slotOf(x)));
+        if (r) { on[r.id] = x; return; }
         const w = x.work || {}, n = Number(w.count);
-        extra.push({ id: 'sch:' + x.id, sched: x, area: 'BOXING', prior: false, route: (x.slot && x.slot.route) || x.route, run: R.loadNumberName((x.slot && x.slot.run) || x.run || x.route || 'Plant pickup', x.loadNo),
+        extra.push({ id: 'sch:' + x.id, sched: x, area: kind, prior: false, route: (x.slot && x.slot.route) || x.route, run: R.loadNumberName((x.slot && x.slot.run) || x.run || x.route || 'Plant pickup', x.loadNo),
           driver: x.scheduleType === 'CARRIER' ? 'Carrier' : '', truck: '', trailer: x.trailer, quantity: w.count === '' || w.count === undefined || !isFinite(n) ? null : n,
           state: schedState(w), paused: w.state === 'PAUSED', startedAt: w.startedAt || '', completedAt: w.completedAt || '' });
       });
@@ -202,15 +205,12 @@
     const routeNo = (route) => String(route || '').replace(/_[0-9]+$/, '');
     const schedTag = (x) => [x.poNumber ? 'PO ' + x.poNumber : '', x.pickupTime ? clock24(x.pickupTime) : ''].filter(Boolean).join(' · ');
 
-    // Joe 10/11: Route 20%, Truck 10%, Trailer 10% and Cases Out 20% narrower; Driver / CVG gets all of that room so a driver's
-    // name fits on one line (a name still too long shrinks to fit, see fitDrivers).
+    // Joe 10/14 (Daily Box Loadout, then "for the case type columns ... B, make them narrower too"): on every loadout but Tanker,
+    // Truck, Trailer and the count column are 20% narrower and Driver / CVG 30% (a name too long for it wraps at 16px); Route and
+    // Run get the room, so a run like "ALDI - CHARLESTON Load 1" is one line. (Before, Joe 10/11: Driver / CVG had that room.)
     const COLS = {
       // Review item 22 (Joe 10/13): the Start / End column has its heading.
-      normal: [['Route', 4.8], ['Run', 9], ['Driver / CVG', 15.6], ['Truck', 8.1], ['Trailer', 8.1], ['', 6.4], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
-      // Joe 10/14 (Daily Box Loadout): Truck, Trailer and Boxes Out 20% narrower, Driver / CVG 30% (on boxes it is usually blank
-      // or Carrier); Route and Run get the room, so "ALDI - CHARLESTON Load 1" is one line. Case and Totes keep their widths
-      // (Joe 10/11: a driver's name on one line there).
-      BOXING: [['Route', 5.6], ['Run', 18.4], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 7], ['', 6]],
+      normal: [['Route', 5.6], ['Run', 18.4], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 7], ['', 6]],
       TANKER: [['Route', 5.6], ['Run', 15], ['Driver / CVG', 20], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
     // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
@@ -271,7 +271,7 @@
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
       const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r) && r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
-      const cols = COLS[area === 'TANKER' || area === 'BOXING' ? area : 'normal'];
+      const cols = COLS[area === 'TANKER' ? area : 'normal'];
       document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
       const edit = canLoad(), dis = edit ? '' : ' disabled';
@@ -347,7 +347,13 @@
       const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' && !r.paused ? ' end' : '') + '" data-sclock="' + escapeHtml(r.id) + '">' + (st === 'LOADING' && !r.paused ? 'End' : 'Start') + '</button></span>' : '';
       const mins = P.minutesTaken(r);
       const over = x.overSlots ? '<span class="skip-tag inline" title="Route Master has no LOAD ' + x.loadNo + ' run for this customer: add one so this load has its own line">NO LOAD ' + x.loadNo + ' RUN</span>' : '';
-      return '<tr class="sched-row' + (st === 'DONE' ? ' done' : st === 'LOADING' ? ' loading' : '') + '" data-row="' + escapeHtml(r.id) + '"><td class="strong">' + escapeHtml(routeNo(r.route)) + '</td>' +
+      const tr = '<tr class="sched-row' + (st === 'DONE' ? ' done' : st === 'LOADING' ? ' loading' : '') + '" data-row="' + escapeHtml(r.id) + '"><td class="strong">' + escapeHtml(routeNo(r.route)) + '</td>';
+      const driver = '<td class="lo-driver">' + (over || escapeHtml([r.driver, x.poNumber ? 'PO ' + x.poNumber : ''].filter(Boolean).join(' · '))) + '</td>';
+      const editBtn = '<td><button type="button" class="edit-row" data-sedit="' + escapeHtml(r.id) + '">Edit</button></td></tr>';
+      // Tanker Loadout's columns: Route, Run, Driver, Truck, Trailer, Quantity Out, Status, Shift (Start / End here), Pickup, Edit.
+      if (r.area === 'TANKER') return tr + '<td>' + escapeHtml(r.run) + '</td>' + driver + '<td></td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
+        '<td>' + status + '</td><td>' + clockCell + '</td><td>' + escapeHtml(clock24(x.pickupTime)) + '</td>' + editBtn;
+      return tr +
         '<td><span class="lo-run" title="' + escapeHtml([r.run, x.poNumber ? 'PO ' + x.poNumber : ''].filter(Boolean).join(' · ')) + '">' + escapeHtml(r.run) + '</span></td>' +
         // A Scheduler load has no driver here: Driver / CVG says Carrier and its PO, or that Route Master needs a LOAD N run.
         '<td class="lo-driver">' + (over || escapeHtml([r.driver, x.poNumber ? 'PO ' + x.poNumber : ''].filter(Boolean).join(' · '))) + '</td><td></td>' +
@@ -582,6 +588,9 @@
       document.getElementById('s-route').innerHTML = (pick < 0 ? '<option value="">Pick one…</option>' : '') + schedOptions.map((c, i) => '<option value="' + i + '"' + (i === pick ? ' selected' : '') + '>' + escapeHtml([c.route, c.run, c.name].filter(Boolean).join(' · ')) + '</option>').join('');
       document.getElementById('sched-title').textContent = (x ? 'Edit Load · ' + R.loadNumberName(x.run || x.route, x.loadNo) : 'Add Load · Daily Box Loadout ' + shortDate(date));
       const put = (id, v) => { document.getElementById(id).value = v || ''; };
+      // Joe 10/14: Load Type starts as the run's Route Master type and can be changed; each loadout shows its own type.
+      const kind = x ? R.scheduleArea(x, list) : '';
+      document.getElementById('s-kind').innerHTML = (kind ? '' : '<option value=""></option>') + R.LOAD_TYPES.map(([v, t]) => '<option value="' + v + '"' + (v === kind ? ' selected' : '') + '>' + t + '</option>').join('');
       put('s-type', x ? x.scheduleType : 'ROUTE'); put('s-load', x ? (x.loadDate || x.date) : date); put('s-date', x ? x.date : L.addDays(date, 1));
       put('s-time', x ? x.pickupTime : ''); put('s-trailer', x ? x.trailer : ''); put('s-po', x ? x.poNumber : ''); put('s-cases', x ? x.cases : ''); put('s-product', x ? x.product : ''); put('s-notes', x ? x.notes : '');
       document.getElementById('s-error').hidden = true;
@@ -590,11 +599,17 @@
     }
     const schedError = (t) => { const e = document.getElementById('s-error'); e.textContent = t; e.hidden = !t; };
     document.getElementById('add-load').onclick = () => openSchedLoad(null);
+    document.getElementById('s-route').addEventListener('change', ev => {
+      const c = schedOptions[Number(ev.target.value)], k = document.getElementById('s-kind');
+      if (!c || ev.target.value === '') return;
+      k.value = R.routeLoadType(R.scheduleCustomers(slotRoutes()), c.runId);
+      const blank = k.querySelector('option[value=""]'); if (blank) blank.remove();
+    });
     document.getElementById('s-save').onclick = async () => {
       const c = schedOptions[Number(document.getElementById('s-route').value)], val = (id) => document.getElementById(id).value.trim();
       const key = val('s-date'), x = schedEditing;
       const f = { routeId: c ? c.routeId : '', runId: c ? c.runId : '', route: c ? c.route : '', run: c ? c.run : '', scheduleType: val('s-type'), loadDate: val('s-load'), pickupTime: val('s-time'),
-        trailer: val('s-trailer').toUpperCase(), poNumber: val('s-po'), cases: val('s-cases'), product: val('s-product'), notes: document.getElementById('s-notes').value };
+        trailer: val('s-trailer').toUpperCase(), poNumber: val('s-po'), cases: val('s-cases'), product: val('s-product'), notes: document.getElementById('s-notes').value, loadType: val('s-kind') };
       // The same checks as the server, so a mistake is fixed in the box.
       if (!c || document.getElementById('s-route').value === '') return schedError('Pick the route / run.');
       if (!L.isDateKey(key)) return schedError('Pick the delivery date.');

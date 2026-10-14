@@ -52,13 +52,16 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       assert.match(await page.textContent('.divider.prior'), /PRIOR DAY LOADS/);
       assert.match(await page.textContent('#strip'), /Pickups 1 left of 2/);
       assert.equal(await page.textContent(row('805') + ' button.pu'), 'P/U1', 'an open pickup shows red with its count');
-      // Joe 10/11: Driver / CVG takes the room Route, Truck, Trailer and Cases Out gave up, and every driver's name sits on one line
-      // (a name still too long shrinks to fit).
+      // Joe 10/14 ("for the case type columns ... B, make them narrower too"): as on Daily Box Loadout, Truck, Trailer and Cases Out
+      // 20% narrower and Driver / CVG 30% (replacing Joe 10/11's one-line driver names); a driver's whole name still shows, at 16px
+      // or more, wrapping when it is too long for the column.
       const drivers = await page.$$eval('#rows td.lo-driver', tds => tds.map(td => ({ name: td.textContent, fits: td.scrollWidth <= td.clientWidth + 1, size: parseFloat(getComputedStyle(td).fontSize) })));
-      assert.ok(drivers.length >= 12 && drivers.every(d => d.fits), 'every driver on one line at ' + w + ': ' + JSON.stringify(drivers.filter(d => !d.fits)));
+      assert.ok(drivers.length >= 12 && drivers.every(d => d.fits && d.size >= 16), 'every driver\'s whole name shows at 16px or more at ' + w + ': ' + JSON.stringify(drivers.filter(d => !d.fits || d.size < 16)));
       assert.ok(drivers.some(d => /ALESANTRINO, DAVID/.test(d.name)), 'the long name is on the list');
       const widths = await page.$$eval('#cols col', c => c.map(x => parseFloat(x.style.width)));
-      assert.deepEqual(widths.slice(0, 6), [4.8, 9, 15.6, 8.1, 8.1, 6.4], 'Route, Truck, Trailer and Cases Out narrower; Driver wider');
+      assert.deepEqual(widths.slice(0, 6), [5.6, 18.4, 10.9, 6.5, 6.5, 5.1], 'Truck, Trailer and Cases Out 20% narrower, Driver 30%; Route and Run wider');
+      const runs = await page.$$eval('#rows tr[data-row] td:nth-child(2)', tds => tds.filter(td => td.classList.contains('fit-wrap')).map(td => td.textContent));
+      assert.deepEqual(runs, [], 'every run on one line at ' + w);
       // Review item 22 (Joe 10/13): the Start / End column has its heading, and Wednesday's 6303 (still loading, End forgotten)
       // shows just "forgot End?" on one line; when it started shows on hover.
       assert.equal((await page.$$eval('#head-row th', ths => ths.map(t => t.textContent)))[8], 'Start / End');
