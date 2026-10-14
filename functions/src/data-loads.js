@@ -215,7 +215,7 @@ async function loadGarageOrdersOnce(db, opts) {
     const m = await tx.get(mark);
     if (m.exists && m.data().status === 'DONE') return { skipped: true };
     const sent = (await tx.get(db.collection('maintenance').where('kind', 'in', ['TRUCK', 'TRAILER', 'FORK_TRUCK']))).docs.map(d => d.data())
-      .filter(r => r.record_id && String(r.notes || '').indexOf(GARAGE.G.GARAGE_MARK) >= 0 && !CLOSED.test(String(r.status || '').trim()));
+      .filter(r => r.record_id && L.garageSent(r.notes) && !CLOSED.test(String(r.status || '').trim()));
     const steps = [];
     for (const r of sent) steps.push({ r, step: await GARAGE.writeUpOrderStep(tx, db, r, 'garage', BY, stamp) });
     const made = [], kept = [];

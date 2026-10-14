@@ -46,7 +46,7 @@ const G = Object.freeze({
   MAX_TECHS: 2, SESSION_MS: 30 * 60000, SIGNATURE_MAX: 30000, TECH_FAILS: 5, TECH_LOCK_MS: 5 * 60000, STATION_FAILS_PER_MINUTE: 30,
   GARAGE_MARK: 'Sent to garage'
 });
-const WORK_ORDERS = 'workOrders', TECHS = 'garageTechs', LOGINS = 'garageLogins', SESSIONS = 'garageSessions', LOCKS = 'garageLocks', CLOCKS = 'garageClocks';
+const WORK_ORDERS = 'workOrders', DELETED = 'workOrdersDeleted', TECHS = 'garageTechs', LOGINS = 'garageLogins', SESSIONS = 'garageSessions', LOCKS = 'garageLocks', CLOCKS = 'garageClocks';
 // The write-up queues the garage works from, as the job key's first part (Equipment Issues' TRUCK / TRAILER / FORK_TRUCK).
 const KIND_KEYS = Object.freeze({ TRUCK: 'trucks', TRAILER: 'trailers', FORK_TRUCK: 'forks' });
 const KEY_KINDS = Object.freeze({ trucks: 'TRUCK', trailers: 'TRAILER', forks: 'FORK_TRUCK' });
@@ -142,7 +142,9 @@ function garageJobs(orders, records, units) {
     if (!KIND_KEYS[kind] || !realWriteUp(r) || linked[writeUpKey(r)]) return;
     const raw = text(rawUnit(r)), unit = kind === 'FORK_TRUCK' ? null : byUnit[alnum(raw)] || byUnit[alnum(raw).replace(/^T/, '')];
     // A leased unit's write-up goes to the lessor unless the office sent it to our garage.
-    if (unit && unit.leased && String(r.notes || '').indexOf(G.GARAGE_MARK) < 0) return;
+    if (unit && unit.leased && !L.garageSent(r.notes)) return;
+    // Joe 10/14: a manager took it off the garage list (Delete on Fleet Service's Work Orders).
+    if (L.garageOff(r.notes)) return;
     const problem = text(r.issue_details || r.notes, 300);
     jobs.push({ id: '', writeUp: writeUpKey(r), unit: unit ? unit.unit : unitText(raw, kind), type: kind, problem, category: '', canRun: canRunGuess(problem + ' ' + (r.priority || '')),
       source: 'WRITE_UP', serviceKey: '', status: 'NEW', techs: [], startedAt: '', createdAt: String(r.opened_at || r.service_date || ''), driver: r.driver || '',
@@ -479,7 +481,9 @@ async function engineCodeOrders(db, faults, stamp) {
     const g = groups[sid];
     await db.runTransaction(async tx => {
       const docs = (await tx.get(db.collection(WORK_ORDERS).where('source_id', '==', sid))).docs.filter(d => d.data().source === 'FLEET');
-      const seen = {}; docs.forEach(d => (d.data().code_alerts || []).forEach(id => { seen[id] = true; }));
+      // A work order the office deleted keeps its alerts here, so the same alerts never make it again.
+      const gone = (await tx.get(db.collection(DELETED).where('source_id', '==', sid))).docs;
+      const seen = {}; docs.concat(gone).forEach(d => (d.data().code_alerts || []).forEach(id => { seen[id] = true; }));
       const fresh = g.faults.filter(f => !seen[f.alertId]).sort((a, b) => String(a.at).localeCompare(String(b.at)));
       if (!fresh.length) return;
       const open = docs.find(d => String(d.data().status || 'NEW').toUpperCase() !== 'DONE');
@@ -501,6 +505,72 @@ async function engineCodeOrders(db, faults, stamp) {
     });
   }
   return { made, counted };
+}
+
+/*
+ * Joe 10/14 ("The manager should be able to view all the work orders. And delete them"): the office's copy of the Garage
+ * Station list, for Fleet Service's Work Orders. It is the station's list with the drivers' names: the open work orders and
+ * the write-ups the station shows that have no work order yet. Any signed-in United Dairy account may read it.
+ */
+async function officeJobs(db) {
+  const units = garageUnits((await db.collection(C.equipment).get()).docs.map(d => d.data()));
+  const orders = (await db.collection(WORK_ORDERS).get()).docs.map(d => d.data());
+  const records = (await db.collection(C.maintenance).where('kind', 'in', Object.keys(KIND_KEYS)).get()).docs.map(d => d.data());
+  return { jobs: garageJobs(orders, records, units).filter(j => !j.id) };
+}
+
+/*
+ * Delete on Fleet Service's Work Orders (managers and administrators, Joe 10/14): the job comes off the Garage Station.
+ * A work order is deleted, with a full copy kept in workOrdersDeleted (an engine code's alerts stay counted there, so the
+ * same alerts never make it again) and any mechanic's clock on it stopped. A write-up (one with no work order yet, or the
+ * write-up behind a deleted work order) gets the note "Taken off the garage list ..." so the station leaves it off; it stays
+ * open on Truck Issues, and pressing Garage there sends it again.
+ */
+function validateDelete(input, out) {
+  out.workOrderId = text(input.workOrderId, 40);
+  out.writeUp = text(input.writeUp, 320);
+  if (!out.workOrderId && !/^(trucks|trailers|forks)\|.+/.test(out.writeUp)) throw SaveErr('BAD_REQUEST', 'Pick the work order to delete');
+  return out;
+}
+async function deleteGarageJob(tx, db, req, email, stamp, logRef, mode) {
+  let orderRef = null, order = null, kindName = '', recordId = '';
+  if (req.workOrderId) {
+    orderRef = db.collection(WORK_ORDERS).doc(docId(req.workOrderId));
+    const snap = await tx.get(orderRef);
+    if (!snap.exists) throw SaveErr('NOT_FOUND', 'That work order is already gone.');
+    order = snap.data();
+    if (KEY_KINDS[order.source_kind] && order.source_id) { kindName = order.source_kind; recordId = order.source_id; }
+  } else { kindName = req.writeUp.split('|')[0]; recordId = req.writeUp.slice(req.writeUp.indexOf('|') + 1); }
+  let wRef = null, w = null;
+  if (recordId) {
+    wRef = db.collection(C.maintenance).doc(MAINT.docId(recordId));
+    const ws = await tx.get(wRef);
+    w = ws.exists ? ws.data() : null;
+    if (!w && !order) throw SaveErr('NOT_FOUND', 'That write-up is no longer on the list.');
+  }
+  let moved = null, labor = [];
+  if (order) {
+    labor = laborOf(order);
+    moved = await CLOCK.moveClocks(tx, db, { clocks: CLOCKS, orders: WORK_ORDERS, docId, op: 'DONE', finishing: true, people: [], labor, thisId: order.work_order_id, nowMs: Date.parse(stamp), stamp,
+      keys: { onNow: 'on_now', laborMinutes: 'labor_minutes' }, clockDoc: () => ({}), touched: {}, otherName: () => '' });
+  }
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  if (order) {
+    tx.set(db.collection(DELETED).doc(docId(order.work_order_id)), Object.assign({}, order, moved.laborFields(labor), { deleted_at: stamp, deleted_by: email }));
+    tx.delete(orderRef);
+    CLOCK.applyWrites(tx, moved.writes);
+    result.deleted = order.work_order_id;
+  }
+  if (w && !DONE_STATUS.test(String(w.status || '')) && !L.garageOff(w.notes)) {
+    const notes = String(w.notes || '').trim(), change = { notes: (notes ? notes + '\n' : '') + L.GARAGE_OFF + ' ' + stamp + ' by ' + email, updated_at: stamp, updated_by: email };
+    tx.update(wRef, Object.assign({}, change, { testEdited: true, editedAt: stamp, editedBy: email }));
+    const list = MAINT.LISTS[String(w.kind || '').toUpperCase()];
+    if (list) queueMaster(tx, db, mode, req.requestId, 'issue', wRef, w.record_id, w.createdInApp ? Object.assign({}, w, change) : change, !!w.createdInApp, stamp, email, list);
+    result.writeUpOff = w.record_id;
+  }
+  const logged = order ? Object.assign({}, order) : null; if (logged && logged.signature) logged.signature = '(signature)';
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, workOrderId: order ? order.work_order_id : '', recordId: recordId || '', before: logged, after: null, result });
+  return result;
 }
 
 /*
@@ -698,6 +768,8 @@ async function garageCall(db, input, now, caller) {
   // the garage tablet, so the garage's station code does not lock it; every step still needs a mechanic's login ID.
   if (op === 'pmBoard') { await maintBoardAllowed(db, input, caller); return require('./plantmaint').stationBoard(db, input, nowMs); }
   if (op === 'pmStep') return require('./plantmaint').stationStep(db, input, nowMs);
+  // Fleet Service's Work Orders (office screens): a signed-in United Dairy account, not the garage tablet's code.
+  if (op === 'office') { if (!caller || !caller.user) throw SaveErr('NOT_ALLOWED', 'Sign in with your United Dairy account.'); return officeJobs(db); }
   const maintSignIn = input.maint === true && (op === 'signIn' || op === 'signOut');
   if (!maintSignIn && await ST.needsCode(db, 'GARAGE', FACILITY)) {
     const st = input.station || {}, ok = await ST.check(db, 'GARAGE', st.key, st.version);
@@ -718,4 +790,4 @@ async function garageCall(db, input, now, caller) {
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, engineCodeOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, LOGINS };
+module.exports = { G, engineCodeOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, LOGINS };

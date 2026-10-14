@@ -58,6 +58,49 @@ test('jobs: real write-ups of our own units, down ones first; a leased truck onl
   assert.deepEqual(r.jobs.map(j => j.unit), ['T-901', '900001', '223876']);
 });
 
+test('office list and Delete (Joe 10/14): the office sees the station\'s write-ups; a manager deletes a work order or a write-up job, a dispatcher cannot', async () => {
+  const MGR = { email: 'manager.test@uniteddairy.com' }, DISP = { email: 'dispatch.test@uniteddairy.com' };
+  await assert.rejects(garageCall(db(), { op: 'office' }, now()), /Sign in with your United Dairy account/);
+  const office = () => garageCall(db(), { op: 'office' }, now(), { user: MGR });
+  assert.deepEqual((await office()).jobs.map(j => j.unit), ['T-901', '900001'], 'the write-ups the station lists with no work order yet');
+  const sent = await applyAction(db(), MGR, { action: 'updateIssue', requestId: rid(), recordId: 'TRK-2', step: 'garage' });
+  assert.deepEqual((await office()).jobs.map(j => j.unit), ['T-901', '900001'], 'a work order is not repeated as a write-up');
+  await assert.rejects(applyAction(db(), DISP, { action: 'deleteGarageJob', requestId: rid(), workOrderId: sent.workOrderId }), /does not have a role/);
+  // A mechanic is on it when the manager deletes it: the clock stops, a copy is kept, and the write-up leaves the garage list.
+  const tom = await garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213' }, now());
+  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'START', id: sent.workOrderId }, now(1));
+  const gone = await applyAction(db(), MGR, { action: 'deleteGarageJob', requestId: rid(), workOrderId: sent.workOrderId });
+  assert.deepEqual([gone.deleted, gone.writeUpOff], [sent.workOrderId, 'TRK-2']);
+  assert.equal((await db().collection('workOrders').doc(sent.workOrderId).get()).exists, false);
+  const copy = (await db().collection('workOrdersDeleted').doc(sent.workOrderId).get()).data();
+  assert.deepEqual([copy.deleted_by, copy.on_now, !!copy.labor[0].end], [MGR.email, '', true]);
+  assert.equal((await db().collection('garageClocks').doc('TECH-JT').get()).exists, false);
+  let board = (await garageCall(db(), { op: 'board' }, now(2))).jobs;
+  assert.deepEqual(board.map(j => j.unit), ['T-901', '900001'], 'off the Garage Station, not back as a write-up');
+  const L = require('../../src/logic'), trk2 = () => db().collection('maintenance').where('record_id', '==', 'TRK-2').get().then(q => q.docs[0].data());
+  assert.deepEqual([(await trk2()).status, L.issueRows([await trk2()], 'TRUCK')[0].atGarage], ['OPEN', false], 'still open on Truck Issues, no longer at the garage');
+  // Garage on Truck Issues sends it again with a new work order.
+  const again = await applyAction(db(), MGR, { action: 'updateIssue', requestId: rid(), recordId: 'TRK-2', step: 'garage' });
+  assert.ok(again.workOrderId && again.workOrderId !== sent.workOrderId);
+  assert.equal(L.issueRows([await trk2()], 'TRUCK')[0].atGarage, true);
+  // A write-up job with no work order: Delete takes it off the station; it stays open.
+  const t901 = (await office()).jobs.find(j => j.unit === 'T-901');
+  const off = await applyAction(db(), MGR, { action: 'deleteGarageJob', requestId: rid(), writeUp: t901.writeUp });
+  assert.equal(off.deleted, undefined);
+  board = (await garageCall(db(), { op: 'board' }, now(3))).jobs;
+  assert.deepEqual(board.map(j => j.unit).sort(), ['223876', '900001']);
+  assert.deepEqual((await office()).jobs.map(j => j.unit), ['900001']);
+});
+
+test('an engine code work order the office deleted is not made again from the same alerts', async () => {
+  const f = (id, at) => ({ alertId: id, tag: '900001', code: '791:2', fmiText: '', at });
+  await engineCodeOrders(db(), [f('B1', '2026-10-06T13:00:00Z')], '2026-10-06T13:05:00Z');
+  const wo = (await db().collection('workOrders').where('source', '==', 'FLEET').get()).docs[0].id;
+  await applyAction(db(), { email: 'manager.test@uniteddairy.com' }, { action: 'deleteGarageJob', requestId: rid(), workOrderId: wo });
+  assert.deepEqual(await engineCodeOrders(db(), [f('B1', '2026-10-06T13:00:00Z')], '2026-10-06T13:15:00Z'), { made: 0, counted: 0 });
+  assert.deepEqual(await engineCodeOrders(db(), [f('B1', '2026-10-06T13:00:00Z'), f('B2', '2026-10-07T09:00:00Z')], '2026-10-07T09:05:00Z'), { made: 1, counted: 0 }, 'a new alert makes a new one');
+});
+
 const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
 test('engine codes from Verizon Fleet: one work order per truck and code, counted once per alert, a new one after it is completed', async () => {

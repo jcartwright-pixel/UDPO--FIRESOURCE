@@ -185,7 +185,7 @@
     var written = (records || []).filter(function (r) { return r && String(r.kind || '').toUpperCase() === kind; }).map(function (r) {
       var notes = String(r.notes || ''), status = String(r.status || 'OPEN').trim().toUpperCase();
       var unit = String(r.truck_number || r.trailer_number || r.unit_number || '').trim(), text = String(r.issue_details || '').trim();
-      var sent = /Repair email sent (\S+) to ([^\n(]*)/.exec(notes), garageAt = notes.lastIndexOf('Sent to garage');
+      var sent = /Repair email sent (\S+) to ([^\n(]*)/.exec(notes), garageAt = garageSent(notes) ? notes.lastIndexOf('Sent to garage') : -1;
       var garage = garageAt >= 0 ? /^ (\S+) by ([^\n]*)/.exec(notes.slice(garageAt + 'Sent to garage'.length)) : null;
       var reviewed = /Reviewed by (\S+) at (\S+)/.exec(notes), lessor = /Sent to lessor (.*?) ?(\d{4}-\d\d-\d\dT\S+) by ([^\n]*)/.exec(notes);
       var opened = Date.parse(r.opened_at || r.service_date || ''), done = Date.parse(r.completed_at || '');
@@ -1083,6 +1083,12 @@
     };
   }
 
+  // Joe 10/14: a write-up's notes say "Sent to garage ..." when the office sends it, and "Taken off the garage list ..." when a
+  // manager deletes its Garage job. The later line wins: sent and not taken off since.
+  var GARAGE_OFF = 'Taken off the garage list';
+  function garageSent(notes) { var n = String(notes || ''); return n.lastIndexOf('Sent to garage') > n.lastIndexOf(GARAGE_OFF); }
+  function garageOff(notes) { var n = String(notes || ''), off = n.lastIndexOf(GARAGE_OFF); return off >= 0 && off > n.lastIndexOf('Sent to garage'); }
+
   // A check-in or write-up answer that says nothing is wrong ("none", "ok", "no issues", "Y"): no write-up (udpoMaintenanceNoWriteUp_).
   function noWriteUp(value) {
     var t = String(value === null || value === undefined ? '' : value).toLowerCase().replace(/[^a-z0-9/+ ]+/g, ' ').replace(/\s+/g, ' ').replace(/^[/+ ]+|[/+ ]+$/g, '');
@@ -1096,7 +1102,7 @@
   }
 
   return {
-    noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS,
+    noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
