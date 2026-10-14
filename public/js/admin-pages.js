@@ -121,6 +121,44 @@ export async function renderPeople(box) {
     return (code) => on && (admin || (!restricted(code) && (d.grants.indexOf(code) >= 0 || (fromRole.has(code) && d.denials.indexOf(code) < 0))));
   }
 
+  // Joe 10/14 (mock-up A): what this person can see, one table with the screens down the side and the plants across.
+  // draft.screens null = nothing limited yet (every screen their role allows): the boxes show ticked, and the first change
+  // ticks every screen of their plants for real, so unticking one limits only that one.
+  const draftPlants = () => L.plantsFor(Object.assign({}, draft, { status: 'ACTIVE' }));
+  const allTicks = () => { const out = {}; draftPlants().forEach(id => { out[id] = L.SCREEN_KEYS.slice(); }); return out; };
+  const ticks = () => draft.screens || allTicks();
+  const ticked = (plant, key) => (ticks()[plant] || []).indexOf(key) >= 0;
+  function setTicks(plant, keys, on) {
+    const t = draft.screens || allTicks();
+    const have = new Set(t[plant] || []);
+    keys.forEach(k => { if (on) have.add(k); else have.delete(k); });
+    t[plant] = L.SCREEN_KEYS.filter(k => have.has(k));
+    draft.screens = t; draft.screensChanged = true;
+  }
+  function screensTable(admin) {
+    const mine = draftPlants();
+    const head = '<tr><th>Area and screen</th>' + L.PLANTS.map(p => '<th class="sa-plant">' + e(p.name) + (mine.indexOf(p.id) < 0 ? '<small>Not in Allowed locations</small>' : '') + '</th>').join('') + '</tr>';
+    const box = (plant, keys, extra) => {
+      const off = admin || mine.indexOf(plant) < 0;
+      const n = off ? 0 : keys.filter(k => ticked(plant, k)).length;
+      return '<td class="sa-cell"><input type="checkbox" data-sa-plant="' + plant + '" data-sa-keys="' + keys.join(' ') + '"' + (n && n === keys.length ? ' checked' : '') + (n && n < keys.length ? ' data-part="1"' : '') +
+        (off ? ' disabled' : '') + ' aria-label="' + e(extra) + ' at ' + e(plantName(plant)) + '"></td>';
+    };
+    const rows = L.SCREEN_AREAS.map(a => {
+      const keys = a.screens.map(x => x[0]), open = draft.openAreas.indexOf(a.key) >= 0;
+      return '<tr class="sa-area"><td><button type="button" class="sa-toggle" data-sa-area="' + a.key + '" aria-expanded="' + open + '">' + (open ? 'Hide screens' : 'Show screens') + '</button> ' +
+        '<b>' + e(a.name) + '</b> <span class="sa-count">(' + keys.length + (keys.length === 1 ? ' screen' : ' screens') + ')</span></td>' + L.PLANTS.map(p => box(p.id, keys, a.name)).join('') + '</tr>' +
+        (open ? a.screens.map(x => '<tr class="sa-screen"><td>' + e(x[1]) + '</td>' + L.PLANTS.map(p => box(p.id, [x[0]], x[1])).join('') + '</tr>').join('') : '');
+    }).join('');
+    const jobs = '<option value="">Pick a job to tick its screens</option>' + data.screenJobs.map(j => '<option value="' + j.key + '">' + e(j.name) + '</option>').join('') +
+      '<option value="__all__">Every screen their role allows</option>';
+    return '<div class="sa"><div class="sa-top"><b class="sa-title">What this person can see' + (draft.screensChanged ? ' <span class="ap-chip warn">Unsaved</span>' : '') + '</b>' +
+      '<label class="ap-field sa-job">Start from a job<select id="p-job"' + (admin ? ' disabled' : '') + '>' + jobs + '</select></label></div>' +
+      '<p class="ap-help" style="margin:4px 0">' + (admin ? 'An Administrator sees every screen at every plant.' : draft.screens ? 'Tick a whole area, or click Show screens and tick single screens. A screen that is not ticked is not on their Home or menu, is refused if they type its address, and its saves are refused.' :
+        'Nothing is limited yet: this person sees every screen their role allows. Untick anything they should not see, or start from a job.') + '</p>' +
+      '<table class="ap-t sa-t"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
   function renderList() {
     const q = find.trim().toLowerCase();
     const rows = data.people.filter(p => (filter === 'all' || p.status === filter) && (!q || (p.name + ' ' + p.email).toLowerCase().indexOf(q) >= 0))
@@ -158,10 +196,13 @@ export async function renderPeople(box) {
       '<div class="ap-field"><b style="color:#0b3d6b;font-size:16px">Allowed locations</b><div class="ap-checks" id="p-plants"><label><input type="checkbox" value="*"' + (draft.facilities.indexOf('*') >= 0 ? ' checked' : '') + '> All locations</label>' +
       L.PLANTS.map(p => '<label><input type="checkbox" value="' + p.id + '"' + (draft.facilities.indexOf(p.id) >= 0 ? ' checked' : '') + '> ' + e(p.name) + (p.status !== 'ACTIVE' ? ' (being built)' : '') + '</label>').join('') +
       '</div><span class="ap-help">All locations covers every plant, including ones added later. With none ticked, an Administrator sees every plant and anyone else sees Uniontown.</span></div>' +
-      '<div><b style="color:#0b3d6b">Effective Rights</b>' + (dirty ? ' <span class="ap-chip warn">Unsaved preview</span>' : '') +
+      screensTable(admin) +
+      // The save-by-save rights stay, folded under the screens (Joe 10/14: the screens table is what he uses now).
+      '<details class="sa-rights"' + (draft.rightsOpen ? ' open' : '') + '><summary>Save rights, one by one (Effective Rights)</summary>' + (dirty ? ' <span class="ap-chip warn">Unsaved preview</span>' : '') +
       '<p class="ap-help" style="margin:4px 0">Use Role inherits the role template. Deny overrides Allow. Changes take effect only after Save.</p>' +
-      '<table class="ap-t"><thead><tr><th>Action</th><th>Person exception</th><th>Result</th></tr></thead><tbody>' + rights + '</tbody></table></div>' +
+      '<table class="ap-t"><thead><tr><th>Action</th><th>Person exception</th><th>Result</th></tr></thead><tbody>' + rights + '</tbody></table></details>' +
       '<p class="ap-note">' + (sel && sel.updatedAt ? 'Last saved ' + e(when(sel.updatedAt)) + ' by ' + e(sel.updatedBy) : 'No saved changes for this entry.') + '</p>';
+    c.querySelectorAll('input[data-part]').forEach(x => { x.indeterminate = true; });
   }
 
   function pick(person, open) {
@@ -169,6 +210,10 @@ export async function renderPeople(box) {
     if (!person && !open) { draft = null; dirty = false; renderList(); renderEdit(); return; }
     draft = person ? { email: person.email, name: person.name, roles: person.roles.map(r => String(r).toUpperCase()), status: person.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE', facilities: shownPlants(person),
       grants: person.grants.slice(), denials: person.denials.slice() } : { email: '', name: '', roles: ['EMPLOYEE'], status: 'ACTIVE', facilities: [], grants: [], denials: [] };
+    draft.screens = person && person.screenAccess ? JSON.parse(JSON.stringify(person.screenAccess)) : null;
+    draft.screensChanged = false;
+    // Areas with only some screens ticked start open, so what is limited shows.
+    draft.openAreas = draft.screens ? L.SCREEN_AREAS.filter(a => Object.keys(draft.screens).some(pl => { const n = a.screens.filter(x => (draft.screens[pl] || []).indexOf(x[0]) >= 0).length; return n && n < a.screens.length; })).map(a => a.key) : [];
     dirty = false;
     renderList(); renderEdit();
   }
@@ -229,7 +274,15 @@ export async function renderPeople(box) {
       });
     }
     if (b.id === 'p-reload') { if (!leaving('reload')) return; load(sel && sel.email); }
-    if (b.id === 'p-defaults') { draft.grants = []; draft.denials = []; dirty = true; renderEdit(); say(box, 'This person\'s draft exceptions are cleared. Click Save to apply; no one else is changed.'); }
+    if (b.id === 'p-defaults') { draft.grants = []; draft.denials = []; draft.screens = null; draft.screensChanged = true; dirty = true; renderEdit(); say(box, 'This person\'s draft exceptions are cleared and they see every screen their role allows. Click Save to apply; no one else is changed.'); }
+    if (b.dataset.saArea) {
+      const k = b.dataset.saArea, i = draft.openAreas.indexOf(k);
+      if (i >= 0) draft.openAreas.splice(i, 1); else draft.openAreas.push(k);
+      draft.rightsOpen = !!box.querySelector('.sa-rights[open]');
+      renderEdit();
+      const again = box.querySelector('[data-sa-area="' + k + '"]');
+      if (again) again.focus();
+    }
     if (b.id === 'p-save') {
       draft.name = $('#p-name').value.trim();
       draft.email = $('#p-email').value.trim().toLowerCase();
@@ -237,8 +290,8 @@ export async function renderPeople(box) {
       const wasAdmin = sel && sel.roles.some(r => /^ADMIN/.test(String(r).toUpperCase())), nowAdmin = draft.roles.indexOf('ADMINISTRATOR') >= 0;
       const sensitive = sel && ((sel.status === 'ACTIVE' && draft.status !== 'ACTIVE') || wasAdmin !== nowAdmin) || (!sel && nowAdmin);
       const go = () => busy(box, b, async () => {
-        const out = await call('savePerson', { email: draft.email, name: draft.name, roles: draft.roles, status: draft.status, facilities: draft.facilities, grants: draft.grants, denials: draft.denials,
-          isNew: !sel, revision: sel ? sel.revision : data.newRevision });
+        const out = await call('savePerson', Object.assign({ email: draft.email, name: draft.name, roles: draft.roles, status: draft.status, facilities: draft.facilities, grants: draft.grants, denials: draft.denials,
+          isNew: !sel, revision: sel ? sel.revision : data.newRevision }, draft.screensChanged ? { screenAccess: draft.screens } : {}));
         await load();
         say(box, 'Saved ' + out.email + '. The Users sheet copy gets it within a minute.', 'good');
       });
@@ -266,6 +319,17 @@ export async function renderPeople(box) {
       if (t.value === 'deny') draft.denials.push(c);
     }
     if (t.id === 'p-role' && draft.roles.indexOf('ADMINISTRATOR') >= 0) { draft.grants = []; draft.denials = []; }
+    if (t.dataset.saPlant) setTicks(t.dataset.saPlant, t.dataset.saKeys.split(' '), t.checked);
+    if (t.id === 'p-job' && t.value) {
+      if (t.value === '__all__') { draft.screens = null; draft.screensChanged = true; } else {
+        const job = data.screenJobs.find(j => j.key === t.value);
+        const next = {};
+        draftPlants().forEach(id => { next[id] = L.SCREEN_KEYS.filter(k => job.screens.indexOf(k) >= 0); });
+        draft.screens = next; draft.screensChanged = true;
+        draft.openAreas = L.SCREEN_AREAS.filter(a => a.screens.some(x => job.screens.indexOf(x[0]) >= 0)).map(a => a.key);
+      }
+    }
+    draft.rightsOpen = !!box.querySelector('.sa-rights[open]');
     draft.name = $('#p-name').value; draft.email = $('#p-email').value;
     dirty = true; guard = '';
     renderEdit();
@@ -645,14 +709,23 @@ export async function renderEmailSenders(box, ctx) {
   const $ = (s) => box.querySelector(s);
   function render() {
     $('#es-sending').innerHTML = data.sending ? '<span class="ap-chip good">Sending is ON</span>' : '<button type="button" class="ap-btn small" data-goto="sent-log">Sending is OFF: turn it on</button>';
+    // Joe 10/14: no gray hint text inside the boxes, so a box that looks filled is filled. What an empty box means is
+    // written under it, and a box changed but not saved yet is marked until Save.
     const std = data.standard, empty = std ? 'Empty: sends as the standard sender, ' + e(std) : 'Empty: no email goes out for this plant until an address is set';
-    $('#es-rows').innerHTML = data.plants.map(p => '<tr><td><b>' + e(p.plant) + '</b></td>' +
-      '<td><input data-addr="' + e(p.id) + '" value="' + e(p.address) + '" maxlength="120" placeholder="' + e(std || 'name@uniteddairy.com') + '" style="width:100%">' + (p.address ? '' : '<small>' + empty + '</small>') + '</td>' +
-      '<td><input data-name="' + e(p.id) + '" value="' + e(p.senderName) + '" maxlength="80" placeholder="United Dairy ' + e(p.plant) + ' Operations" style="width:100%"></td>' +
-      '<td>' + (p.changedAt ? e(when(p.changedAt)) + '<small>' + e(p.changedBy) + '</small>' : '') + '</td></tr>').join('');
+    $('#es-rows').innerHTML = data.plants.map(p => '<tr data-plant="' + e(p.id) + '"><td><b>' + e(p.plant) + '</b></td>' +
+      '<td><input data-addr="' + e(p.id) + '" data-saved="' + e(p.address) + '" value="' + e(p.address) + '" maxlength="120" style="width:100%"><small data-empty="addr"' + (p.address ? ' hidden' : '') + '>' + empty + '</small></td>' +
+      '<td><input data-name="' + e(p.id) + '" data-saved="' + e(p.senderName) + '" value="' + e(p.senderName) + '" maxlength="80" style="width:100%"><small data-empty="name"' + (p.senderName ? ' hidden' : '') + '>Empty: the standard name</small></td>' +
+      '<td><span class="ap-chip warn" data-unsaved hidden>Not saved yet</span>' + (p.changedAt ? e(when(p.changedAt)) + '<small>' + e(p.changedBy) + '</small>' : '') + '</td></tr>').join('');
     $('#es-who').value = data.fromWho;
   }
   async function load() { try { data = await call('emailSenders'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  box.addEventListener('input', ev => {
+    const tr = ev.target.closest('#es-rows tr');
+    if (!tr) return;
+    const boxes = [...tr.querySelectorAll('input')];
+    boxes.forEach(i => { i.classList.toggle('es-unsaved', i.value.trim() !== i.dataset.saved); i.nextElementSibling.hidden = !!i.value.trim(); });
+    tr.querySelector('[data-unsaved]').hidden = !boxes.some(i => i.classList.contains('es-unsaved'));
+  });
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
@@ -661,7 +734,7 @@ export async function renderEmailSenders(box, ctx) {
     if (b.id === 'es-save') {
       const senders = {};
       data.plants.forEach(p => { senders[p.id] = { address: box.querySelector('[data-addr="' + p.id + '"]').value, name: box.querySelector('[data-name="' + p.id + '"]').value }; });
-      busy(box, b, async () => { await call('saveEmailSenders', { senders, fromWho: $('#es-who').value }); await load(); say(box, 'Saved.', 'good'); });
+      busy(box, b, async () => { const out = await call('saveEmailSenders', { senders, fromWho: $('#es-who').value }); await load(); say(box, out.message, out.message === 'Saved.' ? 'good' : 'warn'); });
     }
   });
   await load();

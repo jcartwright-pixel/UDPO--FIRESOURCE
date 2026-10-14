@@ -11,3 +11,10 @@
 /* Route Distribution home (review item 16): the Dispatch and Drivers cards carry the current app's quick staffing numbers,
    Covered % and drivers Available today, as a fifth tile. */
 .card.home4 .dc-metrics.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* Joe 10/14 (mock-up A): the Manager card runs across the page under the four cards, its four links on one line. */
+.cards.cards4:has(> .dc-wide) { grid-template-rows: repeat(3, auto); flex: none; }  /* full height; the page scrolls a little */
+.card.home4.dc-wide { grid-column: 1 / -1; }
+.card.home4.dc-wide .dc-links { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .card.home4.dc-wide .dc-links { grid-template-columns: 1fr 1fr; }
+}

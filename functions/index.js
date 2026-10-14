@@ -236,7 +236,7 @@ exports.save = onCall(async (request) => {
   const user = await saver(request);
   try {
     // Asking, not saving: which of these saves this person may make (People & Roles counts).
-    if (request.data && Array.isArray(request.data.checkSaves)) return { allowed: await checkSaves(db, user, request.data.checkSaves) };
+    if (request.data && Array.isArray(request.data.checkSaves)) return { allowed: await checkSaves(db, user, request.data.checkSaves, request.data.facilityId) };
     // Local test database only: a browser test can set the server's clock (?testNow) to its made-up day.
     const testNow = process.env.FUNCTIONS_EMULATOR === 'true' && request.data && request.data.testNow ? new Date(request.data.testNow) : null;
     const result = await applyAction(db, user, request.data, testNow && !isNaN(testNow) ? () => testNow : undefined);

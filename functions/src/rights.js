@@ -10,6 +10,8 @@
  */
 'use strict';
 
+const L = require('./logic');
+
 const CATALOG = Object.freeze([
   ['dashboard.read', 'Open company Home', 'Home'],
   ['self.checkin.write', 'Submit own driver check-in', 'Employee / Mobile'],
@@ -159,4 +161,50 @@ function saveAllowed(person, action, roleOk, templates, exceptions) {
   return roleOk;
 }
 
-module.exports = { CATALOG, RESTRICTED, ASSIGNABLE, ROLES, DEFAULTS, ACTION_RIGHT, normRole, templateFor, effectiveRights, saveAllowed, isAdminPerson };
+// Joe 10/14 (People & Roles, mock-up A): the screens each save is made from (logic.js SCREEN_AREAS). Someone whose screens
+// are ticked may make a save only when one of its screens is ticked for that plant. An empty list is not decided by the
+// ticks: Administration's own setup pages (Products, Shifts, Location Areas) and the code-signed Plant Station.
+const ACTION_SCREENS = Object.freeze({
+  assignDriver: ['daily', 'weekly'], assignTruck: ['daily', 'weekly'], assignTrailer: ['daily', 'weekly'], setDriverNote: ['daily', 'weekly'],
+  setRuns: ['daily', 'weekly', 'routeWeek'], setDispatchTime: ['daily'], setJack: ['daily'], moveRun: ['daily'], setUnitDown: ['daily', 'equipment'], setUnitUp: ['daily', 'equipment'],
+  reorderLoads: ['daily', 'weekly'], reorderWeek: ['daily', 'weekly'], clearConflict: ['conflicts'], saveCheckIn: ['checkins'],
+  setDriverTruck: ['drivers'], setDriverAvailable: ['drivers'], setDriverRelief: ['drivers'], saveDriver: ['drivers'], removeDrivers: ['drivers'], addDriverIncident: ['drivers'],
+  saveDriverException: ['daily', 'weekly'], saveVacation: ['vacations'], publishWeek: ['weekly'], resetWeek: ['weekly'], saveRoute: ['routes', 'otr', 'rOtr'],
+  reorderRouteDay: ['routes'], updateIssue: ['issues'], setWeekReason: ['routeWeek'], saveDriverTemplate: ['template'], saveOtr: ['otr', 'rOtr'],
+  saveScorecard: ['scorecard', 'rScorecard'], rateTruckClean: ['scorecard', 'rScorecard'], excuseScorecardMiss: ['scorecard', 'rScorecard'],
+  reviewDriverIncident: ['drivers', 'scorecard', 'rScorecard'], saveOpsAssignment: ['ops'],
+  savePlantLoad: ['loadout', 'trailers'], addPickup: ['loadout'], completePickup: ['loadout'], reorderPlantLoads: ['loadout'], saveUnloading: ['unloading', 'returns'],
+  completeWash: ['unloading', 'washing'], addReturn: ['returns'], savePlantSchedule: ['scheduler', 'loadout'], saveYardCheck: ['yard'], saveQualityCheck: ['quality'],
+  saveShiftNote: ['shiftNotes', 'pmCenter'], saveTemperatureCheck: ['temps'], sendPlantReport: ['manager'],
+  saveMachineProducts: ['lineTargets'], saveLineCounter: ['lineTargets'], saveLineEntry: ['lineTablet'],
+  saveSafetyWalk: ['safetyWalk'], saveSafetyIssue: ['safetyIssues'], saveExtinguisherCheck: ['extinguishers'], saveExtinguisher: ['extinguishers'],
+  saveFireSystemCheck: ['fire'], saveFireSystem: ['fire'], saveSafetyChecklist: ['safetySetup'],
+  saveMachine: ['machinery'], makeWorkOrder: ['pmCenter'], savePmTask: ['pmSchedule'], sendPmToMaintenance: ['pmCenter', 'pmSchedule'], saveReceivingItem: ['receiving'],
+  sendToGarage: ['fleetService', 'rFleetService'], deleteGarageJob: ['fleetService', 'rFleetService'], saveFleetRules: ['fleetService'], saveFleetUnit: ['fleetService'],
+  saveGarageTech: ['fleetService'],
+  saveProductSetup: [], saveProductUpload: [], saveProductSheet: [], savePlantShifts: [], saveLocationAreas: [], saveReceivingScan: []
+});
+
+// The ticks a People & Roles save may hold: {plantId: [screen keys]} with known plants and screens, or null (every screen).
+function cleanScreenAccess(input, plants) {
+  if (input === null || input === undefined) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) return undefined;
+  const out = {};
+  for (const id of Object.keys(input)) {
+    if (plants.indexOf(id) < 0 || !Array.isArray(input[id])) return undefined;
+    if (input[id].some(k => L.SCREEN_KEYS.indexOf(k) < 0)) return undefined;
+    out[id] = L.SCREEN_KEYS.filter(k => input[id].indexOf(k) >= 0);
+  }
+  return out;
+}
+
+// Whether the person's ticked screens let this save through for this plant (true when nothing is ticked yet).
+function screenSaveAllowed(person, action, exceptions, plantId) {
+  const screens = ACTION_SCREENS[action];
+  const access = exceptions && exceptions.screenAccess;
+  if (!screens || !screens.length || !L.screenLimited(person, access)) return true;
+  const mine = L.screensFor(person, access, plantId);
+  return screens.some(k => mine.indexOf(k) >= 0);
+}
+
+module.exports = { CATALOG, RESTRICTED, ASSIGNABLE, ROLES, DEFAULTS, ACTION_RIGHT, normRole, templateFor, effectiveRights, saveAllowed, isAdminPerson, ACTION_SCREENS, cleanScreenAccess, screenSaveAllowed };

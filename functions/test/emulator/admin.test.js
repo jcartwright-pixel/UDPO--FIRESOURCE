@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { db, clear } = require('./helpers');
 const A = require('../../src/admin');
 const { appMail } = require('../../src/adminmail');
-const { applyAction } = require('../../src/actions');
+const { applyAction, checkSaves } = require('../../src/actions');
 
 const ADMIN = { email: 'boss@uniteddairy.com' };
 const call = (input, user, deps) => A.adminCall(db(), user || ADMIN, input, deps);
@@ -96,6 +96,30 @@ test('Add Role and Role Templates change what a person may save', async () => {
   await assert.rejects(call({ op: 'saveRoleTemplate', role: 'ADMINISTRATOR', rights: [], expected: [] }), /protected/);
 });
 
+// Joe 10/14 (mock-up A): People & Roles ticks the screens a person may see, per plant; the server refuses saves on the rest.
+test('People & Roles: ticked screens are kept per plant and decide which saves go through', async () => {
+  let sup = await person('sup@uniteddairy.com');
+  assert.equal(sup.screenAccess, null, 'nothing ticked yet');
+  const base = { op: 'savePerson', email: sup.email, name: 'Sup', roles: ['SUPERVISOR'], status: 'ACTIVE', facilities: ['fac_uniontown'], grants: [], denials: [] };
+  assert.deepEqual(await checkSaves(db(), { email: sup.email }, ['publishWeek', 'saveShiftNote']), { publishWeek: true, saveShiftNote: true });
+  await call(Object.assign({}, base, { revision: sup.revision, screenAccess: { fac_uniontown: ['machinery', 'pmCenter'] } }));
+  assert.deepEqual((await db().collection('personRights').doc(sup.email).get()).data().screenAccess, { fac_uniontown: ['pmCenter', 'machinery'] });
+  sup = await person(sup.email);
+  assert.deepEqual(sup.screenAccess, { fac_uniontown: ['pmCenter', 'machinery'] });
+  assert.deepEqual(await checkSaves(db(), { email: sup.email }, ['publishWeek', 'saveShiftNote']), { publishWeek: false, saveShiftNote: true });
+  await assert.rejects(applyAction(db(), { email: sup.email }, { requestId: 'req-screens-1', action: 'publishWeek', weekStart: '2026-10-04' }), /does not have this screen ticked for Uniontown/);
+  // Another plant's saves need that plant ticked.
+  assert.deepEqual(await checkSaves(db(), { email: sup.email }, ['saveShiftNote'], 'fac_charleston'), { saveShiftNote: false });
+  // A save that leaves the ticks out keeps them; a save of nothing ticked (null) sees every screen again.
+  await call(Object.assign({}, base, { name: 'Sup Two', revision: sup.revision }));
+  sup = await person(sup.email);
+  assert.deepEqual(sup.screenAccess, { fac_uniontown: ['pmCenter', 'machinery'] });
+  await assert.rejects(call(Object.assign({}, base, { revision: sup.revision, screenAccess: { fac_uniontown: ['notAScreen'] } })), /ticked screens could not be read/);
+  await call(Object.assign({}, base, { revision: sup.revision, screenAccess: null }));
+  assert.equal((await person(sup.email)).screenAccess, null);
+  assert.deepEqual(await checkSaves(db(), { email: sup.email }, ['publishWeek']), { publishWeek: true });
+});
+
 test('personal access link: generated once, revoked, emailed only to the sender outside production', async () => {
   const out = await call({ op: 'accessGenerate', email: 'sup@uniteddairy.com' });
   assert.match(out.token, /^[A-Za-z0-9_-]{20,}$/);
@@ -126,7 +150,11 @@ test('Email Senders: email comes from whoever pressed Send; no one pressed = the
   assert.deepEqual(first.plants.map(p => [p.plant, p.address]), [['Uniontown', ''], ['Charleston', ''], ['Martins Ferry', '']]);
   assert.deepEqual([first.standard, first.fromWho], ['joe@uniteddairy.com', 'PERSON']);
   await assert.rejects(call({ op: 'saveEmailSenders', senders: { fac_charleston: { address: 'ops@gmail.com' } } }), /not a United Dairy email address/);
-  await assert.rejects(call({ op: 'saveEmailSenders', senders: { fac_charleston: { address: '', name: 'Charleston Ops' } } }), /type the email address/);
+  // Joe 10/14: an empty address never stops Save. A name alone is kept (the name on the standard sender's email); an email
+  // address typed as the name is left out, and the message says to type it in Send emails from instead.
+  const nameOnly = await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: '', name: 'utplantmgmt@uniteddairy.com' }, fac_charleston: { address: '', name: 'Charleston Ops' } } }, null, deps);
+  assert.match(nameOnly.message, /^Saved\. Uniontown: "Name people see" takes a name, not an email address.*type it in "Send emails from"/);
+  assert.deepEqual(nameOnly.plants.map(p => [p.address, p.senderName]), [['', ''], ['', 'Charleston Ops'], ['', '']]);
   const out = await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' },
     fac_charleston: { address: 'charleston.operations@uniteddairy.com', name: '' } } }, null, deps);
   assert.deepEqual(out.plants.map(p => [p.address, p.senderName]), [['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations'], ['charleston.operations@uniteddairy.com', ''], ['', '']]);
@@ -143,6 +171,12 @@ test('Email Senders: email comes from whoever pressed Send; no one pressed = the
   await mail('M', 'fac_martins_ferry', { by: '', testTo: 'boss@uniteddairy.com' });
   assert.deepEqual(sent.slice(1).map(m => [m.from, m.fromName]), [['uniontown.operations@uniteddairy.com', 'United Dairy Uniontown Operations'],
     ['charleston.operations@uniteddairy.com', 'United Dairy Plant Operations'], ['joe@uniteddairy.com', 'United Dairy Operations']]);
+  // A plant with only a name: the standard sender, under that name.
+  await call({ op: 'saveEmailSenders', senders: { fac_uniontown: { address: 'uniontown.operations@uniteddairy.com', name: 'United Dairy Uniontown Operations' },
+    fac_charleston: { address: 'charleston.operations@uniteddairy.com', name: '' }, fac_martins_ferry: { address: '', name: 'Martins Ferry Ops' } } }, null, deps);
+  await mail('M2', 'fac_martins_ferry', { by: '', testTo: 'boss@uniteddairy.com' });
+  assert.deepEqual([sent[4].from, sent[4].fromName], ['joe@uniteddairy.com', 'Martins Ferry Ops']);
+  sent.pop();
   // Send Current Report comes from the person who pressed it, or the plant address when Email Senders says so.
   const { mailReport } = require('../../src/reportmail');
   const ref = db().collection('plantReports').doc('r1');
@@ -154,6 +188,30 @@ test('Email Senders: email comes from whoever pressed Send; no one pressed = the
   await ref.set(report);
   assert.equal(await mailReport(ref, report, send), 'SENT');
   assert.equal(sent[5].from, 'uniontown.operations@uniteddairy.com');
+});
+
+test('Send Current Report in live mode goes to the plant group from Manager Report Recipients (Joe 10/14)', async () => {
+  const { mailReport } = require('../../src/reportmail');
+  const sent = [];
+  const send = { env: { MAIL_FROM: 'joe@uniteddairy.com' }, sendMail: async (m) => { sent.push(m); return { to: m.to }; } };
+  await call({ op: 'saveReportGroup', facilityId: 'fac_uniontown', name: 'Plant Management', recipients: 'a@uniteddairy.com, b@uniteddairy.com' });
+  const ref = db().collection('plantReports').doc('rg1');
+  // The Manager Center saves the report with groupName "Plant Managers"; the plant's only group gets it.
+  const report = { status: 'SENDING', subject: 'Report', text: 't', by: 'boss@uniteddairy.com', mode: 'live', groupName: 'Plant Managers' };
+  await ref.set(report);
+  assert.equal(await mailReport(ref, report, send), 'SENT');
+  assert.deepEqual(sent[0].to, ['a@uniteddairy.com', 'b@uniteddairy.com']);
+  const saved = (await ref.get()).data();
+  assert.deepEqual([saved.testCopy, saved.groupName], [false, 'Plant Management']);
+  // A group named exactly so wins when the plant has more than one.
+  await call({ op: 'saveReportGroup', facilityId: 'fac_uniontown', name: 'Plant Managers', recipients: 'c@uniteddairy.com' });
+  await ref.set(report);
+  await mailReport(ref, report, send);
+  assert.deepEqual(sent[1].to, ['c@uniteddairy.com']);
+  // Test mode: only the person who pressed Send.
+  await ref.set(Object.assign({}, report, { mode: 'test' }));
+  await mailReport(ref, Object.assign({}, report, { mode: 'test' }), send);
+  assert.deepEqual(sent[2].to, ['boss@uniteddairy.com']);
 });
 
 test('Route Distribution code: new code shown to administrators, turned off and on', async () => {
