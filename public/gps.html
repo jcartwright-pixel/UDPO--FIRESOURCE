@@ -54,7 +54,13 @@
         <p class="hint"><a href="trucks.html">Open Trucks Today</a></p>
       </section>
       <section class="gps-card wide">
-        <h2>3. What the app reads from Fleet</h2>
+        <h2>3. What we're getting from Verizon</h2>
+        <p class="hint">Each kind of data the app reads from Fleet: how many came in today and when one was last seen. Alerts only come in when something happens, so they count the whole week too.</p>
+        <table class="gps-check"><colgroup><col style="width:5%"><col style="width:27%"><col style="width:15%"><col style="width:18%"><col style="width:35%"></colgroup>
+          <thead><tr><th></th><th>Data</th><th>Today</th><th>Last seen</th><th>Notes</th></tr></thead><tbody id="check"></tbody></table>
+      </section>
+      <section class="gps-card wide">
+        <h2>4. What the app reads from Fleet</h2>
         <ol class="gps-steps">
           <li>Where each truck is now: last report time, place, speed, ignition on or off, and the driver Fleet shows.</li>
           <li>Each truck's odometer and engine hours, and the miles it drove today with its first and last movement.</li>
@@ -89,6 +95,34 @@
       $('history').textContent = !h ? '' : h.finishedAt ? 'This week\'s history (' + dayRange(h.days) + ') read in full ' + stamp(h.finishedAt) + '.'
         : h.stopped ? 'This week\'s history stopped: ' + h.error + ' Save the login again to try once more.'
         : 'Reading this week\'s history (' + dayRange(h.days) + '): ' + h.done + ' of ' + h.total + ' parts done' + (h.error ? '. Last try failed: ' + h.error : '') + '. It goes on every 5 minutes.';
+      renderCheck();
+    }
+    // Joe 10/14: "how can I tell if we're pulling all the data we want from Verizon?"
+    const UNIT = { positions: 'units', odometer: 'units', engineHours: 'trucks', trailerHours: 'trailers', miles: 'trucks', yard: 'trucks' };
+    const NOTE = {
+      trailerHours: 'Comes from the reefer hours Fleet shows on T- units.',
+      miles: 'Trucks that moved today.', yard: 'Left or came back to Uniontown Branch or Plant.',
+      alert_HARSH_BRAKING: 'Set up in Fleet 10-13-26.', alert_HARSH_ACCEL: 'Set up in Fleet 10-13-26.', alert_HARSH_TURN: 'Set up in Fleet 10-13-26.',
+      alert_SEATBELT: 'Needs a seatbelt alert in Fleet.', mpg: 'Coming next.', fuel: 'Needs fuel cards linked in Fleet.' };
+    function renderCheck() {
+      const rows = (s.coverage || []).slice(), h = s.history;
+      if (h) {
+        const i = rows.findIndex(r => r.notYet);
+        rows.splice(i < 0 ? rows.length : i, 0, { key: 'history', label: 'This week\'s history', history: h });
+      }
+      const mark = (ok, cls) => '<span class="gps-mark ' + cls + '" aria-label="' + (ok ? 'yes' : 'no') + '">' + (ok ? '✓' : cls === 'wait' ? '…' : '✗') + '</span>';
+      $('check').innerHTML = rows.map(r => {
+        if (r.notYet) return '<tr class="not-yet"><td><span class="gps-mark none">–</span></td><td>' + escapeHtml(r.label) + '</td><td colspan="2">Not set up yet</td><td>' + escapeHtml(NOTE[r.key] || '') + '</td></tr>';
+        if (r.history) {
+          const x = r.history, done = !!x.finishedAt;
+          return '<tr><td>' + mark(done, done ? 'ok' : x.stopped ? 'bad' : 'wait') + '</td><td>' + escapeHtml(r.label) + '</td><td>' + x.done + ' of ' + x.total + ' parts</td><td>' +
+            (done ? stamp(x.finishedAt) : '') + '</td><td>' + escapeHtml(done ? dayRange(x.days) + ', read in full.' : x.stopped ? 'Stopped: ' + x.error : dayRange(x.days) + ', a part every 5 minutes.') + '</td></tr>';
+        }
+        const ok = r.alert ? r.week > 0 : r.today > 0;
+        const count = r.alert ? r.today + ' today' : r.today.toLocaleString() + ' ' + (UNIT[r.key] || '');
+        const note = r.alert ? (r.week ? r.week + ' this week.' : 'None this week. ') + (r.week ? '' : NOTE[r.key] || '') : NOTE[r.key] || '';
+        return '<tr><td>' + mark(ok, ok ? 'ok' : 'bad') + '</td><td>' + escapeHtml(r.label) + '</td><td>' + escapeHtml(count) + '</td><td>' + (r.last ? escapeHtml(stamp(r.last)) : 'Not yet') + '</td><td>' + escapeHtml(note) + '</td></tr>';
+      }).join('') || '<tr><td colspan="5" class="hint">Shows once the login is saved and the first read is done.</td></tr>';
     }
     const dayRange = (days) => days && days.length ? shortDay(days[0]) + ' to ' + shortDay(days[days.length - 1]) : '';
     const shortDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };

@@ -502,6 +502,36 @@ async function historyDay(db, d, o, token, item, tagOf, yards, at) {
   await writeAll(db, 'gpsDays', docs, true);
 }
 
+/*
+ * Joe 10/14: "how can I tell if we're pulling all the data we want from Verizon?" GPS Setup's checklist: for each kind of
+ * data, how many came in today and when one was last seen (this week for the alerts, which do not happen every day).
+ */
+const ALERT_KINDS = [['SPEEDING', 'Speeding alerts'], ['IDLE', 'Idling alerts'], ['HARSH_BRAKING', 'Harsh braking alerts'], ['HARSH_ACCEL', 'Harsh acceleration alerts'],
+  ['HARSH_TURN', 'Harsh cornering alerts'], ['SEATBELT', 'Seatbelt alerts'], ['FAULT', 'Engine code alerts']];
+async function coverage(db, now) {
+  const at = now.toISOString(), today = nyDate(at), week = weekDays(at)[0];
+  const trucks = (await db.collection('gpsTrucks').get()).docs.map(x => x.data());
+  const days = (await db.collection('gpsDays').where('date', '==', today).get()).docs.map(x => x.data());
+  const alerts = (await db.collection('gpsAlerts').where('date', '>=', week).get()).docs.map(x => x.data());
+  const newest = (list, f) => list.reduce((m, x) => { const v = f(x) || ''; return v > m ? v : m; }, '');
+  const isToday = (t) => !!t && nyDate(t) === today;
+  const trailer = (t) => /^T-/i.test(String(t.tag || ''));
+  const row = (key, label, list, when) => ({ key, label, today: list.filter(x => isToday(when(x))).length, last: newest(list, when) });
+  const reported = trucks.filter(t => t.lastReport);
+  const out = [
+    row('positions', 'Truck and trailer positions', reported, t => t.lastReport),
+    row('odometer', 'Odometer', reported.filter(t => num(t.odometerMiles) > 0), t => t.lastReport),
+    row('engineHours', 'Engine hours (trucks)', reported.filter(t => !trailer(t) && num(t.engineHours) > 0), t => t.lastReport),
+    row('trailerHours', 'Trailer hours (T- units)', reported.filter(t => trailer(t) && num(t.engineHours) > 0), t => t.lastReport),
+    Object.assign(row('miles', 'Miles today', days.filter(x => num(x.miles) > 0), x => x.lastMove || x.updatedAt), { scope: 'trucks' }),
+    Object.assign(row('yard', 'Yard leave and return times', days.filter(x => x.yardOut || x.yardIn), x => x.yardIn > x.yardOut ? x.yardIn : x.yardOut), { scope: 'trucks' })
+  ];
+  ALERT_KINDS.forEach(([type, label]) => out.push(Object.assign(row('alert_' + type, label, alerts.filter(a => a.type === type), a => a.at),
+    { alert: true, week: alerts.filter(a => a.type === type).length })));
+  out.push({ key: 'mpg', label: 'MPG', notYet: true }, { key: 'fuel', label: 'Fuel purchases', notYet: true });
+  return out;
+}
+
 function withDefaults(options) {
   return Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date(), sleep: (ms) => new Promise(r => setTimeout(r, ms)), base: '' }, options || {});
 }
@@ -518,7 +548,7 @@ async function fleetCall(db, email, input, options) {
   const d = (await ref.get()).data() || {};
   const op = String(input.op || 'status');
   const hist = async () => (await db.collection('private').doc('gpsFleetHistory').get()).data();
-  if (op === 'status') return status(d, await hist());
+  if (op === 'status') return Object.assign(status(d, await hist()), { coverage: await coverage(db, o.now()) });
   if (op === 'save') {
     const next = Object.assign({}, d);
     if (String(input.fleet || '').trim()) next.fleet = cleanFleet(input.fleet);
@@ -557,7 +587,7 @@ async function fleetCall(db, email, input, options) {
   if (op === 'pull') {
     const r = await pull(db, options);
     const fresh = (await ref.get()).data() || {};
-    return Object.assign(status(fresh, await hist()), { pulled: r });
+    return Object.assign(status(fresh, await hist()), { pulled: r, coverage: await coverage(db, o.now()) });
   }
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }

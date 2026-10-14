@@ -214,6 +214,12 @@ test('Fleet GPS: this week\'s history is read once, a part each run, and today i
   assert.equal(log.length, before);
   const s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'status' }, o);
   assert.deepEqual([s.history.done, s.history.total, s.history.days, s.history.finishedAt], [6, 6, ['2026-10-11', '2026-10-12', '2026-10-13'], '2026-10-13T14:20:00.000Z']);
+  // Joe 10/14: GPS Setup's checklist of what is coming in from Fleet.
+  const c = {}; s.coverage.forEach(r => { c[r.key] = r; });
+  assert.deepEqual([c.positions.today, c.odometer.today, c.engineHours.today, c.trailerHours.today], [2, 1, 1, 0]);
+  assert.deepEqual([c.miles.today, c.miles.last, c.yard.today], [1, '2026-10-13T14:40:00.000Z', 1]);
+  assert.deepEqual([c.alert_SPEEDING.today, c.alert_SPEEDING.week, c.alert_HARSH_BRAKING.today, c.alert_IDLE.week, c.alert_SEATBELT.week], [1, 1, 1, 1, 0]);
+  assert.deepEqual([c.mpg.notYet, c.fuel.notYet], [true, true]);
 });
 
 test('Fleet GPS: the history goes a part at a time and stops after three failures in a row', async () => {

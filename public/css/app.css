@@ -602,6 +602,15 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
 .gps-page .gps-result { padding: 14px 16px; border-radius: 10px; font-size: 17px; background: #eef2f6; color: var(--ink); }
 .gps-page .gps-result.ok { background: var(--pill-green-bg); color: var(--pill-green-ink); border: 1px solid #a9d8b8; }
 .gps-page .gps-result.bad { background: #fde3df; color: #a8321f; border: 1px solid #f0b4aa; }
+.gps-page .gps-check { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+.gps-page .gps-check th { text-align: left; font-size: 16px; color: var(--muted); font-weight: 800; padding: 6px 8px; border-bottom: 2px solid var(--line); position: sticky; top: 0; background: #fff; }
+.gps-page .gps-check td { padding: 7px 8px; border: 0; border-bottom: 1px solid var(--line); vertical-align: middle; text-align: left; }
+.gps-page .gps-check tr.not-yet td { color: var(--muted); }
+.gps-page .gps-mark { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-weight: 900; font-size: 16px; }
+.gps-page .gps-mark.ok { background: #e3f4e8; color: #1d6b37; }
+.gps-page .gps-mark.bad { background: #fde3df; color: #a8321f; }
+.gps-page .gps-mark.wait { background: #fdecc4; color: #8a5a00; }
+.gps-page .gps-mark.none { background: #eef2f5; color: #6b7c8c; }
 .gps-page .gps-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 16px; }
 
 /* One app, not page after page (Joe 10/9): the page colour shows while a screen loads (no white flash), and Chrome
