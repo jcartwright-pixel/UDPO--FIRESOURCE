@@ -205,15 +205,12 @@
     const routeNo = (route) => String(route || '').replace(/_[0-9]+$/, '');
     const schedTag = (x) => [x.poNumber ? 'PO ' + x.poNumber : '', x.pickupTime ? clock24(x.pickupTime) : ''].filter(Boolean).join(' · ');
 
-    // Joe 10/11: Route 20%, Truck 10%, Trailer 10% and Cases Out 20% narrower; Driver / CVG gets all of that room so a driver's
-    // name fits on one line (a name still too long shrinks to fit, see fitDrivers).
+    // Joe 10/14 (Daily Box Loadout, then "for the case type columns ... B, make them narrower too"): on every loadout but Tanker,
+    // Truck, Trailer and the count column are 20% narrower and Driver / CVG 30% (a name too long for it wraps at 16px); Route and
+    // Run get the room, so a run like "ALDI - CHARLESTON Load 1" is one line. (Before, Joe 10/11: Driver / CVG had that room.)
     const COLS = {
       // Review item 22 (Joe 10/13): the Start / End column has its heading.
-      normal: [['Route', 4.8], ['Run', 9], ['Driver / CVG', 15.6], ['Truck', 8.1], ['Trailer', 8.1], ['', 6.4], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 8], ['', 6]],
-      // Joe 10/14 (Daily Box Loadout): Truck, Trailer and Boxes Out 20% narrower, Driver / CVG 30% (on boxes it is usually blank
-      // or Carrier); Route and Run get the room, so "ALDI - CHARLESTON Load 1" is one line. Case and Totes keep their widths
-      // (Joe 10/11: a driver's name on one line there).
-      BOXING: [['Route', 5.6], ['Run', 18.4], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 7], ['', 6]],
+      normal: [['Route', 5.6], ['Run', 18.4], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 7], ['', 6]],
       TANKER: [['Route', 5.6], ['Run', 15], ['Driver / CVG', 20], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
     // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
@@ -274,7 +271,7 @@
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
       const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r) && r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
-      const cols = COLS[area === 'TANKER' || area === 'BOXING' ? area : 'normal'];
+      const cols = COLS[area === 'TANKER' ? area : 'normal'];
       document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
       const edit = canLoad(), dis = edit ? '' : ' disabled';
