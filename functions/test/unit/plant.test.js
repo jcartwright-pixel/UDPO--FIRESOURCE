@@ -337,3 +337,21 @@ test('report route tiles: the run\'s short name (Joe 10/14)', () => {
   assert.equal(R.routeNumber('6301_1'), '6301');
 });
 
+test('Run Complete: a Finished line is done for its shift; Undo takes it back (Joe 10/14)', () => {
+  const now = Date.parse('2026-10-08T19:40:00Z'); // 3:40 PM in New York, second shift
+  const fin = { status: 'FINISHED', product: 'Skim', recordedAt: '2026-10-08T19:30:00Z' };
+  assert.equal(R.lineDone(fin, now), true);
+  assert.equal(R.lineDone(fin, Date.parse('2026-10-09T05:30:00Z')), false, 'the next shift (third, 1:30 AM) opens the line again');
+  assert.equal(R.lineDone({ status: 'RUNNING', recordedAt: fin.recordedAt }, now), false);
+  const r = R.plantReport({ loads: [], lines: [{ name: 'GALLON FILLER', last: fin }, { name: 'BOXING', last: { status: 'RUNNING', product: 'Skim', recordedAt: '2026-10-08T19:00:00Z' } }], temps: [], roundStart: '2026-10-08T19:35:00Z' }, now);
+  assert.deepEqual(r.lines.map(l => [l.line, l.status]), [['GALLON FILLER', 'RUN COMPLETE'], ['BOXING', 'NOT CHECKED']], 'a done line is not "not checked"');
+  assert.match(r.text, /GALLON FILLER {2}RUN COMPLETE 3:30 PM/);
+  assert.match(R.reportHtml(r, ''), /RUN COMPLETE 3:30 PM/);
+  const checks = R.qualityLines([{ type: 'PRODUCTION_AREA', operationId: 'ut_prod_gallon', name: 'GALLON FILLER', status: 'ACTIVE' }],
+    [{ type: 'PRODUCTION_QUALITY', recordedAt: '2026-10-08T19:00:00Z', payload: { operationId: 'ut_prod_gallon', status: 'RUNNING' }, _id: 'a' },
+      { type: 'PRODUCTION_QUALITY', recordedAt: '2026-10-08T19:30:00Z', payload: { operationId: 'ut_prod_gallon', status: 'FINISHED', undone: true }, _id: 'b' }], [], now);
+  assert.equal(checks[0].last.status, 'RUNNING', 'an undone Run Complete is off the line');
+  assert.equal(P.validateQuality({ operationId: 'ut_prod_gallon', checkId: 'PRODUCTION_QUALITY_app_x1', undone: true }, SaveError).undone, true);
+  assert.throws(() => P.validateQuality({ operationId: 'ut_prod_gallon', undone: true }, SaveError), /Undo needs the check/);
+});
+

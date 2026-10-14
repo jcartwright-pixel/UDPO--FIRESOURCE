@@ -343,7 +343,15 @@ function nameScore(emailed, dispatched) {
   if (!e.length || !d.length) return 0;
   if (e.every(w => d.indexOf(w) >= 0)) return 2;
   const last = e[e.length - 1], first = e[0];
-  return e.length > 1 && last.length > 2 && d.indexOf(last) >= 0 && d.some(w => w !== last && w[0] === first[0]) ? 1 : 0;
+  // The answering service mistypes names ("MIKE GREGORYT" for GREGORY, Joe 10/14): a last name of 5+ letters one letter off still counts.
+  const near = (a, b) => a === b || a.length > 4 && b.length > 4 && Math.abs(a.length - b.length) <= 1 && oneEdit(a, b);
+  return e.length > 1 && last.length > 2 && d.some(w => near(last, w)) && d.some(w => !near(last, w) && w[0] === first[0]) ? 1 : 0;
+}
+// True when a and b differ by one letter added, dropped or changed.
+function oneEdit(a, b) {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return a.slice(i + (a.length >= b.length ? 1 : 0)) === b.slice(i + (b.length >= a.length ? 1 : 0));
 }
 const routeKey = (v) => String(v || '').trim().toUpperCase().replace(/^ROUTE\s*#?\s*/, '').replace(/^0+(?=\d)/, '');
 // 2 = the route as typed (or one of several typed: "892-901"); 1 = only its last digits ("8" for 808); 0 = no.
@@ -446,27 +454,66 @@ async function recreditMailCheckins(db, opts) {
     const at = copy.receivedAt || s.data().at || stamp;
     const hit = await findRun(db, c.route, c.driver, c.taken || L.operatingDay(new Date(Date.parse(at) || Date.now())));
     if (!hit) { still.push(s.id); continue; }
-    const by = 'EMAIL · ' + c.driver;
-    await db.runTransaction(async tx => {
-      const mode = await (require('./actions').requireTestMode)(tx, db, 'checkIns');
-      const runSnap = await tx.get(hit.snap.ref);
-      if (!runSnap.exists) return;
-      const run = runSnap.data(), d = run.days[hit.day] || {}, after = {};
-      if (c.casesDelivered !== null && (d.casesDelivered === null || d.casesDelivered === undefined)) after.casesDelivered = c.casesDelivered;
-      if (c.driverCaseReturn !== null && (d.driverCaseReturn === null || d.driverCaseReturn === undefined)) after.driverCaseReturn = c.driverCaseReturn;
-      if (!d.checkinCompletedAt) after.checkinCompletedAt = at;
-      if (Object.keys(after).length) {
-        const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp };
-        Object.keys(after).forEach(k => { update['days.' + hit.day + '.' + k] = after[k]; });
-        update['days.' + hit.day + '.updatedAt'] = stamp; update['days.' + hit.day + '.updatedBy'] = by;
-        tx.update(runSnap.ref, update);
-        if (mode.writeBack) require('./actions').queueSheetCells(tx, db, rid('mailredo'), '', run, hit.snap.id, hit.day, after, stamp, by);
-      }
-      tx.update(s.ref, { run: hit.snap.id + '|' + hit.day, recreditedAt: stamp });
-    });
+    await creditCheckin(db, hit, c, at, stamp, s.ref, { run: hit.snap.id + '|' + hit.day, recreditedAt: stamp });
     credited.push(s.id + ' ' + hit.snap.id + '|' + hit.day);
   }
   return { credited, still };
+}
+
+// A check-in onto the run it was matched to: the check-in time (when none is there yet: one made in the app wins) and the
+// cases delivered and returned where none are there yet. seenRef gets seen (set, or updated when it is already there).
+async function creditCheckin(db, hit, c, at, stamp, seenRef, seen, isNew) {
+  const by = 'EMAIL · ' + c.driver;
+  return db.runTransaction(async tx => {
+    if (isNew && (await tx.get(seenRef)).exists) return { duplicate: true };
+    const mode = await (require('./actions').requireTestMode)(tx, db, 'checkIns');
+    const runSnap = await tx.get(hit.snap.ref);
+    if (!runSnap.exists) return { credited: false };
+    const run = runSnap.data(), d = run.days[hit.day] || {}, after = {};
+    if (c.casesDelivered !== null && (d.casesDelivered === null || d.casesDelivered === undefined)) after.casesDelivered = c.casesDelivered;
+    if (c.driverCaseReturn !== null && (d.driverCaseReturn === null || d.driverCaseReturn === undefined)) after.driverCaseReturn = c.driverCaseReturn;
+    if (!d.checkinCompletedAt) after.checkinCompletedAt = at;
+    if (Object.keys(after).length) {
+      const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp };
+      Object.keys(after).forEach(k => { update['days.' + hit.day + '.' + k] = after[k]; });
+      update['days.' + hit.day + '.updatedAt'] = stamp; update['days.' + hit.day + '.updatedBy'] = by;
+      tx.update(runSnap.ref, update);
+      if (mode.writeBack) require('./actions').queueSheetCells(tx, db, rid('mailredo'), '', run, hit.snap.id, hit.day, after, stamp, by);
+    }
+    if (isNew) tx.set(seenRef, seen); else tx.update(seenRef, seen);
+    return { credited: !!after.checkinCompletedAt };
+  });
+}
+
+/*
+ * Joe 10/14: the answering service also sends one morning email listing every check-in it took the day before (the first
+ * email of each day's conversation). Each check-in in it is matched on its own, as a backup for one whose own email never
+ * came: it gives the check-in credit and cases only. Write-ups come from each check-in's own email, so none are made twice.
+ */
+function digestEntries(body) {
+  return String(body || '').replace(/\r/g, '').split(/\n\s*={6,}[^\n]*/).map(part => {
+    const c = parseCheckinEmail(part);
+    return c && !c.digest ? Object.assign(c, { takenAt: takenAt(part) }) : null;
+  }).filter(Boolean);
+}
+// The moment the answering service took the report ("Tue 13-Oct-26 07:03p TAKEN", New York time), as an ISO time; '' when none.
+function takenAt(body) {
+  const m = /\b(\d{1,2})-([A-Za-z]{3})-(\d{2})\s+(\d{1,2}):(\d{2})\s*([ap])m?\s+TAKEN\b/i.exec(String(body || ''));
+  const mon = m ? MONTHS.indexOf(m[2].toLowerCase()) : -1;
+  if (mon < 0) return '';
+  const wall = Date.UTC(2000 + Number(m[3]), mon, Number(m[1]), (Number(m[4]) % 12) + (m[6].toLowerCase() === 'p' ? 12 : 0), Number(m[5]));
+  // New York's offset at that moment (4 or 5 hours behind UTC).
+  const ny = nyParts(new Date(wall)), seen = Date.UTC(Number(ny.date.slice(0, 4)), Number(ny.date.slice(5, 7)) - 1, Number(ny.date.slice(8, 10)), ny.hour, ny.minute);
+  return new Date(wall + (wall - seen)).toISOString();
+}
+async function saveDigestEntry(db, msg, i, c, stamp) {
+  const seenRef = db.collection('mailSeen').doc(M.safeIdPart(msg.id) + '_' + i);
+  if ((await seenRef.get()).exists) return { duplicate: true };
+  const at = c.takenAt || (Number(msg.internalDate) ? new Date(Number(msg.internalDate)).toISOString() : stamp);
+  const hit = await findRun(db, c.route, c.driver, c.taken || L.operatingDay(new Date(Date.parse(at))));
+  const seen = { at: stamp, route: c.route, driver: c.driver, digest: msg.id, takenAt: at, run: hit ? hit.snap.id + '|' + hit.day : '', made: [] };
+  if (!hit) { await seenRef.set(seen); return { credited: false, run: false }; }
+  return Object.assign({ run: true }, await creditCheckin(db, hit, c, at, stamp, seenRef, seen, true));
 }
 
 /*
@@ -494,7 +541,14 @@ async function checkinRun(db, opts) {
     for (const m of msgs) {
       if (!has(m.from, s.sender) || !has(m.to, s.recipient) || String(m.subject || '').trim().toUpperCase() !== s.subject.toUpperCase()) { status.skipped++; continue; }
       const c = parseCheckinEmail(m.body);
-      if (!c || c.digest) { status.skipped++; continue; }
+      if (c && c.digest) {
+        // Every check-in listed in the morning email, each on its own.
+        const entries = digestEntries(m.body);
+        status.digestRead = (status.digestRead || 0) + entries.length;
+        for (let i = 0; i < entries.length; i++) { const r = await saveDigestEntry(db, m, i, entries[i], stamp); if (r.credited) status.digestCredited = (status.digestCredited || 0) + 1; }
+        continue;
+      }
+      if (!c) { status.skipped++; continue; }
       status.read++;
       const r = await saveMailCheckin(db, m, c, String(m.from || s.sender).slice(0, 120), stamp);
       if (r.duplicate) { status.seen++; continue; }
@@ -509,7 +563,7 @@ async function checkinRun(db, opts) {
       : String(e.message || e).slice(0, 300);
   }
   await checkinDoc(db, plant, true).set(status);
-  const message = status.status === 'FAIL' ? 'The check did not finish: ' + status.error : 'Checked: ' + status.read + ' check-in' + (status.read === 1 ? '' : 's') + ' read, ' + status.added + ' record' + (status.added === 1 ? '' : 's') + ' added, ' + status.review + ' need review' + (status.seen ? ', ' + status.seen + ' already seen' : '') + '.';
+  const message = status.status === 'FAIL' ? 'The check did not finish: ' + status.error : 'Checked: ' + status.read + ' check-in' + (status.read === 1 ? '' : 's') + ' read, ' + status.added + ' record' + (status.added === 1 ? '' : 's') + ' added, ' + status.review + ' need review' + (status.seen ? ', ' + status.seen + ' already seen' : '') + (status.digestRead ? ', ' + status.digestRead + ' in the morning list (' + (status.digestCredited || 0) + ' newly credited)' : '') + '.';
   return { status: status.status, message, run: status };
 }
 
@@ -1095,4 +1149,4 @@ const OPS = {
   dateConvert: (db, email, input, stamp, d) => dateConvert(db, email, input, stamp, { sheets: d.sheets && d.sheets(), sources: d.sources })
 };
 
-module.exports = { OPS, repairSweep, sendOneRepair, afterSave, lessorOf, checkinRun, parseCheckinEmail, pickMailRun, recreditMailCheckins, jobDue, archiveCompleted, preflight, updateLive, toSerial, cellKind, sheetCatalog, JOBS, CHECKIN_STANDARD };
+module.exports = { OPS, repairSweep, sendOneRepair, afterSave, lessorOf, checkinRun, parseCheckinEmail, digestEntries, takenAt, pickMailRun, recreditMailCheckins, jobDue, archiveCompleted, preflight, updateLive, toSerial, cellKind, sheetCatalog, JOBS, CHECKIN_STANDARD };
