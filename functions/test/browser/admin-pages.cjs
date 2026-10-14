@@ -75,7 +75,10 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await p.waitForSelector('#p-modal:not([hidden]) #p-save');
     assert.equal(await p.inputValue('#p-name'), 'Test Supervisor');
     await p.selectOption('#p-role', 'MANAGER');
+    // Joe 10/14: the save-by-save rights are folded under What this person can see; open them first.
+    await p.click('#p-edit .sa-rights summary');
     await p.selectOption('#p-edit select[data-right="otr.write"]', 'deny');
+    assert.equal(await p.$('#p-edit .sa-rights[open]') !== null, true, 'the rights stay open after a change');
     await shot(p, 'person-popup-1920.png');
     await p.click('#p-save');
     await p.waitForSelector('#p-modal[hidden]', { state: 'attached' });

@@ -63,7 +63,7 @@ async function templatesOf(db) {
 
 function personRevision(p, ex) {
   return crypto.createHash('sha256').update(JSON.stringify([p ? [p.name || '', p.status || '', (p.roles || []).slice().sort(), (p.facilities || []).slice().sort()] : null,
-    ex ? [(ex.grants || []).slice().sort(), (ex.denials || []).slice().sort()] : null])).digest('hex').slice(0, 16);
+    ex ? [(ex.grants || []).slice().sort(), (ex.denials || []).slice().sort()].concat(ex.screenAccess ? [ex.screenAccess] : []) : null])).digest('hex').slice(0, 16);
 }
 
 async function people(db) {
@@ -73,10 +73,10 @@ async function people(db) {
   const list = snap.docs.map(d => {
     const p = d.data(), e = ex[d.id] || null;
     return { email: d.id, name: p.name || '', status: p.status || '', roles: p.roles || [], facilities: p.facilities || [], grants: e ? e.grants || [] : [], denials: e ? e.denials || [] : [],
-      updatedAt: (e && e.updatedAt) || (p.cells && p.cells.updated_at) || '', updatedBy: (e && e.updatedBy) || (p.cells && p.cells.updated_by) || '', primary: L.PRIMARY_ADMINS.indexOf(d.id) >= 0,
+      screenAccess: e && e.screenAccess ? e.screenAccess : null, updatedAt: (e && e.updatedAt) || (p.cells && p.cells.updated_at) || '', updatedBy: (e && e.updatedBy) || (p.cells && p.cells.updated_by) || '', primary: L.PRIMARY_ADMINS.indexOf(d.id) >= 0,
       revision: personRevision(p, e), rights: R.effectiveRights(p, tpl.templates, e) };
   });
-  return { people: list, catalog: R.CATALOG, roles: tpl.roles, defaults: R.DEFAULTS, templates: tpl.templates, plants: L.PLANTS, newRevision: personRevision(null, null) };
+  return { people: list, catalog: R.CATALOG, screenAreas: L.SCREEN_AREAS, screenJobs: L.SCREEN_JOBS, roles: tpl.roles, defaults: R.DEFAULTS, templates: tpl.templates, plants: L.PLANTS, newRevision: personRevision(null, null) };
 }
 
 // The sandbox's own Users sheet copy (WRITEBACK_JSON.masters.users, a copy, never the real Users sheet): People & Roles
@@ -105,6 +105,9 @@ async function savePerson(db, email, input, stamp, deps) {
   if (grants.some(c => denials.indexOf(c) >= 0)) fail('BAD_REQUEST', 'A right cannot be both Allow and Deny.');
   const admin = roles.indexOf('ADMINISTRATOR') >= 0;
   if (admin && (grants.length || denials.length)) fail('BAD_REQUEST', 'An Administrator has every right; take the exceptions off first (Use Role Defaults).');
+  // Joe 10/14: the screens this person may see, ticked per plant (left out = unchanged; null = every screen their role allows).
+  const screenAccess = R.cleanScreenAccess(input.screenAccess, L.PLANTS.map(p => p.id));
+  if (screenAccess === undefined && input.screenAccess !== undefined) fail('BAD_REQUEST', 'The ticked screens could not be read. Reload this person and tick them again.');
   if (L.PRIMARY_ADMINS.indexOf(target) >= 0 && (!admin || status !== 'ACTIVE')) fail('NOT_ALLOWED', 'The primary administrator must stay an Administrator and Enabled.');
   if (target === email && (!admin || status !== 'ACTIVE')) fail('NOT_ALLOWED', 'You cannot remove your own Administrator role or disable yourself. Use another administrator to change this account.');
 
@@ -124,11 +127,12 @@ async function savePerson(db, email, input, stamp, deps) {
     const fields = { name, status, roles, facilities: admin && facilities.length === 0 ? ['*'] : facilities, 'cells.version': String(version) };
     if (!before) Object.assign(fields, { 'cells.id': id, 'cells.created_at': stamp, 'cells.created_by': email });
     tx.set(ref, { name, status, roles, facilities: fields.facilities, updatedAt: stamp, updatedBy: email, cells: Object.assign({}, before ? before.cells : {}, { email: target, id }) }, { merge: true });
-    tx.set(exRef, { grants, denials, updatedAt: stamp, updatedBy: email });
+    const keepScreens = input.screenAccess === undefined ? (exBefore && exBefore.screenAccess) || null : admin ? null : screenAccess;
+    tx.set(exRef, { grants, denials, screenAccess: keepScreens, updatedAt: stamp, updatedBy: email });
     queueMaster(tx, db, mode, 'person-' + crypto.randomBytes(8).toString('hex'), '', ref, target, fields, !before, stamp, email, 'users');
     tx.set(db.collection(M.COLLECTIONS.actions).doc('adm-' + crypto.randomBytes(8).toString('hex')), { action: 'savePerson', by: email, at: stamp, person: target,
-      before: before ? { name: before.name, status: before.status, roles: before.roles, facilities: before.facilities, grants: exBefore ? exBefore.grants : [], denials: exBefore ? exBefore.denials : [] } : null,
-      after: { name, status, roles, facilities: fields.facilities, grants, denials } });
+      before: before ? { name: before.name, status: before.status, roles: before.roles, facilities: before.facilities, grants: exBefore ? exBefore.grants : [], denials: exBefore ? exBefore.denials : [], screenAccess: exBefore ? exBefore.screenAccess || null : null } : null,
+      after: { name, status, roles, facilities: fields.facilities, grants, denials, screenAccess: keepScreens } });
     return { ok: true, message: 'Person access saved.', email: target };
   });
 }

@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { db, clear } = require('./helpers');
 const A = require('../../src/admin');
 const { appMail } = require('../../src/adminmail');
-const { applyAction } = require('../../src/actions');
+const { applyAction, checkSaves } = require('../../src/actions');
 
 const ADMIN = { email: 'boss@uniteddairy.com' };
 const call = (input, user, deps) => A.adminCall(db(), user || ADMIN, input, deps);
@@ -94,6 +94,30 @@ test('Add Role and Role Templates change what a person may save', async () => {
   await call({ op: 'saveRoleTemplate', role: 'SUPERVISOR', rights: sup.filter(c => c !== 'dispatch.publish'), expected: sup });
   await assert.rejects(applyAction(db(), { email: 'sup@uniteddairy.com' }, { requestId: 'req-rights-1', action: 'publishWeek', weekStart: '2026-10-04' }), /not allowed this save/);
   await assert.rejects(call({ op: 'saveRoleTemplate', role: 'ADMINISTRATOR', rights: [], expected: [] }), /protected/);
+});
+
+// Joe 10/14 (mock-up A): People & Roles ticks the screens a person may see, per plant; the server refuses saves on the rest.
+test('People & Roles: ticked screens are kept per plant and decide which saves go through', async () => {
+  let sup = await person('sup@uniteddairy.com');
+  assert.equal(sup.screenAccess, null, 'nothing ticked yet');
+  const base = { op: 'savePerson', email: sup.email, name: 'Sup', roles: ['SUPERVISOR'], status: 'ACTIVE', facilities: ['fac_uniontown'], grants: [], denials: [] };
+  assert.deepEqual(await checkSaves(db(), { email: sup.email }, ['publishWeek', 'saveShiftNote']), { publishWeek: true, saveShiftNote: true });
+  await call(Object.assign({}, base, { revision: sup.revision, screenAccess: { fac_uniontown: ['machinery', 'pmCenter'] } }));
+  assert.deepEqual((await db().collection('personRights').doc(sup.email).get()).data().screenAccess, { fac_uniontown: ['pmCenter', 'machinery'] });
+  sup = await person(sup.email);
+  assert.deepEqual(sup.screenAccess, { fac_uniontown: ['pmCenter', 'machinery'] });
+  assert.deepEqual(await checkSaves(db(), { email: sup.email }, ['publishWeek', 'saveShiftNote']), { publishWeek: false, saveShiftNote: true });
+  await assert.rejects(applyAction(db(), { email: sup.email }, { requestId: 'req-screens-1', action: 'publishWeek', weekStart: '2026-10-04' }), /does not have this screen ticked for Uniontown/);
+  // Another plant's saves need that plant ticked.
+  assert.deepEqual(await checkSaves(db(), { email: sup.email }, ['saveShiftNote'], 'fac_charleston'), { saveShiftNote: false });
+  // A save that leaves the ticks out keeps them; a save of nothing ticked (null) sees every screen again.
+  await call(Object.assign({}, base, { name: 'Sup Two', revision: sup.revision }));
+  sup = await person(sup.email);
+  assert.deepEqual(sup.screenAccess, { fac_uniontown: ['pmCenter', 'machinery'] });
+  await assert.rejects(call(Object.assign({}, base, { revision: sup.revision, screenAccess: { fac_uniontown: ['notAScreen'] } })), /ticked screens could not be read/);
+  await call(Object.assign({}, base, { revision: sup.revision, screenAccess: null }));
+  assert.equal((await person(sup.email)).screenAccess, null);
+  assert.deepEqual(await checkSaves(db(), { email: sup.email }, ['publishWeek']), { publishWeek: true });
 });
 
 test('personal access link: generated once, revoked, emailed only to the sender outside production', async () => {

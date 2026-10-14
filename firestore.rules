@@ -46,6 +46,8 @@ service cloud.firestore {
     match /routes/{id} { allow read: if activeUser(); }
     // Each person may read their own entry (to know which buttons to show, or that they are not on the list), not everyone's.
     match /users/{email} { allow read: if unitedDairy() && request.auth.token.email.lower() == email; }
+    // Joe 10/14: each person reads their own ticked screens (People & Roles), so their Home and menu show only those; not anyone else's.
+    match /personRights/{email} { allow read: if unitedDairy() && request.auth.token.email.lower() == email; }
     match /transfers/{id} { allow read: if activeUser(); }
     match /exceptions/{id} { allow read: if activeUser(); }
     match /vacations/{id} { allow read: if activeUser(); }
