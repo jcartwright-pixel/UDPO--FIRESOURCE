@@ -39,7 +39,7 @@ function reportHtml(report) {
 // Administration > Sent Email Log. A log line that cannot be written never stops the report.
 async function logReport(db, report, status, sentTo, reason, from) {
   try {
-    await db.collection('sentEmails').add({ at: new Date().toISOString(), kind: 'Plant report', label: report.group || 'Current report', detail: report.mode || '', by: report.by || '',
+    await db.collection('sentEmails').add({ at: new Date().toISOString(), kind: 'Plant report', label: report.group || report.groupName || 'Current report', detail: report.mode || '', by: report.by || '',
       meantFor: [], subject: String(report.subject || '').slice(0, 300), sentTo, status, reason: String(reason || '').slice(0, 200), testCopy: report.mode !== 'live', from: from || '' });
   } catch (e) { console.error('Sent Email Log', e.message || e); }
 }
@@ -66,9 +66,14 @@ async function mailReport(ref, report, deps) {
       await logReport(db, report, 'BLOCKED', [], 'Outbound email is turned off.');
       return 'HELD';
     }
-    if (report.mode === 'live' && report.group) {
-      const g = (await db.collection('reportGroups').where('facilityId', '==', report.facilityId || 'fac_uniontown').where('name', '==', report.group).get()).docs.map(x => x.data()).find(x => x.active !== false);
-      if (g && g.recipients && g.recipients.length) env = Object.assign({}, env, { REPORT_TO: g.recipients.join(',') });
+    // Joe 10/14: the report is saved with groupName ("Plant Managers"); reading report.group here missed it, so a live
+    // report went only to the sender. The group of that name, else the plant's only group, from Manager Report Recipients.
+    const groupName = report.groupName || report.group || '';
+    if (report.mode === 'live' && groupName) {
+      const groups = (await db.collection('reportGroups').where('facilityId', '==', report.facilityId || 'fac_uniontown').get()).docs.map(x => x.data())
+        .filter(x => x.active !== false && x.recipients && x.recipients.length);
+      const g = groups.find(x => x.name === groupName) || (groups.length === 1 ? groups[0] : null);
+      if (g) { env = Object.assign({}, env, { REPORT_TO: g.recipients.join(',') }); report = Object.assign({}, report, { group: g.name }); }
     }
   }
   const { to, copy } = recipients(report, env);
@@ -78,7 +83,7 @@ async function mailReport(ref, report, deps) {
   }
   try {
     const sent = await send({ from: sender.from, fromName: sender.fromName, to, subject: report.subject, text: report.text, html: reportHtml(report) });
-    await ref.update({ status: 'SENT', emailed: true, sentTo: sent.to, testCopy: copy, sentAt: Date.now(), gmailId: sent.id || '', reason: '' });
+    await ref.update({ status: 'SENT', emailed: true, sentTo: sent.to, testCopy: copy, groupName: report.group || report.groupName || '', sentAt: Date.now(), gmailId: sent.id || '', reason: '' });
     if (db) await logReport(db, report, 'SENT', sent.to, copy ? 'Test copy: sent only to ' + sent.to.join(', ') + '.' : '', sender.from);
     return 'SENT';
   } catch (e) {

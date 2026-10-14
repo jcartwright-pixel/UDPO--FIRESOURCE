@@ -645,14 +645,23 @@ export async function renderEmailSenders(box, ctx) {
   const $ = (s) => box.querySelector(s);
   function render() {
     $('#es-sending').innerHTML = data.sending ? '<span class="ap-chip good">Sending is ON</span>' : '<button type="button" class="ap-btn small" data-goto="sent-log">Sending is OFF: turn it on</button>';
+    // Joe 10/14: no gray hint text inside the boxes, so a box that looks filled is filled. What an empty box means is
+    // written under it, and a box changed but not saved yet is marked until Save.
     const std = data.standard, empty = std ? 'Empty: sends as the standard sender, ' + e(std) : 'Empty: no email goes out for this plant until an address is set';
-    $('#es-rows').innerHTML = data.plants.map(p => '<tr><td><b>' + e(p.plant) + '</b></td>' +
-      '<td><input data-addr="' + e(p.id) + '" value="' + e(p.address) + '" maxlength="120" placeholder="' + e(std || 'name@uniteddairy.com') + '" style="width:100%">' + (p.address ? '' : '<small>' + empty + '</small>') + '</td>' +
-      '<td><input data-name="' + e(p.id) + '" value="' + e(p.senderName) + '" maxlength="80" placeholder="United Dairy ' + e(p.plant) + ' Operations" style="width:100%"></td>' +
-      '<td>' + (p.changedAt ? e(when(p.changedAt)) + '<small>' + e(p.changedBy) + '</small>' : '') + '</td></tr>').join('');
+    $('#es-rows').innerHTML = data.plants.map(p => '<tr data-plant="' + e(p.id) + '"><td><b>' + e(p.plant) + '</b></td>' +
+      '<td><input data-addr="' + e(p.id) + '" data-saved="' + e(p.address) + '" value="' + e(p.address) + '" maxlength="120" style="width:100%"><small data-empty="addr"' + (p.address ? ' hidden' : '') + '>' + empty + '</small></td>' +
+      '<td><input data-name="' + e(p.id) + '" data-saved="' + e(p.senderName) + '" value="' + e(p.senderName) + '" maxlength="80" style="width:100%"><small data-empty="name"' + (p.senderName ? ' hidden' : '') + '>Empty: the standard name</small></td>' +
+      '<td><span class="ap-chip warn" data-unsaved hidden>Not saved yet</span>' + (p.changedAt ? e(when(p.changedAt)) + '<small>' + e(p.changedBy) + '</small>' : '') + '</td></tr>').join('');
     $('#es-who').value = data.fromWho;
   }
   async function load() { try { data = await call('emailSenders'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  box.addEventListener('input', ev => {
+    const tr = ev.target.closest('#es-rows tr');
+    if (!tr) return;
+    const boxes = [...tr.querySelectorAll('input')];
+    boxes.forEach(i => { i.classList.toggle('es-unsaved', i.value.trim() !== i.dataset.saved); i.nextElementSibling.hidden = !!i.value.trim(); });
+    tr.querySelector('[data-unsaved]').hidden = !boxes.some(i => i.classList.contains('es-unsaved'));
+  });
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
@@ -661,7 +670,7 @@ export async function renderEmailSenders(box, ctx) {
     if (b.id === 'es-save') {
       const senders = {};
       data.plants.forEach(p => { senders[p.id] = { address: box.querySelector('[data-addr="' + p.id + '"]').value, name: box.querySelector('[data-name="' + p.id + '"]').value }; });
-      busy(box, b, async () => { await call('saveEmailSenders', { senders, fromWho: $('#es-who').value }); await load(); say(box, 'Saved.', 'good'); });
+      busy(box, b, async () => { const out = await call('saveEmailSenders', { senders, fromWho: $('#es-who').value }); await load(); say(box, out.message, out.message === 'Saved.' ? 'good' : 'warn'); });
     }
   });
   await load();

@@ -355,23 +355,28 @@ async function setSending(db, email, input, stamp) {
 async function emailSenders(db, deps) {
   const s = await emailSettings(db), env = (deps && deps.env) || process.env;
   return { standard: String(env.MAIL_FROM || '').trim(), fromWho: s.fromWho, sending: s.sending,
-    plants: L.PLANTS.map(p => { const x = s.senders[p.id] || {}; return { id: p.id, plant: p.name, address: x.address || '', senderName: x.address ? x.name || '' : '', changedAt: x.changedAt || '', changedBy: x.changedBy || '' }; }) };
+    plants: L.PLANTS.map(p => { const x = s.senders[p.id] || {}; return { id: p.id, plant: p.name, address: x.address || '', senderName: x.name || '', changedAt: x.changedAt || '', changedBy: x.changedBy || '' }; }) };
 }
 
+// Joe 10/14: an empty "Send emails from" means the standard sender and never stops Save. A name with no address is the
+// name people see on the standard sender's email. An email address typed as the name is not a name: it is left out and
+// the message says where it goes instead.
 async function saveEmailSenders(db, email, input, stamp, deps) {
-  const before = await emailSettings(db), senders = {};
+  const before = await emailSettings(db), senders = {}, notes = [];
   const given = input.senders || {};
   L.PLANTS.forEach(p => {
-    const g = given[p.id] || {}, raw = text(g.address, 120).toLowerCase(), name = text(g.name, 80).replace(/[<>"\r\n]/g, '');
+    const g = given[p.id] || {}, raw = text(g.address, 120).toLowerCase();
+    let name = text(g.name, 80).replace(/[<>"\r\n]/g, '');
     if (raw && !ourAddress(raw)) fail('BAD_REQUEST', p.name + ': "' + raw + '" is not a United Dairy email address (it must end in ' + DOMAIN + ').');
-    if (name && !raw) fail('BAD_REQUEST', p.name + ': type the email address the name goes with, or clear the name.');
+    if (/@/.test(name)) { notes.push(p.name + ': "Name people see" takes a name, not an email address, so it was left empty.' +
+      (raw ? '' : ' To send ' + p.name + '\'s automatic email from ' + name + ', type it in "Send emails from".')); name = ''; }
     const was = before.senders[p.id] || {};
     const same = (was.address || '') === raw && (was.name || '') === name;
     senders[p.id] = { address: raw, name, changedAt: same ? was.changedAt || '' : stamp, changedBy: same ? was.changedBy || '' : email };
   });
   const fromWho = input.fromWho === 'PLANT' ? 'PLANT' : 'PERSON';
   await db.collection('private').doc('emailSettings').set({ senders, fromWho, sendersChangedAt: stamp, sendersChangedBy: email }, { merge: true });
-  return Object.assign({ ok: true, message: 'Saved.' }, await emailSenders(db, deps));
+  return Object.assign({ ok: true, message: ['Saved.'].concat(notes).join(' ') }, await emailSenders(db, deps));
 }
 
 /* ---------- Remaining Repair Items ---------- */
