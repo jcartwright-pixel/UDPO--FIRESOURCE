@@ -28,7 +28,7 @@
     <div class="head">
       <div class="title"><h1>Trucks Today</h1><small id="sub">From Verizon Connect Fleet</small></div>
       <div class="tabs" role="tablist">
-        <button type="button" role="tab" data-mode="today" aria-selected="true">Today's Drivers</button>
+        <button type="button" role="tab" data-mode="today" aria-selected="true">Today's Routes</button>
         <button type="button" role="tab" data-mode="units" aria-selected="false">All Fleet Units</button>
       </div>
     </div>
@@ -104,30 +104,19 @@
         return;
       }
       if (mode === 'today') {
-        // Joe 10/14: only drivers, never routes. One line per driver: a driver on several routes (855 and 856) shows once,
-        // with the earliest dispatch and that route's truck; CARRIER and OPEN aren't drivers.
-        const byDriver = new Map();
-        L.dailyRows(runs, opDay).forEach(r => {
-          const name = String(r.driver || '').trim(), up = name.toUpperCase();
-          if (!name || up === 'CARRIER' || up === 'OPEN') return;
-          const k = up, was = byDriver.get(k);
-          const at = (x) => x.dispatchTime === null || x.dispatchTime === undefined || x.dispatchTime === '' ? Infinity : Number(x.dispatchTime);
-          if (!was) { byDriver.set(k, r); return; }
-          const early = at(r) < at(was) ? r : was, late = early === r ? was : r;
-          byDriver.set(k, String(early.truck || '').trim() ? early : Object.assign({}, early, { truck: late.truck, truckId: late.truckId }));
-        });
-        const rows = Array.from(byDriver.values());
+        const rows = L.dailyRows(runs, opDay).filter(r => r.truck || r.driver);
         const list = rows.map(r => { const t = String(r.truck || '').trim() ? find(r.truck) : null; return { r, t, s: state(t, r.truck), d: t ? dayBy[key(t.tag)] : null }; });
         const count = (k) => list.filter(x => x.s[0] === k).length;
-        kpis.innerHTML = [['Drivers today', list.length], ['Driving', count('road')], ['Stopped or parked', count('stopped')], ['In yard', count('yard')], ['No signal', count('nosignal')], ['Not in Fleet', count('nogps')], ['No truck', count('notruck')]]
+        kpis.innerHTML = [['Dispatched today', list.length], ['Driving', count('road')], ['Stopped or parked', count('stopped')], ['In yard', count('yard')], ['No signal', count('nosignal')], ['Not in Fleet', count('nogps')], ['No truck', count('notruck')]]
           .map(k => '<div><b>' + k[1] + '</b><span>' + k[0] + '</span></div>').join('');
-        // Joe 10/13: the driver and the truck are evaluated together (the driver Daily Dispatch put on that truck), so they lead.
-        sheet.innerHTML = '<table class="issues tt-board"><colgroup><col style="width:15%"><col style="width:8%"><col style="width:9%"><col style="width:28%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:14%"></colgroup>' +
-          '<thead><tr><th>Driver</th><th>Truck</th><th>Status</th><th>Where now</th><th>Miles today</th><th>First move</th><th>Dispatch</th><th>Last report</th></tr></thead><tbody>' +
+        // Joe 10/13: the driver and the truck are evaluated together (the driver Daily Dispatch put on that truck), so they
+        // lead; the route stays, last.
+        sheet.innerHTML = '<table class="issues tt-board"><colgroup><col style="width:13%"><col style="width:8%"><col style="width:9%"><col style="width:25%"><col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:13%"><col style="width:7%"></colgroup>' +
+          '<thead><tr><th>Driver</th><th>Truck</th><th>Status</th><th>Where now</th><th>Miles today</th><th>First move</th><th>Dispatch</th><th>Last report</th><th>Route</th></tr></thead><tbody>' +
           (list.map(x => '<tr class="tt-' + x.s[0] + '"><td class="strong">' + escapeHtml(x.r.driver || '') + '</td><td class="strong">' + escapeHtml(x.r.truck || '') + '</td>' +
             '<td>' + pill(x.s) + '</td><td>' + placeCell(x.t) + '</td><td>' + milesCell(x.d) + '</td><td>' + firstMoveCell(x.d) + '</td>' +
-            '<td>' + escapeHtml(timeOfDay(x.r.dispatchTime)) + '</td><td>' + (x.t && x.t.lastReport ? clock(x.t.lastReport) + '<small>' + ago(x.t.lastReport) + '</small>' : '') + '</td></tr>').join('') ||
-            '<tr><td colspan="8" class="empty">No drivers on Daily Dispatch for ' + escapeHtml(shortDate(opDay)) + '.</td></tr>') + '</tbody></table>';
+            '<td>' + escapeHtml(timeOfDay(x.r.dispatchTime)) + '</td><td>' + (x.t && x.t.lastReport ? clock(x.t.lastReport) + '<small>' + ago(x.t.lastReport) + '</small>' : '') + '</td><td>' + escapeHtml(x.r.route || '') + '</td></tr>').join('') ||
+            '<tr><td colspan="9" class="empty">No routes on Daily Dispatch for ' + escapeHtml(shortDate(opDay)) + '.</td></tr>') + '</tbody></table>';
         foot.textContent = 'In yard = at the Fleet place Uniontown Branch or Uniontown Plant · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes.';
         return;
       }
