@@ -44,7 +44,7 @@
     import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
     import { watchLists, lists } from './js/edit.js';
     import { collection, onSnapshot, query, where } from './js/firebase.js';
-    import { NO_SIGNAL_MINUTES, unitKey, gpsIndex, truckState } from './js/gps-state.js';
+    import { NO_SIGNAL_MINUTES, unitKey, gpsIndex, truckState, workingToday } from './js/gps-state.js';
 
     // Trucks Today (the current app's screen A, Joe 10/9): every route on today's Daily Dispatch with where its truck is now,
     // read from Verizon Connect Fleet every 5 minutes (functions/src/fleetgps.js) and its miles today (every 15 minutes).
@@ -97,11 +97,11 @@
     const pill = (s) => '<span class="tt-pill tt-' + s[0] + '">' + s[1] + '</span>';
 
     function render() {
-      const find = index(), today = nyDate(new Date()), opDay = L.operatingDay(new Date());
+      const find = index(), today = nyDate(new Date());
       const dayBy = {}; days.filter(d => d.date === today).forEach(d => { dayBy[key(d.tag)] = d; });
       const sheet = document.getElementById('sheet'), kpis = document.getElementById('kpis'), foot = document.getElementById('foot');
       const newest = gps.reduce((m, t) => t.updatedAt > m ? t.updatedAt : m, '');
-      document.getElementById('sub').textContent = 'From Verizon Connect Fleet · ' + shortDate(opDay) + (newest ? ' · read ' + clock(newest) : ' · not read yet');
+      document.getElementById('sub').textContent = 'From Verizon Connect Fleet · ' + shortDate(today) + (newest ? ' · read ' + clock(newest) : ' · not read yet');
       document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
       if (!gps.length) {
         kpis.innerHTML = '';
@@ -110,7 +110,7 @@
         return;
       }
       if (mode === 'today') {
-        const rows = L.dailyRows(runs, opDay).filter(r => r.truck || r.driver);
+        const rows = workingToday(L, runs, today);
         const list = rows.map(r => { const t = String(r.truck || '').trim() ? find(r.truck) : null, d = t ? dayBy[key(t.tag)] : null, ev = events(t, d); return { r, t, s: state(t, r.truck), d, ev, n: ev.filter(e => e.alert).length, open: opened.has(r.id) }; });
         const count = (k) => list.filter(x => x.s[0] === k).length;
         kpis.innerHTML = [['Dispatched today', list.length], ['Driving', count('road')], ['Stopped or parked', count('stopped')], ['In yard', count('yard')], ['No signal', count('nosignal')], ['Not in Fleet', count('nogps')], ['No truck', count('notruck')]]
@@ -126,7 +126,7 @@
             (x.open ? '<tr class="tt-events"><td colspan="10">' + (x.ev.length ? '<table><thead><tr><th>Time</th><th>Verizon</th><th>Detail</th><th>Where</th></tr></thead><tbody>' +
               x.ev.map(e => '<tr><td>' + clock(e.at) + '</td><td>' + escapeHtml(e.name) + '</td><td>' + escapeHtml(e.detail) + '</td><td>' + escapeHtml(e.where) + '</td></tr>').join('') + '</tbody></table>'
               : '<div class="tt-none">' + (x.t ? 'Nothing from Verizon yet today for truck ' + escapeHtml(x.t.tag) + '.' : 'No Fleet truck on this line, so no Verizon alerts.') + '</div>') + '</td></tr>' : '')).join('') ||
-            '<tr><td colspan="10" class="empty">No routes on Daily Dispatch for ' + escapeHtml(shortDate(opDay)) + '.</td></tr>') + '</tbody></table>';
+            '<tr><td colspan="10" class="empty">No Daily Dispatch runs leave with one of our drivers on ' + escapeHtml(shortDate(today)) + '.</td></tr>') + '</tbody></table>';
         foot.textContent = 'In yard = at the Fleet place Uniontown Branch or Uniontown Plant · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes · Alerts = Verizon Fleet alerts today for that truck; click the number to see them with the yard leave and return times.';
         return;
       }

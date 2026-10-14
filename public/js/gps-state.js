@@ -19,3 +19,20 @@ export function truckState(t, truck) {
   if (YARD_PLACES.indexOf(String(t.place || '').trim().toUpperCase()) >= 0 && !(t.speedMph > 3)) return ['yard', 'In yard'];
   return t.speedMph > 3 ? ['road', 'Driving'] : t.ignitionOn ? ['stopped', 'Stopped'] : ['stopped', 'Parked'];
 }
+// Joe 10/14: who worked a truck today. Daily Dispatch lists the loads loaded today, which mostly leave tomorrow (a 4:00 AM
+// run loaded tonight), so a driver was showing, and was charged with his truck's alerts, a day early. A line counts here
+// only when its run leaves today (the Live departure date, else its delivery date) and its driver is one of ours: never
+// CARRIER, OPEN, a blank, or a route an owner or outside carrier covers.
+export const NOT_OURS = /^(|open|carrier|tba|tbd|none|n\/a|na|.*needs driver.*|vacation.*|off)$/i;
+export function workingToday(L, runs, today) {
+  const byId = {}, out = [], seen = {};
+  (runs || []).forEach(r => { byId[r.id] = r; });
+  [-2, -1, 0, 1].forEach(n => L.dailyRows(runs, L.addDays(today, n)).forEach(r => {
+    if (seen[r.id]) return;
+    const day = (byId[r.runDocId] && byId[r.runDocId].days || {})[r.day] || {};
+    if ((L.dateKey(day.departureDate) || r.deliveryDate) !== today) return;
+    if (NOT_OURS.test(String(r.driver || '').trim()) || L.coveredRoute(r)) return;
+    seen[r.id] = true; out.push(r);
+  }));
+  return out.sort((a, b) => (a.dispatchTime == null ? 1e9 : a.dispatchTime) - (b.dispatchTime == null ? 1e9 : b.dispatchTime));
+}

@@ -57,7 +57,7 @@
   <script type="module">
     import { start, requireSignIn, showError, shortDate, shortTime } from './js/app.js';
     import { collection, doc, query, where, limit, onSnapshot } from './js/firebase.js';
-    import { unitKey, gpsIndex, truckState } from './js/gps-state.js';
+    import { unitKey, gpsIndex, truckState, workingToday } from './js/gps-state.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
@@ -84,7 +84,7 @@
       // Manager card (Joe 10/14): accidents, complaints and PDAs waiting for review; today's scored Fleet alerts on our Uniontown
       // units (the Driver Scorecard's kinds); today's dispatched trucks driving or in the yard, counted like Trucks Today.
       const ours = new Set(data.equipment.map(e => unitKey(e.unit)));
-      const find = gpsIndex(data.gps), states = L.dailyRows(data.runs, today).filter(r => String(r.truck || '').trim()).map(r => truckState(find(r.truck), r.truck)[0]);
+      const find = gpsIndex(data.gps), states = workingToday(L, data.runs, L.localDay(new Date().toISOString())).filter(r => String(r.truck || '').trim()).map(r => truckState(find(r.truck), r.truck)[0]);
       n.mgr = { review: data.review, alerts: data.alerts.filter(a => window.UDScore.scAlertKind_(a.type) && ours.has(unitKey(a.tag))).length,
         road: states.filter(x => x === 'road').length, yard: states.filter(x => x === 'yard').length };
       // Joe 10/12: no "New app" / "Current app" tags on the cards (confusing). Which screens are switched on is seen and
