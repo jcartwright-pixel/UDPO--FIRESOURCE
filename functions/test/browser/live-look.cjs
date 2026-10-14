@@ -27,7 +27,8 @@ const { chromium } = require('playwright');
       titleIcon: size('.dtitle-icon svg'),
       logo: size('.brand img'),
       header: size('.topbar'),
-      cards: document.querySelectorAll('.card.dc').length,
+      cards: document.querySelectorAll('.card.dc:not(.dc-wide)').length,
+      managerCards: document.querySelectorAll('.card.dc.dc-wide').length,
       firstCard: size('.card.dc'),
       pageHeight: document.scrollingElement.scrollHeight
     };
@@ -40,7 +41,7 @@ const { chromium } = require('playwright');
   console.log('LIVE-LOOK ' + JSON.stringify(look, null, 1));
   console.log('LIVE-PROBLEMS ' + JSON.stringify(problems));
   await browser.close();
-  const ok = look.titleIcon !== 'missing' && parseInt(look.titleIcon, 10) <= 40 && (look.logo === 'missing' || parseInt(look.logo.split('x')[1], 10) <= 60) && look.cards === 4; // Joe 10/9: the home is four cards (Dispatch, Drivers & Vacations, Equipment, Check-ins & Overall)
+  const ok = look.titleIcon !== 'missing' && parseInt(look.titleIcon, 10) <= 40 && (look.logo === 'missing' || parseInt(look.logo.split('x')[1], 10) <= 60) && look.cards === 4 && look.managerCards === 1; // Joe 10/9: the home is four cards (Dispatch, Drivers & Vacations, Equipment, Check-ins & Overall); Joe 10/14 (mock-up A): plus one Manager card across the page under them
   if (!ok) { console.log('::error::The live home page styles did not apply: ' + JSON.stringify(look)); process.exit(1); }
   console.log('Live home page styles applied');
 })().catch(e => { console.error(e); process.exit(1); });
