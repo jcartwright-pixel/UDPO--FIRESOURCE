@@ -163,8 +163,10 @@
   /* Yard Checks on a laptop: tighter gaps keep Refresh on the top line (it only just fitted, and wrapped on wider fonts). */
   body.yard-page .head { column-gap: 8px; }
   body.yard-page .head .hstats { gap: 4px; }
-  /* It still wrapped on the CI runner's fonts (plant-shell.cjs, 10/14): the counts take the Unloading size, about 40px less. */
-  body.yard-page .head .hstats div { min-width: 60px; padding: 3px 8px; }
+  /* It still wrapped with wider fonts (the test runner's DejaVu Sans, 10/14): under 1500 the counts go to the line below the
+     buttons, so the tabs and Refresh stay on the top line whatever the font. */
+  body.yard-page .head .hstats { order: 5; }
+  body.yard-page .head .badge-test { order: 6; }
   .unload-page .hstats { gap: 6px; }
   .unload-page .hstats div { min-width: 60px; padding: 3px 8px; }
   .unload-page .hstats b { font-size: 18px; }
