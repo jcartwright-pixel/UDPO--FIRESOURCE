@@ -80,7 +80,7 @@ export async function renderCheckinEmail(box) {
     const s = data.settings, l = data.last;
     const lines = [s.enabled ? '<b>ON</b> &mdash; checks about every ' + data.every + ' minutes (change it in Refresh Rates).' : '<b>OFF</b> &mdash; the mailbox is not being checked.',
       'Last successful check: ' + e(s.lastSuccessAt ? when(s.lastSuccessAt) : 'never') + (l ? ' (' + e(String(l.status).toLowerCase()) + ')' : ''),
-      l ? 'Last run: ' + chip(l.status) + ' ' + l.read + ' check-ins read, ' + l.added + ' records added, ' + l.review + ' need review, ' + l.seen + ' already seen' + (l.error ? ' &mdash; ' + e(l.error) : '') : 'Last run: none yet.',
+      l ? 'Last run: ' + chip(l.status) + ' ' + l.read + ' check-ins read, ' + l.added + ' records added, ' + l.review + ' need review, ' + l.seen + ' already seen' + (l.digestRead ? ', ' + l.digestRead + ' in the morning list (' + (l.digestCredited || 0) + ' newly credited)' : '') + (l.error ? ' &mdash; ' + e(l.error) : '') : 'Last run: none yet.',
       'Mailbox owner: ' + e(s.owner || 'set when the check is turned on (the administrator who saves it)')];
     $('#ce-status').innerHTML = lines.map(t => '<div class="ap-item"><div>' + t + '</div></div>').join('');
   }
