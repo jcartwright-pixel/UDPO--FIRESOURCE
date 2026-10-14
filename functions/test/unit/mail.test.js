@@ -88,10 +88,12 @@ test('report email: HELD without a sender; FAILED with a plain reason; nothing d
 });
 
 test('report email: the HTML of a real report matches the screen numbers', () => {
-  const html = R.reportHtml({ dayLabel: 'Thursday 10/8', behind: [{ route: '801' }], loaded: [{ route: '802', loadSequence: 2 }], nextUp: [{ route: '803' }], totalLoads: 4, leftToLoad: 3,
+  const html = R.reportHtml({ dayLabel: 'Thursday 10/8', behind: [{ route: '801', routeName: 'DSD' }], loaded: [{ route: '802', run: 'LANCASTER TRANSFER', loadSequence: 2 }], nextUp: [{ route: '803', run: '803' }, { route: '6304', routeName: 'WALMART', run: 'UT WALMART' }], totalLoads: 5, leftToLoad: 4,
     pickups: [{ route: '503', run: 'MASSILLON', quantity: '3 cases', product: 'Chocolate milk' }], down: [], lines: [], temperatures: [{ location: 'Cooler North', reading: 44, status: 'HIGH', flag: true }] }, '');
-  assert.match(html, /1 ROUTE BEHIND<\/div><div style="font-size:14px;margin-top:3px">Thursday 10\/8 &middot; 1 of 4 loaded/);
-  assert.match(html, /802<\/td>[\s\S]*LOADED[\s\S]*801<\/td>[\s\S]*BEHIND[\s\S]*803<\/td>[\s\S]*NOT LOADED/);
+  assert.match(html, /1 ROUTE BEHIND<\/div><div style="font-size:14px;margin-top:3px">Thursday 10\/8 &middot; 1 of 5 loaded/);
+  // Joe 10/14: the colour says loaded or not; each tile shows the run and where it goes (none when the run has no name).
+  assert.match(html, /802<\/td>[\s\S]*>Lancaster<\/td>[\s\S]*801<\/td>[\s\S]*>DSD<\/td>[\s\S]*803<\/td><td[^>]*><\/td>[\s\S]*6304<\/td>[\s\S]*>Walmart<\/td>/);
+  assert.doesNotMatch(html, />(NOT LOADED|LOADED|BEHIND)<\/td>/);
   assert.match(html, /PICKUP 503 MASSILLON<\/b> 3 cases Chocolate milk/);
   assert.match(html, /Cooler North[\s\S]*44&deg;F [\s\S]*HIGH/);
 });

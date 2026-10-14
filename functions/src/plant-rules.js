@@ -646,7 +646,7 @@
     (input.loads || []).forEach(function (r) {
       if (!areas[r.area]) return;
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
-      var item = { route: text(r.route), run: text(r.run), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
+      var item = { route: text(r.route), run: text(r.run), routeName: text(r.routeName), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
         startedAt: r.startedAt ? clockOf(r.startedAt) : '', priorDay: !!r.prior, loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
       areas[r.area].total++; out.total++;
       if (r.state === 'DONE') { out.loaded.push(item); return; }
@@ -686,6 +686,17 @@
     return r;
   }
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
+  // Joe 10/14 ("906, I know is Lancaster ... 6304, Walmart"): the report's route tiles show the run and a short name for where it
+  // goes, not LOADED / NOT LOADED (green is loaded, red is not). The name is Route Master's Route Name, else the run's name, with
+  // "UT", "TRANSFER" and "LOAD n" dropped; a run with no name (6301_1) shows just its number.
+  function reportDest(x) {
+    var name = text(x.routeName) || text(x.run);
+    name = name.replace(/^UT\s+/i, '').replace(/[\s-]*LOAD\s*[0-9]+$/i, '').replace(/\s+TRANSFER$/i, '').replace(/\s+/g, ' ').trim();
+    if (!name || !/[A-Za-z]/.test(name) || name === text(x.route)) return '';
+    if (name.length > 14 && name.indexOf(' - ') > 0) name = name.split(' - ')[0];
+    if (name === name.toUpperCase()) name = name.split(' ').map(function (w) { return w.length <= 3 || w === 'USDA' || /[^A-Za-z]/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase(); }).join(' ');
+    return name.length > 16 ? name.slice(0, 15).trim() + '…' : name;
+  }
   function reportText(r) {
     var L = [];
     L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': no route is more than ' + r.behindMinutes + ' minutes past its depart time'));
@@ -733,9 +744,9 @@
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
     var loaded = (r.loaded || []).slice().sort(function (a, b) { return Number(a.priorDay) - Number(b.priorDay) || a.loadSequence - b.loadSequence || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return { route: x.route, word: 'LOADED', bg: '#e2f4ea', fg: GREEN }; });
-    var notLoaded = (r.behind || []).map(function (x) { return { route: x.route, word: 'BEHIND', bg: RED, fg: '#ffffff' }; })
-      .concat((r.nextUp || []).map(function (x) { return { route: x.route, word: 'NOT LOADED', bg: '#fde8e6', fg: RED }; }));
+      .map(function (x) { return { route: x.route, word: reportDest(x), bg: '#e2f4ea', fg: GREEN }; });
+    var notLoaded = (r.behind || []).map(function (x) { return { route: x.route, word: reportDest(x), bg: RED, fg: '#ffffff' }; })
+      .concat((r.nextUp || []).map(function (x) { return { route: x.route, word: reportDest(x), bg: '#fde8e6', fg: RED }; }));
     var H = [];
     H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : GREEN) + ';color:#ffffff"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
@@ -775,5 +786,5 @@
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
-    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, reportText: reportText, reportHtml: reportHtml };
+    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, reportDest: reportDest, reportText: reportText, reportHtml: reportHtml };
 });
