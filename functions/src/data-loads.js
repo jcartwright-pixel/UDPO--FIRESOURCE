@@ -171,9 +171,12 @@ async function loadGarageTechsOnce(db, opts) {
 }
 
 const FLEET_MILES_ID = 'fleet-gps-start-miles-2026-10-13';
+const projectId = () => process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
 const blank = (v) => v === undefined || v === null || String(v).trim() === '';
 async function loadFleetStartMilesOnce(db, opts) {
   const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  // Joe's OK for the live app has to name this load, so it runs by itself on the test copy only.
+  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
   const mark = db.collection('dataLoads').doc(FLEET_MILES_ID);
   return db.runTransaction(async tx => {
     const m = await tx.get(mark);
@@ -204,7 +207,6 @@ async function loadFleetStartMilesOnce(db, opts) {
 
 const GARAGE_ORDERS_ID = 'garage-work-orders-2026-10-14';
 const CLOSED = /^(COMPLETE|COMPLETED|CLOSED|RESOLVED|REPAIRED|REMOVED)$/i;
-const projectId = () => process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
 async function loadGarageOrdersOnce(db, opts) {
   const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
   if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };

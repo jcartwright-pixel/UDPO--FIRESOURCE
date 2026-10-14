@@ -79,16 +79,18 @@ test('Joe\'s four garage technicians load once by name only: one already listed 
 // Joe 10/13: "input all the mileages in to our units that we have now. So then I can start adjusting those also."
 test('Fleet Service starting miles load once from the GPS odometers: a typed number stays, a unit with no reading stays blank', async () => {
   await clear();
-  const d = db(), stamp = '2026-10-13T20:00:00.000Z';
+  const d = db(), stamp = '2026-10-13T20:00:00.000Z', SB = { now: tick, project: 'ud-distribution-sandbox' };
   const unit = (id, u, type, extra) => d.collection('equipment').doc(id).set(Object.assign({ unit: u, type, status: 'ACTIVE', facilityId: 'fac_uniontown' }, extra || {}));
   await unit('veh_1', '223893', 'TRUCK'); await unit('veh_2', '223894', 'TRUCK'); await unit('veh_3', '223895', 'TRUCK'); await unit('veh_4', 'T-2893', 'TRAILER');
   await unit('veh_5', '223896', 'TRUCK', { facilityId: 'fac_charleston' });
   await d.collection('fleetSetup').doc('223894').set({ unit: '223894', last_service_miles: '100000' });
   // Nothing read from Fleet yet: the load waits.
-  assert.deepEqual((await DL.runDataLoads(d, { now: tick }))[DL.FLEET_MILES_ID], { waiting: 'no GPS odometers read yet' });
+  assert.deepEqual((await DL.runDataLoads(d, SB))[DL.FLEET_MILES_ID], { waiting: 'no GPS odometers read yet' });
   const gps = (tag, odometerMiles, engineHours) => d.collection('gpsTrucks').doc(tag).set({ tag, odometerMiles, engineHours, lastReport: stamp });
   await gps('223893', 114720.6, 9000); await gps('223894', 120000, 0); await gps('T-2893', null, 1950.4); await gps('223896', 5000, 0);
-  const r = (await DL.runDataLoads(d, { now: tick }))[DL.FLEET_MILES_ID];
+  assert.match((await DL.runDataLoads(d, { now: tick }))[DL.FLEET_MILES_ID].skipped, /test copy only/, 'nothing on the live app');
+  assert.equal((await d.collection('fleetSetup').doc('223893').get()).exists, false, 'the live app is not touched');
+  const r = (await DL.runDataLoads(d, SB))[DL.FLEET_MILES_ID];
   assert.deepEqual(r, { set: 2, kept: 1, noReading: 1 });
   assert.equal((await d.collection('fleetSetup').doc('223893').get()).data().last_service_miles, '114721');
   assert.equal((await d.collection('fleetSetup').doc('223894').get()).data().last_service_miles, '100000', 'a typed number stays');
@@ -97,7 +99,7 @@ test('Fleet Service starting miles load once from the GPS odometers: a typed num
   assert.equal((await d.collection('fleetSetup').doc('223896').get()).exists, false, 'another plant\'s truck is not touched');
   const mark = (await d.collection('dataLoads').doc(DL.FLEET_MILES_ID).get()).data();
   assert.deepEqual(mark.set.map(x => x.unit), ['223893', 'T-2893']);
-  assert.deepEqual((await DL.runDataLoads(d, { now: tick }))[DL.FLEET_MILES_ID], { skipped: true });
+  assert.deepEqual((await DL.runDataLoads(d, SB))[DL.FLEET_MILES_ID], { skipped: true });
 });
 
 test('Garage work orders load (test copy only): each open write-up already sent to the garage gets one work order, once', async () => {
