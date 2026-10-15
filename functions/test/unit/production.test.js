@@ -166,3 +166,15 @@ test('Joe 10/14 follow-on: the weekly line scorecard adds up each line\'s shifts
   assert.deepEqual(W.lines.find(x => x.operationId === 'L2').shifts, 0, 'a shift with nothing entered is not counted');
   assert.deepEqual(W.topLosses.map(r => r.reason), ['Filler jam', 'Cap feed']);
 });
+
+test('Blow Mold bottle check (Joe 10/14): one jug from each of the six heads in grams, flagged outside the range on Line Targets', () => {
+  const P = require('../../src/production-rules');
+  assert.deepEqual(P.CHECK_FIELDS.BLOWMOLD.map(f => f[1]), ['Head 1 g', 'Head 2 g', 'Head 3 g', 'Head 4 g', 'Head 5 g', 'Head 6 g', 'Top load']);
+  const ld = { jugWeightLow: 55, jugWeightHigh: 59 };
+  assert.equal(P.weightFlag('head2', '60.2', ld), 'HEAVY');
+  assert.equal(P.weightFlag('head5', '54.6', ld), 'LIGHT');
+  assert.equal(P.weightFlag('head1', '57.1', ld), '');
+  assert.equal(P.weightFlag('head1', '', ld), '', 'an empty box is not flagged');
+  assert.equal(P.weightFlag('topLoad', '80', ld), '', 'only the heads are weighed');
+  assert.equal(P.weightFlag('head1', '70', {}), '', 'no range, no flag');
+});

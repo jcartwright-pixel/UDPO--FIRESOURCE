@@ -13,8 +13,12 @@
  *                  UPC_DATE, COUNT) and target (the line, or later the receiving station). AREAS says what each area does with
  *                  the reads, so Receiving plugs in as one more entry. A line reader's id is its line's id.
  *   readerCall     Line Targets, administrators only: make or replace a line's key; start or stop the test feed (sandbox only).
- *   readerMinute   every minute: the test feed's pretend jugs, and a stop when a reader line has sent nothing for 3 minutes.
- * Reads count only on a line whose Counted by (Line Targets) is Label reader.
+ *   readerMinute   every minute: the test feed's pretend jugs, and a stop when a reader or controller line has gone quiet for 3 minutes.
+ *   controllerReads  the line PC reading a machine's own controller (Joe 10/14, the Blow Mold), READ-ONLY: the jug count, speed and
+ *                  temperature it read ({device, controller: {count, speed, temp, errors}}), the answer to a Test read ({test}), and
+ *                  back the line's setup from Line Targets (productionLines/{id}.controller) and any Test read asked for.
+ * Reads count only on a line whose Counted by (Line Targets) is Label reader; a controller's jug count only on a Machine controller
+ * line (its speed and temperature are kept whatever counts the line).
  */
 'use strict';
 
@@ -100,7 +104,8 @@ async function applyReads(db, operationId, reads, opts) {
       if (!upc && !named) { rd.unreadable++; return; }
       rd.read++;
       rd.lastUpc = upc;
-      if (!t) { rd.unknown++; rd.lastUnknownUpc = upc; return; }
+      // A label that is not one of this line's products: the tablet flags a wrong label (Joe 10/14).
+      if (!t) { rd.unknown++; rd.lastUnknownUpc = upc; rd.lastUnknownAt = stamp; return; }
       // A new product on the line: a new run from now, as when the operator picks it on the tablet.
       if (!current || current.name !== t.name) {
         if (run.runs.length < RUN_LIMIT) run.runs.push({ product: t.name, sku: text(t.sku), from: stamp, by: BY });
@@ -132,7 +137,100 @@ const AREAS = {
   PRODUCTION: (db, dev, reads, opts) => applyReads(db, dev.target, reads, opts),
   RECEIVING: null
 };
-const KINDS = ['LINE_READER', 'CAMERA', 'HANDHELD'], READS = ['UPC', 'UPC_DATE', 'COUNT'];
+const KINDS = ['LINE_READER', 'CAMERA', 'HANDHELD', 'CONTROLLER'], READS = ['UPC', 'UPC_DATE', 'COUNT'];
+
+// ---------- A machine's own controller (Joe 10/14) ----------
+const BY_MACHINE = 'machine controller';
+const READ_KEYS = ['count', 'speed', 'temp'];
+const LOG_LIMIT = 720, BIG_JUMP = 50000;
+const numOrNull = (v) => (v === null || v === undefined || text(v) === '' || !isFinite(Number(v)) ? null : Number(v));
+const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? t : 0; };
+// What the line PC needs from Line Targets: where the controller is and which tag or register holds each reading.
+function configOut(cfg) {
+  const c = cfg || {}, readings = {};
+  READ_KEYS.forEach(k => { if (text(c[k + 'Tag'])) readings[k] = { tag: text(c[k + 'Tag']), size: numOrNull(c[k + 'Size']) || (k === 'count' ? 32 : 16) }; });
+  if (!text(c.brand) || !text(c.ip)) return null;
+  return { brand: text(c.brand), ip: text(c.ip), port: numOrNull(c.port), slot: numOrNull(c.slot), rack: numOrNull(c.rack), unit: numOrNull(c.unit), wordOrder: text(c.wordOrder) || 'HIGH_FIRST', readings };
+}
+function machineRun(id, line, shift, stamp) {
+  return { operationId: id, line: line.name, facilityId: line.facilityId, shiftKey: shift.key, shiftName: shift.name, date: shift.date, shiftStart: shift.start, shiftEnd: shift.end,
+    product: '', sku: '', count: 0, counts: [], runs: [], stops: [], createdAt: stamp, createdBy: BY_MACHINE };
+}
+// One reading from the line PC: the jugs made since the last one count on the shift (the machine's counter only goes up; a
+// smaller number means it was reset), speed and temperature are kept with their range flags, one minute's reading logged.
+async function applyMachine(db, id, r, opts) {
+  const o = Object.assign({ now: () => new Date() }, opts || {});
+  return db.runTransaction(async (tx) => {
+    const line = await lineOf((ref) => tx.get(ref), db, id);
+    const lineRef = db.collection('productionLines').doc(docId(id)), ld = (await tx.get(lineRef)).data() || {}, cfg = ld.controller || {};
+    const now = o.now(), stamp = now.toISOString(), ms = now.getTime();
+    const shifts = await tx.get(db.collection('plantShifts').doc(docId(line.facilityId)));
+    const shift = plantShift(shifts.exists ? shifts.data().shifts : null, ms);
+    const ref = db.collection('productionRuns').doc(docId(P.runId(id, shift.key))), had = await tx.get(ref);
+    const productsSnap = had.exists ? null : await tx.get(db.collection('plantProducts').doc(docId(id)));
+    const scale = (v, d) => (v === null ? null : Math.round(v / (numOrNull(d) > 0 ? numOrNull(d) : 1) * 10) / 10);
+    const value = numOrNull(r.count), speed = scale(numOrNull(r.speed), cfg.speedDivide), temp = scale(numOrNull(r.temp), cfg.tempDivide);
+    const last = ld.machineLast && numOrNull(ld.machineLast.value) !== null ? numOrNull(ld.machineLast.value) : null;
+    let delta = 0;
+    if (ld.counter === 'CONTROLLER' && value !== null && value >= 0 && last !== null) {
+      delta = value >= last ? value - last : value;
+      // A jump that big is a new counter or a wrong tag, not jugs made in seconds: count from here.
+      if (delta > BIG_JUMP) delta = 0;
+    }
+    const errors = r.errors && typeof r.errors === 'object' ? READ_KEYS.filter(k => text(r.errors[k])).map(k => k + ': ' + text(r.errors[k]).slice(0, 200)).join(' · ') : '';
+    const lineUpd = {};
+    if (value !== null && last !== value) lineUpd.machineLast = { value, at: stamp };
+    if (!when(ld.machineHeardAt) || ms - when(ld.machineHeardAt) >= 60000 || errors !== text(ld.machineError)) { lineUpd.machineHeardAt = stamp; lineUpd.machineError = errors; }
+    let count = had.exists ? numOrNull(had.data().count) : null;
+    if (had.exists || delta > 0 || speed !== null || temp !== null) {
+      const run = had.exists ? had.data() : machineRun(id, line, shift, stamp);
+      ['counts', 'runs', 'stops'].forEach(k => { if (!Array.isArray(run[k])) run[k] = []; });
+      // Joe 10/14: the Blow Mold makes only gallon jugs, so a new shift starts on its one product.
+      const only = productsSnap ? P.targetsFor(productsSnap.exists ? productsSnap.data().products : []) : [];
+      if (!had.exists && only.length === 1 && P.lineKind(line.name) === 'BLOWMOLD') { run.product = only[0].name; run.sku = text(only[0].sku); run.runs.push({ product: run.product, sku: run.sku, from: stamp, by: 'only product' }); }
+      const m = Object.assign({}, run.machine || {}), log = Array.isArray(run.machineLog) ? run.machineLog : [];
+      const sf = P.machineFlag(speed, cfg.speedLow, cfg.speedHigh), tf = P.machineFlag(temp, cfg.tempLow, cfg.tempHigh);
+      const lastLog = log[log.length - 1], logDue = !lastLog || ms - when(lastLog.at) >= 60000;
+      const write = !had.exists || delta > 0 || logDue || sf !== (m.speedFlag || '') || tf !== (m.tempFlag || '') || ms - when(m.at) >= 15000;
+      if (write) {
+        Object.assign(m, { at: stamp, counter: value, speed, temp, speedFlag: sf, tempFlag: tf,
+          speedOutSince: sf ? (m.speedFlag === sf && m.speedOutSince ? m.speedOutSince : stamp) : '', tempOutSince: tf ? (m.tempFlag === tf && m.tempOutSince ? m.tempOutSince : stamp) : '' });
+        if (delta > 0) {
+          run.count = (Number(run.count) || 0) + delta;
+          run.counts.push({ at: stamp, count: run.count });
+          if (run.counts.length > COUNT_LIMIT) run.counts = run.counts.slice(-COUNT_LIMIT);
+          run.countAt = stamp; run.countBy = BY_MACHINE;
+          m.lastMoveAt = stamp;
+          // Jugs moving: an open stop has ended (the operator still picks why on the tablet).
+          const open = run.stops.filter(s => !s.end)[0];
+          if (open) { open.end = stamp; open.endBy = BY_MACHINE; }
+        }
+        if (logDue && (speed !== null || temp !== null || value !== null)) { log.push({ at: stamp, speed, temp, count: Number(run.count) || 0 }); }
+        run.machine = m; run.machineLog = log.length > LOG_LIMIT ? log.slice(-LOG_LIMIT) : log;
+        run.updatedAt = stamp; run.updatedBy = BY_MACHINE;
+        tx.set(ref, run);
+      }
+      count = Number(run.count) || 0;
+    }
+    if (Object.keys(lineUpd).length) tx.set(lineRef, lineUpd, { merge: true });
+    return { count, counted: delta };
+  });
+}
+// The line PC's call for a machine controller line. Returns its setup and any Test read asked for, so the PC needs only its key.
+async function controllerReads(db, id, b, opts) {
+  const o = Object.assign({ now: () => new Date() }, opts || {});
+  const lineRef = db.collection('productionLines').doc(docId(id));
+  await lineOf((ref) => ref.get(), db, id);
+  if (b.test && typeof b.test === 'object' && text(b.test.askAt)) {
+    const value = numOrNull(b.test.value), reading = READ_KEYS.indexOf(text(b.test.reading)) >= 0 ? text(b.test.reading) : 'count';
+    await lineRef.set({ controller: { testResult: { askAt: text(b.test.askAt).slice(0, 40), reading, value, error: value === null ? text(b.test.error).slice(0, 300) || 'No number came back.' : '', at: o.now().toISOString() } } }, { merge: true });
+  }
+  let out = {};
+  if (b.controller && typeof b.controller === 'object') out = await applyMachine(db, id, b.controller, o);
+  const cfg = ((await lineRef.get()).data() || {}).controller || {};
+  const ask = cfg.testAsk && text(cfg.testAsk.at) ? { at: text(cfg.testAsk.at), reading: text(cfg.testAsk.reading) || 'count' } : null;
+  return Object.assign({ ok: true, operationId: id, config: configOut(cfg), testAsk: ask }, out);
+}
 
 // A device's call (the line PC, later a receiving station). Returns [status, body]. {line} is the same as {device}.
 async function handleReads(db, headers, body, opts) {
@@ -144,6 +242,12 @@ async function handleReads(db, headers, body, opts) {
   const devices = (await db.collection('private').doc('readDevices').get()).data() || {};
   const dev = devices[docId(id)];
   if (!id || !dev || !dev.hash || dev.hash !== hash(m[1])) return [403, { ok: false, error: 'That key is not this device\'s key. Make a new one on Line Targets.' }];
+  if (dev.area === 'PRODUCTION' && (b.controller || b.test || b.op === 'config')) {
+    try { return [200, Object.assign({ device: id, area: dev.area }, await controllerReads(db, dev.target, b, opts))]; } catch (e) {
+      if (e instanceof ReaderError) return [e.code === 'NOT_FOUND' ? 404 : 400, { ok: false, error: e.message }];
+      throw e;
+    }
+  }
   const area = AREAS[dev.area];
   if (!area) return [501, { ok: false, error: (text(dev.area) || 'That area') + ' is being built: its reads are not taken yet.' }];
   try {
@@ -174,10 +278,28 @@ async function readerCall(db, user, input, opts) {
     const key = o.key();
     // A line's reader: Production, at this line. kind and reads say what is plugged in (a camera also reads the code date).
     const kind = KINDS.indexOf(text(i.kind).toUpperCase()) >= 0 ? text(i.kind).toUpperCase() : 'LINE_READER';
-    const reads = READS.indexOf(text(i.reads).toUpperCase()) >= 0 ? text(i.reads).toUpperCase() : 'UPC_DATE';
+    const reads = kind === 'CONTROLLER' ? 'COUNT' : READS.indexOf(text(i.reads).toUpperCase()) >= 0 ? text(i.reads).toUpperCase() : 'UPC_DATE';
     await keysRef.set({ [docId(id)]: { hash: hash(key), at, by: email, facilityId: line.facilityId, area: 'PRODUCTION', kind, reads, target: id, name: line.name } }, { merge: true });
     await lineRef.set({ operationId: id, line: line.name, facilityId: line.facilityId, readerKeyAt: at, readerKeyBy: email }, { merge: true });
     return { ok: true, key, message: 'New key for ' + line.name + '. Copy it into the line PC now: it is not shown again, and the old key stops working.' };
+  }
+  // The machine controller's setup (Line Targets), one box at a time, and a Test read the line PC answers.
+  if (op === 'saveController') {
+    const field = text(i.field), cur = ((await lineRef.get()).data() || {}).controller || {};
+    const brand = field === 'brand' ? text(i.value) : text(cur.brand);
+    const r = P.controllerField(field, i.value, brand);
+    if (r.error) throw new ReaderError('BAD_REQUEST', r.error);
+    await lineRef.set({ operationId: id, line: line.name, facilityId: line.facilityId, controller: { [field]: r.value, updatedAt: at, updatedBy: email } }, { merge: true });
+    return { ok: true, message: '' };
+  }
+  if (op === 'testRead') {
+    const reading = READ_KEYS.indexOf(text(i.reading)) >= 0 ? text(i.reading) : 'count';
+    const cfg = ((await lineRef.get()).data() || {}).controller || {};
+    const label = (P.READINGS.find(x => x[0] === reading) || [, 'reading'])[1].toLowerCase();
+    if (!text(cfg.brand) || !text(cfg.ip)) throw new ReaderError('BAD_REQUEST', 'Pick the brand and type the IP address first.');
+    if (!text(cfg[reading + 'Tag'])) throw new ReaderError('BAD_REQUEST', 'Type where the ' + label + ' is first.');
+    await lineRef.set({ controller: { testAsk: { at, by: email, reading } } }, { merge: true });
+    return { ok: true, message: 'Asked the line PC to read the ' + label + '. The number shows here in a few seconds.' };
   }
   if (op === 'startTest' || op === 'stopTest') {
     if (!sandboxOnly(o.project)) throw new ReaderError('NOT_ALLOWED', 'The test feed runs on the sandbox only, so the real counts stay real.');
@@ -211,7 +333,7 @@ async function stopFeed(lineRef, line, at, email) {
   const c = (await lineRef.get()).data() || {};
   const back = c.testFeed && c.testFeed.counterBefore;
   await lineRef.set(Object.assign({ testFeed: null }, back ? { counter: back, updatedAt: at, updatedBy: email } : {}), { merge: true });
-  return { ok: true, message: 'Test feed stopped on ' + line.name + '.' + (back ? ' It is counted ' + (back === 'SENSOR' ? 'by a sensor' : 'by typing') + ' again.' : '') };
+  return { ok: true, message: 'Test feed stopped on ' + line.name + '.' + (back ? ' It is counted ' + (back === 'SENSOR' ? 'by a sensor' : back === 'CONTROLLER' ? 'by its machine controller' : 'by typing') + ' again.' : '') };
 }
 
 // Line Targets' Test Feed on Every Line / Stop Every Test Feed (sandbox, administrators): lines = [{operationId, products}].
@@ -264,10 +386,10 @@ function testReads(feed, minute, expected) {
 async function readerMinute(db, opts) {
   const o = Object.assign({ now: () => new Date(), project: '' }, opts || {});
   const now = o.now(), ms = now.getTime(), done = [];
-  const lines = await db.collection('productionLines').where('counter', '==', 'READER').get();
+  const lines = await db.collection('productionLines').where('counter', 'in', ['READER', 'CONTROLLER']).get();
   for (const d of lines.docs) {
     const c = d.data(), id = c.operationId || d.id;
-    const feed = c.testFeed && sandboxOnly(o.project) && Date.parse(c.testFeed.until) > ms ? c.testFeed : null;
+    const feed = c.counter === 'READER' && c.testFeed && sandboxOnly(o.project) && Date.parse(c.testFeed.until) > ms ? c.testFeed : null;
     if (feed) {
       const minute = Math.floor((ms - Date.parse(feed.startedAt)) / 60000);
       const pSnap = await db.collection('plantProducts').doc(docId(id)).get();
@@ -287,11 +409,11 @@ async function readerMinute(db, opts) {
     await db.runTransaction(async (tx) => {
       const s = await tx.get(ref);
       if (!s.exists) return;
-      const run = s.data(), last = Date.parse(run.reader && run.reader.lastReadAt || '');
+      const run = s.data(), last = Date.parse((c.counter === 'CONTROLLER' ? run.machine && run.machine.lastMoveAt : run.reader && run.reader.lastReadAt) || '');
       const stops = Array.isArray(run.stops) ? run.stops : [];
       if (!last || ms - last < QUIET_MINUTES * 60000 || stops.some(x => !x.end) || stops.length >= STOP_LIMIT) return;
       if (stops.some(x => Date.parse(x.start) >= last)) return;
-      stops.push({ start: new Date(last).toISOString(), end: null, reason: '', by: BY });
+      stops.push({ start: new Date(last).toISOString(), end: null, reason: '', by: c.counter === 'CONTROLLER' ? BY_MACHINE : BY });
       tx.set(ref, Object.assign(run, { stops, updatedAt: now.toISOString(), updatedBy: BY }));
       done.push(id + ': stopped (no jugs for ' + QUIET_MINUTES + ' minutes)');
     });
@@ -299,4 +421,4 @@ async function readerMinute(db, opts) {
   return done;
 }
 
-module.exports = { ReaderError, AREAS, applyReads, handleReads, readerCall, readerAll, readerMinute, testReads, plantShift, zoneOffset, dateOf, hash, QUIET_MINUTES };
+module.exports = { ReaderError, AREAS, applyReads, applyMachine, controllerReads, configOut, handleReads, readerCall, readerAll, readerMinute, testReads, plantShift, zoneOffset, dateOf, hash, QUIET_MINUTES };

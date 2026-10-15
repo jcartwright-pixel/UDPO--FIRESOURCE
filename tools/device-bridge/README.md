@@ -23,3 +23,15 @@ To try it without a reader, use `--stdin` in place of `--reader` and type UPCs, 
 - **Code date:** the date read is checked against the shift's day plus the product's shelf life. The tablet shows CODE DATE OK or CODE DATE WRONG, and counts missing and unreadable dates.
 - **Stops:** if no jugs come for 3 minutes, the line shows **stopped**, and the operator taps why on the tablet. When jugs come again, the stop ends.
 - **If the network drops:** reads that could not be sent are kept and go out with the next send.
+
+## A machine's own controller (read-only)
+
+For a machine whose controller already keeps the count (Joe 10/14: the Blow Mold), run with `--controller` in place of `--reader`:
+
+```
+node bridge.cjs --address <address from Line Targets> --device ut_prod_blow_mold --key <key> --controller
+```
+
+On **Line Targets**, set **Counted by** to **Machine controller (read-only)**. Then pick the brand, type the IP address and where the jug count, speed and temperature are, and set the speed and temperature ranges. Each reading has a **Test read**. The program picks up the setup with its key, reads every 5 seconds, and sends the numbers.
+
+`controllers.cjs` speaks Allen-Bradley EtherNet/IP (ControlLogix, CompactLogix and Micro800 tags), Modbus TCP (holding and input registers) and Siemens S7 (data block and memory addresses). It has only the read requests, so nothing is ever written to the machine. The plain-words version is in [docs/plant-production/How-The-Blow-Mold-Controller-Connects.md](../../docs/plant-production/How-The-Blow-Mold-Controller-Connects.md).

@@ -39,7 +39,7 @@
     <div class="view">
       <div class="qc-split">
         <aside class="qc-lines" aria-label="Production lines"><h2>Lines</h2><div id="lines"></div>
-          <p class="lt-note">Each line is counted one of three ways: <b>Typed by operator</b> on the line tablet, a <b>Sensor</b> (counts only), or a <b>Label reader</b> (counts, product and code date). The lines are the plant's machines in Plant Operations.</p></aside>
+          <p class="lt-note">Each line is counted one of four ways: <b>Typed by operator</b> on the line tablet, a <b>Sensor</b> (counts only), a <b>Label reader</b> (counts, product and code date), or the <b>Machine controller</b> (count, speed and temperature, read-only). The lines are the plant's machines in Plant Operations.</p></aside>
         <section class="qc-form lt-form">
           <div class="qc-top"><h2 id="form-title">Line</h2><span class="lt-pill" id="counter-pill"></span><span class="qc-last" id="form-last"></span>
             <label class="lt-counter">Counted by <select id="counter" aria-label="How this line is counted"></select></label></div>
@@ -52,6 +52,8 @@
           </div>
           <!-- Joe 10/14: the line's changeover standard and hours between CIP washes (the production manager sets them). -->
           <div class="lt-setup" id="setup"></div>
+          <!-- Machine controller (Joe 10/14, the Blow Mold): brand, IP address and where each reading is, with a Test read; read-only. -->
+          <div class="lt-reader lt-ctrl" id="controller" hidden></div>
           <!-- Label reader (Joe 10/11): the line PC's key and the sandbox test feed; administrators only (src/reader.js). -->
           <div class="lt-reader" id="reader" hidden></div>
         </section>
@@ -109,8 +111,8 @@
       box.hidden = false;
       box.innerHTML = '<h3>Label reader</h3>' +
         (reader ? '<p>The line PC sends each piece the reader sees to <b class="lt-mono">' + escapeHtml(readsAddress()) + '</b> with this line\'s key. ' +
-          (info.readerKeyAt ? 'Key made ' + escapeHtml(dateTimeText(info.readerKeyAt)) + '.' : 'No key yet.') + '</p>' : '<p>' + escapeHtml(line.name) + ' is counted ' + (counter === 'SENSOR' ? 'by a sensor' : 'by typing') + '. Start Test Feed switches it to Label reader for the test, and Stop Test Feed switches it back.</p>') +
-        (shownKey && shownKey.line === line.operationId ? '<p class="lt-key">Line key (copy it now, it is not shown again): <b class="lt-mono" id="reader-key">' + escapeHtml(shownKey.key) + '</b></p>' : '') +
+          (info.readerKeyAt ? 'Key made ' + escapeHtml(dateTimeText(info.readerKeyAt)) + '.' : 'No key yet.') + '</p>' : '<p>' + escapeHtml(line.name) + ' is counted ' + (counter === 'SENSOR' ? 'by a sensor' : counter === 'CONTROLLER' ? 'by its machine controller' : 'by typing') + '. Start Test Feed switches it to Label reader for the test, and Stop Test Feed switches it back.</p>') +
+        (reader && shownKey && shownKey.line === line.operationId ? '<p class="lt-key">Line key (copy it now, it is not shown again): <b class="lt-mono" id="reader-key">' + escapeHtml(shownKey.key) + '</b></p>' : '') +
         '<div class="lt-reader-btns">' + (reader ? '<button type="button" id="make-key">' + (info.readerKeyAt ? 'Replace Line Key' : 'Make Line Key') + '</button>' : '') +
         (SANDBOX ? (feed ? '<button type="button" id="stop-feed" class="danger">Stop Test Feed</button>' : '<button type="button" id="start-feed">Start Test Feed (1 hour)</button>') +
           '<button type="button" id="start-all">Test Feed on Every Line</button>' + (anyFeed ? '<button type="button" id="stop-all" class="danger">Stop Every Test Feed</button>' : '') : '') + '</div>' +
@@ -118,6 +120,77 @@
           (line.operationId === 'ut_prod_gallon_filler' ? ' The Gallon Filler is the first line to get a real reader.' : ' A real reader for this line comes after the Gallon Filler test.') + '</p>' : '') +
         (readerNote ? '<p class="lt-note" id="reader-note">' + escapeHtml(readerNote) + '</p>' : '');
     }
+    // The machine controller panel (Joe 10/14, the Blow Mold; administrators): the line PC reads the jug count, speed and
+    // temperature from the machine's own controller, READ-ONLY. Each box saves as it is left; Test read asks the line PC for
+    // one reading now and shows the number it read (src/reader.js, tools/device-bridge).
+    let ctrlNote = '', ctrlTimer = null;
+    const ctrlVal = (c, k) => (c[k] === null || c[k] === undefined ? '' : c[k]);
+    function drawController(line, counter) {
+      const box = document.getElementById('controller');
+      if (!L.isAdmin(person) || counter !== 'CONTROLLER') { box.hidden = true; return; }
+      box.hidden = false;
+      if (box.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
+      const info = data.lineInfo[line.operationId] || {}, c = info.controller || {}, brand = c.brand || '', port = R.CONTROLLER_PORTS[brand];
+      const inp = (k, label, cls) => '<label' + (cls ? ' class="' + cls + '"' : '') + '>' + label + '<input data-c="' + k + '" value="' + escapeHtml(ctrlVal(c, k)) + '" aria-label="' + escapeHtml(label) + '"></label>';
+      const sel = (k, label, opts) => '<label>' + label + '<select data-c="' + k + '" aria-label="' + escapeHtml(label) + '"><option value=""></option>' + opts.map(o => opt(o[0], String(ctrlVal(c, k)), o[1])).join('') + '</select></label>';
+      const ask = c.testAsk || null, res = c.testResult || null;
+      const result = (k) => {
+        if (!ask || ask.reading !== k) return res && res.reading === k ? shown(res, k) : '';
+        if (res && res.askAt === ask.at) return shown(res, k);
+        return Date.now() - Date.parse(ask.at) < 30000 ? '<span class="lt-wait">Asking the line PC…</span>' : '<span class="lt-bad">No answer from the line PC. Check that the line PC program is running.</span>';
+      };
+      const shown = (r, k) => {
+        if (r.error) return '<span class="lt-bad">' + escapeHtml(r.error) + '</span>';
+        const d = Number(c[k + 'Divide']) > 0 ? Number(c[k + 'Divide']) : 1, unit = k === 'temp' ? '°F' : k === 'speed' ? ' a minute' : ' on the machine\'s counter';
+        return '<span class="lt-good"><b>' + fmt(r.value) + '</b>' + (d !== 1 ? ' ÷ ' + d + ' = <b>' + (Math.round(r.value / d * 10) / 10) + '</b>' : '') + escapeHtml(unit) + ' · read ' + escapeHtml(dateTimeText(r.at)) + '</span>';
+      };
+      const kind = R.lineKind(line.name), speedDefault = R.speedNameFor(kind, {});
+      const names = { count: 'Jug count', speed: R.speedNameFor(kind, c), temp: 'Temperature (°F)' };
+      const modbus = brand === 'MODBUS';
+      const row = (k) => '<tr><th>' + escapeHtml(names[k]) + '</th><td><input data-c="' + k + 'Tag" value="' + escapeHtml(ctrlVal(c, k + 'Tag')) + '" aria-label="Where the ' + escapeHtml(names[k].toLowerCase()) + ' is"' + (brand ? '' : ' disabled') + '></td>' +
+        (modbus ? '<td><select data-c="' + k + 'Size" aria-label="Size of the ' + escapeHtml(names[k].toLowerCase()) + '"><option value=""></option>' + [['16', '16 bits'], ['32', '32 bits']].map(o => opt(o[0], String(ctrlVal(c, k + 'Size')), o[1])).join('') + '</select></td>' : '') +
+        (k === 'count' ? '<td colspan="3" class="lt-mut">Counts the jugs made since the last read</td>' : '<td><input data-c="' + k + 'Divide" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Divide')) + '" aria-label="Divide the ' + escapeHtml(names[k].toLowerCase()) + ' by"></td><td><input data-c="' + k + 'Low" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Low')) + '" aria-label="Lowest ' + escapeHtml(names[k].toLowerCase()) + '"></td><td><input data-c="' + k + 'High" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'High')) + '" aria-label="Highest ' + escapeHtml(names[k].toLowerCase()) + '"></td>') +
+        '<td class="lt-test"><button type="button" data-test="' + k + '"' + (c[k + 'Tag'] && c.ip ? '' : ' disabled') + '>Test read</button><div>' + result(k) + '</div></td></tr>';
+      const heard = info.machineHeardAt ? 'The line PC last sent readings ' + dateTimeText(info.machineHeardAt) + (info.machineLast ? '; the machine\'s counter read ' + fmt(info.machineLast.value) : '') + '.' : 'The line PC has not sent anything yet.';
+      box.innerHTML = '<h3>Machine controller · read-only</h3>' +
+        '<p>The line PC reads these from the machine\'s own controller every 5 seconds. <b>It only reads: the app never changes anything on the machine.</b></p>' +
+        '<div class="lt-cgrid">' + sel('brand', 'Brand', R.CONTROLLER_BRANDS) + inp('ip', 'IP address') + inp('port', 'Port' + (port ? ' (empty = ' + port + ')' : '')) +
+          (brand === 'AB' ? inp('slot', 'Slot (empty = 0)') : '') + (brand === 'S7' ? inp('rack', 'Rack (empty = 0)') + inp('slot', 'Slot (empty = 1)') : '') +
+          (modbus ? inp('unit', 'Unit id (empty = 1)') + sel('wordOrder', 'Word order (empty = high first)', [['HIGH_FIRST', 'High word first'], ['LOW_FIRST', 'Low word first']]) : '') +
+          inp('speedName', 'Speed is called (empty = ' + speedDefault + ')', 'wide') + '</div>' +
+        '<div class="lt-scroll"><table class="loadout lt-ctable"><colgroup><col style="width:15%"><col style="width:16%">' + (modbus ? '<col style="width:9%">' : '') + '<col style="width:9%"><col style="width:9%"><col style="width:9%"><col></colgroup><thead><tr><th>Reading</th><th>Where it is</th>' + (modbus ? '<th>Size</th>' : '') + '<th>Divide by</th><th>Low</th><th>High</th><th>Test read</th></tr></thead><tbody>' +
+          ['count', 'speed', 'temp'].map(row).join('') + '</tbody></table></div>' +
+        '<p class="lt-note">' + (brand ? 'Where it is: ' + escapeHtml(R.TAG_HELP[brand]) + '. ' : 'Pick the brand first (it is on the controller\'s nameplate). ') + 'Divide by: 10 when the controller sends 4312 for 431.2. Low and high: the line tablet flashes the reading red outside them. Empty boxes are left out.</p>' +
+        '<p' + (info.machineError ? ' class="lt-bad"' : '') + '>' + escapeHtml(heard) + (info.machineError ? ' Last read problem: ' + escapeHtml(info.machineError) : '') + '</p>' +
+        '<p>The line PC sends to <b class="lt-mono">' + escapeHtml(readsAddress()) + '</b> with this line\'s key. ' + (info.readerKeyAt ? 'Key made ' + escapeHtml(dateTimeText(info.readerKeyAt)) + '.' : 'No key yet.') + '</p>' +
+        (shownKey && shownKey.line === line.operationId ? '<p class="lt-key">Line key (copy it now, it is not shown again): <b class="lt-mono" id="ctrl-key">' + escapeHtml(shownKey.key) + '</b></p><p class="lt-key">On the line PC: <b class="lt-mono">node bridge.cjs --address ' + escapeHtml(readsAddress()) + ' --device ' + escapeHtml(line.operationId) + ' --key ' + escapeHtml(shownKey.key) + ' --controller</b></p>' : '') +
+        '<div class="lt-reader-btns"><button type="button" id="ctrl-key-btn">' + (info.readerKeyAt ? 'Replace Line Key' : 'Make Line Key') + '</button></div>' +
+        (ctrlNote ? '<p class="lt-note" id="ctrl-note">' + escapeHtml(ctrlNote) + '</p>' : '');
+      // A Test read waiting on the line PC: look again when it should have answered.
+      clearTimeout(ctrlTimer);
+      if (ask && !(res && res.askAt === ask.at) && Date.now() - Date.parse(ask.at) < 31000) ctrlTimer = setTimeout(() => render('keep'), 31000 - (Date.now() - Date.parse(ask.at)));
+    }
+    async function ctrlOp(extra) {
+      const line = current();
+      if (!line) return;
+      ctrlNote = 'Working…'; render('keep');
+      try {
+        const r = await callServer('lineReader', Object.assign({ operationId: line.operationId }, extra));
+        if (r.key) shownKey = { line: line.operationId, key: r.key };
+        ctrlNote = r.message || savedText(); showError('');
+      } catch (err) { ctrlNote = 'Not saved.'; showError(line.name + ': ' + (err.message || err)); }
+      document.activeElement && document.getElementById('controller').contains(document.activeElement) && document.activeElement.blur();
+      render('keep');
+    }
+    document.getElementById('controller').addEventListener('change', e => {
+      const box = e.target.closest('[data-c]');
+      if (box) ctrlOp({ op: 'saveController', field: box.dataset.c, value: box.value.trim() });
+    });
+    document.getElementById('controller').addEventListener('click', e => {
+      const t = e.target.closest('[data-test]');
+      if (t) ctrlOp({ op: 'testRead', reading: t.dataset.test });
+      if (e.target.id === 'ctrl-key-btn') ctrlOp({ op: 'makeKey', kind: 'CONTROLLER' });
+    });
     // The pretend pieces are the line's first two products (so the feed changes product too), preferring ones with a full speed.
     const feedList = (id) => { const ps = listOf(id).filter(p => String(p.name || '').trim()); return ps.filter(p => Number(p.ratePerMin) > 1).concat(ps.filter(p => !(Number(p.ratePerMin) > 1))).slice(0, 2)
       .map(p => ({ name: p.name, upc: p.upc || '', ratePerMin: Number(p.ratePerMin) || null, shelfLifeDays: Number(p.shelfLifeDays) || null })); };
@@ -147,7 +220,7 @@
       if (line) chosen = line.operationId;
       document.getElementById('products-link').href = 'products.html?plant=' + encodeURIComponent(plant) + (line ? '&line=' + encodeURIComponent(line.operationId) : '');
       document.getElementById('lines').innerHTML = lines().map(l => { const n = listOf(l.operationId).length, c = (data.counters[l.operationId] || 'TABLET');
-        return '<button type="button" data-line="' + escapeHtml(l.operationId) + '"' + (line && l.operationId === line.operationId ? ' class="active"' : '') + '><span>' + escapeHtml(l.name) + '<small>' + n + ' product' + (n === 1 ? '' : 's') + ' · ' + (c === 'READER' ? 'Label reader' : c === 'SENSOR' ? 'Sensor' : 'Typed') + '</small></span></button>'; }).join('') ||
+        return '<button type="button" data-line="' + escapeHtml(l.operationId) + '"' + (line && l.operationId === line.operationId ? ' class="active"' : '') + '><span>' + escapeHtml(l.name) + '<small>' + n + ' product' + (n === 1 ? '' : 's') + ' · ' + (c === 'READER' ? 'Label reader' : c === 'SENSOR' ? 'Sensor' : c === 'CONTROLLER' ? 'Machine controller' : 'Typed') + '</small></span></button>'; }).join('') ||
         '<p class="lt-note">' + (data && data.read.setup ? 'No production lines are set up for this plant in Plant Operations.' : 'Reading the lines…') + '</p>';
       const hours = R.shiftHours(data ? data.shifts : []);
       document.getElementById('shift-head').textContent = 'Target / shift';
@@ -157,12 +230,13 @@
       const counter = data.counters[line.operationId] || 'TABLET';
       document.getElementById('form-title').textContent = line.name;
       const pill = document.getElementById('counter-pill');
-      pill.textContent = counter === 'READER' ? 'Counts from label reader' : counter === 'SENSOR' ? 'Counts from sensor' : 'Counts typed on the tablet';
+      pill.textContent = counter === 'READER' ? 'Counts from label reader' : counter === 'SENSOR' ? 'Counts from sensor' : counter === 'CONTROLLER' ? 'Counts from the machine' : 'Counts typed on the tablet';
       pill.className = 'lt-pill ' + (counter === 'TABLET' ? 'typed' : 'auto');
       const sel = document.getElementById('counter');
       sel.innerHTML = R.COUNTERS.map(c => opt(c, counter, R.COUNTER_LABEL[c])).join('');
       sel.disabled = !ck;
       drawReader(line, counter);
+      drawController(line, counter);
       drawSetup(line, ck);
       // Not drawn again while someone types in the list.
       if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
@@ -183,13 +257,16 @@
       const info = data.lineInfo[line.operationId] || {}, val = (k) => info[k] === null || info[k] === undefined ? '' : info[k];
       box.innerHTML = '<label>Changeover standard, minutes <input id="setup-co" data-setup="changeoverMin" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('changeoverMin')) + '"' + (ck ? '' : ' disabled') + '></label>' +
         '<label>CIP wash every, hours <input id="setup-cip" data-setup="cipHours" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('cipHours')) + '"' + (ck ? '' : ' disabled') + '></label>' +
-        '<span>The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes. Leave a box empty for none.</span>';
+        // Joe 10/14: the Blow Mold weighs a jug from each of its six heads; the tablet flags a head outside this range.
+        (R.lineKind(line.name) === 'BLOWMOLD' ? [['jugWeightTarget', 'Jug weight target, g'], ['jugWeightLow', 'Lightest, g'], ['jugWeightHigh', 'Heaviest, g']].map(([k, l]) => '<label>' + l + ' <input id="setup-' + k + '" data-setup="' + k + '" inputmode="decimal" maxlength="6" value="' + escapeHtml(val(k)) + '"' + (ck ? '' : ' disabled') + '></label>').join('') : '') +
+        '<span>The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes.' + (R.lineKind(line.name) === 'BLOWMOLD' ? ' The bottle check flags a head\'s jug lighter or heavier than the range.' : '') + ' Leave a box empty for none.</span>';
     }
     document.getElementById('setup').addEventListener('change', async e => {
       const box = e.target.closest('[data-setup]'), line = current();
       if (!box || !line || !canSave()) return;
-      const k = box.dataset.setup, v = box.value.trim(), max = k === 'cipHours' ? 72 : 600, n = Number(v);
-      if (v !== '' && (!isFinite(n) || n < 0 || n > max)) { refuse((k === 'cipHours' ? 'CIP wash every' : 'Changeover standard') + ' must be a number from 0 to ' + max + '. It was not changed.'); box.blur(); render(true); return; }
+      const k = box.dataset.setup, v = box.value.trim(), max = k === 'cipHours' ? 72 : /^jugWeight/.test(k) ? 500 : 600, n = Number(v);
+      const names = { cipHours: 'CIP wash every', changeoverMin: 'Changeover standard', jugWeightTarget: 'Jug weight target', jugWeightLow: 'Lightest jug weight', jugWeightHigh: 'Heaviest jug weight' };
+      if (v !== '' && (!isFinite(n) || n < 0 || n > max)) { refuse(names[k] + ' must be a number from 0 to ' + max + '. It was not changed.'); box.blur(); render(true); return; }
       note = 'Saving…'; render('keep');
       try { await save('saveLineSetup', { operationId: line.operationId, [k]: v }); note = savedText(); showError(''); }
       catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
@@ -229,8 +306,10 @@
     document.getElementById('counter').addEventListener('change', async e => {
       const line = current();
       if (!line || !canSave()) return;
+      // Read the pick before drawing again: the drawing puts the saved choice back in the drop-down.
+      const counter = e.target.value;
       note = 'Saving…'; render('keep');
-      try { await save('saveLineCounter', { operationId: line.operationId, counter: e.target.value }); note = savedText(); showError(''); }
+      try { await save('saveLineCounter', { operationId: line.operationId, counter }); note = savedText(); showError(''); }
       catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
       render(true);
     });

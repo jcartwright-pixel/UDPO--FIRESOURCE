@@ -57,6 +57,8 @@
         </div>
         <!-- Joe 10/14 (mock-ups G and H): the HTST's and the Blow Mold's own cards in place of the filler's. -->
         <div class="lb-cards" id="kind-cards" hidden></div>
+        <!-- Joe 10/14: the jug count, speed and temperature read from the machine's own controller (read-only), with their ranges. -->
+        <div class="lb-mach" id="machine" hidden></div>
         <div class="lb-date" id="date-check"></div>
         <div class="lb-date" id="cip-strip" hidden></div>
         <div class="lb-strip" id="check-inline" hidden></div>
@@ -129,7 +131,7 @@
       document.getElementById('line-name').textContent = line.name;
       document.getElementById('line-sub').textContent = plantName(plant()).toUpperCase() + ' · ' + shortDate(s.date) + ' · ' + shiftText(s);
       const live = document.getElementById('live');
-      live.textContent = v.counter === 'READER' ? 'Label reader on' : v.counter === 'SENSOR' ? 'Counts from sensor' : 'Counts typed on this tablet';
+      live.textContent = v.counter === 'READER' ? 'Label reader on' : v.counter === 'SENSOR' ? 'Counts from sensor' : v.counter === 'CONTROLLER' ? 'Counts from the machine' : 'Counts typed on this tablet';
       live.className = 'lb-live ' + (v.counter === 'TABLET' ? 'typed' : 'auto');
       // Running now
       const tg = v.target;
@@ -161,7 +163,11 @@
       if (rd && v.counter === 'READER') {
         const ok = rd.dateOk !== false;
         dc.className = 'lb-date ' + (ok ? 'ok' : 'bad');
-        dc.innerHTML = '<span class="lb-pill ' + (ok ? 'g' : 'r') + '">' + (ok ? 'CODE DATE OK' : 'CODE DATE WRONG') + '</span><b>' + escapeHtml(rd.lastDate || v.expectedCode || '') + '</b><span>' + escapeHtml([v.expectedCode ? 'should be ' + v.expectedCode : '', rd.read !== undefined ? fmt(rd.read) + ' of ' + fmt(v.made) + ' jugs read' : '', rd.unreadable ? fmt(rd.unreadable) + ' unreadable' : '', rd.lastMissingAt ? 'last missing date ' + clock(rd.lastMissingAt) : ''].filter(Boolean).join(' · ')) + '</span>';
+        // Joe 10/14: the UPC on the jug confirms the product running; a label that is not one of this line's products is wrong.
+        const wrong = rd.lastUpc && rd.lastUpc === rd.lastUnknownUpc;
+        if (wrong) dc.className = 'lb-date bad';
+        dc.innerHTML = (wrong ? '<span class="lb-pill r">WRONG LABEL</span><b>UPC ' + escapeHtml(rd.lastUnknownUpc) + '</b><span>is not one of this line\'s products (Line Targets). ' + fmt(rd.unknown) + ' jug' + (rd.unknown === 1 ? '' : 's') + ' this shift · since ' + escapeHtml(clock(rd.lastUnknownAt)) + '</span>' :
+          v.product ? '<span class="lb-pill g">LABEL MATCHES</span><b>' + escapeHtml(v.product) + '</b>' : '') + (wrong ? '' : '<span class="lb-pill ' + (ok ? 'g' : 'r') + '">' + (ok ? 'CODE DATE OK' : 'CODE DATE WRONG') + '</span><b>' + escapeHtml(rd.lastDate || v.expectedCode || '') + '</b><span>' + escapeHtml([v.expectedCode ? 'should be ' + v.expectedCode : '', rd.read !== undefined ? fmt(rd.read) + ' of ' + fmt(v.made) + ' jugs read' : '', rd.unreadable ? fmt(rd.unreadable) + ' unreadable' : '', rd.lastMissingAt ? 'last missing date ' + clock(rd.lastMissingAt) : ''].filter(Boolean).join(' · ')) + '</span>');
       } else {
         dc.className = 'lb-date wait';
         dc.innerHTML = '<span class="lb-pill n">CODE DATE CHECK</span><b>' + escapeHtml(v.expectedCode || '—') + '</b><span>' + (v.expectedCode ? 'is today\'s code for this product. ' : 'Set the product\'s shelf life on Line Targets to see today\'s code. ') + 'The label reader checks every jug once it is on this line.</span>';
@@ -186,7 +192,7 @@
         st.className = 'lb-status ' + (need ? 'needs' : 'running');
         txt.innerHTML = need ? '<b>STOP AT ' + clock(need.start) + ' (' + need.minutes + ' MIN) NEEDS A REASON.</b> Tap why it stopped.' :
           v.kind === 'HTST' ? (v.diverting ? '<b>IN DIVERT ' + v.diverting.minutes + ' MIN</b>' + (v.diverting.reason ? ' · ' + escapeHtml(v.diverting.reason) : '') : '<b>PASTEURIZING</b> · forward flow') + (v.product ? '' : ' · pick the product running') :
-          '<b>LINE RUNNING</b>' + (v.product ? '' : ' · pick the product running');
+          '<b>LINE RUNNING</b>' + (v.product || v.targets.length === 1 ? '' : ' · pick the product running');
         if (!need && v.diverting) st.className = 'lb-status needs';
         btn.textContent = 'LINE STOPPED'; btn.className = 'stop';
         reasonFor = need ? need.index : -1;
@@ -230,6 +236,28 @@
       return [a, '', ''];
     }
     // The board's new pieces: the HTST and Blow Mold cards, the CIP clock, the hourly check, Up next and each hour, the six buttons.
+    // From the machine (Joe 10/14): what the line PC last read from the machine's controller, with the ranges from Line Targets.
+    // Read-only; a reading outside its range flashes red. Shown on any line whose controller sends readings.
+    function drawMachine(v) {
+      const box = document.getElementById('machine'), m = v.machine;
+      box.hidden = !m;
+      if (!m) return;
+      const range = (lo, hi, unit) => lo === null && hi === null ? 'No range set on Line Targets' : 'Range ' + (lo === null ? 'up' : lo + unit) + ' to ' + (hi === null ? 'any' : hi + unit);
+      const flagged = (f) => f === 'HIGH' || f === 'LOW';
+      const tile = (name, big, sub, pill, flag) => '<div class="lb-card' + (flagged(flag) ? ' lb-flash' : '') + '"><span class="eyebrow">' + escapeHtml(name) + '</span><div class="lb-big">' + big + '</div><div class="lb-mut">' + sub + '</div><div>' + pill + '</div></div>';
+      const tiles = [];
+      if (v.counter === 'CONTROLLER' || m.counter !== null) {
+        const moving = m.lastMoveAt && Date.now() - Date.parse(m.lastMoveAt) < 180000;
+        tiles.push(tile('Jug count', fmt(v.counter === 'CONTROLLER' ? v.made : m.counter), escapeHtml(v.counter === 'CONTROLLER' ? 'this shift' + (m.counter !== null ? ' · machine counter ' + fmt(m.counter) : '') : 'machine counter'),
+          v.counter === 'CONTROLLER' ? (moving ? '<span class="lb-pill g">COUNTING</span>' : '<span class="lb-pill a">NO JUGS IN 3 MIN</span>') : '', ''));
+      }
+      if (m.speed !== null) tiles.push(tile(m.speedName, fmt(m.speed), escapeHtml(range(m.speedLow, m.speedHigh, '')) + (m.speedOutSince ? ' · ' + (m.speedFlag === 'HIGH' ? 'high' : 'low') + ' since ' + clock(m.speedOutSince) : ''),
+        m.speedFlag === 'HIGH' ? '<span class="lb-pill r">TOO FAST</span>' : m.speedFlag === 'LOW' ? '<span class="lb-pill r">TOO SLOW</span>' : m.speedLow !== null || m.speedHigh !== null ? '<span class="lb-pill g">IN RANGE</span>' : '', m.speedFlag));
+      if (m.temp !== null) tiles.push(tile('Temperature', fmt(m.temp) + '°F', escapeHtml(range(m.tempLow, m.tempHigh, '°F')) + (m.tempOutSince ? ' · ' + (m.tempFlag === 'HIGH' ? 'high' : 'low') + ' since ' + clock(m.tempOutSince) : ''),
+        m.tempFlag === 'HIGH' ? '<span class="lb-pill r">TOO HOT</span>' : m.tempFlag === 'LOW' ? '<span class="lb-pill r">TOO COLD</span>' : m.tempLow !== null || m.tempHigh !== null ? '<span class="lb-pill g">IN RANGE</span>' : '', m.tempFlag));
+      box.innerHTML = '<div class="lb-mach-head">From the machine <span' + (m.stale ? ' class="stale"' : '') + '>' + (m.stale ? 'NOT READING · last read ' + escapeHtml(clock(m.at)) : 'read ' + escapeHtml(clock(m.at)) + ' · every 5 seconds') + '</span></div>' +
+        '<div class="lb-mach-row n' + tiles.length + '">' + tiles.join('') + '</div><p class="lb-mach-note">Read-only: the app only reads these numbers from the machine\'s controller. It never changes anything on the machine.</p>';
+    }
     function drawMoreBoard(v) {
       const k = v.kind, special = k === 'HTST' || k === 'BLOWMOLD', tg = v.target;
       document.getElementById('std-cards').hidden = special;
@@ -238,12 +266,15 @@
       const madeBits = '<div class="lb-mut">Target so far ' + fmt(v.soFar) + '</div><div class="lb-bar"><i class="c-' + (v.pct === null || v.pct >= 100 ? 'g' : v.pct >= 90 ? 'a' : 'r') + '" style="width:' + Math.min(100, v.pct || 0) + '%"></i></div>' +
         (v.pct === null ? '' : v.made >= v.soFar ? '<div><span class="lb-pill g">' + fmt(v.made - v.soFar) + ' AHEAD · ' + v.pct + '%</span></div>' : '<div><span class="lb-pill ' + (v.pct >= 90 ? 'a' : 'r') + '">' + fmt(v.behind) + ' BEHIND · ' + v.pct + '%</span></div>');
       const countBtn = v.counter === 'TABLET' ? '<button type="button" class="lb-btn" data-act="count">Enter Count</button>' : '';
-      const speedLine = v.speed === null ? '' : '<div class="lb-mut">Speed ' + v.speed + ' / min ' + (v.speedFlag === 'OVER' ? '<span class="lb-pill r">TOO FAST</span>' : v.speedFlag === 'UNDER' ? '<span class="lb-pill r">TOO SLOW</span>' : '') + '</div>';
+      const mach = v.machine, fromMachine = v.counter === 'CONTROLLER' ? '<div><span class="lb-pill g">FROM THE MACHINE</span></div>' : '';
+      const speedLine = v.speed === null || (mach && mach.speed !== null) ? '' : '<div class="lb-mut">Speed ' + v.speed + ' / min ' + (v.speedFlag === 'OVER' ? '<span class="lb-pill r">TOO FAST</span>' : v.speedFlag === 'UNDER' ? '<span class="lb-pill r">TOO SLOW</span>' : '') + '</div>';
       if (k === 'BLOWMOLD') {
         const rej = Number(v.waste['Leak tester'] || 0);
         kc.innerHTML =
-          '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || 'No product picked') + '</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div><button type="button" class="lb-btn" data-act="product">' + (v.product ? 'Change Product' : 'Pick Product') + '</button></div>' +
-          '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs this shift</span><div class="lb-big">' + fmt(v.made) + '</div>' + madeBits + speedLine + countBtn + '</div>' +
+          // Joe 10/14: the Blow Mold makes only gallon jugs; with one product on its list there is nothing to pick.
+          (v.targets.length === 1 ? '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || v.targets[0].name) + '</div><div class="lb-mut">The only product made here</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div></div>' :
+          '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || 'No product picked') + '</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div><button type="button" class="lb-btn" data-act="product">' + (v.product ? 'Change Product' : 'Pick Product') + '</button></div>') +
+          '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs this shift</span><div class="lb-big">' + fmt(v.made) + '</div>' + madeBits + speedLine + fromMachine + countBtn + '</div>' +
           '<div class="lb-card"><span class="eyebrow">Leak tester rejects</span><div class="lb-big">' + fmt(rej) + '</div><div class="lb-mut">' + (v.made ? (Math.round(rej / v.made * 1000) / 10) + '% of jugs made' : 'this shift') + '</div><button type="button" class="lb-btn" data-act="waste" data-reason="Leak tester">Enter Rejects</button></div>' +
           '<div class="lb-card"><span class="eyebrow">Jugs ahead of filler</span><div class="lb-big">' + (v.stock === null ? '—' : fmt(v.stock)) + '</div><div class="lb-mut">' + (v.run && v.run.stockAt ? 'counted ' + clock(v.run.stockAt) : 'not counted this shift') + '</div><button type="button" class="lb-btn" data-act="stock">Enter Jugs</button></div>';
       } else if (k === 'HTST') {
@@ -254,6 +285,7 @@
           '<div class="lb-card"><span class="eyebrow">Flow</span><div class="lb-big">' + (flow ? escapeHtml(flow.value) : '—') + '</div><div class="lb-mut">gallons a minute · ' + fmt(v.made) + ' made this shift</div>' + countBtn + '</div>' +
           '<div class="lb-card"><span class="eyebrow">Diverts this shift</span><div class="lb-big">' + v.diverts + '</div><div class="lb-mut">' + (v.lastDivertAt ? 'Last divert ' + shortDate(v.lastDivertAt.slice(0, 10)) + ' ' + clock(v.lastDivertAt) : 'No divert recorded') + '</div></div>';
       }
+      drawMachine(v);
       // The CIP clock (mock-up G): hours since the last CIP wash that passed, against the line's hours between washes.
       const cs = document.getElementById('cip-strip');
       cs.hidden = !(k === 'HTST' || v.cipHours);
@@ -289,15 +321,17 @@
           const opts = f[0] === 'pen' ? ['ON TIME', 'LATE'] : ['OK', 'NOT OK'];
           return '<label class="lb-field">' + escapeHtml(f[1]) + '<select class="lb-sel" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '"><option value=""></option>' + opts.map(o => '<option' + (o === got ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></label>';
         }
-        return '<label class="lb-field">' + escapeHtml(f[1]) + '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '"></label>';
-      }).join('') + '</div>';
+        // A Blow Mold head's jug outside the weight range on Line Targets: red, with LIGHT or HEAVY.
+        const wf = R.weightFlag(f[0], got, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high });
+        return '<label class="lb-field' + (wf ? ' lb-off' : '') + '">' + escapeHtml(f[1]) + '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '">' + (wf ? '<b class="lb-pill r">' + wf + '</b>' : '') + '</label>';
+      }).join('') + '</div>' + (v.kind === 'BLOWMOLD' && v.jugWeight && (v.jugWeight.low !== null || v.jugWeight.high !== null || v.jugWeight.target !== null) ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.' + (v.jugWeight.target !== null ? ' Target ' + v.jugWeight.target + ' g.' : '') + (v.jugWeight.low !== null || v.jugWeight.high !== null ? ' Range ' + (v.jugWeight.low !== null ? v.jugWeight.low : 'up') + ' to ' + (v.jugWeight.high !== null ? v.jugWeight.high : 'any') + ' g.' : '') + '</p>' : v.kind === 'BLOWMOLD' ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.</p>' : '');
     }
     function checkTable(v) {
       const c = (v.run && v.run.checks) || {}, fields = R.CHECK_FIELDS[v.kind] || [], every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, start = Date.parse((v.run && v.run.shiftStart) || '');
       const slots = Object.keys(c).map(Number).filter(n => !v.check || n !== v.check.slot).sort((a, b) => a - b);
       if (!slots.length) return '<p class="lb-mut">No checks yet this shift.</p>';
       return '<table class="lb-t"><thead><tr><th>Time</th>' + fields.map(f => '<th' + (f[2] === 'num' ? ' class="n"' : '') + '>' + escapeHtml(f[1]) + '</th>').join('') + '<th>By</th></tr></thead><tbody>' +
-        slots.map(n => '<tr><td>' + clock(new Date(start + n * every).toISOString()) + '</td>' + fields.map(f => { const x = String(c[n][f[0]] === undefined ? '' : c[n][f[0]]); return '<td class="' + (f[2] === 'num' ? 'n' : /NOT OK|LATE/.test(x) ? 'lb-bad' : x ? 'lb-ok' : '') + '">' + escapeHtml(x) + '</td>'; }).join('') + '<td>' + escapeHtml(who(c[n].by)) + '</td></tr>').join('') + '</tbody></table>';
+        slots.map(n => '<tr><td>' + clock(new Date(start + n * every).toISOString()) + '</td>' + fields.map(f => { const x = String(c[n][f[0]] === undefined ? '' : c[n][f[0]]), wf = R.weightFlag(f[0], x, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high }); return '<td class="' + (f[2] === 'num' ? 'n' + (wf ? ' lb-bad' : '') : /NOT OK|LATE/.test(x) ? 'lb-bad' : x ? 'lb-ok' : '') + '">' + escapeHtml(x) + (wf ? ' ' + wf : '') + '</td>'; }).join('') + '<td>' + escapeHtml(who(c[n].by)) + '</td></tr>').join('') + '</tbody></table>';
     }
     // What a button opens (mock-ups D, E, F, G, H).
     function drawMore(v) {

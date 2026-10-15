@@ -273,3 +273,39 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 #mp-body .lb-status { margin-top: 14px; }
 #mp-body .lb-pick button:disabled, #mp-body .lb-check:disabled { opacity: .55; }
 .lb-in:disabled { border-color: #c9d6e4; background: #f4f7fa; }
+/* Line Targets: the machine controller panel (Joe 10/14, the Blow Mold; administrators). */
+.lt-ctrl { border-left-color: #2e7d32; }
+.lt-cgrid { display: flex; flex-wrap: wrap; gap: 12px 18px; margin: 10px 0; }
+.lt-cgrid label { display: flex; flex-direction: column; gap: 4px; font-weight: 800; color: var(--ud-blue-dark); }
+.lt-cgrid input, .lt-cgrid select, .lt-ctable input, .lt-ctable select { height: 40px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; background: #fff; }
+.lt-cgrid input { width: 170px; }
+.lt-cgrid select { min-width: 220px; }
+.lt-cgrid label.wide input { width: 240px; }
+.lt-ctable { width: 100%; min-width: 760px; }
+.lt-ctable th, .lt-ctable td { font-size: 16px; vertical-align: middle; }
+.lt-ctable tbody th { text-align: left; white-space: nowrap; color: var(--ud-blue-dark); }
+.lt-ctable input { width: 100%; min-width: 70px; }
+.lt-ctable td:nth-child(2) input { min-width: 160px; }
+.lt-ctable .lt-mut { color: var(--muted); font-weight: 600; white-space: normal; overflow: visible; text-overflow: clip; }
+.lt-test { min-width: 300px; text-align: left; }
+.lt-test button { min-height: 40px; padding: 0 14px; border: 1px solid var(--ud-blue); border-radius: 9px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.lt-test button:disabled { opacity: .55; cursor: default; }
+.lt-test div { margin-top: 4px; }
+.lt-good { color: #1d6b3a; font-weight: 700; } .lt-bad { color: #c62828; font-weight: 700; } .lt-wait { color: var(--muted); font-weight: 700; }
+/* Line tablet: From the machine (Joe 10/14), the jug count, speed and temperature read from the machine's controller. */
+.lb-mach[hidden] { display: none; }
+.lb-mach-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 14px 2px 0; font-size: 16px; font-weight: 800; letter-spacing: .08em; color: var(--ud-blue-dark); text-transform: uppercase; }
+.lb-mach-head span { letter-spacing: 0; text-transform: none; font-weight: 600; color: #5b6b7c; }
+.lb-mach-head span.stale { color: #c62828; font-weight: 800; }
+.lb-mach-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 8px; }
+.lb-mach-row.n1 { grid-template-columns: 1fr 2fr; } .lb-mach-row.n2 { grid-template-columns: 1fr 1fr; }
+.lb-mach-row .lb-card { border-left: 6px solid #2e7d32; }
+.lb-mach-row .lb-card.lb-flash { border-left-width: 6px; }
+.lb-mach-note { margin: 8px 2px 0; font-size: 16px; font-weight: 600; color: #5b6b7c; }
+@media (max-width: 860px) { .lb-mach-row { gap: 10px; } }
+/* Line tablet: a Blow Mold head's jug outside the weight range (Joe 10/14, six heads in grams). */
+.lb-field.lb-off { color: #c62828; }
+.lb-field.lb-off b { align-self: flex-start; margin-top: 4px; }
+.lb-fields:has(.lb-off) { align-items: flex-start; }
+.lb-field.lb-off .lb-in { border-color: #c62828; background: #fde1e1; color: #c62828; }
+.lb-wrange { margin: 8px 0 0; }

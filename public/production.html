@@ -78,7 +78,7 @@
     const who = (email) => String(email || '').split('@')[0];
     const latest = (v, field) => { const c = (v.run && v.run.checks) || {}; for (const k of Object.keys(c).map(Number).sort((a, b) => b - a)) if (c[k] && String(c[k][field] || '') !== '') return { value: c[k][field], at: c[k].at }; return null; };
     // A line needs attention when it is stopped, has a stop with no reason, is off its speed, more than 10% behind, has a check due or is past its CIP hours.
-    const attention = (v) => v.state === 'STOPPED' || v.needReason.length > 0 || v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' || (v.pct !== null && v.pct < 90) || (v.check && !v.check.done && v.state !== 'IDLE') || (v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours) || !!v.diverting;
+    const attention = (v) => v.state === 'STOPPED' || v.needReason.length > 0 || v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' || (v.pct !== null && v.pct < 90) || (v.check && !v.check.done && v.state !== 'IDLE') || (v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours) || !!v.diverting || !!(v.machine && (v.machine.speedFlag || v.machine.tempFlag)) || !!(v.reader && v.reader.lastUpc && v.reader.lastUpc === v.reader.lastUnknownUpc);
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
 
     function render() {
@@ -114,6 +114,14 @@
       } else if (v.speed !== null || (tg && (tg.minSpeed !== null || tg.maxSpeed !== null))) {
         rows.push('Speed ' + b(v.speed === null ? '—' : v.speed + '/min') + (tg && (tg.minSpeed !== null || tg.maxSpeed !== null) ? ' (' + (tg.minSpeed !== null ? tg.minSpeed : 0) + (tg.maxSpeed !== null ? '–' + tg.maxSpeed : '+') + ')' : '') + (manager() && v.efficiency && v.efficiency.oee !== null ? ' &nbsp; Efficiency ' + b(v.efficiency.oee + '%') : ''));
       } else if (manager() && v.efficiency && v.efficiency.oee !== null) rows.push('Efficiency ' + b(v.efficiency.oee + '%'));
+      // The label reader (Joe 10/14): the UPC on the jugs is not one of this line's products.
+      if (v.reader && v.reader.lastUpc && v.reader.lastUpc === v.reader.lastUnknownUpc) rows.push('<b class="pd-bad">WRONG LABEL</b> UPC ' + escapeHtml(v.reader.lastUnknownUpc));
+      // From the machine's controller (Joe 10/14): speed and temperature, red outside the range set on Line Targets.
+      const m = v.machine;
+      if (m && (m.speed !== null || m.temp !== null)) {
+        const flag = (f, hi, lo) => f === 'HIGH' ? ' <b class="pd-bad">' + hi + '</b>' : f === 'LOW' ? ' <b class="pd-bad">' + lo + '</b>' : '';
+        rows.push('Machine' + (m.speed !== null ? ' &nbsp; ' + escapeHtml(m.speedName) + ' ' + b(fmt(m.speed)) + flag(m.speedFlag, 'TOO FAST', 'TOO SLOW') : '') + (m.temp !== null ? ' &nbsp; Temp ' + b(fmt(m.temp) + '°F') + flag(m.tempFlag, 'TOO HOT', 'TOO COLD') : '') + (m.stale ? ' &nbsp; <b class="pd-bad">not reading</b>' : ''));
+      }
       if (v.changeover) rows.push((v.kind === 'BLOWMOLD' ? 'Mold change ' : 'Changeover ') + b(v.changeover.minutes + (v.changeoverStd ? ' of ' + v.changeoverStd : '') + ' min') + (v.changeoverStd ? ' standard' : '') + ' &nbsp; Checklist ' + b(Object.keys(v.changeover.checks).length + ' of ' + (R.CHANGEOVER_CHECKS[v.kind] || []).length));
       if (v.cip) rows.push('CIP wash ' + b(v.cip.minutes + ' min') + ' since ' + clockOf(v.cip.start));
       else if (v.cipHours && v.sinceCipHours !== null) rows.push('Since CIP ' + b(v.sinceCipHours + ' of ' + v.cipHours + ' h'));
@@ -169,23 +177,34 @@
       const tl = segs.length ? '<div class="pd-tl">' + segs.map(x => '<i class="' + x.kind + '" style="width:' + (x.minutes / total * 100) + '%" title="' + (NAMES[x.kind] || 'Still to come') + ' ' + clockOf(x.from) + ', ' + x.minutes + ' min"></i>').join('') + '</div><div class="pd-ticks">' + ticks.join('') + '</div><div class="pd-key">' + Object.keys(NAMES).map(k => '<span><i class="' + k + '"></i>' + NAMES[k] + '</span>').join('') + '</div>' : '<p class="pd-none">Nothing entered on this line this shift.</p>';
       // Hour by hour
       const hrs = R.hourly(run, v.targets, t).filter(x => x.past);
-      const hourRows = hrs.map(x => [clockOf(x.from).replace(':00', '') + '–' + clockOf(x.to).replace(':00', ''), escapeHtml(x.products.join(' → ') || '—'), fmt(x.made), fmt(x.target), x.pct === null ? '–' : x.pct, x.stopped]);
+      const mach = v.machine, hasM = !!mach && hrs.some(x => x.speed !== null || x.temp !== null);
+      const mCell = (val, lo, hi, unit) => val === null ? '–' : R.machineFlag(val, lo, hi) ? '<b class="pd-bad">' + fmt(val) + unit + '</b>' : fmt(val) + unit;
+      const hourRows = hrs.map(x => [clockOf(x.from).replace(':00', '') + '–' + clockOf(x.to).replace(':00', ''), escapeHtml(x.products.join(' → ') || '—'), fmt(x.made), fmt(x.target), x.pct === null ? '–' : x.pct, x.stopped]
+        .concat(hasM ? [mCell(x.speed, mach.speedLow, mach.speedHigh, ''), mCell(x.temp, mach.tempLow, mach.tempHigh, '°')] : []));
+      const machBox = mach ? box('From the machine', (() => {
+        const range = (lo, hi, u) => lo === null && hi === null ? 'no range set' : (lo === null ? 'up' : lo + u) + ' to ' + (hi === null ? 'any' : hi + u);
+        const line = (name, now, lo, hi, mn, mx, out, f, u) => now === null && mn === null ? '' : '<p><b>' + escapeHtml(name) + ':</b> ' + (now === null ? '—' : (f ? '<b class="pd-bad">' + fmt(now) + u + '</b>' : '<b>' + fmt(now) + u + '</b>')) + ' now · shift ' + (mn === null ? '—' : fmt(mn) + u + ' to ' + fmt(mx) + u) + ' · range ' + escapeHtml(range(lo, hi, u)) + (out ? ' · <b class="pd-bad">' + out + ' min outside</b>' : '') + '</p>';
+        return (mach.counter !== null ? '<p><b>Machine counter:</b> ' + fmt(mach.counter) + (v.counter === 'CONTROLLER' ? ' (the jugs made count from it)' : '') + '</p>' : '') +
+          line(mach.speedName, mach.speed, mach.speedLow, mach.speedHigh, mach.speedMin, mach.speedMax, mach.speedOutMin, mach.speedFlag, '') +
+          line('Temperature', mach.temp, mach.tempLow, mach.tempHigh, mach.tempMin, mach.tempMax, mach.tempOutMin, mach.tempFlag, '°F') +
+          '<p class="pd-none">Read ' + (mach.stale ? '<b class="pd-bad">last at ' + clockOf(mach.at) + ', not reading now</b>' : clockOf(mach.at)) + ' from the machine\'s controller (read-only).</p>';
+      })()) : '';
       const eff = v.efficiency;
       const effBox = mgr ? box('How the shift is going', eff ? '<p class="pd-eff">Running <b>' + (eff.running === null ? '—' : eff.running + '%') + '</b> of the time &nbsp; At speed <b>' + (eff.speed === null ? '—' : eff.speed + '%') + '</b> &nbsp; Good <b>' + (eff.good === null ? '—' : eff.good + '%') + '</b></p><p class="pd-oee">Line efficiency ' + (eff.oee === null ? '—' : eff.oee + '%') + '</p><p class="pd-none">Running time × speed × good product. Changeovers and stops count against running time; CIP washes and breaks do not.</p>' : '<p class="pd-none">Starts with the shift\'s first product.</p>') : '';
       const coRows = v.changeovers.map(c => [escapeHtml((c.from || '—') + ' → ' + (c.to || '—')), clockOf(c.start), c.end ? c.minutes : c.minutes + ' so far', v.changeoverStd === null ? '–' : v.changeoverStd]);
       const stopRows = (run.stops || []).map(s => { const m = Math.round(((s.end ? Date.parse(s.end) : t) - Date.parse(s.start)) / 60000); return [clockOf(s.start), s.end ? m : m + ' so far', escapeHtml(s.reason || 'No reason yet') + (s.woNumber ? ' · <a href="pmaint.html">work order ' + escapeHtml(s.woNumber) + '</a>' : ''), escapeHtml(who(s.reasonBy || s.by))]; });
       const wasteRows = Object.keys(v.waste).map(k => [escapeHtml(k), fmt(v.waste[k])]);
       const fields = R.CHECK_FIELDS[v.kind] || [], every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, checks = run.checks || {};
-      const checkRows = Object.keys(checks).map(Number).sort((a, b) => a - b).map(n => [clockOf(new Date(start + n * every).toISOString())].concat(fields.map(f => { const x = String(checks[n][f[0]] === undefined ? '' : checks[n][f[0]]); return /NOT OK|LATE/.test(x) ? '<b class="pd-bad">' + escapeHtml(x) + '</b>' : escapeHtml(x); }), [escapeHtml(who(checks[n].by))]));
+      const checkRows = Object.keys(checks).map(Number).sort((a, b) => a - b).map(n => [clockOf(new Date(start + n * every).toISOString())].concat(fields.map(f => { const x = String(checks[n][f[0]] === undefined ? '' : checks[n][f[0]]), wf = R.weightFlag(f[0], x, { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high }); return /NOT OK|LATE/.test(x) || wf ? '<b class="pd-bad">' + escapeHtml(x) + (wf ? ' ' + wf : '') + '</b>' : escapeHtml(x); }), [escapeHtml(who(checks[n].by))]));
       const cipRows = v.cips.map(c => [clockOf(c.start), c.end ? clockOf(c.end) : 'washing', c.minutes, c.result === 'FAIL' ? '<b class="pd-bad">Failed</b>' : c.result ? 'Passed' : '']);
       const crew = v.crew.length ? v.crew.map(c => escapeHtml(c.name) + (c.on ? '' : ' (off)')).join(', ') : 'No one signed on.';
       const notes = '<p><b>Crew:</b> ' + crew + '</p>' + (v.prevNote ? '<p><b>From last shift' + (v.prevNoteBy ? ' (' + escapeHtml(who(v.prevNoteBy)) + ')' : '') + ':</b> ' + escapeHtml(v.prevNote) + '</p>' : '') + '<p><b>For the next shift:</b> ' + (v.note ? escapeHtml(v.note) : 'no note yet') + '</p>' +
         (v.kind === 'HTST' ? '<p><b>Silo and tanks:</b> ' + escapeHtml([v.source.from, v.source.to].filter(Boolean).join(' → ') || '—') + ' &nbsp; <b>Diverts:</b> ' + v.diverts + '</p>' : '') + (v.kind === 'BLOWMOLD' ? '<p><b>Resin lot:</b> ' + escapeHtml(v.lot || '—') + ' &nbsp; <b>Jugs ahead:</b> ' + (v.stock === null ? '—' : fmt(v.stock)) + '</p>' : '') +
         (v.next ? '<p><b>Up next:</b> ' + escapeHtml(v.next.product) + (v.next.qty ? ' · ' + fmt(v.next.qty) : '') + '</p>' : '');
       document.getElementById('detail').innerHTML = box(escapeHtml(v.line.name) + ' · this shift', tl, 'wide') +
-        '<div class="pd-col">' + box('Hour by hour', table([['Hour'], ['Product', 'w'], ['Made', 1], ['Target', 1], ['%', 1], ['Stopped', 1]], hourRows, 'No hours yet this shift.')) +
+        '<div class="pd-col">' + box('Hour by hour', table([['Hour'], ['Product', 'w'], ['Made', 1], ['Target', 1], ['%', 1], ['Stopped', 1]].concat(hasM ? [[escapeHtml(mach.speedName), 1], ['Temp', 1]] : []), hourRows, 'No hours yet this shift.')) +
         box('Stops and why', table([['From'], ['Min', 1], ['Why', 'w'], ['Who']], stopRows, 'No stops this shift.')) + box('Waste and rejects', table([['Why', 'w'], ['How many', 1]], wasteRows, 'No waste entered this shift.')) + '</div>' +
-        '<div class="pd-col">' + effBox + box('Changeovers', table([['From → to', 'w'], ['Started'], ['Min', 1], ['Standard', 1]], coRows, 'No changeovers this shift.')) +
+        '<div class="pd-col">' + machBox + effBox + box('Changeovers', table([['From → to', 'w'], ['Started'], ['Min', 1], ['Standard', 1]], coRows, 'No changeovers this shift.')) +
         box('CIP washes', table([['Started'], ['Done'], ['Min', 1], ['Result']], cipRows, v.lastCipAt ? 'None this shift. Last one that passed: ' + shortDate(v.lastCipAt.slice(0, 10)) + ' ' + clockOf(v.lastCipAt) + '.' : 'None this shift.')) +
         box('Crew and notes', notes) + '</div>' +
         box('Quality checks', table([['Time']].concat(fields.map(f => [escapeHtml(f[1]), f[2] === 'num' ? 1 : 0])).concat([['By']]), checkRows, 'No checks yet this shift.'), 'wide');
