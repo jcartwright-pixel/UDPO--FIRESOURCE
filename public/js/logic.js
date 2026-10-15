@@ -165,14 +165,25 @@
     return d.active === undefined || d.active === null || d.active === '' ? true : d.active === true;
   }
   // A truck, trailer or pallet jack can be put on a run only when its status is AVAILABLE, ACTIVE, IN SERVICE or READY and,
-  // for trucks and trailers, it is still on the United Dairy fleet list import (source_present), as udpoV7000EquipmentIsActive_.
+  // for trucks, it is still on the United Dairy fleet list import (source_present), as udpoV7000EquipmentIsActive_.
+  // Joe 10/15 (T-10311 on Marietta 909): the trailer box takes any trailer number, so an ACTIVE trailer that is not on the fleet
+  // list is usable; a trailer marked DOWN or INACTIVE (a trailer dropped from the fleet list is set INACTIVE) still is not.
   var UNIT_ON_STATUSES = ['AVAILABLE', 'ACTIVE', 'IN SERVICE', 'READY'];
   function unitUsable(unit) {
     if (!unit) return false;
     if (UNIT_ON_STATUSES.indexOf(String(unit.status || '').trim().toUpperCase()) < 0) return false;
     var type = String(unit.type || '').toUpperCase();
-    if ((type === 'TRUCK' || type === 'TRACTOR' || type === 'TRAILER') && unit.sourcePresent === false) return false;
+    if ((type === 'TRUCK' || type === 'TRACTOR') && unit.sourcePresent === false) return false;
     return true;
+  }
+  // A trailer number as typed on Daily, Weekly or the route editor: TBA and N/A stay as words; a bare number or T-number becomes
+  // T-###; anything else is kept as typed (Joe 10/15: "allow numbers, also allow TBA"; TBA used to become T-BA).
+  function trailerNumber(v) {
+    var c = String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, '');
+    if (!c) return '';
+    if (c === 'TBA' || c === 'N/A' || c === 'NA') return c === 'NA' ? 'N/A' : c;
+    var m = /^T-?(\d+)$/.exec(c) || /^(\d+)$/.exec(c);
+    return m ? 'T-' + m[1] : c;
   }
 
   // Equipment Issues (the current app's Maintenance screen, udpoV740MaintenanceRowsFromTable_): the write-ups on TRUCK LIVE,
@@ -729,11 +740,11 @@
 
   // Truck and trailer choices skip these, as the current app does (unless OVR is ticked).
   var UNIT_OFF_STATUSES = ['DOWN', 'INACTIVE', 'OUT', 'OUT OF SERVICE', 'OOS', 'REPAIR', 'DISABLED', 'UNAVAILABLE'];
-  // Off = not usable by the current app's rule (unitUsable below): a status outside AVAILABLE / ACTIVE / IN SERVICE / READY, or a truck
-  // or trailer no longer on the fleet list import.
+  // Off = not usable (unitUsable above): a status outside AVAILABLE / ACTIVE / IN SERVICE / READY, or a truck no longer on the
+  // fleet list import.
   function unitOff(unit) { return !unitUsable(unit); }
   // Joe 10/12 ("T-10308 is ACTIVE (not usable)"): why an off unit is off, in words: its status (DOWN, INACTIVE, ...), or, for an
-  // ACTIVE truck or trailer, that it is not on the fleet list. '' when the unit is usable.
+  // ACTIVE truck, that it is not on the fleet list. '' when the unit is usable.
   function unitOffWhy(unit) {
     if (!unit || !unitOff(unit)) return '';
     var status = String(unit.status || '').trim().toUpperCase();
@@ -1208,7 +1219,7 @@
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
-    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, driverActive: driverActive, notRunningRows: notRunningRows,
+    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,

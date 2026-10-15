@@ -203,6 +203,51 @@ async function keyMove(page, route, dir) {
     assert.ok(await scrolled() > top0, 'the list scrolls by itself while a line is held near the bottom edge');
     await short.context().close();
     results.push('Holding a dragged line near the bottom edge scrolls the list by itself (as on Daily Dispatch)');
+    // Joe 10/15 ("grab and move doesn't work in plant case loading"): on his 1536 screen a load picked up from a line near the
+    // bottom of the list goes where it is let go. The list used to start scrolling the moment such a line was picked up,
+    // carrying the other loads away under the pointer, so the load landed back where it was.
+    const laptop = await openPage(browser, { viewport: { width: 1536, height: 730 }, deviceScaleFactor: 1.25 }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
+    await laptop.waitForSelector(row('811') + '[data-drag]');
+    // A line near the bottom of the list (the list could still scroll on down) is grabbed by its Route and let go above the
+    // first open line.
+    const at = await laptop.evaluate(() => {
+      let n = document.querySelector('#rows').parentElement;
+      for (; n && n !== document.body; n = n.parentElement) { const o = getComputedStyle(n).overflowY; if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) break; }
+      const lines = [...document.querySelectorAll('#rows tr[data-drag]')], first = lines[0], box = n.getBoundingClientRect(), room = n.scrollHeight - n.clientHeight;
+      // A line (two or more places below the first, so it alone counts as moved) that can sit in the bottom 48 pixels of the list with the list still able to scroll on down,
+      // and the first open line still showing.
+      const mid = (tr) => { const b = tr.children[0].getBoundingClientRect(); return b.top + b.height / 2; };
+      let tr = null;
+      for (const t of lines.slice(2)) {
+        const s = Math.max(0, n.scrollTop + mid(t) - (box.bottom - 20));
+        if (s > room - 30) continue;
+        n.scrollTop = s;
+        const fromBottom = box.bottom - mid(t), q = first.children[0].getBoundingClientRect();
+        if (fromBottom > 0 && fromBottom < 48 && q.top > box.top + 40) { tr = t; break; }
+      }
+      if (!tr) return { none: true, room, box: [box.top, box.bottom] };
+      const p = tr.children[0].getBoundingClientRect(), q = first.children[0].getBoundingClientRect();
+      return { low: tr.children[0].textContent, high: first.children[0].textContent, fromBottom: box.bottom - mid(tr), scrollTop: n.scrollTop, room,
+        pick: { x: p.left + p.width / 2, y: p.top + p.height / 2 }, drop: { x: q.left + q.width / 2, y: q.top + q.height * 0.25 } };
+    });
+    assert.ok(!at.none, 'a line can sit in the bottom 48 pixels of the list ' + JSON.stringify(at));
+    const { low, high, pick, drop } = at;
+    await laptop.mouse.move(pick.x, pick.y);
+    await laptop.mouse.down();
+    // Picked up (a small move up), held still a moment as a person does, then moved up to the first open line.
+    await laptop.mouse.move(pick.x, pick.y - 8);
+    await laptop.waitForTimeout(500);
+    for (let i = 1; i <= 20; i++) { await laptop.mouse.move(pick.x + i, pick.y + (drop.y - pick.y) * i / 20); await laptop.waitForTimeout(40); }
+    await laptop.waitForTimeout(300);
+    await laptop.mouse.up();
+    await laptop.waitForFunction(([l, h]) => { const r = [...document.querySelectorAll('#rows tr[data-drag] td:first-child')].map(td => td.textContent); return r.indexOf(l) === r.indexOf(h) - 1; }, [low, high], { timeout: 8000 })
+      .catch(async () => { throw new Error(low + ' was let go above ' + high + ' but the screen shows ' + (await routes(laptop)).join(',') + ' / ' + (await laptop.textContent('#error').catch(() => ''))); });
+    // (Earlier moves already took this day out of the sheet's order, so which lines show MOVED is checked above, not here.)
+    assert.ok((await movedRoutes(laptop)).length > 0, 'moved lines still show green with MOVED');
+    if (SHOTS) await laptop.screenshot({ path: path.join(SHOTS, '6b-loadout-bottom-line-moved-1536.png'), scale: 'css' });
+    assert.deepEqual(laptop.errors, []);
+    await laptop.context().close();
+    results.push('1536 screen: a load picked up from a line at the bottom of the list goes where it is let go (the list no longer scrolls away at pick-up)');
     // Joe 10/12 ("mobile looks wrong and I can't edit"): on a phone each load is a card with its boxes named, big enough to type in,
     // the page scrolls as a whole (no strip a few rows high) and nothing slides sideways.
     const phone = await openPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');

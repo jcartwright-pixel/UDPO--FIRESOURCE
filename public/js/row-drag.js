@@ -18,7 +18,7 @@
 // focused line, ahead of the screen's own keys on that box.
 
 const SKIP = 'input, button, select, textarea, a, label, [contenteditable]';
-const HOLD_MS = 350, MOUSE_PX = 6;
+const HOLD_MS = 350, MOUSE_PX = 6, EDGE_PX = 12;
 
 export function mountRowDrag({ box, canDrag, onMove, onEnd, keysInside = false, handle = (td) => td.cellIndex < 2 }) {
   let press = null, drag = null;
@@ -65,12 +65,16 @@ export function mountRowDrag({ box, canDrag, onMove, onEnd, keysInside = false, 
     try { box.setPointerCapture(press.pointerId); } catch (e) { /* the pointer is gone */ }
     // Near the top or bottom of the window (or the list's own scroll box) the list scrolls by itself, as on Daily Dispatch,
     // so a load can be moved past what is on screen.
+    // Joe 10/15 ("grab and move doesn't work"): a line picked up near the bottom (or top) of the list no longer sets the list
+    // scrolling at once, which carried the other loads away under the pointer so the line landed back where it was; the list
+    // scrolls only once the line is moved on toward that edge.
     const sc = scrollerOf(box);
     drag.y = press.y;
+    drag.startY = press.y;
     drag.scroller = setInterval(() => {
       if (!drag) return;
       const r = sc === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : sc.getBoundingClientRect(), edge = 48;
-      const step = drag.y < r.top + edge ? -12 : drag.y > r.bottom - edge ? 12 : 0;
+      const step = drag.y < r.top + edge && drag.y < drag.startY - EDGE_PX ? -12 : drag.y > r.bottom - edge && drag.y > drag.startY + EDGE_PX ? 12 : 0;
       if (step) { sc.scrollTop += step; drag.to = showLine(drag.y); }
     }, 30);
     if (navigator.vibrate && press.touch) { try { navigator.vibrate(15); } catch (e) { /* not allowed */ } }
