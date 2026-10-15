@@ -217,6 +217,8 @@ function validateLoad(input, SaveError) {
   }
   // The Loadout Center asks to load past the limit; only a manager's save gets it (loadValues).
   if (input.overLimit === true && !out.assign) out.overLimit = true;
+  // Loading Rundown (Joe 10/15): a Plant Station tablet signed in with a UD account names its station, so its times show as the tablet's.
+  if (input.station !== undefined && text(input.station)) out.station = text(input.station).replace(/[^A-Za-z0-9 /&-]/g, '').slice(0, 40);
   return out;
 }
 
@@ -310,7 +312,32 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
       after[idField] = u.id;
     });
   }
+  if (req.saver) markTimes(day, after, stamp, req.saver);
   return after;
+}
+
+/*
+ * Loading Rundown (Joe 10/15): who recorded each Start and End time, from where, and every later change. App-only day fields
+ * (model.APP_ONLY_DAY_FIELDS), never written to the sheet:
+ *   startMark / endMark  the time now on the load: { value, savedAt, by, name, via: 'TABLET' | 'DESK', station }
+ *   timeEdits            the last 12 changes to a time already there: { what: 'START' | 'END', from, to, savedAt, by, name, via, station, was }
+ *                        (was = who had recorded the time that was changed)
+ * saver = { email, name, station }: a Plant Station tablet names its station; any other save is the manager's desk
+ * (Daily Case Loadout). A mark whose value no longer matches the load's time was changed outside the app (the sheet).
+ */
+const TIME_MARKS = [['plantStartedAt', 'startMark', 'START'], ['completeTime', 'endMark', 'END']];
+function markTimes(day, after, stamp, saver) {
+  const who = { savedAt: stamp, by: text(saver.email), name: text(saver.name), via: saver.station ? 'TABLET' : 'DESK', station: text(saver.station) };
+  const edits = Array.isArray(day.timeEdits) ? day.timeEdits.slice() : [], had = edits.length;
+  TIME_MARKS.forEach(([field, mark, what]) => {
+    if (after[field] === undefined) return;
+    const was = text(day[field]), now = text(after[field]);
+    if (was === now) return;
+    const old = day[mark] && day[mark].value === was ? day[mark] : null;
+    if (was) edits.push(Object.assign({ what, from: was, to: now }, who, { was: old ? { name: old.name || old.by || '', via: old.via || '', station: old.station || '', savedAt: old.savedAt || '' } : null }));
+    after[mark] = now ? Object.assign({ value: now }, who) : '';
+  });
+  if (edits.length !== had) after.timeEdits = edits.slice(-12);
 }
 
 // Trailer Assignments' checks (udpoV7176ResolveUnitInput_, 220_V7276_DownUnitsOffSchedule.gs): a short number that matches

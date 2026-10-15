@@ -77,6 +77,8 @@
     let date = today(), pane = params.get('view') === 'history' ? 'history' : 'current';
     let runs = [], journal = [], person = null, app = {};
     const drafts = {};          // trailer -> what was typed and not recorded yet
+    // The set point in the box: what was just typed, else the trailer's last set point.
+    const setOf = (x) => { const d = drafts[x.trailer] || {}; return d.setPoint !== undefined ? d.setPoint : x.setPoint || ''; };
     const pending = [];         // checks pressed and not back from the database yet (shown at once)
     const armed = {};           // trailer -> Left Yard pressed once, waiting for Confirm Left
     const unsubs = [];
@@ -118,7 +120,9 @@
         const dis = ck ? '' : ' disabled';
         return '<tr data-trailer="' + escapeHtml(x.trailer) + '" data-route="' + escapeHtml(x.routeRun) + '"><td class="yd-trailer"><b>' + escapeHtml(x.trailer) + '</b><small>' + escapeHtml(next) + '</small></td>' +
           '<td><input class="yd-temp" data-k="temperature" inputmode="decimal" aria-label="Temperature for trailer ' + escapeHtml(x.trailer) + '" placeholder="Temp" value="' + escapeHtml(v('temperature')) + '"' + dis + '></td>' +
-          '<td><input class="yd-set" value="' + escapeHtml(x.setPoint) + '" readonly tabindex="-1"></td>' +
+          // Joe 10/15 ("unable to enter the temperature setting"): the set point is typed here, like the temperature; the trailer's
+          // last set point stays in the box (it is the reefer's setting, not a reading) and can be changed.
+          '<td><input class="yd-set" data-k="setPoint" inputmode="decimal" aria-label="Set point for trailer ' + escapeHtml(x.trailer) + '" placeholder="Set" value="' + escapeHtml(setOf(x)) + '"' + dis + '></td>' +
           '<td><select data-k="fuelLevel"' + dis + '>' + FUEL.map(([val, label]) => '<option value="' + val + '"' + (v('fuelLevel') === val ? ' selected' : '') + '>' + label + '</option>').join('') + '</select></td>' +
           '<td><input class="yd-notes" data-k="notes" placeholder="Add notes (optional)…" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></td>' +
           '<td class="yd-last">' + last + '</td><td class="yd-next' + (x.minutesUntilDue === 0 ? ' overdue' : '') + '">' + escapeHtml(next) + '<small>' + escapeHtml(x.routeRun) + '</small></td>' +
@@ -159,6 +163,7 @@
         return '<article class="yd-card' + (m ? ' done' : '') + '" data-trailer="' + escapeHtml(x.trailer) + '" data-route="' + escapeHtml(x.routeRun) + '">' +
           '<header><b>' + escapeHtml(x.trailer) + '</b><span class="yd-run">' + escapeHtml(x.routeRun) + '</span>' + state + '</header>' +
           '<label class="yd-f"><span>Temp °F</span><input data-k="temperature" inputmode="decimal" enterkeyhint="done" placeholder="Temp" value="' + escapeHtml(v('temperature')) + '"' + dis + '></label>' +
+          '<label class="yd-f"><span>Set °F</span><input data-k="setPoint" inputmode="decimal" enterkeyhint="done" placeholder="Set point" value="' + escapeHtml(setOf(x)) + '"' + dis + '></label>' +
           '<div class="yd-f"><span>Fuel</span><div class="yd-fuel">' + ['FULL', '3/4', '1/2', 'EMPTY'].map(f => '<button type="button" data-fuel="' + f + '" aria-pressed="' + (fuel === f) + '"' + dis + '>' + (f === 'FULL' ? 'Full' : f === 'EMPTY' ? 'Empty' : f) + '</button>').join('') + '</div></div>' +
           '<label class="yd-f"><span>Notes</span><input data-k="notes" enterkeyhint="done" placeholder="Optional" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></label>' +
           (ck ? '<button type="button" class="yd-leave" data-left' + (armed[x.trailer] ? ' data-armed="true">Tap again to confirm: left the yard' : '>Left Yard') + '</button>' : '') + '</article>';
@@ -184,6 +189,11 @@
         showError('Yard check ' + trailer + ' not saved: the temperature must be a number, like 35.');
         return;
       }
+      if (d.setPoint !== undefined && String(d.setPoint).trim() !== '' && !/^-?\d+(\.\d+)?$/.test(String(d.setPoint).trim())) {
+        if (mine[trailer]) { mine[trailer].saved = 'error'; tick(trailer); }
+        showError('Yard check ' + trailer + ' not saved: the set point must be a number, like 34.');
+        return;
+      }
       forgetOld();
       const x = queue().rows.concat(queue().locked).find(r => r.trailer === trailer) || {};
       const m = mine[trailer] = mine[trailer] || { saved: 'saving' };
@@ -191,7 +201,7 @@
       tick(trailer);
       const pick = (k) => d[k] !== undefined ? d[k] : (m.checkId ? x[k] || '' : '');
       const run = async () => {
-        const fields = { date, trailer, routeRun, temperature: pick('temperature'), setPoint: x.setPoint || '', fuelLevel: pick('fuelLevel'), notes: pick('notes') };
+        const fields = { date, trailer, routeRun, temperature: pick('temperature'), setPoint: d.setPoint !== undefined ? d.setPoint : x.setPoint || '', fuelLevel: pick('fuelLevel'), notes: pick('notes') };
         if (m.checkId) fields.checkId = m.checkId;
         let mineRec = null;
         if (!m.checkId) {
@@ -247,7 +257,7 @@
     async function send(trailer, routeRun, departed) {
       const d = drafts[trailer] || {}, x = queue().rows.find(r => r.trailer === trailer) || {};
       const fields = departed ? { date, trailer, routeRun, departed: true }
-        : { date, trailer, routeRun, temperature: d.temperature !== undefined ? d.temperature : x.temperature || '', setPoint: x.setPoint || '', fuelLevel: d.fuelLevel !== undefined ? d.fuelLevel : x.fuelLevel || '', notes: d.notes !== undefined ? d.notes : x.notes || '' };
+        : { date, trailer, routeRun, temperature: d.temperature !== undefined ? d.temperature : x.temperature || '', setPoint: d.setPoint !== undefined ? d.setPoint : x.setPoint || '', fuelLevel: d.fuelLevel !== undefined ? d.fuelLevel : x.fuelLevel || '', notes: d.notes !== undefined ? d.notes : x.notes || '' };
       const mine = { type: 'YARD_CHECK', date, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, run: routeRun,
         payload: departed ? { route: routeRun, run: routeRun, trailer, notes: 'Left the yard', status: 'DEPARTED' } : Object.assign({ route: routeRun, run: routeRun, status: 'COMPLETE' }, fields) };
       pending.push(mine);

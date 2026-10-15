@@ -351,3 +351,27 @@ test('Send Current Report with email set up: the report is SENDING, with the rep
     assert.deepEqual([kept.status, kept.emailed, JSON.parse(kept.reportJson).dayLabel], ['SENDING', false, 'Thursday 10/8']);
   } finally { delete process.env.MAIL_FROM; }
 });
+
+// Joe 10/15 (Loading Rundown): each Start / End keeps who saved it and whether from a Plant Station tablet or the desk; a change
+// keeps the old time; the next copy from the sheets keeps all of it (app-only fields).
+test('Loading Rundown: the tablet and the desk are told apart, a changed time is kept, and the copy keeps them', async () => {
+  const [w] = (await areaLoads('CASE')).filter(x => isWaiting(x.d));
+  const ADMIN = { email: 'admin.test@uniteddairy.com' };
+  const save = (user, fields, extra) => applyAction(db(), user, Object.assign({ action: 'savePlantLoad', requestId: rid(), runDocId: w.runDocId, day: w.day, fields, overLimit: true }, extra || {}), tick);
+  await save(ADMIN, { startedAt: '2026-10-08T15:00:00.000Z' }, { station: 'Case Loadout' });
+  let d = (await db().collection('runs').doc(w.runDocId).get()).data().days[w.day];
+  assert.deepEqual([d.startMark.via, d.startMark.station, d.startMark.value, d.startMark.by], ['TABLET', 'Case Loadout', '2026-10-08T15:00:00.000Z', 'admin.test@uniteddairy.com']);
+  await save(ADMIN, { startedAt: '2026-10-08T14:30:00.000Z', completedAt: '2026-10-08T15:20:00.000Z' });
+  d = (await db().collection('runs').doc(w.runDocId).get()).data().days[w.day];
+  assert.equal(d.startMark.via, 'DESK');
+  assert.equal(d.endMark.value, '2026-10-08T15:20:00.000Z');
+  assert.equal(d.timeEdits.length, 1);
+  assert.deepEqual([d.timeEdits[0].what, d.timeEdits[0].from, d.timeEdits[0].to, d.timeEdits[0].via, d.timeEdits[0].was.via], ['START', '2026-10-08T15:00:00.000Z', '2026-10-08T14:30:00.000Z', 'DESK', 'TABLET']);
+  // A Plant Station signed in by its code alone is the tablet, named by its station.
+  await save({ email: 'station:st_x', station: { name: 'Case Loadout 2' } }, { completedAt: '2026-10-08T15:25:00.000Z' });
+  d = (await db().collection('runs').doc(w.runDocId).get()).data().days[w.day];
+  assert.deepEqual([d.endMark.via, d.endMark.station, d.timeEdits.length], ['TABLET', 'Case Loadout 2', 2]);
+  await copy();
+  const kept = (await db().collection('runs').doc(w.runDocId).get()).data().days[w.day];
+  assert.deepEqual([kept.startMark.via, kept.endMark.station, kept.timeEdits.length], ['DESK', 'Case Loadout 2', 2]);
+});

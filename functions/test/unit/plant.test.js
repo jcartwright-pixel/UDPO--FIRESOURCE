@@ -355,3 +355,25 @@ test('Run Complete: a Finished line is done for its shift; Undo takes it back (J
   assert.throws(() => P.validateQuality({ operationId: 'ut_prod_gallon', undone: true }, SaveError), /Undo needs the check/);
 });
 
+
+test('Loading Rundown: each Start / End keeps who saved it and from where, and a changed time keeps the change', async () => {
+  const save = (day, fields, saver) => P.loadValues(tx(), db, { plant: P.validateLoad({ fields }, SaveError), saver }, day, STAMP, SaveError);
+  const tablet = { email: 'station:st_1', name: 'Case Loadout', station: 'Case Loadout' }, desk = { email: 'mgr@uniteddairy.com', name: 'Pat Manager', station: '' };
+  const a = await save({}, { startedAt: '2026-10-08T10:00:00Z' }, tablet);
+  assert.deepEqual(a.startMark, { value: '2026-10-08T10:00:00.000Z', savedAt: STAMP, by: 'station:st_1', name: 'Case Loadout', via: 'TABLET', station: 'Case Loadout' });
+  assert.equal(a.timeEdits, undefined);
+  // The manager moves the Start at the desk: the new mark is the desk's, and the change keeps the tablet as who had it.
+  const b = await save({ plantStartedAt: a.plantStartedAt, startMark: a.startMark }, { startedAt: '2026-10-08T09:30:00Z' }, desk);
+  assert.equal(b.startMark.via, 'DESK');
+  assert.equal(b.startMark.name, 'Pat Manager');
+  assert.equal(b.timeEdits.length, 1);
+  assert.deepEqual(Object.assign({}, b.timeEdits[0], { was: null }), { what: 'START', from: '2026-10-08T10:00:00.000Z', to: '2026-10-08T09:30:00.000Z', savedAt: STAMP, by: 'mgr@uniteddairy.com', name: 'Pat Manager', via: 'DESK', station: '', was: null });
+  assert.deepEqual(b.timeEdits[0].was, { name: 'Case Loadout', via: 'TABLET', station: 'Case Loadout', savedAt: STAMP });
+  // The same time again changes nothing; Done from the picker marks the End (and the Start it fills in).
+  assert.equal((await save({ plantStartedAt: '2026-10-08T09:30:00.000Z' }, { startedAt: '2026-10-08T09:30:00Z' }, desk)).startMark, undefined);
+  const c = await save({}, { status: 'COMPLETE' }, desk);
+  assert.equal(c.endMark.value, STAMP);
+  assert.equal(c.startMark.value, STAMP);
+  // A station named by a tablet signed in with a UD account comes through validateLoad.
+  assert.equal(P.validateLoad({ fields: { completedAt: STAMP }, station: 'Case Loadout <b>' }, SaveError).station, 'Case Loadout b');
+});
