@@ -231,7 +231,7 @@
       if (a === 'changeover') return v.changeover ? [k === 'BLOWMOLD' ? 'Mold Change' : 'Changeover', v.changeover.minutes + ' min running', 'on'] : [k === 'BLOWMOLD' ? 'Mold Change' : 'Changeover', 'start / finish', ''];
       if (a === 'cip') return [k === 'HTST' ? 'CIP Wash' : 'CIP / Sanitation', v.cip ? 'washing ' + v.cip.minutes + ' min' : v.sinceCipHours !== null ? (v.sinceCipHours < 1 ? 'last under 1 h ago' : 'last ' + v.sinceCipHours + ' h ago') : 'start / finish', v.cip ? 'on' : v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours ? 'warn' : ''];
       if (a === 'waste') return ['Waste / Rejects', fmt(v.wasteTotal) + ' this shift', ''];
-      if (a === 'check') return ['Quality Check', !v.check ? 'every ' + (R.CHECK_EVERY[k] || 2) + ' hours' : v.check.done ? 'next ' + clock(v.check.next) : 'due ' + clock(v.check.at), v.check && !v.check.done ? 'warn' : ''];
+      if (a === 'check') return ['Quality Check', !v.check ? 'every ' + (R.CHECK_EVERY[k] || 2) + ' hours' : v.check.done ? 'next ' + clock(v.check.next) : 'due ' + clock(v.check.at), v.check && !v.check.done ? 'warn lb-flashbtn' : ''];
       if (a === 'crew') return ['Crew', v.crewOn.length + ' signed on', ''];
       if (a === 'notes') return ['Shift Notes', v.note ? 'note written' : v.prevNote ? '1 from last shift' : 'none yet', ''];
       if (a === 'divert') return ['Divert', v.diverting ? 'IN DIVERT ' + v.diverting.minutes + ' min' : 'record why', v.diverting ? 'warn' : ''];
@@ -309,7 +309,7 @@
       // The HTST's hourly chart check and the Blow Mold's bottle check, on the board (mock-ups G and H).
       const ci = document.getElementById('check-inline');
       ci.hidden = !special || !v.check;
-      if (!ci.hidden) draw('check-inline', '<div class="lb-box"><h3>' + (k === 'HTST' ? 'Hourly chart check' : 'Bottle check') + ' · ' + clock(v.check.at) + (v.check.done ? ' done' : ' due') + '</h3>' + checkForm(v) + '</div><div class="lb-box"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>');
+      if (!ci.hidden) draw('check-inline', '<div class="lb-box' + (v.check.done ? '' : ' lb-flashbox') + '"><h3>' + (k === 'HTST' ? 'Hourly chart check' : 'Bottle check') + ' · ' + clock(v.check.at) + (v.check.done ? ' done' : ' due') + '</h3>' + checkForm(v) + '</div><div class="lb-box"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>');
       // Up next and each hour (mock-up C).
       const sp = document.getElementById('strip');
       sp.hidden = special;
@@ -360,11 +360,17 @@
       const avg = cur && cur.avgNet !== null ? '<div class="lb-fillavg' + (cur.flag === 'LIGHT' ? ' bad' : '') + '"><span>Average product per ' + w.one + '</span><b>' + g(cur.avgNet) + '</b>' + (cur.diff !== null ? '<span class="lb-pill ' + (cur.flag === 'LIGHT' ? 'r' : cur.flag === 'HEAVY' ? 'a' : cur.diff > 0 ? 'a' : 'g') + '">' + (cur.diff === 0 ? 'ON TARGET' : sgn(cur.diff) + ' G ' + (cur.diff > 0 ? 'OVER' : 'UNDER')) + '</span>' : '') + '</div>' : '';
       const math = '<p class="lb-mut lb-wrange">Product = filled weight − ' + w.empty + ' ' + (tare === null ? '<b class="lb-warn">(set ' + w.empty + ' on Line Targets)</b>' : g(tare) + (tareFrom === 'BLOWMOLD' ? ' (Blow Mold heads average)' : '')) + ' − ' + w.cap + ' ' + (cap === null ? '0 g (no ' + w.cap + ' weight set)' : g(cap)) +
         '. Target ' + (target === null ? '<b class="lb-warn">set target</b> (Target Fill Weight g on the Product Sheet' + (product ? ' for ' + escapeHtml(product) : '') + ')' : g(target) + (product ? ' for ' + escapeHtml(product) : '')) + '.</p>';
+      // Joe 10/15: a recorded check is never left in the boxes; its result is one read-only line.
+      const lc = !cur && d.last && d.last.filled ? d.last : null;
+      const last = lc ? '<p class="lb-last">Last check ' + clock(lc.at) + (lc.by ? ' by ' + escapeHtml(who(lc.by)) : '') + ': ' + (lc.avgNet === null ? lc.filled + ' ' + w.many + ' weighed' : lc.diff === null ? g(lc.avgNet) + ' average, set target' :
+        '<b>' + sgn(lc.diff) + ' g ' + (lc.diff >= 0 ? 'over' : 'under') + '</b> target') + (lc.light ? ' · <b class="lb-pill r">' + lc.light + ' LIGHT</b>' : '') + (lc.heavy ? ' · <b class="lb-pill a">' + lc.heavy + ' HEAVY</b>' : '') + (!lc.flag && lc.diff !== null ? ' · <b class="lb-pill g">PASSED</b>' : '') + '</p>' : '';
       const earlier = f.checks.slice(0, d.index === null ? f.checks.length : d.index).reverse();
       const table = earlier.length ? '<table class="lb-t"><thead><tr><th>Time</th><th>Product</th><th class="n">Average product</th><th class="n">vs target</th><th>' + w.One + 's</th><th>By</th></tr></thead><tbody>' + earlier.map(c => '<tr><td>' + clock(c.at) + '</td><td>' + escapeHtml(c.product) + '</td><td class="n' + (c.flag === 'LIGHT' ? ' lb-bad' : '') + '">' + g(c.avgNet) + '</td><td class="n' + (c.flag ? ' lb-bad' : '') + '">' + (c.diff === null ? 'set target' : sgn(c.diff) + ' g') + (c.flag ? ' ' + c.flag : '') + '</td><td>' + c.filled + ' of ' + R.FILL_JUGS + '</td><td>' + escapeHtml(who(c.by)) + '</td></tr>').join('') + '</tbody></table>' : '<p class="lb-mut">No earlier fill weight checks this shift.</p>';
       const tot = f.totals, give = tot.checks && tot.avgDiff !== null ? '<p class="lb-mut">This shift: ' + tot.checks + ' check' + (tot.checks === 1 ? '' : 's') + ', average ' + sgn(tot.avgDiff) + ' g ' + (tot.avgDiff >= 0 ? 'over' : 'under') + ' target' + (tot.giveawayG ? ' · giveaway about ' + fmt(tot.giveawayLb) + ' lb on ' + fmt(v.made) + ' ' + w.many : '') + '.</p>' : '';
-      const html = '<div class="lb-box' + (d.due ? ' lb-due' : '') + '"><h3>Fill weight check · ' + escapeHtml(fillDueText(d, w)) + '</h3><div class="lb-fields">' + fields + '</div><div id="fill-sum">' + avg + math + '</div></div><div class="lb-box"><h3>Earlier this shift</h3>' + table + give + '</div>';
-      if (!typing('fill-box')) { draw('fill-box', html); return; }
+      const html = '<div class="lb-box' + (d.due ? ' lb-due lb-flashbox' : '') + '"><h3>Fill weight check · ' + escapeHtml(fillDueText(d, w)) + '</h3>' + last + '<div class="lb-fields">' + fields + '</div><div id="fill-sum">' + avg + math + '</div></div><div class="lb-box"><h3>Earlier this shift</h3>' + table + give + '</div>';
+      // Draw it whole unless someone is typing the next weight of the same check (a recorded check empties its boxes at once).
+      const recorded = !cur && [...box.querySelectorAll('input[data-save="fill"]')].some(i => i.dataset.index !== '');
+      if (!typing('fill-box') || recorded) { draw('fill-box', html); return; }
       // Still typing the next jug: the boxes stay as they are; each jug's product, the flags and the average catch up around them.
       const t = document.createElement('div');
       t.innerHTML = html;
@@ -387,6 +393,13 @@
     function checkForm(v) {
       const c = v.check;
       if (!c) return '<p class="lb-mut">The checks start with the shift.</p>';
+      // Joe 10/15: a recorded check is never left in the boxes (nobody copies or guesses); its result is one read-only line, and
+      // the boxes come back empty when the next check is due.
+      if (c.done) {
+        const bad = (R.CHECK_FIELDS[v.kind] || []).filter(f => { const x = String(c.values[f[0]] === undefined ? '' : c.values[f[0]]); return /NOT OK|LATE/.test(x) || (f[2] === 'num' && R.weightFlag(f[0], x, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high })); });
+        return '<p class="lb-last">Last check ' + clock(c.values.at || c.at) + (c.values.by ? ' by ' + escapeHtml(who(c.values.by)) : '') + ': ' + (bad.length ? '<b class="lb-pill r">' + escapeHtml(bad.map(f => f[1].replace(/ g$/, '')).join(', ')) + ' OUT</b>' : '<b class="lb-pill g">PASSED</b>') +
+          ' · next check due ' + clock(c.next) + '</p><p class="lb-mut">The numbers are in Earlier this shift and on the Quality screen.</p>';
+      }
       return '<div class="lb-fields">' + (R.CHECK_FIELDS[v.kind] || []).map(f => {
         const got = c.values[f[0]] === undefined ? '' : String(c.values[f[0]]);
         if (f[2] === 'ok') {
@@ -402,7 +415,7 @@
       const c = (v.run && v.run.checks) || {}, every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, start = Date.parse((v.run && v.run.shiftStart) || '');
       // A filler's checks saved before the jug weights moved to the fill weight check (Joe 10/14) still show their pounds.
       const fields = (R.CHECK_FIELDS[v.kind] || []).concat((R.OLD_CHECK_FIELDS[v.kind] || []).filter(f => Object.values(c).some(x => x && String(x[f[0]] === undefined ? '' : x[f[0]]) !== '')));
-      const slots = Object.keys(c).map(Number).filter(n => !v.check || n !== v.check.slot).sort((a, b) => a - b);
+      const slots = Object.keys(c).map(Number).filter(n => !v.check || n !== v.check.slot || v.check.done).sort((a, b) => a - b);
       if (!slots.length) return '<p class="lb-mut">No checks yet this shift.</p>';
       return '<table class="lb-t"><thead><tr><th>Time</th>' + fields.map(f => '<th' + (f[2] === 'num' ? ' class="n"' : '') + '>' + escapeHtml(f[1]) + '</th>').join('') + '<th>By</th></tr></thead><tbody>' +
         slots.map(n => '<tr><td>' + clock(new Date(start + n * every).toISOString()) + '</td>' + fields.map(f => { const x = String(c[n][f[0]] === undefined ? '' : c[n][f[0]]), wf = R.weightFlag(f[0], x, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high }); return '<td class="' + (f[2] === 'num' ? 'n' + (wf ? ' lb-bad' : '') : /NOT OK|LATE/.test(x) ? 'lb-bad' : x ? 'lb-ok' : '') + '">' + escapeHtml(x) + (wf ? ' ' + wf : '') + '</td>'; }).join('') + '<td>' + escapeHtml(who(c[n].by)) + '</td></tr>').join('') + '</tbody></table>';

@@ -301,18 +301,20 @@
       filled: jugs.filter(function (j) { return j.gross !== null; }).length };
   }
   // When the line's next fill weight check is due. index = the check being filled in now (null = the next save starts one).
+  // Joe 10/15: once all FILL_JUGS weights of a check are in, it is recorded: the boxes empty for the next check (index null), so
+  // nobody copies or guesses from the last numbers; last = the latest check worked out, for a read-only line.
   function fillDue(run, lineDoc, nowMs) {
     var r = run || {}, ld = lineDoc || {}, mode = text(ld.fillEvery).toUpperCase(), n = num(ld.fillEveryN);
     if (['MINUTES', 'JUGS', 'CHANGE'].indexOf(mode) < 0 || (mode !== 'CHANGE' && !(n > 0))) { mode = ''; n = null; }
     var fills = Array.isArray(r.fills) ? r.fills : [], last = fills.length ? fills[fills.length - 1] : null, lastAt = last ? when(last.at) : 0;
     var runs = (r.runs || []).slice().sort(function (a, b) { return when(a.from) - when(b.from); }), change = runs.length ? when(runs[runs.length - 1].from) : 0;
-    var o = { mode: mode, every: n, count: fills.length, due: false, why: '', dueAt: '', nextAt: '', jugsLeft: null, index: null, current: null };
+    var o = { mode: mode, every: n, count: fills.length, due: false, why: '', dueAt: '', nextAt: '', jugsLeft: null, index: null, current: null, last: last ? fillOf(last) : null };
     if (!change) { o.why = 'product'; return o; }
     var minutes = mode === 'MINUTES' ? n : mode === '' ? FILL_DEFAULT_MIN : null, made = num(r.count) || 0;
     if (!last || lastAt < change) { o.due = true; o.why = last ? 'change' : 'start'; o.dueAt = new Date(change).toISOString(); return o; }
     if (minutes !== null && nowMs >= lastAt + minutes * 60000) { o.due = true; o.why = 'time'; o.dueAt = new Date(lastAt + minutes * 60000).toISOString(); return o; }
     if (mode === 'JUGS' && made - (num(last.count) || 0) >= n) { o.due = true; o.why = 'jugs'; return o; }
-    o.index = fills.length - 1; o.current = fillOf(last);
+    if (o.last.filled < FILL_JUGS) { o.index = fills.length - 1; o.current = o.last; }
     if (minutes !== null) o.nextAt = new Date(lastAt + minutes * 60000).toISOString();
     if (mode === 'JUGS') o.jugsLeft = Math.max(0, n - (made - (num(last.count) || 0)));
     return o;

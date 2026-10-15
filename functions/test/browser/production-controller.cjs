@@ -194,6 +194,22 @@ function controller() {
       assert.deepEqual(bm.errors, []);
       await bm.close();
     }
+    // Joe 10/15: the last box records the check: no numbers left in boxes, the result is one read-only line until the next is due.
+    const rec = await openPage(browser, 1024, 1300, '/line.html?line=' + BLOW + '&' + ADMIN);
+    await rec.waitForSelector('#check-inline:not([hidden]) select[data-field="topLoad"]');
+    assert.equal(await rec.$eval('#check-inline .lb-box', e => e.classList.contains('lb-flashbox')), true, 'the check due now flashes');
+    await rec.selectOption('#check-inline select[data-field="topLoad"]', 'OK');
+    await rec.waitForFunction(() => /Last check/.test(document.getElementById('check-inline').textContent));
+    assert.match(await rec.textContent('#check-inline'), /Last check \d+:\d\d [AP]M by admin\.test: Head 2, Head 5 OUT · next check due \d+:\d\d [AP]M/);
+    assert.equal(await rec.$('#check-inline input[data-save="check"]'), null, 'no boxes with the old numbers');
+    assert.equal(await rec.$eval('#check-inline .lb-box', e => e.classList.contains('lb-flashbox')), false);
+    assert.match(await rec.textContent('#check-inline'), /60\.2 HEAVY/, 'the numbers are in Earlier this shift');
+    await bigText(rec, '#check-inline', 'the recorded check');
+    await rec.$eval('#check-inline', e => e.scrollIntoView({ block: 'center' }));
+    await shot(rec, 'check-recorded-blow-mold-1024');
+    assert.deepEqual(rec.errors, []);
+    await rec.close();
+    results.push('Blow Mold check recorded: Last check · Head 2, Head 5 OUT · next check due, read-only; the numbers only in Earlier this shift');
     results.push('Blow Mold tablet (1024 and 800): From the machine with the jug count, annealer speed in range and the temperature flashing TOO HOT; Jugs this shift FROM THE MACHINE with no Enter Count; Gallon Jug running with no Pick Product; the bottle check has Head 1 to Head 6 in grams with 60.2 HEAVY and 54.6 LIGHT against 55 to 59 g');
 
     // Production Lines: the card and the line's shift view.
