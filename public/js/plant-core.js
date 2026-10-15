@@ -58,12 +58,33 @@ function rowFor(run, block, loadDate, prior) {
     id: run.id + '|' + block.prefix, runDocId: run.id, day: block.prefix, weekStart: run.weekStart, rev: run.rev || 0,
     route: run.route || '', run: run.run || '', routeId: run.routeId || '', runId: run.runId || '', area: runArea(run),
     loadDate, deliveryDate: block.deliveryDate, departureDate: day.departureDate || block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
+    baseSequence: day.loadSequence == null ? null : day.loadSequence,
     driver: day.driver || '', truck: day.truck || '', trailer: day.trailer || '', dispatchTime: day.dispatchTime,
     quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '',
     startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day),
     // Joe 10/12: a paused load is started but not loading now (it does not count toward the loadout's limit).
     paused: loadState(day) === 'LOADING' && String(day.loadStatus || '').trim().toUpperCase() === 'PAUSED'
   };
+}
+
+// Joe 10/15 ("whenever the route is moved out of the original sequence… shade that row… green"): the loads dragged out of the
+// sheet's load_sequence order. Within each load date the loads are taken in today's order; the longest run that still follows
+// the sheet's order stays put and every other load counts as moved, so dragging one load marks that load, not the ones it
+// passed. A load with no sheet number is never marked.
+export function movedIds(rows) {
+  const moved = new Set(), byDate = {};
+  rows.forEach(r => { if (r.baseSequence != null && r.loadSequence != null) (byDate[r.loadDate] = byDate[r.loadDate] || []).push(r); });
+  Object.values(byDate).forEach(list => {
+    if (!list.some(r => Number(r.loadSequence) !== Number(r.baseSequence))) return;
+    list = list.slice().sort((a, b) => Number(a.loadSequence) - Number(b.loadSequence) || Number(a.baseSequence) - Number(b.baseSequence));
+    const len = list.map(() => 1), prev = list.map(() => -1);
+    list.forEach((r, i) => { for (let j = 0; j < i; j++) if (Number(list[j].baseSequence) <= Number(r.baseSequence) && len[j] + 1 > len[i]) { len[i] = len[j] + 1; prev[i] = j; } });
+    let at = len.indexOf(Math.max(...len));
+    const keep = new Set();
+    while (at >= 0) { keep.add(list[at].id); at = prev[at]; }
+    list.forEach(r => { if (!keep.has(r.id)) moved.add(r.id); });
+  });
+  return moved;
 }
 
 const byLoad = (a, b) => (Number(b.prior) - Number(a.prior)) || String(a.loadDate).localeCompare(String(b.loadDate)) ||

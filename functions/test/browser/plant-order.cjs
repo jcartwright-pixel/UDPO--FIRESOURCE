@@ -43,6 +43,7 @@ async function openPage(browser, opts, url) {
   return page;
 }
 const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
+const movedRoutes = (page) => page.$$eval('#rows tr.moved[data-row] td:first-child', tds => tds.map(td => td.textContent));
 const routes = (page) => page.$$eval('#rows tr[data-row] td:first-child', tds => tds.map(td => td.textContent));
 const waitOrder = (page, list) => page.waitForFunction(want => [...document.querySelectorAll('#rows tr[data-row] td:first-child')].map(td => td.textContent).slice(1, 1 + want.length).join(',') === want.join(','), list, { timeout: 8000 })
   .catch(async e => { throw new Error('Wanted ' + list.join(',') + ' but the screen shows ' + (await routes(page)).join(',') + ' / ' + (await page.textContent('#error').catch(() => ''))); });
@@ -109,6 +110,7 @@ async function keyMove(page, route, dir) {
       assert.equal(await loader.$(row(r) + '[data-drag]'), null, r + ' is already loaded, so it does not move');
     }
     assert.equal(await loader.$eval('#rows tr[data-drag]', t => t.dataset.drag.split('|')[0]), '2026-10-04__run_p808', '808 is the first line that can be dragged');
+    assert.deepEqual(await movedRoutes(loader), [], 'nothing is shaded as moved while the day follows the sheet\'s order');
     if (SHOTS) {
       await loader.screenshot({ path: path.join(SHOTS, '1-loadout-order-1920.png'), scale: 'css' });
       await loader.screenshot({ path: path.join(SHOTS, '2-loadout-order-top-2x.png'), clip: { x: 0, y: 0, width: 1920, height: 475 }, scale: 'device' });
@@ -121,6 +123,18 @@ async function keyMove(page, route, dir) {
     await waitOrder(loader, ['801', '802', '805', '808', '812', '811']);
     await waitOrder(watcher, ['801', '802', '805', '808', '812', '811']);
     assert.equal(await loader.evaluate(() => String(window.getSelection())), '', 'dragging a line by its words does not select them');
+    // Joe 10/15: the load dragged out of the sheet's order (811, not 812 which it passed) is shaded light green with a MOVED tag,
+    // on the other open screen too, and it looks different from a Done line.
+    await loader.waitForFunction(() => [...document.querySelectorAll('#rows tr.moved td:first-child')].map(t => t.textContent).join() === '811');
+    await watcher.waitForFunction(() => [...document.querySelectorAll('#rows tr.moved td:first-child')].map(t => t.textContent).join() === '811');
+    const look = await loader.evaluate(() => {
+      const bg = (sel) => getComputedStyle(document.querySelector(sel).children[1]).backgroundColor;
+      const tag = document.querySelector('#rows tr.moved .moved-tag');
+      return { moved: bg('#rows tr.moved'), done: bg('#rows tr.done:not(.moved)'), plain: bg('#rows tr[data-drag]:not(.moved):not(.done)'), tag: tag && tag.textContent, size: tag && parseFloat(getComputedStyle(tag).fontSize) };
+    });
+    assert.ok(look.moved !== look.done && look.moved !== look.plain && /^rgb\(\d+, \d+, \d+\)$/.test(look.moved), 'a moved line has its own green, not the Done one ' + JSON.stringify(look));
+    assert.deepEqual([look.tag, look.size >= 16], ['MOVED', true], 'a MOVED tag at 16px or more ' + JSON.stringify(look));
+    if (SHOTS) await loader.screenshot({ path: path.join(SHOTS, '3b-loadout-moved-1920.png'), scale: 'css' });
     results.push('Loaded loads (801, 802, 805) do not move; 808 is the first line that can be dragged; the hand shows over a line');
     results.push('Mouse: 811 dragged below 812 by its Driver cell (the whole line grabs); no text selected; the other open screen shows it');
 
@@ -129,6 +143,7 @@ async function keyMove(page, route, dir) {
     await waitOrder(loader, ['801', '802', '805', '815', '808', '812', '811']);
     await waitOrder(watcher, ['801', '802', '805', '815', '808', '812', '811']);
     await loader.waitForFunction(() => document.activeElement && /run_p815/.test(document.activeElement.dataset.drag || ''));
+    assert.deepEqual((await movedRoutes(loader)).sort(), ['811', '815'], 'Joe 10/15: 815 is shaded as moved too; 808 and 812, which it passed, are not');
     results.push('Keyboard: Alt+Up three times put 815 before 808 and kept its line selected');
 
     const run = async (r) => (await db().collection('runs').doc('2026-10-04__run_p' + r).get()).data().days.fri.loadSequenceOverride;

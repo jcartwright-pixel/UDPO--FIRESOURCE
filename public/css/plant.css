@@ -922,6 +922,11 @@
 .plant-page button.skip { min-width: 48px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid #bd7a00; background: #fff6df; color: #855400; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
 .plant-page .skip-tag { display: block; width: fit-content; margin: 3px auto 0; padding: 2px 8px; border-radius: 6px; background: #fff0d2; color: #8d5d00; font-size: 16px; font-weight: 800; letter-spacing: .03em; line-height: 1.25; }
 .plant-page tr.skipped > td { background: #fffaf0 !important; }
+/* Joe 10/15: a load dragged out of the sheet's order: a clearer light green than a Done row (#f1faf4), a green bar on its left edge
+   and a MOVED tag under the run, Done or not. */
+.plant-page tr.moved > td { background: #d6f2dc !important; }
+.plant-page tr.moved > td:first-child { box-shadow: inset 6px 0 0 #2e9e4f; }
+.plant-page .moved-tag { display: inline-block; margin: 0 0 0 8px; vertical-align: 1px; padding: 2px 8px; border-radius: 6px; background: #2e7d43; color: #fff; font-size: 16px; font-weight: 800; letter-spacing: .03em; line-height: 1.25; }
 /* Polish item 5 (Joe 10/11): a load or unload left running past 12 hours shows its start time in orange. */
 .plant-page .stale { color: #b45309; font-weight: 800; white-space: normal; line-height: 1.15; }
 /* Polish 6: Yard Checks shows the short date under the weekday, so the top line keeps its room. */
