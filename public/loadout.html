@@ -235,7 +235,11 @@
     // A skipped load and a load already loaded do not move (no line to drag); the others move around them, which keep their places.
     let heldMove = null;
 
+    let rowDrag = null, heldDraw = false;
     function render() {
+      // Joe 10/15: while a load is being dragged the list is not drawn again (another screen's save, the minute tick), so the
+      // lifted line stays under the pointer; it is drawn when the line is let go.
+      if (rowDrag && rowDrag.busy()) { heldDraw = true; return; }
       const live = rowsNow(), all = withSched(live), byArea = {};
       P.AREAS.forEach(a => { byArea[a] = all.filter(r => r.area === a); });
       // Skipped loads go to the bottom of their group (still open from a prior day first, then today).
@@ -429,7 +433,7 @@
 
     // Joe 10/12 ("grab the line with the hand and drag it"): toIndex is the load's new place among the loads shown with a line
     // to drag (not loaded, not skipped); loaded and skipped loads keep their places in the order.
-    mountRowDrag({ box: document.getElementById('rows'), canDrag: canOrder, onMove: (id, to, byKey) => {
+    rowDrag = mountRowDrag({ box: document.getElementById('rows'), canDrag: canOrder, onEnd: () => { if (heldDraw) { heldDraw = false; render(); } }, onMove: (id, to, byKey) => {
       const shown = [...document.querySelectorAll('#rows tr[data-drag]')].map(tr => tr.dataset.drag), i = shown.indexOf(id), target = rowById(shown[to]);
       const full = orderRows(rowsNow().filter(r => r.area === area));
       if (i < 0 || !target || to === i) return;
