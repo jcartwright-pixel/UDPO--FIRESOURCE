@@ -101,7 +101,10 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       // Joe 10/15: Scheduler shows Shipping and Receiving only, today's loads big with this week under; Yard tiles say what they count.
       assert.deepEqual(await page.$$eval('[data-card="sched"] .mc-tile > span', a => a.map(x => x.textContent)), ['Shipping', 'Receiving']);
       assert.match(await tileText(page, 'sched', 'Shipping'), /^\d+today \| \d+ this week$/);
-      assert.deepEqual(await page.$$eval('[data-card="yard"] .mc-tile > span', a => a.map(x => x.textContent)), ['Loaded Trailers', 'Due for a Check', 'Checked', 'Last Check']);
+      // Joe 10/15 (later): Yard Checks and Cooler Temperature Reports are two big tiles each.
+      assert.deepEqual(await page.$$eval('[data-card="yard"] .mc-tile > span', a => a.map(x => x.textContent)), ['In the Yard', 'Checked']);
+      assert.deepEqual(await page.$$eval('[data-card="temps"] .mc-tile > span', a => a.map(x => x.textContent)), ['Status', 'Last Manual Read']);
+      assert.ok(await page.$eval('[data-card="yard"] .mc-tile b', b => parseFloat(getComputedStyle(b).fontSize) >= 40), 'big numbers');
       // Shift Notes A (Joe 10/10): breakdowns still open, carried over from earlier shifts; Joe 10/15: handoff notes still open
       // (they stay until resolved, not only since the last report).
       assert.deepEqual([await tileText(page, 'notes', 'Breakdowns'), await tileText(page, 'notes', 'Carried Over'), await tileText(page, 'notes', 'Handoff')],
