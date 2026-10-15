@@ -633,6 +633,24 @@
     return { sensors: (rows || []).filter(function (r) { return r.sensorId; }).length, offline: (rows || []).filter(function (r) { return r.status === 'OFFLINE'; }).length,
       alerts: (rows || []).filter(tempAlert).length, lastManual: last, history: (history || []).length };
   }
+  // Joe 10/15 (Manager Walkthrough): what the manager still has to check: the walk (Coolers, then Quality) and Yard Checks
+  // (its own choice). A check is due once its 2-hour cycle is up (or it was never checked) and past due 30 minutes after
+  // that; the newest Coolers or Quality check is the last walkthrough. yard = yardQueue(), temps = tempRows(), lines = qualityLines().
+  var WALK_LATE_MINUTES = 30;
+  function managerWalk(yard, temps, lines, nowMs) {
+    var cycle = 120, late = function (at) { var t = when(at); return !t || (nowMs - t) / 60000 >= cycle + WALK_LATE_MINUTES; };
+    var yardDue = ((yard || {}).rows || []), tempDue = (temps || []).filter(function (r) { return !r.locked; });
+    var lineDue = (lines || []).filter(function (l) { var x = l.last || {}, t = when(x.recordedAt); return !lineDone(x, nowMs) && (!t || (nowMs - t) / 60000 >= cycle); });
+    var all = [];
+    (temps || []).forEach(function (r) { if (r.lastCheckedAt) all.push({ at: r.lastCheckedAt, by: r.lastCheckedBy }); });
+    (lines || []).forEach(function (l) { var x = l.last || {}; if (x.recordedAt && x.inApp) all.push({ at: x.recordedAt, by: x.recordedBy }); });
+    all.sort(function (a, b) { return when(b.at) - when(a.at); });
+    return {
+      yard: { due: yardDue.length, late: yardDue.filter(function (x) { return late(x.recordedAt); }).length, total: yardDue.length + ((yard || {}).locked || []).length },
+      coolers: { due: tempDue.length, late: tempDue.filter(function (r) { return late(r.lastCheckedAt); }).length, out: (temps || []).filter(tempAlert).length, total: (temps || []).length },
+      quality: { due: lineDue.length, late: lineDue.filter(function (l) { return late((l.last || {}).recordedAt); }).length, total: (lines || []).length },
+      last: all[0] || null };
+  }
   function managerNotes(log) {
     var type = function (r) { return text(r.type).toUpperCase(); };
     return { handoff: (log || []).filter(function (r) { return type(r) === 'HANDOFF'; }).length, issues: (log || []).filter(function (r) { return type(r) !== 'HANDOFF'; }).length,
@@ -821,6 +839,6 @@
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
-    weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
+    weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes, WALK_LATE_MINUTES: WALK_LATE_MINUTES, managerWalk: managerWalk,
     REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
 });

@@ -66,6 +66,12 @@
         // Someone who sees more than one plant starts on the all-plants overview; a one-plant person (Joe: a supervisor
         // such as Brian Bircher) only ever sees their plant's home.
         if (plants.length > 1 && !picked) { location.replace('company.html' + location.search); return; }
+        // Joe 10/15: a manager who signs in on a phone or tablet starts on the manager's three choices (Manager Walkthrough,
+        // Yard Checks, Loadout Center); "Open the full Operations app" there comes back here (?full=1, kept for this tab).
+        let full = new URLSearchParams(location.search).get('full') === '1';
+        try { if (full) sessionStorage.setItem('udFull', '1'); else full = sessionStorage.getItem('udFull') === '1'; } catch (e) { /* no storage */ }
+        const handheld = window.matchMedia('(pointer: coarse) and (max-width: 1100px)').matches;
+        if (handheld && !full && L.hasRole(person, ['ADMINISTRATOR', 'ADMIN', 'MANAGER', 'SUPERVISOR'])) { location.replace('walkthrough.html?view=home'); return; }
         decided();
         const plant = L.PLANTS.find(p => p.id === (plants.indexOf(picked) >= 0 ? picked : plants[0])) || L.PLANTS[0];
         document.getElementById('plant-name').textContent = plant.name + ' Operations';

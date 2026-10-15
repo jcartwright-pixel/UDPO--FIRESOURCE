@@ -58,8 +58,10 @@
     import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, optionTag, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
+    import { walkBar } from './js/walk-bar.js';
     import { watchProducts, sizeFor, OTHER } from './js/products.js';
 
+    walkBar('quality');
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());

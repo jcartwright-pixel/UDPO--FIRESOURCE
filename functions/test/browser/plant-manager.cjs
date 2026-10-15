@@ -88,27 +88,30 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
   const browser = await chromium.launch();
   const results = [];
   try {
-    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+    for (const [w, h] of [[1920, 950], [1536, 730], [1366, 650]]) {
       const page = await openPage(browser, w, h, '/manager.html' + MANAGER);
       await page.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 4/.test(document.querySelector('[data-card="dept"]').textContent));
       const behind = seed.behind;
       assert.match(await page.textContent('#pv-subject'), new RegExp('^Plant Update .+: ' + behind + ' routes? behind$'));
       assert.equal(await tileText(page, 'dept', 'Loadout Center'), '1of 4 | 3 waiting · 0 loading');
-      assert.equal(await tileText(page, 'quality', 'Lines Running'), '5of 5 | all running');
-      // Joe 10/15: Status says OK when all is well, otherwise how many need checking (red).
-      assert.equal(await tileText(page, 'temps', 'Status'), 'CHECK | 1 need checking');
-      assert.ok(await page.$eval('[data-card="temps"] .mc-tile.bad', t => /Status/.test(t.textContent)), 'Status is red');
+      // Joe 10/15 (Manager Walkthrough): one card in walking order instead of Quality, Cooler Temperatures and Yard Checks.
+      // The five lines' last checks are days old (past due); Cooler North read 44°F (too warm) 30 minutes ago, the newest check.
+      assert.deepEqual(await page.$$('[data-card="quality"], [data-card="temps"], [data-card="yard"]'), []);
+      assert.equal(await tileText(page, 'walk', '2 · Quality'), '5of 5 | 5 past due');
+      assert.match(await tileText(page, 'walk', '1 · Coolers'), /^\d+ \| 1 out of range$/);
+      assert.ok(await page.$eval('[data-card="walk"]', c => [...c.querySelectorAll('.mc-tile.bad')].map(t => t.querySelector('span').textContent).join() === '1 · Coolers,2 · Quality'), 'Coolers and Quality are red');
+      assert.match(await tileText(page, 'walk', 'Last Walkthrough'), /^\d{1,2}:\d\d [AP]M \| Supervisor Test$/);
+      assert.match(await page.textContent('[data-card="walk"] .mc-pill'), /^\d+ past due$/);
+      assert.ok((await page.getAttribute('[data-card="walk"] a.mc-bar', 'href')) === 'walkthrough.html' && (await page.$$eval('[data-card="walk"] .mc-tile', t => t.map(x => x.getAttribute('href')))).join() ===
+        'temps.html?walk=1,quality.html?walk=1,yard.html,walkthrough.html', 'the card and its tiles open the walkthrough');
       // Joe 10/15: Scheduler shows Shipping and Receiving only, today's loads big with this week under; Yard tiles say what they count.
       assert.deepEqual(await page.$$eval('[data-card="sched"] .mc-tile > span', a => a.map(x => x.textContent)), ['Shipping', 'Receiving']);
       assert.match(await tileText(page, 'sched', 'Shipping'), /^\d+today \| \d+ this week$/);
-      // Joe 10/15 (later): Yard Checks and Cooler Temperature Reports are two big tiles each.
-      assert.deepEqual(await page.$$eval('[data-card="yard"] .mc-tile > span', a => a.map(x => x.textContent)), ['In the Yard', 'Checked']);
-      assert.deepEqual(await page.$$eval('[data-card="temps"] .mc-tile > span', a => a.map(x => x.textContent)), ['Status', 'Out of Range']);
-      assert.deepEqual(await page.$$eval('[data-card="quality"] .mc-tile > span', a => a.map(x => x.textContent)), ['Lines Running', 'Last Updated']);
+      assert.deepEqual(await page.$$eval('[data-card="walk"] .mc-tile > span', a => a.map(x => x.textContent)), ['1 · Coolers', '2 · Quality', 'Yard Checks', 'Last Walkthrough']);
       assert.deepEqual(await page.$$eval('[data-card="notes"] .mc-tile > span', a => a.map(x => x.textContent)), ['Breakdowns', 'Handoffs', 'Carryover']);
       // The card's tiles are redrawn as data arrives, so wait for the drawn tile rather than reading the first one.
-      const bigSize = () => page.$eval('[data-card="yard"] .mc-tile b', b => getComputedStyle(b).fontSize + ' ' + b.className + ' ' + b.textContent);
-      await page.waitForFunction(() => { const b = document.querySelector('[data-card="yard"] .mc-tile b'); return b && parseFloat(getComputedStyle(b).fontSize) >= 40; }, null, { timeout: 8000 })
+      const bigSize = () => page.$eval('[data-card="walk"] .mc-tile b', b => getComputedStyle(b).fontSize + ' ' + b.className + ' ' + b.textContent);
+      await page.waitForFunction(() => { const b = document.querySelector('[data-card="walk"] .mc-tile b'); return b && parseFloat(getComputedStyle(b).fontSize) >= 40; }, null, { timeout: 8000 })
         .catch(async () => assert.fail('big numbers at ' + w + ': ' + await bigSize()));
       // Shift Notes A (Joe 10/10): breakdowns still open, carried over from earlier shifts; Joe 10/15: handoff notes still open
       // (they stay until resolved, not only since the last report).
@@ -122,6 +125,8 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       assert.deepEqual(await page.$$eval('.mc-rt i', i => i.filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.textContent)), []);
       if (w === 1920) await fits(page, 'Manager Center ' + w + 'x' + h);
       await shots(page, 'manager', w);
+      // The Manager Walkthrough card at the bottom of the cards (scrolled to it where the screen is short).
+      if (SHOTS) { await page.$eval('#grid', g => { g.scrollTop = g.scrollHeight; }); await page.screenshot({ path: path.join(SHOTS, 'manager-walk-card-' + w + '.png'), scale: 'css' }); }
       assert.deepEqual(page.errors, []);
       await page.close();
     }
