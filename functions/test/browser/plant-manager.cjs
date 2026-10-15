@@ -106,7 +106,10 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       assert.deepEqual(await page.$$eval('[data-card="temps"] .mc-tile > span', a => a.map(x => x.textContent)), ['Status', 'Out of Range']);
       assert.deepEqual(await page.$$eval('[data-card="quality"] .mc-tile > span', a => a.map(x => x.textContent)), ['Lines Running', 'Last Updated']);
       assert.deepEqual(await page.$$eval('[data-card="notes"] .mc-tile > span', a => a.map(x => x.textContent)), ['Breakdowns', 'Handoffs', 'Carryover']);
-      assert.ok(await page.$eval('[data-card="yard"] .mc-tile b', b => parseFloat(getComputedStyle(b).fontSize) >= 40), 'big numbers');
+      // The card's tiles are redrawn as data arrives, so wait for the drawn tile rather than reading the first one.
+      const bigSize = () => page.$eval('[data-card="yard"] .mc-tile b', b => getComputedStyle(b).fontSize + ' ' + b.className + ' ' + b.textContent);
+      await page.waitForFunction(() => { const b = document.querySelector('[data-card="yard"] .mc-tile b'); return b && parseFloat(getComputedStyle(b).fontSize) >= 40; }, null, { timeout: 8000 })
+        .catch(async () => assert.fail('big numbers at ' + w + ': ' + await bigSize()));
       // Shift Notes A (Joe 10/10): breakdowns still open, carried over from earlier shifts; Joe 10/15: handoff notes still open
       // (they stay until resolved, not only since the last report).
       assert.deepEqual([await tileText(page, 'notes', 'Breakdowns'), await tileText(page, 'notes', 'Handoffs'), await tileText(page, 'notes', 'Carryover')],
