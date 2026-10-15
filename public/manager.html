@@ -140,11 +140,12 @@
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       const grid = document.getElementById('grid'), put = (k, html) => { const el = grid.querySelector('[data-card="' + k + '"]'); el.innerHTML = html; const bar = el.querySelector('a.mc-bar'); if (bar) el.dataset.href = bar.getAttribute('href'); };
       put('yard', card('&#10003;', 'Yard Checks', 'Loaded trailers remaining on yard · temperature · fuel · timestamped checks', 'yard.html', [
-        tile('yard.html', 'Active', x.yard.rows.length + x.yard.locked.length, '', 'on the yard'), tile('yard.html', 'Due', x.yard.rows.length, '', 'need a check', null, x.yard.rows.length ? 'warn' : ''),
-        tile('yard.html', 'Checked', x.yard.locked.length, '', 'in the last 2 hours', null, 'good'), tile('yard.html?view=history', 'Latest', x.latestYard ? clock(x.latestYard.recordedAt) : '—', '', x.latestYard ? 'last check' : 'no check yet')]));
+        // Joe 10/15: "Active" was unclear; each tile says what it counts.
+        tile('yard.html', 'Loaded Trailers', x.yard.rows.length + x.yard.locked.length, '', 'on the yard now'), tile('yard.html', 'Due for a Check', x.yard.rows.length, '', x.yard.rows.length ? 'trailers to check now' : 'none due', null, x.yard.rows.length ? 'warn' : ''),
+        tile('yard.html', 'Checked', x.yard.locked.length, '', 'in the last 2 hours', null, 'good'), tile('yard.html?view=history', 'Last Check', x.latestYard ? clock(x.latestYard.recordedAt) : '—', '', x.latestYard ? 'latest yard check' : 'no check yet')]));
       put('sched', card('&#128467;', 'Plant Operations Scheduler', 'Shipping out · Receiving in · Day, Week and Month', 'scheduler.html', [
-        tile('scheduler.html?lane=SHIPPING', 'Shipping', x.ship.week, 'loads', 'this week · ' + x.ship.today + ' today'), tile('scheduler.html?lane=RECEIVING', 'Receiving', x.recv.week, 'loads', 'this week · ' + x.recv.today + ' today'),
-        tile('scheduler.html?lane=SHIPPING&view=month', 'This Month', x.ship.month, 'loads', 'shipping'), tile('scheduler.html?lane=SHIPPING&view=week', 'Need Trailer', x.ship.needTrailer, '', x.ship.needTrailer ? 'this week' : 'all have trailers', null, x.ship.needTrailer ? 'warn' : 'good')]));
+        // Joe 10/15: today's loads big, this week underneath; This Month and Need Trailer came off so these two can be bigger.
+        tile('scheduler.html?lane=SHIPPING', 'Shipping', x.ship.today, 'today', x.ship.week + ' this week'), tile('scheduler.html?lane=RECEIVING', 'Receiving', x.recv.today, 'today', x.recv.week + ' this week')]));
       put('dept', card('&#9638;', 'Plant Distribution Departments', 'Loading, unloading, returns, washing and live workboards', 'plant.html', [
         tile('loadout.html', 'Loadout Center', x.done.done, 'of ' + x.done.total, x.done.waiting + ' waiting · ' + x.done.loading + ' loading', pct(x.done.done, x.done.total)),
         tile('unloading.html', 'Unloading', x.uc.complete, 'of ' + x.uc.total, x.uc.waiting + ' waiting · ' + x.uc.unloading + ' unloading', pct(x.uc.complete, x.uc.total)),
@@ -157,7 +158,8 @@
       put('temps', card('&#127777;', 'Cooler Temperature Reports', 'Manual plant checks plus read-only sensor readings', 'temps.html', [
         tile('temps.html', 'Sensor Temp', x.T.sensors, '', x.T.offline ? 'sensors · ' + x.T.offline + ' offline' : 'sensors', null, x.T.offline ? 'warn' : ''),
         tile('temps.html', 'Manual Read', x.T.lastManual ? clock(x.T.lastManual) : '—', '', x.T.lastManual ? 'last manual read' : 'no manual read yet'),
-        tile('temps.html?view=alerts', 'Status', x.T.alerts, '', x.T.alerts ? 'need attention' : 'all in range', null, x.T.alerts ? 'bad' : 'good'), tile('temps.html?view=history', '24-Hour History', x.T.history, '', 'readings in 24 hours')]));
+        // Joe 10/15: OK when all is well; otherwise how many need checking, in red.
+        tile('temps.html?view=alerts', 'Status', x.T.alerts || 'OK', '', x.T.alerts ? 'need checking' : 'all in range', null, x.T.alerts ? 'bad' : 'good'), tile('temps.html?view=history', '24-Hour History', x.T.history, '', 'readings in 24 hours')]));
       // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.
       // Joe 10/15: the card turns red while any note is not resolved by hand and lists them (a line opens that note); handoff
       // notes and breakdowns stay big and red until resolved; the 24-Hour History number turns red while any there needs review.

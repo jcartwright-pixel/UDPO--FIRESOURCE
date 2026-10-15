@@ -1272,3 +1272,10 @@
 .manager-page .mc-card.mc-alert .mc-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* With the Shift Notes list showing, no row squeezes its cards below their content (the grid scrolls instead). */
 @media (min-width: 1501px) { .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: repeat(3, minmax(min-content, 1fr)); } }
+/* Joe 10/15: the Scheduler card's two tiles, Shipping and Receiving: the label, today's loads big under it, this week under that. */
+.manager-page .mc-grid [data-card="sched"] .mc-tiles { grid-template-rows: minmax(0, 1fr); }
+.manager-page [data-card="sched"] .mc-tile { grid-template-columns: minmax(0, 1fr); grid-template-areas: "label" "num" "line"; align-content: center; row-gap: 2px; padding: 6px 14px; }
+.manager-page [data-card="sched"] .mc-tile span { font-size: 18px; }
+.manager-page [data-card="sched"] .mc-tile b { text-align: left; font-size: 40px; line-height: 1.05; }
+.manager-page [data-card="sched"] .mc-tile b small { font-size: 20px; }
+.manager-page [data-card="sched"] .mc-tile i { font-size: 18px; font-weight: 800; color: var(--ud-blue-dark); }

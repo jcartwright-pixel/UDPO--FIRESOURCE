@@ -95,7 +95,13 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       assert.match(await page.textContent('#pv-subject'), new RegExp('^Plant Update .+: ' + behind + ' routes? behind$'));
       assert.equal(await tileText(page, 'dept', 'Loadout Center'), '1of 4 | 3 waiting · 0 loading');
       assert.equal(await tileText(page, 'quality', 'Quality Checks'), '5lines | all running');
-      assert.equal(await tileText(page, 'temps', 'Status'), '1 | need attention');
+      // Joe 10/15: Status says OK when all is well, otherwise how many need checking (red).
+      assert.equal(await tileText(page, 'temps', 'Status'), '1 | need checking');
+      assert.ok(await page.$eval('[data-card="temps"] .mc-tile.bad', t => /Status/.test(t.textContent)), 'Status is red');
+      // Joe 10/15: Scheduler shows Shipping and Receiving only, today's loads big with this week under; Yard tiles say what they count.
+      assert.deepEqual(await page.$$eval('[data-card="sched"] .mc-tile > span', a => a.map(x => x.textContent)), ['Shipping', 'Receiving']);
+      assert.match(await tileText(page, 'sched', 'Shipping'), /^\d+today \| \d+ this week$/);
+      assert.deepEqual(await page.$$eval('[data-card="yard"] .mc-tile > span', a => a.map(x => x.textContent)), ['Loaded Trailers', 'Due for a Check', 'Checked', 'Last Check']);
       // Shift Notes A (Joe 10/10): breakdowns still open, carried over from earlier shifts; Joe 10/15: handoff notes still open
       // (they stay until resolved, not only since the last report).
       assert.deepEqual([await tileText(page, 'notes', 'Breakdowns'), await tileText(page, 'notes', 'Carried Over'), await tileText(page, 'notes', 'Handoff')],
