@@ -248,7 +248,14 @@ function ioModule() {
 
     // The Quality screen: the Gallon Filler's package weight is the same check's jugs.
     const qf = await openPage(browser, 1536, 960, '/quality.html?line=' + GALLON + '&' + ADMIN);
-    await qf.waitForFunction(() => (document.querySelector('.prod-weights') || {}).value === '3870, 3852, 3880, 3866, 3861 g');
+    // The Quality screen loads every line's checks and products first: on a busy CI runner that can take longer than the default.
+    await qf.waitForFunction(() => (document.querySelector('.prod-weights') || {}).value === '3870, 3852, 3880, 3866, 3861 g', null, { timeout: 90000 })
+      .catch(async e => {
+        const q = (await db().collection('plantJournal').where('type', '==', 'PRODUCTION_QUALITY').get()).docs.map(d => d.data()).filter(d => (d.payload || {}).operationId === GALLON)
+          .map(d => [d.recordedAt, d.status, JSON.stringify((d.payload || {}).weights)]);
+        console.error('QUALITY', await qf.textContent('#form-title').catch(() => 'none'), await qf.$eval('.prod-weights', x => x.value).catch(() => 'no box'), JSON.stringify(q), new Date().toISOString());
+        throw e;
+      });
     assert.equal(await qf.getAttribute('.prod-weights', 'placeholder'), 'filled jugs in grams, like 3861, 3863');
     await shot(qf, 'join-quality-gallon-filler-1536');
     assert.deepEqual(qf.errors, []);
