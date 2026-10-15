@@ -706,6 +706,11 @@
 .quality-page .qc-done button { font: inherit; font-size: 16px; font-weight: 800; padding: 9px 18px; border-radius: 9px; cursor: pointer; }
 .quality-page .qc-done .qc-next { background: #0b3d6e; color: #fff; border: 0; }
 .quality-page .qc-done .qc-undo { background: #fff; color: #b42332; border: 2px solid #b42332; }
+.quality-page .qc-run-last { flex-basis: 100%; background: #fff; border: 1px solid #cdd7e1; border-radius: 10px; padding: 12px 14px; }
+.quality-page .qc-run-last h4 { margin: 0 0 8px; font-size: 16px; font-weight: 800; color: #0b3d6e; }
+.quality-page .qc-run-last dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 16px; }
+.quality-page .qc-run-last dt { font-size: 16px; font-weight: 700; color: #4a5d70; }
+.quality-page .qc-run-last dd { margin: 0; font-size: 18px; font-weight: 800; color: #24384d; overflow-wrap: anywhere; }
 .quality-page .qc-done-chip { font-style: normal; padding: 0 7px; border-radius: 999px; background: #e3e8ee; color: #4a5d70; font-size: 16px; font-weight: 800; }
 /* Joe 10/14 (A): a picked product waits 4 seconds with Undo before it saves. */
 .quality-page .qc-wait { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 6px; padding: 10px 12px; border-radius: 10px; background: #fff7e0; border: 1px solid #f0d38a; color: #7a5200; white-space: normal; }
