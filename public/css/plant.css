@@ -1335,3 +1335,29 @@
 .plant-page .wk-bar b { order: -1; flex: 1 1 100%; min-width: 0; font-size: 18px; color: var(--ud-blue-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plant-page .wk-bar a.next { margin-left: auto; background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
 @media (min-width: 761px) { .plant-page .wk-bar { flex-wrap: nowrap; } .plant-page .wk-bar b { order: 0; flex: 1 1 auto; } .plant-page .wk-bar a.next { margin-left: 0; } }
+/* Joe 10/15 (later): the Manager Walkthrough card's Yard, Coolers and Quality tiles list what is in them (problems first, red),
+   with the name and big number on one line so the list has the room; the bottom row takes the height its lists need. */
+.manager-page [data-card="walk"] .wk-tile { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label num" "line num" "list list"; align-content: start; row-gap: 2px; padding: 8px 12px; }
+.manager-page [data-card="walk"] .wk-tile b { grid-area: num; text-align: right; align-self: center; }
+.manager-page [data-card="walk"] .wk-tile .wk-items { grid-area: list; list-style: none; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.manager-page [data-card="walk"] .wk-items li { font-size: 16px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page [data-card="walk"] .wk-items li b { font-size: 16px; font-weight: 900; color: inherit; line-height: inherit; text-align: left; }
+.manager-page [data-card="walk"] .wk-items li.bad { color: #c62828; }
+.manager-page [data-card="walk"] .wk-items li.warn { color: #b45f00; }
+.manager-page [data-card="walk"] .wk-items li.ok { color: #1f7a4d; }
+.manager-page [data-card="walk"] .wk-items li.more { color: var(--ud-blue); font-weight: 800; }
+/* The two top rows share what the walkthrough card leaves (the report preview scrolls inside itself). */
+@media (min-width: 1501px) { .manager-page .mc-grid, .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: minmax(250px, 1fr) minmax(250px, 1fr) auto; } }
+/* Joe 10/15 (later): each walkthrough tile on the phone lists what it holds under its name and number. */
+.walk-page .wk-choice { flex-wrap: wrap; }
+.walk-page .wk-choice .wk-items { flex: 1 1 100%; list-style: none; margin: 4px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.walk-page .wk-items li { font-size: 16px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.walk-page .wk-items li b { font-weight: 900; }
+.walk-page .wk-items li.bad { color: #c62828; } .walk-page .wk-items li.warn { color: #b45f00; } .walk-page .wk-items li.ok { color: #1f7a4d; }
+.walk-page .wk-items li.more { color: var(--ud-blue); font-weight: 800; }
+@media (min-width: 761px) { .walk-page .wk-items li { font-size: 18px; } }
+/* The walkthrough card grows to fit its lists (they were clipped at 1920): its tile row sizes to the tallest tile. */
+.manager-page .mc-grid [data-card="walk"] { min-height: min-content; }
+.manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-rows: auto; grid-auto-rows: auto; flex: none; min-height: auto; }
+.manager-page .mc-grid [data-card="walk"] .mc-tile { min-height: 0; overflow: visible; }
+.manager-page .mc-grid [data-card="walk"] .mc-tile:not(.wk-tile) { align-content: start; }

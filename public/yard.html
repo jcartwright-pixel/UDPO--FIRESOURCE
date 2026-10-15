@@ -69,7 +69,9 @@
     import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, dateTimeText, goLiveNote, shortTime, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { savedText, watchRound } from './js/autosave.js';
+    import { walkBar } from './js/walk-bar.js';
 
+    walkBar('yard');
     const L = window.UDLogic, U = window.UDPlant;
     const FUEL = [['', ''], ['FULL', 'FULL'], ['3/4', '3/4'], ['1/2', '1/2'], ['EMPTY', 'EMPTY']];
     const params = new URLSearchParams(location.search);
