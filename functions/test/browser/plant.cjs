@@ -97,8 +97,19 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     results.push('End on 811: the other screen shows it Done');
 
     // Typing a trailer number: 977 becomes T-977 (no unit matches, kept as typed like the current app).
+    // CI flake (10/14 #280, 10/15 #293): the trailer was typed while 811's End save was still on its way, and the table drawn
+    // again when that save landed could take the typing. Wait for End to be saved first, then for the trailer's own save to
+    // reach the database, before looking at the other screen (the same check, with each step waited for).
+    const friDay = async (route) => ((await db().collection('runs').doc('2026-10-04__run_p' + route).get()).data().days || {}).fri || {};
+    for (let i = 0; (await friDay('811')).loadStatus !== 'COMPLETE'; i++) {
+      assert.ok(i < 80, 'End on 811 was saved'); await new Promise(r => setTimeout(r, 250));
+    }
+    await loader.waitForTimeout(500);
     await loader.fill(row('812') + ' input[data-k="trailer"]', '977');
     await loader.press(row('812') + ' input[data-k="trailer"]', 'Enter');
+    for (let i = 0; (await friDay('812')).trailer !== 'T-977'; i++) {
+      assert.ok(i < 80, 'the trailer typed on 812 was saved as T-977 (saved: ' + (await friDay('812')).trailer + ')'); await new Promise(r => setTimeout(r, 250));
+    }
     await watcher.waitForFunction(() => { const i = document.querySelector('tr[data-row^="2026-10-04__run_p812|"] input[data-k="trailer"]'); return i && i.value === 'T-977'; }, null, { timeout: 8000 });
     await loader.fill(row('812') + ' input[data-k="quantity"]', '575');
     await loader.press(row('812') + ' input[data-k="quantity"]', 'Enter');
@@ -138,6 +149,28 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       await new Promise(r => setTimeout(r, 250));
     }
     results.push('Edit Load: the note saved on leaving the box (no Save button)');
+
+    // Joe 10/15 (option B): the plant note shows written out on a yellow line under its load, on every open screen; clicking
+    // the line opens the load's Edit box. A dispatch note (driver_notes) never shows on Loadout.
+    await db().collection('runs').doc('2026-10-04__run_p812').update({ 'days.fri.driverNotes': 'Dispatch: call the store first' });
+    const noteUnder = (page, route) => page.waitForFunction((r) => {
+      const tr = document.querySelector('tr[data-row^="2026-10-04__run_p' + r + '|"]'), n = tr && tr.nextElementSibling;
+      return !!n && n.classList.contains('lo-note') && /Note:\s*Short 2 cases of buttermilk/.test(n.textContent);
+    }, route, { timeout: 8000 });
+    await noteUnder(watcher, '6301_1');
+    await noteUnder(loader, '6301_1');
+    await watcher.waitForTimeout(1500);
+    const lines = await watcher.$$eval('#rows tr.lo-note', trs => trs.map(t => t.textContent));
+    assert.equal(lines.filter(t => /buttermilk/.test(t)).length, 1, 'one note line for the load with a plant note');
+    assert.ok(!lines.some(t => /Dispatch: call the store/.test(t)), 'a dispatch note does not show on Loadout');
+    const fs16 = await watcher.$eval('#rows tr.lo-note button', b => parseFloat(getComputedStyle(b).fontSize));
+    assert.ok(fs16 >= 16, 'note line text is at least 16px');
+    if (SHOTS) await watcher.screenshot({ path: path.join(SHOTS, 'loadout-note-line-1920.png'), scale: 'css' });
+    await loader.click('#rows tr.lo-note button');
+    await loader.waitForSelector('#edit-modal:not([hidden])', { timeout: 5000 });
+    assert.equal(await loader.inputValue('#edit-notes'), 'Short 2 cases of buttermilk');
+    await loader.click('#edit-modal [data-close]');
+    results.push('Load note: written out on a yellow line under 6301 on both screens; clicking it opens Edit; the dispatch note on 812 does not show');
 
     // Tanker columns.
     await loader.click('[data-area="TANKER"]');

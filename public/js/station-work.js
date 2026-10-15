@@ -21,7 +21,7 @@ const readSkips = () => { try { return JSON.parse(sessionStorage.getItem(SKIP_KE
 
 export function mountStationWork({ db, box, person, onDraw }) {
   let station = null, view = '', date = today();
-  let runs = [], pickups = [], week = [], queue = [], sheetWash = [], appWash = [], app = {}, products = [];
+  let runs = [], pickups = [], week = [], queue = [], sheetWash = [], appWash = [], app = {}, products = [], gpsDays = [];
   // Boxing: the Plant Operations Scheduler's Shipping and Receiving loads (read only while a Boxing station is open).
   const sched = { SHIPPING: [], RECEIVING: [] };
   let routeDocs = [];   // Route Master (coverage_type), for a United Dairy account; a station-code tablet cannot read it
@@ -351,19 +351,26 @@ export function mountStationWork({ db, box, person, onDraw }) {
     return list || form ? '<div class="sw-pickups"><h3>Pickups</h3>' + list + form + '</div>' : '';
   }
 
+  // Joe 10/15 (Case Unloading, mock-up A): the trailers in the order the next loads leave, numbered; each card leads with the
+  // trailer in big type, then the run (no route, no times). Back (Fleet's yard return or the driver's check-in) or On the road
+  // (no Start button on the card; it still opens). A drop-and-hook load with no trailer typed is a Transfer trailer card.
   function unloadingView() {
-    const rows = unloads(), ck = canSave(), unit = P.UNLOAD_UNIT[area() || 'CASE'], wash = washes();
+    const rows = P.unloadOrder(unloads(), gpsDays), ck = canSave(), unit = P.UNLOAD_UNIT[area() || 'CASE'], wash = washes();
     const left = rows.filter(r => r.status !== 'COMPLETE').length;
+    const transfers = rows.filter(r => r.transfer && r.status !== 'COMPLETE');
+    const places = [...new Set(transfers.map(r => String(r.run).replace(/\s*load\s*\d+\s*$/i, '').trim().toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase())).filter(Boolean))];
     let html = '';
     rows.forEach(r => {
       const s = r.status, isOpen = s === 'UNLOADING' ? !closed[r.key] : !!opened[r.key], ws = P.washesForRow(r, wash), done = s === 'COMPLETE';
-      const chips = [r.casesIn !== '' ? '<i class="ok">' + unit + ' · ' + escapeHtml(r.casesIn) + ' confirmed</i>' : '', r.pendingReturns.length ? '<i class="ret">Product return</i>' : r.returns.length ? '<i class="ok">Returned to the cooler</i>' : '',
+      const where = done || s === 'UNLOADING' ? '' : r.transfer ? '<i class="tt">Transfer trailer</i>' : r.back ? '<i class="back">&#10003; Back ' + escapeHtml(P.clock(r.back)) + '</i>' : r.road ? '<i class="road">On the road</i>' : '';
+      const chips = [where, r.casesIn !== '' ? '<i class="ok">' + unit + ' · ' + escapeHtml(r.casesIn) + ' confirmed</i>' : '', r.pendingReturns.length ? '<i class="ret">Product return</i>' : r.returns.length ? '<i class="ok">Returned to the cooler</i>' : '',
         ws.length ? '<i class="wash">Wash required</i>' : r.washed ? '<i class="ok">Washed</i>' : ''].join('');
-      const status = done ? badge('COMPLETE', 'done') : s === 'UNLOADING' ? badge('UNLOADING', 'going') : badge('WAITING');
-      const quick = ck && s === 'WAITING' && !isOpen ? '<span class="sw-quick">' + btn('START UNLOADING', 'ustart', r.key, 'primary') + '</span>' : '';
-      html += '<article class="sw-card ' + (done ? 'done' : s === 'UNLOADING' ? 'run' : '') + (r.pendingReturns.length ? ' ret' : '') + (isOpen ? ' open' : '') + '" data-sw="' + escapeHtml(r.key) + '">' +
-        '<div class="sw-head tall" data-toggle="' + escapeHtml(r.key) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title"><b>' + escapeHtml(r.route + ' · ' + r.run) + '</b><small>' + escapeHtml(r.trailer || 'Trailer not typed yet') +
-        (r.nextLoad ? ' · next: ' + escapeHtml([r.nextLoad.route, r.nextLoad.run, r.nextLoad.time].filter(Boolean).join(' · ')) : '') + '</small><span class="sw-chips">' + chips + '</span></span>' +
+      const status = done ? badge('COMPLETE', 'done') : s === 'UNLOADING' ? badge('UNLOADING', 'going') : r.transfer ? badge('NEEDS A TRAILER') : badge('WAITING');
+      const quick = ck && s === 'WAITING' && !isOpen && !r.road && !r.transfer ? '<span class="sw-quick">' + btn('START UNLOADING', 'ustart', r.key, 'primary') + '</span>' : '';
+      const title = (r.order ? '<span class="sw-order">' + r.order + '</span>' : '') + (r.trailer ? '<span class="sw-trailer">' + escapeHtml(r.trailer) + '</span>' : '') + escapeHtml(r.run);
+      html += '<article class="sw-card ' + (done ? 'done' : s === 'UNLOADING' ? 'run' : '') + (r.pendingReturns.length ? ' ret' : '') + (r.road ? ' road' : '') + (isOpen ? ' open' : '') + '" data-sw="' + escapeHtml(r.key) + '">' +
+        '<div class="sw-head tall" data-toggle="' + escapeHtml(r.key) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title unload"><b>' + title + '</b>' +
+        (!r.trailer && !r.transfer ? '<small>Trailer not typed yet</small>' : '') + '<span class="sw-chips">' + chips + '</span></span>' +
         '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>';
       if (isOpen) {
         const dis = !ck || done;
@@ -378,7 +385,8 @@ export function mountStationWork({ db, box, person, onDraw }) {
       html += '</article>';
     });
     if (!rows.length) html = '<p class="sw-empty">' + (got.runs ? 'No trucks are back for unloading today.' : 'Reading today\'s loads&hellip;') + '</p>';
-    return panel('Unloading', left + ' to unload of ' + plural(rows.length, 'item'), '<div class="sw-list">' + html + '</div>');
+    const need = transfers.length ? '<i class="sw-need">' + plural(transfers.length, 'transfer trailer') + ' needed' + (places.length ? ' (' + escapeHtml(places.join(', ')) + ')' : '') + '</i> ' : '';
+    return panel('Unloading', need + left + ' to unload of ' + plural(rows.length, 'item'), '<div class="sw-list">' + html + '</div>');
   }
 
   function washingView() {
@@ -773,7 +781,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
       onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [-1, 0, 1, 2].map(n => L.addDays(date, n)))), s => { pickups = s.docs.map(d => d.data()); render(); }, fail('the pickups')),
       onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', weekDays())), s => { week = s.docs.map(d => d.data()); got.week = true; render(); }, fail('the unloading list')),
       // Refusals called in by email: a tablet with no UD account cannot read them; the rest still works.
-      onSnapshot(query(collection(db, 'plantReturns'), where('date', '==', date)), s => { queue = s.docs.map(d => d.data()); render(); }, () => { queue = []; render(); })
+      onSnapshot(query(collection(db, 'plantReturns'), where('date', '==', date)), s => { queue = s.docs.map(d => d.data()); render(); }, () => { queue = []; render(); }),
+      // Fleet's yard leave and return per unit (Case Unloading's Back / On the road). A tablet that cannot read them shows neither.
+      onSnapshot(query(collection(db, 'gpsDays'), where('date', 'in', [-1, 0, 1].map(n => L.addDays(date, n)))), s => { gpsDays = s.docs.map(d => d.data()); render(); }, () => { gpsDays = []; render(); })
     ];
   }
   always = [onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); }, () => {}),
