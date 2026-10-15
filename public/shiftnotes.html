@@ -50,6 +50,7 @@
           <div id="open-box"></div>
           <div class="sn-sec" id="new-title">New breakdown</div>
           <div class="qc-fields" id="fields"></div>
+          <div class="sn-send" id="mr-send-row" hidden><span class="sn-unsent" id="mr-unsent">Not sent yet</span><button type="button" class="qc-btn primary" id="mr-send">Send to Maintenance</button></div>
         </section>
       </div>
       <section class="sn-history" id="pane-history" hidden>
@@ -82,7 +83,7 @@
     // (Plant Maintenance) and shows here what maintenance did with it.
     const KINDS = [['Handoff', 'Handoff', 'Shift to shift'], ['Breakdown', 'Breakdowns'], ['Maintenance Request', 'Maintenance Requests', 'Sent to maintenance'], ['Incident', 'Incidents'], ['Safety', 'Safety'], ['Quality', 'Quality'], ['Other', 'Other']];
     const NEW_WORD = { Handoff: 'New handoff note', Breakdown: 'New breakdown', 'Maintenance Request': 'New maintenance request', Incident: 'New incident', Safety: 'New safety note', Quality: 'New quality note', Other: 'New entry' };
-    const WHY_WORD = { Breakdown: 'recorded on the machine\'s history and down time; maintenance is called in person', 'Maintenance Request': 'goes on maintenance\'s list as soon as it has words' };
+    const WHY_WORD = { Breakdown: 'recorded on the machine\'s history and down time; maintenance is called in person', 'Maintenance Request': 'goes on maintenance\'s list when you press Send' };
     let pane = params.get('view') === 'history' ? 'history' : 'current', kind = 'Breakdown';
     // Manager Center (Joe 10/15) opens a kind (?kind=Handoff) and one note on it (&entry=...), shown and outlined once it loads.
     const askKind = String(params.get('kind') || '').toLowerCase();
@@ -121,6 +122,23 @@
     // The new entry: the type picked on the left, the shift starting on the shift now. A breakdown and a maintenance request say
     // what broke, typed (Joe 10/12: "all kind of little things. Not a list"; a machine named in it goes on its history); a breakdown has its down and back up times and what fixed it, a
     // request how long it can wait. keep: the boxes change with the Type, and what is typed stays (the same entry keeps saving).
+    // Joe 10/15 ("This needs to have a send button, not automatically send. And until it's sent, can't be cleared"): a new
+    // maintenance request is kept on this screen (and on this computer, so nothing typed is lost) as a draft marked Not sent yet; it
+    // goes on maintenance's list only when Send to Maintenance is pressed. A report or a new shift does not empty it.
+    const DRAFT_KEY = 'ud.shiftnotes.requestDraft', DRAFT_BOXES = ['sn-equip', 'sn-shift', 'sn-urgency', 'sn-entry', 'sn-notes', 'sn-follow'];
+    const readDraft = () => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { return null; } };
+    const writeDraft = (d) => { try { if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); else localStorage.removeItem(DRAFT_KEY); } catch (e) { /* the draft still stays on screen */ } };
+    const formType = () => { const t = document.querySelector('#fields .sn-type'); return t ? t.value : kind; };
+    // A request typed but not sent yet (not on the log).
+    const unsent = () => !!entry && !entry.mine && formType() === 'Maintenance Request' &&
+      ['sn-entry', 'sn-notes', 'sn-equip'].some(c => { const x = document.querySelector('#fields .' + c); return x && x.value.trim(); });
+    function sendRow() {
+      const row = document.getElementById('mr-send-row'), show = canSave() && !!entry && !entry.mine && formType() === 'Maintenance Request';
+      row.hidden = !show;
+      document.getElementById('mr-unsent').hidden = !unsent();
+      const last = document.getElementById('form-last'), word = unsent() ? 'Not sent yet' : 'Press Send to send it to maintenance';
+      if (show && ['', 'Not sent yet', 'Press Send to send it to maintenance', 'Every box saves when you leave it'].indexOf(last.textContent) >= 0) { last.textContent = word; last.classList.remove('done'); last.classList.toggle('bad', unsent()); }
+    }
     const layout = () => kind === 'Breakdown' ? 'B' : kind === 'Maintenance Request' ? 'R' : 'N';
     const hm = (n) => hoursMinutesText(n);
     function drawForm(keep) {
@@ -152,14 +170,18 @@
           '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500" placeholder="What the next shift needs to know or do"></textarea></label>' + follow;
       f0.innerHTML = html;
       if (keep) Object.keys(was).forEach(c => { const x = f0.querySelector('.' + c); if (x && !x.matches('.sn-type') && was[c] !== '') x.value = was[c]; });
+      const draft = lay === 'R' && !(keep && entry && entry.mine) ? readDraft() : null;
+      if (draft) DRAFT_BOXES.forEach(c => { const x = f0.querySelector('.' + c); if (x && draft[c] && !(keep && was[c])) x.value = draft[c]; });
       f0.querySelectorAll('input,select,textarea').forEach(x => { x.disabled = !ck; });
       drawnFor = (m ? 'phone' : 'desk') + '|' + ck + '|' + lay;
       if (keep && entry) return;
       // No Save button: the entry saves to the log as each box is left; Start Another Entry empties the form for the next one.
       entry = { fill: fillIn('saveShiftNote', save), mine: null, round: roundStart, shiftPicked: false };
       const last = document.getElementById('form-last');
-      last.textContent = ck ? 'Every box saves when you leave it' : ''; last.classList.remove('bad', 'done');
+      last.textContent = ck ? (lay === 'R' ? 'Press Send to send it to maintenance' : 'Every box saves when you leave it') : ''; last.classList.remove('bad', 'done');
+      if (draft) entry.shiftPicked = true;
       document.getElementById('another').hidden = true;
+      sendRow();
     }
     const formEmpty = () => !entry || (!entry.mine && ![...document.querySelectorAll('#fields .sn-entry, #fields .sn-notes, #fields .sn-equip, #fields .sn-fix')].some(x => x.value.trim()));
 
@@ -244,7 +266,8 @@
       const hist = document.getElementById('history');
       if (!busy(hist)) hist.innerHTML = rows.map(r => card(r, ck, '', r.status !== 'RESOLVED')).join('') || '<div class="empty">No entries in the last 24 hours.</div>';
       if (askEntry) { const el = document.querySelector('#open-box [data-entry="' + CSS.escape(askEntry) + '"]'); if (el) { askEntry = ''; el.classList.add('sn-asked'); el.scrollIntoView({ block: 'center' }); } }
-      document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Every box saves by itself when you leave it. Send Current Report sends what is new since the last report and empties the entry boxes; anything not resolved stays here until it is.' : 'View only.') : rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' in the last 24 hours.';
+      document.getElementById('foot').textContent = pane === 'current' ? (ck ? (formType() === 'Maintenance Request' && entry && !entry.mine ? 'A new maintenance request goes to maintenance only when you press Send to Maintenance; until then it stays here, marked Not sent yet. ' : 'Every box saves by itself when you leave it. ') + 'Send Current Report sends what is new since the last report and empties the entry boxes; anything not resolved stays here until it is.' : 'View only.') : rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' in the last 24 hours.';
+      sendRow();
       const st = L.screenState(app, 'plant');
       goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
@@ -310,12 +333,24 @@
       kind = e.target.value;
       render();
     });
-    document.getElementById('fields').addEventListener('change', async (e) => {
+    async function saveEntry(e, sendNow) {
       if (!canSave() || !entry) return;
       if (e && e.target && e.target.matches('.sn-shift')) entry.shiftPicked = true;
       const f = document.getElementById('fields'), v = (c) => { const n = f.querySelector('.' + c); return n ? n.value.trim() : ''; };
       const text = v('sn-entry') || (v('sn-fix') ? 'Breakdown' : ''), notes = v('sn-notes'), mine0 = entry.mine, cur = entry;
-      if (!text && !notes) return;
+      // A maintenance request not sent yet: what is typed is kept as the draft; nothing goes to maintenance until Send.
+      if (!mine0 && v('sn-type') === 'Maintenance Request' && !sendNow) {
+        const d = {}; DRAFT_BOXES.forEach(c => { d[c] = v(c); });
+        writeDraft(['sn-equip', 'sn-entry', 'sn-notes'].some(c => d[c]) ? d : null);
+        const last = document.getElementById('form-last');
+        last.textContent = unsent() ? 'Not sent yet' : 'Press Send to send it to maintenance'; last.classList.remove('done'); last.classList.toggle('bad', unsent());
+        sendRow();
+        return;
+      }
+      if (!text && !notes) {
+        if (sendNow) { const last = document.getElementById('form-last'); last.textContent = 'Type what\'s wrong first'; last.classList.add('bad'); const x = f.querySelector('.sn-entry'); if (x) x.focus(); }
+        return;
+      }
       const values = Object.assign({ Entry: text, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') }, v('sn-up') ? { UpAt: v('sn-up') } : {}, v('sn-fix') ? { Fix: v('sn-fix') } : {}, v('sn-urgency') ? { Urgency: v('sn-urgency') } : {});
       const fields = { values, notes, shift: v('sn-shift') || shiftNow(), readingTime: v('sn-time') || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
       const mine = mine0 || record(values, { entryId: 'pending-' + Date.now(), shift: fields.shift });
@@ -330,16 +365,22 @@
         if (done && done.entryId) mine.payload.entryId = done.entryId;
         if (done && done.shift) mine.payload.shift = done.shift;
         showError('');
-        if (entry === cur) { last.textContent = '✓ ' + savedText() + ' · on the log'; last.classList.add('done'); document.getElementById('another').hidden = false; }
+        if (!mine0 && values.Type === 'Maintenance Request') writeDraft(null);
+        if (entry === cur) { last.textContent = '✓ ' + (sendNow ? 'Sent to maintenance ' + clockOf(Date.now()) : savedText() + ' · on the log'); last.classList.add('done'); document.getElementById('another').hidden = false; }
+        sendRow();
         render();
         setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0 && journal.some(d => d.recordId === mine.payload.entryId)) { pending.splice(i, 1); render(); } }, 20000);
       } catch (e) {
         if (!cur.fill.id) { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); cur.mine = null; }
-        if (entry === cur) { last.textContent = 'Not saved'; last.classList.add('bad'); }
+        if (entry === cur) { last.textContent = sendNow ? 'Not sent' : 'Not saved'; last.classList.add('bad'); }
+        sendRow();
         render();
         showError(e.message || String(e));
       }
-    });
+    }
+    document.getElementById('fields').addEventListener('change', (e) => saveEntry(e, false));
+    document.getElementById('fields').addEventListener('input', () => { if (entry && !entry.mine && formType() === 'Maintenance Request') sendRow(); });
+    document.getElementById('mr-send').onclick = () => saveEntry(null, true);
     document.getElementById('another').onclick = () => { drawForm(); render(); };
     document.getElementById('lines').addEventListener('click', e => {
       const b = e.target.closest('[data-kind]');
@@ -370,7 +411,7 @@
       // The plant's machinery (a machine named in What broke) and maintenance's work orders (what became of each request).
       watchMaint(db, 'fac_uniontown', d => { maint = d; render(); }, () => {}, { noJournal: true });
       // A new report empties the entry boxes for the next round; open items stay on the list.
-      watchRound(db, (at, data) => { const first = roundStart === null; roundStart = at; lastReport = data; if (!first && entry && entry.round !== at) drawForm(); render(); });
+      watchRound(db, (at, data) => { const first = roundStart === null; roundStart = at; lastReport = data; if (!first && entry && entry.round !== at && !unsent()) drawForm(); render(); });
       // 30 days of the log, so anything still open from earlier shifts stays on the list until it is resolved.
       let unsub = null, day0 = '';
       const watch = () => { const t = today(); if (t === day0) return; day0 = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', Array.from({ length: KEEP_DAYS }, (_, n) => L.addDays(t, -n)))), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the log')); };
