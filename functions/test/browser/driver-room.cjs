@@ -88,7 +88,7 @@ async function touchPage(browser, width, height, url, mobile) {
       await p.waitForURL(/route\.html\?room=1$/);
       await p.waitForSelector('#step-menu:not([hidden]) #m-checkin');
       assert.equal(await p.textContent('.phone-top b'), 'Uniontown Driver Room Check-In Station');
-      assert.deepEqual(await p.$$eval('#step-menu .drv-card b', b => b.map(x => x.textContent)), ['View Loadout', 'DVIR', 'Check-In']);
+      assert.deepEqual(await p.$$eval('#step-menu .drv-card b', b => b.map(x => x.textContent)), ['View Loadout', 'DVIR', 'Check-In', 'My Schedule']);
       assert.equal(await p.$('#go-back, #go-home, #signout'), null, 'no Back, Home or Sign out into the app');
       assert.ok(await p.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth), 'no side scroll');
       await shot(p, 'driver-room-2-choices-' + tag + '.png');
@@ -275,7 +275,7 @@ async function touchPage(browser, width, height, url, mobile) {
         let f = await fit();
         assert.ok(f.body >= w - 1, 'the station uses the whole width at ' + w);
         const tops = await tab.$$eval('#step-menu .drv-card', b => b.map(x => Math.round(x.getBoundingClientRect().top)));
-        assert.equal(new Set(tops).size, 1, 'the three choices in one row at ' + w);
+        assert.equal(new Set(tops).size, 1, 'the four choices in one row at ' + w);
         assert.ok(f.card <= f.bar && f.side <= 0, 'the choices show above Release at ' + w);
         await shot(tab, 'room-landscape-choices-' + w + '.png');
         await tab.click('#m-checkin');

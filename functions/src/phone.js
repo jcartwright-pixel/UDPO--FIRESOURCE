@@ -178,6 +178,46 @@ function checkinExtras(f, d, equipment) {
  * One phone call: {code, op, ...}. op 'roster' -> active drivers; 'loads' {driverId, date} -> that driver's loads;
  * 'checkIn' {driverId, runDocId, day, requestId, fields} -> saves one check-in. Throws SaveError.
  */
+/*
+ * My Schedule (Joe 10/15): a driver types his employee number (Driver Master employee_id) and sees his week, Sunday to
+ * Saturday. From Saturday's 6 AM roll the phone shows the coming week; before that, the current one. Each day comes from the
+ * dispatch week (the Weekly's runs, as on its Driver board): his routes, else why he is off (Day Off exceptions), else OFF
+ * from Driver Master (<day>_available), else Not scheduled.
+ */
+function scheduleWeek(today) { const week = L.weekStart(today); return L.dayPrefix(today) === 'sat' ? L.addDays(week, 7) : week; }
+const employeeKey = (v) => { const t = String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, ' '); return /^\d+$/.test(t) ? String(Number(t)) : t; };
+const titleWord = (t) => String(t || '').toLowerCase().replace(/(^|[\s/-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+function scheduleDays(driver, rows, exceptions, week) {
+  const board = L.driverBoardRows([driver], rows, exceptions, week)[0];
+  return L.DAYS.map((p, i) => {
+    const date = L.addDays(week, i), c = board ? board.days[p] : null;
+    const runs = rows.filter(r => r.days[p].runs && r.days[p].driverId === driver.id).map(r => {
+      const d = r.days[p], leaves = d.dispatchTime === null || d.dispatchTime === undefined || d.dispatchTime === '' ? '' : L.timeText(Number(d.dispatchTime));
+      return { route: String(r.streamId || r.route || '').trim().replace(/_\d+$/, ''), run: r.streamId ? '' : String(r.run || '').trim(), truck: d.truck || '', trailer: d.trailer || '', leaves };
+    });
+    // Off on a day with a run (the exception wins on the board too): the run still shows, marked off.
+    const off = c && (c.kind === 'vacation' || c.kind === 'unavailable' || c.kind === 'conflict') ? titleWord(L.exceptionLabel(L.exceptionOn(exceptions, driver.id, date)) || 'Off') : '';
+    const status = runs.length ? (off ? 'Off: ' + off : '') : off ? 'Off: ' + off : c && c.kind === 'off' ? 'Off' : 'Not scheduled';
+    return { day: p, date, runs, status, kind: runs.length ? (off ? 'conflict' : 'work') : c && c.kind === 'available' || !c ? 'none' : 'off' };
+  });
+}
+async function mySchedule(db, input, stamp) {
+  const key = employeeKey(String(input.employeeId || '').slice(0, 40));
+  if (!key) throw new SaveError('BAD_REQUEST', 'Type your employee number.');
+  const drivers = (await db.collection(C.drivers).get()).docs.map(d => Object.assign({ id: d.id }, d.data())).filter(d => d.name && L.driverActive(d));
+  const driver = drivers.find(d => employeeKey(d.employeeId) === key) || drivers.find(d => employeeKey(d.id) === key);
+  if (!driver) throw new SaveError('NOT_FOUND', 'That employee number is not on the driver list. Check it, or ask Dispatch.');
+  const today = L.operatingDay(new Date(stamp)), week = scheduleWeek(today);
+  const runs = (await db.collection(C.runs).where('weekStart', '==', week).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
+  const exceptions = (await db.collection(C.exceptions).where('driverId', '==', driver.id).get()).docs.map(d => d.data());
+  const rows = L.weeklyRows(runs, week);
+  // Posted: Weekly Publish has made the week the Live Current week (or it is already behind it); before that Dispatch may still change it.
+  const live = ((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {};
+  const posted = rows.length > 0 && (!live.current || week <= live.current);
+  return { driverId: driver.id, name: driver.name, employeeId: String(driver.employeeId || '').trim(), week, end: L.addDays(week, 6), today, posted, built: rows.length > 0,
+    days: scheduleDays(driver, rows, exceptions, week), at: stamp };
+}
+
 async function phoneCall(db, input, now) {
   input = input || {};
   const stamp = (now ? now() : new Date()).toISOString();
@@ -214,6 +254,7 @@ async function phoneCall(db, input, now) {
     const rows = B.loadoutBoardRows(runs, pickups, date).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, driver: r.driver, cases: r.cases, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText }));
     return { date, rows, remaining: rows.filter(r => r.state !== 'LOADED').length, at: stamp };
   }
+  if (op === 'schedule') return mySchedule(db, input, stamp);
   const who = await whoFor(db, input.driverId);
   const dates = allowedDates(stamp);
   if (op === 'loads') {
@@ -361,4 +402,4 @@ async function saveDvir(db, input, who, dates, stamp) {
   });
 }
 
-module.exports = { phoneCall, newRouteCode, hashCode, MAX_FAILED_PER_MINUTE, DVIR, dvirTrailer };
+module.exports = { phoneCall, scheduleWeek, scheduleDays, employeeKey, newRouteCode, hashCode, MAX_FAILED_PER_MINUTE, DVIR, dvirTrailer };

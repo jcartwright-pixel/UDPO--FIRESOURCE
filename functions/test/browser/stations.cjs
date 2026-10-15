@@ -79,7 +79,7 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await phone.click('#step-code button[type=submit]');
     // Joe 10/12: the phone opens on three choices: View Loadout (no name needed), DVIR and Check-In (the name once).
     await phone.waitForSelector('#step-menu:not([hidden])', { timeout: 8000 });
-    assert.deepEqual(await phone.$$eval('#step-menu .drv-card b', b => b.map(x => x.textContent)), ['View Loadout', 'DVIR', 'Check-In']);
+    assert.deepEqual(await phone.$$eval('#step-menu .drv-card b', b => b.map(x => x.textContent)), ['View Loadout', 'DVIR', 'Check-In', 'My Schedule']);
     await shot(phone, 'phone-driver-menu-390.png');
     await phone.click('#m-board');
     await phone.waitForSelector('#step-board:not([hidden])', { timeout: 8000 });
