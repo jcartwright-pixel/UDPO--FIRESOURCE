@@ -25,7 +25,7 @@ function routeValue(kind, v, label) {
   const t = text(v, 300);
   if (kind === 'text') return t;
   if (kind === 'unit') return t.toUpperCase();
-  if (kind === 'trailer') return !t ? '' : /^T-/i.test(t) ? t.toUpperCase() : 'T-' + t.toUpperCase(); // "T- is added", as on the current screen
+  if (kind === 'trailer') return L.trailerNumber(t); // "T- is added" to a number, as on the current screen; TBA stays TBA
   if (t === '') return null;
   if (kind === 'time') { const m = L.minutesOfDay(/^\d{1,2}\s*[AaPp][Mm]$/.test(t) ? t.replace(/\s*([AaPp][Mm])$/, ':00 $1') : t); if (m === null) throw new SaveError('BAD_REQUEST', label + ' must look like 5 AM or 5:30 PM'); return m; }
   if (kind === 'hours') { if (!/^\d{1,2}(:\d{2})?$|^\d+(\.\d+)?$/.test(t)) throw new SaveError('BAD_REQUEST', label + ' must be hours:minutes or a decimal'); return t; }
