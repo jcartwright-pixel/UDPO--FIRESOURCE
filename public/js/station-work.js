@@ -488,7 +488,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     let res, ok = false;
     // One load's saves go one after another: a Complete tapped while its Start was still on its way landed first, and the
     // Start then cleared the finish (the load showed loading again).
-    const turn = (loadChain[r.id] || Promise.resolve()).then(() => save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields }));
+    const turn = (loadChain[r.id] || Promise.resolve()).then(() => save('savePlantLoad', { runDocId: r.runDocId, day: r.day, fields, station: myName() }));
     loadChain[r.id] = turn.catch(() => {});
     try { res = await turn; ok = true; showError(''); clearSent(r.id, fields); } catch (e) { const m = String(e.message || e); if (/already loading/.test(m)) refuse(r.id, m); else showError(r.route + ' ' + r.run + ': ' + m); }
     if (queued(res)) hold(r.id, done); else if (ok) settle(r.id, shown, done); else done();
