@@ -90,6 +90,10 @@
     // fills it and is filled in further as each box is left; with none yet the boxes are empty, with the last check small and grey.
     // Joe 10/14: a check clears from the form when the report is sent or 2 hours after it was entered, whichever comes first
     // (as Cooler Temperatures); the boxes then start empty with the last check small and grey.
+    // Joe 10/14: a filler's package weights are its filled jugs in grams, the same check as the line tablet's fill weight check.
+    const filler = (name) => !/^(HTST\d*|BLOWMOLD|BOXING|RAYPAK|TOTES?)$/.test(String(name || '').toUpperCase().replace(/[^A-Z0-9]/g, ''));
+    // Joe 10/14: the 5-gallon bag fillers weigh filled bags in grams on the line tablet too (the same check).
+    const bags = (name) => /^(BOXING|RAYPAK)$/.test(String(name || '').toUpperCase().replace(/[^A-Z0-9]/g, ''));
     function roundCheck(line) { const l = line.last || {}; return l.docId && l.status !== 'FINISHED' && inRound(l.recordedAt, roundStart) && Date.now() - Date.parse(l.recordedAt) < 2 * 3600000 ? l : null; }
     // Joe 10/14 (Run Complete, A): a line pressed Run Complete is done for that shift: no form, no checks due, until Start Next Run
     // or the next shift. Undo takes a press made by mistake back.
@@ -131,7 +135,7 @@
       const note = (cls) => '<small class="as-note" data-note="' + cls + '"></small>';
       const word = (v) => CHECK[v] || v;
       const weight = blow ? '<div class="qc-heads">' + [1, 2, 3, 4, 5, 6].map(n => '<label>H' + n + '<input class="prod-head" data-head="' + n + '" inputmode="decimal" value="' + escapeHtml(w['head' + n] || '') + '"' + dis + '>' + was(ow['head' + n]) + '</label>').join('') + '</div>' + note('prod-head')
-        : '<input class="prod-weights" aria-label="Package weight" inputmode="decimal" placeholder="lb" value="' + escapeHtml(w.result || '') + '"' + dis + '>' + note('prod-weights') + was(ow.result);
+        : '<input class="prod-weights" aria-label="Package weight" inputmode="' + (filler(line.name) || bags(line.name) ? 'text' : 'decimal') + '" placeholder="' + (filler(line.name) ? 'filled jugs in grams, like 3861, 3863' : bags(line.name) ? 'filled bags in grams, like 19520, 19480' : 'lb') + '" value="' + escapeHtml(w.result || '') + '"' + dis + '>' + note('prod-weights') + was(ow.result);
       const fields = blow
         ? '<label>Jug size<select class="prod-product"' + dis + '><option value="Gallon">Gallon</option></select></label><label>Annealer temperature<input class="prod-temperature" inputmode="decimal" value="' + escapeHtml(last.temperature || '') + '"' + dis + '>' + note('prod-temperature') + was(old.temperature) + '</label>' +
           '<label>Annealer speed<input class="prod-annealer-speed" inputmode="decimal" placeholder="Machine setting" value="' + escapeHtml(last.annealerSpeed || '') + '"' + dis + '>' + note('prod-annealer-speed') + was(old.annealerSpeed) + '</label><div class="qc-field wide"><span>Jug weight</span>' + weight + '</div><label>Cycle time<input class="prod-cycle" inputmode="decimal" value="' + escapeHtml(last.cycleTime || '') + '"' + dis + '>' + note('prod-cycle') + was(old.cycleTime) + '</label>'

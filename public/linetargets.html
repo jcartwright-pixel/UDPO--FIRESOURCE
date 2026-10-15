@@ -127,7 +127,9 @@
     const ctrlVal = (c, k) => (c[k] === null || c[k] === undefined ? '' : c[k]);
     function drawController(line, counter) {
       const box = document.getElementById('controller');
-      if (!L.isAdmin(person) || counter !== 'CONTROLLER') { box.hidden = true; return; }
+      // Joe 10/14 (Gallon Filler add-on sensors, B): every filler can read a motor switch and an infeed eye, however it is counted.
+      const kind = R.lineKind(line.name), keys = R.readingsFor(kind, counter);
+      if (!L.isAdmin(person) || (counter !== 'CONTROLLER' && kind !== 'FILLER')) { box.hidden = true; return; }
       box.hidden = false;
       if (box.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
       const info = data.lineInfo[line.operationId] || {}, c = info.controller || {}, brand = c.brand || '', port = R.CONTROLLER_PORTS[brand];
@@ -141,30 +143,34 @@
       };
       const shown = (r, k) => {
         if (r.error) return '<span class="lt-bad">' + escapeHtml(r.error) + '</span>';
-        const d = Number(c[k + 'Divide']) > 0 ? Number(c[k + 'Divide']) : 1, unit = k === 'temp' ? '°F' : k === 'speed' ? ' a minute' : ' on the machine\'s counter';
+        if (k === 'running') return '<span class="lt-good"><b>' + (Number(r.value) ? 'ON: running' : 'OFF: stopped') + '</b> (read ' + fmt(r.value) + ') · read ' + escapeHtml(dateTimeText(r.at)) + '</span>';
+        const d = Number(c[k + 'Divide']) > 0 ? Number(c[k + 'Divide']) : 1, unit = k === 'temp' ? '°F' : k === 'speed' ? ' a minute' : k === 'infeed' ? ' on the infeed eye\'s counter' : ' on the machine\'s counter';
         return '<span class="lt-good"><b>' + fmt(r.value) + '</b>' + (d !== 1 ? ' ÷ ' + d + ' = <b>' + (Math.round(r.value / d * 10) / 10) + '</b>' : '') + escapeHtml(unit) + ' · read ' + escapeHtml(dateTimeText(r.at)) + '</span>';
       };
-      const kind = R.lineKind(line.name), speedDefault = R.speedNameFor(kind, {});
-      const names = { count: 'Jug count', speed: R.speedNameFor(kind, c), temp: 'Temperature (°F)' };
+      const speedDefault = R.speedNameFor(kind, {});
+      const names = { count: 'Jug count', speed: R.speedNameFor(kind, c), temp: 'Temperature (°F)', running: 'Motor running', infeed: 'Jugs in (infeed eye)' };
+      const what = { count: 'Counts the jugs made since the last read', running: 'The motor current switch: on = running; off opens a stop on the tablet', infeed: 'Jugs in less jugs counted out = rejects and spills' };
       const modbus = brand === 'MODBUS';
       const row = (k) => '<tr><th>' + escapeHtml(names[k]) + '</th><td><input data-c="' + k + 'Tag" value="' + escapeHtml(ctrlVal(c, k + 'Tag')) + '" aria-label="Where the ' + escapeHtml(names[k].toLowerCase()) + ' is"' + (brand ? '' : ' disabled') + '></td>' +
-        (modbus ? '<td><select data-c="' + k + 'Size" aria-label="Size of the ' + escapeHtml(names[k].toLowerCase()) + '"><option value=""></option>' + [['16', '16 bits'], ['32', '32 bits']].map(o => opt(o[0], String(ctrlVal(c, k + 'Size')), o[1])).join('') + '</select></td>' : '') +
-        (k === 'count' ? '<td colspan="3" class="lt-mut">Counts the jugs made since the last read</td>' : '<td><input data-c="' + k + 'Divide" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Divide')) + '" aria-label="Divide the ' + escapeHtml(names[k].toLowerCase()) + ' by"></td><td><input data-c="' + k + 'Low" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Low')) + '" aria-label="Lowest ' + escapeHtml(names[k].toLowerCase()) + '"></td><td><input data-c="' + k + 'High" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'High')) + '" aria-label="Highest ' + escapeHtml(names[k].toLowerCase()) + '"></td>') +
+        (modbus ? (k === 'running' ? '<td class="lt-mut">on/off</td>' : '<td><select data-c="' + k + 'Size" aria-label="Size of the ' + escapeHtml(names[k].toLowerCase()) + '"><option value=""></option>' + [['16', '16 bits'], ['32', '32 bits']].map(o => opt(o[0], String(ctrlVal(c, k + 'Size')), o[1])).join('') + '</select></td>') : '') +
+        (what[k] ? '<td colspan="3" class="lt-mut">' + escapeHtml(what[k]) + '</td>' : '<td><input data-c="' + k + 'Divide" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Divide')) + '" aria-label="Divide the ' + escapeHtml(names[k].toLowerCase()) + ' by"></td><td><input data-c="' + k + 'Low" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Low')) + '" aria-label="Lowest ' + escapeHtml(names[k].toLowerCase()) + '"></td><td><input data-c="' + k + 'High" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'High')) + '" aria-label="Highest ' + escapeHtml(names[k].toLowerCase()) + '"></td>') +
         '<td class="lt-test"><button type="button" data-test="' + k + '"' + (c[k + 'Tag'] && c.ip ? '' : ' disabled') + '>Test read</button><div>' + result(k) + '</div></td></tr>';
       const heard = info.machineHeardAt ? 'The line PC last sent readings ' + dateTimeText(info.machineHeardAt) + (info.machineLast ? '; the machine\'s counter read ' + fmt(info.machineLast.value) : '') + '.' : 'The line PC has not sent anything yet.';
-      box.innerHTML = '<h3>Machine controller · read-only</h3>' +
-        '<p>The line PC reads these from the machine\'s own controller every 5 seconds. <b>It only reads: the app never changes anything on the machine.</b></p>' +
+      const addOn = counter !== 'CONTROLLER';
+      box.innerHTML = (addOn ? '<h3>Add-on sensors · read-only</h3><p>The motor current switch and the second photo-eye wire into one small network I/O module (Modbus TCP). The line PC reads it every 5 seconds, the same way as a machine\'s controller. <b>It only reads: the app never changes anything on the machine.</b></p>'
+          : '<h3>Machine controller · read-only</h3><p>The line PC reads these from the machine\'s own controller every 5 seconds. <b>It only reads: the app never changes anything on the machine.</b></p>') +
         '<div class="lt-cgrid">' + sel('brand', 'Brand', R.CONTROLLER_BRANDS) + inp('ip', 'IP address') + inp('port', 'Port' + (port ? ' (empty = ' + port + ')' : '')) +
           (brand === 'AB' ? inp('slot', 'Slot (empty = 0)') : '') + (brand === 'S7' ? inp('rack', 'Rack (empty = 0)') + inp('slot', 'Slot (empty = 1)') : '') +
           (modbus ? inp('unit', 'Unit id (empty = 1)') + sel('wordOrder', 'Word order (empty = high first)', [['HIGH_FIRST', 'High word first'], ['LOW_FIRST', 'Low word first']]) : '') +
-          inp('speedName', 'Speed is called (empty = ' + speedDefault + ')', 'wide') + '</div>' +
+          (keys.indexOf('speed') >= 0 ? inp('speedName', 'Speed is called (empty = ' + speedDefault + ')', 'wide') : '') + '</div>' +
         '<div class="lt-scroll"><table class="loadout lt-ctable"><colgroup><col style="width:15%"><col style="width:16%">' + (modbus ? '<col style="width:9%">' : '') + '<col style="width:9%"><col style="width:9%"><col style="width:9%"><col></colgroup><thead><tr><th>Reading</th><th>Where it is</th>' + (modbus ? '<th>Size</th>' : '') + '<th>Divide by</th><th>Low</th><th>High</th><th>Test read</th></tr></thead><tbody>' +
-          ['count', 'speed', 'temp'].map(row).join('') + '</tbody></table></div>' +
-        '<p class="lt-note">' + (brand ? 'Where it is: ' + escapeHtml(R.TAG_HELP[brand]) + '. ' : 'Pick the brand first (it is on the controller\'s nameplate). ') + 'Divide by: 10 when the controller sends 4312 for 431.2. Low and high: the line tablet flashes the reading red outside them. Empty boxes are left out.</p>' +
+          keys.map(row).join('') + '</tbody></table></div>' +
+        '<p class="lt-note">' + (brand ? 'Where it is: ' + escapeHtml(R.TAG_HELP[brand]) + '. ' : (addOn ? 'Pick the brand first (Modbus TCP for the I/O module). ' : 'Pick the brand first (it is on the controller\'s nameplate). ')) + 'Divide by: 10 when the controller sends 4312 for 431.2. Low and high: the line tablet flashes the reading red outside them. Empty boxes are left out.</p>' +
         '<p' + (info.machineError ? ' class="lt-bad"' : '') + '>' + escapeHtml(heard) + (info.machineError ? ' Last read problem: ' + escapeHtml(info.machineError) : '') + '</p>' +
         '<p>The line PC sends to <b class="lt-mono">' + escapeHtml(readsAddress()) + '</b> with this line\'s key. ' + (info.readerKeyAt ? 'Key made ' + escapeHtml(dateTimeText(info.readerKeyAt)) + '.' : 'No key yet.') + '</p>' +
         (shownKey && shownKey.line === line.operationId ? '<p class="lt-key">Line key (copy it now, it is not shown again): <b class="lt-mono" id="ctrl-key">' + escapeHtml(shownKey.key) + '</b></p><p class="lt-key">On the line PC: <b class="lt-mono">node bridge.cjs --address ' + escapeHtml(readsAddress()) + ' --device ' + escapeHtml(line.operationId) + ' --key ' + escapeHtml(shownKey.key) + ' --controller</b></p>' : '') +
-        '<div class="lt-reader-btns"><button type="button" id="ctrl-key-btn">' + (info.readerKeyAt ? 'Replace Line Key' : 'Make Line Key') + '</button></div>' +
+        (addOn ? '<p>The add-on sensors use this line\'s key (Label reader above). On the line PC, run a second copy of the program with the same key and <b class="lt-mono">--controller</b> on the end.</p>'
+          : '<div class="lt-reader-btns"><button type="button" id="ctrl-key-btn">' + (info.readerKeyAt ? 'Replace Line Key' : 'Make Line Key') + '</button></div>') +
         (ctrlNote ? '<p class="lt-note" id="ctrl-note">' + escapeHtml(ctrlNote) + '</p>' : '');
       // A Test read waiting on the line PC: look again when it should have answered.
       clearTimeout(ctrlTimer);
@@ -259,14 +265,50 @@
         '<label>CIP wash every, hours <input id="setup-cip" data-setup="cipHours" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('cipHours')) + '"' + (ck ? '' : ' disabled') + '></label>' +
         // Joe 10/14: the Blow Mold weighs a jug from each of its six heads; the tablet flags a head outside this range.
         (R.lineKind(line.name) === 'BLOWMOLD' ? [['jugWeightTarget', 'Jug weight target, g'], ['jugWeightLow', 'Lightest, g'], ['jugWeightHigh', 'Heaviest, g']].map(([k, l]) => '<label>' + l + ' <input id="setup-' + k + '" data-setup="' + k + '" inputmode="decimal" maxlength="6" value="' + escapeHtml(val(k)) + '"' + (ck ? '' : ' disabled') + '></label>').join('') : '') +
-        '<span>The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes.' + (R.lineKind(line.name) === 'BLOWMOLD' ? ' The bottle check flags a head\'s jug lighter or heavier than the range.' : '') + ' Leave a box empty for none.</span>';
+        '<span>The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes.' + (R.lineKind(line.name) === 'BLOWMOLD' ? ' The bottle check flags a head\'s jug lighter or heavier than the range.' : '') + ' Leave a box empty for none.</span>' +
+        (R.hasFill(line.name) ? fillSetup(line, info, val, ck) : '') + (R.lineKind(line.name) === 'PACK' ? fedSetup(line, info, val, ck) : '');
+    }
+    // Joe 10/14: a filler's fill weight check: how often it is due, and the numbers for the product in each jug (filled - empty jug - cap,
+    // against each product's Target fill weight on the Product Sheet).
+    function fillSetup(line, info, val, ck) {
+      const dis = ck ? '' : ' disabled', mode = String(val('fillEvery') || ''), blowHeads = Object.values(data.lineInfo || {}).filter(x => R.lineKind(x.line) === 'BLOWMOLD' && x.headsLast).map(x => x.headsLast).sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
+      const tare = R.tareFor(line.name, info, blowHeads, Date.now()), gal = R.usesBlowMoldJugs(line.name), w = R.fillWords(line.name);
+      const num = (k, l, max) => '<label>' + l + ' <input id="setup-' + k + '" data-setup="' + k + '" data-max="' + max + '" inputmode="decimal" maxlength="7" value="' + escapeHtml(val(k)) + '"' + dis + '></label>';
+      return '<div class="lt-fill"><h3>Fill weight check <small>' + R.FILL_JUGS + ' filled ' + w.many + ' weighed in grams on the line tablet' + (window.UDPlant.qualitySkip(line.name).weight ? '' : ', the same check as the Quality screen\'s package weight') + '</small></h3>' +
+        '<label>Due <select id="setup-fillEvery" data-setup="fillEvery"' + dis + '><option value=""' + (mode ? '' : ' selected') + '></option>' + R.FILL_MODES.map(m => '<option value="' + m[0] + '"' + (mode === m[0] ? ' selected' : '') + '>' + escapeHtml(m[1].replace(/ jugs\b/, ' ' + w.many)) + '</option>').join('') + '</select></label>' +
+        (mode === 'MINUTES' || mode === 'JUGS' ? num('fillEveryN', mode === 'MINUTES' ? 'Every, minutes' : 'Every, ' + w.many, 100000) : '') +
+        '<span>' + (mode ? '' : 'Empty is every ' + (R.FILL_DEFAULT_MIN / 60) + ' hours. ') + 'A check is always due at the start of the shift and after each product change.</span>' +
+        '<div class="lt-fillrow">' + num('tareGrams', w.Empty + ' weight, g', 2000) + num('capGrams', w.Cap + ' weight, g', 200) + num('fillUnder', 'Light when under target by, g', 1000) + num('fillOver', 'Heavy when over target by, g', 1000) + '</div>' +
+        '<span>Product in each ' + w.one + ' = filled weight − ' + w.empty + ' − ' + w.cap + ', against the product\'s Target Fill Weight g on the Product Sheet. ' +
+        (gal ? 'The empty jug is the average of the Blow Mold\'s latest Head 1 to 6 weights (the last ' + R.TARE_HOURS + ' hours); the weight typed here is used when there is none. ' : '') +
+        w.Empty + ' now: <b id="tare-now">' + (tare ? tare.grams + ' g' + (tare.from === 'BLOWMOLD' ? ' (Blow Mold heads)' : ' (typed here)') : 'not set') + '</b>. Light empty means any ' + w.one + ' under target is LIGHT; Heavy empty means overfill is not flagged.</span></div>';
+    }
+    // Joe 10/14: a packing line's boxes against the fillers that feed it: which lines feed it, and how many jugs go in each box.
+    function fedSetup(line, info, val, ck) {
+      const dis = ck ? '' : ' disabled', fed = Array.isArray(info.fedBy) ? info.fedBy : [];
+      const feeders = lines().filter(l => l.operationId !== line.operationId && R.lineKind(l.name) === 'FILLER');
+      return '<div class="lt-fill"><h3>Fed by <small>the fillers whose jugs this line boxes; the line tablet shows jugs in against boxes out</small></h3>' +
+        '<div class="lt-fillrow">' + feeders.map(l => '<label class="lt-check"><input type="checkbox" data-fedby="' + escapeHtml(l.operationId) + '"' + (fed.indexOf(l.operationId) >= 0 ? ' checked' : '') + dis + '> ' + escapeHtml(l.name) + '</label>').join('') + '</div>' +
+        '<label>Jugs in each box <input id="setup-perBox" data-setup="perBox" data-max="1000" inputmode="numeric" maxlength="4" value="' + escapeHtml(val('perBox')) + '"' + dis + '></label>' +
+        '<span>Jugs boxed = boxes counted on this line × jugs in each box. Jugs in minus jugs boxed is what is still on the conveyor, rejected or spilled. Leave every line unticked for none.</span></div>';
     }
     document.getElementById('setup').addEventListener('change', async e => {
-      const box = e.target.closest('[data-setup]'), line = current();
+      const line = current();
+      if (e.target.dataset.fedby !== undefined && line && canSave()) {
+        const fedBy = [...document.querySelectorAll('#setup [data-fedby]')].filter(x => x.checked).map(x => x.dataset.fedby);
+        note = 'Saving…'; render('keep');
+        try { await save('saveLineSetup', { operationId: line.operationId, fedBy }); note = savedText(); showError(''); }
+        catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
+        render(true);
+        return;
+      }
+      const box = e.target.closest('[data-setup]');
       if (!box || !line || !canSave()) return;
-      const k = box.dataset.setup, v = box.value.trim(), max = k === 'cipHours' ? 72 : /^jugWeight/.test(k) ? 500 : 600, n = Number(v);
-      const names = { cipHours: 'CIP wash every', changeoverMin: 'Changeover standard', jugWeightTarget: 'Jug weight target', jugWeightLow: 'Lightest jug weight', jugWeightHigh: 'Heaviest jug weight' };
-      if (v !== '' && (!isFinite(n) || n < 0 || n > max)) { refuse(names[k] + ' must be a number from 0 to ' + max + '. It was not changed.'); box.blur(); render(true); return; }
+      const k = box.dataset.setup, v = box.value.trim(), max = box.dataset.max ? Number(box.dataset.max) : k === 'cipHours' ? 72 : /^jugWeight/.test(k) ? 500 : 600, n = Number(v);
+      const names = { cipHours: 'CIP wash every', changeoverMin: 'Changeover standard', jugWeightTarget: 'Jug weight target', jugWeightLow: 'Lightest jug weight', jugWeightHigh: 'Heaviest jug weight',
+        fillEveryN: 'How often', tareGrams: 'Empty jug weight', capGrams: 'Cap weight', fillUnder: 'Light when under target by', fillOver: 'Heavy when over target by', perBox: 'Jugs in each box' };
+      if (k !== 'fillEvery' && v !== '' && (!isFinite(n) || n < 0 || n > max)) { refuse(names[k] + ' must be a number from 0 to ' + max + '. It was not changed.'); box.blur(); render(true); return; }
+      if (k === 'fillEvery') box.blur();
       note = 'Saving…'; render('keep');
       try { await save('saveLineSetup', { operationId: line.operationId, [k]: v }); note = savedText(); showError(''); }
       catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }

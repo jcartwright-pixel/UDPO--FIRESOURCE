@@ -55,14 +55,18 @@ function modbusAddress(tag) {
   const t = String(tag || '').trim().toUpperCase();
   let m = /^(HR|IR)\s*:?\s*(\d{1,5})$/.exec(t);
   if (m) return { fc: m[1] === 'HR' ? 3 : 4, addr: Number(m[2]) };
-  m = /^([34])(\d{4,5})$/.exec(t);
-  if (m && Number(m[2]) >= 1) return { fc: m[1] === '4' ? 3 : 4, addr: Number(m[2]) - 1 };
+  // Joe 10/14 (the Gallon Filler's add-on sensors, B): an on/off input on an I/O module, like the motor current switch.
+  m = /^(DI|COIL)\s*:?\s*(\d{1,5})$/.exec(t);
+  if (m) return { fc: m[1] === 'DI' ? 2 : 1, addr: Number(m[2]), bit: true };
+  m = /^([0134])(\d{4,5})$/.exec(t);
+  if (m && Number(m[2]) >= 1) return Object.assign({ fc: { 4: 3, 3: 4, 1: 2, 0: 1 }[m[1]], addr: Number(m[2]) - 1 }, m[1] === '0' || m[1] === '1' ? { bit: true } : {});
   m = /^(\d{1,5})$/.exec(t);
   if (m) return { fc: 3, addr: Number(m[1]) };
   return null;
 }
+// Read requests only: 1 (coils), 2 (discrete inputs), 3 (holding registers) and 4 (input registers). words = registers, or 1 bit.
 function modbusRequest(a, words, unit, id) {
-  if (a.fc !== 3 && a.fc !== 4) throw new ControllerError('Only Modbus read functions 3 and 4 are allowed.');
+  if ([1, 2, 3, 4].indexOf(a.fc) < 0) throw new ControllerError('Only Modbus read functions 1 to 4 are allowed.');
   const b = Buffer.alloc(12);
   b.writeUInt16BE(id & 0xffff, 0); b.writeUInt16BE(0, 2); b.writeUInt16BE(6, 4); b.writeUInt8(unit & 0xff, 6);
   b.writeUInt8(a.fc, 7); b.writeUInt16BE(a.addr & 0xffff, 8); b.writeUInt16BE(words, 10);
@@ -72,6 +76,7 @@ const MODBUS_ERRORS = { 1: 'the controller does not allow that read', 2: 'there 
 function modbusValue(res, words, wordOrder) {
   const fc = res.readUInt8(7);
   if (fc & 0x80) { const code = res.readUInt8(8); throw new ControllerError('Modbus error ' + code + ': ' + (MODBUS_ERRORS[code] || 'refused') + '.'); }
+  if (fc === 1 || fc === 2) { if (res.readUInt8(8) < 1) throw new ControllerError('The controller sent too few bytes.'); return res.readUInt8(9) & 1; }
   if (res.readUInt8(8) < words * 2) throw new ControllerError('The controller sent too few bytes.');
   if (words === 1) return res.readUInt16BE(9);
   const a = res.readUInt16BE(9), b = res.readUInt16BE(11);
@@ -79,8 +84,8 @@ function modbusValue(res, words, wordOrder) {
 }
 async function readModbus(cfg) {
   const a = modbusAddress(cfg.tag);
-  if (!a) throw new ControllerError('Type the register like 40001, 30001 or HR 100.');
-  const words = Number(cfg.size) === 16 ? 1 : 2, unit = cfg.unit === null || cfg.unit === undefined || cfg.unit === '' ? 1 : Number(cfg.unit);
+  if (!a) throw new ControllerError('Type the register like 40001, 30001, HR 100, or 10001 or DI 0 for an on/off input.');
+  const words = a.bit ? 1 : Number(cfg.size) === 16 ? 1 : 2, unit = cfg.unit === null || cfg.unit === undefined || cfg.unit === '' ? 1 : Number(cfg.unit);
   return talk(cfg.ip, Number(cfg.port) || 502, b => (b.length >= 6 ? 6 + b.readUInt16BE(4) : 0), async (send, want) => {
     send(modbusRequest(a, words, unit, 1));
     return modbusValue(await want(), words, cfg.wordOrder);
@@ -178,6 +183,11 @@ function s7Address(tag) {
   if (m) return { area: 0x84, db: Number(m[1]), start: Number(m[3]), bytes: m[2] === 'D' ? 4 : 2 };
   m = /^M([DW])(\d{1,5})$/.exec(t);
   if (m) return { area: 0x83, db: 0, start: Number(m[2]), bytes: m[1] === 'D' ? 4 : 2 };
+  // One on/off bit (a switch): DB10.DBX4.0, M20.1, or an input I0.3 (read as its byte, then the bit).
+  m = /^DB(\d{1,5})\.DBX(\d{1,5})\.([0-7])$/.exec(t);
+  if (m) return { area: 0x84, db: Number(m[1]), start: Number(m[2]), bytes: 1, bit: Number(m[3]) };
+  m = /^([MIE])(\d{1,5})\.([0-7])$/.exec(t);
+  if (m) return { area: m[1] === 'M' ? 0x83 : 0x81, db: 0, start: Number(m[2]), bytes: 1, bit: Number(m[3]) };
   return null;
 }
 const tpkt = (body) => { const h = Buffer.from([3, 0, 0, 0]); h.writeUInt16BE(body.length + 4, 2); return Buffer.concat([h, body]); };
@@ -201,11 +211,12 @@ function s7Value(res, a) {
   if (errClass || errCode) throw new ControllerError('The controller refused the read (S7 error ' + errClass + '/' + errCode + '). Allow PUT/GET in the controller.');
   const d = o + 12 + 2, rc = res.readUInt8(d);
   if (rc !== 0xff) throw new ControllerError('The controller said ' + (S7_RETURN[rc] || 'no (S7 return code ' + rc + ')') + '.');
+  if (a.bytes === 1) return (res.readUInt8(d + 4) >> (a.bit || 0)) & 1;
   return a.bytes === 4 ? res.readUInt32BE(d + 4) : res.readUInt16BE(d + 4);
 }
 async function readS7(cfg) {
   const a = s7Address(cfg.tag);
-  if (!a) throw new ControllerError('Type the address like DB10.DBD4 (a data block\'s 4 bytes) or MD20.');
+  if (!a) throw new ControllerError('Type the address like DB10.DBD4 (a data block\'s 4 bytes), MD20, or DB10.DBX4.0 or I0.3 for an on/off input.');
   const frame = b => (b.length >= 4 ? b.readUInt16BE(2) : 0);
   const slot = cfg.slot === '' || cfg.slot === undefined || cfg.slot === null ? 1 : Number(cfg.slot);
   return talk(cfg.ip, Number(cfg.port) || 102, frame, async (send, want) => {

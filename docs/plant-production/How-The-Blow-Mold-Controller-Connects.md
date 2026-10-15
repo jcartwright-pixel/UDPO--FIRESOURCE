@@ -43,3 +43,12 @@ node bridge.cjs --address <address> --device ut_prod_blow_mold --key <key> --con
 ```
 
 The line PC needs to reach the controller on the plant network and the internet. It takes the brand, IP address and tags from Line Targets, so a change there needs no change on the PC.
+
+## The same door for the filler's add-on sensors
+
+The Gallon Filler (and the half gallon fillers, if they get them) can use the same read-only path for two cheap add-on sensors on one small Modbus TCP I/O module (Joe picked B on 10/14):
+
+- **Motor running**: a current switch clamped on the motor wire, read as an on/off input such as `DI 0` (or `10001`). Off opens a stop on the tablet, and on ends it.
+- **Jugs in**: a photo-eye on the infeed, read as a counter such as `30001`. Rejects and spills = jugs in minus jugs the label reader counted.
+
+They are set up on **Line Targets** under **Add-on sensors · read-only**, each with a **Test read**. The line PC runs a second copy of the program with `--controller`, using the label reader's key. Nothing is written to the module.
