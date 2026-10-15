@@ -105,12 +105,16 @@ async function seed() {
     await desk.selectOption(row('T-701') + ' select', '1/2');
     await desk.fill(row('T-701') + ' .yd-notes', 'Reefer on, doors sealed');
     await desk.press(row('T-701') + ' .yd-notes', 'Tab');
+    // Joe 10/15 ("unable to enter the temperature setting"): the set point box takes a typed number and saves with the check.
+    assert.equal(await desk.$eval(row('T-701') + ' .yd-set', x => x.readOnly), false, 'the set point box can be typed in');
+    await desk.fill(row('T-701') + ' .yd-set', '34');
+    await desk.press(row('T-701') + ' .yd-set', 'Tab');
     for (let i = 0; i < 40; i++) {
       const c = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).find(x => x.createdInApp && x.payload.trailer === 'T-701');
-      if (c && c.payload.fuelLevel === '1/2' && c.payload.notes === 'Reefer on, doors sealed') break;
+      if (c && c.payload.fuelLevel === '1/2' && c.payload.notes === 'Reefer on, doors sealed' && c.payload.setPoint === '34') break;
       await desk.waitForTimeout(250);
     }
-    results.push('T-701 (35°F, 1/2, notes) saved box by box: saved on screen in ' + shown + ' ms, off the other screen in ' + (Date.now() - t0) + ' ms; locked for 2 hours');
+    results.push('T-701 (35°F, set point 34, 1/2, notes) saved box by box: saved on screen in ' + shown + ' ms, off the other screen in ' + (Date.now() - t0) + ' ms; locked for 2 hours');
     // Left Yard asks once more.
     await desk.click(row('T-704') + ' [data-left]');
     assert.equal(await desk.textContent(row('T-704') + ' [data-left]'), 'Confirm Left');
@@ -121,7 +125,7 @@ async function seed() {
     await watcher.waitForFunction(() => document.querySelectorAll('#history tr').length === 4);
     const top = await watcher.$$eval('#history tr', r => r.slice(0, 2).map(x => x.textContent));
     assert.match(top[0], /T-704[\s\S]*Left the yard[\s\S]*Left Yard/);
-    assert.match(top[1], /T-701[\s\S]*35[\s\S]*1\/2[\s\S]*Reefer on, doors sealed[\s\S]*Recorded/);
+    assert.match(top[1], /T-701[\s\S]*35[\s\S]*34[\s\S]*1\/2[\s\S]*Reefer on, doors sealed[\s\S]*Recorded/);
     results.push('24-Hour History: the Left Yard and the check on top, newest first');
     const saved = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp);
     assert.deepEqual(saved.map(x => x.payload.trailer + ' ' + x.payload.status).sort(), ['T-701 COMPLETE', 'T-704 DEPARTED']);
@@ -136,6 +140,8 @@ async function seed() {
     await phone.fill(card + ' [data-k="temperature"]', '37');
     await phone.press(card + ' [data-k="temperature"]', 'Enter');
     await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
+    await phone.fill(card + ' [data-k="setPoint"]', '33');
+    await phone.press(card + ' [data-k="setPoint"]', 'Enter');
     await phone.click(card + ' [data-fuel="3/4"]');
     await phone.fill(card + ' [data-k="notes"]', 'Doors sealed');
     await phone.press(card + ' [data-k="notes"]', 'Enter');
@@ -143,8 +149,8 @@ async function seed() {
     await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
     const one = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp && x.payload.trailer === 'T-702');
     assert.equal(one.length, 1, 'the three boxes fill in one check');
-    assert.deepEqual([one[0].payload.temperature, one[0].payload.fuelLevel, one[0].payload.notes], ['37', '3/4', 'Doors sealed']);
-    results.push('Phone: T-702 temp, fuel and notes each saved as they were left, into one check; the card stays with "Saved"');
+    assert.deepEqual([one[0].payload.temperature, one[0].payload.setPoint, one[0].payload.fuelLevel, one[0].payload.notes], ['37', '33', '3/4', 'Doors sealed']);
+    results.push('Phone: T-702 temp, set point, fuel and notes each saved as they were left, into one check; the card stays with "Saved"');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-saved-412.png'), scale: 'css' });
     await phone.click(card + ' [data-left]');
     assert.match(await phone.textContent(card + ' [data-left]'), /Tap again to confirm/);
