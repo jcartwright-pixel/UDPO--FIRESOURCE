@@ -50,10 +50,10 @@ async function note(id, at, values, status) {
     assert.equal(mc.pill.trim(), '2 need review');
     assert.equal(mc.lines.length, 2);
     assert.match(mc.lines.join(' | '), /Needs attention.*Handoff · Cooler 2 door \| Needs attention.*Handoff · Dock 6/);
-    assert.deepEqual(mc.tiles.slice(2), ['Handoff=2 red still open', '24-Hour History=2 red notes · 1 needs review']);
+    assert.deepEqual(mc.tiles, ['Breakdowns=0 still open', 'Handoffs=2 red open', 'Carryover=2 from earlier shifts']);
     assert.ok(await page.$eval('[data-card="notes"] .mc-tile b', b => parseFloat(getComputedStyle(b).fontSize) >= 30), 'bigger numbers on the Shift Notes card');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'shift-keep-manager-1536.png') });
-    results.push('Manager Center: the Shift Notes card is red with "2 need review", lists both handoff notes, Handoff 2 still open and 24-Hour History "1 needs review" in red');
+    results.push('Manager Center: the Shift Notes card is red with "2 need review", lists both handoff notes, Handoffs 2 open in red, 2 carried over from earlier shifts');
     // A line opens that note on Shift Notes, outlined.
     await page.click('[data-card="notes"] .mc-wait');
     await page.waitForSelector('#open-box .sn-card.sn-asked[data-entry="SHIFT-keep1"]', { timeout: 15000 });
@@ -85,11 +85,10 @@ async function note(id, at, values, status) {
     await page.selectOption('#open-box [data-status="SHIFT-keep2"]', 'RESOLVED');
     await page.waitForFunction(() => !document.querySelector('#open-box .sn-card'), null, { timeout: 10000 });
     await page.goto(HOSTING + '/manager.html' + MANAGER);
-    await page.waitForFunction(() => /none open[\s\S]*24-Hour History\d+notes$/.test((document.querySelector('[data-card="notes"]') || { textContent: '' }).textContent), null, { timeout: 15000 });
+    await page.waitForFunction(() => /Handoffs0open/.test((document.querySelector('[data-card="notes"]') || { textContent: '' }).textContent), null, { timeout: 15000 });
     mc = await notesCard();
     assert.deepEqual([mc.alert, mc.pill, mc.lines.length], [false, '', 0]);
-    assert.equal(mc.tiles[2], 'Handoff=0 none open');
-    assert.match(mc.tiles[3], /^24-Hour History=\d+ notes$/, 'no longer red');
+    assert.deepEqual(mc.tiles, ['Breakdowns=0 still open', 'Handoffs=0 open', 'Carryover=0 from earlier shifts']);
     results.push('All resolved: the Manager Center card is calm again');
     assert.deepEqual(errors, []);
   } finally {

@@ -131,8 +131,9 @@
       report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart, output: lineOutput(), outputShift: prod && prod.shift ? shiftText(prod.shift) : '' }, now);
       const S = U.shiftReport(week, data.roundStart);
       // Joe 10/15: every note not yet resolved by hand, newest first, and how many of the last 24 hours still need review.
-      const wait = week.filter(r => r.status !== 'RESOLVED').sort((a, b) => (a.status === 'MONITOR') - (b.status === 'MONITOR')), review24 = U.shiftLog(data.shift, now, 24).filter(r => r.status !== 'RESOLVED').length;
-      return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N, S, wait, review24 };
+      const wait = week.filter(r => r.status !== 'RESOLVED').sort((a, b) => (a.status === 'MONITOR') - (b.status === 'MONITOR'));
+      const outRange = temps.filter(r => /^(HIGH|LOW)$/.test(r.status) || /^(HIGH|LOW)$/.test(r.lastStatus)).length;
+      return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N, S, wait, qhist, outRange };
     }
 
     function render() {
@@ -151,25 +152,27 @@
         tile('unloading.html', 'Unloading', x.uc.complete, 'of ' + x.uc.total, x.uc.waiting + ' waiting · ' + x.uc.unloading + ' unloading', pct(x.uc.complete, x.uc.total)),
         tile('returns.html', 'Returns', x.returns.length, '', x.returns.filter(z => z.pending).length + ' pending', null, x.returns.some(z => z.pending) ? 'warn' : ''),
         tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash')]));
+      // Joe 10/15: two big tiles: how many lines are running, and when the quality checks were last updated.
+      const qLast = x.qhist.map(c => c.recordedAt).filter(Boolean).sort().pop() || '';
       put('quality', card('&#10003;', 'Quality Checks Report', 'Production quality results and 24-hour history', 'quality.html', [
-        tile('quality.html', 'Quality Checks', x.Q.lines, 'lines', x.Q.down ? x.Q.down + ' down' : 'all running', null, x.Q.down ? 'bad' : ''),
-        tile('quality.html?view=history', 'Tip Test', x.Q.tipTests, '', x.Q.tipFails ? x.Q.tipFails + ' fail or review' : 'in 24 hours · all pass', null, x.Q.tipFails ? 'bad' : ''),
-        tile('quality.html?view=history', 'Weights', x.Q.lastWeight ? clock(x.Q.lastWeight) : '—', '', x.Q.lastWeight ? 'last weight' : 'no weight yet'), tile('quality.html?view=history', 'History', x.Q.history, '', 'checks in 24 hours')]));
-      // Joe 10/15: two big tiles: Status (OK, or how many need checking in red) and the last manual read.
+        tile('quality.html', 'Lines Running', x.Q.lines - x.Q.down, 'of ' + x.Q.lines, x.Q.down ? x.Q.down + ' down' : 'all running', null, x.Q.down ? 'bad' : 'good'),
+        tile('quality.html?view=history', 'Last Updated', qLast ? clock(qLast) : '—', '', qLast ? 'last quality check' : 'none in 24 hours')]));
+      // Joe 10/15: two big tiles: Status (OK when everything is good, otherwise how many need checking) and how many are out of range.
       put('temps', card('&#127777;', 'Cooler Temperature Reports', 'Manual plant checks plus read-only sensor readings', 'temps.html', [
-        tile('temps.html?view=alerts', 'Status', x.T.alerts || 'OK', '', x.T.alerts ? 'need checking' : 'all in range', null, x.T.alerts ? 'bad' : 'good'),
-        tile('temps.html', 'Last Manual Read', x.T.lastManual ? clock(x.T.lastManual) : '—', '', x.T.lastManual ? 'latest one' : 'none yet', null, x.T.lastManual ? '' : 'bad')]));
+        tile('temps.html?view=alerts', 'Status', x.T.alerts ? 'CHECK' : 'OK', '', x.T.alerts ? x.T.alerts + ' need checking' : 'all good', null, x.T.alerts ? 'bad' : 'good'),
+        tile('temps.html?view=alerts', 'Out of Range', x.outRange, '', x.outRange ? 'too warm or too cold' : 'all in range', null, x.outRange ? 'bad' : 'good')]));
       // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.
       // Joe 10/15: the card turns red while any note is not resolved by hand and lists them (a line opens that note); handoff
       // notes and breakdowns stay big and red until resolved; the 24-Hour History number turns red while any there needs review.
-      const carried = x.S.down.filter(d => d.carried).length, isType = (r, t) => String(r.type || '').toUpperCase() === t;
+      // Joe 10/15: three big tiles: breakdowns still open, handoff notes open, and anything open carried over from earlier shifts.
+      const before = Date.parse(data.roundStart || ''), carried = isFinite(before) ? x.wait.filter(r => Date.parse(r.recordedAt || '') <= before).length : 0, isType = (r, t) => String(r.type || '').toUpperCase() === t;
       const handOpen = x.wait.filter(r => isType(r, 'HANDOFF')).length, waitN = x.wait.length;
       const noteLine = (r) => '<a class="mc-wait' + (r.status === 'MONITOR' ? ' mon' : '') + '" href="shiftnotes.html?kind=' + encodeURIComponent(r.type || '') + '&entry=' + encodeURIComponent(r.entryId) + '"><em>' + escapeHtml(U.followLabel(r.status)) + '</em><b>' +
         escapeHtml(r.recordedAt ? clock(r.recordedAt) : r.readingTime || '') + '</b>' + escapeHtml([r.type || 'Note', r.equipment || r.entry].filter(Boolean).join(' · ')) + '</a>';
       put('notes', card('&#9998;', 'Shift Notes', 'Breakdowns carried over until resolved, shift handoff', 'shiftnotes.html', [
-        tile('shiftnotes.html?kind=Breakdown', 'Breakdowns', x.S.down.length, '', 'still open', null, x.S.down.length ? 'bad' : ''), tile('shiftnotes.html', 'Carried Over', carried, '', 'from earlier shifts', null, carried ? 'warn' : ''),
-        tile('shiftnotes.html?kind=Handoff', 'Handoff', handOpen, '', handOpen ? 'still open' : 'none open', null, handOpen ? 'bad' : ''),
-        tile('shiftnotes.html?view=history', '24-Hour History', x.N.history, '', x.review24 ? 'notes · ' + x.review24 + ' need' + (x.review24 === 1 ? 's' : '') + ' review' : 'notes', null, x.review24 ? 'bad' : '')]));
+        tile('shiftnotes.html?kind=Breakdown', 'Breakdowns', x.S.down.length, '', 'still open', null, x.S.down.length ? 'bad' : ''),
+        tile('shiftnotes.html?kind=Handoff', 'Handoffs', handOpen, '', 'open', null, handOpen ? 'bad' : ''),
+        tile('shiftnotes.html', 'Carryover', carried, '', 'from earlier shifts', null, carried ? 'warn' : '')]));
       const nc = grid.querySelector('[data-card="notes"]');
       nc.classList.toggle('mc-alert', waitN > 0);
       if (waitN) {

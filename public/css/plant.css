@@ -1272,13 +1272,18 @@
 .manager-page .mc-card.mc-alert .mc-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* With the Shift Notes list showing, no row squeezes its cards below their content (the grid scrolls instead). */
 @media (min-width: 1501px) { .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: repeat(3, minmax(min-content, 1fr)); } }
-/* Joe 10/15: the Scheduler, Yard Checks and Cooler Temperature cards have two big tiles each: the label, the number big under it, the line under that. */
-.manager-page .mc-grid :is([data-card="sched"], [data-card="yard"], [data-card="temps"]) .mc-tiles { grid-template-rows: minmax(0, 1fr); }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"]) .mc-tile { grid-template-columns: minmax(0, 1fr); grid-template-areas: "label" "num" "line"; align-content: center; row-gap: 2px; padding: 6px 14px; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"]) .mc-tile span { font-size: 18px; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"]) .mc-tile b { text-align: left; font-size: 40px; line-height: 1.05; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"]) .mc-tile b small { font-size: 20px; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"]) .mc-tile i { font-size: 18px; font-weight: 800; color: var(--ud-blue-dark); }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"]) .mc-tile.bad { background: #fdecec; border-color: #f1b5b5; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"]) .mc-tile.bad i { color: #c62828; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"]) .mc-tile.warn i { color: #b45f00; }
+/* Joe 10/15: the Scheduler, Yard Checks, Cooler Temperature and Quality cards have two big tiles each (Shift Notes three): the label, the number big under it, the line under that. */
+.manager-page .mc-grid :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"]) .mc-tiles { grid-template-rows: minmax(0, 1fr); }
+.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"]) .mc-tile { grid-template-columns: minmax(0, 1fr); grid-template-areas: "label" "num" "line"; align-content: center; row-gap: 2px; padding: 6px 14px; }
+.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"]) .mc-tile span { font-size: 18px; }
+.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"]) .mc-tile b { text-align: left; font-size: 40px; line-height: 1.05; }
+.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"]) .mc-tile b small { font-size: 20px; }
+.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"]) .mc-tile i { font-size: 18px; font-weight: 800; color: var(--ud-blue-dark); }
+.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"]) .mc-tile.bad { background: #fdecec; border-color: #f1b5b5; }
+.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"]) .mc-tile.bad i { color: #c62828; }
+.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"]) .mc-tile.warn i { color: #b45f00; }
+.manager-page .mc-grid [data-card="notes"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.manager-page .mc-card[data-card="notes"] .mc-tile b, .manager-page .mc-card[data-card="notes"] .mc-tile.bad b { font-size: 40px; }
+.manager-page .mc-card[data-card="notes"] .mc-tile { padding: 6px 10px; }
+.manager-page .mc-card[data-card="notes"] .mc-tile span { font-size: 17px; }
+.manager-page .mc-card[data-card="notes"] .mc-tile i { white-space: normal; overflow: visible; overflow-wrap: normal; line-height: 1.15; }
