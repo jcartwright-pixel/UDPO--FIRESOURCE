@@ -97,17 +97,17 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       // Joe 10/15 (Manager Walkthrough): one card in walking order instead of Quality, Cooler Temperatures and Yard Checks.
       // The five lines' last checks are days old (past due); Cooler North read 44°F (too warm) 30 minutes ago, the newest check.
       assert.deepEqual(await page.$$('[data-card="quality"], [data-card="temps"], [data-card="yard"]'), []);
-      assert.equal(await tileText(page, 'walk', '3 · Quality'), '5of 5 | 5 past due');
-      assert.match(await tileText(page, 'walk', '2 · Coolers'), /^\d+ \| 1 out of range$/);
-      assert.ok(await page.$eval('[data-card="walk"]', c => [...c.querySelectorAll('.mc-tile.bad')].map(t => t.querySelector('span').textContent).join() === '2 · Coolers,3 · Quality'), 'Coolers and Quality are red');
+      assert.equal(await tileText(page, 'walk', '2 · Quality'), '5of 5 | 5 past due');
+      assert.match(await tileText(page, 'walk', '1 · Coolers'), /^\d+ \| 1 out of range$/);
+      assert.ok(await page.$eval('[data-card="walk"]', c => [...c.querySelectorAll('.mc-tile.bad')].map(t => t.querySelector('span').textContent).join() === '1 · Coolers,2 · Quality'), 'Coolers and Quality are red');
       assert.match(await tileText(page, 'walk', 'Last Walkthrough'), /^\d{1,2}:\d\d [AP]M \| Supervisor Test$/);
       assert.match(await page.textContent('[data-card="walk"] .mc-pill'), /^\d+ past due$/);
       assert.ok((await page.getAttribute('[data-card="walk"] a.mc-bar', 'href')) === 'walkthrough.html' && (await page.$$eval('[data-card="walk"] .mc-tile', t => t.map(x => x.getAttribute('href')))).join() ===
-        'walkthrough.html?step=yard,walkthrough.html?step=coolers,walkthrough.html?step=quality,walkthrough.html', 'the card and its tiles open the walkthrough');
+        'temps.html?walk=1,quality.html?walk=1,yard.html,walkthrough.html', 'the card and its tiles open the walkthrough');
       // Joe 10/15: Scheduler shows Shipping and Receiving only, today's loads big with this week under; Yard tiles say what they count.
       assert.deepEqual(await page.$$eval('[data-card="sched"] .mc-tile > span', a => a.map(x => x.textContent)), ['Shipping', 'Receiving']);
       assert.match(await tileText(page, 'sched', 'Shipping'), /^\d+today \| \d+ this week$/);
-      assert.deepEqual(await page.$$eval('[data-card="walk"] .mc-tile > span', a => a.map(x => x.textContent)), ['1 · Yard', '2 · Coolers', '3 · Quality', 'Last Walkthrough']);
+      assert.deepEqual(await page.$$eval('[data-card="walk"] .mc-tile > span', a => a.map(x => x.textContent)), ['1 · Coolers', '2 · Quality', 'Yard Checks', 'Last Walkthrough']);
       assert.deepEqual(await page.$$eval('[data-card="notes"] .mc-tile > span', a => a.map(x => x.textContent)), ['Breakdowns', 'Handoffs', 'Carryover']);
       // The card's tiles are redrawn as data arrives, so wait for the drawn tile rather than reading the first one.
       const bigSize = () => page.$eval('[data-card="walk"] .mc-tile b', b => getComputedStyle(b).fontSize + ' ' + b.className + ' ' + b.textContent);

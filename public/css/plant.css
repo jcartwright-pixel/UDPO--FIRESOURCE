@@ -1306,3 +1306,32 @@
 .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .manager-page [data-card="walk"] .mc-tile.warn b { color: #b45f00; }
 @media (max-width: 760px) { .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; } }
+/* Joe 10/15 (Manager Walkthrough, look C, option 1): the phone and tablet start screen (three choices) and the walkthrough
+   (Coolers, then Quality) as big tiles with big numbers; a red tile flashes while a check is past due. */
+.walk-page .wk-view { display: block; overflow: auto; padding: 4px 16px 16px; }
+.walk-page .wk-ask { margin: 6px 2px 12px; font-size: 20px; color: var(--ink); }
+.walk-page .wk-list { display: flex; flex-direction: column; gap: 12px; max-width: 900px; }
+.walk-page .wk-choice { display: flex; align-items: center; gap: 14px; min-height: 120px; padding: 16px 18px; background: #fff; border: 1px solid var(--line); border-left: 8px solid var(--ud-blue); border-radius: 14px; text-decoration: none; color: var(--ink); }
+.walk-page .wk-choice:hover { border-color: var(--ud-blue); }
+.walk-page .wk-num { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--ud-blue); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; }
+.walk-page .wk-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.walk-page .wk-t b { font-size: 26px; color: var(--ud-blue-dark); }
+.walk-page .wk-t span { font-size: 16px; color: var(--muted); font-weight: 600; }
+.walk-page .wk-n { flex: none; display: flex; flex-direction: column; align-items: flex-end; text-align: right; line-height: 1; gap: 4px; max-width: 45%; }
+.walk-page .wk-n b { font-size: 48px; font-weight: 900; color: var(--ud-blue-dark); }
+.walk-page .wk-n span { font-size: 16px; font-weight: 800; color: var(--muted); }
+.walk-page .wk-choice.good { border-left-color: #1b7f3b; } .walk-page .wk-choice.good .wk-n b, .walk-page .wk-choice.good .wk-n span { color: #1f7a4d; }
+.walk-page .wk-choice.due { border-left-color: #e08a00; } .walk-page .wk-choice.due .wk-n b, .walk-page .wk-choice.due .wk-n span { color: #b45f00; }
+.walk-page .wk-choice.bad { border-left-color: #c62828; background: #fff6f6; } .walk-page .wk-choice.bad .wk-n b, .walk-page .wk-choice.bad .wk-n span { color: #c62828; }
+.walk-page .wk-choice.late { animation: wk-flash 1.6s ease-in-out infinite; }
+@keyframes wk-flash { 50% { box-shadow: 0 0 0 5px #c6282855; border-color: #c62828; } }
+@media (prefers-reduced-motion: reduce) { .walk-page .wk-choice.late { animation: none; box-shadow: 0 0 0 4px #c6282844; } }
+.walk-page .wk-last { margin: 14px 2px 0; font-size: 16px; color: var(--muted); font-weight: 600; }
+.walk-page .wk-full { display: inline-block; margin: 18px 2px 0; font-size: 16px; font-weight: 800; color: var(--ud-blue); }
+@media (min-width: 761px) { .walk-page .wk-choice { min-height: 150px; padding: 22px 26px; } .walk-page .wk-t b { font-size: 32px; } .walk-page .wk-t span { font-size: 18px; } .walk-page .wk-n b { font-size: 60px; } .walk-page .wk-n span { font-size: 18px; } }
+/* Coolers and Quality opened from the walkthrough (?walk=1): a bar with the way back and the next stop. */
+.plant-page .wk-bar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 12px; margin: 0 16px 8px; background: #fff; border: 1px solid var(--line); border-left: 6px solid #7b35b5; border-radius: 10px; }
+.plant-page .wk-bar a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; font-weight: 800; color: var(--ud-blue); text-decoration: none; white-space: nowrap; }
+.plant-page .wk-bar b { order: -1; flex: 1 1 100%; min-width: 0; font-size: 18px; color: var(--ud-blue-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plant-page .wk-bar a.next { margin-left: auto; background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+@media (min-width: 761px) { .plant-page .wk-bar { flex-wrap: nowrap; } .plant-page .wk-bar b { order: 0; flex: 1 1 auto; } .plant-page .wk-bar a.next { margin-left: 0; } }

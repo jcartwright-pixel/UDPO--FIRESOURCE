@@ -150,13 +150,13 @@
         tile('unloading.html', 'Unloading', x.uc.complete, 'of ' + x.uc.total, x.uc.waiting + ' waiting · ' + x.uc.unloading + ' unloading', pct(x.uc.complete, x.uc.total)),
         tile('returns.html', 'Returns', x.returns.length, '', x.returns.filter(z => z.pending).length + ' pending', null, x.returns.some(z => z.pending) ? 'warn' : ''),
         tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash')]));
-      // Joe 10/15 (Manager Walkthrough): what the walk still has to check, in walking order, and the newest check of the three.
-      // A past-due check turns its tile red and puts a flashing "past due" pill on the card.
+      // Joe 10/15 (Manager Walkthrough, option 1): the walk is Coolers then Quality (each opens its screen with the walkthrough
+      // bar); Yard Checks stays its own tile. A past-due check turns its tile red and puts a flashing "past due" pill on the card.
       const W = x.walk, late = W.yard.late + W.coolers.late + W.quality.late;
-      const walkTile = (step, label, z, what) => tile('walkthrough.html?step=' + step, label, z.due, z.total && step === 'quality' ? 'of ' + z.total : '',
+      const walkTile = (href, label, z, what, of) => tile(href, label, z.due, of && z.total ? 'of ' + z.total : '',
         z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : 'all checked', null, z.out || z.late ? 'bad' : z.due ? 'warn' : 'good');
-      put('walk', card('', 'Manager Walkthrough', 'Yard, Coolers and Quality in walking order · the same checks as the phone app', 'walkthrough.html', [
-        walkTile('yard', '1 · Yard', W.yard, 'trailers to check'), walkTile('coolers', '2 · Coolers', W.coolers, 'to check'), walkTile('quality', '3 · Quality', W.quality, 'lines due'),
+      put('walk', card('', 'Manager Walkthrough', 'Coolers and Quality in walking order, and Yard Checks · the same checks as the phone app', 'walkthrough.html', [
+        walkTile('temps.html?walk=1', '1 · Coolers', W.coolers, 'to check'), walkTile('quality.html?walk=1', '2 · Quality', W.quality, 'lines due', true), walkTile('yard.html', 'Yard Checks', W.yard, 'trailers to check'),
         tile('walkthrough.html', 'Last Walkthrough', W.last ? clock(W.last.at) : 'None', '', W.last ? personName(W.last.by) : 'no checks yet', null, W.last ? 'good' : '')]));
       if (late) grid.querySelector('[data-card="walk"] .mc-bar strong').insertAdjacentHTML('beforeend', ' <span class="mc-pill">' + late + ' past due</span>');
       // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.

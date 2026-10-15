@@ -378,7 +378,7 @@ test('Loading Rundown: each Start / End keeps who saved it and from where, and a
   assert.equal(P.validateLoad({ fields: { completedAt: STAMP }, station: 'Case Loadout <b>' }, SaveError).station, 'Case Loadout b');
 });
 
-test('Manager Walkthrough: due after 2 hours, past due 30 minutes later, Run Complete lines skipped, newest check is the last walkthrough', () => {
+test('Manager Walkthrough: due after 2 hours, past due 30 minutes later, Run Complete lines skipped, newest Coolers or Quality check is the last walkthrough', () => {
   const now = Date.parse('2026-10-15T17:00:00Z'), ago = (m) => new Date(now - m * 60000).toISOString();
   const yard = { rows: [{ trailer: '5312', recordedAt: ago(200), recordedBy: 'a@x' }, { trailer: '5307', recordedAt: ago(130), recordedBy: 'a@x' }, { trailer: '5330', recordedAt: '' }],
     locked: [{ trailer: '5320', recordedAt: ago(12), recordedBy: 'mike.a@x' }] };

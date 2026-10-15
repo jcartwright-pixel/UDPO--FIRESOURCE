@@ -633,16 +633,15 @@
     return { sensors: (rows || []).filter(function (r) { return r.sensorId; }).length, offline: (rows || []).filter(function (r) { return r.status === 'OFFLINE'; }).length,
       alerts: (rows || []).filter(tempAlert).length, lastManual: last, history: (history || []).length };
   }
-  // Joe 10/15 (Manager Walkthrough): what the manager's walk still has to check, in walking order (Yard, Coolers, Quality).
-  // A check is due once its 2-hour cycle is up (or it was never checked) and past due 30 minutes after that; the newest
-  // check of the three is the last walkthrough. yard = yardQueue(), temps = tempRows(), lines = qualityLines().
+  // Joe 10/15 (Manager Walkthrough): what the manager still has to check: the walk (Coolers, then Quality) and Yard Checks
+  // (its own choice). A check is due once its 2-hour cycle is up (or it was never checked) and past due 30 minutes after
+  // that; the newest Coolers or Quality check is the last walkthrough. yard = yardQueue(), temps = tempRows(), lines = qualityLines().
   var WALK_LATE_MINUTES = 30;
   function managerWalk(yard, temps, lines, nowMs) {
     var cycle = 120, late = function (at) { var t = when(at); return !t || (nowMs - t) / 60000 >= cycle + WALK_LATE_MINUTES; };
     var yardDue = ((yard || {}).rows || []), tempDue = (temps || []).filter(function (r) { return !r.locked; });
     var lineDue = (lines || []).filter(function (l) { var x = l.last || {}, t = when(x.recordedAt); return !lineDone(x, nowMs) && (!t || (nowMs - t) / 60000 >= cycle); });
     var all = [];
-    ((yard || {}).rows || []).concat((yard || {}).locked || []).forEach(function (x) { if (x.recordedAt) all.push({ at: x.recordedAt, by: x.recordedBy }); });
     (temps || []).forEach(function (r) { if (r.lastCheckedAt) all.push({ at: r.lastCheckedAt, by: r.lastCheckedBy }); });
     (lines || []).forEach(function (l) { var x = l.last || {}; if (x.recordedAt && x.inApp) all.push({ at: x.recordedAt, by: x.recordedBy }); });
     all.sort(function (a, b) { return when(b.at) - when(a.at); });
