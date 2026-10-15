@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Manager Walkthrough · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page walk-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Manager Walkthrough</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow" id="eyebrow">Plant Distribution · Phone and Tablet</span><h1 id="title">Manager Walkthrough</h1></div>
+      <div class="dayname" id="dayname"></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <!-- Joe 10/15: a manager on a phone or tablet starts on three choices (view=home); the walkthrough itself is the walking
+         checks, Coolers then Quality, each a big tile that opens that screen (look C, option 1). Yard Checks is its own choice. -->
+    <div class="view wk-view">
+      <h2 class="wk-ask" id="ask"></h2>
+      <div class="wk-list" id="list" aria-live="polite"></div>
+      <p class="wk-last" id="last"></p>
+      <a class="wk-full" id="full" href="index.html?full=1" hidden>Open the full Operations app</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError, shortTime, watchPerson } from './js/app.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import * as P from './js/plant-core.js';
+
+    const L = window.UDLogic, U = window.UDPlant;
+    const home = new URLSearchParams(location.search).get('view') === 'home';
+    const today = () => L.operatingDay(new Date());
+    let date = today(), app = {};
+    const data = { runs: [], journal: [], setup: [], tempLocs: [], sensors: [], lineStatus: [] }, loaded = { runs: false, journal: false };
+    // The person who made a check, from their sign-in (mike.adams@… reads Mike Adams).
+    const personName = (v) => String(v || '').split('@')[0].split(/[._-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+
+    // One big choice: its number, the line under it and its colour (red flashes while a check is past due).
+    function choice(href, num, title, desc, n, line, kind) {
+      return '<a class="wk-choice ' + kind + '" href="' + href + '">' + (num ? '<span class="wk-num">' + num + '</span>' : '') +
+        '<span class="wk-t"><b>' + escapeHtml(title) + '</b><span>' + escapeHtml(desc) + '</span></span>' +
+        '<span class="wk-n"><b>' + escapeHtml(String(n)) + '</b><span>' + escapeHtml(line) + '</span></span></a>';
+    }
+    // A step's tile: red when past due or out of range, amber when due, green "OK" when all checked.
+    const kindOf = (z) => z.late || z.out ? 'bad' + (z.late ? ' late' : '') : z.due ? 'due' : 'good';
+    const lineOf = (z, what) => z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : 'all checked';
+
+    function render() {
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
+      const st = L.screenState(app, 'plant');
+      document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
+      if (!loaded.runs || !loaded.journal) return;
+      const now = Date.now(), journal = data.journal;
+      const yard = U.yardQueue(data.runs, journal, date, now);
+      const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors);
+      const lines = U.qualityLines(data.setup, journal, data.lineStatus, now);
+      const W = U.managerWalk(yard, temps, lines, now);
+      const C = W.coolers, Q = W.quality, Y = W.yard;
+      let html;
+      if (home) {
+        const walk = { due: C.due + Q.due, late: C.late + Q.late, out: C.out };
+        const done = P.counts(P.loadoutRows(data.runs, date));
+        html = choice('walkthrough.html', '', 'Manager Walkthrough', 'Coolers and Quality checks', walk.due, walk.due ? 'due' + (walk.out ? ' · ' + walk.out + ' out of range' : walk.late ? ' · ' + walk.late + ' past due' : '') : walk.out ? walk.out + ' out of range' : 'all checked', kindOf(walk)) +
+          choice('yard.html', '', 'Yard Checks', 'Loaded trailers on the yard', Y.due, lineOf(Y, 'to check'), kindOf(Y)) +
+          choice('loadout.html', '', 'Loadout Center', 'Today\'s loads, loading order', done.done, 'of ' + done.total + ' loaded', done.total && done.done === done.total ? 'good' : 'plain');
+      } else {
+        html = choice('temps.html?walk=1', '1', 'Coolers', 'Cooler and freezer temperatures', C.due, lineOf(C, 'to check'), kindOf(C)) +
+          choice('quality.html?walk=1', '2', 'Quality', 'Production line checks', Q.due, Q.total ? 'of ' + Q.total + ' · ' + lineOf(Q, 'lines due') : lineOf(Q, 'lines due'), kindOf(Q));
+      }
+      document.getElementById('list').innerHTML = html;
+      document.getElementById('last').textContent = W.last ? 'Last walkthrough check: ' + shortTime(Date.parse(W.last.at)) + ' · ' + personName(W.last.by) : 'No walkthrough checks yet today.';
+    }
+
+    document.getElementById('title').textContent = home ? 'Operations' : 'Manager Walkthrough';
+    document.getElementById('ask').textContent = home ? 'What are you doing?' : 'Walk in this order';
+    document.getElementById('full').hidden = !home;
+    if (home) document.title = 'Manager · Operations';
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      let timer = null;
+      const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 50); };
+      watchPerson(db, user, () => later(), { withEmail: true });
+      onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; later(); });
+      onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
+      onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});
+      onSnapshot(collection(db, 'sensors'), s => { data.sensors = s.docs.map(d => d.data()); later(); }, () => {});
+      onSnapshot(collection(db, 'plantLineStatus'), s => { data.lineStatus = s.docs.map(d => d.data()); later(); }, fail('the line status'));
+      const unsubs = [];
+      const watch = () => {
+        date = today();
+        unsubs.splice(0).forEach(u => u());
+        loaded.runs = loaded.journal = false;
+        const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
+        unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); loaded.runs = true; later(); }, fail('the loads')));
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); loaded.journal = true; later(); }, fail('the plant journal')));
+      };
+      watch();
+      // The 2-hour cycles move with the clock; the day rolls at 6 AM.
+      setInterval(() => { if (today() !== date) watch(); render(); }, 60000);
+      render();
+    });
+  </script>
+</body>
+</html>
