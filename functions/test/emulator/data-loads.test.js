@@ -120,3 +120,20 @@ test('Garage work orders load (test copy only): each open write-up already sent 
   assert.deepEqual([made.unit, made.unit_type, made.status, made.problem], ['223881', 'TRUCK', 'NEW', 'Clearance light out']);
   assert.deepEqual((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.GARAGE_ORDERS_ID], { skipped: true });
 });
+
+test('Half gallon label readers load (test copy only): both half gallon fillers counted by their UPC scanner, once; another setting is kept', async () => {
+  await clear();
+  const d = db(), line = (id, name) => d.collection('plantSetup').doc(id).set({ operationId: id, type: 'PRODUCTION_AREA', status: 'ACTIVE', name, area: name, facilityId: 'fac_uniontown', viewSequence: 60 });
+  await line('ut_prod_new_half_gallon', 'NEW 1/2 GALLON');
+  assert.match((await DL.runDataLoads(d, { now: tick }))[DL.HALF_READERS_ID].skipped, /test copy only/, 'nothing on the live app');
+  assert.match((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.HALF_READERS_ID].waiting, /not set up/, 'waits for both lines');
+  await line('ut_prod_old_half_gallon', 'OLD 1/2 GALLON');
+  await line('ut_prod_gallon_filler', 'GALLON FILLER');
+  await d.collection('productionLines').doc('ut_prod_old_half_gallon').set({ operationId: 'ut_prod_old_half_gallon', counter: 'SENSOR', tareGrams: 38 });
+  const r = (await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.HALF_READERS_ID];
+  assert.deepEqual(r, { set: ['NEW 1/2 GALLON'], kept: ['OLD 1/2 GALLON SENSOR'] });
+  assert.equal((await d.collection('productionLines').doc('ut_prod_new_half_gallon').get()).data().counter, 'READER');
+  assert.deepEqual((await d.collection('productionLines').doc('ut_prod_old_half_gallon').get()).data(), { operationId: 'ut_prod_old_half_gallon', counter: 'SENSOR', tareGrams: 38 });
+  assert.equal((await d.collection('productionLines').doc('ut_prod_gallon_filler').get()).exists, false, 'only the half gallon fillers');
+  assert.deepEqual((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.HALF_READERS_ID], { skipped: true });
+});
