@@ -105,7 +105,11 @@ async function shots(page, name, w) {
         const doneTile = '[data-line="ut_prod_gallon_filler"] .qc-done-chip';
         await page.click('#run-done');
         await page.waitForSelector('#fields .qc-done');
-        assert.match(await page.textContent('#fields .qc-done'), /GALLON FILLER run complete · \d{1,2}:\d\d [AP]M[\s\S]*No checks are due/);
+        assert.match(await page.textContent('#fields .qc-done'), /GALLON FILLER run complete · \d{1,2}:\d\d [AP]M[\s\S]*No checks are due[\s\S]*until 6 a\.m\./);
+        // Joe 10/15: the run's last check stays with it, read only, so nothing is typed in again.
+        await page.waitForSelector('#fields .qc-run-last');
+        assert.match(await page.textContent('#fields .qc-run-last'), new RegExp('Last check of the run[\\s\\S]*Product' + pick.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+        assert.equal(await page.$('#fields .qc-run-last input, #fields .qc-run-last select'), null, 'the run\'s last check is read only');
         assert.ok(await page.isVisible(doneTile), 'the line says DONE in the list');
         assert.equal(await page.isVisible('#run-done'), false);
         for (let i = 0; i < 50 && ((await lastGallon()) || {}).status !== 'FINISHED'; i++) await page.waitForTimeout(100);
@@ -122,7 +126,7 @@ async function shots(page, name, w) {
         await page.waitForSelector('#fields select.prod-product');
         assert.equal(await page.inputValue('select.prod-product'), '', 'Start Next Run: the boxes start empty');
         assert.equal(await page.$(doneTile), null);
-        results.push('Run Complete: the line shows done with no form and DONE in the list; Undo opens it again (check marked undone); Start Next Run starts empty boxes');
+        results.push('Run Complete: the line shows done until 6 a.m. with the run\'s last check read only, no form and DONE in the list; Undo opens it again (check marked undone); Start Next Run starts empty boxes');
       }
       await page.click('[data-pane="history"]');
       await page.waitForSelector('#pane-history:not([hidden])');
