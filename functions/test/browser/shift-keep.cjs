@@ -40,6 +40,25 @@ async function note(id, at, values, status) {
     await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
+    const notesCard = () => page.$eval('[data-card="notes"]', c => ({ alert: c.classList.contains('mc-alert'), pill: (c.querySelector('.mc-pill') || {}).textContent || '', lines: [...c.querySelectorAll('.mc-wait')].map(a => a.textContent),
+      tiles: [...c.querySelectorAll('.mc-tile')].map(t => t.querySelector('span').textContent + '=' + t.querySelector('b').textContent + (t.classList.contains('bad') ? ' red' : '') + ' ' + t.querySelector('i').textContent) }));
+
+    // Manager Center: the Shift Notes card turns red, says how many need review and lists them, oldest open handoff included.
+    await page.goto(HOSTING + '/manager.html' + MANAGER);
+    await page.waitForSelector('[data-card="notes"].mc-alert', { timeout: 15000 });
+    let mc = await notesCard();
+    assert.equal(mc.pill.trim(), '2 need review');
+    assert.equal(mc.lines.length, 2);
+    assert.match(mc.lines.join(' | '), /Needs attention.*Handoff · Cooler 2 door \| Needs attention.*Handoff · Dock 6/);
+    assert.deepEqual(mc.tiles.slice(2), ['Handoff=2 red still open', '24-Hour History=2 red notes · 1 needs review']);
+    assert.ok(await page.$eval('[data-card="notes"] .mc-tile b', b => parseFloat(getComputedStyle(b).fontSize) >= 30), 'bigger numbers on the Shift Notes card');
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'shift-keep-manager-1536.png') });
+    results.push('Manager Center: the Shift Notes card is red with "2 need review", lists both handoff notes, Handoff 2 still open and 24-Hour History "1 needs review" in red');
+    // A line opens that note on Shift Notes, outlined.
+    await page.click('[data-card="notes"] .mc-wait');
+    await page.waitForSelector('#open-box .sn-card.sn-asked[data-entry="SHIFT-keep1"]', { timeout: 15000 });
+    assert.deepEqual(await page.$$eval('#lines .active', b => b.map(x => x.dataset.kind)), ['Handoff']);
+    results.push('A line on the card opens that note on Shift Notes (Handoff picked, the note outlined)');
     await page.goto(HOSTING + '/shiftnotes.html' + MANAGER);
     await page.click('#lines [data-kind="Handoff"]');
     await page.waitForFunction(() => document.querySelectorAll('#open-box .sn-card').length === 2, null, { timeout: 10000 });
@@ -63,6 +82,15 @@ async function note(id, at, values, status) {
     await page.selectOption('#open-box [data-status="SHIFT-keep1"]', 'RESOLVED');
     await page.waitForFunction(() => document.querySelectorAll('#open-box .sn-card').length === 1 && !document.getElementById('need-badge'), null, { timeout: 10000 });
     results.push('Marked Resolved: it leaves Still open and the tab badge goes');
+    await page.selectOption('#open-box [data-status="SHIFT-keep2"]', 'RESOLVED');
+    await page.waitForFunction(() => !document.querySelector('#open-box .sn-card'), null, { timeout: 10000 });
+    await page.goto(HOSTING + '/manager.html' + MANAGER);
+    await page.waitForFunction(() => /none open[\s\S]*24-Hour History\d+notes$/.test((document.querySelector('[data-card="notes"]') || { textContent: '' }).textContent), null, { timeout: 15000 });
+    mc = await notesCard();
+    assert.deepEqual([mc.alert, mc.pill, mc.lines.length], [false, '', 0]);
+    assert.equal(mc.tiles[2], 'Handoff=0 none open');
+    assert.match(mc.tiles[3], /^24-Hour History=\d+ notes$/, 'no longer red');
+    results.push('All resolved: the Manager Center card is calm again');
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

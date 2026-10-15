@@ -1250,3 +1250,25 @@
   .plant-page.loadout-page table.loadout tr.lo-note { display: block; margin: -14px 0 12px; }
   .plant-page.loadout-page table.loadout tr.lo-note td { display: block; border: 1px solid #e0c35a; border-top: 0; border-radius: 0 0 12px 12px; }
 }
+
+/* Joe 10/15: Manager Center's Shift Notes card. Bigger, bolder numbers; while any note is not resolved by hand the card turns
+   red, says how many need review and lists them (a line opens that note); calm again once all are resolved. */
+.manager-page .mc-card[data-card="notes"] .mc-tile b { font-size: 30px; font-weight: 900; }
+.manager-page .mc-card[data-card="notes"] .mc-tile.bad { background: #fdecec; border-color: #f1b5b5; }
+.manager-page .mc-card[data-card="notes"] .mc-tile.bad b { font-size: 34px; }
+.manager-page .mc-card[data-card="notes"] .mc-tile.bad span, .manager-page .mc-card[data-card="notes"] .mc-tile.bad i { color: #b42318; font-weight: 800; }
+.manager-page .mc-card.mc-alert { --accent: #c62828; background: #fff6f6; box-shadow: 0 0 0 3px #f3b4b4; }
+.manager-page .mc-pill { display: inline-block; margin-left: 8px; padding: 1px 10px; border-radius: 12px; background: #c62828; color: #fff; font-size: 16px; font-weight: 900; vertical-align: middle; white-space: nowrap; animation: mc-pill-pulse 1.6s ease-in-out infinite; }
+@keyframes mc-pill-pulse { 50% { background: #e5891a; } }
+@media (prefers-reduced-motion: reduce) { .manager-page .mc-pill { animation: none; } }
+.manager-page .mc-waits { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.manager-page .mc-wait { display: block; padding: 3px 8px; border-left: 4px solid #c62828; background: #fff; border-radius: 6px; font-size: 16px; font-weight: 700; text-decoration: none; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page .mc-wait.mon { border-left-color: #e5891a; }
+.manager-page .mc-wait em { font-style: normal; font-weight: 900; color: #c62828; margin-right: 8px; }
+.manager-page .mc-wait.mon em { color: #b45f00; }
+.manager-page .mc-wait b { color: var(--ud-blue-dark); margin-right: 8px; }
+.manager-page .mc-wait.more { color: #c62828; font-weight: 900; }
+.shift-page .sn-card.sn-asked { box-shadow: 0 0 0 3px #f3b4b4; }
+.manager-page .mc-card.mc-alert .mc-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* With the Shift Notes list showing, no row squeezes its cards below their content (the grid scrolls instead). */
+@media (min-width: 1501px) { .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: repeat(3, minmax(min-content, 1fr)); } }

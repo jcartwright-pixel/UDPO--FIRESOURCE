@@ -96,9 +96,10 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       assert.equal(await tileText(page, 'dept', 'Loadout Center'), '1of 4 | 3 waiting · 0 loading');
       assert.equal(await tileText(page, 'quality', 'Quality Checks'), '5lines | all running');
       assert.equal(await tileText(page, 'temps', 'Status'), '1 | need attention');
-      // Shift Notes A (Joe 10/10): breakdowns still open, carried over from earlier shifts, and handoff since the last report.
+      // Shift Notes A (Joe 10/10): breakdowns still open, carried over from earlier shifts; Joe 10/15: handoff notes still open
+      // (they stay until resolved, not only since the last report).
       assert.deepEqual([await tileText(page, 'notes', 'Breakdowns'), await tileText(page, 'notes', 'Carried Over'), await tileText(page, 'notes', 'Handoff')],
-        ['1 | still open', '0 | from earlier shifts', '0 | since the last report']);
+        ['1 | still open', '0 | from earlier shifts', '0 | none open']);
       assert.match(await page.textContent('#pv-chips'), new RegExp(behind + ' Behind[\\s\\S]*3 of 4 To load[\\s\\S]*1 Pickups[\\s\\S]*1 Breakdowns[\\s\\S]*0 Lines down[\\s\\S]*1 Temps out'));
       // Review item 30 (Joe 10/13): the buttons are words only (no 📊 ✉ ✎), a tile label is one 16px line, and a route behind
       // shows its whole BEHIND line.

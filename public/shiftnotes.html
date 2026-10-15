@@ -84,6 +84,10 @@
     const NEW_WORD = { Handoff: 'New handoff note', Breakdown: 'New breakdown', 'Maintenance Request': 'New maintenance request', Incident: 'New incident', Safety: 'New safety note', Quality: 'New quality note', Other: 'New entry' };
     const WHY_WORD = { Breakdown: 'recorded on the machine\'s history and down time; maintenance is called in person', 'Maintenance Request': 'goes on maintenance\'s list as soon as it has words' };
     let pane = params.get('view') === 'history' ? 'history' : 'current', kind = 'Breakdown';
+    // Manager Center (Joe 10/15) opens a kind (?kind=Handoff) and one note on it (&entry=...), shown and outlined once it loads.
+    const askKind = String(params.get('kind') || '').toLowerCase();
+    let askEntry = params.get('entry') || '';
+    if (askKind) { const k = KINDS.find(x => x[0].toLowerCase() === askKind); if (k) kind = k[0]; }
     let maint = null;
     let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null, shifts = shiftsFor(null, 'fac_uniontown');
     const pending = [];
@@ -239,6 +243,7 @@
       // The log is not redrawn while someone is typing a review note in it.
       const hist = document.getElementById('history');
       if (!busy(hist)) hist.innerHTML = rows.map(r => card(r, ck, '', r.status !== 'RESOLVED')).join('') || '<div class="empty">No entries in the last 24 hours.</div>';
+      if (askEntry) { const el = document.querySelector('#open-box [data-entry="' + CSS.escape(askEntry) + '"]'); if (el) { askEntry = ''; el.classList.add('sn-asked'); el.scrollIntoView({ block: 'center' }); } }
       document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Every box saves by itself when you leave it. Send Current Report sends what is new since the last report and empties the entry boxes; anything not resolved stays here until it is.' : 'View only.') : rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' in the last 24 hours.';
       const st = L.screenState(app, 'plant');
       goLiveNote(st.live && st.owner !== 'new');
