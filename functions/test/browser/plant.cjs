@@ -139,6 +139,28 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     }
     results.push('Edit Load: the note saved on leaving the box (no Save button)');
 
+    // Joe 10/15 (option B): the plant note shows written out on a yellow line under its load, on every open screen; clicking
+    // the line opens the load's Edit box. A dispatch note (driver_notes) never shows on Loadout.
+    await db().collection('runs').doc('2026-10-04__run_p812').update({ 'days.fri.driverNotes': 'Dispatch: call the store first' });
+    const noteUnder = (page, route) => page.waitForFunction((r) => {
+      const tr = document.querySelector('tr[data-row^="2026-10-04__run_p' + r + '|"]'), n = tr && tr.nextElementSibling;
+      return !!n && n.classList.contains('lo-note') && /Note:\s*Short 2 cases of buttermilk/.test(n.textContent);
+    }, route, { timeout: 8000 });
+    await noteUnder(watcher, '6301_1');
+    await noteUnder(loader, '6301_1');
+    await watcher.waitForTimeout(1500);
+    const lines = await watcher.$$eval('#rows tr.lo-note', trs => trs.map(t => t.textContent));
+    assert.equal(lines.filter(t => /buttermilk/.test(t)).length, 1, 'one note line for the load with a plant note');
+    assert.ok(!lines.some(t => /Dispatch: call the store/.test(t)), 'a dispatch note does not show on Loadout');
+    const fs16 = await watcher.$eval('#rows tr.lo-note button', b => parseFloat(getComputedStyle(b).fontSize));
+    assert.ok(fs16 >= 16, 'note line text is at least 16px');
+    if (SHOTS) await watcher.screenshot({ path: path.join(SHOTS, 'loadout-note-line-1920.png'), scale: 'css' });
+    await loader.click('#rows tr.lo-note button');
+    await loader.waitForSelector('#edit-modal:not([hidden])', { timeout: 5000 });
+    assert.equal(await loader.inputValue('#edit-notes'), 'Short 2 cases of buttermilk');
+    await loader.click('#edit-modal [data-close]');
+    results.push('Load note: written out on a yellow line under 6301 on both screens; clicking it opens Edit; the dispatch note on 812 does not show');
+
     // Tanker columns.
     await loader.click('[data-area="TANKER"]');
     const heads = await loader.$$eval('#head-row th', ths => ths.map(t => t.textContent));
