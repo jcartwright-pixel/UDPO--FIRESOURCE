@@ -141,14 +141,16 @@ const KINDS = ['LINE_READER', 'CAMERA', 'HANDHELD', 'CONTROLLER'], READS = ['UPC
 
 // ---------- A machine's own controller (Joe 10/14) ----------
 const BY_MACHINE = 'machine controller';
-const READ_KEYS = ['count', 'speed', 'temp'];
+const READ_KEYS = ['count', 'speed', 'temp', 'running', 'infeed'];
+// Joe 10/14 (Gallon Filler add-on sensors, B): a stop the motor current switch opened is ended by it too.
+const BY_SWITCH = 'motor switch';
 const LOG_LIMIT = 720, BIG_JUMP = 50000;
 const numOrNull = (v) => (v === null || v === undefined || text(v) === '' || !isFinite(Number(v)) ? null : Number(v));
 const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? t : 0; };
 // What the line PC needs from Line Targets: where the controller is and which tag or register holds each reading.
 function configOut(cfg) {
   const c = cfg || {}, readings = {};
-  READ_KEYS.forEach(k => { if (text(c[k + 'Tag'])) readings[k] = { tag: text(c[k + 'Tag']), size: numOrNull(c[k + 'Size']) || (k === 'count' ? 32 : 16) }; });
+  READ_KEYS.forEach(k => { if (text(c[k + 'Tag'])) readings[k] = { tag: text(c[k + 'Tag']), size: numOrNull(c[k + 'Size']) || (k === 'count' || k === 'infeed' ? 32 : 16) }; });
   if (!text(c.brand) || !text(c.ip)) return null;
   return { brand: text(c.brand), ip: text(c.ip), port: numOrNull(c.port), slot: numOrNull(c.slot), rack: numOrNull(c.rack), unit: numOrNull(c.unit), wordOrder: text(c.wordOrder) || 'HIGH_FIRST', readings };
 }
@@ -177,12 +179,18 @@ async function applyMachine(db, id, r, opts) {
       // A jump that big is a new counter or a wrong tag, not jugs made in seconds: count from here.
       if (delta > BIG_JUMP) delta = 0;
     }
+    // The add-on sensors (any way the line is counted): the motor switch, and the infeed eye's jugs in (its own counter, like the count).
+    const runV = numOrNull(r.running), running = runV === null ? null : runV !== 0, inV = numOrNull(r.infeed);
+    const inLast = ld.infeedLast && numOrNull(ld.infeedLast.value) !== null ? numOrNull(ld.infeedLast.value) : null;
+    let inDelta = 0;
+    if (inV !== null && inV >= 0 && inLast !== null) { inDelta = inV >= inLast ? inV - inLast : inV; if (inDelta > BIG_JUMP) inDelta = 0; }
     const errors = r.errors && typeof r.errors === 'object' ? READ_KEYS.filter(k => text(r.errors[k])).map(k => k + ': ' + text(r.errors[k]).slice(0, 200)).join(' · ') : '';
     const lineUpd = {};
     if (value !== null && last !== value) lineUpd.machineLast = { value, at: stamp };
+    if (inV !== null && inLast !== inV) lineUpd.infeedLast = { value: inV, at: stamp };
     if (!when(ld.machineHeardAt) || ms - when(ld.machineHeardAt) >= 60000 || errors !== text(ld.machineError)) { lineUpd.machineHeardAt = stamp; lineUpd.machineError = errors; }
     let count = had.exists ? numOrNull(had.data().count) : null;
-    if (had.exists || delta > 0 || speed !== null || temp !== null) {
+    if (had.exists || delta > 0 || speed !== null || temp !== null || running !== null || inDelta > 0) {
       const run = had.exists ? had.data() : machineRun(id, line, shift, stamp);
       ['counts', 'runs', 'stops'].forEach(k => { if (!Array.isArray(run[k])) run[k] = []; });
       // Joe 10/14: the Blow Mold makes only gallon jugs, so a new shift starts on its one product.
@@ -191,7 +199,8 @@ async function applyMachine(db, id, r, opts) {
       const m = Object.assign({}, run.machine || {}), log = Array.isArray(run.machineLog) ? run.machineLog : [];
       const sf = P.machineFlag(speed, cfg.speedLow, cfg.speedHigh), tf = P.machineFlag(temp, cfg.tempLow, cfg.tempHigh);
       const lastLog = log[log.length - 1], logDue = !lastLog || ms - when(lastLog.at) >= 60000;
-      const write = !had.exists || delta > 0 || logDue || sf !== (m.speedFlag || '') || tf !== (m.tempFlag || '') || ms - when(m.at) >= 15000;
+      const switched = running !== null && running !== (m.running === undefined ? null : m.running);
+      const write = !had.exists || delta > 0 || inDelta > 0 || switched || logDue || sf !== (m.speedFlag || '') || tf !== (m.tempFlag || '') || ms - when(m.at) >= 15000;
       if (write) {
         Object.assign(m, { at: stamp, counter: value, speed, temp, speedFlag: sf, tempFlag: tf,
           speedOutSince: sf ? (m.speedFlag === sf && m.speedOutSince ? m.speedOutSince : stamp) : '', tempOutSince: tf ? (m.tempFlag === tf && m.tempOutSince ? m.tempOutSince : stamp) : '' });
@@ -205,6 +214,18 @@ async function applyMachine(db, id, r, opts) {
           const open = run.stops.filter(s => !s.end)[0];
           if (open) { open.end = stamp; open.endBy = BY_MACHINE; }
         }
+        if (running !== null) {
+          if (switched) m.runningSince = stamp;
+          m.running = running;
+          const open = run.stops.filter(s => !s.end)[0];
+          // The motor stopped: the line is stopped from now (the operator picks why); running again ends the stop it opened.
+          if (!running && !open && run.stops.length < STOP_LIMIT) run.stops.push({ start: stamp, end: null, reason: '', by: BY_SWITCH });
+          if (running && open && open.by === BY_SWITCH) { open.end = stamp; open.endBy = BY_SWITCH; }
+        }
+        if (inDelta > 0) {
+          if (run.infeed === undefined || run.infeed === null) run.infeedBase = Number(run.count) || 0;
+          run.infeed = (Number(run.infeed) || 0) + inDelta;
+        } else if (inV !== null && (run.infeed === undefined || run.infeed === null)) { run.infeed = 0; run.infeedBase = Number(run.count) || 0; }
         if (logDue && (speed !== null || temp !== null || value !== null)) { log.push({ at: stamp, speed, temp, count: Number(run.count) || 0 }); }
         run.machine = m; run.machineLog = log.length > LOG_LIMIT ? log.slice(-LOG_LIMIT) : log;
         run.updatedAt = stamp; run.updatedBy = BY_MACHINE;
@@ -421,4 +442,4 @@ async function readerMinute(db, opts) {
   return done;
 }
 
-module.exports = { ReaderError, AREAS, applyReads, applyMachine, controllerReads, configOut, handleReads, readerCall, readerAll, readerMinute, testReads, plantShift, zoneOffset, dateOf, hash, QUIET_MINUTES };
+module.exports = { BY_SWITCH, ReaderError, AREAS, applyReads, applyMachine, controllerReads, configOut, handleReads, readerCall, readerAll, readerMinute, testReads, plantShift, zoneOffset, dateOf, hash, QUIET_MINUTES };

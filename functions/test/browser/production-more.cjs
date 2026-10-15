@@ -128,12 +128,13 @@ async function pickFirstProduct(tb) {
     // The quality check due now.
     await tb.click('#mp-close');
     await tb.click('#actions [data-act="check"]');
-    await tb.fill('#mp-body input[data-field="w1"]', '8.62');
-    await tb.press('#mp-body input[data-field="w1"]', 'Tab');
-    await tb.waitForFunction(() => /1 OF 8 DONE/.test(document.getElementById('mp-badge').textContent));
+    // Joe 10/14: the filler's jug weights moved to the fill weight check on the board; this check keeps cap, code date and temperature.
+    await tb.fill('#mp-body input[data-field="temp"]', '38');
+    await tb.press('#mp-body input[data-field="temp"]', 'Tab');
+    await tb.waitForFunction(() => /1 OF 3 DONE/.test(document.getElementById('mp-badge').textContent));
     assert.equal(await tb.inputValue('#mp-body select[data-field="capSeal"]'), '', 'OK / Not OK starts blank');
-    await tb.fill('#mp-body input[data-field="w2"]', 'heavy');
-    await tb.press('#mp-body input[data-field="w2"]', 'Tab');
+    await tb.fill('#mp-body input[data-field="temp"]', 'cold');
+    await tb.press('#mp-body input[data-field="temp"]', 'Tab');
     await tb.waitForFunction(() => /Type a number/.test(document.getElementById('error').textContent));
     await shot(tb, 'more-tablet-check-1024');
     // Crew and notes.
@@ -168,7 +169,7 @@ async function pickFirstProduct(tb) {
     await tb.waitForFunction(() => /4,000/.test(document.getElementById('strip').textContent));
     r = await runOf(LINE, shiftKey);
     assert.deepEqual(r.waste, { Leaker: 12 });
-    assert.equal(Object.values(r.checks)[0].w1, '8.62');
+    assert.equal(Object.values(r.checks)[0].temp, '38');
     assert.deepEqual(r.crew.map(c => c.name), ['J. Myers']);
     assert.equal(r.note, 'Valve 14 sticking.');
     assert.deepEqual(r.cips.map(c => c.result), ['PASS']);

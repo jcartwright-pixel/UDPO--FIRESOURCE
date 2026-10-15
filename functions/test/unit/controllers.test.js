@@ -143,3 +143,39 @@ test('The line PC: fetches its setup, sends each reading, answers a Test read', 
     assert.deepEqual(posts.find(p => p.test).test, { askAt: '2026-10-14T22:40:00.000Z', reading: 'temp', value: 4312 });
   } finally { clearInterval(timer); console.log = quiet; global.fetch = real; await s.close(); }
 });
+
+// Joe 10/14 (Gallon Filler add-on sensors, B): the motor current switch is an on/off input on a small I/O module.
+function modbusBits(bits) {
+  return fake(buf => {
+    if (buf.length < 12) return null;
+    const id = buf.readUInt16BE(0), unit = buf[6], fc = buf[7], addr = buf.readUInt16BE(8);
+    const table = bits[fc] || {};
+    if (fc > 4 || !(addr in table)) { const e = Buffer.from([0, 0, 0, 0, 0, 3, unit, fc | 0x80, 2]); e.writeUInt16BE(id, 0); return [e, 12]; }
+    const out = Buffer.from([0, 0, 0, 0, 0, 4, unit, fc, 1, table[addr] ? 1 : 0]);
+    out.writeUInt16BE(id, 0);
+    return [out, 12];
+  });
+}
+test('Modbus TCP: an on/off input (discrete input 10001 or DI 0, coil 00001), read only', async () => {
+  const s = await modbusBits({ 2: { 0: 1, 3: 0 }, 1: { 4: 1 } });
+  try {
+    assert.equal(await C.readCount({ brand: 'MODBUS', ip: '127.0.0.1', port: s.port, tag: '10001' }), 1);
+    assert.equal(await C.readCount({ brand: 'MODBUS', ip: '127.0.0.1', port: s.port, tag: 'DI 3' }), 0);
+    assert.equal(await C.readCount({ brand: 'MODBUS', ip: '127.0.0.1', port: s.port, tag: '00005' }), 1);
+    assert.ok(s.seen.every(r => r[7] === 1 || r[7] === 2), 'only read functions 1 and 2 were sent');
+  } finally { await s.close(); }
+  assert.deepEqual(C.modbusAddress('10001'), { fc: 2, addr: 0, bit: true });
+  assert.deepEqual(C.modbusAddress('COIL 7'), { fc: 1, addr: 7, bit: true });
+  assert.throws(() => C.modbusRequest({ fc: 5, addr: 0 }, 1, 1, 1), /Only Modbus read functions/, 'write single coil cannot be built');
+  assert.throws(() => C.modbusRequest({ fc: 15, addr: 0 }, 1, 1, 1), /Only Modbus read functions/);
+});
+
+test('Siemens S7: one bit of an input byte or a data block (a switch)', () => {
+  assert.deepEqual(C.s7Address('I0.3'), { area: 0x81, db: 0, start: 0, bytes: 1, bit: 3 });
+  assert.deepEqual(C.s7Address('DB10.DBX4.1'), { area: 0x84, db: 10, start: 4, bytes: 1, bit: 1 });
+  assert.equal(C.s7ReadRequest(C.s7Address('I0.3'))[4 + 13], 0x04, 'Read Var only');
+  // An answer with the byte 0b00001000: bit 3 is on.
+  const a = C.s7Address('I0.3'), res = Buffer.from([3, 0, 0, 26, 2, 0xf0, 0x80, 0x32, 3, 0, 0, 0, 2, 0, 2, 0, 5, 0, 0, 4, 1, 0xff, 4, 0, 8, 0x08]);
+  assert.equal(C.s7Value(res, a), 1);
+  assert.equal(C.s7Value(res, C.s7Address('I0.2')), 0);
+});

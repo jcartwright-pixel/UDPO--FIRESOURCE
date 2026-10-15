@@ -48,6 +48,21 @@ export function watchProduction(db, facilityId, cb, fail, nowFn) {
   return () => { clearInterval(tick); subs.forEach(u => u()); if (stopRuns) stopRuns(); if (stopPrev) stopPrev(); };
 }
 
+// The plant's Blow Mold's latest head weights (Joe 10/14: the Gallon Filler's empty jug is their average).
+function blowHeads(data, line) {
+  const fac = plantOf((data.lineInfo || {})[line.operationId] || line);
+  return Object.values(data.lineInfo || {}).filter(x => x && x.headsLast && R().lineKind(x.line) === 'BLOWMOLD' && plantOf(x) === fac)
+    .map(x => x.headsLast).sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0] || null;
+}
+// Joe 10/14: the lines feeding a packing line (Line Targets "Fed by"), with what each made this shift.
+function feeders(data, line, nowMs) {
+  const ids = ((data.lineInfo || {})[line.operationId] || {}).fedBy;
+  if (!Array.isArray(ids) || !ids.length) return [];
+  return (data.lines || []).filter(l => ids.indexOf(l.operationId) >= 0).map(l => {
+    const run = (data.runs || {})[l.operationId] || null;
+    return { operationId: l.operationId, name: l.name, made: run ? R().lineNow(run, R().targetsFor(data.products[l.operationId] || []), nowMs).made : 0 };
+  });
+}
 // One line now: the line, its targets (its products), how it is counted and lineNow() for this shift.
 export function lineView(data, line, nowMs) {
   const targets = R().targetsFor(data.products[line.operationId] || []);
@@ -55,7 +70,7 @@ export function lineView(data, line, nowMs) {
   // Joe 10/14 (mock-ups A to H): lineMore() adds the changeover, CIP, waste, checks, crew, efficiency and the HTST and Blow Mold readings.
   const kind = R().lineKind(line.name), prev = (data.prevRuns || {})[line.operationId] || null;
   const v = Object.assign({ line, targets, counter: data.counters[line.operationId] || 'TABLET', run, prevNote: prev ? String(prev.note || '').trim() : '', prevNoteBy: prev ? prev.noteBy || '' : '' },
-    R().lineMore(run, targets, nowMs, kind, (data.lineInfo || {})[line.operationId] || {}));
+    R().lineMore(run, targets, nowMs, kind, (data.lineInfo || {})[line.operationId] || {}, { blowHeads: blowHeads(data, line), lineName: line.name, feeders: feeders(data, line, nowMs) }));
   // Before the shift's first tap, today's code is still the shift's day plus the product's shelf life.
   if (!v.expectedCode && v.target && data.shift) v.expectedCode = R().codeDate(data.shift.date, v.target.shelfLifeDays);
   return v;
