@@ -406,6 +406,14 @@
 .shift-page .sn-form { margin: 0; flex: 1 1 auto; min-height: 0; }
 /* Option A (Joe 10/10): kinds of entry on the left, open items carried over on top, the new entry below; no shift to pick. */
 .shift-page .sn-since { display: inline-flex; align-items: center; gap: 6px; height: 44px; border: 1px solid #b8cadb; border-radius: 9px; padding: 0 12px; font-size: 16px; font-weight: 700; color: var(--ink); background: #fff; white-space: nowrap; }
+@media (max-width: 1700px) {
+  /* The tab badge (Joe 10/15) takes room: tighter tiles keep the header on one line at 1536. */
+  .shift-page .head { gap: 12px; }
+  .shift-page .hstats { gap: 6px; }
+  .shift-page .hstats div { padding: 5px 8px; }
+  .shift-page .hstats span { letter-spacing: .01em; }
+  .shift-page .sn-since { flex-direction: column; justify-content: center; align-items: flex-start; gap: 0; line-height: 1.15; padding: 0 10px; }
+}
 .shift-page .sn-since b { color: var(--ud-blue); }
 .shift-page .qc-lines { flex-basis: 270px; }
 .shift-page .qc-lines button span.qc-dot { flex: none; }
@@ -431,6 +439,11 @@
 .shift-page .tag { display: inline-block; border-radius: 10px; padding: 2px 9px; font-size: 16px; font-weight: 900; letter-spacing: .03em; white-space: nowrap; }
 .shift-page .tag.carry { background: #fff1d6; color: #9a5b00; border: 1px solid #f0c987; }
 .shift-page .tag.new { background: #e7f0fa; color: var(--ud-blue); border: 1px solid #b9d1ea; }
+.shift-page .tag.need { background: #fde8e8; color: #b42318; border: 1px solid #f3b4b4; }
+/* Joe 10/15: the 24-Hour History tab says when something in it still needs review. */
+.shift-page .sn-need { display: inline-block; margin-left: 6px; padding: 1px 9px; border-radius: 10px; background: #c62828; color: #fff; font-size: 16px; font-weight: 900; white-space: nowrap; animation: sn-need-pulse 1.6s ease-in-out infinite; }
+@keyframes sn-need-pulse { 50% { background: #e5891a; } }
+@media (prefers-reduced-motion: reduce) { .shift-page .sn-need { animation: none; } }
 .shift-page .st { height: 36px; border-radius: 9px; padding: 0 8px; font: inherit; font-size: 16px; font-weight: 800; border: 1px solid; }
 .shift-page .st.open { background: #fdecec; color: #c62828; border-color: #f1b5b5; }
 .shift-page .st.mon { background: #fff3df; color: #b45f00; border-color: #f0c987; }
