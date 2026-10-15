@@ -129,7 +129,7 @@
 .lb-crew button { background: #fff; border: 2px solid #c9d6e4; border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 19px; font-weight: 800; color: #0b2f55; text-align: left; cursor: pointer; min-height: 64px; }
 .lb-crew button small { display: block; font-size: 16px; color: #5b6b7c; font-weight: 600; }
 .lb-crew button.on { border-color: #1d7a3e; background: #eef8f1; }
-table.lb-t { width: 100%; border-collapse: collapse; font-size: 16px; }
+table.lb-t { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: auto; }
 table.lb-t th { text-align: left; color: #5b6b7c; font-weight: 800; border-bottom: 2px solid #c9d6e4; padding: 5px 6px; white-space: nowrap; }
 table.lb-t td { border-bottom: 1px solid #e3eaf1; padding: 5px 6px; white-space: nowrap; }
 table.lb-t .n { text-align: right; }
@@ -324,3 +324,10 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .lb-warn { color: #9a5b00; }
 .lt-check { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; min-height: 38px; }
 .lt-check input { width: 22px; height: 22px; }
+/* Joe 10/15: a check that is due flashes until it is done; the last recorded check is one read-only line. */
+@keyframes lb-boxflash { 0%, 100% { border-color: #e0a000; background: #fff; } 50% { border-color: #c62828; background: #fff4e5; } }
+.lb-box.lb-flashbox { border: 3px solid #e0a000; animation: lb-boxflash 1s steps(1) infinite; }
+.lb-actions button.lb-flashbtn { animation: lb-boxflash 1s steps(1) infinite; border-width: 3px; }
+.lb-last { margin: 4px 0 10px; font-size: 18px; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+/* A wide Earlier this shift table scrolls sideways inside its box, one line per cell, instead of squeezing into letters. */
+.lb-strip > .lb-box { min-width: 0; overflow-x: auto; }

@@ -171,18 +171,31 @@ function ioModule() {
       await gf.waitForSelector('#fill-box:not([hidden]) input[data-field="jug1"]');
       if (w === 1024) {
         assert.match(await gf.textContent('#fill-box'), /Due now: first check of the run/);
-        for (const [j, g] of [[1, '3870'], [2, '3852'], [3, '3880'], [4, '3866'], [5, '3861']]) {
+        assert.equal(await gf.$eval('#fill-box .lb-box', e => e.classList.contains('lb-flashbox')), true, 'a check that is due flashes');
+        for (const [j, g] of [[1, '3870'], [2, '3852'], [3, '3880'], [4, '3866']]) {
           await gf.fill('#fill-box input[data-field="jug' + j + '"]', g);
           await gf.press('#fill-box input[data-field="jug' + j + '"]', 'Tab');
         }
+        await until('four jugs saved on one check', async () => (await runsOf(GALLON)).some(r => (r.fills || []).length === 1 && r.fills[0].jug4 === 3866));
+        // While the check is being typed: each jug's product and its flag.
+        await gf.waitForFunction(() => /3,791\.9 g product/.test(document.getElementById('fill-box').textContent) && document.querySelectorAll('#fill-box .lb-field.lb-off').length === 2);
+        const typing = await gf.textContent('#fill-box');
+        assert.match(typing, /3,791\.9 g product · −8\.1 g/, 'jug 2: 3852 - 57.1 - 3 = 3791.9');
+        assert.match(typing, /empty jug 57\.1 g \(Blow Mold heads average\) − cap 3 g\. Target 3,800 g for Broughton 2% Gallon/);
+        assert.deepEqual(await gf.$$eval('#fill-box .lb-field.lb-off', f => f.map(x => x.firstChild.textContent.trim())), ['Jug 2 g', 'Jug 3 g']);
+        await gf.$eval('#fill-box', e => e.scrollIntoView({ block: 'center' }));
+        await shot(gf, 'fill-tablet-gallon-filler-typing-1024');
+        await gf.fill('#fill-box input[data-field="jug5"]', '3861');
+        await gf.press('#fill-box input[data-field="jug5"]', 'Tab');
         await until('five jugs saved on one check', async () => (await runsOf(GALLON)).some(r => (r.fills || []).length === 1 && r.fills[0].jug5 === 3861));
       }
-      await gf.waitForFunction(() => /LIGHT/.test(document.getElementById('fill-box').textContent) && /HEAVY/.test(document.getElementById('fill-box').textContent) && /Next due/.test(document.getElementById('fill-box').textContent));
+      // Joe 10/15: the fifth weight records the check: the boxes empty for the next one, the result is one read-only line.
+      await gf.waitForFunction(() => /Last check/.test(document.getElementById('fill-box').textContent) && /Next due/.test(document.getElementById('fill-box').textContent));
       const box = await gf.textContent('#fill-box');
-      assert.match(box, /3,791\.9 g product · −8\.1 g/, 'jug 2: 3852 - 57.1 - 3 = 3791.9');
-      assert.match(box, /Average product per jug3,805\.7 g\+5\.7 G OVER/);
-      assert.match(box, /empty jug 57\.1 g \(Blow Mold heads average\) − cap 3 g\. Target 3,800 g for Broughton 2% Gallon/);
-      assert.deepEqual(await gf.$$eval('#fill-box .lb-field.lb-off', f => f.map(x => x.firstChild.textContent.trim())), ['Jug 2 g', 'Jug 3 g']);
+      assert.match(box, /Last check \d+:\d\d [AP]M by admin\.test: \+5\.7 g over target · 1 LIGHT · 1 HEAVY/);
+      assert.deepEqual(await gf.$$eval('#fill-box input[data-save="fill"]', i => i.map(x => x.value + '|' + x.dataset.index)), ['|', '|', '|', '|', '|'], 'the boxes are empty for the next check');
+      assert.equal(await gf.$eval('#fill-box .lb-box', e => e.classList.contains('lb-flashbox')), false, 'not due: no flashing');
+      assert.match(box, /Broughton 2% Gallon3,805\.7 g\+5\.7 g LIGHT5 of 5/, 'the check is in Earlier this shift');
       await gf.waitForFunction(() => /Rejects and spills/.test(document.getElementById('machine').textContent) && /RUNNING/.test(document.getElementById('machine').textContent));
       assert.match(await gf.textContent('#machine'), /104 jugs in · 100 counted out/);
       assert.equal(await gf.$eval('#std-cards', e => e.hidden), false, 'the filler\'s own cards stay');
@@ -205,7 +218,7 @@ function ioModule() {
     await off.close();
     mod.io.motor = 1;
     await until('the motor running again ended its stop', async () => (await runsOf(GALLON)).some(r => (r.stops || []).length === 1 && r.stops[0].end));
-    results.push('Gallon Filler tablet (1024 and 800): the fill weight check with five jugs in grams, the product in each (filled - 57.1 g Blow Mold jug - 3 g cap) against 3,800 g, jug 2 LIGHT and jug 3 HEAVY, average +5.7 g over, next due; Motor RUNNING and 4 rejects of 104 jugs in; the motor switch off stopped the line (MOTOR OFF) and on again ended the stop');
+    results.push('Gallon Filler tablet (1024 and 800): the fill weight check flashes when due; five jugs in grams, the product in each (filled - 57.1 g Blow Mold jug - 3 g cap) against 3,800 g, jug 2 LIGHT and jug 3 HEAVY while typing; the fifth records it: boxes empty, Last check +5.7 g over target · 1 LIGHT · 1 HEAVY, next due; Motor RUNNING and 4 rejects of 104 jugs in; the motor switch off stopped the line (MOTOR OFF) and on again ended the stop');
 
     // The two half gallon fillers (Joe 10/14: "We have two"): the same check, the empty jug typed on Line Targets.
     await save('saveLineSetup', { operationId: NEW_HALF, tareGrams: '38', capGrams: '2', fillEvery: 'JUGS', fillEveryN: '2000' });

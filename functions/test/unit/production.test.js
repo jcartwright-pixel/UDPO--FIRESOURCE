@@ -215,6 +215,11 @@ test('Fill weight check: due at the start and each product change, then every so
   run.fills.push({ at: iso(5), count: 600, jug1: 3850 });
   d = P.fillDue(run, {}, t0 + 30 * 60000);
   assert.deepEqual([d.due, d.index, d.nextAt], [false, 0, iso(5 + P.FILL_DEFAULT_MIN)], 'empty setting: every 2 hours');
+  // Joe 10/15: once all five weights are in, the check is recorded: the boxes empty for the next one, the result read-only.
+  Object.assign(run.fills[0], { jug2: 3851, jug3: 3852, jug4: 3853, jug5: 3854 });
+  d = P.fillDue(run, {}, t0 + 30 * 60000);
+  assert.deepEqual([d.due, d.index, d.current, d.last.filled, d.nextAt], [false, null, null, 5, iso(5 + P.FILL_DEFAULT_MIN)]);
+  run.fills[0] = { at: iso(5), count: 600, jug1: 3850 };
   assert.equal(P.fillDue(run, {}, t0 + 126 * 60000).why, 'time');
   assert.deepEqual([P.fillDue(run, { fillEvery: 'MINUTES', fillEveryN: 30 }, t0 + 36 * 60000).due, P.fillDue(run, { fillEvery: 'MINUTES', fillEveryN: 30 }, t0 + 34 * 60000).due], [true, false]);
   run.count = 1500;
