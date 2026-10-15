@@ -1,0 +1,119 @@
+'use strict';
+/*
+ * Browser check of the Update ready banner (Joe 10/15: "Anytime we do an update and somebody has not refreshed ... a banner").
+ * A screen opened on one version, with a newer one published, shows a yellow line under the header with a big Refresh button,
+ * on the desk (1536, Joe's screen), a tablet (800) and a phone (390). Nothing reloads by itself: what is typed stays until
+ * Refresh is pressed, and Refresh reloads the screen. The same version, or a local copy with no commit, shows nothing.
+ */
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const { chromium } = require('playwright');
+const { db, clear } = require('../emulator/helpers');
+const { runTransfer } = require('../../src/transfer');
+const F = require('../fixtures/fake-sheets');
+
+const HOSTING = 'http://127.0.0.1:5000';
+const SDK = path.dirname(require.resolve('firebase/package.json'));
+const SHOTS = process.env.SHOTS_DIR;
+const ADMIN = 'testEmail=admin.test@uniteddairy.com';
+
+async function openPage(browser, width, height, url, version) {
+  // No offline helper (sw.js) in this check, so every version.json read reaches the route below.
+  const page = await (await browser.newContext({ viewport: { width, height }, serviceWorkers: 'block' })).newPage();
+  await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
+    route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
+  });
+  // The published version, as the deploy writes it (tools/stamp-version.cjs); the check changes it to a newer one.
+  page.published = version;
+  await page.route(/\/version\.json$/, (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(page.published) }));
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(HOSTING + url);
+  page.errors = errors;
+  return page;
+}
+const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, name) }); };
+const V1 = { label: 'Version 6.16 · 10-15-26', release: '6.16', date: '10-15-26', copy: 'Live', commit: '1111111' };
+const V2 = { label: 'Version 6.17 · 10-15-26', release: '6.17', date: '10-15-26', copy: 'Live', commit: '2222222' };
+
+(async () => {
+  await clear();
+  await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
+  const browser = await chromium.launch();
+  const results = [];
+  try {
+    for (const [w, h, url, ready, name] of [
+      [1536, 864, '/index.html?' + ADMIN, '#screen:not([hidden]) .topbar .brand', 'home-1536'],
+      [1536, 864, '/administration.html?' + ADMIN, '.adm-item', 'administration-1536'],
+      [800, 1280, '/index.html?' + ADMIN, '#screen:not([hidden]) .topbar .brand', 'home-tablet-800'],
+      [390, 844, '/route.html', '.phone-top', 'route-phone-390']
+    ]) {
+      const p = await openPage(browser, w, h, url, V1);
+      await p.waitForSelector(ready);
+      await p.evaluate(() => window.UD_checkForUpdate());
+      assert.equal(await p.$('#update-ready'), null, name + ': the same version shows no banner');
+      await shot(p, 'update-before-' + name + '.png');
+
+      // A newer version is published while the screen is open: the banner shows under the header, and nothing reloads.
+      await p.evaluate(() => { window.udStillHere = 1; });
+      p.published = V2;
+      await p.evaluate(() => window.UD_checkForUpdate());
+      await p.waitForSelector('#update-ready button#update-refresh', { timeout: 5000 }).catch(async e => { throw new Error(name + ': no banner (' + await p.evaluate(async () => JSON.stringify(await fetch('version.json', { cache: 'no-store' }).then(r => r.json()))) + ')'); });
+      const look = await p.$eval('#update-ready', el => {
+        const head = document.querySelector('.topbar, .phone-top'), r = el.getBoundingClientRect(), b = el.querySelector('button').getBoundingClientRect();
+        return { text: el.textContent, under: !head || Math.abs(head.getBoundingClientRect().bottom - r.top) <= 2, font: parseFloat(getComputedStyle(el).fontSize),
+          button: b.height, onScreen: r.top >= 0 && r.bottom <= innerHeight, wide: document.scrollingElement.scrollWidth <= innerWidth };
+      });
+      assert.match(look.text, /Update ready/);
+      assert.match(look.text, /Refresh/);
+      assert.ok(look.under, name + ': the banner sits right under the header');
+      assert.ok(look.font >= 16, name + ': banner text is 16px or bigger');
+      assert.ok(look.button >= 44, name + ': the Refresh button is big enough to tap');
+      assert.ok(look.onScreen, name + ': the banner is on screen');
+      assert.ok(look.wide, name + ': no sideways scrolling');
+      await p.waitForTimeout(500);
+      assert.equal(await p.evaluate(() => window.udStillHere), 1, name + ': the screen did not reload by itself');
+      await shot(p, 'update-after-' + name + '.png');
+
+      // A second check does not add a second banner.
+      await p.evaluate(() => window.UD_checkForUpdate());
+      assert.equal((await p.$$('#update-ready')).length, 1);
+
+      // Refresh reloads the screen, which then opens on the new version with no banner.
+      await Promise.all([p.waitForEvent('load'), p.click('#update-refresh')]);
+      await p.waitForSelector(ready);
+      assert.equal(await p.evaluate(() => window.udStillHere), undefined, name + ': Refresh reloaded the screen');
+      await p.evaluate(() => window.UD_checkForUpdate());
+      assert.equal(await p.$('#update-ready'), null, name + ': after Refresh the screen is on the new version');
+      assert.deepEqual(p.errors, []);
+      await p.close();
+      results.push(name + ': a newer version shows "Update ready" under the header with a Refresh button; it reloads only when pressed');
+    }
+
+    // Typing is never interrupted: the banner shows while a box has text in it, the box keeps its text and focus.
+    const t = await openPage(browser, 1536, 864, '/administration.html?' + ADMIN, V1);
+    await t.waitForSelector('.adm-item');
+    await t.evaluate(() => { const i = document.createElement('input'); i.id = 'typing-check'; document.querySelector('.topbar').after(i); });
+    await t.fill('#typing-check', 'half typed');
+    await t.focus('#typing-check');
+    t.published = V2;
+    await t.evaluate(() => window.UD_checkForUpdate());
+    await t.waitForSelector('#update-ready');
+    assert.equal(await t.$eval('#typing-check', i => i.value + '|' + (document.activeElement === i)), 'half typed|true');
+    await t.close();
+    results.push('typing: the banner leaves the box being typed in alone (text and cursor stay)');
+
+    // A local copy has no commit: no banner, whatever is published.
+    const l = await openPage(browser, 1536, 864, '/index.html?' + ADMIN, { label: 'Test copy on this computer', commit: '' });
+    await l.waitForSelector('#screen:not([hidden]) .topbar .brand');
+    l.published = V2;
+    await l.evaluate(() => window.UD_checkForUpdate());
+    assert.equal(await l.$('#update-ready'), null);
+    await l.close();
+    results.push('a local copy (no commit) never shows the banner');
+  } finally {
+    await browser.close();
+  }
+  results.forEach(r => console.log('ok - ' + r));
+})().catch(err => { console.error(err); process.exit(1); });
