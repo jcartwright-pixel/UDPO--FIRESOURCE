@@ -377,3 +377,17 @@ test('Loading Rundown: each Start / End keeps who saved it and from where, and a
   // A station named by a tablet signed in with a UD account comes through validateLoad.
   assert.equal(P.validateLoad({ fields: { completedAt: STAMP }, station: 'Case Loadout <b>' }, SaveError).station, 'Case Loadout b');
 });
+
+test('Manager Walkthrough: due after 2 hours, past due 30 minutes later, Run Complete lines skipped, newest check is the last walkthrough', () => {
+  const now = Date.parse('2026-10-15T17:00:00Z'), ago = (m) => new Date(now - m * 60000).toISOString();
+  const yard = { rows: [{ trailer: '5312', recordedAt: ago(200), recordedBy: 'a@x' }, { trailer: '5307', recordedAt: ago(130), recordedBy: 'a@x' }, { trailer: '5330', recordedAt: '' }],
+    locked: [{ trailer: '5320', recordedAt: ago(12), recordedBy: 'mike.a@x' }] };
+  const temps = [{ locked: false, lastCheckedAt: ago(300), status: 'MANUAL ONLY', lastStatus: 'HIGH' }, { locked: true, lastCheckedAt: ago(20), lastCheckedBy: 'b@x', status: 'IN RANGE' }];
+  const lines = [{ last: { recordedAt: ago(125), status: 'RUNNING', inApp: true } }, { last: { recordedAt: ago(5), status: 'FINISHED', inApp: true, recordedBy: 'c@x' } }, { last: {} }, { last: { recordedAt: ago(30), status: 'RUNNING', inApp: true } }];
+  const w = R.managerWalk(yard, temps, lines, now);
+  assert.deepEqual(w.yard, { due: 3, late: 2, total: 4 });
+  assert.deepEqual(w.coolers, { due: 1, late: 1, out: 1, total: 2 });
+  assert.deepEqual(w.quality, { due: 2, late: 1, total: 4 });
+  assert.deepEqual(w.last, { at: ago(5), by: 'c@x' });
+  assert.deepEqual(R.managerWalk({ rows: [], locked: [] }, [], [], now), { yard: { due: 0, late: 0, total: 0 }, coolers: { due: 0, late: 0, out: 0, total: 0 }, quality: { due: 0, late: 0, total: 0 }, last: null });
+});

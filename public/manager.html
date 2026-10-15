@@ -56,9 +56,9 @@
         <div class="mc-card" style="--accent:#d27b00" data-card="dept"></div>
         <div class="mc-card" style="--accent:#1976d2" data-card="sched"></div>
         <div class="mc-card" style="--accent:#0f766e" data-card="notes"></div>
-        <div class="mc-card" style="--accent:#7b35b5" data-card="quality"></div>
-        <div class="mc-card" style="--accent:#526d82" data-card="temps"></div>
-        <div class="mc-card" style="--accent:#16813b" data-card="yard"></div>
+        <!-- Joe 10/15: Quality, Cooler Temperatures and Yard Checks are done walking the plant, so one Manager Walkthrough card
+             (the same walkthrough as the phone app) takes their place. The three screens stay on the menu. -->
+        <div class="mc-card" style="--accent:#7b35b5" data-card="walk"></div>
       </section>
     </div>
   </div>
@@ -100,6 +100,8 @@
     // Joe 10/15: shift notes stay until resolved, so the card reads 30 days of the log (as Shift Notes does).
     const NOTE_DAYS = 30;
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : 'None'; };
+    // The person who made a check, from their sign-in (mike.adams@… reads Mike Adams).
+    const personName = (v) => String(v || '').split('@')[0].split(/[._-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
     const pct = (a, b) => b ? Math.min(100, Math.round(a / b * 100)) : 0;
 
     // One mini-card: its label, number, the line under it and (for loads) a bar; a tap opens that screen.
@@ -115,14 +117,14 @@
     function build() {
       const now = Date.now(), journal = data.journal, todays = journal.filter(d => d.date === date);
       const loads = P.loadoutRows(data.runs, date);
-      const yard = U.yardQueue(data.runs, journal, date, now), yardHist = U.yardHistory(journal, date, now), latestYard = yardHist.find(h => h.status !== 'DEPARTED');
+      const yard = U.yardQueue(data.runs, journal, date, now);
       const done = P.counts(loads), returns = P.returnsFor(data.runs, date, todays), urows = P.unloadRows(data.runs, date, todays, returns, loads), uc = P.unloadCounts(urows);
       const wash = P.washItems(date, data.wash, data.appWash, todays), seen = {};
       let repeat = 0;
       wash.forEach(w => { const k = String(w.trailer || '').toUpperCase(); seen[k] = (seen[k] || 0) + 1; if (seen[k] === 2) repeat++; });
       const ship = U.managerSchedule(U.scheduleEntries(data.ship, 'SHIPPING'), date), recv = U.managerSchedule(U.scheduleEntries(data.recv, 'RECEIVING'), date);
-      const lines = U.qualityLines(data.setup, journal, data.lineStatus, now), qhist = U.qualityHistory(journal, data.lineStatus, now), Q = U.managerQuality(lines, qhist);
-      const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors), T = U.managerTemps(temps, U.tempHistory(journal, now));
+      const lines = U.qualityLines(data.setup, journal, data.lineStatus, now);
+      const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors);
       // The report carries open breakdowns over from earlier shifts (30 days of the log, Joe 10/15: nothing open drops off);
       // the tile counts the last 24 hours.
       const log = U.shiftLog(journal, now), N = U.managerNotes(log), week = U.shiftLog(data.shift, now, NOTE_DAYS * 24);
@@ -132,18 +134,14 @@
       const S = U.shiftReport(week, data.roundStart);
       // Joe 10/15: every note not yet resolved by hand, newest first, and how many of the last 24 hours still need review.
       const wait = week.filter(r => r.status !== 'RESOLVED').sort((a, b) => (a.status === 'MONITOR') - (b.status === 'MONITOR'));
-      const outRange = temps.filter(r => /^(HIGH|LOW)$/.test(r.status) || /^(HIGH|LOW)$/.test(r.lastStatus)).length;
-      return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N, S, wait, qhist, outRange };
+      const walk = U.managerWalk(yard, temps, lines, now);
+      return { done, returns, uc, wash, repeat, ship, recv, N, S, wait, walk };
     }
 
     function render() {
       const x = build(), r = report;
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       const grid = document.getElementById('grid'), put = (k, html) => { const el = grid.querySelector('[data-card="' + k + '"]'); el.innerHTML = html; const bar = el.querySelector('a.mc-bar'); if (bar) el.dataset.href = bar.getAttribute('href'); };
-      // Joe 10/15: two big tiles, how many loaded trailers are in the yard and how many were checked in the last 2 hours.
-      put('yard', card('&#10003;', 'Yard Checks', 'Loaded trailers remaining on yard · temperature · fuel · timestamped checks', 'yard.html', [
-        tile('yard.html', 'In the Yard', x.yard.rows.length + x.yard.locked.length, '', 'loaded trailers'),
-        tile('yard.html', 'Checked', x.yard.locked.length, '', 'in the last 2 hours', null, x.yard.rows.length ? 'warn' : 'good')]));
       put('sched', card('&#128467;', 'Plant Operations Scheduler', 'Shipping out · Receiving in · Day, Week and Month', 'scheduler.html', [
         // Joe 10/15: today's loads big, this week underneath; This Month and Need Trailer came off so these two can be bigger.
         tile('scheduler.html?lane=SHIPPING', 'Shipping', x.ship.today, 'today', x.ship.week + ' this week'), tile('scheduler.html?lane=RECEIVING', 'Receiving', x.recv.today, 'today', x.recv.week + ' this week')]));
@@ -152,15 +150,15 @@
         tile('unloading.html', 'Unloading', x.uc.complete, 'of ' + x.uc.total, x.uc.waiting + ' waiting · ' + x.uc.unloading + ' unloading', pct(x.uc.complete, x.uc.total)),
         tile('returns.html', 'Returns', x.returns.length, '', x.returns.filter(z => z.pending).length + ' pending', null, x.returns.some(z => z.pending) ? 'warn' : ''),
         tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash')]));
-      // Joe 10/15: two big tiles: how many lines are running, and when the quality checks were last updated.
-      const qLast = x.qhist.map(c => c.recordedAt).filter(Boolean).sort().pop() || '';
-      put('quality', card('&#10003;', 'Quality Checks Report', 'Production quality results and 24-hour history', 'quality.html', [
-        tile('quality.html', 'Lines Running', x.Q.lines - x.Q.down, 'of ' + x.Q.lines, x.Q.down ? x.Q.down + ' down' : 'all running', null, x.Q.down ? 'bad' : 'good'),
-        tile('quality.html?view=history', 'Last Updated', qLast ? clock(qLast) : '—', '', qLast ? 'last quality check' : 'none in 24 hours')]));
-      // Joe 10/15: two big tiles: Status (OK when everything is good, otherwise how many need checking) and how many are out of range.
-      put('temps', card('&#127777;', 'Cooler Temperature Reports', 'Manual plant checks plus read-only sensor readings', 'temps.html', [
-        tile('temps.html?view=alerts', 'Status', x.T.alerts ? 'CHECK' : 'OK', '', x.T.alerts ? x.T.alerts + ' need checking' : 'all good', null, x.T.alerts ? 'bad' : 'good'),
-        tile('temps.html?view=alerts', 'Out of Range', x.outRange, '', x.outRange ? 'too warm or too cold' : 'all in range', null, x.outRange ? 'bad' : 'good')]));
+      // Joe 10/15 (Manager Walkthrough): what the walk still has to check, in walking order, and the newest check of the three.
+      // A past-due check turns its tile red and puts a flashing "past due" pill on the card.
+      const W = x.walk, late = W.yard.late + W.coolers.late + W.quality.late;
+      const walkTile = (step, label, z, what) => tile('walkthrough.html?step=' + step, label, z.due, z.total && step === 'quality' ? 'of ' + z.total : '',
+        z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : 'all checked', null, z.out || z.late ? 'bad' : z.due ? 'warn' : 'good');
+      put('walk', card('', 'Manager Walkthrough', 'Yard, Coolers and Quality in walking order · the same checks as the phone app', 'walkthrough.html', [
+        walkTile('yard', '1 · Yard', W.yard, 'trailers to check'), walkTile('coolers', '2 · Coolers', W.coolers, 'to check'), walkTile('quality', '3 · Quality', W.quality, 'lines due'),
+        tile('walkthrough.html', 'Last Walkthrough', W.last ? clock(W.last.at) : 'None', '', W.last ? personName(W.last.by) : 'no checks yet', null, W.last ? 'good' : '')]));
+      if (late) grid.querySelector('[data-card="walk"] .mc-bar strong').insertAdjacentHTML('beforeend', ' <span class="mc-pill">' + late + ' past due</span>');
       // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.
       // Joe 10/15: the card turns red while any note is not resolved by hand and lists them (a line opens that note); handoff
       // notes and breakdowns stay big and red until resolved; the 24-Hour History number turns red while any there needs review.

@@ -1283,15 +1283,15 @@
 /* With the Shift Notes list showing, no row squeezes its cards below their content (the grid scrolls instead). */
 @media (min-width: 1501px) { .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: repeat(3, minmax(min-content, 1fr)); } }
 /* Joe 10/15: the Scheduler, Yard Checks, Cooler Temperature and Quality cards have two big tiles each (Shift Notes three): the label, the number big under it, the line under that. */
-.manager-page .mc-grid :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"], [data-card="dept"]) .mc-tiles { grid-template-rows: minmax(0, 1fr); }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"], [data-card="dept"]) .mc-tile { grid-template-columns: minmax(0, 1fr); grid-template-areas: "label" "num" "line"; align-content: center; row-gap: 2px; padding: 6px 14px; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"], [data-card="dept"]) .mc-tile span { font-size: 18px; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"], [data-card="dept"]) .mc-tile b { text-align: left; font-size: 40px; line-height: 1.05; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"], [data-card="dept"]) .mc-tile b small { font-size: 20px; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"], [data-card="dept"]) .mc-tile i { font-size: 18px; font-weight: 800; color: var(--ud-blue-dark); }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"], [data-card="dept"]) .mc-tile.bad { background: #fdecec; border-color: #f1b5b5; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"], [data-card="dept"]) .mc-tile.bad i { color: #c62828; }
-.manager-page :is([data-card="sched"], [data-card="yard"], [data-card="temps"], [data-card="quality"], [data-card="notes"], [data-card="dept"]) .mc-tile.warn i { color: #b45f00; }
+.manager-page .mc-grid :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tiles { grid-template-rows: minmax(0, 1fr); }
+.manager-page :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tile { grid-template-columns: minmax(0, 1fr); grid-template-areas: "label" "num" "line"; align-content: center; row-gap: 2px; padding: 6px 14px; }
+.manager-page :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tile span { font-size: 18px; }
+.manager-page :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tile b { text-align: left; font-size: 40px; line-height: 1.05; }
+.manager-page :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tile b small { font-size: 20px; }
+.manager-page :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tile i { font-size: 18px; font-weight: 800; color: var(--ud-blue-dark); }
+.manager-page :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tile.bad { background: #fdecec; border-color: #f1b5b5; }
+.manager-page :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tile.bad i { color: #c62828; }
+.manager-page :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tile.warn i { color: #b45f00; }
 .manager-page .mc-grid [data-card="notes"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .manager-page .mc-card[data-card="notes"] .mc-tile b, .manager-page .mc-card[data-card="notes"] .mc-tile.bad b { font-size: 40px; }
 .manager-page .mc-card[data-card="notes"] .mc-tile { padding: 6px 10px; }
@@ -1300,3 +1300,9 @@
 /* Joe 10/15: Plant Distribution Departments in the same big style; its tiles keep their progress bar under the line. */
 .manager-page [data-card="dept"] .mc-tile { grid-template-areas: "label" "num" "line" "bar"; }
 .manager-page [data-card="dept"] .mc-tile i { white-space: normal; overflow: visible; line-height: 1.15; }
+/* Joe 10/15 (Manager Walkthrough): the one walkthrough card takes the bottom row (where Quality, Cooler Temperatures and Yard
+   Checks were), its four tiles side by side: Yard, Coolers, Quality and the last walkthrough. */
+.manager-page .mc-grid [data-card="walk"] { grid-column: 1 / -1; }
+.manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.manager-page [data-card="walk"] .mc-tile.warn b { color: #b45f00; }
+@media (max-width: 760px) { .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; } }
