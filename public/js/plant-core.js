@@ -307,7 +307,7 @@ export function unloadRows(runs, date, journal, returns, loads) {
     rows.push({ id: key, key, runDocId: run.id, day: prefix, route: txt(run.route), run: txt(run.run), runId: run.runId || '', area, driver: d.driver || '', truck: txt(d.truck), trailer,
       trailerTyped: u.trailer !== undefined && u.trailer !== '', dropAndHook: !!run.dropAndHook, casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn),
       startedAt: u.startedAt || '', completedAt: u.completedAt || '', notes: u.notes || '', status: u.status || 'WAITING', returns: mine, pendingReturns: mine.filter(x => x.pending),
-      washed: !!(wash && (!u.completedAt || U.when(wash.completedAt) >= U.when(u.completedAt))), checkedIn: !!d.checkinCompletedAt, nextLoad: null, nextRank: 999999 });
+      washed: !!(wash && (!u.completedAt || U.when(wash.completedAt) >= U.when(u.completedAt))), checkedIn: !!d.checkinCompletedAt, checkinAt: d.checkinCompletedAt || '', nextLoad: null, nextRank: 999999 });
   });
   // When each trailer is next needed: the first unfinished load (in loading order) that uses the same unit.
   (loads || []).forEach((l, i) => {
@@ -316,11 +316,44 @@ export function unloadRows(runs, date, journal, returns, loads) {
     if (!unit) return;
     rows.forEach(r => {
       if (r.nextLoad || U.unitKey(r.trailer || (r.dropAndHook ? '' : r.truck)) !== unit || (l.prior && l.runDocId === r.runDocId)) return;
-      r.nextLoad = { route: l.route, run: l.run, time: timeOfDay(l.dispatchTime) }; r.nextRank = i;
+      r.nextLoad = { route: l.route, run: l.run, time: timeOfDay(l.dispatchTime), depart: departWall(l) }; r.nextRank = i;
     });
   });
   const order = { UNLOADING: 0, WAITING: 2, COMPLETE: 3 };
   return rows.sort((a, b) => (order[a.status] - order[b.status]) || a.nextRank - b.nextRank || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
+}
+
+/*
+ * Case Unloading's order on the Plant Station (Joe 10/15, mock-up A): the trailers in the order the next loads leave (the
+ * first unfinished load that needs the same trailer, by departure), with no times or routes shown. Each card says whether
+ * the trailer is back: Verizon Connect Fleet's yard return (gpsDays yardIn after yardOut, the trailer's unit first, else its
+ * truck), else the driver's check-in. A trailer Fleet shows out of the yard is "On the road" and goes below the ones that
+ * are back. A drop-and-hook load (Route Master drop and hook, e.g. Marietta) with no trailer typed is a transfer trailer
+ * still needed. Order: unloading now, back (numbered 1, 2, 3...), on the road, transfer trailers, then the ones done.
+ * gpsDays: the gpsDays docs of the days around `date` ([] when the tablet cannot read them: then no one is On the road).
+ */
+export function unloadOrder(rows, gpsDays) {
+  const byUnit = {};
+  (gpsDays || []).forEach(g => { const k = U.unitKey(g.tag); if (k) (byUnit[k] = byUnit[k] || []).push(g); });
+  const yard = (unit) => {
+    const docs = byUnit[U.unitKey(unit)] || [];
+    const out = docs.map(g => g.yardOut).filter(Boolean).sort().pop() || '', back = docs.map(g => g.yardIn).filter(Boolean).sort().pop() || '';
+    if (back && (!out || back > out)) return { back };
+    return out ? { road: true } : null;
+  };
+  const rank = (r) => r.status === 'COMPLETE' ? 4 : r.transfer ? 3 : r.status === 'UNLOADING' ? 0 : r.road ? 2 : 1;
+  const out = (rows || []).map(r => {
+    const transfer = r.dropAndHook && !r.trailer;
+    const y = transfer ? null : r.trailer && yard(r.trailer) || yard(r.truck);
+    const back = y && y.back ? y.back : !(y && y.road) && r.checkinAt ? r.checkinAt : '';
+    const road = !!(y && y.road) && !r.checkedIn && r.status === 'WAITING';
+    return Object.assign({}, r, { transfer, back, road, order: 0 });
+  });
+  const dep = (r) => (r.nextLoad && r.nextLoad.depart !== null && r.nextLoad.depart !== undefined ? r.nextLoad.depart : 1e12);
+  out.sort((a, b) => rank(a) - rank(b) || dep(a) - dep(b) || a.nextRank - b.nextRank || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run)));
+  let n = 0;
+  out.forEach(r => { if (rank(r) <= 1) r.order = ++n; });
+  return out;
 }
 
 export function unloadCounts(rows) {
