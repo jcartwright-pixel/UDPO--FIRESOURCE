@@ -97,8 +97,19 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     results.push('End on 811: the other screen shows it Done');
 
     // Typing a trailer number: 977 becomes T-977 (no unit matches, kept as typed like the current app).
+    // CI flake (10/14 #280, 10/15 #293): the trailer was typed while 811's End save was still on its way, and the table drawn
+    // again when that save landed could take the typing. Wait for End to be saved first, then for the trailer's own save to
+    // reach the database, before looking at the other screen (the same check, with each step waited for).
+    const friDay = async (route) => ((await db().collection('runs').doc('2026-10-04__run_p' + route).get()).data().days || {}).fri || {};
+    for (let i = 0; (await friDay('811')).loadStatus !== 'COMPLETE'; i++) {
+      assert.ok(i < 80, 'End on 811 was saved'); await new Promise(r => setTimeout(r, 250));
+    }
+    await loader.waitForTimeout(500);
     await loader.fill(row('812') + ' input[data-k="trailer"]', '977');
     await loader.press(row('812') + ' input[data-k="trailer"]', 'Enter');
+    for (let i = 0; (await friDay('812')).trailer !== 'T-977'; i++) {
+      assert.ok(i < 80, 'the trailer typed on 812 was saved as T-977 (saved: ' + (await friDay('812')).trailer + ')'); await new Promise(r => setTimeout(r, 250));
+    }
     await watcher.waitForFunction(() => { const i = document.querySelector('tr[data-row^="2026-10-04__run_p812|"] input[data-k="trailer"]'); return i && i.value === 'T-977'; }, null, { timeout: 8000 });
     await loader.fill(row('812') + ' input[data-k="quantity"]', '575');
     await loader.press(row('812') + ' input[data-k="quantity"]', 'Enter');
