@@ -75,14 +75,37 @@ test('Driver Scorecard logic: the screen and the server load the same file; a mi
   assert.equal(rows[0].driver, 'ADAMS, PAT');
 });
 
-test('an off unit says why in words: its status, or for an ACTIVE truck or trailer, not on the fleet list (Joe 10/12, T-10308)', () => {
-  assert.equal(L.unitOffWhy({ unit: 'T-10308', type: 'TRAILER', status: 'ACTIVE', sourcePresent: false }), 'NOT ON THE FLEET LIST');
+test('an off unit says why in words: its status, or for an ACTIVE truck, not on the fleet list (Joe 10/12, T-10308)', () => {
+  assert.equal(L.unitOffWhy({ unit: '224999', type: 'TRUCK', status: 'ACTIVE', sourcePresent: false }), 'NOT ON THE FLEET LIST');
   assert.equal(L.unitOffWhy({ unit: '537', type: 'TRUCK', status: 'DOWN', sourcePresent: true }), 'DOWN');
   assert.equal(L.unitOffWhy({ unit: '670', type: 'TRUCK', status: 'OUT_OF_SERVICE' }), 'OUT OF SERVICE');
   assert.equal(L.unitOffWhy({ unit: '123891', type: 'TRUCK', status: 'ACTIVE', sourcePresent: true }), '');
-  const runs = [{ id: 'w1', weekStart: '2026-10-11', route: '909_1', days: { tue: { runs: true, trailerId: 'veh_trailer_t_10308' } } }];
-  const off = L.offUnitLoads(runs, [{ id: 'veh_trailer_t_10308', unit: 'T-10308', type: 'TRAILER', status: 'ACTIVE', sourcePresent: false }], '2026-10-11');
-  assert.deepEqual(off.map(x => [x.unit, x.why, x.route]), [['T-10308', 'NOT ON THE FLEET LIST', '909_1']]);
+  const runs = [{ id: 'w1', weekStart: '2026-10-11', route: '909_1', days: { tue: { runs: true, truckId: 'veh_truck_224999' } } }];
+  const off = L.offUnitLoads(runs, [{ id: 'veh_truck_224999', unit: '224999', type: 'TRUCK', status: 'ACTIVE', sourcePresent: false }], '2026-10-11');
+  assert.deepEqual(off.map(x => [x.unit, x.why, x.route]), [['224999', 'NOT ON THE FLEET LIST', '909_1']]);
+});
+
+// Joe 10/15 (T-10311 on Marietta 909): the trailer box takes any trailer number. An ACTIVE trailer that is not on the fleet list is
+// usable and no load is flagged for it; a DOWN or INACTIVE trailer still is.
+test('trailers: any ACTIVE trailer is usable even off the fleet list; DOWN and INACTIVE trailers still warn (Joe 10/15, T-10311)', () => {
+  const t10311 = { id: 'veh_trailer_t_10311', unit: 'T-10311', type: 'TRAILER', status: 'ACTIVE', sourcePresent: false };
+  assert.equal(L.unitUsable(t10311), true);
+  assert.equal(L.unitOffWhy(t10311), '');
+  assert.equal(L.unitOffWhy({ unit: 'T-946', type: 'TRAILER', status: 'DOWN', sourcePresent: true }), 'DOWN');
+  assert.equal(L.unitOffWhy({ unit: 'T-700', type: 'TRAILER', status: 'INACTIVE', sourcePresent: false }), 'INACTIVE');
+  const runs = [{ id: 'w1', weekStart: '2026-10-11', route: '909_1', days: { fri: { runs: true, trailerId: 'veh_trailer_t_10311' } } }];
+  assert.deepEqual(L.offUnitLoads(runs, [t10311], '2026-10-11'), []);
+});
+
+test('a typed trailer number: digits get T-, TBA and N/A stay words, anything else is kept as typed (Joe 10/15)', () => {
+  assert.equal(L.trailerNumber('10311'), 'T-10311');
+  assert.equal(L.trailerNumber('t 965'), 'T-965');
+  assert.equal(L.trailerNumber('T-978'), 'T-978');
+  assert.equal(L.trailerNumber('tba'), 'TBA');
+  assert.equal(L.trailerNumber('TBA'), 'TBA');
+  assert.equal(L.trailerNumber('na'), 'N/A');
+  assert.equal(L.trailerNumber('ryder 52'), 'RYDER52');
+  assert.equal(L.trailerNumber(''), '');
 });
 
 // Joe 10/13: miles and reefer hours from Verizon Connect Fleet (gpsTrucks) next to the drivers' DVIR odometers.

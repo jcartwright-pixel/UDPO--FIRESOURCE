@@ -523,9 +523,10 @@ function validate(input) {
   if (action === 'assignDriver') out.driverId = text(input.driverId);
   if (action === 'assignTruck' || action === 'assignTrailer') {
     out.equipmentId = text(input.equipmentId);
-    // A unit typed on Daily that is not on Equipment Master (the current app took any number): kept as typed, trailers as T-###.
+    // A unit typed on Daily that is not on Equipment Master (the current app took any number): kept as typed, a trailer number as
+    // T-### and TBA as TBA (L.trailerNumber).
     const typed = text(input.unit, 20).toUpperCase().replace(/\s+/g, '');
-    if (!out.equipmentId && typed) out.unit = action === 'assignTrailer' ? 'T-' + typed.replace(/^T-?/, '') : typed;
+    if (!out.equipmentId && typed) out.unit = action === 'assignTrailer' ? L.trailerNumber(typed) : typed;
   }
   // OVR on Daily: a driver who is off that day, or a unit that is down, may still be picked on purpose.
   if (['assignDriver', 'assignTruck', 'assignTrailer'].indexOf(action) >= 0 && input.override === true) out.override = true;

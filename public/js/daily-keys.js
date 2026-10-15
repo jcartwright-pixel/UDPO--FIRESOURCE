@@ -11,6 +11,7 @@
  */
 import { escapeHtml } from './app.js';
 
+const L = window.UDLogic;
 const LISTS = { driver: true, truck: true, trailer: true };
 let want = null; // the cell to select after the next render: {id, kind}
 
@@ -185,7 +186,7 @@ export function bindDailyKeys(tbody, h) {
           const b = shown.find(c => c.blocked && endsWith(c, input.value));
           if (h.warn) h.warn((b.label || input.value.trim()) + ' was not put on' + (b.reason ? ' (' + b.reason + ')' : '') + '. The old one stays. Tick OVR on the line to use it anyway.');
         }
-        else if (unit && input.value.trim()) { const t = input.value.trim().toUpperCase().replace(/\s+/g, ''); value = { unit: kind === 'trailer' ? 'T-' + t.replace(/^T-?/, '') : t }; }
+        else if (unit && input.value.trim()) { const t = input.value.trim().toUpperCase().replace(/\s+/g, ''); value = { unit: kind === 'trailer' ? L.trailerNumber(t) : t }; }
       }
       want = to;
       h.setEditing(false);

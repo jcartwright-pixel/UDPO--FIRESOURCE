@@ -28,6 +28,14 @@ test('a typed unit not on Equipment Master is kept as typed; trailers get T-', a
   assert.equal(d.trailerId, '');
 });
 
+// Joe 10/15: "allow numbers, also allow TBA". TBA used to be saved as T-BA.
+test('TBA typed in the trailer box is saved as TBA', async () => {
+  await applyAction(db(), DISPATCHER, { action: 'assignTrailer', requestId: rid(), runDocId: RUN, day: 'tue', equipmentId: '', unit: 'tba' });
+  const d = await day();
+  assert.equal(d.trailer, 'TBA');
+  assert.equal(d.trailerId, '');
+});
+
 test('a typed unit that is on Equipment Master is used as that unit, with its checks', async () => {
   await applyAction(db(), DISPATCHER, { action: 'assignTrailer', requestId: rid(), runDocId: RUN, day: 'tue', equipmentId: '', unit: 't901' });
   const d = await day();
