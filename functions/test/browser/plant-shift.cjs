@@ -106,7 +106,8 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     await desk.selectOption('.sn-type', 'Handoff');
     now = await side();
     assert.deepEqual([now.active, now.title, now.equip], [['Handoff'], 'Handoff', 'Filler 4']);
-    assert.match(now.count, /^\d+ in the last 24 hours$/);
+    // Joe 10/15: handoff notes stay until resolved like every other kind, so they show their open count too.
+    assert.match(now.count, /^\d+ in the last 24 hours · \d+ still open$/);
     results.push('Type drop-down and left buttons stay in step both ways; heading and counts follow; typed words kept');
     await desk.selectOption('.sn-type', 'Safety');
     await desk.fill('.sn-equip', 'Cooler 2 floor');

@@ -94,11 +94,26 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       const behind = seed.behind;
       assert.match(await page.textContent('#pv-subject'), new RegExp('^Plant Update .+: ' + behind + ' routes? behind$'));
       assert.equal(await tileText(page, 'dept', 'Loadout Center'), '1of 4 | 3 waiting · 0 loading');
-      assert.equal(await tileText(page, 'quality', 'Quality Checks'), '5lines | all running');
-      assert.equal(await tileText(page, 'temps', 'Status'), '1 | need attention');
-      // Shift Notes A (Joe 10/10): breakdowns still open, carried over from earlier shifts, and handoff since the last report.
-      assert.deepEqual([await tileText(page, 'notes', 'Breakdowns'), await tileText(page, 'notes', 'Carried Over'), await tileText(page, 'notes', 'Handoff')],
-        ['1 | still open', '0 | from earlier shifts', '0 | since the last report']);
+      assert.equal(await tileText(page, 'quality', 'Lines Running'), '5of 5 | all running');
+      // Joe 10/15: Status says OK when all is well, otherwise how many need checking (red).
+      assert.equal(await tileText(page, 'temps', 'Status'), 'CHECK | 1 need checking');
+      assert.ok(await page.$eval('[data-card="temps"] .mc-tile.bad', t => /Status/.test(t.textContent)), 'Status is red');
+      // Joe 10/15: Scheduler shows Shipping and Receiving only, today's loads big with this week under; Yard tiles say what they count.
+      assert.deepEqual(await page.$$eval('[data-card="sched"] .mc-tile > span', a => a.map(x => x.textContent)), ['Shipping', 'Receiving']);
+      assert.match(await tileText(page, 'sched', 'Shipping'), /^\d+today \| \d+ this week$/);
+      // Joe 10/15 (later): Yard Checks and Cooler Temperature Reports are two big tiles each.
+      assert.deepEqual(await page.$$eval('[data-card="yard"] .mc-tile > span', a => a.map(x => x.textContent)), ['In the Yard', 'Checked']);
+      assert.deepEqual(await page.$$eval('[data-card="temps"] .mc-tile > span', a => a.map(x => x.textContent)), ['Status', 'Out of Range']);
+      assert.deepEqual(await page.$$eval('[data-card="quality"] .mc-tile > span', a => a.map(x => x.textContent)), ['Lines Running', 'Last Updated']);
+      assert.deepEqual(await page.$$eval('[data-card="notes"] .mc-tile > span', a => a.map(x => x.textContent)), ['Breakdowns', 'Handoffs', 'Carryover']);
+      // The card's tiles are redrawn as data arrives, so wait for the drawn tile rather than reading the first one.
+      const bigSize = () => page.$eval('[data-card="yard"] .mc-tile b', b => getComputedStyle(b).fontSize + ' ' + b.className + ' ' + b.textContent);
+      await page.waitForFunction(() => { const b = document.querySelector('[data-card="yard"] .mc-tile b'); return b && parseFloat(getComputedStyle(b).fontSize) >= 40; }, null, { timeout: 8000 })
+        .catch(async () => assert.fail('big numbers at ' + w + ': ' + await bigSize()));
+      // Shift Notes A (Joe 10/10): breakdowns still open, carried over from earlier shifts; Joe 10/15: handoff notes still open
+      // (they stay until resolved, not only since the last report).
+      assert.deepEqual([await tileText(page, 'notes', 'Breakdowns'), await tileText(page, 'notes', 'Handoffs'), await tileText(page, 'notes', 'Carryover')],
+        ['1 | still open', '0 | open', '0 | from earlier shifts']);
       assert.match(await page.textContent('#pv-chips'), new RegExp(behind + ' Behind[\\s\\S]*3 of 4 To load[\\s\\S]*1 Pickups[\\s\\S]*1 Breakdowns[\\s\\S]*0 Lines down[\\s\\S]*1 Temps out'));
       // Review item 30 (Joe 10/13): the buttons are words only (no 📊 ✉ ✎), a tile label is one 16px line, and a route behind
       // shows its whole BEHIND line.

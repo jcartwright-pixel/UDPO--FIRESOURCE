@@ -97,6 +97,8 @@
     };
     let askReport = new URLSearchParams(location.search).get('report') === '1';
     const canSend = () => maySave(person, L.SAVE_ROLES, app, 'plant');
+    // Joe 10/15: shift notes stay until resolved, so the card reads 30 days of the log (as Shift Notes does).
+    const NOTE_DAYS = 30;
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : 'None'; };
     const pct = (a, b) => b ? Math.min(100, Math.round(a / b * 100)) : 0;
 
@@ -121,43 +123,62 @@
       const ship = U.managerSchedule(U.scheduleEntries(data.ship, 'SHIPPING'), date), recv = U.managerSchedule(U.scheduleEntries(data.recv, 'RECEIVING'), date);
       const lines = U.qualityLines(data.setup, journal, data.lineStatus, now), qhist = U.qualityHistory(journal, data.lineStatus, now), Q = U.managerQuality(lines, qhist);
       const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors), T = U.managerTemps(temps, U.tempHistory(journal, now));
-      // The report carries open breakdowns over from earlier shifts (a week of the log); the tile counts the last 24 hours.
-      const log = U.shiftLog(journal, now), N = U.managerNotes(log), week = U.shiftLog(data.shift, now, 168);
+      // The report carries open breakdowns over from earlier shifts (30 days of the log, Joe 10/15: nothing open drops off);
+      // the tile counts the last 24 hours.
+      const log = U.shiftLog(journal, now), N = U.managerNotes(log), week = U.shiftLog(data.shift, now, NOTE_DAYS * 24);
       const openPickups = P.withNotePickups(loads, data.pickups).filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       // Joe 10/10: only what was checked since the last report was sent goes in; the rest is "Not checked".
       report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart, output: lineOutput(), outputShift: prod && prod.shift ? shiftText(prod.shift) : '' }, now);
       const S = U.shiftReport(week, data.roundStart);
-      return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N, S };
+      // Joe 10/15: every note not yet resolved by hand, newest first, and how many of the last 24 hours still need review.
+      const wait = week.filter(r => r.status !== 'RESOLVED').sort((a, b) => (a.status === 'MONITOR') - (b.status === 'MONITOR'));
+      const outRange = temps.filter(r => /^(HIGH|LOW)$/.test(r.status) || /^(HIGH|LOW)$/.test(r.lastStatus)).length;
+      return { yard, latestYard, done, returns, uc, wash, repeat, ship, recv, Q, T, N, S, wait, qhist, outRange };
     }
 
     function render() {
       const x = build(), r = report;
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       const grid = document.getElementById('grid'), put = (k, html) => { const el = grid.querySelector('[data-card="' + k + '"]'); el.innerHTML = html; const bar = el.querySelector('a.mc-bar'); if (bar) el.dataset.href = bar.getAttribute('href'); };
+      // Joe 10/15: two big tiles, how many loaded trailers are in the yard and how many were checked in the last 2 hours.
       put('yard', card('&#10003;', 'Yard Checks', 'Loaded trailers remaining on yard · temperature · fuel · timestamped checks', 'yard.html', [
-        tile('yard.html', 'Active', x.yard.rows.length + x.yard.locked.length, '', 'on the yard'), tile('yard.html', 'Due', x.yard.rows.length, '', 'need a check', null, x.yard.rows.length ? 'warn' : ''),
-        tile('yard.html', 'Checked', x.yard.locked.length, '', 'in the last 2 hours', null, 'good'), tile('yard.html?view=history', 'Latest', x.latestYard ? clock(x.latestYard.recordedAt) : '—', '', x.latestYard ? 'last check' : 'no check yet')]));
+        tile('yard.html', 'In the Yard', x.yard.rows.length + x.yard.locked.length, '', 'loaded trailers'),
+        tile('yard.html', 'Checked', x.yard.locked.length, '', 'in the last 2 hours', null, x.yard.rows.length ? 'warn' : 'good')]));
       put('sched', card('&#128467;', 'Plant Operations Scheduler', 'Shipping out · Receiving in · Day, Week and Month', 'scheduler.html', [
-        tile('scheduler.html?lane=SHIPPING', 'Shipping', x.ship.week, 'loads', 'this week · ' + x.ship.today + ' today'), tile('scheduler.html?lane=RECEIVING', 'Receiving', x.recv.week, 'loads', 'this week · ' + x.recv.today + ' today'),
-        tile('scheduler.html?lane=SHIPPING&view=month', 'This Month', x.ship.month, 'loads', 'shipping'), tile('scheduler.html?lane=SHIPPING&view=week', 'Need Trailer', x.ship.needTrailer, '', x.ship.needTrailer ? 'this week' : 'all have trailers', null, x.ship.needTrailer ? 'warn' : 'good')]));
+        // Joe 10/15: today's loads big, this week underneath; This Month and Need Trailer came off so these two can be bigger.
+        tile('scheduler.html?lane=SHIPPING', 'Shipping', x.ship.today, 'today', x.ship.week + ' this week'), tile('scheduler.html?lane=RECEIVING', 'Receiving', x.recv.today, 'today', x.recv.week + ' this week')]));
       put('dept', card('&#9638;', 'Plant Distribution Departments', 'Loading, unloading, returns, washing and live workboards', 'plant.html', [
         tile('loadout.html', 'Loadout Center', x.done.done, 'of ' + x.done.total, x.done.waiting + ' waiting · ' + x.done.loading + ' loading', pct(x.done.done, x.done.total)),
         tile('unloading.html', 'Unloading', x.uc.complete, 'of ' + x.uc.total, x.uc.waiting + ' waiting · ' + x.uc.unloading + ' unloading', pct(x.uc.complete, x.uc.total)),
         tile('returns.html', 'Returns', x.returns.length, '', x.returns.filter(z => z.pending).length + ' pending', null, x.returns.some(z => z.pending) ? 'warn' : ''),
         tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash')]));
+      // Joe 10/15: two big tiles: how many lines are running, and when the quality checks were last updated.
+      const qLast = x.qhist.map(c => c.recordedAt).filter(Boolean).sort().pop() || '';
       put('quality', card('&#10003;', 'Quality Checks Report', 'Production quality results and 24-hour history', 'quality.html', [
-        tile('quality.html', 'Quality Checks', x.Q.lines, 'lines', x.Q.down ? x.Q.down + ' down' : 'all running', null, x.Q.down ? 'bad' : ''),
-        tile('quality.html?view=history', 'Tip Test', x.Q.tipTests, '', x.Q.tipFails ? x.Q.tipFails + ' fail or review' : 'in 24 hours · all pass', null, x.Q.tipFails ? 'bad' : ''),
-        tile('quality.html?view=history', 'Weights', x.Q.lastWeight ? clock(x.Q.lastWeight) : '—', '', x.Q.lastWeight ? 'last weight' : 'no weight yet'), tile('quality.html?view=history', 'History', x.Q.history, '', 'checks in 24 hours')]));
+        tile('quality.html', 'Lines Running', x.Q.lines - x.Q.down, 'of ' + x.Q.lines, x.Q.down ? x.Q.down + ' down' : 'all running', null, x.Q.down ? 'bad' : 'good'),
+        tile('quality.html?view=history', 'Last Updated', qLast ? clock(qLast) : '—', '', qLast ? 'last quality check' : 'none in 24 hours')]));
+      // Joe 10/15: two big tiles: Status (OK when everything is good, otherwise how many need checking) and how many are out of range.
       put('temps', card('&#127777;', 'Cooler Temperature Reports', 'Manual plant checks plus read-only sensor readings', 'temps.html', [
-        tile('temps.html', 'Sensor Temp', x.T.sensors, '', x.T.offline ? 'sensors · ' + x.T.offline + ' offline' : 'sensors', null, x.T.offline ? 'warn' : ''),
-        tile('temps.html', 'Manual Read', x.T.lastManual ? clock(x.T.lastManual) : '—', '', x.T.lastManual ? 'last manual read' : 'no manual read yet'),
-        tile('temps.html?view=alerts', 'Status', x.T.alerts, '', x.T.alerts ? 'need attention' : 'all in range', null, x.T.alerts ? 'bad' : 'good'), tile('temps.html?view=history', '24-Hour History', x.T.history, '', 'readings in 24 hours')]));
+        tile('temps.html?view=alerts', 'Status', x.T.alerts ? 'CHECK' : 'OK', '', x.T.alerts ? x.T.alerts + ' need checking' : 'all good', null, x.T.alerts ? 'bad' : 'good'),
+        tile('temps.html?view=alerts', 'Out of Range', x.outRange, '', x.outRange ? 'too warm or too cold' : 'all in range', null, x.outRange ? 'bad' : 'good')]));
       // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.
-      const carried = x.S.down.filter(d => d.carried).length;
+      // Joe 10/15: the card turns red while any note is not resolved by hand and lists them (a line opens that note); handoff
+      // notes and breakdowns stay big and red until resolved; the 24-Hour History number turns red while any there needs review.
+      // Joe 10/15: three big tiles: breakdowns still open, handoff notes open, and anything open carried over from earlier shifts.
+      const before = Date.parse(data.roundStart || ''), carried = isFinite(before) ? x.wait.filter(r => Date.parse(r.recordedAt || '') <= before).length : 0, isType = (r, t) => String(r.type || '').toUpperCase() === t;
+      const handOpen = x.wait.filter(r => isType(r, 'HANDOFF')).length, waitN = x.wait.length;
+      const noteLine = (r) => '<a class="mc-wait' + (r.status === 'MONITOR' ? ' mon' : '') + '" href="shiftnotes.html?kind=' + encodeURIComponent(r.type || '') + '&entry=' + encodeURIComponent(r.entryId) + '"><em>' + escapeHtml(U.followLabel(r.status)) + '</em><b>' +
+        escapeHtml(r.recordedAt ? clock(r.recordedAt) : r.readingTime || '') + '</b>' + escapeHtml([r.type || 'Note', r.equipment || r.entry].filter(Boolean).join(' · ')) + '</a>';
       put('notes', card('&#9998;', 'Shift Notes', 'Breakdowns carried over until resolved, shift handoff', 'shiftnotes.html', [
-        tile('shiftnotes.html', 'Breakdowns', x.S.down.length, '', 'still open', null, x.S.down.length ? 'bad' : ''), tile('shiftnotes.html', 'Carried Over', carried, '', 'from earlier shifts', null, carried ? 'warn' : ''),
-        tile('shiftnotes.html', 'Handoff', x.S.handoff.length, '', 'since the last report'), tile('shiftnotes.html?view=history', '24-Hour History', x.N.history, '', 'notes')]));
+        tile('shiftnotes.html?kind=Breakdown', 'Breakdowns', x.S.down.length, '', 'still open', null, x.S.down.length ? 'bad' : ''),
+        tile('shiftnotes.html?kind=Handoff', 'Handoffs', handOpen, '', 'open', null, handOpen ? 'bad' : ''),
+        tile('shiftnotes.html', 'Carryover', carried, '', 'from earlier shifts', null, carried ? 'warn' : '')]));
+      const nc = grid.querySelector('[data-card="notes"]');
+      nc.classList.toggle('mc-alert', waitN > 0);
+      if (waitN) {
+        nc.querySelector('.mc-bar strong').insertAdjacentHTML('beforeend', ' <span class="mc-pill">' + waitN + ' need' + (waitN === 1 ? 's' : '') + ' review</span>');
+        nc.querySelector('.mc-desc').insertAdjacentHTML('afterend', '<div class="mc-waits">' + x.wait.slice(0, 3).map(noteLine).join('') + (waitN > 3 ? '<a class="mc-wait more" href="shiftnotes.html">+ ' + (waitN - 3) + ' more</a>' : '') + '</div>');
+      }
       // The report card's preview: subject, the counts and a brief of what needs attention.
       document.getElementById('pv-subject').textContent = r.subject;
       document.getElementById('pv-subject').className = 'mc-subject' + (r.behind.length ? ' bad' : ' good');
@@ -303,7 +324,7 @@
         const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
         unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); loaded.runs = true; later(); }, fail('the loads')));
         unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); loaded.journal = true; later(); }, fail('the plant journal')));
-        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', [0, 1, 2, 3, 4, 5, 6, 7].map(n => L.addDays(date, -n)))), s => { data.shift = s.docs.map(d => d.data()); later(); }, fail('the shift notes')));
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', Array.from({ length: NOTE_DAYS }, (_, n) => L.addDays(date, -n)))), s => { data.shift = s.docs.map(d => d.data()); later(); }, fail('the shift notes')));
         unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); later(); }, fail('the pickups')));
       };
       watch();
