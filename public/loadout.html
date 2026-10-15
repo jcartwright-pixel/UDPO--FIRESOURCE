@@ -281,7 +281,7 @@
       const dragAttrs = (r) => orderIds.indexOf(r.id) < 0 ? '' : ' data-drag="' + r.id + '" tabindex="0" aria-label="Load ' + escapeHtml(r.route + ' ' + r.run) + ', place ' + (orderIds.indexOf(r.id) + 1) + ' of ' + orderIds.length + '. Drag up or down, or Alt and the up or down arrow, to change the loading order"';
       let html = '', lastPrior = null;
       rows.forEach(r => {
-        if (r.sched) { html += schedRowHtml(r); return; }
+        if (r.sched) { html += schedRowHtml(r) + noteLine(r, [r.sched.notes, r.sched.work && r.sched.work.notes].filter((v, i, a) => v && a.indexOf(v) === i).join('\n'), cols.length, 'data-sedit'); return; }
         if (r.prior !== lastPrior) {
           html += r.prior ? '<tr class="divider prior"><td colspan="' + cols.length + '">PRIOR DAY LOADS · ' + shortDate(r.loadDate) + ' — still open, finish these first</td></tr>'
             : (lastPrior === true ? '<tr class="divider today"><td colspan="' + cols.length + '">TODAY · ' + shortDate(date) + '</td></tr>' : '');
@@ -314,6 +314,7 @@
             '<td>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
             '<td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         }
+        html += noteLine(r, r.notes, cols.length, 'data-edit');
       });
       // Keep the cursor where it is when a redraw lands while someone types.
       const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.id ? [document.activeElement.dataset.id, document.activeElement.dataset.k, document.activeElement.value] : null;
@@ -333,6 +334,17 @@
       goLiveNote(s.live && s.owner !== 'new');
       // Joe 10/12: no "new app" words; not switched on says where to switch it.
       document.getElementById('mode-text').textContent = s.live ? (s.open ? 'LIVE' : s.owner === 'new' ? 'VIEW ONLY: WRITE-BACK TO THE SHEET IS OFF' : 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES') : 'TEST COPY';
+    }
+
+    // Joe 10/15 (option B): a load's plant note shows as a yellow line under the load, written out; clicking it opens the
+    // load's Edit box, where the note is changed or cleared. Only the plant's note (Live extension_03, plantNotes) shows here:
+    // dispatch notes (driver_notes) are a different column and never show on Loadout.
+    const NOTE_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M5 3h10l4 4v14H5z" opacity=".2"/><path fill="none" stroke="currentColor" stroke-width="2" d="M5 3h10l4 4v14H5zM8 11h8M8 15h8M8 7h4"/></svg>';
+    function noteLine(r, notes, span, key) {
+      const text = String(notes || '').split(/\n+/).map(x => x.trim()).filter(Boolean).join(' · ');
+      if (!text) return '';
+      return '<tr class="lo-note' + (r.state === 'DONE' ? ' done' : '') + '" data-note="' + escapeHtml(r.id) + '"><td colspan="' + span + '"><button type="button" class="lo-note-btn" ' + key + '="' + escapeHtml(r.id) + '" title="Open the load to change or clear the note">' +
+        NOTE_ICON + '<b>Note:</b> ' + escapeHtml(text) + '</button></td></tr>';
     }
 
     function rowById(id) { return rowsNow().find(r => r.id === id); }

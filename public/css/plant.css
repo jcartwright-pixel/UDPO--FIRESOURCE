@@ -1225,3 +1225,15 @@
 .plant-page.loadout-page table.loadout td > input { padding: 0 2px; }
 /* The unit list still opens on a click in the box (loadout.html), so the narrow box spends no room on the list arrow. */
 .plant-page.loadout-page table.loadout td > input[list]::-webkit-calendar-picker-indicator { display: none !important; }
+
+/* Joe 10/15 (option B): a load's plant note, written out on a yellow line under the load; clicking it opens the load's Edit box. */
+.plant-page.loadout-page table.loadout tr.lo-note td { padding: 0; height: auto; background: #fff6cc; border-top: 0; text-align: left; }
+.plant-page.loadout-page table.loadout tr.lo-note.done td { background: #fbf6dd; }
+.plant-page.loadout-page button.lo-note-btn { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 36px; padding: 6px 16px; border: 0; background: transparent; color: #4a3500; font: inherit; font-size: 17px; font-weight: 600; text-align: left; white-space: normal; cursor: pointer; }
+.plant-page.loadout-page button.lo-note-btn svg { flex: none; color: #7a5200; }
+.plant-page.loadout-page button.lo-note-btn b { flex: none; font-weight: 800; }
+.plant-page.loadout-page button.lo-note-btn:hover, .plant-page.loadout-page button.lo-note-btn:focus-visible { background: #ffeea0; }
+@media (max-width: 1000px) {
+  .plant-page.loadout-page table.loadout tr.lo-note { display: block; margin: -14px 0 12px; }
+  .plant-page.loadout-page table.loadout tr.lo-note td { display: block; border: 1px solid #e0c35a; border-top: 0; border-radius: 0 0 12px 12px; }
+}
