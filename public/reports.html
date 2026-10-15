@@ -35,8 +35,10 @@
         <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="rp-print">Print</button></label>
         <label class="rp-field"><span>&nbsp;</span><button type="button" class="rp-btn" id="tv" title="Plant Performance: today, live, big text for a TV">TV display</button></label>
         <label class="rp-field"><span>Report</span><select id="report" aria-label="Report">
-          <option value="scorecard">Weekly Scorecard</option><option value="shifts">Shift Comparison</option><option value="trends">Day-of-Week Trends</option>
+          <option value="scorecard">Weekly Scorecard</option><option value="shifts">Shift Comparison</option><option value="trends">Day-of-Week Trends</option><option value="rundown">Loading Rundown</option>
         </select></label>
+        <label class="rp-field" id="area-field" hidden><span>Loadout</span><select id="area" aria-label="Loadout"></select></label>
+        <label class="rp-field" id="day-field" hidden><span>Day</span><span class="rp-step"><button type="button" id="dprev" aria-label="Day before">&#9664;</button><input id="day" type="date" aria-label="Day"><button type="button" id="dnext" aria-label="Day after">&#9654;</button></span></label>
         <label class="rp-field" id="week-field"><span>Week</span><span class="rp-step"><button type="button" id="prev" aria-label="Week before">&#9664;</button><input id="week" type="date" aria-label="A day in the week"><button type="button" id="next" aria-label="Week after">&#9654;</button></span></label>
         <label class="rp-field" id="weeks-field" hidden><span>Weeks</span><select id="weeks" aria-label="How many weeks"><option value="4">Last 4 weeks</option><option value="6">Last 6 weeks</option><option value="8" selected>Last 8 weeks</option><option value="12">Last 12 weeks</option></select></label>
       </div>
@@ -59,7 +61,12 @@
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
     const sel = document.getElementById('report'), weekBox = document.getElementById('week'), weeksBox = document.getElementById('weeks');
-    let view = ['scorecard', 'shifts', 'trends'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'scorecard';
+    let view = ['scorecard', 'shifts', 'trends', 'rundown'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'scorecard';
+    // Loading Rundown (Joe 10/15): one plant day (6 AM to 6 AM), yesterday unless a day is asked for; one loadout or all.
+    const dayBox = document.getElementById('day'), areaBox = document.getElementById('area');
+    areaBox.innerHTML = R.RUNDOWN_AREAS.map(([v, t]) => '<option value="' + v + '">' + escapeHtml(t) + '</option>').join('');
+    let rdDay = L.isDateKey(params.get('date')) ? params.get('date') : L.addDays(today(), -1);
+    if (R.RUNDOWN_AREAS.some(([v]) => v === params.get('area'))) areaBox.value = params.get('area');
     // The scorecard opens on yesterday's week with yesterday picked (on a Sunday that is last week's Saturday).
     let pick = L.isDateKey(params.get('date')) ? params.get('date') : L.addDays(today(), -1);
     let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(pick);
@@ -75,17 +82,21 @@
     const t12 = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ''); return m ? L.timeText(Number(m[1]) * 60 + Number(m[2])) : hm; };
 
     // Reads the run documents, pickups and journal a span of days needs; each week or span is read once per opening.
-    async function load(from, to) {
+    async function loadRuns(from, to) {
       const need = R.weeksFor(L.addDays(from, -1), to), weeks = need.filter(w => !cache.runs[w]);
       for (let i = 0; i < weeks.length; i += 10) {
         const part = weeks.slice(i, i + 10), snap = await getDocs(query(collection(db, 'runs'), where('weekStart', 'in', part)));
         part.forEach(w => { cache.runs[w] = []; });
         snap.docs.forEach(d => { const r = Object.assign({ id: d.id }, d.data()); (cache.runs[r.weekStart] = cache.runs[r.weekStart] || []).push(r); });
       }
+      return [].concat(...need.map(w => cache.runs[w] || []));
+    }
+    async function load(from, to) {
+      const runs = await loadRuns(from, to);
       const key = from + '|' + to;
       if (!cache.pickups[key]) cache.pickups[key] = (await getDocs(query(collection(db, 'pickups'), where('date', '>=', L.addDays(from, -1)), where('date', '<=', L.addDays(to, 7))))).docs.map(d => d.data());
       if (!cache.journal[key]) cache.journal[key] = (await getDocs(query(collection(db, 'plantJournal'), where('date', '>=', from), where('date', '<=', to)))).docs.map(d => Object.assign({ _id: d.id }, d.data()));
-      return { runs: [].concat(...need.map(w => cache.runs[w] || [])), pickups: cache.pickups[key], journal: cache.journal[key] };
+      return { runs, pickups: cache.pickups[key], journal: cache.journal[key] };
     }
     const summaries = (dates, d) => dates.map(x => R.daySummary(x, d.runs, d.pickups, d.journal, Date.now(), shifts));
 
@@ -188,26 +199,84 @@
         '<p class="rp-foot">Counts the days the Operations app has recorded' + (tr.first ? ', starting ' + fmtY(tr.first) : '') + '. On time = loaded no later than ' + R.ON_TIME_MINUTES + ' minutes after the depart time (the same rule as Behind). Line speed (cases an hour) and the time a truck really leaves are not recorded yet.</p>';
     }
 
+    // Loading Rundown (Joe 10/15): every load of one plant day in the order it started, where each time came from, and a recap
+    // by shift. A time saved more than R.TYPED_LATE_MINUTES away from the time it says shows when it was really entered.
+    const longGap = (m) => m >= 60 ? 'bad' : m >= 30 ? 'warn' : '';
+    function srcCell(s) {
+      if (!s) return '<td></td>';
+      const cls = s.kind === 'TABLET' ? 'rd-tablet' : s.kind === 'DESK' ? 'rd-desk' : s.kind === 'SHEET' ? 'bad' : 'rd-none';
+      return '<td class="rd-src ' + cls + '"' + (s.by ? ' title="' + escapeHtml(s.by) + '"' : '') + '>' + escapeHtml(s.text) +
+        (s.typed !== null ? '<small class="rd-typed">entered ' + escapeHtml(R.clockText(s.typed)) + '</small>' : '') + '</td>';
+    }
+    function drawRundown(rd) {
+      const t = rd.total, dayName = (k) => nice(L.dayName(k));
+      const rows = rd.loads.map((x, i) => '<tr class="' + (x.edits.length || (x.startSource && x.startSource.typed !== null) || (x.endSource && x.endSource.typed !== null) ? 'rd-flag' : '') + '">' +
+        '<td>' + (i + 1) + '</td><td><b>' + escapeHtml([x.route, x.run].filter(Boolean).join(' ')) + '</b></td><td>' + escapeHtml(R.AREA_NAME[x.area] || x.area) + '</td><td>' + escapeHtml(x.shift) + '</td>' +
+        '<td class="rd-time">' + (x.started !== null ? escapeHtml(R.clockText(x.started)) : '—') + '</td>' + srcCell(x.startSource) +
+        '<td class="rd-time">' + (x.done !== null ? escapeHtml(R.clockText(x.done)) : '<span class="rp-warn">Still loading</span>') + '</td>' + srcCell(x.endSource) +
+        '<td>' + (x.taken !== null ? escapeHtml(R.minutesText(x.taken)) : '—') + '</td>' +
+        '<td class="' + (x.gap ? longGap(x.gap) : '') + '">' + (x.gap === null ? '<small>first load</small>' : x.gap ? escapeHtml(R.minutesText(x.gap)) : '<small>none</small>') + '</td>' +
+        '<td class="rd-edits">' + (x.edits.length ? x.edits.map(e => '<span>' + escapeHtml(e.what + ' ' + (e.from !== null ? R.clockText(e.from) : 'blank') + ' → ' + (e.to !== null ? R.clockText(e.to) : 'blank') + ' · ' + e.who + (e.at !== null ? ' · at ' + R.clockText(e.at) : '')) + '</span>').join('') : '') + '</td></tr>');
+      const recap = rd.rows.map(r => '<tr><td><b>' + escapeHtml(r.shift) + '</b><small> ' + escapeHtml(t12(r.start) + '–' + t12(r.end)) + '</small></td><td>' + r.started + '</td><td>' + r.finished + '</td>' +
+        '<td>' + (r.avgTaken === null ? '—' : R.minutesText(r.avgTaken)) + '</td><td class="' + longGap(r.downtime) + '">' + (r.downtime ? R.minutesText(r.downtime) : '0') + '</td><td>' + (r.longestGap ? R.minutesText(r.longestGap) : '—') + '</td>' +
+        '<td class="rp-pct">' + bar(r.onTimePct) + '</td><td>' + r.tablet + '</td><td>' + r.desk + '</td><td class="' + (r.notRecorded + r.sheet ? 'warn' : '') + '">' + (r.notRecorded + r.sheet) + '</td>' +
+        '<td class="' + (r.typed ? 'warn' : '') + '">' + r.typed + '</td><td class="' + (r.changed ? 'warn' : '') + '">' + r.changed + '</td></tr>');
+      recap.push('<tr class="rp-total"><td><b>Whole day</b></td><td>' + t.started + '</td><td>' + t.finished + '</td><td>' + (t.avgTaken === null ? '—' : R.minutesText(t.avgTaken)) + '</td><td>' + (t.downtime ? R.minutesText(t.downtime) : '0') + '</td><td>' + (t.longestGap ? R.minutesText(t.longestGap) : '—') + '</td>' +
+        '<td class="rp-pct">' + bar(t.onTimePct) + '</td><td>' + t.tablet + '</td><td>' + t.desk + '</td><td>' + (t.notRecorded + t.sheet) + '</td><td>' + t.typed + '</td><td>' + t.changed + '</td></tr>');
+      // What stands out: the shift with the most downtime against the least, and the shifts whose times were typed in later or changed.
+      const notes = [], used = rd.rows.filter(r => r.started);
+      if (used.length >= 2) {
+        const most = used.slice().sort((a, b) => b.downtime - a.downtime)[0], least = used.slice().sort((a, b) => a.downtime - b.downtime)[0];
+        if (most !== least && most.downtime - least.downtime >= 30) notes.push(most.shift + ' had the most downtime between loads: ' + R.minutesText(most.downtime) + ' against ' + (least.downtime ? R.minutesText(least.downtime) : 'none') + ' on ' + least.shift + '.');
+      }
+      rd.rows.filter(r => r.typed + r.changed + r.sheet).forEach(r => notes.push(r.shift + ': ' + [r.typed ? r.typed + ' time' + (r.typed === 1 ? '' : 's') + ' entered well after the time ' + (r.typed === 1 ? 'it says' : 'they say') : '', r.changed ? r.changed + ' time' + (r.changed === 1 ? '' : 's') + ' changed later' : '', r.sheet ? r.sheet + ' changed on the sheet' : ''].filter(Boolean).join(', ') + '.'));
+      const none = rd.noTimes.map(x => '<tr><td><b>' + escapeHtml([x.route, x.run].filter(Boolean).join(' ')) + '</b></td><td>' + escapeHtml(R.AREA_NAME[x.area] || x.area) + '</td><td>' + escapeHtml(x.depart !== null ? R.clockText(x.depart) : '—') + '</td><td class="' + (x.state === 'DONE' ? 'warn' : x.result === 'NOT LOADED' ? 'bad' : '') + '">' + (x.state === 'DONE' ? 'Marked done with no times' : x.result === 'NOT LOADED' ? 'Never started' : 'Not started yet') + '</td></tr>');
+      const head = dayName(rd.date) + ' ' + fmtY(rd.date) + ' 6:00 AM to ' + dayName(L.addDays(rd.date, 1)) + ' 6:00 AM' + (areaBox.value !== 'ALL' ? ' · ' + R.AREA_NAME[areaBox.value] : '');
+      return '<h2 class="rp-dayhead">' + escapeHtml(head) + '</h2><div class="rp-kpis">' +
+        kpi('Loads', String(t.started), t.started - t.finished ? (t.started - t.finished) + ' still loading' : 'started this day') +
+        kpi('First start', t.firstStart === null ? '—' : R.clockText(t.firstStart).replace(' ', '&nbsp;'), 'first load started', '', true) +
+        kpi('Last end', t.lastEnd === null ? '—' : R.clockText(t.lastEnd).replace(' ', '&nbsp;'), 'last load finished', '', true) +
+        kpi('Avg load', t.avgTaken === null ? '—' : t.avgTaken + '<small> min</small>', 'Start to End') +
+        kpi('Downtime', t.downtime ? R.minutesText(t.downtime) : '0', 'between loads', t.downtime >= 60 ? 'warn' : '', true) +
+        kpi('Longest gap', t.longestGap ? R.minutesText(t.longestGap) : '—', 'one loadout idle', t.longestGap >= 60 ? 'warn' : '', true) +
+        kpi('Entered later', String(t.typed), 'saved over ' + R.TYPED_LATE_MINUTES + ' min from the time', t.typed ? 'warn' : '') +
+        kpi('Changed', String(t.changed + t.sheet), 'times changed after', t.changed + t.sheet ? 'warn' : '') + '</div>' +
+        (notes.length ? '<div class="rp-lead bad"><b>What stands out: </b>' + escapeHtml(notes.join(' ')) + '</div>' : '') +
+        card('Recap by shift', 'a load counts for the shift it started in; downtime goes to the shift it happened in', table(['Shift', 'Loads started', 'Loads finished', 'Avg load', 'Downtime between loads', 'Longest gap', 'On time', 'Times from tablet', 'Times from desk', 'No source', 'Entered later', 'Changed later'], recap, ''), 'rp-wide') +
+        card('Every load, first started to last', rd.loads.length + ' load' + (rd.loads.length === 1 ? '' : 's'), table(['#', 'Route / Run', 'Loadout', 'Shift', 'Start', 'Start recorded by', 'End', 'End recorded by', 'Load time', 'Downtime before', 'Changes'], rows, 'No load was started this day.'), 'rp-wide rd-loads') +
+        (none.length ? card('Loads for this day with no Start or End', String(none.length), table(['Route / Run', 'Loadout', 'Depart', 'What happened'], none, ''), 'rp-wide') : '') +
+        '<p class="rp-foot">The plant day runs 6:00 AM to 6:00 AM. Tablet = the Plant Station tablet; Desk = a manager on Daily Case Loadout. "Entered" shows when a time was really saved, when that is more than ' + R.TYPED_LATE_MINUTES + ' minutes from the time it says. No source = a time saved before the app kept who saved it, or changed on the sheet. Downtime before = minutes that loadout had nothing loading before this load started (each loadout counted on its own).</p>';
+    }
+
     function remember() {
       const url = new URL(location.href);
       url.searchParams.set('view', view);
       ['week', 'date', 'weeks'].forEach(k => url.searchParams.delete(k));
+      url.searchParams.delete('area');
       if (view === 'trends') url.searchParams.set('weeks', weeksBox.value);
+      else if (view === 'rundown') { url.searchParams.set('date', rdDay); url.searchParams.set('area', areaBox.value); }
       else { url.searchParams.set('week', week); if (view === 'scorecard') url.searchParams.set('date', pick); }
       history.replaceState(null, '', url);
     }
 
     async function draw() {
       const mine = ++ask, body = document.getElementById('body'), now = today();
-      document.getElementById('week-field').hidden = view === 'trends';
+      document.getElementById('week-field').hidden = view === 'trends' || view === 'rundown';
       document.getElementById('weeks-field').hidden = view !== 'trends';
+      document.getElementById('day-field').hidden = view !== 'rundown';
+      document.getElementById('area-field').hidden = view !== 'rundown';
+      dayBox.value = rdDay;
       sel.value = view;
       weekBox.value = week;
       remember();
       body.innerHTML = '<p class="rp-wait">Reading the plant\'s days…</p>';
       try {
         let html = '', title = '';
-        if (view === 'trends') {
+        if (view === 'rundown') {
+          const runs = await loadRuns(L.addDays(rdDay, -1), L.addDays(rdDay, 1));
+          title = 'Loading Rundown';
+          html = drawRundown(R.loadingRundown(rdDay, runs, shifts, Date.now(), areaBox.value));
+        } else if (view === 'trends') {
           const weeks = Number(weeksBox.value), from = L.addDays(L.weekStart(now), -7 * weeks), to = L.addDays(now, -1), d = await load(from, to);
           title = 'Day-of-Week Trends';
           html = drawTrends(R.weekdayTrends(summaries(R.datesBetween(from, to), d)), weeks);
@@ -238,6 +307,10 @@
     document.getElementById('prev').onclick = () => step(-1);
     document.getElementById('next').onclick = () => step(1);
     weeksBox.addEventListener('change', draw);
+    dayBox.addEventListener('change', () => { if (L.isDateKey(dayBox.value)) { rdDay = dayBox.value; draw(); } });
+    document.getElementById('dprev').onclick = () => { rdDay = L.addDays(rdDay, -1); draw(); };
+    document.getElementById('dnext').onclick = () => { rdDay = L.addDays(rdDay, 1); draw(); };
+    areaBox.addEventListener('change', draw);
     document.getElementById('rp-print').onclick = () => window.print();
     document.getElementById('tv').onclick = () => { location.href = 'plant-kiosk.html'; };
     // A day card (or a day row) shows that day's details under the cards, without reading again.
