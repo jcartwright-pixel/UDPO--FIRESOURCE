@@ -306,6 +306,9 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .ps-page #ps-top .ps-brand img { width: auto; height: 38px; }
 .ps-page #ps-top .ps-brand strong { font-size: 20px; }
 .ps-page .ps-pill { background: #073c6a; color: #fff; border-radius: 999px; padding: 7px 14px; font-weight: 700; white-space: nowrap; }
+/* A long line name with a scrollbar showing: the buttons keep their words on one line and the name shortens instead. */
+.ps-page #ps-top button, .ps-page #ps-top .ps-brand strong { white-space: nowrap; }
+.ps-page .ps-pill { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ps-page .ps-pill::before { content: '\25CF  '; color: #f3b613; }
 .ps-page .ps-title { padding: 16px 18px 4px; }
 .ps-page .ps-title .eyebrow { display: block; color: #5b6b7c; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
@@ -672,3 +675,13 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 body.ds-tv .ds-score { grid-row: 2; grid-column: 1 / 3; }
 .ds-score iframe { flex: 1; width: 100%; height: 100%; border: 0; }
 @media (max-width: 1050px) { body.ds-tv .ds-score { grid-column: 1; } }
+
+/* Joe 10/15 (Case Unloading, mock-up A): the unloading order number, the trailer in big type, Back / On the road, transfer trailers. */
+.sw-title.unload b { display: flex; align-items: center; flex-wrap: wrap; gap: 0 14px; font-size: 26px; line-height: 1.2; }
+.sw-order { display: inline-grid; place-items: center; min-width: 36px; height: 36px; padding: 0 6px; border-radius: 999px; background: #0b3d6e; color: #fff; font-size: 20px; font-weight: 900; }
+.sw-trailer { font-size: 28px; font-weight: 900; letter-spacing: .01em; }
+.sw-chips i.back { background: #e3f4e8; color: #1d7a3e; border: 1px solid #9fd3ae; border-radius: 999px; }
+.sw-chips i.road { background: #eef2f6; color: #5a6b7d; border: 1px solid #d3dce5; border-radius: 999px; }
+.sw-chips i.tt { background: #fff4d6; color: #8a5a00; border: 1px solid #f0d38a; }
+.sw-card.road { opacity: .6; border-left-color: #9fb3c8; }
+.sw-panel-head i.sw-need { font-style: normal; display: inline-block; margin-right: 6px; padding: 3px 10px; border-radius: 8px; background: #fff4d6; color: #8a5a00; border: 1px solid #f0d38a; font-weight: 800; }

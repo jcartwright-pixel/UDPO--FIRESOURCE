@@ -172,10 +172,10 @@
       const shown = rows.filter(r => (!q || (r.p.name + ' ' + (r.p.sku || '')).toUpperCase().indexOf(q) >= 0) && inGroup(r.p) &&
         (!machineFilter || (machineFilter === '-' ? !Object.keys(r.on).length : !!r.on[machineFilter])));
       const head = '<colgroup><col class="c-name">' + '<col class="c-sku"><col class="c-upc"><col class="c-type"><col class="c-group">' + all.map(() => '<col class="c-mach">').join('') +
-        '<col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num"><col class="c-rm"></colgroup>' +
-        '<thead><tr class="pm-band"><th class="pm-pin"></th><th colspan="4">Product</th><th class="pm-m" colspan="' + all.length + '">Machines · check each one it runs on</th><th colspan="6">Speeds and Targets</th></tr>' +
+        '<col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num"><col class="c-rm"></colgroup>' +
+        '<thead><tr class="pm-band"><th class="pm-pin"></th><th colspan="4">Product</th><th class="pm-m" colspan="' + all.length + '">Machines · check each one it runs on</th><th colspan="7">Speeds and Targets</th></tr>' +
         '<tr><th class="pm-pin">Product</th><th>SKU</th><th>UPC</th><th>Type</th><th>Group</th>' + all.map(a => '<th class="pm-m" data-area="' + escapeHtml(a.id) + '">' + escapeHtml(a.name) + '</th>').join('') +
-        '<th title="Full speed per minute">Full&nbsp;Speed /Min</th><th>Target %</th><th title="Lowest speed per minute">Lowest Speed</th><th title="Highest speed per minute">Highest Speed</th><th title="Days from the run date to the code date">Shelf Life Days</th><th></th></tr></thead>';
+        '<th title="Full speed per minute">Full&nbsp;Speed /Min</th><th>Target %</th><th title="Lowest speed per minute">Lowest Speed</th><th title="Highest speed per minute">Highest Speed</th><th title="Days from the run date to the code date">Shelf Life Days</th><th title="What the product in one package should weigh, in grams (blank = set target)">Target Fill g</th><th></th></tr></thead>';
       const cell = (k, v, also) => '<td data-k="' + k + '"' + (also ? ' class="pm-check" title="Same SKU as ' + escapeHtml(also.join(', ')) + '. Check the SKU; the product name is what is saved."' : '') + '><span class="pm-val">' + show(v) + '</span>' + (also ? '<small>Check SKU · also ' + escapeHtml(also.join(', ')) + '</small>' : '') + '</td>';
       const num = (r, k) => {
         const vals = machineValues(r, k, all).map(Number).filter(n => isFinite(n)), set = [...new Set(vals)];
@@ -185,12 +185,12 @@
       const box = (r, a) => { const on = !!r.on[a.id]; return '<td class="pm-mc"><button type="button" class="pm-ck' + (on ? ' on' : '') + '" data-ck="' + escapeHtml(a.id) + '" aria-pressed="' + on + '" aria-label="' + escapeHtml(r.p.name) + ' on ' + escapeHtml(a.name) + '"' + (ck ? '' : ' disabled') + '>' + (on ? '✓' : '') + '</button></td>'; };
       const body = shown.map(r => '<tr data-key="' + escapeHtml(r.key) + '"><td data-k="name" class="pm-namecell pm-pin">' + (ck ? '<button type="button" class="pm-editbtn" data-edit="1" aria-label="Edit ' + show(r.p.name) + '">Edit</button>' : '') + '<span class="pm-name">' + show(r.p.name) + '</span></td>' +
         cell('sku', r.p.sku, shared(r.p)) + cell('upc', r.p.upc) + cell('mfgType', r.p.mfgType) + cell('productGroup', r.p.productGroup) +
-        all.map(a => box(r, a)).join('') + MACHINE_FIELDS.map(k => num(r, k)).join('') + '<td data-k="shelfLifeDays" class="pm-num">' + show(r.p.shelfLifeDays) + '</td>' +
+        all.map(a => box(r, a)).join('') + MACHINE_FIELDS.map(k => num(r, k)).join('') + '<td data-k="shelfLifeDays" class="pm-num">' + show(r.p.shelfLifeDays) + '</td>' + '<td data-k="fillGrams" class="pm-num">' + show(r.p.fillGrams) + '</td>' +
         '<td>' + (ck ? '<button type="button" class="pm-remove" data-remove="1">' + (armed === 'rm|' + r.key ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
-        '<tr><td colspan="' + (12 + all.length) + '" class="empty">' + (q || group || machineFilter ? 'No product matches' + (q ? ' ' + escapeHtml(find) : '') + (group ? ' in ' + escapeHtml(group) : '') + '.' : escapeHtml(plantName(plant)) + ' has no products yet. Add Product puts one in, or Upload loads the list.') + '</td></tr>';
+        '<tr><td colspan="' + (13 + all.length) + '" class="empty">' + (q || group || machineFilter ? 'No product matches' + (q ? ' ' + escapeHtml(find) : '') + (group ? ' in ' + escapeHtml(group) : '') + '.' : escapeHtml(plantName(plant)) + ' has no products yet. Add Product puts one in, or Upload loads the list.') + '</td></tr>';
       const sc = document.querySelector('.pm-sheet-scroll'), left = sc.scrollLeft, top = sc.scrollTop;
       document.getElementById('sheet').innerHTML = head + '<tbody id="rows">' + body + '</tbody>';
-      document.getElementById('sheet').style.width = (300 + 96 + 130 + 112 + 92 + 80 * all.length + 86 * 5 + 104) + 'px';
+      document.getElementById('sheet').style.width = (300 + 96 + 130 + 112 + 92 + 80 * all.length + 86 * 6 + 104) + 'px';
       sc.scrollLeft = left; sc.scrollTop = top;
       if (editing) drawEdit(true);
     }
@@ -303,7 +303,7 @@
         return '<select data-k="' + k + '" aria-label="' + label + '"><option value=""></option>' + opts.map(x => opt(x, opts.find(y => y.toUpperCase() === v.toUpperCase()) || '', x)).join('') + (k === 'mfgType' ? '<option value="__other__">Other (type it)</option>' : '') + '</select>' +
           (k === 'mfgType' ? '<input data-k="mfgType" class="pm-other" placeholder="Type it" maxlength="40" aria-label="Other type" hidden>' : '');
       };
-      const hint = { upc: '6 to 14 digits', shelfLifeDays: 'run date to code date' };
+      const hint = { upc: '6 to 14 digits', shelfLifeDays: 'run date to code date', fillGrams: 'the product in one package' };
       document.getElementById('edit-fields').innerHTML = FIELDS.filter(f => SHARED_FIELDS.indexOf(f.k) >= 0).map(f => {
         const bx = f.k === 'mfgType' ? pick('mfgType', typesFrom(allProducts), 'Type') : f.k === 'productGroup' ? pick('productGroup', ownOf().groups, 'Group')
           : '<input data-k="' + f.k + '" value="' + escapeHtml(val(f.k)) + '" maxlength="120" aria-label="' + escapeHtml(f.head) + '"' + (f.num ? ' inputmode="decimal" class="pm-num"' : f.k === 'upc' ? ' inputmode="numeric"' : '') + (f.k === 'name' ? ' placeholder="Product name"' : '') + '>';
@@ -416,7 +416,7 @@
     const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again')); document.head.appendChild(el); });
     const COLS = TEMPLATE.filter(t => t !== 'Plant');
     const plantByName = (n) => { const t = String(n || '').trim().toUpperCase(); return ALL_PLANTS.find(p => p.name.toUpperCase() === t || p.id.toUpperCase() === t) || null; };
-    const SHEET_FIELDS = [['Product', 'name'], ['SKU', 'sku'], ['UPC', 'upc'], ['Type', 'mfgType'], ['Group', 'productGroup'], ['Full Speed Per Min', 'ratePerMin'], ['Target %', 'targetPct'], ['Lowest Speed', 'minSpeed'], ['Highest Speed', 'maxSpeed'], ['Shelf Life Days', 'shelfLifeDays']];
+    const SHEET_FIELDS = [['Product', 'name'], ['SKU', 'sku'], ['UPC', 'upc'], ['Type', 'mfgType'], ['Group', 'productGroup'], ['Full Speed Per Min', 'ratePerMin'], ['Target %', 'targetPct'], ['Lowest Speed', 'minSpeed'], ['Highest Speed', 'maxSpeed'], ['Shelf Life Days', 'shelfLifeDays'], ['Target Fill Weight g', 'fillGrams']];
     const today = () => { const d = new Date(); return shortDate(d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })); };
     document.getElementById('template').addEventListener('click', async () => {
       const b = document.getElementById('template');
@@ -426,7 +426,7 @@
         ps.forEach(pl => {
           const all = areas(pl.id), head = SHEET_HEAD.concat(all.map(a => a.name)).concat(SHEET_TAIL);
           const out = [head].concat(rowsOf(pl.id).map(r => [r.p.name, r.p.sku || '', r.p.upc || '', r.p.mfgType || '', r.p.productGroup || ''].concat(all.map(a => r.on[a.id] ? 'X' : ''))
-            .concat(MACHINE_FIELDS.map(k => shownValue(r, k, all))).concat([r.p.shelfLifeDays === undefined ? '' : r.p.shelfLifeDays])));
+            .concat(MACHINE_FIELDS.map(k => shownValue(r, k, all))).concat([r.p.shelfLifeDays === undefined ? '' : r.p.shelfLifeDays, r.p.fillGrams === undefined ? '' : r.p.fillGrams])));
           const ws = X.utils.aoa_to_sheet(out);
           ws['!cols'] = head.map((c, i) => ({ wch: i === 0 ? 34 : Math.max(8, c.length + 2) }));
           X.utils.book_append_sheet(wb, ws, pl.name.slice(0, 31));

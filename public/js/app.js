@@ -228,6 +228,47 @@ function showVersion() {
     });
   });
 }
+// Joe 10/15: "Anytime we do an update and somebody has not refreshed ... a banner." The version this page opened with is
+// checked against the one now published every few minutes and whenever the screen comes back into view. A newer one shows
+// a yellow line under the header with a big Refresh button; nothing reloads by itself, so typing and unsaved boxes are safe.
+const UPDATE_CHECK_MS = 3 * 60000;
+let updateTimer = 0, updateShown = false;
+function updateBanner() {
+  if (updateShown || EMBED) return;
+  updateShown = true;
+  const box = document.createElement('div');
+  box.id = 'update-ready';
+  box.className = 'update-ready';
+  box.setAttribute('role', 'status');
+  box.innerHTML = '<span><b>Update ready.</b> A new version of Operations is out. Press Refresh to get it.</span><button type="button" id="update-refresh">Refresh</button>';
+  const head = document.querySelector('.topbar, .phone-top');
+  if (head && head.parentNode) head.after(box); else document.body.prepend(box);
+  box.querySelector('button').addEventListener('click', () => {
+    const btn = box.querySelector('button');
+    btn.disabled = true;
+    btn.textContent = 'Refreshing…';
+    // Leaving a box saves it (blur); wait for every save on the screen to finish before the page reloads.
+    const started = Date.now();
+    const go = () => (saving > 0 && Date.now() - started < 15000) ? setTimeout(go, 250) : location.reload();
+    setTimeout(go, 300);
+  });
+}
+async function checkForUpdate() {
+  const first = await appVersion();
+  if (!first || !first.commit || updateShown) return;
+  const now = await fetch('version.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (now && now.commit && now.commit !== first.commit) updateBanner();
+}
+export function watchForUpdates() {
+  if (updateTimer || EMBED) return;
+  updateTimer = setInterval(checkForUpdate, UPDATE_CHECK_MS);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
+  window.addEventListener('focus', checkForUpdate);
+  window.addEventListener('online', checkForUpdate);
+}
+window.UD_checkForUpdate = checkForUpdate;
+appVersion();
+watchForUpdates();
 export function sideFor(page) {
   // Home, the all-plants overview and the Administration Center sit above the three sides: their menu lists the sides.
   if (!page || ['index.html', 'company.html', 'administration.html'].indexOf(page) >= 0) return null;

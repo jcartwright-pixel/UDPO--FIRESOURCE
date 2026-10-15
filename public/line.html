@@ -57,9 +57,15 @@
         </div>
         <!-- Joe 10/14 (mock-ups G and H): the HTST's and the Blow Mold's own cards in place of the filler's. -->
         <div class="lb-cards" id="kind-cards" hidden></div>
+        <!-- Joe 10/14: the jug count, speed and temperature read from the machine's own controller (read-only), with their ranges. -->
+        <div class="lb-mach" id="machine" hidden></div>
         <div class="lb-date" id="date-check"></div>
         <div class="lb-date" id="cip-strip" hidden></div>
+        <!-- Joe 10/14: a packing line's boxes against the jugs its fillers made (Line Targets "Fed by"). -->
+        <div class="lb-date" id="box-strip" hidden></div>
         <div class="lb-strip" id="check-inline" hidden></div>
+        <!-- Joe 10/14: a filler's fill weight check (filled jugs in grams) and the product in each jug against the product's target. -->
+        <div class="lb-strip lb-fillbox" id="fill-box" hidden></div>
         <div class="lb-strip" id="strip" hidden></div>
         <div class="lb-actions" id="actions"></div>
         <div class="lb-status" id="status"><div id="status-text"></div><button type="button" id="status-btn"></button></div>
@@ -129,7 +135,7 @@
       document.getElementById('line-name').textContent = line.name;
       document.getElementById('line-sub').textContent = plantName(plant()).toUpperCase() + ' · ' + shortDate(s.date) + ' · ' + shiftText(s);
       const live = document.getElementById('live');
-      live.textContent = v.counter === 'READER' ? 'Label reader on' : v.counter === 'SENSOR' ? 'Counts from sensor' : 'Counts typed on this tablet';
+      live.textContent = v.counter === 'READER' ? 'Label reader on' : v.counter === 'SENSOR' ? 'Counts from sensor' : v.counter === 'CONTROLLER' ? 'Counts from the machine' : 'Counts typed on this tablet';
       live.className = 'lb-live ' + (v.counter === 'TABLET' ? 'typed' : 'auto');
       // Running now
       const tg = v.target;
@@ -161,7 +167,11 @@
       if (rd && v.counter === 'READER') {
         const ok = rd.dateOk !== false;
         dc.className = 'lb-date ' + (ok ? 'ok' : 'bad');
-        dc.innerHTML = '<span class="lb-pill ' + (ok ? 'g' : 'r') + '">' + (ok ? 'CODE DATE OK' : 'CODE DATE WRONG') + '</span><b>' + escapeHtml(rd.lastDate || v.expectedCode || '') + '</b><span>' + escapeHtml([v.expectedCode ? 'should be ' + v.expectedCode : '', rd.read !== undefined ? fmt(rd.read) + ' of ' + fmt(v.made) + ' jugs read' : '', rd.unreadable ? fmt(rd.unreadable) + ' unreadable' : '', rd.lastMissingAt ? 'last missing date ' + clock(rd.lastMissingAt) : ''].filter(Boolean).join(' · ')) + '</span>';
+        // Joe 10/14: the UPC on the jug confirms the product running; a label that is not one of this line's products is wrong.
+        const wrong = rd.lastUpc && rd.lastUpc === rd.lastUnknownUpc;
+        if (wrong) dc.className = 'lb-date bad';
+        dc.innerHTML = (wrong ? '<span class="lb-pill r">WRONG LABEL</span><b>UPC ' + escapeHtml(rd.lastUnknownUpc) + '</b><span>is not one of this line\'s products (Line Targets). ' + fmt(rd.unknown) + ' jug' + (rd.unknown === 1 ? '' : 's') + ' this shift · since ' + escapeHtml(clock(rd.lastUnknownAt)) + '</span>' :
+          v.product ? '<span class="lb-pill g">LABEL MATCHES</span><b>' + escapeHtml(v.product) + '</b>' : '') + (wrong ? '' : '<span class="lb-pill ' + (ok ? 'g' : 'r') + '">' + (ok ? 'CODE DATE OK' : 'CODE DATE WRONG') + '</span><b>' + escapeHtml(rd.lastDate || v.expectedCode || '') + '</b><span>' + escapeHtml([v.expectedCode ? 'should be ' + v.expectedCode : '', rd.read !== undefined ? fmt(rd.read) + ' of ' + fmt(v.made) + ' jugs read' : '', rd.unreadable ? fmt(rd.unreadable) + ' unreadable' : '', rd.lastMissingAt ? 'last missing date ' + clock(rd.lastMissingAt) : ''].filter(Boolean).join(' · ')) + '</span>');
       } else {
         dc.className = 'lb-date wait';
         dc.innerHTML = '<span class="lb-pill n">CODE DATE CHECK</span><b>' + escapeHtml(v.expectedCode || '—') + '</b><span>' + (v.expectedCode ? 'is today\'s code for this product. ' : 'Set the product\'s shelf life on Line Targets to see today\'s code. ') + 'The label reader checks every jug once it is on this line.</span>';
@@ -177,14 +187,16 @@
         btn.textContent = co ? (v.kind === 'BLOWMOLD' ? 'MOLD CHANGE DONE' : 'CHANGEOVER DONE') : 'CIP DONE'; btn.className = 'done';
       } else if (v.state === 'STOPPED') {
         st.className = 'lb-status stopped';
-        txt.innerHTML = '<b>LINE STOPPED ' + v.stoppedMin + ' MIN</b> since ' + clock(v.stoppedAt) + '. ' + (v.openReason ? 'Reason: ' + escapeHtml(v.openReason) + '.' : 'Tap why it stopped.');
+        const openStop = v.run && v.run.stops ? v.run.stops[v.stopIndex] : null;
+        txt.innerHTML = '<b>LINE STOPPED ' + v.stoppedMin + ' MIN</b> since ' + clock(v.stoppedAt) + '. ' + (v.openReason ? 'Reason: ' + escapeHtml(v.openReason) + '.' : 'Tap why it stopped.') +
+          (openStop && openStop.woNumber ? ' <b>Work order ' + escapeHtml(openStop.woNumber) + ' sent to maintenance.</b>' : '');
         btn.textContent = 'RUNNING AGAIN'; btn.className = 'run';
         reasonFor = v.stopIndex; chosen = v.openReason;
       } else {
         st.className = 'lb-status ' + (need ? 'needs' : 'running');
         txt.innerHTML = need ? '<b>STOP AT ' + clock(need.start) + ' (' + need.minutes + ' MIN) NEEDS A REASON.</b> Tap why it stopped.' :
           v.kind === 'HTST' ? (v.diverting ? '<b>IN DIVERT ' + v.diverting.minutes + ' MIN</b>' + (v.diverting.reason ? ' · ' + escapeHtml(v.diverting.reason) : '') : '<b>PASTEURIZING</b> · forward flow') + (v.product ? '' : ' · pick the product running') :
-          '<b>LINE RUNNING</b>' + (v.product ? '' : ' · pick the product running');
+          '<b>LINE RUNNING</b>' + (v.product || v.targets.length === 1 ? '' : ' · pick the product running');
         if (!need && v.diverting) st.className = 'lb-status needs';
         btn.textContent = 'LINE STOPPED'; btn.className = 'stop';
         reasonFor = need ? need.index : -1;
@@ -193,7 +205,7 @@
       const rs = document.getElementById('reasons');
       rs.hidden = reasonFor < 0;
       rs.dataset.stop = reasonFor;
-      rs.innerHTML = reasonFor < 0 ? '' : R.REASONS.map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
+      rs.innerHTML = reasonFor < 0 ? '' : R.stopReasons(v.kind).map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
       drawMoreBoard(v);
     }
     // ---------- Joe 10/14 ("all of your picks", mock-ups C to H): Up next, each hour, six buttons for the kind of line and what they open ----------
@@ -219,7 +231,7 @@
       if (a === 'changeover') return v.changeover ? [k === 'BLOWMOLD' ? 'Mold Change' : 'Changeover', v.changeover.minutes + ' min running', 'on'] : [k === 'BLOWMOLD' ? 'Mold Change' : 'Changeover', 'start / finish', ''];
       if (a === 'cip') return [k === 'HTST' ? 'CIP Wash' : 'CIP / Sanitation', v.cip ? 'washing ' + v.cip.minutes + ' min' : v.sinceCipHours !== null ? (v.sinceCipHours < 1 ? 'last under 1 h ago' : 'last ' + v.sinceCipHours + ' h ago') : 'start / finish', v.cip ? 'on' : v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours ? 'warn' : ''];
       if (a === 'waste') return ['Waste / Rejects', fmt(v.wasteTotal) + ' this shift', ''];
-      if (a === 'check') return ['Quality Check', !v.check ? 'every ' + (R.CHECK_EVERY[k] || 2) + ' hours' : v.check.done ? 'next ' + clock(v.check.next) : 'due ' + clock(v.check.at), v.check && !v.check.done ? 'warn' : ''];
+      if (a === 'check') return ['Quality Check', !v.check ? 'every ' + (R.CHECK_EVERY[k] || 2) + ' hours' : v.check.done ? 'next ' + clock(v.check.next) : 'due ' + clock(v.check.at), v.check && !v.check.done ? 'warn lb-flashbtn' : ''];
       if (a === 'crew') return ['Crew', v.crewOn.length + ' signed on', ''];
       if (a === 'notes') return ['Shift Notes', v.note ? 'note written' : v.prevNote ? '1 from last shift' : 'none yet', ''];
       if (a === 'divert') return ['Divert', v.diverting ? 'IN DIVERT ' + v.diverting.minutes + ' min' : 'record why', v.diverting ? 'warn' : ''];
@@ -228,6 +240,32 @@
       return [a, '', ''];
     }
     // The board's new pieces: the HTST and Blow Mold cards, the CIP clock, the hourly check, Up next and each hour, the six buttons.
+    // From the machine (Joe 10/14): what the line PC last read from the machine's controller, with the ranges from Line Targets.
+    // Read-only; a reading outside its range flashes red. Shown on any line whose controller sends readings.
+    function drawMachine(v) {
+      const box = document.getElementById('machine'), m = v.machine;
+      box.hidden = !m;
+      if (!m) return;
+      const range = (lo, hi, unit) => lo === null && hi === null ? 'No range set on Line Targets' : 'Range ' + (lo === null ? 'up' : lo + unit) + ' to ' + (hi === null ? 'any' : hi + unit);
+      const flagged = (f) => f === 'HIGH' || f === 'LOW';
+      const tile = (name, big, sub, pill, flag) => '<div class="lb-card' + (flagged(flag) ? ' lb-flash' : '') + '"><span class="eyebrow">' + escapeHtml(name) + '</span><div class="lb-big">' + big + '</div><div class="lb-mut">' + sub + '</div><div>' + pill + '</div></div>';
+      const tiles = [];
+      if (v.counter === 'CONTROLLER' || m.counter !== null) {
+        const moving = m.lastMoveAt && Date.now() - Date.parse(m.lastMoveAt) < 180000;
+        tiles.push(tile('Jug count', fmt(v.counter === 'CONTROLLER' ? v.made : m.counter), escapeHtml(v.counter === 'CONTROLLER' ? 'this shift' + (m.counter !== null ? ' · machine counter ' + fmt(m.counter) : '') : 'machine counter'),
+          v.counter === 'CONTROLLER' ? (moving ? '<span class="lb-pill g">COUNTING</span>' : '<span class="lb-pill a">NO JUGS IN 3 MIN</span>') : '', ''));
+      }
+      // The filler's add-on sensors (Joe 10/14, B): the motor current switch and the rejects from the second photo-eye.
+      if (m.running !== null) tiles.push(tile('Motor', m.running ? 'RUNNING' : 'STOPPED', m.runningSince ? (m.running ? 'running since ' : 'stopped since ') + escapeHtml(clock(m.runningSince)) : 'from the current switch',
+        m.running ? '<span class="lb-pill g">RUNNING</span>' : '<span class="lb-pill r">MOTOR OFF</span>', m.running ? '' : 'LOW'));
+      if (m.rejects !== null) tiles.push(tile('Rejects and spills', fmt(m.rejects), fmt(m.infeed) + ' jugs in · ' + fmt(Math.max(0, m.infeed - m.rejects)) + ' counted out', m.infeed ? '<span class="lb-pill ' + (m.rejects / m.infeed > 0.01 ? 'a' : 'g') + '">' + (Math.round(m.rejects / m.infeed * 1000) / 10) + '% OF JUGS IN</span>' : '', ''));
+      if (m.speed !== null) tiles.push(tile(m.speedName, fmt(m.speed), escapeHtml(range(m.speedLow, m.speedHigh, '')) + (m.speedOutSince ? ' · ' + (m.speedFlag === 'HIGH' ? 'high' : 'low') + ' since ' + clock(m.speedOutSince) : ''),
+        m.speedFlag === 'HIGH' ? '<span class="lb-pill r">TOO FAST</span>' : m.speedFlag === 'LOW' ? '<span class="lb-pill r">TOO SLOW</span>' : m.speedLow !== null || m.speedHigh !== null ? '<span class="lb-pill g">IN RANGE</span>' : '', m.speedFlag));
+      if (m.temp !== null) tiles.push(tile('Temperature', fmt(m.temp) + '°F', escapeHtml(range(m.tempLow, m.tempHigh, '°F')) + (m.tempOutSince ? ' · ' + (m.tempFlag === 'HIGH' ? 'high' : 'low') + ' since ' + clock(m.tempOutSince) : ''),
+        m.tempFlag === 'HIGH' ? '<span class="lb-pill r">TOO HOT</span>' : m.tempFlag === 'LOW' ? '<span class="lb-pill r">TOO COLD</span>' : m.tempLow !== null || m.tempHigh !== null ? '<span class="lb-pill g">IN RANGE</span>' : '', m.tempFlag));
+      box.innerHTML = '<div class="lb-mach-head">From the machine <span' + (m.stale ? ' class="stale"' : '') + '>' + (m.stale ? 'NOT READING · last read ' + escapeHtml(clock(m.at)) : 'read ' + escapeHtml(clock(m.at)) + ' · every 5 seconds') + '</span></div>' +
+        '<div class="lb-mach-row n' + tiles.length + '">' + tiles.join('') + '</div><p class="lb-mach-note">Read-only: the app only reads these numbers' + (v.counter === 'CONTROLLER' ? ' from the machine\'s controller' : ' from the add-on sensors') + '. It never changes anything on the machine.</p>';
+    }
     function drawMoreBoard(v) {
       const k = v.kind, special = k === 'HTST' || k === 'BLOWMOLD', tg = v.target;
       document.getElementById('std-cards').hidden = special;
@@ -236,12 +274,15 @@
       const madeBits = '<div class="lb-mut">Target so far ' + fmt(v.soFar) + '</div><div class="lb-bar"><i class="c-' + (v.pct === null || v.pct >= 100 ? 'g' : v.pct >= 90 ? 'a' : 'r') + '" style="width:' + Math.min(100, v.pct || 0) + '%"></i></div>' +
         (v.pct === null ? '' : v.made >= v.soFar ? '<div><span class="lb-pill g">' + fmt(v.made - v.soFar) + ' AHEAD · ' + v.pct + '%</span></div>' : '<div><span class="lb-pill ' + (v.pct >= 90 ? 'a' : 'r') + '">' + fmt(v.behind) + ' BEHIND · ' + v.pct + '%</span></div>');
       const countBtn = v.counter === 'TABLET' ? '<button type="button" class="lb-btn" data-act="count">Enter Count</button>' : '';
-      const speedLine = v.speed === null ? '' : '<div class="lb-mut">Speed ' + v.speed + ' / min ' + (v.speedFlag === 'OVER' ? '<span class="lb-pill r">TOO FAST</span>' : v.speedFlag === 'UNDER' ? '<span class="lb-pill r">TOO SLOW</span>' : '') + '</div>';
+      const mach = v.machine, fromMachine = v.counter === 'CONTROLLER' ? '<div><span class="lb-pill g">FROM THE MACHINE</span></div>' : '';
+      const speedLine = v.speed === null || (mach && mach.speed !== null) ? '' : '<div class="lb-mut">Speed ' + v.speed + ' / min ' + (v.speedFlag === 'OVER' ? '<span class="lb-pill r">TOO FAST</span>' : v.speedFlag === 'UNDER' ? '<span class="lb-pill r">TOO SLOW</span>' : '') + '</div>';
       if (k === 'BLOWMOLD') {
         const rej = Number(v.waste['Leak tester'] || 0);
         kc.innerHTML =
-          '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || 'No product picked') + '</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div><button type="button" class="lb-btn" data-act="product">' + (v.product ? 'Change Product' : 'Pick Product') + '</button></div>' +
-          '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs this shift</span><div class="lb-big">' + fmt(v.made) + '</div>' + madeBits + speedLine + countBtn + '</div>' +
+          // Joe 10/14: the Blow Mold makes only gallon jugs; with one product on its list there is nothing to pick.
+          (v.targets.length === 1 ? '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || v.targets[0].name) + '</div><div class="lb-mut">The only product made here</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div></div>' :
+          '<div class="lb-card"><span class="eyebrow">Making now</span><div class="lb-prod">' + escapeHtml(v.product || 'No product picked') + '</div><div class="lb-mut">' + escapeHtml(v.lot ? 'Resin lot ' + v.lot : 'No resin lot typed') + '</div><button type="button" class="lb-btn" data-act="product">' + (v.product ? 'Change Product' : 'Pick Product') + '</button></div>') +
+          '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs this shift</span><div class="lb-big">' + fmt(v.made) + '</div>' + madeBits + speedLine + fromMachine + countBtn + '</div>' +
           '<div class="lb-card"><span class="eyebrow">Leak tester rejects</span><div class="lb-big">' + fmt(rej) + '</div><div class="lb-mut">' + (v.made ? (Math.round(rej / v.made * 1000) / 10) + '% of jugs made' : 'this shift') + '</div><button type="button" class="lb-btn" data-act="waste" data-reason="Leak tester">Enter Rejects</button></div>' +
           '<div class="lb-card"><span class="eyebrow">Jugs ahead of filler</span><div class="lb-big">' + (v.stock === null ? '—' : fmt(v.stock)) + '</div><div class="lb-mut">' + (v.run && v.run.stockAt ? 'counted ' + clock(v.run.stockAt) : 'not counted this shift') + '</div><button type="button" class="lb-btn" data-act="stock">Enter Jugs</button></div>';
       } else if (k === 'HTST') {
@@ -252,6 +293,9 @@
           '<div class="lb-card"><span class="eyebrow">Flow</span><div class="lb-big">' + (flow ? escapeHtml(flow.value) : '—') + '</div><div class="lb-mut">gallons a minute · ' + fmt(v.made) + ' made this shift</div>' + countBtn + '</div>' +
           '<div class="lb-card"><span class="eyebrow">Diverts this shift</span><div class="lb-big">' + v.diverts + '</div><div class="lb-mut">' + (v.lastDivertAt ? 'Last divert ' + shortDate(v.lastDivertAt.slice(0, 10)) + ' ' + clock(v.lastDivertAt) : 'No divert recorded') + '</div></div>';
       }
+      drawMachine(v);
+      drawFill(v);
+      drawBoxing(v);
       // The CIP clock (mock-up G): hours since the last CIP wash that passed, against the line's hours between washes.
       const cs = document.getElementById('cip-strip');
       cs.hidden = !(k === 'HTST' || v.cipHours);
@@ -265,7 +309,7 @@
       // The HTST's hourly chart check and the Blow Mold's bottle check, on the board (mock-ups G and H).
       const ci = document.getElementById('check-inline');
       ci.hidden = !special || !v.check;
-      if (!ci.hidden) draw('check-inline', '<div class="lb-box"><h3>' + (k === 'HTST' ? 'Hourly chart check' : 'Bottle check') + ' · ' + clock(v.check.at) + (v.check.done ? ' done' : ' due') + '</h3>' + checkForm(v) + '</div><div class="lb-box"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>');
+      if (!ci.hidden) draw('check-inline', '<div class="lb-box' + (v.check.done ? '' : ' lb-flashbox') + '"><h3>' + (k === 'HTST' ? 'Hourly chart check' : 'Bottle check') + ' · ' + clock(v.check.at) + (v.check.done ? ' done' : ' due') + '</h3>' + checkForm(v) + '</div><div class="lb-box"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>');
       // Up next and each hour (mock-up C).
       const sp = document.getElementById('strip');
       sp.hidden = special;
@@ -277,25 +321,104 @@
       const acts = document.getElementById('actions');
       acts.innerHTML = (ACTIONS[k] || ACTIONS.FILLER).map(a => { const t = actionText(v, a); return '<button type="button" data-act="' + a + '"' + (t[2] ? ' class="' + t[2] + '"' : '') + '>' + escapeHtml(t[0]) + '<small>' + escapeHtml(t[1]) + '</small></button>'; }).join('');
     }
+    // ---------- Fill weight check (Joe 10/14): filled jugs weighed in grams, as often as Line Targets says ----------
+    // Product in each jug = filled - empty jug - cap, against the product's Target Fill Weight g (Product Sheet). Each box saves as it is left.
+    let fillNew = null;
+    const g = (n) => (n === null || n === undefined ? '—' : fmt(n) + ' g');
+    const sgn = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
+    function fillDueText(d, w) {
+      if (!d) return '';
+      w = w || { many: 'jugs' };
+      if (d.why === 'product') return 'Starts when a product is running';
+      if (d.due) return d.why === 'change' ? 'Due now: product changed' + (d.dueAt ? ' ' + clock(d.dueAt) : '') : d.why === 'start' ? 'Due now: first check of the run' : d.why === 'jugs' ? 'Due now: ' + fmt(d.every) + ' ' + w.many + ' since the last one' : 'Due now (since ' + clock(d.dueAt) + ')';
+      return d.nextAt ? 'Next due ' + clock(d.nextAt) : d.jugsLeft !== null ? 'Next due in ' + fmt(d.jugsLeft) + ' ' + w.many : 'Next due at the next product change';
+    }
+    // Jugs in from the fillers that feed this line against boxes out x jugs in each box.
+    function drawBoxing(v) {
+      const el = document.getElementById('box-strip'), b = v.boxing;
+      el.hidden = !b;
+      if (!b) return;
+      const from = b.feeders.map(f => escapeHtml(f.name) + ' ' + fmt(f.made)).join(' · ') || 'no feeding line this shift';
+      const pill = b.diff === null ? '<span class="lb-pill n">SET JUGS PER BOX</span>' : b.diff < 0 ? '<span class="lb-pill r">MORE BOXED THAN FILLED</span>' :
+        b.diff > 2 * (b.perBox || 1) ? '<span class="lb-pill a">JUGS NOT BOXED</span>' : '<span class="lb-pill g">BOXES MATCH</span>';
+      el.innerHTML = pill + '<b>' + fmt(b.jugsIn) + ' jugs in · ' + fmt(b.boxes) + ' boxes' + (b.perBox ? ' × ' + fmt(b.perBox) + ' = ' + fmt(b.boxed) + ' boxed' : '') + '</b><span>' +
+        (b.diff === null ? 'Type how many jugs go in each box on Line Targets.' : b.diff < 0 ? fmt(-b.diff) + ' more jugs boxed than the fillers counted. Check the counts.' : fmt(b.diff) + ' jugs not boxed yet (on the conveyor, rejected or spilled).') +
+        ' From ' + from + '.</span>';
+    }
+    function drawFill(v) {
+      const box = document.getElementById('fill-box'), f = v.fill;
+      box.hidden = !f;
+      if (!f) return;
+      // Joe 10/14: the 5-gallon bag fillers weigh bags (empty bag and fitment) the same way.
+      const d = f.due, cur = d.current, idx = d.index === null ? '' : String(d.index), product = v.product || '', w = f.words || { one: 'jug', many: 'jugs', One: 'Jug', empty: 'empty jug', cap: 'cap' };
+      // The numbers this check uses: its own (once started), else what a check started now would use.
+      const tare = cur ? cur.tare : f.tare ? f.tare.grams : null, cap = cur ? cur.cap : f.cap, target = cur ? cur.target : f.target;
+      const tareFrom = cur ? cur.tareFrom : f.tare ? f.tare.from : '';
+      const jugs = cur ? cur.jugs : Array.from({ length: R.FILL_JUGS }, () => ({ gross: null, net: null, diff: null, flag: '' }));
+      const fields = jugs.map((j, i) => '<label class="lb-field' + (j.flag ? ' lb-off' : '') + '">' + w.One + ' ' + (i + 1) + ' g<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="fill" data-field="jug' + (i + 1) + '" data-index="' + idx + '" value="' + (j.gross === null ? '' : escapeHtml(String(j.gross))) + '">' +
+        '<small class="lb-net">' + (j.net !== null ? g(j.net) + ' product' + (j.diff !== null ? ' · ' + sgn(j.diff) + ' g' : '') : '&nbsp;') + '</small>' + (j.flag ? '<b class="lb-pill r">' + j.flag + '</b>' : '') + '</label>').join('');
+      const avg = cur && cur.avgNet !== null ? '<div class="lb-fillavg' + (cur.flag === 'LIGHT' ? ' bad' : '') + '"><span>Average product per ' + w.one + '</span><b>' + g(cur.avgNet) + '</b>' + (cur.diff !== null ? '<span class="lb-pill ' + (cur.flag === 'LIGHT' ? 'r' : cur.flag === 'HEAVY' ? 'a' : cur.diff > 0 ? 'a' : 'g') + '">' + (cur.diff === 0 ? 'ON TARGET' : sgn(cur.diff) + ' G ' + (cur.diff > 0 ? 'OVER' : 'UNDER')) + '</span>' : '') + '</div>' : '';
+      const math = '<p class="lb-mut lb-wrange">Product = filled weight − ' + w.empty + ' ' + (tare === null ? '<b class="lb-warn">(set ' + w.empty + ' on Line Targets)</b>' : g(tare) + (tareFrom === 'BLOWMOLD' ? ' (Blow Mold heads average)' : '')) + ' − ' + w.cap + ' ' + (cap === null ? '0 g (no ' + w.cap + ' weight set)' : g(cap)) +
+        '. Target ' + (target === null ? '<b class="lb-warn">set target</b> (Target Fill Weight g on the Product Sheet' + (product ? ' for ' + escapeHtml(product) : '') + ')' : g(target) + (product ? ' for ' + escapeHtml(product) : '')) + '.</p>';
+      // Joe 10/15: a recorded check is never left in the boxes; its result is one read-only line.
+      const lc = !cur && d.last && d.last.filled ? d.last : null;
+      const last = lc ? '<p class="lb-last">Last check ' + clock(lc.at) + (lc.by ? ' by ' + escapeHtml(who(lc.by)) : '') + ': ' + (lc.avgNet === null ? lc.filled + ' ' + w.many + ' weighed' : lc.diff === null ? g(lc.avgNet) + ' average, set target' :
+        '<b>' + sgn(lc.diff) + ' g ' + (lc.diff >= 0 ? 'over' : 'under') + '</b> target') + (lc.light ? ' · <b class="lb-pill r">' + lc.light + ' LIGHT</b>' : '') + (lc.heavy ? ' · <b class="lb-pill a">' + lc.heavy + ' HEAVY</b>' : '') + (!lc.flag && lc.diff !== null ? ' · <b class="lb-pill g">PASSED</b>' : '') + '</p>' : '';
+      const earlier = f.checks.slice(0, d.index === null ? f.checks.length : d.index).reverse();
+      const table = earlier.length ? '<table class="lb-t"><thead><tr><th>Time</th><th>Product</th><th class="n">Average product</th><th class="n">vs target</th><th>' + w.One + 's</th><th>By</th></tr></thead><tbody>' + earlier.map(c => '<tr><td>' + clock(c.at) + '</td><td>' + escapeHtml(c.product) + '</td><td class="n' + (c.flag === 'LIGHT' ? ' lb-bad' : '') + '">' + g(c.avgNet) + '</td><td class="n' + (c.flag ? ' lb-bad' : '') + '">' + (c.diff === null ? 'set target' : sgn(c.diff) + ' g') + (c.flag ? ' ' + c.flag : '') + '</td><td>' + c.filled + ' of ' + R.FILL_JUGS + '</td><td>' + escapeHtml(who(c.by)) + '</td></tr>').join('') + '</tbody></table>' : '<p class="lb-mut">No earlier fill weight checks this shift.</p>';
+      const tot = f.totals, give = tot.checks && tot.avgDiff !== null ? '<p class="lb-mut">This shift: ' + tot.checks + ' check' + (tot.checks === 1 ? '' : 's') + ', average ' + sgn(tot.avgDiff) + ' g ' + (tot.avgDiff >= 0 ? 'over' : 'under') + ' target' + (tot.giveawayG ? ' · giveaway about ' + fmt(tot.giveawayLb) + ' lb on ' + fmt(v.made) + ' ' + w.many : '') + '.</p>' : '';
+      const html = '<div class="lb-box' + (d.due ? ' lb-due lb-flashbox' : '') + '"><h3>Fill weight check · ' + escapeHtml(fillDueText(d, w)) + '</h3>' + last + '<div class="lb-fields">' + fields + '</div><div id="fill-sum">' + avg + math + '</div></div><div class="lb-box"><h3>Earlier this shift</h3>' + table + give + '</div>';
+      // Draw it whole unless someone is typing the next weight of the same check (a recorded check empties its boxes at once).
+      const recorded = !cur && [...box.querySelectorAll('input[data-save="fill"]')].some(i => i.dataset.index !== '');
+      if (!typing('fill-box') || recorded) { draw('fill-box', html); return; }
+      // Still typing the next jug: the boxes stay as they are; each jug's product, the flags and the average catch up around them.
+      const t = document.createElement('div');
+      t.innerHTML = html;
+      const now = box.querySelectorAll('.lb-field'), fresh = t.querySelectorAll('.lb-field');
+      now.forEach((lab, i) => {
+        const f = fresh[i];
+        if (!f) return;
+        lab.className = f.className;
+        lab.querySelector('input').dataset.index = idx;
+        lab.querySelector('.lb-net').innerHTML = f.querySelector('.lb-net').innerHTML;
+        const p = lab.querySelector('.lb-pill'), q = f.querySelector('.lb-pill');
+        if (p) p.remove();
+        if (q) lab.appendChild(q);
+      });
+      box.querySelector('h3').textContent = t.querySelector('h3').textContent;
+      box.querySelector('.lb-box').className = t.querySelector('.lb-box').className;
+      document.getElementById('fill-sum').innerHTML = t.querySelector('#fill-sum').innerHTML;
+    }
     // One quality check's boxes; each saves when it is left (Review item 38: no Save buttons; drop-downs start blank).
     function checkForm(v) {
       const c = v.check;
       if (!c) return '<p class="lb-mut">The checks start with the shift.</p>';
+      // Joe 10/15: a recorded check is never left in the boxes (nobody copies or guesses); its result is one read-only line, and
+      // the boxes come back empty when the next check is due.
+      if (c.done) {
+        const bad = (R.CHECK_FIELDS[v.kind] || []).filter(f => { const x = String(c.values[f[0]] === undefined ? '' : c.values[f[0]]); return /NOT OK|LATE/.test(x) || (f[2] === 'num' && R.weightFlag(f[0], x, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high })); });
+        return '<p class="lb-last">Last check ' + clock(c.values.at || c.at) + (c.values.by ? ' by ' + escapeHtml(who(c.values.by)) : '') + ': ' + (bad.length ? '<b class="lb-pill r">' + escapeHtml(bad.map(f => f[1].replace(/ g$/, '')).join(', ')) + ' OUT</b>' : '<b class="lb-pill g">PASSED</b>') +
+          ' · next check due ' + clock(c.next) + '</p><p class="lb-mut">The numbers are in Earlier this shift and on the Quality screen.</p>';
+      }
       return '<div class="lb-fields">' + (R.CHECK_FIELDS[v.kind] || []).map(f => {
         const got = c.values[f[0]] === undefined ? '' : String(c.values[f[0]]);
         if (f[2] === 'ok') {
           const opts = f[0] === 'pen' ? ['ON TIME', 'LATE'] : ['OK', 'NOT OK'];
           return '<label class="lb-field">' + escapeHtml(f[1]) + '<select class="lb-sel" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '"><option value=""></option>' + opts.map(o => '<option' + (o === got ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></label>';
         }
-        return '<label class="lb-field">' + escapeHtml(f[1]) + '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '"></label>';
-      }).join('') + '</div>';
+        // A Blow Mold head's jug outside the weight range on Line Targets: red, with LIGHT or HEAVY.
+        const wf = R.weightFlag(f[0], got, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high });
+        return '<label class="lb-field' + (wf ? ' lb-off' : '') + '">' + escapeHtml(f[1]) + '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '">' + (wf ? '<b class="lb-pill r">' + wf + '</b>' : '') + '</label>';
+      }).join('') + '</div>' + (v.kind === 'BLOWMOLD' && v.jugWeight && (v.jugWeight.low !== null || v.jugWeight.high !== null || v.jugWeight.target !== null) ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.' + (v.jugWeight.target !== null ? ' Target ' + v.jugWeight.target + ' g.' : '') + (v.jugWeight.low !== null || v.jugWeight.high !== null ? ' Range ' + (v.jugWeight.low !== null ? v.jugWeight.low : 'up') + ' to ' + (v.jugWeight.high !== null ? v.jugWeight.high : 'any') + ' g.' : '') + '</p>' : v.kind === 'BLOWMOLD' ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.</p>' : '');
     }
     function checkTable(v) {
-      const c = (v.run && v.run.checks) || {}, fields = R.CHECK_FIELDS[v.kind] || [], every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, start = Date.parse((v.run && v.run.shiftStart) || '');
-      const slots = Object.keys(c).map(Number).filter(n => !v.check || n !== v.check.slot).sort((a, b) => a - b);
+      const c = (v.run && v.run.checks) || {}, every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, start = Date.parse((v.run && v.run.shiftStart) || '');
+      // A filler's checks saved before the jug weights moved to the fill weight check (Joe 10/14) still show their pounds.
+      const fields = (R.CHECK_FIELDS[v.kind] || []).concat((R.OLD_CHECK_FIELDS[v.kind] || []).filter(f => Object.values(c).some(x => x && String(x[f[0]] === undefined ? '' : x[f[0]]) !== '')));
+      const slots = Object.keys(c).map(Number).filter(n => !v.check || n !== v.check.slot || v.check.done).sort((a, b) => a - b);
       if (!slots.length) return '<p class="lb-mut">No checks yet this shift.</p>';
       return '<table class="lb-t"><thead><tr><th>Time</th>' + fields.map(f => '<th' + (f[2] === 'num' ? ' class="n"' : '') + '>' + escapeHtml(f[1]) + '</th>').join('') + '<th>By</th></tr></thead><tbody>' +
-        slots.map(n => '<tr><td>' + clock(new Date(start + n * every).toISOString()) + '</td>' + fields.map(f => { const x = String(c[n][f[0]] === undefined ? '' : c[n][f[0]]); return '<td class="' + (f[2] === 'num' ? 'n' : /NOT OK|LATE/.test(x) ? 'lb-bad' : x ? 'lb-ok' : '') + '">' + escapeHtml(x) + '</td>'; }).join('') + '<td>' + escapeHtml(who(c[n].by)) + '</td></tr>').join('') + '</tbody></table>';
+        slots.map(n => '<tr><td>' + clock(new Date(start + n * every).toISOString()) + '</td>' + fields.map(f => { const x = String(c[n][f[0]] === undefined ? '' : c[n][f[0]]), wf = R.weightFlag(f[0], x, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high }); return '<td class="' + (f[2] === 'num' ? 'n' + (wf ? ' lb-bad' : '') : /NOT OK|LATE/.test(x) ? 'lb-bad' : x ? 'lb-ok' : '') + '">' + escapeHtml(x) + (wf ? ' ' + wf : '') + '</td>'; }).join('') + '<td>' + escapeHtml(who(c[n].by)) + '</td></tr>').join('') + '</tbody></table>';
     }
     // What a button opens (mock-ups D, E, F, G, H).
     function drawMore(v) {
@@ -372,6 +495,19 @@
         if (val && el.tagName === 'INPUT' && !/^-?\d+(\.\d+)?$/.test(val)) { showError('Type a number, like 8.62.'); return; }
         return queue('check', { slot: Number(el.dataset.slot), field: el.dataset.field, value: val });
       }
+      if (f === 'fill') {
+        const n = val.replace(/,/g, '');
+        if (n && !/^\d+(\.\d+)?$/.test(n)) { showError('Type the filled weight in grams, like 3861.'); return; }
+        // The first jug of a new check starts it; the next jugs typed before the card has caught up go on that same check.
+        let index = el.dataset.index === '' ? null : Number(el.dataset.index);
+        if (index === null) {
+          const fv = (lineView(data, data.lines.find(l => l.operationId === lineId), now()).fill || {}), n0 = (fv.checks || []).length;
+          if (fillNew && fillNew.line === lineId && Date.now() - fillNew.at < 600000 && (n0 === fillNew.index || (n0 === fillNew.index + 1 && !(fv.due && fv.due.due)))) index = fillNew.index;
+          else fillNew = { line: lineId, index: n0, at: Date.now() };
+          if (index === null) return queue('fill', { field: el.dataset.field, value: n, index: null });
+        }
+        return queue('fill', { field: el.dataset.field, value: n, index });
+      }
       if (f === 'waste') {
         const n = val.replace(/[,\s]/g, '');
         if (n && !/^\d+$/.test(n)) { showError('Type how many, digits only.'); return; }
@@ -397,7 +533,7 @@
         if (v.changeover) return queue('changeover', { sub: 'to', to: el.value });
       }
     }
-    ['mp-body', 'check-inline'].forEach(id => document.getElementById(id).addEventListener('change', e => { if (e.target.dataset.save) saveBox(e.target); }));
+    ['mp-body', 'check-inline', 'fill-box'].forEach(id => document.getElementById(id).addEventListener('change', e => { if (e.target.dataset.save) saveBox(e.target); }));
     document.getElementById('mp-body').addEventListener('click', e => {
       const b = e.target.closest('[data-click]');
       if (!b) return;

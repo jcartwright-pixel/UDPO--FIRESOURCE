@@ -18,8 +18,8 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.UDProduction = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
-  var COUNTERS = ['TABLET', 'SENSOR', 'READER'];
-  var COUNTER_LABEL = { TABLET: 'Typed by operator', SENSOR: 'Sensor (counts only)', READER: 'Label reader (counts, product and date)' };
+  var COUNTERS = ['TABLET', 'SENSOR', 'READER', 'CONTROLLER'];
+  var COUNTER_LABEL = { TABLET: 'Typed by operator', SENSOR: 'Sensor (counts only)', READER: 'Label reader (counts, product and date)', CONTROLLER: 'Machine controller (read-only)' };
   // The reasons a line stops (Joe picked the big-button tablet, 10/11).
   var REASONS = ['Changeover', 'Waiting on product', 'Filler jam', 'Caser jam', 'Labeler / coder', 'Cap feed', 'Out of cases or crates', 'Sanitation / CIP', 'Break or lunch', 'Maintenance called', 'No orders', 'Other'];
   var START_SHIFTS = [{ name: 'First Shift', start: '06:00', end: '14:30' }, { name: 'Second Shift', start: '14:00', end: '22:30' }, { name: 'Third Shift', start: '22:00', end: '05:30' }];
@@ -75,7 +75,7 @@
 
   // The target fields each product keeps on its plant's Products list (Joe 10/11: one product list, everything about a product
   // on it), as Line Targets and the template name them.
-  var TARGET_FIELDS = ['upc', 'shelfLifeDays', 'ratePerMin', 'targetPct', 'minSpeed', 'maxSpeed'];
+  var TARGET_FIELDS = ['upc', 'shelfLifeDays', 'ratePerMin', 'targetPct', 'minSpeed', 'maxSpeed', 'fillGrams'];
   // A line's products (its Products list rows) with their numbers and target per hour.
   function targetsFor(products) {
     return (products || []).filter(function (p) { return text(p && p.name); }).map(function (p) {
@@ -168,14 +168,201 @@
   };
   // The quality check each kind records (mock-ups E, G, H): every 2 hours, the HTST chart check every hour.
   var CHECK_FIELDS = {
-    FILLER: [['w1', 'Jug 1 lb', 'num'], ['w2', 'Jug 2 lb', 'num'], ['w3', 'Jug 3 lb', 'num'], ['w4', 'Jug 4 lb', 'num'], ['w5', 'Jug 5 lb', 'num'], ['capSeal', 'Cap and seal', 'ok'], ['codeOk', 'Code date readable', 'ok'], ['temp', 'Product temp °F', 'num']],
+    // Joe 10/14: the fillers' five jug weights moved to their own Fill weight check (fillDue, in grams, as often as Line Targets
+    // says); OLD_CHECK_FIELDS still shows the pounds an earlier check saved.
+    FILLER: [['capSeal', 'Cap and seal', 'ok'], ['codeOk', 'Code date readable', 'ok'], ['temp', 'Product temp °F', 'num']],
     PACK: [['capSeal', 'Seal', 'ok'], ['codeOk', 'Code date readable', 'ok'], ['temp', 'Product temp °F', 'num']],
     HTST: [['recorder', 'Recorder °F', 'num'], ['indicating', 'Indicating °F', 'num'], ['pen', 'Pen on time', 'ok'], ['flow', 'Flow GPM', 'num']],
-    BLOWMOLD: [['w1', 'Jug 1 g', 'num'], ['w2', 'Jug 2 g', 'num'], ['w3', 'Jug 3 g', 'num'], ['topLoad', 'Top load', 'ok']]
+    // Joe 10/14: a six-head blow mold, so every check weighs a jug from each of heads 1 to 6 in grams (the Blow Mold quality
+    // check's same six: head1 to head6).
+    BLOWMOLD: [['head1', 'Head 1 g', 'num'], ['head2', 'Head 2 g', 'num'], ['head3', 'Head 3 g', 'num'], ['head4', 'Head 4 g', 'num'], ['head5', 'Head 5 g', 'num'], ['head6', 'Head 6 g', 'num'], ['topLoad', 'Top load', 'ok']]
   };
+  var OLD_CHECK_FIELDS = { FILLER: [['w1', 'Jug 1 lb', 'num'], ['w2', 'Jug 2 lb', 'num'], ['w3', 'Jug 3 lb', 'num'], ['w4', 'Jug 4 lb', 'num'], ['w5', 'Jug 5 lb', 'num']] };
   var CHECK_EVERY = { FILLER: 2, PACK: 2, HTST: 1, BLOWMOLD: 2 };
+  // Why a line stopped, for each kind of line (Joe 10/14 follow-on: "stop reasons for each kind of line"). The fillers keep the
+  // first twelve (REASONS); each list is twelve, the tablet's four rows of three.
+  var STOP_REASONS = {
+    FILLER: REASONS,
+    PACK: ['Waiting on product', 'Box or tote jam', 'Sealer / glue', 'Labeler / coder', 'Out of boxes or film', 'Out of totes or crates', 'Changeover', 'Sanitation / CIP', 'Break or lunch', 'Maintenance called', 'No orders', 'Other'],
+    HTST: ['Divert / low temp', 'Pump or flow problem', 'Waiting on silo / raw milk', 'Tanks full (no room)', 'Changeover / flush', 'Sanitation / CIP', 'Seal or test (inspector)', 'Air, steam or water', 'Break or lunch', 'Maintenance called', 'No orders', 'Other'],
+    BLOWMOLD: ['Mold change', 'Resin feed', 'Leak tester down', 'Trimmer jam', 'Conveyor / bottle jam', 'Heater / temperature', 'Compressed air', 'Filler backed up (jugs full)', 'Cleaning', 'Break or lunch', 'Maintenance called', 'Other']
+  };
+  function stopReasons(kind) { return STOP_REASONS[kind] || REASONS; }
   var DIVERT_REASONS = ['Low temperature', 'Flow too high', 'Startup', 'Power or air', 'Test', 'Other'];
-  var LIMITS = { WASTE: 999999, CREW: 30, NOTE: 1000, DIVERTS: 200, CHANGEOVERS: 60, CIPS: 20, CHECK_SLOTS: 30 };
+  // A machine's own controller (Joe 10/14, the Blow Mold): READ-ONLY, and only the three readings Joe named: the jug count,
+  // the speed and the temperature. The line PC (tools/device-bridge) reads them; Line Targets keeps the setup in
+  // productionLines/{id}.controller, one box at a time (controllerField checks each box).
+  var CONTROLLER_BRANDS = [['AB', 'Allen-Bradley ControlLogix / CompactLogix'], ['AB_MICRO', 'Allen-Bradley Micro800'], ['MODBUS', 'Modbus TCP (many brands)'], ['S7', 'Siemens S7']];
+  var CONTROLLER_PORTS = { AB: 44818, AB_MICRO: 44818, MODBUS: 502, S7: 102 };
+  // Joe 10/14 (Gallon Filler add-on sensors, B): a filler can also read a motor current switch (on = running) and a second photo-eye
+  // on the infeed (jugs in: jugs in less jugs counted out are the rejects and spills), on a small I/O module the line PC reads the
+  // same way. The Blow Mold keeps only its three.
+  var READINGS = [['count', 'Jug count'], ['speed', 'Speed'], ['temp', 'Temperature'], ['running', 'Motor running (current switch)'], ['infeed', 'Jugs in (infeed eye)']];
+  // The readings Line Targets shows for a line: a filler counted another way (its label reader) shows only its add-on sensors.
+  function readingsFor(kind, counter) {
+    if (kind !== 'FILLER') return ['count', 'speed', 'temp'];
+    return counter === 'CONTROLLER' ? ['count', 'speed', 'temp', 'running', 'infeed'] : ['running', 'infeed'];
+  }
+  var TAG_HELP = { AB: 'the tag name as it shows in the controller program, like Jug_Count or Counter1.ACC', AB_MICRO: 'the tag name as it shows in the controller program, like Jug_Count',
+    MODBUS: 'the register number, like 40001, 30001 or HR 100 (an on/off input like the motor switch: 10001 or DI 0)', S7: 'the address, like DB10.DBD4 (4 bytes) or DB10.DBW2 (2 bytes), or an on/off bit like I0.3 or DB10.DBX4.0' };
+  var CONTROLLER_FIELDS = ['brand', 'ip', 'port', 'slot', 'rack', 'unit', 'wordOrder', 'countTag', 'countSize', 'speedName', 'speedTag', 'speedSize', 'speedDivide', 'speedLow', 'speedHigh', 'tempTag', 'tempSize', 'tempDivide', 'tempLow', 'tempHigh', 'runningTag', 'infeedTag', 'infeedSize'];
+  function tagOk(brand, tag) {
+    var t = text(tag);
+    if (brand === 'MODBUS') return /^(HR|IR|DI|COIL)\s*:?\s*\d{1,5}$/i.test(t) || /^[0134]\d{4,5}$/.test(t) || /^\d{1,5}$/.test(t);
+    if (brand === 'S7') { var u = t.replace(/\s+/g, ''); return /^DB\d{1,5}\.DB[DW]\d{1,5}$/i.test(u) || /^M[DW]\d{1,5}$/i.test(u) || /^DB\d{1,5}\.DBX\d{1,5}\.[0-7]$/i.test(u) || /^[MIE]\d{1,5}\.[0-7]$/i.test(u); }
+    return t.length <= 200 && /^(Program:[A-Za-z_][A-Za-z0-9_]*\.)?[A-Za-z_][A-Za-z0-9_]*(\[\d+\])*(\.[A-Za-z_][A-Za-z0-9_]*(\[\d+\])*)*$/.test(t);
+  }
+  // One box of the controller setup: { value } to keep (null = empty) or { error } in plain words.
+  function controllerField(field, value, brand) {
+    var v = text(value), n = Number(v), whole = function (lo, hi, what) { return v === '' ? { value: null } : /^\d+$/.test(v) && n >= lo && n <= hi ? { value: n } : { error: what + ' must be a whole number from ' + lo + ' to ' + hi + '.' }; };
+    if (CONTROLLER_FIELDS.indexOf(field) < 0) return { error: 'Unknown controller box.' };
+    if (field === 'brand') return v === '' || CONTROLLER_BRANDS.some(function (b) { return b[0] === v; }) ? { value: v || null } : { error: 'Pick the controller\'s brand.' };
+    if (field === 'ip') {
+      if (v === '') return { value: null };
+      var parts = v.split('.');
+      return parts.length === 4 && parts.every(function (x) { return /^\d{1,3}$/.test(x) && Number(x) <= 255; }) ? { value: v } : { error: 'Type the controller\'s IP address like 192.168.1.20.' };
+    }
+    if (field === 'port') return whole(1, 65535, 'The port');
+    if (field === 'slot') return whole(0, 31, 'The slot');
+    if (field === 'rack') return whole(0, 7, 'The rack');
+    if (field === 'unit') return whole(0, 255, 'The unit id');
+    if (field === 'speedName') return v.length <= 30 ? { value: v || null } : { error: 'Keep the speed\'s name to 30 letters, like Annealer speed.' };
+    if (field === 'wordOrder') return v === '' || v === 'HIGH_FIRST' || v === 'LOW_FIRST' ? { value: v || null } : { error: 'Pick the word order.' };
+    if (/Size$/.test(field)) return v === '' || v === '16' || v === '32' ? { value: v ? Number(v) : null } : { error: 'Pick 16 or 32 bits.' };
+    if (/Tag$/.test(field)) {
+      if (v === '') return { value: null };
+      if (!brand) return { error: 'Pick the controller\'s brand first.' };
+      return tagOk(brand, v) ? { value: v } : { error: 'Type ' + TAG_HELP[brand] + '.' };
+    }
+    if (v === '') return { value: null };
+    if (!isFinite(n) || v.length > 12) return { error: 'Type a number.' };
+    if (/Divide$/.test(field)) return n > 0 && n <= 100000 ? { value: n } : { error: 'Divide by must be a number above 0, like 10 when the controller sends 4312 for 431.2.' };
+    return Math.abs(n) <= 100000 ? { value: n } : { error: 'Type a number.' };
+  }
+  // A Blow Mold head's jug weight against the line's range on Line Targets (lineDoc.jugWeightLow / jugWeightHigh): 'HEAVY',
+  // 'LIGHT' or ''. Only the head boxes are weighed.
+  function weightFlag(field, value, lineDoc) {
+    if (!/^head\d$/.test(field)) return '';
+    var f = machineFlag(value, (lineDoc || {}).jugWeightLow, (lineDoc || {}).jugWeightHigh);
+    return f === 'HIGH' ? 'HEAVY' : f === 'LOW' ? 'LIGHT' : '';
+  }
+  // The average of the Blow Mold heads weighed (head1 to head6, grams), one decimal; null when none is.
+  function headsAverage(h) {
+    var v = [1, 2, 3, 4, 5, 6].map(function (n) { return num((h || {})['head' + n]); }).filter(function (x) { return x !== null && x > 0; });
+    return v.length ? round1(v.reduce(function (a, b) { return a + b; }, 0) / v.length) : null;
+  }
+  function round1(n) { return Math.round(n * 10) / 10; }
+
+  // ---------- Fill weight check (Joe 10/14: "we weigh jugs after fill just to check", and the math on what goes in each jug) ----------
+  // Each filler weighs FILL_JUGS filled jugs in grams (the filler's quality check weighed five), as often as Line Targets says
+  // (lineDoc.fillEvery MINUTES / JUGS / CHANGE with fillEveryN; blank = every FILL_DEFAULT_MIN minutes), and always at the start
+  // and after each product change. The product in a jug is net = filled - empty jug (tare) - cap, against the product's Target
+  // fill weight (g) on the Product Sheet. The Gallon Filler's empty jug is the average of the Blow Mold's latest Head 1 to 6
+  // weights (its jugs come from the Blow Mold) for TARE_HOURS; otherwise, and on the other fillers, the empty weight typed on
+  // Line Targets (tareGrams). LIGHT below target less fillUnder (blank = 0), HEAVY above target plus fillOver (blank = not flagged).
+  var FILL_JUGS = 5, TARE_HOURS = 12, FILL_DEFAULT_MIN = 120, GRAMS_PER_LB = 453.592;
+  var FILL_MODES = [['MINUTES', 'Every so many minutes'], ['JUGS', 'Every so many jugs'], ['CHANGE', 'Only at the start and after each product change']];
+  // Joe 10/14: the 5-gallon bag fillers (Raypak, "the dispenser", and Boxing, the dispenser filler that feeds the box) weigh
+  // filled bags the same way: the empty bag and fitment typed on Line Targets, against the product's Target Fill Weight g.
+  var BAG_LINES = ['RAYPAK', 'BOXING'];
+  function isBagFiller(lineName) { return BAG_LINES.indexOf(text(lineName).toUpperCase().replace(/[^A-Z0-9]/g, '')) >= 0; }
+  function hasFill(lineName) { return lineKind(lineName) === 'FILLER' || isBagFiller(lineName); }
+  // The words for what a line's fill weight check weighs: jugs and caps, or bags and fitments.
+  function fillWords(lineName) {
+    return isBagFiller(lineName) ? { one: 'bag', many: 'bags', One: 'Bag', empty: 'empty bag', Empty: 'Empty bag', cap: 'fitment', Cap: 'Fitment' }
+      : { one: 'jug', many: 'jugs', One: 'Jug', empty: 'empty jug', Empty: 'Empty jug', cap: 'cap', Cap: 'Cap' };
+  }
+  function usesBlowMoldJugs(lineName) { return text(lineName).toUpperCase().replace(/[^A-Z0-9]/g, '') === 'GALLONFILLER'; }
+  // The empty jug weight for a line now: { grams, from: 'BLOWMOLD' | 'TYPED', at } or null. blowHeads = the Blow Mold's headsLast.
+  function tareFor(lineName, lineDoc, blowHeads, nowMs) {
+    var b = blowHeads || {}, at = when(b.at);
+    if (usesBlowMoldJugs(lineName) && num(b.avg) !== null && at && nowMs - at < TARE_HOURS * 3600000) return { grams: num(b.avg), from: 'BLOWMOLD', at: text(b.at) };
+    var t = num((lineDoc || {}).tareGrams);
+    return t !== null ? { grams: t, from: 'TYPED', at: '' } : null;
+  }
+  function fillFlag(net, target, under, over) {
+    var n = num(net), t = num(target), o = num(over);
+    if (n === null || t === null) return '';
+    if (n < t - (num(under) || 0)) return 'LIGHT';
+    if (o !== null && n > t + o) return 'HEAVY';
+    return '';
+  }
+  // One fill weight check (a run.fills entry) worked out: each jug's net and difference from target, their average and flags.
+  function fillOf(f) {
+    var x = f || {}, tare = num(x.tare), cap = num(x.cap) || 0, target = num(x.target), jugs = [];
+    for (var i = 1; i <= FILL_JUGS; i++) {
+      var g = num(x['jug' + i]), net = g !== null && tare !== null ? round1(g - tare - cap) : null;
+      jugs.push({ gross: g, net: net, diff: net !== null && target !== null ? round1(net - target) : null, flag: fillFlag(net, target, x.under, x.over) });
+    }
+    var nets = jugs.map(function (j) { return j.net; }).filter(function (n) { return n !== null; }), avg = nets.length ? round1(nets.reduce(function (a, b) { return a + b; }, 0) / nets.length) : null;
+    var light = jugs.filter(function (j) { return j.flag === 'LIGHT'; }).length, heavy = jugs.filter(function (j) { return j.flag === 'HEAVY'; }).length;
+    return { at: text(x.at), by: text(x.by), product: text(x.product), tare: tare, tareFrom: text(x.tareFrom), cap: num(x.cap), target: target, under: num(x.under), over: num(x.over), jugs: jugs,
+      avgNet: avg, diff: avg !== null && target !== null ? round1(avg - target) : null, light: light, heavy: heavy, flag: light ? 'LIGHT' : heavy ? 'HEAVY' : '',
+      filled: jugs.filter(function (j) { return j.gross !== null; }).length };
+  }
+  // When the line's next fill weight check is due. index = the check being filled in now (null = the next save starts one).
+  // Joe 10/15: once all FILL_JUGS weights of a check are in, it is recorded: the boxes empty for the next check (index null), so
+  // nobody copies or guesses from the last numbers; last = the latest check worked out, for a read-only line.
+  function fillDue(run, lineDoc, nowMs) {
+    var r = run || {}, ld = lineDoc || {}, mode = text(ld.fillEvery).toUpperCase(), n = num(ld.fillEveryN);
+    if (['MINUTES', 'JUGS', 'CHANGE'].indexOf(mode) < 0 || (mode !== 'CHANGE' && !(n > 0))) { mode = ''; n = null; }
+    var fills = Array.isArray(r.fills) ? r.fills : [], last = fills.length ? fills[fills.length - 1] : null, lastAt = last ? when(last.at) : 0;
+    var runs = (r.runs || []).slice().sort(function (a, b) { return when(a.from) - when(b.from); }), change = runs.length ? when(runs[runs.length - 1].from) : 0;
+    var o = { mode: mode, every: n, count: fills.length, due: false, why: '', dueAt: '', nextAt: '', jugsLeft: null, index: null, current: null, last: last ? fillOf(last) : null };
+    if (!change) { o.why = 'product'; return o; }
+    var minutes = mode === 'MINUTES' ? n : mode === '' ? FILL_DEFAULT_MIN : null, made = num(r.count) || 0;
+    if (!last || lastAt < change) { o.due = true; o.why = last ? 'change' : 'start'; o.dueAt = new Date(change).toISOString(); return o; }
+    if (minutes !== null && nowMs >= lastAt + minutes * 60000) { o.due = true; o.why = 'time'; o.dueAt = new Date(lastAt + minutes * 60000).toISOString(); return o; }
+    if (mode === 'JUGS' && made - (num(last.count) || 0) >= n) { o.due = true; o.why = 'jugs'; return o; }
+    if (o.last.filled < FILL_JUGS) { o.index = fills.length - 1; o.current = o.last; }
+    if (minutes !== null) o.nextAt = new Date(lastAt + minutes * 60000).toISOString();
+    if (mode === 'JUGS') o.jugsLeft = Math.max(0, n - (made - (num(last.count) || 0)));
+    return o;
+  }
+  // The shift's fill weight checks added up: the average over or under target and the product given away (overfill) on every
+  // jug made, in grams and pounds (made x the average over target, when the line ran over).
+  function fillTotals(run, made) {
+    var list = ((run || {}).fills || []).map(fillOf).filter(function (f) { return f.avgNet !== null; }), withT = list.filter(function (f) { return f.diff !== null; });
+    var avgDiff = withT.length ? round1(withT.reduce(function (a, f) { return a + f.diff; }, 0) / withT.length) : null, give = avgDiff !== null && avgDiff > 0 ? Math.round(avgDiff * (num(made) || 0)) : 0;
+    return { checks: list.length, light: list.filter(function (f) { return f.flag === 'LIGHT'; }).length, heavy: list.filter(function (f) { return f.flag === 'HEAVY'; }).length,
+      avgDiff: avgDiff, giveawayG: give, giveawayLb: round1(give / GRAMS_PER_LB), noTarget: list.length > 0 && !withT.length };
+  }
+  // A reading outside its range: 'HIGH', 'LOW' or ''.
+  function machineFlag(value, low, high) {
+    var v = num(value), lo = num(low), hi = num(high);
+    if (v === null) return '';
+    if (lo !== null && v < lo) return 'LOW';
+    if (hi !== null && v > hi) return 'HIGH';
+    return '';
+  }
+  // What the controller last sent this shift (run.machine), with the line's ranges (lineDoc.controller). Stale after 2 minutes.
+  // Joe 10/14: on the Blow Mold the speed is the annealer speed (like 70), unless Line Targets names it otherwise.
+  function r0(run) { return run || {}; }
+  function speedNameFor(kind, c) { return text((c || {}).speedName) || (kind === 'BLOWMOLD' ? 'Annealer speed' : 'Speed'); }
+  function machineNow(run, lineDoc, nowMs, kind) {
+    var m = (run || {}).machine, c = ((lineDoc || {}).controller) || {};
+    if (!m || typeof m !== 'object') return null;
+    var at = when(m.at), o = { at: text(m.at), stale: !at || nowMs - at > 120000, counter: num(m.counter), speed: num(m.speed), temp: num(m.temp),
+      speedName: speedNameFor(kind, c), speedLow: num(c.speedLow), speedHigh: num(c.speedHigh), tempLow: num(c.tempLow), tempHigh: num(c.tempHigh), speedOutSince: text(m.speedOutSince), tempOutSince: text(m.tempOutSince), lastMoveAt: text(m.lastMoveAt) };
+    // The filler's add-on sensors: the motor switch (running true / false, since when) and jugs in on the infeed this shift, with
+    // the rejects (jugs in less jugs counted out since the infeed eye started counting this shift).
+    o.running = m.running === true ? true : m.running === false ? false : null;
+    o.runningSince = text(m.runningSince);
+    o.infeed = num(r0(run).infeed);
+    o.rejects = o.infeed === null ? null : Math.max(0, o.infeed - Math.max(0, (num(r0(run).count) || 0) - (num(r0(run).infeedBase) || 0)));
+    o.speedFlag = machineFlag(o.speed, o.speedLow, o.speedHigh);
+    o.tempFlag = machineFlag(o.temp, o.tempLow, o.tempHigh);
+    var log = Array.isArray(run.machineLog) ? run.machineLog : [];
+    ['speed', 'temp'].forEach(function (k) {
+      var vals = log.map(function (x) { return num(x && x[k]); }).filter(function (x) { return x !== null; });
+      o[k + 'Min'] = vals.length ? Math.min.apply(null, vals) : null;
+      o[k + 'Max'] = vals.length ? Math.max.apply(null, vals) : null;
+      o[k + 'OutMin'] = log.filter(function (x) { return machineFlag(x && x[k], o[k + 'Low'], o[k + 'High']); }).length;
+    });
+    return o;
+  }
+
+  var LIMITS = { WASTE: 999999, CREW: 30, NOTE: 1000, DIVERTS: 200, CHANGEOVERS: 60, CIPS: 20, CHECK_SLOTS: 30, FILLS: 120, GRAMS: 30000 };
 
   function overlap(a, b, c, d) { return Math.max(0, Math.min(b, d) - Math.max(a, c)); }
   function openOf(list) { return (list || []).filter(function (x) { return x && x.start && !x.end; })[0] || null; }
@@ -198,8 +385,22 @@
   }
 
   // Everything mock-ups A to H add for one line this shift (run = productionRuns doc, line = productionLines doc).
-  function lineMore(run, targets, nowMs, kind, lineDoc) {
-    var r = run || {}, ld = lineDoc || {}, base = lineNow(run, targets, nowMs);
+  // Joe 10/14: a packing line's box count against the fillers that feed it ("Fed by" on Line Targets: lineDoc.fedBy, the feeding
+  // lines' ids, and perBox, the jugs in each box). feeders = [{ operationId, name, made }] this shift. Jugs in = what the feeding
+  // lines made; jugs boxed = boxes x perBox; the difference is jugs not boxed (on the conveyor, rejected or spilled), or, below
+  // zero, more boxed than the fillers counted. null when the line has no feeders set.
+  function boxingOf(lineDoc, made, feeders) {
+    var ids = Array.isArray((lineDoc || {}).fedBy) ? lineDoc.fedBy : [];
+    if (!ids.length) return null;
+    var fed = (feeders || []).filter(function (f) { return ids.indexOf(f.operationId) >= 0; }), per = num(lineDoc.perBox);
+    var jugsIn = fed.reduce(function (a, f) { return a + (num(f.made) || 0); }, 0), boxes = num(made) || 0, boxed = per ? boxes * per : null;
+    return { perBox: per, boxes: boxes, jugsIn: jugsIn, boxed: boxed, diff: boxed === null ? null : jugsIn - boxed,
+      feeders: fed.map(function (f) { return { operationId: f.operationId, name: text(f.name), made: num(f.made) || 0 }; }) };
+  }
+  // plant = { blowHeads, lineName, feeders }: the Blow Mold's latest head weights (productionLines headsLast), for the Gallon
+  // Filler's empty jug; the line's name; and the lines feeding a packing line (boxingOf).
+  function lineMore(run, targets, nowMs, kind, lineDoc, plant) {
+    var r = run || {}, ld = lineDoc || {}, base = lineNow(run, targets, nowMs), lname = text((plant || {}).lineName) || text(ld.line) || text(r.line);
     var co = openOf(r.changeovers), cip = openOf(r.cips), dv = openOf(r.diverts);
     var waste = r.waste && typeof r.waste === 'object' ? r.waste : {}, wasteTotal = 0;
     Object.keys(waste).forEach(function (k) { wasteTotal += num(waste[k]) || 0; });
@@ -243,6 +444,12 @@
       diverting: dv ? { start: dv.start, reason: text(dv.reason), minutes: Math.round((nowMs - when(dv.start)) / 60000) } : null,
       diverts: (r.diverts || []).length, lastDivertAt: (r.diverts || []).length ? r.diverts[r.diverts.length - 1].start : text(ld.lastDivertAt),
       source: r.source && typeof r.source === 'object' ? { from: text(r.source.from), to: text(r.source.to) } : { from: '', to: '' },
+      machine: machineNow(r, ld, nowMs, kind),
+      jugWeight: { target: num(ld.jugWeightTarget), low: num(ld.jugWeightLow), high: num(ld.jugWeightHigh) },
+      fill: kind === 'FILLER' || isBagFiller(lname) ? { due: fillDue(r, ld, nowMs), tare: tareFor(ld.line || r.line, ld, (plant || {}).blowHeads, nowMs), cap: num(ld.capGrams),
+        target: base.target ? num(base.target.fillGrams) : null, under: num(ld.fillUnder), over: num(ld.fillOver), totals: fillTotals(r, base.made),
+        checks: (r.fills || []).map(fillOf), words: fillWords(lname) } : null,
+      boxing: boxingOf(ld, base.made, (plant || {}).feeders),
       lot: text(r.lot), stock: num(r.stock), note: text(r.note), next: ld.next && typeof ld.next === 'object' && text(ld.next.product) ? { product: text(ld.next.product), qty: num(ld.next.qty) } : null
     });
   }
@@ -262,7 +469,11 @@
       });
       var made = past ? Math.max(0, countAt(r.counts, end) - countAt(r.counts, a)) : 0;
       target = Math.round(target);
+      // The machine's speed and temperature (a controller line), the hour's average of its minute readings.
+      var avg = function (k) { var vals = (r.machineLog || []).filter(function (x) { var t = when(x && x.at); return t >= a && t < end; }).map(function (x) { return num(x[k]); }).filter(function (x) { return x !== null; });
+        return vals.length ? Math.round(vals.reduce(function (n, x) { return n + x; }, 0) / vals.length * 10) / 10 : null; };
       out.push({ from: new Date(a).toISOString(), to: new Date(b).toISOString(), past: past, now: a <= nowMs && nowMs < b, products: names, made: made, target: target, pct: target ? Math.round(made / target * 100) : null,
+        speed: past ? avg('speed') : null, temp: past ? avg('temp') : null,
         stopped: past ? Math.round((r.stops || []).reduce(function (n, x) { return n + overlap(when(x.start), x.end ? when(x.end) : nowMs, a, end); }, 0) / 60000) : 0 });
     }
     return out;
@@ -286,8 +497,40 @@
     return out;
   }
 
+  // The weekly line scorecard (Joe 10/14 follow-on): each line's shifts of the week added up (runs = productionRuns docs for the
+  // week, lines = [{ operationId, name }], targetsOf(operationId) = that line's targets, lineDocs = productionLines by id).
+  // Efficiency is weighted by each shift's planned minutes; stop reasons are ranked by minutes lost, across the plant too.
+  function weekScore(runs, lines, targetsOf, lineDocs, nowMs) {
+    var byLine = {}, plantReasons = {};
+    (lines || []).forEach(function (l) { byLine[l.operationId] = { operationId: l.operationId, line: l.name, kind: lineKind(l.name), shifts: 0, made: 0, soFar: 0, downMin: 0, stops: 0, wasteTotal: 0, changeovers: 0, changeoverMin: 0, overStd: 0, cips: 0, reasons: {}, effMin: 0, effSum: 0 }; });
+    (runs || []).forEach(function (r) {
+      var o = byLine[r.operationId];
+      if (!o) return;
+      var end = Math.min(nowMs, when(r.shiftEnd) || nowMs), ld = (lineDocs || {})[r.operationId] || {}, v = lineMore(r, targetsOf(r.operationId), end, o.kind, ld);
+      if (!v.made && !v.stops && !v.wasteTotal && !(r.runs || []).length) return;
+      o.shifts++; o.made += v.made; o.soFar += v.soFar; o.downMin += v.downMin; o.stops += v.stops; o.wasteTotal += v.wasteTotal; o.cips += v.cips.length;
+      v.changeovers.forEach(function (c) { o.changeovers++; o.changeoverMin += c.minutes; if (v.changeoverStd && c.minutes > v.changeoverStd) o.overStd++; });
+      (r.stops || []).forEach(function (x) {
+        var k = text(x.reason) || 'No reason given', m = Math.max(0, Math.round(((x.end ? when(x.end) : end) - when(x.start)) / 60000));
+        o.reasons[k] = (o.reasons[k] || 0) + m; plantReasons[k] = (plantReasons[k] || 0) + m;
+      });
+      if (v.efficiency && v.efficiency.oee !== null && v.efficiency.plannedMin > 0) { o.effMin += v.efficiency.plannedMin; o.effSum += v.efficiency.oee * v.efficiency.plannedMin; }
+    });
+    var rank = function (m) { return Object.keys(m).filter(function (k) { return m[k] > 0; }).sort(function (a, b) { return m[b] - m[a] || a.localeCompare(b); }).map(function (k) { return { reason: k, minutes: m[k] }; }); };
+    var out = Object.keys(byLine).map(function (k) {
+      var o = byLine[k];
+      return { operationId: o.operationId, line: o.line, kind: o.kind, shifts: o.shifts, made: o.made, soFar: o.soFar, pct: o.soFar ? Math.round(o.made / o.soFar * 100) : null, downMin: o.downMin, stops: o.stops, wasteTotal: o.wasteTotal,
+        changeovers: o.changeovers, changeoverAvg: o.changeovers ? Math.round(o.changeoverMin / o.changeovers) : null, overStd: o.overStd, changeoverStd: num(((lineDocs || {})[k] || {}).changeoverMin), cips: o.cips,
+        topReasons: rank(o.reasons).slice(0, 3), oee: o.effMin ? Math.round(o.effSum / o.effMin) : null };
+    });
+    return { lines: out, topLosses: rank(plantReasons).slice(0, 5) };
+  }
+
   return { COUNTERS: COUNTERS, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
-    lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, LIMITS: LIMITS,
-    countAt: countAt, checkDue: checkDue, lineMore: lineMore, hourly: hourly, timeline: timeline };
+    lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
+    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
+    OLD_CHECK_FIELDS: OLD_CHECK_FIELDS, headsAverage: headsAverage, FILL_JUGS: FILL_JUGS, FILL_MODES: FILL_MODES, FILL_DEFAULT_MIN: FILL_DEFAULT_MIN, TARE_HOURS: TARE_HOURS, GRAMS_PER_LB: GRAMS_PER_LB,
+    usesBlowMoldJugs: usesBlowMoldJugs, isBagFiller: isBagFiller, hasFill: hasFill, fillWords: fillWords, boxingOf: boxingOf, tareFor: tareFor, fillFlag: fillFlag, fillOf: fillOf, fillDue: fillDue, fillTotals: fillTotals,
+    countAt: countAt, checkDue: checkDue, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };
 });

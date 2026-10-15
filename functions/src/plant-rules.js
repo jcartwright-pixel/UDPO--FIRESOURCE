@@ -687,12 +687,27 @@
     var r = { timeLabel: zoned(nowMs, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ''),
       dayLabel: zoned(nowMs, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + zoned(nowMs, { hour: 'numeric', minute: '2-digit' }),
       behindMinutes: REPORT_BEHIND, behind: out.behind, nextUp: out.nextUp, loaded: out.loaded, leftToLoad: out.leftToLoad, totalLoads: out.total,
-      areas: REPORT_AREAS.map(function (a) { return areas[a]; }).filter(function (a) { return a.total > 0; }), down: down, fixed: shift.fixed, handoff: shift.handoff, others: shift.others, pickups: pickups, lines: lines, temperatures: temps };
+      areas: REPORT_AREAS.map(function (a) { return areas[a]; }).filter(function (a) { return a.total > 0; }), down: down, fixed: shift.fixed, handoff: shift.handoff, others: shift.others, pickups: pickups, lines: lines, temperatures: temps,
+      output: lineOutput(input.output), outputShift: text(input.outputShift) };
     r.counts = { behind: r.behind.length, leftToLoad: r.leftToLoad, pickups: pickups.length, down: down.length, linesDown: lines.filter(function (l) { return l.flag; }).length, tempsOut: temps.filter(function (t) { return t.flag; }).length };
     r.subject = 'Plant Update ' + r.timeLabel + ': ' + (r.behind.length ? r.behind.length + ' route' + (r.behind.length === 1 ? '' : 's') + ' behind' : 'All routes on time');
     r.smooth = !r.counts.behind && !r.counts.down && !r.counts.linesDown && !r.counts.tempsOut;
     r.text = reportText(r);
     return r;
+  }
+  // Joe 10/14 follow-on (end-of-shift production report): each line's shift from the line tablets (production.js lineView):
+  // made against target, stopped minutes and the biggest reason, waste, changeovers and line efficiency. Lines with nothing
+  // entered this shift are left out.
+  function lineOutput(list) {
+    var n = function (v) { var x = Number(v); return isFinite(x) ? x : 0; };
+    return (list || []).filter(function (o) { return o && (n(o.made) || n(o.stops) || n(o.wasteTotal) || (o.state && o.state !== 'IDLE')); }).map(function (o) {
+      return { line: text(o.line), product: text(o.product), made: n(o.made), soFar: n(o.soFar), pct: o.pct === null || o.pct === undefined || o.pct === '' ? null : n(o.pct), downMin: n(o.downMin), stops: n(o.stops),
+        topReason: text(o.topReason), wasteTotal: n(o.wasteTotal), changeovers: n(o.changeovers), changeoverMin: n(o.changeoverMin), oee: o.oee === null || o.oee === undefined || o.oee === '' ? null : n(o.oee), state: text(o.state) };
+    });
+  }
+  function outputText(o) {
+    return o.made.toLocaleString('en-US') + ' of ' + o.soFar.toLocaleString('en-US') + (o.pct === null ? '' : ' (' + o.pct + '%)') + ' · stopped ' + o.downMin + ' min' + (o.topReason && o.downMin ? ' (' + o.topReason + ')' : '') +
+      (o.wasteTotal ? ' · waste ' + o.wasteTotal.toLocaleString('en-US') : '') + (o.changeovers ? ' · ' + o.changeovers + ' changeover' + (o.changeovers === 1 ? '' : 's') + ' ' + o.changeoverMin + ' min' : '') + (o.oee === null ? '' : ' · efficiency ' + o.oee + '%');
   }
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
   // Joe 10/14: the report's route tiles show the route number and a short run name ("845 DSD", "906 Lancaster", "6304 Walmart"),
@@ -727,6 +742,11 @@
     L.push('PRODUCTION');
     if (!r.lines.length) L.push('  No production lines set up');
     r.lines.forEach(function (l) { if (l.runComplete) { L.push('  ' + l.line + '  RUN COMPLETE ' + l.lastCheckedAt); return; } L.push('  ' + l.line + '  ' + (l.status || 'no status') + (l.product ? '  ' + l.product : '') + (l.lastCheckedAt ? (l.notChecked ? '  last check ' : '  quality check ') + l.lastCheckedAt + (l.qualityCheck ? ' ' + l.qualityCheck : '') : '') + (l.flag && l.notes ? '  (' + l.notes + ')' : '')); });
+    if ((r.output || []).length) {
+      L.push('');
+      L.push('LINE OUTPUT' + (r.outputShift ? ' · ' + r.outputShift : ''));
+      r.output.forEach(function (o) { L.push('  ' + o.line + (o.product ? '  ' + o.product : '') + '  ' + outputText(o)); });
+    }
     L.push('');
     L.push('TEMPERATURES');
     if (!r.temperatures.length) L.push('  No temperature locations set up');
@@ -778,6 +798,12 @@
     H.push(head('Production'));
     if (!lines.length) H.push(plain('No production lines set up.'));
     else H.push(rows(lines.map(function (l) { if (l.runComplete) return [l.line, pill('RUN COMPLETE ' + l.lastCheckedAt, '#eef1f4', GREY)]; return [l.line, (l.product ? e(l.product) + ' ' : '') + (l.qualityCheck ? pill('QC ' + l.qualityCheck, l.qualityCheck === 'FAIL' ? '#fde8e6' : '#e2f4ea', l.qualityCheck === 'FAIL' ? RED : GREEN) + ' ' : '') + (l.notChecked ? pill('NOT CHECKED', '#fff1d6', '#9a5b00') : l.status ? pill(l.status, l.flag ? '#fde8e6' : '#eef1f4', l.flag ? RED : GREY) : 'no status')]; })));
+    var output = r.output || [];
+    if (output.length) {
+      H.push(head('Line output' + (r.outputShift ? ' · ' + r.outputShift : '')));
+      H.push(rows(output.map(function (o) { var k = o.pct === null ? null : o.pct >= 100 ? 'g' : o.pct >= 90 ? 'a' : 'r';
+        return [o.line, e(outputText(o).replace(/ \(\d+%\)/, '')) + (k ? ' ' + pill(o.pct + '%', k === 'g' ? '#e2f4ea' : k === 'a' ? '#fff1d6' : '#fde8e6', k === 'g' ? GREEN : k === 'a' ? '#9a5b00' : RED) : '')]; })));
+    }
     H.push(head('Temperatures'));
     if (!temps.length) H.push(plain('No temperature locations set up.'));
     else H.push(rows(temps.map(function (t) { var ok = t.status === 'OK', due = t.due || t.status === 'NO CHECK'; if (t.notChecked) return [t.location, pill('NOT CHECKED', '#fff1d6', '#9a5b00')]; return [t.location, (t.reading !== '' && t.reading !== undefined ? e(t.reading) + '&deg;F ' : '&ndash; ') + (t.flag ? pill(t.status, '#fde8e6', RED) : due ? pill(t.status === 'NO CHECK' ? 'CHECK DUE' : t.status + ' · CHECK DUE', '#fff1d6', '#9a5b00') : pill(t.status || '-', ok ? '#e2f4ea' : '#eef1f4', ok ? GREEN : GREY))]; })));
@@ -796,5 +822,5 @@
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes,
-    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
+    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
 });

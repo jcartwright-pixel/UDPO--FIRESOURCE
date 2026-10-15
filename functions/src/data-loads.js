@@ -32,6 +32,13 @@
  * work orders"): Truck Issues' Garage button now makes the write-up's work order (garage.js writeUpOrderStep). Every open truck,
  * trailer or fork truck write-up already marked "Sent to garage" before that gets its work order the same way, one per write-up
  * (one already there is kept). TEST COPY ONLY: on the live app it does nothing and leaves no marker until Joe OKs it by name.
+ *
+ * half-gallon-label-readers-2026-10-15 (Joe 10/15, "b": both half gallon fillers have a UPC label scanner like the Gallon Filler):
+ * NEW 1/2 GALLON and OLD 1/2 GALLON are counted by their label reader (Counted by = Label reader on Line Targets, as
+ * saveLineCounter sets it), so each scan counts a carton, the UPC picks the product, the code date is checked, a label not on the
+ * line shows WRONG LABEL and 3 quiet minutes is a stop. A line already set to anything but Typed by operator keeps its setting.
+ * It waits (tries again next run) until both lines are set up. TEST COPY ONLY: on the live app the scanners are not wired to a
+ * line PC yet, so it does nothing and leaves no marker until Joe OKs it by name.
  */
 const crypto = require('crypto');
 const L = require('./logic');
@@ -242,13 +249,40 @@ async function loadMailCheckinsOnce(db, opts) {
   return { credited: out.credited.length, still: out.still.length };
 }
 
+const HALF_READERS_ID = 'half-gallon-label-readers-2026-10-15';
+const HALF_GALLON = /^(NEW|OLD)12GAL(LON)?$/;
+async function loadHalfGallonReadersOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
+  const mark = db.collection('dataLoads').doc(HALF_READERS_ID);
+  return db.runTransaction(async tx => {
+    const m = await tx.get(mark);
+    if (m.exists && m.data().status === 'DONE') return { skipped: true };
+    const lines = (await tx.get(db.collection('plantSetup').where('type', '==', 'PRODUCTION_AREA'))).docs.map(d => d.data())
+      .filter(d => String(d.status || '').toUpperCase() === 'ACTIVE' && HALF_GALLON.test(String(d.name || d.area || '').toUpperCase().replace(/[^A-Z0-9]/g, '')));
+    if (lines.length < 2) return { waiting: 'both half gallon fillers are not set up yet' };
+    const refs = lines.map(d => db.collection('productionLines').doc(docId(d.operationId)));
+    const had = [];
+    for (const ref of refs) had.push(await tx.get(ref));
+    const set = [], kept = [];
+    lines.forEach((d, i) => {
+      const was = had[i].exists ? had[i].data().counter || 'TABLET' : 'TABLET', name = String(d.name || d.area);
+      if (was !== 'TABLET') { kept.push(name + ' ' + was); return; }
+      tx.set(refs[i], { operationId: d.operationId, line: name, facilityId: String(d.facilityId || '').trim() || 'fac_uniontown', counter: 'READER', updatedAt: stamp, updatedBy: BY }, { merge: true });
+      set.push(name);
+    });
+    tx.set(mark, { status: 'DONE', doneAt: stamp, what: 'Both half gallon fillers counted by their UPC label scanner (Joe 10/15, "b")', set, kept });
+    return { set, kept };
+  });
+}
+
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;
 }
 
-module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID };
+module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID, loadHalfGallonReadersOnce, HALF_READERS_ID };

@@ -23,3 +23,27 @@ To try it without a reader, use `--stdin` in place of `--reader` and type UPCs, 
 - **Code date:** the date read is checked against the shift's day plus the product's shelf life. The tablet shows CODE DATE OK or CODE DATE WRONG, and counts missing and unreadable dates.
 - **Stops:** if no jugs come for 3 minutes, the line shows **stopped**, and the operator taps why on the tablet. When jugs come again, the stop ends.
 - **If the network drops:** reads that could not be sent are kept and go out with the next send.
+
+## A machine's own controller (read-only)
+
+For a machine whose controller already keeps the count (Joe 10/14: the Blow Mold), run with `--controller` in place of `--reader`:
+
+```
+node bridge.cjs --address <address from Line Targets> --device ut_prod_blow_mold --key <key> --controller
+```
+
+On **Line Targets**, set **Counted by** to **Machine controller (read-only)**. Then pick the brand, type the IP address and where the jug count, speed and temperature are, and set the speed and temperature ranges. Each reading has a **Test read**. The program picks up the setup with its key, reads every 5 seconds, and sends the numbers.
+
+`controllers.cjs` speaks Allen-Bradley EtherNet/IP (ControlLogix, CompactLogix and Micro800 tags), Modbus TCP (holding and input registers, plus on/off inputs: discrete inputs `DI 0` or `10001`, coils `COIL 0` or `00001`) and Siemens S7 (data block and memory addresses, plus bits like `DB10.DBX4.0`, `M2.1` or `I0.3`). It has only the read requests, so nothing is ever written to the machine. The plain-words version is in [docs/plant-production/How-The-Blow-Mold-Controller-Connects.md](../../docs/plant-production/How-The-Blow-Mold-Controller-Connects.md).
+
+## Add-on sensors on a filler (read-only)
+
+For a filler counted by its label reader (Joe 10/14: the Gallon Filler, sensors B), a small Modbus TCP I/O module can add a **motor running** input (a current switch on the motor wire) and a **jugs in** counter (a photo-eye on the infeed). On **Line Targets**, the filler shows **Add-on sensors · read-only** under any **Counted by**. Type the module's IP address and the two inputs, then press **Test read**.
+
+Run a second copy of the program with `--controller` and the **same key** as the label reader:
+
+```
+node bridge.cjs --address <address> --device ut_prod_gallon_filler --key <the label reader's key> --controller
+```
+
+When the motor switch goes off, a stop opens on the tablet (by "motor switch"), and it ends when the motor runs again. Rejects and spills = jugs in minus jugs the label reader counted. The add-on sensors never count jugs themselves, and nothing is written to the module.

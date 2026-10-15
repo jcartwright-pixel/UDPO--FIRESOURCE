@@ -133,3 +133,24 @@ test('Joe 10/14: a manager sets the changeover standard and CIP hours; a dispatc
   await assert.rejects(applyAction(db(), { email: MANAGER }, { action: 'saveLineSetup', requestId: rid(), operationId: LINE, changeoverMin: '9000' }), /from 0 to 600/);
   await assert.rejects(applyAction(db(), { email: DISPATCHER }, { action: 'saveLineSetup', requestId: rid(), operationId: LINE, changeoverMin: '15' }), /does not have a role/);
 });
+
+test('Joe 10/14 follow-on: a stop with Maintenance called becomes a Plant Maintenance work order, once', async () => {
+  await tap('product', { product: 'Broughton 2% Gallon', sku: '50305' }, '2026-10-08T10:05:00Z');
+  await tap('stop', {}, '2026-10-08T11:10:00Z');
+  const done = await tap('reason', { reason: 'Maintenance called', stopIndex: 0 }, '2026-10-08T11:12:00Z');
+  assert.match(done.message, /work order M-\d+ sent to maintenance/);
+  let r = await run();
+  const wos = (await db().collection('plantWorkOrders').get()).docs.map(d => d.data());
+  assert.equal(wos.length, 1);
+  assert.deepEqual([wos[0].machine, wos[0].lineDown, wos[0].urgency, wos[0].status, wos[0].source, wos[0].woNumber], ['GALLON FILLER', 'YES', 'HIGH', 'NEW', 'LINE_TABLET', r.stops[0].woNumber]);
+  assert.match(wos[0].problem, /GALLON FILLER stopped at 7:10 AM running Broughton 2% Gallon/);
+  await tap('reason', { reason: 'Filler jam', stopIndex: 0 }, '2026-10-08T11:13:00Z');
+  await tap('reason', { reason: 'Maintenance called', stopIndex: 0 }, '2026-10-08T11:14:00Z');
+  assert.equal((await db().collection('plantWorkOrders').get()).docs.length, 1, 'picking it again does not make a second work order');
+  await tap('run', {}, '2026-10-08T11:30:00Z');
+  await tap('stop', {}, '2026-10-08T12:00:00Z');
+  await tap('reason', { reason: 'Filler jam', stopIndex: 1 }, '2026-10-08T12:01:00Z');
+  assert.equal((await db().collection('plantWorkOrders').get()).docs.length, 1, 'other reasons make no work order');
+  r = await run();
+  assert.equal(r.stops[1].workOrderId, undefined);
+});

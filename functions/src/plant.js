@@ -19,6 +19,7 @@ const R = require('./plant-rules');
 const { queueMaster } = require('./masterwrite');
 const M = require('./model');
 const B = require('./board-rules');
+const WJ = require('./weightjoin');
 
 // Everyone who may save on Daily Dispatch, plus the plant floor.
 const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
@@ -865,18 +866,24 @@ async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
     tipTest: req.tipTest, temperature: req.temperature, cycleTime: req.cycleTime, productSize: req.productSize, annealerSpeed: req.annealerSpeed, weights: req.weights, notes: req.notes,
     facilityId: d.facilityId || 'fac_uniontown' };
   if (req.undone) record.undone = true;
+  const id = req.checkId || 'PRODUCTION_QUALITY_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
   if (req.checkId) {
     const ref = db.collection('plantJournal').doc(req.checkId), had = await tx.get(ref), old = had.exists ? had.data() : null;
     if (!old || old.type !== R.QUALITY_TYPE || (old.payload || {}).operationId !== req.operationId) throw new SaveError('NOT_FOUND', 'That quality check is no longer open. Enter it again.');
     if (Date.parse(stamp) - R.when(old.recordedAt) >= FILL_IN_HOURS * 3600000) throw new SaveError('CONFLICT', 'That quality check is too old to change. Enter a new one.');
+    if ((old.payload || {}).fromLine) record.fromLine = true;
+    // Joe 10/14: one weight record. The Blow Mold's heads and a filler's filled jugs go on the line tablet too (weightjoin.js).
+    const mirror = req.undone ? null : await WJ.planFromQuality(tx, db, d, req, id, stamp, email);
     tx.update(ref, { status: req.status, temperature: req.temperature, notes: req.notes, payload: record, editedAt: stamp, editedBy: email, testEdited: true });
+    if (mirror) WJ.applyFromQuality(tx, db, mirror, req, email, stamp);
     const result = { ok: true, requestId: req.requestId, operationId: req.operationId, checkId: req.checkId, recordedAt: old.recordedAt, message: d.name + ' quality check saved.' };
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, checkId: req.checkId, before: old.payload || {}, after: record, result });
     return result;
   }
-  const id = 'PRODUCTION_QUALITY_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+  const mirror = req.undone ? null : await WJ.planFromQuality(tx, db, d, req, id, stamp, email);
   tx.set(db.collection('plantJournal').doc(id), { recordId: 'PQ-' + req.requestId.slice(0, 40), type: R.QUALITY_TYPE, date: L.operatingDay(new Date(stamp)), status: req.status, area: d.name,
     temperature: req.temperature, notes: req.notes, payload: record, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  if (mirror) WJ.applyFromQuality(tx, db, mirror, req, email, stamp);
   const result = { ok: true, requestId: req.requestId, operationId: req.operationId, checkId: id, recordedAt: stamp, message: d.name + ' production status updated; quality observation recorded.' };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, after: record, result });
   return result;
@@ -1044,7 +1051,7 @@ function validFacility(v, SaveError) {
 // Joe 10/11: one product list holds everything about each product: UPC, full speed per minute (RedZone's Rate/Min), Target %
 // (RedZone's), the allowed speed range per minute, and shelf life (days from the run date to the code date). The same names are in
 // public/js/products.js (FIELDS) and are read by the Line Targets, line tablet and TV screens; blank ones are left off.
-const PRODUCT_NUMBERS = [['ratePerMin', 'Full Speed Per Min', 100000], ['targetPct', 'Target %', 100], ['minSpeed', 'Lowest Speed', 100000], ['maxSpeed', 'Highest Speed', 100000], ['shelfLifeDays', 'Shelf Life Days', 3650]];
+const PRODUCT_NUMBERS = [['ratePerMin', 'Full Speed Per Min', 100000], ['targetPct', 'Target %', 100], ['minSpeed', 'Lowest Speed', 100000], ['maxSpeed', 'Highest Speed', 100000], ['shelfLifeDays', 'Shelf Life Days', 3650], ['fillGrams', 'Target Fill Weight g', 20000]];
 // An upload never wipes these: a file that leaves one blank or out keeps what the product has.
 const PRODUCT_KEEP = ['upc'].concat(PRODUCT_NUMBERS.map(x => x[0]));
 function productRows(list, SaveError) {

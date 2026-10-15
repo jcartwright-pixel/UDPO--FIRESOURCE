@@ -154,7 +154,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     // The Edit panel: the shared details (Type and Group drop-downs), a box for each machine, and each machine's own speeds.
     await admin.click(rowOf('GV 2% Gallon') + ' .pm-editbtn');
     await admin.waitForSelector('#edit-back:not([hidden])');
-    assert.deepEqual(await admin.$$eval('#edit-fields [data-k]:not(.pm-other)', x => x.map(e => e.dataset.k + ':' + e.tagName)), ['name:INPUT', 'sku:INPUT', 'upc:INPUT', 'mfgType:SELECT', 'productGroup:SELECT', 'shelfLifeDays:INPUT']);
+    assert.deepEqual(await admin.$$eval('#edit-fields [data-k]:not(.pm-other)', x => x.map(e => e.dataset.k + ':' + e.tagName)), ['name:INPUT', 'sku:INPUT', 'upc:INPUT', 'mfgType:SELECT', 'productGroup:SELECT', 'shelfLifeDays:INPUT', 'fillGrams:INPUT']);
     assert.deepEqual(await admin.$$eval('#edit-machines .pm-mbox.on', b => b.map(x => x.textContent)), ['✓BOXING', '✓HTST #1', '✓GALLON FILLER']);
     assert.deepEqual(await admin.$$eval('#edit-machines .pm-speeds tbody th', t => t.map(x => x.textContent)), ['BOXING', 'HTST #1', 'GALLON FILLER'], 'a speeds line for each machine it runs on');
     const types = await admin.$$eval('#edit-fields select[data-k="mfgType"] option', o => o.map(x => x.textContent));
@@ -227,7 +227,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     const book = await readBook(fs.readFileSync(await dl.path()).toString('base64'));
     assert.deepEqual(book.map(b => b[0]), ['Uniontown'], 'a tab for each plant the person sees');
     const tab = book[0][1];
-    assert.deepEqual(tab[0], ['Product', 'SKU', 'UPC', 'Type', 'Group', 'BOXING', 'TOTES', 'HTST #1', 'GALLON FILLER', 'BLOW MOLD', 'CASES', 'TANKER', 'Full Speed Per Min', 'Target %', 'Lowest Speed', 'Highest Speed', 'Shelf Life Days']);
+    assert.deepEqual(tab[0], ['Product', 'SKU', 'UPC', 'Type', 'Group', 'BOXING', 'TOTES', 'HTST #1', 'GALLON FILLER', 'BLOW MOLD', 'CASES', 'TANKER', 'Full Speed Per Min', 'Target %', 'Lowest Speed', 'Highest Speed', 'Shelf Life Days', 'Target Fill Weight g']);
     assert.equal(tab.length - 1, names.size, 'every product, one line each');
     const gvLine = tab.find(r => r[0] === 'GV 2% Gallon');
     assert.deepEqual(gvLine.slice(0, 14), ['GV 2% Gallon', '280305', '070852999001', 'Gallon', 'Milk', 'X', '', 'X', 'X', '', '', '', '74', '60'], 'an X under each machine; the first machine\'s numbers');

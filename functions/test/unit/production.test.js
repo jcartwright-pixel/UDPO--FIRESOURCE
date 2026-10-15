@@ -121,3 +121,147 @@ test('Joe 10/14: the quality check due now, each hour made vs target, and the sh
   const tl = P.timeline(run, Date.parse('2026-10-11T12:00:00Z'));
   assert.deepEqual(tl.map(x => [x.kind, x.minutes]), [['run', 90], ['stop', 10], ['run', 20], ['left', 120]]);
 });
+
+test('Joe 10/14 follow-on: stop reasons for each kind of line, twelve each; the fillers keep theirs', () => {
+  assert.deepEqual(P.stopReasons('FILLER'), P.REASONS);
+  ['FILLER', 'PACK', 'HTST', 'BLOWMOLD'].forEach(k => {
+    const r = P.stopReasons(k);
+    assert.equal(r.length, 12, k);
+    assert.equal(new Set(r).size, 12, k + ' has no repeats');
+    assert.ok(r.indexOf('Maintenance called') >= 0 && r.indexOf('Other') >= 0 && r.some(x => /break|lunch/i.test(x)), k + ' has a break reason (not counted against efficiency) and Maintenance called');
+  });
+  assert.ok(P.stopReasons('HTST').indexOf('Divert / low temp') >= 0);
+  assert.ok(P.stopReasons('BLOWMOLD').indexOf('Leak tester down') >= 0);
+});
+
+test('Joe 10/14 follow-on: the Current Report carries each line\'s shift (made, stopped and why, waste, changeovers, efficiency)', () => {
+  const U = require('../../src/plant-rules');
+  const out = U.lineOutput([
+    { line: 'GALLON FILLER', product: 'GV 2% Gallon', made: 6420, soFar: 6300, pct: 102, downMin: 14, stops: 2, topReason: 'Filler jam', wasteTotal: 19, changeovers: 1, changeoverMin: 22, oee: 87, state: 'RUNNING' },
+    { line: 'TOTES', made: 0, soFar: 0, pct: null, downMin: 0, stops: 0, wasteTotal: 0, state: 'IDLE' }]);
+  assert.equal(out.length, 1, 'a line with nothing this shift is left out');
+  assert.equal(U.outputText(out[0]), '6,420 of 6,300 (102%) · stopped 14 min (Filler jam) · waste 19 · 1 changeover 22 min · efficiency 87%');
+  const r = U.plantReport({ loads: [], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '', output: out, outputShift: 'Second Shift 2:00 PM to 10:30 PM' }, Date.parse('2026-10-14T21:00:00Z'));
+  assert.match(r.text, /LINE OUTPUT · Second Shift 2:00 PM to 10:30 PM\n  GALLON FILLER  GV 2% Gallon  6,420 of 6,300 \(102%\)/);
+  const html = U.reportHtml(r, '');
+  assert.match(html, /Line output · Second Shift/);
+  assert.match(html, /GALLON FILLER.*6,420 of 6,300 · stopped 14 min \(Filler jam\).*102%/s);
+  assert.doesNotMatch(U.reportHtml(U.plantReport({ loads: [], lines: [], temps: [] }, Date.now()), ''), /Line output/, 'no section without line output');
+});
+
+test('Joe 10/14 follow-on: the weekly line scorecard adds up each line\'s shifts and ranks the biggest losses', () => {
+  const t = { L1: P.targetsFor([{ name: 'A', ratePerMin: 60, targetPct: 100 }]) };
+  const shift = (key, day, extra) => Object.assign({ operationId: 'L1', shiftKey: key, date: day, shiftStart: day + 'T10:00:00Z', shiftEnd: day + 'T12:00:00Z', product: 'A', count: 6000, runs: [{ product: 'A', from: day + 'T10:00:00Z' }], counts: [{ at: day + 'T12:00:00Z', count: 6000 }], stops: [] }, extra);
+  const runs = [
+    shift('a', '2026-10-11', { stops: [{ start: '2026-10-11T10:30:00Z', end: '2026-10-11T10:50:00Z', reason: 'Filler jam' }], waste: { Leaker: 10 }, changeovers: [{ start: '2026-10-11T11:00:00Z', end: '2026-10-11T11:30:00Z', from: 'A', to: 'A' }] }),
+    shift('b', '2026-10-12', { stops: [{ start: '2026-10-12T10:30:00Z', end: '2026-10-12T10:40:00Z', reason: 'Cap feed' }, { start: '2026-10-12T11:00:00Z', end: '2026-10-12T11:15:00Z', reason: 'Filler jam' }], waste: { Leaker: 5 }, changeovers: [{ start: '2026-10-12T11:30:00Z', end: '2026-10-12T11:40:00Z' }] }),
+    { operationId: 'L2', date: '2026-10-12', runs: [], stops: [] },
+    { operationId: 'NOT_A_LINE', date: '2026-10-12', runs: [{ product: 'A', from: '2026-10-12T10:00:00Z' }] }];
+  const W = P.weekScore(runs, [{ operationId: 'L1', name: 'GALLON FILLER' }, { operationId: 'L2', name: 'TOTES' }], id => t[id] || [], { L1: { changeoverMin: 20 } }, Date.parse('2026-10-14T00:00:00Z'));
+  const g = W.lines.find(x => x.operationId === 'L1');
+  assert.deepEqual([g.shifts, g.made, g.soFar, g.pct, g.downMin, g.stops, g.wasteTotal], [2, 12000, 14400, 83, 45, 3, 15]);
+  assert.deepEqual([g.changeovers, g.changeoverAvg, g.overStd, g.changeoverStd], [2, 20, 1, 20]);
+  assert.deepEqual(g.topReasons, [{ reason: 'Filler jam', minutes: 35 }, { reason: 'Cap feed', minutes: 10 }]);
+  assert.ok(g.oee > 0 && g.oee <= 100);
+  assert.deepEqual(W.lines.find(x => x.operationId === 'L2').shifts, 0, 'a shift with nothing entered is not counted');
+  assert.deepEqual(W.topLosses.map(r => r.reason), ['Filler jam', 'Cap feed']);
+});
+
+test('Blow Mold bottle check (Joe 10/14): one jug from each of the six heads in grams, flagged outside the range on Line Targets', () => {
+  const P = require('../../src/production-rules');
+  assert.deepEqual(P.CHECK_FIELDS.BLOWMOLD.map(f => f[1]), ['Head 1 g', 'Head 2 g', 'Head 3 g', 'Head 4 g', 'Head 5 g', 'Head 6 g', 'Top load']);
+  const ld = { jugWeightLow: 55, jugWeightHigh: 59 };
+  assert.equal(P.weightFlag('head2', '60.2', ld), 'HEAVY');
+  assert.equal(P.weightFlag('head5', '54.6', ld), 'LIGHT');
+  assert.equal(P.weightFlag('head1', '57.1', ld), '');
+  assert.equal(P.weightFlag('head1', '', ld), '', 'an empty box is not flagged');
+  assert.equal(P.weightFlag('topLoad', '80', ld), '', 'only the heads are weighed');
+  assert.equal(P.weightFlag('head1', '70', {}), '', 'no range, no flag');
+});
+
+// Joe 10/14: "we weigh jugs after fill just to check", and the math on how much goes in each jug.
+test('Fill weight check: product = filled - empty jug - cap, against the product target; LIGHT and HEAVY by the allowances', () => {
+  const f = P.fillOf({ at: '2026-10-14T15:00:00.000Z', product: 'Whole Milk Gallon', tare: 57, cap: 3, target: 3800, under: 5, over: 15, jug1: 3870, jug2: 3852, jug3: 3880, jug4: '', count: 100 });
+  assert.deepEqual(f.jugs.slice(0, 4).map(j => [j.net, j.diff, j.flag]), [[3810, 10, ''], [3792, -8, 'LIGHT'], [3820, 20, 'HEAVY'], [null, null, '']]);
+  assert.equal(f.filled, 3);
+  assert.equal(f.avgNet, 3807.3);
+  assert.equal(f.diff, 7.3);
+  assert.equal(f.flag, 'LIGHT', 'a light jug flags the check');
+  // No target on the Product Sheet: nets still show, nothing is flagged ("set target").
+  const n = P.fillOf({ tare: 57, jug1: 3870 });
+  assert.deepEqual([n.jugs[0].net, n.jugs[0].diff, n.flag, n.diff], [3813, null, '', null]);
+  // No heavy allowance: overfill is shown, not flagged; no light allowance: any jug under target is LIGHT.
+  assert.equal(P.fillFlag(3900, 3800, null, null), '');
+  assert.equal(P.fillFlag(3799.9, 3800, null, null), 'LIGHT');
+});
+
+test('Fill weight check: the Gallon Filler\'s empty jug is the Blow Mold heads average (12 hours), else the weight typed on Line Targets', () => {
+  const now = Date.parse('2026-10-14T20:00:00.000Z'), heads = { avg: P.headsAverage({ head1: '57', head2: '58', head3: '', head4: '56.5', head5: '57.5', head6: '57' }), at: '2026-10-14T18:00:00.000Z' };
+  assert.equal(heads.avg, 57.2);
+  assert.deepEqual(P.tareFor('GALLON FILLER', { tareGrams: 60 }, heads, now), { grams: 57.2, from: 'BLOWMOLD', at: '2026-10-14T18:00:00.000Z' });
+  assert.deepEqual(P.tareFor('GALLON FILLER', { tareGrams: 60 }, heads, now + 13 * 3600000), { grams: 60, from: 'TYPED', at: '' }, 'old Blow Mold weights: the typed weight');
+  assert.deepEqual(P.tareFor('NEW 1/2 GALLON', { tareGrams: 38 }, heads, now), { grams: 38, from: 'TYPED', at: '' }, 'a half gallon filler\'s jugs are not the Blow Mold\'s');
+  assert.equal(P.tareFor('OLD 1/2 GALLON', {}, heads, now), null);
+  assert.equal(P.usesBlowMoldJugs('Gallon Filler'), true);
+  assert.equal(P.usesBlowMoldJugs('NEW 1/2 GALLON'), false);
+});
+
+test('Fill weight check: due at the start and each product change, then every so many minutes or jugs (Line Targets)', () => {
+  const t0 = Date.parse('2026-10-14T10:00:00.000Z'), iso = (m) => new Date(t0 + m * 60000).toISOString();
+  const run = { shiftStart: iso(-240), runs: [{ product: 'Whole', from: iso(0) }], count: 500, fills: [] };
+  assert.equal(P.fillDue({ shiftStart: iso(0), runs: [] }, {}, t0).why, 'product', 'nothing running yet');
+  let d = P.fillDue(run, {}, t0 + 60000);
+  assert.deepEqual([d.due, d.why, d.index], [true, 'start', null]);
+  run.fills.push({ at: iso(5), count: 600, jug1: 3850 });
+  d = P.fillDue(run, {}, t0 + 30 * 60000);
+  assert.deepEqual([d.due, d.index, d.nextAt], [false, 0, iso(5 + P.FILL_DEFAULT_MIN)], 'empty setting: every 2 hours');
+  // Joe 10/15: once all five weights are in, the check is recorded: the boxes empty for the next one, the result read-only.
+  Object.assign(run.fills[0], { jug2: 3851, jug3: 3852, jug4: 3853, jug5: 3854 });
+  d = P.fillDue(run, {}, t0 + 30 * 60000);
+  assert.deepEqual([d.due, d.index, d.current, d.last.filled, d.nextAt], [false, null, null, 5, iso(5 + P.FILL_DEFAULT_MIN)]);
+  run.fills[0] = { at: iso(5), count: 600, jug1: 3850 };
+  assert.equal(P.fillDue(run, {}, t0 + 126 * 60000).why, 'time');
+  assert.deepEqual([P.fillDue(run, { fillEvery: 'MINUTES', fillEveryN: 30 }, t0 + 36 * 60000).due, P.fillDue(run, { fillEvery: 'MINUTES', fillEveryN: 30 }, t0 + 34 * 60000).due], [true, false]);
+  run.count = 1500;
+  d = P.fillDue(run, { fillEvery: 'JUGS', fillEveryN: 1000 }, t0 + 40 * 60000);
+  assert.deepEqual([d.due, d.jugsLeft], [false, 100]);
+  run.count = 1600;
+  assert.equal(P.fillDue(run, { fillEvery: 'JUGS', fillEveryN: 1000 }, t0 + 40 * 60000).why, 'jugs');
+  d = P.fillDue(run, { fillEvery: 'CHANGE' }, t0 + 600 * 60000);
+  assert.deepEqual([d.due, d.nextAt, d.jugsLeft], [false, '', null], 'start and product change only');
+  run.runs.push({ product: '2%', from: iso(50) });
+  assert.equal(P.fillDue(run, { fillEvery: 'CHANGE' }, t0 + 51 * 60000).why, 'change');
+});
+
+test('Fill weight check: the shift\'s giveaway is the average over target on every jug made', () => {
+  const run = { fills: [{ tare: 57, cap: 3, target: 3800, jug1: 3870, jug2: 3870 }, { tare: 57, cap: 3, target: 3800, jug1: 3866 }] };
+  const t = P.fillTotals(run, 10000);
+  assert.deepEqual([t.checks, t.avgDiff, t.giveawayG, t.giveawayLb, t.light], [2, 8, 80000, 176.4, 0]);
+  assert.equal(P.fillTotals({ fills: [{ tare: 57, cap: 3, target: 3800, jug1: 3850 }] }, 10000).giveawayG, 0, 'under target gives nothing away');
+  assert.equal(P.fillTotals({ fills: [{ tare: 57, jug1: 3850 }] }, 100).noTarget, true);
+});
+
+test('Gallon Filler add-on sensors (Joe 10/14, B): a filler reads its motor switch and infeed eye; the Blow Mold keeps its three', () => {
+  assert.deepEqual(P.readingsFor('BLOWMOLD', 'CONTROLLER'), ['count', 'speed', 'temp']);
+  assert.deepEqual(P.readingsFor('FILLER', 'READER'), ['running', 'infeed']);
+  assert.deepEqual(P.readingsFor('FILLER', 'CONTROLLER'), ['count', 'speed', 'temp', 'running', 'infeed']);
+  assert.ok(P.tagOk('MODBUS', '10001') && P.tagOk('MODBUS', 'DI 0') && P.tagOk('S7', 'I0.3') && P.tagOk('S7', 'DB10.DBX4.0'));
+  assert.deepEqual(P.controllerField('runningTag', '10001', 'MODBUS'), { value: '10001' });
+  const m = P.machineNow({ count: 1000, infeed: 1030, infeedBase: 0, machine: { at: '2026-10-14T10:00:00.000Z', running: false, runningSince: '2026-10-14T09:58:00.000Z', speed: null, temp: null, counter: null } }, {}, Date.parse('2026-10-14T10:00:30.000Z'), 'FILLER');
+  assert.deepEqual([m.running, m.runningSince, m.infeed, m.rejects], [false, '2026-10-14T09:58:00.000Z', 1030, 30]);
+});
+
+test('Bag fillers and Fed by (Joe 10/14): Raypak and Boxing weigh bags; a packing line\'s boxes against its fillers\' jugs', () => {
+  assert.deepEqual(['RAYPAK', 'BOXING', 'GALLON FILLER', 'NEW 1/2 GALLON', 'TOTES', 'HTST #1', 'BLOW MOLD'].map(P.hasFill), [true, true, true, true, false, false, false]);
+  assert.equal(P.fillWords('RAYPAK').cap, 'fitment');
+  assert.equal(P.fillWords('GALLON FILLER').one, 'jug');
+  const raypak = P.lineMore(null, [], Date.parse('2026-10-08T15:00:00Z'), 'PACK', {}, { lineName: 'RAYPAK' });
+  assert.equal(raypak.fill.words.many, 'bags');
+  assert.equal(P.lineMore(null, [], Date.parse('2026-10-08T15:00:00Z'), 'PACK', {}, { lineName: 'TOTES' }).fill, null);
+  assert.equal(P.boxingOf({}, 10, []), null, 'no feeders set: nothing to compare');
+  const feeders = [{ operationId: 'a', name: 'GALLON FILLER', made: 300 }, { operationId: 'b', name: 'NEW 1/2 GALLON', made: 150 }, { operationId: 'c', name: 'OTHER', made: 99 }];
+  assert.deepEqual(P.boxingOf({ fedBy: ['a', 'b'], perBox: 4 }, 100, feeders), { perBox: 4, boxes: 100, jugsIn: 450, boxed: 400, diff: 50,
+    feeders: [{ operationId: 'a', name: 'GALLON FILLER', made: 300 }, { operationId: 'b', name: 'NEW 1/2 GALLON', made: 150 }] });
+  assert.equal(P.boxingOf({ fedBy: ['a'] }, 100, feeders).diff, null, 'no jugs per box yet');
+  assert.equal(P.boxingOf({ fedBy: ['a'], perBox: 4 }, 100, feeders).diff, -100, 'more boxed than filled');
+});

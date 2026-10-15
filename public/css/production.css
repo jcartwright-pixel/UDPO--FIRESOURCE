@@ -129,7 +129,7 @@
 .lb-crew button { background: #fff; border: 2px solid #c9d6e4; border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 19px; font-weight: 800; color: #0b2f55; text-align: left; cursor: pointer; min-height: 64px; }
 .lb-crew button small { display: block; font-size: 16px; color: #5b6b7c; font-weight: 600; }
 .lb-crew button.on { border-color: #1d7a3e; background: #eef8f1; }
-table.lb-t { width: 100%; border-collapse: collapse; font-size: 16px; }
+table.lb-t { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: auto; }
 table.lb-t th { text-align: left; color: #5b6b7c; font-weight: 800; border-bottom: 2px solid #c9d6e4; padding: 5px 6px; white-space: nowrap; }
 table.lb-t td { border-bottom: 1px solid #e3eaf1; padding: 5px 6px; white-space: nowrap; }
 table.lb-t .n { text-align: right; }
@@ -214,6 +214,15 @@ table.pd-t .n { text-align: right; white-space: nowrap; }
 .pd-key span { display: inline-flex; align-items: center; gap: 6px; }
 .pd-key i { width: 14px; height: 14px; border-radius: 3px; }
 @media (max-width: 1100px) { .pd-detail { grid-template-columns: minmax(0, 1fr); } }
+/* The weekly line scorecard (Joe 10/14 follow-on). */
+.pd-week { display: flex; flex-direction: column; gap: 14px; }
+.pd-week[hidden] { display: none; }
+.pd-weeknav { justify-content: flex-end; }
+.pd-weeknav button { min-height: 40px; padding: 0 16px; border-radius: 9px; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.pd-weeknav button:disabled { opacity: .5; cursor: default; }
+.pd-losses { margin: 0; padding-left: 26px; display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: 18px; }
+.pd-losses b { color: var(--ud-blue-dark); }
+b.pd-good { color: #1d7a3e; }
 /* ?tv=1: the TV on the floor (mock-up B). */
 html:has(body.pd-tv) { background: #06223d; }
 body.pd-tv { background: #06223d; color: #fff; }
@@ -244,6 +253,11 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .lt-setup label { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .lt-setup input { width: 80px; height: 38px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; text-align: right; }
 .lt-setup span { font-weight: 600; color: var(--muted); flex: 1 1 320px; }
+.lt-fill { flex: 1 1 100%; display: flex; gap: 12px 18px; align-items: center; flex-wrap: wrap; border-top: 1px solid #dbe4ee; padding-top: 12px; }
+.lt-fill h3 { flex: 1 1 100%; margin: 0; font-size: 18px; }
+.lt-fill h3 small { font-size: 16px; font-weight: 600; color: var(--muted); }
+.lt-fill select { height: 38px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; min-width: 200px; }
+.lt-fillrow { flex: 1 1 100%; display: flex; gap: 12px 18px; flex-wrap: wrap; }
 /* Line Targets: the label reader panel (administrators). */
 .lt-reader { margin-top: 14px; padding: 14px 18px; border: 1px solid var(--line); border-left: 6px solid var(--ud-gold); border-radius: 12px; background: #fff; font-size: 16px; }
 .lt-reader h3 { margin: 0 0 6px; font-size: 18px; color: var(--ud-blue-dark); }
@@ -264,3 +278,56 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 #mp-body .lb-status { margin-top: 14px; }
 #mp-body .lb-pick button:disabled, #mp-body .lb-check:disabled { opacity: .55; }
 .lb-in:disabled { border-color: #c9d6e4; background: #f4f7fa; }
+/* Line Targets: the machine controller panel (Joe 10/14, the Blow Mold; administrators). */
+.lt-ctrl { border-left-color: #2e7d32; }
+.lt-cgrid { display: flex; flex-wrap: wrap; gap: 12px 18px; margin: 10px 0; }
+.lt-cgrid label { display: flex; flex-direction: column; gap: 4px; font-weight: 800; color: var(--ud-blue-dark); }
+.lt-cgrid input, .lt-cgrid select, .lt-ctable input, .lt-ctable select { height: 40px; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; background: #fff; }
+.lt-cgrid input { width: 170px; }
+.lt-cgrid select { min-width: 220px; }
+.lt-cgrid label.wide input { width: 240px; }
+.lt-ctable { width: 100%; min-width: 760px; }
+.lt-ctable th, .lt-ctable td { font-size: 16px; vertical-align: middle; }
+.lt-ctable tbody th { text-align: left; white-space: nowrap; color: var(--ud-blue-dark); }
+.lt-ctable input { width: 100%; min-width: 70px; }
+.lt-ctable td:nth-child(2) input { min-width: 160px; }
+.lt-ctable .lt-mut { color: var(--muted); font-weight: 600; white-space: normal; overflow: visible; text-overflow: clip; }
+.lt-test { min-width: 300px; text-align: left; }
+.lt-test button { min-height: 40px; padding: 0 14px; border: 1px solid var(--ud-blue); border-radius: 9px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.lt-test button:disabled { opacity: .55; cursor: default; }
+.lt-test div { margin-top: 4px; }
+.lt-good { color: #1d6b3a; font-weight: 700; } .lt-bad { color: #c62828; font-weight: 700; } .lt-wait { color: var(--muted); font-weight: 700; }
+/* Line tablet: From the machine (Joe 10/14), the jug count, speed and temperature read from the machine's controller. */
+.lb-mach[hidden] { display: none; }
+.lb-mach-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 14px 2px 0; font-size: 16px; font-weight: 800; letter-spacing: .08em; color: var(--ud-blue-dark); text-transform: uppercase; }
+.lb-mach-head span { letter-spacing: 0; text-transform: none; font-weight: 600; color: #5b6b7c; }
+.lb-mach-head span.stale { color: #c62828; font-weight: 800; }
+.lb-mach-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 8px; }
+.lb-mach-row.n1 { grid-template-columns: 1fr 2fr; } .lb-mach-row.n2 { grid-template-columns: 1fr 1fr; }
+.lb-mach-row .lb-card { border-left: 6px solid #2e7d32; }
+.lb-mach-row .lb-card.lb-flash { border-left-width: 6px; }
+.lb-mach-note { margin: 8px 2px 0; font-size: 16px; font-weight: 600; color: #5b6b7c; }
+@media (max-width: 860px) { .lb-mach-row { gap: 10px; } }
+/* Line tablet: a Blow Mold head's jug outside the weight range (Joe 10/14, six heads in grams). */
+.lb-field.lb-off { color: #c62828; }
+.lb-field.lb-off b { align-self: flex-start; margin-top: 4px; }
+.lb-fields:has(.lb-off) { align-items: flex-start; }
+.lb-field.lb-off .lb-in { border-color: #c62828; background: #fde1e1; color: #c62828; }
+.lb-wrange { margin: 8px 0 0; }
+
+/* Joe 10/14: a filler's fill weight check on the line tablet. */
+.lb-fillbox .lb-due { border-color: #e0a000; box-shadow: inset 0 0 0 2px #f4c64d; }
+.lb-net { display: block; font-size: 16px; font-weight: 700; color: var(--muted); margin-top: 4px; }
+.lb-fillavg { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: 18px; }
+.lb-fillavg b { font-size: 26px; }
+.lb-fillavg.bad b { color: #b42318; }
+.lb-warn { color: #9a5b00; }
+.lt-check { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; min-height: 38px; }
+.lt-check input { width: 22px; height: 22px; }
+/* Joe 10/15: a check that is due flashes until it is done; the last recorded check is one read-only line. */
+@keyframes lb-boxflash { 0%, 100% { border-color: #e0a000; background: #fff; } 50% { border-color: #c62828; background: #fff4e5; } }
+.lb-box.lb-flashbox { border: 3px solid #e0a000; animation: lb-boxflash 1s steps(1) infinite; }
+.lb-actions button.lb-flashbtn { animation: lb-boxflash 1s steps(1) infinite; border-width: 3px; }
+.lb-last { margin: 4px 0 10px; font-size: 18px; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+/* A wide Earlier this shift table scrolls sideways inside its box, one line per cell, instead of squeezing into letters. */
+.lb-strip > .lb-box { min-width: 0; overflow-x: auto; }

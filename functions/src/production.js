@@ -5,7 +5,8 @@
  *   product  the product now running (a new run of the shift starts from now);
  *   count    the total made this shift so far (typed by the operator until a sensor or label reader sends it);
  *   stop     the line stopped (from now);       run     the line is running again (the open stop ends now);
- *   reason   why a stop happened (stopIndex = which stop).
+ *   reason   why a stop happened (stopIndex = which stop). Joe 10/14 follow-on: "Maintenance called" also makes the stop a Plant
+ *            Maintenance work order (plantWorkOrders, M-1001 on, once per stop), so maintenance sees it on the Maintenance Station.
  * The shift is worked out on the tablet (production-rules.js shiftNow) and sent with the entry; times are the server's.
  * More for every line (Joe 10/14: "all of your picks", mock-ups C to H), on the same shift's record:
  *   changeover  start (to = the new product), to (change the new product) or done; cocheck ticks one changeover checklist line (key);
@@ -15,18 +16,23 @@
  *   crew        a name signed on or off the line;  note  the note for the next shift;
  *   divert      the HTST went to divert (with why) or back to forward flow (sub 'forward');
  *   source      the HTST's silo or tank and where it goes;  lot  the Blow Mold's resin lot;  stock  jugs ahead of the filler;
- *   next        what runs next on the line (kept on productionLines, not the shift).
+ *   next        what runs next on the line (kept on productionLines, not the shift);
+ *   fill        one filled jug's weight in grams on the fill weight check (index = which check; none starts the one due now, with the
+ *               empty jug, cap and product target of that moment: production-rules fillOf works out the product in each jug).
+ * The Blow Mold's heads (check) and a filler's fill weights are also the Quality screen's check, in the same save (weightjoin.js).
  * saveLineCounter: how a line is counted (TABLET, SENSOR or READER), Line Targets (productionLines/{operationId}).
- * saveLineSetup: the line's changeover standard minutes and hours between CIP washes (Line Targets).
+ * saveLineSetup: the line's changeover standard minutes and hours between CIP washes, the Blow Mold's jug weight target and
+ *   range in grams, and a filler's fill weight check setup (how often, empty jug, cap, light and heavy allowances) (Line Targets).
  * The products, their speeds, targets, UPCs and shelf lives are the plant's Products list (plantProducts), not kept here.
  */
 'use strict';
 
 const P = require('./production-rules');
+const W = require('./weightjoin');
 
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const docId = (id) => String(id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 200);
-const OPS = ['product', 'count', 'stop', 'run', 'reason', 'changeover', 'cocheck', 'cip', 'waste', 'check', 'crew', 'note', 'divert', 'source', 'lot', 'stock', 'next'];
+const OPS = ['product', 'count', 'stop', 'run', 'reason', 'changeover', 'cocheck', 'cip', 'waste', 'check', 'crew', 'note', 'divert', 'source', 'lot', 'stock', 'next', 'fill'];
 const STOP_LIMIT = 300, COUNT_LIMIT = 400, RUN_LIMIT = 100;
 
 function lineId(v, SaveError) {
@@ -91,6 +97,15 @@ function validateLineEntry(input, SaveError) {
     if (!/^[A-Za-z0-9]+$/.test(out.field)) throw new SaveError('BAD_REQUEST', 'Pick which box of the check.');
     if (out.value && !/^(OK|NOT OK|ON TIME|LATE|-?\d+(\.\d+)?)$/i.test(out.value)) throw new SaveError('BAD_REQUEST', 'Type a number, or pick OK or Not OK.');
   }
+  if (op === 'fill') {
+    out.field = text(input.field);
+    if (!new RegExp('^jug[1-' + P.FILL_JUGS + ']$').test(out.field)) throw new SaveError('BAD_REQUEST', 'Pick which jug.');
+    const v = text(input.value), n = Number(v);
+    if (v !== '' && (!isFinite(n) || n <= 0 || n > P.LIMITS.GRAMS)) throw new SaveError('BAD_REQUEST', 'Type the filled jug\'s weight in grams.');
+    out.value = v === '' ? null : Math.round(n * 10) / 10;
+    out.index = input.index === null || input.index === undefined || input.index === '' ? null : Number(input.index);
+    if (out.index !== null && (!Number.isInteger(out.index) || out.index < 0)) throw new SaveError('BAD_REQUEST', 'Pick which fill weight check.');
+  }
   if (op === 'crew') {
     out.name = text(input.name).replace(/\s+/g, ' ').slice(0, 40);
     out.on = input.on !== false;
@@ -116,6 +131,33 @@ function validateLineEntry(input, SaveError) {
   }
   return out;
 }
+// A stop with "Maintenance called" becomes the line's work order (Joe 10/14 follow-on), the same as Plant Maintenance's own.
+// Its reads come before any write of the save.
+const MAINT_REASON = 'Maintenance called';
+async function stopWorkOrder(tx, db, req, line, run, stop, email, stamp) {
+  const PM = require('./plantmaint'), MR = require('./pmaint-rules');
+  const ref = db.collection('plantWorkOrders').doc(docId('LS_' + P.runId(req.operationId, req.shift.key) + '_' + req.stopIndex));
+  const had = await tx.get(ref);
+  if (had.exists) return { id: ref.id, woNumber: had.data().woNumber, write: () => {} };
+  const all = await PM.plantMachines(tx, db, line.facilityId), m = MR.findMachine(all, line.name);
+  const num = await PM.nextNumber(tx, db, line.facilityId);
+  const wo = { woNumber: MR.woNumber(num.n), facilityId: line.facilityId, machineId: m ? m.id : '', machine: m ? m.name : line.name, area: m ? m.area || '' : '',
+    problem: line.name + ' stopped at ' + new Date(stop.start).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) + (run.product ? ' running ' + run.product : '') + '. Maintenance called from the line tablet.', notes: '', lineDown: stop.end ? 'NO' : 'YES',
+    type: 'Maintenance Request', urgency: stop.end ? '' : 'HIGH', source: 'LINE_TABLET', sourceRunId: P.runId(req.operationId, req.shift.key), sourceStop: req.stopIndex, sourceShift: req.shift.name || '', sourceAt: stop.start,
+    sourceBy: email, status: 'NEW', labor: [], createdAt: stamp, createdBy: email, updatedAt: stamp, updatedBy: email, testEdited: true };
+  num.write(stamp);
+  tx.set(ref, wo);
+  return { id: ref.id, woNumber: wo.woNumber };
+}
+// A Blow Mold shift starts on the line's one product (the plant's Products list gives it only Gallon Jug).
+async function onlyProduct(tx, db, operationId, line, run, stamp) {
+  if (P.lineKind(line.name) !== 'BLOWMOLD' || run.product) return;
+  const snap = await tx.get(db.collection('plantProducts').doc(docId(operationId)));
+  const targets = P.targetsFor(snap.exists ? snap.data().products : []);
+  if (targets.length !== 1) return;
+  run.product = targets[0].name; run.sku = text(targets[0].sku);
+  run.runs.push({ product: run.product, sku: run.sku, from: stamp, by: 'only product' });
+}
 async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const line = await lineOf(tx, db, req.operationId, SaveError);
   const ref = db.collection('productionRuns').doc(docId(P.runId(req.operationId, req.shift.key))), had = await tx.get(ref);
@@ -123,10 +165,28 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
   const run = before ? JSON.parse(JSON.stringify(before)) : { operationId: req.operationId, line: line.name, facilityId: line.facilityId, shiftKey: req.shift.key, shiftName: req.shift.name,
     date: req.shift.date, shiftStart: req.shift.start, shiftEnd: req.shift.end, product: '', sku: '', count: 0, counts: [], runs: [], stops: [], createdAt: stamp, createdBy: email };
   ['counts', 'runs', 'stops', 'changeovers', 'cips', 'crew', 'diverts'].forEach(k => { if (!Array.isArray(run[k])) run[k] = []; });
+  // Joe 10/14: the Blow Mold makes only gallon jugs, so its one product runs from the shift's first entry without a pick.
+  if (!before && req.op !== 'product') await onlyProduct(tx, db, req.operationId, line, run, stamp);
   if (!run.waste || typeof run.waste !== 'object') run.waste = {};
   if (!run.checks || typeof run.checks !== 'object') run.checks = {};
   const lineRef = db.collection('productionLines').doc(docId(req.operationId));
   let lineSet = null;
+  // Joe 10/14: one weight record. The Blow Mold's heads and a filler's filled jugs are also the Quality screen's check (weightjoin.js);
+  // what that needs is read here, before anything is written.
+  const get = (r) => tx.get(r), kind = P.lineKind(line.name);
+  if (!Array.isArray(run.fills)) run.fills = [];
+  let headPlan = null, fillPlan = null, fillCtx = null;
+  if (req.op === 'check' && kind === 'BLOWMOLD' && W.HEADS.indexOf(req.field) >= 0) headPlan = await W.planHeads(get, db, run, req.slot, stamp);
+  if (req.op === 'fill') {
+    if (!P.hasFill(line.name)) throw new SaveError('BAD_REQUEST', line.name + ' has no fill weight check.');
+    if (req.index !== null && !run.fills[req.index]) throw new SaveError('NOT_FOUND', 'That fill weight check is not on this shift.');
+    if (req.index !== null && Date.parse(stamp) - Date.parse(run.fills[req.index].at) >= 12 * 3600000) throw new SaveError('CONFLICT', 'That fill weight check is too old to change. Start a new one.');
+    if (req.index === null) {
+      if (run.fills.length >= P.LIMITS.FILLS) throw new SaveError('BAD_REQUEST', 'This shift has too many fill weight checks to keep.');
+      fillCtx = await W.fillContext(get, db, line, req.operationId, run.product, Date.parse(stamp));
+    }
+    if (W.fillToQuality(line.name)) fillPlan = await W.planFill(get, db, run, req.index === null ? null : run.fills[req.index], req.index === null ? run.fills.length : req.index, stamp);
+  }
   const open = run.stops.filter(s => !s.end)[0] || null;
   let message = line.name + ' saved.';
   if (req.op === 'product') {
@@ -193,6 +253,24 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
     got.by = email; got.at = stamp;
     run.checks[k] = got;
     message = line.name + ': check saved.';
+    if (headPlan) {
+      const heads = W.headsOf(got), q = W.qualityWrite(headPlan, line, run, heads, W.HEADS, email, stamp);
+      W.writeQuality(tx, db, q);
+      got.qualityId = q.id;
+      lineSet = { headsLast: W.headsLast(heads, stamp) };
+    }
+  } else if (req.op === 'fill') {
+    let f = req.index === null ? null : run.fills[req.index];
+    if (!f) { f = W.newFill(fillCtx, run, email, stamp); run.fills.push(f); }
+    if (req.value === null) delete f[req.field]; else f[req.field] = req.value;
+    f.editedAt = stamp; f.editedBy = email;
+    if (fillPlan) {
+      const q = W.qualityWrite(fillPlan, line, run, { result: W.jugsText(f) }, ['result'], email, stamp);
+      W.writeQuality(tx, db, q);
+      f.qualityId = q.id;
+    }
+    const o = P.fillOf(f), j = o.jugs[Number(req.field.slice(3)) - 1];
+    message = line.name + ': ' + P.fillWords(line.name).one + ' ' + req.field.slice(3) + (req.value === null ? ' cleared.' : ' ' + req.value + ' g' + (j.net !== null ? ', ' + j.net + ' g of product' : '') + (j.flag ? ' (' + j.flag + ')' : '') + '.');
   } else if (req.op === 'crew') {
     const c = run.crew.filter(x => x.name.toUpperCase() === req.name.toUpperCase())[0];
     if (c) { c.on = req.on; c.at = stamp; c.by = email; } else {
@@ -233,6 +311,11 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
     if (!s) throw new SaveError('NOT_FOUND', 'That stop is not on this shift.');
     s.reason = req.reason; s.reasonBy = email;
     message = line.name + ' stop: ' + req.reason + '.';
+    if (req.reason === MAINT_REASON && !s.workOrderId) {
+      const wo = await stopWorkOrder(tx, db, req, line, run, s, email, stamp);
+      s.workOrderId = wo.id; s.woNumber = wo.woNumber;
+      message = line.name + ': work order ' + wo.woNumber + ' sent to maintenance.';
+    }
   }
   if (lineSet) tx.set(lineRef, Object.assign({ operationId: req.operationId, line: line.name, facilityId: line.facilityId, updatedAt: stamp, updatedBy: email }, lineSet), { merge: true });
   if (req.op === 'next') {
@@ -262,26 +345,43 @@ async function saveLineCounter(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
+// Line Targets' setup boxes (Joe 10/14): changeover standard, hours between CIP washes, and the Blow Mold's jug weight range.
+// Joe 10/14: and each filler's fill weight check: how often (fillEvery MINUTES / JUGS / CHANGE, fillEveryN), the empty jug and cap
+// in grams, and how far under or over the product's target fill weight is flagged.
+// Joe 10/14: and a packing line's feeders (fedBy, the lines whose jugs it boxes) and how many jugs go in each box (perBox).
+const SETUP_KEYS = ['changeoverMin', 'cipHours', 'jugWeightTarget', 'jugWeightLow', 'jugWeightHigh', 'fillEvery', 'fillEveryN', 'tareGrams', 'capGrams', 'fillUnder', 'fillOver', 'fedBy', 'perBox'];
 function validateLineSetup(input, SaveError) {
   const out = { operationId: lineId(input.operationId, SaveError) };
-  [['changeoverMin', 'Changeover standard minutes', 600], ['cipHours', 'Hours between CIP washes', 72]].forEach(([k, label, max]) => {
+  [['changeoverMin', 'Changeover standard minutes', 600], ['cipHours', 'Hours between CIP washes', 72], ['jugWeightTarget', 'Jug weight target grams', 500], ['jugWeightLow', 'Lowest jug weight grams', 500], ['jugWeightHigh', 'Highest jug weight grams', 500],
+    ['fillEveryN', 'How often', 100000], ['tareGrams', 'Empty jug weight grams', 2000], ['capGrams', 'Cap weight grams', 200], ['fillUnder', 'Light below target by grams', 1000], ['fillOver', 'Heavy above target by grams', 1000], ['perBox', 'Jugs in each box', 1000]].forEach(([k, label, max]) => {
     if (!(k in input)) return;
     const v = text(input[k]), n = Number(v);
     if (v !== '' && (!isFinite(n) || n < 0 || n > max)) throw new SaveError('BAD_REQUEST', label + ' must be a number from 0 to ' + max + '.');
     out[k] = v === '' ? null : n;
   });
-  if (!('changeoverMin' in out) && !('cipHours' in out)) throw new SaveError('BAD_REQUEST', 'Nothing to save.');
+  if ('fillEvery' in input) {
+    const v = text(input.fillEvery).toUpperCase();
+    if (v && !P.FILL_MODES.some(m => m[0] === v)) throw new SaveError('BAD_REQUEST', 'Pick how often the fill weight check is due.');
+    out.fillEvery = v || null;
+  }
+  if ('fedBy' in input) {
+    if (!Array.isArray(input.fedBy) || input.fedBy.length > 12) throw new SaveError('BAD_REQUEST', 'Pick up to 12 lines that feed this line.');
+    const ids = input.fedBy.map(v => lineId(v, SaveError));
+    if (ids.indexOf(out.operationId) >= 0) throw new SaveError('BAD_REQUEST', 'A line cannot feed itself.');
+    out.fedBy = ids.filter((v, i) => ids.indexOf(v) === i);
+  }
+  if (Object.keys(out).length < 2) throw new SaveError('BAD_REQUEST', 'Nothing to save.');
   return out;
 }
 async function saveLineSetup(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const line = await lineOf(tx, db, req.operationId, SaveError);
   const ref = db.collection('productionLines').doc(docId(req.operationId)), had = await tx.get(ref), before = had.exists ? had.data() : {};
   const set = { operationId: req.operationId, line: line.name, facilityId: line.facilityId, updatedAt: stamp, updatedBy: email };
-  ['changeoverMin', 'cipHours'].forEach(k => { if (k in req) set[k] = req[k]; });
+  SETUP_KEYS.forEach(k => { if (k in req) set[k] = req[k]; });
   tx.set(ref, set, { merge: true });
   const result = { ok: true, requestId: req.requestId, operationId: req.operationId, message: line.name + ' saved.' };
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, before: { changeoverMin: before.changeoverMin === undefined ? null : before.changeoverMin, cipHours: before.cipHours === undefined ? null : before.cipHours }, after: set, result });
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, operationId: req.operationId, before: Object.fromEntries(SETUP_KEYS.filter(k => k in req).map(k => [k, before[k] === undefined ? null : before[k]])), after: set, result });
   return result;
 }
 
-module.exports = { validateLineEntry, saveLineEntry, validateLineCounter, saveLineCounter, validateLineSetup, saveLineSetup };
+module.exports = { onlyProduct, validateLineEntry, saveLineEntry, validateLineCounter, saveLineCounter, validateLineSetup, saveLineSetup };
